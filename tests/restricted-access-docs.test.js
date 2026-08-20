@@ -50,6 +50,8 @@ const CATALOG = "docs/reference/skill-catalog.md";
 const DOCS_INDEX = "docs/README.md";
 const CONCEPTS_INDEX = "docs/concepts/README.md";
 const RUNBOOKS_INDEX = "docs/runbooks/README.md";
+const FIRST_WEEK = "docs/runbooks/first-week.md";
+const FIRST_WEEK_DAY1 = "docs/runbooks/first-week/day-1-tasks.md";
 const SKILL = "skills/tracker-reconcile/SKILL.md";
 
 const VOCABULARY = [
@@ -141,6 +143,33 @@ test("new pages are reachable from the docs indexes", () => {
   assert.ok(exists(CONCEPT));
   assert.ok(exists(DECISION));
   assert.ok(exists(RUNBOOK));
+});
+
+test("first-week onboarding signposts restricted access", () => {
+  // The First-Week runbook is step 4 of the root README's Learning Path and
+  // silently assumed `access: full` for a full task cycle after the
+  // restricted-access layer shipped — a newcomer without a write token hit an
+  // unexplained wall mid-week. The index-reachability test above stayed green
+  // throughout, because the gap was an omission in a walkthrough, not a
+  // missing index entry. This asserts the signpost exists at both surfaces a
+  // Day-1 reader actually opens.
+  const index = read(FIRST_WEEK);
+  const day1 = read(FIRST_WEEK_DAY1);
+  assert.match(
+    index,
+    /restricted-access\.md/,
+    `${FIRST_WEEK} must link the restricted-access concept before Day 1`,
+  );
+  assert.match(
+    index,
+    /which-access\.md/,
+    `${FIRST_WEEK} must link the access-model decision guide`,
+  );
+  assert.match(
+    day1,
+    /restricted-access\.md/,
+    `${FIRST_WEEK_DAY1} prerequisites must name the tracker-access decision`,
+  );
 });
 
 test("tracker-reconcile is registered honestly", () => {
@@ -267,4 +296,62 @@ test("concept and decision pages include a mermaid diagram", () => {
   assert.match(read(CONCEPT), /```mermaid/);
   assert.match(read(DECISION), /```mermaid/);
   assert.match(read(RUNBOOK), /```mermaid/);
+});
+
+test("the accept gap is a DECISION: finalise accepts locally AND records the debt — both, or red", () => {
+  // task.57 pinned this deliberately so a future reader cannot quietly "fix"
+  // the accept gap into a halt. finalise writes `status: accepted` under every
+  // access mode; the restricted modes additionally record the debt loudly.
+  // Weakening EITHER half — refusing to accept, or accepting silently — must
+  // fail here.
+  const step7 = read("shared/resources/develop-pipeline-step-7-finalise.md");
+  assert.match(
+    step7,
+    /writes `status: accepted` and moves on, \*\*by design\*\*/,
+    "step-7 must state that finalise accepts locally under restricted modes — " +
+      "the accept gap is a decision, not a bug to halt on",
+  );
+  assert.match(
+    step7,
+    /\*\*Tracker debt:?\*\*/,
+    "the debt line must be specified",
+  );
+  assert.match(step7, /## Tracker Actions Required/);
+  assert.match(
+    step7,
+    /both-or-red|never one without the other/,
+    "the both-or-red coupling must be stated on the checklist item",
+  );
+  assert.doesNotMatch(
+    step7,
+    /do not write `status: accepted` under|refuse to accept under/i,
+    "the accept gap must never be re-read as a reason to withhold acceptance",
+  );
+
+  // The two standing-rule amendments that stop the deferral being read as the
+  // prohibited Step 7 skip.
+  const anti = read("docs/reference/anti-patterns.md");
+  assert.match(
+    anti,
+    /restricted-access deferral is not this skip/i,
+    "anti-patterns.md must carry the amendment paragraph",
+  );
+  assert.match(anti, /tracker-reconcile/);
+  const faq = read("docs/reference/faq.md");
+  assert.match(
+    faq,
+    /deferred, not skipped/i,
+    "faq.md must carry the amendment paragraph",
+  );
+
+  // And the report templates carry the debt line, so a restricted run's
+  // Completion block cannot read "Completed" with the gap unstated.
+  const step0 = read(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  const debtLines = step0.match(/\*\*Tracker debt\*\*/g) || [];
+  assert.ok(
+    debtLines.length >= 2,
+    "both implementation-report templates must carry the Tracker debt line",
+  );
 });

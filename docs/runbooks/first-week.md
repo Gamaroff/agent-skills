@@ -20,6 +20,14 @@ If this is your first time using agent-skills, read the quickstarts first:
 
 They cover the core concepts (task pipeline, story pipeline, Phase 0 prompts) you will need before Day 1.
 
+> **No tracker write token for the agent?** These walkthroughs assume `access: full` — the default,
+> where the agent moves the board itself. If your org won't let the locally running agent write to
+> Jira or GitHub Issues, read [Restricted tracker access](../concepts/restricted-access.md) before
+> Day 1 and pick a model with [Which access model?](../concepts/which-access.md). Every day still
+> completes under a restricted model — but board moves and issue writes land in a committed
+> **handover checklist** instead of on the board, so end each day by working the checklist (or
+> running `/tracker-reconcile`) rather than waiting for cards that will not move on their own.
+
 ## The week at a glance
 
 | Day | What you do | Done when… |

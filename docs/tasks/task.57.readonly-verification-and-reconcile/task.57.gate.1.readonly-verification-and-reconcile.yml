@@ -1,0 +1,134 @@
+schema: 1
+task: 'task.57.readonly-verification-and-reconcile'
+task_title: '[Task 57] Read-only verification, and /tracker-reconcile so the checklist is a ledger rather than a receipt'
+gate: FAIL
+status_reason: >-
+  Implementation and tests are strong (1643 green, mutation-proven), but the diff code review
+  found one high-severity integration defect: the Step 7 accept-gap commands invoke
+  references/handover-{verify,render}.js inside the develop-* skills, where neither engine is
+  bundled — MODULE_NOT_FOUND for every consumer. Seven further medium/low bugs gate as CONCERNS
+  behind it (code_review_blocking=true).
+reviewer: 'QA Engineer'
+updated: '2026-08-20T07:20:00Z'
+
+top_issues:
+  - id: CR-1
+    severity: high
+    finding: >-
+      develop-pipeline-step-7-finalise.md invokes .agents/skills/{develop-*}/references/
+      handover-verify.js and handover-render.js, but neither file is bundled into those skills'
+      references/ — the documented accept-gap step fails with MODULE_NOT_FOUND for every consumer.
+    suggested_action: >-
+      Reference the engines as shared/resources paths from the develop-* pipeline docs so the
+      bundler copies them (verify with npm run bundle + ls skills/develop-task/references/).
+    suggested_owner: dev
+  - id: CR-2
+    severity: medium
+    finding: >-
+      handover-verify.js verifyRecords never clears satisfied on a record whose later read finds
+      pending/divergent — partition tests r.satisfied first, so a revoked tick renders ticked and
+      divergence is swallowed on the second reconcile.
+    suggested_action: Set annotated.satisfied from the fresh verification state each pass.
+    suggested_owner: dev
+  - id: CR-3
+    severity: medium
+    finding: >-
+      tracker-reconcile applyRecords guards irreversible actions with `confirm && !confirm(rec)`
+      but no default confirm exists, so --apply on a tty executes irreversible actions with no
+      confirmation — contradicting SKILL.md and the function's own doc comment.
+    suggested_action: >-
+      Provide a real tty confirmation by default and skip irreversible records whenever no
+      confirmation mechanism is available; add the tty-present test.
+    suggested_owner: dev
+  - id: CR-4
+    severity: medium
+    finding: >-
+      In the rendered script, a divergent AND irreversible record routes to divergent_step, which
+      under --all calls run_step directly — bypassing the confirm gate the script promises for
+      irreversible actions.
+    suggested_action: Compose the guards — divergent_step must dispatch to confirm_step for irreversible records.
+    suggested_owner: dev
+  - id: CR-5
+    severity: medium
+    finding: >-
+      Step 7's `handover-verify.js --json > /dev/null` discards the annotations (the verify CLI
+      writes nothing), so the documented verification pass is a guaranteed no-op before render.
+    suggested_action: >-
+      Add --verify to handover-render.js (annotate in-process before rendering) and have Step 7
+      use it for credential-holding modes; render unannotated otherwise.
+    suggested_owner: dev
+  - id: CR-6
+    severity: medium
+    finding: >-
+      Step 7 hardcodes --format md --format sh --format json for every access mode, contradicting
+      renderersForMode and committing a script artifact for manual/read-only runs.
+    suggested_action: Derive the format flags from the resolved access mode per the renderersForMode table.
+    suggested_owner: dev
+  - id: CR-7
+    severity: low
+    finding: >-
+      isReadOnlyArgv misses `--field` and `--input` (both make gh api a POST) and does not scan
+      -F values for `mutation` in the graphql branch.
+    suggested_action: Add the missing flags to the refused set and scan -F graphql values; extend the §1 test.
+    suggested_owner: dev
+  - id: CR-8
+    severity: low
+    finding: >-
+      applyRecords' `rec.retry_of === ""` clause is dead per the schema (string | null) and would
+      wrongly skip a retry record if a producer ever emitted "".
+    suggested_action: Delete the clause.
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 1643
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [1, 2, 3, 5]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      Redaction layers intact and re-proven; but CR-7 leaves two mutating gh api shapes
+      (--field/--input) admitted by the read-only allowlist — defence-in-depth gap, no live
+      exploit path in shipped recipes (all recipes build their own argv).
+  performance:
+    status: PASS
+    notes: Pure renderers over ≤ dozens of records; CR-10 quadruple model build is advisory only.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      CR-2 (stale satisfied swallows divergence on re-reconcile) and CR-4 (guard bypass under
+      --all) weaken exactly the invariants the task exists to hold; both have narrow triggers.
+  maintainability:
+    status: PASS
+    notes: >-
+      36 new tests, six invariants mutation-proven red, engines documented in
+      tracker-access-record.md; CR-9/CR-10 cleanups advisory.
+
+recommendations:
+  immediate:
+    - action: Fix CR-1 — bundle handover-verify.js/handover-render.js into develop-story/develop-task/develop-bug references
+      refs: ['shared/resources/develop-pipeline-step-7-finalise.md']
+    - action: Fix CR-2 satisfied-clearing, CR-3 default confirm, CR-4 guard composition, CR-5 --verify wiring, CR-6 per-mode formats
+      refs: ['shared/resources/handover-verify.js', 'skills/tracker-reconcile/scripts/tracker-reconcile.js', 'shared/resources/handover-render.js']
+    - action: Fix CR-7 allowlist gaps and CR-8 dead clause
+      refs: ['shared/resources/handover-verify.js', 'skills/tracker-reconcile/scripts/tracker-reconcile.js']
+  future:
+    - action: 'CR-9: extract an object-aware observed formatter and use it at all four interpolation sites'
+      refs: ['shared/resources/handover-render.js']
+    - action: 'CR-10: build the render model once per sidecar (advisory — the re-redaction per render is deliberate defence-in-depth)'
+      refs: ['skills/tracker-reconcile/scripts/tracker-reconcile.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - CR-1 fixed and proven by ls of develop-* references after npm run bundle
+    - CR-2/CR-3/CR-4 fixed with regression tests

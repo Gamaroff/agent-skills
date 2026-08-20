@@ -68,6 +68,8 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 **Do this instead:** if you genuinely need to skip Step 7, bypass `develop-*` and drive the pipeline manually. The lite flag is not the right tool.
 
+**The restricted-access deferral is not this skip.** Under `access.tracker: read-only | approve | command | manual`, Step 7 still runs in full — but its tracker mutations are **deferred and recorded** in the committed handover artifacts (`*.handover.{n}.{name}.{md,sh,json}`), the implementation report's `## Tracker Actions Required` section, a `**Tracker debt:**` line, and a PR comment. This rule's stated harm is *silent* drift; a deferral with a loud, committed, reviewable record — one a later `/tracker-reconcile` run ticks back against the live board — is the opposite of silent. Do not "fix" a restricted run into performing the mutations anyway, and do not read its deferral as a violation of this rule.
+
 ## Never set story numbers by hand
 
 **Rule:** `create-story` computes the next `{S}` from existing siblings under the parent epic.

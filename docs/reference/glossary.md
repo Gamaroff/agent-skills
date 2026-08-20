@@ -64,9 +64,9 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **retry_of**               | On a deferred-mutation record: this is a *failed* full-access write, not a policy deferral. Rendered in its own handover section. |
 | **UNRECORDED**             | A pipeline moment that should have produced a deferred record and did not. Rendered `⚠️ UNRECORDED` in the handover. |
 | **blocking**               | A deferred record that yields a value nothing else can supply — an issue or milestone number. Rendered `🚫 BLOCKING` at the top of the handover checklist and the inline summary. Ticking it is not enough: perform it, write the value into the document's frontmatter, and re-run (the two-run convergence). |
-| **divergent**              | Planned `/tracker-reconcile` state (task.57, **not shipped**): the live board value is neither the desired value nor the pre-action value. |
-| **unverifiable**           | Planned `/tracker-reconcile` state (task.57, **not shipped**): the read failed, was ambiguous, or the kind has no reliable read. Never coerced to satisfied. |
-| **tracker-reconcile**      | Planned skill `/tracker-reconcile` (task.57, **not shipped**). Re-reads a committed handover against the live board. Until it lands, work the checklist by hand. |
+| **divergent**              | `/tracker-reconcile` verification state: the live board value is neither the desired value nor the pre-action value — someone moved it somewhere else. Rendered `⚠️ observed X, wanted Y`; skipped by `--apply` and by the script unless `--all`. |
+| **unverifiable**           | `/tracker-reconcile` verification state: the read failed, was ambiguous (2+ matches), or the kind has no reliable read. Rendered "cannot verify — check by hand". Never coerced to satisfied. |
+| **tracker-reconcile**      | Skill (`/tracker-reconcile`): re-reads a committed handover against the live board, ticks `satisfied`, flags `divergent`, marks `unverifiable`, sets checklist `status:`. Refuses `--apply` under every non-`full` access mode. |
 | **Packaged skill**         | `.zip` distributable produced by `package_skill.py`. Self-contained: shared resources bundled in.                                                                                             |
 | **Skill catalog**          | Auto-generated index of all skills at [`docs/reference/skill-catalog.md`](./skill-catalog.md). Regenerate with `npm run generate-catalog`.                                                    |
 

@@ -18,6 +18,7 @@ created: 2026-05-13
 - Node ≥ 20 (`node --version`)
 - A working agent CLI (e.g. Claude Code with skills installed). First-time setup: `bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)`
 - A clone of this repo with a clean working tree on `develop`
+- Tracker access decided — this walkthrough assumes `access: full` (the default). If the agent must not hold a tracker write token, read [Restricted tracker access](../../concepts/restricted-access.md) first: the pipeline still completes, but each task ends with a committed handover checklist instead of board moves
 
 ---
 
@@ -45,7 +46,11 @@ Follow the quickstart end-to-end. It walks you through `/create-task` → `/deve
 
 **What you're building:** Add a one-sentence summary to `CONTRIBUTING.md` introducing `docs/concepts/quickstart-task.md`. Something like:
 
-> New contributors: see [Quickstart: your first task](docs/concepts/quickstart-task.md) for a 10-minute end-to-end walkthrough before diving into the pipeline details below.
+```markdown
+New contributors: see [Quickstart: your first task](docs/concepts/quickstart-task.md) for a 10-minute end-to-end walkthrough before diving into the pipeline details below.
+```
+
+(The link is root-relative because it will live in `CONTRIBUTING.md` at the repo root.)
 
 This task is simple and will fly through QA with zero findings. The goal is to run the pipeline a second time with full autonomy.
 

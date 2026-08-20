@@ -65,7 +65,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Sync this story to GitHub" | `sync-github-story` |
 | "Sync this task to GitHub" | `sync-github-task` |
 | "File an issue for this" / "Create a ticket" | `create-issue` (platform auto-detected) |
-| "Reconcile the tracker handover" / "Work the deferred checklist" | `/tracker-reconcile` — **not shipped** (task.57). Until then, open the committed `*.handover.*.md` |
+| "Reconcile the tracker handover" / "Work the deferred checklist" / "Did anyone do the handover actions?" | `tracker-reconcile` |
 
 ## Lifecycle / change management
 

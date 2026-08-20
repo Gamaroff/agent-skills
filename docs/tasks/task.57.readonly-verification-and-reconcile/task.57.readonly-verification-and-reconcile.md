@@ -5,13 +5,15 @@ type: task
 description: 'Turns a one-shot handover into a loop that converges. Adds the read-only verification pass — read current state, tick what is already satisfied, flag what someone moved somewhere else — and /tracker-reconcile, which re-reads a committed handover days later and reports or applies what is outstanding. Reconcile refuses --apply under read-only, command and manual, because a reconcile that quietly applies under manual makes manual meaningless. Also lands the approve model and makes the accept gap loud in the implementation report and on the PR.'
 tags: [restricted-access, verification, reconcile, skill]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-20
+completed_date: 2026-08-20
 estimated_effort_hours: 12
 github_issue: 235
+pr_number: 269
 ---
 
 # [Task 57] Read-only verification, and `/tracker-reconcile` so the checklist is a ledger rather than a receipt
@@ -19,6 +21,10 @@ github_issue: 235
 **Task File**: [task.57.readonly-verification-and-reconcile.md](./task.57.readonly-verification-and-reconcile.md)
 
 **GitHub Issue**: [#235](https://github.com/Gamaroff/agent-skills/issues/235)
+
+**Status**: Accepted
+
+**Review**: ✅ All review recommendations from `task.57.review.1.readonly-verification-and-reconcile.md` implemented 2026-08-20
 
 ## Overview
 
@@ -45,6 +51,32 @@ human, possibly on a different branch, with no work item in flight.
 
 It holds a credential. That turns "do these six things" into "these two are still outstanding",
 which is the difference between a checklist people use and one they skip.
+
+## Technical Background
+
+### Current
+
+`handover-render.js` renders the committed checklist from `.claude/state/tracker-actions.jsonl`
+write-once, at handover time: it knows `satisfied` (recorded as executed), outstanding, and failures,
+but performs no reads against the tracker. Once committed, the checklist never changes — it is a
+receipt of what the run wanted, not a ledger of what has since happened. Nothing in the repo can
+answer "did someone already do this?" after the fact: `finalise` writes `status: accepted` and moves
+on, and the accept gap (board not yet caught up) is invisible unless a human remembers to look.
+
+The reads this task needs already exist as primitives: `gh-stage.js --probe-board` (board kinds),
+`jira-stage.js --print-plan` (transition targets), the `sync-jira-* --check-card` offline preflight,
+the comment idempotency marker from [task.55](../task.55.tracker-comment-cli/task.55.tracker-comment-cli.md),
+and `git ls-remote` for push verification.
+
+### Target
+
+A verification pass (`shared/resources/handover-verify.js`) reads current tracker state per action
+kind and derives one of four states — `satisfied` / `pending` / `divergent` / `unverifiable` — which
+the renderer displays as ticks, strike-throughs, and divergence warnings without ever deleting items.
+A new `/tracker-reconcile` skill re-runs that pass against a committed handover days later, rewrites
+the checklist boxes in place, updates the sidecar, and (only under `access: full`, only with
+`--apply`) executes what is still outstanding. The `approve` model batches one confirmation at
+handover; the accept gap becomes loud in the implementation report and on the PR.
 
 ## Decisions
 
@@ -110,11 +142,21 @@ is `unverifiable`.
 | File | Change |
 | ---- | ------ |
 | `skills/tracker-reconcile/SKILL.md` | **new** skill |
-| `shared/resources/handover-render.js` | states, ticks, divergence |
-| `shared/resources/handover-verify.js` | **new** — the read pass |
-| `shared/resources/develop-pipeline-step-7-finalise.md` | accept-gap reporting |
+| `skills/tracker-reconcile/scripts/tracker-reconcile.js` | **new** — the reconcile CLI (refusal, tick-back, apply) |
+| `skills/tracker-reconcile/tests/tracker-reconcile.test.js` | **new** — 16 tests incl. the refusal matrix |
+| `shared/resources/handover-render.js` | four states, ticks/strike-through, divergence guard, `renderersForMode` |
+| `shared/resources/handover-verify.js` | **new** — the read pass, recipes, state derivation, read-only allowlist |
+| `shared/resources/tests/handover-verify.test.mjs` | **new** — 19 tests incl. the throwing-stub no-mutation proof |
+| `shared/resources/tracker-access-record.md` | `verification` field documented; `observed` = pre-action baseline |
+| `shared/resources/develop-pipeline-step-7-finalise.md` | accept-gap reporting + `approve` handover prose + checklist item |
+| `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` | `**Tracker debt:**` line in both report templates |
 | `docs/reference/anti-patterns.md`, `docs/reference/faq.md` | amend the Step 7 rule |
-| `docs/reference/skill-catalog.md` | regenerate |
+| `docs/reference/{commands,activation-phrases,troubleshooting,glossary}.md` | "not shipped" claims flipped to live behaviour |
+| `docs/concepts/{restricted-access,which-access}.md`, `docs/runbooks/restricted-access.md` | approve + reconcile now described as shipped |
+| `tests/restricted-access-docs.test.js` | accept-gap decision pinned (both-or-red) |
+| `package.json` | `skills/tracker-reconcile/tests/*.test.js` added to the test glob |
+| `docs/reference/skill-catalog.md` | regenerated |
+| `CHANGELOG.md` | Unreleased entry |
 
 ## Testing Strategy
 
@@ -142,16 +184,16 @@ reader cannot quietly "fix" it into a halt.
 
 ## Success Criteria
 
-- [ ] `read-only` performs no mutation, proven against a throwing stub
-- [ ] Four states derived correctly; `unverifiable` never coerced to `satisfied`
-- [ ] Satisfied actions ticked, not deleted; item count always equals record count
-- [ ] `/tracker-reconcile` ticks back into the committed checklist and updates the sidecar
-- [ ] `--apply` refused under every non-`full` model, naming the blocker
-- [ ] Reconcile is idempotent
-- [ ] Change Log rows only for executed actions
-- [ ] `finalise` still accepts locally **and** records the debt loudly
-- [ ] The anti-patterns and FAQ entries amended so the mode is not read as a violation
-- [ ] Every invariant watched failing; `npm test`, `validate:all` green; catalog regenerated; bundled
+- [x] `read-only` performs no mutation, proven against a throwing stub
+- [x] Four states derived correctly; `unverifiable` never coerced to `satisfied`
+- [x] Satisfied actions ticked, not deleted; item count always equals record count
+- [x] `/tracker-reconcile` ticks back into the committed checklist and updates the sidecar
+- [x] `--apply` refused under every non-`full` model, naming the blocker
+- [x] Reconcile is idempotent
+- [x] Change Log rows only for executed actions
+- [x] `finalise` still accepts locally **and** records the debt loudly
+- [x] The anti-patterns and FAQ entries amended so the mode is not read as a violation
+- [x] Every invariant watched failing; `npm test`, `validate:all` green; catalog regenerated; bundled
 
 ## Risk Assessment
 
@@ -168,6 +210,98 @@ reader cannot quietly "fix" it into a halt.
 
 `git revert <sha>` then `npm run bundle` and regenerate the catalog. Handover artifacts from earlier
 tasks remain valid and readable; only the tick-back loop is lost.
+
+## Progress Tracking
+
+- [x] 1. Verification recipes per kind; the read pass; state derivation (`handover-verify.js`)
+- [x] 2. Renderer changes — ticks, strike-through, divergence warning, state counts
+- [x] 3. `skills/tracker-reconcile/` — check-only default, in-place tick-back, frontmatter `status:`
+- [x] 4. `approve` — batched confirmation; non-TTY degrades to `command`
+- [x] 5. Accept gap made loud — report section, `**Tracker debt:**` line, PR comment
+- [x] 6. Amend the standing rule — `anti-patterns.md` and `faq.md`
+- [x] 7. Tests, docs, catalog regeneration, `npm run bundle`
+
+## QA Testing Results
+
+**QA Status**: PASS (cycle 3)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-20
+**Quality Score**: 92/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.57.qa.3.readonly-verification-and-reconcile.md](./task.57.qa.3.readonly-verification-and-reconcile.md) (cycles 1–2: [qa.1](./task.57.qa.1.readonly-verification-and-reconcile.md), [qa.2](./task.57.qa.2.readonly-verification-and-reconcile.md))
+- **Gate File**: [task.57.gate.3.readonly-verification-and-reconcile.yml](./task.57.gate.3.readonly-verification-and-reconcile.yml) (cycles 1–2: [gate.1](./task.57.gate.1.readonly-verification-and-reconcile.yml), [gate.2](./task.57.gate.2.readonly-verification-and-reconcile.yml))
+
+### Test Coverage Summary
+- **Tests Executed**: 1653 (fresh full run, all green; 46 new across the task)
+- **Phases Verified**: 7/7
+- **Critical Issues**: 0 remaining (19 findings closed across 3 QA cycles)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Three-cycle QA loop with blocking code review: cycle 1 found 8 bugs (highest: step-7 engines not bundled — MODULE_NOT_FOUND for consumers); cycle 2's adversarial pass over the fixes found 3 HIGH defects the fixes introduced (wrong-extension artifacts, tick revoked on silence, ttyConfirm injection); cycle 3 found 4 coherence defects, fixed in-cycle. Final gate PASS 92/100, deployment APPROVED. 10 named mutations proven red across the run.
+
+## Implementation Notes
+
+**Completed**: 2026-08-20 · **Tests**: 36 new (19 `handover-verify.test.mjs` + 16 `tracker-reconcile.test.js` + 1 accept-gap pin), 1643 total green · `validate:all` 116/116 · catalog regenerated · bundled.
+
+### Approach
+
+- **The pre-action baseline lives in the record itself.** `divergent` needs three values — desired, observed, and where the card started — but deferred records carry no `from`. The first verification pass that reads a non-desired value stores it as the baseline (in `observed` / `verification.baseline`); a later pass reading a third value can then say `divergent` instead of guessing. Handover-time verification is therefore what arms divergence detection for reconcile-time.
+- **The no-mutation invariant is enforced twice**: `handover-verify.js` checks every argv against a read-only allowlist before exec (fail-closed → `unverifiable`), and the suite drives the pass with a stub that throws on any mutating shape — so weakening either layer goes red.
+- **Idempotence is annotation retention, not clock discipline**: a re-read that agrees with the stored `verification` keeps it verbatim (timestamp included), and the checklist frontmatter's `updated:` derives from annotations, not the clock. Reconcile twice → byte-identical, proven.
+- **The refusal covers `approve` too** — the Decisions table names read-only/command/manual, but the Success Criteria's "every non-`full` model" governs: under `approve` the human consents at handover via the batched prompt, not via a reconcile side door.
+- **`renderersForMode(mode, {tty})`** in `handover-render.js` is where "approve without a tty degrades to `command`" is a testable function rather than prose.
+- The `verification` field is an additive, optional record field — documented in `tracker-access-record.md`; schema `v` stays 1.
+
+### What the work found that the plan did not predict
+
+- `jira.backlog.add` and `jira.sprint.move-issues` have no reliable read (no board id in the record; no stable "which sprint now" answer days later), so they resolve `unverifiable` rather than getting recipes that guess.
+- The reconcile CLI re-renders the `.sh` only where one already exists — re-creating it on a `manual` handover would widen that mode's renderer selection after the fact.
+
+### Mutation-prove log (all red, then restored green)
+
+ambiguous→satisfied coercion (7 red) · refusal dropped under `manual` (13 red) · satisfied records deleted (5 red) · Change Log row on observation (7 red) · divergent auto-applied (3 red) · finalise re-read as a halt (3 red).
+
+## Change Log
+
+| Date | Version | Description | Author |
+| ---- | ------- | ----------- | ------ |
+| 2026-08-17 | 1.0 | Initial draft | create-task |
+| 2026-08-20 | 1.1 | Review (9/10) — no critical findings; Technical Background, Progress Tracking and Change Log sections added; body Status line added | review-task |
+| 2026-08-20 |  | Status → ready-for-development | review-task |
+| 2026-08-20 |  | Implemented — 20+ files, 36 new tests (1643 total green); all mutations proven red | develop |
+| 2026-08-20 |  | QA gate FAIL (40/100) — 1 high, 5 medium, 2 low from blocking code review | qa-task |
+| 2026-08-20 |  | QA cycle 2 gate FAIL (40/100) — cycle-1 fixes verified; 3 high defects introduced by the fixes (wrong-extension artifacts, tick revoked on unverifiable read, ttyConfirm injection) | qa-task |
+| 2026-08-20 |  | QA cycle 3 gate PASS (92/100) — cycle-2 fixes verified; 4 coherence findings fixed in-cycle | qa-task |
+| 2026-08-20 |  | QA findings fixed — gate PASS (92/100), 3 iterations, 19 defects closed | qa-fix |
+| 2026-08-20 | 1.2 | DoD passed — accepted (PR #269) | finalise |
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.57.qa.1/2/3.readonly-verification-and-reconcile.md`
+**Gate Files**: `task.57.gate.1/2/3.readonly-verification-and-reconcile.yml`
+**Final Gate Status**: ✅ PASS · **Quality Score**: 92/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10 — every criterion traced to implementation AND a test running in the npm-test lane
+✅ **Tests:** 46 new tests across the task; full suite 1653 pass / 0 fail; 10 named mutations proven red
+✅ **CI:** SUCCESS on final head `e193e27` (Test, Validate Skills, Docs link check, Branch Policy)
+✅ **PR:** #269 (open, pending merge — no human review decision; autonomous pipeline)
+✅ **Documentation:** CHANGELOG, SKILL.md, catalog, six reference/concept docs flipped live, schema doc, both standing-rule amendments — all pinned or cited
+✅ **Security Review:** PASS — read-only gate proven by throwing stub; injection closed with hostile-intent regression test; redaction intact on all render paths
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal developer tooling; credential-hygiene checks all PASS
+✅ **Tracker debt:** none — journal empty; no deferred actions this run
+
+**Task marked as ACCEPTED on:** 2026-08-20
+
+**Detailed Verification Log:** See `task.57.dod.1.readonly-verification-and-reconcile.md` for complete verification evidence.
 
 ## References
 

@@ -220,12 +220,34 @@ function partition(sorted) {
   const outstanding = [];
   const satisfied = [];
   const failures = [];
+  // task.57's verification pass subdivides `outstanding` by what a read of the
+  // live tracker showed. The three sub-lists PARTITION `outstanding` exactly:
+  // pending + divergent + unverifiable === outstanding, and
+  // outstanding + satisfied + failures === all. Item count always equals
+  // record count — a satisfied action is ticked, never deleted.
+  const pending = [];
+  const divergent = [];
+  const unverifiable = [];
   for (const r of sorted) {
-    if (r.satisfied === true) satisfied.push(r);
+    const vstate = r.verification && r.verification.state;
+    if (r.satisfied === true || vstate === "satisfied") satisfied.push(r);
     else if (r.retry_of) failures.push(r);
-    else outstanding.push(r);
+    else {
+      outstanding.push(r);
+      if (vstate === "divergent") divergent.push(r);
+      else if (vstate === "unverifiable") unverifiable.push(r);
+      else pending.push(r);
+    }
   }
-  return { outstanding, satisfied, failures };
+  return { outstanding, satisfied, failures, pending, divergent, unverifiable };
+}
+
+/** The verification state of a record, as the renderers read it. */
+function verificationState(rec) {
+  if (rec.satisfied === true) return "satisfied";
+  const v = rec.verification && rec.verification.state;
+  if (v === "satisfied" || v === "divergent" || v === "unverifiable") return v;
+  return "pending";
 }
 
 /** Group records by system, preserving within-group order. */
@@ -249,7 +271,8 @@ function groupBySystem(records) {
 function buildModel(records, ctx = {}) {
   const deduped = dedupe(records || []);
   const { sorted, warnings } = topoSort(deduped);
-  const { outstanding, satisfied, failures } = partition(sorted);
+  const { outstanding, satisfied, failures, pending, divergent, unverifiable } =
+    partition(sorted);
 
   // A moment the run was expected to record but did not. Rendering nothing here
   // is what makes drift invisible, so it is rendered loudly instead.
@@ -277,6 +300,9 @@ function buildModel(records, ctx = {}) {
     outstanding,
     satisfied,
     failures,
+    pending,
+    divergent,
+    unverifiable,
     unrecorded,
     blocking,
     warnings: warnings.concat(ctx.warnings || []),
@@ -286,6 +312,9 @@ function buildModel(records, ctx = {}) {
       outstanding: outstanding.length,
       satisfied: satisfied.length,
       failures: failures.length,
+      pending: pending.length,
+      divergent: divergent.length,
+      unverifiable: unverifiable.length,
       unrecorded: unrecorded.length,
       blocking: blocking.length,
     },
@@ -349,6 +378,16 @@ function describeDesired(rec) {
   return parts.join(", ");
 }
 
+/**
+ * Render an observed value for display. Object observations JSON-stringify
+ * rather than degrading to "[object Object]" — one helper for every
+ * interpolation site so the four formats cannot disagree.
+ */
+function formatObserved(v) {
+  if (v === undefined || v === null) return "";
+  return typeof v === "object" ? JSON.stringify(v) : String(v);
+}
+
 /** One-line headline shared by md and summary, so the two cannot disagree. */
 function headline(rec) {
   const { verb, noun } = presentationFor(rec.kind);
@@ -379,6 +418,10 @@ function renderMarkdown(model) {
   L.push(`| Outstanding | ${model.counts.outstanding} |`);
   if (model.counts.blocking)
     L.push(`| **Blocking** | **${model.counts.blocking}** |`);
+  if (model.counts.divergent)
+    L.push(`| **⚠️ Divergent** | **${model.counts.divergent}** |`);
+  if (model.counts.unverifiable)
+    L.push(`| Unverifiable | ${model.counts.unverifiable} |`);
   if (model.counts.failures)
     L.push(`| Failed (full access) | ${model.counts.failures} |`);
   if (model.counts.satisfied)
@@ -489,8 +532,29 @@ function renderMarkdown(model) {
         "— nothing to do.</summary>",
     );
     L.push("");
+    // Ticked and struck through, never deleted: deleting a satisfied item
+    // would make the checklist lie about what the run wanted, and the item
+    // count stops equalling the record count — the drift this exists to show.
+    //
+    // A RETAINED tick — `satisfied` carried forward past a read that produced
+    // no evidence — says so explicitly. Folding it into the freshly-verified
+    // wording would assert a verification that demonstrably did not happen.
     for (const rec of model.satisfied) {
-      L.push(`- ✅ ${headline(rec)} — \`${rec.kind}\` (\`${rec.id}\`)`);
+      const v = rec.verification || {};
+      if (v.state && v.state !== "satisfied") {
+        L.push(
+          `- [x] ~~${headline(rec)}~~ — ticked previously; this pass could not ` +
+            `confirm (${v.detail || v.state}) — \`${rec.kind}\` (\`${rec.id}\`)`,
+        );
+        continue;
+      }
+      const observed = formatObserved(v.observed)
+        ? ` — observed \`${formatObserved(v.observed)}\``
+        : "";
+      const when = v.at ? ` at ${v.at}` : "";
+      L.push(
+        `- [x] ~~${headline(rec)}~~${observed}${when} — \`${rec.kind}\` (\`${rec.id}\`)`,
+      );
     }
     L.push("");
     L.push("</details>");
@@ -533,6 +597,25 @@ function markdownItem(rec, model, depth, seen) {
   seen.add(rec.id);
 
   L.push(`${pad}- [ ] **${headline(rec)}**`);
+  // The verification pass's verdict, when one exists. `divergent` and
+  // `unverifiable` render loudly and UNTICKED: the first because someone moved
+  // the card somewhere neither the plan nor its starting point expected, the
+  // second because on ambiguity this file does not guess.
+  const vstate = verificationState(rec);
+  if (vstate === "divergent") {
+    const v = rec.verification || {};
+    const wanted = describeDesired(rec) || "the recorded desired state";
+    L.push(
+      `${pad}  - ⚠️ **DIVERGENT** — observed \`${formatObserved(v.observed)}\`, wanted \`${wanted}\`` +
+        (v.at ? ` (read ${v.at})` : "") +
+        ". Someone moved this somewhere else — resolve by hand before applying.",
+    );
+  } else if (vstate === "unverifiable") {
+    const v = rec.verification || {};
+    L.push(
+      `${pad}  - ❓ cannot verify — check by hand${v.detail ? ` (${v.detail})` : ""}`,
+    );
+  }
   L.push(`${pad}  - ${rec.intent}`);
   L.push(`${pad}  - Kind: \`${rec.kind}\` · id \`${rec.id}\``);
   if (url) L.push(`${pad}  - Where: ${url}`);
@@ -654,6 +737,9 @@ function renderShell(model) {
     "  bash <this file>            show the plan (default — changes nothing)",
   );
   L.push("  bash <this file> --apply    perform it");
+  L.push(
+    "  bash <this file> --apply --all    include DIVERGENT actions (see warnings)",
+  );
   L.push("");
   L.push(
     "Contains no credential — only environment variable NAMES. Export those",
@@ -663,9 +749,11 @@ function renderShell(model) {
   L.push("}");
   L.push("");
   L.push("APPLY=0");
+  L.push("ALL=0");
   L.push('for arg in "$@"; do');
   L.push('  case "$arg" in');
   L.push("    --apply) APPLY=1 ;;");
+  L.push("    --all) ALL=1 ;;");
   L.push("    -h|--help) usage; exit 0 ;;");
   L.push('    *) echo "unknown argument: $arg" >&2; exit 2 ;;');
   L.push("  esac");
@@ -720,6 +808,31 @@ function renderShell(model) {
   L.push("  esac");
   L.push("}");
   L.push("");
+  L.push("divergent_step() {");
+  L.push("  # The verification pass saw a value that is neither the desired");
+  L.push("  # state nor where the card started. Applying the recorded command");
+  L.push(
+    "  # anyway could drag it BACKWARDS off a state a human chose. Skipped",
+  );
+  L.push("  # with a warning unless --all is given.");
+  L.push("  #");
+  L.push("  # The guards COMPOSE: --all lifts only the divergence skip. An");
+  L.push(
+    '  # irreversible action still goes through confirm_step — "$3" names',
+  );
+  L.push("  # the inner helper — so --all never becomes a consent bypass.");
+  L.push('  local id="$1"; shift');
+  L.push('  local desc="$1"; shift');
+  L.push('  local helper="$1"; shift');
+  L.push('  if [ "$ALL" -ne 1 ]; then');
+  L.push(
+    '    echo "⚠️  [$id] DIVERGENT — skipped (re-run with --all to force): $desc" >&2',
+  );
+  L.push("    return 0");
+  L.push("  fi");
+  L.push('  "$helper" "$id" "$desc" "$@"');
+  L.push("}");
+  L.push("");
 
   const runnable = model.outstanding.concat(model.failures);
 
@@ -746,6 +859,22 @@ function renderShell(model) {
       L.push("}");
       L.push("");
     }
+  }
+
+  // Satisfied actions are SHORT-CIRCUITED, and visibly so — a silent absence
+  // from the script is indistinguishable from "never wanted".
+  if (model.satisfied.length) {
+    L.push(
+      "# ── Already satisfied — short-circuited ────────────────────────────",
+    );
+    for (const rec of model.satisfied) {
+      const v = rec.verification || {};
+      L.push(
+        `# [${rec.id}] ✅ already satisfied — ${shComment(headline(rec))}` +
+          (v.at ? ` (verified ${shComment(v.at)})` : ""),
+      );
+    }
+    L.push("");
   }
 
   if (!runnable.length) {
@@ -794,8 +923,23 @@ function shellStep(rec) {
   // end of this is trusted input.
   const desc = shQuote(headline(rec));
 
+  const vstate = verificationState(rec);
+
   L.push(`# [${rec.id}] ${shComment(rec.intent)}`);
   L.push(`#   kind: ${rec.kind}  ·  consequence: ${rec.consequence}`);
+  if (vstate === "divergent") {
+    const v = rec.verification || {};
+    L.push(
+      `#   ⚠️ DIVERGENT: observed ${shComment(formatObserved(v.observed))} — guarded behind --all`,
+    );
+  } else if (vstate === "unverifiable") {
+    const v = rec.verification || {};
+    L.push(
+      `#   ❓ unverifiable — could not confirm current state${
+        v.detail ? `: ${shComment(v.detail)}` : ""
+      }; runs unguarded`,
+    );
+  }
   if (rec.retry_of)
     L.push(
       `#   retry of: ${shComment(rec.retry_of)} (failed under full access)`,
@@ -836,9 +980,18 @@ function shellStep(rec) {
     )
     .join(" ");
 
-  const helper =
+  // Guard precedence: a divergent read outranks the consequence class — the
+  // command was planned against a board state that no longer holds, so even a
+  // reversible action must not run without --all. The guards COMPOSE rather
+  // than replace each other: a divergent step names its inner helper, so an
+  // irreversible action stays behind confirm_step even under --all.
+  const inner =
     rec.consequence === "irreversible" ? "confirm_step" : "run_step";
-  L.push(`${helper} ${shQuote(rec.id)} ${desc} ${quoted}`);
+  if (vstate === "divergent") {
+    L.push(`divergent_step ${shQuote(rec.id)} ${desc} ${inner} ${quoted}`);
+  } else {
+    L.push(`${inner} ${shQuote(rec.id)} ${desc} ${quoted}`);
+  }
 
   if (rec.verify && rec.verify.cmd) {
     L.push(
@@ -867,6 +1020,9 @@ function renderJson(model) {
     outstanding: model.outstanding.map((r) => r.id),
     satisfied: model.satisfied.map((r) => r.id),
     failures: model.failures.map((r) => r.id),
+    pending: model.pending.map((r) => r.id),
+    divergent: model.divergent.map((r) => r.id),
+    unverifiable: model.unverifiable.map((r) => r.id),
     unrecorded: model.unrecorded,
     warnings: model.warnings,
   };
@@ -892,6 +1048,8 @@ function renderSummary(model) {
 
   const bits = [`${c.outstanding} outstanding`];
   if (c.blocking) bits.push(`**${c.blocking} BLOCKING**`);
+  if (c.divergent) bits.push(`**${c.divergent} divergent**`);
+  if (c.unverifiable) bits.push(`${c.unverifiable} unverifiable`);
   if (c.failures) bits.push(`${c.failures} failed`);
   if (c.satisfied) bits.push(`${c.satisfied} already correct`);
   if (c.unrecorded) bits.push(`${c.unrecorded} unrecorded`);
@@ -927,9 +1085,23 @@ function renderSummary(model) {
     L.push(`**${SYSTEM_LABEL[system] || system}**`);
     for (const rec of recs) {
       const url = actionUrl(rec);
+      const vstate = verificationState(rec);
+      const mark =
+        vstate === "divergent"
+          ? "⚠️"
+          : vstate === "unverifiable"
+            ? "❓"
+            : rec.consequence === "irreversible"
+              ? "🛑"
+              : "▫️";
+      const note =
+        vstate === "divergent"
+          ? ` — DIVERGENT: observed \`${formatObserved((rec.verification || {}).observed)}\`, wanted \`${describeDesired(rec)}\``
+          : vstate === "unverifiable"
+            ? " — cannot verify, check by hand"
+            : "";
       L.push(
-        `- ${rec.consequence === "irreversible" ? "🛑" : "▫️"} ${headline(rec)}` +
-          `${url ? ` — ${url}` : ""} \`${rec.id}\``,
+        `- ${mark} ${headline(rec)}${note}${url ? ` — ${url}` : ""} \`${rec.id}\``,
       );
     }
     L.push("");
@@ -974,6 +1146,44 @@ const RENDERERS = Object.freeze({
 });
 
 /**
+ * Which renderers a mode selects (tracker-access-record.md §"Two axes").
+ * A mode is a selection over renderers, never a renderer itself.
+ *
+ * `approve` is the one mode whose selection depends on the terminal: its whole
+ * point is a batched confirmation prompt at handover, and a prompt needs a
+ * human on a tty. WITHOUT one (CI, a pipe, nohup) it DEGRADES TO `command` —
+ * the operator gets the script and runs it themselves. It never assumes
+ * consent: no tty, no prompt, no execution.
+ *
+ * @param {"full"|"read-only"|"approve"|"command"|"manual"} mode
+ * @param {{tty?: boolean}} [opts] - default: process.stdout.isTTY
+ */
+function renderersForMode(mode, opts = {}) {
+  const tty =
+    opts.tty !== undefined
+      ? !!opts.tty
+      : !!(process.stdout && process.stdout.isTTY);
+  switch (mode) {
+    case "full":
+      // Nothing is deferred by policy; a record here means something FAILED.
+      return ["summary"];
+    case "read-only":
+      return ["json", "summary"];
+    case "approve":
+      return tty ? ["md", "sh", "summary"] : ["sh", "summary"];
+    case "command":
+      return ["sh", "summary"];
+    case "manual":
+      return ["md", "summary"];
+    default:
+      throw new Error(
+        `handover-render: unknown access mode "${mode}". ` +
+          `Known: full, read-only, approve, command, manual.`,
+      );
+  }
+}
+
+/**
  * Render a record list in one format. Pure — no filesystem, no clock.
  *
  * @param {object[]} records
@@ -1011,11 +1221,18 @@ Renders a deferred-mutation journal (see tracker-access-record.md).
   --journal <path>   NDJSON journal (default: $TRACKER_ACTIONS_JOURNAL, else
                      .claude/state/tracker-actions.jsonl)
   --format <f>       ${FORMATS.join(" | ")}   (repeatable: --format md --format sh)
-  --out <path>       write here instead of stdout. With multiple --format flags,
-                     the extension is substituted per format.
+  --out <path>       write here instead of stdout. The {md,sh,json} extension is
+                     substituted per file format — single-format renders included —
+                     so the artifact always lands on its own extension.
   --expected <k,…>   kinds this run was expected to record; any missing one
                      renders as ⚠️ UNRECORDED
   --run <r>  --access <mode>  --work-item <path>    context for the header
+  --verify           run the read-only verification pass (handover-verify.js)
+                     over the records first, so ticks / divergence / baselines
+                     reach the rendered artifacts. Reads only; a failed or
+                     ambiguous read renders unverifiable — it never CREATES a
+                     tick, though a tick backed by earlier positive evidence
+                     is retained (and labelled "could not confirm").
   --quiet            suppress the per-file confirmation line
   -h, --help
 
@@ -1038,6 +1255,9 @@ function parseArgs(argv) {
         break;
       case "--quiet":
         args.quiet = true;
+        break;
+      case "--verify":
+        args.verify = true;
         break;
       case "--journal":
         args.journal = need(i, a);
@@ -1077,11 +1297,8 @@ function parseArgs(argv) {
   return args;
 }
 
-function run({
-  argv = process.argv,
-  env = process.env,
-  cwd = process.cwd(),
-} = {}) {
+function run(opts = {}) {
+  const { argv = process.argv, env = process.env, cwd = process.cwd() } = opts;
   let args;
   try {
     args = parseArgs(argv);
@@ -1110,6 +1327,40 @@ function run({
     onWarn: (m) => console.error(`⚠️  ${file}: ${m}`),
   });
 
+  // --verify runs the read-only verification pass in-process so its
+  // annotations actually reach the render — piping the verify CLI's stdout to
+  // /dev/null and then rendering from the raw journal was a guaranteed no-op.
+  // Async only on this path: run() stays synchronous for every existing
+  // caller; with --verify it returns a Promise (the CLI entry point handles
+  // both). `opts.verifyIo` lets tests inject a stubbed read layer.
+  if (args.verify) {
+    const hv = require("./handover-verify.js");
+    const io = opts.verifyIo || hv.makeIo({ env });
+    // The catch is attached to the VERIFY promise only: a render failure must
+    // propagate as a render failure, not be misreported as a verification
+    // failure and trigger a second, unannotated render over files the first
+    // attempt already wrote.
+    return hv
+      .verifyRecords(records, { io })
+      .then(
+        ({ records: annotated }) => annotated,
+        (e) => {
+          console.error(
+            `⚠️  verification pass failed (${e.message}) — rendering unannotated`,
+          );
+          return records;
+        },
+      )
+      .then((recs) =>
+        renderFromRecords(recs, { args, formats, env, warnings }),
+      );
+  }
+
+  return renderFromRecords(records, { args, formats, env, warnings });
+}
+
+/** The synchronous core shared by the plain and --verify paths. */
+function renderFromRecords(records, { args, formats, env, warnings }) {
   const ctx = {
     expected: args.expected,
     run: args.run,
@@ -1156,8 +1407,14 @@ function run({
     // Strip only a KNOWN extension. A blanket /\.[^./]+$/ ate the `{name}`
     // component of `task.52.handover.1.deferred-mutation`, which file-naming.md
     // requires, turning it into `task.52.handover.1.md`.
+    //
+    // The extension is substituted for EVERY file format, single-format renders
+    // included: a lone `--format sh` with `--out …md` used to write the shell
+    // script into a .md filename, and a lone `--format json` buried the sidecar
+    // where tracker-reconcile\'s *.handover.*.json discovery never finds it.
+    // `summary` keeps the caller\'s path verbatim when it is the only format.
     const outPath =
-      formats.length === 1
+      format === "summary" && formats.length === 1
         ? args.out
         : `${args.out.replace(/\.(md|sh|json)$/, "")}.${format}`;
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -1173,8 +1430,13 @@ function run({
 }
 
 if (require.main === module) {
-  const r = run();
-  process.exit(r.exitCode || 0);
+  Promise.resolve(run()).then(
+    (r) => process.exit(r.exitCode || 0),
+    (e) => {
+      console.error(`Error: ${e.message}`);
+      process.exit(2);
+    },
+  );
 }
 
 module.exports = {
@@ -1186,11 +1448,14 @@ module.exports = {
   dedupe,
   topoSort,
   partition,
+  verificationState,
+  renderersForMode,
   groupBySystem,
   buildModel,
   isEmpty,
   shQuote,
   shComment,
+  formatObserved,
   headline,
   renderMarkdown,
   renderShell,

@@ -399,16 +399,22 @@ handover renders the gap on purpose so drift is visible — this is not a skip.
 skill that performed the write without going through `defer-mutation` / `tracker_write`. Do not
 delete the UNRECORDED line to make the checklist look clean.
 
-## `/tracker-reconcile` is not a command yet
+## `/tracker-reconcile --apply` was refused
 
-**Symptom:** the agent cannot find a `tracker-reconcile` skill, or you expected `--apply` to tick
-the committed checklist from the live board.
+**Symptom:** reconcile printed `⛔ --apply refused: access.tracker resolves to \`manual\`` (or
+`command`, `read-only`, `approve`) and only re-rendered the checklist.
 
-**Cause:** `/tracker-reconcile` is **not shipped**. Task.57 is still `planned`. `divergent` and
-`unverifiable` are glossary terms for that skill; they are not states the current renderer writes.
+**Cause:** by design. `--apply` executes tracker mutations, and the resolved access mode forbids
+them — a reconcile that quietly applied under `manual` would be a back door around the policy the
+repo configured. The refusal names the blocking system (`skills-config.yaml access.tracker` /
+`ACCESS_TRACKER` / `AGENT_SKILLS_ACCESS_TRACKER`); the check pass still ran, so ticks, `divergent`
+flags and the frontmatter `status:` are current.
 
-**Fix:** work the `.md` checklist (or the `.sh` under `command`) by hand. When task.57 lands,
-reconcile will refuse `--apply` under `manual`, `command`, and `read-only`.
+**Fix:** if applying is genuinely wanted, run under `access.tracker: full` (or clear the env
+override). Otherwise work the `.md` checklist (or the `.sh` under `command`) by hand and re-run
+`/tracker-reconcile` check-only — it will tick what was done. A `divergent` record is skipped even
+under `full --apply`: someone moved that card somewhere the plan did not expect; resolve it by
+hand rather than forcing it with `--all`.
 
 ## `/develop-next` ran, and the board still did not move
 

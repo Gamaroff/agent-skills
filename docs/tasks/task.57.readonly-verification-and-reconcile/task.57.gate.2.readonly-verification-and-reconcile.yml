@@ -1,0 +1,110 @@
+schema: 1
+task: 'task.57.readonly-verification-and-reconcile'
+task_title: '[Task 57] Read-only verification, and /tracker-reconcile so the checklist is a ledger rather than a receipt'
+gate: FAIL
+status_reason: >-
+  All eight cycle-1 findings verified FIXED, but the adversarial pass over the fixes themselves
+  found three high-severity defects the fixes introduced: single-format renders write sh/json
+  content into a .md filename (breaking reconcile discovery), the satisfied-clearing fix revokes
+  ticks on unverifiable re-reads (re-running executed mutations under --apply), and ttyConfirm
+  interpolates record text into bash -c (shell injection).
+reviewer: 'QA Engineer'
+updated: '2026-08-20T07:35:00Z'
+
+top_issues:
+  - id: CR2-1
+    severity: high
+    finding: >-
+      Per-mode FORMAT_FLAGS emits a single --format while --out stays .md, and the renderer
+      substitutes the extension only when >1 format is requested — `command` writes a shell
+      script and `read-only` writes the JSON sidecar into a .md file, which tracker-reconcile's
+      *.handover.*.json discovery then never finds.
+    suggested_action: Always substitute the extension per format in the renderer; single-format renders must land on the correct {md,sh,json} filename.
+    suggested_owner: dev
+  - id: CR2-2
+    severity: high
+    finding: >-
+      Unconditionally recomputing `satisfied` also revokes the tick when the fresh read is
+      unverifiable (UNRELIABLE kinds, auth/network failure) or pending-because-no-recipe, so an
+      already-executed action returns to outstanding and is re-run by --apply and the .sh — the
+      duplicate-mutation risk the original short-circuit prevented.
+    suggested_action: Revoke only on positive evidence (a real read showing pending/divergent); keep a prior tick when the fresh state carries no evidence.
+    suggested_owner: dev
+  - id: CR2-3
+    severity: high
+    finding: >-
+      ttyConfirm builds bash -c script text via JSON.stringify of a prompt containing the
+      record's intent — `$(…)` and backticks in a committed record execute in the shell when the
+      prompt renders.
+    suggested_action: Pass the prompt as data (env var referenced as "$PROMPT" inside a fixed script), never interpolated script text.
+    suggested_owner: dev
+  - id: CR2-4
+    severity: low
+    finding: >-
+      The --verify .catch is chained after .then, so a render failure is misreported as a
+      verification failure and triggers a second unannotated render over already-written files.
+    suggested_action: Catch around verifyRecords only; let render failures propagate.
+    suggested_owner: dev
+  - id: CR2-5
+    severity: low
+    finding: >-
+      The case fallback emits --format md for `full`, whose renderersForMode selection has no
+      file format — committing an artifact the mode table forbids.
+    suggested_action: full → no file artifact (summary only); keep md only for genuinely unknown modes.
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 1649
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [1, 3, 5]
+
+nfr_validation:
+  security:
+    status: FAIL
+    notes: CR2-3 is a shell-injection vector from committed record content into an operator's shell.
+  performance:
+    status: PASS
+    notes: unchanged.
+  reliability:
+    status: CONCERNS
+    notes: CR2-1 breaks reconcile discovery; CR2-2 reintroduces duplicate-mutation risk.
+  maintainability:
+    status: PASS
+    notes: cycle-1 fixes all verified with regression tests; CR2-6 (duplicate formats default) advisory.
+
+recommendations:
+  immediate:
+    - action: Fix CR2-1 extension substitution (renderer-level, with test), CR2-2 evidence-gated revocation, CR2-3 prompt-as-data
+      refs: ['shared/resources/handover-render.js', 'shared/resources/handover-verify.js', 'skills/tracker-reconcile/scripts/tracker-reconcile.js']
+    - action: Fix CR2-4 catch placement and CR2-5 full-mode fallback
+      refs: ['shared/resources/handover-render.js', 'shared/resources/develop-pipeline-step-7-finalise.md']
+  future:
+    - action: 'CR2-6: compute effective formats once and pass into renderFromRecords'
+      refs: ['shared/resources/handover-render.js']
+
+re_review_context:
+  previous_gate: task.57.gate.1.readonly-verification-and-reconcile.yml
+  previous_issues:
+    - { id: CR-1, status: FIXED, evidence: 'npm run bundle + ls — handover-{verify,render}.js present in develop-story/task/bug references/' }
+    - { id: CR-2, status: FIXED, evidence: '§10 regression test green; mutation-proven — but see CR2-2 for the over-correction' }
+    - { id: CR-3, status: FIXED, evidence: '§7 tests green (no-mechanism skip, declined, consented) — but see CR2-3 for the default prompt implementation' }
+    - { id: CR-4, status: FIXED, evidence: '§10 test: divergent_step … confirm_step composition pinned; mutation-proven' }
+    - { id: CR-5, status: FIXED, evidence: '§10 test: --verify annotations reach the artifact; live smoke via bundled engine' }
+    - { id: CR-6, status: FIXED, evidence: 'step-7 per-mode case block — but see CR2-1/CR2-5 for two defects in it' }
+    - { id: CR-7, status: FIXED, evidence: '§1 allowlist test extended to --field/-F/--input and -F mutation scan' }
+    - { id: CR-8, status: FIXED, evidence: 'clause removed' }
+    - { id: CR-9, status: FIXED, evidence: 'formatObserved applied at all four sites' }
+    - { id: CR-10, status: DEFERRED, evidence: 'advisory — per-render re-redaction is deliberate defence-in-depth' }
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - CR2-1/CR2-2/CR2-3 fixed with regression tests
