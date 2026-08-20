@@ -75,7 +75,7 @@ flowchart TD
     K -->|No| G{access model}
     G -->|manual / approve / read-only| H[Tick the .md checklist on the board]
     G -->|command| I["Run the .sh -- dry-run, then --apply"]
-    H --> J["/tracker-reconcile — not shipped, task.57"]
+    H --> J["/tracker-reconcile — tick the ledger from the live board"]
     I --> J
 ```
 
@@ -110,7 +110,7 @@ When something was deferred, Step 8 commits three files next to the work item ([
 | --- | --- |
 | `task.{N}.handover.{n}.{name}.md` | Tick boxes. **This is the `manual` path.** |
 | `task.{N}.handover.{n}.{name}.sh` | Same records as a script (dry-run by default). |
-| `task.{N}.handover.{n}.{name}.json` | Sidecar for `/tracker-reconcile` — **that skill is not shipped** ([task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md)). |
+| `task.{N}.handover.{n}.{name}.json` | Sidecar — [`/tracker-reconcile`](../../skills/tracker-reconcile/SKILL.md)'s machine input. |
 
 `tracker-issue.js` is the fourth stage-CLI peer, added by
 [task.56](../tasks/task.56.tracker-issue-cli/task.56.tracker-issue-cli.md). It gates the GitHub issue
@@ -158,11 +158,17 @@ bash docs/tasks/task.{N}.{name}/task.{N}.handover.{n}.{name}.sh
 bash docs/tasks/task.{N}.{name}/task.{N}.handover.{n}.{name}.sh --apply
 ```
 
-`--apply` under `manual` is not how `manual` is meant to be used; the checklist is. `/tracker-reconcile` will **refuse `--apply`** under `manual`, `command`, and `read-only` when it ships, for the same reason.
+`--apply` under `manual` is not how `manual` is meant to be used; the checklist is. `/tracker-reconcile` **refuses `--apply`** under `manual`, `command`, `approve` and `read-only`, naming the blocker, for the same reason — a reconcile that quietly applied under `manual` would make `manual` meaningless.
 
-## What this runbook cannot do yet
+## Phase 5 — reconcile, days later
 
-`/tracker-reconcile` is **not shipped**. You cannot re-read a week-old handover and have the tool tick `satisfied` / flag `divergent` / skip `unverifiable` from the live board. Until [task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md) lands, compare the checklist to the card by hand.
+Re-read the committed handover against the live board:
+
+```bash
+node .agents/skills/tracker-reconcile/scripts/tracker-reconcile.js docs/tasks/task.{N}.{name}/
+```
+
+It ticks `satisfied` back into the checklist (struck through, observed value and time), flags `divergent` (`⚠️ observed X, wanted Y` — someone moved the card somewhere else; resolve by hand), marks `unverifiable` ("cannot verify — check by hand" — ambiguity is never guessed into `satisfied`), and sets the checklist frontmatter `status:` to `outstanding` / `partial` / `complete`. Run it as often as you like — an unchanged board reconciles byte-identically. `--apply` executes what is left **only under `access.tracker: full`**; see [`tracker-reconcile`](../../skills/tracker-reconcile/SKILL.md).
 
 ## Called-skills map
 
@@ -173,7 +179,7 @@ This runbook does not invoke an orchestrator of its own. It wraps:
 | [`develop-task`](../../skills/develop-task/SKILL.md) / [`develop-story`](../../skills/develop-story/SKILL.md) | The run that defers |
 | `handover-render.js` | Three files from `.claude/state/tracker-actions.jsonl` |
 | `gh-stage.js --print-plan` | Credential-free column names |
-| `/tracker-reconcile` | **Not shipped** — task.57 |
+| [`/tracker-reconcile`](../../skills/tracker-reconcile/SKILL.md) | Ticks the committed ledger from the live board; refuses `--apply` under every non-`full` mode |
 
 ## Verification
 

@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Read-only verification and `/tracker-reconcile` — the handover checklist is now a ledger, not a
+  receipt (task.57).** A committed handover could only ever say "outstanding": it recorded what a
+  restricted run wanted at one moment and nothing could tick it back against the live board. Three
+  pieces close the loop. `shared/resources/handover-verify.js` is the read-only verification pass —
+  per-kind read recipes (board fields via GraphQL reads, issue state via `gh issue view`, comment
+  idempotency via the `agent-skills-comment:` marker, Jira status via REST GET, `git ls-remote`
+  for pushes) derive one of four states per record: `satisfied` (ticked, struck through, with the
+  observed value and time — never deleted, so item count always equals record count), `pending`,
+  `divergent` (a value that is neither desired nor the pre-action baseline — someone moved the
+  card; the rendered script skips it unless `--all`), and `unverifiable` (a failed or ambiguous
+  read — 2+ matches is never coerced to `satisfied`). Every argv is checked against a read-only
+  allowlist in-process, and the suite drives the pass with a stub that throws on any mutating
+  shape. The new `/tracker-reconcile` skill re-runs that pass against a committed handover days
+  later — ticks boxes in place, updates the JSON sidecar, sets the checklist frontmatter `status:`
+  to `outstanding`/`partial`/`complete`, and is byte-identical when re-run against an unchanged
+  board. Its load-bearing behaviour is the refusal: `--apply` executes only under
+  `access.tracker: full` and is refused under `read-only`, `approve`, `command` and `manual`,
+  naming the blocking system — a reconcile that quietly applied under `manual` would make `manual`
+  meaningless. Only actions reconcile *executed* earn a Change Log row; deferral and observation
+  are non-events. The `approve` model now has its handover behaviour: one batched confirmation at
+  handover, executing approved records via the committed script, degrading to `command` output
+  without a tty — consent is never assumed. The accept gap is made loud (`## Tracker Actions
+  Required` populated, a `**Tracker debt:**` line in the implementation report's Completion block,
+  a PR comment via the existing escalation path), and `docs/reference/anti-patterns.md` /
+  `docs/reference/faq.md` now state explicitly that a deferral with a loud, committed record is
+  not the "skipped Step 7 side-effects" anti-pattern — with the finalise-still-accepts decision
+  pinned by test so it cannot be quietly "fixed" into a halt.
+
 ## [v0.43.0] - 2026-08-20
 
 ### Added

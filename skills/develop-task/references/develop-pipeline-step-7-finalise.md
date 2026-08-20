@@ -270,6 +270,77 @@ Log in Decisions Log: "Post-close state check (poller): issue {TRACKER_ISSUE} st
 
 ---
 
+## The Accept Gap — Made Loud (restricted runs and failed tracker calls)
+
+`/finalise` writes `status: accepted` and moves on, **by design** — including under a restricted
+`access.tracker` mode. Local acceptance records that the *work* meets its DoD; the tracker catching
+up is a separate event that a restricted run cannot perform. The gap between the two is the
+**accept gap**, and this section is what stops it being silent. Deferring with a loud, committed,
+reviewable record is **not** the "skipped Step 7 side-effects" anti-pattern — the anti-pattern's
+stated harm is *silent* drift, and everything below exists to make the drift visible
+(see `docs/reference/anti-patterns.md` §"Never skip Step 7 (`finalise`) side-effects").
+
+After the Tracker Issue Update above, check the journal (`.claude/state/tracker-actions.jsonl`,
+or `$TRACKER_ACTIONS_JOURNAL`). **When it is empty, skip this entire section** — no artifacts, no
+debt line, no comment. When it is non-empty:
+
+1. **Run the read-only verification pass, then render and commit the handover artifacts.**
+   The formats come from the access mode — `renderersForMode` in `handover-render.js`
+   (`manual` → md; `command` → sh; `read-only` → json; `approve` → md+sh on a tty, sh without
+   one; every mode also gets the inline summary). Artifact names follow the established grammar,
+   co-located with the work item: `{prefix}.handover.{n}.{name}.{md,sh,json}`.
+
+   ```bash
+   node .agents/skills/{develop-story|develop-task|develop-bug}/references/handover-verify.js --json \
+     > /dev/null 2>&1 || true   # annotates nothing on failure — render proceeds either way
+   node .agents/skills/{develop-story|develop-task|develop-bug}/references/handover-render.js \
+     --format md --format sh --format json \
+     --out {work-item-dir}/{prefix}.handover.{n}.{name}.md \
+     --run "{branch}" --access "$ACCESS_TRACKER" --work-item {work-item-dir}
+   ```
+
+2. **Populate the implementation report's `## Tracker Actions Required` section** with the
+   `--format summary` output (replacing the placeholder italics). This is the section the report
+   template reserves for exactly this moment.
+
+3. **Add the `**Tracker debt:**` line to the report's Completion block**, immediately after
+   **DoD Summary**:
+
+   ```
+   **Tracker debt**: {N} action(s) outstanding — see ## Tracker Actions Required and
+   {prefix}.handover.{n}.{name}.md. Reconcile later with /tracker-reconcile.
+   ```
+
+   When the journal is empty, write `**Tracker debt**: none`. The line is not optional on a
+   restricted run: a Completion block that reads "Completed" with no debt line is how the accept
+   gap goes silent.
+
+4. **Post the checklist to the PR** via the existing `not-on-board` escalation path (the
+   `gh pr comment` block in `finalise/SKILL.md` §Tracker Issue Update) — the comment names the
+   committed `*.handover.*` files and says the board has **not** caught up with the accepted
+   status. Reviewers see the debt where they review, not only in the repo tree.
+
+### The `approve` model at handover
+
+`approve` means *credentials are present; a human confirms before writes*. At this point — and
+only at this point — the orchestrator asks **one batched confirmation** via `AskUserQuestion`:
+list the outstanding actions (id, headline, consequence) and offer "Apply all N actions" /
+"Apply reversible only (skip irreversible)" / "Defer all — keep the checklist". Approved records
+execute via the committed script (`bash {prefix}.handover.{n}.{name}.sh --apply`); the run then
+re-renders so executed actions show ticked.
+
+**Non-interactive runs degrade to `command`**: no tty (or an autonomous pipeline run) means no
+prompt, no execution, and the operator gets the script — consent is **never** assumed. This is
+`renderersForMode("approve", {tty:false})`, and it is pinned by test.
+
+### Reconciling later
+
+`/tracker-reconcile {work-item-dir}` re-reads the committed handover against the live tracker —
+days later, on any branch — ticks what someone already did, flags `divergent` moves, and refuses
+`--apply` under every non-`full` mode. The checklist is a ledger, not a receipt.
+
+---
+
 ## Step 7 Completion Checklist (MUST verify before marking ✅)
 
 Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST verify every item below. If any item is missing, the row stays ⏳ and the orchestrator goes back and completes the missing action — do NOT mark ✅ with caveats in the Notes column.
@@ -284,6 +355,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] Tracker issue closed (GitHub `gh issue close` confirmed CLOSED) — N/A for Jira (handled by transition)
 - [ ] Project board / Jira board moved to Done (verify via tracker state poller — `result.issue.state` or `result.issue.column`; see `references/tracker-state-poller-subagent.md`)
 - [ ] All five Decisions Log lines written: "DoD summary", "DoD body posted to PR", "issue close" (GitHub), "board transition", and the success log entry ("Story accepted" / "Task completed")
+- [ ] **Accept gap**: journal checked; if non-empty — handover artifacts committed, `## Tracker Actions Required` populated, `**Tracker debt:**` line written in the Completion block, PR comment posted. If empty — `**Tracker debt**: none` written. `status: accepted` was written **either way** — the debt record and the local acceptance are both-or-red, never one without the other
 
 This checklist applies in **both lite and standard modes**. Lite mode skips Steps 5–6; it never skips any item in this list.
 
