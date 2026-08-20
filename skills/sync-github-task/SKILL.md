@@ -82,9 +82,16 @@ Invoke the `ensure-task-github-issue` sub-routine with `TASK_FILE_PATH={resolved
 - writes `github_issue: {N}` into the task frontmatter,
 - inserts/repairs the body cross-reference link.
 
-On return, `TASK_ISSUE_NUM` is set (integer) or empty (on failure).
+On return, `TASK_ISSUE_NUM` is set (integer) or empty — on failure **or when the create was
+deferred** by a restricted `access.tracker`.
 
-Append a Change Log row to the task markdown:
+> **When `TASK_ISSUE_NUM` is empty, stop here.** Do not append the Change Log row below and
+> do not continue to Step 5. The row would read `Initial GitHub issue created (#)`
+> and assert a create that did not happen — the same false-success this sequence
+> exists to remove. Report the deferral instead; the handover checklist carries the
+> action, and the second run converges once the key is in the frontmatter.
+
+Otherwise append a Change Log row to the task markdown:
 
 ```markdown
 | YYYY-MM-DD HH:MM | Initial GitHub issue created (#{TASK_ISSUE_NUM}) |
@@ -114,9 +121,12 @@ Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The bo
 If anything changed, run:
 
 ```bash
-gh issue edit ${ISSUE_NUM} \
+mkdir -p .claude/state
+printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+
+node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Task ${TASK_N}] ${TASK_TITLE}" \
-  --body-file <(printf '%s' "$NEW_BODY") \
+  --body-file .claude/state/issue-body.md \
   --milestone "${MILESTONE_TITLE}" \
   --add-label "priority:${priority}" \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
@@ -159,9 +169,9 @@ if [ "$CURRENT" != "$DESIRED" ]; then
   if [ "$DESIRED" = "closed" ]; then
     REASON=completed
     [ "$STATUS" = "cancelled" ] && REASON=not_planned
-    gh issue close ${TASK_ISSUE_NUM} --reason ${REASON}
+    node references/tracker-issue.js --kind close --issue ${TASK_ISSUE_NUM} --reason ${REASON}
   else
-    gh issue reopen ${TASK_ISSUE_NUM}
+    node references/tracker-issue.js --kind reopen --issue ${TASK_ISSUE_NUM}
   fi
 fi
 ```

@@ -1646,22 +1646,26 @@ fi
 2. Post the comment through the CLI:
 
    ```bash
+   # Terminator at COLUMN 0 — an indented terminator does not close an unquoted
+   # heredoc, and bash would swallow the invocation below into the comment body.
+   # Body lines are unindented for the same reason: leading spaces would be
+   # written into the comment verbatim.
    mkdir -p .claude/state
    cat > .claude/state/comment-body.md <<EOF
-   ## Task Review Complete
+## Task Review Complete
 
-   **Recommendation**: ${RECOMMENDATION}
-   **Readiness Score**: ${SCORE}/10
+**Recommendation**: ${RECOMMENDATION}
+**Readiness Score**: ${SCORE}/10
 
-   | Severity | Count |
-   |---|---|
-   | Critical 🚨 | ${CRITICAL} |
-   | Important ⚠️ | ${IMPORTANT} |
-   | Optional 💡 | ${OPTIONAL} |
+| Severity | Count |
+|---|---|
+| Critical 🚨 | ${CRITICAL} |
+| Important ⚠️ | ${IMPORTANT} |
+| Optional 💡 | ${OPTIONAL} |
 
-   **Review artifact**: \`${REVIEW_FILE}\`
-   ${CHANGES_SECTION}
-   EOF
+**Review artifact**: \`${REVIEW_FILE}\`
+${CHANGES_SECTION}
+EOF
 
    node .agents/skills/review-task/references/tracker-comment.js \
      --issue "{jira_key from frontmatter}" --body-file .claude/state/comment-body.md \
@@ -1698,7 +1702,8 @@ fi
    BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
    OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
    REPO=$(gh repo view --json name -q '.name')
-   gh project item-add "$BOARD_NUM" --owner "$OWNER" \
+   source references/resolve-platform.sh || exit 1
+   tracker_write gh project item-add "$BOARD_NUM" --owner "$OWNER" \
      --url "https://github.com/$OWNER/$REPO/issues/$GITHUB_ISSUE" 2>/dev/null || true
    ```
 
@@ -1709,23 +1714,38 @@ fi
    ```bash
    GITHUB_ISSUE={github_issue from frontmatter}
 
-   gh issue comment "$GITHUB_ISSUE" --body "## Task Review Complete
+   # The heredoc terminator sits at COLUMN 0 even though this block is indented
+   # inside a numbered list — an indented terminator does not close an unquoted
+   # heredoc, and bash would swallow the invocation below into the body.
+   # The body lines are unindented for the same reason: leading spaces would be
+   # written into the comment verbatim.
+   mkdir -p .claude/state
+   cat > .claude/state/comment-body.md <<EOF
+## Task Review Complete
 
-   **Recommendation**: ${RECOMMENDATION}
-   **Readiness Score**: ${SCORE}/10
+**Recommendation**: ${RECOMMENDATION}
+**Readiness Score**: ${SCORE}/10
 
-   | Severity | Count |
-   |----------|-------|
-   | Critical 🚨 | ${CRITICAL} |
-   | Important ⚠️ | ${IMPORTANT} |
-   | Optional 💡 | ${OPTIONAL} |
+| Severity | Count |
+|----------|-------|
+| Critical 🚨 | ${CRITICAL} |
+| Important ⚠️ | ${IMPORTANT} |
+| Optional 💡 | ${OPTIONAL} |
 
-   **Review artifact**: \`${REVIEW_FILE}\`
-   ${CHANGES_SECTION}" \
+**Review artifact**: \`${REVIEW_FILE}\`
+${CHANGES_SECTION}
+EOF
+
+   node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
+     --body-file .claude/state/comment-body.md --stage review-task --json \
      || echo "⚠️  GitHub issue comment failed — continuing"
    ```
 
-4. **Verify**: If `gh issue comment` exits 0, confirm: "✅ Review summary posted to GitHub issue #${GITHUB_ISSUE}." If it fails, report the error but do NOT halt the skill.
+   This is the same call the Jira path above makes — `tracker-comment.js` resolves
+   `TRACKER` itself, so the two branches differ only in the issue identifier.
+   Always `--body-file`: the body carries backticks and newlines.
+
+4. **Verify**: read `reason` from the JSON and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md). On `posted`, confirm: "✅ Review summary posted to GitHub issue #${GITHUB_ISSUE}." If it fails, report the error but do NOT halt the skill.
 
 **Output** (GitHub path): GitHub issue updated with review outcome comment and added to the project board (if `github_issue` present in frontmatter).
 

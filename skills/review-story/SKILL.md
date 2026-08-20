@@ -2243,22 +2243,27 @@ User Can Now: Run `/develop` to begin implementation
    Post the comment through the CLI:
 
    ```bash
+   # Terminator at COLUMN 0 — a QUOTED heredoc needs an unindented terminator
+   # just as an unquoted one does; bash otherwise swallows the call below into
+   # the body. Body lines are unindented too: leading spaces are written
+   # verbatim, and the inconsistent 3/5-space mix here would have shown up as
+   # a stray indented block inside the posted comment.
    mkdir -p .claude/state
    cat > .claude/state/comment-body.md <<'EOF'
-   ## Story Review Complete
+## Story Review Complete
 
-     **Recommendation**: {RECOMMENDATION}
-     **Readiness Score**: {SCORE}/10
+**Recommendation**: {RECOMMENDATION}
+**Readiness Score**: {SCORE}/10
 
-     | Severity | Count |
-     |---|---|
-     | Critical 🚨 | {CRITICAL} |
-     | Important ⚠️ | {IMPORTANT} |
-     | Optional 💡 | {OPTIONAL} |
+| Severity | Count |
+|---|---|
+| Critical 🚨 | {CRITICAL} |
+| Important ⚠️ | {IMPORTANT} |
+| Optional 💡 | {OPTIONAL} |
 
-   **Review artifact**: `{REVIEW_FILE}`
-   {CHANGES_SECTION}
-   EOF
+**Review artifact**: `{REVIEW_FILE}`
+{CHANGES_SECTION}
+EOF
 
    node .agents/skills/review-story/references/tracker-comment.js \
      --issue {jira_key from frontmatter} --body-file .claude/state/comment-body.md \
@@ -2285,7 +2290,8 @@ User Can Now: Run `/develop` to begin implementation
    BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
    OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
    REPO=$(gh repo view --json name -q '.name')
-   gh project item-add "$BOARD_NUM" --owner "$OWNER" \
+   source references/resolve-platform.sh || exit 1
+   tracker_write gh project item-add "$BOARD_NUM" --owner "$OWNER" \
      --url "https://github.com/$OWNER/$REPO/issues/$GITHUB_ISSUE" 2>/dev/null || true
    ```
 

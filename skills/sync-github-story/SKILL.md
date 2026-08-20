@@ -116,9 +116,16 @@ The sub-routine:
 - writes `github_issue: {N}` into the story frontmatter,
 - inserts/repairs the body cross-reference row.
 
-On return, `STORY_ISSUE_NUM` is set (integer) or empty (on failure).
+On return, `STORY_ISSUE_NUM` is set (integer) or empty — on failure **or when the create was
+deferred** by a restricted `access.tracker`.
 
-Append a Change Log row to the story markdown:
+> **When `STORY_ISSUE_NUM` is empty, stop here.** Do not append the Change Log row below and
+> do not continue to Step 5. The row would read `Initial GitHub issue created (#)`
+> and assert a create that did not happen — the same false-success this sequence
+> exists to remove. Report the deferral instead; the handover checklist carries the
+> action, and the second run converges once the key is in the frontmatter.
+
+Otherwise append a Change Log row to the story markdown:
 
 ```markdown
 | YYYY-MM-DD HH:MM | Initial GitHub issue created (#{STORY_ISSUE_NUM}) |
@@ -147,9 +154,12 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body > /tmp/issue-${ISSUE_N
 Diff `title`, `body`, `labels` against current GitHub state. The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create, including the `## Document` link block (using `DOC_URL` above), so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch. If anything changed, run:
 
 ```bash
-gh issue edit ${ISSUE_NUM} \
+mkdir -p .claude/state
+printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
+
+node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
   --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
-  --body-file <(printf '%s' "$NEW_BODY") \
+  --body-file .claude/state/issue-body.md \
   --add-label "priority:${priority}" \
   --remove-label "$OLD_PRIORITY_LABEL_IF_DIFFERENT"
 ```
@@ -193,9 +203,9 @@ if [ "$CURRENT" != "$DESIRED" ]; then
   if [ "$DESIRED" = "closed" ]; then
     REASON=completed
     [ "$STATUS" = "cancelled" ] && REASON=not_planned
-    gh issue close ${STORY_ISSUE_NUM} --reason ${REASON}
+    node references/tracker-issue.js --kind close --issue ${STORY_ISSUE_NUM} --reason ${REASON}
   else
-    gh issue reopen ${STORY_ISSUE_NUM}
+    node references/tracker-issue.js --kind reopen --issue ${STORY_ISSUE_NUM}
   fi
 fi
 ```

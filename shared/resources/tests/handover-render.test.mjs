@@ -68,11 +68,11 @@ function withTmp(fn) {
 
 // ── 1. Totality — every kind × every renderer ──────────────────────────────
 
-test("§1 the roster in the schema doc has exactly 22 kinds, 10 Jira + 12 GitHub", () => {
+test("§1 the roster in the schema doc has exactly 23 kinds, 10 Jira + 13 GitHub", () => {
   const roster = dm.loadRoster();
   assert.equal(
     roster.size,
-    22,
+    23,
     "roster size changed — update the schema doc's own count too",
   );
   const bySystem = {};
@@ -80,7 +80,7 @@ test("§1 the roster in the schema doc has exactly 22 kinds, 10 Jira + 12 GitHub
     const s = k.split(".")[0];
     bySystem[s] = (bySystem[s] || 0) + 1;
   }
-  assert.deepEqual(bySystem, { jira: 10, github: 12 });
+  assert.deepEqual(bySystem, { jira: 10, github: 13 });
 });
 
 test("§1 every roster kind has a renderer, and every renderer has a roster kind", () => {
@@ -108,7 +108,7 @@ test("§1 every kind renders non-empty in all four formats, with nothing unsubst
   const { records } = loadFixture("handover-all-kinds.jsonl");
   assert.equal(
     records.length,
-    22,
+    23,
     "the all-kinds fixture must carry every kind",
   );
 
@@ -151,9 +151,13 @@ test("§1 every kind renders non-empty in all four formats, with nothing unsubst
   const summaryBullets = outputs.summary
     .split("\n")
     .filter((l) => l.startsWith("- ")).length;
+  // Derived from the fixture, not a literal. Three separate assertions used to
+  // hard-code the roster size, so adding one kind turned a two-file change into
+  // a five-file one and the extra edits carried no information — they only
+  // restated a number the fixture already knows.
   assert.equal(
     summaryBullets,
-    22,
+    records.length,
     "summary must list every outstanding record",
   );
 });
@@ -924,7 +928,8 @@ test("§14 the script is dry-run by default and says so", () => {
 });
 
 test("§14 the generated script runs clean as a dry run and changes nothing", () => {
-  const sh = hr.render(loadFixture("handover-all-kinds.jsonl").records, "sh", {
+  const { records: allKinds } = loadFixture("handover-all-kinds.jsonl");
+  const sh = hr.render(allKinds, "sh", {
     env: CLEAN_ENV,
   });
   withTmp((dir) => {
@@ -932,12 +937,17 @@ test("§14 the generated script runs clean as a dry run and changes nothing", ()
     fs.writeFileSync(f, sh);
     const out = execFileSync("bash", [f], { encoding: "utf8" });
     assert.match(out, /Dry run — nothing was changed/);
-    // Every kind is accounted for in the plan: 22 records, each either a step
-    // or an explicit "do this by hand" line.
+    // Every kind is accounted for in the plan: one line per record, each either
+    // a step or an explicit "do this by hand" line. Counted from the fixture so
+    // a new kind does not need this literal updated too.
     const planned = out
       .split("\n")
       .filter((l) => /^[·✋]/.test(l.trim())).length;
-    assert.equal(planned, 22, `dry run planned ${planned} of 22 actions`);
+    assert.equal(
+      planned,
+      allKinds.length,
+      `dry run planned ${planned} of ${allKinds.length} actions`,
+    );
   });
 });
 

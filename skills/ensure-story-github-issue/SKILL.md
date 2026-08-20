@@ -85,10 +85,13 @@ DOC_URL="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}/${STORY_RE
 Auto-create the milestone if it doesn't exist yet:
 
 ```bash
-gh api repos/${OWNER}/$(gh repo view --json name -q '.name')/milestones \
-  -f title="${MILESTONE_TITLE}" \
-  -f state="open" 2>/dev/null || true
+node references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
+
+The CLI is resolve-or-create: an existing title is reused and reported as
+`already`, so this is safe to run on every pass. Under a deferring access mode it
+records the create and prints nothing — see [`references/tracker-issue-cli.md`](./references/tracker-issue-cli.md).
 
 Create the story issue.
 
@@ -98,14 +101,24 @@ which is also what the Jira path enforces in code. Read it before changing this
 template. Anything trimmed must be announced with an accurate count; a reader who
 is not told they are seeing part of something believes they saw all of it.
 
+Write the body to a file first. **Always `--body-file`, never an inline `--body`**:
+the body carries backticks, `$(…)` and newlines, and an inline `--body` is a
+shell injection waiting for the first story whose acceptance criteria contain one.
+The file is also what carries the body into the deferred record's `command.stdin`.
+
+> **The heredoc below is unquoted, and that is a real residual risk — not a
+> solved problem.** `<<EOF` still performs command substitution, so a `$(…)` or a
+> backticked span in the document's own text is executed while the body is being
+> written. `--body-file` removes the *argv* injection surface, which is the larger
+> one; it does not remove this. Where the source text is untrusted, write the file
+> with the editor tool instead of a heredoc. `<<'EOF'` is not the fix here — it
+> would also stop the `${…}` values below from being substituted, which the body
+> needs.
+
 ```bash
-STORY_ISSUE_URL=$(gh issue create \
-  --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
-  --project "${PROJECT_NAME}" \
-  --label "story" \
-  --label "priority:${priority}" \
-  --milestone "${MILESTONE_TITLE}" \
-  --body "## Summary
+mkdir -p .claude/state
+cat > .claude/state/issue-body.md <<EOF
+## Summary
 
 {First 2-4 sentences from the story's User Story / Story / Story Statement — or its Description if it has none}
 
@@ -125,23 +138,49 @@ omitted. If 5 or fewer, list them all and add no such line.}
 ## Document
 
 📄 [Story Document](${DOC_URL})
-📁 \`${STORY_RELATIVE_PATH}\`")
+📁 \`${STORY_RELATIVE_PATH}\`
+EOF
 
-STORY_ISSUE_NUM=$(echo "$STORY_ISSUE_URL" | grep -oE '[0-9]+$')
+STORY_ISSUE_NUM=$(node references/tracker-issue.js \
+  --kind create \
+  --title "[Story ${STORY_E}.${STORY_S}] ${STORY_TITLE}" \
+  --body-file .claude/state/issue-body.md \
+  --label "story" \
+  --label "priority:${priority}" \
+  --milestone "${MILESTONE_TITLE}")
 ```
 
-**On failure** (`gh` exits non-zero or `STORY_ISSUE_NUM` is empty):
-- Log: `⚠️ Failed to create GitHub issue for story — proceeding without story issue linkage`
-- Set `STORY_ISSUE_NUM=""`
+The CLI prints the issue **number** — the old `grep -oE '[0-9]+$'` on the URL is
+gone from this and five other blocks, because the CLI does it once.
+
+**On an empty `STORY_ISSUE_NUM`** — whether the create failed or was **deferred**:
+
+- Log: `⚠️ No GitHub issue number for story — proceeding without story issue linkage`
+- Leave `STORY_ISSUE_NUM=""`
+- **Do not write a placeholder into frontmatter.** Not `0`, not `<pending>`. Step
+  S6 below simply does not run. A wrong key is worse than no key: it defeats the
+  idempotent search that stops the *next* run creating a duplicate issue, so a
+  placeholder converts a recoverable state into a permanent one.
 - **Return to the calling skill** — do NOT halt the calling skill.
+
+Under a deferring access mode this is the **two-run convergence**: the run records
+the create as `blocking`, the checklist opens with a banner saying so, and the
+operator creates the issue, writes the number into the story's frontmatter, and
+re-runs. The second run finds `github_issue` present and takes the update path.
+That path already exists — see Step S2, which skips to S6 when the field is set.
 
 ### Step S5: Add to Project Board, Set Priority, Link as Sub-Issue
 
 **Add to GitHub Project board:**
 
 ```bash
-gh project item-add ${PROJECT_NUM} --owner ${OWNER} --url "${STORY_ISSUE_URL}" 2>/dev/null || true
+source references/resolve-platform.sh || exit 1
+tracker_write gh project item-add ${PROJECT_NUM} --owner ${OWNER} \
+  --url "https://github.com/${OWNER}/$(gh repo view --json name -q '.name')/issues/${STORY_ISSUE_NUM}" 2>/dev/null || true
 ```
+
+`tracker_write` infers `github.board.item-add` from the argv, so a restricted run
+records the board add rather than performing it.
 
 **Mirror the priority label onto the board's Priority single-select field:**
 
@@ -157,27 +196,41 @@ bash references/set-github-project-estimate.sh "${STORY_ISSUE_NUM}" "${estimated
 
 **Link story as sub-issue of parent epic** (only if `EPIC_ISSUE_NUM` is non-empty):
 
-The GitHub sub-issues API requires the **internal database id** of the child issue, not its visible issue number. It must be passed as a typed integer (`-F`), not a string (`-f`):
+The GitHub sub-issues API needs the child's **internal database id**, which a
+preceding `gh api` call must fetch — a fetch-then-mutate pair. The CLI performs
+both, and under a deferring mode records them as **one** composite record:
 
 ```bash
-if [ -n "${EPIC_ISSUE_NUM}" ]; then
-  REPO_NAME=$(gh repo view --json name -q '.name')
-  SUB_ID=$(gh api /repos/${OWNER}/${REPO_NAME}/issues/${STORY_ISSUE_NUM} --jq .id 2>/dev/null)
-  if [ -n "$SUB_ID" ]; then
-    gh api \
-      --method POST \
-      -H "Accept: application/vnd.github+json" \
-      /repos/${OWNER}/${REPO_NAME}/issues/${EPIC_ISSUE_NUM}/sub_issues \
-      -F sub_issue_id="$SUB_ID" 2>/dev/null \
-      && echo "✅ Story #${STORY_ISSUE_NUM} linked as sub-issue of Epic #${EPIC_ISSUE_NUM}." \
-      || echo "⚠️ Sub-issue linking failed — story issue created but not hierarchically linked."
-  fi
+if [ -n "${EPIC_ISSUE_NUM}" ] && [ -n "${STORY_ISSUE_NUM}" ]; then
+  node references/tracker-issue.js \
+    --kind sub-issue-link \
+    --issue "${STORY_ISSUE_NUM}" \
+    --parent "${EPIC_ISSUE_NUM}" \
+    && echo "✅ Story #${STORY_ISSUE_NUM} linked as sub-issue of Epic #${EPIC_ISSUE_NUM}." \
+    || echo "⚠️ Sub-issue linking failed — story issue created but not hierarchically linked."
 fi
 ```
+
+**One record, not two, and that is deliberate.** Emitting the fetch and the mutate
+separately would produce two checklist items neither of which a human can perform
+alone: the fetch changes nothing, and the mutate has no id to send. The record's
+`manual` path routes around the internal id entirely, because the GitHub UI takes
+the visible issue number.
+
+The `[ -n "${STORY_ISSUE_NUM}" ]` guard is what makes this safe after a deferred
+create — with no issue number there is nothing to link, and the link is recorded
+on the second run alongside everything else.
 
 All three operations are non-blocking — log warnings on failure, continue.
 
 ### Step S6: Write `github_issue` to Story Frontmatter and Insert Body Link
+
+> **Skip this entire step when `STORY_ISSUE_NUM` is empty.** That is the state
+> after a failed *or deferred* create, and there is nothing to write. Writing a
+> placeholder instead — `0`, `<pending>`, an empty value — is specifically
+> forbidden: the next run's idempotent lookup keys off this field, so a wrong
+> value makes it create a **second** issue rather than finding the first. No
+> value at all is what lets the second run converge.
 
 Write `github_issue: {STORY_ISSUE_NUM}` to the story file's YAML frontmatter:
 - Locate the closing `---` of the frontmatter block.

@@ -475,8 +475,22 @@ assert_stderr_has "non-full mode → names what is still written"  "still procee
 assert_stderr_has "non-full mode → names the gated Jira paths"   "Jira REST via jira-sync.js"
 assert_stderr_has "non-full mode → names the gated GitHub board helpers" "GitHub board-field helpers"
 assert_stderr_has "non-full mode → names tracker_write as gated" "tracker_write"
-assert_stderr_has "non-full mode → names the remaining GitHub gap" "gh issue create"
+# task.56 CLOSED the gap this line used to pin. Until then the notice named
+# `gh issue create` and the sub-issue link as paths that "still proceed normally",
+# because tracker_write cannot return the value those calls produce.
+# tracker-issue.js can — it is a CLI, not a wrapper — so the assertion moved with
+# the coverage rather than the notice being bent to satisfy a stale test.
+assert_stderr_has "non-full mode → names the GitHub issue lifecycle as gated" "tracker-issue.js"
 assert_stderr_has "non-full mode → names raw curl / MCP as a gap"  "raw curl or the Atlassian MCP tools"
+
+# The other direction: claiming those calls are still ungated now UNDERSTATES
+# coverage, which sends an operator hunting for a mutation the run already
+# recorded. Both directions, always — that is this block's whole point.
+if grep -q "GitHub calls whose output the caller captures" "$STDERR_FILE"; then
+  fail "non-full mode → no stale 'caller captures' gap claim" "absent" "present"
+else
+  pass "non-full mode → no stale 'caller captures' gap claim"
+fi
 
 # The gap wording must not survive its own closure. `gh issue comment` IS gated as of task.54, so a
 # banner still describing "all GitHub issue and PR writes" as unprotected is stale — the exact

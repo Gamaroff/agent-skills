@@ -484,15 +484,19 @@ fi
 #   - the two GitHub board-field helpers (set-github-project-{priority,estimate}.sh) and every `gh`
 #     mutation routed through `tracker_write` below — ~38 call sites, covering `gh issue comment`,
 #     `gh pr comment`, `gh issue close` and the rest — are deferred and recorded (task.54);
-#   - NOT gated: Jira writes issued as raw `curl` from skill prose (create-issue, review-task) or
-#     through the Atlassian MCP tools, and the handful of GitHub calls whose stdout the caller
-#     consumes — `gh issue create` and the sub-issue-link graphql call — which cannot be wrapped
-#     without returning an empty capture to the caller (task.56 gives them a CLI instead).
+#   - the GitHub issue lifecycle — create, edit, close, reopen, milestone create and the
+#     sub-issue link — goes through `tracker-issue.js`, a CLI rather than a wrapper because
+#     its callers CAPTURE its stdout. Under a deferring mode it records the mutation and
+#     prints nothing, so the caller's `$( )` is empty by contract; a create additionally
+#     records `blocking: true` and the checklist opens with the two-run convergence
+#     instruction (task.56);
+#   - NOT gated: Jira writes issued as raw `curl` from skill prose or through the Atlassian
+#     MCP tools.
 # Keep this notice accurate as each one lands; a warning that overstates coverage is worse than none.
 # CR-5: the previous wording claimed every Jira write was covered, which the raw-curl and MCP
 # paths falsify. Name the gated paths instead of generalising over them.
 if [ "$ACCESS_TRACKER" != "full" ]; then
-  printf '⚠️  access.tracker=%s is PARTIALLY ENFORCED — Jira REST via jira-sync.js, the sprint scripts, board/status moves, the GitHub board-field helpers and every gh mutation routed through tracker_write are deferred and recorded, but Jira writes made by raw curl or the Atlassian MCP tools, and the GitHub calls whose output the caller captures (gh issue create, sub-issue links), still proceed normally.\n' \
+  printf '⚠️  access.tracker=%s is PARTIALLY ENFORCED — Jira REST via jira-sync.js, the sprint scripts, board/status moves, the GitHub board-field helpers, every gh mutation routed through tracker_write, and the GitHub issue lifecycle via tracker-issue.js (create, edit, close, reopen, milestone, sub-issue link) are deferred and recorded, but Jira writes made by raw curl or the Atlassian MCP tools still proceed normally.\n' \
     "$ACCESS_TRACKER" >&2
 fi
 

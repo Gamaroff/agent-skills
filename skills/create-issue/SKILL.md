@@ -276,18 +276,37 @@ fi
 **GitHub:**
 
 ```bash
-issue_url=$(gh issue create \
+issue_number=$(node references/tracker-issue.js \
+  --kind create \
   --title "[Story 180.3] Debounce timing needs adjustment" \
   --body-file "$body_file" \
   --label "enhancement" \
   --label "story.180")
-issue_number="${issue_url##*/}"
-issue_url="$issue_url"
+# REPO_SLUG is already derived from $REMOTE_URL during platform detection above
+# — reuse it. The earlier fix here referenced ${OWNER}/${REPO_NAME}, which this
+# skill never assigns (producing https://github.com///issues/N); the fix after
+# that added a `gh repo view` call, which was worse: a network call on a path
+# whose create may have just been DEFERRED, shadowing a value that was already
+# correct and free.
 ```
 
-Post-create verification:
+The CLI prints the issue **number**, so the old `${issue_url##*/}` split is gone.
+
+**On an empty `issue_number`** — a failed or **deferred** create — stop here and
+report it. Do not fabricate a number and do not continue to the verification
+below: there is no issue to verify. Under a deferring access mode the create is
+recorded as `blocking`, and the checklist tells the operator to create the issue
+by hand. See [`references/tracker-issue-cli.md`](./references/tracker-issue-cli.md).
+
+Post-create verification (skip when `issue_number` is empty):
 
 ```bash
+# The guard comes FIRST. Everything below — the URL, the read-back — assumes an
+# issue exists, and under a deferring access mode it does not.
+[ -z "$issue_number" ] && exit 0
+
+issue_url="https://github.com/${REPO_SLUG}/issues/${issue_number}"
+
 created_body=$(gh issue view "$issue_number" --json body --jq '.body')
 if echo "$created_body" | grep -Eq '(_PLACEHOLDER|\{[a-z_]+\})'; then
   echo "ERROR: created issue #$issue_number has unsubstituted tokens:" >&2

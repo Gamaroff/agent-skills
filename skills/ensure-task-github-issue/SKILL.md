@@ -58,10 +58,13 @@ Determine `MILESTONE_TITLE` in this order:
 If the chosen milestone does not yet exist on the repo, auto-create it (idempotent):
 
 ```bash
-gh api repos/${OWNER}/${REPO_NAME}/milestones \
-  -f title="${MILESTONE_TITLE}" \
-  -f state="open" 2>/dev/null || true
+node references/tracker-issue.js \
+  --kind milestone --title "${MILESTONE_TITLE}" --quiet 2>/dev/null || true
 ```
+
+The CLI is resolve-or-create: an existing title is reused and reported as
+`already`, so this is safe to run on every pass. Under a deferring access mode it
+records the create and prints nothing — see [`references/tracker-issue-cli.md`](./references/tracker-issue-cli.md).
 
 ### Step T4: Dedup Search — Look for Pre-Existing Task Issue
 
@@ -110,14 +113,24 @@ which is also what the Jira path enforces in code. Read it before changing this
 template. Anything trimmed must be announced with an accurate count; a reader who
 is not told they are seeing part of something believes they saw all of it.
 
+Write the body to a file first. **Always `--body-file`, never an inline `--body`**:
+the body carries backticks, `$(…)` and newlines, and an inline `--body` is a
+shell injection waiting for the first task whose success criteria contain one.
+The file is also what carries the body into the deferred record's `command.stdin`.
+
+> **The heredoc below is unquoted, and that is a real residual risk — not a
+> solved problem.** `<<EOF` still performs command substitution, so a `$(…)` or a
+> backticked span in the document's own text is executed while the body is being
+> written. `--body-file` removes the *argv* injection surface, which is the larger
+> one; it does not remove this. Where the source text is untrusted, write the file
+> with the editor tool instead of a heredoc. `<<'EOF'` is not the fix here — it
+> would also stop the `${…}` values below from being substituted, which the body
+> needs.
+
 ```bash
-TASK_ISSUE_URL=$(gh issue create \
-  --title "[Task ${TASK_N}] ${TASK_TITLE}" \
-  --project "${PROJECT_NAME}" \
-  --label "task" \
-  --label "priority:${priority}" \
-  --milestone "${MILESTONE_TITLE}" \
-  --body "## Summary
+mkdir -p .claude/state
+cat > .claude/state/issue-body.md <<EOF
+## Summary
 
 {First paragraph of the task's Overview section — 2-4 sentences}
 
@@ -145,30 +158,63 @@ the common case. Never leave an empty heading behind.}
 ## Document
 
 📄 [Task Document](${DOC_URL})
-📁 \`${TASK_RELATIVE_PATH}\`")
+📁 \`${TASK_RELATIVE_PATH}\`
+EOF
 
-TASK_ISSUE_NUM=$(echo "$TASK_ISSUE_URL" | grep -oE '[0-9]+$')
+TASK_ISSUE_NUM=$(node references/tracker-issue.js \
+  --kind create \
+  --title "[Task ${TASK_N}] ${TASK_TITLE}" \
+  --body-file .claude/state/issue-body.md \
+  --label "task" \
+  --label "priority:${priority}" \
+  --milestone "${MILESTONE_TITLE}")
 ```
 
-**On failure** (`gh` exits non-zero or `TASK_ISSUE_NUM` is empty):
+The CLI prints the issue **number** — the old `grep -oE '[0-9]+$'` on the URL is
+gone, because the CLI does it once for every call site.
 
-- Log: `⚠️ Failed to create GitHub issue for task — proceeding without task issue linkage`
-- Set `TASK_ISSUE_NUM=""`
+**On an empty `TASK_ISSUE_NUM`** — whether the create failed or was **deferred**:
+
+- Log: `⚠️ No GitHub issue number for task — proceeding without task issue linkage`
+- Leave `TASK_ISSUE_NUM=""`
+- **Do not write a placeholder into frontmatter.** Not `0`, not `<pending>`. Step
+  T7 simply does not run. A wrong key is worse than no key: it defeats the
+  idempotent dedup search in Step T4 that stops the *next* run creating a
+  duplicate issue, so a placeholder converts a recoverable state into a permanent
+  one.
 - **Return to the calling skill** — do NOT halt the calling skill.
+
+Under a deferring access mode this is the **two-run convergence**: the run records
+the create as `blocking`, the checklist opens with a banner saying so, and the
+operator creates the issue, writes the number into the task's frontmatter, and
+re-runs. The second run finds `github_issue` present and takes the update path.
 
 ### Step T6: Add to Project Board and Set Priority
 
 ```bash
-gh project item-add ${PROJECT_NUM} --owner ${OWNER} --url "${TASK_ISSUE_URL}" 2>/dev/null || true
+source references/resolve-platform.sh || exit 1
+tracker_write gh project item-add ${PROJECT_NUM} --owner ${OWNER} \
+  --url "https://github.com/${OWNER}/${REPO_NAME}/issues/${TASK_ISSUE_NUM}" 2>/dev/null || true
 bash references/set-github-project-priority.sh "${TASK_ISSUE_NUM}" "${priority}" || true
 bash references/set-github-project-estimate.sh "${TASK_ISSUE_NUM}" "${estimated_effort_hours}" || true
 ```
+
+`tracker_write` infers `github.board.item-add` from the argv, so a restricted run
+records the board add rather than performing it. Skip this step entirely when
+`TASK_ISSUE_NUM` is empty — there is no issue to add.
 
 Both operations are non-blocking — log warnings on failure, continue.
 
 Tasks are **standalone** — no sub-issue linking step. If a task happens to also have an `epic` frontmatter field, the milestone lookup in Step T3 covers the relationship; no separate sub-issue API call is made.
 
 ### Step T7: Write `github_issue` to Task Frontmatter and Insert Body Link
+
+> **Skip this entire step when `TASK_ISSUE_NUM` is empty.** That is the state
+> after a failed *or deferred* create, and there is nothing to write. Writing a
+> placeholder instead — `0`, `<pending>`, an empty value — is specifically
+> forbidden: Step T4's dedup search keys off this field, so a wrong value makes
+> the next run create a **second** issue rather than finding the first. No value
+> at all is what lets the second run converge.
 
 Write `github_issue: {TASK_ISSUE_NUM}` to the task file's YAML frontmatter:
 

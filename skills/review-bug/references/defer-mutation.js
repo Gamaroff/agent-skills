@@ -62,7 +62,7 @@ const ROSTER_DOC = "tracker-access-record.md";
 
 // Asserted, not merely non-zero. A reformatted row used to truncate the roster
 // silently; pinning the count turns that into an immediate, explicit failure.
-const EXPECTED_KIND_COUNT = 22;
+const EXPECTED_KIND_COUNT = 23;
 
 const ACCESS_MODES = Object.freeze([
   "full",
@@ -146,7 +146,7 @@ function parseRoster(text) {
       if (cells[0].includes("`")) {
         throw new Error(
           `${ROSTER_DOC}: row "${cells[0]}" sits in a kind table but does not ` +
-            `parse as a kind. Keep the shape documented under "The 22 kinds" — ` +
+            `parse as a kind. Keep the shape documented under "The 23 kinds" — ` +
             `a single backtick-quoted token, no other markup.`,
         );
       }
@@ -173,7 +173,7 @@ function parseRoster(text) {
   if (roster.size !== EXPECTED_KIND_COUNT) {
     throw new Error(
       `${ROSTER_DOC}: parsed ${roster.size} kinds, expected ${EXPECTED_KIND_COUNT}. ` +
-        `Either the roster table shape changed (see the note under "The 21 kinds") ` +
+        `Either the roster table shape changed (see the note under "The 23 kinds") ` +
         `or a kind was added/removed without updating EXPECTED_KIND_COUNT in ` +
         `defer-mutation.js. Both halves must move together — that is what stops a ` +
         `silent truncation from looking like a smaller roster.`,
@@ -1091,6 +1091,13 @@ function buildRecord(input, opts = {}) {
     command: input.command || null,
     verify: input.verify || null,
 
+    // `=== true`, never truthiness: a caller passing the STRING "false" — which is
+    // what every shell chokepoint passes, since a shell has no booleans — would
+    // otherwise mark the record blocking and put a banner at the top of a
+    // checklist that has nothing blocking in it. A banner that cries wolf is
+    // worse than no banner, because the one run that IS blocked then reads the
+    // same as the twenty that were not.
+    blocking: input.blocking === true || input.blocking === "true",
     retry_of: input.retry_of || null,
   };
 
@@ -1194,6 +1201,7 @@ Common:
   --produces <sym>      symbol this action yields
   --depends-on <ids>    comma-separated record ids
   --satisfied           mark already-correct
+  --blocking            nothing after this can proceed until a human performs it
   --retry-of <id>       this is a FAILED full-access mutation, not a policy deferral
 
 Renderings:
@@ -1244,6 +1252,9 @@ function parseArgs(argv) {
         break;
       case "--satisfied":
         args.satisfied = true;
+        break;
+      case "--blocking":
+        args.blocking = true;
         break;
       case "--kind":
         args.kind = need(i, a);
@@ -1445,6 +1456,7 @@ function run({
       produces: args.produces,
       dependsOn: args.dependsOn,
       satisfied: args.satisfied,
+      blocking: args.blocking,
       retry_of: args.retryOf,
       target: parseJsonFlag(args.target, "--target"),
       desired: parseJsonFlag(args.desired, "--desired"),

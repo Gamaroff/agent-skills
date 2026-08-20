@@ -464,8 +464,13 @@ This is a **separate concern** that merely used to share a GraphQL response with
   P2_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith("P2")) | .id // empty')
 
   # Only when the field exists and is currently unset — never overwrite a human's choice.
+  #
+  # `tracker_write` wraps the mutation so a restricted run records a
+  # `github.board.field-set` instead of performing it. The READS above stay bare:
+  # they are GETs, and gating a read would break the very check that decides
+  # whether a mutation is needed at all.
   if [ -n "$ITEM_ID" ] && [ -n "$PROJECT_ID" ] && [ -n "$PRIORITY_FIELD_ID" ] && [ -n "$P2_OPTION_ID" ] && [ -z "$CURRENT_PRIORITY" ]; then
-    gh api graphql -f query='
+    tracker_write gh api graphql -f query='
     mutation {
       updateProjectV2ItemFieldValue(input: {
         projectId: "'"$PROJECT_ID"'"

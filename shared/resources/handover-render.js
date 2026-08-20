@@ -14,7 +14,7 @@
 // totality test as the other three, because a run-end block that silently omits
 // an action is the same invisible-drift failure as a checklist that does.
 //
-// THE INVARIANT THAT MATTERS MOST IS TOTALITY. Every one of the 21 kinds must
+// THE INVARIANT THAT MATTERS MOST IS TOTALITY. Every one of the 23 kinds must
 // render in all four outputs. There is deliberately NO silent `default:` case
 // anywhere below: an unknown kind raises, and the roster is read from the schema
 // doc rather than a list in this file, so adding a kind without a renderer fails
@@ -82,6 +82,7 @@ const KIND_PRESENTATION = Object.freeze({
   "github.issue.close": { verb: "Close", noun: "GitHub issue" },
   "github.issue.reopen": { verb: "Reopen", noun: "GitHub issue" },
   "github.issue.comment": { verb: "Comment on", noun: "GitHub issue" },
+  "github.milestone.create": { verb: "Create", noun: "GitHub milestone" },
   "github.sub-issue.add": {
     verb: "Attach as a sub-issue",
     noun: "GitHub issue",
@@ -259,6 +260,17 @@ function buildModel(records, ctx = {}) {
   // than three succeeding and one throwing halfway through a file write.
   for (const r of sorted) presentationFor(r.kind);
 
+  // Blocking records, computed ONCE here so both renderers read the same list.
+  // Deriving it separately in `md` and in `summary` is how the two end up
+  // disagreeing about whether a run is blocked — and the whole point of the
+  // banner is that the two agree loudly.
+  //
+  // Only OUTSTANDING records can block. A blocking record that is `satisfied`
+  // (the value already exists) or is a `failure` retry has nothing left to
+  // block on, and banner-ing it would tell an operator to go and perform an
+  // action that is already done.
+  const blocking = outstanding.filter((r) => r.blocking === true);
+
   return {
     v: dm.SCHEMA_VERSION,
     all: sorted,
@@ -266,6 +278,7 @@ function buildModel(records, ctx = {}) {
     satisfied,
     failures,
     unrecorded,
+    blocking,
     warnings: warnings.concat(ctx.warnings || []),
     bySystem: groupBySystem(outstanding),
     counts: {
@@ -274,6 +287,7 @@ function buildModel(records, ctx = {}) {
       satisfied: satisfied.length,
       failures: failures.length,
       unrecorded: unrecorded.length,
+      blocking: blocking.length,
     },
     context: {
       run: ctx.run || (sorted[0] && sorted[0].run) || "",
@@ -363,11 +377,59 @@ function renderMarkdown(model) {
   if (ctx.access) L.push(`| Access mode | \`${ctx.access}\` |`);
   if (ctx.workItem) L.push(`| Work item | ${ctx.workItem} |`);
   L.push(`| Outstanding | ${model.counts.outstanding} |`);
+  if (model.counts.blocking)
+    L.push(`| **Blocking** | **${model.counts.blocking}** |`);
   if (model.counts.failures)
     L.push(`| Failed (full access) | ${model.counts.failures} |`);
   if (model.counts.satisfied)
     L.push(`| Already correct | ${model.counts.satisfied} |`);
   L.push("");
+
+  // ── The blocking banner ───────────────────────────────────────────────────
+  //
+  // AT THE TOP, not in document order, and that placement is the entire point.
+  // These records yield a value nothing else can supply, so until a human
+  // performs them the run cannot converge — and a blocking record sitting at
+  // position 17 of a checklist is a blocking record nobody does first.
+  //
+  // It also has to explain the two-run convergence, because the failure mode it
+  // guards against is silent: the operator re-runs, the run does nothing again
+  // (the key still is not in the document), and a run that appears to do nothing
+  // twice is indistinguishable from a broken one.
+  if (model.blocking.length) {
+    L.push("## 🚫 BLOCKING — do these first");
+    L.push("");
+    L.push(
+      "The run stopped short of writing values it could not obtain. Each action below " +
+        "yields something later steps need, and nothing else can supply it.",
+    );
+    L.push("");
+    L.push("**After performing each one:**");
+    L.push("");
+    L.push(
+      "1. Copy the value it produced (an issue number, a milestone number).",
+    );
+    L.push(
+      "2. Write it into the document's frontmatter — the field is named below.",
+    );
+    L.push("3. Re-run the skill. It will find the value present and carry on.");
+    L.push("");
+    L.push(
+      "> Re-running **without** step 2 does nothing at all, every time. That is not a " +
+        "bug — the run has no way to learn the value except from the document. No " +
+        "placeholder was written on your behalf, because a wrong key would defeat the " +
+        "duplicate guard and leave you with two issues instead of none.",
+    );
+    L.push("");
+    for (const rec of model.blocking) {
+      const p = presentationFor(rec.kind);
+      L.push(
+        `- 🚫 **${p.verb} ${p.noun}** — ${rec.intent}` +
+          (rec.produces ? ` → yields \`${rec.produces}\`` : ""),
+      );
+    }
+    L.push("");
+  }
 
   if (model.counts.outstanding === 0 && model.counts.failures === 0) {
     L.push("✅ Nothing outstanding.");
@@ -829,15 +891,37 @@ function renderSummary(model) {
   }
 
   const bits = [`${c.outstanding} outstanding`];
+  if (c.blocking) bits.push(`**${c.blocking} BLOCKING**`);
   if (c.failures) bits.push(`${c.failures} failed`);
   if (c.satisfied) bits.push(`${c.satisfied} already correct`);
   if (c.unrecorded) bits.push(`${c.unrecorded} unrecorded`);
   L.push(
-    `${c.outstanding + c.failures > 0 ? "⚠️" : "✅"} ${bits.join(" · ")}${
+    `${c.blocking > 0 ? "🚫" : c.outstanding + c.failures > 0 ? "⚠️" : "✅"} ${bits.join(" · ")}${
       model.context.access ? ` (access: \`${model.context.access}\`)` : ""
     }`,
   );
   L.push("");
+
+  // The summary's twin of the markdown banner. This block is what a reader of
+  // the implementation report sees without opening the checklist, so it must
+  // carry the convergence instruction too — not merely a count. A number alone
+  // reads as "some things are pending", which is exactly the reading that leads
+  // to a second no-op run and a bug report.
+  if (model.blocking.length) {
+    L.push(
+      "**🚫 Blocking — the run cannot converge until these are done by hand.** " +
+        "Perform each one, write the value it produces into the document's frontmatter, " +
+        "then re-run. Re-running without writing the value changes nothing.",
+    );
+    for (const rec of model.blocking) {
+      L.push(
+        `- 🚫 ${headline(rec)}` +
+          (rec.produces ? ` → yields \`${rec.produces}\`` : "") +
+          ` \`${rec.id}\``,
+      );
+    }
+    L.push("");
+  }
 
   for (const [system, recs] of model.bySystem) {
     L.push(`**${SYSTEM_LABEL[system] || system}**`);
