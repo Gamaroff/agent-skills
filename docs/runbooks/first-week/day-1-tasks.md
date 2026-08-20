@@ -18,6 +18,7 @@ created: 2026-05-13
 - Node ≥ 20 (`node --version`)
 - A working agent CLI (e.g. Claude Code with skills installed). First-time setup: `bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/scripts/setup-consumer.sh)`
 - A clone of this repo with a clean working tree on `develop`
+- Tracker access decided — this walkthrough assumes `access: full` (the default). If the agent must not hold a tracker write token, read [Restricted tracker access](../../concepts/restricted-access.md) first: the pipeline still completes, but each task ends with a committed handover checklist instead of board moves
 
 ---
 

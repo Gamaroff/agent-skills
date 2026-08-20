@@ -50,6 +50,8 @@ const CATALOG = "docs/reference/skill-catalog.md";
 const DOCS_INDEX = "docs/README.md";
 const CONCEPTS_INDEX = "docs/concepts/README.md";
 const RUNBOOKS_INDEX = "docs/runbooks/README.md";
+const FIRST_WEEK = "docs/runbooks/first-week.md";
+const FIRST_WEEK_DAY1 = "docs/runbooks/first-week/day-1-tasks.md";
 const SKILL = "skills/tracker-reconcile/SKILL.md";
 
 const VOCABULARY = [
@@ -141,6 +143,33 @@ test("new pages are reachable from the docs indexes", () => {
   assert.ok(exists(CONCEPT));
   assert.ok(exists(DECISION));
   assert.ok(exists(RUNBOOK));
+});
+
+test("first-week onboarding signposts restricted access", () => {
+  // The First-Week runbook is step 4 of the root README's Learning Path and
+  // silently assumed `access: full` for a full task cycle after the
+  // restricted-access layer shipped — a newcomer without a write token hit an
+  // unexplained wall mid-week. The index-reachability test above stayed green
+  // throughout, because the gap was an omission in a walkthrough, not a
+  // missing index entry. This asserts the signpost exists at both surfaces a
+  // Day-1 reader actually opens.
+  const index = read(FIRST_WEEK);
+  const day1 = read(FIRST_WEEK_DAY1);
+  assert.match(
+    index,
+    /restricted-access\.md/,
+    `${FIRST_WEEK} must link the restricted-access concept before Day 1`,
+  );
+  assert.match(
+    index,
+    /which-access\.md/,
+    `${FIRST_WEEK} must link the access-model decision guide`,
+  );
+  assert.match(
+    day1,
+    /restricted-access\.md/,
+    `${FIRST_WEEK_DAY1} prerequisites must name the tracker-access decision`,
+  );
 });
 
 test("tracker-reconcile is registered honestly", () => {
