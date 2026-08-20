@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.44.0] - 2026-08-20
+
 ### Added
 
 - **Read-only verification and `/tracker-reconcile` — the handover checklist is now a ledger, not a
