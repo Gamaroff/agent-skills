@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.43.0] - 2026-08-20
+
 ### Added
 
 - **`/develop-next` and `/develop-batch` can reach bug work — the selector now dispatches
