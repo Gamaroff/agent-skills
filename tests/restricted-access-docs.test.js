@@ -268,3 +268,61 @@ test("concept and decision pages include a mermaid diagram", () => {
   assert.match(read(DECISION), /```mermaid/);
   assert.match(read(RUNBOOK), /```mermaid/);
 });
+
+test("the accept gap is a DECISION: finalise accepts locally AND records the debt — both, or red", () => {
+  // task.57 pinned this deliberately so a future reader cannot quietly "fix"
+  // the accept gap into a halt. finalise writes `status: accepted` under every
+  // access mode; the restricted modes additionally record the debt loudly.
+  // Weakening EITHER half — refusing to accept, or accepting silently — must
+  // fail here.
+  const step7 = read("shared/resources/develop-pipeline-step-7-finalise.md");
+  assert.match(
+    step7,
+    /writes `status: accepted` and moves on, \*\*by design\*\*/,
+    "step-7 must state that finalise accepts locally under restricted modes — " +
+      "the accept gap is a decision, not a bug to halt on",
+  );
+  assert.match(
+    step7,
+    /\*\*Tracker debt:?\*\*/,
+    "the debt line must be specified",
+  );
+  assert.match(step7, /## Tracker Actions Required/);
+  assert.match(
+    step7,
+    /both-or-red|never one without the other/,
+    "the both-or-red coupling must be stated on the checklist item",
+  );
+  assert.doesNotMatch(
+    step7,
+    /do not write `status: accepted` under|refuse to accept under/i,
+    "the accept gap must never be re-read as a reason to withhold acceptance",
+  );
+
+  // The two standing-rule amendments that stop the deferral being read as the
+  // prohibited Step 7 skip.
+  const anti = read("docs/reference/anti-patterns.md");
+  assert.match(
+    anti,
+    /restricted-access deferral is not this skip/i,
+    "anti-patterns.md must carry the amendment paragraph",
+  );
+  assert.match(anti, /tracker-reconcile/);
+  const faq = read("docs/reference/faq.md");
+  assert.match(
+    faq,
+    /deferred, not skipped/i,
+    "faq.md must carry the amendment paragraph",
+  );
+
+  // And the report templates carry the debt line, so a restricted run's
+  // Completion block cannot read "Completed" with the gap unstated.
+  const step0 = read(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  const debtLines = step0.match(/\*\*Tracker debt\*\*/g) || [];
+  assert.ok(
+    debtLines.length >= 2,
+    "both implementation-report templates must carry the Tracker debt line",
+  );
+});

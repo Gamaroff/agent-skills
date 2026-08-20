@@ -722,6 +722,7 @@ _Track each QA review/fix cycle._
 **PR**: {populated after Step 4}
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
+**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
 ```
 
 #### develop-task implementation report template
@@ -815,6 +816,7 @@ _Track each QA review/fix cycle._
 **PR**: {populated after Step 4}
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
+**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
 ```
 
 ---

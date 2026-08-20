@@ -72,8 +72,9 @@ One JSON object per line of the journal. Field order below is the canonical orde
     "ui_url": "https://acme.atlassian.net/browse/PROJ-123"
   },
   "desired":   { "status": "In Review" },
-  "observed":  null,             // read-only mode populates; task.57
+  "observed":  null,             // the verification pass populates (handover-verify.js)
   "satisfied": false,            // true → already correct, collapsed by the renderers
+  "verification": null,          // optional; written by handover-verify.js — see §Verification
 
   "manual": {
     "deepLink": "https://acme.atlassian.net/browse/PROJ-123",
@@ -112,8 +113,9 @@ One JSON object per line of the journal. Field order below is the canonical orde
 | `intent` | string | yes | One line, imperative, human-facing. Never an argv restatement. |
 | `target` | object | yes | `url` is *the object*; `ui_url` is *where you perform the action*. They differ for board-field sets and sprint operations. |
 | `desired` | object \| null | yes | The state wanted. |
-| `observed` | object \| null | yes | `null` until task.57 populates it. |
-| `satisfied` | boolean | yes | `true` → collapsed into "already correct" by every renderer. |
+| `observed` | object \| null | yes | `null` until the verification pass (`handover-verify.js`) populates it. Holds the observed value — for a value read that has not yet reached the desired state, this is the **pre-action baseline** later passes use to detect `divergent`. |
+| `satisfied` | boolean | yes | `true` → collapsed into "already correct" by every renderer — ticked and struck through, never deleted. |
+| `verification` | object \| null | no | Written by `handover-verify.js` / `/tracker-reconcile`: `{state, at, observed, detail, baseline?}` where `state` ∈ `satisfied` · `pending` · `divergent` · `unverifiable`. Kept verbatim (timestamp included) when a re-read agrees, which is what makes reconciling twice byte-identical. `unverifiable` is **never** coerced to `satisfied`. |
 | `manual` | object \| null | yes | `null` only when the kind genuinely has no UI path. |
 | `command` | object \| null | yes | `argv` is an **array** — never a joined string. `stdin` carries bodies. |
 | `verify` | object \| null | no | Omitted when there is no cheap read-back. |

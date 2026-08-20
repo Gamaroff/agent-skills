@@ -48,7 +48,7 @@ flowchart TD
 A write token is whatever would let the agent create issues, comment, or move cards (a `gh` login with `repo`/`project` scopes, or `JIRA_API_TOKEN` with write).
 
 - **Yes, and it may write unattended** → `full`. Omit the `access:` block entirely if that is the default you want.
-- **Yes, but a human must confirm before each write** → `approve`. **Limit:** today this mode **defers like the others**; there is no ask prompt yet. That prompt is [task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md) (`planned`, not shipped). Until then, treat `approve` as "credentials present, writes still handed over".
+- **Yes, but a human must confirm first** → `approve`. Writes are deferred during the run and confirmed **once, batched, at handover** — approved records then execute via the committed script. Not per-mutation, by design: one prompt per run keeps the confirmation meaningful. Without a tty (CI, autonomous runs) it degrades to `command` — the operator gets the script; consent is never assumed.
 - **No write token** → continue to Question 2.
 
 ---
@@ -74,7 +74,7 @@ A read token lets the agent see current column, issue body, and comments. It doe
 | Situation | Mode |
 |-----------|------|
 | Agent has write credentials; unattended board updates are wanted | `full` |
-| Agent has write credentials; a human must confirm (prompt **not shipped**) | `approve` |
+| Agent has write credentials; a human confirms once at handover | `approve` |
 | Agent may read the tracker, not write | `read-only` |
 | No token; a human will run the generated script | `command` |
 | No token; a human will click the board | `manual` |

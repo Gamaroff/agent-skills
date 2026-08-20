@@ -93,11 +93,11 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 
 Which family fires is resolved per-run, not chosen by hand — see [platform detection](../../shared/resources/platform-detection.md) and [tracker workflow](./tracker-workflow.md).
 
-### Restricted access — not shipped
+### Restricted access
 
 | Command | What it does | Reference |
 |---|---|---|
-| `/tracker-reconcile` | **Not shipped** ([task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md)). Re-read a committed handover and report (or, when allowed, apply) what is still outstanding. Until it lands, work the `.md` checklist or the `.sh` by hand. | [Restricted access](../concepts/restricted-access.md), [runbook](../runbooks/restricted-access.md) |
+| `/tracker-reconcile [<dir> \| <handover.json> \| --all] [--apply] [--json]` | Re-read a committed handover against the live board — tick `satisfied`, flag `divergent`, mark `unverifiable` — and report what is still outstanding. Check-only by default; `--apply` executes only under `access.tracker: full` and is refused (naming the blocker) under every other mode. | [`tracker-reconcile`](../../skills/tracker-reconcile/SKILL.md), [Restricted access](../concepts/restricted-access.md), [runbook](../runbooks/restricted-access.md) |
 
 
 ## Sprint & ceremony

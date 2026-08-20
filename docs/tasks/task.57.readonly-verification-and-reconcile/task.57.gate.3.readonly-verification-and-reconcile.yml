@@ -1,0 +1,112 @@
+schema: 1
+task: 'task.57.readonly-verification-and-reconcile'
+task_title: '[Task 57] Read-only verification, and /tracker-reconcile so the checklist is a ledger rather than a receipt'
+gate: PASS
+status_reason: >-
+  All cycle-2 fixes verified; the four cycle-3 coherence findings (CR3-1..CR3-4) and both
+  cleanups fixed in the same cycle and quick-verified: SKILL.md documents the retention
+  exception, retained ticks render as "ticked previously; could not confirm", the debt line
+  names artifacts by glob, the full-mode no-artifact path is an allowed checklist outcome, and
+  USAGE/JSDoc refreshed. Suite 1653/0; no high or unresolved findings remain.
+reviewer: 'QA Engineer'
+updated: '2026-08-20T08:20:00Z'
+
+top_issues:
+  - id: CR3-1
+    status: closed
+    fixed_date: '2026-08-20'
+    severity: medium
+    finding: >-
+      The retention keeps `satisfied: true` through an unverifiable fresh read, while
+      tracker-reconcile SKILL.md's state table and "never coerced" invariant read as if any
+      unverifiable state renders unticked — contract and code disagree.
+    suggested_action: >-
+      Keep the semantics (a tick backed by earlier positive evidence survives silence; a
+      never-ticked action never gains a tick without evidence) and update SKILL.md + the task's
+      Decisions wording to state the retention exception; mark retained ticks in the annotation.
+    suggested_owner: dev
+  - id: CR3-2
+    status: closed
+    fixed_date: '2026-08-20'
+    severity: medium
+    finding: >-
+      The Tracker-debt template and §4 PR-comment instruction hardcode `{prefix}.handover.{n}.{name}.md`,
+      which single-format `command`/`read-only` runs no longer write.
+    suggested_action: Name the artifacts by glob `{prefix}.handover.{n}.{name}.*` in both places.
+    suggested_owner: dev
+  - id: CR3-3
+    status: closed
+    fixed_date: '2026-08-20'
+    severity: medium
+    finding: >-
+      `full`'s no-artifact path cannot satisfy the accept-gap checklist item or §4's "committed
+      *.handover.* files" wording — a gate full can never pass as written.
+    suggested_action: Add the full/no-artifact carve-out to §4 and the checklist item.
+    suggested_owner: dev
+  - id: CR3-4
+    status: closed
+    fixed_date: '2026-08-20'
+    severity: low
+    finding: >-
+      A retained tick renders under "verified already in the desired state" with the fresh
+      pass's timestamp — asserting a verification that did not happen.
+    suggested_action: Render retained ticks distinctly ("ticked previously; this pass could not confirm — {detail}").
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 1653
+  phases_verified: 7/7
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [2, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: CR2-3 injection closed (hostile-intent regression test); allowlist hardened; redaction intact.
+  performance:
+    status: PASS
+    notes: unchanged.
+  reliability:
+    status: PASS
+    notes: CR2-1/CR2-2 regressions closed with mutation-proven tests; remaining findings are contract/report coherence, not behaviour drift.
+  maintainability:
+    status: PASS
+    notes: Contract text realigned — SKILL.md retention exception, USAGE refreshed, step-7 templates mode-aware (CR3-1/2/3/5 closed).
+
+recommendations:
+  immediate:
+    - action: Align SKILL.md + task Decisions wording with retention semantics; mark and distinctly render retained ticks
+      refs: ['skills/tracker-reconcile/SKILL.md', 'shared/resources/handover-verify.js', 'shared/resources/handover-render.js']
+    - action: Fix debt-line/PR-comment artifact naming (glob) and the full-mode carve-outs in step-7
+      refs: ['shared/resources/develop-pipeline-step-7-finalise.md']
+    - action: Refresh USAGE (--out substitution rule, --verify retention caveat); fix ttyConfirm JSDoc placement
+      refs: ['shared/resources/handover-render.js', 'skills/tracker-reconcile/scripts/tracker-reconcile.js']
+  future: []
+
+re_review_context:
+  previous_gate: task.57.gate.2.readonly-verification-and-reconcile.yml
+  previous_issues:
+    - { id: CR2-1, status: FIXED, evidence: '§11 three-format extension sweep + live multi-format smoke' }
+    - { id: CR2-2, status: FIXED, evidence: '§11 both directions + mutation-proven — see CR3-1 for the contract wording follow-up' }
+    - { id: CR2-3, status: FIXED, evidence: '§8 hostile-intent probe: fixed script text, prompt as env data' }
+    - { id: CR2-4, status: FIXED, evidence: '§11 render-failure propagation test' }
+    - { id: CR2-5, status: FIXED, evidence: 'step-7 full|"" branch + guarded render call — see CR3-3 for the checklist carve-out' }
+    - { id: CR2-6, status: FIXED, evidence: 'formats computed once in run()' }
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-08-20'
+  total_iterations: 3
+  verification_method: 'Quick verification (trivial-class fixes): suites 92/92 targeted + 1653/1653 full; retained-tick rendering functionally probed; SKILL/step-7 wording diff-reviewed'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
