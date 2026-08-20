@@ -309,11 +309,6 @@ function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = ()
 }
 
 /**
- * The default per-record confirmation for irreversible actions: a y/N prompt
- * read from /dev/tty. Built only when a tty exists; where /dev/tty cannot be
- * read the answer is "no" — consent is never assumed.
- */
-/**
  * The bash invocation for one confirmation prompt. The script text is a FIXED
  * string — the prompt travels as data in an environment variable, never
  * interpolated into `bash -c`. A committed record's `intent` can contain
@@ -334,6 +329,11 @@ function ttyConfirmCommand(rec) {
   };
 }
 
+/**
+ * The default per-record confirmation for irreversible actions: a y/N prompt
+ * read from /dev/tty. Where /dev/tty cannot be read the answer is "no" —
+ * consent is never assumed.
+ */
 function ttyConfirm(rec) {
   try {
     const cmd = ttyConfirmCommand(rec);

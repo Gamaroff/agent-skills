@@ -338,8 +338,13 @@ debt line, no comment. When it is non-empty:
 
    ```
    **Tracker debt**: {N} action(s) outstanding — see ## Tracker Actions Required and
-   {prefix}.handover.{n}.{name}.md. Reconcile later with /tracker-reconcile.
+   the committed {prefix}.handover.{n}.{name}.* artifacts. Reconcile later with /tracker-reconcile.
    ```
+
+   Name the artifacts by the `.*` glob, not a hardcoded `.md` — which file extensions exist
+   depends on the access mode (`command` commits only the `.sh`, `read-only` only the `.json`),
+   and under `full` no artifact exists at all, so its debt line points at the
+   `## Tracker Actions Required` summary only.
 
    When the journal is empty, write `**Tracker debt**: none`. The line is not optional on a
    restricted run: a Completion block that reads "Completed" with no debt line is how the accept
@@ -347,8 +352,11 @@ debt line, no comment. When it is non-empty:
 
 4. **Post the checklist to the PR** via the existing `not-on-board` escalation path (the
    `gh pr comment` block in `finalise/SKILL.md` §Tracker Issue Update) — the comment names the
-   committed `*.handover.*` files and says the board has **not** caught up with the accepted
-   status. Reviewers see the debt where they review, not only in the repo tree.
+   committed `*.handover.*` files (whichever extensions the mode rendered) and says the board
+   has **not** caught up with the accepted status. Reviewers see the debt where they review,
+   not only in the repo tree. Under `full` — where records exist only as `retry_of` failures
+   and no artifact is committed — the comment carries the inline summary itself instead of
+   file names.
 
 ### The `approve` model at handover
 
@@ -385,7 +393,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] Tracker issue closed (GitHub `gh issue close` confirmed CLOSED) — N/A for Jira (handled by transition)
 - [ ] Project board / Jira board moved to Done (verify via tracker state poller — `result.issue.state` or `result.issue.column`; see `shared/resources/tracker-state-poller-subagent.md`)
 - [ ] All five Decisions Log lines written: "DoD summary", "DoD body posted to PR", "issue close" (GitHub), "board transition", and the success log entry ("Story accepted" / "Task completed")
-- [ ] **Accept gap**: journal checked; if non-empty — handover artifacts committed, `## Tracker Actions Required` populated, `**Tracker debt:**` line written in the Completion block, PR comment posted. If empty — `**Tracker debt**: none` written. `status: accepted` was written **either way** — the debt record and the local acceptance are both-or-red, never one without the other
+- [ ] **Accept gap**: journal checked; if non-empty — the mode's handover artifacts committed (`full` commits none, by selection — its summary-only path satisfies this item), `## Tracker Actions Required` populated, `**Tracker debt:**` line written in the Completion block, PR comment posted. If empty — `**Tracker debt**: none` written. `status: accepted` was written **either way** — the debt record and the local acceptance are both-or-red, never one without the other
 
 This checklist applies in **both lite and standard modes**. Lite mode skips Steps 5–6; it never skips any item in this list.
 

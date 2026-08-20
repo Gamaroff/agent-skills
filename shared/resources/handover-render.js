@@ -535,8 +535,19 @@ function renderMarkdown(model) {
     // Ticked and struck through, never deleted: deleting a satisfied item
     // would make the checklist lie about what the run wanted, and the item
     // count stops equalling the record count — the drift this exists to show.
+    //
+    // A RETAINED tick — `satisfied` carried forward past a read that produced
+    // no evidence — says so explicitly. Folding it into the freshly-verified
+    // wording would assert a verification that demonstrably did not happen.
     for (const rec of model.satisfied) {
       const v = rec.verification || {};
+      if (v.state && v.state !== "satisfied") {
+        L.push(
+          `- [x] ~~${headline(rec)}~~ — ticked previously; this pass could not ` +
+            `confirm (${v.detail || v.state}) — \`${rec.kind}\` (\`${rec.id}\`)`,
+        );
+        continue;
+      }
       const observed = formatObserved(v.observed)
         ? ` — observed \`${formatObserved(v.observed)}\``
         : "";
@@ -1204,15 +1215,18 @@ Renders a deferred-mutation journal (see tracker-access-record.md).
   --journal <path>   NDJSON journal (default: $TRACKER_ACTIONS_JOURNAL, else
                      .claude/state/tracker-actions.jsonl)
   --format <f>       ${FORMATS.join(" | ")}   (repeatable: --format md --format sh)
-  --out <path>       write here instead of stdout. With multiple --format flags,
-                     the extension is substituted per format.
+  --out <path>       write here instead of stdout. The {md,sh,json} extension is
+                     substituted per file format — single-format renders included —
+                     so the artifact always lands on its own extension.
   --expected <k,…>   kinds this run was expected to record; any missing one
                      renders as ⚠️ UNRECORDED
   --run <r>  --access <mode>  --work-item <path>    context for the header
   --verify           run the read-only verification pass (handover-verify.js)
                      over the records first, so ticks / divergence / baselines
-                     reach the rendered artifacts. Reads only; on any failure
-                     the affected record renders unverifiable, never satisfied.
+                     reach the rendered artifacts. Reads only; a failed or
+                     ambiguous read renders unverifiable — it never CREATES a
+                     tick, though a tick backed by earlier positive evidence
+                     is retained (and labelled "could not confirm").
   --quiet            suppress the per-file confirmation line
   -h, --help
 

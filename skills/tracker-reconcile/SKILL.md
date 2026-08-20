@@ -53,7 +53,7 @@ a mutation cannot slip through.
    | `satisfied` | Read matched the desired value | Ticked, struck through, observed value and time | Short-circuited |
    | `pending` | Read did not match, or no read is defined | Unticked | Runs |
    | `divergent` | Observed a value that is neither desired nor the pre-action value | Unticked, `⚠️ observed X, wanted Y` | Skipped with a warning unless `--all` |
-   | `unverifiable` | Read failed, was ambiguous, or the kind has no reliable read | Unticked, "cannot verify — check by hand" | Runs, unguarded |
+   | `unverifiable` | Read failed, was ambiguous, or the kind has no reliable read | Unticked, "cannot verify — check by hand" — unless the record already carried a tick backed by earlier positive evidence, which is **retained** and labelled "ticked previously; this pass could not confirm" | Runs, unguarded (retained ticks stay short-circuited) |
 
 3. **Rewrites the checklist's boxes in place** — a satisfied action is ticked,
    never deleted, so item count always equals record count and drift stays
@@ -89,8 +89,13 @@ confirmed per-record on a tty and **skipped, never assumed, without one**.
 
 - **An ambiguous match resolves to `unverifiable`, never `satisfied`.** Two
   marker hits, two issues sharing a title — on 2+ candidates the answer is
-  "cannot verify — check by hand". `unverifiable` must never be coerced to
-  `satisfied`.
+  "cannot verify — check by hand". An unverifiable read never **creates** a
+  tick. The one asymmetry is deliberate and runs the other way: a tick backed
+  by earlier positive evidence (a verified read, or an action reconcile itself
+  executed) is **retained** through a silent read — revoking it on silence
+  would return an executed action to outstanding, and `--apply` would run the
+  mutation a second time. Only a real read showing pending or divergent
+  revokes a tick, and a retained tick is labelled as such in the checklist.
 - **`divergent` is a first-class state, not a flavour of `pending`.**
   `gh-stage.js` and `jira-stage.js` already treat exactly this as
   `would-regress` — informational, "the board is ahead of the pipeline".
