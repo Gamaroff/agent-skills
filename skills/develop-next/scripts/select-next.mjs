@@ -49,7 +49,7 @@ const ROW_RE = /^(\s*)[-*]\s*\[([ xX])\]\s*(.*)$/;
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 const EXCLUDED_HEADING_RE = /deferred|human.?gated|housekeeping|change\s*log/i;
 const COMMAND_RE =
-  /\/(develop-story|develop-task|create-story|create-epic|create-task)(?:\s+`?([^\s`)]+\.md))?/;
+  /\/(develop-story|develop-task|develop-bug|create-story|create-epic|create-task)(?:\s+`?([^\s`)]+\.md))?/;
 const MD_LINK_RE = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const SKIP_RE = /⏭️|⏭|\bSKIP\b/;
 // `touches:` — the write-footprint field (see references/roadmap-selection.md and
@@ -88,10 +88,18 @@ function isTaskId(id) {
   return /^T\d/.test(id);
 }
 
-/** First markdown-link href that points at a story/task file, else null. */
+/**
+ * First markdown-link href that points at a story/task/bug file, else null.
+ *
+ * `bug` is load-bearing for general bugs only: story bugs
+ * (`story.2.3.bug.1.x.md`) and task bugs (`task.44.bug.1.x.md`) already match on
+ * their `story.`/`task.` prefix, but a general bug is `bug.{N}.{name}.md`
+ * (docs/standards/file-naming.md) and would otherwise resolve to null — turning
+ * an otherwise-valid `/develop-bug` row into a "no resolvable path" stop.
+ */
 function workItemPath(text) {
   for (const m of text.matchAll(MD_LINK_RE)) {
-    if (/(?:^|\/)(?:story|task)\.[^/]*\.md$/i.test(m[1])) return m[1];
+    if (/(?:^|\/)(?:story|task|bug)\.[^/]*\.md$/i.test(m[1])) return m[1];
   }
   return null;
 }
@@ -469,14 +477,14 @@ export function selectNext(model) {
         continue;
       }
 
-      if (!row.command || !/^\/develop-(story|task)$/.test(row.command)) {
+      if (!row.command || !/^\/develop-(story|task|bug)$/.test(row.command)) {
         // Eligible but not auto-runnable (e.g. a "run /review-prd" checkpoint).
         // Pause for the operator rather than erroring — the loop is unattended.
         return {
           status: "stop",
           stopReason: "manual-checkpoint",
           item: pickItem(row, phase),
-          detail: `${row.id} is the next item but names no /develop-story or /develop-task command — operator must action or annotate it`,
+          detail: `${row.id} is the next item but names no /develop-story, /develop-task or /develop-bug command — operator must action or annotate it`,
           skipped,
           lint,
         };
@@ -486,7 +494,7 @@ export function selectNext(model) {
           status: "stop",
           stopReason: "manual-checkpoint",
           item: pickItem(row, phase),
-          detail: `${row.id} names ${row.command} but no resolvable story/task path (expected a [story](…)/[task](…) link) — operator must fix the row`,
+          detail: `${row.id} names ${row.command} but no resolvable story/task/bug path (expected a [story](…)/[task](…)/[bug](…) link) — operator must fix the row`,
           skipped,
           lint,
         };
@@ -574,7 +582,8 @@ function buildRationale(model, row, phase, skipped, phaseNotes) {
 /** Ready = actionable and directly auto-runnable with every gate satisfied. */
 function isReady(model, r) {
   if (r.ticked || r.skip || r.manual || r.gated) return false;
-  if (!r.command || !/^\/develop-(story|task)$/.test(r.command)) return false;
+  if (!r.command || !/^\/develop-(story|task|bug)$/.test(r.command))
+    return false;
   if (!r.commandArg) return false;
   if (
     r.blockedUntil.some((b) => b === "<unparsed>" || idDone(model, b) !== true)
@@ -595,7 +604,12 @@ function hardConflict(a, b) {
 
 function worktreeFor(row) {
   const slug = row.id.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  const kind = row.command === "/develop-task" ? "task" : "story";
+  const kind =
+    row.command === "/develop-task"
+      ? "task"
+      : row.command === "/develop-bug"
+        ? "bug"
+        : "story";
   const branch = `${kind}/${slug}`;
   const dir = `../tc-wt-${slug}`;
   return {
