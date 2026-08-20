@@ -63,6 +63,7 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Deferred**               | A tracker write refused by `access.tracker` and recorded rather than sent. Stage CLIs exit 0 with `reason: "deferred"`. |
 | **retry_of**               | On a deferred-mutation record: this is a *failed* full-access write, not a policy deferral. Rendered in its own handover section. |
 | **UNRECORDED**             | A pipeline moment that should have produced a deferred record and did not. Rendered `⚠️ UNRECORDED` in the handover. |
+| **blocking**               | A deferred record that yields a value nothing else can supply — an issue or milestone number. Rendered `🚫 BLOCKING` at the top of the handover checklist and the inline summary. Ticking it is not enough: perform it, write the value into the document's frontmatter, and re-run (the two-run convergence). |
 | **divergent**              | Planned `/tracker-reconcile` state (task.57, **not shipped**): the live board value is neither the desired value nor the pre-action value. |
 | **unverifiable**           | Planned `/tracker-reconcile` state (task.57, **not shipped**): the read failed, was ambiguous, or the kind has no reliable read. Never coerced to satisfied. |
 | **tracker-reconcile**      | Planned skill `/tracker-reconcile` (task.57, **not shipped**). Re-reads a committed handover against the live board. Until it lands, work the checklist by hand. |

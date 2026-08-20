@@ -143,6 +143,39 @@ shipped reality, not by reading it.
 → red · rename a `reason` code on one side only → red · add a doc page and leave it out of the index
 → red · put an invalid value in a config example → red. A guard that cannot fail is decoration.
 
+### Manual verification
+
+The guard asserts the docs match shipped reality. It cannot assert they *read* well, so a human walks
+them once:
+
+1. Read [`docs/concepts/restricted-access.md`](../../concepts/restricted-access.md). You should know
+   in one page whether restricted access applies to you, and see the limits at the same prominence as
+   the capabilities.
+2. Walk [`docs/concepts/which-access.md`](../../concepts/which-access.md). The three questions must
+   separate all five modes (`full`, `read-only`, `approve`, `command`, `manual`).
+3. Follow [`docs/runbooks/restricted-access.md`](../../runbooks/restricted-access.md):
+
+   ```bash
+   node shared/resources/gh-stage.js --stage work-started --print-plan
+   node shared/resources/gh-stage.js --stage done --print-plan
+   ```
+
+   Targets must be `In Progress` and `Done` — this board's columns, from `tracker-workflow.yaml`.
+
+4. Confirm `/tracker-reconcile` is listed in `commands.md` and `activation-phrases.md` as **not
+   shipped** (task.57).
+5. Confirm the wizard distinguishes Skip from restrict: `grep -n "Skip" scripts/setup-consumer.sh`.
+6. Drift guard green: `node --test tests/restricted-access-docs.test.js`.
+7. Mutation — add `"sixth"` to `ACCESS_MODES` in `shared/resources/defer-mutation.js`, re-run step 6,
+   watch the concept-doc assertion fail, revert.
+8. Broader: `npm test` · `npm run validate:all` · `npm run generate-catalog`.
+
+> These steps lived in a separate `task.58.test.md` until 2026-08-20. That filename parsed as a
+> *primary task document* (`task.{n}.{slug}.md`, slug `test`), so every glob that enumerates tasks
+> counted it as one — and an orchestrator handed it would have resolved it, found no frontmatter, and
+> proceeded. Folded in here, where a reviewer looking for how to verify this task will actually find
+> it. `tests/work-item-artifact-naming.test.js` now blocks the shape.
+
 ## Success Criteria
 
 - [x] A developer who has never heard of restricted access can read one page and know whether it

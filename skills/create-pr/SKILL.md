@@ -85,7 +85,11 @@ Before asking the user, check whether parameters were supplied:
 **`--exclude <path>`** (repeatable):
 
 - The caller may pass one or more `--exclude <path>` flags (e.g., `/create-pr --exclude path/to/report.md`)
-- When invoked by the `develop-story` or `develop-task` orchestrator, the implementation report path is passed so it is never staged in the auto-commit
+- Orchestrators use it for files that must stay out of *this* commit. Note that the develop pipelines
+  do **not** pass the implementation report here — Step 4 is where the report's first commit belongs,
+  so that reviewers can read the audit trail during QA and so that any document linking to it does not
+  acquire a dangling relative link. Steps 5–6 exclude the report's *updates* from each `fix(...)`
+  commit, which is a different thing: by then the file is tracked
 - Collect all values into an `EXCLUDE_PATHS` array
 - When invoking `/commit-changes` in Step 2 (uncommitted changes present): forward all values as repeated flags — `/commit-changes --exclude path1 --exclude path2 ...`
 - When there are NO uncommitted changes (commit-changes is not invoked): silently ignore all `--exclude` values and log `"--exclude received but no commit needed — ignored"`
