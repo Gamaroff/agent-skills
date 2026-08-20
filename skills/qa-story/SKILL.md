@@ -350,6 +350,23 @@ Action: Perform re-review to verify if issues were addressed.
 
 ---
 
+## Mutation-Proof Spot Check
+
+A green suite says the tests ran, not that they can fail. Before crediting a test
+as coverage for a defect this cycle fixed, **revert the behaviour it names and
+confirm that test goes red** — full procedure and the four shapes vacuity takes:
+[`references/mutation-proving.md`](references/mutation-proving.md).
+
+Scope it: not every assertion, but **every test guarding a fix made this cycle**,
+plus any guard whose failure mode is silence. If the suite stays green with the
+behaviour reverted, record the test as **not** covering that criterion — a
+vacuous test is worse than a missing one, because it reports coverage that is not
+there.
+
+Record `mutation-proven: yes/no` per fixed defect in the QA report's Code Review
+section. Do **not** write "every invariant mutation-proven" unless every one was
+actually reverted; if you proved four of five, say four of five.
+
 ## Story Review Process
 
 Perform a comprehensive test architecture review with quality assessment. This adaptive, risk-aware review creates both a QA report and a detailed gate file.

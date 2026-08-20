@@ -639,6 +639,12 @@ Three-strikes escalation (applied to the triage summary, not the raw log):
 
 **Important**: Do not mark a task as complete if its tests are failing. Tests must pass before checking off task checkboxes.
 
+**And a passing test is not yet evidence.** For each invariant a new test claims to
+hold, revert that behaviour in the source, re-run, and confirm *that* test goes
+red before restoring. A test that passes whether or not the behaviour is present
+reports coverage that does not exist. Procedure and the four shapes this takes:
+[`references/mutation-proving.md`](references/mutation-proving.md).
+
 **Blocking Conditions** (HALT and ask user):
 
 - Unapproved dependencies needed

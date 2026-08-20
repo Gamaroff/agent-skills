@@ -61,6 +61,9 @@ const VOCABULARY = [
   "retry_of",
   "UNRECORDED",
   "tracker-reconcile",
+  // task.56. Added after the concept doc drifted for a full task cycle while
+  // this guard stayed green — see the coverage test below.
+  "blocking",
 ];
 
 const SEQUENCE_REASONS = ["deferred"];
@@ -183,6 +186,70 @@ test("glossary carries the restricted-access vocabulary", () => {
       `glossary.md missing term: ${term}`,
     );
   }
+});
+
+test("the concept doc does not claim a gated path is ungated", () => {
+  // THE ASSERTION THIS GUARD WAS MISSING.
+  //
+  // task.56 gated the GitHub issue lifecycle, and rewrote both the runtime
+  // notice in resolve-platform.sh and the access.tracker row in
+  // configuration.md to say so. The concept page kept saying the opposite —
+  // "Still not gated ... gh issue create, sub-issue links" — for a whole task
+  // cycle, and this suite stayed green throughout, because it checked that
+  // vocabulary was PRESENT and never that a claim was still TRUE.
+  //
+  // Vocabulary coverage cannot catch a contradiction. This can.
+  const concept = read(CONCEPT);
+  // Strip markdown emphasis BEFORE matching. The first version of this check
+  // was itself vacuous: it looked for `not **gated**` while the prose actually
+  // read `**not** gated`, so restoring the exact stale sentence left it green.
+  // Caught by reverting the sentence and watching nothing happen — which is the
+  // only way this class of defect is ever caught.
+  const plain = concept.replace(/\*\*/g, "");
+  const stale = [
+    // The exact shape of the drift: naming a now-gated call as ungated.
+    /not gated[^.]*gh issue create/i,
+    /not gated[^.]*sub-issue link/i,
+    /gh issue create[^.]*(?:still proceed|not gated|ungated)/i,
+  ];
+  for (const re of stale) {
+    assert.doesNotMatch(
+      plain,
+      re,
+      `${CONCEPT} claims the GitHub issue lifecycle is ungated. It has been ` +
+        `gated since task.56 via tracker-issue.js — resolve-platform.sh's ` +
+        `runtime notice and configuration.md both say so, and a concept page ` +
+        `that contradicts the runtime notice is worse than one that says nothing.`,
+    );
+  }
+
+  // And the mechanism the reader needs is actually described, not just named.
+  assert.match(
+    concept,
+    /frontmatter/i,
+    `${CONCEPT} must tell the reader to write the produced value into ` +
+      `frontmatter — without that step the two-run convergence silently never ` +
+      `converges, which is the failure it exists to prevent`,
+  );
+  assert.match(
+    concept,
+    /BLOCKING/,
+    `${CONCEPT} must name the 🚫 BLOCKING marker — it is the higher-priority ` +
+      `rendering marker and outranks ⚠️ UNRECORDED for what the reader does first`,
+  );
+});
+
+test("the runbook walks the blocking path, not only the status-move path", () => {
+  // A runbook that only teaches ticking leaves a reader stuck in a silent
+  // no-op loop the first time a run creates something.
+  const runbook = read(RUNBOOK);
+  assert.match(runbook, /BLOCKING/, `${RUNBOOK} must cover blocking records`);
+  assert.match(
+    runbook,
+    /frontmatter/i,
+    `${RUNBOOK} must include the write-back step — ticking a blocking record ` +
+      `is not sufficient and never converges`,
+  );
 });
 
 test("sequence reason codes are enumerated in troubleshooting.md", () => {

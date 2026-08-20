@@ -64,7 +64,7 @@ A read token lets the agent see current column, issue body, and comments. It doe
 
 **Question 3 — Will a human run CLI commands, or only click?**
 
-- **Run commands** (`gh`, `curl`, a generated script) → `command`. After the run, execute `task.{N}.handover.{n}.{name}.sh` (dry-run until you pass `--apply`).
+- **Run commands** (`gh`, `curl`, a generated script) → `command`. After the run, execute `task.{N}.handover.{n}.{name}.sh` (dry-run until you pass `--apply`). **Read the `.md` first if the run created anything** — the `.sh` carries no blocking banner, because a script cannot pause for you to edit a document, and a deferred issue create needs its number written into frontmatter before the next run converges.
 - **Only click the tracker UI** → `manual`. After the run, tick `task.{N}.handover.{n}.{name}.md`. Column names in that file come from **your board**, not from this page.
 
 > **Default:** when in doubt between `command` and `manual`, choose `manual`. The checklist is always emitted; the script is a convenience for people who already run `gh`.

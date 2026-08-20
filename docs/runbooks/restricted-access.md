@@ -69,7 +69,10 @@ flowchart TD
     C --> D{Anything deferred?}
     D -->|No| E[Done — board already matched or stage-disabled]
     D -->|Yes| F["Commit *.handover.{md,sh,json}"]
-    F --> G{access model}
+    F --> K{Any BLOCKING record?}
+    K -->|Yes| L["Perform it, write the value<br/>into frontmatter, re-run"]
+    L --> B
+    K -->|No| G{access model}
     G -->|manual / approve / read-only| H[Tick the .md checklist on the board]
     G -->|command| I["Run the .sh -- dry-run, then --apply"]
     H --> J["/tracker-reconcile — not shipped, task.57"]
@@ -109,7 +112,27 @@ When something was deferred, Step 8 commits three files next to the work item ([
 | `task.{N}.handover.{n}.{name}.sh` | Same records as a script (dry-run by default). |
 | `task.{N}.handover.{n}.{name}.json` | Sidecar for `/tracker-reconcile` — **that skill is not shipped** ([task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md)). |
 
-Open the `.md`. It starts `# Tracker actions required`. A Status move on **this** board looks like:
+`tracker-issue.js` is the fourth stage-CLI peer, added by
+[task.56](../tasks/task.56.tracker-issue-cli/task.56.tracker-issue-cli.md). It gates the GitHub issue
+lifecycle and produces the **blocking** records above — so on a run that creates anything, it is the
+CLI whose output you meet first. Contract:
+[`tracker-issue-cli.md`](../../shared/resources/tracker-issue-cli.md).
+
+Open the `.md`. It starts `# Tracker actions required` and a context table.
+
+**If a `🚫 BLOCKING — do these first` section follows, start there.** A run that created an issue or a
+milestone puts it here, because those actions yield a value the pipeline cannot obtain for itself.
+Ticking is *not* sufficient for them:
+
+1. Perform the action from its deep link.
+2. **Copy the number it produced into the document's frontmatter** — `github_issue: 207`,
+   `jira_key: PROJ-42`.
+3. Re-run the pipeline. It finds the field set and carries on.
+
+Skip step 2 and the next run does nothing at all, silently, every time — see
+[*I re-ran it and it did nothing again*](../reference/troubleshooting.md).
+
+Then the ordinary items. A Status move on **this** board looks like:
 
 - **Status**: `In Progress` or `Done` — those strings, not `work-started` / `done`
 - **Where** / **Start here**: a URL on `github.com/Gamaroff/agent-skills/issues/{N}`

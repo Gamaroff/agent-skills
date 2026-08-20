@@ -30,10 +30,16 @@ Restricted access is **not** "run without a tracker". It is "run with a tracker 
 
 These are shipped behaviour, not caveats:
 
-1. **Enforcement is partial.** Jira REST through `jira-sync.js`, the sprint scripts, `jira-epic-creator.js`, GitHub board Status/membership, Priority, Estimate, and every `gh` mutation routed through `tracker_write` are **deferred and recorded**. Still **not** gated, by design: Jira writes issued as raw `curl` or through the Atlassian MCP tools, and GitHub calls whose stdout a caller captures (`gh issue create`, sub-issue links). A restricted run prints this on stderr every time. Key row: [`configuration.md` → `access.tracker`](../reference/configuration.md).
+1. **Enforcement is partial.** Jira REST through `jira-sync.js`, the sprint scripts, `jira-epic-creator.js`, GitHub board Status/membership, Priority, Estimate, and every `gh` mutation routed through `tracker_write` are **deferred and recorded**. Since task.56 the **GitHub issue lifecycle** is gated too — create, edit, close, reopen, milestone create and the sub-issue link, through [`tracker-issue.js`](../../shared/resources/tracker-issue-cli.md). Still **not** gated, by design: Jira writes issued as raw `curl` or through the Atlassian MCP tools. A restricted run prints this on stderr every time — and the notice enumerates both halves, so trust it over this page if the two ever disagree. Key row: [`configuration.md` → `access.tracker`](../reference/configuration.md).
 2. **`approve` does not yet ask.** The five mode names are valid config. Today every value other than `full` **defers the write and records it** — there is no per-mutation confirmation prompt. Batched confirmation is [task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md), which has not shipped.
 3. **`/develop-next` and `/develop-batch` still need VCS write.** `access.vcs` accepts only `full`. Tracker restriction does **not** stop those orchestrators; git push and `gh pr merge` still happen. What they will not do is move the tracker card — that goes into the handover. See [`access.vcs`](../reference/configuration.md).
-4. **Issue creation converges over two runs.** A deferred create writes **no** placeholder `jira_key` / `github_issue`. The next run that is allowed to write creates the card for real. That is deliberate (a placeholder would duplicate on the unrestricted retry). Until then the work item has no remote id.
+4. **Issue creation converges over two runs — and the middle step is yours.** A deferred create writes **no** placeholder `jira_key` / `github_issue`, deliberately: a placeholder defeats the idempotent search that stops the next run creating a *duplicate*, so a wrong key is worse than no key. What makes it converge is three steps, not two:
+
+   1. Perform the create — the checklist opens with a `🚫 BLOCKING — do these first` banner naming it.
+   2. **Write the number it produced into the document's frontmatter.**
+   3. Re-run. The skill finds the field set and takes its ordinary update path.
+
+   Step 2 is the one that is easy to skip, and skipping it is silent: re-running without it changes nothing, every time, and a run that appears to do nothing twice is indistinguishable from a broken one. See [troubleshooting → *I re-ran it and it did nothing again*](../reference/troubleshooting.md).
 5. **`finalise` still writes `status: accepted` locally.** The tracker debt is recorded in the handover, the implementation report, and the PR — it is not a failed run. The board can lag the documents.
 6. **`/tracker-reconcile` is not shipped.** [Task.57](../tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md) is still `planned`. Until it lands, work the committed checklist by hand (or run the `.sh` under `command`). There is no command that ticks the ledger from the live board.
 
@@ -80,9 +86,14 @@ docs/tasks/task.{N}.{name}/
 └── task.{N}.handover.{n}.{name}.json   # machine copy, for the reconcile that has not shipped
 ```
 
-The markdown file opens with `# Tracker actions required`. Each item is `- [ ]`, names the kind, and carries a **Where** / **Start here** URL and the **Status** (or other field) using **this board's column names**, not the pipeline moment names. On this library's own board those columns are `Todo`, `In Progress`, and `Done` — see [`tracker-workflow.yaml`](../../tracker-workflow.yaml).
+The markdown file opens with `# Tracker actions required` and a context table. Each item is `- [ ]`, names the kind, and carries a **Where** / **Start here** URL and the **Status** (or other field) using **this board's column names**, not the pipeline moment names. On this library's own board those columns are `Todo`, `In Progress`, and `Done` — see [`tracker-workflow.yaml`](../../tracker-workflow.yaml).
 
-A moment the run was expected to record but did not renders as `⚠️ UNRECORDED`. That is a bug in the run, not a skip you can ignore.
+Two markers change what you do next, and both are hoisted rather than left in document order:
+
+- **`🚫 BLOCKING — do these first`** sits directly under the context table when any record yields a value nothing else can supply — an issue number, a milestone number. These are the ones that need the write-back-and-re-run of limit 4 above, not just a tick. A blocking item at position 17 of a checklist is one nobody does first, which is why it is not left there.
+- **`⚠️ UNRECORDED`** — a moment the run was expected to record and did not. That is a bug in the run, not a skip you can ignore.
+
+Note the `.sh` renderer carries **no** blocking banner: a script cannot pause for you to edit a document. If you work under `command` and run only the script, read the `.md` first for the blocking items.
 
 Walk through a real board: [Restricted access runbook](../runbooks/restricted-access.md).
 
