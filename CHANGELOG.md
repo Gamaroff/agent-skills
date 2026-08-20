@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`/develop-next` and `/develop-batch` can reach bug work — the selector now dispatches
+  `/develop-bug`.** The roadmap selector recognised `/develop-story` and `/develop-task` only, so
+  bugs were unreachable by the autonomous loop no matter how they were annotated. The failure was
+  worse than a gap: a roadmap row that correctly named `/develop-bug` fell through to the
+  *manual-checkpoint* stop and hard-stopped the loop with "names no /develop-story or /develop-task
+  command", so filing rows for bugs made every subsequent `/develop-next` run halt where doing
+  nothing would at least have reported a clean empty frontier. Observed in a consumer whose only
+  unparked work was four open bugs. The `develop-bug` skill already existed, so this is wiring, not
+  new capability.
+
+  Five sites in `select-next.mjs` were involved, and the two easy to miss are the ones that fail
+  quietly. The batch planner derived a row's worktree kind with a **two-way ternary**
+  (`command === "/develop-task" ? "task" : "story"`), so a bug row would have been silently branched
+  as `story/<slug>` — a wrong label on a real branch, with nothing to notice it. And `workItemPath`,
+  the `[story](…)`/`[task](…)` link fallback, matched only filename stems beginning `story.` or
+  `task.`: story bugs (`story.2.3.bug.1.x.md`) and task bugs (`task.44.bug.1.x.md`) happened to pass
+  on their prefix, but a **general bug** is `bug.{N}.{name}.md` and resolved to null, so a correctly
+  authored row stopped with "no resolvable path" — precisely the form the consumer's bugs took. Both
+  are fixed alongside the command regex, the selection gate, and the batch readiness predicate.
+
+  Widening the alternation deliberately did *not* become "accept anything": an unrecognised command
+  such as `/develop-epic` still returns the manual-checkpoint stop, and the stop's `detail` string
+  was corrected so it stays truthful now that three commands are legal. The dispatch directive in
+  `develop-next` was generalised too — it previously hard-coded the story/task Phase 0d question
+  numbering, which does not map onto `develop-bug`'s three-question set (Q1 branch model, with base
+  and PR target derived from it), so it now says *take the recommended option for every question* and
+  names each pipeline's set rather than assuming one shape. Batch worktrees are always based off
+  `develop`, so a batched bug row is a bugfix; a production hotfix is not expressible in a batch and
+  must be run through `/develop-bug` directly. Documented in `roadmap-selection.md`, the roadmap
+  template, and both orchestrator SKILL.md files.
+
+  Nine unit tests cover it, and each of the five sites was mutation-checked to confirm the test that
+  names it actually fails when that site is reverted — including the two silent ones.
+
+  **Consumer note:** land this before filing `/develop-bug` roadmap rows. Rows first means every
+  `/develop-next` run hard-stops until the selector is re-vendored.
+
 ### Fixed
 
 - **The scaffolded Stakeholder Sign-off section no longer claims development is blocked when it is

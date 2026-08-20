@@ -1,6 +1,6 @@
 ---
 name: develop-batch
-description: "Parallel roadmap orchestrator: selects the maximal set of unblocked, write-disjoint roadmap items (via scripts/select-next.mjs --batch), fans each into its own git worktree, runs their pipelines (/develop-story or /develop-task) concurrently and fully autonomously, then merges the green PRs serially — rebasing each on the new base tip — and ticks the roadmap + Change Log per item. Develop in parallel, merge serially. Crash-safe via a batch run-state file; re-running resumes where the last run stopped. Stops at an empty frontier, manual/blocked rows, planning gaps, or any pipeline HALT. Invoke with `/develop-batch`, `/develop-batch --dry-run` (read-only batch preview), or wrap in `/loop /develop-batch` for continuous runs. Sibling of develop-next (single item); this fans out the whole conflict-free frontier."
+description: "Parallel roadmap orchestrator: selects the maximal set of unblocked, write-disjoint roadmap items (via scripts/select-next.mjs --batch), fans each into its own git worktree, runs their pipelines (/develop-story, /develop-task or /develop-bug) concurrently and fully autonomously, then merges the green PRs serially — rebasing each on the new base tip — and ticks the roadmap + Change Log per item. Develop in parallel, merge serially. Crash-safe via a batch run-state file; re-running resumes where the last run stopped. Stops at an empty frontier, manual/blocked rows, planning gaps, or any pipeline HALT. Invoke with `/develop-batch`, `/develop-batch --dry-run` (read-only batch preview), or wrap in `/loop /develop-batch` for continuous runs. Sibling of develop-next (single item); this fans out the whole conflict-free frontier."
 ---
 
 # Develop Batch — Parallel Roadmap Fan-out Orchestrator
@@ -263,7 +263,7 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
    than its root one, carries the credentials a test run needs.
 
 2. **Dispatch one agent per admitted worktree.** Run the item's named command
-   (`worktrees[].run`, e.g. `/develop-task <path>`) **with its working directory set to
+   (`worktrees[].run`, e.g. `/develop-task <path>`; `/develop-story` and `/develop-bug` dispatch identically) **with its working directory set to
    `<dir>`**, prepending the directive below. Mark `dispatched: true`.
 
    **Dispatch in the background** so individual completions can be observed. This is what

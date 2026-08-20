@@ -21,8 +21,9 @@ milestones are done you may archive them out to a `roadmap-history.md`.
 3. **`‖` = parallelizable, `→` = sequential.** State each epic's flow on a
    `Flow:` line under its heading.
 4. **Run the named command.** Stories → `` `/develop-story` ``, tasks →
-   `` `/develop-task` ``. The path is taken from the row's `[story](…)`/`[task](…)`
-   link (or an inline path after the command).
+   `` `/develop-task` ``, bug reports → `` `/develop-bug` ``. The path is taken from
+   the row's `[story](…)`/`[task](…)`/`[bug](…)` link (or an inline path after the
+   command).
 5. **Tick `[x]` only when accepted** (QA PASS + DoD verified + merged), and add a
    Change Log row.
 
@@ -39,6 +40,7 @@ milestones are done you may archive them out to a `roadmap-history.md`.
   they share no `!` tag. Tag vocabulary is project-specific — define a **Conflict-footprint
   registry** in this Legend (tag → path/region) once you start annotating.
 - Item format: `- [ ] **<id>** <title> — [story](<path>) · deps: … · touches: … · \`/develop-story\``
+  (or `[task](…)` + `` `/develop-task` ``, or `[bug](…)` + `` `/develop-bug` ``)
 
 ---
 
@@ -48,6 +50,7 @@ milestones are done you may archive them out to a `roadmap-history.md`.
 
 - [ ] **1.1** <title> — [story](<relative/path/to/story.1.1.<name>.md>) · deps: none · `/develop-story`
 - [ ] **1.2** <title> — [task](<relative/path/to/task.<n>.<name>.md>) · deps: 1.1 · `/develop-task`
+- [ ] **1.3** <title> — [bug](<relative/path/to/bug.<n>.<name>.md>) · deps: none · `/develop-bug`
 
 ---
 
