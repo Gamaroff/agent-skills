@@ -219,6 +219,27 @@ tasks remain valid and readable; only the tick-back loop is lost.
 - [x] 6. Amend the standing rule — `anti-patterns.md` and `faq.md`
 - [x] 7. Tests, docs, catalog regeneration, `npm run bundle`
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-20
+**Quality Score**: 40/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.57.qa.1.readonly-verification-and-reconcile.md](./task.57.qa.1.readonly-verification-and-reconcile.md)
+- **Gate File**: [task.57.gate.1.readonly-verification-and-reconcile.yml](./task.57.gate.1.readonly-verification-and-reconcile.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1643 (fresh full run, all green)
+- **Phases Verified**: 7/7
+- **Critical Issues**: 1 (CR-1 — engines not bundled into develop-* skills)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Code review (blocking, pipeline mode) found 8 bugs: CR-1 high (Step 7 commands invoke unbundled engines — MODULE_NOT_FOUND for consumers), CR-2..CR-6 medium (stale satisfied swallows divergence; no default tty confirm for irreversible --apply; divergent guard bypasses confirm gate; verify no-op in Step 7; formats hardcoded per mode), CR-7/CR-8 low. 2 advisory cleanups.
+
 ## Implementation Notes
 
 **Completed**: 2026-08-20 · **Tests**: 36 new (19 `handover-verify.test.mjs` + 16 `tracker-reconcile.test.js` + 1 accept-gap pin), 1643 total green · `validate:all` 116/116 · catalog regenerated · bundled.
@@ -249,6 +270,7 @@ ambiguous→satisfied coercion (7 red) · refusal dropped under `manual` (13 red
 | 2026-08-20 | 1.1 | Review (9/10) — no critical findings; Technical Background, Progress Tracking and Change Log sections added; body Status line added | review-task |
 | 2026-08-20 |  | Status → ready-for-development | review-task |
 | 2026-08-20 |  | Implemented — 20+ files, 36 new tests (1643 total green); all mutations proven red | develop |
+| 2026-08-20 |  | QA gate FAIL (40/100) — 1 high, 5 medium, 2 low from blocking code review | qa-task |
 
 ## References
 

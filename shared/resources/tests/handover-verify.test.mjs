@@ -134,7 +134,13 @@ test("§1 the allowlist admits reads and refuses every mutating shape", () => {
     ["gh", "pr", "merge", "12"],
     ["gh", "api", "-X", "POST", "repos/{owner}/{repo}/milestones"],
     ["gh", "api", "repos/x/y/issues", "-f", "title=x"],
+    ["gh", "api", "repos/x/y/issues", "-F", "title=x"],
+    ["gh", "api", "repos/x/y/issues", "--field", "title=x"],
+    ["gh", "api", "repos/x/y/issues", "--input", "body.json"],
+    ["gh", "api", "graphql", "--input", "mutation.json"],
     ["gh", "api", "graphql", "-f", "query=mutation { }"],
+    ["gh", "api", "graphql", "-F", "query=mutation { m }"],
+    ["gh", "api", "graphql", "--field", "query=mutation { m }"],
     ["git", "push", "origin", "main"],
     ["curl", "-X", "POST", "https://example.invalid"],
     [],
@@ -478,4 +484,82 @@ test("§9 verifyGitPush compares ls-remote to the local sha with no API call", (
     },
   });
   assert.equal(hv.verifyGitPush("main", { io: io2 }).state, "pending");
+});
+
+// ── §10 Regressions from QA cycle 1 (CR-2, CR-4, CR-5) ─────────────────────
+
+test("§10 CR-2: a revoked tick is cleared — satisfied follows the fresh read", async () => {
+  // Ticked by an earlier pass, then the board regresses to a third value.
+  const stub = readStub([["graphql", boardRead("Blocked")]]);
+  const r = rec({
+    satisfied: true,
+    verification: {
+      state: "satisfied",
+      at: "2026-08-19T10:00:00Z",
+      observed: "Done",
+      detail: "verified in the desired state",
+    },
+  });
+  const { records: out, counts } = await verify([r], stub);
+  assert.equal(out[0].satisfied, false, "the stale tick must be revoked");
+  assert.notEqual(out[0].verification.state, "satisfied");
+  assert.equal(counts.satisfied, 0);
+  const model = hr.buildModel(out, {});
+  assert.equal(model.counts.satisfied, 0, "partition must not render the regression as ticked");
+  assert.equal(model.counts.outstanding, 1);
+});
+
+test("§10 CR-4: a divergent AND irreversible step keeps its confirm gate under --all", async () => {
+  const stub = readStub([["graphql", boardRead("Blocked")]]);
+  const r = rec({
+    consequence: "irreversible",
+    command: { argv: ["gh", "pr", "merge", "12", "--squash"], stdin: null },
+    verification: {
+      state: "pending",
+      at: "2026-08-18T10:00:00Z",
+      observed: "To Do",
+      baseline: "To Do",
+      detail: "",
+    },
+  });
+  const { records: out } = await verify([r], stub);
+  const sh = hr.render(out, "sh", { env: {} });
+  assert.match(
+    sh,
+    /divergent_step 'aaaa0001' .* confirm_step /,
+    "the divergent guard must dispatch to confirm_step, not replace it",
+  );
+  // And a reversible divergent step dispatches to run_step.
+  const r2 = { ...r, consequence: "state-drift" };
+  const { records: out2 } = await verify([r2], readStub([["graphql", boardRead("Blocked")]]));
+  const sh2 = hr.render(out2, "sh", { env: {} });
+  assert.match(sh2, /divergent_step 'aaaa0001' .* run_step /);
+});
+
+test("§10 CR-5: render --verify annotates in-process and the annotations reach the artifact", async () => {
+  const { mkdtempSync, writeFileSync, readFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(join(tmpdir(), "render-verify-"));
+  try {
+    const journal = join(dir, "journal.jsonl");
+    writeFileSync(journal, `${JSON.stringify(rec())}\n`);
+    const out = join(dir, "task.9.handover.1.smoke.md");
+    const io = hv.makeIo({
+      env: {},
+      execImpl: readStub([["graphql", boardRead("Done")]]).execImpl,
+      now: FIXED_NOW,
+    });
+    const result = await hr.run({
+      argv: ["node", "handover-render.js", "--journal", journal, "--format", "md", "--out", out, "--verify", "--quiet"],
+      env: {},
+      cwd: dir,
+      verifyIo: io,
+    });
+    assert.equal(result.exitCode, 0);
+    const md = readFileSync(out, "utf8");
+    assert.match(md, /- \[x\] ~~/, "the verified tick must reach the rendered artifact");
+    assert.match(md, /observed `Done`/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

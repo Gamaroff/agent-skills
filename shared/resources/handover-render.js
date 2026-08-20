@@ -378,6 +378,16 @@ function describeDesired(rec) {
   return parts.join(", ");
 }
 
+/**
+ * Render an observed value for display. Object observations JSON-stringify
+ * rather than degrading to "[object Object]" — one helper for every
+ * interpolation site so the four formats cannot disagree.
+ */
+function formatObserved(v) {
+  if (v === undefined || v === null) return "";
+  return typeof v === "object" ? JSON.stringify(v) : String(v);
+}
+
 /** One-line headline shared by md and summary, so the two cannot disagree. */
 function headline(rec) {
   const { verb, noun } = presentationFor(rec.kind);
@@ -527,10 +537,9 @@ function renderMarkdown(model) {
     // count stops equalling the record count — the drift this exists to show.
     for (const rec of model.satisfied) {
       const v = rec.verification || {};
-      const observed =
-        v.observed !== undefined && v.observed !== null
-          ? ` — observed \`${typeof v.observed === "object" ? JSON.stringify(v.observed) : v.observed}\``
-          : "";
+      const observed = formatObserved(v.observed)
+        ? ` — observed \`${formatObserved(v.observed)}\``
+        : "";
       const when = v.at ? ` at ${v.at}` : "";
       L.push(
         `- [x] ~~${headline(rec)}~~${observed}${when} — \`${rec.kind}\` (\`${rec.id}\`)`,
@@ -586,7 +595,7 @@ function markdownItem(rec, model, depth, seen) {
     const v = rec.verification || {};
     const wanted = describeDesired(rec) || "the recorded desired state";
     L.push(
-      `${pad}  - ⚠️ **DIVERGENT** — observed \`${v.observed}\`, wanted \`${wanted}\`` +
+      `${pad}  - ⚠️ **DIVERGENT** — observed \`${formatObserved(v.observed)}\`, wanted \`${wanted}\`` +
         (v.at ? ` (read ${v.at})` : "") +
         ". Someone moved this somewhere else — resolve by hand before applying.",
     );
@@ -793,15 +802,20 @@ function renderShell(model) {
   L.push("  # state nor where the card started. Applying the recorded command");
   L.push("  # anyway could drag it BACKWARDS off a state a human chose. Skipped");
   L.push("  # with a warning unless --all is given.");
+  L.push("  #");
+  L.push("  # The guards COMPOSE: --all lifts only the divergence skip. An");
+  L.push('  # irreversible action still goes through confirm_step — "$3" names');
+  L.push("  # the inner helper — so --all never becomes a consent bypass.");
   L.push('  local id="$1"; shift');
   L.push('  local desc="$1"; shift');
+  L.push('  local helper="$1"; shift');
   L.push('  if [ "$ALL" -ne 1 ]; then');
   L.push(
     '    echo "⚠️  [$id] DIVERGENT — skipped (re-run with --all to force): $desc" >&2',
   );
   L.push("    return 0");
   L.push("  fi");
-  L.push('  run_step "$id" "$desc" "$@"');
+  L.push('  "$helper" "$id" "$desc" "$@"');
   L.push("}");
   L.push("");
 
@@ -901,7 +915,7 @@ function shellStep(rec) {
   if (vstate === "divergent") {
     const v = rec.verification || {};
     L.push(
-      `#   ⚠️ DIVERGENT: observed ${shComment(v.observed)} — guarded behind --all`,
+      `#   ⚠️ DIVERGENT: observed ${shComment(formatObserved(v.observed))} — guarded behind --all`,
     );
   } else if (vstate === "unverifiable") {
     const v = rec.verification || {};
@@ -953,15 +967,16 @@ function shellStep(rec) {
 
   // Guard precedence: a divergent read outranks the consequence class — the
   // command was planned against a board state that no longer holds, so even a
-  // reversible action must not run without --all. Irreversible actions keep
-  // their confirm gate otherwise; everything else runs plainly.
-  const helper =
-    vstate === "divergent"
-      ? "divergent_step"
-      : rec.consequence === "irreversible"
-        ? "confirm_step"
-        : "run_step";
-  L.push(`${helper} ${shQuote(rec.id)} ${desc} ${quoted}`);
+  // reversible action must not run without --all. The guards COMPOSE rather
+  // than replace each other: a divergent step names its inner helper, so an
+  // irreversible action stays behind confirm_step even under --all.
+  const inner =
+    rec.consequence === "irreversible" ? "confirm_step" : "run_step";
+  if (vstate === "divergent") {
+    L.push(`divergent_step ${shQuote(rec.id)} ${desc} ${inner} ${quoted}`);
+  } else {
+    L.push(`${inner} ${shQuote(rec.id)} ${desc} ${quoted}`);
+  }
 
   if (rec.verify && rec.verify.cmd) {
     L.push(
@@ -1066,7 +1081,7 @@ function renderSummary(model) {
               : "▫️";
       const note =
         vstate === "divergent"
-          ? ` — DIVERGENT: observed \`${(rec.verification || {}).observed}\`, wanted \`${describeDesired(rec)}\``
+          ? ` — DIVERGENT: observed \`${formatObserved((rec.verification || {}).observed)}\`, wanted \`${describeDesired(rec)}\``
           : vstate === "unverifiable"
             ? " — cannot verify, check by hand"
             : "";
@@ -1194,6 +1209,10 @@ Renders a deferred-mutation journal (see tracker-access-record.md).
   --expected <k,…>   kinds this run was expected to record; any missing one
                      renders as ⚠️ UNRECORDED
   --run <r>  --access <mode>  --work-item <path>    context for the header
+  --verify           run the read-only verification pass (handover-verify.js)
+                     over the records first, so ticks / divergence / baselines
+                     reach the rendered artifacts. Reads only; on any failure
+                     the affected record renders unverifiable, never satisfied.
   --quiet            suppress the per-file confirmation line
   -h, --help
 
@@ -1216,6 +1235,9 @@ function parseArgs(argv) {
         break;
       case "--quiet":
         args.quiet = true;
+        break;
+      case "--verify":
+        args.verify = true;
         break;
       case "--journal":
         args.journal = need(i, a);
@@ -1255,11 +1277,12 @@ function parseArgs(argv) {
   return args;
 }
 
-function run({
-  argv = process.argv,
-  env = process.env,
-  cwd = process.cwd(),
-} = {}) {
+function run(opts = {}) {
+  const {
+    argv = process.argv,
+    env = process.env,
+    cwd = process.cwd(),
+  } = opts;
   let args;
   try {
     args = parseArgs(argv);
@@ -1288,6 +1311,34 @@ function run({
     onWarn: (m) => console.error(`⚠️  ${file}: ${m}`),
   });
 
+  // --verify runs the read-only verification pass in-process so its
+  // annotations actually reach the render — piping the verify CLI's stdout to
+  // /dev/null and then rendering from the raw journal was a guaranteed no-op.
+  // Async only on this path: run() stays synchronous for every existing
+  // caller; with --verify it returns a Promise (the CLI entry point handles
+  // both). `opts.verifyIo` lets tests inject a stubbed read layer.
+  if (args.verify) {
+    const hv = require("./handover-verify.js");
+    const io = opts.verifyIo || hv.makeIo({ env });
+    return hv
+      .verifyRecords(records, { io })
+      .then(({ records: annotated }) =>
+        renderFromRecords(annotated, { args, env, warnings }),
+      )
+      .catch((e) => {
+        console.error(
+          `⚠️  verification pass failed (${e.message}) — rendering unannotated`,
+        );
+        return renderFromRecords(records, { args, env, warnings });
+      });
+  }
+
+  return renderFromRecords(records, { args, env, warnings });
+}
+
+/** The synchronous core shared by the plain and --verify paths. */
+function renderFromRecords(records, { args, env, warnings }) {
+  const formats = args.formats.length ? args.formats : ["summary"];
   const ctx = {
     expected: args.expected,
     run: args.run,
@@ -1351,8 +1402,13 @@ function run({
 }
 
 if (require.main === module) {
-  const r = run();
-  process.exit(r.exitCode || 0);
+  Promise.resolve(run()).then(
+    (r) => process.exit(r.exitCode || 0),
+    (e) => {
+      console.error(`Error: ${e.message}`);
+      process.exit(2);
+    },
+  );
 }
 
 module.exports = {
@@ -1371,6 +1427,7 @@ module.exports = {
   isEmpty,
   shQuote,
   shComment,
+  formatObserved,
   headline,
   renderMarkdown,
   renderShell,

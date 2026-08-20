@@ -284,17 +284,38 @@ After the Tracker Issue Update above, check the journal (`.claude/state/tracker-
 or `$TRACKER_ACTIONS_JOURNAL`). **When it is empty, skip this entire section** — no artifacts, no
 debt line, no comment. When it is non-empty:
 
-1. **Run the read-only verification pass, then render and commit the handover artifacts.**
-   The formats come from the access mode — `renderersForMode` in `handover-render.js`
-   (`manual` → md; `command` → sh; `read-only` → json; `approve` → md+sh on a tty, sh without
-   one; every mode also gets the inline summary). Artifact names follow the established grammar,
-   co-located with the work item: `{prefix}.handover.{n}.{name}.{md,sh,json}`.
+1. **Render and commit the handover artifacts — formats from the access mode, verification
+   in-process.** The format selection is `renderersForMode` in the render engine (`manual` → md;
+   `command` → sh; `read-only` → json; `approve` → md+sh on a tty, sh without one; every mode
+   also gets the inline summary — the file formats below are the mode's selection minus
+   `summary`). Artifact names follow the established grammar, co-located with the work item:
+   `{prefix}.handover.{n}.{name}.{md,sh,json}`.
+
+   > Engine sources: `references/handover-render.js` and
+   > `references/handover-verify.js` (bundled into each skill as
+   > `references/handover-render.js` / `references/handover-verify.js`).
 
    ```bash
-   node .agents/skills/{develop-story|develop-task|develop-bug}/references/handover-verify.js --json \
-     > /dev/null 2>&1 || true   # annotates nothing on failure — render proceeds either way
+   # Formats per renderersForMode — never hardcode all three: committing a
+   # runnable .sh for a `manual` or `read-only` handover widens that mode's
+   # renderer selection, which is exactly what the mode table forbids.
+   case "$ACCESS_TRACKER" in
+     manual)    FORMAT_FLAGS="--format md" ;;
+     command)   FORMAT_FLAGS="--format sh" ;;
+     read-only) FORMAT_FLAGS="--format json" ;;
+     approve)   if [ -t 1 ]; then FORMAT_FLAGS="--format md --format sh"; else FORMAT_FLAGS="--format sh"; fi ;;
+     *)         FORMAT_FLAGS="--format md" ;;   # full reaches here only via retry_of failures
+   esac
+
+   # --verify runs the read-only verification pass IN-PROCESS so its
+   # annotations (ticks, baselines) reach the artifacts — pass it only for the
+   # credential-holding modes; under manual/command there is nothing to read
+   # with, and every record would just render "cannot verify".
+   VERIFY_FLAG=""
+   case "$ACCESS_TRACKER" in read-only|approve) VERIFY_FLAG="--verify" ;; esac
+
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/handover-render.js \
-     --format md --format sh --format json \
+     $VERIFY_FLAG $FORMAT_FLAGS \
      --out {work-item-dir}/{prefix}.handover.{n}.{name}.md \
      --run "{branch}" --access "$ACCESS_TRACKER" --work-item {work-item-dir}
    ```

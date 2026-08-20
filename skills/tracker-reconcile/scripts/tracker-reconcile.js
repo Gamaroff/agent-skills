@@ -259,7 +259,7 @@ function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = ()
 
   for (const rec of records) {
     const state = hr.verificationState(rec);
-    if (state === "satisfied" || rec.retry_of === "") continue;
+    if (state === "satisfied") continue;
     if (rec.satisfied === true) continue;
 
     if (state === "divergent") {
@@ -275,12 +275,19 @@ function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = ()
     }
 
     if (rec.consequence === "irreversible") {
-      if (!isTTY) {
-        skipped.push({ id: rec.id, why: "irreversible — no tty to confirm; never assumed" });
-        log(`⚠️  [${rec.id}] irreversible — no tty, skipped (re-run interactively)`);
+      // Consent is NEVER assumed: an irreversible action runs only when a
+      // confirmation mechanism exists AND says yes. No tty and no callback
+      // both mean skip — a tty without a prompt implementation must not be
+      // read as a yes.
+      if (!isTTY || typeof confirm !== "function") {
+        skipped.push({
+          id: rec.id,
+          why: "irreversible — no confirmation mechanism; never assumed",
+        });
+        log(`⚠️  [${rec.id}] irreversible — no way to confirm, skipped (re-run interactively)`);
         continue;
       }
-      if (confirm && !confirm(rec)) {
+      if (!confirm(rec)) {
         skipped.push({ id: rec.id, why: "irreversible — declined" });
         continue;
       }
@@ -299,6 +306,29 @@ function applyRecords(records, { execImpl = defaultExec, isTTY = false, log = ()
   }
 
   return { executed, skipped };
+}
+
+/**
+ * The default per-record confirmation for irreversible actions: a y/N prompt
+ * read from /dev/tty. Built only when a tty exists; where /dev/tty cannot be
+ * read the answer is "no" — consent is never assumed.
+ */
+function ttyConfirm(rec) {
+  try {
+    const reply = execFileSync(
+      "bash",
+      [
+        "-c",
+        `read -r -p ${JSON.stringify(
+          `⚠️  [${rec.id}] IRREVERSIBLE — ${rec.intent}. Perform this? [y/N] `,
+        )} _reply < /dev/tty && printf %s "$_reply"`,
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+    ).trim();
+    return /^y(es)?$/i.test(reply);
+  } catch {
+    return false;
+  }
 }
 
 /** Mark an executed record satisfied, so the re-render ticks it. */
@@ -419,10 +449,16 @@ async function run({
     let executedIds = [];
     let skippedApply = [];
     if (args.apply && !applyRefused) {
+      // Default confirmation: a real /dev/tty prompt when interactive and the
+      // caller supplied none. applyRecords still skips irreversible records
+      // whenever no callback reaches it — the default here is what makes a
+      // plain `--apply` on a tty ask instead of silently executing.
+      const effectiveConfirm =
+        confirm || (isTTY ? ttyConfirm : null);
       const { executed, skipped } = applyRecords(records, {
         execImpl,
         isTTY,
-        confirm,
+        confirm: effectiveConfirm,
         log: (m) => console.error(m),
       });
       const at = io.now();
@@ -517,6 +553,7 @@ module.exports = {
   frontmatterFor,
   writeArtifacts,
   applyRecords,
+  ttyConfirm,
   markExecuted,
   writeChangeLogRow,
   run,

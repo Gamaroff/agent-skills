@@ -393,3 +393,88 @@ test("§6 a non-sidecar target and a sidecar-less directory are refused cleanly"
   });
   assert.equal(r2.exitCode, 2);
 });
+
+// ── §7 Regressions from QA cycle 1 (CR-3) ───────────────────────────────────
+
+test("§7 CR-3: irreversible on a tty with NO confirm mechanism is skipped — never assumed", () => {
+  // applyRecords directly: a tty alone is not consent. Without a callback the
+  // action must not run, tty or no tty.
+  const recs = [
+    record({
+      kind: "github.pr.merge",
+      consequence: "irreversible",
+      intent: "Merge the PR",
+      target: { pr: "12", issue: "12", url: "" },
+      command: { argv: ["gh", "pr", "merge", "12", "--squash"], stdin: null },
+    }),
+  ];
+  const apply = applyStub();
+  const { executed, skipped } = tr.applyRecords(recs, {
+    execImpl: apply.execImpl,
+    isTTY: true,
+    confirm: null,
+  });
+  assert.equal(executed.length, 0, "tty without a confirm mechanism must not execute");
+  assert.equal(apply.calls.length, 0);
+  assert.match(skipped[0].why, /no confirmation mechanism|never assumed/);
+});
+
+test("§7 CR-3: on a tty, declined stays skipped and consented executes", () => {
+  const mk = () => [
+    record({
+      kind: "github.pr.merge",
+      consequence: "irreversible",
+      intent: "Merge the PR",
+      target: { pr: "12", issue: "12", url: "" },
+      command: { argv: ["gh", "pr", "merge", "12", "--squash"], stdin: null },
+    }),
+  ];
+  const declinedApply = applyStub();
+  const declined = tr.applyRecords(mk(), {
+    execImpl: declinedApply.execImpl,
+    isTTY: true,
+    confirm: () => false,
+  });
+  assert.equal(declined.executed.length, 0);
+  assert.match(declined.skipped[0].why, /declined/);
+
+  const consentedApply = applyStub();
+  const consented = tr.applyRecords(mk(), {
+    execImpl: consentedApply.execImpl,
+    isTTY: true,
+    confirm: () => true,
+  });
+  assert.equal(consented.executed.length, 1, "explicit consent executes");
+  assert.equal(consentedApply.calls.length, 1);
+});
+
+test("§7 CR-3: run() threads an injected confirm through to the apply pass", async () => {
+  const repo = makeRepo([
+    record({
+      kind: "github.pr.merge",
+      consequence: "irreversible",
+      intent: "Merge the PR",
+      target: { pr: "12", issue: "12", url: "" },
+      desired: { state: "MERGED" },
+      command: { argv: ["gh", "pr", "merge", "12", "--squash"], stdin: null },
+    }),
+  ]);
+  const apply = applyStub();
+  const asked = [];
+  const result = await tr.run({
+    argv: ["node", "tracker-reconcile.js", repo.dir, "--apply"],
+    env: {},
+    cwd: repo.root,
+    verifyExecImpl: (argv) => {
+      if (!hv.isReadOnlyArgv(argv)) throw new Error("MUTATION during verify");
+      if (argv.join(" ").includes("pr view")) return { status: 0, stdout: JSON.stringify({ state: "OPEN" }) };
+      return { status: 1, error: "no canned response" };
+    },
+    execImpl: apply.execImpl,
+    isTTY: true,
+    confirm: (rec) => { asked.push(rec.id); return true; },
+  });
+  assert.equal(result.reason, "applied");
+  assert.equal(asked.length, 1, "the injected confirm must be consulted");
+  assert.equal(apply.calls.length, 1);
+});

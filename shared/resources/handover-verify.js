@@ -78,24 +78,24 @@ function isReadOnlyArgv(argv) {
       return verb === "view" || verb === "list";
     if (group === "api") {
       // A bare `gh api <path>` is a GET. Any explicit method other than GET,
-      // and any field flag (-f/-F/--raw-field) OUTSIDE a graphql query, is a
-      // mutation shape.
+      // and any field flag OUTSIDE a graphql query, is a mutation shape.
+      // The field-flag set covers every spelling gh accepts: -f/--raw-field
+      // (string), -F/--field (typed), and --input (request body from a file) —
+      // each of these makes gh api POST.
+      const FIELD_FLAGS = ["-f", "--raw-field", "-F", "--field"];
       const isGraphql = rest.includes("graphql");
       for (let i = 1; i < rest.length; i++) {
         const a = rest[i];
         if (a === "-X" || a === "--method") {
           if (String(rest[i + 1]).toUpperCase() !== "GET") return false;
         }
-        if (!isGraphql && (a === "-f" || a === "-F" || a === "--raw-field"))
-          return false;
-        if (
-          isGraphql &&
-          (a === "-f" || a === "--raw-field") &&
-          /^\s*query\s*=/.test(String(rest[i + 1] || ""))
-        ) {
+        if (a === "--input") return false; // body from file — always a mutation shape
+        if (!isGraphql && FIELD_FLAGS.includes(a)) return false;
+        if (isGraphql && FIELD_FLAGS.includes(a)) {
           // A graphql document that contains `mutation` anywhere is refused —
-          // cheap, and the only graphql this file builds is a query.
-          if (/\bmutation\b/i.test(String(rest[i + 1]))) return false;
+          // cheap, and the only graphql this file builds is a query. Scan the
+          // value regardless of which field flag carried it.
+          if (/\bmutation\b/i.test(String(rest[i + 1] || ""))) return false;
         }
       }
       return true;
@@ -879,8 +879,13 @@ async function verifyRecords(records, opts = {}) {
     const verification = await verifyRecord(rec, { io });
     counts[verification.state]++;
     const annotated = { ...rec, verification };
+    // `satisfied` follows the FRESH verification state in both directions. A
+    // record ticked by an earlier pass whose later read finds pending or
+    // divergent must lose its tick — partition() tests `satisfied` first, so a
+    // stale `true` here would render the regression as ticked and silently
+    // swallow the divergence. A revoked tick must be visible.
+    annotated.satisfied = verification.state === "satisfied";
     if (verification.state === "satisfied") {
-      annotated.satisfied = true;
       annotated.observed =
         verification.observed !== null &&
         typeof verification.observed !== "object"
