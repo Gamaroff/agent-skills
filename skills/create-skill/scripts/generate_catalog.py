@@ -86,7 +86,7 @@ CATEGORIES = [
     ]),
     ("Content & Writing", [
         "extract", "simplify", "book-typesetter-pro",
-        "humaniser", "humanize-text",
+        "explain-simply", "humaniser", "humanize-text",
     ]),
     ("Research & Analysis", [
         "analyst", "brainstorming", "create-research-prompt", "deep-research-prompt",
