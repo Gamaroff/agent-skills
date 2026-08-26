@@ -639,9 +639,16 @@ Iterate until:
 
 **Story Status Rule**:
 
-- Gate was PASS + all gaps closed + all bugs closed → `Status: Ready for Done`
+- Gate was PASS + all gaps closed + all bugs closed → `Status: Ready for Review`
 - Bug fixes applied + ready for QA verification → `Status: Ready for Review`
 - Otherwise → `Status: Ready for Review` (notify QA to re-run review)
+
+> All three land on the same value, and that is correct rather than redundant: `qa-fix` hands work
+> **back to QA**, so the document stays at `ready-for-review` until `finalise` accepts it. ⚠️ Do not
+> write `Ready for Done` — it is outside the canonical set in
+> [`document-status-lifecycle.md`](references/document-status-lifecycle.md) and a consumer repo that
+> lints its status vocabulary will go red on it. **Bug-report** statuses are a separate lifecycle;
+> `Reopened` stays valid there.
 
 ### Step 6: Do NOT Edit Gate Files
 

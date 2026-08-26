@@ -1357,10 +1357,26 @@ After review:
    ```
 
    c. **Update Story Status** based on gate decision:
-   - PASS → Status: "Ready for Done"
-   - CONCERNS → Status: "Ready for Done" (with notes about concerns)
-   - FAIL → Status: "Reopened" (requires fixes)
-   - WAIVED → Status: "Ready for Done" (with waiver notes)
+   - PASS → **leave at `ready-for-review`** — QA passing is not acceptance
+   - CONCERNS → **leave at `ready-for-review`** (with notes about concerns)
+   - FAIL → `in-progress` (requires fixes; this is the QA loop's backward edge)
+   - WAIVED → **leave at `ready-for-review`** (with waiver notes)
+
+   > **`accepted` is `finalise`'s to write, and only after the DoD check.** A gate PASS says the
+   > implementation is good; it does not say the Definition of Done is met, and on a repo where CI
+   > is a DoD gate it does not even say the build is green. Writing a terminal status here would
+   > announce acceptance before the check that can refuse it.
+   >
+   > ⚠️ **Do not write `Ready for Done` or `Reopened`.** Both are outside the canonical set in
+   > [`document-status-lifecycle.md`](references/document-status-lifecycle.md), which admits only
+   > `draft`, `planned`, `ready-for-development`, `in-progress`, `ready-for-review`, `accepted` and
+   > `cancelled`. A consumer repo that lints its status vocabulary will go **red** on either — and
+   > because `finalise` overwrites the value minutes later, the window is short enough that the
+   > fault only surfaces when a commit lands inside it. Observed live in `tinker-city`: `docs-lint`
+   > runs ungated on every PR there and failed on `ready-for-done` during a DoD verification.
+   >
+   > These are **story/task** statuses. **Bug-report** statuses are a separate lifecycle
+   > (`New | In Progress | Ready for QA | Reopened | Closed`) and `Reopened` remains correct there.
 
    d. **Append the verdict row to `## Change Log`** — in the same edit as (a)–(c), bumping
    frontmatter `updated`:
@@ -1490,7 +1506,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] QA report file created and saved (co-located with story/task)
 - [ ] Gate YAML file created and saved (co-located with story/task)
 - [ ] Story/task `## QA Testing Results` section updated with gate status, quality score, and links to artifacts
-- [ ] Story/task status updated (`Ready for Done` / `Reopened` / etc.) per gate decision
+- [ ] Story/task status correct per gate decision — `ready-for-review` on PASS/CONCERNS/WAIVED, `in-progress` on FAIL. Never `Ready for Done`, never `Reopened`, never `accepted` (that is `finalise`'s)
 - [ ] `## Change Log` row appended recording the gate verdict (blank `Version`, `Author` = `qa-story` / `qa-task`), with frontmatter `updated` bumped in the same edit
 - [ ] Bug report files created for all HIGH and MEDIUM severity issues (if any)
 - [ ] Story Bug Reports section updated with current bug statuses (if any)
