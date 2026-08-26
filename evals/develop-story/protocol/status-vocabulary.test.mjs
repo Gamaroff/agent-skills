@@ -102,6 +102,23 @@ for (const skill of ["qa-story", "qa-fix"]) {
       /(?:PASS|CONCERNS|WAIVED) → Status: "Ready for Done"/,
       `${skill}/SKILL.md maps a gate result to \`Ready for Done\`.`,
     );
+
+    // Widened after the first version of this guard MISSED a live instance. Key Principle 11
+    // restated the same rule in a parenthesised prose form — "(PASS/CONCERNS → Ready for Done,
+    // FAIL → Reopened)" — with no `Status:` prefix and no quotes, so the assertion above sailed
+    // past it. It was caught by hand while porting the fix into a consumer repo, which is exactly
+    // the place a guard is supposed to make unnecessary.
+    //
+    // So match the VALUE next to an arrow, in any phrasing, rather than one sentence shape.
+    for (const forbidden of ["Ready for Done", "Reopened"]) {
+      assert.doesNotMatch(
+        src,
+        new RegExp(`→\\s*\`?${forbidden}\`?`),
+        `${skill}/SKILL.md still routes a gate result to \`${forbidden}\`, which is outside the ` +
+          `canonical set. Check prose restatements (Key Principles, summaries), not just the ` +
+          `Status Rule — the first version of this test only matched the rule and missed one.`,
+      );
+    }
   });
 }
 

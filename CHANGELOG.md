@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The status-vocabulary fix missed one restatement, and the guard that should have caught it was
+  too narrow.** `qa-story`'s Key Principle 11 still said *"(PASS/CONCERNS → Ready for Done, FAIL →
+  Reopened)"* — the same rule in a parenthesised prose form, with no `Status:` prefix and no quotes,
+  so `status-vocabulary.test.mjs` sailed straight past it. It was found by hand while porting the
+  fix into a consumer repo, which is precisely the place a guard exists to make unnecessary.
+
+  The test now matches the forbidden **value next to an arrow** in any phrasing, rather than one
+  sentence shape, and is mutation-proved against the exact text it previously missed.
+
 - **`qa-story` and `qa-fix` wrote a document status the canonical lifecycle forbids.** Both told the
   agent to set `Ready for Done` on a gate PASS (and `Reopened` on FAIL), while
   `document-status-lifecycle.md` has listed `Ready for Done` as **deprecated** since it was written.
