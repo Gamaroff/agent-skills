@@ -2454,5 +2454,5 @@ docs/
 8. **Given-When-Then for Mapping**: Document test coverage, not test code
 9. **Interactive When Needed**: Use AskUserQuestion for unclear scope or thresholds
 10. **Integrated Outputs**: All assessments (direct tools + agents when used) feed into unified gate decision
-11. **Update Status Based on Gate**: Set story/task status according to gate decision (PASS/CONCERNS → Ready for Done, FAIL → Reopened)
+11. **Update Status Based on Gate**: Set story/task status according to gate decision (PASS/CONCERNS/WAIVED → leave at `ready-for-review`; FAIL → `in-progress`). `accepted` is `finalise`'s to write, and only after the DoD check
 12. **Re-Review When Concerns Exist**: ALWAYS check for existing gate files. Only skip re-review if gate is PASS with NO top_issues. Re-review when gate has CONCERNS/FAIL or any top_issues listed, to verify fixes were implemented.
