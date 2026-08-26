@@ -68,14 +68,20 @@ test("the lifecycle doc still declares exactly the canonical frontmatter values"
 });
 
 test("`Ready for Done` is deprecated, and maps to Ready for Review — NOT to Accepted", async () => {
-  const doc = flat(await read("shared", "resources", "document-status-lifecycle.md"));
+  const doc = flat(
+    await read("shared", "resources", "document-status-lifecycle.md"),
+  );
 
-  assert.match(doc, /\| `Ready for Done` \| `Ready for Review`/, [
-    "The deprecation table must map `Ready for Done` to `Ready for Review`.",
-    "Mapping it to `Accepted` trades a lint failure for a worse defect: qa-story runs",
-    "BEFORE finalise, so writing the terminal state there announces acceptance before",
-    "the Definition-of-Done check that is allowed to refuse it.",
-  ].join(" "));
+  assert.match(
+    doc,
+    /\| `Ready for Done` \| `Ready for Review`/,
+    [
+      "The deprecation table must map `Ready for Done` to `Ready for Review`.",
+      "Mapping it to `Accepted` trades a lint failure for a worse defect: qa-story runs",
+      "BEFORE finalise, so writing the terminal state there announces acceptance before",
+      "the Definition-of-Done check that is allowed to refuse it.",
+    ].join(" "),
+  );
 });
 
 for (const skill of ["qa-story", "qa-fix"]) {
