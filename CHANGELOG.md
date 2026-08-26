@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`qa-story` and `qa-fix` wrote a document status the canonical lifecycle forbids.** Both told the
+  agent to set `Ready for Done` on a gate PASS (and `Reopened` on FAIL), while
+  `document-status-lifecycle.md` has listed `Ready for Done` as **deprecated** since it was written.
+  The two skills were simply never updated to match it. A QA PASS therefore wrote `ready-for-done`
+  into the document, which is outside the canonical set
+  (`draft` · `planned` · `ready-for-development` · `in-progress` · `ready-for-review` · `accepted` ·
+  `cancelled`).
+
+  **Why it stayed hidden for so long.** `finalise` overwrites the value with `accepted` minutes
+  later, so nothing is wrong at rest and the bad status exists only inside a short window. The cost
+  lands in the *consumer* repo, and only when a commit happens to land inside that window. Observed
+  live in `tinker-city`, whose `docs-lint` runs ungated on every PR: it went red on `ready-for-done`
+  during a Definition-of-Done verification, and the fault was caught by that DoD pass rather than by
+  anything in this repository.
+
+  A gate PASS now **leaves the document at `ready-for-review`**, and a FAIL sends it to
+  `in-progress` — the QA loop's backward edge in the canonical state machine. Acceptance stays
+  `finalise`'s to write, and only after the DoD check: a PASS says the implementation is good, not
+  that the Definition of Done is met, and on a project where CI is a DoD gate it does not even say
+  the build is green.
+
+  ⚠️ **The lifecycle doc's own deprecation table gave the wrong replacement**, and that is corrected
+  here too. It mapped `Ready for Done` → `Accepted`. Following that advice would have traded a lint
+  failure for a worse defect, because `qa-story` runs *before* `finalise` — writing the terminal
+  state there announces acceptance ahead of the check that is allowed to refuse it. The mapping is
+  now `Ready for Done` → `Ready for Review`.
+
+  Pinned by `evals/develop-story/protocol/status-vocabulary.test.mjs`, so the next regression fails
+  **here** rather than in a consumer repo's pull request. The test was mutation-proved: restoring the
+  original wording turns it red. It also asserts the distinction an editor could easily collapse —
+  **bug-report** statuses are a separate lifecycle in which `Reopened` remains entirely correct, so a
+  blanket ban on the word would be wrong.
+
+
 ## [v0.44.0] - 2026-08-20
 
 ### Added
