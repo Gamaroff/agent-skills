@@ -1,0 +1,158 @@
+schema: 1
+task: "task.64.loop-supervisor-dashboard-and-docs"
+task_title: "Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable"
+gate: CONCERNS
+status_reason: "All 8 success criteria are met in substance and CI is fully green, but one real contract-breaking bug (the frame publishes the whole append-only ledger, not this run's rows) and four verification gaps on a task whose stated thesis is proving rather than assuming."
+reviewer: "QA Engineer"
+updated: "2026-08-29T00:15:00Z"
+
+top_issues:
+  - id: QA-1
+    issue: "Dashboard frames publish the entire append-only runs.jsonl, not this run's rows"
+    severity: medium
+    finding: "pushFrame passes readLedger(cwd) unfiltered into buildDashboardPayload. readLedger has no runId filter and runs.jsonl is append-only across runs, so a second run in the same tree publishes outcome counts and `recent` rows spanning every previous run, while totals.iterations comes from this run's live counter. This directly breaks the README contract the same change authored: 'cumulative for the run' and 'sum to iterations'."
+    suggested_action: "Filter to this run before building: readLedger(cwd).filter((r) => r && r.runId === runId). Every ledger row already carries runId."
+    suggested_owner: dev
+    ref: "skills/loop-supervisor/scripts/run-loop.mjs:1150"
+
+  - id: QA-2
+    issue: "The token-absence test is vacuous — it cannot fail"
+    severity: medium
+    finding: "'the token never appears anywhere in a serialised frame' builds a payload with no token input of any kind (buildDashboardPayload has no token parameter) and asserts the literal 's3cret' is absent. Mutation-proved: deleting the token header from pushDashboard entirely left this test green — only the separate header test went red. The task's Risk Assessment rates this leak Low/HIGH and claims it is 'asserted by test'; it is not."
+    suggested_action: "Drive the assertion through the real path — assert the pushDashboard request BODY is token-free while the header carries it, so a future field copying opts.dashboardToken into the frame fails the test."
+    suggested_owner: dev
+    ref: "evals/loop-supervisor/unit/dashboard.test.mjs:170"
+
+  - id: QA-3
+    issue: "Success Criterion 2 is only half proved — nothing asserts the run's outcome or exit status"
+    severity: medium
+    finding: "SC2 says each failure mode must 'leave the run's outcome and exit status unchanged — each proved by a test, not by inspection'. The three deliberate-breakage tests assert only res.pushed === false and warnings.length === 1 on pushDashboard itself. No test exercises pushFrame or a run. The guarantee currently rests on reading that `await pushDashboard(...)` has no catch at its call site — which is the 'assumed rather than verified' posture the task's own Motivation says it is closing."
+    suggested_action: "Add a runner-level test that drives the loop (or pushFrame) with a dashboard URL that cannot resolve and asserts the run's outcome and exit status are identical to the same run without --dashboard."
+    suggested_owner: dev
+    ref: "evals/loop-supervisor/unit/dashboard.test.mjs:242,264,282"
+
+  - id: QA-4
+    issue: "The gate the task names as its runbook mitigation does not scan the runbook"
+    severity: medium
+    finding: "The Risk Assessment mitigates 'Runbook documents commands that do not ship' with 'tests/executable-instructions.test.js is exactly this gate'. collectDocs() collects shared/resources/*.md, skills/*/SKILL.md and skills/*/references/*.md only. Neither docs/runbooks/** nor skills/*/README.md is collected — so the two documents this task created and expanded, both full of `node .agents/skills/.../run-loop.mjs` invocations, are not scanned by it. The mitigation is not real as written."
+    suggested_action: "Extend collectDocs() to include docs/runbooks/*.md and skills/*/README.md, then fix whatever it surfaces. If that is out of scope, correct the Risk Assessment so it does not claim coverage that does not exist."
+    suggested_owner: dev
+    ref: "tests/executable-instructions.test.js:105-127"
+
+  - id: QA-5
+    issue: "The dashboard token is inherited by every spawned claude child"
+    severity: medium
+    finding: "applyConfig reads $LOOP_SUPERVISOR_DASHBOARD_TOKEN into the supervisor's environment, and each iteration is spawned with spawn(claudeBin, args, { cwd, stdio }) — no env option — so the token is inherited by every `claude -p` child and anything it shells out to. One `env` or `printenv` in an agent's Bash call writes it into iter-NNN.txt and iter-NNN.jsonl on disk, contradicting the README's 'never in a log line'."
+    suggested_action: "Pass an explicit child env to spawn that strips LOOP_SUPERVISOR_DASHBOARD_TOKEN, so the credential stays in the supervisor process."
+    suggested_owner: dev
+    ref: "skills/loop-supervisor/scripts/run-loop.mjs:1230"
+
+  - id: QA-6
+    issue: "Double-SIGINT leaves the dashboard showing a live run forever"
+    severity: low
+    finding: "The second SIGINT calls cleanup() then process.exit(130) without pushing a final frame, so the dashboard's last frame stays active:true with a live `current` — precisely the 'iteration frozen mid-flight' state the final-frame comment says it exists to prevent."
+    suggested_action: "Push a best-effort active:false frame before exiting the handler, or document that the interrupt path leaves a stale frame the consumer must age out."
+    suggested_owner: dev
+    ref: "skills/loop-supervisor/scripts/run-loop.mjs:1079"
+
+  - id: QA-7
+    issue: "pushFrame is unguarded, so the observer can still reach the run's exit path"
+    severity: low
+    finding: "pushDashboard is defensive, but pushFrame itself has no try/catch and the async IIFE awaiting it has no rejection handler. A throw from its inputs — or an EPIPE from the default stderr warn inside pushDashboard's own catch — would reject the IIFE and abort before the run's JSON summary and process.exit(terminal ? 1 : 0). The stated invariant is that the observer can never affect the run; it is not airtight."
+    suggested_action: "Wrap the pushFrame body in its own try/catch so no input can reach the run's exit path."
+    suggested_owner: dev
+    ref: "skills/loop-supervisor/scripts/run-loop.mjs:1364"
+
+  - id: QA-8
+    issue: "The env-var fallback infers presence instead of tracking it"
+    severity: low
+    finding: "applyConfig gates the token env fallback on `!opts.dashboardToken` (falsiness) while dashboardUrl immediately above uses the tracked explicit set, so `--dashboard-token ''` is silently overridden by the environment. This is the exact 'presence must be TRACKED, never inferred' failure the comment at run-loop.mjs:186 warns about, and parseArgs already records dashboardToken in explicit."
+    suggested_action: "Use `if (!explicit.has('dashboardToken'))`, consistent with the branch above it."
+    suggested_owner: dev
+    ref: "skills/loop-supervisor/scripts/run-loop.mjs:345"
+
+  - id: QA-9
+    issue: "repoUrl is published unredacted"
+    severity: low
+    finding: "repoUrl comes verbatim from `git remote get-url origin`. A repo cloned over HTTPS with an embedded credential ships that credential to the dashboard endpoint on every iteration boundary. This repo uses SSH, so it is latent rather than live."
+    suggested_action: "Strip any userinfo from the remote before publishing it."
+    suggested_owner: dev
+    ref: "skills/loop-supervisor/scripts/run-loop.mjs:1132"
+
+  - id: QA-10
+    issue: "The live-network test can fail for environmental reasons"
+    severity: low
+    finding: "'a genuinely unreachable host over the real network still resolves' performs a real DNS lookup inside the default npm test glob. On a network whose resolver hijacks NXDOMAIN with a captive-portal 200, the push succeeds and the test fails for reasons unrelated to the code."
+    suggested_action: "Put the live-network case behind an opt-in env guard, leaving the three injected-failure tests as the unit-level proof."
+    suggested_owner: dev
+    ref: "evals/loop-supervisor/unit/dashboard.test.mjs:305"
+
+  - id: QA-11
+    issue: "The unserialisable-payload test passes with the guard it protects removed"
+    severity: low
+    finding: "It asserts only pushed === false and one warning, unlike its siblings which pin res.reason. Deleting the inner JSON.stringify try/catch would let the same TypeError fall to the outer catch and produce an identical observable result."
+    suggested_action: "Assert res.reason === 'unserialisable payload'."
+    suggested_owner: dev
+    ref: "evals/loop-supervisor/unit/dashboard.test.mjs:322"
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 1856
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2]
+  criteria_full: [3, 4, 5, 6, 7]
+  criteria_partial: [1, 2, 8]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: "Token inherited by every spawned child (QA-5); repoUrl published unredacted (QA-9); the risk table's 'asserted by test' mitigation is vacuous (QA-2). No live leak in this repo — SSH remote, and the token is unset — but three latent paths."
+  performance:
+    status: PASS
+    notes: "One eager `git remote get-url origin` per run even without --dashboard; negligible. The push is bounded by a 5s timeout and adds latency only at iteration boundaries."
+  reliability:
+    status: CONCERNS
+    notes: "The warn-and-continue policy is genuinely proved at the pushDashboard level (mutation-proved: rethrowing kills 3 tests, dropping the non-2xx check kills 1). But pushFrame is unguarded (QA-7) and the double-SIGINT path leaves a stale active frame (QA-6)."
+  maintainability:
+    status: CONCERNS
+    notes: "Documentation is thorough, accurate and cross-consistent. The concern is test quality: two tests report coverage that is not there (QA-2 vacuous, QA-11 survives removal of its guard), on a task whose thesis is proving rather than assuming."
+
+code_review:
+  findings_total: 11
+  bugs: 4
+  cleanups: 7
+  blocking_mode: true
+  promoted_to_top_issues: [QA-1, QA-5, QA-6, QA-7, QA-9]
+  mutation_proven:
+    warn_and_continue_policy: yes
+    non_2xx_detection: yes
+    token_header_sent: yes
+    token_absent_from_frame: no
+
+recommendations:
+  immediate:
+    - action: "Scope the ledger to this run before building a frame"
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs"]
+    - action: "Make the token-absence assertion capable of failing, and strip the token from the child env"
+      refs: ["evals/loop-supervisor/unit/dashboard.test.mjs", "skills/loop-supervisor/scripts/run-loop.mjs"]
+    - action: "Prove SC2 at the run level, not only at pushDashboard"
+      refs: ["evals/loop-supervisor/unit/dashboard.test.mjs"]
+    - action: "Either widen executable-instructions to cover runbooks and skill READMEs, or stop claiming it does"
+      refs: ["tests/executable-instructions.test.js", "docs/tasks/task.64.loop-supervisor-dashboard-and-docs/task.64.loop-supervisor-dashboard-and-docs.md"]
+  future:
+    - action: "Guard pushFrame; handle the double-SIGINT final frame; redact repoUrl userinfo; use the explicit set for the env fallback"
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "QA-1 fixed — a second run in the same tree currently publishes a wrong frame"
+    - "QA-2 and QA-3 fixed — the task's central claim is that the failure policy is proved, and it is proved one level below where the criterion states it"
+    - "QA-4 resolved either way — a Risk Assessment that names a gate which does not cover the artefact is worse than one that names none"

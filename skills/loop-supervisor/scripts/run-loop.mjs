@@ -342,7 +342,12 @@ export function applyConfig(opts, config) {
   // committed; a credential read from it would be a credential in git history,
   // and the risk this task set out to avoid is precisely a token that outlives
   // the run it authorised. It comes from the flag, or from the environment.
-  if (!opts.dashboardToken) {
+  //
+  // Gated on the tracked `explicit` set, not on falsiness: `--dashboard-token ''`
+  // is a supplied value that happens to be empty, and inferring absence from it
+  // would let the environment silently win — the same "presence must be TRACKED,
+  // never inferred" failure the comment in parseArgs warns about.
+  if (!explicit.has("dashboardToken")) {
     opts.dashboardToken = process.env.LOOP_SUPERVISOR_DASHBOARD_TOKEN || null;
   }
   return opts;
@@ -669,6 +674,26 @@ export function notifyTerminalStop(opts, summary, deps = {}) {
 // ── the dashboard push ───────────────────────────────────────────────────────
 
 /**
+ * Strip any userinfo from a remote URL before it is published.
+ *
+ * A repo cloned over HTTPS can carry a credential in the URL itself
+ * (`https://x-access-token:ghp_xxx@github.com/o/r.git`). `git remote get-url`
+ * returns it verbatim, so publishing that value unredacted would ship a token to
+ * the dashboard on every iteration boundary — the exact leak the rest of this
+ * file works to prevent. SSH remotes (`git@github.com:o/r.git`) have no userinfo
+ * to strip and pass through unchanged.
+ *
+ * @param {string|null} url
+ * @returns {string|null}
+ */
+export function redactRemoteUrl(url) {
+  if (!url) return null;
+  // Only scheme://[userinfo@]host can carry userinfo. `git@host:path` is
+  // scp-like syntax, not a URL, and its "user" is not a credential.
+  return url.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/@]*@/, "$1");
+}
+
+/**
  * Build one dashboard frame.
  *
  * Pure, and every field is derived from state the runner already writes —
@@ -689,7 +714,7 @@ export function notifyTerminalStop(opts, summary, deps = {}) {
  * @param {boolean} [a.active] false on the final frame of a run
  * @param {string} a.runId
  * @param {string} a.command the prompt each iteration runs
- * @param {string} a.startedAt ISO timestamp of the run's first iteration
+ * @param {string} a.startedAt ISO timestamp of the run's start (not this iteration's)
  * @param {string} [a.reporterHost] defaults to this machine's hostname
  * @param {string|null} [a.repoUrl] origin remote, when there is one
  * @param {object|null} [a.current] parsed `current.json`, or null after cleanup
@@ -859,6 +884,84 @@ export async function pushDashboard(
         : (e && e.message) || String(e);
     warn(`⚠ dashboard push failed — ${url}: ${why}; continuing`);
     return { pushed: false, reason: why };
+  }
+}
+
+/**
+ * Build and push one frame for a live run — the whole observer path in one
+ * exported, testable unit.
+ *
+ * Three things live here rather than at the call site, each because the call
+ * site is inside the loop and must not be able to fail:
+ *
+ * 1. **The ledger is scoped to this run.** `runs.jsonl` is append-only across
+ *    runs, so passing it whole would publish last night's outcomes as this
+ *    run's — counts that disagree with `totals.iterations`, and a `recent`
+ *    showing iterations from a run that finished hours ago. Every row already
+ *    carries `runId`; filter on it.
+ * 2. **Nothing escapes.** `pushDashboard` is defensive about the request, but
+ *    its *inputs* are not: `readCurrent`/`readLedger` touch the filesystem, and
+ *    `warn` writes to stderr, which can EPIPE. Wrapped here, the observer cannot
+ *    reject into the run's async IIFE and abort it before its exit path.
+ * 3. **It is callable from a test.** The failure policy is a claim about the
+ *    RUN, not about `pushDashboard`, so this is the unit a test must drive.
+ *
+ * @returns {Promise<{pushed: boolean, reason?: string}>} never rejects
+ */
+export async function pushRunFrame({
+  cwd,
+  runId,
+  command,
+  startedAt,
+  repoUrl = null,
+  url,
+  token = null,
+  totals = {},
+  active = true,
+  elapsedSec = null,
+  readCurrentImpl = readCurrent,
+  readLedgerImpl = readLedger,
+  timeoutMs,
+  fetchImpl,
+  warn = (m) => process.stderr.write(m + "\n"),
+} = {}) {
+  if (!url) return { pushed: false, reason: "no dashboard url" };
+  try {
+    const rows = readLedgerImpl(cwd);
+    const mine = Array.isArray(rows)
+      ? rows.filter((r) => r && r.runId === runId)
+      : [];
+    const payload = buildDashboardPayload({
+      active,
+      runId,
+      command,
+      startedAt,
+      repoUrl,
+      current: readCurrentImpl(cwd),
+      elapsedSec,
+      ledger: mine,
+      totals,
+    });
+    return await pushDashboard(payload, {
+      url,
+      token,
+      ...(timeoutMs != null ? { timeoutMs } : {}),
+      ...(fetchImpl !== undefined ? { fetchImpl } : {}),
+      warn,
+    });
+  } catch (e) {
+    // Reached only when an INPUT throws — a filesystem error, or a stderr write
+    // that EPIPEs inside pushDashboard's own catch. Swallowed for the same
+    // reason as every other failure here: the observer must never be able to
+    // change the run's outcome.
+    try {
+      warn(
+        `⚠ dashboard frame skipped — ${(e && e.message) || String(e)}; continuing`,
+      );
+    } catch {
+      /* stderr is gone too; there is nowhere left to report this */
+    }
+    return { pushed: false, reason: "frame build failed" };
   }
 }
 
@@ -1055,6 +1158,7 @@ function main() {
   };
   let resumeAttempts = 0;
   let stopping = false;
+  let killing = false;
   let activeChild = null;
 
   // First SIGINT: finish the current iteration, then stop. Never mid-merge —
@@ -1067,7 +1171,8 @@ function main() {
       process.stderr.write(
         "\n⚠ SIGINT — finishing the current iteration, then stopping. Ctrl-C again to kill it.\n",
       );
-    } else {
+    } else if (!killing) {
+      killing = true;
       process.stderr.write("\n⚠ SIGINT again — killing the child.\n");
       if (activeChild)
         try {
@@ -1076,6 +1181,21 @@ function main() {
           /* gone */
         }
       cleanup();
+      // Best-effort, and on a short leash. Without it this path leaves the
+      // dashboard's last frame at `active: true` with a live `current` forever —
+      // the "iteration frozen mid-flight" state the final frame exists to
+      // prevent. The operator is at the keyboard here and has asked twice to
+      // stop, so 1.5s is the whole budget; a SIGKILL still leaves a stale frame,
+      // which is why the contract also tells consumers to age frames out.
+      pushFrame({ active: false, timeoutMs: 1500 })
+        .catch(() => {})
+        .finally(() => process.exit(130));
+    } else {
+      // A THIRD SIGINT lands inside the 1.5s the frame push is allowed. Without
+      // this branch it re-entered the one above — killing an already-dead child,
+      // running cleanup again and racing a second process.exit. An operator
+      // mashing Ctrl-C means "now", so honour that and drop the frame.
+      process.stderr.write("\n⚠ SIGINT again — exiting now.\n");
       process.exit(130);
     }
   });
@@ -1129,29 +1249,39 @@ function main() {
   }
 
   const runStartedAt = new Date(totals.startedAtMs).toISOString();
-  const repoUrl = gitOut(cwd, ["remote", "get-url", "origin"]) || null;
+  // Resolved only when there is an observer to publish it to — the value has no
+  // other consumer, and this is a subprocess spawn on every run.
+  const repoUrl = opts.dashboard
+    ? redactRemoteUrl(gitOut(cwd, ["remote", "get-url", "origin"]))
+    : null;
 
   /**
    * Push one frame. Inert unless `--dashboard` was passed, and awaited rather
    * than fired-and-forgotten so a slow observer shows up as bounded latency at
    * a known point rather than as an unhandled rejection later in the night.
+   *
+   * Every guarantee lives in `pushRunFrame`, which is exported so a test can
+   * drive this exact path rather than the layer below it.
    */
-  async function pushFrame({ active = true, elapsedSec = null } = {}) {
+  async function pushFrame({
+    active = true,
+    elapsedSec = null,
+    timeoutMs,
+  } = {}) {
     if (!opts.dashboard) return;
-    await pushDashboard(
-      buildDashboardPayload({
-        active,
-        runId,
-        command: prompt,
-        startedAt: runStartedAt,
-        repoUrl,
-        current: readCurrent(cwd),
-        elapsedSec,
-        ledger: readLedger(cwd),
-        totals,
-      }),
-      { url: opts.dashboard, token: opts.dashboardToken },
-    );
+    await pushRunFrame({
+      cwd,
+      runId,
+      command: prompt,
+      startedAt: runStartedAt,
+      repoUrl,
+      url: opts.dashboard,
+      token: opts.dashboardToken,
+      totals,
+      active,
+      elapsedSec,
+      timeoutMs,
+    });
   }
 
   (async () => {
@@ -1227,9 +1357,18 @@ function main() {
       const result = await new Promise((resolve) => {
         const raw = fs.createWriteStream(rawPath, { flags: "a" });
         const txt = fs.createWriteStream(txtPath, { flags: "a" });
+        // The child inherits the supervisor's environment by default, which
+        // would hand the dashboard token to every `claude -p` iteration and to
+        // anything that iteration shells out to. That child is an agent with a
+        // Bash tool writing iter-NNN.txt and iter-NNN.jsonl to disk, so one
+        // `env` in a tool call would write the credential into a log file —
+        // contradicting the contract that the token never reaches one. Strip it.
+        const childEnv = { ...process.env };
+        delete childEnv.LOOP_SUPERVISOR_DASHBOARD_TOKEN;
         const child = spawn(claudeBin, args, {
           cwd,
           stdio: ["ignore", "pipe", "pipe"],
+          env: childEnv,
         });
         activeChild = child;
         let buf = "";

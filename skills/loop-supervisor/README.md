@@ -326,7 +326,16 @@ without a line changing here.
 | `recent` | The trailing 10 ledger rows, **oldest first**, each exactly as written to `runs.jsonl` (`iteration`, `outcome`, `reason`, `itemId`, `exitCode`, `durationMs`, `costUsd`, `turns`, `sessionId`, `logPath`, `transcriptPath`). |
 
 **The token is never in the payload**, never in `runs.jsonl`, never in `current.json` and never in a log
-line. It travels only in the header. There is a test asserting it.
+line. It travels only in the header, and a test drives the real push path to assert the request body is
+free of it while the header carries it.
+
+It is also **stripped from the environment of every spawned iteration**. Without that, `--dashboard-token`
+read from `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` would be inherited by each `claude -p` child and by anything
+that child shells out to — and the child is an agent with a Bash tool writing `iter-NNN.txt` to disk, so
+a single `env` in a tool call would put the credential in a log file.
+
+`repoUrl` is redacted the same way: a repo cloned over HTTPS can carry a credential in the remote URL
+itself, and `git remote get-url` returns it verbatim. Any userinfo is stripped before the frame goes out.
 
 ### The failure policy
 
@@ -344,6 +353,11 @@ gets assumed rather than verified.
 The corollary for the consumer: **frames can be dropped, and you will not be told.** Treat each frame as
 a full snapshot rather than a delta, and treat `recent` as the recovery mechanism for anything you
 missed. Do not build a counter by incrementing on receipt.
+
+**Age frames out rather than trusting `active`.** A double `Ctrl-C` pushes a best-effort final frame on a
+1.5-second leash, but a `SIGKILL`, a power cut or a lost network leaves the last frame reading
+`active: true` with a live `current` forever. `reporterHost` plus the frame's own arrival time is enough
+to mark a run stale; nothing in the protocol can guarantee a closing frame.
 
 ### If you are building the consumer side
 

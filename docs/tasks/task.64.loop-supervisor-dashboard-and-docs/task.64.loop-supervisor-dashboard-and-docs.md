@@ -191,6 +191,7 @@ ahead of the code.
 | `skills-config.yaml`                          | Dashboard defaults in the `loopSupervisor:` block              |
 | `docs/reference/configuration.md`             | New rows                                                       |
 | `evals/loop-supervisor/unit/*.test.mjs`       | Payload shape + failure-policy tests                           |
+| `tests/executable-instructions.test.js`      | Widen `collectDocs()` to cover runbooks and skill READMEs      |
 
 **New** — `docs/runbooks/unattended-overnight-runs.md`.
 
@@ -227,7 +228,7 @@ ahead of the code.
 | --------------------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------ |
 | A push failure aborts a long run                                | Low        | High   | Warn-and-continue, proved by three deliberate-breakage tests           |
 | Contract drifts from what the consumer builds                   | Medium     | Medium | Payload documented in full and versioned with `schemaVersion`          |
-| Runbook documents commands that do not ship                     | Medium     | Medium | `tests/executable-instructions.test.js` is exactly this gate           |
+| Runbook documents commands that do not ship                     | Medium     | Medium | `tests/executable-instructions.test.js` — **widened by this task** to collect `docs/runbooks/**` and `skills/*/README.md`, which it did not scan before; mutation-proved on both |
 | Consumer overloads `/api/batch` and inherits its closed vocabulary | Medium  | Low    | Both warnings written into the README, not left as tribal knowledge    |
 | Token logged in a transcript or ledger line                     | Low        | High   | Token never written to `runs.jsonl`, `current.json` or any log; asserted by test |
 
@@ -246,6 +247,97 @@ their own.
 - [x] 5. `develop-next` cross-references, config rows
 - [x] 6. Executable-instructions, link check, format, suite
 
+## Dev Agent Record — QA Fix Cycle 1
+
+**Date**: 2026-08-29 · **Gate addressed**: `task.64.gate.1.*.yml` (CONCERNS, 50/100)
+
+All 11 findings closed — 5 MEDIUM, 6 LOW. No ambiguity required a user decision; the one fork
+(QA-4: widen the gate, or delete the claim) was resolved by widening, because a Risk Assessment that
+names a mitigation is better served by making the mitigation real than by retracting it.
+
+### Completion notes
+
+- **QA-1 / QA-3 / QA-7 — one export closes all three.** Extracted `pushRunFrame()`: it filters the
+  ledger to this run's `runId` (QA-1), wraps the whole observer path so no input can reject into the
+  loop's async IIFE (QA-7), and is exported so a test can drive the unit the loop actually calls
+  rather than the layer beneath it (QA-3). SC2 is now proved where the criterion states it — six
+  failure modes, each asserted with `assert.doesNotReject`.
+- **QA-2 — the vacuous test is replaced, not patched.** The new test drives the real push path and
+  asserts the request **body** is token-free while the **header** carries it, so a future field
+  copying `opts.dashboardToken` into the frame would fail it.
+- **QA-4 — the gate was widened and mutation-proved.** `collectDocs()` now collects
+  `docs/runbooks/**` and `skills/*/README.md`. It passes repo-wide with no fallout, and a phantom
+  command injected into each of those two file classes turns it red — so the mitigation is real
+  rather than nominally cited.
+- **QA-5 — the token is stripped from the child environment.** `spawn` now receives an explicit
+  `env` with `LOOP_SUPERVISOR_DASHBOARD_TOKEN` deleted.
+- **QA-6, QA-8, QA-9, QA-10, QA-11** — best-effort final frame on double-SIGINT (1.5s leash);
+  `explicit.has("dashboardToken")` instead of a falsiness check; `redactRemoteUrl()` strips userinfo
+  from an HTTPS remote; the live-network test is gated behind
+  `LOOP_SUPERVISOR_LIVE_NETWORK_TESTS=1`; the unserialisable test now pins `res.reason`.
+
+### Found by the adversarial pass over the fixes (Step 3.5), not by QA
+
+The double-SIGINT fix introduced a **third**-SIGINT re-entrancy bug: a Ctrl-C landing inside the 1.5s
+frame-push window re-entered the same branch, re-killing a dead child, running `cleanup()` again and
+racing a second `process.exit`. Guarded with a `killing` flag, and a third SIGINT now exits
+immediately — an operator mashing Ctrl-C means *now*. Recorded as a finding of this cycle rather than
+fixed silently.
+
+### Verification
+
+`npm test` 1867 tests — 1866 pass, 1 skipped (the newly-gated live-network case), 0 fail.
+`format:check` clean · `npm run bundle` no drift · 100 paths + 26 anchors verified, 0 broken.
+
+### File list
+
+Modified: `skills/loop-supervisor/scripts/run-loop.mjs`, `skills/loop-supervisor/README.md`,
+`evals/loop-supervisor/unit/dashboard.test.mjs`, `tests/executable-instructions.test.js`,
+`docs/tasks/task.64.loop-supervisor-dashboard-and-docs/task.64.loop-supervisor-dashboard-and-docs.md`
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-29
+**Quality Score**: 50/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.64.qa.1.loop-supervisor-dashboard-and-docs.md](./task.64.qa.1.loop-supervisor-dashboard-and-docs.md)
+- **Gate File**: [task.64.gate.1.loop-supervisor-dashboard-and-docs.yml](./task.64.gate.1.loop-supervisor-dashboard-and-docs.yml)
+- **Traceability Matrix**: [.summaries/qa-traceability-matrix.md](./.summaries/qa-traceability-matrix.md)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1856 (all passing); CI 4/4 green
+- **Phases Verified**: 5/5 (2 with issues)
+- **Criteria**: 5 full, 3 partial
+- **Issues**: HIGH 0, MEDIUM 5, LOW 6
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+The implementation is complete and CI is green. The gate is CONCERNS because this is a task whose thesis
+is that its load-bearing property is **proved rather than assumed**, and three of its proofs do not reach
+as far as they claim — one cannot fail at all. Plus one real bug the criteria would not have caught.
+
+- **QA-1** — a frame publishes the whole append-only ledger, not this run's rows, so the outcome counts
+  and `recent` span every previous run while `totals.iterations` counts only this one. Breaks the payload
+  contract this same change authored.
+- **QA-2** — the token-absence test is vacuous. Mutation-proved: deleting the token header entirely left
+  it green. The Risk Assessment rates the leak Low/HIGH and says it is "asserted by test".
+- **QA-3** — SC2 requires the *run's* outcome and exit status to be proved unchanged; the tests prove it
+  one level down, at `pushDashboard`.
+- **QA-4** — the Risk Assessment names `tests/executable-instructions.test.js` as the runbook mitigation,
+  but `collectDocs()` does not scan `docs/runbooks/**` or `skills/*/README.md`.
+- **QA-5** — the token is inherited by every spawned `claude` child, and the child writes logs to disk.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -254,6 +346,8 @@ their own.
 | 2026-08-29 | 1.1     | Review passed (9/10, READY TO IMPLEMENT) — added `schemaVersion` to the payload spec so the Risk Assessment mitigation it names is real; named the runbooks-index entry and the two `## Limits` deletions the Files Summary had left implicit | review-task |
 | 2026-08-29 |         | Status → ready-for-development | review-task |
 | 2026-08-29 |         | Implemented all 5 phases: `--dashboard`/`--dashboard-token` with warn-and-continue push, 22 unit tests (3 deliberate-breakage failure-mode tests), README payload contract with both consumer warnings, `docs/runbooks/unattended-overnight-runs.md` + index row, develop-next cross-references, config rows. Status → ready-for-review | develop-task |
+| 2026-08-29 |         | QA gate CONCERNS (50/100) — 0 high, 5 medium, 6 low; SC 5 full / 3 partial | qa-task |
+| 2026-08-29 |         | QA findings fixed — all 11 closed (5 medium, 6 low) plus 1 found by the adversarial pass over the fixes; `executable-instructions` widened to cover runbooks and skill READMEs, mutation-proved; 1 QA iteration | qa-fix |
 
 ## References
 

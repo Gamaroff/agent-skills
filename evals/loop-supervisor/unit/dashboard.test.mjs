@@ -23,6 +23,8 @@ import os from "node:os";
 import {
   buildDashboardPayload,
   pushDashboard,
+  pushRunFrame,
+  redactRemoteUrl,
   parseArgs,
   applyConfig,
   UNREADABLE,
@@ -167,16 +169,39 @@ test("reporterHost defaults to this machine", () => {
   assert.equal(p.reporterHost, os.hostname());
 });
 
-test("the token never appears anywhere in a serialised frame", () => {
-  // The frame is written to logs and handed to a consumer. A token that reached
-  // it would outlive the run that authorised it.
-  const p = buildDashboardPayload({
-    ...base,
-    current: CURRENT,
-    ledger: LEDGER,
-    totals: { iterations: 6, costUsd: 1 },
+test("the token reaches the header and never the request body", async () => {
+  // This test replaced a tautology. The previous version called
+  // buildDashboardPayload — which has no token parameter — and asserted the
+  // literal was absent from the result. It could not fail: deleting the token
+  // header from pushDashboard entirely left it green, which is how QA found it.
+  //
+  // Driving the REAL push path is what makes the assertion load-bearing: a
+  // future field that copied opts.dashboardToken into the frame would fail here.
+  let seen = null;
+  await pushRunFrame({
+    cwd: "/nonexistent",
+    runId: "run-1",
+    command: "/develop-next",
+    startedAt: base.startedAt,
+    repoUrl: base.repoUrl,
+    url: "https://dash.example/api/loop",
+    token: "s3cret",
+    totals: { iterations: 3, costUsd: 1 },
+    readCurrentImpl: () => CURRENT,
+    readLedgerImpl: () => LEDGER.map((r) => ({ ...r, runId: "run-1" })),
+    fetchImpl: async (url, init) => {
+      seen = init;
+      return { ok: true, status: 200 };
+    },
+    warn: () => assert.fail("a successful push must not warn"),
   });
-  assert.equal(JSON.stringify(p).includes("s3cret"), false);
+
+  assert.equal(seen.headers["X-Dash-Token"], "s3cret");
+  assert.equal(
+    seen.body.includes("s3cret"),
+    false,
+    "the token must never reach the serialised frame",
+  );
 });
 
 // ── the token header and the request ─────────────────────────────────────────
@@ -302,22 +327,32 @@ test("a timeout warns once and resolves", async () => {
   assert.match(warnings[0], /timed out/);
 });
 
-test("a genuinely unreachable host over the real network still resolves", async () => {
-  // The three tests above inject the failure. This one does not: it uses the
-  // real `fetch` against a hostname that cannot resolve, so the assertion
-  // survives a future refactor that changes which errors Node throws.
-  const warnings = [];
-  const res = await pushDashboard(
-    { a: 1 },
-    {
-      url: "http://loop-supervisor-does-not-exist.invalid/api/loop",
-      timeoutMs: 2000,
-      warn: (m) => warnings.push(m),
-    },
-  );
-  assert.equal(res.pushed, false);
-  assert.equal(warnings.length, 1);
-});
+// Opt-in: this one performs a REAL DNS lookup. On a network whose resolver
+// hijacks NXDOMAIN with a captive-portal 200 the push succeeds and the test
+// fails for reasons that have nothing to do with the code. It stays valuable —
+// it is the only case not injecting its own failure — so it is kept and gated
+// rather than deleted. Run it with LOOP_SUPERVISOR_LIVE_NETWORK_TESTS=1.
+test(
+  "a genuinely unreachable host over the real network still resolves",
+  {
+    skip: process.env.LOOP_SUPERVISOR_LIVE_NETWORK_TESTS
+      ? false
+      : "set LOOP_SUPERVISOR_LIVE_NETWORK_TESTS=1 to run the live-network case",
+  },
+  async () => {
+    const warnings = [];
+    const res = await pushDashboard(
+      { a: 1 },
+      {
+        url: "http://loop-supervisor-does-not-exist.invalid/api/loop",
+        timeoutMs: 2000,
+        warn: (m) => warnings.push(m),
+      },
+    );
+    assert.equal(res.pushed, false);
+    assert.equal(warnings.length, 1);
+  },
+);
 
 test("a payload that will not serialise warns once instead of throwing", async () => {
   const warnings = [];
@@ -329,6 +364,10 @@ test("a payload that will not serialise warns once instead of throwing", async (
     warn: (m) => warnings.push(m),
   });
   assert.equal(res.pushed, false);
+  // Pin the reason, not just the outcome. Without this the test passes with the
+  // inner JSON.stringify guard deleted: the same TypeError would fall through to
+  // the outer catch and produce an identical pushed/warnings result.
+  assert.equal(res.reason, "unserialisable payload");
   assert.equal(warnings.length, 1);
 });
 
@@ -418,4 +457,183 @@ test("the token is never read from config, only from the flag or the environment
     if (prev === undefined) delete process.env.LOOP_SUPERVISOR_DASHBOARD_TOKEN;
     else process.env.LOOP_SUPERVISOR_DASHBOARD_TOKEN = prev;
   }
+});
+
+// ── the frame push at the RUN level ──────────────────────────────────────────
+//
+// Success Criterion 2 is a claim about the RUN — "leave the run's outcome and
+// exit status unchanged" — not about pushDashboard. The tests above prove the
+// layer below it. These drive `pushRunFrame`, which is the unit the loop
+// actually calls, so the criterion is proved where it is stated.
+
+const frameBase = {
+  cwd: "/nonexistent",
+  runId: "run-1",
+  command: "/develop-next",
+  startedAt: "2026-08-29T01:00:00.000Z",
+  repoUrl: "git@github.com:o/r.git",
+  url: "https://dash.example/api/loop",
+  totals: { iterations: 3, costUsd: 1.5 },
+  readCurrentImpl: () => CURRENT,
+  readLedgerImpl: () => LEDGER.map((r) => ({ ...r, runId: "run-1" })),
+};
+
+test("the frame publishes only THIS run's ledger rows", async () => {
+  // runs.jsonl is append-only across runs. Passing it whole made a second run
+  // in the same tree publish the previous run's outcomes as its own, with
+  // counts that disagreed with totals.iterations and a `recent` showing
+  // iterations from a run that had already finished.
+  let body = null;
+  const mixed = [
+    { runId: "OLD-run", iteration: 1, outcome: "progress" },
+    { runId: "OLD-run", iteration: 2, outcome: "halt" },
+    { runId: "run-1", iteration: 1, outcome: "progress" },
+    { runId: "run-1", iteration: 2, outcome: "idle" },
+  ];
+
+  await pushRunFrame({
+    ...frameBase,
+    readLedgerImpl: () => mixed,
+    totals: { iterations: 2, costUsd: 1 },
+    fetchImpl: async (_u, init) => {
+      body = JSON.parse(init.body);
+      return { ok: true, status: 200 };
+    },
+  });
+
+  assert.equal(body.totals.progressed, 1);
+  assert.equal(body.totals.idle, 1);
+  assert.equal(
+    body.totals.halted,
+    0,
+    "the previous run's halt must not appear",
+  );
+  assert.equal(body.recent.length, 2);
+  assert.deepEqual(
+    body.recent.map((r) => r.runId),
+    ["run-1", "run-1"],
+  );
+  // The contract the README states: the counts sum to iterations.
+  const summed =
+    body.totals.progressed +
+    body.totals.idle +
+    body.totals.incomplete +
+    body.totals.errored +
+    body.totals.halted +
+    body.totals.done;
+  assert.equal(summed, body.totals.iterations);
+});
+
+test("a torn or missing heartbeat does not stop the frame going out", async () => {
+  let body = null;
+  await pushRunFrame({
+    ...frameBase,
+    readCurrentImpl: () => UNREADABLE,
+    fetchImpl: async (_u, init) => {
+      body = JSON.parse(init.body);
+      return { ok: true, status: 200 };
+    },
+  });
+  assert.equal(body.current, null);
+  assert.equal(body.active, true);
+});
+
+// SC2, proved at the level the criterion states it: every failure mode resolves,
+// warns at most once, and returns a value the caller can ignore. The loop awaits
+// this with no catch, so "never rejects" IS "the run's outcome is unchanged".
+for (const [name, mode] of [
+  [
+    "unresolvable host",
+    {
+      fetchImpl: async () => {
+        const e = new TypeError("fetch failed");
+        e.cause = new Error("getaddrinfo ENOTFOUND");
+        throw e;
+      },
+    },
+  ],
+  ["non-2xx", { fetchImpl: async () => ({ ok: false, status: 503 }) }],
+  [
+    "timeout",
+    {
+      fetchImpl: async () => {
+        const e = new Error("aborted");
+        e.name = "TimeoutError";
+        throw e;
+      },
+    },
+  ],
+  [
+    "a throwing ledger read",
+    {
+      readLedgerImpl: () => {
+        throw new Error("EACCES");
+      },
+    },
+  ],
+  [
+    "a throwing heartbeat read",
+    {
+      readCurrentImpl: () => {
+        throw new Error("EIO");
+      },
+    },
+  ],
+  ["no fetch in the runtime", { fetchImpl: null }],
+]) {
+  test(`SC2: ${name} leaves the run able to continue`, async () => {
+    const warnings = [];
+    let result;
+    // The assertion is the absence of a throw: pushRunFrame is documented as
+    // never rejecting, and the loop relies on that with no catch of its own.
+    await assert.doesNotReject(async () => {
+      result = await pushRunFrame({
+        ...frameBase,
+        ...mode,
+        warn: (m) => warnings.push(m),
+      });
+    });
+    assert.equal(result.pushed, false);
+    assert.ok(
+      warnings.length <= 1,
+      `warned ${warnings.length} times, expected at most 1`,
+    );
+  });
+}
+
+test("no dashboard url makes the whole frame path inert", async () => {
+  const res = await pushRunFrame({
+    ...frameBase,
+    url: null,
+    readLedgerImpl: () => assert.fail("must not read the ledger"),
+    fetchImpl: async () => assert.fail("must not call fetch"),
+    warn: () => assert.fail("must not warn"),
+  });
+  assert.deepEqual(res, { pushed: false, reason: "no dashboard url" });
+});
+
+// ── repoUrl redaction ────────────────────────────────────────────────────────
+
+test("an HTTPS remote's embedded credential is stripped before publishing", () => {
+  assert.equal(
+    redactRemoteUrl("https://x-access-token:ghp_secret@github.com/o/r.git"),
+    "https://github.com/o/r.git",
+  );
+  assert.equal(
+    redactRemoteUrl("https://user@github.com/o/r.git"),
+    "https://github.com/o/r.git",
+  );
+});
+
+test("an SSH remote passes through untouched", () => {
+  // scp-like syntax, not a URL — `git` here is a username, not a credential.
+  assert.equal(
+    redactRemoteUrl("git@github.com:o/r.git"),
+    "git@github.com:o/r.git",
+  );
+  assert.equal(
+    redactRemoteUrl("ssh://git@github.com/o/r.git"),
+    "ssh://github.com/o/r.git",
+  );
+  assert.equal(redactRemoteUrl(null), null);
 });
