@@ -38,6 +38,7 @@ After those, pick a runbook from the table below as the work in front of you dem
 | [Change Management](./change-management.md) | Responding to pivots, blockers, or scope changes mid-project. |
 | [Document Existing Project](./document-existing-project.md) | Generating brownfield architecture docs before adopting the library on an existing codebase. |
 | [Restricted Access](./restricted-access.md) | Agent must not write to the tracker: configure an access model, run the pipeline, work the handover checklist on the real board. |
+| [Unattended Overnight Runs](./unattended-overnight-runs.md) | Leaving `loop-supervisor` to work the roadmap for hours with a fresh context per iteration — caps, watching from a second terminal, and morning triage of the ledger. |
 | [Release & Install](./release-and-install.md) | Cutting a versioned release (maintainers) and running the consumer setup wizard to install skills into a project. |
 
 ## Runbook conventions
