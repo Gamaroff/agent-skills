@@ -309,7 +309,7 @@ Modified: `skills/loop-supervisor/scripts/run-loop.mjs`, `skills/loop-supervisor
 
 - **Full Report**: [task.64.qa.1.loop-supervisor-dashboard-and-docs.md](./task.64.qa.1.loop-supervisor-dashboard-and-docs.md)
 - **Gate File**: [task.64.gate.1.loop-supervisor-dashboard-and-docs.yml](./task.64.gate.1.loop-supervisor-dashboard-and-docs.yml)
-- **Traceability Matrix**: [.summaries/qa-traceability-matrix.md](./.summaries/qa-traceability-matrix.md)
+- **Traceability Matrix**: inlined in the QA report (the working copy under `.summaries/` is gitignored scratch, so linking to it would dangle in the tracked tree)
 
 ### Test Coverage Summary
 

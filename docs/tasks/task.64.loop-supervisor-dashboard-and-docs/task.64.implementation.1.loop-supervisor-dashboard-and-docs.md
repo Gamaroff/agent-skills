@@ -34,8 +34,8 @@ Add the optional `--dashboard` / `--dashboard-token` push to `run-loop.mjs` with
 | 1. create-branch           | ✅ Done    | Branch `feature/task.64.*` exists in git                               | Branch created at `8aa2b65`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.64.review.1.*.md` exists (or skip logged)                        | READY TO IMPLEMENT, 9/10; 0 critical, 2 important (both fixed), 2 optional; status Draft → Ready for Development | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. All 5 phases + 6 progress boxes complete. npm test 1856/1856, format:check clean, 93 links verified | — |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.64.qa.1.*.md`; `task.64.gate.1.*.yml`; PR comment posted         |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #278](https://github.com/Gamaroff/agent-skills/pull/278); 3 commits; issue comment skipped (no linked issue) | — |
+| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 | `task.64.qa.1.*.md`; `task.64.gate.1.*.yml`; PR comment posted         | Gate 1 CONCERNS (50/100): 0 high, 5 medium, 6 low. qa-fix next | `.summaries/…` (gitignored; matrix inlined in the QA report) |
 | 7. finalise                | ⏳ Pending | `task.64.dod.1.*.md`; task `status: accepted`                          |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -77,6 +77,15 @@ Add the optional `--dashboard` / `--dashboard-token` push to `run-loop.mjs` with
 - **Second decision:** `totals` counts **all six** classifier outcomes (`progressed`, `halted`, `idle`, `incomplete`, `errored`, `done`), not the three the task's payload example names. Three would not sum to `iterations` — a night with two `error`s would render as a night with two fewer iterations. A test asserts the histogram sums.
 - **Third decision:** `current.phase` is passed through from `current.json` verbatim (`spawning` | `running`). The task's example shows `"in-pipeline"`, which the runner never writes; publishing an invented vocabulary would be a contract a consumer could not rely on. The README documents the two values that actually ship.
 - Final frame ordering: pushed **after** `cleanup()`, so `current` reads back `null` and the frame carries `active: false` — a dashboard rendering the last frame verbatim shows a finished run rather than an iteration frozen mid-flight.
+### Step 4 — create-pr — 2026-08-29
+
+- Base pre-supplied `develop` (Q2) — create-pr Step 1 prompt skipped.
+- SCOPE_PATHS: `docs/tasks/task.64.loop-supervisor-dashboard-and-docs`, `skills/loop-supervisor`, `skills/develop-next`, `evals/loop-supervisor`, `docs/runbooks`, `docs/reference`, `skills-config.yaml`. Pre-flight guard held nothing — every untracked path was in scope.
+- Three logical commits: `47e75f4` feat (code + tests + config), `caa81b5` docs (contract + runbook + cross-references), `979992d` docs(task.64) (work-item artifacts). Implementation report committed here, as Step 4 specifies.
+- Leak check: OK — no out-of-scope path in any commit.
+- `--issue` omitted (TRACKER_ISSUE empty); Step 6b issue comment skipped silently.
+- PR: https://github.com/Gamaroff/agent-skills/pull/278
+
 - Gates: `npm run bundle` (no drift — no bundled `references/` file was touched), `npm test` **1856/1856 pass, exit 0**, `npm run format:check` clean, 93 relative links verified.
 
 ---
@@ -90,7 +99,26 @@ Add the optional `--dashboard` / `--dashboard-token` push to `run-loop.mjs` with
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — qa-task — 2026-08-29 — Gate CONCERNS (50/100)
+
+Strategy: direct tools + two independent read-only subagents (traceability mapper over the 8 success criteria; adversarial diff code review in blocking mode). **Every subagent finding was re-verified against source before acceptance** — `pushFrame`'s ledger call, the `spawn` options object and the double-SIGINT handler were each read line by line, and the `collectDocs()` scope claim was read directly out of the test file.
+
+Suite 1856/1856; CI 4/4 green on `c3532e9`.
+
+**Mutation proving (Step 3c)** — three mutations applied and reverted:
+
+| Invariant | Mutation | Killed | Proven |
+|---|---|---|---|
+| Warn-and-continue | `throw e` in outer catch | 3 tests | ✅ |
+| Non-2xx detection | `if (false)` for `!res.ok` | 1 test | ✅ |
+| Token header sent | header assignment deleted | 1 test | ✅ |
+| **Token absent from frame** | header assignment deleted | **0** | ❌ vacuous |
+
+**5 MEDIUM (gating):** QA-1 frame publishes the whole append-only ledger, not this run's rows — breaks the payload contract this change authored; QA-2 token-absence test is vacuous; QA-3 SC2 proved at `pushDashboard`, not at the run level the criterion names; QA-4 `executable-instructions` does not scan `docs/runbooks/**` or `skills/*/README.md`, so the Risk Assessment names a mitigation that does not fire; QA-5 token inherited by every spawned child, which writes logs to disk.
+
+**6 LOW:** double-SIGINT leaves `active:true`; `pushFrame` unguarded; env fallback infers presence rather than tracking it; `repoUrl` unredacted; live-network test in the default glob; unserialisable test survives removal of its guard.
+
+**Honest note:** QA-1, QA-2 and QA-3 are all defects in work done earlier in this same run. QA-4 is the one that would have shipped silently — a runbook full of `node .agents/skills/.../run-loop.mjs` invocations recorded as gated by a test that never opens the file.
 
 ---
 
@@ -99,7 +127,7 @@ _Track each QA review/fix cycle._
 **Finished**: _pending_
 **Final Status**: _pending_
 **Branch**: `feature/task.64.loop-supervisor-dashboard-and-docs`
-**PR**: _pending_
+**PR**: [#278](https://github.com/Gamaroff/agent-skills/pull/278)
 **QA Iterations**: _pending_
 **DoD Summary**: _pending_
 **Tracker debt**: _pending_

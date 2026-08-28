@@ -44,7 +44,25 @@ Plus one real bug that no criterion would have caught: a dashboard frame publish
 
 Direct tools for the document-anchored checks, plus two independent read-only subagents: a traceability mapper over the eight success criteria and an adversarial diff code review. **Every finding either subagent returned was re-verified against the source before being accepted into this report** — three were checked line by line (`pushFrame`'s ledger call, the `spawn` options object, the double-SIGINT handler), and the `collectDocs()` scope claim was read directly out of `tests/executable-instructions.test.js`. Nothing here rests on a subagent's word.
 
-Traceability matrix: [`.summaries/qa-traceability-matrix.md`](./.summaries/qa-traceability-matrix.md).
+### Traceability matrix
+
+Produced by a read-only Explore subagent and inlined here rather than linked: the working copy lives in
+`.summaries/`, which is **gitignored agent scratch**, so a markdown link to it resolves locally and 404s
+in CI — the asymmetry that produces a red build nobody can reproduce in the same directory.
+
+| Criterion | Spec files | Src files | Coverage (cycle 1) |
+|---|---|---|---|
+| SC1 payload posted each boundary, ending `active: false` | `dashboard.test.mjs:70,133,144` | `run-loop.mjs` `pushRunFrame` + 3 call sites | partial → **full** after QA-1/QA-3 fixes |
+| SC2 three failure modes warn once, run outcome unchanged | `dashboard.test.mjs:242,264,282` + the six `SC2:` cases | `pushDashboard`, `pushRunFrame` | partial → **full** — now asserted at the run level |
+| SC3 README documents the payload, both consumer warnings | `dashboard.test.mjs:70-182` | `README.md` §Publishing the run to a dashboard | full |
+| SC4 runbook: nothing → completed run, halts, caps, triage | `tests/executable-instructions.test.js` (after widening) | `docs/runbooks/unattended-overnight-runs.md` | full |
+| SC5 `claude --resume <uuid>` documented | — | `README.md`; runbook §In the morning | full |
+| SC6 per-iteration cost stated with prompt-cache caveat | — | `README.md`; runbook; `SKILL.md` §Limits | full |
+| SC7 develop-next points at the fresh-context alternative | — | `develop-next/SKILL.md`; `develop-next/README.md` | full |
+| SC8 executable-instructions, link check, test, format green | `tests/executable-instructions.test.js:105-140` | n/a | partial → **full** — the gate now scans the artefacts it names |
+
+Cross-cutting (Risk Assessment, not a numbered SC): the token-absence assertion was **vacuous** in
+cycle 1 — mutation-proved by deleting the token header and watching it stay green. Closed by QA-2.
 
 ---
 
