@@ -102,7 +102,7 @@ When a step dispatches subagents, persist their summaries per [`references/subag
 **Step Transition Protocol (mandatory — prevents orchestrator stalls).**
 
 > ```
-> SUB-SKILL RETURNS → [Bash advance] → [Edit ✅] → [Banner] → [Skill]
+> SUB-SKILL RETURNS → [Bash advance] → [Edit ✅] → [Status + Banner] → [Skill]
 >                          ↑
 >                FIRST. ALWAYS. NO PROSE BEFORE.
 > ```
@@ -111,10 +111,21 @@ Every step ends with the same four actions, executed _in order, with no text out
 
 1. **Bash tool call** advancing the lock to the next step: `bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh {N+1}`. **This must be the first call** — it anchors the orchestrator into "still working" mode and signals the `Stop` hook that the pipeline advanced. If the just-completed step was Step 8, use `--complete` instead (removes the lock). Idempotent — a sub-skill normally self-advances the lock, so this re-advance noops.
 2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`).
-3. **Emit the Step {N+1} banner** (or the Phase 2 Completion banner if N=8):
+3. **Emit the Remaining Work Status block, then the Step {N+1} banner** (or the Phase 2 Completion banner if N=8) — one contiguous output, nothing between them:
+
    ```
+   ═══ REMAINING WORK STATUS ═══
+   Pipeline position:  Step {N}/8 — {STEP-NAME} ✅ complete
+
+   Pipeline steps still ahead:
+     - Step {N+1}: {name}
+     - ...
+     - Step 8: commit-changes + push
+
    ═══ DEVELOP-BUG PIPELINE: STEP {N+1}/8 — {STEP-NAME} ═══
    ```
+
+   The status block is **required at every transition**, not optional garnish — it is what makes pipeline position legible after compaction and to a user reading the log later. Canonical format, the other firing points (each continuing develop-loop iteration, each QA/verify cycle, every HALT) and the "Remaining fix phases" middle block that shows while Step 3 is open: [`references/develop-pipeline-remaining-work-banner.md`](references/develop-pipeline-remaining-work-banner.md).
 4. **Invoke the next sub-skill** via the Skill tool in the same assistant turn. Do NOT pause for user acknowledgement, do NOT summarise progress, do NOT print "Returning to orchestrator".
 
 Two structural defences back this up: each pipeline sub-skill self-advances the lock as its last inline action; and the `Stop` hook re-prompts the orchestrator if it tries to stop mid-pipeline.

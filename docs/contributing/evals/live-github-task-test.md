@@ -152,7 +152,7 @@ Phase 0 will ask, in order:
 1. **Feature branch base** — `Which branch should feature/task.1.setup-jest be based on?` → choose **develop** (recommended default).
 2. **PR target branch** — `Which branch should the pull request target?` → choose **develop** (recommended default).
 
-Expected pipeline progression:
+Expected pipeline progression — every step banner below is preceded by a `═══ REMAINING WORK STATUS ═══` block naming the just-completed step and the steps still ahead (see [`shared/resources/develop-pipeline-remaining-work-banner.md`](../../../shared/resources/develop-pipeline-remaining-work-banner.md)); omitted here for brevity:
 
 ```
 ═══ DEVELOP-TASK PIPELINE: STEP 1/8 — CREATE-BRANCH ═══

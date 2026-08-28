@@ -171,7 +171,7 @@ REASON=$(cat <<EOF
 
 That call is an idempotent re-assert (the lock already reads ${NEXT}); it exists to anchor this turn into "still working" rather than to move the pipeline on.
 
-Then: emit banner \`═══ ${BANNER_PREFIX} PIPELINE: STEP ${NEXT}/8 — ${NEXT_NAME} ═══\` → invoke ${NEXT_SKILL}.
+Then: emit the Remaining Work Status block (position \`Step $((NEXT - 1))/8 ✅ complete\`, then the steps still ahead through Step 8) → banner \`═══ ${BANNER_PREFIX} PIPELINE: STEP ${NEXT}/8 — ${NEXT_NAME} ═══\` → invoke ${NEXT_SKILL}. Status block and banner are one contiguous output, no prose around them.
 
 Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to $((NEXT + 1)) (or \`--complete\` if that was Step 8).
 

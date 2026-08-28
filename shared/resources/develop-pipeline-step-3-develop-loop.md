@@ -226,49 +226,17 @@ Log in Decisions Log: "Development completion comment posted to {TRACKER} issue 
 
 ## Remaining Work Status Banner
 
-Required: output after each develop-loop iteration that continues, and after Steps 1, 2, 4, 5–6, and 7 complete.
+Canonical format, firing points and per-pipeline variants:
+[`shared/resources/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
+It is a pipeline-wide default — every step transition emits one, not just this step.
 
-#### develop-story banner
+Step 3 adds one firing point of its own: **every develop-loop iteration that
+continues** emits the block before re-invoking `/develop`, with the position
+line reading `Step 3/8 — DEVELOP ⏳ in progress, iter {ITER}/{MAX_ITER}`.
 
-Read the story file to get unchecked `[ ]` task names from the Tasks section. Output:
-
-```
-═══ REMAINING WORK STATUS ═══
-Pipeline position:  Step {N}/8 — {STEP-NAME} {✅ just completed / ⏳ in progress, iter {ITER}/{MAX_ITER}}
-
-Remaining story tasks ({X} of {M} tasks complete):
-  ✅ Task {n}: {name}      ← already ticked
-  ⬜ Task {n+1}: {name}   ← still to do
-  ...
-
-Pipeline steps still ahead:
-  - Step {next-step}: {name}
-  - ...
-  - Step 8: commit-changes + push
-```
-
-Omit the "Remaining story tasks" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
-
-#### develop-task banner
-
-Read the task file to get unchecked `[ ]` phase names from the Implementation Plan. Output:
-
-```
-═══ REMAINING WORK STATUS ═══
-Pipeline position:  Step {N}/8 — {STEP-NAME} {✅ just completed / ⏳ in progress, iter {ITER}/{MAX_ITER}}
-
-Remaining task phases ({X} of {M} phases complete):
-  ✅ Phase {n}: {name}      ← already ticked
-  ⬜ Phase {n+1}: {name}   ← still to do
-  ...
-
-Pipeline steps still ahead:
-  - Step {next-step}: {name}
-  - ...
-  - Step 8: commit-changes + push
-```
-
-Omit the "Remaining task phases" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
+Step 3 is also the only step where the middle block is populated — the unchecked
+`[ ]` story tasks / task phases / bug fix phases read straight out of the work
+item you already have open. From Step 4 onward that block is omitted.
 
 ---
 

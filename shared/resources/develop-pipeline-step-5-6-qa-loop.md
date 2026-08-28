@@ -262,6 +262,8 @@ Read `reason` and act per the table in [`shared/resources/tracker-comment-contra
 
 On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cycle {N} result comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
+**Remaining Work Status block (required, per cycle).** Before re-invoking the QA skill for the next cycle, emit the block with the position line `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {N}/5`. On the gate that exits the loop, the block is emitted as part of the Step 7 transition instead (`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate})`). Format: [`shared/resources/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
+
 ### 5b. Run QA Fix (shared)
 
 #### Signal the `changes-requested` stage (when `TRACKER_ISSUE` is set)

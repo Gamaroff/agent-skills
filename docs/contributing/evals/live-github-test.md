@@ -224,7 +224,7 @@ Phase 0 asks exactly two questions:
 
 Both prompts also list `epic/1.health-endpoint — create epic integration branch` as a trailing, unrecommended option. Do not pick it for this test: epic 1 declares no `branch_model:`, so `develop` is the path under test. (A third prompt, or an "Epic branch creation" question, means you are on a pre-v0.24.0 build — see [recipes § develop-story evals](./recipes.md).)
 
-Expected pipeline progression:
+Expected pipeline progression — every step banner below is preceded by a `═══ REMAINING WORK STATUS ═══` block naming the just-completed step and the steps still ahead (see [`shared/resources/develop-pipeline-remaining-work-banner.md`](../../../shared/resources/develop-pipeline-remaining-work-banner.md)); omitted here for brevity:
 
 ```
 ═══ DEVELOP-STORY PIPELINE: STEP 1/8 — CREATE-BRANCH ═══

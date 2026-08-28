@@ -157,6 +157,8 @@ Exit the loop and proceed to Step 7.
 
 5. Increment the counter and return to **5a**.
 
+6. **Emit the Remaining Work Status block** before re-entering 5a — position line `Steps 5–6/8 — VERIFY LOOP ⏳ in progress, cycle {N}/5`. Format: [`references/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
+
 ---
 
 ## Loop Limit Escalation (after 5 cycles without PASS)
