@@ -6,6 +6,58 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`loop-supervisor` `status` and `watch` — an unattended run you can actually see, and one that
+  tells you when it stops.** The runner already wrote an accurate record of what it did; there was no
+  way to read it back while it was happening. The honest answer to *"how do I see what it's doing"*
+  was *tail a JSONL file and parse it in your head* — enough for the person who wrote it, on the day
+  they wrote it, and nobody afterwards. That matters more than it sounds, because the failure this
+  whole design exists to catch is **silent quality degradation**, and a run that has quietly idled for
+  four iterations looks identical to a healthy one until a human glances at it.
+
+  `run-loop.mjs status` prints a snapshot (`--json` for machines); `run-loop.mjs watch` repaints the
+  same content every ~2s. Both are **pure readers** — no lock, no writes, nothing spawned — so they are
+  safe from a second terminal, over SSH, twice at once, and mid-iteration. Looking cannot disturb the
+  run. `watch` repaints in place and **never clears scrollback**: an operator who scrolled up to read
+  something does not lose it to a repaint.
+
+  **The states worth knowing about are the last two.** `current.json` present with a live pid is
+  `running`; absent is `no run in flight` (the normal state after a clean exit — exit 0, not an
+  error); present with a **dead** pid is `CRASHED SUPERVISOR`, and it says the values are the last
+  recorded rather than live; present but **unparseable** is `HEARTBEAT UNREADABLE`, explicitly not
+  "no run in flight".
+
+  Both exist because the one thing a passive view must never do is state the opposite of the truth.
+  Reporting hours-old data as live is one way; answering "no run in flight" for a heartbeat it merely
+  failed to parse is the other, and it is worse — a crashed report makes someone look, while "no run
+  in flight" ends the investigation. QA caught the second during review of this very change. The
+  heartbeat is now written **atomically** (temp file, then rename) so a reader cannot catch it
+  half-written, and the reader distinguishes absent from unreadable regardless, rather than trusting
+  the writer to be careful.
+
+  Liveness is a `process.kill(pid, 0)` probe and deliberately **not** a heartbeat timeout — the
+  runner clears its heartbeat interval while no child is running, so `current.json` legitimately goes
+  untouched across the probe and the cooldown window, and a time-based rule would call a healthy loop
+  crashed between iterations.
+
+  **`runs.jsonl` has two row shapes, and the thin one is the common one.** A finished iteration
+  carries `durationMs`, `costUsd` and `turns`; a *probe-stop* row (`spawned: false`, written when
+  the probe finds no work) carries only `outcome`, `reason` and `at` — and that is the normal
+  **last** line of a healthy run. The renderer tolerates both and shows `—` for what is absent, never
+  `undefined`. Note the field is `turns`, not `num_turns`: the ledger renames the envelope's key on
+  write, and a reader written against the envelope's name silently renders nothing.
+
+  `--notify` (macOS `osascript`) and `--webhook <url>` (ntfy-shaped POST, for phone push) fire
+  **once, when the loop ends** — halt, error, budget cap or clean completion — naming the reason. Not
+  per iteration: a notifier that pings twenty times a night is one you have muted by morning, which is
+  worse than none. An eight-hour run that halts at 02:00 otherwise wastes six hours. **A failed
+  notification warns and leaves the run's exit status untouched**, proved by a test that breaks the
+  webhook on purpose. A double Ctrl-C is deliberately excluded — it exits from inside the signal
+  handler, and that operator is already at the keyboard.
+
+  The renderer is a pure function in `skills/loop-supervisor/references/render.js` that both
+  subcommands wrap, so the two views cannot drift apart, and the whole formatting surface is testable
+  without a terminal, a clock or a live supervisor.
+
 - **`loop-supervisor` — a fresh-context sequential loop runner.** `/loop /develop-next` re-invokes
   the **same** conversation every iteration (both the cron path and the self-paced path do), so item
   five is worked through a context mostly consumed by items one to four, and auto-compaction

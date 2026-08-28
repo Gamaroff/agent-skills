@@ -24,6 +24,8 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/loop /develop-next` | Run an orchestrator continuously until the frontier empties or a pipeline HALTs | [`develop-next` README](../../skills/develop-next/README.md) |
 | `run-loop.mjs run` | Run an orchestrator continuously with a **fresh Claude process and fresh context per iteration**, classified from filesystem post-conditions and logged per iteration. Launched from a terminal, not by Claude. Use instead of `/loop` when a long unattended run must not decay | [`loop-supervisor` README](../../skills/loop-supervisor/README.md) |
 | `run-loop.mjs dry-run` | Probe, print the plan and the exact `claude` argv, spawn nothing | [`loop-supervisor` README](../../skills/loop-supervisor/README.md) |
+| `run-loop.mjs status` | One-shot snapshot of a supervisor run — state, current item, pipeline step, recent iterations. A **pure reader**: safe from a second terminal, mid-iteration, or twice at once. `--json` for machines | [`loop-supervisor` README](../../skills/loop-supervisor/README.md) |
+| `run-loop.mjs watch` | The same snapshot repainted every ~2s, in place and without clearing scrollback | [`loop-supervisor` README](../../skills/loop-supervisor/README.md) |
 
 ## Authoring
 
