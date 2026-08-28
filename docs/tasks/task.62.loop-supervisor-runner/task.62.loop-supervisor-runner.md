@@ -169,7 +169,9 @@ afterthoughts:
   sides; invoked through a path that does not realpath to the module, `main()` never runs and it exits 0
   silently. A naive probe reads that as "no work" and ends the loop having done nothing. The module's own
   comment at `:843-848` describes this failure verbatim, so it is a known trap, not a hypothesis.
-- Resolve `commandArg` against the roadmap file's directory, not the repo root.
+- **`commandArg` is repo-root-relative and arrives verbatim** — the selector does no path resolution
+  (`select-next.mjs:250`, `:620`). Spawn with cwd = repo root; do not resolve it against the roadmap's
+  own directory.
 - `lint.warnings` is noisy by design and non-fatal; only `lint.errors` is fatal.
 
 ### Phase 3 — spawn, tee and heartbeat

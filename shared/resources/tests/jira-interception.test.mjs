@@ -2,6 +2,16 @@
  * jira-interception.test.mjs — the two layers that make a restricted
  * `access.tracker` real for Jira REST (task.53).
  *
+ * Every spawned driver below pins `FORCE_COLOR: "0"`. Its stdout is
+ * pattern-matched, and `console.log` styles non-string args through
+ * `util.inspect` when colour is on — so an ambient `FORCE_COLOR` turned
+ * `DEFERRED true` into `DEFERRED \x1b[33mtrue\x1b[39m` and failed two
+ * assertions that had nothing to do with the behaviour under test. Pinned at
+ * the spawn rather than fixed per-log so a future non-string arg cannot
+ * reintroduce it. This matters beyond tidiness: `develop-next` runs `npm test`
+ * as its pre-merge quality gate, so an env-sensitive suite fails every merge
+ * and blames the item being developed.
+ *
  * Hermetic: no network, no credentials, no tracker. Every non-GET assertion
  * runs against a `fetchImpl` stub that THROWS on any write, so "no mutation
  * reached the network" is proven by the suite rather than asserted by reading
@@ -759,7 +769,12 @@ test("§8 jsm_curl defers a non-GET and leaves JSM_HTTP_STATUS/JSM_BODY set", as
     `;
     const out = execFileSync("bash", ["-c", script], {
       encoding: "utf8",
-      env: { ...process.env, ACCESS_TRACKER: "manual", PATH: process.env.PATH },
+      env: {
+        ...process.env,
+        FORCE_COLOR: "0",
+        ACCESS_TRACKER: "manual",
+        PATH: process.env.PATH,
+      },
     });
     assert.match(out, /status=200/);
     assert.match(out, /completed/);
@@ -786,7 +801,7 @@ test("§8 the sprint gate resolves a restricted mode into caller scope", async (
     `;
     const out = execFileSync("bash", ["-c", script], {
       encoding: "utf8",
-      env: { ...process.env, ACCESS_TRACKER: "manual" },
+      env: { ...process.env, FORCE_COLOR: "0", ACCESS_TRACKER: "manual" },
     });
     assert.match(out, /ok/);
     assert.deepEqual(journal(dir), []);
@@ -1415,7 +1430,7 @@ test("§13 QA-1 an unrecognised mode fails a write, not a read", () => {
   `;
   const r = spawnSync(process.execPath, ["-e", driver], {
     encoding: "utf8",
-    env: { ...process.env, ACCESS_TRACKER: "bogus" },
+    env: { ...process.env, FORCE_COLOR: "0", ACCESS_TRACKER: "bogus" },
     timeout: 20000,
   });
   assert.match(
@@ -1694,7 +1709,7 @@ test("§15 C3-CR6 the mode is resolved once, into caller scope", async () => {
     const r = spawnSync("bash", ["-c", sh], {
       encoding: "utf8",
       cwd: dir,
-      env: { ...process.env },
+      env: { ...process.env, FORCE_COLOR: "0" },
       timeout: 20000,
     });
     assert.match(
@@ -1833,7 +1848,7 @@ test("§17 G-CR9 an injected access may restrict, never escalate", async () => {
     `;
     const r = spawnSync(process.execPath, ["-e", driver], {
       encoding: "utf8",
-      env: { ...process.env, ACCESS_TRACKER: "manual" },
+      env: { ...process.env, FORCE_COLOR: "0", ACCESS_TRACKER: "manual" },
       timeout: 20000,
     });
     assert.match(

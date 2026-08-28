@@ -264,8 +264,13 @@ alternative to `/loop /develop-next`).
    This is the highest-consequence bug available in this design, and the module's own comment at `:843-848`
    spells out the failure verbatim: *"exit 0, no output. That reads as 'no item selected' rather than as
    a failure, so the loop silently does nothing."*
-2. **`commandArg` from the selector is relative to the roadmap file's directory**, not the repo root.
-   Resolve with `path.resolve(path.dirname(roadmapPath), commandArg)`.
+2. **`commandArg` is emitted verbatim and is repo-root-relative.** The selector does no path
+   resolution at all — `select-next.mjs:250` stores the raw string and `:620` interpolates it
+   straight into `run`. Every archived roadmap row and the eval replay fixture write repo-root-relative
+   paths (`/develop-task docs/tasks/…`), so the supervisor must spawn with cwd = repo root and must
+   **not** resolve against the roadmap's own directory. *(The source handoff claimed the opposite.
+   It is wrong for this repo: resolving against `docs/development/` yields
+   `docs/development/docs/tasks/…`, which does not exist.)*
 3. **`lint.warnings` from the selector is noisy by design and non-fatal.** Only `lint.errors` is.
 4. **`node` is not reliably on `PATH`** in non-interactive shells (an nvm shim has been observed
    printing its help text instead of running). Resolve `node` and `claude` absolutely, or launch under
