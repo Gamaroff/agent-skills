@@ -48,7 +48,10 @@ test("the canonical banner spec exists and names every firing point", () => {
 
 for (const skill of PIPELINES) {
   test(`${skill} SKILL.md makes the status block part of the Step Transition Protocol`, () => {
-    const text = readFileSync(join(repoRoot, "skills", skill, "SKILL.md"), "utf-8");
+    const text = readFileSync(
+      join(repoRoot, "skills", skill, "SKILL.md"),
+      "utf-8",
+    );
     assert.match(
       text,
       /3\.\s+\*\*Emit the Remaining Work Status block, then the Step \{N\+1\} banner\*\*/,
