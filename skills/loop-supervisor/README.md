@@ -86,6 +86,27 @@ node .agents/skills/loop-supervisor/scripts/run-loop.mjs run \
 Every budget ceiling is checked **before** a spawn, not after. A `--max-cost` that only stops once it
 has been exceeded is not a ceiling.
 
+#### Notification on stop
+
+```bash
+run-loop.mjs run --notify --webhook https://ntfy.sh/your-topic
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--notify` | macOS `osascript` notification. Warns and skips on any other platform. |
+| `--webhook <url>` | ntfy-shaped POST — message as the body, title and priority as headers. Points at anything that accepts one. |
+
+It fires **once, when the loop ends** — halt, error, budget cap or clean completion — and says which. It
+does not fire per iteration: a notifier that pings you twenty times a night is one you have muted by
+morning, which is worse than having none.
+
+**A failed notification never changes the run's exit status.** A dead webhook or a missing `osascript`
+prints a warning and the run's outcome stands. There is a test that breaks the webhook on purpose to
+prove it.
+
+An eight-hour run that halts at 02:00 otherwise wastes six hours before anyone finds out.
+
 ### Configuration
 
 Optional, in the consumer repo's `skills-config.yaml`:
@@ -131,6 +152,62 @@ collide on `develop-pipeline.lock`. If the process died hard, delete the file.
 tool input can be an entire file, and this log exists to be skimmed by a human, not to be complete. The
 `.jsonl` beside it is complete.
 
+### How do I see what it's doing?
+
+Two subcommands read those files for you. Both are **pure readers** — no lock, no writes, nothing
+spawned — so they are safe from a second terminal, over SSH, twice at once, and mid-iteration. Looking
+cannot disturb the run.
+
+```bash
+# One-shot snapshot: is it alive, which item, which pipeline step, what has happened so far.
+run-loop.mjs status
+
+# The same thing, repainted every ~2s. Ctrl-C leaves the terminal exactly as it found it.
+run-loop.mjs watch
+
+# For a script or a dashboard.
+run-loop.mjs status --json
+```
+
+```
+loop-supervisor — running
+
+  run         2026-08-28T11-00-00  (pid 4242)
+  adapter     develop-next
+  iteration   4   phase running   item T63
+  pipeline    step 5/8   branch feature/task.63.loop-supervisor-status-views
+  totals      3 iterations · $1.2345 · 87 turns
+  heartbeat   12s ago
+  log         .claude/state/loop-supervisor/logs/latest/iter-004.txt
+
+  ledger      3 iterations — progress 1 · idle 1 · done 1
+
+  #   outcome     item      dur      cost      turns  reason
+  1   progress    T60       4m12s    $0.4210   23     merged + ticked
+  2   idle        T61       1m01s    $0.0900   8      no progress on develop
+  3   done        —         —        —         —      roadmap-complete
+```
+
+There are exactly **three** things `status` can tell you, and the third is the one worth knowing about:
+
+| It says | What that means |
+| --- | --- |
+| `running` | `current.json` is there and its pid is alive. Live data. |
+| `no run in flight` | `current.json` is absent. **The normal state after a clean exit** — the runner deletes it when the loop ends. Not an error, and it exits 0. |
+| `CRASHED SUPERVISOR` | `current.json` is there but its pid is **dead**. The values shown are the last thing that process recorded, not live data. |
+
+That last row is why `status` probes the pid rather than timing the heartbeat. Reporting hours-old data
+as live is the one genuinely misleading thing a passive view can do — and a time-based rule would get it
+wrong in the other direction, since the heartbeat legitimately pauses across the probe and the cooldown.
+
+**`watch` repaints in place and never clears your scrollback.** If you scrolled up to read something,
+it is still there.
+
+### Reading the files directly
+
+The subcommands above are the answer; these are the fallback when you want a field they do not show, or
+you are on a machine without this checkout.
+
 ```bash
 # Is it alive, and where is it?
 cat .claude/state/loop-supervisor/current.json
@@ -142,6 +219,12 @@ cat .claude/state/loop-supervisor/runs.jsonl | jq -r \
 # Watch the current iteration.
 tail -f .claude/state/loop-supervisor/logs/latest/iter-*.txt
 ```
+
+Note that `runs.jsonl` has **two row shapes**. A finished iteration (`spawned: true`) carries
+`durationMs`, `costUsd` and `turns`; a **probe-stop** row (`spawned: false`, written when the probe
+finds no work) carries only `outcome`, `reason` and `at`. The second is the normal *last* line of a
+healthy run, so a `jq` filter that assumes the first shape will print nulls exactly when the loop
+finished cleanly. Also note the field is `turns` — not `num_turns`, which is the envelope's name.
 
 ### Reopening any iteration
 
@@ -186,6 +269,7 @@ Use `--max-cost` on any unattended run. It is checked before each spawn.
 ## Limits
 
 - **Sequential only.** Parallelism belongs to `/develop-batch`, inside one iteration.
-- **No `status` or `watch` subcommand yet**, and no notifications or dashboard push — separate work.
+- **No dashboard push yet** — a different transport with a different failure policy, and separate work.
+  `status`, `watch` and stop-notification all ship.
 - **Consumer repos may have a `PreToolUse` Bash guard** rejecting `<cmd> | head` / `| tail`. It fires
   inside every iteration too.

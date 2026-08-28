@@ -22,6 +22,14 @@
  * Usage:
  *   run-loop.mjs run     [options]      spawn iterations until a stop condition
  *   run-loop.mjs dry-run [options]      probe, print the plan and the exact argv, spawn nothing
+ *   run-loop.mjs status  [--json]       one-shot snapshot of the live run; reads only
+ *   run-loop.mjs watch                  the same snapshot, repainted every ~2s; reads only
+ *
+ * `status` and `watch` are PURE READERS. They take no lock, spawn nothing and
+ * write nothing, so they are safe from a second terminal, over SSH, twice
+ * concurrently, and mid-iteration. They also short-circuit before `claude` is
+ * resolved — a view that dies because the binary it never invokes is off PATH
+ * is not much of a view.
  *
  * Options:
  *   --adapter <develop-next|develop-batch|generic>   default develop-next
@@ -37,6 +45,8 @@
  *   --on-error <stop|continue>  default stop
  *   --cooldown <sec>            between iterations (default 10)
  *   --config <path>             skills-config.yaml (default skills-config.yaml)
+ *   --notify                    macOS notification when the loop reaches a terminal stop
+ *   --webhook <url>             ntfy-shaped POST on terminal stop (phone push)
  *   --json                      machine-readable summary on stdout
  *
  * Output: JSON on stdout for `dry-run` and for `run --json`, always.
@@ -56,6 +66,11 @@ import { randomUUID } from "node:crypto";
 import { classify, shouldStop } from "../references/classify.js";
 import { interpretProbe, resolveAdapter } from "../references/adapters.js";
 import { parseYamlSubset } from "../references/yaml-subset.js";
+import {
+  renderLines,
+  statusView,
+  notificationText,
+} from "../references/render.js";
 
 const SCHEMA_VERSION = 1;
 const STATE_ROOT = ".claude/state/loop-supervisor";
@@ -69,6 +84,9 @@ const DEFAULTS = {
   cooldown: 10,
   config: "skills-config.yaml",
   heartbeatMs: 5000,
+  // Repaint faster than the heartbeat is written, so `watch` never shows a
+  // frame the operator reads as frozen.
+  watchIntervalMs: 2000,
 };
 
 // ── binary resolution ────────────────────────────────────────────────────────
@@ -150,6 +168,8 @@ export function parseArgs(argv) {
     onError: DEFAULTS.onError,
     cooldown: DEFAULTS.cooldown,
     config: DEFAULTS.config,
+    notify: false,
+    webhook: null,
     json: false,
     // Which options the caller actually named. Presence must be TRACKED, never
     // inferred by comparing the parsed value against DEFAULTS: `--base develop`
@@ -162,9 +182,9 @@ export function parseArgs(argv) {
   };
   const rest = [...argv];
   if (rest.length && !rest[0].startsWith("-")) out.subcommand = rest.shift();
-  if (!["run", "dry-run"].includes(out.subcommand)) {
+  if (!["run", "dry-run", "status", "watch"].includes(out.subcommand)) {
     throw new Error(
-      `unknown subcommand ${JSON.stringify(out.subcommand)} (expected run | dry-run)`,
+      `unknown subcommand ${JSON.stringify(out.subcommand)} (expected run | dry-run | status | watch)`,
     );
   }
   const need = (i, flag) => {
@@ -187,6 +207,8 @@ export function parseArgs(argv) {
     "--on-error": "onError",
     "--cooldown": "cooldown",
     "--config": "config",
+    "--notify": "notify",
+    "--webhook": "webhook",
     "--json": "json",
   };
   for (let i = 0; i < rest.length; i++) {
@@ -243,6 +265,13 @@ export function parseArgs(argv) {
         break;
       case "--config":
         out.config = need(i, a);
+        i++;
+        break;
+      case "--notify":
+        out.notify = true;
+        break;
+      case "--webhook":
+        out.webhook = need(i, a);
         i++;
         break;
       case "--json":
@@ -417,6 +446,169 @@ export function renderStreamLine(obj) {
   return null;
 }
 
+// ── the read side: status, watch, notify ─────────────────────────────────────
+
+/** Read `current.json`, or null when there is no run in flight. */
+export function readCurrent(cwd) {
+  return readJson(path.join(cwd, STATE_ROOT, "current.json"));
+}
+
+/**
+ * Read `runs.jsonl` into an array, skipping any line that will not parse.
+ *
+ * Tolerating a bad line matters more here than it looks: the ledger is appended
+ * to by a live process, so a reader can catch a torn final write. Dropping that
+ * line shows every complete iteration; throwing shows none.
+ */
+export function readLedger(cwd) {
+  let raw;
+  try {
+    raw = fs.readFileSync(path.join(cwd, STATE_ROOT, "runs.jsonl"), "utf8");
+  } catch {
+    return [];
+  }
+  const rows = [];
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      rows.push(JSON.parse(line));
+    } catch {
+      /* torn or truncated line — skip it, show the rest */
+    }
+  }
+  return rows;
+}
+
+/** The display model for the current working tree. Reads two files, nothing else. */
+function snapshot(cwd) {
+  return statusView({
+    current: readCurrent(cwd),
+    runs: readLedger(cwd),
+    nowMs: Date.now(),
+    isAlive: isPidAlive,
+  });
+}
+
+/**
+ * `status` — print once, exit 0. "No run in flight" is a normal answer, not an error.
+ *
+ * Both modes render from ONE snapshot. Reading the files twice would let `--json`
+ * and the text frame disagree about an iteration that finished between them.
+ */
+function runStatus(cwd, opts) {
+  const view = snapshot(cwd);
+  process.stdout.write(
+    (opts.json ? JSON.stringify(view, null, 2) : renderLines(view).join("\n")) +
+      "\n",
+  );
+  process.exit(0);
+}
+
+/**
+ * `watch` — repaint the same content in place.
+ *
+ * Moves the cursor up over the frame it drew and erases forward from there
+ * (\x1b[nA + \x1b[0J). It never emits \x1b[2J or \x1b[3J: clearing the screen —
+ * and especially the scrollback — would throw away whatever the operator had
+ * scrolled up to read, which is the one thing a passive view must not do.
+ */
+function runWatch(cwd) {
+  let painted = 0;
+  const hideCursor = () => process.stdout.write("\x1b[?25l");
+  const showCursor = () => process.stdout.write("\x1b[?25h");
+
+  const paint = () => {
+    const lines = renderLines(snapshot(cwd));
+    let frame = "";
+    if (painted) frame += `\x1b[${painted}A\x1b[0J`;
+    frame += lines.join("\n") + "\n";
+    process.stdout.write(frame);
+    painted = lines.length;
+  };
+
+  const stop = () => {
+    clearInterval(timer);
+    showCursor();
+    process.stdout.write("\n");
+    process.exit(0);
+  };
+
+  hideCursor();
+  paint();
+  const timer = setInterval(paint, DEFAULTS.watchIntervalMs);
+  process.on("SIGINT", stop);
+  process.on("SIGTERM", stop);
+  // Leave the terminal usable however we leave: a hidden cursor outlives the
+  // process that hid it.
+  process.on("exit", showCursor);
+}
+
+/**
+ * Fire the terminal-stop notification. Best effort, always.
+ *
+ * WARN AND CONTINUE is the whole contract: the run's outcome is what it is
+ * regardless of whether anyone was told, so a broken webhook or a missing
+ * osascript must never change the exit status. Both transports are wrapped
+ * individually so one failing does not skip the other.
+ */
+export function notifyTerminalStop(opts, summary, deps = {}) {
+  const {
+    platform = process.platform,
+    run = (bin, args) => spawnSync(bin, args, { stdio: "ignore" }),
+    post = null,
+    warn = (m) => process.stderr.write(m + "\n"),
+  } = deps;
+  const { title, message } = notificationText(summary);
+  const fired = [];
+
+  if (opts.notify) {
+    if (platform !== "darwin") {
+      warn("⚠ --notify is macOS-only (osascript); skipped on " + platform);
+    } else {
+      try {
+        const script = `display notification ${JSON.stringify(message)} with title ${JSON.stringify(title)}`;
+        const r = run("osascript", ["-e", script]);
+        if (r && r.status !== 0)
+          throw new Error(`osascript exited ${r.status}`);
+        fired.push("osascript");
+      } catch (e) {
+        warn(
+          `⚠ notification failed (osascript): ${e.message} — run unaffected`,
+        );
+      }
+    }
+  }
+
+  if (opts.webhook) {
+    const send =
+      post ||
+      ((url, body, headers) =>
+        fetch(url, { method: "POST", body, headers }).then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }));
+    try {
+      // ntfy-shaped: the body IS the message; title and priority are headers.
+      const pending = send(opts.webhook, message, {
+        Title: title,
+        Priority: summary.ok ? "default" : "high",
+        Tags: summary.ok ? "white_check_mark" : "rotating_light",
+      });
+      if (pending && typeof pending.catch === "function") {
+        pending.catch((e) =>
+          warn(
+            `⚠ notification failed (webhook): ${e.message} — run unaffected`,
+          ),
+        );
+      }
+      fired.push("webhook");
+    } catch (e) {
+      warn(`⚠ notification failed (webhook): ${e.message} — run unaffected`);
+    }
+  }
+
+  return fired;
+}
+
 // ── PID lock (single-flight per working tree) ────────────────────────────────
 
 export function isPidAlive(pid) {
@@ -510,6 +702,13 @@ function main() {
   // flag always wins, including when its value happens to equal the default —
   // which is exactly what a DEFAULTS comparison could not express.
   applyConfig(opts, config);
+
+  // ── status / watch: pure readers, and they stop here ──────────────────────
+  // Deliberately ahead of resolveAdapter and resolveBinary("claude"). Neither
+  // view spawns anything, and failing to read a heartbeat because `claude` is
+  // off PATH in the second terminal would defeat the point of having a view.
+  if (opts.subcommand === "status") return runStatus(cwd, opts);
+  if (opts.subcommand === "watch") return runWatch(cwd);
 
   let adapter, nodeBin, claudeBin;
   try {
@@ -869,6 +1068,22 @@ function main() {
     cleanup();
     const terminal =
       finalStop.outcome === "halt" || finalStop.outcome === "error";
+
+    // Terminal stop — halt, error, budget cap or clean completion. Fired ONCE
+    // per run, here and nowhere else: a per-iteration notifier is ignored
+    // within one night, which makes it worse than none. The double-SIGINT path
+    // exits from inside the signal handler and never reaches this line, which
+    // is deliberate — that operator is at the keyboard already.
+    if (opts.notify || opts.webhook) {
+      notifyTerminalStop(opts, {
+        ok: !terminal,
+        outcome: finalStop.outcome,
+        reason: finalStop.reason,
+        iterations: totals.iterations,
+        costUsd: totals.costUsd,
+      });
+    }
+
     process.stdout.write(
       JSON.stringify(
         {

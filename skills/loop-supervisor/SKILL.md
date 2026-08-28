@@ -115,6 +115,23 @@ Under `.claude/state/loop-supervisor/`:
 - `logs/<runId>/iter-NNN.txt` — assistant text plus tool-call names; the one a human reads
 - `logs/latest` — symlink to the current run
 
+### Reading them while it runs
+
+```bash
+run-loop.mjs status          # one-shot snapshot; --json for machines
+run-loop.mjs watch           # the same, repainted every ~2s
+```
+
+Both are **pure readers** — no lock, no writes, nothing spawned — so they are safe from a second
+terminal, over SSH, concurrently, and mid-iteration. Three states: `running`, `no run in flight` (the
+normal post-run state, exit 0, not an error) and `CRASHED SUPERVISOR` (heartbeat present, pid dead — the
+values are the last recorded, not live). Liveness is a pid probe, not a timeout, because the heartbeat
+legitimately pauses between iterations. `watch` repaints in place and never clears scrollback.
+
+`--notify` (macOS `osascript`) and `--webhook <url>` (ntfy-shaped POST) fire **once, when the loop
+ends**, naming the reason — never per iteration. A failed notification warns and leaves the run's exit
+status untouched.
+
 Because `--session-id` is pinned, **every iteration is reopenable afterwards** with
 `claude --resume <sessionId>` (the id is in each `runs.jsonl` line). That is the strongest debugging
 affordance here.
@@ -133,4 +150,5 @@ surface for no gain.
 - **Not free.** Every iteration re-primes CLAUDE.md, the skill files and the roadmap. Much of that
   should be prompt-cache-served since the prefix is identical across iterations, but it is a real
   per-iteration floor.
-- **Layers 1–2 only.** `status` / `watch` views, notifications and dashboard push are separate work.
+- **No dashboard push.** `status` / `watch` and stop-notification ship; pushing to a dashboard is a
+  different transport with a different failure policy, and separate work.

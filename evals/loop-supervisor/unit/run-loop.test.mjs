@@ -27,7 +27,11 @@ import {
   transcriptPathFor,
   isPidAlive,
   applyConfig,
+  readCurrent,
+  readLedger,
+  notifyTerminalStop,
 } from "../../../skills/loop-supervisor/scripts/run-loop.mjs";
+import fs from "node:fs";
 
 // ── argv ─────────────────────────────────────────────────────────────────────
 
@@ -44,7 +48,9 @@ test("dry-run is recognised as a subcommand", () => {
 });
 
 test("an unknown subcommand is rejected, not silently treated as run", () => {
-  assert.throws(() => parseArgs(["watch"]), /unknown subcommand/);
+  // `watch` was the example here until task 63 made it a real subcommand.
+  // Keep an example that is genuinely unknown, or this asserts nothing.
+  assert.throws(() => parseArgs(["sprint"]), /unknown subcommand/);
 });
 
 test("an unknown option is rejected rather than ignored", () => {
@@ -449,4 +455,212 @@ test("LS-1: the oracle ref survives a disagreeing config end to end", () => {
     "main",
     "the oracle must watch the ref the operator named",
   );
+});
+
+// ── task 63: status / watch subcommands and the notification flags ──────────
+
+test("T63: status and watch are accepted subcommands", () => {
+  for (const sub of ["run", "dry-run", "status", "watch"]) {
+    assert.equal(parseArgs([sub]).subcommand, sub);
+  }
+});
+
+test("T63: an unknown subcommand still throws, and the message lists all four", () => {
+  assert.throws(
+    () => parseArgs(["stats"]),
+    (e) => {
+      assert.match(e.message, /unknown subcommand/);
+      for (const sub of ["run", "dry-run", "status", "watch"]) {
+        assert.ok(
+          e.message.includes(sub),
+          `expected the error to offer ${sub}`,
+        );
+      }
+      return true;
+    },
+  );
+});
+
+test("T63: --notify and --webhook parse — the flag switch throws on anything unregistered", () => {
+  const o = parseArgs([
+    "status",
+    "--notify",
+    "--webhook",
+    "https://ntfy.sh/x",
+    "--json",
+  ]);
+  assert.equal(o.notify, true);
+  assert.equal(o.webhook, "https://ntfy.sh/x");
+  assert.equal(o.json, true);
+  assert.equal(parseArgs(["run"]).notify, false);
+  assert.equal(parseArgs(["run"]).webhook, null);
+  assert.throws(() => parseArgs(["run", "--notifyy"]), /unknown option/);
+  assert.throws(
+    () => parseArgs(["run", "--webhook"]),
+    /--webhook needs a value/,
+  );
+});
+
+test("T63: --command is not required for the read-only subcommands", () => {
+  // The generic-adapter guard is scoped to `run`; a pure reader needs no prompt.
+  assert.doesNotThrow(() => parseArgs(["status", "--adapter", "generic"]));
+  assert.doesNotThrow(() => parseArgs(["watch", "--adapter", "generic"]));
+  assert.throws(
+    () => parseArgs(["run", "--adapter", "generic"]),
+    /--command is required/,
+  );
+});
+
+test("T63: the readers return empty rather than throwing when there is no state", () => {
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), "ls-empty-"));
+  assert.equal(readCurrent(empty), null);
+  assert.deepEqual(readLedger(empty), []);
+});
+
+test("T63: readLedger skips a torn final line and keeps every complete one", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ls-torn-"));
+  const root = path.join(dir, ".claude", "state", "loop-supervisor");
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "runs.jsonl"),
+    '{"iteration":1,"outcome":"progress"}\n' +
+      '{"iteration":2,"outcome":"done"}\n' +
+      '{"iteration":3,"outc\n',
+  );
+  const rows = readLedger(dir);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(
+    rows.map((r) => r.iteration),
+    [1, 2],
+  );
+});
+
+test("T63: readCurrent parses a heartbeat written by writeCurrent", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ls-cur-"));
+  const root = path.join(dir, ".claude", "state", "loop-supervisor");
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(
+    path.join(root, "current.json"),
+    JSON.stringify({ runId: "r", pid: 7, iteration: 2, phase: "running" }),
+  );
+  assert.equal(readCurrent(dir).pid, 7);
+  assert.equal(readCurrent(dir).phase, "running");
+});
+
+test("T63: a failing osascript warns and returns — it never throws at the caller", () => {
+  const warnings = [];
+  let fired;
+  assert.doesNotThrow(() => {
+    fired = notifyTerminalStop(
+      { notify: true, webhook: null },
+      {
+        ok: false,
+        outcome: "halt",
+        reason: "pipeline HALT",
+        iterations: 2,
+        costUsd: 1,
+      },
+      {
+        platform: "darwin",
+        run: () => ({ status: 1 }),
+        warn: (m) => warnings.push(m),
+      },
+    );
+  });
+  assert.deepEqual(fired, []);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /run unaffected/);
+});
+
+test("T63: a failing webhook warns and does not stop the other transport", () => {
+  const warnings = [];
+  const fired = notifyTerminalStop(
+    { notify: true, webhook: "https://ntfy.sh/x" },
+    {
+      ok: true,
+      outcome: "done",
+      reason: "roadmap-complete",
+      iterations: 3,
+      costUsd: 0.5,
+    },
+    {
+      platform: "darwin",
+      run: () => ({ status: 0 }),
+      post: () => {
+        throw new Error("ECONNREFUSED");
+      },
+      warn: (m) => warnings.push(m),
+    },
+  );
+  // osascript still fired even though the webhook blew up.
+  assert.deepEqual(fired, ["osascript"]);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /webhook/);
+  assert.match(warnings[0], /run unaffected/);
+});
+
+test("T63: a rejected webhook promise warns asynchronously without an unhandled rejection", async () => {
+  const warnings = [];
+  const fired = notifyTerminalStop(
+    { notify: false, webhook: "https://ntfy.sh/x" },
+    { ok: true, outcome: "done", reason: "done", iterations: 1, costUsd: 0 },
+    {
+      post: () => Promise.reject(new Error("HTTP 500")),
+      warn: (m) => warnings.push(m),
+    },
+  );
+  assert.deepEqual(fired, ["webhook"]);
+  await new Promise((r) => setImmediate(r));
+  assert.match(warnings[0], /HTTP 500/);
+});
+
+test("T63: --notify on a non-darwin platform warns instead of shelling out", () => {
+  const warnings = [];
+  let ran = false;
+  const fired = notifyTerminalStop(
+    { notify: true, webhook: null },
+    { ok: true, outcome: "done", reason: "done", iterations: 1, costUsd: 0 },
+    {
+      platform: "linux",
+      run: () => {
+        ran = true;
+        return { status: 0 };
+      },
+      warn: (m) => warnings.push(m),
+    },
+  );
+  assert.equal(ran, false);
+  assert.deepEqual(fired, []);
+  assert.match(warnings[0], /macOS-only/);
+});
+
+test("T63: neither flag set fires nothing at all", () => {
+  const warnings = [];
+  const fired = notifyTerminalStop(
+    { notify: false, webhook: null },
+    { ok: true, outcome: "done", reason: "done", iterations: 1, costUsd: 0 },
+    { warn: (m) => warnings.push(m) },
+  );
+  assert.deepEqual(fired, []);
+  assert.deepEqual(warnings, []);
+});
+
+test("T63: the webhook body is ntfy-shaped — message as body, title and priority as headers", () => {
+  const calls = [];
+  notifyTerminalStop(
+    { notify: false, webhook: "https://ntfy.sh/topic" },
+    {
+      ok: false,
+      outcome: "halt",
+      reason: "pipeline HALT at step 5",
+      iterations: 4,
+      costUsd: 2,
+    },
+    { post: (url, body, headers) => calls.push({ url, body, headers }) },
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://ntfy.sh/topic");
+  assert.match(calls[0].body, /pipeline HALT at step 5/);
+  assert.match(calls[0].headers.Title, /STOPPED/);
+  assert.equal(calls[0].headers.Priority, "high");
 });
