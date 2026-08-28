@@ -65,7 +65,7 @@ bash .agents/skills/develop-task/scripts/install-hooks.sh
 **4. A permission posture that does not prompt.** Nobody is there to answer. The supervisor passes its
 own settings file to each spawned process; if your repo has a `PreToolUse` guard that rejects common
 shapes (a Bash guard on `<cmd> | head`, for example), it fires **inside every iteration too**. Test it
-with a cheap run before trusting it with a night — see [Rehearsal](#rehearse-first-it-costs-cents).
+with a cheap run before trusting it with a night — see [Rehearse first](#rehearse-first).
 
 **5. `claude` and `node` resolvable from a non-interactive shell.** This bites more people than anything
 else on the list. If `node` is an nvm shell function rather than a binary, a naive spawn inherits
@@ -74,9 +74,9 @@ both to absolute paths itself, and `dry-run` prints what it resolved. Check it.
 
 ---
 
-## Rehearse first — it costs cents
+## Rehearse first
 
-Never let the first run of the night be the first run at all. Two rehearsals, in order:
+**It costs cents.** Never let the first run of the night be the first run at all — two rehearsals, in order:
 
 **A. `dry-run` — probes, prints the plan and the exact argv, spawns nothing.**
 
