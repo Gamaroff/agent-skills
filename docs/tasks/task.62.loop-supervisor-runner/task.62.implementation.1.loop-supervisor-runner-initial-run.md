@@ -34,10 +34,10 @@ Build `skills/loop-supervisor` — a dependency-free Node CLI that spawns one `c
 | 1. create-branch           | ✅ Done    | Branch `feature/task.62.*` exists in git                               | Branch created at `b84fd6a`; pushed | —                    |
 | 2. review-task             | ✅ Done    | `task.62.review.1.loop-supervisor-runner.md` exists                    | 8/10 READY TO IMPLEMENT; 0 critical, 2 important | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 11 files, 101 unit tests, 4 mutants verified | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.62.qa.{N}.*.md`; `task.62.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.62.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment skipped (no linked issue)                        | PR #276; 3 commits, 18 files | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.62.qa.{1,2}.*.md`; `task.62.gate.1.*.yml`; PR comments posted    | 2 cycles: CONCERNS (90) → PASS (96) | —                    |
+| 7. finalise                | ✅ Done    | `task.62.dod.1.*.md`; task `status: accepted`                          | CI SUCCESS on head; CHANGELOG gap found + closed | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 5 commits on the branch | —                    |
 
 ---
 
@@ -73,6 +73,11 @@ Build `skills/loop-supervisor` — a dependency-free Node CLI that spawns one `c
 - **Gotcha 4 reproduced, not assumed:** `node --version` in a non-interactive shell here prints nvm's entire help text before the version, and `command -v node` returns the bare word `node`. The supervisor resolves both binaries absolutely and refuses to start rather than spawn a shim.
 - Repo convention correction made mid-build: `references/*.js` in this repo are **CommonJS** (imported from `.mjs` via named-export interop, as `yaml-subset.js` is). `classify.js`/`adapters.js` were first written as ESM, failed to load, and were rewritten to match. `run-loop.mjs` imports yaml-subset via `../../../shared/resources/` so `npm run bundle` rewrites it — verified: 1 bundled, 1 rewritten, dry-run still green afterwards.
 - Deferred: Success Criterion 5 (one real `/develop-next` iteration) — the post-merge operator step agreed in Step 2. Tasks 63/64 features (`status`/`watch`, notify, dashboard) are out of scope by the task's own Scope section.
+- Step 7 finalise: DoD **PASSED**, task `status: accepted`. Four domain checks run inline rather than via four parallel Explore subagents (same standing directive as Step 3) — recorded in the DoD summary so the deviation is visible, with every claim carrying a re-verifiable citation.
+- **CI was held, not assumed.** The first rollup sample read `PENDING` (`test` was `IN_PROGRESS`); finalise waited for it to settle rather than rounding it up. Final: `CI_ROLLUP = SUCCESS`, all four checks green, on rollup head `0426f7d1` == local `HEAD` — evidence about this commit, not an ancestor.
+- **This corrects QA cycle 1's SC7 concern.** Local full-suite runs failed in `shared/resources/tests/jira-interception.test.mjs`, and a clean-`develop` control run failed there too, so it was attributed to a pre-existing load-sensitive flake. CI's own `test` job is green on this head — stronger evidence than a local run competing with the concurrent background suites this session was running. SC7 assessed PASS at DoD.
+- **DoD found one real gap that both QA cycles missed: `CHANGELOG.md` had no entry.** `develop`'s task checklist requires one when a task adds a feature, and this repo actively maintains a Keep-a-Changelog file. Both QA cycles were scoped to code and tests, so neither looked. Closed during finalisation with an `### Added` entry under `[Unreleased]`, and recorded in the DoD summary as *found and closed* rather than quietly repaired — the miss is the useful signal, and a DoD pass that silently fixes what it audits tells the next reader nothing.
+- Tracker issue close + board move skipped — no linked issue. Sprint Review summary not generated: this repo does not keep `sprint-review-summary.md` beside its tasks, and inventing the convention here would be noise.
 
 ---
 
@@ -98,16 +103,56 @@ Build `skills/loop-supervisor` — a dependency-free Node CLI that spawns one `c
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-08-28
+
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1 medium (**LS-1** — config silently overrode an explicit CLI flag whose value equalled the built-in default; consequential because `--base` is the ref the progress oracle watches, so a wrong ref makes every healthy iteration classify `idle` and ends the loop at `--max-idle` reporting no progress), 1 low advisory (`retry-once` in a JSDoc type that `parseArgs` rejects).
+**Action**: Ran qa-fix (cycle 1 of 5).
+
+**Fix**: presence is now **tracked** in an `explicit` Set rather than inferred from a `DEFAULTS` comparison, and the merge moved into an exported `applyConfig(opts, config)`. Mechanism-level, so every config-fillable option is covered and later ones inherit the rule. 9 regression tests added; commit `55980ca`.
+
+### QA Cycle 2 — 2026-08-28
+
+**Gate Result**: PASS (96/100)
+**Issues Found**: none. LS-1 verified fixed four ways — regression tests (110/110), mutation probe (restoring the old comparison turns exactly 3 red, green again on revert), live check against a disagreeing config, and a structural + behavioural check that the new flag→key table covers all 14 flags. Reliability NFR CONCERNS → PASS. An adversarial pass over the fix itself found nothing (the new `Set` does not leak into serialised output; no dangling binding from the refactor; `applyConfig` safe when `explicit` is absent).
+**Action**: Proceeding to finalise.
+
+**On the loop-exit rule**: the gate carries one `top_issues` entry with `status: closed`. The Step 5–6 branching rule reads "`CONCERNS`, `FAIL`, or has `top_issues` → proceed to 5b"; taken literally that would loop forever on a closed issue. The qa-task skill's own post-fix example keeps the resolved issue in `top_issues` with `status: closed`, so "has `top_issues`" means **open** ones. Loop exited on `PASS` + zero open issues.
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-08-28 13:15
+**Final Status**: Completed
 **Branch**: `feature/task.62.loop-supervisor-runner`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/276
+**QA Iterations**: 2 (CONCERNS 90/100 → PASS 96/100)
+**DoD Summary**: `docs/tasks/task.62.loop-supervisor-runner/task.62.dod.1.loop-supervisor-runner.md`
+**Tracker debt**: none deferred by access restrictions. One outstanding item by choice: the task has no linked tracker issue (`/sync-github-task` when convenient) — flagged at review, deliberately not auto-created because it is outward-facing and uncovered by the autonomous-defaults tables.
+
+### Completion Summary
+
+Built `skills/loop-supervisor` — a dependency-free Node CLI that runs each loop iteration in a fresh
+`claude -p` process and classifies the outcome from filesystem post-conditions rather than the
+assistant's prose. 11 files, **110 unit tests**, CI green.
+
+The pipeline did its job rather than rubber-stamping:
+
+- **Step 2 (review)** found that Success Criterion 5 specified a test the implementing pipeline
+  structurally cannot run — a nested `/develop-next` collides on `develop-next.state.json` and
+  `develop-pipeline.lock`, and would merge an unrelated roadmap item as a side effect of testing.
+  Reworded into a post-merge operator step rather than left to be silently skipped.
+- **Step 5 (QA cycle 1)** found a real medium correctness bug by diff review — config silently
+  overrode an explicit CLI flag whose value equalled the default, which would have pointed the
+  progress oracle at the wrong ref and made every healthy iteration read as `idle`. Fixed at the
+  mechanism level (track presence, don't infer it) and mutation-proven.
+- **Step 7 (DoD)** found a gap both QA cycles had missed — no `CHANGELOG.md` entry — because QA was
+  scoped to code and tests while the obligation is repo-level. Closed, and recorded as found rather
+  than quietly repaired.
+- **CI was waited for, not assumed.** The rollup read `PENDING` on first sample; acceptance held
+  until `test` completed, then went green on the exact head.
+
+Two things are carried forward openly rather than buried: **SC5 is deferred, not met** — an operator
+must run one real `/develop-next` iteration on a clean tree after merge — and the repo's pre-existing
+`jira-interception` timeout flake is unrelated to this task and warrants its own bug.

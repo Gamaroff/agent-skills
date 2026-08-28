@@ -5,11 +5,13 @@ type: task
 description: '/loop /develop-next re-invokes the same conversation every iteration, so item five is worked through a context mostly consumed by items one to four — and the degradation is invisible from outside. A skill cannot clear its own context; the loop has to move outside the session. This builds loop-supervisor: a dependency-free Node CLI that spawns one claude -p per iteration with a pinned --session-id, probes select-next.mjs before spending a model invocation, and classifies each outcome purely from filesystem post-conditions rather than from the assistant''s prose. Safe because the develop pipelines are already crash-safe — a process boundary is the boundary they already tolerate.'
 tags: [loop-supervisor, orchestration, cli, fresh-context, unattended, classifier]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-28
 updated: 2026-08-28
+completed_date: 2026-08-28
+pr_number: 276
 estimated_effort_hours: 16
 ---
 
@@ -17,7 +19,7 @@ estimated_effort_hours: 16
 
 **Task File**: [task.62.loop-supervisor-runner.md](./task.62.loop-supervisor-runner.md)
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 **Review**: ✅ Review recommendations from `task.62.review.1.loop-supervisor-runner.md` implemented 2026-08-28 (1 applied, 1 deferred — tracker linkage)
 
@@ -422,6 +424,32 @@ Score is 96 rather than the formula's 100 because SC5 (one real `/develop-next` 
 to a post-merge operator step and therefore has no evidence behind it yet — a documented deferral, not a
 defect, but not something to claim as verified.
 
+## Definition of Done - PASSED
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**QA Reports**: `task.62.qa.1.loop-supervisor-runner.md` (CONCERNS 90/100) → `task.62.qa.2.loop-supervisor-runner.md` (PASS 96/100)
+**Gate File**: `task.62.gate.1.loop-supervisor-runner.yml` — ✅ PASS, 96/100, zero open issues
+**QA Cycles**: 2
+
+All Definition of Done criteria verified:
+
+- **Success criteria** — 7 of 8 met; SC5 deliberately deferred to a post-merge operator step (it cannot run inside the pipeline that implements it — lock collision, documented in Testing Strategy)
+- **CI** — ✅ **SUCCESS** on the exact head `0426f7d1`. The first sample read `PENDING`; acceptance was held until the `test` job finished rather than assumed
+- **Tests** — 110/110 unit tests; four mutation probes during development plus one in the QA fix cycle, every mutant flipping the verdict
+- **PR** — #276, OPEN and MERGEABLE
+- **Security** — ✅ PASS: no secrets, `acceptEdits` rather than skip-permissions, argv-array spawns throughout, config restricted to path strings so it cannot become a code-execution surface, logs record tool names without inputs
+- **Compliance** — N/A: no personal data, payments, UI or health data
+- **Documentation** — ✅ PASS: SKILL.md, README.md, config reference, commands reference, regenerated catalog, and a `CHANGELOG.md` entry **added during finalisation after the DoD found it missing**
+
+**Carried forward, openly:** SC5 is deferred rather than met and needs an operator run post-merge; the pre-existing `jira-interception` timeout flake is unrelated to this task and warrants its own bug.
+
+**Detailed Verification Log:** see [`task.62.dod.1.loop-supervisor-runner.md`](./task.62.dod.1.loop-supervisor-runner.md) for full evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-08-28
+
 ## Change Log
 
 | Date       | Version | Description   | Author     |
@@ -433,6 +461,7 @@ defect, but not something to claim as verified.
 | 2026-08-28 |         | QA gate CONCERNS (90/100) — 1 medium finding (LS-1, flag/config precedence) | qa-task |
 | 2026-08-28 |         | QA findings fixed — LS-1 flag/config precedence, 1 iteration | qa-fix |
 | 2026-08-28 |         | QA gate PASS (96/100) — LS-1 verified fixed, 2 cycles | qa-task |
+| 2026-08-28 | 1.2     | DoD verified — accepted (PR #276); CHANGELOG entry added to close a docs gap | finalise |
 
 ## References
 
