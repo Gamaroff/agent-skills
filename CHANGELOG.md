@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`loop-supervisor` — a fresh-context sequential loop runner.** `/loop /develop-next` re-invokes
+  the **same** conversation every iteration (both the cron path and the self-paced path do), so item
+  five is worked through a context mostly consumed by items one to four, and auto-compaction
+  summarises rather than clears. The failure is not a crash — it is **quality degradation with no
+  external signal**: the loop keeps reporting success while the work gets worse. `/loop` cannot fix
+  this from the inside, because the wakeup lands in the session that already exists and clearing
+  context is not an operation a skill can perform on itself.
+
+  `skills/loop-supervisor/scripts/run-loop.mjs` is a host process — launched from a terminal, it
+  spawns Claude rather than the reverse. Each iteration is one `claude -p` with a pinned
+  `--session-id`, so every iteration stays reopenable afterwards with `claude --resume`. It probes
+  `select-next.mjs` before spending a model invocation, tees `stream-json` to a raw log and a
+  human-readable one, and stops on an empty frontier, a halt, a budget cap, or consecutive
+  no-progress.
+
+  **Outcomes are classified from filesystem post-conditions, never from the assistant's prose.**
+  `/develop-next` signals its stop conditions only in its final message — no exit code distinguishes
+  them, no run-report file, no stop-marker — so grepping that message would put a model call inside a
+  control-flow decision and break silently the first time the wording changed. The classifier is a
+  pure module with 39 of the suite's tests to itself.
+
+  Three traps shape it, each tested on both sides of its boundary: **a halt file proves nothing by
+  existing** (it is never deleted by a successful run, so only its timestamp counts — a stale one must
+  classify `progress`); **a leftover lock is `incomplete`, not an error** (`on-stop.sh` blocks a
+  mid-pipeline stop, so a stalled iteration exits cleanly with the lock still on disk — that is the
+  system working as designed); and **empty probe stdout is an error, never "no work"**
+  (`select-next.mjs`'s direct-invocation guard exits 0 silently when reached through a path that does
+  not realpath to the module, and reading that as an empty frontier would report a clean night's sleep
+  while doing nothing).
+
+  Sequential by design — two supervisors in one working tree would collide on
+  `develop-pipeline.lock`, so a PID lock enforces single-flight. Additive: `/loop /develop-next` is
+  unchanged, and the `loopSupervisor:` config block is optional with every key defaulted.
+
 ### Fixed
 
 - **The status-vocabulary fix missed one restatement, and the guard that should have caught it was

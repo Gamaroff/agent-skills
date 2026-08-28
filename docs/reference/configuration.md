@@ -123,6 +123,14 @@ developBatch: # optional — develop-batch parallel fan-out
         command: "curl -fsS --max-time 5 $PROBE_URL/health"
         intervalSec: 60
         timeoutSec: 10
+
+loopSupervisor: # optional — fresh-context sequential loop runner
+  baseBranch: develop # ref the progress oracle watches for tick commits
+  roadmapPath: docs/development/project-completion-roadmap.md
+  cooldownSeconds: 10 # pause between iterations
+  adapters: # optional — declarative path overrides only, never JavaScript
+    develop-next:
+      stateFile: .claude/state/develop-next.state.json
 ```
 
 `develop-batch` reuses the `developNext:` keys above (same roadmap, base branch, merge
@@ -177,6 +185,10 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `developBatch.worktreeSeedPaths`                 | array                           | `[]`                                             | Gitignored paths copied from the main tree into each fresh worktree. A `git worktree add` carries no gitignored files, and a missing runner config usually degrades _silently_ rather than failing. **Entries are repo-relative paths and must be copied path-preservingly** (`mkdir -p "$dir/$(dirname "$p")" && cp "$p" "$dir/$p"`, or `rsync -R`) — a flattening `cp "$p" "$dir/"` silently clobbers when two entries share a basename (e.g. `.env` and `apps/api/.env`) and never creates the nested location that needed the file. |
 | `developBatch.maxResumeAttempts`                 | integer                         | `2`                                              | How many times an **externally interrupted** item (plan mode, permission denial, compaction) may be re-dispatched before it becomes `haltKind: "interrupted-exhausted"`. Does not apply to genuine pipeline HALTs, which are never re-dispatched.                                                                                                                                                                                                                                         |
 | `developBatch.maxRebatches`                      | integer                         | `3`                                              | Cap on Step 5.5 re-selections within one invocation. Re-batching also requires that the previous batch ticked at least one roadmap row, which is the real anti-spin guard.                                                                                                                                                                                                                                                                                                                |
+| `loopSupervisor.baseBranch`                      | branch name                     | `develop`                                        | Ref `loop-supervisor`'s progress oracle watches for a new `docs(roadmap): tick` commit. Every CLI flag overrides its config key.                                                                                                                                                                                                                                                                                                                                                          |
+| `loopSupervisor.roadmapPath`                     | path                            | (adapter default)                                | Roadmap passed to the supervisor's probe. Falls back to the adapter's own default when unset.                                                                                                                                                                                                                                                                                                                                                                                            |
+| `loopSupervisor.cooldownSeconds`                 | integer                         | `10`                                             | Pause between iterations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `loopSupervisor.adapters.<name>`                 | map of paths                    | (adapter defaults)                               | Per-adapter overrides for `stateFile`, `lockFile`, `haltFile`, `probeScript` and `command`. **Declarative only** — a config key that could name a module to `require()` would be a code-execution surface, so JavaScript adapters are deliberately not supported.                                                                                                                                                                                                                          |
 
 ## QA artifacts are co-located
 
