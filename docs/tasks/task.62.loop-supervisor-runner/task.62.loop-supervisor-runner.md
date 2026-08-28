@@ -385,38 +385,42 @@ Test count: 101 → **110**.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 96/100
+**Gate Decision**: PASS
+**QA Cycles**: 2
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.62.qa.1.loop-supervisor-runner.md](./task.62.qa.1.loop-supervisor-runner.md)
-- **Gate File**: [task.62.gate.1.loop-supervisor-runner.yml](./task.62.gate.1.loop-supervisor-runner.yml)
+- **Cycle 1**: [task.62.qa.1.loop-supervisor-runner.md](./task.62.qa.1.loop-supervisor-runner.md) — CONCERNS (90/100)
+- **Cycle 2**: [task.62.qa.2.loop-supervisor-runner.md](./task.62.qa.2.loop-supervisor-runner.md) — PASS (96/100)
+- **Gate File**: [task.62.gate.1.loop-supervisor-runner.yml](./task.62.gate.1.loop-supervisor-runner.yml) (updated in place)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 101 (this task's own suite; 101/101 passing)
+- **Tests Executed**: 110 (this task's own suite; 110/110 passing)
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-One medium-severity correctness bug (**LS-1**): the `loopSupervisor:` config block silently overrides an
-explicit CLI flag whose value equals the built-in default, because "was this flag supplied?" is inferred by
-comparing against the default rather than tracked. For `--base` that matters — it is the ref the progress
-oracle watches, so a wrong ref makes every healthy iteration classify `idle` and ends the loop at
-`--max-idle` while reporting no progress. Both `README.md` and `docs/reference/configuration.md` promise the
-opposite precedence.
+Cycle 1 found one medium correctness bug (**LS-1**): the config block silently overrode an explicit CLI
+flag whose value equalled the built-in default, because presence was inferred from a `DEFAULTS`
+comparison rather than tracked. Consequential for `--base`, the ref the progress oracle watches — a
+wrong ref makes every healthy iteration classify `idle` and ends the loop at `--max-idle` reporting no
+progress.
 
-One low-severity cleanup: `retry-once` appears in `classify.js`'s `onError` JSDoc type but is rejected by
-`parseArgs` and unimplemented in `shouldStop`.
+Cycle 2 verified it fixed **at the mechanism level** rather than symptomatically: presence is now
+tracked in an `explicit` Set, so every config-fillable option is covered by the same rule and any option
+added later inherits it. Mutation-proven (restoring the old comparison turns 3 of the 9 new tests red)
+and confirmed live against a disagreeing config. No new issues and no regressions.
 
-Everything else verified against real execution rather than fixtures, including a mutation probe of four
-separate post-conditions run before any green was trusted.
+Score is 96 rather than the formula's 100 because SC5 (one real `/develop-next` iteration) is deferred
+to a post-merge operator step and therefore has no evidence behind it yet — a documented deferral, not a
+defect, but not something to claim as verified.
 
 ## Change Log
 
@@ -428,6 +432,7 @@ separate post-conditions run before any green was trusted.
 | 2026-08-28 |         | Implemented — 11 files, 101 tests | develop |
 | 2026-08-28 |         | QA gate CONCERNS (90/100) — 1 medium finding (LS-1, flag/config precedence) | qa-task |
 | 2026-08-28 |         | QA findings fixed — LS-1 flag/config precedence, 1 iteration | qa-fix |
+| 2026-08-28 |         | QA gate PASS (96/100) — LS-1 verified fixed, 2 cycles | qa-task |
 
 ## References
 
