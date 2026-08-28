@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-08-17
-**Next Available Task Number:** **62**
+**Last Updated:** 2026-08-28
+**Next Available Task Number:** **65**
 
 ## How to use
 
@@ -101,6 +101,9 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 59 | [Finish the Prettier adoption — sweep the 50 stragglers, then guard the boundary](task.59.prettier-sweep-and-format-guard/task.59.prettier-sweep-and-format-guard.md) | accepted | infrastructure | Medium | 2026-08-17 | [#237](https://github.com/Gamaroff/agent-skills/issues/237) | none |
 | 60 | [Give the config reader's awk tier a grammar, or make it refuse](task.60.config-reader-strict-subset/task.60.config-reader-strict-subset.md) | accepted | infrastructure | High | 2026-08-18 | [#247](https://github.com/Gamaroff/agent-skills/issues/247) | task.51 |
 | 61 | [Let the JavaScript gates read a config-declared access mode, with read-config.sh parity](task.61.access-mode-config-tier/task.61.access-mode-config-tier.md) | accepted | infrastructure | High | 2026-08-19 | [#251](https://github.com/Gamaroff/agent-skills/issues/251) | task.51, task.52, task.53, task.60 |
+| 62 | [Run each loop iteration in a fresh Claude process, and classify the outcome from the filesystem](task.62.loop-supervisor-runner/task.62.loop-supervisor-runner.md) | draft | infrastructure | High | 2026-08-28 | — | — |
+| 63 | [Make an unattended run watchable from a second terminal, and audible when it stops](task.63.loop-supervisor-status-views/task.63.loop-supervisor-status-views.md) | draft | infrastructure | Medium | 2026-08-28 | — | task.62 |
+| 64 | [Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable](task.64.loop-supervisor-dashboard-and-docs/task.64.loop-supervisor-dashboard-and-docs.md) | draft | documentation | Medium | 2026-08-28 | — | task.62 |
 
 ---
 
@@ -113,4 +116,5 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Task 59 shipped 2026-08-17** ([#240](https://github.com/Gamaroff/agent-skills/pull/240)). Its merge-ordering constraint applied to **JavaScript only**, and the pre-flight check found nothing at risk. Kept here because the constraint recurs for any future repo-wide reformat: Its Prettier sweep rewrites ~103 `.js` files, so a branch touching any of them conflicts on every line. Markdown, YAML and JSON are `.prettierignore`d, so **doc-only branches are unaffected** — which covers most of the 51-58 sequence. Land or rebase in-flight *code* work before merging 59. (Checked 2026-08-17: nothing was at risk. Task 49 had already merged as [#223](https://github.com/Gamaroff/agent-skills/pull/223) and task 51's branch was markdown-only, merged as [#238](https://github.com/Gamaroff/agent-skills/pull/238).)
 - Task 48's document was written **after** its implementation, to give the branch that already carried the number a registry entry. Task 49 is the half that task 48 deliberately deferred. Neither has a tracker issue yet.
 - Tasks 32-34 are the **Evals Infrastructure** milestone ([#1](https://github.com/Gamaroff/agent-skills/milestone/1)).
+- Tasks 62-64 are the **`loop-supervisor`** sequence — one shippable unit each. Design: [`.agents/plans/loop-supervisor.md`](../../.agents/plans/loop-supervisor.md). Task 62 is the only one that has to exist; it delivers a usable runner with log files alone. 63 (terminal views, notifications) and 64 (dashboard push, runbook) both depend on 62 and are independent of each other, so they can land in either order. None has a tracker issue yet.
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).

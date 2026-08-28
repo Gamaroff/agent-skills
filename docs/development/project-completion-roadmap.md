@@ -5,9 +5,8 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 and 2 are complete and archived.** There is no current frontier: the rows below are
-deferred or human-gated and are invisible to selection, so `select-next.mjs` reports
-`roadmap-complete` until a new phase is added.
+**Phases 1 and 2 are complete and archived.** Phase 3 (the `loop-supervisor` series) is the current
+frontier. The rows under "Deferred / human-gated" below remain invisible to selection.
 
 Selection is executed by `select-next.mjs`, never by eye:
 
@@ -37,6 +36,20 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `change-log`       | `shared/resources/change-log.js`, `document-change-log.md`              |
 | `templates`        | `skills/*/resources/*template*`, `docs/templates/*`, `create-*/SKILL.md` |
 | `review-skills`    | `skills/review-*/SKILL.md`, `skills/edit-*/SKILL.md`                    |
+| `loop-supervisor`  | `skills/loop-supervisor/*`, `evals/loop-supervisor/*`                  |
+
+---
+
+## PHASE 3 — loop-supervisor: fresh-context sequential loop runner
+
+Design: [`.agents/plans/loop-supervisor.md`](../../.agents/plans/loop-supervisor.md). T62 is the only
+unit that has to exist — it delivers a usable runner with log files alone. T63 and T64 both depend on
+it and are independent of each other, but they hard-conflict on `run-loop.mjs`, so `--batch` will
+correctly take only one of them at a time.
+
+- [ ] **T62** Run each loop iteration in a fresh Claude process, and classify the outcome from the filesystem · deps: none · touches: loop-supervisor!, docs-config~ · /develop-task docs/tasks/task.62.loop-supervisor-runner/task.62.loop-supervisor-runner.md
+- [ ] **T63** Make an unattended run watchable from a second terminal, and audible when it stops · deps: T62 · touches: loop-supervisor!, docs-config~ · /develop-task docs/tasks/task.63.loop-supervisor-status-views/task.63.loop-supervisor-status-views.md
+- [ ] **T64** Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable · deps: T62 · touches: loop-supervisor!, orchestrators~, docs-config~ · /develop-task docs/tasks/task.64.loop-supervisor-dashboard-and-docs/task.64.loop-supervisor-dashboard-and-docs.md
 
 ---
 
@@ -71,3 +84,4 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 | 2026-08-12 | T43 accepted — PR #210 merged (`7dd5e24`). **Every template now emits the canonical section and every `create-*` skill seeds row one**, so a newly created PRD / epic / story / task opens with one Change Log row. Placement follows the sign-off precedent: unnumbered on tasks (the 11-section count re-asserted in the same test block), promoted out of `## Notes & Updates` to its own H2 on epics, and left nested as `### Change Log` on PRDs. All 12 success criteria met, no waivers. 2 QA cycles, 4 findings closed; tests 1144 → 1158. **The documented drift was half the real drift**: two epic-template copies were described as byte-equal and were not — one carried a wholly different frontmatter schema hidden behind an identical line count, so `wc -l` had been mistaken for equality. Phase 2 therefore *replaced* a schema rather than copying three lines, which is a decision; the review made it explicit and added the pre-lock consumer grep that then caught `prd-structure-guide.md` documenting the old shape. **Every defect QA found was in the new instructions, not the templates** — two told an agent to bump a frontmatter `updated:` field its document type does not have, and fixing the first surfaced a second instance the code review had missed; the invariant is now swept for. Two residuals named rather than silently shipped: `review-prd` still writes a five-cell row into the now-four-column brownfield table (**a blocking condition on T44**, as this task's own Risk 4 predicted), and the brownfield *architecture* template carries the same five-column form while its three siblings do not — outside the canonical spec's scope. **T44 is now unblocked** |
 | 2026-08-13 | T45 accepted — PR #213 merged (`1aba9f1`). **Phase 2 is complete.** The pipeline now records itself and the sync stops narrating: `develop`, `qa-story`/`qa-task`, `qa-fix` and `finalise` write milestone rows, while the six sync skills narrow from a row per body-hash refresh to two events — issue created, status transition. One marker pair replaces two; the task.42 compatibility wrappers are deleted rather than left orphaned. 20/21 success criteria met; **live-Jira verification recorded as not met** (no credentials, GitHub-tracked repo) rather than quietly ticked. 2 QA cycles, 3 bugs closed; tests 1175 → 1185. The demonstration is the document itself: task.45's own Change Log is eight rows written by the code it ships, with `Version` moving only at creation, review and acceptance. Found on the way, and the reason this row is long: **the engine silently deleted every Change Log row it could not parse** — `upsertChangeLog` regenerated blocks from rows passing a date-first predicate, so a log ordered `\| Version \| Date \|` lost its entire history on first write. This repo's own roadmap template shipped with that ordering. Pre-existing in T42 and not a regression here, but T45 routes five more writers into that path, and "never drops a row it parsed" was the mitigation T45 claimed for its own Critical risk — true, and hollow, since the rows it drops are the ones it fails to parse. Fixed, with the template corrected. Two further T42 engine defects (content loss on the hand-written-heading path; the same-pair collapse skip) were **named and left** rather than folded in mid-QA-cycle. Also caught: a bulk section-replacement regex whose next-heading lookahead matched a heading *inside a fenced sample*, leaving orphaned legacy blocks and unbalanced fences in all six sync skills — the same context-blind class of error recurred once more during finalise and was caught by a guard count |
 | 2026-08-13 | **Phases 1 and 2 archived** to `roadmap-history.md` at phase close, per the standing Housekeeping row — the first time that file has been cut, so the header no longer promises a document that did not exist. Ten accepted rows (T36–T45) moved verbatim, keeping their `touches:` tags and acceptance annotations so a `deps:` naming any of them still resolves. The two `-fixtures` rows stay here, deferred and human-gated. This Change Log is deliberately **not** split: it is append-only and it is this document's own history, so the archive references it rather than copying ten long entries out of it. No frontier remains — `select-next.mjs` reports `roadmap-complete` until a new phase is added |
+| 2026-08-28 | Phase 3 seeded with the `loop-supervisor` series (T62–T64). Legend gained the `loop-supervisor` tag. T62 is the only mandatory unit; T63/T64 depend on it and hard-conflict with each other on `run-loop.mjs`. Design: `.agents/plans/loop-supervisor.md` |
