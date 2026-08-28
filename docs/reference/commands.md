@@ -22,6 +22,8 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/develop-batch` | Same, but fans the whole conflict-free frontier into parallel worktrees — develop in parallel, merge serially | [`develop-batch` README](../../skills/develop-batch/README.md) |
 | `/develop-batch --dry-run` | Read-only preview of the batch the selector would pick | [Roadmap selection](../../skills/develop-next/references/roadmap-selection.md) |
 | `/loop /develop-next` | Run an orchestrator continuously until the frontier empties or a pipeline HALTs | [`develop-next` README](../../skills/develop-next/README.md) |
+| `run-loop.mjs run` | Run an orchestrator continuously with a **fresh Claude process and fresh context per iteration**, classified from filesystem post-conditions and logged per iteration. Launched from a terminal, not by Claude. Use instead of `/loop` when a long unattended run must not decay | [`loop-supervisor` README](../../skills/loop-supervisor/README.md) |
+| `run-loop.mjs dry-run` | Probe, print the plan and the exact `claude` argv, spawn nothing | [`loop-supervisor` README](../../skills/loop-supervisor/README.md) |
 
 ## Authoring
 

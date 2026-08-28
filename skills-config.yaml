@@ -19,3 +19,10 @@ devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
+
+# loop-supervisor — fresh-context sequential loop runner.
+# Every key is optional; these are the defaults made explicit for this repo.
+loopSupervisor:
+  baseBranch: develop
+  roadmapPath: docs/development/project-completion-roadmap.md
+  cooldownSeconds: 10
