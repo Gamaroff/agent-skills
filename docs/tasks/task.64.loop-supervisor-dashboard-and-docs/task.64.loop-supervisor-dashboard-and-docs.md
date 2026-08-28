@@ -299,42 +299,40 @@ Modified: `skills/loop-supervisor/scripts/run-loop.mjs`, `skills/loop-supervisor
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS → fixed (cycle 3 pending)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-29
-**Quality Score**: 50/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 90/100 (cycle 2; cycle 1 was 50/100)
+**Gate Decision**: CONCERNS (gate 2)
 
-### QA Report
+### QA Artifacts
 
-- **Full Report**: [task.64.qa.1.loop-supervisor-dashboard-and-docs.md](./task.64.qa.1.loop-supervisor-dashboard-and-docs.md)
-- **Gate File**: [task.64.gate.1.loop-supervisor-dashboard-and-docs.yml](./task.64.gate.1.loop-supervisor-dashboard-and-docs.yml)
-- **Traceability Matrix**: inlined in the QA report (the working copy under `.summaries/` is gitignored scratch, so linking to it would dangle in the tracked tree)
+| Cycle | Gate | Report | Decision |
+|---|---|---|---|
+| 1 | [gate.1](./task.64.gate.1.loop-supervisor-dashboard-and-docs.yml) | [qa.1](./task.64.qa.1.loop-supervisor-dashboard-and-docs.md) | CONCERNS 50/100 — 5 medium, 6 low |
+| 2 | [gate.2](./task.64.gate.2.loop-supervisor-dashboard-and-docs.yml) | [qa.2](./task.64.qa.2.loop-supervisor-dashboard-and-docs.md) | CONCERNS 90/100 — 10 fixed, 1 partial |
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 1856 (all passing); CI 4/4 green
-- **Phases Verified**: 5/5 (2 with issues)
-- **Criteria**: 5 full, 3 partial
-- **Issues**: HIGH 0, MEDIUM 5, LOW 6
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Tests Executed**: 1870 (1869 pass, 1 gated skip, 0 fail); CI 4/4 green
+- **Phases Verified**: 5/5
+- **Criteria**: 8 full (was 5 full / 3 partial at cycle 1)
+- **NFR**: Security CONCERNS→resolved, Performance PASS, Reliability PASS, Maintainability PASS
 
-### Key Findings
+### Key Findings Across Both Cycles
 
-The implementation is complete and CI is green. The gate is CONCERNS because this is a task whose thesis
-is that its load-bearing property is **proved rather than assumed**, and three of its proofs do not reach
-as far as they claim — one cannot fail at all. Plus one real bug the criteria would not have caught.
+Twelve findings, all closed. The through-line is a single failure mode, and it is the one this task
+set out to avoid: **coverage reported where none existed.**
 
-- **QA-1** — a frame publishes the whole append-only ledger, not this run's rows, so the outcome counts
-  and `recent` span every previous run while `totals.iterations` counts only this one. Breaks the payload
-  contract this same change authored.
-- **QA-2** — the token-absence test is vacuous. Mutation-proved: deleting the token header entirely left
-  it green. The Risk Assessment rates the leak Low/HIGH and says it is "asserted by test".
-- **QA-3** — SC2 requires the *run's* outcome and exit status to be proved unchanged; the tests prove it
-  one level down, at `pushDashboard`.
-- **QA-4** — the Risk Assessment names `tests/executable-instructions.test.js` as the runbook mitigation,
-  but `collectDocs()` does not scan `docs/runbooks/**` or `skills/*/README.md`.
-- **QA-5** — the token is inherited by every spawned `claude` child, and the child writes logs to disk.
+- **Cycle 1** found the payload publishing the whole append-only ledger (breaking the contract this
+  change authored), a token-absence test that could not fail, SC2 proved a level below where it is
+  stated, and a Risk Assessment naming a gate that never opened the file it protected.
+- **Cycle 2** re-verified every fix by **mutation** rather than by reading it, and found one that was
+  real but unheld: the child-environment token strip lived inline in `main()`, so deleting it left the
+  suite green. Extracted to `childEnvFor()` with tests; the same mutation now kills two.
+- **Two defects were introduced by the fixes themselves** and caught before CI — a third-SIGINT
+  re-entrancy bug from the double-SIGINT fix, and a QA report linking gitignored scratch that would
+  have resolved locally and 404'd in CI.
 
 ---
 
@@ -348,6 +346,8 @@ as far as they claim — one cannot fail at all. Plus one real bug the criteria 
 | 2026-08-29 |         | Implemented all 5 phases: `--dashboard`/`--dashboard-token` with warn-and-continue push, 22 unit tests (3 deliberate-breakage failure-mode tests), README payload contract with both consumer warnings, `docs/runbooks/unattended-overnight-runs.md` + index row, develop-next cross-references, config rows. Status → ready-for-review | develop-task |
 | 2026-08-29 |         | QA gate CONCERNS (50/100) — 0 high, 5 medium, 6 low; SC 5 full / 3 partial | qa-task |
 | 2026-08-29 |         | QA findings fixed — all 11 closed (5 medium, 6 low) plus 1 found by the adversarial pass over the fixes; `executable-instructions` widened to cover runbooks and skill READMEs, mutation-proved; 1 QA iteration | qa-fix |
+| 2026-08-29 |         | QA gate 2 CONCERNS (90/100) — cycle-1 fixes re-verified by mutation; 10 closed, QA-12 found (child-env strip real but unheld by any test) | qa-task |
+| 2026-08-29 |         | QA-12 fixed — `childEnvFor()` extracted and asserted; the mutation that killed 0 tests now kills 2; 2 QA iterations | qa-fix |
 
 ## References
 

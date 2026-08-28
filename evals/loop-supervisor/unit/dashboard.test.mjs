@@ -25,6 +25,7 @@ import {
   pushDashboard,
   pushRunFrame,
   redactRemoteUrl,
+  childEnvFor,
   parseArgs,
   applyConfig,
   UNREADABLE,
@@ -636,4 +637,48 @@ test("an SSH remote passes through untouched", () => {
     "ssh://github.com/o/r.git",
   );
   assert.equal(redactRemoteUrl(null), null);
+});
+
+// ── the child-environment credential boundary ────────────────────────────────
+//
+// QA cycle 2 found this protection real but unheld: deleting the strip left the
+// whole suite green, because it lived inline in main() where no test could reach
+// it. That is the same shape as the vacuous token test cycle 1 found — a
+// mitigation nothing enforces — so it is now a pure function with tests on it.
+
+test("the spawned child never inherits the dashboard token", () => {
+  const env = childEnvFor({
+    PATH: "/usr/bin",
+    HOME: "/home/x",
+    LOOP_SUPERVISOR_DASHBOARD_TOKEN: "s3cret",
+  });
+  assert.equal("LOOP_SUPERVISOR_DASHBOARD_TOKEN" in env, false);
+  assert.equal(JSON.stringify(env).includes("s3cret"), false);
+});
+
+test("everything else in the environment survives untouched", () => {
+  // The child is a real Claude process: stripping more than the one variable
+  // would break PATH resolution, credentials it legitimately needs, or the
+  // terminal settings its output depends on.
+  const source = {
+    PATH: "/usr/bin",
+    HOME: "/home/x",
+    ANTHROPIC_API_KEY: "kept",
+    TERM: "xterm",
+    LOOP_SUPERVISOR_DASHBOARD_TOKEN: "s3cret",
+  };
+  const env = childEnvFor(source);
+  assert.deepEqual(env, {
+    PATH: "/usr/bin",
+    HOME: "/home/x",
+    ANTHROPIC_API_KEY: "kept",
+    TERM: "xterm",
+  });
+  // and the source is not mutated — the supervisor still needs its own token
+  assert.equal(source.LOOP_SUPERVISOR_DASHBOARD_TOKEN, "s3cret");
+});
+
+test("an environment without the token is passed through unchanged", () => {
+  const source = { PATH: "/usr/bin" };
+  assert.deepEqual(childEnvFor(source), { PATH: "/usr/bin" });
 });

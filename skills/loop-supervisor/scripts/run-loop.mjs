@@ -674,6 +674,27 @@ export function notifyTerminalStop(opts, summary, deps = {}) {
 // ── the dashboard push ───────────────────────────────────────────────────────
 
 /**
+ * The environment a spawned iteration should inherit.
+ *
+ * Exported and pure for one reason: the thing it removes is a credential, and a
+ * protection that lives inline inside `main()` cannot be tested — so nothing
+ * holds it in place and a later refactor of the spawn options drops it in
+ * silence. QA proved exactly that: deleting the strip left the whole suite green.
+ *
+ * The child is an agent with a Bash tool writing `iter-NNN.txt` and
+ * `iter-NNN.jsonl` to disk. A token it inherits is one `env` away from a log
+ * file, and from there from a commit.
+ *
+ * @param {object} [env] defaults to this process's environment
+ * @returns {object} a copy with the dashboard token removed
+ */
+export function childEnvFor(env = process.env) {
+  const out = { ...env };
+  delete out.LOOP_SUPERVISOR_DASHBOARD_TOKEN;
+  return out;
+}
+
+/**
  * Strip any userinfo from a remote URL before it is published.
  *
  * A repo cloned over HTTPS can carry a credential in the URL itself
@@ -1357,18 +1378,13 @@ function main() {
       const result = await new Promise((resolve) => {
         const raw = fs.createWriteStream(rawPath, { flags: "a" });
         const txt = fs.createWriteStream(txtPath, { flags: "a" });
-        // The child inherits the supervisor's environment by default, which
-        // would hand the dashboard token to every `claude -p` iteration and to
-        // anything that iteration shells out to. That child is an agent with a
-        // Bash tool writing iter-NNN.txt and iter-NNN.jsonl to disk, so one
-        // `env` in a tool call would write the credential into a log file —
-        // contradicting the contract that the token never reaches one. Strip it.
-        const childEnv = { ...process.env };
-        delete childEnv.LOOP_SUPERVISOR_DASHBOARD_TOKEN;
+        // `childEnvFor` rather than an inline delete: see its docstring. The
+        // strip is a credential boundary, and a credential boundary that no test
+        // can reach is one a refactor removes without anything going red.
         const child = spawn(claudeBin, args, {
           cwd,
           stdio: ["ignore", "pipe", "pipe"],
-          env: childEnv,
+          env: childEnvFor(),
         });
         activeChild = child;
         let buf = "";
