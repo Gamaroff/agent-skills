@@ -301,39 +301,47 @@ intent is unchanged; only its fixture moved.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS (cycle 2; cycle 1 was CONCERNS)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+**QA Cycles**: 2
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.63.qa.1.loop-supervisor-status-views.md](./task.63.qa.1.loop-supervisor-status-views.md)
-- **Gate File**: [task.63.gate.1.loop-supervisor-status-views.yml](./task.63.gate.1.loop-supervisor-status-views.yml)
+- **Cycle 2 (final)**: [task.63.qa.2.loop-supervisor-status-views.md](./task.63.qa.2.loop-supervisor-status-views.md) · [gate.2](./task.63.gate.2.loop-supervisor-status-views.yml) — **PASS 100/100**
+- **Cycle 1**: [task.63.qa.1.loop-supervisor-status-views.md](./task.63.qa.1.loop-supervisor-status-views.md) · [gate.1](./task.63.gate.1.loop-supervisor-status-views.yml) — CONCERNS 90/100
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 1824 repo-wide (140 for this skill; 30 new)
+- **Tests Executed**: 150 for this skill (40 new); 1833 repo-wide
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 3 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Issues**: 0 HIGH, 0 MEDIUM open (1 MEDIUM found and closed in cycle 1), 3 LOW accepted
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-All nine success criteria met and the suite is green. The diff code review found one medium-severity
-correctness defect the criteria do not cover: an unparseable `current.json` is indistinguishable from an
-absent one, so a torn heartbeat renders as **"no run in flight"** while the supervisor is still
-running — the same failure class this task set out to prevent. See
-[task.63.bug.1.corrupt-heartbeat-reads-as-no-run.md](./task.63.bug.1.corrupt-heartbeat-reads-as-no-run.md).
+All nine success criteria met. QA cycle 1's diff review found one medium-severity defect the criteria
+do not cover — an unparseable `current.json` was indistinguishable from an absent one, so a torn
+heartbeat rendered as **"no run in flight"** while the supervisor was still running, the same failure
+class this task set out to prevent
+([TASK-63-BUG-1](./task.63.bug.1.corrupt-heartbeat-reads-as-no-run.md), now **closed**).
 
-Five invariants were mutation-proved by QA independently: each reverted in source and confirmed red.
+Cycle 2 verified the fix independently across all four states and four lifecycle transitions, and found
+a fragility the fix itself introduced — the new sentinel was duck-typed and so forgeable by file
+content — which was demonstrated, fixed and pinned in the same cycle.
+
+Seven invariants were mutation-proved by QA independently: each reverted in source and confirmed red.
+
+**A suite-wide flake was investigated and proved unrelated.** Clean `develop` plus two *filler* test
+files fails five tests; this branch fails one. See QA report 2.
 
 ## Bug Reports
 
-### In QA Verification
+### Closed
 
-- [TASK-63-BUG-1: A corrupt heartbeat renders as "no run in flight"](./task.63.bug.1.corrupt-heartbeat-reads-as-no-run.md) — ✅ Ready for QA — Severity: MEDIUM (found and fixed in QA cycle 1, 2026-08-28)
+- [TASK-63-BUG-1: A corrupt heartbeat renders as "no run in flight"](./task.63.bug.1.corrupt-heartbeat-reads-as-no-run.md) — ✅ **Closed** — Severity: MEDIUM (found cycle 1, fixed and verified cycle 2, 2026-08-28)
 
 ## Risk Assessment
 
@@ -368,6 +376,7 @@ depends on anything this task adds. The artifacts remain readable by hand.
 | 2026-08-28 |         | Implemented — 8 files, 30 tests | develop |
 | 2026-08-28 |         | QA gate CONCERNS (90/100) — 1 medium finding: a corrupt heartbeat renders as "no run in flight" | qa-task |
 | 2026-08-28 |         | QA findings fixed — TASK-63-BUG-1 closed (reader distinguishes absent from unreadable; writer now atomic), 9 tests added, 1 iteration | qa-fix |
+| 2026-08-28 |         | QA gate PASS (100/100), cycle 2 — fix verified across all four states; sentinel made identity-based after QA showed it was forgeable by file content | qa-task |
 
 ## References
 

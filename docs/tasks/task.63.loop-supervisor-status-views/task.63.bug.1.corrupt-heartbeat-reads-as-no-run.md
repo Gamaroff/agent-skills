@@ -4,7 +4,7 @@
 **Bug ID**: TASK-63-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA (diff code review, Step 3b)
 **Date Found**: 2026-08-28
 
@@ -171,3 +171,4 @@ heartbeat corrupted by anything other than a torn write.
 | 2026-08-28 | New | QA | Found in diff code review (qa-task Step 3b), cycle 1 |
 | 2026-08-28 | In Progress | qa-fix | Root cause identified in `readCurrent`/`readJson` |
 | 2026-08-28 | Ready for QA | qa-fix | Reader + renderer + atomic writer; 9 tests, both halves mutation-proved |
+| 2026-08-28 | Closed | QA | Verified across all four states and four lifecycle transitions; both halves mutation-proved by QA independently. Gate 2 PASS. |
