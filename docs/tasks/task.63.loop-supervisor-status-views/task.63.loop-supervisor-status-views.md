@@ -227,6 +227,9 @@ is written.
       measured: 3 frames in 4.6s, 2 in-place repaints, 0 screen/scrollback clears.
 - [x] 3. A stale `current.json` with a dead pid is reported as a crashed supervisor, never as live
       data — pid probe, no time-based rule; mutation-proved (3 tests red when reverted).
+- [x] 3b. An **unreadable** `current.json` is reported as such, never as "no run in flight"
+      (TASK-63-BUG-1, found in QA cycle 1). Reader distinguishes absent from unparseable; writer is
+      atomic. Both halves mutation-proved.
 - [x] 4. No run in flight exits 0 with a plain statement, not an error — verified, exit 0.
 - [x] 5. Notification fires exactly once per run, on terminal stop other than an operator-forced
       double-SIGINT kill, naming the reason.
@@ -296,6 +299,42 @@ intent is unchanged; only its fixture moved.
 - `npm run format:check` green; `npm run bundle:skill` reports in sync; `npm run generate-catalog`
   produces no diff.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-28
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.63.qa.1.loop-supervisor-status-views.md](./task.63.qa.1.loop-supervisor-status-views.md)
+- **Gate File**: [task.63.gate.1.loop-supervisor-status-views.yml](./task.63.gate.1.loop-supervisor-status-views.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1824 repo-wide (140 for this skill; 30 new)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 3 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+All nine success criteria met and the suite is green. The diff code review found one medium-severity
+correctness defect the criteria do not cover: an unparseable `current.json` is indistinguishable from an
+absent one, so a torn heartbeat renders as **"no run in flight"** while the supervisor is still
+running — the same failure class this task set out to prevent. See
+[task.63.bug.1.corrupt-heartbeat-reads-as-no-run.md](./task.63.bug.1.corrupt-heartbeat-reads-as-no-run.md).
+
+Five invariants were mutation-proved by QA independently: each reverted in source and confirmed red.
+
+## Bug Reports
+
+### In QA Verification
+
+- [TASK-63-BUG-1: A corrupt heartbeat renders as "no run in flight"](./task.63.bug.1.corrupt-heartbeat-reads-as-no-run.md) — ✅ Ready for QA — Severity: MEDIUM (found and fixed in QA cycle 1, 2026-08-28)
+
 ## Risk Assessment
 
 | Risk                                                       | Likelihood | Impact | Mitigation                                                            |
@@ -326,7 +365,9 @@ depends on anything this task adds. The artifacts remain readable by hand.
 | 2026-08-28 | 1.0     | Initial draft | create-task |
 | 2026-08-28 | 1.1     | Review 8/10 — corrected `runs.jsonl` field `numTurns`→`turns`, documented the second (`spawned: false`) ledger row shape, named the `parseArgs` registration points, scoped the README/SKILL.md Limits retractions, and recorded the double-SIGINT notification decision | review-task |
 | 2026-08-28 |         | Status → ready-for-development | review-task |
-| 2026-08-28 |         | Implemented — 8 files, 29 tests | develop |
+| 2026-08-28 |         | Implemented — 8 files, 30 tests | develop |
+| 2026-08-28 |         | QA gate CONCERNS (90/100) — 1 medium finding: a corrupt heartbeat renders as "no run in flight" | qa-task |
+| 2026-08-28 |         | QA findings fixed — TASK-63-BUG-1 closed (reader distinguishes absent from unreadable; writer now atomic), 9 tests added, 1 iteration | qa-fix |
 
 ## References
 

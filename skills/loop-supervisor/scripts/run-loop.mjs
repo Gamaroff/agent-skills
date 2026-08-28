@@ -448,9 +448,40 @@ export function renderStreamLine(obj) {
 
 // ── the read side: status, watch, notify ─────────────────────────────────────
 
-/** Read `current.json`, or null when there is no run in flight. */
+/**
+ * A heartbeat that exists but cannot be read. Distinct from `null`, which means
+ * genuinely absent.
+ *
+ * Collapsing the two is how a view ends up stating the opposite of the truth:
+ * `writeCurrent` rewrites this file every ~5s, so a reader can catch it
+ * mid-write, and "unparseable" answered "no run in flight" — the single most
+ * reassuring thing it could say, at the moment it was least entitled to.
+ */
+export const UNREADABLE = Object.freeze({ __unreadable: true });
+
+/**
+ * Read `current.json`. Returns the parsed object, `null` when the file is
+ * absent, or `UNREADABLE` when it exists but cannot be parsed.
+ *
+ * One `readFileSync` decides between absent and unreadable, rather than an
+ * `exists()` probe followed by a read: the file can be deleted between the two
+ * (the runner removes it on clean exit), and that race would report a normal
+ * shutdown as a corrupt heartbeat.
+ */
 export function readCurrent(cwd) {
-  return readJson(path.join(cwd, STATE_ROOT, "current.json"));
+  let raw;
+  try {
+    raw = fs.readFileSync(path.join(cwd, STATE_ROOT, "current.json"), "utf8");
+  } catch (e) {
+    // ENOENT is the normal post-run state. Anything else — a permission error,
+    // a directory in its place — is a file we cannot read, not an absent one.
+    return e.code === "ENOENT" ? null : UNREADABLE;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return UNREADABLE;
+  }
 }
 
 /**
@@ -832,6 +863,7 @@ function main() {
   function cleanup() {
     try {
       fs.rmSync(currentPath, { force: true });
+      fs.rmSync(currentPath + ".tmp", { force: true });
     } catch {
       /* best effort */
     }
@@ -844,8 +876,14 @@ function main() {
 
   function writeCurrent(patch) {
     const lock = readJson(path.join(cwd, adapter.lockFile));
+    // Write-then-rename, not write-in-place. `rename` within a filesystem is
+    // atomic, so a reader sees either the previous heartbeat or the new one and
+    // never a half-written file. The reader handles the torn case anyway
+    // (UNREADABLE), but a view should not depend on the writer being sloppy in
+    // order to be honest.
+    const tmpPath = currentPath + ".tmp";
     fs.writeFileSync(
-      currentPath,
+      tmpPath,
       JSON.stringify(
         {
           schemaVersion: SCHEMA_VERSION,
@@ -867,6 +905,7 @@ function main() {
         2,
       ),
     );
+    fs.renameSync(tmpPath, currentPath);
   }
 
   (async () => {

@@ -36,7 +36,7 @@ that task 62 writes.
 | 1. create-branch           | ✅ Done    | Branch `feature/task.63.*` exists in git                               | Branch created at `94a8653`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.63.review.1.loop-supervisor-status-views.md` exists              | 8/10; 1 Critical + 4 Important + 5 Optional, all applied; Draft → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no rework; 5 phases; 8 files; 30 new tests; 5 mutations proved; npm test 1824/1824 | — (surface map built inline) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #277](https://github.com/Gamaroff/agent-skills/pull/277) → `develop`; no issue linked, Step 6b skipped | — (PR body written directly) |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.63.qa.{N}.*.md`; `task.63.gate.{N}.*.yml`; PR comment posted     |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.63.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -179,7 +179,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.63.loop-supervisor-status-views`
-**PR**: {populated after Step 4}
+**PR**: [#277](https://github.com/Gamaroff/agent-skills/pull/277)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

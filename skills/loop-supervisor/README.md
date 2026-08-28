@@ -139,7 +139,7 @@ collide on `develop-pipeline.lock`. If the process died hard, delete the file.
 
 ```
 .claude/state/loop-supervisor/
-├── current.json                    # heartbeat, ~5s, deleted on clean exit
+├── current.json                    # heartbeat, ~5s (atomic: temp + rename), deleted on clean exit
 ├── runs.jsonl                      # one line per finished iteration
 └── logs/
     ├── latest -> 2026-08-28T…      # symlink to the current run
@@ -195,8 +195,17 @@ There are exactly **three** things `status` can tell you, and the third is the o
 | `running` | `current.json` is there and its pid is alive. Live data. |
 | `no run in flight` | `current.json` is absent. **The normal state after a clean exit** — the runner deletes it when the loop ends. Not an error, and it exits 0. |
 | `CRASHED SUPERVISOR` | `current.json` is there but its pid is **dead**. The values shown are the last thing that process recorded, not live data. |
+| `HEARTBEAT UNREADABLE` | `current.json` is there but will not parse, so the state is **unknown**. Explicitly *not* "no run in flight" — a supervisor may well be running. Try again in a few seconds. |
 
-That last row is why `status` probes the pid rather than timing the heartbeat. Reporting hours-old data
+The last two rows exist for the same reason, and it is the reason the whole view is worth having: **the
+one thing a passive view must never do is state the opposite of the truth.** Reporting hours-old data as
+live is one way to do that; answering "no run in flight" for a heartbeat it merely failed to parse is
+the other, and it is the worse of the two — a crashed report makes someone look, while "no run in
+flight" ends the investigation. The heartbeat is written atomically (temp file, then rename) so a reader
+cannot catch it half-written, and the reader distinguishes *absent* from *unreadable* regardless, rather
+than trusting the writer to be careful.
+
+That third row is also why `status` probes the pid rather than timing the heartbeat. Reporting hours-old data
 as live is the one genuinely misleading thing a passive view can do — and a time-based rule would get it
 wrong in the other direction, since the heartbeat legitimately pauses across the probe and the cooldown.
 

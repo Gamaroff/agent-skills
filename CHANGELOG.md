@@ -20,14 +20,24 @@ All notable changes to this project will be documented in this file. Format foll
   run. `watch` repaints in place and **never clears scrollback**: an operator who scrolled up to read
   something does not lose it to a repaint.
 
-  **The state worth knowing about is the third one.** `current.json` present with a live pid is
+  **The states worth knowing about are the last two.** `current.json` present with a live pid is
   `running`; absent is `no run in flight` (the normal state after a clean exit — exit 0, not an
   error); present with a **dead** pid is `CRASHED SUPERVISOR`, and it says the values are the last
-  recorded rather than live. Reporting hours-old data as live is the one genuinely misleading thing a
-  passive view can do. Liveness is a `process.kill(pid, 0)` probe and deliberately **not** a
-  heartbeat timeout — the runner clears its heartbeat interval while no child is running, so
-  `current.json` legitimately goes untouched across the probe and the cooldown window, and a
-  time-based rule would call a healthy loop crashed between iterations.
+  recorded rather than live; present but **unparseable** is `HEARTBEAT UNREADABLE`, explicitly not
+  "no run in flight".
+
+  Both exist because the one thing a passive view must never do is state the opposite of the truth.
+  Reporting hours-old data as live is one way; answering "no run in flight" for a heartbeat it merely
+  failed to parse is the other, and it is worse — a crashed report makes someone look, while "no run
+  in flight" ends the investigation. QA caught the second during review of this very change. The
+  heartbeat is now written **atomically** (temp file, then rename) so a reader cannot catch it
+  half-written, and the reader distinguishes absent from unreadable regardless, rather than trusting
+  the writer to be careful.
+
+  Liveness is a `process.kill(pid, 0)` probe and deliberately **not** a heartbeat timeout — the
+  runner clears its heartbeat interval while no child is running, so `current.json` legitimately goes
+  untouched across the probe and the cooldown window, and a time-based rule would call a healthy loop
+  crashed between iterations.
 
   **`runs.jsonl` has two row shapes, and the thin one is the common one.** A finished iteration
   carries `durationMs`, `costUsd` and `turns`; a *probe-stop* row (`spawned: false`, written when

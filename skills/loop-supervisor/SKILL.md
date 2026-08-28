@@ -109,7 +109,7 @@ single-flight: two supervisors in one working tree would collide on `develop-pip
 
 Under `.claude/state/loop-supervisor/`:
 
-- `current.json` — heartbeat, rewritten ~5s, removed on clean exit
+- `current.json` — heartbeat, rewritten ~5s atomically (temp + rename), removed on clean exit
 - `runs.jsonl` — append-only, one line per finished iteration
 - `logs/<runId>/iter-NNN.jsonl` — raw `stream-json`, full fidelity
 - `logs/<runId>/iter-NNN.txt` — assistant text plus tool-call names; the one a human reads
@@ -123,10 +123,11 @@ run-loop.mjs watch           # the same, repainted every ~2s
 ```
 
 Both are **pure readers** — no lock, no writes, nothing spawned — so they are safe from a second
-terminal, over SSH, concurrently, and mid-iteration. Three states: `running`, `no run in flight` (the
-normal post-run state, exit 0, not an error) and `CRASHED SUPERVISOR` (heartbeat present, pid dead — the
-values are the last recorded, not live). Liveness is a pid probe, not a timeout, because the heartbeat
-legitimately pauses between iterations. `watch` repaints in place and never clears scrollback.
+terminal, over SSH, concurrently, and mid-iteration. Four states: `running`; `no run in flight` (the
+normal post-run state, exit 0, not an error); `CRASHED SUPERVISOR` (heartbeat present, pid dead — the
+values are the last recorded, not live); and `HEARTBEAT UNREADABLE` (present but unparseable — state
+unknown, explicitly *not* "no run"). Liveness is a pid probe, not a timeout, because the heartbeat
+legitimately pauses between iterations. The heartbeat is written atomically (temp file, then rename). `watch` repaints in place and never clears scrollback.
 
 `--notify` (macOS `osascript`) and `--webhook <url>` (ntfy-shaped POST) fire **once, when the loop
 ends**, naming the reason — never per iteration. A failed notification warns and leaves the run's exit

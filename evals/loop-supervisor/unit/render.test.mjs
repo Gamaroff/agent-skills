@@ -145,6 +145,58 @@ test("state: a heartbeat with no usable pid is crashed, not running", () => {
   assert.equal(runState({ runId: "x" }, ALIVE), "crashed");
 });
 
+test("state: an unreadable heartbeat is its own state, never 'no run in flight'", () => {
+  const torn = { __unreadable: true };
+  assert.equal(runState(torn, ALIVE), "unreadable");
+  const text = frame({ current: torn, runs: [], nowMs: NOW, isAlive: ALIVE });
+  assert.match(text, /UNREADABLE/);
+  // The regression this guards: the reassuring answer at the moment it is least
+  // deserved. A supervisor may well be running.
+  //
+  // Assert on the CLAIM, not the substring — the body deliberately contains the
+  // phrase "no run in flight" while denying it, and a naive doesNotMatch would
+  // fail on the very sentence that fixes the bug.
+  assert.doesNotMatch(text.split("\n")[0], /no run in flight/);
+  assert.doesNotMatch(text, /No supervisor is running/);
+  assert.match(text, /NOT the same as no run in flight/);
+});
+
+test("state: unreadable exposes no run fields — there are none to trust", () => {
+  const view = statusView({
+    current: { __unreadable: true },
+    runs: [],
+    nowMs: NOW,
+    isAlive: ALIVE,
+  });
+  assert.equal(view.state, "unreadable");
+  assert.equal(view.run, null);
+});
+
+test("state: unreadable still shows the ledger, which is a separate file", () => {
+  const text = frame({
+    current: { __unreadable: true },
+    runs: [fullRow()],
+    nowMs: NOW,
+    isAlive: ALIVE,
+  });
+  assert.match(text, /merged \+ ticked/);
+});
+
+test("state: all four states are distinct", () => {
+  const seen = new Set([
+    runState(null, ALIVE),
+    runState({ __unreadable: true }, ALIVE),
+    runState(current(), ALIVE),
+    runState(current(), DEAD),
+  ]);
+  assert.deepEqual([...seen].sort(), [
+    "crashed",
+    "no-run",
+    "running",
+    "unreadable",
+  ]);
+});
+
 // ── the two ledger row shapes ───────────────────────────────────────────────
 
 test("ledger: the full row reads `turns`, not `numTurns`", () => {

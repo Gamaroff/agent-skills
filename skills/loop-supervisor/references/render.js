@@ -54,12 +54,19 @@ function num(v) {
  * Three states, and the distinction between the last two is the whole reason
  * this function exists:
  *
- * - `no-run`   — `current.json` absent. The NORMAL post-run state (the runner
- *                deletes it on clean exit), never an error.
- * - `running`  — heartbeat present and its pid is alive.
- * - `crashed`  — heartbeat present and its pid is dead. Reporting hours-old
- *                data as live is the one genuinely misleading thing a view can
- *                do, so it gets its own state rather than a footnote.
+ * - `no-run`     — `current.json` absent. The NORMAL post-run state (the runner
+ *                  deletes it on clean exit), never an error.
+ * - `running`    — heartbeat present and its pid is alive.
+ * - `crashed`    — heartbeat present and its pid is dead. Reporting hours-old
+ *                  data as live is the one genuinely misleading thing a view can
+ *                  do, so it gets its own state rather than a footnote.
+ * - `unreadable` — heartbeat present but not parseable. **Not `no-run`.** The
+ *                  two were once collapsed, which meant a torn write answered
+ *                  "no run in flight" — telling the operator the loop had
+ *                  finished when it had not. That is the same misleading shape
+ *                  as `crashed`-reported-as-`running`, and it is worse in one
+ *                  respect: a crashed report prompts a look, while "no run in
+ *                  flight" ends the investigation.
  *
  * Liveness is the ONLY signal used. There is deliberately no "older than N
  * seconds" rule: the runner clears its heartbeat interval while the child is
@@ -69,6 +76,7 @@ function num(v) {
  */
 function runState(current, isAlive) {
   if (!current) return "no-run";
+  if (current.__unreadable) return "unreadable";
   const pid = current.pid;
   if (typeof pid !== "number") return "crashed";
   return isAlive(pid) ? "running" : "crashed";
@@ -126,7 +134,7 @@ function statusView({ current, runs = [], nowMs, isAlive }) {
     state,
     generatedAt: new Date(nowMs).toISOString(),
     run:
-      state === "no-run"
+      state === "no-run" || state === "unreadable"
         ? null
         : {
             runId: c.runId || null,
@@ -150,6 +158,7 @@ function statusView({ current, runs = [], nowMs, isAlive }) {
 const HEAD = {
   running: "loop-supervisor — running",
   crashed: "loop-supervisor — CRASHED SUPERVISOR (heartbeat present, pid dead)",
+  unreadable: "loop-supervisor — HEARTBEAT UNREADABLE (state unknown)",
   "no-run": "loop-supervisor — no run in flight",
 };
 
@@ -172,6 +181,15 @@ function renderLines(view) {
     out.push(
       "  No supervisor is running. This is the normal state after a clean exit —",
       "  current.json is removed when the loop ends.",
+      "",
+    );
+  } else if (view.state === "unreadable") {
+    out.push(
+      "  current.json exists but could not be parsed, so the run's state is unknown.",
+      "  This is NOT the same as no run in flight — a supervisor may well be running.",
+      "  Most likely a heartbeat caught mid-write; try again in a few seconds.",
+      "  If it persists, the file is corrupt: check it by hand before assuming the",
+      "  loop has stopped.",
       "",
     );
   } else {

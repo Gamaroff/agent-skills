@@ -30,6 +30,7 @@ import {
   readCurrent,
   readLedger,
   notifyTerminalStop,
+  UNREADABLE,
 } from "../../../skills/loop-supervisor/scripts/run-loop.mjs";
 import fs from "node:fs";
 
@@ -663,4 +664,61 @@ test("T63: the webhook body is ntfy-shaped — message as body, title and priori
   assert.match(calls[0].body, /pipeline HALT at step 5/);
   assert.match(calls[0].headers.Title, /STOPPED/);
   assert.equal(calls[0].headers.Priority, "high");
+});
+
+// ── TASK-63-BUG-1: absent and unreadable are different answers ──────────────
+
+const withState = (write) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ls-state-"));
+  const root = path.join(dir, ".claude", "state", "loop-supervisor");
+  fs.mkdirSync(root, { recursive: true });
+  write(root);
+  return dir;
+};
+
+test("TASK-63-BUG-1: an absent heartbeat reads as null — the normal post-run state", () => {
+  const dir = withState(() => {});
+  assert.equal(readCurrent(dir), null);
+});
+
+test("TASK-63-BUG-1: a torn heartbeat reads as UNREADABLE, not as absent", () => {
+  // Exactly the shape a reader catches mid-write: valid prefix, no closing brace.
+  const dir = withState((root) =>
+    fs.writeFileSync(
+      path.join(root, "current.json"),
+      '{"runId":"r","pid":42,"iter',
+    ),
+  );
+  const got = readCurrent(dir);
+  assert.equal(got, UNREADABLE);
+  assert.notEqual(
+    got,
+    null,
+    "an unreadable heartbeat must not be reported as absent",
+  );
+});
+
+test("TASK-63-BUG-1: an empty heartbeat file is unreadable, not absent", () => {
+  const dir = withState((root) =>
+    fs.writeFileSync(path.join(root, "current.json"), ""),
+  );
+  assert.equal(readCurrent(dir), UNREADABLE);
+});
+
+test("TASK-63-BUG-1: a valid heartbeat still parses to its object", () => {
+  const dir = withState((root) =>
+    fs.writeFileSync(
+      path.join(root, "current.json"),
+      JSON.stringify({ runId: "r", pid: 7 }),
+    ),
+  );
+  assert.equal(readCurrent(dir).pid, 7);
+});
+
+test("TASK-63-BUG-1: a heartbeat that cannot be opened is unreadable, not absent", () => {
+  // A directory where the file should be: exists, cannot be read as a file.
+  const dir = withState((root) =>
+    fs.mkdirSync(path.join(root, "current.json")),
+  );
+  assert.equal(readCurrent(dir), UNREADABLE);
 });
