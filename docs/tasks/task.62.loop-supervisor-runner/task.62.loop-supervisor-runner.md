@@ -5,7 +5,7 @@ type: task
 description: '/loop /develop-next re-invokes the same conversation every iteration, so item five is worked through a context mostly consumed by items one to four — and the degradation is invisible from outside. A skill cannot clear its own context; the loop has to move outside the session. This builds loop-supervisor: a dependency-free Node CLI that spawns one claude -p per iteration with a pinned --session-id, probes select-next.mjs before spending a model invocation, and classifies each outcome purely from filesystem post-conditions rather than from the assistant''s prose. Safe because the develop pipelines are already crash-safe — a process boundary is the boundary they already tolerate.'
 tags: [loop-supervisor, orchestration, cli, fresh-context, unattended, classifier]
 category: infrastructure
-status: draft
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-08-28
@@ -17,7 +17,9 @@ estimated_effort_hours: 16
 
 **Task File**: [task.62.loop-supervisor-runner.md](./task.62.loop-supervisor-runner.md)
 
-**Status**: Draft
+**Status**: Ready for Review
+
+**Review**: ✅ Review recommendations from `task.62.review.1.loop-supervisor-runner.md` implemented 2026-08-28 (1 applied, 1 deferred — tracker linkage)
 
 ## Overview
 
@@ -221,8 +223,15 @@ second kills the child and exits leaving state for the next resume. PID lock at
 - **End-to-end, cheap.** `generic` adapter, `--command "reply with OK" --max-iterations 2`. Asserts two
   `runs.jsonl` lines, two log pairs, two resumable transcripts, `current.json` removed on exit. A few
   cents.
-- **End-to-end, real.** One `/develop-next` iteration, `--max-iterations 1`, against a roadmap item
-  already known selectable. Asserts a merged PR, a ticked row, outcome `progress`, no leftover lock.
+- **End-to-end, real — operator step, run after this task's PR merges.** One `/develop-next` iteration,
+  `--max-iterations 1`, against a roadmap item already known selectable. Asserts a merged PR, a ticked
+  row, outcome `progress`, no leftover lock. **This cannot run inside the `develop-task` pipeline that
+  implements this task**, because that pipeline was itself dispatched by `/develop-next` and still holds
+  both `.claude/state/develop-next.state.json` (that skill's single-flight lock — its Step 0 refuses to
+  select a new item while the file exists) and `.claude/state/develop-pipeline.lock` (which the nested
+  pipeline's own Step 1 collision check HALTs on). Even with both locks free, a passing run would select,
+  develop and merge an unrelated roadmap item as a side effect of testing. Run it by hand on a clean tree
+  once this task has landed.
 - **Mutation probe — before trusting any green.** Break one post-condition on purpose (delete the tick
   commit; backdate `halted_at`; leave a lock behind) and confirm the classifier's verdict flips. A gate
   that has never reproduced a known failure proves nothing about the gate.
@@ -236,8 +245,10 @@ second kills the child and exits leaving state for the next resume. PID lock at
    loop stops loudly rather than reporting "no work".
 4. The cheap end-to-end run produces two ledger lines and two transcripts that `claude --resume` can
    reopen.
-5. One real `/develop-next` iteration completes with outcome `progress`, a merged PR and no leftover
-   lock.
+5. **(Operator acceptance, after this task's PR merges — not a gate on the implementing pipeline.)**
+   One real `/develop-next` iteration completes with outcome `progress`, a merged PR and no leftover
+   lock. Excluded from the implementing run for the collision reasons given under Testing Strategy; do
+   not re-add it as an in-pipeline gate.
 6. The mutation probe flips the classifier's verdict for all three broken post-conditions.
 7. `npm test`, `npm run format:check`, `quick_validate.py`, `npm run bundle` and
    `npm run generate-catalog` are all green and committed.
@@ -265,20 +276,96 @@ safe to delete.
 
 ## Progress Tracking
 
-- [ ] 1. `classify.js` against the full outcome table, both traps included
-- [ ] 2. `adapters.js` + the probe wrapper, empty-stdout guard first
-- [ ] 3. Spawn, tee, rendered log, heartbeat
-- [ ] 4. Loop, stop policy, signals, PID lock
-- [ ] 5. `dry-run`
-- [ ] 6. `SKILL.md`, `README.md`, config block, doc rows
-- [ ] 7. Cheap end-to-end, real end-to-end, mutation probe
-- [ ] 8. Bundle, catalog, format, full suite
+- [x] 1. `classify.js` against the full outcome table, both traps included
+- [x] 2. `adapters.js` + the probe wrapper, empty-stdout guard first
+- [x] 3. Spawn, tee, rendered log, heartbeat
+- [x] 4. Loop, stop policy, signals, PID lock
+- [x] 5. `dry-run`
+- [x] 6. `SKILL.md`, `README.md`, config block, doc rows
+- [x] 7. Cheap end-to-end, mutation probe (real end-to-end is a post-merge operator step — see Testing Strategy)
+- [x] 8. Bundle, catalog, format, full suite
+
+## Implementation Record
+
+**Started / completed**: 2026-08-28. Branch `feature/task.62.loop-supervisor-runner`.
+
+### What was built
+
+`skills/loop-supervisor/` — a dependency-free Node CLI (ESM script + CommonJS reference modules,
+matching `schedule.mjs` / `yaml-subset.js` house style) that spawns one `claude -p` per iteration with
+a pinned `--session-id`, probes before spending a model invocation, and classifies each outcome purely
+from filesystem post-conditions.
+
+The split that matters: `classify.js` does no I/O and `adapters.js`'s `interpretProbe` takes a captured
+result rather than running one, so the two pieces carrying all the correctness — the outcome table and
+the empty-stdout guard — are unit-testable without a subprocess. `run-loop.mjs` is the only module that
+touches the filesystem or spawns anything.
+
+### Files
+
+**New**
+
+| File                                                     | Lines | Purpose                                             |
+| -------------------------------------------------------- | ----- | --------------------------------------------------- |
+| `skills/loop-supervisor/SKILL.md`                        | ~120  | Frontmatter + the `/loop` differentiator, outcomes  |
+| `skills/loop-supervisor/README.md`                       | ~180  | Operator guide — options, logs, resume, cost        |
+| `skills/loop-supervisor/scripts/run-loop.mjs`            | ~560  | The supervisor — probe, spawn, tee, classify, decide |
+| `skills/loop-supervisor/references/classify.js`          | ~250  | Pure outcome classifier                             |
+| `skills/loop-supervisor/references/adapters.js`          | ~270  | Probe interpreter, oracles, adapter table           |
+| `skills/loop-supervisor/references/yaml-subset.js`       | —     | Bundled from `shared/resources/` by `npm run bundle` |
+| `skills/loop-supervisor/assets/supervisor-settings.json` | ~40   | Pinned permission mode + allowlist                  |
+| `evals/loop-supervisor/unit/classify.test.mjs`           | ~250  | 39 tests — every outcome row, both traps, precedence |
+| `evals/loop-supervisor/unit/adapters.test.mjs`           | ~200  | 29 tests — empty-stdout guard, oracles vs real git  |
+| `evals/loop-supervisor/unit/run-loop.test.mjs`           | ~200  | 33 tests — argv, budget, binaries, rendering        |
+
+**Modified** — `skills-config.yaml` (`loopSupervisor:` block), `docs/reference/configuration.md`
+(example + 4 key rows), `docs/reference/commands.md` (2 rows), `package.json` (test glob),
+`docs/reference/skill-catalog.md` (regenerated).
+
+### Success Criteria
+
+| # | Criterion | Result |
+| - | --------- | ------ |
+| 1 | `dry-run --adapter develop-next` prints a plan and the exact argv, spawns nothing | ✅ Verified against this repo. Resolved `node` → `~/.nvm/…/v24.13.1/bin/node` and `claude` → `~/.local/bin/claude`; probe returned `selected T62`; `resumePending: true` (the outer run's state file was live), so it correctly reported it would resume rather than re-select |
+| 2 | Every outcome-table row has a passing unit test, incl. stale halt → `progress` and leftover lock → `incomplete` | ✅ 39 classifier tests. Both traps tested on **both** sides of their boundary, plus the equality edge (a timestamp equal to iteration start is stale, not fresh) |
+| 3 | A probe that does not realpath to `select-next.mjs` classifies as error and stops loudly | ✅ Empty stdout is an error by construction; 4 tests, incl. one asserting no route through `interpretProbe` can turn it into `stop`. The diagnostic naming `realpath` survives into the loop's stop reason |
+| 4 | Cheap end-to-end produces two ledger lines and two resumable transcripts | ✅ `generic --max-iterations 2 --cooldown 0`. 2 `runs.jsonl` lines, 2 log pairs, both transcripts on disk under `~/.claude/projects/…`, `current.json` and the PID lock both removed, stop reason `--max-iterations 2 reached`, exit 0. $0.0995 total |
+| 5 | One real `/develop-next` iteration | ⏭ **Deferred by design** — reworded in review as a post-merge operator step. It cannot run inside this pipeline (see Testing Strategy) |
+| 6 | Mutation probe flips the classifier's verdict for broken post-conditions | ✅ Four mutants run, each restored: halt-freshness ignoring the timestamp (6 fail), leftover lock → error (2 fail), error/halt precedence removed (5 fail), empty stdout → `stop` (3 fail). Green again after each restore |
+| 7 | `npm test`, `format:check`, `quick_validate.py`, `bundle`, `generate-catalog` green and committed | ⚠️ **Green for this task's additions; the suite is not clean on `develop` either.** All 101 new tests pass (`node --test 'evals/loop-supervisor/unit/*.test.mjs'`, 101/101 — the same glob `package.json` runs). `format:check`, `quick_validate.py`, `npm run bundle` (1 bundled, 1 rewritten) and `npm run generate-catalog` are all green. Full `npm test` reports failures — but a control run of the full suite on a clean `develop` worktree fails too (`§8b move-sprint-issues.sh` at a 30s timeout, and `driver claude-sdk — availability reflects SDK install + API key`). The failing set varies run to run and is entirely 20–30s timeouts in `shared/resources/tests/jira-interception.test.mjs`, which passes 48/48 in isolation and which this branch does not touch. Pre-existing and load-sensitive, not introduced here — see the Issues Log in the implementation report. |
+| 8 | `SKILL.md` description states the `/loop` differentiator explicitly | ✅ "fresh Claude process and a fresh context", "the built-in /loop re-invokes the same conversation each time"; SKILL.md opens with a five-row comparison table |
+
+### Two things the build learned that the plan did not know
+
+**The result envelope can report `subtype: "success"` and `is_error: true` at the same time.** Seen on
+a live run whose API-key credit was exhausted: `{"subtype":"success","is_error":true,"result":"Credit
+balance is too low"}`. A classifier trusting `subtype` alone would have called every such iteration
+clean and looped all night reporting progress while nothing ran — precisely the silent-success failure
+this design exists to rule out. `isChildError` already checked all three signals independently; the
+real envelope is now pinned as a regression test.
+
+Second-order: `ANTHROPIC_API_KEY` takes precedence over a `claude.ai` login, so an unattended run can
+fail this way with no obvious cause. Documented in the README's Auth section.
+
+**Gotcha 4 reproduced exactly.** In a non-interactive shell here, `node --version` prints nvm's entire
+help text before the version and `command -v node` returns the bare word `node`. Absolute resolution is
+load-bearing, not defensive — and the supervisor refuses to start rather than spawning a shim.
+
+### Deferred
+
+- Success Criterion 5 (one real `/develop-next` iteration) — operator step after this PR merges.
+- `status` / `watch` subcommands, `--notify` / `--webhook`, dashboard push — tasks 63 and 64, out of
+  scope here by design.
+
 
 ## Change Log
 
 | Date       | Version | Description   | Author     |
 | ---------- | ------- | ------------- | ---------- |
 | 2026-08-28 | 1.0     | Initial draft | create-task |
+| 2026-08-28 | 1.1     | Review passed (8/10) — reworded SC5 and its Testing Strategy row as a post-merge operator step; it could not run inside the implementing pipeline without colliding on `develop-next.state.json` and `develop-pipeline.lock`. Tracker linkage gap left open (no `github_issue`). | review-task |
+| 2026-08-28 |         | Status → ready-for-development | review-task |
+| 2026-08-28 |         | Implemented — 11 files, 101 tests | develop |
 
 ## References
 
