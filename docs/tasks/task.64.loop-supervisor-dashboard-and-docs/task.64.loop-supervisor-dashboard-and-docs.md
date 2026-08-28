@@ -5,11 +5,11 @@ type: task
 description: 'The last unit of the loop-supervisor sequence, and the one that lets a consumer repo render a run without this repo knowing anything about that consumer. Adds the optional --dashboard push, whose contract is a documented JSON payload rather than an integration — a failed push warns and never aborts a run. Then the narrative layer the first two tasks deliberately deferred: the unattended-overnight-runs runbook, the honest per-iteration re-prime cost note, the claude --resume recipe for reopening any single iteration, and the cross-references from develop-next pointing at the fresh-context alternative to /loop /develop-next.'
 tags: [loop-supervisor, dashboard, documentation, runbook, integration-contract]
 category: documentation
-status: draft
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-08-28
-updated: 2026-08-28
+updated: 2026-08-29
 estimated_effort_hours: 6
 ---
 
@@ -17,7 +17,9 @@ estimated_effort_hours: 6
 
 **Task File**: [task.64.loop-supervisor-dashboard-and-docs.md](./task.64.loop-supervisor-dashboard-and-docs.md)
 
-**Status**: Draft
+**Status**: Ready for Review
+
+**Review**: ✅ All review recommendations from `task.64.review.1.loop-supervisor-dashboard-and-docs.md` implemented 2026-08-29
 
 **Depends on**: task.62
 
@@ -68,7 +70,8 @@ sequence. Three things in particular are worthless in a code comment and load-be
 Posted to `--dashboard <url>` with `--dashboard-token <tok>`, via `fetch`, on each iteration boundary:
 
 ```json
-{ "active": true, "runId": "...", "command": "/develop-next", "startedAt": "...",
+{ "schemaVersion": 1,
+  "active": true, "runId": "...", "command": "/develop-next", "startedAt": "...",
   "reporterHost": "...", "repoUrl": "...",
   "current": { "iteration": 7, "phase": "in-pipeline", "pipelineStep": 5,
                "itemId": "T94", "branch": "...", "prUrl": "...", "elapsedSec": 812 },
@@ -77,6 +80,12 @@ Posted to `--dashboard <url>` with `--dashboard-token <tok>`, via `fetch`, on ea
 ```
 
 Every field is derivable from what task 62 already writes. This task adds no new state.
+
+`schemaVersion` is the **same constant the runner already stamps into `runs.jsonl` and
+`current.json`** (`SCHEMA_VERSION` in `run-loop.mjs`), not a second version number invented for this
+payload. It is what makes the "versioned with `schemaVersion`" mitigation in Risk Assessment real: a
+consumer can version-check the frame against a value it may already have seen in the ledger, and the two
+can never disagree because there is only one of them.
 
 ### Consumer-side notes (spec only — not built here)
 
@@ -146,17 +155,23 @@ matters, so it is proved rather than assumed.
 ### Phase 3 — the contract in the README
 
 Payload, field semantics, the token header, and the two consumer-side warnings, written for someone who
-does not have this repo open.
+does not have this repo open. **Delete the "No dashboard push yet" bullet from `## Limits` in the same
+pass** — a README that documents the push under a Limits section still saying it does not exist is worse
+than one that says neither. The cost note here is the fuller companion to the statement already in
+`SKILL.md` §Limits; write it so the two agree rather than as a second independent claim.
 
 ### Phase 4 — the runbook
 
 `docs/runbooks/` — starting an overnight run, choosing caps, what each stop reason means, watching from
 a second terminal (task 63), what to do with a halt in the morning, the `claude --resume <uuid>` recipe,
-and the cost note.
+and the cost note. **Add its row to the `docs/runbooks/README.md` index table** — an unindexed runbook
+is reachable only by someone who already knows its filename, which is precisely not the reader this
+runbook is for.
 
 ### Phase 5 — cross-references and gates
 
-`develop-next` SKILL.md and README pointers; config rows; `npm run bundle`;
+`develop-next` SKILL.md and README pointers; the `## Limits` deletion in `skills/loop-supervisor/SKILL.md`;
+config rows; `npm run bundle`;
 `tests/executable-instructions.test.js` — **every command the prose tells a reader to run must resolve
 to something that actually ships**, which is the gate most likely to catch a runbook written slightly
 ahead of the code.
@@ -168,8 +183,9 @@ ahead of the code.
 | File                                          | Change                                                        |
 | --------------------------------------------- | --------------------------------------------------------------- |
 | `skills/loop-supervisor/scripts/run-loop.mjs` | `--dashboard` / `--dashboard-token`; warn-and-continue push    |
-| `skills/loop-supervisor/README.md`            | Payload contract, consumer warnings, resume recipe, cost note  |
-| `skills/loop-supervisor/SKILL.md`             | Dashboard mentioned in the body                                |
+| `skills/loop-supervisor/README.md`            | Payload contract, consumer warnings, resume recipe, cost note — **and delete the "No dashboard push yet" bullet from `## Limits`** |
+| `skills/loop-supervisor/SKILL.md`             | Dashboard mentioned in the body — **and delete the "No dashboard push." bullet from `## Limits`** |
+| `docs/runbooks/README.md`                     | Index the new runbook in the runbook table                     |
 | `skills/develop-next/SKILL.md`                | §Continuous mode cross-reference                               |
 | `skills/develop-next/README.md`               | Same cross-reference                                           |
 | `skills-config.yaml`                          | Dashboard defaults in the `loopSupervisor:` block              |
@@ -223,18 +239,21 @@ their own.
 
 ## Progress Tracking
 
-- [ ] 1. Payload construction + push
-- [ ] 2. Failure policy, proved by deliberate breakage
-- [ ] 3. Payload contract in the README, with both consumer warnings
-- [ ] 4. `docs/runbooks/unattended-overnight-runs.md`
-- [ ] 5. `develop-next` cross-references, config rows
-- [ ] 6. Executable-instructions, link check, format, suite
+- [x] 1. Payload construction + push
+- [x] 2. Failure policy, proved by deliberate breakage
+- [x] 3. Payload contract in the README, with both consumer warnings
+- [x] 4. `docs/runbooks/unattended-overnight-runs.md` + its row in the runbooks index
+- [x] 5. `develop-next` cross-references, config rows
+- [x] 6. Executable-instructions, link check, format, suite
 
 ## Change Log
 
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-28 | 1.0     | Initial draft | create-task |
+| 2026-08-29 | 1.1     | Review passed (9/10, READY TO IMPLEMENT) — added `schemaVersion` to the payload spec so the Risk Assessment mitigation it names is real; named the runbooks-index entry and the two `## Limits` deletions the Files Summary had left implicit | review-task |
+| 2026-08-29 |         | Status → ready-for-development | review-task |
+| 2026-08-29 |         | Implemented all 5 phases: `--dashboard`/`--dashboard-token` with warn-and-continue push, 22 unit tests (3 deliberate-breakage failure-mode tests), README payload contract with both consumer warnings, `docs/runbooks/unattended-overnight-runs.md` + index row, develop-next cross-references, config rows. Status → ready-for-review | develop-task |
 
 ## References
 
