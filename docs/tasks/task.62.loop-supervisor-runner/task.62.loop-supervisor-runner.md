@@ -351,12 +351,72 @@ fail this way with no obvious cause. Documented in the README's Auth section.
 help text before the version and `command -v node` returns the bare word `node`. Absolute resolution is
 load-bearing, not defensive — and the supervisor refuses to start rather than spawning a shim.
 
+### QA Cycle 1 fixes
+
+**LS-1 — config silently overrode an explicit CLI flag whose value equalled the default.**
+`run-loop.mjs` inferred "flag not supplied" by comparing the parsed value against `DEFAULTS`, so
+`--base develop` was indistinguishable from unset and a config `baseBranch: main` won over it. That
+matters because `--base` is the ref the progress oracle watches: pointed at the wrong branch,
+`tickCommitOracle` never fires, so every *successful* iteration classifies `idle` and `--max-idle`
+ends a healthy loop while reporting no progress — a silent wrong answer, the failure class this
+component exists to detect.
+
+Fixed by **tracking** presence rather than inferring it: `parseArgs` now records every named option in
+an `explicit` Set, and the merge moved into an exported `applyConfig(opts, config)` that fills in only
+what the caller did not name. `applyConfig` treats a missing `explicit` as "nothing supplied", so a
+caller that did not build its options through `parseArgs` still gets config defaults.
+
+9 regression tests added, and **mutation-proven**: restoring the original `=== DEFAULTS` comparison
+turns 3 of them red, and the suite is green again once reverted. Also verified live — with a config
+saying `baseBranch: main`, `--base develop` now yields `develop` while an unnamed base still yields
+`main`.
+
+Advisory cleanup also taken: `retry-once` removed from `classify.js`'s `onError` JSDoc type, with a
+note that `--max-resume-attempts` already bounds the only retry case that occurs in practice.
+
+Test count: 101 → **110**.
+
 ### Deferred
 
 - Success Criterion 5 (one real `/develop-next` iteration) — operator step after this PR merges.
 - `status` / `watch` subcommands, `--notify` / `--webhook`, dashboard push — tasks 63 and 64, out of
   scope here by design.
 
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-28
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.62.qa.1.loop-supervisor-runner.md](./task.62.qa.1.loop-supervisor-runner.md)
+- **Gate File**: [task.62.gate.1.loop-supervisor-runner.yml](./task.62.gate.1.loop-supervisor-runner.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 101 (this task's own suite; 101/101 passing)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+One medium-severity correctness bug (**LS-1**): the `loopSupervisor:` config block silently overrides an
+explicit CLI flag whose value equals the built-in default, because "was this flag supplied?" is inferred by
+comparing against the default rather than tracked. For `--base` that matters — it is the ref the progress
+oracle watches, so a wrong ref makes every healthy iteration classify `idle` and ends the loop at
+`--max-idle` while reporting no progress. Both `README.md` and `docs/reference/configuration.md` promise the
+opposite precedence.
+
+One low-severity cleanup: `retry-once` appears in `classify.js`'s `onError` JSDoc type but is rejected by
+`parseArgs` and unimplemented in `shouldStop`.
+
+Everything else verified against real execution rather than fixtures, including a mutation probe of four
+separate post-conditions run before any green was trusted.
 
 ## Change Log
 
@@ -366,6 +426,8 @@ load-bearing, not defensive — and the supervisor refuses to start rather than 
 | 2026-08-28 | 1.1     | Review passed (8/10) — reworded SC5 and its Testing Strategy row as a post-merge operator step; it could not run inside the implementing pipeline without colliding on `develop-next.state.json` and `develop-pipeline.lock`. Tracker linkage gap left open (no `github_issue`). | review-task |
 | 2026-08-28 |         | Status → ready-for-development | review-task |
 | 2026-08-28 |         | Implemented — 11 files, 101 tests | develop |
+| 2026-08-28 |         | QA gate CONCERNS (90/100) — 1 medium finding (LS-1, flag/config precedence) | qa-task |
+| 2026-08-28 |         | QA findings fixed — LS-1 flag/config precedence, 1 iteration | qa-fix |
 
 ## References
 

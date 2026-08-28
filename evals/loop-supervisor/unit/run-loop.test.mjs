@@ -26,6 +26,7 @@ import {
   resolveBinary,
   transcriptPathFor,
   isPidAlive,
+  applyConfig,
 } from "../../../skills/loop-supervisor/scripts/run-loop.mjs";
 
 // ── argv ─────────────────────────────────────────────────────────────────────
@@ -341,4 +342,111 @@ test("transcriptPathFor slugs dots as well as slashes", () => {
 test("isPidAlive is true for this process and false for an implausible pid", () => {
   assert.equal(isPidAlive(process.pid), true);
   assert.equal(isPidAlive(4_194_303), false);
+});
+
+// ── LS-1: config must never override an explicitly-supplied flag ─────────────
+//
+// The bug this pins: presence was inferred by comparing the parsed value against
+// DEFAULTS, so `--base develop` was indistinguishable from "not supplied" and a
+// config `baseBranch: main` won over it. `--base` is the ref the progress oracle
+// watches, so the wrong ref makes tickCommitOracle never fire — every healthy
+// iteration classifies `idle`, and --max-idle ends a working loop while
+// reporting no progress. A silent wrong answer, which is the failure class this
+// whole component exists to detect.
+
+const CFG = {
+  loopSupervisor: {
+    baseBranch: "main",
+    roadmapPath: "docs/from-config.md",
+    cooldownSeconds: 300,
+  },
+};
+
+test("LS-1: an explicit flag EQUAL TO THE DEFAULT still beats config", () => {
+  const o = applyConfig(
+    parseArgs(["run", "--base", "develop", "--cooldown", "10"]),
+    CFG,
+  );
+  assert.equal(
+    o.base,
+    "develop",
+    "`--base develop` was named by the caller; config must not win",
+  );
+  assert.equal(
+    o.cooldown,
+    10,
+    "`--cooldown 10` was named by the caller; config must not win",
+  );
+});
+
+test("LS-1: an explicit flag DIFFERENT from the default also beats config", () => {
+  const o = applyConfig(
+    parseArgs(["run", "--base", "release", "--cooldown", "5"]),
+    CFG,
+  );
+  assert.equal(o.base, "release");
+  assert.equal(o.cooldown, 5);
+});
+
+test("LS-1: config still fills in options the caller did NOT name", () => {
+  const o = applyConfig(parseArgs(["run"]), CFG);
+  assert.equal(o.base, "main");
+  assert.equal(o.roadmap, "docs/from-config.md");
+  assert.equal(o.cooldown, 300);
+});
+
+test("LS-1: --roadmap is covered by the same rule", () => {
+  const o = applyConfig(parseArgs(["run", "--roadmap", "docs/mine.md"]), CFG);
+  assert.equal(o.roadmap, "docs/mine.md");
+});
+
+test("LS-1: explicit tracking is per-option, not all-or-nothing", () => {
+  const o = applyConfig(parseArgs(["run", "--base", "develop"]), CFG);
+  assert.equal(o.base, "develop", "named — caller wins");
+  assert.equal(o.cooldown, 300, "not named — config fills in");
+  assert.equal(o.roadmap, "docs/from-config.md", "not named — config fills in");
+});
+
+test("LS-1: an empty config leaves explicitly-supplied values untouched", () => {
+  const o = applyConfig(
+    parseArgs(["run", "--base", "develop", "--cooldown", "10"]),
+    {},
+  );
+  assert.equal(o.base, "develop");
+  assert.equal(o.cooldown, 10);
+});
+
+test("LS-1: applyConfig tolerates an opts object with no `explicit` set", () => {
+  // A caller that did not build opts via parseArgs gets config-fills-everything,
+  // which is the safe reading of "nothing was explicitly supplied".
+  const o = applyConfig({ base: "develop", cooldown: 10, roadmap: null }, CFG);
+  assert.equal(o.base, "main");
+  assert.equal(o.cooldown, 300);
+});
+
+test("LS-1: parseArgs records exactly the options that were named", () => {
+  const o = parseArgs([
+    "run",
+    "--base",
+    "develop",
+    "--max-idle",
+    "4",
+    "--json",
+  ]);
+  assert.ok(o.explicit.has("base"));
+  assert.ok(o.explicit.has("maxIdle"));
+  assert.ok(o.explicit.has("json"));
+  assert.ok(!o.explicit.has("cooldown"));
+  assert.ok(!o.explicit.has("adapter"));
+});
+
+test("LS-1: the oracle ref survives a disagreeing config end to end", () => {
+  // The concrete failure: base=main from config while the branch ticks land on
+  // develop => oracle never fires => everything reads `idle`.
+  const o = applyConfig(parseArgs(["run", "--base", "develop"]), CFG);
+  assert.notEqual(
+    o.base,
+    "main",
+    "the oracle must watch the ref the operator named",
+  );
 });

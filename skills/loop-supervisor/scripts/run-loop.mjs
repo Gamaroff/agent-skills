@@ -151,6 +151,14 @@ export function parseArgs(argv) {
     cooldown: DEFAULTS.cooldown,
     config: DEFAULTS.config,
     json: false,
+    // Which options the caller actually named. Presence must be TRACKED, never
+    // inferred by comparing the parsed value against DEFAULTS: `--base develop`
+    // parses to exactly DEFAULTS.base, so a sentinel comparison cannot tell an
+    // explicit flag from an absent one. That mattered — `--base` is the ref the
+    // progress oracle watches, and a config silently winning over it points the
+    // oracle at the wrong branch, which makes every healthy iteration classify
+    // `idle` and ends the loop at --max-idle reporting no progress.
+    explicit: new Set(),
   };
   const rest = [...argv];
   if (rest.length && !rest[0].startsWith("-")) out.subcommand = rest.shift();
@@ -163,8 +171,27 @@ export function parseArgs(argv) {
     if (i + 1 >= rest.length) throw new Error(`${flag} needs a value`);
     return rest[i + 1];
   };
+  // Long-flag name -> the option key it sets, so the switch below can record
+  // presence in one place rather than at 14 call sites.
+  const KEY_OF = {
+    "--adapter": "adapter",
+    "--command": "command",
+    "--roadmap": "roadmap",
+    "--base": "base",
+    "--max-iterations": "maxIterations",
+    "--max-cost": "maxCost",
+    "--max-duration": "maxDurationMs",
+    "--max-idle": "maxIdle",
+    "--max-turns": "maxTurns",
+    "--max-resume-attempts": "maxResumeAttempts",
+    "--on-error": "onError",
+    "--cooldown": "cooldown",
+    "--config": "config",
+    "--json": "json",
+  };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
+    if (KEY_OF[a]) out.explicit.add(KEY_OF[a]);
     switch (a) {
       case "--adapter":
         out.adapter = need(i, a);
@@ -234,6 +261,31 @@ export function parseArgs(argv) {
     throw new Error("--command is required for the generic adapter");
   }
   return out;
+}
+
+/**
+ * Fill unset options from a parsed `skills-config.yaml`.
+ *
+ * Precedence, as documented in README.md and docs/reference/configuration.md:
+ * **an explicitly-supplied CLI flag always wins over config.** `opts.explicit`
+ * is the authority on what "supplied" means; a value equal to the default is
+ * still supplied. When `explicit` is absent (an object not built by parseArgs)
+ * every key is treated as unset, which keeps this safe for callers that only
+ * want config defaults.
+ *
+ * @param {object} opts parsed options (mutated in place, and returned)
+ * @param {object} [config] parsed skills-config.yaml
+ * @returns {object} opts
+ */
+export function applyConfig(opts, config) {
+  const ls = (config && config.loopSupervisor) || {};
+  const explicit = opts.explicit || new Set();
+  if (ls.baseBranch && !explicit.has("base")) opts.base = ls.baseBranch;
+  if (ls.roadmapPath && !explicit.has("roadmap")) opts.roadmap = ls.roadmapPath;
+  if (ls.cooldownSeconds != null && !explicit.has("cooldown")) {
+    opts.cooldown = Number(ls.cooldownSeconds);
+  }
+  return opts;
 }
 
 // ── the claude argv ──────────────────────────────────────────────────────────
@@ -454,12 +506,10 @@ function main() {
       config = {};
     }
   }
-  const ls = (config && config.loopSupervisor) || {};
-  if (ls.baseBranch && opts.base === DEFAULTS.base) opts.base = ls.baseBranch;
-  if (ls.roadmapPath && !opts.roadmap) opts.roadmap = ls.roadmapPath;
-  if (ls.cooldownSeconds != null && opts.cooldown === DEFAULTS.cooldown) {
-    opts.cooldown = Number(ls.cooldownSeconds);
-  }
+  // Config fills in only what the caller did NOT name. An explicitly-supplied
+  // flag always wins, including when its value happens to equal the default —
+  // which is exactly what a DEFAULTS comparison could not express.
+  applyConfig(opts, config);
 
   let adapter, nodeBin, claudeBin;
   try {

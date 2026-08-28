@@ -226,7 +226,10 @@ function classify(snapshot) {
  *
  * @param {string} outcome
  * @param {object} [policy]
- * @param {"stop"|"continue"|"retry-once"} [policy.onError]
+ * @param {"stop"|"continue"} [policy.onError] the CLI accepts these two only.
+ *        (`retry-once` appears in the design of record but is deliberately not
+ *        implemented — `--max-resume-attempts` already bounds the one retry
+ *        case that occurs in practice, `incomplete`.)
  * @param {number} [policy.resumeAttempts]    consecutive `incomplete`s so far, including this one
  * @param {number} [policy.maxResumeAttempts]
  * @returns {{stop: boolean, reason: string}}
