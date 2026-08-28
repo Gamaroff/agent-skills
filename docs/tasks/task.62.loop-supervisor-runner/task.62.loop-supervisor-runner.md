@@ -1,0 +1,287 @@
+---
+id: task.62
+title: '[Task 62] Run each loop iteration in a fresh Claude process, and classify the outcome from the filesystem'
+type: task
+description: '/loop /develop-next re-invokes the same conversation every iteration, so item five is worked through a context mostly consumed by items one to four — and the degradation is invisible from outside. A skill cannot clear its own context; the loop has to move outside the session. This builds loop-supervisor: a dependency-free Node CLI that spawns one claude -p per iteration with a pinned --session-id, probes select-next.mjs before spending a model invocation, and classifies each outcome purely from filesystem post-conditions rather than from the assistant''s prose. Safe because the develop pipelines are already crash-safe — a process boundary is the boundary they already tolerate.'
+tags: [loop-supervisor, orchestration, cli, fresh-context, unattended, classifier]
+category: infrastructure
+status: draft
+priority: High
+risk_level: medium
+created: 2026-08-28
+updated: 2026-08-28
+estimated_effort_hours: 16
+---
+
+# [Task 62] Run each loop iteration in a fresh Claude process, and classify the outcome from the filesystem
+
+**Task File**: [task.62.loop-supervisor-runner.md](./task.62.loop-supervisor-runner.md)
+
+**Status**: Draft
+
+## Overview
+
+First of three (62–64), and the only one that has to exist. Delivers Layers 1–2 of
+[`.agents/plans/loop-supervisor.md`](../../../.agents/plans/loop-supervisor.md): the supervisor process
+and the artifacts it writes. Usable on its own with nothing but log files — 63 and 64 add views on top
+of what this task writes.
+
+Nothing else depends on it landing first except 63 and 64.
+
+## Motivation
+
+### The loop cannot clear its own context
+
+`/loop /develop-next` runs every iteration inside **one** Claude session. Both loop paths — the cron
+path (`CronCreate`) and the self-paced path (`ScheduleWakeup`) — re-invoke the *same* conversation, so
+each iteration starts on top of the accumulated transcript from all the previous ones. Auto-compaction
+summarises rather than clears.
+
+On a long unattended run the model works roadmap item five through a context mostly consumed by items
+one through four. The failure is not a crash. It is **quality degradation with no external signal** —
+the loop keeps reporting success while the work gets worse.
+
+`/loop` cannot fix this from the inside. The wakeup lands in the session that already exists. Clearing
+context is not an operation a skill can perform on itself.
+
+### Why a process boundary is safe here
+
+This would be reckless against a stateful pipeline. It is safe against these ones because they are
+**already crash-safe, by design and under test**:
+
+- `/develop-next` persists `.claude/state/develop-next.state.json` and resumes from its flags.
+- `/develop-batch` does the same with `develop-batch.state.json`.
+- The inner `/develop-*` pipelines carry `.claude/state/develop-pipeline.lock` with a step cursor, and
+  a `Stop` hook that re-prompts on a mid-pipeline stop.
+
+A process boundary is exactly the boundary they already tolerate. This task adds no new resumption
+machinery; it *uses* what the pipelines already persist.
+
+### Why the classifier cannot read prose
+
+`/develop-next` signals its stop conditions **only as prose in its final assistant message**. There is
+no exit code that distinguishes them, no run-report file, no stop-marker. A supervisor that greps that
+message is a model call inside a control-flow decision — precisely what this repo's "No Model Calls for
+Deterministic Decisions" principle exists to prevent, and it would fail silently the first time the
+wording changed.
+
+So the filesystem is the truth, and the classifier is a separate pure module with its own tests. This
+is the single most important design constraint in the task.
+
+## Technical Background
+
+### Verified environment facts
+
+Measured against `claude` v2.1.250 on macOS. **Re-verify at implementation time** — flags move.
+
+- `--output-format json` returns a result envelope carrying `session_id`, `subtype`, `is_error`,
+  `num_turns`, `duration_ms`, `total_cost_usd`, `permission_denials`. `subtype` values `success`,
+  `error_max_turns`, `error_during_execution` are all present in the binary.
+- `--output-format stream-json` **requires `--verbose`**. `--include-partial-messages` adds token-level
+  streaming.
+- `--session-id <uuid>` pins the session id. Transcripts land at
+  `~/.claude/projects/<cwd-slug>/<session-id>.jsonl`, so pinning makes each iteration's transcript path
+  deterministic **and** every iteration reopenable with `claude --resume <uuid>` afterwards.
+
+### Reuse map — the exact things this builds on
+
+| Need                                | Existing thing                                                                                   | Path                                            |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Work oracle                         | `select-next.mjs` — JSON on stdout always; `status` ∈ `selected \| stop \| halt`, plus `stopReason` | `skills/develop-next/scripts/select-next.mjs`   |
+| Unfinished-run signal               | `develop-next.state.json` — deleted only in Step 5, so presence ⇒ unfinished                        | spec in `skills/develop-next/SKILL.md`          |
+| Sub-step granularity                | `develop-pipeline.lock` — `current_step` 1–8, `branch`, `pr_url`, updated at every step banner       | `skills/develop-story/references/develop-pipeline-pause.md` |
+| Halt signal                         | `develop-pipeline.last-halt.json` — `halted_at`/`paused_at`, `halt_step`                            | `shared/resources/develop-pipeline-on-precompact.sh` |
+| CLI house style                     | `schedule.mjs` — subcommands, JSON on stdout always, exit 0/1, no deps, pure exports for tests       | `skills/develop-batch/scripts/schedule.mjs`     |
+| Headless-Claude prior art           | `spawnSync("claude", ["-p", ctx.prompt, …])`                                                        | `evals/shared/drivers/claude-cli.mjs`           |
+| Attempt/interrupt accounting shape  | `attempts` / `interrupted` fields                                                                    | `skills/develop-batch/scripts/schedule.mjs`     |
+
+`run-loop.mjs` is a peer of `schedule.mjs` and must match its conventions exactly: dependency-free Node
+ESM, Node ≥ 22, JSON on stdout, exit 0/1, pure functions exported for unit tests.
+
+## Scope
+
+**In scope**
+
+- `scripts/run-loop.mjs` with `run` (default) and `dry-run` subcommands.
+- `references/classify.js` — the pure outcome classifier.
+- `references/adapters.js` — three adapters: `develop-next`, `develop-batch`, `generic`.
+- `assets/supervisor-settings.json` — the `--settings` payload.
+- The full artifact set: `current.json`, `runs.jsonl`, `logs/<runId>/iter-NNN.{jsonl,txt}`,
+  `logs/latest`.
+- Stop policy, signal handling, single-flight PID lock.
+- `SKILL.md` and `README.md`.
+- A `loopSupervisor:` block in `skills-config.yaml` plus its row in `docs/reference/configuration.md`.
+
+**Out of scope — deferred to 63/64**
+
+- `status` and `watch` subcommands (63).
+- `--notify` / `--webhook` (63).
+- `--dashboard` push and the payload contract (64).
+- The overnight-runs runbook and `develop-next` cross-references (64).
+
+**Out of scope entirely**
+
+- Parallelism. Two supervisors in one working tree collide on `develop-pipeline.lock`.
+- Any change to the develop pipelines' own logic.
+
+## Breaking Changes
+
+None. This is additive: a new skill directory, one new optional config block, one `package.json` test
+glob entry. Nothing existing changes behaviour, and `/loop /develop-next` keeps working exactly as it
+does today.
+
+## Decisions
+
+| Decision                          | Choice                                                                       | Rationale                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Classifier input                  | Filesystem post-conditions only                                                | Prose has no contract; the state files do                                  |
+| Classifier location               | Its own module, `references/classify.js`                                       | It is the whole correctness surface — it needs to be unit-testable in isolation |
+| Probe before spawn                | Always, except when the run-state file exists                                  | Never spend a model invocation to learn there is no work; an unfinished run resumes rather than re-selects |
+| `incomplete` as an outcome        | First-class, with a bounded resume budget                                      | The `Stop` hook leaves a lock behind on a stalled iteration — that is normal, not an error |
+| Permission mode                   | `acceptEdits` via a pinned `--settings` file                                   | Not plan mode (has killed 4 of 5 pipelines in a live batch); not `--dangerously-skip-permissions`; pinned so runs do not inherit local settings drift |
+| Consumer adapters                 | Declarative in `skills-config.yaml`                                            | User-supplied JS in a config path is a code-execution surface for no gain  |
+| `--max-turns`                     | Wired, unset by default                                                        | `error_max_turns` is a distinguishable subtype so it is cheap; no basis yet for a sane default |
+
+## Implementation Plan
+
+### Phase 1 — the classifier, first and alone
+
+`references/classify.js`, pure, no I/O of its own: takes a snapshot object (state-file presence, lock
+presence + `current_step`, halt-file contents, iteration start time, child exit code, result-envelope
+`subtype`/`is_error`, progress-oracle boolean) and returns `{ outcome, reason }`.
+
+Write it against the outcome table before anything spawns a process. Both traps are Phase 1 tests, not
+afterthoughts:
+
+- A halt file whose `halted_at`/`paused_at` is **older** than iteration start must classify `progress`,
+  not `halt`. The file is never deleted by a successful run and is overwritten on each halt, so its
+  mere existence proves nothing.
+- A leftover lock must classify `incomplete`, not `error`.
+
+### Phase 2 — adapters and the probe
+
+`references/adapters.js` with the three adapters. The probe wrapper is the risky part:
+
+- Branch on `.status`, **never on exit code alone** — `selected` and every `stop` both exit 0; only
+  `halt` exits 1.
+- **Empty stdout is an error, never `stop`.** `select-next.mjs` has a direct-invocation guard —
+  `isInvokedDirectly()` at `skills/develop-next/scripts/select-next.mjs:849-860` — that realpaths both
+  sides; invoked through a path that does not realpath to the module, `main()` never runs and it exits 0
+  silently. A naive probe reads that as "no work" and ends the loop having done nothing. The module's own
+  comment at `:843-848` describes this failure verbatim, so it is a known trap, not a hypothesis.
+- Resolve `commandArg` against the roadmap file's directory, not the repo root.
+- `lint.warnings` is noisy by design and non-fatal; only `lint.errors` is fatal.
+
+### Phase 3 — spawn, tee and heartbeat
+
+Spawn `claude -p` with the argv from the plan. Tee stdout: raw to `iter-NNN.jsonl`, parsed line-by-line
+to drive `current.json` and the rendered `iter-NNN.txt` (assistant text plus tool-call names only).
+Poll `develop-pipeline.lock` every ~5s for `current_step`/`branch`/`pr_url`.
+
+Resolve `node` and `claude` to absolute paths — `node` is not reliably on `PATH` in non-interactive
+shells, and an nvm shim has been observed printing its help text instead of running.
+
+### Phase 4 — the loop, stop policy and signals
+
+Ledger append, cooldown, and the four stop conditions (frontier empty · halt/error · budget caps ·
+consecutive no-progress). First `SIGINT` stops after the current iteration completes — never mid-merge;
+second kills the child and exits leaving state for the next resume. PID lock at
+`.claude/state/loop-supervisor.lock` for single-flight per tree.
+
+### Phase 5 — `dry-run`, docs and gates
+
+`dry-run` runs the probe, prints the plan and the exact `claude` argv, spawns nothing. Then `SKILL.md`,
+`README.md`, the config block, `npm run bundle`, `npm run generate-catalog`, and the test glob.
+
+## Files Summary
+
+**New**
+
+| File                                                     | Purpose                                    |
+| -------------------------------------------------------- | ------------------------------------------ |
+| `skills/loop-supervisor/SKILL.md`                        | Frontmatter + thin body                    |
+| `skills/loop-supervisor/README.md`                       | Operator guide                             |
+| `skills/loop-supervisor/scripts/run-loop.mjs`            | The supervisor                             |
+| `skills/loop-supervisor/references/classify.js`          | Pure outcome classifier                    |
+| `skills/loop-supervisor/references/adapters.js`          | Probe / oracle / state-path table          |
+| `skills/loop-supervisor/assets/supervisor-settings.json` | Pinned permission mode + allowlist         |
+| `evals/loop-supervisor/unit/*.test.mjs`                  | Classifier and probe unit tests            |
+
+**Modified** — `skills-config.yaml`, `docs/reference/configuration.md`,
+`docs/reference/commands.md`, `package.json` (test glob),
+`docs/reference/skill-catalog.md` (regenerated).
+
+## Testing Strategy
+
+- **Unit (the bulk).** `classify.js` against fixture `.claude/state/` directories covering every row of
+  the outcome table, plus the two traps and the empty-stdout probe case.
+- **`dry-run` against this repo.** Verifies adapter wiring at zero model spend.
+- **End-to-end, cheap.** `generic` adapter, `--command "reply with OK" --max-iterations 2`. Asserts two
+  `runs.jsonl` lines, two log pairs, two resumable transcripts, `current.json` removed on exit. A few
+  cents.
+- **End-to-end, real.** One `/develop-next` iteration, `--max-iterations 1`, against a roadmap item
+  already known selectable. Asserts a merged PR, a ticked row, outcome `progress`, no leftover lock.
+- **Mutation probe — before trusting any green.** Break one post-condition on purpose (delete the tick
+  commit; backdate `halted_at`; leave a lock behind) and confirm the classifier's verdict flips. A gate
+  that has never reproduced a known failure proves nothing about the gate.
+
+## Success Criteria
+
+1. `run-loop.mjs dry-run --adapter develop-next` prints a plan and the exact argv, and spawns nothing.
+2. Every row of the outcome table has a passing unit test, including a stale halt file classifying
+   `progress` and a leftover lock classifying `incomplete`.
+3. A probe against a path that does not realpath to `select-next.mjs` classifies as an error, and the
+   loop stops loudly rather than reporting "no work".
+4. The cheap end-to-end run produces two ledger lines and two transcripts that `claude --resume` can
+   reopen.
+5. One real `/develop-next` iteration completes with outcome `progress`, a merged PR and no leftover
+   lock.
+6. The mutation probe flips the classifier's verdict for all three broken post-conditions.
+7. `npm test`, `npm run format:check`, `quick_validate.py`, `npm run bundle` and
+   `npm run generate-catalog` are all green and committed.
+8. The `SKILL.md` description states the differentiator against the built-in `/loop` explicitly — fresh
+   process, fresh context, sequential, logged.
+
+## Risk Assessment
+
+| Risk                                                            | Likelihood | Impact | Mitigation                                                                        |
+| --------------------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------- |
+| Probe misreads the direct-invocation guard's silent exit 0       | Medium     | High   | Empty stdout is an error by construction, with a unit test; called out in the README |
+| Stale halt file classified as a fresh halt, ending a good run     | Medium     | High   | Timestamp comparison against iteration start; both directions unit-tested          |
+| `Stop` hook leaves a lock behind and it reads as `error`          | High       | Medium | `incomplete` is a first-class outcome with a bounded resume budget                 |
+| CLI flags move between `claude` versions                          | Medium     | Medium | Facts re-verified at implementation time; `dry-run` prints argv so drift is visible |
+| `node`/`claude` not on `PATH` in a non-interactive shell          | Medium     | Medium | Resolve both absolutely; documented in the README                                  |
+| Skill description collides with the built-in `/loop`              | Medium     | Low    | Differentiator stated explicitly; `tests/skill-frontmatter.test.js` guards the rest |
+| Per-iteration re-prime cost surprises an operator                 | High       | Low    | Stated honestly in the README rather than implying the loop is free                |
+
+## Rollback Plan
+
+Delete `skills/loop-supervisor/` and revert the `skills-config.yaml` block, the doc rows and the test
+glob. Nothing else references it; no pipeline behaviour changes; no state file is shared with an
+existing skill. A half-finished run leaves only files under `.claude/state/loop-supervisor/`, which are
+safe to delete.
+
+## Progress Tracking
+
+- [ ] 1. `classify.js` against the full outcome table, both traps included
+- [ ] 2. `adapters.js` + the probe wrapper, empty-stdout guard first
+- [ ] 3. Spawn, tee, rendered log, heartbeat
+- [ ] 4. Loop, stop policy, signals, PID lock
+- [ ] 5. `dry-run`
+- [ ] 6. `SKILL.md`, `README.md`, config block, doc rows
+- [ ] 7. Cheap end-to-end, real end-to-end, mutation probe
+- [ ] 8. Bundle, catalog, format, full suite
+
+## Change Log
+
+| Date       | Version | Description   | Author     |
+| ---------- | ------- | ------------- | ---------- |
+| 2026-08-28 | 1.0     | Initial draft | create-task |
+
+## References
+
+- [`.agents/plans/loop-supervisor.md`](../../../.agents/plans/loop-supervisor.md) — the design of record
+- [`skills/develop-next/scripts/select-next.mjs`](../../../skills/develop-next/scripts/select-next.mjs) — the probe, and the direct-invocation guard behind gotcha 1
+- [`skills/develop-batch/scripts/schedule.mjs`](../../../skills/develop-batch/scripts/schedule.mjs) — the CLI house style this must match, and the attempt/interrupt accounting shape
+- [`shared/resources/develop-pipeline-on-stop.sh`](../../../shared/resources/develop-pipeline-on-stop.sh) — why `incomplete` exists
+- [`evals/shared/drivers/claude-cli.mjs`](../../../evals/shared/drivers/claude-cli.mjs) — headless-Claude prior art
