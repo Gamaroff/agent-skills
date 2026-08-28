@@ -26,3 +26,6 @@ loopSupervisor:
   baseBranch: develop
   roadmapPath: docs/development/project-completion-roadmap.md
   cooldownSeconds: 10
+  # dashboardUrl: https://dash.internal/api/loop   # optional; --dashboard overrides
+  # There is deliberately no dashboardToken key — this file is committed. The
+  # token comes from --dashboard-token or $LOOP_SUPERVISOR_DASHBOARD_TOKEN.

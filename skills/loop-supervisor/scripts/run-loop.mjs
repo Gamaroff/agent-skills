@@ -47,6 +47,8 @@
  *   --config <path>             skills-config.yaml (default skills-config.yaml)
  *   --notify                    macOS notification when the loop reaches a terminal stop
  *   --webhook <url>             ntfy-shaped POST on terminal stop (phone push)
+ *   --dashboard <url>           POST a status frame to a dashboard each iteration boundary
+ *   --dashboard-token <tok>     bearer-style token for that POST (or $LOOP_SUPERVISOR_DASHBOARD_TOKEN)
  *   --json                      machine-readable summary on stdout
  *
  * Output: JSON on stdout for `dry-run` and for `run --json`, always.
@@ -74,6 +76,12 @@ import {
 } from "../references/render.js";
 
 const SCHEMA_VERSION = 1;
+/** Header the dashboard token travels in. Matches the consumer's existing tiers. */
+const DASHBOARD_TOKEN_HEADER = "X-Dash-Token";
+/** How long a single dashboard push may take before it is abandoned. */
+const DASHBOARD_TIMEOUT_MS = 5000;
+/** How many trailing ledger rows ride along in a frame's `recent`. */
+const DASHBOARD_RECENT_LIMIT = 10;
 const STATE_ROOT = ".claude/state/loop-supervisor";
 const PID_LOCK = ".claude/state/loop-supervisor.lock";
 const DEFAULTS = {
@@ -171,6 +179,8 @@ export function parseArgs(argv) {
     config: DEFAULTS.config,
     notify: false,
     webhook: null,
+    dashboard: null,
+    dashboardToken: null,
     json: false,
     // Which options the caller actually named. Presence must be TRACKED, never
     // inferred by comparing the parsed value against DEFAULTS: `--base develop`
@@ -210,6 +220,8 @@ export function parseArgs(argv) {
     "--config": "config",
     "--notify": "notify",
     "--webhook": "webhook",
+    "--dashboard": "dashboard",
+    "--dashboard-token": "dashboardToken",
     "--json": "json",
   };
   for (let i = 0; i < rest.length; i++) {
@@ -275,6 +287,14 @@ export function parseArgs(argv) {
         out.webhook = need(i, a);
         i++;
         break;
+      case "--dashboard":
+        out.dashboard = need(i, a);
+        i++;
+        break;
+      case "--dashboard-token":
+        out.dashboardToken = need(i, a);
+        i++;
+        break;
       case "--json":
         out.json = true;
         break;
@@ -314,6 +334,16 @@ export function applyConfig(opts, config) {
   if (ls.roadmapPath && !explicit.has("roadmap")) opts.roadmap = ls.roadmapPath;
   if (ls.cooldownSeconds != null && !explicit.has("cooldown")) {
     opts.cooldown = Number(ls.cooldownSeconds);
+  }
+  if (ls.dashboardUrl && !explicit.has("dashboard")) {
+    opts.dashboard = ls.dashboardUrl;
+  }
+  // The TOKEN is deliberately not a config key. `skills-config.yaml` is
+  // committed; a credential read from it would be a credential in git history,
+  // and the risk this task set out to avoid is precisely a token that outlives
+  // the run it authorised. It comes from the flag, or from the environment.
+  if (!opts.dashboardToken) {
+    opts.dashboardToken = process.env.LOOP_SUPERVISOR_DASHBOARD_TOKEN || null;
   }
   return opts;
 }
@@ -636,6 +666,202 @@ export function notifyTerminalStop(opts, summary, deps = {}) {
 
 // ── PID lock (single-flight per working tree) ────────────────────────────────
 
+// ── the dashboard push ───────────────────────────────────────────────────────
+
+/**
+ * Build one dashboard frame.
+ *
+ * Pure, and every field is derived from state the runner already writes —
+ * `current.json` and `runs.jsonl`. That is the whole design: the dashboard is
+ * an observer, and an observer that needs its own state file has quietly become
+ * a second source of truth for the same run.
+ *
+ * What this deliberately does NOT do is invent a phase vocabulary. `phase` is
+ * passed through from `current.json` verbatim (`spawning` | `running`), because
+ * a richer-looking string that the runner never writes would be a contract the
+ * consumer could not rely on.
+ *
+ * The token is not a parameter here and must never become one — a frame is
+ * written to `recent` from the ledger and is the sort of object that ends up in
+ * a log line.
+ *
+ * @param {object} a
+ * @param {boolean} [a.active] false on the final frame of a run
+ * @param {string} a.runId
+ * @param {string} a.command the prompt each iteration runs
+ * @param {string} a.startedAt ISO timestamp of the run's first iteration
+ * @param {string} [a.reporterHost] defaults to this machine's hostname
+ * @param {string|null} [a.repoUrl] origin remote, when there is one
+ * @param {object|null} [a.current] parsed `current.json`, or null after cleanup
+ * @param {number|null} [a.elapsedSec] seconds the current iteration has been running
+ * @param {Array<object>} [a.ledger] parsed `runs.jsonl` rows
+ * @param {object} [a.totals] the runner's live `{iterations, costUsd}`
+ * @param {number} [a.recentLimit]
+ * @returns {object} the frame, ready to POST
+ */
+export function buildDashboardPayload({
+  active = true,
+  runId,
+  command,
+  startedAt,
+  reporterHost = os.hostname(),
+  repoUrl = null,
+  current = null,
+  elapsedSec = null,
+  ledger = [],
+  totals = {},
+  recentLimit = DASHBOARD_RECENT_LIMIT,
+}) {
+  // `readCurrent` returns the UNREADABLE sentinel for a torn heartbeat. A frame
+  // built from a sentinel would publish garbage, so treat it as "no current".
+  const cur = current && current !== UNREADABLE ? current : null;
+  const rows = Array.isArray(ledger) ? ledger : [];
+
+  // Outcome histogram. All six classifier outcomes are counted, not just the
+  // three the payload example names: a dashboard showing "7 iterations, 5
+  // progressed, 2 idle" while an `error` sits unreported is worse than one
+  // showing a column it does not yet render.
+  const counts = {
+    progressed: 0,
+    halted: 0,
+    idle: 0,
+    incomplete: 0,
+    errored: 0,
+    done: 0,
+  };
+  for (const row of rows) {
+    switch (row && row.outcome) {
+      case "progress":
+        counts.progressed++;
+        break;
+      case "halt":
+        counts.halted++;
+        break;
+      case "idle":
+        counts.idle++;
+        break;
+      case "incomplete":
+        counts.incomplete++;
+        break;
+      case "error":
+        counts.errored++;
+        break;
+      case "done":
+        counts.done++;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    active,
+    runId,
+    command,
+    startedAt,
+    reporterHost,
+    repoUrl,
+    current: cur
+      ? {
+          iteration: cur.iteration ?? null,
+          phase: cur.phase ?? null,
+          pipelineStep: cur.pipelineStep ?? null,
+          itemId: cur.itemId ?? null,
+          branch: cur.branch ?? null,
+          prUrl: cur.prUrl ?? null,
+          sessionId: cur.sessionId ?? null,
+          elapsedSec,
+        }
+      : null,
+    totals: {
+      iterations: totals.iterations ?? rows.length,
+      costUsd:
+        typeof totals.costUsd === "number"
+          ? Number(totals.costUsd.toFixed(4))
+          : 0,
+      ...counts,
+    },
+    // Trailing rows, oldest first, so a consumer appending them to a table does
+    // not have to reverse anything.
+    recent: rows.slice(-recentLimit),
+  };
+}
+
+/**
+ * POST one frame, and never let the result matter to the run.
+ *
+ * **Every failure mode is swallowed here on purpose.** An eight-hour develop
+ * run that dies because a status POST timed out has inverted the relationship
+ * between the work and the reporting of it. Unresolvable host, non-2xx,
+ * timeout, a `fetch` that is not present at all, a payload that will not
+ * serialise — each warns exactly once and returns. Nothing throws, and the
+ * caller has nothing to catch.
+ *
+ * There is no retry and no queue. The next frame is one iteration boundary
+ * away; a queue would add durable state for a dropped observation nobody reads.
+ *
+ * @param {object} payload frame from {@link buildDashboardPayload}
+ * @param {object} o
+ * @param {string} o.url
+ * @param {string|null} [o.token]
+ * @param {number} [o.timeoutMs]
+ * @param {Function} [o.fetchImpl] injected for tests
+ * @param {Function} [o.warn] injected for tests
+ * @returns {Promise<{pushed: boolean, reason?: string}>} never rejects
+ */
+export async function pushDashboard(
+  payload,
+  {
+    url,
+    token = null,
+    timeoutMs = DASHBOARD_TIMEOUT_MS,
+    fetchImpl = globalThis.fetch,
+    warn = (m) => process.stderr.write(m + "\n"),
+  } = {},
+) {
+  if (!url) return { pushed: false, reason: "no dashboard url" };
+  try {
+    if (typeof fetchImpl !== "function") {
+      warn("⚠ dashboard push skipped — no fetch available in this runtime");
+      return { pushed: false, reason: "no fetch" };
+    }
+    let body;
+    try {
+      body = JSON.stringify(payload);
+    } catch (e) {
+      warn(
+        `⚠ dashboard push skipped — payload would not serialise (${e.message})`,
+      );
+      return { pushed: false, reason: "unserialisable payload" };
+    }
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers[DASHBOARD_TOKEN_HEADER] = token;
+    const res = await fetchImpl(url, {
+      method: "POST",
+      headers,
+      body,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res || res.ok !== true) {
+      const code = res && res.status != null ? res.status : "no status";
+      warn(`⚠ dashboard push failed — ${url} returned ${code}; continuing`);
+      return { pushed: false, reason: `http ${code}` };
+    }
+    return { pushed: true };
+  } catch (e) {
+    // Timeouts arrive here as an AbortError, DNS failures as a TypeError with
+    // a nested cause. Neither is distinguished: the run does not care why the
+    // observer is unreachable, only that it must not stop.
+    const why =
+      e && (e.name === "TimeoutError" || e.name === "AbortError")
+        ? `timed out after ${timeoutMs}ms`
+        : (e && e.message) || String(e);
+    warn(`⚠ dashboard push failed — ${url}: ${why}; continuing`);
+    return { pushed: false, reason: why };
+  }
+}
+
 export function isPidAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -902,6 +1128,32 @@ function main() {
     fs.renameSync(tmpPath, currentPath);
   }
 
+  const runStartedAt = new Date(totals.startedAtMs).toISOString();
+  const repoUrl = gitOut(cwd, ["remote", "get-url", "origin"]) || null;
+
+  /**
+   * Push one frame. Inert unless `--dashboard` was passed, and awaited rather
+   * than fired-and-forgotten so a slow observer shows up as bounded latency at
+   * a known point rather than as an unhandled rejection later in the night.
+   */
+  async function pushFrame({ active = true, elapsedSec = null } = {}) {
+    if (!opts.dashboard) return;
+    await pushDashboard(
+      buildDashboardPayload({
+        active,
+        runId,
+        command: prompt,
+        startedAt: runStartedAt,
+        repoUrl,
+        current: readCurrent(cwd),
+        elapsedSec,
+        ledger: readLedger(cwd),
+        totals,
+      }),
+      { url: opts.dashboard, token: opts.dashboardToken },
+    );
+  }
+
   (async () => {
     let finalStop = { outcome: "done", reason: "no iterations ran" };
 
@@ -964,6 +1216,7 @@ function main() {
         sessionId,
         logPath: path.relative(cwd, txtPath),
       });
+      await pushFrame({ elapsedSec: 0 });
 
       const args = buildClaudeArgs({
         prompt,
@@ -1075,6 +1328,10 @@ function main() {
         transcriptPath: transcriptPathFor(cwd, sessionId),
       });
 
+      await pushFrame({
+        elapsedSec: Math.round((Date.now() - iterationStartMs) / 1000),
+      });
+
       const decision = shouldStop(outcome.outcome, {
         onError: opts.onError,
         resumeAttempts,
@@ -1099,6 +1356,12 @@ function main() {
     }
 
     cleanup();
+
+    // The final frame is pushed AFTER cleanup, so `current` reads back null and
+    // the frame carries `active: false` — a dashboard that renders the last
+    // frame verbatim then shows a finished run rather than an iteration frozen
+    // mid-flight forever.
+    await pushFrame({ active: false });
     const terminal =
       finalStop.outcome === "halt" || finalStop.outcome === "error";
 
