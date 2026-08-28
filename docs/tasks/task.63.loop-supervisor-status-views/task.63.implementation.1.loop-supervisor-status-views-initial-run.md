@@ -37,9 +37,9 @@ that task 62 writes.
 | 2. review-task             | ✅ Done    | `task.63.review.1.loop-supervisor-status-views.md` exists              | 8/10; 1 Critical + 4 Important + 5 Optional, all applied; Draft → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no rework; 5 phases; 8 files; 30 new tests; 5 mutations proved; npm test 1824/1824 | — (surface map built inline) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #277](https://github.com/Gamaroff/agent-skills/pull/277) → `develop`; no issue linked, Step 6b skipped | — (PR body written directly) |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.63.qa.{N}.*.md`; `task.63.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.63.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | qa.1 + qa.2, gate.1 + gate.2, bug.1; PR comments posted                | 2 cycles: CONCERNS 90 → **PASS 100**. 1 MEDIUM found, fixed, verified, closed | — |
+| 7. finalise                | ✅ Done    | `task.63.dod.1.*.md`; task `status: accepted`                          | CI waited on (was PENDING) → SUCCESS on head 7fcc302; sprint-review-summary.md written | — |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final state committed | — |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent.
 
@@ -170,16 +170,40 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — gate CONCERNS (90/100)
+
+The diff code review found a defect the success criteria did not cover: `readCurrent` collapsed
+"absent" and "unparseable" into `null`, so a torn heartbeat rendered as **"no run in flight"** — the
+reassuring answer, at the moment it was least deserved. `writeCurrent` wrote non-atomically every ~5s,
+so the window was real. Filed as TASK-63-BUG-1 (MEDIUM), promoted to the gate under
+`code_review_blocking`.
+
+`qa-fix` fixed both ends: the reader distinguishes the two cases from one `readFileSync` and the error
+code (an `exists()` probe would race the runner's own clean-exit delete), and the writer became atomic
+via temp-then-rename. A fourth render state was added. 9 tests; both halves mutation-proved.
+
+### Cycle 2 — gate PASS (100/100)
+
+QA verified the fix independently across all four states and four lifecycle transitions rather than
+accepting the fix report — including the over-correction check that a clean-exit teardown still reports
+"no run in flight" and was not swept into the new state.
+
+Cycle 2 also found a fragility **introduced by the fix**: the sentinel was duck-typed across a module
+boundary, so a valid heartbeat carrying that key was misreported as unreadable — the same
+state-the-opposite-of-the-truth shape, pointed the other way. Demonstrated, then fixed by moving the
+sentinel to `render.js` and comparing by identity, then pinned by a test. LOW severity (unreachable via
+the writer), so it did not gate; fixed anyway because it is six lines.
+
+**Net:** 150 tests for the skill, 7 invariants mutation-proved, 0 open issues.
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-08-28
+**Final Status**: Completed
 **Branch**: `feature/task.63.loop-supervisor-status-views`
 **PR**: [#277](https://github.com/Gamaroff/agent-skills/pull/277)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 2 (cycle 1 CONCERNS 90/100 → cycle 2 PASS 100/100)
+**DoD Summary**: `task.63.dod.1.loop-supervisor-status-views.md`
+**Tracker debt**: none — this task has no linked tracker issue, consistent with task 62 and this repo's convention for technical tasks. No mutations were deferred.

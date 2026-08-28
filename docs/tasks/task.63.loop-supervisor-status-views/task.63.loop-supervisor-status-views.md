@@ -5,11 +5,13 @@ type: task
 description: 'Task 62 leaves a supervisor that writes a heartbeat and a ledger but has no way to read them back — answering "what is it doing right now?" means tailing a JSONL file by hand. This adds the two terminal views that make an overnight run supervisable: `status` for a one-shot snapshot and `watch` for a ~2s ANSI repaint, both pure file reads over current.json and runs.jsonl, safe to run at any time including mid-iteration. Plus terminal-stop notification — macOS osascript and an ntfy-shaped webhook for phone push — fired only when the loop actually ends, never per iteration.'
 tags: [loop-supervisor, observability, cli, terminal, notifications]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-08-28
 updated: 2026-08-28
+completed_date: 2026-08-28
+pr_number: 277
 estimated_effort_hours: 6
 ---
 
@@ -17,7 +19,7 @@ estimated_effort_hours: 6
 
 **Task File**: [task.63.loop-supervisor-status-views.md](./task.63.loop-supervisor-status-views.md)
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 **Start Date**: 2026-08-28
 
@@ -337,6 +339,41 @@ Seven invariants were mutation-proved by QA independently: each reverted in sour
 **A suite-wide flake was investigated and proved unrelated.** Clean `develop` plus two *filler* test
 files fails five tests; this branch fails one. See QA report 2.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+| Cycle | Gate | Score |
+| --- | --- | --- |
+| 2 (final) | ✅ PASS | 100/100 |
+| 1 | CONCERNS | 90/100 |
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 9/9 met, plus criterion 3b added after QA cycle 1 found a defect the original
+criteria did not cover. Each verified against code and test, not against the implementation report.
+✅ **Tests:** 150 for this skill (82 in the two loop-supervisor unit files), 1833 repo-wide.
+**Seven invariants mutation-proved** — each reverted in source and confirmed red before restoring.
+✅ **PR:** [#277](https://github.com/Gamaroff/agent-skills/pull/277), MERGEABLE → `develop`.
+✅ **CI:** SUCCESS — `test`, `validate`, `link-check` and the branch-policy check all pass, verified
+to be on the **current head** (`7fcc302`) rather than an ancestor. The rollup was PENDING when
+verification began and was waited on rather than assumed.
+✅ **Documentation:** README (four-state table, notification section, `cat`/`jq` reframed as fallback),
+SKILL.md, `docs/reference/commands.md`, CHANGELOG — **and both stale claims retracted**, so no shipped
+doc still denies that `status`/`watch` exist.
+✅ **Security:** No credentials; `osascript` invoked with an argv array and a `JSON.stringify`-quoted
+script, so no shell and no injection; the renderer performs no I/O at all.
+⚠️ **Compliance:** NOT_APPLICABLE — no personal, payment or health data; no dependency added.
+✅ **Bugs:** TASK-63-BUG-1 closed and independently verified.
+
+**Detailed Verification Log:** See
+[task.63.dod.1.loop-supervisor-status-views.md](./task.63.dod.1.loop-supervisor-status-views.md) for
+full evidence, citations and the CI resolution.
+
+**Accepted on:** 2026-08-28
+
 ## Bug Reports
 
 ### Closed
@@ -377,6 +414,7 @@ depends on anything this task adds. The artifacts remain readable by hand.
 | 2026-08-28 |         | QA gate CONCERNS (90/100) — 1 medium finding: a corrupt heartbeat renders as "no run in flight" | qa-task |
 | 2026-08-28 |         | QA findings fixed — TASK-63-BUG-1 closed (reader distinguishes absent from unreadable; writer now atomic), 9 tests added, 1 iteration | qa-fix |
 | 2026-08-28 |         | QA gate PASS (100/100), cycle 2 — fix verified across all four states; sentinel made identity-based after QA showed it was forgeable by file content | qa-task |
+| 2026-08-28 | 1.1     | DoD verified — accepted (PR #277), CI green on head 7fcc302 | finalise |
 
 ## References
 
