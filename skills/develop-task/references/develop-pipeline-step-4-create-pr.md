@@ -268,6 +268,6 @@ Log in Issues Log. Invoke the `/commit-changes` skill to commit the report (sugg
 
 ## Pipeline Continuation (CRITICAL — PIPELINE DOES NOT END HERE)
 
-Steps 5–8 are mandatory. Do NOT emit a "Step 4 COMPLETE" banner here — that competes with the Step Transition Protocol banner in SKILL.md and creates ambiguity at the boundary. The single banner emitted at this transition is the Step 5 banner from the Step Transition Protocol (`═══ DEVELOP-{STORY,TASK} PIPELINE: STEP 5/8 — QA REVIEW ═══`), output by the orchestrator _after_ the lock-advance Bash call.
+Steps 5–8 are mandatory. Do NOT emit a "Step 4 COMPLETE" banner here — that competes with the Step Transition Protocol banner in SKILL.md and creates ambiguity at the boundary. The only output at this transition is the Step Transition Protocol's own action 3 — the Remaining Work Status block followed by the Step 5 banner (`═══ DEVELOP-{STORY,TASK} PIPELINE: STEP 5/8 — QA REVIEW ═══`), both emitted by the orchestrator _after_ the lock-advance Bash call.
 
 Record `PR created: {PR URL}` in the implementation report's Decisions Log only — not as a user-facing banner.
