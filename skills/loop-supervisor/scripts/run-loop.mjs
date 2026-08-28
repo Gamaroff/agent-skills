@@ -70,6 +70,7 @@ import {
   renderLines,
   statusView,
   notificationText,
+  UNREADABLE,
 } from "../references/render.js";
 
 const SCHEMA_VERSION = 1;
@@ -448,16 +449,9 @@ export function renderStreamLine(obj) {
 
 // ── the read side: status, watch, notify ─────────────────────────────────────
 
-/**
- * A heartbeat that exists but cannot be read. Distinct from `null`, which means
- * genuinely absent.
- *
- * Collapsing the two is how a view ends up stating the opposite of the truth:
- * `writeCurrent` rewrites this file every ~5s, so a reader can catch it
- * mid-write, and "unparseable" answered "no run in flight" — the single most
- * reassuring thing it could say, at the moment it was least entitled to.
- */
-export const UNREADABLE = Object.freeze({ __unreadable: true });
+// Re-exported so the CLI's surface is unchanged for tests and consumers; the
+// sentinel itself is owned by render.js, beside the state machine that reads it.
+export { UNREADABLE };
 
 /**
  * Read `current.json`. Returns the parsed object, `null` when the file is

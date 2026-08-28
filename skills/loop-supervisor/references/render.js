@@ -18,6 +18,19 @@
  */
 "use strict";
 
+/**
+ * A heartbeat that exists but cannot be read. Distinct from `null`, which means
+ * genuinely absent.
+ *
+ * It lives here, beside the state machine that interprets it, and is compared
+ * by **identity** — not by a `__unreadable` key. A duck-typed sentinel is data
+ * a file could contain: a valid heartbeat carrying that key would be reported
+ * as unreadable, which is the same "state the opposite of the truth" failure
+ * this state exists to prevent, just pointed the other way. Identity cannot be
+ * forged by JSON.
+ */
+const UNREADABLE = Object.freeze({ unreadable: true });
+
 /** Human duration from milliseconds: 1m04s, 2h07m, 890ms. */
 function formatDuration(ms) {
   if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0) return "—";
@@ -76,7 +89,7 @@ function num(v) {
  */
 function runState(current, isAlive) {
   if (!current) return "no-run";
-  if (current.__unreadable) return "unreadable";
+  if (current === UNREADABLE) return "unreadable";
   const pid = current.pid;
   if (typeof pid !== "number") return "crashed";
   return isAlive(pid) ? "running" : "crashed";
@@ -260,6 +273,7 @@ function notificationText({ ok, outcome, reason, iterations, costUsd }) {
 }
 
 module.exports = {
+  UNREADABLE,
   formatDuration,
   formatAge,
   runState,

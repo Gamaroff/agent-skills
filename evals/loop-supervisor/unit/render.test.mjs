@@ -13,6 +13,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  UNREADABLE,
   formatDuration,
   formatAge,
   runState,
@@ -146,7 +147,7 @@ test("state: a heartbeat with no usable pid is crashed, not running", () => {
 });
 
 test("state: an unreadable heartbeat is its own state, never 'no run in flight'", () => {
-  const torn = { __unreadable: true };
+  const torn = UNREADABLE;
   assert.equal(runState(torn, ALIVE), "unreadable");
   const text = frame({ current: torn, runs: [], nowMs: NOW, isAlive: ALIVE });
   assert.match(text, /UNREADABLE/);
@@ -163,7 +164,7 @@ test("state: an unreadable heartbeat is its own state, never 'no run in flight'"
 
 test("state: unreadable exposes no run fields — there are none to trust", () => {
   const view = statusView({
-    current: { __unreadable: true },
+    current: UNREADABLE,
     runs: [],
     nowMs: NOW,
     isAlive: ALIVE,
@@ -174,7 +175,7 @@ test("state: unreadable exposes no run fields — there are none to trust", () =
 
 test("state: unreadable still shows the ledger, which is a separate file", () => {
   const text = frame({
-    current: { __unreadable: true },
+    current: UNREADABLE,
     runs: [fullRow()],
     nowMs: NOW,
     isAlive: ALIVE,
@@ -185,7 +186,7 @@ test("state: unreadable still shows the ledger, which is a separate file", () =>
 test("state: all four states are distinct", () => {
   const seen = new Set([
     runState(null, ALIVE),
-    runState({ __unreadable: true }, ALIVE),
+    runState(UNREADABLE, ALIVE),
     runState(current(), ALIVE),
     runState(current(), DEAD),
   ]);
@@ -362,4 +363,20 @@ test("notification names the outcome and the reason, and distinguishes ok from s
   });
   assert.match(bad.title, /STOPPED/);
   assert.match(bad.message, /1 iteration\b/); // singular, not "1 iterations"
+});
+
+test("state: the unreadable sentinel is identity, not a key a heartbeat could carry", () => {
+  // A VALID heartbeat that happens to contain the sentinel's own key must still
+  // render as the run it describes. Duck-typing this made the state forgeable by
+  // data — the same "state the opposite of the truth" failure the state exists
+  // to prevent, pointed the other way.
+  const impostor = { ...current(), unreadable: true, __unreadable: true };
+  assert.equal(runState(impostor, ALIVE), "running");
+  assert.equal(runState(impostor, DEAD), "crashed");
+
+  // And the real sentinel still works.
+  assert.equal(runState(UNREADABLE, ALIVE), "unreadable");
+
+  // A structural copy of the sentinel is not the sentinel.
+  assert.equal(runState({ ...UNREADABLE }, ALIVE), "crashed");
 });
