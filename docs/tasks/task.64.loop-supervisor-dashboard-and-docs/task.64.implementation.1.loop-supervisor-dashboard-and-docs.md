@@ -3,7 +3,7 @@
 **Task**: `task.64.loop-supervisor-dashboard-and-docs.md`
 **Run Number**: 1
 **Started**: 2026-08-29 00:00
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -37,7 +37,7 @@ Add the optional `--dashboard` / `--dashboard-token` push to `run-loop.mjs` with
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #278](https://github.com/Gamaroff/agent-skills/pull/278); 3 commits; issue comment skipped (no linked issue) | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.64.qa.{1,2,3}.*.md`; `task.64.gate.{1,2,3}.*.yml`; PR comments posted | **Gate 3 PASS 100/100** after 3 cycles. C1 CONCERNS 50 (11 findings) → C2 CONCERNS 90 (QA-12) → C3 PASS. 12/12 closed, 8/8 criteria full | `.summaries/…` (gitignored; matrix inlined in the QA report) |
 | 7. finalise                | ✅ Done    | `task.64.dod.1.*.md`; task `status: accepted`                          | DoD PASSED. CI_ROLLUP sampled PENDING then waited → SUCCESS on `f823527` (= local HEAD). Sprint review summary + canonical PR comment. Tracker close/board N/A (no linked issue) | — |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 8 commits on the branch; working tree clean; pipeline lock removed | — |
 
 ---
 
