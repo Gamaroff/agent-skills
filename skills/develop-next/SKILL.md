@@ -265,3 +265,19 @@ Delete the run-state file, then end every run with a report: item id + title, PR
 ## Continuous mode
 
 `/loop /develop-next` (no interval — self-paced). Each iteration runs one item; when a run ends with a stop condition, end the loop (do not schedule another wakeup). One-time setup for unattended runs — permission allowlist, pipeline hooks, CI caveat — is in [`README.md`](README.md).
+
+> **For a long or overnight queue, prefer `loop-supervisor`.** `/loop` re-invokes **this** conversation
+> every iteration, so item five is worked through a context mostly consumed by items one to four — and a
+> skill cannot clear its own context, so the loop has to move outside the session to fix it.
+> `loop-supervisor` spawns one `claude -p` per iteration with a fresh context and a pinned session id,
+> classifies each outcome from filesystem post-conditions rather than from prose, and writes a
+> per-iteration ledger every line of which is reopenable with `claude --resume <sessionId>`.
+>
+> It is not free: every iteration re-primes `CLAUDE.md`, the skill files and the roadmap. That should be
+> largely prompt-cache-served since the prefix is identical across iterations, but it is a real
+> per-iteration floor. For two or three items with someone at the keyboard, `/loop /develop-next` is
+> simpler and cheaper; for a twelve-item overnight queue, the re-prime is what buys an iteration-12 as
+> sharp as iteration-1.
+>
+> See [`skills/loop-supervisor/README.md`](../loop-supervisor/README.md) and the
+> [Unattended Overnight Runs runbook](../../docs/runbooks/unattended-overnight-runs.md).

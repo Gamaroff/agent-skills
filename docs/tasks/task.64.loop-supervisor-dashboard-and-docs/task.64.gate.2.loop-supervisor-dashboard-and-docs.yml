@@ -1,0 +1,108 @@
+schema: 1
+task: "task.64.loop-supervisor-dashboard-and-docs"
+task_title: "Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable"
+gate: CONCERNS
+status_reason: "Ten of eleven cycle-1 findings are fixed and mutation-proved. QA-5 (the token stripped from the spawned child's environment) is correct in the code but proved by nothing — a mutation removing the strip kills zero tests, which is the same failure as cycle 1's vacuous test in a different costume."
+reviewer: "QA Engineer"
+updated: "2026-08-29T00:45:00Z"
+
+re_review_context:
+  previous_gate: "task.64.gate.1.loop-supervisor-dashboard-and-docs.yml"
+  previous_decision: CONCERNS
+  previous_score: 50
+  fix_commits: ["1dbf394", "c717386"]
+  method: "Every claimed fix was re-verified by mutation — the behaviour was reverted and the suite re-run. A fix whose mutant kills no test is recorded as NOT proved, whatever the code says."
+
+top_issues:
+  - id: QA-12
+    issue: "The child-environment token strip is proved by no test"
+    severity: medium
+    finding: "M5 deleted `delete childEnv.LOOP_SUPERVISOR_DASHBOARD_TOKEN` from run-loop.mjs and the suite stayed fully green — 32/32. The code fix is correct on inspection, but nothing holds it in place: the strip sits inline in main(), which no test can reach, so a future refactor of the spawn options removes the protection silently. Cycle 1's headline finding was a security mitigation asserted by a test that could not fail; shipping its replacement with no test at all is the same defect wearing different clothes."
+    suggested_action: "Extract the child environment into an exported pure function (e.g. childEnvFor(env)) and assert it drops LOOP_SUPERVISOR_DASHBOARD_TOKEN while preserving the rest of the environment."
+    suggested_owner: dev
+    ref: "skills/loop-supervisor/scripts/run-loop.mjs (spawn options in main())"
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 1867
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  criteria_full: [1, 2, 3, 4, 5, 6, 7, 8]
+  criteria_partial: []
+
+mutation_proving:
+  method: "revert the behaviour, re-run the suite, restore"
+  results:
+    - invariant: "QA-1 — the frame publishes only this run's ledger rows"
+      mutation: "drop the runId filter"
+      tests_killed: 1
+      proven: true
+    - invariant: "QA-2 — the token never reaches the request body"
+      mutation: "copy the token into the serialised frame"
+      tests_killed: 2
+      proven: true
+    - invariant: "QA-3/QA-7 — pushRunFrame never rejects"
+      mutation: "rethrow from its catch"
+      tests_killed: 2
+      proven: true
+    - invariant: "QA-4 — the gate scans runbooks and skill READMEs"
+      mutation: "phantom command in each file class"
+      tests_killed: 2
+      proven: true
+    - invariant: "QA-9 — HTTPS remote userinfo is stripped"
+      mutation: "return the URL unredacted"
+      tests_killed: 2
+      proven: true
+    - invariant: "QA-5 — the token is stripped from the child environment"
+      mutation: "do not strip it"
+      tests_killed: 0
+      proven: false
+
+issue_resolution:
+  from_gate_1:
+    - { id: QA-1, status: closed, verified: mutation }
+    - { id: QA-2, status: closed, verified: mutation }
+    - { id: QA-3, status: closed, verified: mutation }
+    - { id: QA-4, status: closed, verified: mutation }
+    - { id: QA-5, status: partial, verified: inspection-only, note: "code correct, no test holds it" }
+    - { id: QA-6, status: closed, verified: inspection, note: "plus a third-SIGINT re-entrancy bug the fix introduced, found and guarded by the dev-side adversarial pass" }
+    - { id: QA-7, status: closed, verified: mutation }
+    - { id: QA-8, status: closed, verified: test }
+    - { id: QA-9, status: closed, verified: mutation }
+    - { id: QA-10, status: closed, verified: test }
+    - { id: QA-11, status: closed, verified: test }
+  fixed: 10
+  partial: 1
+  remaining: 0
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: "Both latent leaks from cycle 1 are closed in code — the token is stripped from the child env and repoUrl userinfo is redacted (mutation-proved). The strip itself is untested (QA-12), which is why this is not yet PASS."
+  performance:
+    status: PASS
+    notes: "repoUrl is now resolved only when --dashboard is set, so the common case spawns no git subprocess."
+  reliability:
+    status: PASS
+    notes: "pushRunFrame is mutation-proved to swallow every failure mode including throwing inputs. The double-SIGINT path closes the frame on a 1.5s leash, and the third-SIGINT re-entrancy it introduced was caught and guarded before CI."
+  maintainability:
+    status: PASS
+    notes: "The two tests that reported coverage they did not have are both replaced and both mutation-proved. The gate that named itself as a mitigation now actually scans the artefacts it protects."
+
+recommendations:
+  immediate:
+    - action: "Extract childEnvFor() and assert the token is dropped while the rest of the environment survives"
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs", "evals/loop-supervisor/unit/dashboard.test.mjs"]
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "QA-12 closed — the one security control on this change that nothing holds in place"

@@ -82,6 +82,8 @@ node .agents/skills/loop-supervisor/scripts/run-loop.mjs run \
 | `--on-error <stop\|continue>` | `stop`     | what a `halt` or `error` outcome does                          |
 | `--cooldown <sec>`        | `10`           | pause between iterations                                       |
 | `--config <path>`         | `skills-config.yaml` | where to read the `loopSupervisor:` block               |
+| `--dashboard <url>`      | unset          | POST a status frame here on each iteration boundary ([contract](#publishing-the-run-to-a-dashboard)) |
+| `--dashboard-token <tok>` | unset         | bearer-style token for that POST; also read from `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` |
 
 Every budget ceiling is checked **before** a spawn, not after. A `--max-cost` that only stops once it
 has been exceeded is not a ceiling.
@@ -116,10 +118,16 @@ loopSupervisor:
   baseBranch: develop
   roadmapPath: docs/development/project-completion-roadmap.md
   cooldownSeconds: 10
+  dashboardUrl: https://dash.internal/api/loop # optional; --dashboard overrides
   adapters:
     develop-next:
       stateFile: .claude/state/develop-next.state.json
 ```
+
+**There is no `dashboardToken` config key, and there will not be one.** `skills-config.yaml` is
+committed. A token read from it is a token in git history, outliving the run it authorised — so the
+token comes from `--dashboard-token` or `$LOOP_SUPERVISOR_DASHBOARD_TOKEN`, and nowhere else. Prefer the
+environment variable: a token on a command line is visible in `ps` to every user on the box.
 
 Adapter overrides are **declarative only** — paths, never JavaScript. A config file that can name a
 module to `require()` is a code-execution surface, and the gain over "probe command plus expected JSON
@@ -248,6 +256,122 @@ claude --resume "$(jq -r 'select(.iteration==3) | .sessionId' \
 You get the whole iteration back — every tool call, every file read — in an interactive session, days
 later.
 
+## Publishing the run to a dashboard
+
+```bash
+export LOOP_SUPERVISOR_DASHBOARD_TOKEN=...
+run-loop.mjs run --dashboard https://dash.internal/api/loop
+```
+
+A frame is POSTed on each **iteration boundary** — once when an iteration is about to spawn, once when
+it has been classified and written to the ledger, and once at the end of the run with `active: false`.
+Nothing is pushed between boundaries; `watch` is the tool for second-by-second detail.
+
+**What ships here is a payload, not an integration.** The dashboard lives in your repo, not this one.
+That is deliberate: the two halves can then be built independently, in either order, by different
+people, and a second consumer with a completely different dashboard is served by the same contract
+without a line changing here.
+
+### The payload
+
+`Content-Type: application/json`, and the token — when there is one — in an `X-Dash-Token` header.
+
+```json
+{
+  "schemaVersion": 1,
+  "active": true,
+  "runId": "2026-08-29T01-02-03-000Z-4242",
+  "command": "/develop-next",
+  "startedAt": "2026-08-29T01:00:00.000Z",
+  "reporterHost": "build-box.local",
+  "repoUrl": "git@github.com:owner/repo.git",
+  "current": {
+    "iteration": 7,
+    "phase": "running",
+    "pipelineStep": 5,
+    "itemId": "T94",
+    "branch": "feature/task.94.example",
+    "prUrl": "https://github.com/owner/repo/pull/1",
+    "sessionId": "11111111-2222-3333-4444-555555555555",
+    "elapsedSec": 812
+  },
+  "totals": {
+    "iterations": 7,
+    "costUsd": 12.4,
+    "progressed": 5,
+    "halted": 0,
+    "idle": 2,
+    "incomplete": 0,
+    "errored": 0,
+    "done": 0
+  },
+  "recent": [ /* the last 10 runs.jsonl rows, oldest first */ ]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `schemaVersion` | Integer. **The same constant stamped into `runs.jsonl` and `current.json`**, not a second version number — so a frame can be version-checked against a value you may already have read out of the ledger. Version-check it; do not assume. |
+| `active` | `false` on exactly one frame — the last one of the run. See below. |
+| `runId` | Stable for the whole run. Use it as the correlation key; `reporterHost` alone is not unique. |
+| `command` | The prompt every iteration runs, e.g. `/develop-next`. |
+| `startedAt` | ISO 8601, the run's start — not this iteration's. |
+| `reporterHost` | The machine running the supervisor. |
+| `repoUrl` | `origin`'s remote URL, or `null` when there is no remote. |
+| `current` | The live iteration, or **`null`** — on the final frame, and whenever the heartbeat is missing or torn. Always null-check it. |
+| `current.phase` | `"spawning"` or `"running"`. This is the **supervisor's** phase, not the inner pipeline's; `pipelineStep` is where the pipeline is. |
+| `current.pipelineStep` | The develop pipeline's step cursor (1–8), or `null` when no pipeline lock is on disk. |
+| `current.elapsedSec` | Seconds this iteration has been running. `0` on the spawning frame. |
+| `totals` | Cumulative for the run. The six outcome counts are the full classifier vocabulary and **sum to `iterations`** — render all six, or at minimum surface the ones you do not render, or a night with two `error`s will look like a night with two fewer iterations. |
+| `recent` | The trailing 10 ledger rows, **oldest first**, each exactly as written to `runs.jsonl` (`iteration`, `outcome`, `reason`, `itemId`, `exitCode`, `durationMs`, `costUsd`, `turns`, `sessionId`, `logPath`, `transcriptPath`). |
+
+**The token is never in the payload**, never in `runs.jsonl`, never in `current.json` and never in a log
+line. It travels only in the header, and a test drives the real push path to assert the request body is
+free of it while the header carries it.
+
+It is also **stripped from the environment of every spawned iteration**. Without that, `--dashboard-token`
+read from `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` would be inherited by each `claude -p` child and by anything
+that child shells out to — and the child is an agent with a Bash tool writing `iter-NNN.txt` to disk, so
+a single `env` in a tool call would put the credential in a log file.
+
+`repoUrl` is redacted the same way: a repo cloned over HTTPS can carry a credential in the remote URL
+itself, and `git remote get-url` returns it verbatim. Any userinfo is stripped before the frame goes out.
+
+### The failure policy
+
+**A push failure never affects the run.** Unresolvable host, non-2xx, timeout (5s), a payload that will
+not serialise, a runtime without `fetch` — each warns once on stderr and the run continues, with its
+outcome and exit status unchanged. There is no retry and no queue: the next frame is one iteration
+boundary away, and a queue would add durable state for a dropped observation nobody is reading.
+
+This is proved by tests that break it deliberately
+([`evals/loop-supervisor/unit/dashboard.test.mjs`](../../evals/loop-supervisor/unit/dashboard.test.mjs)),
+not asserted here — an eight-hour run that dies because a status POST timed out has inverted the
+relationship between the work and the reporting of it, and that is exactly the kind of property that
+gets assumed rather than verified.
+
+The corollary for the consumer: **frames can be dropped, and you will not be told.** Treat each frame as
+a full snapshot rather than a delta, and treat `recent` as the recovery mechanism for anything you
+missed. Do not build a counter by incrementing on receipt.
+
+**Age frames out rather than trusting `active`.** A double `Ctrl-C` pushes a best-effort final frame on a
+1.5-second leash, but a `SIGKILL`, a power cut or a lost network leaves the last frame reading
+`active: true` with a live `current` forever. `reporterHost` plus the frame's own arrival time is enough
+to mark a run stale; nothing in the protocol can guarantee a closing frame.
+
+### If you are building the consumer side
+
+Two things worth knowing before you start, both learned from the dashboard this contract was designed
+against:
+
+- **Do not overload an existing `/api/batch`-style endpoint.** A `/develop-batch` page hard-codes batch
+  copy, a worktree column and a closed step vocabulary, and its payload has no field for iteration
+  index, exit code, duration or cost. You will end up with a page that cannot express half of what this
+  frame carries. Give the loop its own endpoint and its own page.
+- **In-memory state is the wrong shape for an eight-hour run.** If your existing batch state is held in
+  process memory and lost on restart, do not follow that pattern here — a restart at 03:00 would erase
+  the night. Give the loop page its own table, modelled on whatever durable table you already have.
+
 ## Outcomes, and the two that surprise people
 
 The full table is in [`SKILL.md`](SKILL.md). Two are worth understanding before you read a ledger:
@@ -278,7 +402,5 @@ Use `--max-cost` on any unattended run. It is checked before each spawn.
 ## Limits
 
 - **Sequential only.** Parallelism belongs to `/develop-batch`, inside one iteration.
-- **No dashboard push yet** — a different transport with a different failure policy, and separate work.
-  `status`, `watch` and stop-notification all ship.
 - **Consumer repos may have a `PreToolUse` Bash guard** rejecting `<cmd> | head` / `| tail`. It fires
   inside every iteration too.

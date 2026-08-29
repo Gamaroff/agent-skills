@@ -133,6 +133,12 @@ legitimately pauses between iterations. The heartbeat is written atomically (tem
 ends**, naming the reason — never per iteration. A failed notification warns and leaves the run's exit
 status untouched.
 
+`--dashboard <url>` (with `--dashboard-token`, or `$LOOP_SUPERVISOR_DASHBOARD_TOKEN`) POSTs a status
+frame on each **iteration boundary**, ending with one `active: false` frame. What ships is a documented
+payload, not an integration — the dashboard lives in the consumer repo. A push failure warns once and
+never affects the run's outcome or exit status, proved by tests that break it on purpose. Full payload
+contract, field semantics and consumer-side warnings: [`README.md`](README.md#publishing-the-run-to-a-dashboard).
+
 Because `--session-id` is pinned, **every iteration is reopenable afterwards** with
 `claude --resume <sessionId>` (the id is in each `runs.jsonl` line). That is the strongest debugging
 affordance here.
@@ -151,5 +157,3 @@ surface for no gain.
 - **Not free.** Every iteration re-primes CLAUDE.md, the skill files and the roadmap. Much of that
   should be prompt-cache-served since the prefix is identical across iterations, but it is a real
   per-iteration floor.
-- **No dashboard push.** `status` / `watch` and stop-notification ship; pushing to a dashboard is a
-  different transport with a different failure policy, and separate work.
