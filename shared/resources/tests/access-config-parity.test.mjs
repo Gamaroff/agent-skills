@@ -23,6 +23,7 @@
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { spawnBudget } from "./spawn-budget.mjs";
 import {
   mkdtempSync,
   mkdirSync,
@@ -117,8 +118,8 @@ function childEnvFor(tier) {
  * three times the loaded median — close enough to be hit, rare enough to look
  * like a mystery when it was.
  */
-const SPAWN_TIMEOUT_MS = Number(process.env.PARITY_SPAWN_TIMEOUT_MS || 60000);
-const SPAWN_RETRIES = Number(process.env.PARITY_SPAWN_RETRIES || 2);
+const { timeoutMs: SPAWN_TIMEOUT_MS, retries: SPAWN_RETRIES } =
+  spawnBudget("PARITY");
 
 /**
  * What read-config.sh (via resolve-platform.sh, its only consumer for access)
@@ -572,7 +573,7 @@ describe("the shell seam answers the same as the JS tier", () => {
         cwd,
         env: { ...childEnvFor(), ...env },
         encoding: "utf8",
-        timeout: 20000,
+        timeout: SPAWN_TIMEOUT_MS,
       },
     );
     return String(r.stdout || "").trim();
@@ -645,7 +646,7 @@ describe("the shell seam answers the same as the JS tier", () => {
           cwd: dir,
           env: { PATH: process.env.PATH, HOME: process.env.HOME },
           encoding: "utf8",
-          timeout: 20000,
+          timeout: SPAWN_TIMEOUT_MS,
         },
       );
       const err = String(r.stdout || "").trim();
@@ -716,7 +717,7 @@ describe("regressions from the cycle-1 fixes", () => {
             cwd: join(dir, "sub"),
             env: childEnvFor(),
             encoding: "utf8",
-            timeout: 20000,
+            timeout: SPAWN_TIMEOUT_MS,
           },
         );
         assert.equal(
@@ -770,7 +771,7 @@ describe("regressions from the cycle-1 fixes", () => {
             cwd: dir,
             env: { ...childEnvFor(), CDPATH: join(dir, "decoy") },
             encoding: "utf8",
-            timeout: 20000,
+            timeout: SPAWN_TIMEOUT_MS,
           },
         );
         assert.equal(
@@ -798,7 +799,12 @@ describe("regressions from the cycle-1 fixes", () => {
           "_",
           LIB2,
         ],
-        { cwd: dir, env: childEnvFor(), encoding: "utf8", timeout: 20000 },
+        {
+          cwd: dir,
+          env: childEnvFor(),
+          encoding: "utf8",
+          timeout: SPAWN_TIMEOUT_MS,
+        },
       );
       assert.match(
         String(r.stderr || ""),
