@@ -131,9 +131,10 @@ hand-writing a row here, which is the transcription step this phase *was*. Leavi
 also have suppressed the new fallback outright: roadmap precedence is absolute, so while this phase
 held any actionable row the registries could never be reached.
 
-T65's row is archived **unticked**: it was in flight when the phase was retired (the archival is part
-of T65's own delivery), and its acceptance is recorded in the roadmap Change Log rather than by a tick
-here. Nothing depends on it, so no `deps:` resolution is affected.
+T65's row was archived **unticked** because it was in flight when the phase was retired — the archival
+is part of T65's own delivery, so ticking it then would have attested to a merge that had not happened.
+It merged as PR #281 on 2026-08-29 and is **now ticked**, with the acceptance recorded in the roadmap
+Change Log as promised. Nothing depends on it, so no `deps:` resolution was ever affected.
 
 - [x] **B2** `npm test` runs `node --test` unbounded, so spawn-heavy suites breach their timeouts and the suite fails for environmental reasons · deps: none · touches: test-harness! · /develop-bug docs/bugs/bug.2.unbounded-test-concurrency/bug.2.unbounded-test-concurrency.md
-- [ ] **T65** Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to `/develop-next` · deps: none · touches: orchestrators!, docs-config~ · /develop-task docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md
+- [x] **T65** Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to `/develop-next` · deps: none · touches: orchestrators!, docs-config~ · /develop-task docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md
