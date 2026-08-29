@@ -7,9 +7,9 @@ _already shipped_, not an error. Resolve any such reference there.
 
 **Phases 1, 2 and 3 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
-against that file. **There is currently no open frontier**: no phase holds an actionable row, and the
-rows under "Deferred / human-gated" below are invisible to selection, so `select-next.mjs` reports
-`roadmap-complete` until a new phase is seeded.
+against that file. **Phase 4 is a standing maintenance backlog**, not a planned sequence: it holds
+whatever is outstanding so the loop always has a frontier. The rows under "Deferred / human-gated"
+remain invisible to selection.
 
 Selection is executed by `select-next.mjs`, never by eye:
 
@@ -40,6 +40,22 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `templates`        | `skills/*/resources/*template*`, `docs/templates/*`, `create-*/SKILL.md` |
 | `review-skills`    | `skills/review-*/SKILL.md`, `skills/edit-*/SKILL.md`                    |
 | `loop-supervisor`  | `skills/loop-supervisor/*`, `evals/loop-supervisor/*`                  |
+| `test-harness`     | `package.json` test script, `shared/resources/tests/*`                  |
+
+---
+
+## PHASE 4 — maintenance backlog
+
+Standing phase. Unlike Phases 1–3 it is **not a planned sequence** — it holds whatever is currently
+outstanding, so `/develop-next` has a frontier without anyone maintaining a plan. Rows are added when
+work is filed and archived when the phase empties.
+
+Ordering is deliberate: **a known-broken thing outranks intended work.** T65 exists to remove the need
+for this phase to be hand-maintained at all — once selection reads the registries directly, a filed bug
+or task is visible to the loop without a row here.
+
+- [ ] **B2** `npm test` runs `node --test` unbounded, so spawn-heavy suites breach their timeouts and the suite fails for environmental reasons · deps: none · touches: test-harness! · /develop-bug docs/bugs/bug.2.unbounded-test-concurrency/bug.2.unbounded-test-concurrency.md
+- [ ] **T65** Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to `/develop-next` · deps: none · touches: orchestrators!, docs-config~ · /develop-task docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md
 
 ---
 

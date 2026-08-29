@@ -975,3 +975,137 @@ test("14: non-regression — a roadmap with zero bug rows selects exactly as bef
     ["story/8-1", "story/8-2", "story/8-3"],
   );
 });
+
+// ── general-bug rows: the `B` id form ────────────────────────────────────────
+//
+// A bug row has always been expressible with a story-shaped id borrowed from its
+// surrounding epic (see BUG_ROADMAP above, which uses `4.1`). What did NOT exist
+// was a STANDALONE form — and a general bug has no parent epic to borrow from, so
+// in a maintenance phase there was nothing correct to write. `**B2**` fell outside
+// the id grammar, so the row was rejected as "checkbox row has no item id",
+// SILENTLY SKIPPED, and the row below it selected instead. Found by filing a real
+// bug into a maintenance phase and watching the loop step straight over it.
+
+const STANDALONE_BUG_ROADMAP = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [ ] **B2** the suite fails for environmental reasons · deps: none · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
+- [ ] **T65** something else entirely · deps: none · /develop-task docs/tasks/task.65.x/task.65.x.md
+`;
+
+test("B: a general-bug row is a first-class candidate, not an id-less skip", () => {
+  const r = select(STANDALONE_BUG_ROADMAP);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "B2");
+  assert.equal(r.item.command, "/develop-bug");
+  assert.equal(
+    r.item.commandArg,
+    "docs/bugs/bug.2.flake/bug.2.flake.md",
+    "the bug document path must survive parsing intact",
+  );
+  assert.deepEqual(r.lint.warnings, [], "a valid bug row must not warn");
+  assert.deepEqual(r.lint.errors, []);
+});
+
+test("B: ticking the bug row advances to the next item rather than stalling", () => {
+  const r = select(tick(STANDALONE_BUG_ROADMAP, "B2"));
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "T65");
+});
+
+test("B: a bug id satisfies deps like any other id", () => {
+  const text = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [x] **B2** already fixed · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
+- [ ] **T65** depends on the fix · deps: B2 · /develop-task docs/tasks/task.65.x/task.65.x.md
+`;
+  const r = select(text);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "T65", "a ticked B-dep must count as satisfied");
+});
+
+test("B: an outstanding bug dep blocks its dependent", () => {
+  const text = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [ ] **B2** not fixed yet · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
+- [ ] **T65** depends on the fix · deps: B2 · /develop-task docs/tasks/task.65.x/task.65.x.md
+`;
+  const r = select(text);
+  // B2 itself is eligible and comes first, so it is what gets selected — the point
+  // of the assertion is that `deps: B2` parsed as an id at all. Before the `B`
+  // form existed it was dropped silently, which would have let T65 run first.
+  assert.equal(r.item.id, "B2");
+});
+
+// ── the inline-path matcher must not swallow markdown-link syntax ────────────
+//
+// Both forms are documented. Without excluding `[` from the inline alternative it
+// won the race on a link-form row and captured the SYNTAX — `/develop-bug
+// [bug](x/y.md)` yielded the literal `[bug](x/y.md`, an unbalanced, undispatchable
+// string. Worse than not matching, because the caller would dispatch it.
+
+test("a link-form row resolves to the href, never to the link syntax", () => {
+  const text = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [ ] **B2** link form · /develop-bug [bug](docs/bugs/bug.2.flake/bug.2.flake.md)
+`;
+  const r = select(text);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.commandArg, "docs/bugs/bug.2.flake/bug.2.flake.md");
+  assert.ok(
+    !r.item.commandArg.includes("["),
+    "the captured path must never contain link syntax",
+  );
+});
+
+test("the inline form still wins when there is no link", () => {
+  const text = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [ ] **T65** inline form · /develop-task docs/tasks/task.65.x/task.65.x.md
+`;
+  const r = select(text);
+  assert.equal(r.item.commandArg, "docs/tasks/task.65.x/task.65.x.md");
+});
+
+test("B: a bug row inside an epic section is excluded from that epic's completion set", () => {
+  // `isStandaloneId` governs this. Both `T` and `B` rows are conventionally written
+  // inside a consumer epic's section for readability, but neither is a story OF that
+  // epic — an epic is complete once its own stories are accepted, regardless of a
+  // cross-cutting task or bug parked in the same section.
+  //
+  // Asserted against the PARSED MODEL rather than through selectNext: routed through
+  // selection, the bug row is simply picked first (it is earlier in document order),
+  // so the epic-membership branch is never reached and the assertion proves nothing.
+  // A first attempt at this test did exactly that and survived the mutation.
+  const model = parseRoadmap(`# Roadmap
+
+## PHASE 1 — build
+
+## Epic 4
+
+- [x] **4.1** the only actual story · /develop-story docs/stories/story.4.1.x/story.4.1.x.md
+- [ ] **T65** a cross-cutting task · /develop-task docs/tasks/task.65.x/task.65.x.md
+- [ ] **B2** a cross-cutting bug · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
+`);
+
+  const rowIds = model.epicSections[4].rowIds;
+  assert.deepEqual(
+    rowIds,
+    ["4.1"],
+    "an epic's completion set is its stories — not the standalone T/B rows filed beside them",
+  );
+  assert.ok(
+    !rowIds.includes("B2"),
+    "a general bug must never hold its host epic open",
+  );
+  assert.ok(!rowIds.includes("T65"), "nor must a standalone task");
+});
