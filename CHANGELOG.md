@@ -6,6 +6,55 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/develop-next` now derives its frontier from the registries, so a filed bug or task cannot be
+  invisible to the loop.** `select-next.mjs` read exactly one file: the completion roadmap. Everything
+  else the repo tracks — `docs/bugs/bug-registry.md`, `docs/tasks/task-registry.md` — was invisible to
+  it. A bug could be filed, registered and never picked up, and the loop would cheerfully report
+  `roadmap-complete`.
+
+  **The failure mode is silence, which is why it went unnoticed.** `roadmap-complete` is
+  indistinguishable from "there is genuinely nothing to do", and `/loop /develop-next` and
+  `loop-supervisor` both terminate on it. An overnight run that stops at 23:05 with a Major bug sitting
+  registered and unreferenced has not finished the work; it has failed to find it, and reported
+  success. That happened here: `bug.2` was filed, registered Major/High, with a documented root cause,
+  and the selector reported `roadmap-complete` the same day.
+
+  When — and **only** when — no phase holds an actionable row, selection now falls through to the two
+  registries. **Roadmap precedence is absolute**: an authored phase always wins, because the registries
+  are a floor, not a re-ranking of deliberate human sequencing.
+
+  - **Only `roadmap-complete` is pre-empted.** `human-gated`, `planning-gap`, `manual-checkpoint` and
+    `phase-blocked` still stop the loop. A human gate is never scanned past. This is the sharpest edge
+    in the feature — a fallback reachable from any other stop would look like it was working while
+    stepping over an operator's decision — so there is one test per stop reason, each asserting the
+    strong form: not "no registry item was selected" but *the registry loader was never called*.
+  - **The eligibility floor is the opt-out.** A task enters the frontier at `ready-for-development` or
+    `in-progress`; a bug at `new` or `reopened`. Promotion up the item's own ladder is already the act
+    of saying "this is ready to be worked", so a `draft` task is out **by construction** rather than by
+    someone remembering to mark it. No `deferred` value is added to either lifecycle.
+
+    The floor must be a **subset of the statuses the dispatching pipeline accepts** — that is the rule,
+    and those values are only its current answer. `develop-task` HALTs on `Ready for Review`, so a task
+    in that state is excluded even though it is unambiguously "outstanding": selecting it would produce
+    work the dispatcher refuses, stopping an unattended loop that could not then self-recover. A test
+    parses both pipelines' own status tables and asserts the subset relation, so it re-checks itself if
+    either dispatcher changes.
+  - **Frontmatter decides; the registry row only nominates.** Indexes drift from what they index — six
+    rows of this repo's own task registry were stale when this shipped. A row is a candidate only when
+    the *document* it points at is eligible, whatever the row says, asserted in both directions.
+  - **Out of the frontier, never invisible.** `--lint` gains a `registryFrontier` section naming every
+    row considered and why each was passed over. An escape hatch that hid work silently would be the
+    original bug wearing different clothes.
+  - **`item.source`** (`roadmap` | `bug-registry` | `task-registry`) is on **every** selection,
+    roadmap ones included — a field present only sometimes is an implicit contract.
+  - `--batch` is unchanged and registry-free: registry rows carry no `touches:` data, so
+    write-disjointness cannot be established and they must never enter a parallel batch.
+
+  Absent, empty, header-only and malformed registries all degrade to the previous behaviour rather
+  than halting, so a consumer repo with neither registry is unaffected. Override the paths with
+  `--bug-registry` / `--task-registry`. Rules:
+  `skills/develop-next/references/roadmap-selection.md` §"Registry fallback frontier".
+
 - **`loop-supervisor` `status` and `watch` — an unattended run you can actually see, and one that
   tells you when it stops.** The runner already wrote an accurate record of what it did; there was no
   way to read it back while it was happening. The honest answer to *"how do I see what it's doing"*

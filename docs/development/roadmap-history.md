@@ -3,7 +3,7 @@
 Completed phases from [`project-completion-roadmap.md`](./project-completion-roadmap.md), archived
 at phase close so the live roadmap shows only what is still in play.
 
-**Phases 1, 2 and 3 are archived here.**
+**Phases 1, 2, 3 and 4 are archived here.**
 
 **These rows still satisfy `deps:`.** A `deps:` entry naming a row that appears in no current phase
 means _already shipped_, not a dangling reference — this file is where to resolve it.
@@ -115,3 +115,25 @@ here — a document's own history stays with the document.
 
 Per-item detail sits in the task directories under [`docs/tasks/`](../tasks/), each with its review,
 QA, gate, DoD and implementation-report artifacts.
+
+---
+
+## PHASE 4 — maintenance backlog (retired)
+
+A **standing** phase rather than a planned sequence: it held whatever was currently outstanding so
+that `/develop-next` always had a frontier. Its ordering rule was that a known-broken thing outranks
+intended work.
+
+**It is retired, not merely emptied.** Its own preamble named T65 as the reason it existed — and T65
+removes the need for it, because selection now falls through to `docs/bugs/bug-registry.md` and
+`docs/tasks/task-registry.md` directly. A filed bug or task is visible to the loop without anyone
+hand-writing a row here, which is the transcription step this phase *was*. Leaving it standing would
+also have suppressed the new fallback outright: roadmap precedence is absolute, so while this phase
+held any actionable row the registries could never be reached.
+
+T65's row is archived **unticked**: it was in flight when the phase was retired (the archival is part
+of T65's own delivery), and its acceptance is recorded in the roadmap Change Log rather than by a tick
+here. Nothing depends on it, so no `deps:` resolution is affected.
+
+- [x] **B2** `npm test` runs `node --test` unbounded, so spawn-heavy suites breach their timeouts and the suite fails for environmental reasons · deps: none · touches: test-harness! · /develop-bug docs/bugs/bug.2.unbounded-test-concurrency/bug.2.unbounded-test-concurrency.md
+- [ ] **T65** Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to `/develop-next` · deps: none · touches: orchestrators!, docs-config~ · /develop-task docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md

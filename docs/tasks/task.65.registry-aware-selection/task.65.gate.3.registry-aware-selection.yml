@@ -1,0 +1,109 @@
+schema: 1
+task: 'task.65.registry-aware-selection'
+task_title: 'Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to /develop-next'
+gate: PASS
+status_reason: 'Both gate-2 issues fixed and independently verified. N1 mutation-proved in BOTH directions, and the fix report''s claim that it had made its own fence test non-vacuous was itself checked by reverting the fixture — the original could not fail, the rewrite can. Over-eagerness probes found no defect. All 12 success criteria pass; suite, format, bundle and protocol green.'
+reviewer: 'QA Engineer'
+updated: '2026-08-29T22:55:00Z'
+qa_cycle: 3
+previous_gate: 'task.65.gate.2.registry-aware-selection.yml'
+pr: 'https://github.com/Gamaroff/agent-skills/pull/281'
+
+top_issues: []
+
+low_issues:
+  - id: LR-1
+    issue: 'A table split by a blank line loses its column mapping'
+    finding: 'With a non-standard column order, rows after a blank line fall back to documented positions, so priority can read the wrong cell. This follows from scoping the mapping to one table and is the correct reading — a blank line ENDS a markdown table, so the continuation is a new headerless table, and headerless tables fall back to positions by design. Requires both a non-standard column order and malformed markdown.'
+    action: 'None. Documented behaviour, recorded so it is not rediscovered as a surprise.'
+  - id: LR-2
+    issue: 'Two tables with no blank line between them report the second header as a malformed row'
+    finding: 'Without an intervening non-table line there is nothing to end the first table. A markdown renderer treats that input as one table too; reporting the row is arguably more honest than silently ignoring it, and the input is not valid markdown.'
+    action: 'None. Fixing it would mean special-casing markdown that is already malformed.'
+
+resolved_issues:
+  - id: N1
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-29'
+    verification: 'All six probe scenarios clean; both real registries clean (2 and 65 rows, 0 malformed, 0 warnings). Mutation-proved BOTH directions by QA: removing the reset reddens 4 tests; resetting on the fence toggle as well reddens 1, which is what shows the reset is in the RIGHT PLACE rather than merely present.'
+    mutation_proven: true
+  - id: L5
+    severity: low
+    status: closed
+    fixed_date: '2026-08-29'
+    verification: 'SC11 reworded to assert reachability. The controlled check it describes was executed verbatim — flip one accepted task document to ready-for-development, selector returns selected/T59/task-registry — and restored with no drift.'
+    mutation_proven: true
+
+claim_verification:
+  note: 'The most interesting check this cycle was of a claim about a TEST, not about the code. The fix report stated its fenced-block test could not fail as originally written (conventional column order makes the positional fallback indistinguishable from the header mapping) and that it had been rewritten with swapped columns. QA reverted the fixture to its original form and re-ran the over-reset mutation: 0 red. The claim is true, and the rewrite genuinely fixed it.'
+  result: 'verified'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 1946
+  tests_passing: 1945
+  tests_skipped: 1
+  tests_failing: 0
+  unit_tests_for_this_change: 121
+  phases_verified: '7/7'
+  success_criteria: '12 assessed — 12 PASS'
+  probe_scenarios_run: 12
+  probe_scenarios_defective: 0
+  mutations_run: 3
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged across all three cycles. No credentials, network calls or process execution; nothing written.'
+  performance:
+    status: CONCERNS
+    notes: '--lint reads one document per registry row (67 here) — linear and unbounded. Selection short-circuits, so the hot path is unaffected. Unchanged since the feature was written, confined to an operator-invoked diagnostic, and recorded in the task document as a known limitation. Not blocking.'
+  reliability:
+    status: PASS
+    notes: 'Re-probed after the reset change: CRLF, trailing whitespace, indented tables, blank-line splits, back-to-back tables, absent/empty/header-only/table-less registries. Nothing throws, nothing halts, and a malformed row never suppresses its neighbours.'
+  maintainability:
+    status: PASS
+    notes: 'Column mapping explicitly scoped to one table and documented as such. The cross-file floor ⊆ dispatcher rule remains held by a test that reads the dispatchers own status tables rather than restating them.'
+
+regression:
+  roadmap_selection: 'PASS — byte-identical to origin/develop across all 11 fixtures, modulo source'
+  batch: 'PASS — selectBatch output byte-identical to origin/develop'
+  stop_precedence: 'PASS — all four stops returned, registry loader called 0× each'
+  real_registries: 'PASS — 2 and 65 rows, 0 malformed, 0 warnings'
+  protocol_shape: 'PASS — 19 tests, unchanged across all three cycles'
+  full_suite: 'PASS — 1945/1946, 1 pre-existing skip'
+
+qa_history:
+  - cycle: 1
+    gate: FAIL
+    score: 60
+    issues: '1 HIGH, 2 MEDIUM, 1 LOW'
+  - cycle: 2
+    gate: CONCERNS
+    score: 80
+    issues: '1 MEDIUM (introduced by the cycle-1 fix), 1 LOW'
+  - cycle: 3
+    gate: PASS
+    score: 90
+    issues: '0 blocking; 2 residual limitations recorded'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Measure --lint cost on a registry an order of magnitude larger before recommending it inside a loop'
+      refs: ['skills/develop-next/scripts/select-next.mjs']
+    - action: 'LR-1 / LR-2 are documented limitations on malformed markdown; revisit only if a consumer hits one'
+      refs: ['skills/develop-next/scripts/select-next.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
