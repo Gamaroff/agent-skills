@@ -531,6 +531,7 @@ momentary backlog.
 | 2026-08-29 |  | QA cycle 1 gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 1 LOW; eligibility floor admits `ready-for-review`, which `develop-task` HALTs on | qa-task |
 | 2026-08-29 |  | QA findings fixed — 4 of 4 (1 HIGH, 2 MEDIUM, 1 LOW), 1 iteration; eligibility floor narrowed and the floor ⊆ dispatcher rule made executable; tests 99 → 113 | qa-fix |
 | 2026-08-29 |  | QA cycle 2 gate CONCERNS (80/100) — all 4 cycle-1 findings fixed and closed; 1 new MEDIUM introduced by the M2 fix (column state never reset), 1 LOW | qa-task |
+| 2026-08-29 |  | QA findings fixed — N1 + L5, 1 iteration; column mapping scoped to one table, mutation-proved both directions; SC11 reworded; tests 113 → 121 | qa-fix |
 
 ## References
 
