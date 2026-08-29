@@ -888,7 +888,23 @@ export function parseRegistry(text, kind, registryPath) {
 
     const t = line.trim();
     if (!t.startsWith("|")) {
-      pendingHeader = null; // prose or a blank line ends the table
+      // Prose or a blank line ends the table — and ends its COLUMN MAPPING too.
+      // Resetting `pendingHeader` alone left `cols` set for the rest of the
+      // document, so every later table was parsed as registry data: a `## Notes`
+      // key/value table produced spurious "malformed row" entries, and a second
+      // registry section's own header was reported as `id cell "#" is not a
+      // number`. That could not select anything wrong — malformed rows never
+      // become candidates — but it polluted the `--lint` report the visibility
+      // guarantee depends on, which is the same defect as the invisible-row one
+      // it was introduced to fix, pointed the other way.
+      //
+      // Resetting both is self-correcting rather than special-cased: a stray
+      // `| Key | Meaning |` header fails `mapHeader` (it names neither an id nor
+      // a title column), so `cols` stays null, the row becomes a header
+      // candidate, and the stray table is ignored. No allowlist of tables to
+      // skip is needed. Found by QA cycle 2; pinned by §17.
+      pendingHeader = null;
+      cols = null;
       continue;
     }
     if (TABLE_SEPARATOR_RE.test(t)) {

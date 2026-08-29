@@ -4,7 +4,7 @@ title: 'The task eligibility floor admits `ready-for-review`, which `/develop-ta
 type: bug
 description: 'The registry fallback selects tasks at `ready-for-review`, but develop-task Phase 0c HALTs on that exact status. An unattended /develop-next loop therefore stops on a state that is normal and common — a task awaiting QA or merge — and the run-state file leaves it stuck there.'
 tags: [task.65, develop-next, selection, eligibility]
-status: ready-for-qa
+status: closed
 severity: Major
 priority: High
 created: 2026-08-29
@@ -17,7 +17,7 @@ updated: 2026-08-29
 **Bug ID**: TASK-65-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA (cycle 1)
 **Date Found**: 2026-08-29
 
@@ -192,3 +192,32 @@ against zero parsed rows, which is the vacuous-coverage failure this repo keeps 
 | 2026-08-29 | New | QA | Found in QA cycle 1; reproduces live |
 | 2026-08-29 | In Progress | qa-fix | Root cause confirmed; rule identified |
 | 2026-08-29 | Ready for QA | qa-fix | Floor narrowed + structural test added; mutation-proved 3× |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-08-29 · **Verified in**: QA cycle 2 · **Verdict**: ✅ **FIXED — closed**
+
+Verified rather than accepted. All four verification steps in the fix record were executed:
+
+1. `node --test evals/develop-next/unit/select-next.test.mjs` — 113 pass.
+2. `ready-for-review` re-added to the floor → **3 tests red**, including the structural test failing
+   on the exact regression it is named after.
+3. `#### develop-task` renamed so the parsed section yields nothing → the structural test **fails**
+   rather than passing on an empty set. This was the assertion most at risk of being vacuous, since a
+   test that reads a table in another file can pass by parsing nothing at all.
+4. Live selector: with task 65's own document at `ready-for-review`, it is no longer selected. A
+   controlled check (flipping one accepted task document to `ready-for-development`) confirmed the
+   mechanism still reaches the registry — `selected`, `source: "task-registry"`, `id: "T59"` — and was
+   restored immediately.
+
+**The fix exceeded the finding.** The report asked for a value to be removed; what shipped also made
+the rule executable, parsing both dispatchers' own status tables from git-tracked paths so the
+constraint re-checks itself if either changes. That closes the root cause — *a constraint nobody had
+written down* — rather than the symptom.
+
+**Note for the task, not this bug:** the M2 fix shipped in the same commit introduced a separate
+MEDIUM defect (N1, column state never reset). It is tracked in
+[`task.65.gate.2.registry-aware-selection.yml`](./task.65.gate.2.registry-aware-selection.yml) and
+does not reopen this bug.
+
+| 2026-08-29 | Closed | QA | Fix verified 4 ways incl. two non-vacuity mutations |

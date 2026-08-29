@@ -94,6 +94,8 @@ Bugs before tasks, unconditionally — a registered bug is known-broken behaviou
 
 When the table has a header, columns are read **by name** (`#`/`No`/`Id`, `Title`/`Name`, `Status`, `Severity`, `Priority`), falling back to the documented positions only when no header is recognisable. A consumer who orders their registry differently is read correctly rather than silently mis-ranked; a header that names no `Status` or `Priority` column falls back to the documented position and says so in `--lint` warnings.
 
+Column mapping is scoped to **one table**: it is resolved from that table's header and discarded when the table ends, so a `## Notes` key/value table or a second registry section is parsed on its own terms rather than as more registry rows.
+
 A row whose id cell is not a number is a **malformed row**, not a header — the header is identified positionally, as the line above the `| --- |` separator. A row written `| T65 | … |` (the prefixed form the roadmap uses) is therefore reported rather than silently skipped.
 
 ### Tolerance

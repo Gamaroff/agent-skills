@@ -290,8 +290,20 @@ Two authoring edits, without which the code above changes nothing observable in 
    unrunnable row, or a same-phase deadlock, the selector returns that stop and the registries are not
    read at all.
 10. `--batch` behaviour is unchanged; registry items never enter a batch.
-11. Roadmap `PHASE 4` is archived and `task-registry.md` rows 62–64 read `accepted`, so a fresh
-    `/develop-next --dry-run` in this repo selects from a registry rather than reporting a stop.
+11. Roadmap `PHASE 4` is archived and the drifted `task-registry.md` rows read `accepted`, so the
+    registry frontier is **reachable** in this repo: with the roadmap exhausted, a task whose document
+    sits inside the eligibility floor is selected from the registry rather than the loop reporting a
+    stop. Demonstrated by a controlled check — flip one accepted task document to
+    `ready-for-development` and `select-next.mjs` returns `selected` with `source: "task-registry"`,
+    then restore it.
+
+    > **Reworded in QA cycle 2 (L5).** As submitted this criterion asserted that a *fresh*
+    > `--dry-run` "selects from a registry rather than reporting a stop". That was only ever
+    > satisfiable **because of** the H1 defect: once `ready-for-review` was correctly removed from the
+    > floor, the sole outstanding item in this repo became task 65 itself — in flight and rightly
+    > excluded — so the live command reports `roadmap-complete`, which is the *correct* answer for a
+    > repo with no outstanding work. A criterion about the feature must not be a statement about the
+    > backlog on the day it was written.
 12. Spec and script agree; `npm test`, `npm run bundle` and `npm run format:check` green.
 
 ## Risk Assessment
@@ -463,6 +475,51 @@ deviations from the plan were assessed and found justified.
 
 ---
 
+## QA Testing Results — Cycle 2 (re-review)
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-29
+**QA Cycle**: 2
+**Quality Score**: 80/100 (was 60)
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.65.qa.2.registry-aware-selection.md](./task.65.qa.2.registry-aware-selection.md)
+- **Gate File**: [task.65.gate.2.registry-aware-selection.yml](./task.65.gate.2.registry-aware-selection.yml)
+- **Cycle 1**: [task.65.qa.1.registry-aware-selection.md](./task.65.qa.1.registry-aware-selection.md) (FAIL, 60/100)
+- **Bug 1**: ✅ **Closed** — [task.65.bug.1.ready-for-review-selected-but-undispatchable.md](./task.65.bug.1.ready-for-review-selected-but-undispatchable.md)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1938 (1937 pass, 1 pre-existing skip, 0 fail); 113 unit tests for this change
+- **Success Criteria**: 12 assessed — 11 PASS (one in substance), 1 CONCERNS, 0 FAIL
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: **PASS** (was CONCERNS)
+
+### Key Findings
+
+**All four cycle-1 findings FIXED**, each re-proved by QA independently of the fix report. H1's fix
+exceeded the finding: instead of correcting a value it made the rule executable, parsing both
+dispatchers' own status tables so the constraint re-checks itself. QA proved that test cannot pass
+vacuously — it fails both when the floor is wrong and when the table it reads stops parsing.
+
+**One new MEDIUM (N1), introduced by the M2 fix** — the risk this QA step exists to catch. The
+header-column state is never reset when a table ends, so any second table in a registry document is
+parsed as registry data: a `## Notes` key/value table yields spurious "malformed row" entries in
+`--lint`. It cannot cause a wrong selection, but it pollutes the very report SC6's visibility
+guarantee depends on — the mirror image of the bug it came from. **Held by no test**: the suite is
+green 113/113 with and without the QA-verified one-line remedy, which is why the fix cycle missed it.
+Does not fire in this repo today (both real registries hold one table each and parse clean).
+
+**One LOW (L5)** — SC11's wording is now unsatisfiable by construction: it asserts a live `--dry-run`
+selects from a registry, which was only true *because of* the H1 defect. The mechanism is genuinely
+reachable, confirmed by a controlled check (flipping one accepted task document → `T59` selected from
+the task registry, then restored). The criterion should describe the mechanism, not the repo's
+momentary backlog.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -473,6 +530,7 @@ deviations from the plan were assessed and found justified.
 | 2026-08-29 |  | Implemented — 8 files, 27 new tests (72 → 99 unit); 10 mutations each reddening the tests that name it; roadmap `PHASE 4` retired and 6 drifted registry rows corrected | develop |
 | 2026-08-29 |  | QA cycle 1 gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 1 LOW; eligibility floor admits `ready-for-review`, which `develop-task` HALTs on | qa-task |
 | 2026-08-29 |  | QA findings fixed — 4 of 4 (1 HIGH, 2 MEDIUM, 1 LOW), 1 iteration; eligibility floor narrowed and the floor ⊆ dispatcher rule made executable; tests 99 → 113 | qa-fix |
+| 2026-08-29 |  | QA cycle 2 gate CONCERNS (80/100) — all 4 cycle-1 findings fixed and closed; 1 new MEDIUM introduced by the M2 fix (column state never reset), 1 LOW | qa-task |
 
 ## References
 

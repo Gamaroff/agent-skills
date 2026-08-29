@@ -2045,3 +2045,222 @@ test("16/L4: a title whose only link is not a work item is malformed", () => {
   assert.equal(p.malformed.length, 1);
   assert.match(p.malformed[0].reason, /no \[title\]\(story\|task\|bug/);
 });
+
+// ── 17: column state is scoped to ONE table (task.65 gate 2, N1) ─────────────
+//
+// The M2 fix (§16) introduced this: `cols` was assigned when a header was
+// promoted and never cleared, so once ANY header had been seen every later
+// table row in the document was parsed as registry data. A `## Notes` key/value
+// table produced spurious "malformed row" entries, and a second registry
+// section's own header was reported as `id cell "#" is not a number`.
+//
+// It could not select anything wrong — malformed rows never become candidates —
+// but it polluted the `--lint` report the SC6 visibility guarantee rests on.
+// That is the invisible-row defect M2 fixed, pointed the other way: M2 made real
+// rows visible, and in doing so made NON-rows falsely visible.
+//
+// These tests exist because the suite was green 113/113 both with and without
+// the remedy, which is why the fix cycle that introduced it did not notice.
+
+const REG_HEAD = [
+  "| #   | Title | Status | Category | Priority | Created | Issue | Deps |",
+  "| --- | ----- | ------ | -------- | -------- | ------- | ----- | ---- |",
+];
+const regRow = (n) =>
+  `| ${n} | [T](task.${n}.a/task.${n}.a.md) | ready-for-development | infra | High | x | — | — |`;
+
+test("17/N1: a key/value table AFTER the registry contributes nothing", () => {
+  const p = parseRegistry(
+    [
+      ...REG_HEAD,
+      regRow(1),
+      "",
+      "## Notes",
+      "",
+      "| Key | Meaning |",
+      "| --- | ------- |",
+      "| foo | bar |",
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1],
+  );
+  assert.equal(
+    p.malformed.length,
+    0,
+    "a documentation table is not a registry row — it must not reach --lint",
+  );
+});
+
+test("17/N1: a term/definition table after the registry contributes nothing", () => {
+  const p = parseRegistry(
+    [
+      ...REG_HEAD,
+      regRow(1),
+      "",
+      "## Notes",
+      "",
+      "| Term | Definition |",
+      "| ---- | ---------- |",
+      "| SC | success criterion |",
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1],
+  );
+  assert.equal(p.malformed.length, 0);
+});
+
+test("17/N1: a second registry section parses, header and all", () => {
+  const p = parseRegistry(
+    [
+      ...REG_HEAD,
+      regRow(1),
+      "",
+      "## Archived",
+      "",
+      ...REG_HEAD,
+      regRow(2),
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1, 2],
+    "both sections' rows parse",
+  );
+  assert.equal(
+    p.malformed.length,
+    0,
+    'the second section\'s header is a header, not `id cell "#" is not a number`',
+  );
+});
+
+test("17/N1: a stray table's rows never reach --lint as passed-over rows", () => {
+  const { opts } = registryOpts({
+    tasks: [
+      ...REG_HEAD,
+      regRow(1),
+      "",
+      "## Notes",
+      "",
+      "| Key | Meaning |",
+      "| --- | ------- |",
+      "| foo | bar |",
+      "",
+    ].join("\n"),
+    docs: { "docs/tasks/task.1.a/task.1.a.md": "accepted" },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  assert.equal(f.candidates, 1, "only the real row is a candidate");
+  assert.equal(
+    f.passedOver.length,
+    1,
+    "exactly the one real row is reported — no documentation-table noise",
+  );
+  assert.match(f.passedOver[0].reason, /document status accepted/);
+});
+
+// The scenarios that already worked must keep working — the reset must not
+// throw away a mapping that is still in force.
+
+test("17/N1: a legend table BEFORE the registry does not disturb it", () => {
+  const p = parseRegistry(
+    [
+      "| Key | Meaning |",
+      "| --- | ------- |",
+      "| foo | bar |",
+      "",
+      "## Registry",
+      "",
+      ...REG_HEAD,
+      regRow(1),
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1],
+  );
+  assert.equal(p.malformed.length, 0);
+});
+
+test("17/N1: a fenced block mid-table does not end the table, and the column mapping survives it", () => {
+  // A fence resets the header CANDIDATE but not the resolved mapping — the rows
+  // after it are still the same table.
+  //
+  // The columns here are deliberately SWAPPED relative to the documented
+  // positions (Priority at 3, Category at 4). Without that this test cannot tell
+  // the two apart: if the mapping were dropped at the fence, the parser would
+  // fall back to documented positions and, on a conventionally ordered table,
+  // produce exactly the same answer. Proved by mutation — an over-eager
+  // `cols = null` on the fence toggle reddens this test only in this form, and
+  // passed against the conventionally ordered version it replaced.
+  const head = [
+    "| #   | Title | Status | Priority | Category | Created |",
+    "| --- | ----- | ------ | -------- | -------- | ------- |",
+  ];
+  const row = (n) =>
+    `| ${n} | [T](task.${n}.a/task.${n}.a.md) | ready-for-development | High | infra | x |`;
+  const p = parseRegistry(
+    [...head, row(1), "```", "| 99 | fake |", "```", row(2), ""].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1, 2],
+    "the fenced sample is skipped; the real rows either side both parse",
+  );
+  assert.equal(p.malformed.length, 0);
+  assert.equal(
+    p.rows[1].priority,
+    "High",
+    "the row AFTER the fence still reads Priority by name, not by position",
+  );
+});
+
+test("17/N1: a separator with no header above it still falls back to positions", () => {
+  const p = parseRegistry(
+    [REG_HEAD[1], regRow(1), ""].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1],
+  );
+  assert.equal(p.rows[0].priority, "High");
+});
+
+test("17/N1: the real registries parse clean — no spurious malformed rows", () => {
+  // The strongest form of this test: the actual files, not fixtures. Both carry
+  // a `## Notes` section today, so a regression here reappears in this repo's
+  // own `--lint` output rather than only in a consumer's.
+  for (const [kind, rel] of [
+    ["bug", "docs/bugs/bug-registry.md"],
+    ["task", "docs/tasks/task-registry.md"],
+  ]) {
+    const text = readFileSync(path.join(REPO_ROOT, rel), "utf-8");
+    const p = parseRegistry(text, kind, rel);
+    assert.ok(p.rows.length > 0, `${rel} parsed no rows`);
+    assert.deepEqual(
+      p.malformed,
+      [],
+      `${rel} produced malformed rows: ${JSON.stringify(p.malformed)}`,
+    );
+    assert.deepEqual(p.warnings, [], `${rel} produced header warnings`);
+  }
+});
