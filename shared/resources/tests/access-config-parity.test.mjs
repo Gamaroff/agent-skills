@@ -118,7 +118,8 @@ function childEnvFor(tier) {
  * three times the loaded median — close enough to be hit, rare enough to look
  * like a mystery when it was.
  */
-const { timeoutMs: SPAWN_TIMEOUT_MS, retries: SPAWN_RETRIES } = spawnBudget("PARITY");
+const { timeoutMs: SPAWN_TIMEOUT_MS, retries: SPAWN_RETRIES } =
+  spawnBudget("PARITY");
 
 /**
  * What read-config.sh (via resolve-platform.sh, its only consumer for access)
@@ -798,7 +799,12 @@ describe("regressions from the cycle-1 fixes", () => {
           "_",
           LIB2,
         ],
-        { cwd: dir, env: childEnvFor(), encoding: "utf8", timeout: SPAWN_TIMEOUT_MS },
+        {
+          cwd: dir,
+          env: childEnvFor(),
+          encoding: "utf8",
+          timeout: SPAWN_TIMEOUT_MS,
+        },
       );
       assert.match(
         String(r.stderr || ""),

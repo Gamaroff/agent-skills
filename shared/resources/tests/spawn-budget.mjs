@@ -38,9 +38,32 @@
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_RETRIES = 2;
 
-function readInt(value, fallback) {
+/**
+ * Parse one env value, or return undefined to mean "this source did not answer".
+ *
+ * Returning undefined rather than the fallback is what makes the precedence ladder work. An
+ * earlier version folded parsing and defaulting together, so a set-but-empty `{PREFIX}_` var —
+ * the normal shape of an unset CI input, `docker -e VAR` or `env: VAR: ${{ inputs.x }}` — answered
+ * with the hardcoded default and MASKED `TEST_SPAWN_TIMEOUT_MS`, in exactly the "tune the slow CI
+ * box" scenario this module exists for.
+ *
+ * `min` differs by knob on purpose: a timeout of 0 means "no timeout" to spawnSync and is not a
+ * budget, but 0 retries is the only way to say "do not retry" and must stay expressible.
+ */
+function readInt(value, min) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return undefined;
+  }
   const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
+  return Number.isFinite(n) && n >= min ? n : undefined;
+}
+
+function resolve(candidates, fallback, min) {
+  for (const candidate of candidates) {
+    const n = readInt(candidate, min);
+    if (n !== undefined) return n;
+  }
+  return fallback;
 }
 
 /**
@@ -50,14 +73,24 @@ function readInt(value, fallback) {
  * @returns {{timeoutMs: number, retries: number}}
  */
 export function spawnBudget(prefix) {
-  const specificTimeout = prefix ? process.env[`${prefix}_SPAWN_TIMEOUT_MS`] : undefined;
-  const specificRetries = prefix ? process.env[`${prefix}_SPAWN_RETRIES`] : undefined;
+  const env = process.env;
   return {
-    timeoutMs: readInt(
-      specificTimeout ?? process.env.TEST_SPAWN_TIMEOUT_MS,
+    timeoutMs: resolve(
+      [
+        prefix ? env[`${prefix}_SPAWN_TIMEOUT_MS`] : undefined,
+        env.TEST_SPAWN_TIMEOUT_MS,
+      ],
       DEFAULT_TIMEOUT_MS,
+      1,
     ),
-    retries: readInt(specificRetries ?? process.env.TEST_SPAWN_RETRIES, DEFAULT_RETRIES),
+    retries: resolve(
+      [
+        prefix ? env[`${prefix}_SPAWN_RETRIES`] : undefined,
+        env.TEST_SPAWN_RETRIES,
+      ],
+      DEFAULT_RETRIES,
+      0,
+    ),
   };
 }
 
@@ -70,5 +103,7 @@ export function spawnBudget(prefix) {
  * reported behavioural divergence that never happened.
  */
 export function neverRan(result) {
-  return Boolean(result.error) || Boolean(result.signal) || result.status === null;
+  return (
+    Boolean(result.error) || Boolean(result.signal) || result.status === null
+  );
 }

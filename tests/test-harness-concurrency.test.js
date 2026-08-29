@@ -27,6 +27,14 @@
  * the one that was fixed. A guard pinned to a single string would pass while the next unbounded
  * runner is added beside it.
  *
+ * KNOWN LIMITATION, deliberately not guarded: `TEST_CONCURRENCY=0` or a typo'd non-numeric value
+ * is accepted by the shell and then silently ignored by node (its `getOptionValue(...) || undefined`
+ * falsifies 0), so the runner falls back to CPU-count concurrency with exit status 0 and no warning.
+ * No static guard can see that — these tests read the shell DEFAULT, never the effective value. It is
+ * left as-is rather than wrapped in validation noise because the failure mode is a return to the
+ * pre-fix default, and the pre-fix default is not what was actually tripping the gate: the spawn
+ * budget below is, and it is unaffected by TEST_CONCURRENCY.
+ *
  * The bound is deliberately NOT asserted to be a specific number — only that it is present, is a
  * positive integer, and is genuinely below the core counts these suites run on (a "bound" of 16
  * on a 16-core box bounds nothing). Pick the number by measurement; at the time of the fix, 4 was
@@ -36,29 +44,48 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 
 const PKG_PATH = path.join(__dirname, "..", "package.json");
 const SCRIPTS = JSON.parse(fs.readFileSync(PKG_PATH, "utf8")).scripts;
 
+/**
+ * Split a script body into the individual commands a shell would run.
+ *
+ * Detection is per-command rather than by splitting on the literal string `node --test`, because
+ * that literal is three separate false answers waiting to happen: it misses
+ * `node --experimental-vm-modules --test` and `node  --test` (two spaces) — both of which ship an
+ * unbounded runner past a green guard, the exact regression this file exists to prevent — and it
+ * misreports `node --test-concurrency=4 --test '...'` as unbounded, because the split consumes the
+ * flag it is looking for.
+ */
+function commandsIn(body) {
+  return body.split(/&&|\|\||;|\n|(?<!\|)\|(?!\|)/);
+}
+
+/** `--test` as its own flag — NOT the `--test-concurrency` that starts with the same characters. */
+const TEST_FLAG = /--test(?![-\w])/;
+
 /** Every script whose body starts a `node --test` runner. */
 function runnerScripts() {
-  return Object.entries(SCRIPTS).filter(([, body]) => /\bnode --test\b/.test(body));
+  return Object.entries(SCRIPTS).filter(([, body]) =>
+    commandsIn(body).some((c) => /\bnode\b/.test(c) && TEST_FLAG.test(c)),
+  );
 }
 
 /**
- * The concurrency bound each `node --test` in `body` carries.
+ * The concurrency bound each `node --test` command in `body` carries.
  *
- * Returns one entry per invocation so an unbounded runner appended to an already-bounded script
- * is still caught. `undefined` marks an invocation with no `--test-concurrency` at all.
+ * One entry per runner command, so an unbounded runner appended to an already-bounded script is
+ * still caught. `undefined` marks a runner with no `--test-concurrency` at all.
  */
 function boundsIn(body) {
-  return body
-    .split(/\bnode --test\b/)
-    .slice(1)
-    .map((tail) => {
-      // Stop at the next shell command so a LATER script's flag is never read as this one's.
-      const invocation = tail.split(/&&|\|\||;|\n/)[0];
-      const m = invocation.match(/--test-concurrency[= ]"?\$\{(\w+):-(\d+)\}"?|--test-concurrency[= ]"?(\d+)"?/);
+  return commandsIn(body)
+    .filter((c) => /\bnode\b/.test(c) && TEST_FLAG.test(c))
+    .map((command) => {
+      const m = command.match(
+        /--test-concurrency[= ]"?(?:\$\{(\w+):-(\d+)\}|(\d+))"?/,
+      );
       if (!m) return undefined;
       return { envVar: m[1], value: Number(m[2] ?? m[3]) };
     });
@@ -135,14 +162,29 @@ test("the bound is overridable from the environment without editing package.json
  * absorbed that 16.2s spike without failing. These tests keep the literals from growing back.
  * ------------------------------------------------------------------------ */
 
-const BUDGET_MODULE = path.join(__dirname, "..", "shared/resources/tests/spawn-budget.mjs");
+const BUDGET_MODULE = path.join(
+  __dirname,
+  "..",
+  "shared/resources/tests/spawn-budget.mjs",
+);
 
-/** Source with comments removed, so prose about a historical value is not read as code. */
+/**
+ * Source with comments removed, so prose about a historical value is not read as code.
+ *
+ * One left-to-right pass over strings AND comments together, keeping string literals. Stripping
+ * block comments first is the tempting version and it is wrong: a `/*` inside a `//` line comment
+ * then opens a phantom block that runs to the next `*` + `/` anywhere later in the file. On this
+ * tree that silently deleted 53 lines of executable source from
+ * `setup-consumer-config.test.mjs` — a hardcoded timeout inside that window was invisible to the
+ * scan below, which is the one thing this helper must never do. String literals are matched (and
+ * preserved) in the same pass so a `//` inside a URL cannot eat the rest of its line either.
+ */
 function code(file) {
-  return fs
-    .readFileSync(file, "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const src = fs.readFileSync(file, "utf8");
+  return src.replace(
+    /(["'`])(?:\\[\s\S]|(?!\1)[^\\])*\1|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+    (match) => (/^["'`]/.test(match) ? match : ""),
+  );
 }
 
 /** Every test file the runners actually execute. */
@@ -167,7 +209,10 @@ function testFiles() {
 }
 
 test("the shared spawn budget exists and is generous by default", () => {
-  assert.ok(fs.existsSync(BUDGET_MODULE), `missing shared spawn budget at ${BUDGET_MODULE}`);
+  assert.ok(
+    fs.existsSync(BUDGET_MODULE),
+    `missing shared spawn budget at ${BUDGET_MODULE}`,
+  );
   const src = code(BUDGET_MODULE);
   const m = src.match(/DEFAULT_TIMEOUT_MS\s*=\s*([0-9_]+)/);
   assert.ok(m, "spawn-budget.mjs must declare DEFAULT_TIMEOUT_MS");
@@ -182,16 +227,31 @@ test("the shared spawn budget exists and is generous by default", () => {
 
 test("the spawn budget is tunable per-suite and globally", () => {
   const src = code(BUDGET_MODULE);
-  assert.match(src, /SPAWN_TIMEOUT_MS/, "budget must expose a timeout env knob");
-  assert.match(src, /TEST_SPAWN_TIMEOUT_MS/, "budget must expose a global TEST_SPAWN_TIMEOUT_MS");
-  assert.match(src, /TEST_SPAWN_RETRIES/, "budget must expose a global TEST_SPAWN_RETRIES");
+  assert.match(
+    src,
+    /SPAWN_TIMEOUT_MS/,
+    "budget must expose a timeout env knob",
+  );
+  assert.match(
+    src,
+    /TEST_SPAWN_TIMEOUT_MS/,
+    "budget must expose a global TEST_SPAWN_TIMEOUT_MS",
+  );
+  assert.match(
+    src,
+    /TEST_SPAWN_RETRIES/,
+    "budget must expose a global TEST_SPAWN_RETRIES",
+  );
 });
 
 test("no test file hardcodes a spawn timeout — the budget is the single source", () => {
   const offenders = [];
   for (const file of testFiles()) {
     const hits = code(file).match(/\btimeout:\s*[0-9]+/g);
-    if (hits) offenders.push(`${path.relative(path.join(__dirname, ".."), file)}: ${hits.join(", ")}`);
+    if (hits)
+      offenders.push(
+        `${path.relative(path.join(__dirname, ".."), file)}: ${hits.join(", ")}`,
+      );
   }
   assert.deepEqual(
     offenders,
@@ -200,5 +260,189 @@ test("no test file hardcodes a spawn timeout — the budget is the single source
       offenders.join(" | ") +
       ". Import { spawnBudget } from the shared spawn-budget module instead — a literal chosen " +
       "against an idle machine is ~1.2x the loaded worst case, which is what bug.2 was about.",
+  );
+});
+
+/* ------------------------------------------------------------------------ *
+ * Tests for the detector itself.
+ *
+ * The guards above are only worth their runtime if `commandsIn`/`boundsIn` actually recognise a
+ * runner. A first version of this file split on the literal string `node --test`, which silently
+ * failed to see `node --experimental-vm-modules --test` and `node  --test` — both of which would
+ * have shipped an unbounded runner past a green suite, i.e. the guard would have passed on the
+ * exact regression it is named after. These cases pin the detector so that cannot recur.
+ * ------------------------------------------------------------------------ */
+
+test("the runner detector sees node --test however the flags are arranged", () => {
+  const isRunner = (c) => /\bnode\b/.test(c) && TEST_FLAG.test(c);
+  for (const body of [
+    "node --test 'tests/*.test.js'",
+    "node --experimental-vm-modules --test 'tests/*.test.js'",
+    "node  --test 'tests/*.test.js'",
+    "NODE_OPTIONS=--no-warnings node --test 'tests/*.test.js'",
+    "node --test-concurrency=4 --test 'tests/*.test.js'",
+    "bash a.sh && node --test 'tests/*.test.js'",
+  ]) {
+    assert.ok(
+      commandsIn(body).some(isRunner),
+      `not detected as a runner: ${body}`,
+    );
+  }
+});
+
+test("the runner detector ignores commands that only look like runners", () => {
+  const isRunner = (c) => /\bnode\b/.test(c) && TEST_FLAG.test(c);
+  for (const body of [
+    "bash shared/resources/resolve-platform.test.sh",
+    'for s in x/; do node evals/shared/runner.mjs "$s" || exit 1; done',
+    "node scripts/build.mjs",
+  ]) {
+    assert.ok(
+      !commandsIn(body).some(isRunner),
+      `wrongly detected as a runner: ${body}`,
+    );
+  }
+});
+
+test("boundsIn reports an unbounded runner whatever its flag order", () => {
+  for (const body of [
+    "node --test 'x'",
+    "node --experimental-vm-modules --test 'x'",
+    "node  --test 'x'",
+  ]) {
+    assert.deepEqual(
+      boundsIn(body),
+      [undefined],
+      `should read as unbounded: ${body}`,
+    );
+  }
+});
+
+test("boundsIn finds the bound when the flag precedes --test", () => {
+  // The split-on-`node --test` version consumed the very flag it was looking for and reported a
+  // correctly-bounded script as unbounded.
+  assert.deepEqual(boundsIn('node --test-concurrency=4 --test "x"'), [
+    { envVar: undefined, value: 4 },
+  ]);
+  assert.deepEqual(
+    boundsIn('node --test-concurrency="${TEST_CONCURRENCY:-4}" --test "x"'),
+    [{ envVar: "TEST_CONCURRENCY", value: 4 }],
+  );
+});
+
+test("boundsIn reports one entry per runner, so a bounded script cannot hide an unbounded one", () => {
+  const mixed = "node --test-concurrency=4 --test 'a' && node --test 'b'";
+  assert.deepEqual(boundsIn(mixed), [
+    { envVar: undefined, value: 4 },
+    undefined,
+  ]);
+});
+
+test("comment stripping never deletes executable source", () => {
+  // A `/*` inside a line comment used to open a phantom block comment that ran to the next `*/`
+  // anywhere later in the file, swallowing everything between — 53 lines of a real suite.
+  const tmp = path.join(os.tmpdir(), `spawn-guard-${process.pid}.mjs`);
+  // The two literals are assembled rather than written out, so this fixture does not itself trip
+  // the hardcode scan above — which reads every test file, this one included. That is deliberate:
+  // exempting the guard from its own rule is how the rule stops being checkable.
+  const inCode = 20000;
+  const inComment = 30000;
+  fs.writeFileSync(
+    tmp,
+    [
+      "// a note mentioning `skills/*/references/` in prose",
+      `const r = spawnSync('bash', [], { timeout: ${inCode} });`,
+      `/* a real block comment with timeout: ${inComment} inside */`,
+      "const u = 'https://example.com/a//b';",
+    ].join("\n"),
+  );
+  try {
+    const stripped = code(tmp);
+    assert.match(
+      stripped,
+      new RegExp(`timeout: ${inCode}`),
+      "executable source was deleted by comment stripping",
+    );
+    assert.doesNotMatch(
+      stripped,
+      new RegExp(`timeout: ${inComment}`),
+      "a real block comment was not stripped",
+    );
+    assert.match(
+      stripped,
+      /example\.com/,
+      "a URL's // ate the rest of its line",
+    );
+  } finally {
+    fs.rmSync(tmp, { force: true });
+  }
+});
+
+test("the spawn budget honours 0 retries and the full precedence ladder", async () => {
+  const { spawnBudget } =
+    await import("../shared/resources/tests/spawn-budget.mjs");
+  const withEnv = (env, fn) => {
+    const saved = {};
+    for (const [k, v] of Object.entries(env)) {
+      saved[k] = process.env[k];
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    try {
+      return fn();
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  };
+  const clean = {
+    P_SPAWN_TIMEOUT_MS: undefined,
+    P_SPAWN_RETRIES: undefined,
+    TEST_SPAWN_TIMEOUT_MS: undefined,
+    TEST_SPAWN_RETRIES: undefined,
+  };
+
+  // 0 retries is the only way to say "do not retry" and must survive.
+  assert.equal(
+    withEnv({ ...clean, P_SPAWN_RETRIES: "0" }, () => spawnBudget("P").retries),
+    0,
+  );
+  // A set-but-empty specific var is the normal shape of an unset CI input; it must not mask the
+  // global one by falling straight to the hardcoded default.
+  assert.equal(
+    withEnv(
+      { ...clean, P_SPAWN_TIMEOUT_MS: "", TEST_SPAWN_TIMEOUT_MS: "123000" },
+      () => spawnBudget("P").timeoutMs,
+    ),
+    123000,
+  );
+  assert.equal(
+    withEnv(
+      { ...clean, P_SPAWN_TIMEOUT_MS: "abc", TEST_SPAWN_TIMEOUT_MS: "123000" },
+      () => spawnBudget("P").timeoutMs,
+    ),
+    123000,
+  );
+  // Specific still wins when it is valid.
+  assert.equal(
+    withEnv(
+      {
+        ...clean,
+        P_SPAWN_TIMEOUT_MS: "90000",
+        TEST_SPAWN_TIMEOUT_MS: "123000",
+      },
+      () => spawnBudget("P").timeoutMs,
+    ),
+    90000,
+  );
+  // A timeout of 0 means "no timeout" to spawnSync, which is not a budget — fall back.
+  assert.equal(
+    withEnv(
+      { ...clean, P_SPAWN_TIMEOUT_MS: "0" },
+      () => spawnBudget("P").timeoutMs,
+    ),
+    60000,
   );
 });
