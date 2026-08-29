@@ -29,9 +29,16 @@ All notable changes to this project will be documented in this file. Format foll
     stepping over an operator's decision — so there is one test per stop reason, each asserting the
     strong form: not "no registry item was selected" but *the registry loader was never called*.
   - **The eligibility floor is the opt-out.** A task enters the frontier at `ready-for-development` or
-    later; a bug at `new` or `reopened`. Promotion up the item's own ladder is already the act of
-    saying "this is ready to be worked", so a `draft` task is out **by construction** rather than by
+    `in-progress`; a bug at `new` or `reopened`. Promotion up the item's own ladder is already the act
+    of saying "this is ready to be worked", so a `draft` task is out **by construction** rather than by
     someone remembering to mark it. No `deferred` value is added to either lifecycle.
+
+    The floor must be a **subset of the statuses the dispatching pipeline accepts** — that is the rule,
+    and those values are only its current answer. `develop-task` HALTs on `Ready for Review`, so a task
+    in that state is excluded even though it is unambiguously "outstanding": selecting it would produce
+    work the dispatcher refuses, stopping an unattended loop that could not then self-recover. A test
+    parses both pipelines' own status tables and asserts the subset relation, so it re-checks itself if
+    either dispatcher changes.
   - **Frontmatter decides; the registry row only nominates.** Indexes drift from what they index — six
     rows of this repo's own task registry were stale when this shipped. A row is a candidate only when
     the *document* it points at is eligible, whatever the row says, asserted in both directions.

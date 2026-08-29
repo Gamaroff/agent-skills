@@ -36,9 +36,9 @@ Add a registry-backed fallback frontier to `select-next.mjs` so an outstanding b
 | 1. create-branch           | ✅ Done    | Branch `feature/task.65.*` exists in git                               | `feature/task.65.registry-aware-selection` off `develop` | — |
 | 2. review-task             | ✅ Done    | `task.65.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT (9/10); 9/9 recommendations applied; status → `ready-for-development` | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 7/7 phases; 8 files; 72 → 99 unit tests; 10 mutations each reddening the tests that name them; suite 1923 pass / 0 fail | — |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #281](https://github.com/Gamaroff/agent-skills/pull/281) → `develop`; 3 commits; issue #280 commented (`posted`) | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.65.qa.{N}.*.md`; `task.65.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.65.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 7. finalise                | ✅ Done    | `task.65.dod.{N}.*.md`; task `status: accepted`                        | DoD PASSED; CI SUCCESS on the accepted head; issue #280 closed (verified); board Done (`already`); **2 doc gaps found and corrected** | — |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -130,6 +130,19 @@ Add a registry-backed fallback frontier to `select-next.mjs` so an outstanding b
    task and is in flight; ticking its own row would attest to a merge that has not happened. Archived
    unticked with the reason recorded in `roadmap-history.md`.
 
+### Step 4 — Create PR — 2026-08-29
+
+- **3 commits**, split by separable concern rather than one bulk commit:
+  - `ef54b2b` `feat(develop-next)` — selector, spec, SKILL.md, 27 new tests.
+  - `b88fe5f` `docs(roadmap)` — Phase 6: PHASE 4 retired, 6 registry rows corrected.
+  - `8922749` `docs(task.65)` — task document, review report, implementation report, CHANGELOG.
+- The **review report was committed here, not withheld**: a tracked document links to it, and an
+  untracked link target resolves locally while CI (which checks out only tracked files) goes red.
+- Pushed and verified: local `HEAD` == `origin/feature/task.65.registry-aware-selection`.
+- PR **#281** → `develop`. Issue #280 commented with the PR link (`reason: posted`).
+- Board move to `in-review`: `reason: stage-disabled` — this project has not opted that moment in.
+  Correct outcome, CLI exits 0, no action needed.
+
 ---
 
 ## Issues Log
@@ -144,16 +157,92 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — 2026-08-29 — Gate: **FAIL** (60/100)
+
+- Artifacts: `task.65.qa.1.*.md`, `task.65.gate.1.*.yml`, `task.65.bug.1.ready-for-review-selected-but-undispatchable.md`
+- Suite re-run independently: 1924 tests, 1923 pass, 1 pre-existing skip, 0 fail. Format clean,
+  bundle idempotent, protocol test 19 pass unchanged.
+- **1 HIGH (blocking), 2 MEDIUM, 1 LOW.**
+  - **H1** — `TASK_ELIGIBLE_STATUSES` admits `ready-for-review`; `develop-task` Phase 0c HALTs on it.
+    The frontier nominates work the dispatcher is guaranteed to refuse, in the normal state of any
+    task between development and merge. Unattended loop stops and cannot self-recover. Reproduces
+    live: the selector picks T65, whose own document is `ready-for-review`. A **specification**
+    defect (§ Scope, SC5) the implementation faithfully carried out — and Step 2's review missed it
+    the same way, both having reasoned from `document-status-lifecycle.md` without checking the
+    dispatcher's accepted set.
+  - **M2** — a registry row with a non-numeric `#` cell is silently invisible (contradicts SC6).
+  - **M3** — column positions assumed with no header validation (silently breaks SC4 ordering).
+  - **L4** — `parseRegistry` takes the first `.md` href, not the first *work-item* href.
+- **QA ran 6 mutations of its own** rather than trusting the Implementation Record's ten; all 6
+  reddened. The decisive probe (loader called eagerly, result discarded) reddened all four
+  stop-precedence tests — proving those assertions are about the *call*, not the outcome.
+- Cross-version parity vs `origin/develop`: roadmap selection and `selectBatch` output byte-identical.
+- Task status → `in-progress` per the FAIL gate.
+
+---
+
+### Cycle 2 — 2026-08-29 — Gate: **CONCERNS** (80/100)
+
+- Re-review after fix cycle 1. Artifacts: `task.65.qa.2.*.md`, `task.65.gate.2.*.yml`.
+- **All 4 cycle-1 findings FIXED**, each re-proved by QA independently. Bug 1 **closed**.
+- H1's fix exceeded the finding: rather than correcting a value it made the floor ⊆ dispatcher rule
+  *executable*, parsing both dispatchers' own status tables. QA proved non-vacuity two ways.
+- **1 new MEDIUM (N1), introduced by the M2 fix** — `cols` is never reset when a table ends, so a
+  second table in a registry document is parsed as registry data and pollutes `--lint`. Cannot cause
+  a wrong selection. **Held by no test** (suite green 113/113 both ways). QA verified a one-line
+  remedy against 6 scenarios, both real registries and the unit suite.
+- **1 LOW (L5)** — SC11's wording is now unsatisfiable by construction; it was only satisfiable before
+  because of the H1 defect. Mechanism proved reachable by a controlled check.
+- Suite 1938 / 1937 pass / 1 pre-existing skip / 0 fail. Format clean, bundle idempotent, protocol 19
+  unchanged. SC1 and SC10 re-verified byte-identical to `origin/develop` after the parser rewrite;
+  all four stop reasons still return with the loader called 0×.
+
+### Cycle 2 fix + Cycle 3 — 2026-08-29 — Gate: **PASS** (90/100)
+
+- **qa-fix cycle 2**: N1 (one line — `cols` reset scoped to one table) + L5 (SC11 reworded to assert
+  reachability). Tests 113 → 121 (§17, 8 new).
+  - One of the new tests had to be **rewritten mid-cycle**: as first written the fenced-block test
+    used a conventionally ordered table, so dropping the mapping at the fence fell back to the
+    documented positions and produced an identical answer — it could not fail. Swapped-column fixture
+    makes the fallback observable.
+- **qa-task cycle 3** (verification): **PASS**, 12/12 success criteria.
+  - N1 mutation-proved **both** directions (under-reset → 4 red; over-reset on the fence → 1 red).
+  - QA additionally verified the *claim about the test*: reverting the fence fixture to its original
+    form and re-running the over-reset mutation gave **0 red**, confirming the original was vacuous
+    and the rewrite fixed it.
+  - 12 probe scenarios (6 original + 6 for over-eagerness) — **no defect**.
+  - 2 residual limitations recorded (LR-1 blank-line-split table, LR-2 back-to-back tables), both on
+    malformed markdown, neither warranting a fix.
+- Suite 1946 / 1945 pass / 1 pre-existing skip / 0 fail. Format clean, bundle idempotent, protocol 19
+  unchanged across all three cycles.
+
+**Gate progression: FAIL 60 → CONCERNS 80 → PASS 90.**
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**Finished**: 2026-08-29
+**Final Status**: Completed
+**Branch**: `feature/task.65.registry-aware-selection`
+**PR**: [#281](https://github.com/Gamaroff/agent-skills/pull/281) → `develop`
+**QA Iterations**: 3 (FAIL 60 → CONCERNS 80 → PASS 90)
+**DoD Summary**: [task.65.dod.1.registry-aware-selection.md](./task.65.dod.1.registry-aware-selection.md)
+**Tracker debt**: none — issue #280 commented at every stage and closed (verified `CLOSED`); board reached Done; no deferred mutations.
+
+### Step 7 — Finalise — 2026-08-29
+
+- DoD **PASSED**. CI verified rather than assumed: `SUCCESS` on the exact accepted head (local HEAD ==
+  PR head, 4/4 jobs).
+- **Two documentation gaps found at the gate**, neither a code defect and neither catchable by CI:
+  - `CHANGELOG.md` described the **pre-fix** eligibility floor (`ready-for-development` "or later"),
+    wrong exactly where it matters after H1 — `ready-for-review` *is* "later" and is now excluded.
+  - `task-registry.md` row 65 still read `ready-for-development`.
+  Both corrected in this step and recorded as found-here rather than presented as always-right.
+- SC11's cycle-2 rewording assessed explicitly and judged a **legitimate correction**: its original
+  form was satisfiable only because of defect H1, so keeping it would have meant either failing a
+  correct feature or leaving a defect in to keep a sentence true.
+- Carried forward, not dropped: Performance NFR **CONCERNS** (`--lint` per-row document read), and
+  LR-1/LR-2 (two residual limitations on already-malformed markdown).
+- Suite re-run after the finalise doc edits: 1946 / 1945 pass / 1 pre-existing skip / 0 fail; format
+  clean; 40 relative links in the task directory, 0 broken.

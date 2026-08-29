@@ -104,7 +104,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 62 | [Run each loop iteration in a fresh Claude process, and classify the outcome from the filesystem](task.62.loop-supervisor-runner/task.62.loop-supervisor-runner.md) | accepted | infrastructure | High | 2026-08-28 | — | — |
 | 63 | [Make an unattended run watchable from a second terminal, and audible when it stops](task.63.loop-supervisor-status-views/task.63.loop-supervisor-status-views.md) | accepted | infrastructure | Medium | 2026-08-28 | — | task.62 |
 | 64 | [Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable](task.64.loop-supervisor-dashboard-and-docs/task.64.loop-supervisor-dashboard-and-docs.md) | accepted | documentation | Medium | 2026-08-28 | — | task.62 |
-| 65 | [Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to /develop-next](task.65.registry-aware-selection/task.65.registry-aware-selection.md) | ready-for-development | infrastructure | High | 2026-08-29 | [#280](https://github.com/Gamaroff/agent-skills/issues/280) | — |
+| 65 | [Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to /develop-next](task.65.registry-aware-selection/task.65.registry-aware-selection.md) | accepted | infrastructure | High | 2026-08-29 | [#280](https://github.com/Gamaroff/agent-skills/issues/280) | — |
 
 ---
 

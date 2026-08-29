@@ -5,11 +5,13 @@ type: task
 description: 'select-next.mjs reads one hand-maintained roadmap. Work filed anywhere else — a bug in the bug registry, a task in the task registry — is invisible to it, so the loop reports roadmap-complete while real work is outstanding. This adds the registries as a fallback frontier, consulted only when no phase holds an actionable row, so the operator never has to remember to transcribe a row.'
 tags: [develop-next, selection, registries, backlog, automation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-29
 updated: 2026-08-29
+completed_date: 2026-08-29
+pr_number: 281
 github_issue: 280
 estimated_effort_hours: 10
 ---
@@ -18,7 +20,7 @@ estimated_effort_hours: 10
 
 **Task File**: [task.65.registry-aware-selection.md](./task.65.registry-aware-selection.md)
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 **Review**: ✅ All review recommendations from `task.65.review.1.registry-aware-selection.md` implemented 2026-08-29
 
@@ -520,6 +522,90 @@ momentary backlog.
 
 ---
 
+## QA Testing Results — Cycle 3 (verification)
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-29
+**QA Cycle**: 3 (final)
+**Quality Score**: 90/100 (60 → 80 → 90)
+**Gate Decision**: **PASS**
+
+### QA Report
+
+- **Full Report**: [task.65.qa.3.registry-aware-selection.md](./task.65.qa.3.registry-aware-selection.md)
+- **Gate File**: [task.65.gate.3.registry-aware-selection.yml](./task.65.gate.3.registry-aware-selection.yml)
+- **Cycle 2**: [qa.2](./task.65.qa.2.registry-aware-selection.md) (CONCERNS, 80) · **Cycle 1**: [qa.1](./task.65.qa.1.registry-aware-selection.md) (FAIL, 60)
+- **Bug 1**: ✅ Closed
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1946 (1945 pass, 1 pre-existing skip, 0 fail); 121 unit tests for this change
+- **Success Criteria**: **12/12 PASS**
+- **NFR Status**: Security PASS, Performance CONCERNS (unchanged `--lint` read cost), Reliability PASS, Maintainability PASS
+
+### Key Findings
+
+**Both gate-2 issues fixed and independently verified.** N1 is mutation-proved in **both** directions
+— removing the reset reddens 4 tests, resetting too eagerly reddens 1 — which is what shows the reset
+is in the right *place* rather than merely present.
+
+**The most interesting check was of a claim about a test, not the code.** The fix report stated its
+fenced-block test could not fail as originally written, and that it had been rewritten to make the
+fallback observable. QA reverted the fixture to its original form and re-ran the mutation: **0 red**.
+The claim is true and the rewrite genuinely fixed it.
+
+Twelve probe scenarios (six original, six probing the new reset for over-eagerness) found **no
+defect**. Two residual limitations are recorded rather than buried — a blank-line-split table and two
+back-to-back tables — both on markdown that is already malformed, both LOW, neither warranting a fix.
+
+**No blocking issues. Approved for finalise.**
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED · **Accepted:** 2026-08-29 · **PR:** [#281](https://github.com/Gamaroff/agent-skills/pull/281)
+
+**Final gate:** [gate.3](./task.65.gate.3.registry-aware-selection.yml) — PASS (90/100) after **3 QA cycles**
+**CI:** SUCCESS on the exact head being accepted (4/4 jobs; local HEAD == PR head)
+
+✅ **Success criteria** — 12/12, traced to 50 registered tests naming a criterion
+✅ **Implementation phases** — 7/7
+✅ **Tests** — 1946 total, 1945 pass, 1 pre-existing skip, **0 fail**; `format:check` clean; `bundle` idempotent
+✅ **Security** — verified by grep over the diff: no credentials, no network, no process execution, no writes. Two `readFileSync` calls, Node stdlib only, no new dependencies
+⚠️ **Compliance** — NOT_APPLICABLE (a build-time selector for a developer tool; no personal data, no UI, never deployed)
+✅ **Documentation** — spec, SKILL.md, roadmap, history, CHANGELOG
+
+**Two documentation gaps were found and corrected during finalise**, neither a code defect and neither
+caught by CI:
+
+- **CHANGELOG.md** described the *pre-fix* eligibility floor ("`ready-for-development` **or later**"),
+  which after the H1 fix is wrong in the way that matters — `ready-for-review` is "later" and is now
+  deliberately excluded. It would have shipped as a public description of a rule the code does not
+  implement. Corrected, and rewritten to state the **rule** rather than only its current values.
+- **`task-registry.md` row 65** still read `ready-for-development`. Corrected — leaving a row knowingly
+  wrong in the change that corrected six others would be indefensible.
+
+**Carried forward, not dropped:**
+
+- **Performance NFR: CONCERNS.** `--lint` reads one document per registry row (67 here) — linear and
+  unbounded. Confined to an operator-invoked diagnostic; selection short-circuits. A known limitation
+  with a reasoned decision not to cache, named here because a passing gate is not a reason to stop
+  mentioning it.
+- **LR-1 / LR-2** — two residual limitations on already-malformed markdown (a blank-line-split table;
+  two tables with no blank line between them). Neither fixed; fixing either would mean special-casing
+  invalid markdown.
+
+**Three QA cycles, and the cycle-1 fix introduced the cycle-2 defect** — M2's fix (making an invisible
+row visible) made non-rows falsely visible. Both landed in the same `--lint` report this feature's
+visibility guarantee rests on. That is the honest cost of the change and is recorded rather than
+smoothed over.
+
+**Detailed verification log:** [task.65.dod.1.registry-aware-selection.md](./task.65.dod.1.registry-aware-selection.md)
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -532,6 +618,8 @@ momentary backlog.
 | 2026-08-29 |  | QA findings fixed — 4 of 4 (1 HIGH, 2 MEDIUM, 1 LOW), 1 iteration; eligibility floor narrowed and the floor ⊆ dispatcher rule made executable; tests 99 → 113 | qa-fix |
 | 2026-08-29 |  | QA cycle 2 gate CONCERNS (80/100) — all 4 cycle-1 findings fixed and closed; 1 new MEDIUM introduced by the M2 fix (column state never reset), 1 LOW | qa-task |
 | 2026-08-29 |  | QA findings fixed — N1 + L5, 1 iteration; column mapping scoped to one table, mutation-proved both directions; SC11 reworded; tests 113 → 121 | qa-fix |
+| 2026-08-29 |  | QA cycle 3 gate **PASS** (90/100) — 12/12 success criteria; N1 + L5 closed, 0 blocking issues, 2 residual limitations recorded | qa-task |
+| 2026-08-29 | 1.2 | DoD verified — accepted (PR #281); 12/12 criteria, CI green on the accepted head; two documentation gaps found and corrected during verification | finalise |
 
 ## References
 
