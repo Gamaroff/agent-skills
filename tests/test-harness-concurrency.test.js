@@ -207,15 +207,62 @@ function stripComments(src) {
   let out = "";
   let i = 0;
   const n = src.length;
+  // Trailing significant output, for the regex-vs-division heuristic. A window rather than a scan
+  // of `out`: trimming the whole accumulated string on every `/` is quadratic (measured 3.9s on a
+  // 1.2MB input, 245ms at 500KB) and the longest keyword here is 10 characters.
+  let tail = "";
+  const emit = (text) => {
+    out += text;
+    tail = (tail + text).slice(-16);
+  };
   const regexAllowed = () => {
-    const before = out.replace(/\s+$/, "");
+    const before = tail.replace(/\s+$/, "");
     return before === "" || REGEX_OK_AFTER.test(before);
   };
+
+  // Template-literal state. A template's closing backtick ALWAYS returns to code, because a
+  // template can only be opened from code — either at the top level or inside a `${}`. What needs
+  // a stack is the `${}` substitution: its contents are CODE, and the matching `}` must return to
+  // the enclosing template. Without this, a nested template's opening backtick closed the outer
+  // one and its contents were scanned as code, so a URL, a glob or a `//` inside it started a
+  // comment and deleted the rest of the line — to EOF for a `/*`.
+  let inTemplate = false;
+  const substitutions = []; // saved brace depth, one entry per open `${`
+  let braceDepth = 0;
+
   while (i < n) {
     const c = src[i];
     const d = src[i + 1];
+
+    if (inTemplate) {
+      if (c === "\\") {
+        emit(c + (src[i + 1] ?? ""));
+        i += 2;
+        continue;
+      }
+      if (c === "`") {
+        emit(c);
+        i++;
+        inTemplate = false;
+        continue;
+      }
+      if (c === "$" && d === "{") {
+        emit("${");
+        i += 2;
+        substitutions.push(braceDepth);
+        braceDepth = 0;
+        inTemplate = false;
+        continue;
+      }
+      emit(c);
+      i++;
+      continue;
+    }
+
+    // ---- code ----
     if (c === "/" && d === "/") {
-      while (i < n && src[i] !== "\n") i++;
+      // `\r` terminates a line comment in JS too; stopping only at `\n` ran a CRLF-free comment on.
+      while (i < n && src[i] !== "\n" && src[i] !== "\r") i++;
       continue;
     }
     if (c === "/" && d === "*") {
@@ -224,16 +271,16 @@ function stripComments(src) {
       i += 2;
       continue;
     }
-    if (c === '"' || c === "'" || c === "`") {
-      out += c;
+    if (c === '"' || c === "'") {
+      emit(c);
       i++;
       while (i < n) {
         if (src[i] === "\\") {
-          out += src[i] + (src[i + 1] ?? "");
+          emit(src[i] + (src[i + 1] ?? ""));
           i += 2;
           continue;
         }
-        out += src[i];
+        emit(src[i]);
         if (src[i] === c) {
           i++;
           break;
@@ -242,19 +289,34 @@ function stripComments(src) {
       }
       continue;
     }
+    if (c === "`") {
+      emit(c);
+      i++;
+      inTemplate = true;
+      continue;
+    }
+    if (c === "}" && braceDepth === 0 && substitutions.length > 0) {
+      emit(c);
+      i++;
+      braceDepth = substitutions.pop();
+      inTemplate = true;
+      continue;
+    }
+    if (c === "{") braceDepth++;
+    else if (c === "}") braceDepth--;
     if (c === "/" && regexAllowed()) {
-      out += c;
+      emit(c);
       i++;
       let inClass = false;
       while (i < n) {
         const ch = src[i];
         if (ch === "\\") {
-          out += ch + (src[i + 1] ?? "");
+          emit(ch + (src[i + 1] ?? ""));
           i += 2;
           continue;
         }
         if (ch === "\n") break; // unterminated — not a regex after all; stop rather than run on
-        out += ch;
+        emit(ch);
         i++;
         if (ch === "[") inClass = true;
         else if (ch === "]") inClass = false;
@@ -262,7 +324,7 @@ function stripComments(src) {
       }
       continue;
     }
-    out += c;
+    emit(c);
     i++;
   }
   return out;
@@ -313,10 +375,18 @@ test("the shared spawn budget exists and is generous by default", () => {
 
 test("the spawn budget is tunable per-suite and globally", () => {
   const src = code(BUDGET_MODULE);
+  // `/SPAWN_TIMEOUT_MS/` is a strict substring of `TEST_SPAWN_TIMEOUT_MS`, so it could never fail
+  // independently — a global-only implementation with the per-suite lookups deleted passed all
+  // three of these. Match the interpolated per-suite form instead.
   assert.match(
     src,
-    /SPAWN_TIMEOUT_MS/,
-    "budget must expose a timeout env knob",
+    /\$\{prefix\}_SPAWN_TIMEOUT_MS/,
+    "budget must expose a PER-SUITE timeout knob, not only the global one",
+  );
+  assert.match(
+    src,
+    /\$\{prefix\}_SPAWN_RETRIES/,
+    "budget must expose a PER-SUITE retries knob, not only the global one",
   );
   assert.match(
     src,
@@ -449,6 +519,20 @@ test("comment stripping never deletes executable source", () => {
       // early, and the stray quote then opens another one that runs on and swallows what follows.
       "const esc = 'it\\'s fine';",
       `// escaped-quote bait: timeout: ${inComment}`,
+      // A NESTED template inside a `${}` substitution. A scanner that treats a backtick as a plain
+      // quote closes the outer template on the inner one's opening backtick, then reads the inner
+      // template's contents as code — so a URL, a glob or a `//` inside it starts a comment and
+      // deletes the rest of the line, to EOF for a `/*`.
+      `const url = \`run \${ \`https://host/x\` } now\`; const v = { timeout: ${inCode} };`,
+      `const glob = \`\${ \`skills/*/references\` }\`; const w = { timeout: ${inCode} };`,
+      // A backtick inside a quoted string inside a substitution: same desync, but the stray quote
+      // then runs on and swallows a later, unrelated line.
+      'const tick = `x${ "`" }y`;',
+      'const later = "http://a";',
+      `// substitution bait: timeout: ${inComment}`,
+      // A lone `\r` (classic-Mac line ending) terminates a line comment in JS. A scanner that
+      // breaks only on `\n` runs the comment on and eats the code after it.
+      `const cr = 1;\r// cr bait: timeout: ${inComment}\rconst y = { timeout: ${inCode} };`,
     ].join("\n"),
   );
   try {
@@ -458,7 +542,7 @@ test("comment stripping never deletes executable source", () => {
     // hardcoded timeout, and the guard passes on the regression it exists to catch.
     assert.equal(
       (stripped.match(new RegExp(`timeout: ${inCode}`, "g")) || []).length,
-      2,
+      5,
       "executable source was deleted by comment stripping",
     );
     // NEITHER comment occurrence may survive: the block comment, or the line comment after a regex
