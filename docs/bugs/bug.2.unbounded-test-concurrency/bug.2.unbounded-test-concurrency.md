@@ -82,6 +82,22 @@ full suite and never when the file runs alone. **A failure was not reproduced in
 investigation**; the evidence here is the margin, plus the two historical failures recorded in the
 roadmap.
 
+### The root-cause fix appears to be free (measured 2026-08-29)
+
+Full `npm test`, same machine, back to back:
+
+| Configuration | Wall clock | Result |
+| --- | --- | --- |
+| Default (unbounded — 16-way on this box) | **136.97 s** | 1869 pass, 0 fail |
+| `--test-concurrency=4` | **135.00 s** | 1869 pass, 0 fail |
+
+**No measurable cost.** The suite is dominated by per-spawn latency rather than by parallelism, so
+oversubscribing the box was not buying wall-clock — it was only adding contention. Treat this as
+n=1 per configuration and re-measure before committing to a number, but the usual objection to
+bounding concurrency (a slower suite) does not appear to apply here.
+
+That materially changes the fix recommendation below: option 1 is not a trade-off against speed.
+
 ### The root cause is already documented in the codebase
 
 `shared/resources/tests/access-config-parity.test.mjs:105-121` contains a precise diagnosis:
@@ -134,8 +150,9 @@ and the code is not wrong; the harness is oversubscribed.
 
 **Suggested fix** (for the developer — not prescriptive):
 
-1. **Bound the concurrency**: `node --test --test-concurrency=<n>` in the `test` script. This is the
-   root-cause fix and is one line. Pick `n` against measurement, not intuition.
+1. **Bound the concurrency**: `node --test --test-concurrency=<n>` in the `test` script. One line, and
+   measured at **no wall-clock cost** at `n=4` (see above). Pick `n` against measurement, not
+   intuition, and re-measure on the CI box as well as a dev machine.
 2. **Generalise the `access-config-parity` remedy** to the other spawn-heavy suites — a shared
    spawn helper with a generous env-tunable timeout and a retry for a probe that never started —
    rather than raising six more magic numbers.
