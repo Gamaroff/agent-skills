@@ -35,7 +35,7 @@ Add the optional `--dashboard` / `--dashboard-token` push to `run-loop.mjs` with
 | 2. review-task             | ✅ Done    | `task.64.review.1.*.md` exists (or skip logged)                        | READY TO IMPLEMENT, 9/10; 0 critical, 2 important (both fixed), 2 optional; status Draft → Ready for Development | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. All 5 phases + 6 progress boxes complete. npm test 1856/1856, format:check clean, 93 links verified | — |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #278](https://github.com/Gamaroff/agent-skills/pull/278); 3 commits; issue comment skipped (no linked issue) | — |
-| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 | `task.64.qa.1.*.md`; `task.64.gate.1.*.yml`; PR comment posted         | Gate 1 CONCERNS (50/100): 0 high, 5 medium, 6 low. qa-fix next | `.summaries/…` (gitignored; matrix inlined in the QA report) |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.64.qa.{1,2,3}.*.md`; `task.64.gate.{1,2,3}.*.yml`; PR comments posted | **Gate 3 PASS 100/100** after 3 cycles. C1 CONCERNS 50 (11 findings) → C2 CONCERNS 90 (QA-12) → C3 PASS. 12/12 closed, 8/8 criteria full | `.summaries/…` (gitignored; matrix inlined in the QA report) |
 | 7. finalise                | ⏳ Pending | `task.64.dod.1.*.md`; task `status: accepted`                          |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -118,7 +118,57 @@ Suite 1856/1856; CI 4/4 green on `c3532e9`.
 
 **6 LOW:** double-SIGINT leaves `active:true`; `pushFrame` unguarded; env fallback infers presence rather than tracking it; `repoUrl` unredacted; live-network test in the default glob; unserialisable test survives removal of its guard.
 
-**Honest note:** QA-1, QA-2 and QA-3 are all defects in work done earlier in this same run. QA-4 is the one that would have shipped silently — a runbook full of `node .agents/skills/.../run-loop.mjs` invocations recorded as gated by a test that never opens the file.
+**qa-fix cycle 1 — all 11 closed.** `pushRunFrame()` extracted (closes QA-1 ledger scoping, QA-3 run-level proof, QA-7 guarding in one export); vacuous token test replaced with one driving the real push path; `executable-instructions` widened to `docs/runbooks/**` + `skills/*/README.md` and mutation-proved on both; token stripped from the spawned child's env; six LOW fixes. Suite 1867 (1866 pass, 1 gated skip).
+
+**Two defects introduced by this run and caught before CI:**
+
+1. The double-SIGINT fix introduced a **third**-SIGINT re-entrancy bug — found by the Step 3.5 adversarial pass over the fixes, not by QA. Guarded.
+2. The QA report linked `.summaries/qa-traceability-matrix.md`, which `.gitignore:25` excludes — resolves locally, 404s in CI. Found by checking the **tracked** tree in a detached worktree. Matrix inlined instead.
+
+**Honest note:** QA-1, QA-2 and QA-3 are all defects in work done earlier in this same run.
+
+### Cycle 2 — qa-task re-review — 2026-08-29 — Gate CONCERNS (90/100)
+
+Scope: files changed since gate 1 (`1dbf394`, `c717386`). **Every cycle-1 fix was re-verified by
+mutation** — revert the behaviour, re-run the suite, restore — rather than by reading the diff. That
+choice is the whole value of this cycle: five fixes killed tests and were proved; one did not.
+
+| Invariant | Mutation | Killed | Proved |
+|---|---|---|---|
+| QA-1 frame publishes only this run's rows | drop the `runId` filter | 1 | ✅ |
+| QA-2 token never reaches the request body | copy it into the frame | 2 | ✅ |
+| QA-3 / QA-7 `pushRunFrame` never rejects | rethrow from its catch | 2 | ✅ |
+| QA-4 gate scans runbooks + skill READMEs | phantom command in each | 2 | ✅ |
+| QA-9 HTTPS userinfo stripped | return the URL unredacted | 2 | ✅ |
+| **QA-5 token stripped from child env** | **do not strip** | **0** | ❌ |
+
+**QA-12 (new, MEDIUM).** The child-env strip was correct in code and held by nothing — it sat inline
+in `main()`, unreachable from any test, so a refactor of the `spawn` options would remove a credential
+boundary in silence. Recorded as gating rather than waved through: it is the identical shape to cycle
+1's QA-2, and the lesson of one cycle does not get to be relearned in the next.
+
+10 closed, 1 partial, 0 regressions. All 8 success criteria reached **full** (from 5 full / 3 partial).
+
+### Cycle 3 — qa-task final re-review — 2026-08-29 — Gate PASS (100/100)
+
+QA-12 closed and mutation-confirmed: removing the child-env strip now kills **2** tests (it killed 0
+at cycle 2), and an over-stripping mutant returning an empty environment also kills 2 — the boundary
+is held in both directions. A single "the token is gone" assertion would have passed against a
+`childEnvFor` that returned `{}`, breaking every spawned iteration while looking correct.
+
+12/12 findings closed · 8/8 success criteria full · all four NFRs PASS · CI 4/4 green on `a568539` ·
+10 invariants mutation-proved across cycles 2–3, all 10 proved. No regressions, no new findings.
+
+### Cycle 2 — qa-fix — 2026-08-29
+
+`childEnvFor(env)` extracted — pure, exported, and documented with the reason it is not inline. Three
+tests hold it: the token is gone; **everything else survives** (over-stripping would break `PATH`, the
+API key and `TERM` for a real Claude child); and the source object is not mutated, because the
+supervisor still needs its own token.
+
+Mutation re-run: removing the strip now kills **2** (was 0), and over-stripping the whole environment
+also kills **2** — the boundary is held in both directions, which a single assertion would not have
+caught. Suite 1870 (1869 pass, 1 gated skip, 0 fail). QA-4 is the one that would have shipped silently — a runbook full of `node .agents/skills/.../run-loop.mjs` invocations recorded as gated by a test that never opens the file.
 
 ---
 
@@ -128,6 +178,6 @@ Suite 1856/1856; CI 4/4 green on `c3532e9`.
 **Final Status**: _pending_
 **Branch**: `feature/task.64.loop-supervisor-dashboard-and-docs`
 **PR**: [#278](https://github.com/Gamaroff/agent-skills/pull/278)
-**QA Iterations**: _pending_
+**QA Iterations**: 3 (gate 1 CONCERNS 50 → gate 2 CONCERNS 90 → gate 3 PASS 100)
 **DoD Summary**: _pending_
 **Tracker debt**: _pending_

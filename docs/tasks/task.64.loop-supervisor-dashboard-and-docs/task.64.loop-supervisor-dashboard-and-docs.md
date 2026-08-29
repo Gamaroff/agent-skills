@@ -299,11 +299,11 @@ Modified: `skills/loop-supervisor/scripts/run-loop.mjs`, `skills/loop-supervisor
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS → fixed (cycle 3 pending)
+**QA Status**: ✅ PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-29
-**Quality Score**: 90/100 (cycle 2; cycle 1 was 50/100)
-**Gate Decision**: CONCERNS (gate 2)
+**Quality Score**: 100/100 (cycle 3; 50 → 90 → 100)
+**Gate Decision**: PASS (gate 3)
 
 ### QA Artifacts
 
@@ -311,13 +311,15 @@ Modified: `skills/loop-supervisor/scripts/run-loop.mjs`, `skills/loop-supervisor
 |---|---|---|---|
 | 1 | [gate.1](./task.64.gate.1.loop-supervisor-dashboard-and-docs.yml) | [qa.1](./task.64.qa.1.loop-supervisor-dashboard-and-docs.md) | CONCERNS 50/100 — 5 medium, 6 low |
 | 2 | [gate.2](./task.64.gate.2.loop-supervisor-dashboard-and-docs.yml) | [qa.2](./task.64.qa.2.loop-supervisor-dashboard-and-docs.md) | CONCERNS 90/100 — 10 fixed, 1 partial |
+| 3 | [gate.3](./task.64.gate.3.loop-supervisor-dashboard-and-docs.yml) | [qa.3](./task.64.qa.3.loop-supervisor-dashboard-and-docs.md) | **PASS 100/100** — 12/12 closed, 8/8 criteria full |
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 1870 (1869 pass, 1 gated skip, 0 fail); CI 4/4 green
+- **Tests Executed**: 1870 (1869 pass, 1 gated skip, 0 fail); CI 4/4 green on `a568539`
+- **Mutation proving**: 10 invariants probed across cycles 2–3, all 10 proved
 - **Phases Verified**: 5/5
 - **Criteria**: 8 full (was 5 full / 3 partial at cycle 1)
-- **NFR**: Security CONCERNS→resolved, Performance PASS, Reliability PASS, Maintainability PASS
+- **NFR**: Security PASS, Performance PASS, Reliability PASS, Maintainability PASS
 
 ### Key Findings Across Both Cycles
 
@@ -330,6 +332,7 @@ set out to avoid: **coverage reported where none existed.**
 - **Cycle 2** re-verified every fix by **mutation** rather than by reading it, and found one that was
   real but unheld: the child-environment token strip lived inline in `main()`, so deleting it left the
   suite green. Extracted to `childEnvFor()` with tests; the same mutation now kills two.
+- **Cycle 3** closed QA-12 and found nothing new: 12/12 findings closed, 8/8 criteria full, all NFRs PASS.
 - **Two defects were introduced by the fixes themselves** and caught before CI — a third-SIGINT
   re-entrancy bug from the double-SIGINT fix, and a QA report linking gitignored scratch that would
   have resolved locally and 404'd in CI.
@@ -348,6 +351,7 @@ set out to avoid: **coverage reported where none existed.**
 | 2026-08-29 |         | QA findings fixed — all 11 closed (5 medium, 6 low) plus 1 found by the adversarial pass over the fixes; `executable-instructions` widened to cover runbooks and skill READMEs, mutation-proved; 1 QA iteration | qa-fix |
 | 2026-08-29 |         | QA gate 2 CONCERNS (90/100) — cycle-1 fixes re-verified by mutation; 10 closed, QA-12 found (child-env strip real but unheld by any test) | qa-task |
 | 2026-08-29 |         | QA-12 fixed — `childEnvFor()` extracted and asserted; the mutation that killed 0 tests now kills 2; 2 QA iterations | qa-fix |
+| 2026-08-29 |         | QA gate 3 **PASS** (100/100) — 12/12 findings closed, 8/8 criteria full, all four NFRs PASS; 10 invariants mutation-proved; CI 4/4 green on `a568539` | qa-task |
 
 ## References
 

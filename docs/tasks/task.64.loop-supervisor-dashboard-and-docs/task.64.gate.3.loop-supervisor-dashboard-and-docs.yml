@@ -1,0 +1,84 @@
+schema: 1
+task: "task.64.loop-supervisor-dashboard-and-docs"
+task_title: "Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable"
+gate: PASS
+status_reason: "All twelve findings across three cycles are closed, 8/8 success criteria are full, all four NFRs PASS, and every load-bearing property is proved by a test demonstrated capable of failing."
+reviewer: "QA Engineer"
+updated: "2026-08-29T01:05:00Z"
+
+re_review_context:
+  previous_gates:
+    - { file: "task.64.gate.1.loop-supervisor-dashboard-and-docs.yml", decision: CONCERNS, score: 50, findings: 11 }
+    - { file: "task.64.gate.2.loop-supervisor-dashboard-and-docs.yml", decision: CONCERNS, score: 90, findings: 1 }
+  fix_commits: ["1dbf394", "c717386", "a568539"]
+  method: "Every claimed fix re-verified by mutation — revert the behaviour, re-run the suite, restore. A fix whose mutant kills no test is recorded as not proved, whatever the code says."
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 1870
+  phases_verified: "5/5"
+  head_sha: "a5685391dbbc9bda77fa15f633404158397f8623"
+  ci:
+    checked_on: "a5685391dbbc9bda77fa15f633404158397f8623"
+    result: "4/4 green"
+    checks: ["test", "link-check", "validate", "PR into main comes from an allowed branch"]
+  suite: "1870 tests — 1869 pass, 1 skipped (live-network, gated behind LOOP_SUPERVISOR_LIVE_NETWORK_TESTS), 0 fail"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  criteria_full: [1, 2, 3, 4, 5, 6, 7, 8]
+  criteria_partial: []
+
+mutation_proving:
+  method: "revert the behaviour, re-run the suite, restore"
+  probed: 8
+  proved: 8
+  results:
+    - { invariant: "warn-and-continue on any push failure", mutation: "rethrow from pushDashboard", tests_killed: 3, proven: true }
+    - { invariant: "non-2xx detected as failure", mutation: "if (false) for !res.ok", tests_killed: 1, proven: true }
+    - { invariant: "token sent in the header", mutation: "delete the header assignment", tests_killed: 1, proven: true }
+    - { invariant: "frame publishes only this run's ledger rows", mutation: "drop the runId filter", tests_killed: 1, proven: true }
+    - { invariant: "token never reaches the request body", mutation: "copy the token into the frame", tests_killed: 2, proven: true }
+    - { invariant: "pushRunFrame never rejects", mutation: "rethrow from its catch", tests_killed: 2, proven: true }
+    - { invariant: "gate scans runbooks and skill READMEs", mutation: "phantom command in each file class", tests_killed: 2, proven: true }
+    - { invariant: "HTTPS remote userinfo stripped", mutation: "return the URL unredacted", tests_killed: 2, proven: true }
+    - { invariant: "token stripped from the child environment", mutation: "do not strip it", tests_killed: 2, proven: true, note: "killed 0 at cycle 2 — this is the fix" }
+    - { invariant: "the child environment is not over-stripped", mutation: "return an empty environment", tests_killed: 2, proven: true, note: "the second direction; a single assertion would have passed a childEnvFor that returned {}" }
+
+issue_resolution:
+  total_findings: 12
+  closed: 12
+  outstanding: 0
+  introduced_by_fixes_and_caught: 2
+  notes: "The two defects introduced by fixes — a third-SIGINT re-entrancy bug and a QA report linking gitignored scratch — were caught by the dev-side adversarial pass and by checking the tracked tree, both before CI, and recorded as findings of their cycle rather than fixed silently."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Both leak paths closed and mutation-proved: the token reaches neither the frame body, the child environment, nor a log; repoUrl userinfo is stripped. There is deliberately no dashboardToken config key."
+  performance:
+    status: PASS
+    notes: "The push is bounded by a 5s timeout, fires only at iteration boundaries, and is inert without --dashboard. repoUrl resolves only when a dashboard is configured."
+  reliability:
+    status: PASS
+    notes: "pushRunFrame is mutation-proved to swallow every failure mode including throwing inputs, so the observer cannot reach the run's exit path. The double-SIGINT path closes the frame on a 1.5s leash; the residual SIGKILL case is documented for consumers to age out."
+  maintainability:
+    status: PASS
+    notes: "Every test that reported coverage it did not have is replaced, and each replacement has been demonstrated capable of failing."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "When the consumer dashboard is built, exercise the documented payload against it once end to end — the contract is proved against its own tests, not against a real consumer"
+      refs: ["skills/loop-supervisor/README.md"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
