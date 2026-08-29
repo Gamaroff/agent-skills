@@ -95,10 +95,12 @@ node .agents/skills/develop-next/scripts/select-next.mjs --roadmap <roadmapPath>
 
 Selection rules, marker vocabulary, and edge-case semantics: [`references/roadmap-selection.md`](references/roadmap-selection.md). The script is the authoritative implementation; if its output looks wrong, fix the roadmap (or the script) — do not hand-pick an item.
 
+> **A selection may come from a registry, not the roadmap.** When no phase holds an actionable row — and *only* then — the selector falls through to `docs/bugs/bug-registry.md` and `docs/tasks/task-registry.md`, so a filed bug or task cannot be invisible to the loop. `item.source` names the provenance on **every** selection (`roadmap` | `bug-registry` | `task-registry`); report it. Precedence is absolute (an authored phase always wins), eligibility is the document's own frontmatter rather than the registry row, and the four deliberate stops below are **never** pre-empted — only `roadmap-complete` is. Full rules: [`references/roadmap-selection.md`](references/roadmap-selection.md) §"Registry fallback frontier".
+
 Act on the JSON `status`:
 
 - **`halt` with `missing: true`** (no roadmap file at `roadmapPath`) → this project has no completion roadmap yet. **Do not fabricate one.** In an interactive/one-shot run, offer to scaffold a starter from [`assets/project-completion-roadmap.template.md`](assets/project-completion-roadmap.template.md) at `roadmapPath` (create parent dirs), then **STOP** for the user to populate it with real items — an empty roadmap has nothing to build. In a `/loop` run, **STOP** and notify (no one is present to author it). Never auto-create-and-proceed.
-- **`selected`** → record the `item`, `rationale`, and `skipped[]` for the run report; write the run-state file. In `--dry-run`: print them and **stop here**.
+- **`selected`** → record the `item` (including `item.source`), `rationale`, and `skipped[]` for the run report; write the run-state file. In `--dry-run`: print them and **stop here**.
   - **Already-done guard:** if the item's document frontmatter is already `status: accepted` and its PR is merged, the roadmap tick was lost — skip straight to **Step 4**. Query per `VCS` (resolved in Step 0), or fall back to the document's own PR link:
 
     ```bash
@@ -110,7 +112,7 @@ Act on the JSON `status`:
       gh pr list --state merged --head "<branch>" --json number --jq '.[0].number // empty'
     fi
     ```
-- **`stop`** → **STOP**: report `stopReason` + `detail`, send a push notification, end the loop. Reasons: `human-gated` (`manual`/🚧 frontier), `planning-gap` (a `/create-story` / `/create-epic` row — authoring is interactive and its output needs human review, so it is never run unattended), `manual-checkpoint` (the next item names no runnable command — only `/develop-story`, `/develop-task` and `/develop-bug` are runnable — or no resolvable path — e.g. a "run `/review-prd`" checkpoint), `phase-blocked`, `roadmap-complete`.
+- **`stop`** → **STOP**: report `stopReason` + `detail`, send a push notification, end the loop. Reasons: `human-gated` (`manual`/🚧 frontier), `planning-gap` (a `/create-story` / `/create-epic` row — authoring is interactive and its output needs human review, so it is never run unattended), `manual-checkpoint` (the next item names no runnable command — only `/develop-story`, `/develop-task` and `/develop-bug` are runnable — or no resolvable path — e.g. a "run `/review-prd`" checkpoint), `phase-blocked`, `roadmap-complete`. The first four are deliberate operator decisions and are never scanned past; `roadmap-complete` now means the roadmap **and** both registries are exhausted.
 - **`halt`** (no parseable roadmap content, exit 1) → **HALT**: surface `lint.errors` verbatim. The selector is deliberately tolerant (archived deps, recap rows, and annotation rows are non-fatal warnings — see [`references/roadmap-selection.md`](references/roadmap-selection.md)); a halt means the file could not be parsed as a roadmap at all. `⏭️`/`SKIP` rows are stepped past automatically and never stop the loop. The dispatched command and its work-item path both come from the selector's `item.command` / `item.commandArg`.
 
 ## Step 2 — Dispatch the pipeline

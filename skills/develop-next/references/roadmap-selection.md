@@ -57,6 +57,57 @@ Sections that are never candidates: any heading matching **Deferred**/**human-ga
 4. **Epic order.** Within an execution phase, the section order encodes the ratified epic sequence — top-to-bottom scanning honours it automatically; do not re-derive or re-optimize the order.
 5. **Record the rationale**: the script emits the selected item, its deps and their states, and every earlier `[ ]` row skipped with a one-line reason. Include all of it in the run report.
 
+## Registry fallback frontier
+
+The roadmap is a hand-maintained index of work that **already has two other indexes**. Filing a general bug appends a row to `docs/bugs/bug-registry.md`; creating a task appends a row to `docs/tasks/task-registry.md`. Both carry a path, a status and a priority — everything selection needs. Asking a human to transcribe a subset of that into a third place is one manual step between "work exists" and "the loop can see it", and it is a step nobody notices skipping, because **the failure mode is silence**: the loop reports `roadmap-complete` and stops, which is indistinguishable from there genuinely being nothing to do.
+
+So when — and **only** when — the scan reaches the terminal `roadmap-complete` return, the selector falls through to the two registries.
+
+**Precedence is absolute: an authored phase always wins.** The registries are a floor, not a re-ranking of deliberate human sequencing.
+
+### Which stop the fallback pre-empts
+
+`roadmap-complete`, and nothing else. The other four stops — `human-gated`, `planning-gap`, `manual-checkpoint`, `phase-blocked` — are deliberate operator decisions and still stop the loop. A human gate is never scanned past. This is the sharpest edge in the feature: a fallback reachable from any other stop would look like it was working while quietly stepping over someone's decision. One unit test per stop reason pins it, and each asserts the strong form — not "no registry item was selected" but **"the registry loader was never called"**.
+
+### Eligibility — the floor *is* the opt-out
+
+There is no marker to write and none to remember. An item is opted **in** by being promoted up its own ladder, and the two ladders are deliberately different because bugs and tasks do not share a lifecycle ([`bug-documents.md`](../../../docs/standards/bug-documents.md)):
+
+| Kind        | Lifecycle                                                                       | Eligible                                                     |
+| ----------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| General bug | `new → in-progress → ready-for-qa → closed \| reopened`                          | `new`, `reopened`                                            |
+| Task        | `draft → planned → ready-for-development → in-progress → ready-for-review → accepted \| cancelled` | `ready-for-development`, `in-progress`, `ready-for-review` |
+
+A `draft` or `planned` task is therefore out of the frontier **by construction** rather than by someone remembering to mark it — which is strictly stronger than an opt-out marker, and is why no `deferred` value is added to either lifecycle.
+
+### Frontmatter decides; the registry row only nominates
+
+A registry is an index, and indexes drift from what they index. Three rows of this repo's own task registry read `draft` while their documents read `accepted` — that is the current state of the file, not a hypothetical. So a row is a candidate only when **the document it points at** puts it inside its kind's eligible set, whatever the row says. This holds in both directions: a stale-**open** row with a terminal document is not selected, and a stale-**closed** row with an open document **is**. A document that is missing or carries no readable `status:` is not a candidate.
+
+### Ordering
+
+Bugs before tasks, unconditionally — a registered bug is known-broken behaviour, a filed task is intended work, and broken outranks intended. Within bugs: `severity`, then `priority`, then ascending number. Within tasks: `priority`, then ascending number. The trailing number tie-break is what makes the order **total**, so the frontier is stable under input reordering. An unrecognised severity or priority sorts last within its tier rather than throwing — a typo in a hand-maintained cell must not decide whether work is visible at all.
+
+### Tolerance
+
+A consumer repo may have neither registry. An absent, empty, header-only or table-less registry yields zero rows and **never throws** — it degrades to today's behaviour. A single malformed row (no `[title](path.md)` link, an empty status cell, too few columns) is recorded and stepped over; it never suppresses the well-formed rows around it. A pipe table inside a fenced code block is an example, not the registry.
+
+### Visibility — out of the frontier, never invisible
+
+`select-next.mjs --lint` emits a `registryFrontier` section listing **every** registry row the fallback considered, with the reason each was passed over (`document status draft — outside the task eligibility floor …`, `document missing or unreadable: …`, `malformed row — …`, `eligible, but T3 ranked higher`). An item may be out of the frontier, but it must never be invisible — invisibility is the exact failure this mechanism exists to remove, and an escape hatch that reintroduced it silently would be the same bug wearing different clothes. Selection short-circuits at the first eligible row (so it reads at most one document per candidate up to the hit); `--lint` evaluates every row.
+
+### `item.source`
+
+Every selection carries `item.source` — `roadmap`, `bug-registry` or `task-registry` — **including roadmap ones**. A field present only sometimes is an implicit contract: a consumer would have to infer "absent means roadmap". Uniform shape, one code path, and the run report can always state provenance. `--dry-run` inherits it for free, because it prints the item.
+
+### Not in the batch
+
+`--batch` is registry-free and unchanged. Registry rows carry no `touches:` annotation, so write-disjointness cannot be established for them and they must never enter a parallel batch.
+
+### Paths and overrides
+
+Registry hrefs are resolved **relative to the registry file**, so `bug.2.x/bug.2.x.md` in `docs/bugs/bug-registry.md` becomes the repo-root-relative `docs/bugs/bug.2.x/bug.2.x.md` that the dispatched command receives verbatim. Defaults are `docs/bugs/bug-registry.md` and `docs/tasks/task-registry.md`; override with `--bug-registry <path>` / `--task-registry <path>`.
+
 ## Parallel batch (`--batch`) — worktree fan-out
 
 `select-next.mjs --batch` is a **planning aid**, orthogonal to selection: it returns a maximal set of rows that can be developed concurrently in separate git worktrees. Selection answers "what's next"; batch answers "what can N agents safely do at once". It runs nothing — output is advisory JSON.
@@ -89,4 +140,5 @@ Each rule above is pinned by an executable fixture in `evals/develop-next/unit/f
 - **07** — Deferred/Housekeeping/Change Log rows are invisible to selection.
 - **09** — `/create-*` rows stop the loop before any authoring happens.
 - **10** — a real-world-shaped roadmap: `⏭️ SKIP` non-blocking defer, archived deps assumed shipped, epic-level deps, strikethrough recaps, `-NFR` suffixed ids, path-from-`[story]`-link, `🚧`-gated rows. Selects `12.1`; lints clean.
+- **15** — the registry fallback frontier (no fixture file; the registries are built inline in the test): one test per stop reason proving the four deliberate stops are never scanned past *and the loader is never called*; roadmap precedence asserted as a deep-equal modulo `source`; drift asserted in both directions; the eligibility floor swept over every status in both lifecycles; ordering proved stable under input reordering; absent/empty/malformed/fenced registries all degrading rather than halting.
 - **11** — `T`-prefixed standalone-task ids: a T-row parses as an id and is selectable; `deps: T22` blocks its dependent until ticked; a T-row never counts toward its host epic's completion; a `⏭️ SKIP`'d T-row is stepped past but warns any dependent that its dep is satisfied only by the SKIP; `deps: —` reads as no-deps. Selects `T22` before `28.2`.
