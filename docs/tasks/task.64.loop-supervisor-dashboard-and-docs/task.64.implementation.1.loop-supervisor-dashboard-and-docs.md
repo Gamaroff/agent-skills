@@ -36,7 +36,7 @@ Add the optional `--dashboard` / `--dashboard-token` push to `run-loop.mjs` with
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. All 5 phases + 6 progress boxes complete. npm test 1856/1856, format:check clean, 93 links verified | — |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #278](https://github.com/Gamaroff/agent-skills/pull/278); 3 commits; issue comment skipped (no linked issue) | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.64.qa.{1,2,3}.*.md`; `task.64.gate.{1,2,3}.*.yml`; PR comments posted | **Gate 3 PASS 100/100** after 3 cycles. C1 CONCERNS 50 (11 findings) → C2 CONCERNS 90 (QA-12) → C3 PASS. 12/12 closed, 8/8 criteria full | `.summaries/…` (gitignored; matrix inlined in the QA report) |
-| 7. finalise                | ⏳ Pending | `task.64.dod.1.*.md`; task `status: accepted`                          |       | —                    |
+| 7. finalise                | ✅ Done    | `task.64.dod.1.*.md`; task `status: accepted`                          | DoD PASSED. CI_ROLLUP sampled PENDING then waited → SUCCESS on `f823527` (= local HEAD). Sprint review summary + canonical PR comment. Tracker close/board N/A (no linked issue) | — |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -174,10 +174,10 @@ caught. Suite 1870 (1869 pass, 1 gated skip, 0 fail). QA-4 is the one that would
 
 ## Completion
 
-**Finished**: _pending_
-**Final Status**: _pending_
+**Finished**: 2026-08-29
+**Final Status**: Completed
 **Branch**: `feature/task.64.loop-supervisor-dashboard-and-docs`
 **PR**: [#278](https://github.com/Gamaroff/agent-skills/pull/278)
 **QA Iterations**: 3 (gate 1 CONCERNS 50 → gate 2 CONCERNS 90 → gate 3 PASS 100)
-**DoD Summary**: _pending_
-**Tracker debt**: _pending_
+**DoD Summary**: `task.64.dod.1.loop-supervisor-dashboard-and-docs.md`
+**Tracker debt**: none — this task carries no `github_issue`, consistent with tasks 62 and 63 and this repo's convention for technical tasks. No mutation was deferred, refused or failed.

@@ -5,11 +5,13 @@ type: task
 description: 'The last unit of the loop-supervisor sequence, and the one that lets a consumer repo render a run without this repo knowing anything about that consumer. Adds the optional --dashboard push, whose contract is a documented JSON payload rather than an integration — a failed push warns and never aborts a run. Then the narrative layer the first two tasks deliberately deferred: the unattended-overnight-runs runbook, the honest per-iteration re-prime cost note, the claude --resume recipe for reopening any single iteration, and the cross-references from develop-next pointing at the fresh-context alternative to /loop /develop-next.'
 tags: [loop-supervisor, dashboard, documentation, runbook, integration-contract]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-08-28
 updated: 2026-08-29
+completed_date: 2026-08-29
+pr_number: 278
 estimated_effort_hours: 6
 ---
 
@@ -17,7 +19,7 @@ estimated_effort_hours: 6
 
 **Task File**: [task.64.loop-supervisor-dashboard-and-docs.md](./task.64.loop-supervisor-dashboard-and-docs.md)
 
-**Status**: Ready for Review
+**Status**: Accepted
 
 **Review**: ✅ All review recommendations from `task.64.review.1.loop-supervisor-dashboard-and-docs.md` implemented 2026-08-29
 
@@ -297,6 +299,39 @@ Modified: `skills/loop-supervisor/scripts/run-loop.mjs`, `skills/loop-supervisor
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate:** `task.64.gate.3.*.yml` — ✅ **PASS**, 100/100, `top_issues: []`
+**QA cycles:** 3 (CONCERNS 50/100 → CONCERNS 90/100 → PASS 100/100)
+**Findings:** 12 raised, 12 closed
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria** — 8/8 full (5 full / 3 partial at cycle 1)
+✅ **Tests** — 1870 tests, 1869 pass, 1 skipped (live-network, gated behind an env var), 0 fail
+✅ **CI** — 4/4 green on `f823527`, the commit carrying the final code. The rollup was sampled as
+  `PENDING` first and **waited on** rather than assumed.
+✅ **PR** — [#278](https://github.com/Gamaroff/agent-skills/pull/278), MERGEABLE
+✅ **Documentation** — payload contract, runbook (indexed), cross-references, config rows
+✅ **Security** — every claim mutation-proved: the token reaches neither the frame body, the config,
+  the spawned child's environment, nor the ledger; `repoUrl` userinfo is stripped
+⚠️ **Compliance** — NOT_APPLICABLE: a developer CLI processing no personal, payment or health data
+  and rendering no UI
+
+**Mutation proving:** 10 invariants probed across QA cycles 2–3; all 10 proved. That method is what
+found the two findings a green suite structurally could not — a test that could not fail, and a
+credential boundary held by nothing.
+
+**Detailed Verification Log:** see [`task.64.dod.1.loop-supervisor-dashboard-and-docs.md`](./task.64.dod.1.loop-supervisor-dashboard-and-docs.md).
+
+**Task marked as ACCEPTED on:** 2026-08-29
+
+---
+
 ## QA Testing Results
 
 **QA Status**: ✅ PASS
@@ -352,6 +387,7 @@ set out to avoid: **coverage reported where none existed.**
 | 2026-08-29 |         | QA gate 2 CONCERNS (90/100) — cycle-1 fixes re-verified by mutation; 10 closed, QA-12 found (child-env strip real but unheld by any test) | qa-task |
 | 2026-08-29 |         | QA-12 fixed — `childEnvFor()` extracted and asserted; the mutation that killed 0 tests now kills 2; 2 QA iterations | qa-fix |
 | 2026-08-29 |         | QA gate 3 **PASS** (100/100) — 12/12 findings closed, 8/8 criteria full, all four NFRs PASS; 10 invariants mutation-proved; CI 4/4 green on `a568539` | qa-task |
+| 2026-08-29 | 1.2     | DoD verified — accepted (PR #278); 8/8 criteria, CI green on the final head, 10 invariants mutation-proved | finalise |
 
 ## References
 
