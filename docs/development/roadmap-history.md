@@ -3,6 +3,8 @@
 Completed phases from [`project-completion-roadmap.md`](./project-completion-roadmap.md), archived
 at phase close so the live roadmap shows only what is still in play.
 
+**Phases 1, 2 and 3 are archived here.**
+
 **These rows still satisfy `deps:`.** A `deps:` entry naming a row that appears in no current phase
 means _already shipped_, not a dangling reference — this file is where to resolve it.
 
@@ -87,6 +89,20 @@ caller changes until T45 removes them.
 ### Capstone — operator gate
 
 - [x] **T45** Pipeline, QA, finalise, and tracker sync write the Change Log · deps: T44 · touches: pipeline-steps!, jira-sync!, bundles! · gate cleared 2026-08-12 — T44's `change-log.enforcement: advisory` default was verified against a pre-T43 document (`task.22`): check 4b graded its non-canonical Change Log **Important, not Critical**, verdict **GO** at 9/10, so this row's own Step 2 review did not HALT on the new check · ✅ **accepted + merged** ([PR #213](https://github.com/Gamaroff/agent-skills/pull/213), QA PASS 95/100 after 1 fix cycle) — the run also closed a pre-existing T42 engine defect that silently dropped Change Log rows it could not parse · /develop-task docs/tasks/task.45.change-log-pipeline-and-sync/task.45.change-log-pipeline-and-sync.md
+
+---
+
+## PHASE 3 — loop-supervisor: fresh-context sequential loop runner
+
+Design: [`.agents/plans/loop-supervisor.md`](../../.agents/plans/loop-supervisor.md). T62 is the only
+unit that has to exist — it delivers a usable runner with log files alone. T63 and T64 both depend on
+it and are independent of each other, but they hard-conflict on `run-loop.mjs`, so `--batch` will
+correctly take only one of them at a time.
+
+- [x] **T62** Run each loop iteration in a fresh Claude process, and classify the outcome from the filesystem · deps: none · touches: loop-supervisor!, docs-config~ · /develop-task docs/tasks/task.62.loop-supervisor-runner/task.62.loop-supervisor-runner.md
+- [x] **T63** Make an unattended run watchable from a second terminal, and audible when it stops · deps: T62 · touches: loop-supervisor!, docs-config~ · /develop-task docs/tasks/task.63.loop-supervisor-status-views/task.63.loop-supervisor-status-views.md ✅ **accepted + merged** ([PR #277](https://github.com/Gamaroff/agent-skills/pull/277), QA PASS 100/100)
+- [x] **T64** Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable · deps: T62 · touches: loop-supervisor!, orchestrators~, docs-config~ · /develop-task docs/tasks/task.64.loop-supervisor-dashboard-and-docs/task.64.loop-supervisor-dashboard-and-docs.md ✅ **accepted + merged** ([PR #278](https://github.com/Gamaroff/agent-skills/pull/278), QA PASS 100/100)
+
 
 ---
 

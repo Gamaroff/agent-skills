@@ -1,8 +1,8 @@
 # Bug Registry
 
 **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
-**Last Updated:** 2026-08-04
-**Next Available Bug Number:** **2**
+**Last Updated:** 2026-08-29
+**Next Available Bug Number:** **3**
 
 ## How to use
 
@@ -28,6 +28,7 @@
 | #   | Title | Status | Severity | Priority | Created | Area |
 | --- | ----- | ------ | -------- | -------- | ------- | ---- |
 | 1 | [`ready-for-development` cannot match a Jira column named "Ready for Development"](bug.1.ready-for-development-candidates/bug.1.ready-for-development-candidates.md) | closed | Minor | Medium | 2026-08-04 | jira-sync / status mapping |
+| 2 | [`npm test` runs `node --test` unbounded, so spawn-heavy suites time out for environmental reasons](bug.2.unbounded-test-concurrency/bug.2.unbounded-test-concurrency.md) | new | Major | High | 2026-08-29 | test harness / CI |
 
 ---
 
