@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-08-29'
@@ -11,7 +11,7 @@ description: '`npm test` runs `node --test` with no concurrency bound, so spawn-
 
 **Bug ID**: bug.2.unbounded-test-concurrency
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-08-29
@@ -364,6 +364,55 @@ against a bug marked fixed.
    done` workers. The slowest test should land near 16 s — now against a 60 s budget rather than a
    20 s one.
 
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-08-29
+**Verified by**: develop-bug
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: Verified over **five cycles**; four of them failed. That is the honest headline, and the
+failures were all in the *guard*, not in the fix — which is fitting for a bug about a defective gate.
+
+| Cycle | Verdict | What failed |
+| --- | --- | --- |
+| 1 | FAIL | `prettier --check`. CI runs `format:check` *before* the suite, and the three new/edited files passed it on `develop` — a CI-breaking regression introduced by the fix. |
+| 2 | FAIL | 6 correctness defects from diff review. Four had the same shape: **the guard passed on the regression it was named after.** |
+| 3 | FAIL | 4 more, including two guards asserting properties that were false, and a stripper that deleted 11 real sites' worth of source. |
+| 4 | FAIL | The scanner did not lex template substitutions; a nested template containing a URL or glob silently deleted code, to EOF for a `/*`. |
+| 5 | **PASS** | Regression test 16/16; suite 1892 pass / 0 fail / 1 skipped; `format:check` clean. |
+
+Final evidence:
+
+- **Whole-corpus check, stronger than any single assertion**: strip all 74 scanned files and
+  `node --check` the result. **Zero parse failures** (an earlier revision produced five). On the
+  previous revision an independent acorn differential found the output byte-identical to real
+  comment-range deletion across all 74 files.
+- **Ten mutations, each reddening exactly one guard and nothing else**: drop the bound from one
+  `eval:*` script; restore a bare literal; tighten the budget default; make `readInt` reject 0
+  retries; let `readInt` accept anything `Number()` likes; revert `runnerScripts` to the literal
+  match; lose template state; never return from a substitution; drop string-escape handling; stop
+  line comments at `\n` only.
+- The reported failure no longer reproduces, and — the point of the whole exercise — the two files
+  that could actually trip a timeout now carry a 60 s env-tunable budget instead of bare 20 s
+  literals.
+
+**Known limitations, recorded rather than buried.** None blocks the fix; all were judged and left:
+
+1. `TEST_CONCURRENCY=0` or a typo'd value is accepted by the shell and silently ignored by node,
+   returning CPU-count concurrency with exit 0. No static guard can read the effective value. The
+   failure mode is a return to the pre-fix default, which the measurements above show was not what
+   tripped the gate.
+2. A regex literal directly after `)` — `if (x) /re/.test(y)` — is read as division, and the
+   scanner can lose that line. Adding `)` to the heuristic would misread the far more common
+   `f(1) / 2` as a regex start, trading a rare deletion for a frequent one. Left as is.
+3. An unterminated block comment strips to EOF (the input is not valid JavaScript), and `<!--`,
+   `-->` and `#!` are not treated as comments.
+4. The scanner's character-class tracking is defensive: removing it reddens nothing, and no input
+   was found where it loses code.
+
+**Decision**: Closed (finalised in Step 7)
+
 ---
 
 ## Status History
@@ -374,9 +423,55 @@ against a bug marked fixed.
 | 2026-08-29 | New    | review-bug  | Fix-readiness review: READY TO FIX (10/10). No duplicate; defect still present. All 5 claims re-verified; evidence section added. Severity/priority unchanged (Major/High). |
 | 2026-08-29 | In Progress | develop-bug | Reproduced the margin collapse (3.20s → 48.51s, 15.2×; worst test 461ms → 6741ms against a 20s timeout). Investigation started. |
 | 2026-08-29 | Ready for QA | develop-bug | Bounded all 5 `node --test` runners; extracted a shared 60s env-tunable spawn budget and moved all 11 bare timeout literals onto it. 7 regression cases, all mutation-proven. Suite 1880 pass / 0 fail. |
+| 2026-08-29 | Ready for QA | develop-bug | Fix verified after 5 verify cycles (4 failed, all in the guard). 16/16 regression, 1892 suite pass, 0 fail; 10 mutations each reddening exactly one guard; 74/74 files parse after comment-stripping. |
+| 2026-08-29 | Closed | develop-bug | DoD passed (CI SUCCESS on 60f778d, waited out a PENDING sample). Fix verified and accepted. |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 4 fix iterations across 5 verify cycles
+**Time to Resolution**: same day (filed and closed 2026-08-29)
+
+**Final Fix Details**: `node --test` ran with CPU-count file concurrency over a suite where 19 of 73
+files fork a child per assertion. Two changes shipped: every `node --test` invocation now carries
+`--test-concurrency="${TEST_CONCURRENCY:-4}"`, and a new shared, env-tunable spawn budget
+(`shared/resources/tests/spawn-budget.mjs`, 60 s default with 2 retries) replaced all eleven bare
+timeout literals across `jira-interception.test.mjs` and `access-config-parity.test.mjs`.
+
+**Lessons Learned**
+
+1. **The filed root cause was real but not sufficient, and only measurement showed it.** Bounding
+   concurrency is free — 36–39 s across every configuration — but on a quiet box it buys nothing:
+   the worst single test is ~2.6–2.8 s at *every* concurrency including unbounded, and the spread
+   between two unbounded runs is as wide as bounded-vs-unbounded. What actually collapses the margin
+   is external load the suite does not own, and against that a bound cannot help. Shipping option 1
+   alone would have closed this bug without changing the failure probability — the worst available
+   outcome, because the flake would have returned against a bug marked fixed. **When a bug proposes
+   a fix, measure whether that fix moves the number the bug is about.**
+
+2. **The file that survived is the evidence for what works.** Under load the 16.2 s spike landed on
+   `access-config-parity.test.mjs` — the one file that had already given itself a 60 s budget — and
+   it passed. Its neighbour, the historical victim, peaked at 4.3 s. The remedy the report ranked
+   second is the one that holds.
+
+3. **A local fix that is not extracted is a fix that will be needed again.** `access-config-parity`
+   worked this out first and kept it private, so its neighbour kept failing — and it had applied its
+   own remedy to just 1 of its 12 spawn sites. The extracted budget plus a guard that fails on any
+   bare timeout literal is what stops the third rediscovery.
+
+4. **Four of five verify cycles failed, every one in the guard rather than the fix.** Three separate
+   times the guard passed on the exact regression it was named after: a comment stripper that
+   deleted 53 lines of source, then one that deleted a line after every regex literal, then a
+   detector blind to `node --flag --test`. **A regex cannot lex JavaScript** — the third attempt
+   became a scanner, and the whole-corpus check (strip all 74 files, parse the output, expect zero
+   failures) is what finally made the claim testable rather than asserted.
+
+5. **The fixture is what decides whether a guard is worth anything, not the implementation.** Each
+   broken version had a passing test whose fixture omitted the one construct that broke it. Every
+   scanner arm now has an input that needs it, and reverting the arm reddens the test.
+
+6. **Verify the mutation, not just the test.** One mutation used `sed -i '' '0,/re/s//repl/'`, a GNU
+   extension BSD sed silently ignores. The unchanged file produced a green suite that read as an
+   unheld test. Grep the file after mutating, before trusting the result.
