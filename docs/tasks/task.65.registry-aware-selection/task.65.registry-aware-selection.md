@@ -5,7 +5,7 @@ type: task
 description: 'select-next.mjs reads one hand-maintained roadmap. Work filed anywhere else — a bug in the bug registry, a task in the task registry — is invisible to it, so the loop reports roadmap-complete while real work is outstanding. This adds the registries as a fallback frontier, consulted only when no phase holds an actionable row, so the operator never has to remember to transcribe a row.'
 tags: [develop-next, selection, registries, backlog, automation]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: medium
 created: 2026-08-29
@@ -18,7 +18,7 @@ estimated_effort_hours: 10
 
 **Task File**: [task.65.registry-aware-selection.md](./task.65.registry-aware-selection.md)
 
-**Status**: Ready for Review
+**Status**: In Progress
 
 **Review**: ✅ All review recommendations from `task.65.review.1.registry-aware-selection.md` implemented 2026-08-29
 
@@ -122,8 +122,11 @@ candidates. Phase 6 corrects the rows; Phase 2 makes correctness of the rows unn
 - A **fallback frontier** in `select-next.mjs`: when no phase yields a selection or a stop, read the
   registries and emit the highest-ranked outstanding item.
 - Bug rows whose **document** status is `new` or `reopened` → `/develop-bug <path>`.
-- Task rows whose **document** status is `ready-for-development`, `in-progress` or `ready-for-review`
-  → `/develop-task <path>`.
+- Task rows whose **document** status is `ready-for-development` or `in-progress`
+  → `/develop-task <path>`. (`ready-for-review` was in this set as submitted and was **removed** in QA
+  cycle 1 — `develop-task` Phase 0c HALTs on it, so the frontier would have nominated work the
+  dispatcher refuses. See `task.65.bug.1.*`. The governing rule is that the floor must be a **subset**
+  of the statuses the dispatching pipeline accepts.)
 - A deterministic ordering rule for the fallback set, and a documented tie-break.
 - The **opt-out**, which is the eligibility rule above rather than a new marker: an item is opted in by
   being promoted up its own ladder, and a `draft` / `planned` task is out of the frontier by definition.
@@ -272,9 +275,12 @@ Two authoring edits, without which the code above changes nothing observable in 
    `command: /develop-task` and `source: "task-registry"`.
 4. Bugs outrank tasks; within each, ordering is deterministic and documented.
 5. A registry row is never selected when its document's frontmatter puts it outside the eligible set —
-   a task at `accepted`, `cancelled`, `draft` or `planned`; a bug at `in-progress`, `ready-for-qa` or
-   `closed` — **whatever the registry row says**. Asserted in both directions (registry stale-open with
-   a terminal document, and registry stale-closed with an open document).
+   a task at `accepted`, `cancelled`, `draft`, `planned` or `ready-for-review`; a bug at `in-progress`,
+   `ready-for-qa` or `closed` — **whatever the registry row says**. Asserted in both directions
+   (registry stale-open with a terminal document, and registry stale-closed with an open document).
+   The eligible set is additionally constrained to be a **subset of the statuses the dispatching
+   pipeline accepts**, asserted by parsing `develop-task`'s and `develop-bug`'s own status tables so
+   the constraint re-checks itself if either changes.
 6. Every registry row the fallback passed over appears in `--lint` output with its reason. No row is
    both ineligible and unlisted.
 7. A missing, empty or malformed registry degrades to today's behaviour rather than halting; a single
@@ -402,6 +408,61 @@ size and only ever paid by `--lint` and by a fallback that actually fires; selec
 the first eligible row. No caching was added — it would be a second source of truth about a file the
 selector already reads once.
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-29
+**QA Cycle**: 1
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.65.qa.1.registry-aware-selection.md](./task.65.qa.1.registry-aware-selection.md)
+- **Gate File**: [task.65.gate.1.registry-aware-selection.yml](./task.65.gate.1.registry-aware-selection.yml)
+- **Bug Report**: [task.65.bug.1.ready-for-review-selected-but-undispatchable.md](./task.65.bug.1.ready-for-review-selected-but-undispatchable.md)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 1924 (1923 pass, 1 pre-existing skip, 0 fail); 99 unit tests for this change
+- **Phases Verified**: 7/7 checked — 5 PASS, 1 CONCERNS, 1 FAIL
+- **Success Criteria**: 12 assessed — 10 PASS, 1 CONCERNS (SC4), 1 FAIL (SC6)
+- **Independent mutations run by QA**: 6 devised, 6 reddened
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+**HIGH (1) — blocking.** `TASK_ELIGIBLE_STATUSES` includes `ready-for-review`, but `develop-task`
+Phase 0c **HALTs** on exactly that status, so the frontier nominates work the dispatcher it names is
+contractually guaranteed to refuse. `ready-for-review` is the normal state of any task between
+development and merge, so this is common rather than exceptional; an unattended `/develop-next` loop
+stops there and, with the run-state file left in place, cannot self-recover. It reproduces live on
+this branch — the selector picks `T65`, whose own document is `ready-for-review`.
+
+This is a **specification** defect the implementation faithfully carried out: the floor was reasoned
+from `document-status-lifecycle.md` without checking it against the dispatcher's accepted set, and
+Step 2's review missed it the same way. The bug half got it right — `{new, reopened}` is a strict
+subset of what `develop-bug` accepts — which is what makes the task half read as an oversight rather
+than a decision.
+
+**MEDIUM (2).** A registry row with a non-numeric `#` cell is silently invisible — neither parsed nor
+listed in `--lint`, contradicting SC6 in the exact place a human typo lands (M2). Column positions are
+assumed with no header validation, so a consumer registry with a different column order silently
+breaks the ordering SC4 claims is deterministic (M3).
+
+**LOW (1).** `parseRegistry` takes the first `.md` href where the sibling `workItemPath()` takes the
+first *work-item* href (L4).
+
+**What held up.** QA did not trust the Implementation Record's mutation table; it devised six of its
+own and every one reddened. The decisive probe called the registry loader eagerly and *discarded* the
+result — leaving every outcome correct and changing only whether the loader was invoked — and all four
+stop-precedence tests went red. Those assertions are genuinely about the call. Roadmap selection and
+`--batch` output are byte-identical to `origin/develop` across all 11 fixtures. All three recorded
+deviations from the plan were assessed and found justified.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -410,6 +471,7 @@ selector already reads once.
 | 2026-08-29 | 1.1 | Review passed (9/10) — resolved the undecided opt-out (eligibility floor on document status, no new lifecycle value), fixed the SC1-vs-`item.source` contradiction, pinned the fallback to `roadmap-complete` only so the four other stops still stop, split the bug and task status vocabularies (they are different lifecycles), added Phase 6 to archive roadmap `PHASE 4` and correct the live registry drift in rows 62–64, and linked GitHub issue #280 | review-task |
 | 2026-08-29 |  | Status → ready-for-development | review-task |
 | 2026-08-29 |  | Implemented — 8 files, 27 new tests (72 → 99 unit); 10 mutations each reddening the tests that name it; roadmap `PHASE 4` retired and 6 drifted registry rows corrected | develop |
+| 2026-08-29 |  | QA cycle 1 gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 1 LOW; eligibility floor admits `ready-for-review`, which `develop-task` HALTs on | qa-task |
 
 ## References
 

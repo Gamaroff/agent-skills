@@ -35,6 +35,8 @@ const {
   parseRegistry,
   parseFrontmatterStatus,
   registryFrontier,
+  TASK_ELIGIBLE_STATUSES,
+  BUG_ELIGIBLE_STATUSES,
 } = await import(pathToFileURL(SCRIPT).href);
 
 function fixture(name) {
@@ -1471,18 +1473,23 @@ test("15/SC5: registry stale-CLOSED + open document → selected anyway", () => 
 });
 
 test("15/SC5: the eligibility floor excludes draft and planned by construction", () => {
-  for (const status of ["draft", "planned", "accepted", "cancelled"]) {
+  // `ready-for-review` is deliberately NOT here — see the "eligibility floor ⊆
+  // dispatcher" block below. `develop-task` HALTs on it, so a task in that state
+  // must not enter the frontier at all.
+  for (const status of [
+    "draft",
+    "planned",
+    "ready-for-review",
+    "accepted",
+    "cancelled",
+  ]) {
     const { r } = fallback({
       tasks: [taskRow(5, "spec", status)],
       docs: { "docs/tasks/task.5.spec/task.5.spec.md": status },
     });
     assert.equal(r.status, "stop", `${status} must not be selectable`);
   }
-  for (const status of [
-    "ready-for-development",
-    "in-progress",
-    "ready-for-review",
-  ]) {
+  for (const status of ["ready-for-development", "in-progress"]) {
     const { r } = fallback({
       tasks: [taskRow(5, "spec", status)],
       docs: { "docs/tasks/task.5.spec/task.5.spec.md": status },
@@ -1605,7 +1612,7 @@ test("15/SC7: one malformed row does not suppress the well-formed rows around it
   );
   assert.equal(p.malformed.length, 1);
   assert.equal(p.malformed[0].n, 2);
-  assert.match(p.malformed[0].reason, /no \[title\]\(path\.md\) link/);
+  assert.match(p.malformed[0].reason, /no \[title\]\(story\|task\|bug/);
 });
 
 test("15/SC7: a malformed row is passed over with a reason, never silently dropped", () => {
@@ -1731,4 +1738,310 @@ test("15: registry hrefs resolve relative to the registry file, not the CWD", ()
     "docs/bugs/bug-registry.md",
   );
   assert.equal(p.rows[0].path, "docs/bugs/bug.4.x/bug.4.x.md");
+});
+
+// ── 16: QA cycle-1 fixes (task.65 gate 1) ────────────────────────────────────
+
+// ── H1: the eligibility floor must be a SUBSET of what the dispatcher accepts ─
+//
+// The frontier names a command, so a status that command refuses produces a
+// selection nothing can act on. `develop-task` Phase 0c HALTs on
+// `Ready for Review`, and `/develop-next` leaves its run-state file in place
+// across a pipeline HALT — so an unattended loop would stop at such an item and
+// resume at the same one next invocation. It could not self-recover.
+//
+// This test parses the DISPATCHERS' OWN status tables rather than restating
+// them, so it re-checks itself if either pipeline changes what it accepts. Both
+// sources are git-tracked: `.agents/skills/` is a gitignored symlink, and a test
+// reading through it would pass locally and fail in CI, which is the most
+// expensive shape a defect can take.
+
+const STEP0_TASK = path.join(
+  REPO_ROOT,
+  "shared",
+  "resources",
+  "develop-pipeline-step-0-resolve-and-prepare.md",
+);
+const STEP0_BUG = path.join(
+  REPO_ROOT,
+  "skills",
+  "develop-bug",
+  "references",
+  "develop-bug-step-0-resolve-bug.md",
+);
+
+/** `Ready for Development` → `ready-for-development`; `accepted` → `accepted`. */
+const kebab = (v) => v.trim().toLowerCase().replace(/\s+/g, "-");
+
+/**
+ * Statuses a dispatcher's status table says it PROCEEDS on.
+ *
+ * A table row is `| \`Status\` | Action |`. A row whose action mentions HALT is a
+ * refusal; anything else proceeds. A status cell may name several values
+ * (`` `Ready for Review` / `accepted` ``), so split on the slash.
+ */
+function proceedStatuses(markdown, sectionHeading) {
+  let body = markdown;
+  if (sectionHeading) {
+    const start = markdown.indexOf(sectionHeading);
+    assert.ok(start > -1, `section ${sectionHeading} not found`);
+    const after = markdown.slice(start + sectionHeading.length);
+    const nextHeading = after.search(/\n#{1,4}\s/);
+    body = nextHeading === -1 ? after : after.slice(0, nextHeading);
+  }
+  const proceed = new Set();
+  let sawRow = false;
+  for (const line of body.split("\n")) {
+    const m = line.match(/^\|\s*(`[^|]*`(?:\s*\/\s*`[^|]*`)*)\s*\|(.*)\|\s*$/);
+    if (!m) continue;
+    sawRow = true;
+    const action = m[2];
+    if (/HALT/i.test(action)) continue;
+    for (const v of m[1].split("/")) {
+      const name = v.replace(/`/g, "").trim();
+      if (name) proceed.add(kebab(name));
+    }
+  }
+  assert.ok(sawRow, "no status-table rows parsed — the table shape changed");
+  return proceed;
+}
+
+test("16/H1: every task eligibility status is one develop-task proceeds on", () => {
+  const md = readFileSync(STEP0_TASK, "utf-8");
+  // The develop-task variant of the "Autonomous status handling" table.
+  const idx = md.indexOf("**Autonomous status handling:**");
+  assert.ok(idx > -1, "autonomous status handling section not found");
+  const proceed = proceedStatuses(md.slice(idx), "#### develop-task");
+
+  assert.ok(
+    proceed.has("ready-for-development") && proceed.has("in-progress"),
+    `parsed proceed-set looks wrong: ${[...proceed].join(", ")}`,
+  );
+  assert.ok(
+    !proceed.has("ready-for-review"),
+    "develop-task is documented as HALTing on Ready for Review — if that changed, revisit the floor",
+  );
+
+  for (const status of TASK_ELIGIBLE_STATUSES) {
+    assert.ok(
+      proceed.has(status),
+      `TASK_ELIGIBLE_STATUSES contains "${status}", which develop-task does not proceed on — ` +
+        `the frontier would nominate work the dispatcher refuses`,
+    );
+  }
+});
+
+test("16/H1: every bug eligibility status is one develop-bug proceeds on", () => {
+  const proceed = proceedStatuses(readFileSync(STEP0_BUG, "utf-8"), null);
+  assert.ok(
+    proceed.has("new") && proceed.has("reopened"),
+    `parsed proceed-set looks wrong: ${[...proceed].join(", ")}`,
+  );
+  for (const status of BUG_ELIGIBLE_STATUSES) {
+    assert.ok(
+      proceed.has(status),
+      `BUG_ELIGIBLE_STATUSES contains "${status}", which develop-bug does not proceed on`,
+    );
+  }
+});
+
+test("16/H1: a ready-for-review task is not selected", () => {
+  const { r } = fallback({
+    tasks: [taskRow(9, "awaiting-qa", "ready-for-review")],
+    docs: {
+      "docs/tasks/task.9.awaiting-qa/task.9.awaiting-qa.md": "ready-for-review",
+    },
+  });
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.match(
+    r.registryFrontier.passedOver.find((p) => p.n === 9).reason,
+    /document status ready-for-review — outside the task eligibility floor/,
+  );
+});
+
+// ── M2: a typo'd id is a malformed row, not an invisible one ────────────────
+
+test("16/M2: a non-numeric id row is reported, not silently skipped", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      taskRow(1, "good", "ready-for-development"),
+      // The prefixed form the roadmap uses — an easy thing to carry across by
+      // hand. Previously indistinguishable from the header row, so it vanished.
+      "| T65 | [Task 65](task.65.x/task.65.x.md) | ready-for-development | infra | High | x | — | — |",
+      taskRow(3, "alsogood", "ready-for-development"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((x) => x.n),
+    [1, 3],
+    "the well-formed rows around it still parse",
+  );
+  assert.equal(
+    p.malformed.length,
+    1,
+    "the typo'd row is REPORTED, not skipped",
+  );
+  assert.match(p.malformed[0].reason, /id cell "T65" is not a number/);
+  assert.equal(p.malformed[0].line, 8);
+});
+
+test("16/M2: the header row itself is still not reported as malformed", () => {
+  const p = parseRegistry(
+    taskRegistry([taskRow(1, "good", "ready-for-development")]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.malformed.length, 0, "a header is a header, not a bad row");
+  assert.equal(p.rows.length, 1);
+});
+
+test("16/M2: a typo'd row reaches --lint rather than disappearing", () => {
+  const { opts } = registryOpts({
+    tasks: taskRegistry([
+      "| T65 | [Task 65](task.65.x/task.65.x.md) | ready-for-development | infra | High | x | — | — |",
+    ]),
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  assert.equal(f.selected, null);
+  assert.equal(
+    f.passedOver.length,
+    1,
+    "no row may be both ineligible and unlisted (SC6)",
+  );
+  assert.match(f.passedOver[0].reason, /not a number/);
+});
+
+// ── M3: columns are read by NAME when a header exists ───────────────────────
+
+test("16/M3: a consumer registry with reordered columns reads correctly", () => {
+  // Priority and Category swapped relative to this repo's own layout.
+  const swapped = [
+    "| #   | Title | Status | Priority | Category | Created |",
+    "| --- | ----- | ------ | -------- | -------- | ------- |",
+    "| 7 | [T](task.7.a/task.7.a.md) | ready-for-development | High | infra | 2026-01-01 |",
+  ].join("\n");
+  const p = parseRegistry(swapped, "task", REG_TASK_PATH);
+  assert.equal(p.rows.length, 1);
+  assert.equal(
+    p.rows[0].priority,
+    "High",
+    "priority must come from the Priority column, not from position 4",
+  );
+  assert.equal(p.rows[0].registryStatus, "ready-for-development");
+});
+
+test("16/M3: reordered columns actually change the ORDER, not just the field", () => {
+  const reg = [
+    "| #   | Title | Status | Priority | Category | Created |",
+    "| --- | ----- | ------ | -------- | -------- | ------- |",
+    "| 1 | [Low](task.1.low/task.1.low.md) | ready-for-development | Low | infra | x |",
+    "| 2 | [High](task.2.high/task.2.high.md) | ready-for-development | High | infra | x |",
+  ].join("\n");
+  const { opts } = registryOpts({
+    tasks: reg,
+    docs: {
+      "docs/tasks/task.1.low/task.1.low.md": "ready-for-development",
+      "docs/tasks/task.2.high/task.2.high.md": "ready-for-development",
+    },
+  });
+  const f = registryFrontier(opts.registries);
+  assert.equal(
+    f.selected.id,
+    "T2",
+    "the High-priority row must win; reading position 4 would have made both 'infra' and tie on number",
+  );
+});
+
+test("16/M3: bug severity is read by name too", () => {
+  const reg = [
+    "| #   | Title | Status | Priority | Severity | Created |",
+    "| --- | ----- | ------ | -------- | -------- | ------- |",
+    "| 1 | [A](bug.1.a/bug.1.a.md) | new | Low | Minor | x |",
+    "| 2 | [B](bug.2.b/bug.2.b.md) | new | Low | Blocker | x |",
+  ].join("\n");
+  const { opts } = registryOpts({
+    bugs: reg,
+    docs: {
+      "docs/bugs/bug.1.a/bug.1.a.md": "new",
+      "docs/bugs/bug.2.b/bug.2.b.md": "new",
+    },
+  });
+  const f = registryFrontier(opts.registries);
+  assert.equal(f.selected.id, "B2", "Blocker outranks Minor at equal priority");
+});
+
+test("16/M3: a headerless table still parses at the documented positions", () => {
+  // No separator row, so no header is ever promoted — the fallback must hold.
+  const headerless =
+    "| 4 | [T](task.4.a/task.4.a.md) | ready-for-development | infra | High | x | — | — |";
+  const p = parseRegistry(headerless, "task", REG_TASK_PATH);
+  assert.equal(p.rows.length, 1);
+  assert.equal(p.rows[0].priority, "High");
+  assert.equal(p.rows[0].registryStatus, "ready-for-development");
+});
+
+test("16/M3: a header missing a known column warns rather than reading blind", () => {
+  const noPriority = [
+    "| #   | Title | Status | Category | Created |",
+    "| --- | ----- | ------ | -------- | ------- |",
+    "| 4 | [T](task.4.a/task.4.a.md) | ready-for-development | infra | 2026-01-01 |",
+  ].join("\n");
+  const p = parseRegistry(noPriority, "task", REG_TASK_PATH);
+  assert.equal(p.rows.length, 1);
+  assert.equal(p.warnings.length, 1);
+  assert.match(p.warnings[0], /names no priority column/);
+});
+
+// ── L4: the work-item href test is shared with the roadmap parser ───────────
+
+test("16/L4: a preceding non-work-item link never wins over the work-item one", () => {
+  // The realistic shape: a title that cites something before naming the item.
+  const p = parseRegistry(
+    taskRegistry([
+      "| 1 | [design notes](../../.agents/plans/x.md) — [T](task.1.a/task.1.a.md) | ready-for-development | infra | High | x | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows.length, 1);
+  assert.equal(
+    p.rows[0].path,
+    "docs/tasks/task.1.a/task.1.a.md",
+    "the first .md href is not the work item — the first WORK-ITEM href is",
+  );
+});
+
+test("16/L4: a genuinely nested link degrades to malformed, not to a wrong path", () => {
+  // Nested links are not valid markdown, and `MD_LINK_RE` cannot span the inner
+  // `]`, so only the INNER href is visible. The honest outcome is to report the
+  // row rather than resolve it to `notes.md` and dispatch something wrong — and
+  // that is exactly what the work-item filter now buys: before it, this row
+  // resolved to `docs/tasks/notes.md` and was silently rejected downstream as
+  // "document missing", which named the wrong cause.
+  const p = parseRegistry(
+    taskRegistry([
+      "| 1 | [See [notes](notes.md) here](task.1.a/task.1.a.md) | ready-for-development | infra | High | x | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows.length, 0);
+  assert.equal(p.malformed.length, 1);
+  assert.match(p.malformed[0].reason, /no \[title\]\(story\|task\|bug/);
+});
+
+test("16/L4: a title whose only link is not a work item is malformed", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      "| 1 | [Design](../../.agents/plans/design.md) | ready-for-development | infra | High | x | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows.length, 0);
+  assert.equal(p.malformed.length, 1);
+  assert.match(p.malformed[0].reason, /no \[title\]\(story\|task\|bug/);
 });

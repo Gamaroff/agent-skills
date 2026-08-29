@@ -54,6 +54,20 @@ export const DEFAULT_ROADMAP = "docs/development/project-completion-roadmap.md";
 export const DEFAULT_BUG_REGISTRY = "docs/bugs/bug-registry.md";
 export const DEFAULT_TASK_REGISTRY = "docs/tasks/task-registry.md";
 
+// **The floor must be a SUBSET of the statuses the dispatching pipeline accepts.**
+// That is the load-bearing rule, and it is not a stylistic one: the frontier
+// names a command, so a status the command refuses produces a selection nothing
+// can act on. `develop-task` Phase 0c HALTs on `Ready for Review`, so a
+// `ready-for-review` task in the frontier would stop an unattended loop — and,
+// because `/develop-next` leaves its run-state file in place across a pipeline
+// HALT, the next invocation would resume at the same item and stop again. The
+// loop could not self-recover, which is a *worse* failure than the silence this
+// whole mechanism exists to remove: it is silence's loud cousin, and equally
+// terminal for an overnight run. Found by QA (task.65 cycle 1); pinned by
+// `evals/develop-next/unit/select-next.test.mjs` §"eligibility floor ⊆
+// dispatcher", which parses both pipelines' own status tables so the rule
+// re-checks itself if either dispatcher's table changes.
+//
 // The eligibility floor IS the opt-out. Neither lifecycle has a park value
 // (`deferred`, `wont-fix`), and adding one would touch two standards documents
 // and every reader of those enums. Promotion up the existing ladder is already
@@ -71,7 +85,6 @@ export const BUG_ELIGIBLE_STATUSES = new Set(["new", "reopened"]);
 export const TASK_ELIGIBLE_STATUSES = new Set([
   "ready-for-development",
   "in-progress",
-  "ready-for-review",
 ]);
 
 // Ordering vocabularies. Lower rank sorts first. An unrecognised value sorts
@@ -185,9 +198,24 @@ function isStandaloneId(id) {
  */
 function workItemPath(text) {
   for (const m of text.matchAll(MD_LINK_RE)) {
-    if (/(?:^|\/)(?:story|task|bug)\.[^/]*\.md$/i.test(m[1])) return m[1];
+    if (isWorkItemHref(m[1])) return m[1];
   }
   return null;
+}
+
+/**
+ * Does this href name a work-item document (`story.` / `task.` / `bug.` stem)?
+ *
+ * Shared by `workItemPath` (roadmap rows) and `parseRegistry` (registry rows).
+ * They used to disagree: the registry parser accepted any `.md`, so a title
+ * carrying a nested or preceding link — `[See [x](y.md)](task.1.a/task.1.a.md)` —
+ * resolved to `y.md`. That fails conservatively (the row is then rejected as
+ * "document missing", so nothing wrong is dispatched) but it makes work
+ * invisible for an unobvious reason, which is the failure this file exists to
+ * stop producing. One predicate, one behaviour.
+ */
+function isWorkItemHref(href) {
+  return /(?:^|\/)(?:story|task|bug)\.[^/]*\.md$/i.test(href);
 }
 
 /**
@@ -749,16 +777,54 @@ export function parseFrontmatterStatus(text) {
   return v ? v.toLowerCase() : null;
 }
 
+/** A markdown table separator row (`| --- | :--: |`). */
+const TABLE_SEPARATOR_RE = /^\|[\s:|-]*\|?\s*$/;
+
 /**
- * Split one markdown table row into trimmed cells.
- * Returns null for a separator row (`| --- | --- |`) or a non-row line.
+ * Split one markdown table row into trimmed cells, or null for a non-row line.
+ * Separator rows are the caller's business — it needs to see them, because a
+ * separator is what promotes the line above it from "maybe a header" to "the
+ * header", which is how a header is told apart from a typo'd data row.
  */
 function tableCells(line) {
   const t = line.trim();
   if (!t.startsWith("|")) return null;
-  if (/^\|[\s:|-]*\|?\s*$/.test(t)) return null; // separator
   const inner = t.replace(/^\|/, "").replace(/\|\s*$/, "");
   return inner.split("|").map((c) => c.trim());
+}
+
+// Header cell name → the field it supplies. A consumer's registry is a
+// hand-maintained markdown table, so accept the obvious synonyms rather than
+// demanding one spelling.
+const COLUMN_ALIASES = {
+  "#": "n",
+  no: "n",
+  num: "n",
+  number: "n",
+  id: "n",
+  title: "title",
+  name: "title",
+  status: "status",
+  severity: "severity",
+  priority: "priority",
+};
+
+// Documented positions, used when a registry has no recognisable header.
+//   bug:  | # | Title | Status | Severity | Priority | Created | Area |
+//   task: | # | Title | Status | Category | Priority | Created | Issue | Deps |
+const DEFAULT_COLUMNS = {
+  bug: { n: 0, title: 1, status: 2, severity: 3, priority: 4 },
+  task: { n: 0, title: 1, status: 2, priority: 4 },
+};
+
+/** Map a header row's cells to field indices; null if it names nothing we know. */
+function mapHeader(cells) {
+  const cols = {};
+  cells.forEach((c, i) => {
+    const key = COLUMN_ALIASES[c.trim().toLowerCase()];
+    if (key !== undefined && cols[key] === undefined) cols[key] = i;
+  });
+  return cols.n !== undefined && cols.title !== undefined ? cols : null;
 }
 
 /**
@@ -769,27 +835,44 @@ function tableCells(line) {
  * around it, and neither may throw — a registry problem must degrade to today's
  * behaviour, never to a HALT.
  *
- * Column contract (both registries share cells 0–2 and put priority at 4):
- *   bug:  | # | Title | Status | Severity | Priority | Created | Area |
- *   task: | # | Title | Status | Category | Priority | Created | Issue | Deps |
+ * **Columns are read by NAME when the table has a header**, falling back to the
+ * documented positions only when it does not. Reading `cells[4]` unconditionally
+ * was silently wrong for any consumer who ordered their columns differently: a
+ * registry with Priority and Category swapped parsed `priority` as `"infra"`,
+ * so the ordering this module documents as deterministic returned the wrong item
+ * first. It could never cause a wrong *selection* — the document's frontmatter
+ * owns eligibility — which is exactly why it would have gone unnoticed.
+ *
+ * **A non-numeric id is a malformed row, not a header.** The header is
+ * identified positionally (the line above the `| --- |` separator), so a row
+ * written `| T65 | … |` — the prefixed form the roadmap uses, an easy thing to
+ * carry across by hand — is now reported rather than silently skipped. The
+ * previous guard could not tell the two apart, so a typo made a work item
+ * invisible: out of the frontier *and* absent from `--lint`, which is the one
+ * outcome this design forbids.
  *
  * @param {string} text  registry markdown ("" or null for an absent registry)
  * @param {"bug"|"task"} kind
  * @param {string} registryPath  repo-root-relative path, used to resolve hrefs
- * @returns {{rows: object[], malformed: object[]}}
+ * @returns {{rows: object[], malformed: object[], warnings: string[]}}
  */
 export function parseRegistry(text, kind, registryPath) {
   const rows = [];
   const malformed = [];
-  if (typeof text !== "string" || !text.trim()) return { rows, malformed };
+  const warnings = [];
+  if (typeof text !== "string" || !text.trim())
+    return { rows, malformed, warnings };
 
   const dir = path.posix.dirname(
     String(registryPath || "")
       .split(path.sep)
       .join("/"),
   );
+  const defaults = DEFAULT_COLUMNS[kind] || DEFAULT_COLUMNS.task;
   const lines = text.split(/\r?\n/);
   let fenced = false;
+  let cols = null; // resolved from the header, once seen
+  let pendingHeader = null; // the line above a separator is the header
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -798,32 +881,76 @@ export function parseRegistry(text, kind, registryPath) {
     // showing a sample row must not enter the frontier.
     if (/^\s*(```|~~~)/.test(line)) {
       fenced = !fenced;
+      pendingHeader = null;
       continue;
     }
     if (fenced) continue;
 
+    const t = line.trim();
+    if (!t.startsWith("|")) {
+      pendingHeader = null; // prose or a blank line ends the table
+      continue;
+    }
+    if (TABLE_SEPARATOR_RE.test(t)) {
+      if (pendingHeader) {
+        const mapped = mapHeader(pendingHeader);
+        if (mapped) {
+          cols = mapped;
+          for (const field of kind === "bug"
+            ? ["status", "severity", "priority"]
+            : ["status", "priority"]) {
+            if (cols[field] === undefined && defaults[field] !== undefined) {
+              cols[field] = defaults[field];
+              warnings.push(
+                `${registryPath}: header names no ${field} column — falling back to the documented position ${defaults[field]}`,
+              );
+            }
+          }
+        }
+      }
+      pendingHeader = null;
+      continue;
+    }
+
     const cells = tableCells(line);
     if (!cells) continue;
-    // The header row's first cell is `#`, not a number — that is what separates
-    // the registry table from any other table in the document, with no need to
-    // locate a `## Registry` heading that a consumer may have renamed.
-    if (!/^\d+$/.test(cells[0] || "")) continue;
+    const idCell = cells[cols ? cols.n : defaults.n] || "";
 
-    const n = Number(cells[0]);
-    const titleCell = cells[1] || "";
-    const status = (cells[2] || "").toLowerCase() || null;
+    if (!/^\d+$/.test(idCell)) {
+      // Before a header has been seen, a non-numeric first cell is a header
+      // candidate — hold it, and the next line decides. After one has been
+      // seen, every table row is data, so this is a malformed row and must be
+      // reported rather than skipped.
+      if (!cols) {
+        pendingHeader = cells;
+        continue;
+      }
+      malformed.push({
+        kind,
+        n: null,
+        line: i + 1,
+        raw: t,
+        reason: `malformed row — id cell ${JSON.stringify(idCell)} is not a number`,
+      });
+      continue;
+    }
+
+    const c = cols || defaults;
+    const n = Number(idCell);
+    const titleCell = cells[c.title] || "";
+    const status = (cells[c.status] || "").toLowerCase() || null;
     const href =
       [...titleCell.matchAll(MD_LINK_RE)]
         .map((m) => m[1])
-        .find((h) => /\.md$/i.test(h)) || null;
+        .find(isWorkItemHref) || null;
 
-    const base = { kind, n, line: i + 1, raw: line.trim() };
+    const base = { kind, n, line: i + 1, raw: t };
 
     if (cells.length < 5 || !href || !status) {
       malformed.push({
         ...base,
         reason: !href
-          ? "malformed row — no [title](path.md) link"
+          ? "malformed row — no [title](story|task|bug.….md) link"
           : !status
             ? "malformed row — empty status cell"
             : `malformed row — ${cells.length} cells, expected at least 5`,
@@ -836,11 +963,14 @@ export function parseRegistry(text, kind, registryPath) {
       title: titleCell.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim(),
       path: path.posix.normalize(path.posix.join(dir, href)),
       registryStatus: status,
-      severity: kind === "bug" ? cells[3] || null : null,
-      priority: cells[4] || null,
+      severity:
+        kind === "bug" && c.severity !== undefined
+          ? cells[c.severity] || null
+          : null,
+      priority: c.priority !== undefined ? cells[c.priority] || null : null,
     });
   }
-  return { rows, malformed };
+  return { rows, malformed, warnings };
 }
 
 /**
@@ -914,6 +1044,7 @@ export function registryFrontier(registries, opts = {}) {
     ...m,
     eligible: false,
   }));
+  const warnings = [...(bugs.warnings || []), ...(tasks.warnings || [])];
 
   const ranked = [...bugs.rows, ...tasks.rows].sort(compareCandidates);
 
@@ -972,7 +1103,7 @@ export function registryFrontier(registries, opts = {}) {
     };
   }
 
-  return { selected, passedOver, candidates: ranked.length };
+  return { selected, passedOver, warnings, candidates: ranked.length };
 }
 
 // ── Parallel batch (worktree fan-out) ─────────────────────────────────────────
@@ -1271,6 +1402,7 @@ function main() {
             bugRegistry: args.bugRegistry,
             taskRegistry: args.taskRegistry,
             considered: frontier.candidates,
+            warnings: frontier.warnings,
             selected: frontier.selected,
             passedOver: frontier.passedOver,
           },

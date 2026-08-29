@@ -76,7 +76,9 @@ There is no marker to write and none to remember. An item is opted **in** by bei
 | Kind        | Lifecycle                                                                       | Eligible                                                     |
 | ----------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | General bug | `new → in-progress → ready-for-qa → closed \| reopened`                          | `new`, `reopened`                                            |
-| Task        | `draft → planned → ready-for-development → in-progress → ready-for-review → accepted \| cancelled` | `ready-for-development`, `in-progress`, `ready-for-review` |
+| Task        | `draft → planned → ready-for-development → in-progress → ready-for-review → accepted \| cancelled` | `ready-for-development`, `in-progress`                        |
+
+**The floor must be a subset of the statuses the dispatching pipeline accepts** — this is the rule, and the values above are only its current answer. The frontier names a command, so a status that command refuses yields a selection nothing can act on: `develop-task` Phase 0c HALTs on `Ready for Review`, and because `/develop-next` leaves its run-state file in place across a pipeline HALT, an unattended loop would stop at such an item and resume at the same one next invocation — unable to self-recover. `ready-for-review` is therefore **excluded**, even though it is unambiguously "outstanding" in document terms. Pinned by `evals/develop-next/unit/select-next.test.mjs` §"eligibility floor ⊆ dispatcher", which parses both pipelines' own status tables rather than restating them, so the rule re-checks itself if either dispatcher changes.
 
 A `draft` or `planned` task is therefore out of the frontier **by construction** rather than by someone remembering to mark it — which is strictly stronger than an opt-out marker, and is why no `deferred` value is added to either lifecycle.
 
@@ -87,6 +89,12 @@ A registry is an index, and indexes drift from what they index. Three rows of th
 ### Ordering
 
 Bugs before tasks, unconditionally — a registered bug is known-broken behaviour, a filed task is intended work, and broken outranks intended. Within bugs: `severity`, then `priority`, then ascending number. Within tasks: `priority`, then ascending number. The trailing number tie-break is what makes the order **total**, so the frontier is stable under input reordering. An unrecognised severity or priority sorts last within its tier rather than throwing — a typo in a hand-maintained cell must not decide whether work is visible at all.
+
+### Columns
+
+When the table has a header, columns are read **by name** (`#`/`No`/`Id`, `Title`/`Name`, `Status`, `Severity`, `Priority`), falling back to the documented positions only when no header is recognisable. A consumer who orders their registry differently is read correctly rather than silently mis-ranked; a header that names no `Status` or `Priority` column falls back to the documented position and says so in `--lint` warnings.
+
+A row whose id cell is not a number is a **malformed row**, not a header — the header is identified positionally, as the line above the `| --- |` separator. A row written `| T65 | … |` (the prefixed form the roadmap uses) is therefore reported rather than silently skipped.
 
 ### Tolerance
 
