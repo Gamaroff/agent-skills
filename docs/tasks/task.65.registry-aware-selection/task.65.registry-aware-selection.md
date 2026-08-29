@@ -5,7 +5,7 @@ type: task
 description: 'select-next.mjs reads one hand-maintained roadmap. Work filed anywhere else — a bug in the bug registry, a task in the task registry — is invisible to it, so the loop reports roadmap-complete while real work is outstanding. This adds the registries as a fallback frontier, consulted only when no phase holds an actionable row, so the operator never has to remember to transcribe a row.'
 tags: [develop-next, selection, registries, backlog, automation]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-08-29
@@ -18,7 +18,7 @@ estimated_effort_hours: 10
 
 **Task File**: [task.65.registry-aware-selection.md](./task.65.registry-aware-selection.md)
 
-**Status**: In Progress
+**Status**: Ready for Review
 
 **Review**: ✅ All review recommendations from `task.65.review.1.registry-aware-selection.md` implemented 2026-08-29
 
@@ -472,6 +472,7 @@ deviations from the plan were assessed and found justified.
 | 2026-08-29 |  | Status → ready-for-development | review-task |
 | 2026-08-29 |  | Implemented — 8 files, 27 new tests (72 → 99 unit); 10 mutations each reddening the tests that name it; roadmap `PHASE 4` retired and 6 drifted registry rows corrected | develop |
 | 2026-08-29 |  | QA cycle 1 gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 1 LOW; eligibility floor admits `ready-for-review`, which `develop-task` HALTs on | qa-task |
+| 2026-08-29 |  | QA findings fixed — 4 of 4 (1 HIGH, 2 MEDIUM, 1 LOW), 1 iteration; eligibility floor narrowed and the floor ⊆ dispatcher rule made executable; tests 99 → 113 | qa-fix |
 
 ## References
 
