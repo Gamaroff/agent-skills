@@ -51,11 +51,17 @@ const DEFAULT_RETRIES = 2;
  * budget, but 0 retries is the only way to say "do not retry" and must stay expressible.
  */
 function readInt(value, min) {
-  if (value === undefined || value === null || String(value).trim() === "") {
-    return undefined;
-  }
-  const n = Number(value);
-  return Number.isFinite(n) && n >= min ? n : undefined;
+  if (value === undefined || value === null) return undefined;
+  const raw = String(value).trim();
+  // A plain decimal integer, and nothing else. `Number()` is far too permissive for a knob an
+  // operator types under time pressure: it reads "0x10" as 16 — a 16 ms budget that would kill
+  // every child while passing a `>= 1` check — and accepts "1e3", " +5 " and "1.5", the last of
+  // which renders as "2.5 attempt(s)" in the failure message it feeds. Anything unrecognised
+  // returns undefined, which means "this source did not answer" and falls through to the next
+  // rung of the ladder rather than to a surprising value.
+  if (!/^\d+$/.test(raw)) return undefined;
+  const n = Number(raw);
+  return n >= min ? n : undefined;
 }
 
 function resolve(candidates, fallback, min) {

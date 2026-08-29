@@ -67,9 +67,19 @@ function commandsIn(body) {
 const TEST_FLAG = /--test(?![-\w])/;
 
 /** Every script whose body starts a `node --test` runner. */
-function runnerScripts() {
-  return Object.entries(SCRIPTS).filter(([, body]) =>
-    commandsIn(body).some((c) => /\bnode\b/.test(c) && TEST_FLAG.test(c)),
+function isRunnerCommand(command) {
+  return /\bnode\b/.test(command) && TEST_FLAG.test(command);
+}
+
+/**
+ * @param {Record<string,string>} scripts Injectable so the tests below can pin THIS function against
+ *   synthetic scripts. Testing a locally re-declared copy of the predicate instead left the real one
+ *   unguarded: reverting it to the old literal match changed nothing observable on this repo, so the
+ *   mutation survived a green suite.
+ */
+function runnerScripts(scripts = SCRIPTS) {
+  return Object.entries(scripts).filter(([, body]) =>
+    commandsIn(body).some(isRunnerCommand),
   );
 }
 
@@ -169,22 +179,98 @@ const BUDGET_MODULE = path.join(
 );
 
 /**
- * Source with comments removed, so prose about a historical value is not read as code.
+ * Strip comments from JS source, keeping every other byte.
  *
- * One left-to-right pass over strings AND comments together, keeping string literals. Stripping
- * block comments first is the tempting version and it is wrong: a `/*` inside a `//` line comment
- * then opens a phantom block that runs to the next `*` + `/` anywhere later in the file. On this
- * tree that silently deleted 53 lines of executable source from
- * `setup-consumer-config.test.mjs` — a hardcoded timeout inside that window was invisible to the
- * scan below, which is the one thing this helper must never do. String literals are matched (and
- * preserved) in the same pass so a `//` inside a URL cannot eat the rest of its line either.
+ * WHY THIS IS A SCANNER AND NOT A REGEX
+ * -------------------------------------
+ * Two regex versions of this shipped and both were wrong, in opposite directions, because JavaScript
+ * cannot be lexed by a regex:
+ *
+ *   1. Stripping block comments before line comments let a `/*` inside a `//` comment open a phantom
+ *      block running to the next close-marker anywhere later — 53 lines of a real suite vanished.
+ *   2. Adding a string arm fixed that but had no REGEX-LITERAL arm, so `str.replace(/\//g, "")` put a
+ *      literal `//` into the source and the rest of that line was deleted (11 real sites in this
+ *      tree), while a quote inside a character class — `/['"]/` — opened a pseudo-string that ran to
+ *      the next quote and PRESERVED every comment in between.
+ *
+ * Deleting code is the dangerous direction: the scan below then cannot see a hardcoded timeout that
+ * is really there, and the guard passes on the regression it exists to catch. Preserving a comment is
+ * the annoying direction: a false positive on prose. This scanner does neither.
+ *
+ * It tracks the five states that matter — line comment, block comment, string (all three quotes),
+ * regex literal (character classes included, so `/` inside `[...]` does not end it) — and uses the
+ * standard preceding-token heuristic to tell a regex literal from a division.
  */
+function stripComments(src) {
+  const REGEX_OK_AFTER =
+    /[(,=:[!&|?{};+\-*%~^<>]$|\b(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
+  let out = "";
+  let i = 0;
+  const n = src.length;
+  const regexAllowed = () => {
+    const before = out.replace(/\s+$/, "");
+    return before === "" || REGEX_OK_AFTER.test(before);
+  };
+  while (i < n) {
+    const c = src[i];
+    const d = src[i + 1];
+    if (c === "/" && d === "/") {
+      while (i < n && src[i] !== "\n") i++;
+      continue;
+    }
+    if (c === "/" && d === "*") {
+      i += 2;
+      while (i < n && !(src[i] === "*" && src[i + 1] === "/")) i++;
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      out += c;
+      i++;
+      while (i < n) {
+        if (src[i] === "\\") {
+          out += src[i] + (src[i + 1] ?? "");
+          i += 2;
+          continue;
+        }
+        out += src[i];
+        if (src[i] === c) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    if (c === "/" && regexAllowed()) {
+      out += c;
+      i++;
+      let inClass = false;
+      while (i < n) {
+        const ch = src[i];
+        if (ch === "\\") {
+          out += ch + (src[i + 1] ?? "");
+          i += 2;
+          continue;
+        }
+        if (ch === "\n") break; // unterminated — not a regex after all; stop rather than run on
+        out += ch;
+        i++;
+        if (ch === "[") inClass = true;
+        else if (ch === "]") inClass = false;
+        else if (ch === "/" && !inClass) break;
+      }
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+/** Source with comments removed, so prose about a historical value is not read as code. */
 function code(file) {
-  const src = fs.readFileSync(file, "utf8");
-  return src.replace(
-    /(["'`])(?:\\[\s\S]|(?!\1)[^\\])*\1|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
-    (match) => (/^["'`]/.test(match) ? match : ""),
-  );
+  return stripComments(fs.readFileSync(file, "utf8"));
 }
 
 /** Every test file the runners actually execute. */
@@ -274,7 +360,6 @@ test("no test file hardcodes a spawn timeout — the budget is the single source
  * ------------------------------------------------------------------------ */
 
 test("the runner detector sees node --test however the flags are arranged", () => {
-  const isRunner = (c) => /\bnode\b/.test(c) && TEST_FLAG.test(c);
   for (const body of [
     "node --test 'tests/*.test.js'",
     "node --experimental-vm-modules --test 'tests/*.test.js'",
@@ -284,21 +369,20 @@ test("the runner detector sees node --test however the flags are arranged", () =
     "bash a.sh && node --test 'tests/*.test.js'",
   ]) {
     assert.ok(
-      commandsIn(body).some(isRunner),
+      commandsIn(body).some(isRunnerCommand),
       `not detected as a runner: ${body}`,
     );
   }
 });
 
 test("the runner detector ignores commands that only look like runners", () => {
-  const isRunner = (c) => /\bnode\b/.test(c) && TEST_FLAG.test(c);
   for (const body of [
     "bash shared/resources/resolve-platform.test.sh",
     'for s in x/; do node evals/shared/runner.mjs "$s" || exit 1; done',
     "node scripts/build.mjs",
   ]) {
     assert.ok(
-      !commandsIn(body).some(isRunner),
+      !commandsIn(body).some(isRunnerCommand),
       `wrongly detected as a runner: ${body}`,
     );
   }
@@ -339,12 +423,16 @@ test("boundsIn reports one entry per runner, so a bounded script cannot hide an 
 });
 
 test("comment stripping never deletes executable source", () => {
-  // A `/*` inside a line comment used to open a phantom block comment that ran to the next `*/`
-  // anywhere later in the file, swallowing everything between — 53 lines of a real suite.
+  // Three separate ways a naive stripper gets this wrong, all of which shipped at some point:
+  //   1. a `/*` inside a line comment opening a phantom block that runs to the next close marker;
+  //   2. a regex literal ending in an escaped slash putting a literal `//` into the source, so the
+  //      rest of that line is read as a comment and deleted;
+  //   3. a quote inside a character class opening a pseudo-string, so every comment up to the next
+  //      quote is PRESERVED and then read as code.
   const tmp = path.join(os.tmpdir(), `spawn-guard-${process.pid}.mjs`);
-  // The two literals are assembled rather than written out, so this fixture does not itself trip
-  // the hardcode scan above — which reads every test file, this one included. That is deliberate:
-  // exempting the guard from its own rule is how the rule stops being checkable.
+  // The literals are assembled rather than written out, so this fixture does not itself trip the
+  // hardcode scan above — which reads every test file, this one included. Exempting the guard from
+  // its own rule is how the rule stops being checkable.
   const inCode = 20000;
   const inComment = 30000;
   fs.writeFileSync(
@@ -354,19 +442,31 @@ test("comment stripping never deletes executable source", () => {
       `const r = spawnSync('bash', [], { timeout: ${inCode} });`,
       `/* a real block comment with timeout: ${inComment} inside */`,
       "const u = 'https://example.com/a//b';",
+      `const slash = s.replace(/\\//g, ""); const q = { timeout: ${inCode} };`,
+      "const cls = /['\"]/;",
+      `// pseudo-string bait: timeout: ${inComment}`,
+      // An escaped quote inside a string: a scanner that does not honour the escape ends the string
+      // early, and the stray quote then opens another one that runs on and swallows what follows.
+      "const esc = 'it\\'s fine';",
+      `// escaped-quote bait: timeout: ${inComment}`,
     ].join("\n"),
   );
   try {
     const stripped = code(tmp);
-    assert.match(
-      stripped,
-      new RegExp(`timeout: ${inCode}`),
+    // BOTH executable occurrences must survive: the plain one, and the one sharing a line with a
+    // regex literal. Deleting code is the dangerous direction — the scan then cannot see a real
+    // hardcoded timeout, and the guard passes on the regression it exists to catch.
+    assert.equal(
+      (stripped.match(new RegExp(`timeout: ${inCode}`, "g")) || []).length,
+      2,
       "executable source was deleted by comment stripping",
     );
+    // NEITHER comment occurrence may survive: the block comment, or the line comment after a regex
+    // literal containing a quote.
     assert.doesNotMatch(
       stripped,
       new RegExp(`timeout: ${inComment}`),
-      "a real block comment was not stripped",
+      "a comment survived stripping and would be reported as a hardcoded timeout",
     );
     assert.match(
       stripped,
@@ -444,5 +544,54 @@ test("the spawn budget honours 0 retries and the full precedence ladder", async 
       () => spawnBudget("P").timeoutMs,
     ),
     60000,
+  );
+});
+
+test("runnerScripts itself recognises every runner form", () => {
+  // Pins the REAL function, not a re-declared copy of its predicate. The previous version of these
+  // tests exercised a local copy, so reverting runnerScripts to the old literal `node --test` match
+  // changed nothing observable on this repo and the mutant survived a green suite.
+  const detected = runnerScripts({
+    plain: "node --test 'a'",
+    flagged: "node --experimental-vm-modules --test 'a'",
+    doubleSpace: "node  --test 'a'",
+    chained: "bash x.sh && node --test 'a'",
+    notARunner: "node scripts/build.mjs",
+    alsoNot: "bash shared/resources/resolve-platform.test.sh",
+    reporterOnly: "node --test-reporter=spec x.mjs",
+  }).map(([name]) => name);
+  assert.deepEqual(detected.sort(), [
+    "chained",
+    "doubleSpace",
+    "flagged",
+    "plain",
+  ]);
+});
+
+test("the spawn budget rejects values that are not integers", async () => {
+  const { spawnBudget } =
+    await import("../shared/resources/tests/spawn-budget.mjs");
+  const timeoutFor = (v) => {
+    const saved = process.env.Q_SPAWN_TIMEOUT_MS;
+    process.env.Q_SPAWN_TIMEOUT_MS = v;
+    try {
+      return spawnBudget("Q").timeoutMs;
+    } finally {
+      if (saved === undefined) delete process.env.Q_SPAWN_TIMEOUT_MS;
+      else process.env.Q_SPAWN_TIMEOUT_MS = saved;
+    }
+  };
+  // "0x10" would otherwise become a 16 ms budget that kills every child.
+  for (const v of ["0x10", "1.5", "1e3", " +5 ", "Infinity", "abc"]) {
+    assert.equal(
+      timeoutFor(v),
+      60000,
+      `${v} should not be accepted as a timeout`,
+    );
+  }
+  assert.equal(
+    timeoutFor("90000"),
+    90000,
+    "a plain integer must still be accepted",
   );
 });
