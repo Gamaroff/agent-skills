@@ -5,7 +5,7 @@ type: task
 description: "QA reviews a prose skill's text and never runs it. Task 66 shipped accepted with a glob that collected 0 files on the default macOS shell; the first live run found it in minutes. Add an execution gate to qa-task/qa-story for skills whose deliverable is runnable prose."
 tags: [qa, gate, skills, shell-portability, dogfooding]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: medium
 created: 2026-08-31
@@ -16,7 +16,7 @@ estimated_effort_hours: 8
 
 # Technical Task: Make QA execute a prose skill, not only read it
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.67.review.1.execute-the-skill-qa-gate.md` implemented 2026-08-31
 
 ---
@@ -333,6 +333,42 @@ Tighten the deny-list or the disagreement heuristic; both are concentrated in on
 | 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
 | 2026-08-31 | 1.2     | Review (8/10, READY TO IMPLEMENT) — added the missing `npm run bundle` step and regenerated-files list (CI Bundle freshness check would have failed); moved the detection rule to a new QA-owned `shared/resources/qa-runnable-prose-detection.md` because the step-5-6 doc is not bundled into either QA skill; pinned per-skill placement (qa-task Step 4b, qa-story Phase 1.7 — qa-story is phase-numbered); added a `command -v zsh` guard so a zsh-less CI host does not trip the zero-blocks-executed finding; pinned Phase 5 to `shared/resources/tests/`; dropped the redundant `package.json` edit; added dual-shell prior art to References | review-task |
 | 2026-08-31 |  | Implemented — 3 files created, 4 modified, 8 regenerated; 41 tests, 9 mutation proofs; 5 engine defects found by dogfooding on real skill files and fixed | develop |
+| 2026-08-31 |  | QA gate FAIL (0/100) — 18 findings; classifier fails open 13 verified ways, temp-copy containment disproven | qa-task |
+| 2026-08-31 |  | QA findings fixed — 13 fail-open holes closed, sandbox sentinel added as defence in depth, 61 tests, 16 mutation proofs; 1 cycle | qa-fix |
+
+---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-31
+**Quality Score**: 0/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.67.qa.1.execute-the-skill-qa-gate.md](./task.67.qa.1.execute-the-skill-qa-gate.md)
+- **Gate File**: [task.67.gate.1.execute-the-skill-qa-gate.yml](./task.67.gate.1.execute-the-skill-qa-gate.yml)
+- **Bugs**: [BUG-1 — classifier fails open](./task.67.bug.1.classifier-fails-open.md) · [BUG-2 — extraction and coverage gaps](./task.67.bug.2.extraction-and-coverage-gaps.md)
+
+### Test Coverage Summary
+- **Tests Executed**: 2040 (0 failures, 1 skipped)
+- **Phases Verified**: 5/5 completed; 3 PASS, 1 CONCERNS, 1 FAIL
+- **Critical Issues**: 8 HIGH, 4 MEDIUM, 6 LOW
+- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+The safety boundary fails open in **thirteen independently verified ways** — an allow-listed command
+plus a redirect, a `#` inside quotes, a here-string, an unparseable command position, `env`/`command`/
+`time`, `awk`'s program text, `find -delete`/`-exec`, and process substitution all classify `runnable`
+and execute. Containment to the temp working copy was **disproven** with a canary written outside it.
+
+Three Safety success criteria are unmet. The full suite is green throughout — the same "a passing test
+is not evidence" failure this task exists to eliminate, reproduced inside the fix.
+
+Step 4b itself works: it fired on this change set, recorded every skip with a reason, and with
+`--bind` supplied executed 5 real blocks under both shells with no findings.
 
 ---
 
@@ -421,6 +457,37 @@ documenting snippets that take arguments.
 
 It is still reported, which is what §9's "a run where zero blocks executed is itself a finding" asks
 for, and the detail now names the placeholder count and tells the reader to supply `--bind`.
+
+### QA cycle 1 — thirteen fail-open holes, found and closed
+
+QA gate 1 returned **FAIL (0/100)**: the classifier reached `runnable` on thirteen verified inputs, and
+containment to the temp working copy was disproven with a canary written outside it. Three Safety
+criteria were unmet. The suite was green throughout — the same "a passing test is not evidence" failure
+this task exists to eliminate, reproduced inside the fix.
+
+All thirteen are closed, plus three MEDIUM and four LOW. See
+[BUG-1](./task.67.bug.1.classifier-fails-open.md) and
+[BUG-2](./task.67.bug.2.extraction-and-coverage-gaps.md).
+
+**The structural lesson, which is the part worth keeping.** The original nine mutation proofs all held,
+and none of them touched these paths — a mutation proof can only falsify a check that exists. The
+answer was not more proofs of the same shape but a **second, independent line**: each block now runs in
+`work/` inside a private temp root, and the runner compares that root before and after, reporting any
+write outside the copy as `escaped-sandbox` without consulting the classifier at all.
+
+Two things found by the adversarial pass over the fixes rather than by the findings:
+
+- The sentinel first derived its own boundary as `cwd/..`. Since `runBlock` accepts any `cwd`, a bare
+  temp directory made it walk the whole of `/tmp` twice per block — it hung the suite for two minutes
+  before being killed. The sandbox root is now passed explicitly. **A safety net that guesses its own
+  boundary is not a safety net.**
+- The first `WRITE_REDIRECT` pattern matched `2>&1`, making this repository's own documented zsh guard
+  (`command -v zsh >/dev/null 2>&1`) unrunnable by the gate that recommends it.
+
+One finding was **partly wrong and is corrected in BUG-2** rather than quietly accepted: L3 claimed an
+invalid `--timeout` silently disables hang protection. Measured, `spawnSync` throws `ERR_OUT_OF_RANGE`
+on NaN and on a negative value. The real hole is `--timeout 0`, which is accepted and means *no
+timeout*. The mutation proof coming back UNHELD is what surfaced it.
 
 ### Open question for review — noise on a consistently-failing block
 

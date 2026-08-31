@@ -1,0 +1,120 @@
+schema: 1
+task: 'task.67.execute-the-skill-qa-gate'
+task_title: 'Make QA execute a prose skill, not only read it'
+gate: FAIL
+status_reason: 'The safety boundary fails open in thirteen verified ways — allow-listed commands plus a redirect, a quoted `#`, a here-string, an unparseable command position, command runners, awk, find, and process substitution all classify runnable and execute. Containment to the temp copy is proven false. The full suite is green throughout.'
+reviewer: 'QA Engineer'
+updated: '2026-08-31T21:55:00Z'
+
+top_issues:
+  - id: CR-1
+    severity: high
+    finding: 'Write redirections are never inspected — `echo pwned > /tmp/x` classifies runnable and writes outside the temp copy (proven with a canary).'
+    suggested_action: 'Classify any block containing a write redirection (`>`, `>>`, `&>`, `>|`, `n>`) as mutating.'
+    suggested_owner: dev
+  - id: CR-2
+    severity: high
+    finding: 'The comment stripper fires on a `#` inside quotes, hiding the rest of the line from both scans while execution uses the original code — `echo "note # here"; rm -rf /tmp/x` is runnable.'
+    suggested_action: 'Strip comments with a quote-aware scan rather than a line regex.'
+    suggested_owner: dev
+  - id: CR-3
+    severity: high
+    finding: 'The heredoc opener matches `<<` anywhere, so a here-string `<<<"DATA"` swallows every following line as body — a trailing `rm -rf` is never scanned.'
+    suggested_action: 'Anchor the opener to a real heredoc: `<<` not preceded or followed by `<`; skip matches inside `$(( ))`.'
+    suggested_owner: dev
+  - id: CR-4
+    severity: high
+    finding: 'An unparseable leading token `break`s out of the segment, contributing no command word — `\mv a b` and `CMD=rm` + `$CMD -rf /tmp/x` are runnable. This is the fail-closed rule failing open on the exact case it names.'
+    suggested_action: 'Emit a synthetic unknown word instead of breaking; strip a leading backslash and re-test.'
+    suggested_owner: dev
+  - id: CR-5
+    severity: high
+    finding: '`env` (allow-listed) and `command`/`time` (shell keywords) are command runners whose blast radius is whatever follows; only the prefix is scanned. `env touch /tmp/x` is runnable.'
+    suggested_action: 'Remove them, or recurse onto the following word and classify that.'
+    suggested_owner: dev
+  - id: CR-6
+    severity: high
+    finding: '`awk` is allow-listed and its program is a quoted argument the stripper blanks — `awk ''BEGIN{system("touch /tmp/x")}''` executes arbitrary shell.'
+    suggested_action: 'Drop awk, or deny system(/close(/ENVIRON/"/dev/ and redirecting print, scanned before quote blanking.'
+    suggested_owner: dev
+  - id: CR-7
+    severity: high
+    finding: '`find` is allow-listed with no argument inspection — `find . -name x -delete` and `find . -exec mv {} /tmp \;` are runnable.'
+    suggested_action: 'Deny -delete/-exec/-execdir/-ok/-okdir/-fls/-fprint/-fprintf; same for `sort -o` and sed `w`.'
+    suggested_owner: dev
+  - id: CR-8
+    severity: high
+    finding: 'Process substitution `<(…)` is not turned into a segment break as `$(` is — `cat <(touch /tmp/x)` is runnable.'
+    suggested_action: 'Add `.replace(/[<>]\(/g, "\n")` alongside the existing `$(` rule.'
+    suggested_owner: dev
+  - id: CR-9
+    severity: medium
+    finding: 'The `sed -i` deny pattern misses the long form — `sed --in-place ''s/a/b/'' f.txt` is runnable. A deny-list bypass.'
+    suggested_action: 'Extend the pattern to `--in-place`, with or without `=SUFFIX`.'
+    suggested_owner: dev
+  - id: CR-10
+    severity: medium
+    finding: 'An attributed fence (```bash showLineNumbers) is not recognised, its body is dropped, and its closing fence is read as an opening one — desynchronising the file. Verified: zero blocks extracted, gate silently covers nothing.'
+    suggested_action: 'Take the language as the first word of the info string and ignore the remainder.'
+    suggested_owner: dev
+  - id: CR-11
+    severity: medium
+    finding: 'mkdtempSync and cpSync sit outside the try/finally, so a bad --copy leaks the temp directory silently on every run.'
+    suggested_action: 'Move cpSync inside the try, or remove tmp before rethrowing.'
+    suggested_owner: dev
+  - id: CR-12
+    severity: medium
+    finding: 'Every snippet inherits the full parent environment including GITHUB_TOKEN and tracker credentials, contradicting the file''s own "carries no credentials" claim.'
+    suggested_action: 'Build a minimal allow-listed env plus caller bindings; set PWD to cwd.'
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 0
+
+evidence:
+  tests_reviewed: 2040
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: FAIL
+    notes: 'The deliverable IS a security boundary and it does not hold. Thirteen verified fail-open inputs; containment to the temp working copy disproven with a canary written outside it. Snippets also inherit the full parent environment including tracker credentials.'
+  performance:
+    status: PASS
+    notes: 'Per-block timeout works; a 30s sleep is cut off. zshAvailable() spawns a subprocess per call (LOW, memoisable). No measurable impact on suite runtime.'
+  reliability:
+    status: CONCERNS
+    notes: 'Temp directory leaks on a bad --copy. An attributed fence desynchronises extraction so the gate silently covers nothing. Unvalidated --timeout can disable hang protection.'
+  maintainability:
+    status: PASS
+    notes: 'Clear structure, exported pure functions, comments explain why rather than what. Documentation is genuinely good — the rule doc states its reasoning and records the measurements behind it.'
+
+recommendations:
+  immediate:
+    - action: 'Close all eight high-severity fail-open holes (CR-1 … CR-8), each with a regression test and a mutation proof.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Add defence in depth: verify after each block that nothing outside the temp copy was written, so a future classification miss is still caught.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Fix the attributed-fence desync (CR-10) — it makes the gate report a clean run on a document it never read.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Fix the temp-dir leak (CR-11) and stop leaking the parent environment into snippets (CR-12).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'Make zsh a declared CI prerequisite — eight tests including the whole task-66 fixture vanish silently without it.'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs', '.github/workflows/test.yml']
+    - action: 'Strengthen the two weak tests and add CLI-surface coverage for main()/render().'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs']
+    - action: 'Correct the skip reason that names a template alternation as a command (CR/M4).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'All eight high-severity fail-open holes closed and mutation-proved'
+    - 'Containment to the temp working copy demonstrated, not asserted'

@@ -70,7 +70,26 @@ nobody thought to forbid runs.
 The practical consequence, and it is intentional: `gh` and `curl` are **not** on the allow-list in any
 form. Read-only `gh pr view` and `curl -sf` are skipped along with the mutating ones. Executing a
 network call from inside a QA gate is a side effect QA should not have, and the execution environment
-carries no credentials by design.
+is built from a minimal allow-list (`PATH`, `HOME`, `LANG`, `TERM`, `TMPDIR`) plus the caller's
+bindings — the parent process's credentials are never passed through.
+
+Three further rules fall out of the same principle, each added after a review found the boundary open:
+
+- **A write redirection makes any command mutating**, allow-listed or not. `echo x > /tmp/f` writes a
+  file, and an absolute or `~`-relative target ignores the working directory entirely, so the sandbox
+  is no defence. Redirection to `/dev/null`, `/dev/stdout` or `/dev/stderr` persists nothing and is
+  exempt, as is file-descriptor duplication (`2>&1`) — without that exemption the guard in §3a below
+  is itself unrunnable.
+- **Command runners are refused outright** — `env`, `command`, `time`, `xargs`, `sudo`, `nohup`,
+  `eval`, `exec`, and `awk`. Their blast radius is whatever follows, and only the leading word is
+  scanned. `awk` belongs here for a different reason: its program is a quoted argument, so
+  `awk 'BEGIN{system("…")}'` is arbitrary shell the scanner cannot see. The one exception is
+  `command -v` / `command -V`, which print a path and run nothing.
+  *This costs real coverage — `awk '{print $2}'` is harmless and gets skipped. That is the fail-closed
+  trade accepted deliberately: recognising a safe `awk` program means parsing `awk`.*
+- **An unreadable command position is unsafe, not absent.** A leading token that cannot be parsed as a
+  command name — a variable command `$CMD`, a quoted one — classifies `mutating`. Treating it as "no
+  command here" is how a fail-closed rule fails open.
 
 ### 2b. Unbound variables are placeholders, not failures
 
@@ -95,6 +114,20 @@ A finding is raised when either of these holds:
 
 `medium` on disagreement is deliberate: some blocks legitimately differ between shells, and a check that
 cries wolf is a check reviewers learn to skip.
+
+### 3aa. Defence in depth — the sandbox sentinel
+
+Classification is the first line, and it has been wrong: a single review found **thirteen** inputs that
+reached `runnable`, one of which wrote a file outside the working copy. So the runner keeps a second,
+independent line that does not consult the classifier at all.
+
+Each block runs in `work/` inside a private temp root. Before and after the run, the runner snapshots
+the temp root **excluding `work/`** — writes inside the copy are expected — and reports any difference
+as an `escaped-sandbox` finding at `confidence: high`.
+
+The sandbox root is passed explicitly by the caller. Deriving it from the working directory (`cwd/..`)
+was tried and is wrong: `runBlock` accepts any `cwd`, so a bare temp directory made the sentinel walk
+the whole of `/tmp` twice per block. **A safety net that guesses its own boundary is not a safety net.**
 
 ### 3a. The zsh arm is guarded
 

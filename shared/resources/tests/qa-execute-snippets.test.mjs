@@ -15,9 +15,9 @@
  * Run: node --test shared/resources/tests/qa-execute-snippets.test.mjs
  */
 
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +26,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE = join(__dirname, "..", "qa-execute-snippets.mjs");
 
 const {
+  COMMAND_RUNNERS,
+  main,
+  SAFE_COMMANDS,
   classifyBlock,
   commandWords,
   executeFile,
@@ -35,9 +38,18 @@ const {
   zshAvailable,
 } = await import(MODULE);
 
+const TEMP_DIRS = [];
 function tmp() {
-  return mkdtempSync(join(tmpdir(), "qa-snippets-test-"));
+  const d = mkdtempSync(join(tmpdir(), "qa-snippets-test-"));
+  TEMP_DIRS.push(d);
+  return d;
 }
+// The suite spawns a temp dir per assertion and used to abandon every one of
+// them — 146 were found in /tmp during QA. Registering them here makes cleanup
+// unconditional rather than dependent on each test remembering.
+after(() => {
+  for (const d of TEMP_DIRS) rmSync(d, { recursive: true, force: true });
+});
 
 /**
  * The per-block timeout passed to the code UNDER TEST, deliberately far below the
@@ -51,6 +63,15 @@ function tmp() {
  * not less: a loaded box only reaches the timeout sooner.
  */
 const BLOCK_TIMEOUT_MS = 300;
+
+// Mirrors the module's private SHELL_KEYWORDS for the precedence assertion above;
+// a runner appearing here would bypass the COMMAND_RUNNERS check entirely.
+const SHELL_KEYWORDS_SNAPSHOT = [
+  "!", "[", "[[", "]]", "]", "{", "}", "(", ")", "case", "do", "done", "elif",
+  "else", "esac", "fi", "for", "function", "if", "in", "select", "then",
+  "until", "while", ":", "break", "cd", "continue", "exit", "export", "local",
+  "read", "readonly", "return", "set", "shift", "type", "unset", "which",
+];
 
 function md(...blocks) {
   return blocks.join("\n\n");
@@ -247,6 +268,186 @@ test("unboundVariables recognises for-loop and read bindings", () => {
   assert.deepEqual(unboundVariables("read -r line\necho \"$line\"", {}), []);
 });
 
+// ── 2b. Regressions from QA cycle 1 — every one of these once classified runnable ──
+
+/**
+ * Thirteen inputs reached `runnable` in the shipped first draft, each verified
+ * against the module rather than inferred. They are kept as one table because
+ * they share a single property: the safety boundary must refuse what it cannot
+ * read. Losing any row silently reopens a hole that a green suite will not show.
+ */
+test("QA-1: a write redirection makes any command mutating, allow-listed or not", () => {
+  for (const code of [
+    "echo pwned > /tmp/qa-x",
+    "ls >> /tmp/qa-x",
+    "git diff > $HOME/qa-x",
+    "cat a &> /tmp/qa-x",
+  ]) {
+    const r = classifyBlock(code, {});
+    assert.equal(r.klass, "mutating", code);
+  }
+  // The temp cwd is no defence — an absolute target ignores it entirely, which is
+  // why this is classification's job and not the sandbox's.
+  assert.equal(classifyBlock("echo x > /etc/hosts").reason, "write-redirection");
+});
+
+test("QA-1b: discarding a stream, and duplicating a descriptor, are not writes", () => {
+  // Both exemptions are load-bearing. An earlier draft matched `2>&1` and made
+  // `command -v zsh >/dev/null 2>&1` — this repo's own documented zsh guard —
+  // unrunnable by the gate that recommends it.
+  assert.equal(classifyBlock("ls foo 2>/dev/null").klass, "runnable");
+  assert.equal(classifyBlock("grep x f 2>/dev/null | wc -l").klass, "runnable");
+  assert.equal(classifyBlock("ls >/dev/null").klass, "runnable");
+  assert.equal(classifyBlock("ls >/dev/null 2>&1").klass, "runnable");
+  assert.equal(classifyBlock('find . -name "*.md" 2>/dev/null | sort').klass, "runnable");
+});
+
+test("QA-2: a `#` inside quotes is data, not a comment", () => {
+  // The line regex deleted the rest of the line from BOTH scans while execution
+  // still used the original code, so the `rm -rf` was invisible and ran.
+  assert.equal(classifyBlock('echo "note # here"; rm -rf /tmp/qa-x').klass, "mutating");
+  assert.equal(classifyBlock("echo 'a # b'; git push origin main").klass, "mutating");
+  // A real trailing comment is still stripped.
+  assert.equal(classifyBlock("ls # rm -rf /tmp/qa-x").klass, "runnable");
+});
+
+test("QA-3: a here-string is not a heredoc opener", () => {
+  // `<<<"DATA"` matched the heredoc regex, so every following line was discarded
+  // as "body" — including a trailing rm.
+  assert.equal(classifyBlock('grep -q x <<<"DATA"\nrm -rf /tmp/qa-x').klass, "mutating");
+  // A genuine heredoc still shields its body from the command scan.
+  assert.equal(classifyBlock("cat <<'EOF'\ngit push origin main\nEOF").klass, "runnable");
+});
+
+test("QA-4: an unreadable command position fails CLOSED", () => {
+  // This is the fail-closed rule failing open on the exact case it names: the
+  // leading token could not be parsed, so the segment contributed no command word
+  // and was treated as harmless.
+  assert.equal(classifyBlock("\\mv /tmp/a /tmp/b").klass, "mutating");
+  const varCmd = classifyBlock("CMD=rm\n$CMD -rf /tmp/qa-x");
+  assert.equal(varCmd.klass, "mutating");
+  assert.match(varCmd.reason, /unparseable/);
+  // A backslash-quoted SAFE command is still safe — the fix strips the quote and
+  // re-tests rather than refusing everything it does not recognise on sight.
+  assert.equal(classifyBlock("\\ls -la").klass, "runnable");
+});
+
+test("QA-5: command runners are refused — their blast radius is what follows", () => {
+  for (const code of ["env touch /tmp/qa-x", "command mv a b", "time mv a b",
+                      "xargs rm", "sudo rm -f /tmp/qa-x", "nohup mv a b"]) {
+    assert.equal(classifyBlock(code).klass, "mutating", code);
+  }
+});
+
+test("QA-5b: COMMAND_RUNNERS takes precedence over the allow-list", () => {
+  // Without this ordering the runners check is dead code: they are already absent
+  // from SAFE_COMMANDS, so the fallthrough catches them and nothing proves the set
+  // does anything. Its real job is to survive someone re-adding `env` or `xargs`
+  // to the allow-list — a plausible future edit that would silently reopen QA-5.
+  assert.ok(COMMAND_RUNNERS.has("env"), "env must be a declared runner");
+  assert.ok(COMMAND_RUNNERS.has("xargs"), "xargs must be a declared runner");
+  assert.ok(COMMAND_RUNNERS.has("awk"), "awk must be a declared runner");
+  for (const r of COMMAND_RUNNERS) {
+    assert.equal(SAFE_COMMANDS.has(r), false, `${r} must not also be allow-listed`);
+    assert.equal(SHELL_KEYWORDS_SNAPSHOT.includes(r), false, `${r} must not be a shell keyword`);
+  }
+});
+
+test("QA-5c: `command -v` is a lookup and stays runnable; bare `command` does not", () => {
+  assert.equal(classifyBlock("command -v zsh >/dev/null 2>&1").klass, "runnable");
+  assert.equal(classifyBlock("if command -v zsh >/dev/null 2>&1; then echo yes; fi").klass, "runnable");
+  // The exception is anchored to the flag. Bare `command` still runs its argument.
+  assert.equal(classifyBlock("command mv a b").klass, "mutating");
+  assert.equal(classifyBlock("command rm -f /tmp/x").klass, "mutating");
+});
+
+test("QA-6: awk is refused — its program is a quoted argument the scan cannot see", () => {
+  assert.equal(classifyBlock(`awk 'BEGIN{system("touch /tmp/qa-x")}'`).klass, "mutating");
+  assert.equal(classifyBlock(`awk '{print > "/etc/x"}'`).klass, "mutating");
+});
+
+test("QA-7: find is read-only until given a write action", () => {
+  assert.equal(classifyBlock("find . -name x -delete").klass, "mutating");
+  assert.equal(classifyBlock("find . -exec mv {} /tmp \\;").klass, "mutating");
+  assert.equal(classifyBlock("sort -o out.txt in.txt").klass, "mutating");
+  assert.equal(classifyBlock("ls | tee out.txt").klass, "mutating");
+  // The read-only form this engine actually relies on stays runnable.
+  assert.equal(classifyBlock('find . -maxdepth 1 -name "*.md"').klass, "runnable");
+});
+
+test("QA-8: process substitution starts its own segment", () => {
+  // `<(…)` kept the inner command glued to the outer segment's tail, and only the
+  // first token of a segment is examined — so `cat` was all the scanner saw.
+  assert.equal(classifyBlock("cat <(touch /tmp/qa-x)").klass, "mutating");
+  assert.equal(classifyBlock("diff <(ls a) <(ls b)").klass, "runnable");
+});
+
+test("QA-9: the sed deny-list covers the long form", () => {
+  assert.equal(classifyBlock("sed --in-place 's/a/b/' f.txt").klass, "mutating");
+  assert.equal(classifyBlock("sed --in-place=.bak 's/a/b/' f.txt").klass, "mutating");
+  assert.equal(classifyBlock("sed -i 's/a/b/' f.txt").klass, "mutating");
+  assert.equal(classifyBlock("sed -E 's/a/b/' f.txt").klass, "runnable");
+});
+
+test("QA-10: an attributed fence does not desynchronise the file", () => {
+  // The worst shape this took: the attributed opener was not recognised, its body
+  // was dropped, and its CLOSING fence was then read as an OPENING one — so the
+  // rest of the document was parsed inside-out and the gate reported a clean run
+  // on a file it had never read.
+  const doc = ["```bash showLineNumbers", "echo one", "```", "", "```bash", "echo two", "```"].join("\n");
+  const blocks = extractBlocks(doc);
+  assert.equal(blocks.length, 2);
+  assert.deepEqual(blocks.map((b) => b.code), ["echo one", "echo two"]);
+  assert.deepEqual(
+    extractBlocks('```bash title="x"\necho a\n```').map((b) => b.code),
+    ["echo a"],
+  );
+});
+
+test("QA-11: a failing --copy removes the temp directory it created", () => {
+  const before = readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  const dir = tmp();
+  const file = join(dir, "SKILL.md");
+  writeFileSync(file, bash("echo ok"));
+  executeFile(file, { allowZsh: false });
+  assert.throws(() => executeFile(file, { allowZsh: false, copyFrom: "/nonexistent-qa-path" }));
+  const after_ = readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  assert.equal(after_, before, "neither the happy nor the failing path may leak a temp dir");
+});
+
+test("QA-12: snippets do not inherit the parent environment", () => {
+  // The header claims the execution environment carries no credentials. It did.
+  process.env.QA_FAKE_SECRET = "sekrit";
+  try {
+    const { runs } = runBlock('echo "[${QA_FAKE_SECRET}]"', { shells: ["bash"], cwd: tmp() });
+    assert.equal(runs.bash.stdout, "[]", "the parent env must not reach the snippet");
+  } finally {
+    delete process.env.QA_FAKE_SECRET;
+  }
+});
+
+test("QA-13: the sandbox sentinel catches a block that escapes its working copy", () => {
+  // Defence in depth. Classification is the first line and it was wrong thirteen
+  // ways; this is the second, and it deliberately does NOT consult the classifier.
+  const root = tmp();
+  const work = join(root, "work");
+  mkdirSync(work, { recursive: true });
+
+  const { findings } = runBlock("echo escaped > ../ESCAPED", { shells: ["bash"], cwd: work, sandboxRoot: root });
+  const f = findings.find((x) => x.kind === "escaped-sandbox");
+  assert.ok(f, "a write outside the working copy must be reported whatever the classifier said");
+  assert.equal(f.confidence, "high");
+  assert.match(f.detail, /ESCAPED/);
+});
+
+test("QA-13b: writing inside the working copy does not trip the sentinel", () => {
+  const root = tmp();
+  const work = join(root, "work");
+  mkdirSync(work, { recursive: true });
+  const { findings } = runBlock("echo inside > ./file.txt", { shells: ["bash"], cwd: work, sandboxRoot: root });
+  assert.deepEqual(findings.filter((f) => f.kind === "escaped-sandbox"), []);
+});
+
 // ── 3. Dual-shell execution ───────────────────────────────────────────────────
 
 test("agreeing block under both shells produces no finding", { skip: !zshAvailable() }, () => {
@@ -262,11 +463,22 @@ test("a non-zero exit is reported as execution-failure with high confidence", ()
 });
 
 test("a hanging block is terminated by the timeout rather than hanging the run", () => {
+  // Accepting `execution-failure` as an alternative made this pass even if timeout
+  // classification regressed, and nothing measured that the 30s sleep was actually
+  // cut off rather than waited out — the one property worth asserting.
+  const started = Date.now();
   const { findings } = runBlock("sleep 30", { shells: ["bash"], cwd: tmp(), timeout: BLOCK_TIMEOUT_MS });
+  const elapsed = Date.now() - started;
   assert.ok(
-    findings.some((f) => f.kind === "execution-timeout" || f.kind === "execution-failure"),
-    "expected the timeout to end the block",
+    findings.some((f) => f.kind === "execution-timeout"),
+    "the block must be reported as a timeout, not merely as a failure",
   );
+  assert.ok(elapsed < 10_000, `the 30s sleep must be truncated, took ${elapsed}ms`);
+});
+
+test("a block that terminates itself is not reported as a timeout", () => {
+  const { findings } = runBlock("kill -TERM $$", { shells: ["bash"], cwd: tmp() });
+  assert.equal(findings.some((f) => f.kind === "execution-timeout"), false);
 });
 
 // ── 4. Regression fixture: the task-66 defect ─────────────────────────────────
@@ -389,14 +601,64 @@ test("the task-66 defect is caught end to end, through executeFile", { skip: !zs
   rmSync(cwd, { recursive: true, force: true });
 });
 
-test("MUTATION: removing the fail-closed default lets a novel mutating command execute", () => {
-  // Deny-list only (the mutation): `kubectl delete` matches nothing and would run.
-  const denyListOnly = (code) =>
-    [/\bgit\s+push\b/, /\brm\s+-[A-Za-z]*[rf]/].some((re) => re.test(code)) ? "mutating" : "runnable";
+test("MUTATION: the allow-list, not the deny-list, is what refuses a novel command", () => {
+  // An earlier version asserted against a locally defined deny-list fake, which
+  // could never fail regardless of module behaviour. Assert a property of the
+  // MODULE instead: the command is refused, and refused for the fail-closed
+  // reason rather than by matching a named deny pattern.
+  const r = classifyBlock("kubectl delete pod api-0");
+  assert.equal(r.klass, "mutating");
+  assert.match(r.reason, /fail-closed/);
+  assert.doesNotMatch(r.reason, /deny-list/, "nothing on the deny-list names kubectl");
+});
 
-  const novel = "kubectl delete pod api-0";
-  assert.equal(denyListOnly(novel), "runnable", "a deny-list alone fails OPEN");
-  assert.equal(classifyBlock(novel).klass, "mutating", "the allow-list must fail CLOSED");
+// ── 5b. CLI surface ───────────────────────────────────────────────────────────
+
+test("main() exit codes and argument validation", () => {
+  const dir = tmp();
+  const clean = join(dir, "clean.md");
+  writeFileSync(clean, bash("echo ok"));
+  const findings = join(dir, "findings.md");
+  writeFileSync(findings, bash("exit 3"));
+
+  // 0 = clean, 1 = findings, 2 = hard error. Callers depend on this contract and
+  // nothing exercised it.
+  assert.equal(main(["--file", clean, "--no-zsh"]).exitCode, 0);
+  assert.equal(main(["--file", findings, "--no-zsh"]).exitCode, 1);
+  assert.equal(main(["--file", "/no/such/file.md", "--no-zsh"]).exitCode, 2);
+  assert.equal(main([]).exitCode, 2, "--file is required");
+  assert.equal(main(["--bogus"]).exitCode, 2);
+  assert.equal(main(["--help"]).exitCode, 0);
+});
+
+test("main() validates --bind and --timeout", () => {
+  const dir = tmp();
+  const f = join(dir, "s.md");
+  writeFileSync(f, bash("echo ok"));
+
+  assert.equal(main(["--file", f, "--bind", "novalue"]).exitCode, 2);
+  assert.match(main(["--file", f, "--bind", "novalue"]).error, /bad --bind/);
+
+  // `--timeout 0` is the case that matters, and it is not the one the finding
+  // named. Node THROWS ERR_OUT_OF_RANGE on NaN and on a negative value, so those
+  // already fail loudly with or without validation. `0`, however, is accepted by
+  // spawnSync and means "no timeout" — that is the value that silently disables
+  // hang protection, so that is what this rejects.
+  assert.equal(main(["--file", f, "--timeout", "0"]).exitCode, 2);
+  assert.match(main(["--file", f, "--timeout", "0"]).error, /positive/);
+  // NaN and negative still exit 2; validation makes the message useful rather
+  // than surfacing an opaque ERR_OUT_OF_RANGE.
+  assert.equal(main(["--file", f, "--timeout", "abc"]).exitCode, 2);
+  assert.equal(main(["--file", f, "--timeout", "-1"]).exitCode, 2);
+  // Generous on purpose: this asserts that a valid value is ACCEPTED, not that any
+  // particular duration is enough. A tight value here made the test flaky under
+  // load, failing on shell startup rather than on the thing being tested.
+  assert.equal(main(["--file", f, "--timeout", "30000", "--no-zsh"]).exitCode, 0);
+
+  // A well-formed binding is accepted and reaches the block.
+  const bound = join(dir, "b.md");
+  writeFileSync(bound, bash('test -n "$MY_VAL"'));
+  assert.equal(main(["--file", bound, "--bind", "MY_VAL=x", "--no-zsh"]).exitCode, 0);
 });
 
 // ── 6. File-level orchestration ───────────────────────────────────────────────
