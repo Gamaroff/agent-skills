@@ -1,0 +1,104 @@
+schema: 1
+task: 'task.66.review-pr'
+task_title: 'Review a pull request against the paper trail that is supposed to justify it'
+gate: CONCERNS
+status_reason: 'All 10 phases complete and 1986 repo tests green, but the diff code review found four high-confidence defects in the skill''s own shell snippets and test assertions — including a glob that matches zero gate files and a comment path that references an unassigned variable.'
+reviewer: 'QA Engineer'
+updated: '2026-08-31T00:00:00Z'
+qa_cycle: 1
+pr: 'https://github.com/Gamaroff/agent-skills/pull/283'
+
+top_issues:
+  - id: CR-1
+    severity: medium
+    finding: 'Resolution rung 2 greps `pr_number: ${PR_NUMBER}` with no end anchor, so reviewing PR 28 matches a document whose frontmatter reads pr_number: 281 and anchors the whole review on the wrong work item.'
+    suggested_action: 'Anchor the pattern to end-of-value: grep -rlE "pr_number: ${PR_NUMBER}[[:space:]]*$" docs/.'
+    suggested_owner: dev
+  - id: CR-2
+    severity: medium
+    finding: 'Rungs 1 and 3 use docs/**/ globs, but bash without globstar expands ** as a single level — the documented gate glob matches 0 of 110 gate files in this repo.'
+    suggested_action: 'Replace the ** globs with recursive grep --include / find.'
+    suggested_owner: dev
+  - id: CR-3
+    severity: medium
+    finding: 'Step 8 consumes $BODY_FILE in three commands but no step assigns it, and Step 9 removes only $DIFF_FILE — the comment path is unrunnable as written and leaks the body file if improvised.'
+    suggested_action: 'Assign BODY_FILE via mktemp and write the body before the platform branches; delete it in Step 9.'
+    suggested_owner: dev
+  - id: CR-8
+    severity: low
+    finding: 'The schema-mirror test assertion has a dead first alternative and a loose |parallel fallback, so it passes on the word "parallel" appearing anywhere in the file — a vacuous assertion.'
+    suggested_action: 'Drop the backticks from the first alternative and remove the |parallel fallback so the assertion binds to the real sentence.'
+    suggested_owner: dev
+
+advisory_findings:
+  - id: CR-4
+    severity: medium
+    confidence: medium
+    finding: 'Step 1 dereferences ${PR} and $BRANCH but no step derives them from the documented target argument.'
+  - id: CR-5
+    severity: medium
+    confidence: medium
+    finding: 'Step 4 checks no exit status, so the documented "audit a merged PR after the fact" case produces an empty patch when the head branch was deleted on merge.'
+  - id: CR-6
+    severity: medium
+    confidence: medium
+    finding: 'The verdict table middle row says only "any medium" without naming the field; a code bug at severity high + confidence medium matches no row and falls through to APPROVE.'
+  - id: CR-7
+    severity: low
+    confidence: medium
+    finding: 'The Bitbucket marker search reads only the first page of comments, defeating idempotency on a busy PR.'
+  - id: CR-9
+    severity: low
+    confidence: medium
+    finding: 'The eight-artifact-kinds test substring-checks generic tokens against the whole Step 3 block; it still passes if the globs are deleted.'
+  - id: CR-10
+    severity: low
+    confidence: low
+    finding: 'Arguments and the Step 8 heading disagree on whether an explicit --comment still prompts.'
+  - id: CR-11
+    severity: low
+    confidence: high
+    category: cleanup
+    finding: 'The documented run command `node --test skills/review-pr/tests/` fails with MODULE_NOT_FOUND; the glob form works.'
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 40
+  phases_verified: '10/10'
+  repo_suite: '1986 tests, 1985 pass, 0 fail, 1 skipped'
+  mutation_proofs: 11
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    phases_with_issues: [2, 3, 8, 9]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No secrets. Comment bodies always file-sourced (0 inline --body). Bitbucket auth selected by variable name, never by sniffing the token value. No addCommentToJiraIssue.'
+  performance:
+    status: PASS
+    notes: 'Diff written to a scratch patch file and never read into main context; both lenses dispatched in one parallel message; review scoped to the authored diff.'
+  reliability:
+    status: CONCERNS
+    notes: 'Both sourced helpers guarded with || exit 1 and auth verified by status code, but CR-2 (dead glob), CR-3 (unassigned BODY_FILE) and CR-5 (unchecked fetch on a merged PR) mean documented paths fail silently rather than loudly.'
+  maintainability:
+    status: PASS
+    notes: 'Shared prompts referenced, never copied. 40 contract tests, 11 mutation proofs, bundle idempotent, catalog regenerated. CR-8/CR-9 show two assertions were weaker than they read.'
+
+recommendations:
+  immediate:
+    - action: 'Fix CR-1, CR-2, CR-3, CR-8 — the four high-confidence defects'
+      refs: ['skills/review-pr/SKILL.md', 'skills/review-pr/tests/review-pr.test.js']
+  future:
+    - action: 'Address CR-4 through CR-7, CR-9, CR-10 in the same cycle — all verified by reading, all cheap'
+      refs: ['skills/review-pr/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions:
+    - 'CR-1, CR-2, CR-3, CR-8 fixed and mutation-proved'
