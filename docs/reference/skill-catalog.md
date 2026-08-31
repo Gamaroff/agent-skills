@@ -11,7 +11,7 @@ If you're new to the library, start here:
 
 - **Orchestrators:** `develop-story`, `develop-task` — full lifecycle for a story or task
 - **Authoring:** `create-prd`, `create-epic`, `create-story`, `create-task`
-- **Review:** `review-prd`, `review-epic`, `review-story`, `review-task`
+- **Review:** `review-prd`, `review-epic`, `review-story`, `review-task`, `review-pr`
 - **QA:** `qa-story`, `qa-task`, `qa-fix`, `qa-gate`
 - **Git / PR:** `create-branch`, `commit-changes`, `create-pr`
 - **Meta:** `create-skill`, `find-skills`, `document-existing-project`

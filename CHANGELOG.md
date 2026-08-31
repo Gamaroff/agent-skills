@@ -6,6 +6,48 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/review-pr` — review a pull request against the paper trail that is supposed to justify it.**
+  The repo could review a *diff* (`/review-code`) and review a *document before implementation*
+  (`/review-story`, `/review-task`). Nothing asked the question a human asks when they open a PR:
+  *this says it implements task 65 — does it, and is the evidence there?*
+
+  **The gap was structural, not just a missing skill.** Every resolver in the repo ran
+  doc → branch → PR: `create-branch` builds a branch name from a document, `qa-fix` finds a PR from
+  the current branch. Nothing parsed `feature/task.65.registry-aware-selection` back into
+  `docs/tasks/task.65.registry-aware-selection/`. `/review-pr` adds that reverse lookup as a
+  six-rung, first-hit-wins cascade — branch stem, `pr_number` frontmatter, gate `pr:` URL, tracker
+  issue, a bounded Explore fallback, then degrading to a code-only review. The rung that matched is
+  reported as `resolved_via`, because a resolver that silently anchors on the wrong document
+  produces confidently wrong findings for every check downstream.
+
+  **Two lenses run over one scoped diff.** The code lens dispatches
+  `shared/resources/code-review-prompt.md` verbatim — the same reviewer `/review-code`, `/qa-story`
+  and `/qa-task` already use, so it inherits every future improvement to it. The conformance lens is
+  a new shared prompt, `shared/resources/pr-conformance-prompt.md`, checking four things the code
+  lens cannot see: `coverage` (a criterion the diff does not deliver), `scope` (the diff doing what
+  the doc never claimed), `trail` (a gate that never reached PASS, a `top_issues[]` never emptied, an
+  `accepted` status with no DoD file), and `consistency` (doc, PR and tracker disagreeing). A PR can
+  be flawless code implementing the wrong thing, or correct work whose evidence never closed;
+  neither lens sees the other's failures.
+
+  **Bitbucket gets PR review for the first time.** `/review-code`'s PR path resolved its base with
+  `gh pr view` and had no Bitbucket branch at all. `/review-pr` builds the diff from `git` rather
+  than a host API, so one path serves both platforms, and it branches on `$VCS` for PR-shaped work
+  and `$TRACKER` for issue-shaped work — separate axes, since a repo can host code on Bitbucket and
+  track work in Jira.
+
+  **Advisory by design.** It writes a co-located `.pr-review.{n}.` report and optionally posts one
+  idempotent summary PR comment. It never submits a formal review, never writes a gate `.yml` (only
+  `qa-*` skills do), and never edits code. The new artifact kind is registered in
+  `docs/standards/file-naming.md`, both Co-located artifacts tables and
+  `docs/reference/pipeline-artifacts.md` — a kind that exists in the wild but in no standard is the
+  drift this repo has been bitten by before.
+
+  Two sharp edges found by the skill's own QA and worth knowing about, because both fail *silently*:
+  `docs/**/…` needs `shopt -s globstar`, which is off by default — the first draft's gate glob
+  matched **0 of 110** gate files; and an unanchored `pr_number: ${N}` grep is a prefix match, so
+  reviewing PR 28 resolved to a document reading `pr_number: 281`.
+
 - **`/develop-next` now derives its frontier from the registries, so a filed bug or task cannot be
   invisible to the loop.** `select-next.mjs` read exactly one file: the completion roadmap. Everything
   else the repo tracks — `docs/bugs/bug-registry.md`, `docs/tasks/task-registry.md` — was invisible to

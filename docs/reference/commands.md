@@ -54,6 +54,8 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/review-bug --validate <path>` | Non-interactive GO/NO-GO fix-readiness score (the gate `develop-bug` Step 2 runs) | [`review-bug`](../../skills/review-bug/SKILL.md) |
 | `/review-code` | Adversarial diff review of the working tree or a PR — advisory by default | [`review-code`](../../skills/review-code/SKILL.md) |
 | `/review-code --comment` / `--fix` | Post findings as inline PR comments, or apply them to the working tree | [`review-code`](../../skills/review-code/SKILL.md) |
+| `/review-pr [PR\|branch]` | Review a PR against its work item and pipeline artifacts — conformance + code, advisory | [`review-pr`](../../skills/review-pr/SKILL.md) |
+| `/review-pr --comment` / `--no-code` / `--no-docs` | Post one summary PR comment, or run a single lens | [`review-pr`](../../skills/review-pr/SKILL.md) |
 
 ## QA
 

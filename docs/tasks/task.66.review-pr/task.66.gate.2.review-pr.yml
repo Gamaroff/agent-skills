@@ -1,0 +1,125 @@
+schema: 1
+task: 'task.66.review-pr'
+task_title: 'Review a pull request against the paper trail that is supposed to justify it'
+gate: PASS
+status_reason: 'All 11 cycle-1 findings are closed and individually verified; each fix is held by a test and mutation-proved. Full suite 1991 tests, 0 failures. Reliability NFR clears now that the three silent-failure paths are checked.'
+reviewer: 'QA Engineer'
+updated: '2026-08-31T01:00:00Z'
+qa_cycle: 2
+previous_gate: 'task.66.gate.1.review-pr.yml'
+pr: 'https://github.com/Gamaroff/agent-skills/pull/283'
+
+top_issues: []
+
+resolved_issues:
+  - id: CR-1
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Anchored grep returns 1 match for PR 28 (task.14, which genuinely has pr_number: 28) where the unanchored form returned 3.'
+    mutation_proven: true
+  - id: CR-2
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'No ** glob survives in any cascade rung; rung 1 uses find, rung 3 uses grep --include. The old glob still returns 0 of 110 gate files, confirming the trap was real.'
+    mutation_proven: true
+  - id: CR-3
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'BODY_FILE assigned at SKILL.md:323 via mktemp, before first use; removed at :382 alongside DIFF_FILE.'
+    mutation_proven: true
+  - id: CR-4
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Step 0b exists and precedes Step 1; binds PR and BRANCH from target.'
+    mutation_proven: true
+  - id: CR-5
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Fetch/diff wrapped in a conditional with an emptiness check; failure sets USE_API_DIFF=1. Guard retightened after the first mutation came back NOT HELD.'
+    mutation_proven: true
+  - id: CR-6
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Verdict table names severity and confidence in every row; the old "any medium" row is gone.'
+    mutation_proven: true
+  - id: CR-7
+    severity: low
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Bitbucket comment scan uses ?pagelen=100.'
+    mutation_proven: true
+  - id: CR-8
+    severity: low
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Assertion bound to "mirror the code_review[] schema" plus the six shared field names; the |parallel fallback is gone.'
+    mutation_proven: true
+  - id: CR-9
+    severity: low
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Artifact-kinds test reads the fenced bash block and matches nine glob forms, not bare words.'
+    mutation_proven: true
+  - id: CR-10
+    severity: low
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Step 8 heading no longer claims confirmation that the Arguments rule contradicts.'
+    mutation_proven: false
+  - id: CR-11
+    severity: low
+    status: closed
+    fixed_date: '2026-08-31'
+    verification: 'Test header documents the glob run form; the directory form is noted as failing.'
+    mutation_proven: false
+
+claim_verification:
+  note: 'Each of the 11 findings was re-checked individually rather than inferred from a green suite. One check (CR-3) produced a false negative from shell quoting in the verification harness itself and was re-verified directly against the file.'
+  result: '11/11 closed'
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 45
+  phases_verified: '10/10'
+  repo_suite: '1991 tests, 1990 pass, 0 fail, 1 skipped'
+  mutation_proofs: 20
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from cycle 1. No secrets; bodies always file-sourced; auth selected by variable name; no addCommentToJiraIssue.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. Diff kept out of main context; both lenses dispatched in one parallel message.'
+  reliability:
+    status: PASS
+    notes: 'Upgraded from CONCERNS. The three silent-failure paths are closed: the dead glob is replaced by find/grep -r, the unassigned BODY_FILE is created before use, and the unchecked fetch now falls back on any failure.'
+  maintainability:
+    status: PASS
+    notes: 'Test count 40 → 45; two vacuous assertions replaced with ones bound to real structure. Bundle idempotent, catalog current.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Run the live two-lens end-to-end (full verdict, --no-code, --comment idempotency) — named in the task Deferred Work'
+      refs: ['skills/review-pr/SKILL.md']
+    - action: 'Fix /review-code Step 4 branching on TRACKER where it should branch on VCS'
+      refs: ['skills/review-code/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

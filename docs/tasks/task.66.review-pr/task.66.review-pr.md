@@ -5,11 +5,12 @@ type: task
 description: "Add a /review-pr skill that resolves a PR back to its work item, reads the pipeline artifacts beside it, and reviews the diff and the evidence together — on GitHub and Bitbucket."
 tags: [review, pull-request, bitbucket, github, jira, traceability, skills]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-31
 updated: 2026-08-31
+completed_date: 2026-08-31
 assignee:
 estimated_effort_hours: 12
 github_issue: 282
@@ -18,7 +19,7 @@ pr_number: 283
 
 # Technical Task: Review a pull request against the paper trail that is supposed to justify it
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.66.review.1.review-pr.md` implemented 2026-08-31
 **GitHub Issue**: [#282](https://github.com/Gamaroff/agent-skills/issues/282)
 
@@ -624,28 +625,55 @@ when the behaviour is removed.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-31
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 92/100
+**Gate Decision**: PASS (cycle 2)
 
 ### QA Report
-- **Full Report**: [task.66.qa.1.review-pr.md](./task.66.qa.1.review-pr.md)
-- **Gate File**: [task.66.gate.1.review-pr.yml](./task.66.gate.1.review-pr.yml)
+- **Cycle 1**: [task.66.qa.1.review-pr.md](./task.66.qa.1.review-pr.md) → [gate.1](./task.66.gate.1.review-pr.yml) — CONCERNS (70/100)
+- **Cycle 2**: [task.66.qa.2.review-pr.md](./task.66.qa.2.review-pr.md) → [gate.2](./task.66.gate.2.review-pr.yml) — **PASS (92/100)**
 
 ### Test Coverage Summary
-- **Tests Executed**: 1986 (40 review-pr contract tests)
+- **Tests Executed**: 1991 (45 review-pr contract tests)
 - **Phases Verified**: 10/10
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **QA Cycles**: 2
 
 ### Key Findings
 Diff code review found 10 correctness defects and 1 cleanup in the skill's own shell snippets and
 test assertions. Four are high-confidence and gate the build (CR-1 unanchored `pr_number` grep,
 CR-2 `docs/**/` glob that matches 0 of 110 gate files without `globstar`, CR-3 `$BODY_FILE`
 consumed but never assigned, CR-8 vacuous test assertion). Every testable finding was confirmed
-empirically. None is architectural.
+empirically. None is architectural. **All 11 were fixed in cycle 1 and individually verified in
+cycle 2**, each held by a test and mutation-proved; gate 2 is PASS (92/100).
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**Final Gate:** [task.66.gate.2.review-pr.yml](./task.66.gate.2.review-pr.yml) — **PASS (92/100)**
+**QA Cycles:** 2
+**CI:** ✅ SUCCESS (4/4 checks green)
+**Detailed Verification Log:** [task.66.dod.1.review-pr.md](./task.66.dod.1.review-pr.md)
+
+✅ **Acceptance Criteria:** 19/22 demonstrated; 3 documentation-and-contract-test only (see residual)
+✅ **Tests:** 45 contract tests; full repo suite 1991 tests, 0 failures
+✅ **Documentation:** CHANGELOG, commands, activation-phrases, README, 4 standards docs, catalog
+✅ **Security:** PASS — no secrets, bodies file-sourced, guarded sourcing, status-code auth
+➖ **Compliance:** NOT_APPLICABLE — no data path, no UI, no PII
+✅ **Code Review:** 11 findings across 2 QA cycles, all closed and mutation-proved
+
+**Residual accepted knowingly:** no Bitbucket path has executed against a live API, no PR comment has
+been posted by this skill, and the `ACCESS_TRACKER` deferral is proven on the GitHub path only. All
+three were declared as Deferred Work before QA ran; the repo is GitHub-hosted, so the Bitbucket path
+is not executable here.
+
+**Task marked as ACCEPTED on:** 2026-08-31
 
 ---
 
@@ -657,6 +685,9 @@ empirically. None is architectural.
 | 2026-08-31 | 1.1     | Review passed (8/10) — 6 Important fixes applied: `--effort` defined, rung 4 matches Jira keys, Jira read path named, cross-fork diff handled, `.agents/reviews/` fallback dropped, Phase 10 standards doc sweep added | review-task |
 | 2026-08-31 |         | Implemented — 11 files, 40 tests | develop |
 | 2026-08-31 |         | QA gate CONCERNS (70/100) — 4 blocking, 7 advisory code-review findings | qa-task |
+| 2026-08-31 |         | QA fix cycle 1 — all 11 findings closed, each mutation-proved | qa-fix |
+| 2026-08-31 |         | QA gate PASS (92/100) — 11/11 verified closed | qa-task |
+| 2026-08-31 | 1.2     | DoD verified — accepted (PR #283), 3 criteria carried as recorded residual | finalise |
 
 ---
 
@@ -775,7 +806,7 @@ prose. Ticking them from a dry read would be reporting coverage that does not ex
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.66.review-pr/task.66.review-pr.md`

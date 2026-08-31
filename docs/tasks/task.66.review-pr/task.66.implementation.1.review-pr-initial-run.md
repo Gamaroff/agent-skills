@@ -3,7 +3,7 @@
 **Task**: `task.66.review-pr.md`
 **Run Number**: 1
 **Started**: 2026-08-31 00:00
-**Status**: In Progress
+**Status**: ✅ Complete — Accepted
 
 ---
 
@@ -36,9 +36,9 @@ Build the `review-pr` skill: resolve a PR back to its work item, collect the pip
 | 2. review-task            | ✅ Done    | `task.66.review.{N}.{name}.md` exists (or skip logged)                        | Skipped — `task.66.review.1.review-pr.md` from standalone run (8/10, READY TO IMPLEMENT, 6 fixes applied) | — |
 | 3. develop                | ✅ Done    | Task status == `Ready for Review`                                             | 11 files; 40 contract tests green; 11 mutation proofs; Phase 10 doc sweep | — |
 | 4. create-pr              | ✅ Done    | PR URL targets `develop`; issue comment posted                                | [#283](https://github.com/Gamaroff/agent-skills/pull/283) — 3 commits | — |
-| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 | `task.66.qa.{N}.*.md`; `task.66.gate.{N}.*.yml`; PR comment posted            | Gate 1 CONCERNS (70/100) — 4 blocking, 7 advisory | — |
-| 7. finalise               | ⏳ Pending | `task.66.dod.{N}.*.md`; task `status: accepted`                               |       | —                    |
-| 8. commit-changes         | ⏳ Pending | All artifacts committed and pushed                                            |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.66.qa.{N}.*.md`; `task.66.gate.{N}.*.yml`; PR comment posted            | 2 cycles: gate.1 CONCERNS (70/100) → gate.2 **PASS (92/100)**, 11/11 closed | — |
+| 7. finalise               | ✅ Done    | `task.66.dod.{N}.*.md`; task `status: accepted`                               | Accepted with 3/22 criteria as recorded residual; 6 doc gaps closed during the step | — |
+| 8. commit-changes         | ✅ Done    | All artifacts committed and pushed                                            | Final commit + push | — |
 
 ---
 
@@ -65,6 +65,35 @@ Build the `review-pr` skill: resolve a PR back to its work item, collect the pip
 | 2 | **Mutation M5 exposed a weak assertion.** The cross-fork test matched `headRepositoryOwner` anywhere; the string also appears in Step 1's `--json` list, so deleting the entire cross-fork paragraph left the test green. | Scoped the assertion to the Step 4 section and added three more anchors. Re-proved: deleting the paragraph now goes red. |
 | 3 | **Phase 10's glob-collision grep found a real collision in this skill's own Step 3.** `*.review.*.md` also matches `*.pr-review.*.md`, so a re-review would have collected its own prior report as the pre-implementation review report. | Split the glob and added `grep -v '\.pr-review\.'`, plus a regression test (mutation-proved). The grep was added to Phase 10 by the `/review-task` pass — it paid for itself on the first run. |
 | 4 | **Full suite caught a dead reference**: SKILL.md linked `references/pipeline-artifacts.md`, but that doc lives in `docs/reference/`, not `shared/resources/`, so the bundler never bundled it — a silently unreadable reference in any installed skill. | Named the doc in prose instead of linking it. `tests/executable-instructions.test.js` is what caught it. |
+
+---
+
+## Completion Summary
+
+**Final Status:** ✅ Accepted · **Finished:** 2026-08-31 · **QA Cycles:** 2
+
+| | |
+|---|---|
+| PR | [#283](https://github.com/Gamaroff/agent-skills/pull/283) → `develop` |
+| Issue | [#282](https://github.com/Gamaroff/agent-skills/issues/282) — closed |
+| Final gate | PASS (92/100) |
+| Tests | 45 contract; 1991 repo-wide, 0 failures |
+| CI | 4/4 green |
+| Mutation proofs | 20 |
+| Commits | 5 |
+
+**What this run is worth remembering for.** The QA gate found **11 defects in the skill that had just
+been written**, and four of them were the kind that fail silently — a glob matching 0 of 110 files, an
+unanchored grep resolving to the wrong document, a variable consumed but never assigned. Two more were
+the skill's *own tests* passing vacuously.
+
+Twice in one task an assertion matched a token that occurred more than once in the file, so mutating
+one occurrence left the test green (M5 during development, CR-5 during the fix cycle). The
+generalisable rule: **when a guard asserts a token, count that token's occurrences first; if it
+occurs more than once, bind the assertion to the construct rather than the string.**
+
+Three of twenty-two success criteria were accepted as a recorded residual rather than silently
+rounded up. The decision was put to the maintainer.
 
 ---
 
