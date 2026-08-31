@@ -21,6 +21,7 @@ When invoked from the `/develop-story` orchestrator, the call may be prefixed wi
 
 - Skip parallel agents in the Adaptive Review Strategy decision — use the **Lite mode** rule (rule 0 in the decision tree, direct tools only) regardless of story size or risk.
 - **Phase 1.6 (Diff Code Review) still runs** — as a single read-only Explore subagent. It is the one exception to "skip parallel agents": it is not part of the Phase 1.5 parallel-agent set, and lite mode runs exactly one light code-review pass.
+- **Phase 1.7 (Execute the Documented Commands) still runs** — scoped to blocks in the changed file. It is deterministic script execution, not an agent, so it costs nothing lite mode is trying to save; and it catches the class of defect an inspection-only review structurally cannot.
 - All other phases (NFR, traceability, gate decision) run unchanged.
 - Log the override in the QA report's Review Methodology section: `Adaptive strategy override: lite mode — direct tools only`.
 
@@ -124,6 +125,7 @@ Creates: story.178.8.gate.1.initial-review.yml
 | Locate and read story/task      | Read story/task file, extract ACs, identify implementation files         |
 | Run test architecture review    | Assess test coverage, co-location, co-coverage                           |
 | Run diff code review            | Adversarially review the change-set diff for bugs + cleanups (Phase 1.6) |
+| Execute documented commands     | Extract and run the skill's fenced bash blocks under bash + zsh (Phase 1.7) |
 | Run NFR validation              | Evaluate security, performance, reliability, maintainability             |
 | Run requirements traceability   | Map ACs to test evidence; identify gaps                                  |
 | Write QA report                 | Create co-located `.qa.N.*.md` report file                               |
@@ -800,6 +802,47 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
 5. `rm -f "$DIFF_FILE"`.
 
 This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle. Under the develop-story pipeline (which sets the run-level override) this _is_ the code-review-and-fix loop; standalone, behaviour is unchanged unless the story opts in via frontmatter.
+
+#### Phase 1.7: Execute the Documented Commands
+
+Applies only when this story's deliverable is **runnable prose** — the diff adds or modifies a
+`SKILL.md` or a `shared/resources/*.md` prompt containing at least one fenced ```bash block. The full
+rule, including why the safety boundary is an allow-list rather than a deny-list, is stated once in
+`references/qa-runnable-prose-detection.md`. Read it before changing anything here.
+
+Phase 1.6 above reviews that prose by reading it. This phase runs it. The distinction is the whole
+point: a skill can pass an inspection-only review carrying a defect that breaks its core function on the
+default shell, which is exactly what happened to the `review-pr` skill — two clean QA cycles, a DoD
+gate, forty passing contract tests, and a `ls` glob that collected **nothing** under zsh.
+
+When the rule does not fire, record `Phase 1.7: not applicable — no runnable prose in the change set` in
+the QA report's Review Methodology and move on.
+
+When it does fire, run the engine over each changed in-scope file:
+
+```bash
+node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
+```
+
+Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
+temp working directory from a real directory with `--copy <dir>` so the blocks see real data. Execution
+always happens in that temp copy — never the live tree.
+
+Record in the QA report:
+
+1. **Counts** — blocks found, and how many classified `runnable` / `placeholder` / `mutating`.
+2. **Every skipped block, with its line number and reason.** A silent skip recreates the failure this
+   phase exists to prevent.
+3. **Shells used** — note `zsh-unavailable` when the host has no zsh.
+4. **Findings**, in the existing `code_review` shape: `category: bug`, `confidence: high` for an
+   execution failure and `medium` for a shell disagreement. They feed `top_issues[]` under
+   `code_review_blocking` on the same terms as any other Phase 1.6 finding — no new schema.
+
+> **A run where zero blocks executed is a finding, not a pass.** The engine raises
+> `zero-blocks-executed`; do not suppress it. `zsh` being absent is not that case — it never reduces the
+> runnable count, so record it as information and continue.
+
+**Lite mode**: this phase still runs, but only over blocks in the changed file.
 
 #### Phase 2: Comprehensive Analysis
 

@@ -94,6 +94,7 @@ Activate this skill when:
 | Run test suite                  | Execute tests, lint, build; capture coverage output                          |
 | Verify implementation phases    | Check each phase checkbox; confirm changes match plan via git diff           |
 | Run diff code review            | Adversarially review the change-set diff for bugs + cleanups (Step 3b)        |
+| Execute documented commands     | Extract and run the skill's fenced bash blocks under bash + zsh (Step 4b)    |
 | Verify success criteria         | Check functional, performance, code quality criteria against actual results  |
 | Validate breaking changes       | Verify migration paths documented and consumer code updated                  |
 | Run NFR assessment              | Evaluate performance, reliability, security, maintainability                 |
@@ -375,6 +376,47 @@ npm exec nx test {project} -- --testPathPattern=integration
 - Any test failures
 - Build success/failure
 - Lint errors
+
+### Step 4b: Execute the Documented Commands
+
+Applies only when this work item's deliverable is **runnable prose** — the diff adds or modifies a
+`SKILL.md` or a `shared/resources/*.md` prompt containing at least one fenced ```bash block. The full
+rule, including why the safety boundary is an allow-list rather than a deny-list, is stated once in
+`references/qa-runnable-prose-detection.md`. Read it before changing anything here.
+
+When the rule does not fire, record `Step 4b: not applicable — no runnable prose in the change set` in
+the QA report's Review Methodology and move on. The step is cheap where it does not apply.
+
+When it does fire, run the engine over each changed in-scope file:
+
+```bash
+node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
+```
+
+Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
+temp working directory from a real directory with `--copy <dir>` so the blocks see real data rather than
+an empty tree. Execution always happens in that temp copy — never the live tree.
+
+**Document results:**
+- Blocks found, and the count classified `runnable` / `placeholder` / `mutating`
+- **Every skipped block, with its line number and reason.** A silent skip recreates the exact failure
+  this step exists to prevent
+- Which shells actually ran; note `zsh-unavailable` when the host has no zsh
+- Each finding, mapped onto the existing `code_review` finding shape — `category: bug`, with
+  `severity` and `confidence` from the rule's table (`high` for an execution failure, `medium` for a
+  shell disagreement)
+
+An execution failure is eligible for gate `top_issues[]` under `code_review_blocking` exactly like any
+other `category: bug` finding. No new report or gate schema.
+
+> **A run where zero blocks executed is a finding, not a pass.** The engine raises
+> `zero-blocks-executed` for you; do not suppress it. An over-broad classification that skips everything
+> is the silent-skip shape this step was built to eliminate, and it would be easy to reintroduce here.
+>
+> `zsh` being absent is **not** that case — it never reduces the runnable count. Record it as
+> information and continue.
+
+**Lite mode**: the step still runs, but only over blocks in the changed file.
 
 ### Step 5: Verify Success Criteria
 

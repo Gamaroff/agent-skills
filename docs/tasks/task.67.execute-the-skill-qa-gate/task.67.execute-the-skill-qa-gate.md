@@ -5,7 +5,7 @@ type: task
 description: "QA reviews a prose skill's text and never runs it. Task 66 shipped accepted with a glob that collected 0 files on the default macOS shell; the first live run found it in minutes. Add an execution gate to qa-task/qa-story for skills whose deliverable is runnable prose."
 tags: [qa, gate, skills, shell-portability, dogfooding]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-08-31
@@ -16,7 +16,8 @@ estimated_effort_hours: 8
 
 # Technical Task: Make QA execute a prose skill, not only read it
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.67.review.1.execute-the-skill-qa-gate.md` implemented 2026-08-31
 
 ---
 
@@ -98,12 +99,19 @@ None. The step is additive and skips silently for work items whose deliverable i
 
 **Risk Level**: Low
 
-**Files**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`
+**Files**: `shared/resources/qa-runnable-prose-detection.md` (new), `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
 
 **Changes**:
-- [ ] Define "runnable prose": the diff adds or modifies a `SKILL.md` (or a `shared/resources/*.md` prompt) containing at least one fenced ```bash block
-- [ ] State the rule where both QA skills can reference it once, not twice
-- [ ] Record the detection outcome in the QA report's Review Methodology section
+- [x] Define "runnable prose": the diff adds or modifies a `SKILL.md` (or a `shared/resources/*.md` prompt) containing at least one fenced ```bash block
+- [x] State the rule **once**, in the new QA-owned shared resource `shared/resources/qa-runnable-prose-detection.md`, and reference it from both QA skills as `shared/resources/qa-runnable-prose-detection.md`
+- [x] Cross-reference that file from `shared/resources/develop-pipeline-step-5-6-qa-loop.md` so the orchestrator's step doc points at the rule rather than restating it
+- [x] Record the detection outcome in the QA report's Review Methodology section
+
+> **Why not put the rule in `develop-pipeline-step-5-6-qa-loop.md` itself.** That doc is the
+> *orchestrator's* step 5–6 protocol and is bundled into `develop-story` / `develop-task` only — it is
+> **not** in `skills/qa-task/references/` or `skills/qa-story/references/`. A rule the QA skills execute
+> has to live in a file those skills reference, or "state it once" silently becomes "state it nowhere
+> either skill can read".
 
 **Dependencies**: none
 
@@ -116,10 +124,10 @@ None. The step is additive and skips silently for work items whose deliverable i
 **Files**: `shared/resources/qa-execute-snippets.mjs` (new)
 
 **Changes**:
-- [ ] Extract every fenced ```bash block from the target file, with its line number
-- [ ] Classify each: `runnable` | `placeholder` (contains `{…}` or `<…>`) | `mutating` (matches a deny-list: `gh pr comment`, `gh issue`, `gh api -X`, `curl -X POST|PUT|PATCH|DELETE`, `git push`, `git commit`, `rm -rf`)
-- [ ] The deny-list is the safety boundary — it must fail **closed**: anything unrecognised classifies as `mutating` and is skipped, never executed
-- [ ] Emit a JSON manifest of blocks and classifications
+- [x] Extract every fenced ```bash block from the target file, with its line number
+- [x] Classify each: `runnable` | `placeholder` (contains `{…}` or `<…>`) | `mutating` (matches a deny-list: `gh pr comment`, `gh issue`, `gh api -X`, `curl -X POST|PUT|PATCH|DELETE`, `git push`, `git commit`, `rm -rf`)
+- [x] The deny-list is the safety boundary — it must fail **closed**: anything unrecognised classifies as `mutating` and is skipped, never executed
+- [x] Emit a JSON manifest of blocks and classifications
 
 **Dependencies**: Phase 1
 
@@ -132,10 +140,11 @@ None. The step is additive and skips silently for work items whose deliverable i
 **Files**: `shared/resources/qa-execute-snippets.mjs`
 
 **Changes**:
-- [ ] Execute each `runnable` block under `bash -c` and `zsh -c`, in a temp working copy, with a timeout
-- [ ] Capture stdout, stderr and exit status for each shell
-- [ ] Report a finding when: either shell exits non-zero, **or** the two shells disagree on stdout
-- [ ] Substitute real values for the block's expected inputs (the caller passes a `$DOC_FILE`, `$D`, `$PR_NUMBER` binding set) — a block that cannot be bound is reclassified `placeholder`
+- [x] Execute each `runnable` block under `bash -c` and `zsh -c`, in a temp working copy, with a timeout
+- [x] Capture stdout, stderr and exit status for each shell
+- [x] Report a finding when: either shell exits non-zero, **or** the two shells disagree on stdout
+- [x] Substitute real values for the block's expected inputs (the caller passes a `$DOC_FILE`, `$D`, `$PR_NUMBER` binding set) — a block that cannot be bound is reclassified `placeholder`
+- [x] **Guard the zsh arm on zsh being installed** (`command -v zsh`). When zsh is absent, run the bash arm only, record `zsh-unavailable` as the reason, and report it as information — **not** as the zero-blocks-executed finding. CI runs `ubuntu-latest`, where zsh is not guaranteed; without this guard the "zero executed is a finding" rule turns a missing interpreter into a hard QA failure. Follow the existing precedent in `shared/resources/tracker-access.test.sh` §12, which guards its zsh-parity block the same way
 
 **Dependencies**: Phase 2
 
@@ -148,12 +157,19 @@ None. The step is additive and skips silently for work items whose deliverable i
 **Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`
 
 **Changes**:
-- [ ] Add **Step 4b — Execute the documented commands**, after the test suite and before success-criteria verification
-- [ ] Map findings into the existing `code_review` shape (`category: bug`, `severity`, `confidence: high` for an execution failure, `medium` for a shell disagreement)
-- [ ] Record every skipped block and its reason in the QA report — a silent skip would recreate the problem this task exists to solve
-- [ ] Honour lite mode: run the step, but only on blocks in the changed file
+- [x] `skills/qa-task/SKILL.md`: add **`### Step 4b — Execute the documented commands`**, between `Step 4: Run Tests` and `Step 5: Verify Success Criteria`
+- [x] `skills/qa-story/SKILL.md`: add the same content as **`#### Phase 1.7 — Execute the documented commands`**, immediately after `#### Phase 1.6: Diff Code Review`. `qa-story`'s Review Workflow is phase-numbered and has **no** `Step 4` and no test-suite step, so "Step 4b" has no insertion point there — follow that file's own convention
+- [x] Map findings into the existing `code_review` shape (`category: bug`, `severity`, `confidence: high` for an execution failure, `medium` for a shell disagreement)
+- [x] Record every skipped block and its reason in the QA report — a silent skip would recreate the problem this task exists to solve
+- [x] Honour lite mode: run the step, but only on blocks in the changed file
+- [x] Run `npm run bundle` and commit the regenerated `skills/*/references/*` copies — CI fails the PR otherwise (see the bundle note below)
 
 **Dependencies**: Phase 3
+
+> **The bundle step is not optional.** `.github/workflows/validate.yml` runs a **Bundle freshness check**
+> that re-runs `bundle_skill.py --all` and fails when `git diff --quiet -- 'skills/*/references/*'` is
+> dirty. This task adds one new `shared/resources/` file and edits another, both referenced from skills,
+> so the bundled copies change. Skipping `npm run bundle` produces a red build, not a silent drift.
 
 ---
 
@@ -161,13 +177,17 @@ None. The step is additive and skips silently for work items whose deliverable i
 
 **Risk Level**: Low
 
-**Files**: `evals/qa-task/` or `shared/resources/tests/`
+**Files**: `shared/resources/tests/qa-execute-snippets.test.mjs`
+
+> Pinned deliberately. `evals/qa-task/` does **not** exist — standing one up would also need a
+> `package.json` `eval:*` script and runner wiring, which is out of scope here. §7 already names the
+> `shared/resources/tests/` path; this is the same file.
 
 **Changes**:
-- [ ] Regression fixture: the pre-fix task-66 Step 3 block (multi-glob `ls`) against a directory missing one artifact kind
-- [ ] Assert the step reports a shell disagreement: 0 files under zsh, 7 under bash
-- [ ] Assert the post-fix `find` version reports no finding
-- [ ] Assert a mutating block is skipped, not executed
+- [x] Regression fixture: the pre-fix task-66 Step 3 block (multi-glob `ls`) against a directory missing one artifact kind
+- [x] Assert the step reports a shell disagreement: 0 files under zsh, 7 under bash
+- [x] Assert the post-fix `find` version reports no finding
+- [x] Assert a mutating block is skipped, not executed
 
 **Dependencies**: Phase 4
 
@@ -179,13 +199,27 @@ None. The step is additive and skips silently for work items whose deliverable i
 
 1. ✅ `shared/resources/qa-execute-snippets.mjs` — extraction, classification, dual-shell execution
 2. ✅ `shared/resources/tests/qa-execute-snippets.test.mjs` — unit tests including the task-66 regression fixture
+3. ✅ `shared/resources/qa-runnable-prose-detection.md` — the detection rule, stated once, in a file both QA skills reference
 
 ### Files to Modify
 
-3. ✅ `skills/qa-task/SKILL.md` — Step 4b
-4. ✅ `skills/qa-story/SKILL.md` — Step 4b
-5. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — the detection rule, stated once
-6. ✅ `package.json` — test glob for the new suite
+4. ✅ `skills/qa-task/SKILL.md` — new `### Step 4b`, between Step 4 and Step 5
+5. ✅ `skills/qa-story/SKILL.md` — same content as `#### Phase 1.7`, after Phase 1.6 (that file is phase-numbered; it has no Step 4)
+6. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — cross-reference to the detection rule (not a restatement)
+
+### Files Regenerated (commit them — CI checks freshness)
+
+7. ✅ `skills/{qa-task,qa-story,develop-task,develop-story}/references/*` — output of `npm run bundle`; never hand-edited.
+   `develop-task` / `develop-story` are included **transitively**: they bundle
+   `develop-pipeline-step-5-6-qa-loop.md`, which now cross-references the detection rule, so the rule
+   and the engine follow it into those two skills as well.
+
+### Explicitly NOT modified
+
+- ❌ `package.json` — **no change needed.** The `test` script already globs
+  `'shared/resources/tests/*.test.mjs'`, which picks the new suite up automatically. The constraint this
+  places on the implementation is that the test file **must** land under `shared/resources/tests/` with a
+  `.test.mjs` suffix; put it anywhere else and it runs nowhere, silently.
 
 ---
 
@@ -193,22 +227,22 @@ None. The step is additive and skips silently for work items whose deliverable i
 
 ### Unit Tests
 
-- [ ] Block extraction finds every fenced bash block with correct line numbers
-- [ ] Classification: placeholder detection, mutation deny-list, **fail-closed on unrecognised commands**
-- [ ] Dual-shell runner reports disagreement when stdout differs
-- [ ] Timeout terminates a hanging block without failing the run
+- [x] Block extraction finds every fenced bash block with correct line numbers
+- [x] Classification: placeholder detection, mutation deny-list, **fail-closed on unrecognised commands**
+- [x] Dual-shell runner reports disagreement when stdout differs
+- [x] Timeout terminates a hanging block without failing the run
 
 **Command**: `node --test 'shared/resources/tests/qa-execute-snippets.test.mjs'`
 
 ### Regression Fixture (the whole point)
 
-- [ ] The pre-fix task-66 `ls` block is reported as a shell disagreement
-- [ ] The post-fix `find` block is reported clean
+- [x] The pre-fix task-66 `ls` block is reported as a shell disagreement
+- [x] The post-fix `find` block is reported clean
 
 ### Mutation Proving
 
-- [ ] Remove the zsh arm → the disagreement finding disappears (proves both shells are load-bearing)
-- [ ] Remove the fail-closed default from classification → a novel mutating command becomes executable
+- [x] Remove the zsh arm → the disagreement finding disappears (proves both shells are load-bearing)
+- [x] Remove the fail-closed default from classification → a novel mutating command becomes executable
 
 ---
 
@@ -216,22 +250,28 @@ None. The step is additive and skips silently for work items whose deliverable i
 
 ### Functional
 
-- [ ] A work item adding a SKILL.md with bash blocks triggers Step 4b
-- [ ] A work item with no runnable prose skips it, and the skip is recorded
-- [ ] Read-only blocks execute under both shells; results are compared
-- [ ] Mutating and placeholder blocks are skipped with a recorded reason
-- [ ] An execution failure produces a `category: bug` finding eligible for `top_issues[]`
+- [x] A work item adding a SKILL.md with bash blocks triggers Step 4b
+- [x] A work item with no runnable prose skips it, and the skip is recorded
+- [x] Read-only blocks execute under both shells; results are compared
+- [x] Mutating and placeholder blocks are skipped with a recorded reason
+- [x] An execution failure produces a `category: bug` finding eligible for `top_issues[]`
 
 ### Regression
 
-- [ ] The pre-fix task-66 Step 3 block is caught
-- [ ] The post-fix version is not flagged
+- [x] The pre-fix task-66 Step 3 block is caught
+- [x] The post-fix version is not flagged
 
 ### Safety
 
-- [ ] No block on the mutation deny-list ever executes
-- [ ] Classification fails **closed** on anything unrecognised
-- [ ] Execution happens in a temp working copy, never the live tree
+- [x] No block on the mutation deny-list ever executes
+- [x] Classification fails **closed** on anything unrecognised
+- [x] Execution happens in a temp working copy, never the live tree
+- [x] A host without `zsh` runs the bash arm only and records `zsh-unavailable` — it does **not** trip the zero-blocks-executed finding
+
+### Repository integration
+
+- [x] `npm run bundle` has been run and the regenerated `skills/*/references/*` copies are committed — `validate.yml`'s Bundle freshness check passes
+- [x] The new test suite sits at `shared/resources/tests/qa-execute-snippets.test.mjs` so the existing `npm test` glob collects it; `npm test` shows the new cases running
 
 ---
 
@@ -291,29 +331,32 @@ Tighten the deny-list or the disagreement heuristic; both are concentrated in on
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft — filed from the task.66 dogfood findings | create-task |
 | 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
+| 2026-08-31 | 1.2     | Review (8/10, READY TO IMPLEMENT) — added the missing `npm run bundle` step and regenerated-files list (CI Bundle freshness check would have failed); moved the detection rule to a new QA-owned `shared/resources/qa-runnable-prose-detection.md` because the step-5-6 doc is not bundled into either QA skill; pinned per-skill placement (qa-task Step 4b, qa-story Phase 1.7 — qa-story is phase-numbered); added a `command -v zsh` guard so a zsh-less CI host does not trip the zero-blocks-executed finding; pinned Phase 5 to `shared/resources/tests/`; dropped the redundant `package.json` edit; added dual-shell prior art to References | review-task |
+| 2026-08-31 |  | Implemented — 3 files created, 4 modified, 8 regenerated; 41 tests, 9 mutation proofs; 5 engine defects found by dogfooding on real skill files and fixed | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Detection rule
-- [ ] Define and document the rule
+- [x] Define and document the rule — `shared/resources/qa-runnable-prose-detection.md`
 
 ### Phase 2: Extraction and classification
-- [ ] Extract blocks
-- [ ] Classify, fail-closed
+- [x] Extract blocks
+- [x] Classify, fail-closed
 
 ### Phase 3: Dual-shell execution
-- [ ] Run under bash and zsh
-- [ ] Compare and report
+- [x] Run under bash and zsh
+- [x] Compare and report
 
 ### Phase 4: Wire into QA
-- [ ] qa-task Step 4b
-- [ ] qa-story Step 4b
+- [x] qa-task `### Step 4b` (between Step 4 and Step 5)
+- [x] qa-story `#### Phase 1.7` (after Phase 1.6)
+- [x] `npm run bundle` + commit regenerated references
 
 ### Phase 5: Prove it
-- [ ] task-66 regression fixture
-- [ ] Mutation proofs
+- [x] task-66 regression fixture
+- [x] Mutation proofs — 7 run, all held
 
 ---
 
@@ -323,6 +366,9 @@ Tighten the deny-list or the disagreement heuristic; both are concentrated in on
 - **The gates that passed it anyway**: [`task.66.gate.2.review-pr.yml`](../task.66.review-pr/task.66.gate.2.review-pr.yml), [`task.66.dod.1.review-pr.md`](../task.66.review-pr/task.66.dod.1.review-pr.md)
 - **QA skill**: `skills/qa-task/SKILL.md` Step 3b / Step 4
 - **Mutation proving**: [`shared/resources/mutation-proving.md`](../../../shared/resources/mutation-proving.md)
+- **Prior art — dual-shell parity**: [`tracker-access.test.sh`](../../../shared/resources/tracker-access.test.sh) §12 already re-runs fixtures under `zsh -c` and asserts parity with the `bash -c` runs, guarded on `command -v zsh`. Reuse the pattern; Phase 3 generalises it from one hand-written suite to any documented block
+- **Prior art — the rule, enforced only by reading**: [`shared/resources/platform-detection.md`](../../../shared/resources/platform-detection.md) documents the zsh-portability rules (no `${!var}`, no unquoted `$LIST` word-splitting) as review guidance an agent reads. Step 4b is what makes that guidance executable
+- **CI gate this task must satisfy**: `.github/workflows/validate.yml` — "Bundle freshness check"
 
 ---
 
@@ -332,6 +378,61 @@ Tighten the deny-list or the disagreement heuristic; both are concentrated in on
 
 - The deny-list is a **safety boundary**, not a convenience filter. It must fail closed.
 - A run where zero blocks executed is a finding, not a pass. That is the silent-skip failure this task exists to prevent, and it would be trivially easy to reintroduce here.
+
+### Found by dogfooding the engine on a real skill during implementation
+
+Running the finished engine against `skills/review-pr/SKILL.md` — the skill whose defect motivated this
+task — surfaced three defects in the engine itself that the unit tests had not. All three are fixed and
+carry their own regression tests plus mutation proofs.
+
+1. **`git` was resolved fail-open.** The safe-subcommand check matched the *first* `git …` in a block
+   and applied that verdict to every later one, so `git rev-parse HEAD` followed by `git checkout -b x`
+   classified as **runnable**. The safety boundary had a hole in exactly the direction it exists to
+   prevent. Now every invocation is resolved individually.
+2. **`case` arm patterns were read as commands.** `*://*/pull/*)` and friends were reported as
+   unrecognised commands, so read-only blocks were skipped as mutating.
+3. **Command substitutions were swallowed.** `P=$(git remote get-url origin)` was skipped as an
+   assignment and then `remote` was read as the command word, hiding the real invocation.
+4. **Arithmetic expansion was read as a command.** `M=$((N + 1))` reported `N` as an unrecognised
+   command. Found by running the engine on `qa-story/SKILL.md` — one of the files this task edits.
+5. **Backslash line-continuations started a new command.** `git log … -- \` followed by
+   `  apps packages` reported `apps` as an unrecognised command. Found the same way, on
+   `qa-task/SKILL.md`.
+
+Defects 1–5 each carry a regression test and a mutation proof. Nine mutation proofs run in total; all
+nine turn the intended test red.
+
+Before the fixes, the engine classified **0 of 12** blocks in `review-pr/SKILL.md` as runnable — the
+over-broad-classification risk named in §10, live. The `zero-blocks-executed` finding fired correctly,
+which is the safeguard working; but the underlying cause was the tokenizer, not the file.
+
+### Decision recorded — `zero-blocks-executed` is `confidence: medium`
+
+§6 Phase 3 fixes the confidence of the two *execution* findings (`high` for a failure, `medium` for a
+disagreement) but says nothing about the confidence of the zero-executed finding in §9/§10. It is
+implemented as **`medium`**, and the reasoning is worth keeping:
+
+`confidence: high` on a `category: bug` finding is what makes it eligible for `top_issues[]` and
+therefore gate-blocking. Zero-executed is a statement about **coverage** — this gate did nothing here —
+not a defect in the work item. Measured during implementation: `qa-task` and `qa-story` both classify
+**0 runnable** without bindings, because their snippets read caller variables like `$TASK_FILE`. At
+`high`, this step would have blocked the very pull request that introduced it, for the offence of
+documenting snippets that take arguments.
+
+It is still reported, which is what §9's "a run where zero blocks executed is itself a finding" asks
+for, and the detail now names the placeholder count and tells the reader to supply `--bind`.
+
+### Open question for review — noise on a consistently-failing block
+
+With `DOC_FILE` bound, `review-pr` Step 3 executes under both shells, agrees on stdout, and still
+reports `execution-failure` at `confidence: high` because its trailing `grep -v` exits 1 when nothing
+matches. Per §6 Phase 3 that is correct — "either shell exits non-zero" — and it has been implemented as
+specified rather than quietly redesigned.
+
+It is worth a decision, though, because `confidence: high` is what makes a `category: bug` finding
+gate-blocking: a documented snippet ending in `grep` would block a PR. The finding detail now says
+`identical in every shell — not a portability defect` so a reviewer can triage it in one read, but the
+confidence rule itself is unchanged and belongs to whoever owns this gate.
 
 ### Why this is High priority
 

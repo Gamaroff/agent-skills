@@ -6,6 +6,41 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **QA now executes a skill's documented shell snippets instead of only reading them.**
+  `qa-task` gains **Step 4b** and `qa-story` gains **Phase 1.7**: when a change set adds or modifies a
+  `SKILL.md` or a `shared/resources/*.md` prompt containing fenced ```bash blocks, the documented blocks
+  are extracted, classified, and executed under **both `bash` and `zsh`**, with disagreements reported
+  as findings.
+
+  **The gap this closes was measured, not hypothetical.** Task 66 (`/review-pr`) shipped `accepted`
+  after two QA cycles, a DoD gate and forty passing contract tests, carrying a multi-glob `ls` that
+  collects the whole paper trail. Under zsh — the default macOS shell — a glob matching nothing aborts
+  the entire command, so one absent artifact kind suppressed every kind that was present: **6 files
+  under bash, 0 under zsh**. The first person to actually run the skill found it in minutes. Contract
+  tests structurally could not: they assert what prose *says*, never what it *does*.
+
+  **Exit status could not have caught it either.** Both shells exit `1` on the defective block. Only
+  *stdout* differs, which is why the stdout comparison is the load-bearing signal and is mutation-proved
+  as such — reverting it to a status comparison turns the regression fixture red.
+
+  **The safety boundary is an allow-list, and it fails closed.** Only recognised read-only commands
+  execute; anything unrecognised classifies as `mutating` and is skipped with a recorded reason. A
+  deny-list alone fails *open* — every command nobody thought to forbid runs. `gh` and `curl` are
+  excluded in every form, read-only included: a QA gate should not make network calls. Blocks carrying
+  template slots or variables nothing binds are skipped as `placeholder`. Execution happens in a
+  temporary working copy, never the live tree.
+
+  **A run where zero blocks executed is itself a finding.** That is this step's own failure mode — an
+  over-broad classification would make it quietly do nothing, recreating the silent skip it exists to
+  eliminate — so it is enforced rather than left to good sense. `zsh` being absent is deliberately *not*
+  that case: the arm is guarded on `command -v zsh`, runs bash alone, and records `zsh-unavailable` as
+  information, so a CI box without zsh cannot fail a work item for it.
+
+  New: `shared/resources/qa-execute-snippets.mjs` (library + CLI, exit `0`/`1`/`2`) and
+  `shared/resources/qa-runnable-prose-detection.md` (the rule, stated once, referenced by both QA skills
+  and cross-referenced from the pipeline's step 5–6 doc). Findings map onto the existing `code_review`
+  shape — no new report or gate schema.
+
 - **`/review-pr` — review a pull request against the paper trail that is supposed to justify it.**
   The repo could review a *diff* (`/review-code`) and review a *document before implementation*
   (`/review-story`, `/review-task`). Nothing asked the question a human asks when they open a PR:

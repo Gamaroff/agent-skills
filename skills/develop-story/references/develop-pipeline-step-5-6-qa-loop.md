@@ -88,6 +88,17 @@ Read the gate file to determine the gate result.
 
 ### 5a. Run QA Review
 
+> **When the work item's deliverable is runnable prose, the QA skill executes it.** A change set that
+> adds or modifies a `SKILL.md` or a `shared/resources/*.md` prompt containing fenced ```bash blocks
+> triggers an execution step inside the QA skill — `qa-task` **Step 4b**, `qa-story` **Phase 1.7** —
+> which runs the documented snippets under both `bash` and `zsh` and reports disagreements.
+>
+> The rule lives in one place: `references/qa-runnable-prose-detection.md`. It is **not** restated
+> here, and this orchestrator does nothing to trigger it — the QA skills own both the detection and the
+> execution. This note exists so a reader of the pipeline knows the step is there, and knows where the
+> rule is when a QA cycle reports a shell disagreement.
+
+
 #### develop-story
 
 **Pre-step: Dispatch traceability mapper (standard mode only)**
