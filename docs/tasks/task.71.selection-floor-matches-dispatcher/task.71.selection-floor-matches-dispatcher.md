@@ -341,6 +341,46 @@ If the problem is a specific noisy task rather than the policy, set that task to
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-08-31
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.71.qa.1.selection-floor-matches-dispatcher.md](./task.71.qa.1.selection-floor-matches-dispatcher.md)
+- **Gate File**: [task.71.gate.1.selection-floor-matches-dispatcher.yml](./task.71.gate.1.selection-floor-matches-dispatcher.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 1999 (1998 pass, 0 fail, 1 pre-existing skip)
+- **Phases Verified**: 4/4
+- **Success Criteria Covered**: 10/10, none uncovered
+- **Mutation Proofs**: 3/3 executed and reverted
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+Substance is correct and independently re-verified — QA re-parsed the dispatcher's status table with its own implementation and confirmed `{draft, planned, ready-for-development, in-progress}` with `sawRow = true`, ruling out the vacuous-empty-parse hazard §10 Risk 3 names. Blast radius checked: the constant has exactly two readers.
+
+One MEDIUM defect blocks a clean PASS — [TASK-71-QA1-01](./task.71.bug.1.literal-unicode-escapes-in-comments.md): twelve `//` comment lines in `select-next.test.mjs` render literal escape sequences instead of `⊆`/`—`, including the H1 section header. No runtime impact (the three template-literal occurrences are valid escapes and render correctly); the cost is to the very prose this task exists to get right.
+
+---
+
+## Bug Reports
+
+### In QA Verification
+
+- [TASK-71-BUG-1: Literal `⊆` / `—` escape sequences in test-file comments](./task.71.bug.1.literal-unicode-escapes-in-comments.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-08-31, qa-fix cycle 1)
+
+### Closed Bugs
+
+_None yet — QA closes bugs after verification._
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -349,6 +389,7 @@ If the problem is a specific noisy task rather than the policy, set that task to
 | 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, effort 4h→8h per rubric; status → ready-for-development | review-task |
 | 2026-08-31 | 1.2     | Review 6/10 NEEDS REVISION — 3 critical, 6 important, all applied: corrected the `/create-task` premise (emits `planned`, not `draft`); added §2 "The rationale this reverses" engaging the shipped floor-is-the-opt-out decision; measured the bug axis (diverges by `in-progress`, `ready-for-qa`) and scoped equality to tasks only; rescoped Phase 2 to reuse the existing `proceedStatuses` parser and named test 15/SC5; enumerated six prose sites in Phase 4; replaced the vacuous 67-70 integration check with a synthetic fixture; effort 8h→3h | review-task |
 | 2026-08-31 |         | Implemented — 4 files, 123 tests passing (2 added, 3 rewritten); 3 mutations proved | develop |
+| 2026-08-31 |         | QA gate CONCERNS (90/100) — 1 medium, 1 low; 4/4 phases, 10/10 criteria, 3/3 mutations proved | qa-task |
 
 ---
 

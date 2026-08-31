@@ -1815,22 +1815,22 @@ test("15: registry hrefs resolve relative to the registry file, not the CWD", ()
 
 // ── 16: QA cycle-1 fixes (task.65 gate 1) ────────────────────────────────────
 
-// ── H1: eligibility floor vs dispatcher — `===` for tasks, `\u2286` for bugs ───────
+// ── H1: eligibility floor vs dispatcher — `===` for tasks, `⊆` for bugs ───────
 //
 // The frontier names a command, so a status that command refuses produces a
 // selection nothing can act on. `develop-task` Phase 0c HALTs on
 // `Ready for Review`, and `/develop-next` leaves its run-state file in place
-// across a pipeline HALT \u2014 so an unattended loop would stop at such an item and
+// across a pipeline HALT — so an unattended loop would stop at such an item and
 // resume at the same one next invocation. It could not self-recover.
 //
-// The relation was `\u2286` on both axes until task.71. It is now `===` on the TASK
+// The relation was `⊆` on both axes until task.71. It is now `===` on the TASK
 // axis: a strict subset is a gap the selector cannot explain, because it refuses
-// work the dispatcher would accept, and the one status that mattered \u2014 `planned`,
-// what `/create-task` actually emits \u2014 sat in that gap, making every freshly
+// work the dispatcher would accept, and the one status that mattered — `planned`,
+// what `/create-task` actually emits — sat in that gap, making every freshly
 // filed task invisible to `/develop-next`. Equality also catches OVER-widening,
-// which `\u2286` never could: adding `accepted` to the floor now fails here.
+// which `⊆` never could: adding `accepted` to the floor now fails here.
 //
-// The BUG axis deliberately keeps `\u2286`. See the bug test below for the measured
+// The BUG axis deliberately keeps `⊆`. See the bug test below for the measured
 // gap and why closing it is a different change.
 //
 // This test parses the DISPATCHERS' OWN status tables rather than restating
@@ -1898,7 +1898,7 @@ test("16/H1: the task eligibility floor EQUALS what develop-task proceeds on", (
 
   // Both guards below predate task.71 and are what stops an empty or mangled
   // parse from satisfying the comparison VACUOUSLY. `proceedStatuses` already
-  // asserts `sawRow`; these two pin the CONTENT. Converting \u2286 to === made them
+  // asserts `sawRow`; these two pin the CONTENT. Converting ⊆ to === made them
   // more load-bearing, not less: two empty sets are equal, so without an anchor
   // a table-shape change would turn this test green by parsing nothing at all.
   assert.ok(
@@ -1910,10 +1910,10 @@ test("16/H1: the task eligibility floor EQUALS what develop-task proceeds on", (
     "develop-task is documented as HALTing on Ready for Review — if that changed, revisit the floor",
   );
 
-  // Two-way equality. \u2286 could only catch UNDER-widening (a floor status the
+  // Two-way equality. ⊆ could only catch UNDER-widening (a floor status the
   // dispatcher refuses); it was blind to OVER-restriction (a status the
   // dispatcher accepts that the floor withholds), which is precisely how
-  // `planned` \u2014 what `/create-task` emits \u2014 stayed outside the frontier.
+  // `planned` — what `/create-task` emits — stayed outside the frontier.
   const onlyInFloor = [...TASK_ELIGIBLE_STATUSES].filter(
     (v) => !proceed.has(v),
   );
@@ -1921,22 +1921,22 @@ test("16/H1: the task eligibility floor EQUALS what develop-task proceeds on", (
     (v) => !TASK_ELIGIBLE_STATUSES.has(v),
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     { onlyInFloor, onlyInDispatcher },
     { onlyInFloor: [], onlyInDispatcher: [] },
     `the task eligibility floor and develop-task's accepted set have diverged.\n` +
       `  only in floor:      ${onlyInFloor.join(", ") || "(none)"}\n` +
-      `      \u2192 the frontier would nominate work the dispatcher refuses; an\n` +
+      `      → the frontier would nominate work the dispatcher refuses; an\n` +
       `        unattended loop would HALT on it and resume at the same item.\n` +
       `  only in dispatcher: ${onlyInDispatcher.join(", ") || "(none)"}\n` +
-      `      \u2192 the selector refuses work develop-task would accept; that work is\n` +
+      `      → the selector refuses work develop-task would accept; that work is\n` +
       `        invisible to /develop-next until a human promotes it by hand.\n` +
-      `  If a divergence is deliberate, say so here and in select-next.mjs \u2014 it\n` +
+      `  If a divergence is deliberate, say so here and in select-next.mjs — it\n` +
       `  must not drift in silently.`,
   );
 });
 
-// The bug axis stays `\u2286` \u2014 a deliberate, MEASURED divergence, not an oversight.
+// The bug axis stays `⊆` — a deliberate, MEASURED divergence, not an oversight.
 //
 //   develop-bug proceeds on : new, reopened, in-progress, ready-for-qa
 //   BUG_ELIGIBLE_STATUSES   : new, reopened
@@ -1944,7 +1944,7 @@ test("16/H1: the task eligibility floor EQUALS what develop-task proceeds on", (
 //
 // Task.71 tightened the TASK axis to `===` and deliberately declined to do the
 // same here. Closing this gap would hand an unattended loop a `ready-for-qa` bug
-// \u2014 one whose fix is already written and is only awaiting verification \u2014 and an
+// — one whose fix is already written and is only awaiting verification — and an
 // `in-progress` bug someone may be actively holding. That is a change with its
 // own Breaking Changes and Risk sections, not a corollary of this one. Recorded
 // so the next reader starts from a fact rather than an open question.
