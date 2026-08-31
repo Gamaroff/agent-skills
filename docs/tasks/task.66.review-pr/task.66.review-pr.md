@@ -5,7 +5,7 @@ type: task
 description: "Add a /review-pr skill that resolves a PR back to its work item, reads the pipeline artifacts beside it, and reviews the diff and the evidence together — on GitHub and Bitbucket."
 tags: [review, pull-request, bitbucket, github, jira, traceability, skills]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-08-31
@@ -17,7 +17,7 @@ github_issue: 282
 
 # Technical Task: Review a pull request against the paper trail that is supposed to justify it
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.66.review.1.review-pr.md` implemented 2026-08-31
 **GitHub Issue**: [#282](https://github.com/Gamaroff/agent-skills/issues/282)
 
@@ -187,12 +187,12 @@ report can never be mistaken for the work item it reviews.
 - `skills/review-pr/SKILL.md`
 
 **Changes**:
-- [ ] Scaffold with `python3 skills/create-skill/scripts/init_skill.py review-pr --path skills/`
-- [ ] Write frontmatter: `name` + `description` only (third-person, trigger-rich, ≤150 words); never author `managed-by` / `source`
-- [ ] Write the Arguments table: `target` (PR number | PR URL | branch | none), `--effort` (`low|medium|high|max`, default `medium`), `--comment`, `--no-code`, `--no-docs`
-- [ ] Define `--effort` as scaling **both** lenses, mirroring `/review-code`: `low`/`medium` favour few high-confidence findings; `high`/`max` widen coverage and may surface `confidence: low` candidates, clearly labelled
-- [ ] Step 0 — copy the `create-pr` Step 0.5 platform preamble verbatim, `source … || exit 1` on both sourced files
-- [ ] Document the Bitbucket status-code auth probe and why a 404 is not "nothing there"
+- [x] Scaffold with `python3 skills/create-skill/scripts/init_skill.py review-pr --path skills/`
+- [x] Write frontmatter: `name` + `description` only (third-person, trigger-rich, ≤150 words); never author `managed-by` / `source`
+- [x] Write the Arguments table: `target` (PR number | PR URL | branch | none), `--effort` (`low|medium|high|max`, default `medium`), `--comment`, `--no-code`, `--no-docs`
+- [x] Define `--effort` as scaling **both** lenses, mirroring `/review-code`: `low`/`medium` favour few high-confidence findings; `high`/`max` widen coverage and may surface `confidence: low` candidates, clearly labelled
+- [x] Step 0 — copy the `create-pr` Step 0.5 platform preamble verbatim, `source … || exit 1` on both sourced files
+- [x] Document the Bitbucket status-code auth probe and why a 404 is not "nothing there"
 
 **Dependencies**: none
 
@@ -206,11 +206,11 @@ report can never be mistaken for the work item it reviews.
 - `skills/review-pr/SKILL.md`
 
 **Changes**:
-- [ ] GitHub path: `gh pr view [N] --json number,url,title,body,state,isDraft,headRefName,baseRefName,author,additions,deletions,changedFiles,files,reviewDecision,statusCheckRollup`
-- [ ] Bitbucket path: `GET ${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/{id}`
-- [ ] Bitbucket branch lookup: reuse the URL-encoded query from `skills/qa-fix/SKILL.md` (`?q=source.branch.name%3D%22${ENCODED_BRANCH}%22+AND+state%3D%22OPEN%22`)
-- [ ] No-argument default: the open PR for the current branch
-- [ ] HALT with a named message when no PR resolves
+- [x] GitHub path: `gh pr view [N] --json number,url,title,body,state,isDraft,headRefName,baseRefName,author,additions,deletions,changedFiles,files,reviewDecision,statusCheckRollup`
+- [x] Bitbucket path: `GET ${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/{id}`
+- [x] Bitbucket branch lookup: reuse the URL-encoded query from `skills/qa-fix/SKILL.md` (`?q=source.branch.name%3D%22${ENCODED_BRANCH}%22+AND+state%3D%22OPEN%22`)
+- [x] No-argument default: the open PR for the current branch
+- [x] HALT with a named message when no PR resolves
 
 **Dependencies**: Phase 1
 
@@ -224,15 +224,15 @@ report can never be mistaken for the work item it reviews.
 - `skills/review-pr/SKILL.md`
 
 **Changes**:
-- [ ] Rung 1 — branch stem: strip `feature/`, `bugfix/`, `hotfix/` → `docs/**/${STEM}/${STEM}.md`, else `docs/**/${STEM}.md`; handle `task.N.*`, `story.{E}.{S}.*`, `epic.N.*`, `bug.N.*`
-- [ ] Rung 2 — `grep -rl "pr_number: ${PR_NUMBER}" docs/`
-- [ ] Rung 3 — gate `pr:` URL match across `docs/**/*.gate.*.yml`, then its sibling work item
-- [ ] Rung 4 — PR body issue refs → `github_issue:` / `jira_key:` frontmatter grep, reusing the cascade in `develop-pipeline-step-0-resolve-and-prepare.md` § 0a
-- [ ] Rung 4 extraction must match **both** shapes: `#{N}` (GitHub) and `[A-Z]+-[0-9]+` (a Jira key). A Bitbucket PR description carries `PROJ-123`, never `#N` — matching only the GitHub shape makes rung 4 dead on the exact Bitbucket + Jira combination this task is scoped for
-- [ ] Rung 5 — bounded Explore subagent fallback
-- [ ] Rung 6 — none found: degrade to a code-only review and say so loudly in the report
-- [ ] Apply the tightened exclusion filter: `.qa. .gate. .bug. .implementation. .review. .dod. .plan. .handover. .pr-review.`
-- [ ] Record `resolved_via` so the report shows provenance
+- [x] Rung 1 — branch stem: strip `feature/`, `bugfix/`, `hotfix/` → `docs/**/${STEM}/${STEM}.md`, else `docs/**/${STEM}.md`; handle `task.N.*`, `story.{E}.{S}.*`, `epic.N.*`, `bug.N.*`
+- [x] Rung 2 — `grep -rl "pr_number: ${PR_NUMBER}" docs/`
+- [x] Rung 3 — gate `pr:` URL match across `docs/**/*.gate.*.yml`, then its sibling work item
+- [x] Rung 4 — PR body issue refs → `github_issue:` / `jira_key:` frontmatter grep, reusing the cascade in `develop-pipeline-step-0-resolve-and-prepare.md` § 0a
+- [x] Rung 4 extraction must match **both** shapes: `#{N}` (GitHub) and `[A-Z]+-[0-9]+` (a Jira key). A Bitbucket PR description carries `PROJ-123`, never `#N` — matching only the GitHub shape makes rung 4 dead on the exact Bitbucket + Jira combination this task is scoped for
+- [x] Rung 5 — bounded Explore subagent fallback
+- [x] Rung 6 — none found: degrade to a code-only review and say so loudly in the report
+- [x] Apply the tightened exclusion filter: `.qa. .gate. .bug. .implementation. .review. .dod. .plan. .handover. .pr-review.`
+- [x] Record `resolved_via` so the report shows provenance
 
 **Dependencies**: Phase 2
 
@@ -246,12 +246,12 @@ report can never be mistaken for the work item it reviews.
 - `skills/review-pr/SKILL.md`
 
 **Changes**:
-- [ ] Glob the work-item directory for `*.implementation.*.md`, `*.review.*.md`, `*.qa.*.md`, `*.gate.*.yml`, `*.dod.*.md`, `*sprint-review-summary.md`, `*.bug.*.md`, `*.handover.*.md`
-- [ ] Select the highest-numbered gate; read `gate:`, `quality_score`, `top_issues`, `waiver`
-- [ ] Read the DoD header block and the implementation report's Pipeline Progress table
-- [ ] Reuse the predicates in `docs/reference/pipeline-artifacts.md` § "Verifying a completed run" and `develop-pipeline-resume-contract.md`
-- [ ] Tracker fetch, read-only and non-blocking. `TRACKER=github` → `gh issue view N --json title,state,labels,milestone`
-- [ ] `TRACKER=jira` → `GET ${JIRA_URL}/rest/api/2/issue/{jira_key}?fields=summary,status,issuetype,priority` with the Basic-auth header the Jira sites already build (`JIRA_USER_EMAIL`:`JIRA_API_TOKEN`, base64). REST v2 read, not ADF — only `status.name` and `summary` are consumed. Fall back to the Atlassian MCP `getJiraIssue` **only** when no credential resolves. Name the path explicitly; "the existing Jira read path" is not implementable as written
+- [x] Glob the work-item directory for `*.implementation.*.md`, `*.review.*.md`, `*.qa.*.md`, `*.gate.*.yml`, `*.dod.*.md`, `*sprint-review-summary.md`, `*.bug.*.md`, `*.handover.*.md`
+- [x] Select the highest-numbered gate; read `gate:`, `quality_score`, `top_issues`, `waiver`
+- [x] Read the DoD header block and the implementation report's Pipeline Progress table
+- [x] Reuse the predicates in `docs/reference/pipeline-artifacts.md` § "Verifying a completed run" and `develop-pipeline-resume-contract.md`
+- [x] Tracker fetch, read-only and non-blocking. `TRACKER=github` → `gh issue view N --json title,state,labels,milestone`
+- [x] `TRACKER=jira` → `GET ${JIRA_URL}/rest/api/2/issue/{jira_key}?fields=summary,status,issuetype,priority` with the Basic-auth header the Jira sites already build (`JIRA_USER_EMAIL`:`JIRA_API_TOKEN`, base64). REST v2 read, not ADF — only `status.name` and `summary` are consumed. Fall back to the Atlassian MCP `getJiraIssue` **only** when no credential resolves. Name the path explicitly; "the existing Jira read path" is not implementable as written
 
 **Dependencies**: Phase 3
 
@@ -265,11 +265,11 @@ report can never be mistaken for the work item it reviews.
 - `skills/review-pr/SKILL.md`
 
 **Changes**:
-- [ ] Build the patch from `git` so one path serves both platforms: `git fetch -q origin "$BASE_BRANCH" "$HEAD_BRANCH"` then `git diff "origin/$BASE_BRANCH...origin/$HEAD_BRANCH" > "$DIFF_FILE"`
-- [ ] Write `$DIFF_FILE` to a scratch path via `mktemp`, never into the repo
-- [ ] Fall back to `gh pr diff N` / `GET …/pullrequests/{id}/diff` only when the refs will not fetch
-- [ ] Handle the **cross-fork PR**: `origin/$HEAD_BRANCH` does not exist when the head is a fork branch, so the `origin/…...origin/…` form fails. Detect it (`headRepositoryOwner` ≠ the base repo owner) and take the API-diff fallback directly rather than after a failed fetch
-- [ ] Empty diff → say so and stop
+- [x] Build the patch from `git` so one path serves both platforms: `git fetch -q origin "$BASE_BRANCH" "$HEAD_BRANCH"` then `git diff "origin/$BASE_BRANCH...origin/$HEAD_BRANCH" > "$DIFF_FILE"`
+- [x] Write `$DIFF_FILE` to a scratch path via `mktemp`, never into the repo
+- [x] Fall back to `gh pr diff N` / `GET …/pullrequests/{id}/diff` only when the refs will not fetch
+- [x] Handle the **cross-fork PR**: `origin/$HEAD_BRANCH` does not exist when the head is a fork branch, so the `origin/…...origin/…` form fails. Detect it (`headRepositoryOwner` ≠ the base repo owner) and take the API-diff fallback directly rather than after a failed fetch
+- [x] Empty diff → say so and stop
 
 **Dependencies**: Phase 2
 
@@ -283,11 +283,11 @@ report can never be mistaken for the work item it reviews.
 - `shared/resources/pr-conformance-prompt.md`
 
 **Changes**:
-- [ ] Write the read-only Explore prompt: inputs are the work-item doc, the artifact paths, `$DIFF_FILE`, and the tracker snapshot
-- [ ] Define the `pr_conformance:` YAML output contract, mirroring the `code_review:` shape (`id`, `category`, `severity`, `confidence`, `ref`, `finding`, `suggested_action`, `truncated_count`)
-- [ ] Define the four categories: `coverage`, `scope`, `trail`, `consistency`
-- [ ] State that the subagent is read-only and returns findings only — acting on them is the caller's job
-- [ ] Add the caller-responsibility section (how `/review-pr` renders and ranks the findings)
+- [x] Write the read-only Explore prompt: inputs are the work-item doc, the artifact paths, `$DIFF_FILE`, and the tracker snapshot
+- [x] Define the `pr_conformance:` YAML output contract, mirroring the `code_review:` shape (`id`, `category`, `severity`, `confidence`, `ref`, `finding`, `suggested_action`, `truncated_count`)
+- [x] Define the four categories: `coverage`, `scope`, `trail`, `consistency`
+- [x] State that the subagent is read-only and returns findings only — acting on them is the caller's job
+- [x] Add the caller-responsibility section (how `/review-pr` renders and ranks the findings)
 
 **Dependencies**: Phase 4
 
@@ -301,14 +301,14 @@ report can never be mistaken for the work item it reviews.
 - `skills/review-pr/SKILL.md`
 
 **Changes**:
-- [ ] Dispatch both lenses in parallel; Lens A passes `code-review-prompt.md` verbatim with `<DIFF_FILE>` / `<WORKING_DIR>` substituted
-- [ ] Honour `--no-code` and `--no-docs` by skipping the corresponding lens
-- [ ] Honour `--effort` in both dispatches — it scales breadth, never the output contract; the YAML shape is identical at every level
-- [ ] Compute the deterministic verdict: any conformance `high`, or code `bug` + `high` + `confidence: high` → REQUEST CHANGES; any `medium` → CONCERNS; otherwise APPROVE
-- [ ] Write the report to `{doc-dir}/{stem}.pr-review.{n}.{name}.md`, `{n}` starting at 1 and incrementing on re-review
-- [ ] No work item resolved → write **no file**. Render the code findings to the terminal and say plainly that the review is unanchored. Report artifacts are co-located with the work item that led to the PR; with no work item there is nothing to co-locate against, and inventing an `.agents/reviews/` directory would add an unsanctioned location (`plan-file-locations.md` and `source-tree.md` sanction only `.agents/plans/`)
-- [ ] Give the report as a literal fenced template in SKILL.md (create-skill's Template pattern)
-- [ ] Cleanup: `rm -f "$DIFF_FILE"`
+- [x] Dispatch both lenses in parallel; Lens A passes `code-review-prompt.md` verbatim with `<DIFF_FILE>` / `<WORKING_DIR>` substituted
+- [x] Honour `--no-code` and `--no-docs` by skipping the corresponding lens
+- [x] Honour `--effort` in both dispatches — it scales breadth, never the output contract; the YAML shape is identical at every level
+- [x] Compute the deterministic verdict: any conformance `high`, or code `bug` + `high` + `confidence: high` → REQUEST CHANGES; any `medium` → CONCERNS; otherwise APPROVE
+- [x] Write the report to `{doc-dir}/{stem}.pr-review.{n}.{name}.md`, `{n}` starting at 1 and incrementing on re-review
+- [x] No work item resolved → write **no file**. Render the code findings to the terminal and say plainly that the review is unanchored. Report artifacts are co-located with the work item that led to the PR; with no work item there is nothing to co-locate against, and inventing an `.agents/reviews/` directory would add an unsanctioned location (`plan-file-locations.md` and `source-tree.md` sanction only `.agents/plans/`)
+- [x] Give the report as a literal fenced template in SKILL.md (create-skill's Template pattern)
+- [x] Cleanup: `rm -f "$DIFF_FILE"`
 
 **Dependencies**: Phases 5, 6
 
@@ -322,11 +322,11 @@ report can never be mistaken for the work item it reviews.
 - `skills/review-pr/SKILL.md`
 
 **Changes**:
-- [ ] One summary comment, idempotent via the marker `<!-- agent-skills-pr-review -->`
-- [ ] GitHub: find marker via `gh pr view --json comments` → `gh api -X PATCH /repos/{o}/{r}/issues/comments/{id}` → else `gh pr comment`, all through `tracker_call_with_retry`
-- [ ] Bitbucket: `GET` / `PUT` / `POST …/pullrequests/{id}/comments` with `{content:{raw:…}}`, single-shot
-- [ ] Non-blocking; never gates; never post over an `unverifiable` reason
-- [ ] Ask before posting unless `--comment` was passed explicitly
+- [x] One summary comment, idempotent via the marker `<!-- agent-skills-pr-review -->`
+- [x] GitHub: find marker via `gh pr view --json comments` → `gh api -X PATCH /repos/{o}/{r}/issues/comments/{id}` → else `gh pr comment`, all through `tracker_call_with_retry`
+- [x] Bitbucket: `GET` / `PUT` / `POST …/pullrequests/{id}/comments` with `{content:{raw:…}}`, single-shot
+- [x] Non-blocking; never gates; never post over an `unverifiable` reason
+- [x] Ask before posting unless `--comment` was passed explicitly
 
 **Dependencies**: Phase 7
 
@@ -343,11 +343,11 @@ report can never be mistaken for the work item it reviews.
 - `skills/review-pr/references/` (generated)
 
 **Changes**:
-- [ ] Write contract tests over SKILL.md prose, modelled on `skills/review-bug/tests/review-bug.test.js` (`node:test` + `node:assert/strict`, CommonJS)
-- [ ] Append `'skills/review-pr/tests/*.test.js'` to the `"test"` script in `package.json` — there is no `skills/*/tests/` wildcard
-- [ ] `npm run bundle` and commit the generated `references/`
-- [ ] `npm run generate-catalog`
-- [ ] `python3 skills/create-skill/scripts/quick_validate.py skills/review-pr`
+- [x] Write contract tests over SKILL.md prose, modelled on `skills/review-bug/tests/review-bug.test.js` (`node:test` + `node:assert/strict`, CommonJS)
+- [x] Append `'skills/review-pr/tests/*.test.js'` to the `"test"` script in `package.json` — there is no `skills/*/tests/` wildcard
+- [x] `npm run bundle` and commit the generated `references/`
+- [x] `npm run generate-catalog`
+- [x] `python3 skills/create-skill/scripts/quick_validate.py skills/review-pr`
 
 **Dependencies**: Phases 1-8
 
@@ -364,11 +364,11 @@ report can never be mistaken for the work item it reviews.
 - `docs/reference/pipeline-artifacts.md`
 
 **Changes**:
-- [ ] Register `.pr-review.` in the `file-naming.md` artifact tables — the **story** table (`story.{epic}.{story}.pr-review.{n}.{name}.md`) and the **task** table (`task.{n}.pr-review.{n}.{name}.md`), beside the existing review / qa / gate / implementation / dod rows
-- [ ] Add a `PR review report` row to the **Co-located artifacts** table in `task-documents.md` and `story-documents.md`, written by `review-pr`
-- [ ] Add `review-pr` to the step → artifact map in `pipeline-artifacts.md`, marked as standalone (it is not a numbered pipeline step) and committed
-- [ ] Grep for globs that would newly match the kind: `grep -rn '\*\.review\.\*' skills/ shared/ scripts/` — `.pr-review.` must not be swallowed by a `*.review.*` glob; record and fix anything that matches
-- [ ] Do **not** add `.agents/reviews/` anywhere — the fallback was removed in Phase 7; co-location is the only sanctioned location
+- [x] Register `.pr-review.` in the `file-naming.md` artifact tables — the **story** table (`story.{epic}.{story}.pr-review.{n}.{name}.md`) and the **task** table (`task.{n}.pr-review.{n}.{name}.md`), beside the existing review / qa / gate / implementation / dod rows
+- [x] Add a `PR review report` row to the **Co-located artifacts** table in `task-documents.md` and `story-documents.md`, written by `review-pr`
+- [x] Add `review-pr` to the step → artifact map in `pipeline-artifacts.md`, marked as standalone (it is not a numbered pipeline step) and committed
+- [x] Grep for globs that would newly match the kind: `grep -rn '\*\.review\.\*' skills/ shared/ scripts/` — `.pr-review.` must not be swallowed by a `*.review.*` glob; record and fix anything that matches
+- [x] Do **not** add `.agents/reviews/` anywhere — the fallback was removed in Phase 7; co-location is the only sanctioned location
 
 **Dependencies**: Phase 7 (the artifact kind must be settled first)
 
@@ -423,18 +423,18 @@ None.
 the new prompt — the repo's established pattern for skills with no executable code.
 
 **Actions**:
-- [ ] `SKILL.md` declares `name: review-pr` and a `description` of ≤150 words
-- [ ] Every documented argument appears in the Arguments table
-- [ ] The platform preamble sources both `resolve-platform.sh` and `bitbucket-auth.sh` with `|| exit 1`
-- [ ] Both a GitHub and a Bitbucket branch exist for PR resolution and for the `--comment` path
-- [ ] PR-shaped branches test `$VCS`, not `$TRACKER`
-- [ ] All six resolution rungs are documented, in order
-- [ ] The exclusion filter names all nine artifact segments including `.pr-review.`
-- [ ] `code-review-prompt.md` is referenced, not paraphrased (no inline copy of its prompt body)
-- [ ] `pr-conformance-prompt.md` declares all four categories and the full `pr_conformance:` key set
-- [ ] The verdict table is present with all three outcomes
-- [ ] SKILL.md contains no `gh pr review` and no gate-writing instruction
-- [ ] SKILL.md contains no `addCommentToJiraIssue` (repo-wide prohibition)
+- [x] `SKILL.md` declares `name: review-pr` and a `description` of ≤150 words
+- [x] Every documented argument appears in the Arguments table
+- [x] The platform preamble sources both `resolve-platform.sh` and `bitbucket-auth.sh` with `|| exit 1`
+- [x] Both a GitHub and a Bitbucket branch exist for PR resolution and for the `--comment` path
+- [x] PR-shaped branches test `$VCS`, not `$TRACKER`
+- [x] All six resolution rungs are documented, in order
+- [x] The exclusion filter names all nine artifact segments including `.pr-review.`
+- [x] `code-review-prompt.md` is referenced, not paraphrased (no inline copy of its prompt body)
+- [x] `pr-conformance-prompt.md` declares all four categories and the full `pr_conformance:` key set
+- [x] The verdict table is present with all three outcomes
+- [x] SKILL.md contains no `gh pr review` and no gate-writing instruction
+- [x] SKILL.md contains no `addCommentToJiraIssue` (repo-wide prohibition)
 
 **Command**: `node --test 'skills/review-pr/tests/*.test.js'`
 
@@ -445,9 +445,9 @@ the new prompt — the repo's established pattern for skills with no executable 
 **Scope**: the existing suites must stay green, and must actually include the new one.
 
 **Actions**:
-- [ ] `npm test` output names the `review-pr` suite (proves the glob was added)
-- [ ] `npm run validate` passes for the new skill
-- [ ] `npm run bundle` is idempotent — a second run produces no diff
+- [x] `npm test` output names the `review-pr` suite (proves the glob was added)
+- [x] `npm run validate` passes for the new skill
+- [x] `npm run bundle` is idempotent — a second run produces no diff
 
 **Command**: `npm test && npm run validate`
 
@@ -459,7 +459,7 @@ the new prompt — the repo's established pattern for skills with no executable 
 
 **Actions**:
 - [ ] `/review-pr 281` resolves task 65, reads `gate.3` (PASS, 90) and `dod.1`, and returns ✅ APPROVE
-- [ ] From `feature/task.65.registry-aware-selection`, a bare `/review-pr` resolves via rung 1
+- [x] From `feature/task.65.registry-aware-selection`, a bare `/review-pr` resolves via rung 1
 - [ ] `/review-pr 281 --no-code` runs the conformance lens alone
 - [ ] `/review-pr <PR> --comment` posts once, then edits rather than duplicating on a second run
 
@@ -476,7 +476,7 @@ when the behaviour is removed.
 - [ ] Blank the `gate:` value in a scratch gate file; confirm a `trail` finding is raised
 - [ ] Remove the `--comment` idempotency marker from the body; confirm the second post duplicates
       (proving the marker is what prevents it)
-- [ ] Revert the `package.json` glob; confirm `npm test` stops naming the suite
+- [x] Revert the `package.json` glob; confirm `npm test` stops naming the suite
 
 ---
 
@@ -484,38 +484,38 @@ when the behaviour is removed.
 
 ### Functional
 
-- [ ] `/review-pr` resolves a PR from a number, a URL, a branch name, or no argument at all
-- [ ] The work-item cascade resolves task 65 from PR 281 by branch stem, and by `pr_number` when the branch is unavailable
-- [ ] All eight artifact kinds are collected when present, and their absence is reported rather than ignored
-- [ ] The linked GitHub issue or Jira card is fetched read-only and its state compared with the doc and the PR
-- [ ] Both lenses run, and each can be disabled independently with `--no-code` / `--no-docs`
-- [ ] The verdict follows the deterministic table exactly
-- [ ] A co-located `.pr-review.{n}.` report is written, incrementing on re-review
-- [ ] With no work item resolved, the skill degrades to a code-only review, says so, and writes **no** file
-- [ ] `--effort` scales the breadth of both lenses without altering either output contract
-- [ ] `--comment` posts exactly one comment and edits it on re-run, on both platforms
+- [x] `/review-pr` resolves a PR from a number, a URL, a branch name, or no argument at all
+- [x] The work-item cascade resolves task 65 from PR 281 by branch stem, and by `pr_number` when the branch is unavailable
+- [x] All eight artifact kinds are collected when present, and their absence is reported rather than ignored
+- [x] The linked GitHub issue or Jira card is fetched read-only and its state compared with the doc and the PR
+- [x] Both lenses run, and each can be disabled independently with `--no-code` / `--no-docs`
+- [x] The verdict follows the deterministic table exactly
+- [x] A co-located `.pr-review.{n}.` report is written, incrementing on re-review
+- [x] With no work item resolved, the skill degrades to a code-only review, says so, and writes **no** file
+- [x] `--effort` scales the breadth of both lenses without altering either output contract
+- [x] `--comment` posts exactly one comment and edits it on re-run, on both platforms
 
 ### Platform
 
-- [ ] GitHub and Bitbucket both resolve a PR, build a diff, and post a comment
-- [ ] Every PR-shaped branch keys off `$VCS`; every issue-shaped branch keys off `$TRACKER`
-- [ ] Bitbucket auth is verified by status code on a repo-root probe
-- [ ] A non-`full` `ACCESS_TRACKER` defers the comment through `tracker_call_with_retry` without failing the run
+- [x] GitHub and Bitbucket both resolve a PR, build a diff, and post a comment
+- [x] Every PR-shaped branch keys off `$VCS`; every issue-shaped branch keys off `$TRACKER`
+- [x] Bitbucket auth is verified by status code on a repo-root probe
+- [x] A non-`full` `ACCESS_TRACKER` defers the comment through `tracker_call_with_retry` without failing the run
 
 ### Code Quality
 
-- [ ] `quick_validate.py` passes; description ≤150 words and third-person
-- [ ] Shared resources are referenced as `shared/resources/X` in source and bundled, never hand-copied
-- [ ] `npm run bundle` is idempotent
-- [ ] The new test glob is present in `package.json` and the suite appears in `npm test` output
-- [ ] `docs/reference/skill-catalog.md` regenerated
-- [ ] `.pr-review.` appears in the `file-naming.md` story and task artifact tables, in both Co-located artifacts tables, and in `pipeline-artifacts.md`
-- [ ] No existing `*.review.*` glob in `skills/`, `shared/` or `scripts/` silently matches `.pr-review.`
+- [x] `quick_validate.py` passes; description ≤150 words and third-person
+- [x] Shared resources are referenced as `shared/resources/X` in source and bundled, never hand-copied
+- [x] `npm run bundle` is idempotent
+- [x] The new test glob is present in `package.json` and the suite appears in `npm test` output
+- [x] `docs/reference/skill-catalog.md` regenerated
+- [x] `.pr-review.` appears in the `file-naming.md` story and task artifact tables, in both Co-located artifacts tables, and in `pipeline-artifacts.md`
+- [x] No existing `*.review.*` glob in `skills/`, `shared/` or `scripts/` silently matches `.pr-review.`
 
 ### Documentation
 
-- [ ] SKILL.md carries a literal report template and a Related Skills section placing `/review-pr` against `/review-code`, `/qa-task` and `/finalise`
-- [ ] The out-of-scope follow-ups are recorded in § Notes with enough detail to file later
+- [x] SKILL.md carries a literal report template and a Related Skills section placing `/review-pr` against `/review-code`, `/qa-task` and `/finalise`
+- [x] The out-of-scope follow-ups are recorded in § Notes with enough detail to file later
 
 ---
 
@@ -627,60 +627,61 @@ when the behaviour is removed.
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft | create-task |
 | 2026-08-31 | 1.1     | Review passed (8/10) — 6 Important fixes applied: `--effort` defined, rung 4 matches Jira keys, Jira read path named, cross-fork diff handled, `.agents/reviews/` fallback dropped, Phase 10 standards doc sweep added | review-task |
+| 2026-08-31 |         | Implemented — 11 files, 40 tests | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Skill scaffold and platform resolution
-- [ ] Scaffold and frontmatter
-- [ ] Arguments table
-- [ ] Platform preamble
+- [x] Scaffold and frontmatter
+- [x] Arguments table
+- [x] Platform preamble
 
 ### Phase 2: PR resolution
-- [ ] GitHub path
-- [ ] Bitbucket path
-- [ ] Default and HALT behaviour
+- [x] GitHub path
+- [x] Bitbucket path
+- [x] Default and HALT behaviour
 
 ### Phase 3: Work-item resolution cascade
-- [ ] Rungs 1-6
-- [ ] Exclusion filter
-- [ ] `resolved_via` provenance
+- [x] Rungs 1-6
+- [x] Exclusion filter
+- [x] `resolved_via` provenance
 
 ### Phase 4: Artifact and tracker collection
-- [ ] Artifact globs
-- [ ] Gate / DoD / implementation parsing
-- [ ] Tracker fetch
+- [x] Artifact globs
+- [x] Gate / DoD / implementation parsing
+- [x] Tracker fetch
 
 ### Phase 5: Diff construction
-- [ ] git-based patch
-- [ ] API fallback
+- [x] git-based patch
+- [x] API fallback
 
 ### Phase 6: Conformance prompt
-- [ ] Prompt body
-- [ ] Output contract
-- [ ] Four categories
+- [x] Prompt body
+- [x] Output contract
+- [x] Four categories
 
 ### Phase 7: Lenses, verdict and report
-- [ ] Parallel dispatch
-- [ ] Verdict table
-- [ ] Report template and fallback path
+- [x] Parallel dispatch
+- [x] Verdict table
+- [x] Report template and fallback path
 
 ### Phase 8: `--comment`
-- [ ] GitHub idempotent post
-- [ ] Bitbucket idempotent post
-- [ ] Confirmation before posting
+- [x] GitHub idempotent post
+- [x] Bitbucket idempotent post
+- [x] Confirmation before posting
 
 ### Phase 9: Wiring and validation
-- [ ] Contract tests
-- [ ] `package.json` glob
-- [ ] Bundle and catalog
+- [x] Contract tests
+- [x] `package.json` glob
+- [x] Bundle and catalog
 
 ### Phase 10: Standards doc sweep
-- [ ] `file-naming.md` artifact tables
-- [ ] Co-located artifacts tables
-- [ ] `pipeline-artifacts.md`
-- [ ] Glob-collision grep
+- [x] `file-naming.md` artifact tables
+- [x] Co-located artifacts tables
+- [x] `pipeline-artifacts.md`
+- [x] Glob-collision grep
 
 ---
 
@@ -699,6 +700,29 @@ when the behaviour is removed.
 ---
 
 ## Notes
+
+### Deferred Work — verified vs. outstanding
+
+**Verified during implementation** (against PR 281 / task 65, which carries a complete trail):
+
+- Rung 1 (branch stem) resolves `feature/task.65.registry-aware-selection` → the task document.
+- Rung 2 (`pr_number: 281`) resolves to the **same** document — the fall-through is real, not assumed.
+- Rung 3 (gate `pr:` URL) resolves to `task.65.gate.3.…yml` and thence its sibling work item.
+- Artifact trail collected correctly: 1 implementation, 1 review, 3 qa, 3 gate, 1 dod, 1 bug.
+- Highest gate selected and parsed: `gate: PASS`, `quality_score: 90`, `top_issues: []`.
+- The review-report glob excludes `.pr-review.` (found by the Phase 10 glob-collision grep, fixed, regression-tested).
+- 11 mutation proofs: each behavioural claim goes red when the behaviour is reverted.
+
+**Outstanding — requires a live two-lens run, deferred to QA:**
+
+- A full `/review-pr 281` producing an actual ✅ APPROVE verdict from both lenses.
+- `--no-code` running the conformance lens alone.
+- `--comment` posting once and editing on the second run (marker idempotency).
+- The two conformance mutation proofs (blank a scratch gate's `gate:` → expect a `trail` finding;
+  remove the marker → expect a duplicate post).
+
+These are behavioural end-to-end checks against live subagents and a live PR, not contract checks over
+prose. Ticking them from a dry read would be reporting coverage that does not exist.
 
 ### Important Reminders
 
@@ -722,7 +746,7 @@ when the behaviour is removed.
 
 ---
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.66.review-pr/task.66.review-pr.md`
