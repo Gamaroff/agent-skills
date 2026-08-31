@@ -1,10 +1,10 @@
 schema: 1
 task: "task.71.selection-floor-matches-dispatcher"
 task_title: "Make the selection floor equal what the dispatching pipeline accepts"
-gate: CONCERNS
-status_reason: "Implementation, tests and mutation proofs are correct and complete — all 11 success criteria met, 1999 tests green. One MEDIUM maintainability defect: twelve comment lines in the test file carry literal \\u2286 / \\u2014 escape sequences instead of the characters they denote, including the H1 section header."
+gate: PASS
+status_reason: "All success criteria met, 1999 tests green, 3/3 mutation proofs. The single MEDIUM finding from cycle 1 (literal escape sequences) is fixed and verified — 18 occurrences replaced, 0 remain — and the LOW recommendation was applied in the same pass. Re-verified adversarially: the assertion change was re-mutation-proved rather than accepted on a green suite."
 reviewer: "QA Engineer"
-updated: "2026-08-31T19:05:00Z"
+updated: "2026-08-31T19:35:00Z"
 
 top_issues:
   - id: TASK-71-QA1-01
@@ -15,12 +15,14 @@ top_issues:
     suggested_action: "Replace the literal sequences with the real characters in the twelve comment lines; optionally normalise the three template-literal occurrences for consistency. Text-only, no assertion depends on them."
     suggested_owner: dev
     bug_ref: "task.71.bug.1.literal-unicode-escapes-in-comments.md"
-    status: open
+    status: closed
+    fixed_date: "2026-08-31"
+    verification: "18 occurrences replaced (not the 12 this entry estimated — that counted lines; several carried two). grep for literal escapes returns 0. H1 header renders correctly. Mutation 2 re-applied after the assertion change: guard still fails correctly and the message renders a real arrow."
 
 waiver:
   active: false
 
-quality_score: 90
+quality_score: 98
 
 evidence:
   tests_reviewed: 1999
@@ -49,28 +51,32 @@ nfr_validation:
     status: PASS
     notes: "Excluded statuses are still exactly the three develop-task HALTs on, so the loop-cannot-self-recover failure task.65 identified remains prevented. Rollback is one line, documented in the task's §11. Roadmap precedence is unchanged and asserted in its strong form (loader never called)."
   maintainability:
-    status: CONCERNS
-    notes: "Rationale prose is thorough, rewritten rather than deleted at every site, and the reversed decision is explicitly narrated. But twelve comment lines in the primary test file render as literal escape sequences, including the H1 section header — a documentation defect in a change whose stated purpose is that the prose states the rule correctly."
+    status: PASS
+    notes: "Rationale prose is thorough, rewritten rather than deleted at every site, and the reversed decision is explicitly narrated. The cycle-1 escape-sequence defect is fixed — 0 literal escapes remain and the H1 section header renders correctly. The vacuity guards carry a comment explaining why `===` makes them more load-bearing than the previous subset assertion."
 
 code_review:
   bugs_found: 0
   cleanups_found: 2
+  cleanups_resolved: 2
   blocking_enabled: true
   promoted_to_top_issues: 0
   notes: "code_review_blocking=true was in effect. Zero category:bug findings, so nothing was promoted. The two findings are cleanups: the literal-escape defect (raised separately as a QA MEDIUM, since it is a documentation defect rather than a diff-correctness bug) and a LOW preference for assert.deepStrictEqual over assert.deepEqual."
 
 recommendations:
-  immediate:
-    - action: "Replace the literal escape sequences with real characters in the twelve comment lines"
-      refs: ["evals/develop-next/unit/select-next.test.mjs"]
+  immediate: []
   future:
-    - action: "Prefer assert.deepStrictEqual over assert.deepEqual in 16/H1 — both sides are string arrays so behaviour is identical today, but strict is the documented recommendation and removes a loose-equality footgun if the shape ever changes"
-      refs: ["evals/develop-next/unit/select-next.test.mjs:1923"]
     - action: "The bug-axis divergence (in-progress, ready-for-qa) remains deliberately open — file a task when closing it is wanted"
       refs: ["skills/develop-next/scripts/select-next.mjs"]
 
 deployment_readiness:
-  staging: CONDITIONAL
-  production: CONDITIONAL
-  conditions:
-    - "Fix TASK-71-QA1-01 (comment escape sequences) before merge"
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: "2026-08-31"
+  total_iterations: 1
+  verification_method: "Full suite (1999 tests) + prettier + repo-wide grep for literal escapes + re-run of mutation 2 against the changed assertion"
+  fix_commit: "885de04"

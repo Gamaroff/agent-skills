@@ -3,7 +3,7 @@
 **Task**: `task.71.selection-floor-matches-dispatcher.md`
 **Run Number**: 1
 **Started**: 2026-08-31 20:15
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -34,10 +34,10 @@ Widen `TASK_ELIGIBLE_STATUSES` in `select-next.mjs` to `{draft, planned, ready-f
 | 1. create-branch           | ✅ Done    | Branch `feature/task.71.*` exists in git                               | Branch pre-existed at `1fa9c7c`, identical to `origin/develop` (0/0) — reused, not recreated | —                    |
 | 2. review-task             | ✅ Done    | `task.71.review.{N}.{name}.md` exists (or skip logged)                 | Skipped — status `ready-for-development` + review.1 report present | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4/4 phases; 1999 tests pass, 0 fail; 3 mutations proved | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.71.qa.{N}.*.md`; `task.71.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.71.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #286: https://github.com/Gamaroff/agent-skills/pull/286 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.71.qa.{N}.*.md`; `task.71.gate.{N}.*.yml`; PR comment posted     | 2 cycles, 1 fix cycle; gate PASS 98/100; 1 bug closed | `.summaries/step-5-traceability-mapper.json` |
+| 7. finalise                | ✅ Done    | `task.71.dod.{N}.*.md`; task `status: accepted`                        | DoD PASS; issue #285 closed; board already Done | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report commit + push | —                    |
 
 ---
 
@@ -55,6 +55,14 @@ Widen `TASK_ELIGIBLE_STATUSES` in `select-next.mjs` to `{draft, planned, ready-f
 - Q2 PR target branch: **develop** — standard Gitflow for a task
 - qa-planning gate: skipped (auto — no prompt)
 - Step 1: branch `feature/task.71.selection-floor-matches-dispatcher` already existed and sat exactly on `origin/develop` (`1fa9c7c`, 0 ahead / 0 behind). Reused rather than recreated — the "Branch Already Exists" path resolved to *switch to existing*, and its base is the Q1 answer already.
+- **Step 7 — finalise: ACCEPTED.** DoD summary: `task.71.dod.1.selection-floor-matches-dispatcher.md`. Task `status: accepted`, `completed_date` and `pr_number: 286` written in the same edit as the Change Log acceptance row (v1.3).
+- **Step 7 — CI gate checked, not assumed**: `CI_ROLLUP = SUCCESS` on head `885de04`, which **equals local HEAD** — verified per-check `head_sha` so the green is about the commit being accepted rather than an ancestor. Checks: `test`, `validate`, `link-check`, branch policy. `link-check` matters specifically here, since this task added several relative links between the task, bug, QA and gate files.
+- **Step 7 — one residual recorded rather than rounded up**: the PR has **no human review** (`reviews: 0`, `reviewDecision` empty). The repo requires none — `mergeStateStatus: CLEAN` — so acceptance is defensible, but "no review required" and "approved" are different claims and only the first is true. Written into the DoD file and both PR comments rather than reported as APPROVED.
+- **Step 7 — Security and Compliance are N/A by inspection, not by category**: the diff adds no credential, input, network, dependency or authorisation surface; no personal-data, payment, accessibility or licensing surface. Reasoned per-check in the DoD file.
+- **Step 7 tracker**: Document link already pointed at `develop` (no re-point needed). `tracker-comment.js --stage done` → `posted`. Issue #285 closed, verified `CLOSED`. `gh-stage.js --stage done` → `already` (the close had moved the board) — a correct outcome, not a warning.
+- **Step 7 accept gap**: `.claude/state/tracker-actions.jsonl` empty → no deferred mutations, no handover artifacts, `Tracker debt: none`. The `## Tracker Actions Required` section is deliberately omitted rather than left empty.
+- **Step 4 — PR created**: [#286](https://github.com/Gamaroff/agent-skills/pull/286), `develop` ← `feature/task.71.selection-floor-matches-dispatcher`, state `OPEN`, `mergeable: MERGEABLE`. Two commits, split behaviour / paper trail: `43fc033` (feat) and `26fd888` (docs). Leak check clean — every committed path is inside `SCOPE_PATHS`.
+- **Step 4 tracker**: `tracker-comment.js --stage in-review` → `posted`. `gh-stage.js --stage in-review` → **`stage-disabled`** — the `in-review` moment is not configured in this project's `tracker-workflow.yaml`, so the board stays where `work-started` put it. Correct outcome per the contract (CLI exits 0); recorded rather than retried.
 - **Step 4 SCOPE_PATHS** (5): `docs/tasks/task.71.selection-floor-matches-dispatcher`, `docs/tasks/task-registry.md`, `skills/develop-next`, `evals/develop-next/unit`, `CHANGELOG.md`. `git diff develop...HEAD` was empty (nothing committed on the branch yet), so scope was derived from the working tree instead. Pre-flight guard: **0 out-of-scope untracked files** — both untracked paths are inside the work-item dir — so no hold dir was needed.
 - **Pre-develop surface map: 7 files** (read directly, not via Explore — the task's §7 Files Summary already names every file with line anchors, so a rediscovery agent would only re-derive what the document states):
   1. `skills/develop-next/scripts/select-next.mjs` — `TASK_ELIGIBLE_STATUSES` :84-88; subset-rationale block :59-71; "floor IS the opt-out" block :73-79; `ELIGIBLE_FOR` :1014; `--lint` exclusion message :1093
@@ -153,16 +161,64 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-08-31
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1 MEDIUM, 1 LOW
+- **TASK-71-QA1-01 (MEDIUM)** — twelve `//` comment lines in `select-next.test.mjs` carry literal `\u2286` / `\u2014` escape sequences instead of the characters they denote, including the H1 section header. An authoring artefact: `\u` escapes written in a non-raw Python heredoc during Step 3. No runtime impact — the three occurrences inside a template literal *are* valid JS escapes and render correctly (confirmed by the mutation-2 output printing a real `→`). Bug report: `task.71.bug.1.literal-unicode-escapes-in-comments.md`
+- **LOW** — `assert.deepEqual` → `assert.deepStrictEqual` at `:1923`. Identical behaviour today; advisory only.
+**NFR**: Security PASS, Performance PASS, Reliability PASS, Maintainability **CONCERNS** (the garbled comments are the sole cause)
+**Code review** (`code_review_blocking=true`): 0 `category: bug` findings, so nothing was promoted to `top_issues`. The gate reached CONCERNS through the QA severity rules instead.
+**Independent verification**: QA re-parsed the dispatcher's status table with its own implementation rather than trusting the test's — `sawRow = true`, PROCEED = `{draft, planned, ready-for-development, in-progress}`, equal to the constant. Blast radius checked: the constant has exactly two readers, so `--batch` and all other consumers are untouched.
+**Action**: Ran qa-fix (cycle 1 of 5)
+**Fixes Applied**: TASK-71-QA1-01 — replaced the literal escape sequences with the characters they denote. **18 occurrences, not the 12 the gate estimated**: the gate counted affected *lines* and several carried two. Counted before editing and reported the discrepancy rather than silently fixing more than the gate asked for. Also applied the gate's LOW `future` recommendation (`assert.deepEqual` → `assert.deepStrictEqual`) in the same pass.
+**Adversarial check on the fix itself**: the `deepStrictEqual` swap changes the assertion guarding this task's central invariant, so a green suite was not accepted as sufficient — mutation 2 was re-applied and the guard still failed correctly with the arrow rendering. One check proving two things: the stricter assertion still fires, and the character replacement did not damage the failure message (the only place these characters have observable behaviour). The four transition probes (bulk teardown / in-flight / error path / reconnect) were considered and found not applicable — a text substitution has no lifecycle.
+**Commit**: `885de04`
+
+### QA Cycle 2 — 2026-08-31 (re-review)
+**Gate Result**: **PASS (98/100)** — gate 1 updated in place rather than a gate 2 issued, per the "trivial fix / assertion update → quick verification" path
+**Issues Found**: none. TASK-71-BUG-1 verified fixed and **Closed**
+**Verification**: 0 literal escapes remain; H1 header renders; 1999 tests pass; prettier clean
+**NFR**: Maintainability CONCERNS → **PASS** (sole cause fixed). All four NFRs PASS
+**Action**: Exiting QA loop after 2 cycles / 1 fix cycle — proceeding to Step 7 (finalise)
 
 ---
 
-## Completion
+## Completion Summary
 
-**Finished**: {populated at end}
-**Final Status**: {populated at end}
+The selection floor now equals what `develop-task` accepts. The change itself is one `Set` literal;
+the work was in the argument around it and in making the guard able to catch what it previously
+could not.
+
+**Three things this run is worth remembering for:**
+
+1. **The gap was the default path, not an edge case.** `/create-task` emits `planned`, and `planned`
+   sat outside the floor — so every task ever filed was invisible to `/develop-next` until someone
+   promoted it by hand. The repo's registry showed zero `planned` rows not because the gap was
+   harmless but because the toil was always paid.
+2. **`⊆` was structurally blind to the failure that mattered.** It could only catch a floor status
+   the dispatcher refuses. The equality catches the other direction — a status the dispatcher accepts
+   that the floor withholds — which is exactly where `planned` sat, and it catches over-widening too.
+   Both directions were mutation-proved.
+3. **The plan's six prose sites were seven.** A repo-wide sweep found the reversed decision also
+   asserted as fact in CHANGELOG's `[Unreleased] → Added` bullet. Since task.65's entry is still
+   unreleased, leaving it would have shipped one release block asserting both "the floor **is** the
+   opt-out" and "there is no opt-out".
+
+**What QA caught that development did not:** twelve comment lines (eighteen occurrences) rendering
+literal `\u2286` escape sequences — an authoring artefact of a non-raw Python heredoc, landing on the
+H1 section header a future author reads first. Fixed in one cycle; the accompanying
+`deepEqual → deepStrictEqual` change was re-mutation-proved rather than accepted on a green suite.
+
+**Deliberately left open:** the bug axis diverges from `develop-bug` by `in-progress` and
+`ready-for-qa`. Measured, recorded in three places, and out of scope by §4 — closing it would hand an
+unattended loop a bug whose fix is already written and only awaiting verification.
+
+---
+
+**Finished**: 2026-08-31 19:50
+**Final Status**: Completed
 **Branch**: feature/task.71.selection-floor-matches-dispatcher
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/286
+**QA Iterations**: 2 (1 fix cycle)
+**DoD Summary**: docs/tasks/task.71.selection-floor-matches-dispatcher/task.71.dod.1.selection-floor-matches-dispatcher.md
+**Tracker debt**: none

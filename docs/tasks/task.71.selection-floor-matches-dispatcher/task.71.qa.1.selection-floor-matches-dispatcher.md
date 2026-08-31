@@ -227,3 +227,59 @@ npm run bundle                                      # drift check
 **Conditions**: Fix TASK-71-QA1-01 before merge.
 
 **Next Steps**: `/qa-fix` on the gate file, then re-review.
+
+---
+
+## Bug Resolution Summary — QA Cycle 2 (re-review, 2026-08-31)
+
+**Scope**: quick verification. The fix diff is comments, three template-literal character
+normalisations and one assertion identifier — no logic change — which is the "trivial fix / assertion
+update" case, so gate 1 was updated in place rather than a gate 2 being issued.
+
+### TASK-71-QA1-01 — VERIFIED FIXED
+
+| Check | Result |
+|---|---|
+| `grep -c '\u[0-9a-f]{4}'` over the file | **0** — no literal escape remains |
+| H1 section header (line 1818) | renders `⊆`, correctly |
+| Full suite | 1999 tests, 1998 pass, 0 fail |
+| `prettier --check` | clean |
+
+**One correction to the cycle-1 finding, recorded rather than quietly absorbed**: the gate said
+*twelve* occurrences. There were **eighteen** — the cycle-1 count was of affected *lines*, and several
+lines carried two sequences. The developer counted before editing and reported the discrepancy rather
+than silently fixing more than the gate asked for. The gate entry has been amended.
+
+### LOW recommendation — APPLIED
+
+`assert.deepEqual` → `assert.deepStrictEqual`. The gate listed this under `future` (non-blocking);
+applying it in the same pass was reasonable, being a one-token change to the same assertion.
+
+**This is the only change in the cycle with semantic weight, and it was not accepted on a green suite
+alone.** `deepStrictEqual` guards this task's central invariant, so mutation 2 (adding `accepted` to
+the floor) was re-applied after the swap. The guard still failed correctly:
+
+```
+✖ 16/H1: the task eligibility floor EQUALS what develop-task proceeds on
+    only in floor:      accepted
+        → the frontier would nominate work the dispatcher refuses; an
+```
+
+That single check does double duty — it proves the stricter assertion still fires, **and** it proves
+the character replacement did not damage the failure message, which is the one place these characters
+have observable behaviour. Source restored and confirmed clean afterwards.
+
+### Adversarial pass over the fix itself
+
+Considered and found not applicable: the change touches no emission, subscription, caching or
+lifecycle path — it is a text substitution plus an assertion-helper swap, with no transition states to
+probe. The one semantic surface (the assertion) was mutation-proved directly, above.
+
+### Revised Assessment
+
+**Gate Status**: PASS (was CONCERNS)
+**Quality Score**: 98/100 (was 90)
+**Deployment Recommendation**: APPROVED
+**Bugs**: 1 fixed, 0 remaining
+**Open items**: none blocking. The bug-axis divergence (`in-progress`, `ready-for-qa`) remains
+deliberately open by decision, recorded in three places, and is not a defect of this task.

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-71-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (qa-task cycle 1)
 **Date Found**: 2026-08-31
 
@@ -143,3 +143,4 @@ not damage the failure message — the one place these characters have observabl
 | 2026-08-31 | New          | qa-task    | Found in QA cycle 1                            |
 | 2026-08-31 | In Progress  | qa-fix     | Investigation started; 18 occurrences confirmed |
 | 2026-08-31 | Ready for QA | qa-fix     | All 18 replaced; LOW recommendation also applied |
+| 2026-08-31 | Closed       | qa-task    | Verified in cycle 2: 0 escapes remain, header renders, suite green, mutation re-proved |

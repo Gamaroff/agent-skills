@@ -5,11 +5,13 @@ type: task
 description: "develop-task accepts draft and planned and promotes them via its own Step 2 review, but select-next.mjs excludes both from the frontier. A filed task is therefore invisible to /develop-next until someone remembers to review it by hand."
 tags: [develop-next, selection, eligibility-floor, registries, automation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-31
 updated: 2026-08-31
+completed_date: 2026-08-31
+pr_number: 286
 assignee:
 depends_on: task.66
 estimated_effort_hours: 3
@@ -18,7 +20,7 @@ github_issue: 285
 
 # Technical Task: Make the selection floor equal what the dispatching pipeline accepts
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.71.review.1.selection-floor-matches-dispatcher.md` implemented 2026-08-31
 **GitHub Issue**: [#285](https://github.com/Gamaroff/agent-skills/issues/285)
 
@@ -343,11 +345,11 @@ If the problem is a specific noisy task rather than the policy, set that task to
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-31
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 98/100
+**Gate Decision**: PASS (cycle 1 CONCERNS → cycle 2 PASS after 1 fix cycle)
 
 ### QA Report
 - **Full Report**: [task.71.qa.1.selection-floor-matches-dispatcher.md](./task.71.qa.1.selection-floor-matches-dispatcher.md)
@@ -358,26 +360,57 @@ If the problem is a specific noisy task rather than the policy, set that task to
 - **Phases Verified**: 4/4
 - **Success Criteria Covered**: 10/10, none uncovered
 - **Mutation Proofs**: 3/3 executed and reverted
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 HIGH, 1 MEDIUM (fixed), 1 LOW (fixed)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
 Substance is correct and independently re-verified — QA re-parsed the dispatcher's status table with its own implementation and confirmed `{draft, planned, ready-for-development, in-progress}` with `sawRow = true`, ruling out the vacuous-empty-parse hazard §10 Risk 3 names. Blast radius checked: the constant has exactly two readers.
 
-One MEDIUM defect blocks a clean PASS — [TASK-71-QA1-01](./task.71.bug.1.literal-unicode-escapes-in-comments.md): twelve `//` comment lines in `select-next.test.mjs` render literal escape sequences instead of `⊆`/`—`, including the H1 section header. No runtime impact (the three template-literal occurrences are valid escapes and render correctly); the cost is to the very prose this task exists to get right.
+Cycle 1 raised one MEDIUM defect — [TASK-71-QA1-01](./task.71.bug.1.literal-unicode-escapes-in-comments.md): `//` comment lines in `select-next.test.mjs` rendering literal escape sequences instead of `⊆`/`—`, including the H1 section header. Fixed in one cycle and **closed**: 18 occurrences replaced (the cycle-1 count of 12 was of affected lines; several carried two — the discrepancy was reported rather than silently absorbed), 0 remain. The LOW `deepStrictEqual` recommendation was applied in the same pass and re-mutation-proved, since it changes the assertion guarding this task's central invariant.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**QA Report**: [`task.71.qa.1.selection-floor-matches-dispatcher.md`](./task.71.qa.1.selection-floor-matches-dispatcher.md)
+**Gate File**: [`task.71.gate.1.selection-floor-matches-dispatcher.yml`](./task.71.gate.1.selection-floor-matches-dispatcher.yml)
+**Gate Status**: ✅ PASS · **Quality Score**: 98/100 · **QA Cycles**: 2 (1 fix cycle)
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria** — 10/10 met, 0 uncovered. Traceability matrix maps each to its test.
+✅ **Tests** — 1999 tests, 0 failures. 2 added, 3 rewritten. All 3 planned mutations proved and reverted.
+✅ **CI** — SUCCESS on the exact head commit `885de04` (`test`, `validate`, `link-check`, branch policy). Verified against the head being accepted, not an ancestor.
+✅ **PR** — [#286](https://github.com/Gamaroff/agent-skills/pull/286), `MERGEABLE`, `mergeStateStatus: CLEAN`.
+✅ **Documentation** — 7 prose sites updated (one more than the plan enumerated); CHANGELOG `Changed` entry added and the stale `Added` bullet rewritten.
+⚠️ **Security** — NOT APPLICABLE, asserted from the diff's surface: no credential, input, network, dependency or authorisation change. One `Set` literal plus comments and tests.
+⚠️ **Compliance** — NOT APPLICABLE: no personal data, payment, accessibility or licensing surface.
+✅ **Bugs** — 1 found in QA cycle 1, fixed and closed. 0 remaining.
+
+**Residual, recorded rather than rounded up**: the PR carries **no human review** (`reviews: 0`). This repository requires none — branch protection is satisfied and CI is the enforcing gate — so acceptance is defensible, but "no review required" and "approved" are different statements and only the first is true here.
+
+**Open by decision, not defect**: the bug-axis divergence (`in-progress`, `ready-for-qa`) stays `⊆`, measured and recorded in three places. Out of scope by §4.
+
+**Detailed Verification Log:** See [`task.71.dod.1.selection-floor-matches-dispatcher.md`](./task.71.dod.1.selection-floor-matches-dispatcher.md) for complete evidence, per-check citations and the CI verification.
+
+**Task marked as ACCEPTED on:** 2026-08-31
 
 ---
 
 ## Bug Reports
 
-### In QA Verification
-
-- [TASK-71-BUG-1: Literal `⊆` / `—` escape sequences in test-file comments](./task.71.bug.1.literal-unicode-escapes-in-comments.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-08-31, qa-fix cycle 1)
-
 ### Closed Bugs
 
-_None yet — QA closes bugs after verification._
+- [TASK-71-BUG-1: Literal `⊆` / `—` escape sequences in test-file comments](./task.71.bug.1.literal-unicode-escapes-in-comments.md) — ✅ Closed — Severity: MEDIUM (fixed and verified 2026-08-31, 1 fix cycle)
+
+### Open Bugs
+
+_None._
 
 ---
 
@@ -390,6 +423,8 @@ _None yet — QA closes bugs after verification._
 | 2026-08-31 | 1.2     | Review 6/10 NEEDS REVISION — 3 critical, 6 important, all applied: corrected the `/create-task` premise (emits `planned`, not `draft`); added §2 "The rationale this reverses" engaging the shipped floor-is-the-opt-out decision; measured the bug axis (diverges by `in-progress`, `ready-for-qa`) and scoped equality to tasks only; rescoped Phase 2 to reuse the existing `proceedStatuses` parser and named test 15/SC5; enumerated six prose sites in Phase 4; replaced the vacuous 67-70 integration check with a synthetic fixture; effort 8h→3h | review-task |
 | 2026-08-31 |         | Implemented — 4 files, 123 tests passing (2 added, 3 rewritten); 3 mutations proved | develop |
 | 2026-08-31 |         | QA gate CONCERNS (90/100) — 1 medium, 1 low; 4/4 phases, 10/10 criteria, 3/3 mutations proved | qa-task |
+| 2026-08-31 |         | QA findings fixed — gate PASS (98/100), 1 iteration; 18 escape sequences repaired, deepEqual→deepStrictEqual re-mutation-proved | qa-fix |
+| 2026-08-31 | 1.3     | DoD verified — accepted (PR #286); CI green on head, 10/10 criteria, 1 bug closed | finalise |
 
 ---
 
@@ -443,7 +478,7 @@ The effect is currently **preventive rather than observed**: this repo's task re
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.71.selection-floor-matches-dispatcher/task.71.selection-floor-matches-dispatcher.md`
