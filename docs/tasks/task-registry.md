@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-29
-**Next Available Task Number:** **67**
+**Next Available Task Number:** **72**
 
 ## How to use
 
@@ -106,6 +106,13 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 64 | [Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable](task.64.loop-supervisor-dashboard-and-docs/task.64.loop-supervisor-dashboard-and-docs.md) | accepted | documentation | Medium | 2026-08-28 | — | task.62 |
 | 65 | [Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to /develop-next](task.65.registry-aware-selection/task.65.registry-aware-selection.md) | accepted | infrastructure | High | 2026-08-29 | [#280](https://github.com/Gamaroff/agent-skills/issues/280) | — |
 | 66 | [Review a pull request against the paper trail that is supposed to justify it](task.66.review-pr/task.66.review-pr.md) | accepted | infrastructure | High | 2026-08-31 | [#282](https://github.com/Gamaroff/agent-skills/issues/282) | — |
+| 67 | [Make QA execute a prose skill, not only read it](task.67.execute-the-skill-qa-gate/task.67.execute-the-skill-qa-gate.md) | ready-for-development | infrastructure | High | 2026-08-31 | — | task.66 |
+| 68 | [/review-code branches on TRACKER where it should branch on VCS](task.68.review-code-vcs-branch/task.68.review-code-vcs-branch.md) | ready-for-development | infrastructure | Medium | 2026-08-31 | — | — |
+| 69 | [Give /qa-story and /qa-task a Bitbucket PR-comment path](task.69.qa-bitbucket-pr-comment/task.69.qa-bitbucket-pr-comment.md) | ready-for-development | infrastructure | Medium | 2026-08-31 | — | — |
+| 70 | [Build the inline PR comment primitive, on GitHub and Bitbucket](task.70.inline-pr-comments/task.70.inline-pr-comments.md) | ready-for-development | infrastructure | Low | 2026-08-31 | — | — |
+| 71 | [Make the selection floor equal what the dispatching pipeline accepts](task.71.selection-floor-matches-dispatcher/task.71.selection-floor-matches-dispatcher.md) | ready-for-development | infrastructure | High | 2026-08-31 | — | task.66 |
+
+- **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 
 ---
 
