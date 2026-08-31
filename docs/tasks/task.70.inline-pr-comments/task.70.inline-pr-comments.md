@@ -5,7 +5,7 @@ type: task
 description: "No skill in this repo posts an inline PR comment, yet /review-code documents the behaviour and /review-pr scopes it out. Build the primitive once as a shared CLI so a finding can be anchored to the line it is about."
 tags: [pr-comment, inline, github, bitbucket, shared-resource]
 category: infrastructure
-status: draft
+status: ready-for-development
 priority: Low
 risk_level: medium
 created: 2026-08-31
@@ -16,7 +16,7 @@ estimated_effort_hours: 8
 
 # Technical Task: Build the inline PR comment primitive, on GitHub and Bitbucket
 
-**Status:** Draft
+**Status:** Ready for Development
 
 ---
 
@@ -309,6 +309,7 @@ Keep the CLI and the GitHub path; disable the Bitbucket arm — they are indepen
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft — scoped out of task.66, filed here | create-task |
+| 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
 
 ---
 
@@ -358,7 +359,7 @@ Nothing is broken today — the summary comment works on both platforms. This is
 
 ---
 
-**Status:** Draft
+**Status:** Ready for Development
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.70.inline-pr-comments/task.70.inline-pr-comments.md`

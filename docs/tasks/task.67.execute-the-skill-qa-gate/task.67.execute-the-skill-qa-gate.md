@@ -5,7 +5,7 @@ type: task
 description: "QA reviews a prose skill's text and never runs it. Task 66 shipped accepted with a glob that collected 0 files on the default macOS shell; the first live run found it in minutes. Add an execution gate to qa-task/qa-story for skills whose deliverable is runnable prose."
 tags: [qa, gate, skills, shell-portability, dogfooding]
 category: infrastructure
-status: draft
+status: ready-for-development
 priority: High
 risk_level: medium
 created: 2026-08-31
@@ -16,7 +16,7 @@ estimated_effort_hours: 8
 
 # Technical Task: Make QA execute a prose skill, not only read it
 
-**Status:** Draft
+**Status:** Ready for Development
 
 ---
 
@@ -290,6 +290,7 @@ Tighten the deny-list or the disagreement heuristic; both are concentrated in on
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft — filed from the task.66 dogfood findings | create-task |
+| 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
 
 ---
 
@@ -338,7 +339,7 @@ The evidence is not hypothetical. A skill passed two QA cycles and a DoD gate ca
 
 ---
 
-**Status:** Draft
+**Status:** Ready for Development
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.67.execute-the-skill-qa-gate/task.67.execute-the-skill-qa-gate.md`

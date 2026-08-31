@@ -5,7 +5,7 @@ type: task
 description: "The QA gate comment is GitHub-only in both QA skills, and it is marked BLOCKING. On a Bitbucket repo the step cannot succeed. Two other skills already point at it as the reference Bitbucket recipe, so the gap propagates."
 tags: [qa, bitbucket, pr-comment, platform-parity]
 category: infrastructure
-status: draft
+status: ready-for-development
 priority: Medium
 risk_level: low
 created: 2026-08-31
@@ -16,7 +16,7 @@ estimated_effort_hours: 4
 
 # Technical Task: Give `/qa-story` and `/qa-task` a Bitbucket PR-comment path
 
-**Status:** Draft
+**Status:** Ready for Development
 
 ---
 
@@ -263,6 +263,7 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft — found via /review-code's dead cross-reference | create-task |
+| 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
 
 ---
 
@@ -304,7 +305,7 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 
 ---
 
-**Status:** Draft
+**Status:** Ready for Development
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.69.qa-bitbucket-pr-comment/task.69.qa-bitbucket-pr-comment.md`

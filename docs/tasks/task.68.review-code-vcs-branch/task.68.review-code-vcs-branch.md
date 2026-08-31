@@ -5,18 +5,18 @@ type: task
 description: "review-code Step 4 chooses its PR-comment path from TRACKER, but posting a PR comment is a VCS operation. In a Bitbucket-VCS + GitHub-tracker repo it takes the gh branch against a Bitbucket PR and the comment silently never lands."
 tags: [review-code, platform-detection, bitbucket, bug]
 category: infrastructure
-status: draft
+status: ready-for-development
 priority: Medium
 risk_level: low
 created: 2026-08-31
 updated: 2026-08-31
 assignee:
-estimated_effort_hours: 2
+estimated_effort_hours: 4
 ---
 
 # Technical Task: `/review-code` branches on TRACKER where it should branch on VCS
 
-**Status:** Draft
+**Status:** Ready for Development
 
 ---
 
@@ -226,6 +226,7 @@ None. In a GitHub/GitHub repo — which is every repo this has been exercised in
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft — found while building task.66 | create-task |
+| 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
 
 ---
 
@@ -264,7 +265,7 @@ None. In a GitHub/GitHub repo — which is every repo this has been exercised in
 
 ---
 
-**Status:** Draft
+**Status:** Ready for Development
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.68.review-code-vcs-branch/task.68.review-code-vcs-branch.md`
