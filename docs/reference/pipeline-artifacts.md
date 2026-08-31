@@ -47,6 +47,7 @@ The two pipelines are the same shape. Read `story.{E}.{S}` and `task.{N}` as int
 | 1 | `create-branch` | **Feature branch** `feature/story.{E}.{S}.*` / `feature/task.{N}.*`, plus the epic integration branch if you chose one that did not exist | n/a (git ref) |
 | 1 (end) | (orchestrator) | **Pipeline lock** `.claude/state/develop-pipeline.lock` | No |
 | 2 | `review-story` / `review-task` | **Review report** `*.review.{n}.{name}.md` | Yes — Step 8 |
+| — | `review-pr` (standalone — not a pipeline step) | **PR review report** `*.pr-review.{n}.{name}.md` | Yes |
 | 3 | `develop` | Source changes, tests, and transient **test logs** `.claude/state/test-output-{ITER}-*.log` | Source yes, logs no |
 | 4 | `create-pr` | **Pull request** against the Q2 base | n/a (remote) |
 | 5 | `qa-story` / `qa-task` | **QA report** `*.qa.{n}.{name}.md` **and gate file** `*.gate.{n}.{name}.yml` — one pair per cycle | Yes — Step 8 |
@@ -64,6 +65,7 @@ Steps 5–6 loop up to 5 cycles. Cycle *n* produces `qa.{n}` **and** `gate.{n}` 
 | **Story / task file** | The work item. Source of truth for acceptance criteria and `status:`. | You; skills update `status:` and Change Log |
 | **Plan** | How the work will be done. Written *before* the pipeline runs; the pipeline reads it and checks its mtime against the work item (Plan Freshness) but never rewrites it. | You |
 | **Review report** | The pre-flight check — what was ambiguous, what got fixed, GO/NO-GO with a 1–10 readiness score. | `review-*` skills |
+| **PR review report** | The post-flight check — does the PR deliver what the work item promised, and is the trail behind it complete? Advisory verdict, never a gate. | `review-pr` |
 | **Implementation report** | The pipeline's running log: Pipeline Progress table, Decisions Log, Issues Log, QA Iteration History. **This is the file to read when a run goes wrong** — it records every prompt answer and every fork taken. | The orchestrator, at every step |
 | **QA report** | The full quality review for one cycle: NFR assessment, requirements traceability, findings. | `qa-*` skills |
 | **Gate file** (`.yml`) | The machine-readable verdict for that cycle — `PASS` / `CONCERNS` / `FAIL` / `WAIVED`. Small on purpose: it is what tooling greps. | **`qa-*` skills only.** Dev skills must never write a gate file — see [Anti-patterns](./anti-patterns.md) |
