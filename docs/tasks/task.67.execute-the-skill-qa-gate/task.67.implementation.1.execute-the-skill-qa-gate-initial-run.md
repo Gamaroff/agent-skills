@@ -34,10 +34,10 @@ Add an execution gate to `qa-task`/`qa-story` so a skill whose deliverable is ru
 | 1. create-branch           | ✅ Done    | Branch `feature/task.67.*` exists in git                               | `feature/task.67.execute-the-skill-qa-gate` created at `556a078` from `develop` | —                    |
 | 2. review-task             | ✅ Done    | `task.67.review.{N}.{name}.md` exists (or skip logged)                 | `task.67.review.1.execute-the-skill-qa-gate.md` — READY TO IMPLEMENT, 8/10; 1 critical + 3 important + 3 optional; 7 fixes applied, 0 skipped | 2 pre-pass Explore agents (alignment=drift, impl=not-started) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 5 phases implemented. 41 unit tests, 9 mutation proofs (all held). 5 engine defects found by dogfooding on real skill files, each fixed with a regression test. | Pre-develop surface map (1 Explore agent) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.67.qa.{N}.*.md`; `task.67.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.67.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #289: https://github.com/Gamaroff/agent-skills/pull/289 — commit `2e7aa94`, 20 files, no out-of-scope leak. Issue comment skipped (no tracker issue linked). | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.67.qa.{N}.*.md`; `task.67.gate.{N}.*.yml`; PR comment posted     | 2 cycles. Gate 1 FAIL (0/100, 18 findings) → qa-fix → Gate 2 **PASS (90/100)**, 0 blocking. | Step 3b code-review Explore agent |
+| 7. finalise                | ✅ Done    | `task.67.dod.{N}.*.md`; task `status: accepted`                        | DoD **PASSED**. Gate found red CI, 2 prose-only criteria, and 14 further fail-open routes (BUG-3) — all closed. | 3 parallel DoD Explore agents (AC, security, docs+compliance) |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 4 commits: `2e7aa94`, `a74c59a`, `de9dc8a`, `0c4c05f`. CI green on final head. | —                    |
 
 ---
 
@@ -154,16 +154,75 @@ remembered description. Directory holds 6 of the 7 artifact kinds (`*.bug.*.md` 
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — 2026-08-31 — Gate: **FAIL** (0/100)
+
+- Artifacts: `task.67.qa.1.*.md`, `task.67.gate.1.*.yml`, `task.67.bug.1.classifier-fails-open.md`, `task.67.bug.2.extraction-and-coverage-gaps.md`
+- **8 HIGH / 4 MEDIUM / 6 LOW.** The classifier fails open in 13 independently verified ways; every
+  high-severity finding was reproduced against the shipped module before being accepted.
+- Containment to the temp working copy **disproven** — a canary written by an executed block appeared
+  outside it. Three Safety success criteria unmet.
+- Suite green throughout (2040 tests, 0 failures) with all 13 holes present.
+- Step 4b ran against this change set and behaved correctly; with `--bind` it executed 5 real blocks
+  under both shells with no findings. QA re-verified 4 of the 9 claimed mutation proofs — all held.
+- Next: qa-fix cycle 1.
+
+### Cycle 1 fix — 2026-08-31 — commit `a74c59a`
+
+- All 8 HIGH + 3 of 4 MEDIUM + 4 of 8 LOW closed. Suite 41 → 61 tests; **16 mutation proofs, all held**.
+- **Added a second line of defence rather than a fourteenth rule.** The original nine proofs all held and
+  none touched the paths where the holes were — a mutation proof can only falsify a check that exists.
+  Each block now runs in `work/` inside a private temp root; the runner compares that root before and
+  after and reports any write outside the copy **without consulting the classifier**.
+- **Two defects introduced by the fixes, found by the adversarial pass and reported rather than quietly
+  repaired**: the sentinel first derived its boundary as `cwd/..` and walked all of `/tmp` twice per
+  block (hung the suite past 118s); and the first redirect pattern matched `2>&1`, making this repo's
+  own documented zsh guard unrunnable.
+- **Two mutation proofs came back UNHELD and both were real.** `COMMAND_RUNNERS` was dead code (those
+  commands were already off the allow-list) → a precedence test now makes it defend a plausible future
+  edit. And finding L3's mechanism was wrong: `spawnSync` throws on NaN/negative timeouts; the actual
+  hole is `--timeout 0`. Corrected in BUG-2 rather than accepted.
+
+### Cycle 2 — 2026-08-31 — Gate: **PASS** (90/100)
+
+- Artifacts: `task.67.qa.2.*.md`, `task.67.gate.2.*.yml`. BUG-1 and BUG-2 → **Closed**.
+- QA re-ran the evidence: **0/14 holes still open, 0/6 legitimate blocks refused**; containment canary
+  no longer escapes; 4 QA-side mutation proofs held; full suite 2060 tests, 0 failures.
+- No new findings, no regressions. 6 LOW/MEDIUM deferred with rationale — chiefly L5, that eight tests
+  including the task-66 fixture skip silently on a host without zsh.
+
+---
+
+## Completion Summary
+
+**Every gate caught something the one before it had missed, and each miss had the same shape: asking
+again the question that had already been answered.**
+
+| Gate | Found |
+| --- | --- |
+| Step 2 review | Plan omitted `npm run bundle` — CI would have gone red; two findings pointed at files and headings that do not exist |
+| Dogfooding during develop | 5 engine defects the unit tests missed, incl. `git` resolved fail-open |
+| QA cycle 1 | **13 fail-open holes**; containment disproved by a canary written outside the temp copy — while the suite was green |
+| QA cycle 2 | Confirmed all 13 closed |
+| **DoD gate** | Red CI the local suite could not see; 2 criteria whose only evidence was prose; **14 further fail-open routes**, two of them deny-listed by name |
+
+The task's own thesis — *a passing test is evidence about the test, not about the behaviour* —
+reproduced itself at every level, including inside its own fix.
+
+Twice a mutation proof came back **UNHELD** and both times it was right: once about dead code, once
+about a finding whose stated mechanism was factually wrong. Both were corrected in the record rather
+than quietly accommodated.
+
+**Final numbers:** 36 attack inputs → 0 runnable · 18 legitimate patterns → 0 refused · 66 module tests
++ 10 contract tests · 2075 repo-wide, 0 failures · 21 mutation proofs, all held · CI green.
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-01
+**Final Status**: Completed
 **Branch**: `feature/task.67.execute-the-skill-qa-gate`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: [#289](https://github.com/Gamaroff/agent-skills/pull/289)
+**QA Iterations**: 2 (gate 1 FAIL → qa-fix → gate 2 PASS), plus one DoD-gate fix cycle
+**DoD Summary**: [`task.67.dod.1.execute-the-skill-qa-gate.md`](./task.67.dod.1.execute-the-skill-qa-gate.md) — **ACCEPTED**
+**Tracker debt**: none — task 67 has no linked tracker issue, so no board or issue actions were owed.
