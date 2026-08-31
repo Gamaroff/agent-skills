@@ -70,17 +70,21 @@ All notable changes to this project will be documented in this file. Format foll
     in the feature — a fallback reachable from any other stop would look like it was working while
     stepping over an operator's decision — so there is one test per stop reason, each asserting the
     strong form: not "no registry item was selected" but *the registry loader was never called*.
-  - **The eligibility floor is the opt-out.** A task enters the frontier at `ready-for-development` or
-    `in-progress`; a bug at `new` or `reopened`. Promotion up the item's own ladder is already the act
-    of saying "this is ready to be worked", so a `draft` task is out **by construction** rather than by
-    someone remembering to mark it. No `deferred` value is added to either lifecycle.
+  - **The eligibility floor equals what the dispatcher accepts.** A task enters the frontier at `draft`,
+    `planned`, `ready-for-development` or `in-progress`; a bug at `new` or `reopened`.
 
-    The floor must be a **subset of the statuses the dispatching pipeline accepts** — that is the rule,
-    and those values are only its current answer. `develop-task` HALTs on `Ready for Review`, so a task
-    in that state is excluded even though it is unambiguously "outstanding": selecting it would produce
-    work the dispatcher refuses, stopping an unattended loop that could not then self-recover. A test
-    parses both pipelines' own status tables and asserts the subset relation, so it re-checks itself if
-    either dispatcher changes.
+    The floor must be **the set of statuses the dispatching pipeline accepts** — that is the rule, and
+    those values are only its current answer. `develop-task` HALTs on `Ready for Review`, `accepted` and
+    `Cancelled`, so a task in any of those states is excluded even though `ready-for-review` is
+    unambiguously "outstanding": selecting it would produce work the dispatcher refuses, stopping an
+    unattended loop that could not then self-recover. A test parses the dispatcher's own status table and
+    asserts the relation, so it re-checks itself if the dispatcher changes.
+
+    This bullet originally shipped the *opposite* decision — that the floor **was** the opt-out, so a
+    `draft` task was out of the frontier by construction and no `deferred` park value was needed. That
+    was reversed before release; see **Changed → the selection floor now equals what the dispatching
+    pipeline accepts** below for why. The relation is `===` on the task axis and remains `⊆` on the bug
+    axis, which diverges by `in-progress` and `ready-for-qa` deliberately.
   - **Frontmatter decides; the registry row only nominates.** Indexes drift from what they index — six
     rows of this repo's own task registry were stale when this shipped. A row is a candidate only when
     the *document* it points at is eligible, whatever the row says, asserted in both directions.
@@ -182,6 +186,55 @@ All notable changes to this project will be documented in this file. Format foll
   Sequential by design — two supervisors in one working tree would collide on
   `develop-pipeline.lock`, so a PID lock enforces single-flight. Additive: `/loop /develop-next` is
   unchanged, and the `loopSupervisor:` config block is optional with every key defaulted.
+
+### Changed
+
+- **The selection floor now equals what the dispatching pipeline accepts, instead of being a strict
+  subset of it.** `TASK_ELIGIBLE_STATUSES` in `skills/develop-next/scripts/select-next.mjs` gains
+  `draft` and `planned`, making it exactly the set `develop-task` proceeds on.
+
+  **Behavioural, and worth stating plainly**: an unattended `/loop /develop-next` will now pick up
+  `draft` and `planned` tasks it previously skipped. A stub or half-written task can consume one
+  pipeline run and halt at `develop-task` Step 2 with review findings, where before it was silently
+  ignored. That trade is deliberate — a wasted cycle is visible and recoverable; invisibility is
+  neither.
+
+  **The gap was the default path, not an edge case.** `/create-task` emits `status: planned`, and
+  `planned` was outside the floor. So every task ever filed entered the world invisible to
+  `/develop-next` and stayed there until a human remembered to run `/review-task` — reintroducing, for
+  tasks, exactly the manual tracking the registry fallback was built to remove for bugs. The effect was
+  preventive rather than observed: this repo's task registry holds no `planned` or `draft` rows only
+  because every filing so far was promoted by hand, and that hand-promotion is the toil being removed.
+
+  **This reverses a decision shipped earlier in this same `[Unreleased]` block** — *"the eligibility
+  floor **is** the opt-out"*, which argued that a `draft` task was a speculative filing and out of the
+  frontier by construction, strictly stronger than an opt-out marker because there is nothing new to
+  remember. That argument was coherent; three things answer it. The opt-out was never free — it parked
+  speculative filings at no cost to their author and charged every real filing a manual promotion step.
+  The failure it prevented costs one visible cycle, while the failure it caused costs indefinite
+  silence. And the review gate did not disappear, it moved to where it belongs: `develop-task` Step 2
+  reviews a `draft` before any code is written and HALTs on NEEDS REVISION or REQUIRES REWORK.
+
+  **There is now no opt-out, by decision.** A filing that should not be worked is `cancelled`, or is not
+  filed. No `deferred` park value is added to either lifecycle — that would re-import the "something new
+  to remember" cost the reversed argument correctly warned about.
+
+  **The assertion is now two-way.** The test parses `develop-task`'s own status table and fails on a
+  divergence in *either* direction, naming which statuses diverged and which way. The old `⊆` could only
+  catch a floor status the dispatcher refuses; it was structurally blind to a status the dispatcher
+  accepts that the floor withholds, which is precisely where `planned` sat. Over-widening (adding
+  `accepted`) now fails too.
+
+  **Bugs are unaffected, and the divergence there is now recorded rather than assumed.**
+  `BUG_ELIGIBLE_STATUSES` is unchanged, so no bug becomes newly selectable. Measured: `develop-bug`
+  proceeds on `new`, `reopened`, `in-progress` and `ready-for-qa` while the bug floor is `new`,
+  `reopened` — a real two-status gap, left open on purpose. Closing it would hand an unattended loop a
+  `ready-for-qa` bug whose fix is already written and only awaiting verification: a larger change with
+  its own risk profile.
+
+  **Eligibility, not precedence.** The registries remain a fallback consulted only at the terminal
+  `roadmap-complete` return, so a wider floor changes nothing while any phase still holds an actionable
+  row — asserted by its own test. No API or schema changes.
 
 ### Fixed
 

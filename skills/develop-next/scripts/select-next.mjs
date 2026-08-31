@@ -54,35 +54,67 @@ export const DEFAULT_ROADMAP = "docs/development/project-completion-roadmap.md";
 export const DEFAULT_BUG_REGISTRY = "docs/bugs/bug-registry.md";
 export const DEFAULT_TASK_REGISTRY = "docs/tasks/task-registry.md";
 
-// **The floor must be a SUBSET of the statuses the dispatching pipeline accepts.**
+// **The task floor EQUALS the set of statuses the dispatching pipeline accepts.**
 // That is the load-bearing rule, and it is not a stylistic one: the frontier
 // names a command, so a status the command refuses produces a selection nothing
-// can act on. `develop-task` Phase 0c HALTs on `Ready for Review`, so a
-// `ready-for-review` task in the frontier would stop an unattended loop — and,
-// because `/develop-next` leaves its run-state file in place across a pipeline
-// HALT, the next invocation would resume at the same item and stop again. The
-// loop could not self-recover, which is a *worse* failure than the silence this
-// whole mechanism exists to remove: it is silence's loud cousin, and equally
-// terminal for an overnight run. Found by QA (task.65 cycle 1); pinned by
-// `evals/develop-next/unit/select-next.test.mjs` §"eligibility floor ⊆
-// dispatcher", which parses both pipelines' own status tables so the rule
-// re-checks itself if either dispatcher's table changes.
+// can act on. `develop-task` Phase 0c HALTs on `Ready for Review`, `accepted`
+// and `Cancelled`, so a task in any of those states must stay out — it would
+// stop an unattended loop, and because `/develop-next` leaves its run-state file
+// in place across a pipeline HALT, the next invocation would resume at the same
+// item and stop again. The loop could not self-recover, which is a *worse*
+// failure than the silence this whole mechanism exists to remove: it is
+// silence's loud cousin, and equally terminal for an overnight run. Found by QA
+// (task.65 cycle 1).
 //
-// The eligibility floor IS the opt-out. Neither lifecycle has a park value
-// (`deferred`, `wont-fix`), and adding one would touch two standards documents
-// and every reader of those enums. Promotion up the existing ladder is already
-// the act of saying "this is ready to be worked", so a `draft` task is a
-// speculative filing and is out of the frontier BY CONSTRUCTION rather than by
-// someone remembering to mark it — strictly stronger than an opt-out marker,
-// because there is nothing new to remember and nothing new to write.
+// The rule was originally the weaker `⊆`. Task 71 tightened it to `===` on the
+// task axis, because a strict subset is a gap the selector cannot explain: it
+// refuses work the thing it dispatches to would happily accept. Pinned by
+// `evals/develop-next/unit/select-next.test.mjs` §"eligibility floor vs
+// dispatcher", which parses `develop-task`'s own status table and fails on a
+// divergence in EITHER direction — under-widening and over-widening both.
+//
+// **There is no opt-out, and that is deliberate.** An earlier version of this
+// comment argued the opposite — that the floor itself *was* the opt-out, so a
+// `draft` task sat outside the frontier BY CONSTRUCTION and no `deferred` park
+// value was needed. That argument was coherent and it has been overturned
+// (task.71 §2). Three things answer it:
+//
+//   1. The opt-out was never free — it was paid for by everyone. It parked
+//      speculative filings at no cost to their author and charged every REAL
+//      filing a manual promotion step. `/create-task` emits `status: planned`,
+//      so under the old floor every task in existence entered the world
+//      invisible to `/develop-next` and stayed there until a human remembered
+//      to run `/review-task` — exactly the manual tracking the registry
+//      fallback above was built to remove.
+//   2. The failure it prevented costs one visible cycle. A speculative task
+//      selected by an unattended loop halts at `develop-task` Step 2 with review
+//      findings; nothing merges. The failure it caused costs indefinite silence.
+//      A wasted cycle is strictly better than a task nobody can see.
+//   3. The review gate moved, it did not disappear. A `draft` task still gets
+//      reviewed before any code is written — by `develop-task` Step 2, which is
+//      where the review belongs and where it already HALTs on NEEDS REVISION or
+//      REQUIRES REWORK.
+//
+// So a filing that should not be worked is `cancelled`, or is not filed. Adding
+// `deferred` to the lifecycle would re-import the "something new to remember"
+// cost the old argument correctly warned about.
 //
 // The two sets are deliberately different, because bugs and tasks do not share
 // a lifecycle (docs/standards/bug-documents.md says so explicitly):
 //   bug:  new → in-progress → ready-for-qa → closed | reopened
 //   task: draft → planned → ready-for-development → in-progress →
 //         ready-for-review → accepted | cancelled
+//
+// **The bug axis keeps the weaker `⊆`, on purpose.** Measured: `develop-bug`
+// proceeds on {new, reopened, in-progress, ready-for-qa} while the set below is
+// {new, reopened} — a real two-status gap. Closing it would put a `ready-for-qa`
+// bug (fix already written, awaiting verification) into an unattended loop,
+// which is a larger change than task.71 assessed. See the bug half of
+// §"eligibility floor vs dispatcher" in the test file.
 export const BUG_ELIGIBLE_STATUSES = new Set(["new", "reopened"]);
 export const TASK_ELIGIBLE_STATUSES = new Set([
+  "draft",
+  "planned",
   "ready-for-development",
   "in-progress",
 ]);

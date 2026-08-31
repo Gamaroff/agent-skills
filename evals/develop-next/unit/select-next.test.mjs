@@ -1472,30 +1472,99 @@ test("15/SC5: registry stale-CLOSED + open document → selected anyway", () => 
   assert.match(r.rationale, /frontmatter is authoritative/);
 });
 
-test("15/SC5: the eligibility floor excludes draft and planned by construction", () => {
-  // `ready-for-review` is deliberately NOT here — see the "eligibility floor ⊆
-  // dispatcher" block below. `develop-task` HALTs on it, so a task in that state
-  // must not enter the frontier at all.
-  for (const status of [
-    "draft",
-    "planned",
-    "ready-for-review",
-    "accepted",
-    "cancelled",
-  ]) {
+test("15/SC5: the eligibility floor admits every status develop-task accepts", () => {
+  // The three excluded values are exactly the three `develop-task` Phase 0c
+  // HALTs on. `draft` and `planned` moved to the selectable sweep in task.71:
+  // both are accepted by the dispatcher, and `planned` is what `/create-task`
+  // emits, so excluding it made every freshly filed task invisible to
+  // `/develop-next`. The review gate did not disappear with them — it moved to
+  // `develop-task` Step 2, which HALTs on NEEDS REVISION / REQUIRES REWORK.
+  //
+  // This sweep is the BEHAVIOURAL half of the rule; the "eligibility floor vs
+  // dispatcher" block below is the STRUCTURAL half, parsing the dispatcher's own
+  // table. Both are needed: this one would still pass if the dispatcher changed
+  // its mind, and that one would still pass if the floor were never consulted.
+  for (const status of ["ready-for-review", "accepted", "cancelled"]) {
     const { r } = fallback({
       tasks: [taskRow(5, "spec", status)],
       docs: { "docs/tasks/task.5.spec/task.5.spec.md": status },
     });
     assert.equal(r.status, "stop", `${status} must not be selectable`);
   }
-  for (const status of ["ready-for-development", "in-progress"]) {
+  for (const status of [
+    "draft",
+    "planned",
+    "ready-for-development",
+    "in-progress",
+  ]) {
     const { r } = fallback({
       tasks: [taskRow(5, "spec", status)],
       docs: { "docs/tasks/task.5.spec/task.5.spec.md": status },
     });
     assert.equal(r.status, "selected", `${status} must be selectable`);
   }
+});
+
+// The repo's own task registry holds ZERO `draft` and ZERO `planned` rows — 66
+// `accepted` and 5 `ready-for-development` — because every task filed so far was
+// promoted by hand. So no real corpus exercises the widened floor, and the
+// fixture below has to be synthetic. The obvious alternative check ("--lint
+// reports tasks 67-70 as eligible") would be VACUOUS: all four are already
+// `ready-for-development`, already eligible, and pass identically before and
+// after the change.
+
+test("15/SC5: a draft row and a planned row are both eligible; priority decides", () => {
+  const rows = [
+    taskRow(80, "speculative", "draft", "Medium"),
+    taskRow(81, "fresh", "planned", "High"),
+  ];
+  const docs = {
+    "docs/tasks/task.80.speculative/task.80.speculative.md": "draft",
+    "docs/tasks/task.81.fresh/task.81.fresh.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  // High beats Medium even though 81 > 80 — so this proves ELIGIBILITY, not the
+  // ascending-number tie-break that would select T80 for free.
+  assert.equal(f.selected.id, "T81");
+  assert.equal(f.candidates, 2);
+
+  // The decisive assertion: T80 is passed over for being OUTRANKED, not for
+  // being outside the floor. Before task.71 both rows read
+  // "outside the task eligibility floor" and nothing was selected at all.
+  assert.equal(f.passedOver.length, 1);
+  assert.equal(f.passedOver[0].n, 80);
+  assert.doesNotMatch(
+    f.passedOver[0].reason,
+    /eligibility floor/,
+    `a draft row must no longer be excluded by the floor — got: ${f.passedOver[0].reason}`,
+  );
+});
+
+test("15/SC5: the widened floor does not disturb roadmap precedence", () => {
+  // The registries are a FALLBACK, consulted only at `roadmap-complete`. Widening
+  // the floor makes more rows eligible; it must not make them reachable sooner.
+  const roadmap = fixture("01-first-item.md");
+  const { load, calls } = countingLoader({
+    bugRegistry: { path: REG_BUG_PATH, text: bugRegistry([]) },
+    taskRegistry: {
+      path: REG_TASK_PATH,
+      text: taskRegistry([
+        taskRow(80, "speculative", "draft", "Critical"),
+        taskRow(81, "fresh", "planned", "Critical"),
+      ]),
+    },
+    readStatus: () => "draft",
+  });
+  const r = selectNext(parseRoadmap(roadmap), { loadRegistries: load });
+
+  assert.equal(r.item.source, "roadmap");
+  assert.equal(
+    calls.n,
+    0,
+    "an actionable roadmap must not read the registries, however wide the floor",
+  );
 });
 
 test("15/SC5: a document that does not exist is never a candidate", () => {
@@ -1513,14 +1582,18 @@ test("15/SC5: a document that does not exist is never a candidate", () => {
 // ── SC6: an item may be out of the frontier, never invisible ─────────────────
 
 test("15/SC6: every passed-over row is listed with a reason — none is unlisted", () => {
+  // Row 1 was `draft` until task.71 widened the floor to admit it. Its role in
+  // this fixture is "a row outside the floor, which must still be LISTED with a
+  // reason" — so it becomes `ready-for-review`, and rows 1/2/4 now spell out
+  // exactly the three statuses the floor still excludes.
   const rows = [
-    taskRow(1, "a", "draft"),
+    taskRow(1, "a", "ready-for-review"),
     taskRow(2, "b", "accepted"),
     taskRow(3, "c", "ready-for-development"),
     taskRow(4, "d", "cancelled"),
   ];
   const docs = {
-    "docs/tasks/task.1.a/task.1.a.md": "draft",
+    "docs/tasks/task.1.a/task.1.a.md": "ready-for-review",
     "docs/tasks/task.2.b/task.2.b.md": "accepted",
     "docs/tasks/task.3.c/task.3.c.md": "ready-for-development",
     "docs/tasks/task.4.d/task.4.d.md": "cancelled",
@@ -1742,13 +1815,23 @@ test("15: registry hrefs resolve relative to the registry file, not the CWD", ()
 
 // ── 16: QA cycle-1 fixes (task.65 gate 1) ────────────────────────────────────
 
-// ── H1: the eligibility floor must be a SUBSET of what the dispatcher accepts ─
+// ── H1: eligibility floor vs dispatcher — `===` for tasks, `\u2286` for bugs ───────
 //
 // The frontier names a command, so a status that command refuses produces a
 // selection nothing can act on. `develop-task` Phase 0c HALTs on
 // `Ready for Review`, and `/develop-next` leaves its run-state file in place
-// across a pipeline HALT — so an unattended loop would stop at such an item and
+// across a pipeline HALT \u2014 so an unattended loop would stop at such an item and
 // resume at the same one next invocation. It could not self-recover.
+//
+// The relation was `\u2286` on both axes until task.71. It is now `===` on the TASK
+// axis: a strict subset is a gap the selector cannot explain, because it refuses
+// work the dispatcher would accept, and the one status that mattered \u2014 `planned`,
+// what `/create-task` actually emits \u2014 sat in that gap, making every freshly
+// filed task invisible to `/develop-next`. Equality also catches OVER-widening,
+// which `\u2286` never could: adding `accepted` to the floor now fails here.
+//
+// The BUG axis deliberately keeps `\u2286`. See the bug test below for the measured
+// gap and why closing it is a different change.
 //
 // This test parses the DISPATCHERS' OWN status tables rather than restating
 // them, so it re-checks itself if either pipeline changes what it accepts. Both
@@ -1806,13 +1889,18 @@ function proceedStatuses(markdown, sectionHeading) {
   return proceed;
 }
 
-test("16/H1: every task eligibility status is one develop-task proceeds on", () => {
+test("16/H1: the task eligibility floor EQUALS what develop-task proceeds on", () => {
   const md = readFileSync(STEP0_TASK, "utf-8");
   // The develop-task variant of the "Autonomous status handling" table.
   const idx = md.indexOf("**Autonomous status handling:**");
   assert.ok(idx > -1, "autonomous status handling section not found");
   const proceed = proceedStatuses(md.slice(idx), "#### develop-task");
 
+  // Both guards below predate task.71 and are what stops an empty or mangled
+  // parse from satisfying the comparison VACUOUSLY. `proceedStatuses` already
+  // asserts `sawRow`; these two pin the CONTENT. Converting \u2286 to === made them
+  // more load-bearing, not less: two empty sets are equal, so without an anchor
+  // a table-shape change would turn this test green by parsing nothing at all.
   assert.ok(
     proceed.has("ready-for-development") && proceed.has("in-progress"),
     `parsed proceed-set looks wrong: ${[...proceed].join(", ")}`,
@@ -1822,15 +1910,44 @@ test("16/H1: every task eligibility status is one develop-task proceeds on", () 
     "develop-task is documented as HALTing on Ready for Review — if that changed, revisit the floor",
   );
 
-  for (const status of TASK_ELIGIBLE_STATUSES) {
-    assert.ok(
-      proceed.has(status),
-      `TASK_ELIGIBLE_STATUSES contains "${status}", which develop-task does not proceed on — ` +
-        `the frontier would nominate work the dispatcher refuses`,
-    );
-  }
+  // Two-way equality. \u2286 could only catch UNDER-widening (a floor status the
+  // dispatcher refuses); it was blind to OVER-restriction (a status the
+  // dispatcher accepts that the floor withholds), which is precisely how
+  // `planned` \u2014 what `/create-task` emits \u2014 stayed outside the frontier.
+  const onlyInFloor = [...TASK_ELIGIBLE_STATUSES].filter(
+    (v) => !proceed.has(v),
+  );
+  const onlyInDispatcher = [...proceed].filter(
+    (v) => !TASK_ELIGIBLE_STATUSES.has(v),
+  );
+
+  assert.deepEqual(
+    { onlyInFloor, onlyInDispatcher },
+    { onlyInFloor: [], onlyInDispatcher: [] },
+    `the task eligibility floor and develop-task's accepted set have diverged.\n` +
+      `  only in floor:      ${onlyInFloor.join(", ") || "(none)"}\n` +
+      `      \u2192 the frontier would nominate work the dispatcher refuses; an\n` +
+      `        unattended loop would HALT on it and resume at the same item.\n` +
+      `  only in dispatcher: ${onlyInDispatcher.join(", ") || "(none)"}\n` +
+      `      \u2192 the selector refuses work develop-task would accept; that work is\n` +
+      `        invisible to /develop-next until a human promotes it by hand.\n` +
+      `  If a divergence is deliberate, say so here and in select-next.mjs \u2014 it\n` +
+      `  must not drift in silently.`,
+  );
 });
 
+// The bug axis stays `\u2286` \u2014 a deliberate, MEASURED divergence, not an oversight.
+//
+//   develop-bug proceeds on : new, reopened, in-progress, ready-for-qa
+//   BUG_ELIGIBLE_STATUSES   : new, reopened
+//   gap                     : in-progress, ready-for-qa
+//
+// Task.71 tightened the TASK axis to `===` and deliberately declined to do the
+// same here. Closing this gap would hand an unattended loop a `ready-for-qa` bug
+// \u2014 one whose fix is already written and is only awaiting verification \u2014 and an
+// `in-progress` bug someone may be actively holding. That is a change with its
+// own Breaking Changes and Risk sections, not a corollary of this one. Recorded
+// so the next reader starts from a fact rather than an open question.
 test("16/H1: every bug eligibility status is one develop-bug proceeds on", () => {
   const proceed = proceedStatuses(readFileSync(STEP0_BUG, "utf-8"), null);
   assert.ok(
