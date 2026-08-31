@@ -9,17 +9,27 @@ _already shipped_, not an error. Resolve any such reference there.
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
-**There is no standing maintenance phase, and there should not be one.** Phase 4 was exactly that —
-a hand-maintained list of outstanding work, kept so the loop always had a frontier — and it is
-retired. When no phase holds an actionable row, `select-next.mjs` now falls through to
-[`docs/bugs/bug-registry.md`](../bugs/bug-registry.md) and
-[`docs/tasks/task-registry.md`](../tasks/task-registry.md) directly, so a filed bug or task is visible
-to `/develop-next` **without anyone transcribing a row here**. A task is in that frontier at
-`ready-for-development` or later; a bug at `new` or `reopened` — promotion up the item's own ladder is
-the opt-in, and its document's frontmatter decides, not the registry row. Add a phase here only to
-express *sequencing* the registries cannot: a deliberate order, a dependency chain, a human gate.
-Rules: [`roadmap-selection.md`](../../skills/develop-next/references/roadmap-selection.md)
+**The registries are the default frontier; a phase here is an override.** When no phase holds an
+actionable row, `select-next.mjs` falls through to [`docs/bugs/bug-registry.md`](../bugs/bug-registry.md)
+and [`docs/tasks/task-registry.md`](../tasks/task-registry.md) directly, so a filed bug or task is
+visible to `/develop-next` **without anyone transcribing a row here**. A task is in that frontier at
+`draft` or later (widened by T71 to equal what `develop-task` accepts); a bug at `new` or `reopened`.
+For a registry row, **the document's frontmatter decides, not the row** — a stale row cannot resurrect
+finished work. Rules:
+[`roadmap-selection.md`](../../skills/develop-next/references/roadmap-selection.md)
 §"Registry fallback frontier".
+
+Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
+chain, a human gate. **Phase 5 below is such an override** — it states the current frontier's order
+explicitly rather than leaving it implied by priority ranking.
+
+> ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
+> are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
+> An unticked `[ ]` row whose task is already `accepted` is still selected, and `/develop-task` then
+> HALTs on it ("already past development"), stalling an unattended loop on finished work. Verified
+> against T71 while Phase 5 was authored. **So: tick each row `[x]` the moment its task is accepted.**
+> The registry needs no such discipline, which is why a phase should exist only while its ordering is
+> actually doing work.
 
 Selection is executed by `select-next.mjs`, never by eye:
 
@@ -51,6 +61,24 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `review-skills`    | `skills/review-*/SKILL.md`, `skills/edit-*/SKILL.md`                    |
 | `loop-supervisor`  | `skills/loop-supervisor/*`, `evals/loop-supervisor/*`                  |
 | `test-harness`     | `package.json` test script, `shared/resources/tests/*`                  |
+| `qa-skills`        | `skills/qa-story/SKILL.md`, `skills/qa-task/SKILL.md`                   |
+| `selection`        | `skills/develop-next/scripts/select-next.mjs`, `references/roadmap-selection.md` |
+
+---
+
+## PHASE 5 — Current frontier
+
+Stated in order so the sequence is explicit in one place rather than inferred from priority ranking.
+This phase reproduces what the registry fallback already selects; it does not reorder it.
+
+**Tick each row `[x]` as its task is accepted** — see the warning above; an unticked row for an
+accepted task stalls the loop.
+
+- [ ] **T67** Make QA execute a prose skill, not only read it · deps: none · touches: pipeline-steps!, qa-skills!, test-harness~ · /develop-task docs/tasks/task.67.execute-the-skill-qa-gate/task.67.execute-the-skill-qa-gate.md
+- [ ] **T68** `/review-code` branches on TRACKER where it should branch on VCS · deps: none · touches: review-skills!, test-harness~ · /develop-task docs/tasks/task.68.review-code-vcs-branch/task.68.review-code-vcs-branch.md
+- [ ] **T69** Give `/qa-story` and `/qa-task` a Bitbucket PR-comment path · deps: none · touches: qa-skills!, test-harness~ · /develop-task docs/tasks/task.69.qa-bitbucket-pr-comment/task.69.qa-bitbucket-pr-comment.md
+- [ ] **T72** Pin the bug-axis divergence exactly instead of asserting it loosely · deps: none · touches: selection! · /develop-task docs/tasks/task.72.pin-bug-axis-divergence/task.72.pin-bug-axis-divergence.md
+- [ ] **T70** Build the inline PR comment primitive, on GitHub and Bitbucket · deps: none · touches: review-skills!, test-harness~ · /develop-task docs/tasks/task.70.inline-pr-comments/task.70.inline-pr-comments.md
 
 ---
 
@@ -66,6 +94,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 ## Housekeeping
 
 - [ ] Archive accepted rows to `roadmap-history.md` at each phase close
+- [ ] Tick Phase 5 rows `[x]` as each task is accepted — an unticked row for an accepted task is still selected and stalls the loop
 
 ---
 

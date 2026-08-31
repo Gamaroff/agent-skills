@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-29
-**Next Available Task Number:** **72**
+**Next Available Task Number:** **73**
 
 ## How to use
 
@@ -111,6 +111,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 69 | [Give /qa-story and /qa-task a Bitbucket PR-comment path](task.69.qa-bitbucket-pr-comment/task.69.qa-bitbucket-pr-comment.md) | ready-for-development | infrastructure | Medium | 2026-08-31 | — | — |
 | 70 | [Build the inline PR comment primitive, on GitHub and Bitbucket](task.70.inline-pr-comments/task.70.inline-pr-comments.md) | ready-for-development | infrastructure | Low | 2026-08-31 | — | — |
 | 71 | [Make the selection floor equal what the dispatching pipeline accepts](task.71.selection-floor-matches-dispatcher/task.71.selection-floor-matches-dispatcher.md) | accepted | infrastructure | High | 2026-08-31 | [#285](https://github.com/Gamaroff/agent-skills/issues/285) | task.66 |
+| 72 | [Pin the bug-axis divergence exactly instead of asserting it loosely](task.72.pin-bug-axis-divergence/task.72.pin-bug-axis-divergence.md) | planned | infrastructure | Medium | 2026-08-31 | [#287](https://github.com/Gamaroff/agent-skills/issues/287) | task.71 |
 
 - **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 
