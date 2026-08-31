@@ -399,6 +399,7 @@ report can never be mistaken for the work item it reviews.
 6. ✅ `docs/standards/file-naming.md` — register `.pr-review.` in the story and task artifact tables
 7. ✅ `docs/standards/task-documents.md`, `docs/standards/story-documents.md` — add the PR review report row to Co-located artifacts
 8. ✅ `docs/reference/pipeline-artifacts.md` — add `review-pr` to the step → artifact map
+9. ✅ `skills/create-skill/scripts/generate_catalog.py` — the featured "Review:" list is hardcoded at `:178`; it must be edited at source, since the generated catalog is overwritten
 
 ### Files Already Modified (at task creation, not implementation)
 
@@ -495,14 +496,14 @@ when the behaviour is removed.
 - [x] A co-located `.pr-review.{n}.` report is written, incrementing on re-review
 - [x] With no work item resolved, the skill degrades to a code-only review, says so, and writes **no** file
 - [x] `--effort` scales the breadth of both lenses without altering either output contract
-- [x] `--comment` posts exactly one comment and edits it on re-run, on both platforms
+- [x] `--comment` posts exactly one comment and edits it on re-run — **GitHub verified live 2026-08-31** (posted, then edited in place, marker count stayed 1); Bitbucket contract-test only
 
 ### Platform
 
-- [x] GitHub and Bitbucket both resolve a PR, build a diff, and post a comment
+- [x] GitHub verified live; **Bitbucket contract-test only** — no Bitbucket path has executed against a live API (§ 10 Risk 3)
 - [x] Every PR-shaped branch keys off `$VCS`; every issue-shaped branch keys off `$TRACKER`
 - [x] Bitbucket auth is verified by status code on a repo-root probe
-- [x] A non-`full` `ACCESS_TRACKER` defers the comment through `tracker_call_with_retry` without failing the run
+- [x] A non-`full` `ACCESS_TRACKER` defers the comment through `tracker_call_with_retry` — **GitHub path only**; the Bitbucket path is single-shot with no deferral helper
 
 ### Code Quality
 
@@ -688,6 +689,7 @@ is not executable here.
 | 2026-08-31 |         | QA fix cycle 1 — all 11 findings closed, each mutation-proved | qa-fix |
 | 2026-08-31 |         | QA gate PASS (92/100) — 11/11 verified closed | qa-task |
 | 2026-08-31 | 1.2     | DoD verified — accepted (PR #283), 3 criteria carried as recorded residual | finalise |
+| 2026-08-31 |         | `/review-pr` dogfooded on PR #283 — 🚨 REQUEST CHANGES, 10 findings, all fixed | review-pr |
 
 ---
 

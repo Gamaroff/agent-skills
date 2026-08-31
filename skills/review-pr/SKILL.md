@@ -90,7 +90,10 @@ BRANCH=$(git branch --show-current)
 PR=""
 case "${TARGET:-}" in
   "")                      ;;                                   # no arg → PR for $BRANCH
-  *://*/pull/*|*://*/pullrequests/*) PR="${TARGET##*/}" ;;      # PR URL → trailing number
+  # GitHub /pull/N, Bitbucket web /pull-requests/N, Bitbucket API /pullrequests/N.
+  # The web form is the one a human pastes; omitting it sent Bitbucket URLs to the
+  # branch arm below.
+  *://*/pull/*|*://*/pull-requests/*|*://*/pullrequests/*) PR="${TARGET##*/}" ;;
   *[!0-9]*)                BRANCH="$TARGET" ;;                  # anything non-numeric → a branch
   *)                       PR="$TARGET" ;;                      # all digits → a PR number
 esac
@@ -101,7 +104,11 @@ esac
 **GitHub** (`VCS=github`):
 
 ```bash
-gh pr view "${PR:-}" --json number,url,title,body,state,isDraft,headRefName,baseRefName,\
+# "${PR:-$BRANCH}", never "${PR:-}". An EMPTY argument makes `gh pr view` resolve the
+# CURRENT branch's PR, so `/review-pr some-other-branch` would silently review the wrong
+# PR instead of erroring. Verified: `gh pr view "" --json number` returns the current
+# branch's PR number.
+gh pr view "${PR:-$BRANCH}" --json number,url,title,body,state,isDraft,headRefName,baseRefName,\
 author,additions,deletions,changedFiles,files,reviewDecision,statusCheckRollup,headRepositoryOwner
 ```
 
@@ -155,18 +162,30 @@ Story documents are **not** in `docs/stories/`. They nest under `${PRD_ROOT}/{do
 
 ```bash
 D=$(dirname "$DOC_FILE")
-ls "$D"/*.implementation.*.md "$D"/*.qa.*.md "$D"/*.gate.*.yml \
-   "$D"/*.dod.*.md "$D"/*sprint-review-summary.md \
-   "$D"/*.bug.*.md "$D"/*.handover.*.md 2>/dev/null
+
+# `find`, NOT a multi-glob `ls`. Under zsh — the macOS default shell — a glob that
+# matches nothing aborts the ENTIRE command ("no matches found"), so one absent
+# artifact kind silently suppresses every kind that IS present. Verified: a task
+# directory with no *.bug.*.md returned 0 files under zsh and 7 under bash.
+# A trail check that reports a complete trail as absent is the worst failure this
+# skill can have, and it fails on the default shell.
+for pat in '*.implementation.*.md' '*.qa.*.md' '*.gate.*.yml' '*.dod.*.md' \
+           '*sprint-review-summary.md' '*.bug.*.md' '*.handover.*.md'; do
+  find "$D" -maxdepth 1 -name "$pat" 2>/dev/null
+done
 
 # Review reports, EXCLUDING this skill's own prior output.
 # `*.review.*.md` also matches `*.pr-review.*.md` — without the filter a
 # re-review collects its own previous report as the pre-implementation review.
-ls "$D"/*.review.*.md 2>/dev/null | grep -v '\.pr-review\.'
+find "$D" -maxdepth 1 -name '*.review.*.md' 2>/dev/null | grep -v '\.pr-review\.'
 
 # This skill's own prior reports, for the {n} increment in Step 7.
-ls "$D"/*.pr-review.*.md 2>/dev/null
+find "$D" -maxdepth 1 -name '*.pr-review.*.md' 2>/dev/null
 ```
+
+> **Every shell snippet in this skill must behave identically under bash and zsh.** macOS defaults to
+> zsh; a snippet that only works under bash fails for most users, and unmatched globs fail *silently*
+> in the direction of "nothing is there".
 
 **Glob on the artifact segment; never reconstruct an exact filename.** The trailing slug is free descriptive text — `task.53.implementation.1.jira-rest-interception-initial-run.md` does not repeat the work-item slug. The sprint-review file is unprefixed in task directories and prefixed in some story directories, so glob `*sprint-review-summary.md`.
 
@@ -207,9 +226,27 @@ breaks the *"audit a merged PR after the fact"* case this skill explicitly suppo
 
 ```bash
 gh pr diff "$PR_NUMBER" > "$DIFF_FILE"                                          # GitHub
-curl -sf "${BB_CURL_AUTH[@]}" \
+
+# -L is required: the Bitbucket /diff endpoint REDIRECTS to the rendered diff, and
+# `curl -sf` without it exits 0 having written an empty file — on exactly the merged
+# and cross-fork paths this fallback exists to serve.
+curl -sfL "${BB_CURL_AUTH[@]}" \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/diff" > "$DIFF_FILE"   # Bitbucket
+
+[ -s "$DIFF_FILE" ] || { echo "Diff fallback produced an empty patch — cannot review."; exit 1; }
 ```
+
+**Exclude auto-generated files before dispatching.** A skill change carries its bundled
+`references/` copies — byte-identical to `shared/resources/` and headed `AUTO-GENERATED — DO NOT
+EDIT`. On this repo's own PR they were 30 of 55 files and ~23,000 of 24,253 lines. Reviewing them is
+pure noise and crowds out real findings:
+
+```bash
+git diff "origin/$BASE_BRANCH...origin/$HEAD_BRANCH" -- . ':(exclude)*/references/*' > "$DIFF_FILE"
+```
+
+Widen the exclusion to whatever the repo generates (lockfiles, `dist/`, snapshots). State in the
+report which paths were excluded, so the review's scope is auditable.
 
 Empty diff → say so and stop.
 
@@ -252,6 +289,10 @@ Conformance findings first (they judge whether the change is the right change), 
 **Name the field in every row.** An earlier draft's middle row read only "any `medium`", which left a
 `severity: high` + `confidence: medium` bug matching no row at all — and falling through to APPROVE.
 A verdict table that silently approves a high-severity finding is worse than no table.
+
+**This table is normative.** `pr-conformance-prompt.md` points here rather than restating it — two
+copies of a decision table drift, and a verdict rule that differs between two files in the same change
+means "follows the deterministic table exactly" has no single table to follow.
 
 Never call `gh pr review --approve`. Never write a gate `.yml`.
 

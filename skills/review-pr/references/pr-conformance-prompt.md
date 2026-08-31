@@ -127,11 +127,13 @@ The subagent returns the `pr_conformance:` YAML. `/review-pr`:
    `suggested_action`), so one rendering path serves both.
 2. **Computes the advisory verdict** from both lists:
 
-   | Condition | Verdict |
-   | --- | --- |
-   | any conformance `high`, or code `bug` + `severity: high` + `confidence: high` | 🚨 REQUEST CHANGES |
-   | any `medium` | ⚠️ CONCERNS |
-   | otherwise | ✅ APPROVE |
+   The verdict table in `/review-pr`'s **Step 6 is normative** — it is not restated here. Two copies
+   of a decision table drift, and this file is the proof: the corrected table landed in `SKILL.md`
+   while this copy kept the defective rows (`any conformance high` / a bare `any medium`), so a
+   `severity: high` + `confidence: medium` finding matched no row here and fell through to APPROVE.
+   A QA gate recorded that defect as closed and mutation-proved on the strength of the other file.
+
+   Read the rule from `SKILL.md` Step 6.
 
 3. **Never gates.** `/review-pr` is advisory: it writes a report and optionally posts one summary PR
    comment. It does not submit a formal GitHub review and it does not write a gate `.yml` — only

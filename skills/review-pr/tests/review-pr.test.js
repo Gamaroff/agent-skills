@@ -170,6 +170,52 @@ test("resolution greps are anchored and recursive (no ** globs, no prefix matche
   assert.match(rows, /\[\[:space:\]\]\*\$/);
 });
 
+test("no shell snippet depends on bash-only glob behaviour", () => {
+  // CR-1: a multi-glob `ls` aborts entirely under zsh (macOS default) when any one glob has no
+  // match, so one absent artifact kind silently suppresses every kind that IS present. Verified
+  // live: 0 files under zsh vs 7 under bash on a directory with no *.bug.*.md.
+  const step3 = SKILL.match(
+    /### Step 3 — Collect the paper trail[\s\S]*?### Step 3b/,
+  )[0];
+  const bash = step3.match(/```bash\n([\s\S]*?)```/)[1];
+  assert.doesNotMatch(
+    bash,
+    /^\s*ls\s+"\$D"/m,
+    "no multi-glob ls in the collection block",
+  );
+  assert.match(bash, /find "\$D" -maxdepth 1 -name/);
+  assert.match(SKILL, /must behave identically under bash and zsh/);
+});
+
+test("the Bitbucket web PR URL form is recognised", () => {
+  // CR-2: the arm matched only the API path `pullrequests`, so a pasted Bitbucket web URL
+  // (`/pull-requests/N`) fell through to the branch arm.
+  assert.match(SKILL, /\*:\/\/\*\/pull-requests\/\*/);
+});
+
+test("a branch target reaches the PR resolver instead of resolving the current branch", () => {
+  // CR-3: `gh pr view "${PR:-}"` with an empty argument resolves the CURRENT branch's PR, so
+  // `/review-pr some-other-branch` silently reviewed the wrong PR. Verified: `gh pr view ""`
+  // returns the current branch's number.
+  assert.match(SKILL, /gh pr view "\$\{PR:-\$BRANCH\}"/);
+  assert.doesNotMatch(SKILL, /gh pr view "\$\{PR:-\}"/);
+});
+
+test("the Bitbucket diff fallback follows redirects and rejects an empty patch", () => {
+  // CR-5: the /diff endpoint redirects; `curl -sf` without -L exits 0 having written nothing.
+  assert.match(SKILL, /curl -sfL/);
+  const step4 = SKILL.match(/### Step 4 — Build the diff[\s\S]*?### Step 5/)[0];
+  assert.match(step4, /Diff fallback produced an empty patch/);
+});
+
+test("auto-generated files are excluded from the reviewed diff", () => {
+  // RV-2: 30 of 55 files on this skill's own PR were byte-identical bundle copies, ~23k of
+  // 24,253 lines. Step 4 previously gave no guidance, so the scoping had to be done by hand.
+  const step4 = SKILL.match(/### Step 4 — Build the diff[\s\S]*?### Step 5/)[0];
+  assert.match(step4, /:\(exclude\)\*\/references\/\*/);
+  assert.match(step4, /AUTO-GENERATED/);
+});
+
 test("target is parsed into PR and BRANCH before Step 1 uses them", () => {
   // CR-4: Step 1 dereferenced ${PR} and $BRANCH with no step binding them.
   const idx0b = SKILL.indexOf("### Step 0b — Parse `target`");
@@ -339,9 +385,27 @@ test("the caller resolves the anchor, not the conformance subagent", () => {
 // Conformance prompt contract
 // ---------------------------------------------------------------------------
 test("the conformance prompt declares all four categories", () => {
-  for (const cat of ["coverage", "scope", "trail", "consistency"]) {
-    assert.ok(CONFORMANCE.includes(cat), `category ${cat} declared`);
-  }
+  // Bind to the contract enum line, not bare words. Each of these words occurs 4-8 times in the
+  // surrounding prose, so `includes()` passed even with the contract line deleted (CR-6).
+  assert.match(
+    CONFORMANCE,
+    /category: coverage\s+# coverage \| scope \| trail \| consistency/,
+  );
+});
+
+test("the verdict rule lives in exactly one place", () => {
+  // PC-2/CR-4: the CR-6 fix landed in SKILL.md while pr-conformance-prompt.md kept the defective
+  // table — and a gate recorded CR-6 as closed and mutation-proved on the strength of the one file.
+  // The guard now asserts the invariant across BOTH files, which is what would have caught it.
+  const verdict = SKILL.match(/\*\*Deterministic verdict[\s\S]*?### Step 7/)[0];
+  assert.match(verdict, /at any confidence/);
+  assert.doesNotMatch(verdict, /\| any `medium` \|/);
+  assert.match(verdict, /This table is normative/);
+
+  // The prompt must NOT carry a second copy of the rule.
+  assert.doesNotMatch(CONFORMANCE, /\| any `medium` \|/);
+  assert.doesNotMatch(CONFORMANCE, /any conformance `high`/);
+  assert.match(CONFORMANCE, /Step 6 is normative/);
 });
 
 test("the pr_conformance output contract carries the full key set", () => {

@@ -46,8 +46,9 @@ resolved_issues:
     severity: medium
     status: closed
     fixed_date: '2026-08-31'
-    verification: 'Verdict table names severity and confidence in every row; the old "any medium" row is gone.'
+    verification: 'Verdict table in SKILL.md names severity and confidence in every row. SUPERSEDED 2026-08-31: this verification was scoped to SKILL.md alone, and the identical defective table survived in shared/resources/pr-conformance-prompt.md — found by dogfooding /review-pr on PR #283 (PC-2/CR-4). Now fixed in both, with a cross-file guard.'
     mutation_proven: true
+    reopened_by: 'task.66.pr-review.1.review-pr.md (PC-2)'
   - id: CR-7
     severity: low
     status: closed
