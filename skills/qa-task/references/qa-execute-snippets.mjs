@@ -29,7 +29,15 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -64,7 +72,14 @@ export function extractBlocks(markdown) {
     const [, indent, marker, info] = fence;
 
     if (open === null) {
-      open = { indent, marker: marker[0], len: marker.length, info, start: i, body: [] };
+      open = {
+        indent,
+        marker: marker[0],
+        len: marker.length,
+        info,
+        start: i,
+        body: [],
+      };
       continue;
     }
 
@@ -100,13 +115,39 @@ export function extractBlocks(markdown) {
  * carries no credentials.
  */
 export const SAFE_COMMANDS = new Set([
-  "basename", "cat", "comm", "cut", "date", "diff", "dirname", "echo",
-  "egrep", "false", "fgrep", "file", "grep", "head", "jq", "ls",
-  "printf", "pwd", "readlink", "realpath", "seq", "sort", "stat", "tail", "test",
-  "tr", "true", "uniq", "wc",
+  "basename",
+  "cat",
+  "comm",
+  "cut",
+  "date",
+  "diff",
+  "dirname",
+  "echo",
+  "egrep",
+  "false",
+  "fgrep",
+  "file",
+  "grep",
+  "head",
+  "jq",
+  "ls",
+  "printf",
+  "pwd",
+  "readlink",
+  "realpath",
+  "seq",
+  "sort",
+  "stat",
+  "tail",
+  "test",
+  "tr",
+  "true",
+  "uniq",
+  "wc",
   // `sed` is read-only unless asked to edit in place; `find` unless given a
   // write action; both are constrained by DENY_PATTERNS below.
-  "sed", "find",
+  "sed",
+  "find",
 ]);
 
 /**
@@ -122,8 +163,18 @@ export const SAFE_COMMANDS = new Set([
  * that the quote-blanking hides from the scan entirely.
  */
 export const COMMAND_RUNNERS = new Set([
-  "awk", "command", "env", "eval", "exec", "nice", "nohup", "sudo", "time",
-  "timeout", "watch", "xargs",
+  "awk",
+  "command",
+  "env",
+  "eval",
+  "exec",
+  "nice",
+  "nohup",
+  "sudo",
+  "time",
+  "timeout",
+  "watch",
+  "xargs",
 ]);
 
 /**
@@ -132,12 +183,46 @@ export const COMMAND_RUNNERS = new Set([
  * file, which is exactly what the allow-list exists to refuse.
  */
 const SHELL_KEYWORDS = new Set([
-  "!", "[", "[[", "]]", "]", "{", "}", "(", ")", "case", "do", "done", "elif",
-  "else", "esac", "fi", "for", "function", "if", "in", "select", "then",
-  "until", "while",
+  "!",
+  "[",
+  "[[",
+  "]]",
+  "]",
+  "{",
+  "}",
+  "(",
+  ")",
+  "case",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "esac",
+  "fi",
+  "for",
+  "function",
+  "if",
+  "in",
+  "select",
+  "then",
+  "until",
+  "while",
   // Builtins whose blast radius is the block's own shell process.
-  ":", "break", "cd", "continue", "exit", "export", "local", "read",
-  "readonly", "return", "set", "shift", "type", "unset", "which",
+  ":",
+  "break",
+  "cd",
+  "continue",
+  "exit",
+  "export",
+  "local",
+  "read",
+  "readonly",
+  "return",
+  "set",
+  "shift",
+  "type",
+  "unset",
+  "which",
 ]);
 
 /**
@@ -154,8 +239,17 @@ const COMMAND_NAME = /^[A-Za-z_.\/][\w.\/+-]*$/;
 
 /** `git` subcommands that only read. Any other subcommand is mutating. */
 const SAFE_GIT_SUBCOMMANDS = new Set([
-  "cat-file", "describe", "diff", "log", "ls-files", "ls-remote", "ls-tree",
-  "rev-list", "rev-parse", "show", "status",
+  "cat-file",
+  "describe",
+  "diff",
+  "log",
+  "ls-files",
+  "ls-remote",
+  "ls-tree",
+  "rev-list",
+  "rev-parse",
+  "show",
+  "status",
 ]);
 
 /**
@@ -166,7 +260,10 @@ export const DENY_PATTERNS = [
   [/\bgh\s+pr\s+comment\b/, "gh pr comment"],
   [/\bgh\s+issue\b/, "gh issue"],
   [/\bgh\s+api\b[^\n]*\s(-X|--method)\b/, "gh api with method"],
-  [/\bcurl\b[^\n]*\s(-X|--request)\s*(POST|PUT|PATCH|DELETE)\b/, "curl write method"],
+  [
+    /\bcurl\b[^\n]*\s(-X|--request)\s*(POST|PUT|PATCH|DELETE)\b/,
+    "curl write method",
+  ],
   [/\bgit\s+push\b/, "git push"],
   [/\bgit\s+commit\b/, "git commit"],
   [/\brm\s+-[A-Za-z]*[rf]/, "rm -rf"],
@@ -174,7 +271,10 @@ export const DENY_PATTERNS = [
   // CR-9: the long form bypassed the short-form pattern entirely.
   [/\bsed\b[^\n]*\s--in-place(=\S*)?\b/, "sed --in-place"],
   // CR-7: `find` is read-only until it is given an action that is not.
-  [/\bfind\b[^\n]*\s-(delete|exec|execdir|ok|okdir|fls|fprint|fprintf)\b/, "find write action"],
+  [
+    /\bfind\b[^\n]*\s-(delete|exec|execdir|ok|okdir|fls|fprint|fprintf)\b/,
+    "find write action",
+  ],
   // Other allow-listed commands with a write mode.
   [/\bsort\b[^\n]*\s-o\b/, "sort -o"],
   [/\btee\b/, "tee"],
@@ -209,9 +309,38 @@ const PLACEHOLDER_PATTERNS = [
 
 /** Shell variables that are always available and never need binding. */
 const IMPLICIT_VARS = new Set([
-  "?", "!", "$", "#", "@", "*", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-  "HOME", "IFS", "PATH", "PWD", "OLDPWD", "SHELL", "USER", "TMPDIR", "RANDOM",
-  "LINENO", "SECONDS", "HOSTNAME", "UID", "EUID", "PPID", "BASH_SOURCE",
+  "?",
+  "!",
+  "$",
+  "#",
+  "@",
+  "*",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "HOME",
+  "IFS",
+  "PATH",
+  "PWD",
+  "OLDPWD",
+  "SHELL",
+  "USER",
+  "TMPDIR",
+  "RANDOM",
+  "LINENO",
+  "SECONDS",
+  "HOSTNAME",
+  "UID",
+  "EUID",
+  "PPID",
+  "BASH_SOURCE",
 ]);
 
 /**
@@ -226,10 +355,24 @@ function stripCommentQuoteAware(line) {
   let double = false;
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
-    if (c === "\\" && double) { i++; continue; }
-    if (c === "'" && !double) { single = !single; continue; }
-    if (c === '"' && !single) { double = !double; continue; }
-    if (c === "#" && !single && !double && (i === 0 || /\s/.test(line[i - 1]))) {
+    if (c === "\\" && double) {
+      i++;
+      continue;
+    }
+    if (c === "'" && !double) {
+      single = !single;
+      continue;
+    }
+    if (c === '"' && !single) {
+      double = !double;
+      continue;
+    }
+    if (
+      c === "#" &&
+      !single &&
+      !double &&
+      (i === 0 || /\s/.test(line[i - 1]))
+    ) {
       return line.slice(0, i);
     }
   }
@@ -255,7 +398,9 @@ function stripProse(code) {
     // A REAL heredoc: `<<` or `<<-`, never `<<<` (here-string) and never the
     // second `<` of one. `grep -q x <<<"DATA"` used to swallow every following
     // line as heredoc body, hiding a trailing `rm -rf` from both scans.
-    const here = /(?<!<)<<-?(?!<)\s*\\?(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(raw);
+    const here = /(?<!<)<<-?(?!<)\s*\\?(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(
+      raw,
+    );
     if (here) {
       heredocTerminator = here[2];
       out.push(raw.slice(0, here.index));
@@ -310,7 +455,9 @@ export function commandWords(code) {
   // `task-id}` as a command word, and the fail-closed rule would report a
   // templated block as an unrecognised command. Grouping characters are stripped
   // as prefixes below instead.
-  const segments = stripped.split(/(?:\n|;|\|\||&&|\||&|\bdo\b|\bthen\b|\belse\b)/);
+  const segments = stripped.split(
+    /(?:\n|;|\|\||&&|\||&|\bdo\b|\bthen\b|\belse\b)/,
+  );
 
   for (const seg of segments) {
     const trimmed = seg.trim().replace(/^[({\s]+/, "");
@@ -343,7 +490,10 @@ export function commandWords(code) {
         // Carry THIS invocation's subcommand. Resolving `git` against the first
         // `git …` in the whole block instead fails OPEN: a block opening with
         // `git rev-parse` would license a later `git checkout` in the same block.
-        const rest = trimmed.split(/\s+/).slice(1).find((t) => /^[a-z][a-z-]*$/.test(t));
+        const rest = trimmed
+          .split(/\s+/)
+          .slice(1)
+          .find((t) => /^[a-z][a-z-]*$/.test(t));
         words.push(rest ? `git:${rest}` : "git");
       } else {
         words.push(tok);
@@ -362,12 +512,18 @@ export function unboundVariables(code, bindings) {
     .join("\n");
 
   const assigned = new Set();
-  for (const m of stripped.matchAll(/(?:^|\s|;)([A-Za-z_][A-Za-z0-9_]*)=/g)) assigned.add(m[1]);
-  for (const m of stripped.matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b/g)) assigned.add(m[1]);
-  for (const m of stripped.matchAll(/\bread\s+(?:-\S+\s+)*([A-Za-z_][A-Za-z0-9_]*)/g)) assigned.add(m[1]);
+  for (const m of stripped.matchAll(/(?:^|\s|;)([A-Za-z_][A-Za-z0-9_]*)=/g))
+    assigned.add(m[1]);
+  for (const m of stripped.matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b/g))
+    assigned.add(m[1]);
+  for (const m of stripped.matchAll(
+    /\bread\s+(?:-\S+\s+)*([A-Za-z_][A-Za-z0-9_]*)/g,
+  ))
+    assigned.add(m[1]);
 
   const read = new Set();
-  for (const m of stripped.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) read.add(m[1]);
+  for (const m of stripped.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g))
+    read.add(m[1]);
 
   return [...read].filter(
     (v) => !assigned.has(v) && !IMPLICIT_VARS.has(v) && !(v in bindings),
@@ -386,7 +542,8 @@ export function classifyBlock(code, bindings = {}) {
   const prose = stripProse(code);
 
   for (const [re, name] of DENY_PATTERNS) {
-    if (re.test(prose)) return { klass: "mutating", reason: `deny-list: ${name}` };
+    if (re.test(prose))
+      return { klass: "mutating", reason: `deny-list: ${name}` };
   }
 
   // CR-1 — a write redirection makes any command mutating, allow-listed or not.
@@ -398,10 +555,13 @@ export function classifyBlock(code, bindings = {}) {
   // nothing. Bare `command X` runs X, so the exception is anchored to the flag and
   // nothing else. Without it the repository's own documented zsh guard
   // (`command -v zsh >/dev/null`) is unrunnable by the gate that recommends it.
-  const codeForScan = stripNonCode(code).replace(/\bcommand\s+-[vV]\b/g, "true");
+  const codeForScan = stripNonCode(code).replace(
+    /\bcommand\s+-[vV]\b/g,
+    "true",
+  );
 
   const unknown = commandWords(codeForScan).filter((w) => {
-    if (COMMAND_RUNNERS.has(w)) return true;   // CR-5/CR-6 — before the allow-list
+    if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list
     if (SHELL_KEYWORDS.has(w)) return false;
     if (SAFE_COMMANDS.has(w)) return false;
     if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
@@ -417,12 +577,16 @@ export function classifyBlock(code, bindings = {}) {
 
   // Same reasoning for template slots.
   for (const re of PLACEHOLDER_PATTERNS) {
-    if (re.test(prose)) return { klass: "placeholder", reason: "template slot" };
+    if (re.test(prose))
+      return { klass: "placeholder", reason: "template slot" };
   }
 
   const unbound = unboundVariables(code, bindings);
   if (unbound.length > 0) {
-    return { klass: "placeholder", reason: `unbound-variable: ${unbound.join(", ")}` };
+    return {
+      klass: "placeholder",
+      reason: `unbound-variable: ${unbound.join(", ")}`,
+    };
   }
 
   return { klass: "runnable", reason: null };
@@ -436,7 +600,10 @@ let ZSH_AVAILABLE = null;
  *  `{ skip: !zshAvailable() }` predicate in the test suite. */
 export function zshAvailable() {
   if (ZSH_AVAILABLE === null) {
-    const r = spawnSync("command", ["-v", "zsh"], { shell: "/bin/bash", encoding: "utf8" });
+    const r = spawnSync("command", ["-v", "zsh"], {
+      shell: "/bin/bash",
+      encoding: "utf8",
+    });
     ZSH_AVAILABLE = r.status === 0;
   }
   return ZSH_AVAILABLE;
@@ -459,7 +626,11 @@ function snapshotTree(dir, skipDir = null) {
   const out = new Map();
   const walk = (d, prefix) => {
     let entries;
-    try { entries = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const e of entries) {
       const rel = prefix ? `${prefix}/${e.name}` : e.name;
       const abs = `${d}/${e.name}`;
@@ -467,15 +638,26 @@ function snapshotTree(dir, skipDir = null) {
       // large `--copy` would otherwise be walked twice per block — turning a
       // safety net into the run's dominant cost.
       if (rel === skipDir) continue;
-      if (e.isDirectory()) { walk(abs, rel); continue; }
-      try { const st = statSync(abs); out.set(rel, `${st.mtimeMs}:${st.size}`); } catch { /* raced */ }
+      if (e.isDirectory()) {
+        walk(abs, rel);
+        continue;
+      }
+      try {
+        const st = statSync(abs);
+        out.set(rel, `${st.mtimeMs}:${st.size}`);
+      } catch {
+        /* raced */
+      }
     }
   };
   walk(dir, "");
   return out;
 }
 
-export function runBlock(code, { shells, cwd, timeout = 10_000, bindings = {}, sandboxRoot = null } = {}) {
+export function runBlock(
+  code,
+  { shells, cwd, timeout = 10_000, bindings = {}, sandboxRoot = null } = {},
+) {
   // CR-12 — a minimal environment, not the parent's. Spreading `process.env`
   // handed every snippet GITHUB_TOKEN and tracker credentials, contradicting this
   // file's own claim that the execution environment carries none. Inherited PWD
@@ -506,7 +688,12 @@ export function runBlock(code, { shells, cwd, timeout = 10_000, bindings = {}, s
   const before = sentinelRoot ? snapshotTree(sentinelRoot, workDirName) : null;
 
   for (const shell of shells) {
-    const r = spawnSync(shell, ["-c", code], { cwd, timeout, encoding: "utf8", env });
+    const r = spawnSync(shell, ["-c", code], {
+      cwd,
+      timeout,
+      encoding: "utf8",
+      env,
+    });
     runs[shell] = {
       stdout: (r.stdout ?? "").replace(/\n+$/, ""),
       stderr: (r.stderr ?? "").replace(/\n+$/, ""),
@@ -549,7 +736,9 @@ export function runBlock(code, { shells, cwd, timeout = 10_000, bindings = {}, s
         detail:
           `${shell} exited ${run.status}` +
           (run.stderr ? `: ${run.stderr.split("\n")[0]}` : "") +
-          (consistent ? " (identical in every shell — not a portability defect)" : ""),
+          (consistent
+            ? " (identical in every shell — not a portability defect)"
+            : ""),
       });
     }
   }
@@ -558,7 +747,8 @@ export function runBlock(code, { shells, cwd, timeout = 10_000, bindings = {}, s
     const after = snapshotTree(sentinelRoot, workDirName);
     const outside = [];
     for (const [k, v] of after) if (before.get(k) !== v) outside.push(k);
-    for (const k of before.keys()) if (!after.has(k)) outside.push(`${k} (removed)`);
+    for (const k of before.keys())
+      if (!after.has(k)) outside.push(`${k} (removed)`);
     if (outside.length > 0) {
       findings.push({
         kind: "escaped-sandbox",
@@ -630,7 +820,13 @@ export function executeFile(filePath, opts = {}) {
         bindings,
         sandboxRoot: tmpRoot,
       });
-      results.push({ line: block.line, klass, reason: null, skipped: false, runs });
+      results.push({
+        line: block.line,
+        klass,
+        reason: null,
+        skipped: false,
+        runs,
+      });
       for (const f of blockFindings) findings.push({ ...f, line: block.line });
     }
   } finally {
@@ -667,7 +863,8 @@ export function executeFile(filePath, opts = {}) {
     file: filePath,
     shells,
     zshAvailable: useZsh,
-    zshSkipReason: allowZsh && !useZsh ? "zsh-unavailable" : allowZsh ? null : "disabled",
+    zshSkipReason:
+      allowZsh && !useZsh ? "zsh-unavailable" : allowZsh ? null : "disabled",
     blocks: blocks.length,
     counts,
     results,
@@ -691,29 +888,47 @@ export function main(argv = process.argv.slice(2)) {
 
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
-      case "--file": file = argv[++i]; break;
-      case "--copy": copyFrom = argv[++i]; break;
+      case "--file":
+        file = argv[++i];
+        break;
+      case "--copy":
+        copyFrom = argv[++i];
+        break;
       case "--timeout": {
         // Unvalidated, `--timeout abc` yielded NaN and `--timeout -1` a negative;
         // spawnSync applies NO timeout for either, so a typo silently disabled the
         // hang protection.
         const t = Number(argv[++i]);
-        if (!Number.isFinite(t) || t <= 0) return { exitCode: 2, error: `bad --timeout: must be a positive number` };
+        if (!Number.isFinite(t) || t <= 0)
+          return {
+            exitCode: 2,
+            error: `bad --timeout: must be a positive number`,
+          };
         timeout = t;
         break;
       }
-      case "--no-zsh": allowZsh = false; break;
-      case "--json": json = true; break;
+      case "--no-zsh":
+        allowZsh = false;
+        break;
+      case "--json":
+        json = true;
+        break;
       case "--bind": {
         const pair = argv[++i] ?? "";
         const eq = pair.indexOf("=");
-        if (eq < 1) return { exitCode: 2, error: `bad --bind (want NAME=VALUE): ${pair}` };
+        if (eq < 1)
+          return {
+            exitCode: 2,
+            error: `bad --bind (want NAME=VALUE): ${pair}`,
+          };
         bindings[pair.slice(0, eq)] = pair.slice(eq + 1);
         break;
       }
       case "-h":
-      case "--help": return { exitCode: 0, usage: USAGE };
-      default: return { exitCode: 2, error: `unknown argument: ${argv[i]}` };
+      case "--help":
+        return { exitCode: 0, usage: USAGE };
+      default:
+        return { exitCode: 2, error: `unknown argument: ${argv[i]}` };
     }
   }
 
@@ -736,7 +951,9 @@ function render(report) {
       `${report.counts.runnable} runnable, ${report.counts.placeholder} placeholder, ` +
       `${report.counts.mutating} mutating`,
   );
-  lines.push(`  shells: ${report.shells.join(", ")}${report.zshAvailable ? "" : "  (zsh-unavailable)"}`);
+  lines.push(
+    `  shells: ${report.shells.join(", ")}${report.zshAvailable ? "" : "  (zsh-unavailable)"}`,
+  );
   lines.push("");
   for (const r of report.results.filter((x) => x.skipped)) {
     lines.push(`  SKIP  line ${r.line}  ${r.klass} — ${r.reason}`);
@@ -746,7 +963,9 @@ function render(report) {
   } else {
     lines.push("");
     for (const f of report.findings) {
-      lines.push(`  ${f.kind}  ${f.line ? `line ${f.line}  ` : ""}[${f.confidence}] ${f.detail}`);
+      lines.push(
+        `  ${f.kind}  ${f.line ? `line ${f.line}  ` : ""}[${f.confidence}] ${f.detail}`,
+      );
     }
   }
   return lines.join("\n");

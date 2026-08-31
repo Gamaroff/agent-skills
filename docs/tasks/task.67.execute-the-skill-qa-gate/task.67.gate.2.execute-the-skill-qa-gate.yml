@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.67.execute-the-skill-qa-gate'
+task_title: 'Make QA execute a prose skill, not only read it'
+gate: PASS
+status_reason: 'All eight high-severity fail-open holes are closed and independently re-verified; containment to the temp working copy now holds and is backed by a classifier-independent sandbox sentinel. No over-strictness introduced. 2060 tests, 0 failures.'
+reviewer: 'QA Engineer'
+updated: '2026-08-31T22:40:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2060
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'All 14 previously fail-open inputs re-tested and now classify mutating. Containment re-proved — the canary that escaped in cycle 1 no longer does. A sandbox sentinel provides a second, classifier-independent line. Snippets no longer inherit the parent environment.'
+  performance:
+    status: PASS
+    notes: 'Suite runs in ~7.5s (a mid-cycle sentinel design walked all of /tmp and hung it past 118s; fixed by making the sandbox root explicit). zshAvailable() memoised.'
+  reliability:
+    status: PASS
+    notes: 'Temp root removed in finally on both happy and failing paths, verified by counting engine temp dirs. Attributed-fence desync fixed — the case that made the gate report a clean run on a document it never read. --timeout 0 now rejected.'
+  maintainability:
+    status: PASS
+    notes: 'Comments explain the failure each rule prevents, not just what it does. The rule document records the measurements and names the accepted coverage cost of refusing awk.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-08-31'
+  total_iterations: 1
+  verification_method: 'Independent re-run of all 14 fail-open inputs, containment canary re-proof, 4 QA-side mutation proofs, full suite'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Make zsh a declared CI prerequisite — eight tests including the task-66 fixture skip silently without it (deferred L5).'
+      refs: ['shared/resources/tests/qa-execute-snippets.test.mjs', '.github/workflows/test.yml']
+    - action: 'Correct the skip reason that names a template alternation as a command (deferred M4) and the quoted-span variable scan (deferred L1).'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Decide whether execution-failure should stay confidence: high — a documented snippet ending in grep can block a PR. Recorded as an open question in the task Notes.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

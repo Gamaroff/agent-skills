@@ -4,7 +4,7 @@
 **Bug ID**: TASK-67-BUG-1
 **Severity**: HIGH
 **Priority**: P0
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA (Step 3b diff code review, independently verified in Step 4b)
 **Date Found**: 2026-08-31
 
@@ -181,3 +181,5 @@ does the work), while removing both turns them red.
 | 2026-08-31 | New | QA | 13 fail-open inputs verified |
 | 2026-08-31 | In Progress | qa-fix | Root-cause analysis complete |
 | 2026-08-31 | Ready for QA | qa-fix | All 9 findings fixed; sentinel added; 16 mutation proofs held |
+
+| 2026-08-31 | Closed | QA | Fix verified in cycle 2 — gate.2 PASS |

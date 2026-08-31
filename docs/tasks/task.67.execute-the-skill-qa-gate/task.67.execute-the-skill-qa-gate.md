@@ -5,7 +5,7 @@ type: task
 description: "QA reviews a prose skill's text and never runs it. Task 66 shipped accepted with a glob that collected 0 files on the default macOS shell; the first live run found it in minutes. Add an execution gate to qa-task/qa-story for skills whose deliverable is runnable prose."
 tags: [qa, gate, skills, shell-portability, dogfooding]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-08-31
@@ -16,7 +16,7 @@ estimated_effort_hours: 8
 
 # Technical Task: Make QA execute a prose skill, not only read it
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.67.review.1.execute-the-skill-qa-gate.md` implemented 2026-08-31
 
 ---
@@ -335,31 +335,39 @@ Tighten the deny-list or the disagreement heuristic; both are concentrated in on
 | 2026-08-31 |  | Implemented — 3 files created, 4 modified, 8 regenerated; 41 tests, 9 mutation proofs; 5 engine defects found by dogfooding on real skill files and fixed | develop |
 | 2026-08-31 |  | QA gate FAIL (0/100) — 18 findings; classifier fails open 13 verified ways, temp-copy containment disproven | qa-task |
 | 2026-08-31 |  | QA findings fixed — 13 fail-open holes closed, sandbox sentinel added as defence in depth, 61 tests, 16 mutation proofs; 1 cycle | qa-fix |
+| 2026-08-31 |  | QA gate PASS (90/100) — all findings closed and independently re-verified; 0 blocking issues | qa-task |
 
 ---
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-08-31
-**Quality Score**: 0/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was FAIL)
 
-### QA Report
-- **Full Report**: [task.67.qa.1.execute-the-skill-qa-gate.md](./task.67.qa.1.execute-the-skill-qa-gate.md)
-- **Gate File**: [task.67.gate.1.execute-the-skill-qa-gate.yml](./task.67.gate.1.execute-the-skill-qa-gate.yml)
+### QA Reports
+- **Latest**: [task.67.qa.2.execute-the-skill-qa-gate.md](./task.67.qa.2.execute-the-skill-qa-gate.md) · [gate.2 — PASS](./task.67.gate.2.execute-the-skill-qa-gate.yml)
+- **Cycle 1**: [task.67.qa.1.execute-the-skill-qa-gate.md](./task.67.qa.1.execute-the-skill-qa-gate.md) · [gate.1 — FAIL](./task.67.gate.1.execute-the-skill-qa-gate.yml)
 - **Bugs**: [BUG-1 — classifier fails open](./task.67.bug.1.classifier-fails-open.md) · [BUG-2 — extraction and coverage gaps](./task.67.bug.2.extraction-and-coverage-gaps.md)
 
 ### Test Coverage Summary
-- **Tests Executed**: 2040 (0 failures, 1 skipped)
-- **Phases Verified**: 5/5 completed; 3 PASS, 1 CONCERNS, 1 FAIL
-- **Critical Issues**: 8 HIGH, 4 MEDIUM, 6 LOW
-- **NFR Status**: Security: FAIL, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Tests Executed**: 2060 (0 failures, 1 skipped) — module suite grew 41 → 61
+- **Phases Verified**: 5/5, all PASS
+- **Outstanding Issues**: 0 blocking (6 LOW/MEDIUM deferred with rationale)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **QA Cycles**: 2
 
 ### Key Findings
 
-The safety boundary fails open in **thirteen independently verified ways** — an allow-listed command
+**Cycle 2 (PASS).** All fourteen previously fail-open inputs now classify `mutating`, and the
+containment canary that escaped in cycle 1 no longer does — both re-verified independently, not taken
+on trust. No over-strictness: six representative legitimate patterns still execute. QA re-ran four
+mutation proofs against the shipped code; all held.
+
+**Cycle 1 (FAIL) — kept for the record.** The safety boundary failed open in **thirteen independently
+verified ways** — an allow-listed command
 plus a redirect, a `#` inside quotes, a here-string, an unparseable command position, `env`/`command`/
 `time`, `awk`'s program text, `find -delete`/`-exec`, and process substitution all classify `runnable`
 and execute. Containment to the temp working copy was **disproven** with a canary written outside it.

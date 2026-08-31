@@ -4,7 +4,7 @@
 **Bug ID**: TASK-67-BUG-2
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA (Step 3b diff code review)
 **Date Found**: 2026-08-31
 
@@ -190,3 +190,5 @@ tool does.
 |---|---|---|---|
 | 2026-08-31 | New | QA | 4 MEDIUM + 8 LOW |
 | 2026-08-31 | Ready for QA | qa-fix | 3 MEDIUM + 4 LOW fixed; 5 deferred with rationale |
+
+| 2026-08-31 | Closed | QA | Fix verified in cycle 2 — gate.2 PASS |

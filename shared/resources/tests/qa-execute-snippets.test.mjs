@@ -17,7 +17,14 @@
 
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -67,10 +74,45 @@ const BLOCK_TIMEOUT_MS = 300;
 // Mirrors the module's private SHELL_KEYWORDS for the precedence assertion above;
 // a runner appearing here would bypass the COMMAND_RUNNERS check entirely.
 const SHELL_KEYWORDS_SNAPSHOT = [
-  "!", "[", "[[", "]]", "]", "{", "}", "(", ")", "case", "do", "done", "elif",
-  "else", "esac", "fi", "for", "function", "if", "in", "select", "then",
-  "until", "while", ":", "break", "cd", "continue", "exit", "export", "local",
-  "read", "readonly", "return", "set", "shift", "type", "unset", "which",
+  "!",
+  "[",
+  "[[",
+  "]]",
+  "]",
+  "{",
+  "}",
+  "(",
+  ")",
+  "case",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "esac",
+  "fi",
+  "for",
+  "function",
+  "if",
+  "in",
+  "select",
+  "then",
+  "until",
+  "while",
+  ":",
+  "break",
+  "cd",
+  "continue",
+  "exit",
+  "export",
+  "local",
+  "read",
+  "readonly",
+  "return",
+  "set",
+  "shift",
+  "type",
+  "unset",
+  "which",
 ];
 
 function md(...blocks) {
@@ -84,7 +126,15 @@ function bash(code) {
 // ── 1. Extraction ─────────────────────────────────────────────────────────────
 
 test("extracts every fenced bash block with its opening-fence line number", () => {
-  const doc = ["# Title", "", bash("echo one"), "", "prose", "", bash("echo two")].join("\n");
+  const doc = [
+    "# Title",
+    "",
+    bash("echo one"),
+    "",
+    "prose",
+    "",
+    bash("echo two"),
+  ].join("\n");
   const blocks = extractBlocks(doc);
   assert.equal(blocks.length, 2);
   assert.equal(blocks[0].code, "echo one");
@@ -96,7 +146,17 @@ test("extracts every fenced bash block with its opening-fence line number", () =
 });
 
 test("ignores fences that are not labelled bash", () => {
-  const doc = ["```yaml", "a: 1", "```", "", "```", "unlabelled", "```", "", bash("echo yes")].join("\n");
+  const doc = [
+    "```yaml",
+    "a: 1",
+    "```",
+    "",
+    "```",
+    "unlabelled",
+    "```",
+    "",
+    bash("echo yes"),
+  ].join("\n");
   const blocks = extractBlocks(doc);
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0].code, "echo yes");
@@ -107,14 +167,17 @@ test("an unterminated fence yields no block — we never execute what we cannot 
 });
 
 test("multi-line block bodies survive intact", () => {
-  const code = "D=d\nfor f in a b; do\n  echo \"$f\"\ndone";
+  const code = 'D=d\nfor f in a b; do\n  echo "$f"\ndone';
   assert.equal(extractBlocks(bash(code))[0].code, code);
 });
 
 // ── 2. Classification: the fail-closed safety boundary ────────────────────────
 
 test("a block of allow-listed read-only commands is runnable", () => {
-  assert.equal(classifyBlock("ls -la\ngrep foo bar.txt | wc -l").klass, "runnable");
+  assert.equal(
+    classifyBlock("ls -la\ngrep foo bar.txt | wc -l").klass,
+    "runnable",
+  );
 });
 
 test("fail-closed: an unrecognised command classifies as mutating, never runnable", () => {
@@ -126,8 +189,17 @@ test("fail-closed: an unrecognised command classifies as mutating, never runnabl
 
 test("fail-closed catches a novel mutating command nobody put on the deny-list", () => {
   // The whole point: a deny-list alone fails OPEN on commands nobody foresaw.
-  for (const cmd of ["kubectl delete pod x", "terraform apply", "aws s3 rm s3://b/k", "dd if=/dev/zero of=/x"]) {
-    assert.equal(classifyBlock(cmd).klass, "mutating", `${cmd} must not be runnable`);
+  for (const cmd of [
+    "kubectl delete pod x",
+    "terraform apply",
+    "aws s3 rm s3://b/k",
+    "dd if=/dev/zero of=/x",
+  ]) {
+    assert.equal(
+      classifyBlock(cmd).klass,
+      "mutating",
+      `${cmd} must not be runnable`,
+    );
   }
 });
 
@@ -151,7 +223,10 @@ test("named deny-list entries produce a precise reason", () => {
 
 test("gh and curl are skipped even in read-only form — a QA gate makes no network calls", () => {
   assert.equal(classifyBlock("gh pr view 12 --json number").klass, "mutating");
-  assert.equal(classifyBlock("curl -sf https://example.test").klass, "mutating");
+  assert.equal(
+    classifyBlock("curl -sf https://example.test").klass,
+    "mutating",
+  );
 });
 
 test("read-only git subcommands are allowed; other git subcommands are not", () => {
@@ -165,8 +240,14 @@ test("every git invocation is resolved, not just the first in the block", () => 
   // Found by dogfooding this engine on a real skill file. Resolving `git`
   // against the FIRST `git …` in the block fails OPEN: an opening `git rev-parse`
   // licensed every later git subcommand in the same block.
-  assert.equal(classifyBlock("git rev-parse HEAD\ngit checkout -b x").klass, "mutating");
-  assert.equal(classifyBlock("git rev-parse HEAD\ngit diff --stat").klass, "runnable");
+  assert.equal(
+    classifyBlock("git rev-parse HEAD\ngit checkout -b x").klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("git rev-parse HEAD\ngit diff --stat").klass,
+    "runnable",
+  );
 });
 
 test("case-arm patterns and quote artifacts are not read as commands", () => {
@@ -174,9 +255,9 @@ test("case-arm patterns and quote artifacts are not read as commands", () => {
   // unrecognised commands, so a read-only block was skipped as mutating.
   const block = [
     'case "$T" in',
-    '  *://*/pull/*) echo web ;;',
-    '  *[!0-9]*) echo branch ;;',
-    '  *) echo number ;;',
+    "  *://*/pull/*) echo web ;;",
+    "  *[!0-9]*) echo branch ;;",
+    "  *) echo number ;;",
     "esac",
   ].join("\n");
   assert.equal(classifyBlock(block, { T: "x" }).klass, "runnable");
@@ -195,7 +276,8 @@ test("arithmetic expansion is arithmetic, not an invocation", () => {
   // `$((N + 1))` used to become a segment whose first token was `N`, reported as
   // an unrecognised command — so a read-only block was skipped as mutating.
   assert.equal(
-    classifyBlock('N=$(ls | wc -l)\nif [ -n "$N" ]; then M=$((N + 1)); fi').klass,
+    classifyBlock('N=$(ls | wc -l)\nif [ -n "$N" ]; then M=$((N + 1)); fi')
+      .klass,
     "runnable",
   );
 });
@@ -210,12 +292,19 @@ test("a backslash line-continuation does not start a new command", () => {
   assert.equal(classifyBlock(block).klass, "runnable");
 });
 
-test("a failure identical in every shell is annotated as not a portability defect", { skip: !zshAvailable() }, () => {
-  const { findings } = runBlock("exit 4", { shells: ["bash", "zsh"], cwd: tmp() });
-  const f = findings.find((x) => x.kind === "execution-failure");
-  assert.ok(f);
-  assert.match(f.detail, /identical in every shell/);
-});
+test(
+  "a failure identical in every shell is annotated as not a portability defect",
+  { skip: !zshAvailable() },
+  () => {
+    const { findings } = runBlock("exit 4", {
+      shells: ["bash", "zsh"],
+      cwd: tmp(),
+    });
+    const f = findings.find((x) => x.kind === "execution-failure");
+    assert.ok(f);
+    assert.match(f.detail, /identical in every shell/);
+  },
+);
 
 test("template slots classify as placeholder", () => {
   assert.equal(classifyBlock("echo {task-id}").klass, "placeholder");
@@ -224,18 +313,24 @@ test("template slots classify as placeholder", () => {
 
 test("shell parameter expansion is not a template slot", () => {
   // `${VAR}` must not be mistaken for `{VAR}` — the negative lookbehind is load-bearing.
-  assert.equal(classifyBlock("D=x\necho \"${D}\"").klass, "runnable");
+  assert.equal(classifyBlock('D=x\necho "${D}"').klass, "runnable");
 });
 
 test("redirections and heredocs are not template slots", () => {
   assert.equal(classifyBlock("echo hi 2>/dev/null").klass, "runnable");
-  assert.equal(classifyBlock("cat <<'EOF'\nnot a <placeholder> here\nEOF").klass, "runnable");
+  assert.equal(
+    classifyBlock("cat <<'EOF'\nnot a <placeholder> here\nEOF").klass,
+    "runnable",
+  );
 });
 
 test("a mutating command inside a heredoc body is data, not an invocation", () => {
   // Heredoc bodies are content. Scanning them for commands would classify a doc
   // that merely QUOTES `git push` as mutating.
-  assert.equal(classifyBlock("cat <<'EOF'\ngit push origin main\nEOF").klass, "runnable");
+  assert.equal(
+    classifyBlock("cat <<'EOF'\ngit push origin main\nEOF").klass,
+    "runnable",
+  );
 });
 
 test("mutating beats placeholder when a block is both", () => {
@@ -251,7 +346,10 @@ test("an unbound variable makes a block a placeholder, not a failure", () => {
 });
 
 test("a caller binding satisfies the variable", () => {
-  assert.equal(classifyBlock('ls "$DOC_FILE"', { DOC_FILE: "/tmp/x" }).klass, "runnable");
+  assert.equal(
+    classifyBlock('ls "$DOC_FILE"', { DOC_FILE: "/tmp/x" }).klass,
+    "runnable",
+  );
 });
 
 test("a variable assigned inside the block needs no binding", () => {
@@ -264,8 +362,11 @@ test("commandWords ignores leading assignments and redirections", () => {
 });
 
 test("unboundVariables recognises for-loop and read bindings", () => {
-  assert.deepEqual(unboundVariables("for pat in a b; do echo \"$pat\"; done", {}), []);
-  assert.deepEqual(unboundVariables("read -r line\necho \"$line\"", {}), []);
+  assert.deepEqual(
+    unboundVariables('for pat in a b; do echo "$pat"; done', {}),
+    [],
+  );
+  assert.deepEqual(unboundVariables('read -r line\necho "$line"', {}), []);
 });
 
 // ── 2b. Regressions from QA cycle 1 — every one of these once classified runnable ──
@@ -288,7 +389,10 @@ test("QA-1: a write redirection makes any command mutating, allow-listed or not"
   }
   // The temp cwd is no defence — an absolute target ignores it entirely, which is
   // why this is classification's job and not the sandbox's.
-  assert.equal(classifyBlock("echo x > /etc/hosts").reason, "write-redirection");
+  assert.equal(
+    classifyBlock("echo x > /etc/hosts").reason,
+    "write-redirection",
+  );
 });
 
 test("QA-1b: discarding a stream, and duplicating a descriptor, are not writes", () => {
@@ -299,14 +403,23 @@ test("QA-1b: discarding a stream, and duplicating a descriptor, are not writes",
   assert.equal(classifyBlock("grep x f 2>/dev/null | wc -l").klass, "runnable");
   assert.equal(classifyBlock("ls >/dev/null").klass, "runnable");
   assert.equal(classifyBlock("ls >/dev/null 2>&1").klass, "runnable");
-  assert.equal(classifyBlock('find . -name "*.md" 2>/dev/null | sort').klass, "runnable");
+  assert.equal(
+    classifyBlock('find . -name "*.md" 2>/dev/null | sort').klass,
+    "runnable",
+  );
 });
 
 test("QA-2: a `#` inside quotes is data, not a comment", () => {
   // The line regex deleted the rest of the line from BOTH scans while execution
   // still used the original code, so the `rm -rf` was invisible and ran.
-  assert.equal(classifyBlock('echo "note # here"; rm -rf /tmp/qa-x').klass, "mutating");
-  assert.equal(classifyBlock("echo 'a # b'; git push origin main").klass, "mutating");
+  assert.equal(
+    classifyBlock('echo "note # here"; rm -rf /tmp/qa-x').klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("echo 'a # b'; git push origin main").klass,
+    "mutating",
+  );
   // A real trailing comment is still stripped.
   assert.equal(classifyBlock("ls # rm -rf /tmp/qa-x").klass, "runnable");
 });
@@ -314,9 +427,15 @@ test("QA-2: a `#` inside quotes is data, not a comment", () => {
 test("QA-3: a here-string is not a heredoc opener", () => {
   // `<<<"DATA"` matched the heredoc regex, so every following line was discarded
   // as "body" — including a trailing rm.
-  assert.equal(classifyBlock('grep -q x <<<"DATA"\nrm -rf /tmp/qa-x').klass, "mutating");
+  assert.equal(
+    classifyBlock('grep -q x <<<"DATA"\nrm -rf /tmp/qa-x').klass,
+    "mutating",
+  );
   // A genuine heredoc still shields its body from the command scan.
-  assert.equal(classifyBlock("cat <<'EOF'\ngit push origin main\nEOF").klass, "runnable");
+  assert.equal(
+    classifyBlock("cat <<'EOF'\ngit push origin main\nEOF").klass,
+    "runnable",
+  );
 });
 
 test("QA-4: an unreadable command position fails CLOSED", () => {
@@ -333,8 +452,14 @@ test("QA-4: an unreadable command position fails CLOSED", () => {
 });
 
 test("QA-5: command runners are refused — their blast radius is what follows", () => {
-  for (const code of ["env touch /tmp/qa-x", "command mv a b", "time mv a b",
-                      "xargs rm", "sudo rm -f /tmp/qa-x", "nohup mv a b"]) {
+  for (const code of [
+    "env touch /tmp/qa-x",
+    "command mv a b",
+    "time mv a b",
+    "xargs rm",
+    "sudo rm -f /tmp/qa-x",
+    "nohup mv a b",
+  ]) {
     assert.equal(classifyBlock(code).klass, "mutating", code);
   }
 });
@@ -348,21 +473,38 @@ test("QA-5b: COMMAND_RUNNERS takes precedence over the allow-list", () => {
   assert.ok(COMMAND_RUNNERS.has("xargs"), "xargs must be a declared runner");
   assert.ok(COMMAND_RUNNERS.has("awk"), "awk must be a declared runner");
   for (const r of COMMAND_RUNNERS) {
-    assert.equal(SAFE_COMMANDS.has(r), false, `${r} must not also be allow-listed`);
-    assert.equal(SHELL_KEYWORDS_SNAPSHOT.includes(r), false, `${r} must not be a shell keyword`);
+    assert.equal(
+      SAFE_COMMANDS.has(r),
+      false,
+      `${r} must not also be allow-listed`,
+    );
+    assert.equal(
+      SHELL_KEYWORDS_SNAPSHOT.includes(r),
+      false,
+      `${r} must not be a shell keyword`,
+    );
   }
 });
 
 test("QA-5c: `command -v` is a lookup and stays runnable; bare `command` does not", () => {
-  assert.equal(classifyBlock("command -v zsh >/dev/null 2>&1").klass, "runnable");
-  assert.equal(classifyBlock("if command -v zsh >/dev/null 2>&1; then echo yes; fi").klass, "runnable");
+  assert.equal(
+    classifyBlock("command -v zsh >/dev/null 2>&1").klass,
+    "runnable",
+  );
+  assert.equal(
+    classifyBlock("if command -v zsh >/dev/null 2>&1; then echo yes; fi").klass,
+    "runnable",
+  );
   // The exception is anchored to the flag. Bare `command` still runs its argument.
   assert.equal(classifyBlock("command mv a b").klass, "mutating");
   assert.equal(classifyBlock("command rm -f /tmp/x").klass, "mutating");
 });
 
 test("QA-6: awk is refused — its program is a quoted argument the scan cannot see", () => {
-  assert.equal(classifyBlock(`awk 'BEGIN{system("touch /tmp/qa-x")}'`).klass, "mutating");
+  assert.equal(
+    classifyBlock(`awk 'BEGIN{system("touch /tmp/qa-x")}'`).klass,
+    "mutating",
+  );
   assert.equal(classifyBlock(`awk '{print > "/etc/x"}'`).klass, "mutating");
 });
 
@@ -372,7 +514,10 @@ test("QA-7: find is read-only until given a write action", () => {
   assert.equal(classifyBlock("sort -o out.txt in.txt").klass, "mutating");
   assert.equal(classifyBlock("ls | tee out.txt").klass, "mutating");
   // The read-only form this engine actually relies on stays runnable.
-  assert.equal(classifyBlock('find . -maxdepth 1 -name "*.md"').klass, "runnable");
+  assert.equal(
+    classifyBlock('find . -maxdepth 1 -name "*.md"').klass,
+    "runnable",
+  );
 });
 
 test("QA-8: process substitution starts its own segment", () => {
@@ -383,8 +528,14 @@ test("QA-8: process substitution starts its own segment", () => {
 });
 
 test("QA-9: the sed deny-list covers the long form", () => {
-  assert.equal(classifyBlock("sed --in-place 's/a/b/' f.txt").klass, "mutating");
-  assert.equal(classifyBlock("sed --in-place=.bak 's/a/b/' f.txt").klass, "mutating");
+  assert.equal(
+    classifyBlock("sed --in-place 's/a/b/' f.txt").klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("sed --in-place=.bak 's/a/b/' f.txt").klass,
+    "mutating",
+  );
   assert.equal(classifyBlock("sed -i 's/a/b/' f.txt").klass, "mutating");
   assert.equal(classifyBlock("sed -E 's/a/b/' f.txt").klass, "runnable");
 });
@@ -394,10 +545,21 @@ test("QA-10: an attributed fence does not desynchronise the file", () => {
   // was dropped, and its CLOSING fence was then read as an OPENING one — so the
   // rest of the document was parsed inside-out and the gate reported a clean run
   // on a file it had never read.
-  const doc = ["```bash showLineNumbers", "echo one", "```", "", "```bash", "echo two", "```"].join("\n");
+  const doc = [
+    "```bash showLineNumbers",
+    "echo one",
+    "```",
+    "",
+    "```bash",
+    "echo two",
+    "```",
+  ].join("\n");
   const blocks = extractBlocks(doc);
   assert.equal(blocks.length, 2);
-  assert.deepEqual(blocks.map((b) => b.code), ["echo one", "echo two"]);
+  assert.deepEqual(
+    blocks.map((b) => b.code),
+    ["echo one", "echo two"],
+  );
   assert.deepEqual(
     extractBlocks('```bash title="x"\necho a\n```').map((b) => b.code),
     ["echo a"],
@@ -405,22 +567,39 @@ test("QA-10: an attributed fence does not desynchronise the file", () => {
 });
 
 test("QA-11: a failing --copy removes the temp directory it created", () => {
-  const before = readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
+  const before = readdirSync(tmpdir()).filter((n) =>
+    /^qa-snippets-[^t]/.test(n),
+  ).length;
   const dir = tmp();
   const file = join(dir, "SKILL.md");
   writeFileSync(file, bash("echo ok"));
   executeFile(file, { allowZsh: false });
-  assert.throws(() => executeFile(file, { allowZsh: false, copyFrom: "/nonexistent-qa-path" }));
-  const after_ = readdirSync(tmpdir()).filter((n) => /^qa-snippets-[^t]/.test(n)).length;
-  assert.equal(after_, before, "neither the happy nor the failing path may leak a temp dir");
+  assert.throws(() =>
+    executeFile(file, { allowZsh: false, copyFrom: "/nonexistent-qa-path" }),
+  );
+  const after_ = readdirSync(tmpdir()).filter((n) =>
+    /^qa-snippets-[^t]/.test(n),
+  ).length;
+  assert.equal(
+    after_,
+    before,
+    "neither the happy nor the failing path may leak a temp dir",
+  );
 });
 
 test("QA-12: snippets do not inherit the parent environment", () => {
   // The header claims the execution environment carries no credentials. It did.
   process.env.QA_FAKE_SECRET = "sekrit";
   try {
-    const { runs } = runBlock('echo "[${QA_FAKE_SECRET}]"', { shells: ["bash"], cwd: tmp() });
-    assert.equal(runs.bash.stdout, "[]", "the parent env must not reach the snippet");
+    const { runs } = runBlock('echo "[${QA_FAKE_SECRET}]"', {
+      shells: ["bash"],
+      cwd: tmp(),
+    });
+    assert.equal(
+      runs.bash.stdout,
+      "[]",
+      "the parent env must not reach the snippet",
+    );
   } finally {
     delete process.env.QA_FAKE_SECRET;
   }
@@ -433,9 +612,16 @@ test("QA-13: the sandbox sentinel catches a block that escapes its working copy"
   const work = join(root, "work");
   mkdirSync(work, { recursive: true });
 
-  const { findings } = runBlock("echo escaped > ../ESCAPED", { shells: ["bash"], cwd: work, sandboxRoot: root });
+  const { findings } = runBlock("echo escaped > ../ESCAPED", {
+    shells: ["bash"],
+    cwd: work,
+    sandboxRoot: root,
+  });
   const f = findings.find((x) => x.kind === "escaped-sandbox");
-  assert.ok(f, "a write outside the working copy must be reported whatever the classifier said");
+  assert.ok(
+    f,
+    "a write outside the working copy must be reported whatever the classifier said",
+  );
   assert.equal(f.confidence, "high");
   assert.match(f.detail, /ESCAPED/);
 });
@@ -444,16 +630,30 @@ test("QA-13b: writing inside the working copy does not trip the sentinel", () =>
   const root = tmp();
   const work = join(root, "work");
   mkdirSync(work, { recursive: true });
-  const { findings } = runBlock("echo inside > ./file.txt", { shells: ["bash"], cwd: work, sandboxRoot: root });
-  assert.deepEqual(findings.filter((f) => f.kind === "escaped-sandbox"), []);
+  const { findings } = runBlock("echo inside > ./file.txt", {
+    shells: ["bash"],
+    cwd: work,
+    sandboxRoot: root,
+  });
+  assert.deepEqual(
+    findings.filter((f) => f.kind === "escaped-sandbox"),
+    [],
+  );
 });
 
 // ── 3. Dual-shell execution ───────────────────────────────────────────────────
 
-test("agreeing block under both shells produces no finding", { skip: !zshAvailable() }, () => {
-  const { findings } = runBlock("echo hello", { shells: ["bash", "zsh"], cwd: tmp() });
-  assert.deepEqual(findings, []);
-});
+test(
+  "agreeing block under both shells produces no finding",
+  { skip: !zshAvailable() },
+  () => {
+    const { findings } = runBlock("echo hello", {
+      shells: ["bash", "zsh"],
+      cwd: tmp(),
+    });
+    assert.deepEqual(findings, []);
+  },
+);
 
 test("a non-zero exit is reported as execution-failure with high confidence", () => {
   const { findings } = runBlock("exit 3", { shells: ["bash"], cwd: tmp() });
@@ -467,18 +667,31 @@ test("a hanging block is terminated by the timeout rather than hanging the run",
   // classification regressed, and nothing measured that the 30s sleep was actually
   // cut off rather than waited out — the one property worth asserting.
   const started = Date.now();
-  const { findings } = runBlock("sleep 30", { shells: ["bash"], cwd: tmp(), timeout: BLOCK_TIMEOUT_MS });
+  const { findings } = runBlock("sleep 30", {
+    shells: ["bash"],
+    cwd: tmp(),
+    timeout: BLOCK_TIMEOUT_MS,
+  });
   const elapsed = Date.now() - started;
   assert.ok(
     findings.some((f) => f.kind === "execution-timeout"),
     "the block must be reported as a timeout, not merely as a failure",
   );
-  assert.ok(elapsed < 10_000, `the 30s sleep must be truncated, took ${elapsed}ms`);
+  assert.ok(
+    elapsed < 10_000,
+    `the 30s sleep must be truncated, took ${elapsed}ms`,
+  );
 });
 
 test("a block that terminates itself is not reported as a timeout", () => {
-  const { findings } = runBlock("kill -TERM $$", { shells: ["bash"], cwd: tmp() });
-  assert.equal(findings.some((f) => f.kind === "execution-timeout"), false);
+  const { findings } = runBlock("kill -TERM $$", {
+    shells: ["bash"],
+    cwd: tmp(),
+  });
+  assert.equal(
+    findings.some((f) => f.kind === "execution-timeout"),
+    false,
+  );
 });
 
 // ── 4. Regression fixture: the task-66 defect ─────────────────────────────────
@@ -498,7 +711,8 @@ function trailFixture() {
     "a.dod.1.x.md",
     "a-sprint-review-summary.md",
     "a.handover.1.x.md",
-  ]) writeFileSync(join(d, f), "");
+  ])
+    writeFileSync(join(d, f), "");
   return root;
 }
 
@@ -516,90 +730,135 @@ const POST_FIX = [
   "done | sort",
 ].join("\n");
 
-test("the pre-fix task-66 block is caught as a shell disagreement", { skip: !zshAvailable() }, () => {
-  const cwd = trailFixture();
-  const { runs, findings } = runBlock(PRE_FIX, { shells: ["bash", "zsh"], cwd });
+test(
+  "the pre-fix task-66 block is caught as a shell disagreement",
+  { skip: !zshAvailable() },
+  () => {
+    const cwd = trailFixture();
+    const { runs, findings } = runBlock(PRE_FIX, {
+      shells: ["bash", "zsh"],
+      cwd,
+    });
 
-  // The measured shape of the defect: bash lists six, zsh lists nothing.
-  assert.equal(runs.bash.stdout.split("\n").filter(Boolean).length, 6, "bash should list 6 artifacts");
-  assert.equal(runs.zsh.stdout, "", "zsh should list nothing — the glob aborts the command");
-  assert.match(runs.zsh.stderr, /no matches found/);
+    // The measured shape of the defect: bash lists six, zsh lists nothing.
+    assert.equal(
+      runs.bash.stdout.split("\n").filter(Boolean).length,
+      6,
+      "bash should list 6 artifacts",
+    );
+    assert.equal(
+      runs.zsh.stdout,
+      "",
+      "zsh should list nothing — the glob aborts the command",
+    );
+    assert.match(runs.zsh.stderr, /no matches found/);
 
-  const disagreement = findings.find((f) => f.kind === "shell-disagreement");
-  assert.ok(disagreement, "expected a shell-disagreement finding");
-  assert.equal(disagreement.confidence, "medium");
+    const disagreement = findings.find((f) => f.kind === "shell-disagreement");
+    assert.ok(disagreement, "expected a shell-disagreement finding");
+    assert.equal(disagreement.confidence, "medium");
 
-  rmSync(cwd, { recursive: true, force: true });
-});
+    rmSync(cwd, { recursive: true, force: true });
+  },
+);
 
-test("exit status alone cannot catch the defect — both shells exit non-zero", { skip: !zshAvailable() }, () => {
-  // This is why stdout is the load-bearing comparison. If the implementation ever
-  // regressed to comparing only exit codes, the defect would look clean.
-  const cwd = trailFixture();
-  const { runs } = runBlock(PRE_FIX, { shells: ["bash", "zsh"], cwd });
-  assert.notEqual(runs.bash.status, 0);
-  assert.notEqual(runs.zsh.status, 0);
-  assert.equal(runs.bash.status, runs.zsh.status, "the exit codes AGREE — only stdout differs");
-  rmSync(cwd, { recursive: true, force: true });
-});
+test(
+  "exit status alone cannot catch the defect — both shells exit non-zero",
+  { skip: !zshAvailable() },
+  () => {
+    // This is why stdout is the load-bearing comparison. If the implementation ever
+    // regressed to comparing only exit codes, the defect would look clean.
+    const cwd = trailFixture();
+    const { runs } = runBlock(PRE_FIX, { shells: ["bash", "zsh"], cwd });
+    assert.notEqual(runs.bash.status, 0);
+    assert.notEqual(runs.zsh.status, 0);
+    assert.equal(
+      runs.bash.status,
+      runs.zsh.status,
+      "the exit codes AGREE — only stdout differs",
+    );
+    rmSync(cwd, { recursive: true, force: true });
+  },
+);
 
-test("the post-fix find version is reported clean", { skip: !zshAvailable() }, () => {
-  const cwd = trailFixture();
-  const { runs, findings } = runBlock(POST_FIX, { shells: ["bash", "zsh"], cwd });
-  assert.equal(runs.bash.stdout, runs.zsh.stdout, "both shells must agree");
-  assert.equal(runs.bash.stdout.split("\n").filter(Boolean).length, 6);
-  assert.deepEqual(findings, [], "the corrected block must raise nothing");
-  rmSync(cwd, { recursive: true, force: true });
-});
+test(
+  "the post-fix find version is reported clean",
+  { skip: !zshAvailable() },
+  () => {
+    const cwd = trailFixture();
+    const { runs, findings } = runBlock(POST_FIX, {
+      shells: ["bash", "zsh"],
+      cwd,
+    });
+    assert.equal(runs.bash.stdout, runs.zsh.stdout, "both shells must agree");
+    assert.equal(runs.bash.stdout.split("\n").filter(Boolean).length, 6);
+    assert.deepEqual(findings, [], "the corrected block must raise nothing");
+    rmSync(cwd, { recursive: true, force: true });
+  },
+);
 
 // ── 5. Mutation proofs ────────────────────────────────────────────────────────
 
-test("MUTATION: dropping the zsh arm makes the disagreement finding disappear", { skip: !zshAvailable() }, () => {
-  const cwd = trailFixture();
+test(
+  "MUTATION: dropping the zsh arm makes the disagreement finding disappear",
+  { skip: !zshAvailable() },
+  () => {
+    const cwd = trailFixture();
 
-  const both = runBlock(PRE_FIX, { shells: ["bash", "zsh"], cwd });
-  assert.ok(both.findings.some((f) => f.kind === "shell-disagreement"));
+    const both = runBlock(PRE_FIX, { shells: ["bash", "zsh"], cwd });
+    assert.ok(both.findings.some((f) => f.kind === "shell-disagreement"));
 
-  // Same block, bash only — the mutation. The defect becomes invisible.
-  const bashOnly = runBlock(PRE_FIX, { shells: ["bash"], cwd });
-  assert.equal(
-    bashOnly.findings.some((f) => f.kind === "shell-disagreement"),
-    false,
-    "with one shell there is nothing to disagree with — both arms are load-bearing",
-  );
+    // Same block, bash only — the mutation. The defect becomes invisible.
+    const bashOnly = runBlock(PRE_FIX, { shells: ["bash"], cwd });
+    assert.equal(
+      bashOnly.findings.some((f) => f.kind === "shell-disagreement"),
+      false,
+      "with one shell there is nothing to disagree with — both arms are load-bearing",
+    );
 
-  rmSync(cwd, { recursive: true, force: true });
-});
+    rmSync(cwd, { recursive: true, force: true });
+  },
+);
 
-test("executeFile itself selects both shells when zsh is present", { skip: !zshAvailable() }, () => {
-  // Held deliberately at the executeFile level, not only at runBlock. An earlier
-  // draft proved the dual-shell comparison only by passing `shells` explicitly,
-  // so hard-coding executeFile to ["bash"] broke nothing — the production entry
-  // point was unheld while the mechanism it calls was fully covered.
-  const dir = tmp();
-  const file = join(dir, "SKILL.md");
-  writeFileSync(file, bash("echo ok"));
+test(
+  "executeFile itself selects both shells when zsh is present",
+  { skip: !zshAvailable() },
+  () => {
+    // Held deliberately at the executeFile level, not only at runBlock. An earlier
+    // draft proved the dual-shell comparison only by passing `shells` explicitly,
+    // so hard-coding executeFile to ["bash"] broke nothing — the production entry
+    // point was unheld while the mechanism it calls was fully covered.
+    const dir = tmp();
+    const file = join(dir, "SKILL.md");
+    writeFileSync(file, bash("echo ok"));
 
-  const report = executeFile(file, { allowZsh: true });
-  assert.deepEqual(report.shells, ["bash", "zsh"]);
-  assert.equal(report.zshAvailable, true);
-  rmSync(dir, { recursive: true, force: true });
-});
+    const report = executeFile(file, { allowZsh: true });
+    assert.deepEqual(report.shells, ["bash", "zsh"]);
+    assert.equal(report.zshAvailable, true);
+    rmSync(dir, { recursive: true, force: true });
+  },
+);
 
-test("the task-66 defect is caught end to end, through executeFile", { skip: !zshAvailable() }, () => {
-  const cwd = trailFixture();
-  const file = join(cwd, "SKILL.md");
-  writeFileSync(file, bash(PRE_FIX));
+test(
+  "the task-66 defect is caught end to end, through executeFile",
+  { skip: !zshAvailable() },
+  () => {
+    const cwd = trailFixture();
+    const file = join(cwd, "SKILL.md");
+    writeFileSync(file, bash(PRE_FIX));
 
-  // `--copy` seeds the temp working directory, so the block sees a real trail.
-  const report = executeFile(file, { allowZsh: true, copyFrom: cwd });
-  assert.equal(report.counts.runnable, 1, "the block must actually run");
-  const f = report.findings.find((x) => x.kind === "shell-disagreement");
-  assert.ok(f, "executeFile must surface the disagreement, not just runBlock");
-  assert.equal(f.line, 1);
+    // `--copy` seeds the temp working directory, so the block sees a real trail.
+    const report = executeFile(file, { allowZsh: true, copyFrom: cwd });
+    assert.equal(report.counts.runnable, 1, "the block must actually run");
+    const f = report.findings.find((x) => x.kind === "shell-disagreement");
+    assert.ok(
+      f,
+      "executeFile must surface the disagreement, not just runBlock",
+    );
+    assert.equal(f.line, 1);
 
-  rmSync(cwd, { recursive: true, force: true });
-});
+    rmSync(cwd, { recursive: true, force: true });
+  },
+);
 
 test("MUTATION: the allow-list, not the deny-list, is what refuses a novel command", () => {
   // An earlier version asserted against a locally defined deny-list fake, which
@@ -609,7 +868,11 @@ test("MUTATION: the allow-list, not the deny-list, is what refuses a novel comma
   const r = classifyBlock("kubectl delete pod api-0");
   assert.equal(r.klass, "mutating");
   assert.match(r.reason, /fail-closed/);
-  assert.doesNotMatch(r.reason, /deny-list/, "nothing on the deny-list names kubectl");
+  assert.doesNotMatch(
+    r.reason,
+    /deny-list/,
+    "nothing on the deny-list names kubectl",
+  );
 });
 
 // ── 5b. CLI surface ───────────────────────────────────────────────────────────
@@ -653,12 +916,18 @@ test("main() validates --bind and --timeout", () => {
   // Generous on purpose: this asserts that a valid value is ACCEPTED, not that any
   // particular duration is enough. A tight value here made the test flaky under
   // load, failing on shell startup rather than on the thing being tested.
-  assert.equal(main(["--file", f, "--timeout", "30000", "--no-zsh"]).exitCode, 0);
+  assert.equal(
+    main(["--file", f, "--timeout", "30000", "--no-zsh"]).exitCode,
+    0,
+  );
 
   // A well-formed binding is accepted and reaches the block.
   const bound = join(dir, "b.md");
   writeFileSync(bound, bash('test -n "$MY_VAL"'));
-  assert.equal(main(["--file", bound, "--bind", "MY_VAL=x", "--no-zsh"]).exitCode, 0);
+  assert.equal(
+    main(["--file", bound, "--bind", "MY_VAL=x", "--no-zsh"]).exitCode,
+    0,
+  );
 });
 
 // ── 6. File-level orchestration ───────────────────────────────────────────────
@@ -666,7 +935,10 @@ test("main() validates --bind and --timeout", () => {
 test("executeFile counts each class and records every skip with a reason", () => {
   const dir = tmp();
   const file = join(dir, "SKILL.md");
-  writeFileSync(file, md("# S", bash("echo ok"), bash("git push origin main"), bash("echo {id}")));
+  writeFileSync(
+    file,
+    md("# S", bash("echo ok"), bash("git push origin main"), bash("echo {id}")),
+  );
 
   const report = executeFile(file, { allowZsh: false });
   assert.equal(report.blocks, 3);
@@ -675,7 +947,10 @@ test("executeFile counts each class and records every skip with a reason", () =>
   const skips = report.results.filter((r) => r.skipped);
   assert.equal(skips.length, 2);
   for (const s of skips) {
-    assert.ok(s.reason, "every skip must carry a reason — a silent skip is the bug being prevented");
+    assert.ok(
+      s.reason,
+      "every skip must carry a reason — a silent skip is the bug being prevented",
+    );
     assert.ok(Number.isInteger(s.line));
   }
   rmSync(dir, { recursive: true, force: true });
@@ -720,7 +995,11 @@ test("a file with no bash blocks raises nothing — the step is cheap where it d
 
   const report = executeFile(file, { allowZsh: false });
   assert.equal(report.blocks, 0);
-  assert.deepEqual(report.findings, [], "no blocks means no finding, not a zero-executed finding");
+  assert.deepEqual(
+    report.findings,
+    [],
+    "no blocks means no finding, not a zero-executed finding",
+  );
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -732,7 +1011,15 @@ test("zsh being unavailable is recorded as information and never as a finding", 
   // --no-zsh models a host without zsh: the bash arm runs alone.
   const report = executeFile(file, { allowZsh: false });
   assert.deepEqual(report.shells, ["bash"]);
-  assert.equal(report.counts.runnable, 1, "the runnable count must not drop when zsh is absent");
-  assert.deepEqual(report.findings, [], "a missing interpreter is not a defect in the work item");
+  assert.equal(
+    report.counts.runnable,
+    1,
+    "the runnable count must not drop when zsh is absent",
+  );
+  assert.deepEqual(
+    report.findings,
+    [],
+    "a missing interpreter is not a defect in the work item",
+  );
   rmSync(dir, { recursive: true, force: true });
 });
