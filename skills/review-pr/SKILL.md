@@ -80,6 +80,22 @@ The `|| exit 1` on both `source` lines is load-bearing: a bare `source` prints t
 
 Verify Bitbucket auth **by status code**, never by the length of a returned list: Bitbucket answers an unauthenticated request to a private repo with **404, not 401**, so a bad credential reads exactly like an empty repository.
 
+### Step 0b — Parse `target`
+
+Bind the variables Step 1 uses. Without this, `$PR` and `$BRANCH` are undefined and every form of
+`target` except "no argument" has no path into the commands below.
+
+```bash
+BRANCH=$(git branch --show-current)
+PR=""
+case "${TARGET:-}" in
+  "")                      ;;                                   # no arg → PR for $BRANCH
+  *://*/pull/*|*://*/pullrequests/*) PR="${TARGET##*/}" ;;      # PR URL → trailing number
+  *[!0-9]*)                BRANCH="$TARGET" ;;                  # anything non-numeric → a branch
+  *)                       PR="$TARGET" ;;                      # all digits → a PR number
+esac
+```
+
 ### Step 1 — Resolve the PR
 
 **GitHub** (`VCS=github`):
@@ -109,12 +125,19 @@ A first-hit-wins cascade. Record which rung matched as `resolved_via` and print 
 
 | # | Rung | Mechanism |
 | --- | --- | --- |
-| 1 | **branch stem** | strip `feature/` \| `bugfix/` \| `hotfix/` → `STEM` → `docs/**/${STEM}/${STEM}.md`, else `docs/**/${STEM}.md` |
-| 2 | `pr_number` | `grep -rl "pr_number: ${PR_NUMBER}" docs/` |
-| 3 | gate `pr:` | `grep -rl "$PR_URL" docs/**/*.gate.*.yml` → its sibling work item |
+| 1 | **branch stem** | strip `feature/` \| `bugfix/` \| `hotfix/` → `STEM` → `find docs -type f -path "*/${STEM}/${STEM}.md"`, else `find docs -type f -name "${STEM}.md"` |
+| 2 | `pr_number` | `grep -rlE "^pr_number:[[:space:]]*${PR_NUMBER}[[:space:]]*$" docs/` |
+| 3 | gate `pr:` | `grep -rl --include='*.gate.*.yml' -- "$PR_URL" docs/` → its sibling work item |
 | 4 | tracker issue | PR body `#{N}` **or** `[A-Z]+-[0-9]+` → `github_issue:` / `jira_key:` frontmatter grep |
 | 5 | Explore | bounded read-only subagent fallback |
 | 6 | none | degrade to a **code-only** review, stated loudly |
+
+> **Two shell traps this table deliberately avoids.** `docs/**/…` needs `shopt -s globstar`, which is
+> off by default — without it bash expands `**` as a single level and the gate glob matches **nothing**,
+> silently. And an unanchored `pr_number: ${PR_NUMBER}` is a prefix match: reviewing PR 28 would resolve
+> to a document whose frontmatter reads `pr_number: 281`, anchoring the entire review on the wrong work
+> item. Both fail quietly, which is the worst shape for a resolver whose job is to be right about
+> *which document this is*.
 
 Rung 1 handles `task.{N}.*`, `story.{E}.{S}.*`, `epic.{N}.*` and `bug.{N}.*`. Rungs 4–5 reuse the cascade already documented in [`references/develop-pipeline-step-0-resolve-and-prepare.md`](references/develop-pipeline-step-0-resolve-and-prepare.md) § 0a — do not reinvent it.
 
@@ -167,11 +190,20 @@ Git is the common denominator, so **one path serves both platforms** — no host
 
 ```bash
 DIFF_FILE="$(mktemp -t review-pr.XXXXXX.patch)"   # scratch, never the repo
-git fetch -q origin "$BASE_BRANCH" "$HEAD_BRANCH"
-git diff "origin/$BASE_BRANCH...origin/$HEAD_BRANCH" > "$DIFF_FILE"
+if git fetch -q origin "$BASE_BRANCH" "$HEAD_BRANCH" 2>/dev/null \
+   && git diff "origin/$BASE_BRANCH...origin/$HEAD_BRANCH" > "$DIFF_FILE" \
+   && [ -s "$DIFF_FILE" ]; then
+  : # git path succeeded
+else
+  USE_API_DIFF=1                                   # fall through to the API fallback below
+fi
 ```
 
-**Cross-fork PRs**: `origin/$HEAD_BRANCH` does not exist when the head is a fork branch. Detect it up front (`headRepositoryOwner` ≠ the base repo owner) and take the API fallback directly rather than after a failed fetch:
+**Check the exit status.** A merged PR normally has its head branch deleted, so `git fetch` fails and
+the diff comes back empty — which an unchecked path reports as "no changes to review". That silently
+breaks the *"audit a merged PR after the fact"* case this skill explicitly supports.
+
+**Cross-fork PRs**: `origin/$HEAD_BRANCH` also does not exist when the head is a fork branch. Detect that up front (`headRepositoryOwner` ≠ the base repo owner) and set `USE_API_DIFF=1` without attempting the fetch at all. Either route — cross-fork, or any fetch/diff failure above — lands here:
 
 ```bash
 gh pr diff "$PR_NUMBER" > "$DIFF_FILE"                                          # GitHub
@@ -213,9 +245,13 @@ Conformance findings first (they judge whether the change is the right change), 
 
 | Condition | Verdict |
 | --- | --- |
-| any conformance `high`, or code `bug` + `severity: high` + `confidence: high` | 🚨 **REQUEST CHANGES** |
-| any `medium` | ⚠️ **CONCERNS** |
-| otherwise | ✅ **APPROVE** |
+| any finding with `severity: high` **and** `confidence: high` | 🚨 **REQUEST CHANGES** |
+| any remaining finding with `severity: high` **or** `severity: medium` (at any confidence) | ⚠️ **CONCERNS** |
+| otherwise (only `severity: low` findings, or none) | ✅ **APPROVE** |
+
+**Name the field in every row.** An earlier draft's middle row read only "any `medium`", which left a
+`severity: high` + `confidence: medium` bug matching no row at all — and falling through to APPROVE.
+A verdict table that silently approves a high-severity finding is worse than no table.
 
 Never call `gh pr review --approve`. Never write a gate `.yml`.
 
@@ -277,9 +313,19 @@ ALWAYS use this exact template structure:
 1. {highest-priority action}
 ```
 
-### Step 8 — `--comment` (optional, confirmed before posting)
+### Step 8 — `--comment` (optional)
 
 **One** summary comment, idempotent via the marker `<!-- agent-skills-pr-review -->`, using the find-by-marker → edit-by-id → else-create recipe from `finalise` — the only dual-platform idempotent PR comment in this repo.
+
+First build the body file — every command below reads it, and none of them creates it:
+
+```bash
+BODY_FILE="$(mktemp -t review-pr-comment.XXXXXX.md)"
+{
+  printf '%s\n\n' '<!-- agent-skills-pr-review -->'
+  cat "$REPORT_FILE"            # or the rendered summary when no report was written
+} > "$BODY_FILE"
+```
 
 **GitHub:**
 
@@ -304,8 +350,10 @@ fi
 **Bitbucket:**
 
 ```bash
+# pagelen=100 — Bitbucket pages comments, and scanning only the first page means a busy
+# PR never finds the marker and posts a duplicate, defeating the idempotency this exists for.
 EXISTING_COMMENT_ID=$(curl -sf "${BB_CURL_AUTH[@]}" \
-  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+  "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments?pagelen=100" \
   | jq -r '.values[] | select(.content.raw | startswith("<!-- agent-skills-pr-review -->")) | .id' | head -1)
 
 BB_PAYLOAD=$(jq -n --arg raw "$(cat "$BODY_FILE")" '{content: {raw: $raw}}')
@@ -331,7 +379,7 @@ Commenting never gates. Never post over an `unverifiable` reason.
 ### Step 9 — Cleanup
 
 ```bash
-rm -f "$DIFF_FILE"
+rm -f "$DIFF_FILE" "$BODY_FILE"
 ```
 
 ## Customization

@@ -6,7 +6,8 @@
  * the two lenses, the deterministic verdict, and the guarantees that make this
  * skill advisory (it never approves a PR and never writes a gate file).
  *
- * Run: node --test skills/review-pr/tests/
+ * Run: node --test 'skills/review-pr/tests/*.test.js'
+ *      (the directory form `node --test skills/review-pr/tests/` fails MODULE_NOT_FOUND here)
  */
 
 const fs = require("fs");
@@ -148,6 +149,79 @@ test("the exclusion filter names all nine artifact segments", () => {
   }
 });
 
+test("resolution greps are anchored and recursive (no ** globs, no prefix matches)", () => {
+  const step2 = SKILL.match(
+    /### Step 2 — Resolve the work item[\s\S]*?### Step 3 —/,
+  )[0];
+  // Scope to the cascade TABLE ROWS. The explanatory note under the table deliberately quotes
+  // `docs/**/` to explain why it is avoided, so an unscoped doesNotMatch flags the documentation
+  // rather than the mechanism.
+  const rows = step2
+    .split("\n")
+    .filter((l) => /^\| \d+ \|/.test(l))
+    .join("\n");
+  assert.ok(rows.length > 0, "cascade table rows found");
+  // CR-2: `docs/**/` needs globstar, which is off by default — it matched 0 of 110 gate files.
+  assert.doesNotMatch(rows, /docs\/\*\*\//, "no ** glob may survive in a rung");
+  assert.match(rows, /grep -rl --include='\*\.gate\.\*\.yml'/);
+  assert.match(rows, /find docs -type f/);
+  // CR-1: an unanchored pr_number grep makes PR 28 resolve to pr_number: 281.
+  assert.match(rows, /\^pr_number:/);
+  assert.match(rows, /\[\[:space:\]\]\*\$/);
+});
+
+test("target is parsed into PR and BRANCH before Step 1 uses them", () => {
+  // CR-4: Step 1 dereferenced ${PR} and $BRANCH with no step binding them.
+  const idx0b = SKILL.indexOf("### Step 0b — Parse `target`");
+  const idx1 = SKILL.indexOf("### Step 1 — Resolve the PR");
+  assert.ok(idx0b > -1, "Step 0b exists");
+  assert.ok(idx0b < idx1, "Step 0b precedes Step 1");
+  assert.match(SKILL, /BRANCH=\$\(git branch --show-current\)/);
+});
+
+test("the diff step checks its exit status so a merged PR falls back", () => {
+  // CR-5: an unchecked fetch made the documented "audit a merged PR" case report "no changes".
+  // Assert the CONDITIONAL ITSELF inside the fenced block — `USE_API_DIFF=1` also appears in the
+  // cross-fork prose below, so a bare match on that token survives deleting the guard entirely.
+  const step4 = SKILL.match(/### Step 4 — Build the diff[\s\S]*?### Step 5/)[0];
+  const bash = step4.match(/```bash\n([\s\S]*?)```/)[1];
+  assert.match(
+    bash,
+    /if git fetch -q origin/,
+    "the fetch is inside a conditional",
+  );
+  assert.match(
+    bash,
+    /&&\s*\n?\s*git diff/,
+    "the diff is chained on the fetch succeeding",
+  );
+  assert.match(
+    bash,
+    /\[ -s "\$DIFF_FILE" \]/,
+    "an empty patch is treated as failure",
+  );
+  assert.match(
+    bash,
+    /USE_API_DIFF=1/,
+    "the else branch sets the fallback flag",
+  );
+  assert.match(step4, /deleted/i, "the merged-PR rationale is stated");
+});
+
+test("the comment body file is assigned before use and cleaned up", () => {
+  // CR-3: $BODY_FILE was consumed by three commands and assigned by none.
+  const assign = SKILL.indexOf('BODY_FILE="$(mktemp');
+  const firstUse = SKILL.indexOf("${BODY_FILE}");
+  assert.ok(assign > -1, "BODY_FILE is assigned");
+  assert.ok(assign < firstUse, "assignment precedes first use");
+  assert.match(SKILL, /rm -f "\$DIFF_FILE" "\$BODY_FILE"/);
+});
+
+test("the Bitbucket marker scan is not limited to the first page", () => {
+  // CR-7: the default pagelen meant a busy PR never found the marker and posted a duplicate.
+  assert.match(SKILL, /comments\?pagelen=100/);
+});
+
 test("story documents are globbed, not assumed to live in docs/stories/", () => {
   assert.match(SKILL, /not\*\* in `docs\/stories\/`/);
   assert.match(SKILL, /never assume one root/);
@@ -157,20 +231,25 @@ test("story documents are globbed, not assumed to live in docs/stories/", () => 
 // Artifact collection
 // ---------------------------------------------------------------------------
 test("all eight artifact kinds are collected", () => {
+  // Scope to the fenced bash block and match the GLOB form. Matching bare words against the whole
+  // Step 3 section passed even with the globs deleted, because "gate", "review" and
+  // "implementation" all occur in the surrounding prose (CR-9).
   const step3 = SKILL.match(
     /### Step 3 — Collect the paper trail[\s\S]*?### Step 3b/,
   )[0];
-  for (const kind of [
-    "implementation",
-    "review",
-    "qa",
-    "gate",
-    "dod",
-    "sprint-review-summary",
-    "bug",
-    "handover",
+  const bash = step3.match(/```bash\n([\s\S]*?)```/)[1];
+  for (const glob of [
+    "*.implementation.*.md",
+    "*.qa.*.md",
+    "*.gate.*.yml",
+    "*.dod.*.md",
+    "*sprint-review-summary.md",
+    "*.bug.*.md",
+    "*.handover.*.md",
+    "*.review.*.md",
+    "*.pr-review.*.md",
   ]) {
-    assert.ok(step3.includes(kind), `artifact kind ${kind} collected`);
+    assert.ok(bash.includes(glob), `artifact glob ${glob} present`);
   }
 });
 
@@ -221,7 +300,7 @@ test("the cross-fork PR case is handled up front", () => {
   const step4 = SKILL.match(/### Step 4 — Build the diff[\s\S]*?### Step 5/)[0];
   assert.match(step4, /Cross-fork PRs/);
   assert.match(step4, /headRepositoryOwner/);
-  assert.match(step4, /take the API fallback directly/);
+  assert.match(step4, /USE_API_DIFF=1/);
   assert.match(step4, /gh pr diff/);
 });
 
@@ -283,8 +362,21 @@ test("the pr_conformance output contract carries the full key set", () => {
 });
 
 test("the conformance schema mirrors code_review so one renderer serves both", () => {
-  assert.match(CONFORMANCE, /mirror the `code_review\[?\]?` schema|parallel/i);
-  assert.match(SKILL, /deliberately parallel/);
+  // Was: /mirror the `code_review\[?\]?` schema|parallel/i — the first alternative was dead (the
+  // prompt writes code_review[] without backticks) and the `|parallel` fallback matched a stray
+  // word anywhere in the file, so the assertion passed vacuously (CR-8).
+  assert.match(CONFORMANCE, /mirror the code_review\[\] schema/);
+  assert.match(SKILL, /schemas are deliberately parallel/);
+  for (const key of [
+    "id",
+    "category",
+    "severity",
+    "confidence",
+    "finding",
+    "suggested_action",
+  ]) {
+    assert.ok(CONFORMANCE.includes(`${key}:`), `shared field ${key} present`);
+  }
 });
 
 test("the conformance reviewer is read-only and never gates", () => {
@@ -301,6 +393,10 @@ test("all three verdict outcomes are defined with their conditions", () => {
   assert.match(verdict, /CONCERNS/);
   assert.match(verdict, /APPROVE/);
   assert.match(verdict, /confidence: high/);
+  // CR-6: the middle row said only "any medium", so severity:high + confidence:medium matched no
+  // row at all and fell through to APPROVE.
+  assert.match(verdict, /at any confidence/);
+  assert.doesNotMatch(verdict, /\| any `medium` \|/);
 });
 
 test("the skill never submits a formal review and never writes a gate", () => {

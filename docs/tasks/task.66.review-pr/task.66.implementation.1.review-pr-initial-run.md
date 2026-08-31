@@ -35,8 +35,8 @@ Build the `review-pr` skill: resolve a PR back to its work item, collect the pip
 | 1. create-branch          | ✅ Done    | Branch `feature/task.66.*` exists in git                                      | Auto-skipped — branch already checked out (cut by /review-task Step 0a) | — |
 | 2. review-task            | ✅ Done    | `task.66.review.{N}.{name}.md` exists (or skip logged)                        | Skipped — `task.66.review.1.review-pr.md` from standalone run (8/10, READY TO IMPLEMENT, 6 fixes applied) | — |
 | 3. develop                | ✅ Done    | Task status == `Ready for Review`                                             | 11 files; 40 contract tests green; 11 mutation proofs; Phase 10 doc sweep | — |
-| 4. create-pr              | ⏳ Pending | PR URL targets `develop`; issue comment posted                                |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.66.qa.{N}.*.md`; `task.66.gate.{N}.*.yml`; PR comment posted            |       | —                    |
+| 4. create-pr              | ✅ Done    | PR URL targets `develop`; issue comment posted                                | [#283](https://github.com/Gamaroff/agent-skills/pull/283) — 3 commits | — |
+| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 | `task.66.qa.{N}.*.md`; `task.66.gate.{N}.*.yml`; PR comment posted            | Gate 1 CONCERNS (70/100) — 4 blocking, 7 advisory | — |
 | 7. finalise               | ⏳ Pending | `task.66.dod.{N}.*.md`; task `status: accepted`                               |       | —                    |
 | 8. commit-changes         | ⏳ Pending | All artifacts committed and pushed                                            |       | —                    |
 
@@ -70,4 +70,45 @@ Build the `review-pr` skill: resolve a PR back to its work item, collect the pip
 
 ## QA Iteration History
 
-_Populated during Steps 5–6._
+### Cycle 1 — gate: CONCERNS (70/100)
+
+Document-anchored checks all passed (10/10 phases, 1986 tests green, standards sweep verified).
+The diff code review found 10 correctness defects + 1 cleanup in the skill's own shell snippets
+and test assertions; 4 were `confidence: high` and gated.
+
+Every testable finding was confirmed empirically before being accepted — notably CR-2, where the
+documented `docs/**/*.gate.*.yml` matches **0 of 110** gate files without `globstar`.
+
+Two findings (CR-8, CR-9) are weak test assertions that would pass against a SKILL.md with the
+behaviour deleted. The 11 mutation proofs run during development did not catch them, because
+neither assertion was among the mutated behaviours — the honest limit of a mutation set is that it
+proves the claims you thought to revert.
+
+**Fix cycle 1 — all 11 findings addressed:**
+
+| Finding | Fix |
+|---|---|
+| CR-1 | `pr_number` grep anchored: `grep -rlE "^pr_number:[[:space:]]*${PR_NUMBER}[[:space:]]*$"` |
+| CR-2 | Both `docs/**/` globs replaced — rung 1 uses `find docs -type f`, rung 3 uses `grep -rl --include='*.gate.*.yml'` |
+| CR-3 | `BODY_FILE` assigned via `mktemp` before the platform branches; Step 9 now removes it |
+| CR-4 | New **Step 0b — Parse `target`** binds `PR` and `BRANCH` before Step 1 uses them |
+| CR-5 | Fetch/diff wrapped in a conditional with `[ -s "$DIFF_FILE" ]`; any failure sets `USE_API_DIFF=1` |
+| CR-6 | Verdict table names the field in every row; a `high`+`medium confidence` finding can no longer fall through to APPROVE |
+| CR-7 | Bitbucket marker scan uses `?pagelen=100` |
+| CR-8 | Vacuous assertion bound to the real sentence plus the shared key set |
+| CR-9 | Artifact-kinds test scoped to the fenced bash block, matching glob forms not bare words |
+| CR-10 | Step 8 heading no longer contradicts the Arguments rule |
+| CR-11 | Test header documents the glob run form that actually works |
+
+Each fix is held by a test (45 now, up from 40) and **each was mutation-proved**.
+
+**One mutation came back NOT HELD on the first attempt.** CR-5's guard matched `USE_API_DIFF=1`,
+which also appears in the cross-fork prose below the code block — so mutating the conditional left
+the assertion satisfied. Identical in shape to M5 earlier in this run. The guard now asserts the
+fenced conditional itself (`if git fetch`, the `&&` chain, the `-s` emptiness check) and goes red
+when the conditional is removed.
+
+That is twice in one task that an assertion matched a token appearing in more than one place. The
+lesson is specific and worth carrying: **when a guard asserts a token, check how many times that
+token occurs in the file** — if more than once, scope the assertion to the construct rather than
+the string.
