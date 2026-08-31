@@ -1,0 +1,1009 @@
+#!/usr/bin/env node
+// AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/qa-execute-snippets.mjs. Regenerate via `npm run bundle`.
+/**
+ * qa-execute-snippets — extract, classify and dual-shell execute the fenced
+ * ```bash blocks in a markdown file.
+ *
+ * Usage:
+ *   node <this-file> --file <path.md> [options]
+ *
+ * Options:
+ *   --file <path>        markdown file to analyse (required)
+ *   --bind NAME=VALUE    bind a caller-supplied variable; repeatable
+ *   --copy <dir>         seed the temp working directory from this directory
+ *   --timeout <ms>       per-block, per-shell timeout (default 10000)
+ *   --no-zsh             force the bash arm only (testing / mutation proving)
+ *   --json               emit one JSON object on stdout
+ *
+ * Exit codes (repository convention):
+ *   0  clean — no findings
+ *   1  findings present
+ *   2  hard error (missing file, bad argument)
+ *
+ * The rule this implements — what counts as runnable prose, why the safety
+ * boundary is an allow-list rather than a deny-list, and why stdout rather than
+ * exit status is the load-bearing comparison — is stated once in
+ * `qa-runnable-prose-detection.md`, which sits beside this file in both the
+ * source tree and every bundled copy. Read that first; this file is the
+ * mechanism, not the argument.
+ */
+
+import { spawnSync } from "node:child_process";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+
+// ── Extraction ────────────────────────────────────────────────────────────────
+
+/**
+ * Every fenced ```bash block, with the 1-based line number of its opening fence.
+ * Only the `bash` info string is in scope — see the detection rule §1.
+ */
+export function extractBlocks(markdown) {
+  const lines = markdown.split("\n");
+  const blocks = [];
+  let open = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // CR-10 — take the language as the FIRST WORD of the info string and ignore
+    // the rest. Rejecting an attributed fence (```bash showLineNumbers) did not
+    // merely skip that block: its body was dropped and its CLOSING fence was then
+    // read as an opening one, inverting fence state for the rest of the file.
+    // Verified: a doc with one attributed block extracted zero blocks, so the gate
+    // reported a clean run on a document it had never read.
+    const fence = /^(\s*)(`{3,}|~{3,})\s*([A-Za-z0-9_+-]*)([^`]*)$/.exec(line);
+    if (!fence) {
+      // Ordinary content. Only meaningful while a fence is open — that is the
+      // block body, and dropping it here is how an earlier draft extracted every
+      // block as empty.
+      if (open !== null) open.body.push(line);
+      continue;
+    }
+    const [, indent, marker, info] = fence;
+
+    if (open === null) {
+      open = {
+        indent,
+        marker: marker[0],
+        len: marker.length,
+        info,
+        start: i,
+        body: [],
+      };
+      continue;
+    }
+
+    // A closing fence uses the same marker character and is at least as long.
+    if (marker[0] === open.marker && marker.length >= open.len && info === "") {
+      if (open.info === "bash") {
+        blocks.push({
+          line: open.start + 1,
+          code: open.body.join("\n"),
+        });
+      }
+      open = null;
+      continue;
+    }
+
+    // A differently-marked fence inside an open block is content, not a fence.
+    open.body.push(line);
+  }
+
+  // An unterminated fence is not a block — we never execute what we cannot delimit.
+  return blocks;
+}
+
+// ── Classification ────────────────────────────────────────────────────────────
+
+/**
+ * Commands known to be read-only. This is the safety boundary and it is an
+ * ALLOW-list: anything absent here classifies as `mutating` and is skipped.
+ * A deny-list alone fails open — every command nobody thought to forbid runs.
+ *
+ * `gh` and `curl` are deliberately absent in every form, including read-only
+ * ones: a QA gate should not make network calls, and the execution environment
+ * carries no credentials.
+ */
+export const SAFE_COMMANDS = new Set([
+  "basename",
+  "cat",
+  "comm",
+  "cut",
+  "date",
+  "diff",
+  "dirname",
+  "echo",
+  "egrep",
+  "false",
+  "fgrep",
+  "file",
+  "grep",
+  "head",
+  "jq",
+  "ls",
+  "printf",
+  "pwd",
+  "readlink",
+  "realpath",
+  "seq",
+  "sort",
+  "stat",
+  "tail",
+  "test",
+  "tr",
+  "true",
+  "uniq",
+  "wc",
+  // `sed` is read-only unless asked to edit in place; `find` unless given a
+  // write action; both are constrained by DENY_PATTERNS below.
+  "sed",
+  "find",
+]);
+
+/**
+ * Commands that RUN another command. Their blast radius is whatever follows, and
+ * only the prefix was ever scanned — `env touch /tmp/x`, `command mv a b` and
+ * `time mv a b` all classified runnable. They are refused outright rather than
+ * recursed into: the recursion would have to re-implement each one's option
+ * grammar to find where the real command starts, and getting that wrong fails
+ * open again.
+ *
+ * `awk` is here for the same reason by a different route — its program text is a
+ * quoted argument, so `awk 'BEGIN{system("touch /tmp/x")}'` is arbitrary shell
+ * that the quote-blanking hides from the scan entirely.
+ */
+export const COMMAND_RUNNERS = new Set([
+  "awk",
+  "command",
+  "env",
+  "eval",
+  "exec",
+  "nice",
+  "nohup",
+  "sudo",
+  "time",
+  "timeout",
+  "watch",
+  "xargs",
+]);
+
+/**
+ * Shell keywords, and builtins that cannot mutate anything outside the block's
+ * own shell. `source` and `.` are deliberately absent: they execute an arbitrary
+ * file, which is exactly what the allow-list exists to refuse.
+ */
+const SHELL_KEYWORDS = new Set([
+  "!",
+  "[",
+  "[[",
+  "]]",
+  "]",
+  "{",
+  "}",
+  "(",
+  ")",
+  "case",
+  "do",
+  "done",
+  "elif",
+  "else",
+  "esac",
+  "fi",
+  "for",
+  "function",
+  "if",
+  "in",
+  "select",
+  "then",
+  "until",
+  "while",
+  // Builtins whose blast radius is the block's own shell process.
+  ":",
+  "break",
+  "cd",
+  "continue",
+  "exit",
+  "export",
+  "local",
+  "read",
+  "readonly",
+  "return",
+  "set",
+  "shift",
+  "type",
+  "unset",
+  "which",
+]);
+
+/**
+ * What a command name can look like. A token that cannot name a command — a
+ * `case` arm glob pattern, a blanked quoted string, a stray backslash — is not
+ * an invocation, so the segment holding it is not scanned.
+ *
+ * This does NOT weaken the fail-closed rule. Anything that *could* be a command
+ * name and is not on the allow-list still classifies as mutating. What this
+ * removes is the noise that made a real skill file report ten "unrecognised
+ * commands" that were glob patterns, and skip all twelve of its blocks.
+ */
+const COMMAND_NAME = /^[A-Za-z_.\/][\w.\/+-]*$/;
+
+/** `git` subcommands that only read. Any other subcommand is mutating. */
+const SAFE_GIT_SUBCOMMANDS = new Set([
+  "cat-file",
+  "describe",
+  "diff",
+  "log",
+  "ls-files",
+  "ls-remote",
+  "ls-tree",
+  "rev-list",
+  "rev-parse",
+  "show",
+  "status",
+]);
+
+/**
+ * Named dangers. These do not define the boundary — SAFE_COMMANDS does — but
+ * they produce a precise reason for the cases worth naming.
+ */
+export const DENY_PATTERNS = [
+  [/\bgh\s+pr\s+comment\b/, "gh pr comment"],
+  [/\bgh\s+issue\b/, "gh issue"],
+  [/\bgh\s+api\b[^\n]*\s(-X|--method)\b/, "gh api with method"],
+  [
+    /\bcurl\b[^\n]*\s(-X|--request)\s*(POST|PUT|PATCH|DELETE)\b/,
+    "curl write method",
+  ],
+  [/\bgit\s+push\b/, "git push"],
+  [/\bgit\s+commit\b/, "git commit"],
+  [/\brm\s+-[A-Za-z]*[rf]/, "rm -rf"],
+  // `-i` anywhere in a sed invocation, not only immediately after `sed`.
+  // `sed 's/a/b/' -i file` and `sed -e 's/a/b/' -i file` both edit in place and
+  // both slipped past a pattern anchored to the first argument.
+  [/\bsed\b[^\n|;&]*\s-[A-Za-z]*i\b/, "sed -i"],
+  [/\bsed\b[^\n|;&]*\s--in-place(=\S*)?\b/, "sed --in-place"],
+  // Long-form output flags on otherwise read-only commands write files just as a
+  // redirection does, and carry no `>` for WRITE_REDIRECT to catch.
+  [/\s--output(=|\s)/, "--output flag"],
+  [/\s-o\s+\S/, "-o output flag"],
+  // CR-7: `find` is read-only until it is given an action that is not.
+  [
+    /\bfind\b[^\n]*\s-(delete|exec|execdir|ok|okdir|fls|fprint|fprintf)\b/,
+    "find write action",
+  ],
+  // Other allow-listed commands with a write mode.
+  [/\btee\b/, "tee"],
+];
+
+/**
+ * CR-1 — a write redirection makes ANY command mutating, including an
+ * allow-listed one. `echo pwned > /tmp/x` classified runnable and wrote the file;
+ * the temp working directory is no defence, because an absolute or `~`-relative
+ * target simply ignores it.
+ *
+ * Matches `>`, `>>`, `&>`, `>|` and `n>` / `n>>` when they target a real path.
+ *
+ * Two things are NOT writes and must be exempt, or the rule refuses most of the
+ * documented prose it exists to run: redirection to `/dev/null` / `/dev/stdout` /
+ * `/dev/stderr`, which persists nothing, and file-descriptor duplication `>&1`,
+ * `2>&1`, which redirects a stream onto another rather than onto a file. An
+ * earlier draft matched `2>&1` and made `command -v zsh >/dev/null 2>&1` —
+ * this repository's own documented zsh guard — unrunnable.
+ */
+const WRITE_REDIRECT =
+  /(?:^|[^<>&\d\w])(?:\d*>>?|&>|>\|)\s*(?!&\d|\s*\/dev\/(?:null|stderr|stdout)\b)\S/;
+
+/** Template slots: `{n}`, `{task-id}`, `<path>`, `<PLACEHOLDER>`. */
+const PLACEHOLDER_PATTERNS = [
+  // `{name}` but never `${name}` — the negative lookbehind is what keeps shell
+  // parameter expansion out of the placeholder bucket.
+  /(?<!\$)\{[A-Za-z][\w .:|/-]*\}/,
+  // `<name>` in argument position. `2>&1`, `<<EOF` and `a < b` do not match.
+  /(?<![<>&\w])<[A-Za-z][\w -]*>/,
+];
+
+/** Shell variables that are always available and never need binding. */
+const IMPLICIT_VARS = new Set([
+  "?",
+  "!",
+  "$",
+  "#",
+  "@",
+  "*",
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "HOME",
+  "IFS",
+  "PATH",
+  "PWD",
+  "OLDPWD",
+  "SHELL",
+  "USER",
+  "TMPDIR",
+  "RANDOM",
+  "LINENO",
+  "SECONDS",
+  "HOSTNAME",
+  "UID",
+  "EUID",
+  "PPID",
+  "BASH_SOURCE",
+]);
+
+/**
+ * Remove a `#` comment from one line, respecting quoting.
+ *
+ * Walks the line tracking single- and double-quote state so a `#` inside a string
+ * is data, not a comment. `${#var}` is preserved because a `#` only opens a
+ * comment at the start of a word (start of line or after whitespace).
+ */
+function stripCommentQuoteAware(line) {
+  let single = false;
+  let double = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === "\\" && double) {
+      i++;
+      continue;
+    }
+    if (c === "'" && !double) {
+      single = !single;
+      continue;
+    }
+    if (c === '"' && !single) {
+      double = !double;
+      continue;
+    }
+    if (
+      c === "#" &&
+      !single &&
+      !double &&
+      (i === 0 || /\s/.test(line[i - 1]))
+    ) {
+      return line.slice(0, i);
+    }
+  }
+  return line;
+}
+
+/**
+ * Drop comments and heredoc bodies. Quoted spans are KEPT — a placeholder is
+ * very often written inside quotes (`--issue "{TRACKER_ISSUE}"`), so blanking
+ * quotes before placeholder detection would classify a templated block as
+ * runnable and then execute it.
+ */
+function stripProse(code) {
+  const out = [];
+  const lines = code.split("\n");
+  let heredocTerminator = null;
+
+  for (const raw of lines) {
+    if (heredocTerminator !== null) {
+      if (raw.trim() === heredocTerminator) heredocTerminator = null;
+      continue; // heredoc body is data
+    }
+    // A REAL heredoc: `<<` or `<<-`, never `<<<` (here-string) and never the
+    // second `<` of one. `grep -q x <<<"DATA"` used to swallow every following
+    // line as heredoc body, hiding a trailing `rm -rf` from both scans.
+    const here = /(?<!<)<<-?(?!<)\s*\\?(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(
+      raw,
+    );
+    if (here) {
+      heredocTerminator = here[2];
+      // Keep the WHOLE opener line, not just the part before `<<`. Truncating it
+      // threw away any redirection that followed — `cat <<EOF > /tmp/pwned` had
+      // its `> /tmp/pwned` removed before the write-redirect check ever saw it,
+      // and classified runnable.
+      out.push(raw);
+      continue;
+    }
+    // Drop `# comment` — but ONLY outside quoted spans. A line regex fired on a
+    // `#` inside a string, deleting the rest of the line from both scans while
+    // execution still used the original code: `echo "note # here"; rm -rf /tmp/x`
+    // classified runnable and the `rm -rf` ran.
+    let line = stripCommentQuoteAware(raw);
+    out.push(line);
+  }
+  return out.join("\n");
+}
+
+/**
+ * Everything `stripProse` removes, plus the contents of quoted spans. Used only
+ * for command detection, where a quoted string is an argument and never an
+ * invocation.
+ */
+function stripNonCode(code) {
+  return stripProse(code)
+    .replace(/'[^']*'/g, "''")
+    .replace(/"(\\.|[^"\\])*"/g, '""');
+}
+
+/** The leading word of every simple command in the block. */
+export function commandWords(code) {
+  const stripped = stripNonCode(code)
+    // Backslash line-continuations join one command across several lines. Splitting
+    // on the raw newline first makes the continuation's tail look like a fresh
+    // command: `git log ... -- \` + `apps packages` reported `apps` as a command.
+    .replace(/\\\n/g, " ")
+    // Arithmetic expansion is arithmetic, not an invocation. It must go before the
+    // `$(` rule below, or `$((N + 1))` becomes a segment whose first token is `N`.
+    .replace(/\$\(\([^)]*\)\)/g, " ")
+    // Command substitutions and subshells: turn the delimiters into segment
+    // breaks so the INNER command is scanned as a command rather than being
+    // swallowed by the enclosing assignment. Without this,
+    // `P=$(git remote get-url origin)` skips `P=$(git` as an assignment and then
+    // reads `remote` as the command.
+    .replace(/\$\(/g, "\n")
+    // CR-8: process substitution `<(…)` / `>(…)` keeps the inner command glued to
+    // the outer segment's tail, and only the first token of a segment is examined
+    // — so `cat <(touch /tmp/x)` saw only `cat`.
+    .replace(/[<>]\(/g, "\n")
+    .replace(/`/g, "\n");
+  // NOTE: a bare `)` is deliberately NOT turned into a segment break. It used to
+  // be, and that erased the one signal distinguishing a `case` arm pattern
+  // (`*://*/pull/*)`) from an obfuscated command name (`/usr/bin/[t]ouch`) — both
+  // are globs, and without the trailing `)` there is nothing to tell them apart.
+  // The `$(`/`<(` rules above already put every substituted command at the START
+  // of its own segment, so the closing paren only ever lands on a trailing
+  // argument, where it is harmless.
+  const words = [];
+  // Split on anything that can begin a new simple command.
+  // Deliberately NOT split on `{` or `(`: `echo {task-id}` would then yield
+  // `task-id}` as a command word, and the fail-closed rule would report a
+  // templated block as an unrecognised command. Grouping characters are stripped
+  // as prefixes below instead.
+  const segments = stripped.split(
+    // `&` splits a background or AND-list, but `>&` / `<&` is descriptor
+    // duplication — splitting there left the file descriptor (the `1` in `2>&1`)
+    // sitting in command position, where the fail-closed rule then refused it.
+    /(?:\n|;|\|\||&&|\||(?<![<>])&|\bdo\b|\bthen\b|\belse\b)/,
+  );
+
+  let inCase = false;
+  for (const seg of segments) {
+    const trimmed = seg.trim().replace(/^[({\s]+/, "");
+    if (!trimmed) continue;
+    if (/^case\b/.test(trimmed)) inCase = true;
+    if (/^esac\b/.test(trimmed)) inCase = false;
+    for (let tok of trimmed.split(/\s+/)) {
+      // Leading `VAR=value` assignments and redirections precede the command.
+      if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) continue;
+      if (/^[<>]/.test(tok) || /^\d+[<>]/.test(tok)) continue;
+      if (tok === "") continue;
+      // A `case` arm pattern is the ONE token in command position that is not an
+      // invocation. It is recognisable only by its trailing `)`, which is why the
+      // stripper above no longer erases it.
+      if (inCase && /\)$/.test(tok)) break;
+
+      // Unquote the way a shell does before deciding what the command IS.
+      // `who'am'i`, `to"u"ch` and `t\ouch` are all spellings of one binary, and a
+      // scanner that reads them as unparseable-therefore-absent is a scanner an
+      // attacker only has to add one quote to defeat. Verified: all three
+      // executed under the previous version.
+      let word = tok.replace(/\\(.)/g, "$1").replace(/['"]/g, "");
+
+      if (!COMMAND_NAME.test(word)) {
+        // Everything still unreadable in command position is UNSAFE, not absent.
+        // A tilde path, a glob that expands to a binary (`/usr/bin/[t]ouch`), a
+        // variable command name — the scanner cannot say what any of them runs,
+        // and "cannot say" must never resolve to "safe".
+        words.push("<unparseable>");
+        break;
+      }
+      tok = word;
+      if (tok === "git") {
+        // Carry THIS invocation's subcommand. Resolving `git` against the first
+        // `git …` in the whole block instead fails OPEN: a block opening with
+        // `git rev-parse` would license a later `git checkout` in the same block.
+        const rest = trimmed
+          .split(/\s+/)
+          .slice(1)
+          .find((t) => /^[a-z][a-z-]*$/.test(t));
+        words.push(rest ? `git:${rest}` : "git");
+      } else {
+        words.push(tok);
+      }
+      break; // only the command word of this segment
+    }
+  }
+  return words;
+}
+
+/** Variables the block reads but never assigns. */
+export function unboundVariables(code, bindings) {
+  const stripped = code
+    .split("\n")
+    .filter((l) => !/^\s*#/.test(l))
+    .join("\n");
+
+  const assigned = new Set();
+  for (const m of stripped.matchAll(/(?:^|\s|;)([A-Za-z_][A-Za-z0-9_]*)=/g))
+    assigned.add(m[1]);
+  for (const m of stripped.matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b/g))
+    assigned.add(m[1]);
+  for (const m of stripped.matchAll(
+    /\bread\s+(?:-\S+\s+)*([A-Za-z_][A-Za-z0-9_]*)/g,
+  ))
+    assigned.add(m[1]);
+
+  const read = new Set();
+  for (const m of stripped.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g))
+    read.add(m[1]);
+
+  return [...read].filter(
+    (v) => !assigned.has(v) && !IMPLICIT_VARS.has(v) && !(v in bindings),
+  );
+}
+
+/**
+ * Exactly one of: runnable | placeholder | mutating.
+ * Order matters — `mutating` is decided before `placeholder`, so a block that is
+ * both templated and dangerous is reported by its dangerous property.
+ */
+export function classifyBlock(code, bindings = {}) {
+  // Scan prose-stripped code, not raw: a heredoc body or a comment that merely
+  // MENTIONS `git push` is documentation. Scanning raw text would classify a doc
+  // for its own examples and skip a block that is in fact safe to run.
+  const prose = stripProse(code);
+
+  for (const [re, name] of DENY_PATTERNS) {
+    if (re.test(prose))
+      return { klass: "mutating", reason: `deny-list: ${name}` };
+  }
+
+  // CR-1 — a write redirection makes any command mutating, allow-listed or not.
+  if (WRITE_REDIRECT.test(stripNonCode(code))) {
+    return { klass: "mutating", reason: "write-redirection" };
+  }
+
+  // `command -v X` / `command -V X` is a pure lookup: it prints a path and runs
+  // nothing. Bare `command X` runs X, so the exception is anchored to the flag and
+  // nothing else. Without it the repository's own documented zsh guard
+  // (`command -v zsh >/dev/null`) is unrunnable by the gate that recommends it.
+  const codeForScan = stripNonCode(code).replace(
+    /\bcommand\s+-[vV]\b/g,
+    "true",
+  );
+
+  const unknown = commandWords(codeForScan).filter((w) => {
+    if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list
+    if (SHELL_KEYWORDS.has(w)) return false;
+    if (SAFE_COMMANDS.has(w)) return false;
+    if (w.startsWith("git:")) return !SAFE_GIT_SUBCOMMANDS.has(w.slice(4));
+    return true;
+  });
+
+  if (unknown.length > 0) {
+    return {
+      klass: "mutating",
+      reason: `unrecognised-command: ${[...new Set(unknown.map((w) => w.replace(":", " ")))].join(", ")} (fail-closed)`,
+    };
+  }
+
+  // Same reasoning for template slots.
+  for (const re of PLACEHOLDER_PATTERNS) {
+    if (re.test(prose))
+      return { klass: "placeholder", reason: "template slot" };
+  }
+
+  const unbound = unboundVariables(code, bindings);
+  if (unbound.length > 0) {
+    return {
+      klass: "placeholder",
+      reason: `unbound-variable: ${unbound.join(", ")}`,
+    };
+  }
+
+  return { klass: "runnable", reason: null };
+}
+
+// ── Dual-shell execution ──────────────────────────────────────────────────────
+
+let ZSH_AVAILABLE = null;
+
+/** Memoised — this used to spawn a subprocess on every call, including once per
+ *  `{ skip: !zshAvailable() }` predicate in the test suite. */
+export function zshAvailable() {
+  if (ZSH_AVAILABLE === null) {
+    const r = spawnSync("command", ["-v", "zsh"], {
+      shell: "/bin/bash",
+      encoding: "utf8",
+    });
+    ZSH_AVAILABLE = r.status === 0;
+  }
+  return ZSH_AVAILABLE;
+}
+
+/**
+ * Run one block under each shell and compare.
+ *
+ * stdout is the load-bearing comparison, NOT exit status. The defect this whole
+ * mechanism exists for exits 1 under both shells and differs only in what it
+ * printed — comparing status alone would have missed it.
+ */
+/**
+ * Recursive listing of `dir` as `relative path -> mtimeMs:size`.
+ *
+ * The containment check below compares two of these. It is deliberately cheap and
+ * deliberately NOT a substitute for classification — see `runBlock`.
+ */
+function snapshotTree(dir, skipDir = null) {
+  const out = new Map();
+  const walk = (d, prefix) => {
+    let entries;
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const rel = prefix ? `${prefix}/${e.name}` : e.name;
+      const abs = `${d}/${e.name}`;
+      // Do not descend into the working copy. Writes there are expected, and a
+      // large `--copy` would otherwise be walked twice per block — turning a
+      // safety net into the run's dominant cost.
+      if (rel === skipDir) continue;
+      if (e.isDirectory()) {
+        walk(abs, rel);
+        continue;
+      }
+      try {
+        const st = statSync(abs);
+        out.set(rel, `${st.mtimeMs}:${st.size}`);
+      } catch {
+        /* raced */
+      }
+    }
+  };
+  walk(dir, "");
+  return out;
+}
+
+export function runBlock(
+  code,
+  { shells, cwd, timeout = 10_000, bindings = {}, sandboxRoot = null } = {},
+) {
+  // CR-12 — a minimal environment, not the parent's. Spreading `process.env`
+  // handed every snippet GITHUB_TOKEN and tracker credentials, contradicting this
+  // file's own claim that the execution environment carries none. Inherited PWD
+  // also disagreed with `cwd`, which can manufacture disagreement noise by itself.
+  const env = {
+    PATH: process.env.PATH ?? "",
+    HOME: process.env.HOME ?? "",
+    LANG: process.env.LANG ?? "C",
+    TERM: "dumb",
+    TMPDIR: process.env.TMPDIR ?? "/tmp",
+    PWD: cwd ?? process.cwd(),
+    ...bindings,
+  };
+  const runs = {};
+
+  // Defence in depth. Classification is the first line and it has been wrong
+  // before — thirteen ways, found in one review. This is the second line: watch a
+  // canary directory beside the working copy and report any block that reaches
+  // outside its sandbox, whatever the classifier concluded.
+  // The sentinel engages only when the caller names the sandbox root explicitly.
+  //
+  // Deriving it as `${cwd}/..` was wrong and expensive: `runBlock` accepts any
+  // cwd, so a bare temp directory made the sentinel walk the whole of /tmp twice
+  // per block — it hung the test suite for two minutes before being killed. A
+  // safety net that guesses its own boundary is not a safety net.
+  const sentinelRoot = sandboxRoot;
+  const workDirName = sentinelRoot && cwd ? cwd.split("/").pop() : null;
+  const before = sentinelRoot ? snapshotTree(sentinelRoot, workDirName) : null;
+
+  for (const shell of shells) {
+    const r = spawnSync(shell, ["-c", code], {
+      cwd,
+      timeout,
+      encoding: "utf8",
+      env,
+    });
+    runs[shell] = {
+      stdout: (r.stdout ?? "").replace(/\n+$/, ""),
+      stderr: (r.stderr ?? "").replace(/\n+$/, ""),
+      status: r.status,
+      // Node sets `error.code = "ETIMEDOUT"` on a timeout, and that is sufficient.
+      // Also testing `signal === "SIGTERM"` mislabelled any block that terminates
+      // itself (`kill -TERM $$`) as a timeout, at high confidence.
+      timedOut: r.error?.code === "ETIMEDOUT",
+    };
+  }
+
+  const findings = [];
+
+  // A failure that reproduces identically in every shell is not a portability
+  // defect — it is a block that needs a context this gate did not supply, or a
+  // snippet that is simply broken. The confidence stays `high` per the rule, but
+  // saying so in the detail is what lets a reviewer triage it in one read
+  // instead of re-running it by hand.
+  const statuses = shells.map((sh) => runs[sh].status);
+  const stdouts = shells.map((sh) => runs[sh].stdout);
+  const consistent =
+    shells.length > 1 &&
+    statuses.every((x) => x === statuses[0]) &&
+    stdouts.every((x) => x === stdouts[0]);
+
+  for (const shell of shells) {
+    const run = runs[shell];
+    if (run.timedOut) {
+      findings.push({
+        kind: "execution-timeout",
+        shell,
+        confidence: "high",
+        detail: `${shell} exceeded ${timeout}ms`,
+      });
+    } else if (run.status !== 0) {
+      findings.push({
+        kind: "execution-failure",
+        shell,
+        confidence: "high",
+        detail:
+          `${shell} exited ${run.status}` +
+          (run.stderr ? `: ${run.stderr.split("\n")[0]}` : "") +
+          (consistent
+            ? " (identical in every shell — not a portability defect)"
+            : ""),
+      });
+    }
+  }
+
+  if (before) {
+    const after = snapshotTree(sentinelRoot, workDirName);
+    const outside = [];
+    for (const [k, v] of after) if (before.get(k) !== v) outside.push(k);
+    for (const k of before.keys())
+      if (!after.has(k)) outside.push(`${k} (removed)`);
+    if (outside.length > 0) {
+      findings.push({
+        kind: "escaped-sandbox",
+        confidence: "high",
+        detail:
+          `a block classified runnable wrote outside its working copy: ` +
+          `${outside.slice(0, 5).join(", ")}${outside.length > 5 ? ` (+${outside.length - 5} more)` : ""}`,
+      });
+    }
+  }
+
+  if (shells.length > 1) {
+    const [a, b] = shells;
+    if (runs[a].stdout !== runs[b].stdout) {
+      findings.push({
+        kind: "shell-disagreement",
+        confidence: "medium",
+        detail:
+          `${a} printed ${runs[a].stdout === "" ? 0 : runs[a].stdout.split("\n").length} line(s), ` +
+          `${b} printed ${runs[b].stdout === "" ? 0 : runs[b].stdout.split("\n").length} line(s)`,
+      });
+    }
+  }
+
+  return { runs, findings };
+}
+
+// ── File-level orchestration ──────────────────────────────────────────────────
+
+export function executeFile(filePath, opts = {}) {
+  const {
+    bindings = {},
+    timeout = 10_000,
+    copyFrom = null,
+    allowZsh = true,
+  } = opts;
+
+  const markdown = readFileSync(filePath, "utf8");
+  const blocks = extractBlocks(markdown);
+
+  const useZsh = allowZsh && zshAvailable();
+  const shells = useZsh ? ["bash", "zsh"] : ["bash"];
+
+  // CR-11 — `cpSync` used to sit outside the try, so a bad `--copy` threw with the
+  // temp directory already created and never removed. `main` swallowed it into
+  // exit 2, so the leak was silent and repeated every run.
+  //
+  // The sandbox is a directory INSIDE the temp root, so the root can act as the
+  // containment sentinel in `runBlock`.
+  const tmpRoot = mkdtempSync(join(tmpdir(), "qa-snippets-"));
+  const tmp = join(tmpRoot, "work");
+
+  const results = [];
+  const findings = [];
+
+  try {
+    mkdirSync(tmp, { recursive: true });
+    if (copyFrom) cpSync(copyFrom, tmp, { recursive: true });
+    for (const block of blocks) {
+      const { klass, reason } = classifyBlock(block.code, bindings);
+      if (klass !== "runnable") {
+        results.push({ line: block.line, klass, reason, skipped: true });
+        continue;
+      }
+      const { runs, findings: blockFindings } = runBlock(block.code, {
+        shells,
+        cwd: tmp,
+        timeout,
+        bindings,
+        sandboxRoot: tmpRoot,
+      });
+      results.push({
+        line: block.line,
+        klass,
+        reason: null,
+        skipped: false,
+        runs,
+      });
+      for (const f of blockFindings) findings.push({ ...f, line: block.line });
+    }
+  } finally {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+
+  const counts = { runnable: 0, placeholder: 0, mutating: 0 };
+  for (const r of results) counts[r.klass]++;
+
+  // A run where zero blocks executed is itself a finding — this is the rule's
+  // own failure mode, and it is exactly the silent skip the step exists to stop.
+  // zsh being absent never reduces the runnable count, so the guard cannot trip it.
+  if (blocks.length > 0 && counts.runnable === 0) {
+    // `medium`, deliberately. This is a statement about COVERAGE — the gate did
+    // nothing here — not a defect in the work item, and `high` + `category: bug`
+    // is what makes a finding gate-blocking. A skill whose snippets all read
+    // caller variables would otherwise block its own PR for needing bindings the
+    // run did not supply, which is the "noise trains reviewers to ignore it"
+    // failure the rule warns about. It is still reported, which is what "a
+    // finding, not a pass" requires.
+    findings.push({
+      kind: "zero-blocks-executed",
+      confidence: "medium",
+      detail:
+        `${blocks.length} bash block(s) found, none classified runnable ` +
+        `(${counts.placeholder} placeholder, ${counts.mutating} mutating)` +
+        (counts.placeholder > 0
+          ? " — supply the missing values with --bind to execute the placeholder blocks"
+          : ""),
+    });
+  }
+
+  return {
+    file: filePath,
+    shells,
+    zshAvailable: useZsh,
+    zshSkipReason:
+      allowZsh && !useZsh ? "zsh-unavailable" : allowZsh ? null : "disabled",
+    blocks: blocks.length,
+    counts,
+    results,
+    findings,
+  };
+}
+
+// ── CLI ───────────────────────────────────────────────────────────────────────
+
+const USAGE =
+  "Usage: qa-execute-snippets --file <path.md> [--bind NAME=VALUE]... " +
+  "[--copy <dir>] [--timeout <ms>] [--no-zsh] [--json]";
+
+export function main(argv = process.argv.slice(2)) {
+  let file = null;
+  let copyFrom = null;
+  let timeout = 10_000;
+  let allowZsh = true;
+  let json = false;
+  const bindings = {};
+
+  for (let i = 0; i < argv.length; i++) {
+    switch (argv[i]) {
+      case "--file":
+        file = argv[++i];
+        break;
+      case "--copy":
+        copyFrom = argv[++i];
+        break;
+      case "--timeout": {
+        // Unvalidated, `--timeout abc` yielded NaN and `--timeout -1` a negative;
+        // spawnSync applies NO timeout for either, so a typo silently disabled the
+        // hang protection.
+        const t = Number(argv[++i]);
+        if (!Number.isFinite(t) || t <= 0)
+          return {
+            exitCode: 2,
+            error: `bad --timeout: must be a positive number`,
+          };
+        timeout = t;
+        break;
+      }
+      case "--no-zsh":
+        allowZsh = false;
+        break;
+      case "--json":
+        json = true;
+        break;
+      case "--bind": {
+        const pair = argv[++i] ?? "";
+        const eq = pair.indexOf("=");
+        if (eq < 1)
+          return {
+            exitCode: 2,
+            error: `bad --bind (want NAME=VALUE): ${pair}`,
+          };
+        bindings[pair.slice(0, eq)] = pair.slice(eq + 1);
+        break;
+      }
+      case "-h":
+      case "--help":
+        return { exitCode: 0, usage: USAGE };
+      default:
+        return { exitCode: 2, error: `unknown argument: ${argv[i]}` };
+    }
+  }
+
+  if (!file) return { exitCode: 2, error: `--file is required\n${USAGE}` };
+
+  let report;
+  try {
+    report = executeFile(file, { bindings, timeout, copyFrom, allowZsh });
+  } catch (e) {
+    return { exitCode: 2, error: e.message };
+  }
+
+  return { exitCode: report.findings.length > 0 ? 1 : 0, report, json };
+}
+
+function render(report) {
+  const lines = [`Snippet execution — ${report.file}`, ""];
+  lines.push(
+    `  ${report.blocks} bash block(s): ` +
+      `${report.counts.runnable} runnable, ${report.counts.placeholder} placeholder, ` +
+      `${report.counts.mutating} mutating`,
+  );
+  lines.push(
+    `  shells: ${report.shells.join(", ")}${report.zshAvailable ? "" : "  (zsh-unavailable)"}`,
+  );
+  lines.push("");
+  for (const r of report.results.filter((x) => x.skipped)) {
+    lines.push(`  SKIP  line ${r.line}  ${r.klass} — ${r.reason}`);
+  }
+  if (report.findings.length === 0) {
+    lines.push("", "  No findings.");
+  } else {
+    lines.push("");
+    for (const f of report.findings) {
+      lines.push(
+        `  ${f.kind}  ${f.line ? `line ${f.line}  ` : ""}[${f.confidence}] ${f.detail}`,
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  const r = main();
+  if (r.error) {
+    console.error(r.error);
+    process.exit(r.exitCode);
+  }
+  if (r.usage) {
+    console.log(r.usage);
+    process.exit(r.exitCode);
+  }
+  console.log(r.json ? JSON.stringify(r.report, null, 2) : render(r.report));
+  process.exit(r.exitCode);
+}
