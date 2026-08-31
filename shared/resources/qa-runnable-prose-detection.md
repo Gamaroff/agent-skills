@@ -88,8 +88,20 @@ Three further rules fall out of the same principle, each added after a review fo
   *This costs real coverage — `awk '{print $2}'` is harmless and gets skipped. That is the fail-closed
   trade accepted deliberately: recognising a safe `awk` program means parsing `awk`.*
 - **An unreadable command position is unsafe, not absent.** A leading token that cannot be parsed as a
-  command name — a variable command `$CMD`, a quoted one — classifies `mutating`. Treating it as "no
-  command here" is how a fail-closed rule fails open.
+  command name — a variable command `$CMD`, a glob that expands to a binary (`/usr/bin/[t]ouch`), a
+  tilde path — classifies `mutating`. Treating it as "no command here" is how a fail-closed rule fails
+  open, and it is the hole an attacker reaches for first: `who'am'i`, `to"u"ch` and `t\ouch` are all
+  spellings of one binary.
+
+  The token is unquoted the way a shell would before the name is read, so `\ls` resolves to `ls` and
+  stays runnable. A name with *embedded* quotes is refused even when the underlying command is safe —
+  quote contents are blanked before the name is read, so `l's'` reconstructs as `l`, not `ls`. That is
+  the right direction to be wrong in: no real documentation writes `l's' -la`, and a boundary that
+  guesses at a half-erased name is worse than one that refuses it.
+
+  The **one** token in command position that is genuinely not an invocation is a `case` arm pattern,
+  recognised by its trailing `)`. That is why the scanner no longer erases bare parentheses — without
+  the `)` there is nothing to distinguish `*://*/pull/*)` from `/usr/bin/[t]ouch`.
 
 ### 2b. Unbound variables are placeholders, not failures
 
@@ -128,6 +140,16 @@ as an `escaped-sandbox` finding at `confidence: high`.
 The sandbox root is passed explicitly by the caller. Deriving it from the working directory (`cwd/..`)
 was tried and is wrong: `runBlock` accepts any `cwd`, so a bare temp directory made the sentinel walk
 the whole of `/tmp` twice per block. **A safety net that guesses its own boundary is not a safety net.**
+
+**Be precise about what this catches, because overstating it is worse than not having it.** The sentinel
+watches the sandbox root and nothing else. It detects a block escaping *upward* out of its working copy
+— `> ../x`, `cd .. && …` — which is the common shape of an accidental escape. It does **not** see a
+write to an absolute path (`/tmp/x`, `$HOME/.zshrc`): there is no OS-level sandbox here, `spawnSync`
+runs a real shell with the real `PATH` and the real `HOME`.
+
+So classification remains the primary boundary and the sentinel is a second line under it, not a
+containment guarantee. Anything that claims otherwise — including an earlier draft of this file — is
+claiming more than the mechanism delivers.
 
 ### 3a. The zsh arm is guarded
 

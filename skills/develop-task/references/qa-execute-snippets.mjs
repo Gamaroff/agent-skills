@@ -267,16 +267,21 @@ export const DENY_PATTERNS = [
   [/\bgit\s+push\b/, "git push"],
   [/\bgit\s+commit\b/, "git commit"],
   [/\brm\s+-[A-Za-z]*[rf]/, "rm -rf"],
-  [/\bsed\s+(-[A-Za-z]*\s+)*-i\b|\bsed\s+-[A-Za-z]*i\b/, "sed -i"],
-  // CR-9: the long form bypassed the short-form pattern entirely.
-  [/\bsed\b[^\n]*\s--in-place(=\S*)?\b/, "sed --in-place"],
+  // `-i` anywhere in a sed invocation, not only immediately after `sed`.
+  // `sed 's/a/b/' -i file` and `sed -e 's/a/b/' -i file` both edit in place and
+  // both slipped past a pattern anchored to the first argument.
+  [/\bsed\b[^\n|;&]*\s-[A-Za-z]*i\b/, "sed -i"],
+  [/\bsed\b[^\n|;&]*\s--in-place(=\S*)?\b/, "sed --in-place"],
+  // Long-form output flags on otherwise read-only commands write files just as a
+  // redirection does, and carry no `>` for WRITE_REDIRECT to catch.
+  [/\s--output(=|\s)/, "--output flag"],
+  [/\s-o\s+\S/, "-o output flag"],
   // CR-7: `find` is read-only until it is given an action that is not.
   [
     /\bfind\b[^\n]*\s-(delete|exec|execdir|ok|okdir|fls|fprint|fprintf)\b/,
     "find write action",
   ],
   // Other allow-listed commands with a write mode.
-  [/\bsort\b[^\n]*\s-o\b/, "sort -o"],
   [/\btee\b/, "tee"],
 ];
 
@@ -403,7 +408,11 @@ function stripProse(code) {
     );
     if (here) {
       heredocTerminator = here[2];
-      out.push(raw.slice(0, here.index));
+      // Keep the WHOLE opener line, not just the part before `<<`. Truncating it
+      // threw away any redirection that followed — `cat <<EOF > /tmp/pwned` had
+      // its `> /tmp/pwned` removed before the write-redirect check ever saw it,
+      // and classified runnable.
+      out.push(raw);
       continue;
     }
     // Drop `# comment` — but ONLY outside quoted spans. A line regex fired on a
@@ -436,7 +445,7 @@ export function commandWords(code) {
     .replace(/\\\n/g, " ")
     // Arithmetic expansion is arithmetic, not an invocation. It must go before the
     // `$(` rule below, or `$((N + 1))` becomes a segment whose first token is `N`.
-    .replace(/\$\(\([^)]*\)\)/g, " 0 ")
+    .replace(/\$\(\([^)]*\)\)/g, " ")
     // Command substitutions and subshells: turn the delimiters into segment
     // breaks so the INNER command is scanned as a command rather than being
     // swallowed by the enclosing assignment. Without this,
@@ -447,8 +456,14 @@ export function commandWords(code) {
     // the outer segment's tail, and only the first token of a segment is examined
     // — so `cat <(touch /tmp/x)` saw only `cat`.
     .replace(/[<>]\(/g, "\n")
-    .replace(/`/g, "\n")
-    .replace(/\)/g, "\n");
+    .replace(/`/g, "\n");
+  // NOTE: a bare `)` is deliberately NOT turned into a segment break. It used to
+  // be, and that erased the one signal distinguishing a `case` arm pattern
+  // (`*://*/pull/*)`) from an obfuscated command name (`/usr/bin/[t]ouch`) — both
+  // are globs, and without the trailing `)` there is nothing to tell them apart.
+  // The `$(`/`<(` rules above already put every substituted command at the START
+  // of its own segment, so the closing paren only ever lands on a trailing
+  // argument, where it is harmless.
   const words = [];
   // Split on anything that can begin a new simple command.
   // Deliberately NOT split on `{` or `(`: `echo {task-id}` would then yield
@@ -456,33 +471,41 @@ export function commandWords(code) {
   // templated block as an unrecognised command. Grouping characters are stripped
   // as prefixes below instead.
   const segments = stripped.split(
-    /(?:\n|;|\|\||&&|\||&|\bdo\b|\bthen\b|\belse\b)/,
+    // `&` splits a background or AND-list, but `>&` / `<&` is descriptor
+    // duplication — splitting there left the file descriptor (the `1` in `2>&1`)
+    // sitting in command position, where the fail-closed rule then refused it.
+    /(?:\n|;|\|\||&&|\||(?<![<>])&|\bdo\b|\bthen\b|\belse\b)/,
   );
 
+  let inCase = false;
   for (const seg of segments) {
     const trimmed = seg.trim().replace(/^[({\s]+/, "");
     if (!trimmed) continue;
+    if (/^case\b/.test(trimmed)) inCase = true;
+    if (/^esac\b/.test(trimmed)) inCase = false;
     for (let tok of trimmed.split(/\s+/)) {
       // Leading `VAR=value` assignments and redirections precede the command.
       if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) continue;
       if (/^[<>]/.test(tok) || /^\d+[<>]/.test(tok)) continue;
       if (tok === "") continue;
-      // CR-4 — the fail-closed rule, failing closed.
-      //
-      // A leading token that cannot be read as a command name used to `break`,
-      // contributing NO word, so the segment was treated as harmless: `\mv a b`
-      // and `CMD=rm` + `$CMD -rf /tmp/x` both classified runnable.
-      //
-      // Strip a leading backslash (quoting, not a different command) and re-test.
-      // If it still does not parse, distinguish the two cases: a glob pattern or
-      // blanked quote is genuinely not an invocation, while anything else —
-      // notably a variable command name — is an invocation this scanner cannot
-      // read, and unreadable must mean unsafe.
-      let word = tok.replace(/^\\/, "");
+      // A `case` arm pattern is the ONE token in command position that is not an
+      // invocation. It is recognisable only by its trailing `)`, which is why the
+      // stripper above no longer erases it.
+      if (inCase && /\)$/.test(tok)) break;
+
+      // Unquote the way a shell does before deciding what the command IS.
+      // `who'am'i`, `to"u"ch` and `t\ouch` are all spellings of one binary, and a
+      // scanner that reads them as unparseable-therefore-absent is a scanner an
+      // attacker only has to add one quote to defeat. Verified: all three
+      // executed under the previous version.
+      let word = tok.replace(/\\(.)/g, "$1").replace(/['"]/g, "");
+
       if (!COMMAND_NAME.test(word)) {
-        if (/^[$'"`]/.test(word)) {
-          words.push("<unparseable>");
-        }
+        // Everything still unreadable in command position is UNSAFE, not absent.
+        // A tilde path, a glob that expands to a binary (`/usr/bin/[t]ouch`), a
+        // variable command name — the scanner cannot say what any of them runs,
+        // and "cannot say" must never resolve to "safe".
+        words.push("<unparseable>");
         break;
       }
       tok = word;

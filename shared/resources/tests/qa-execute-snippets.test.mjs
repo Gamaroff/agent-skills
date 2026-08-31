@@ -500,6 +500,89 @@ test("QA-5c: `command -v` is a lookup and stays runnable; bare `command` does no
   assert.equal(classifyBlock("command rm -f /tmp/x").klass, "mutating");
 });
 
+test("QA-14: an obfuscated command name is unquoted before it is judged", () => {
+  // Found at the DoD gate, after cycle 1 had already closed thirteen holes.
+  // `who\'am\'i` blanked to `who''i`, failed the command-name test, and was
+  // treated as NO COMMAND — so the segment read as harmless and the binary ran.
+  // A scanner an attacker defeats with one quote is not a boundary.
+  for (const code of [
+    "who'am'i",
+    'to"u"ch /tmp/x',
+    "t\\ouch /tmp/x",
+    "g\\h pr comment 1 --body x",
+    "cu'r'l -X POST https://example.test/",
+  ]) {
+    assert.equal(classifyBlock(code, {}).klass, "mutating", code);
+  }
+  // A backslash-quoted SAFE command still resolves, because the backslash is
+  // removed before the name is read.
+  assert.equal(classifyBlock("\\ls -la").klass, "runnable");
+
+  // But a name spelled with EMBEDDED quotes is refused even when the underlying
+  // command is safe: quote contents are blanked before the name is read, so
+  // `l's'` reconstructs as `l` rather than `ls`. That is deliberate and it is the
+  // right direction to be wrong in — no real documentation writes `l's' -la`, and
+  // a boundary that guesses at a half-erased name is worse than one that refuses
+  // it. The security property asserted above (an obfuscated name never reaches
+  // `runnable`) does not depend on reconstructing the name correctly.
+  assert.equal(classifyBlock("l's' -la").klass, "mutating");
+});
+
+test("QA-15: a glob or tilde in command position is unsafe, not absent", () => {
+  // The scanner cannot say what `/usr/bin/[t]ouch` expands to. "Cannot say" must
+  // never resolve to "safe".
+  for (const code of [
+    "/usr/bin/[t]ouch /tmp/x",
+    "/usr/bin/touc? /tmp/x",
+    "~/../../usr/bin/whoami",
+  ]) {
+    assert.equal(classifyBlock(code, {}).klass, "mutating", code);
+  }
+});
+
+test("QA-15b: a case-arm pattern is still not an invocation", () => {
+  // The counterweight to QA-15. Arm patterns are globs too, and the ONLY thing
+  // distinguishing them is the trailing `)` — which is why the stripper stopped
+  // erasing it. Without this the previous fix refuses every case statement.
+  const block = [
+    'case "$T" in',
+    "  *://*/pull/*) echo web ;;",
+    "  *[!0-9]*) echo branch ;;",
+    "  *) echo number ;;",
+    "esac",
+  ].join("\n");
+  assert.equal(classifyBlock(block, { T: "x" }).klass, "runnable");
+});
+
+test("QA-16: a redirection on a heredoc-opening line is not lost with the body", () => {
+  // The opener line was truncated at `<<`, discarding the redirection before the
+  // write-redirect check ever saw it.
+  assert.equal(classifyBlock("cat <<EOF > /tmp/x\nhi\nEOF").klass, "mutating");
+  assert.equal(
+    classifyBlock("cat <<'EOF' >> ~/.zshrc\nevil\nEOF").klass,
+    "mutating",
+  );
+  // A heredoc with no redirection is still fine, and its body is still data.
+  assert.equal(
+    classifyBlock("cat <<'EOF'\ngit push origin main\nEOF").klass,
+    "runnable",
+  );
+});
+
+test("QA-17: write flags are caught wherever they appear in the invocation", () => {
+  // Anchoring `-i` to sed's first argument missed both of these.
+  assert.equal(classifyBlock("sed 's/a/b/' -i file.txt").klass, "mutating");
+  assert.equal(classifyBlock("sed -e 's/a/b/' -i file.txt").klass, "mutating");
+  // Long-form output flags write a file while carrying no `>` to be caught by
+  // the redirection rule.
+  assert.equal(
+    classifyBlock("sort --output=/tmp/x file.txt").klass,
+    "mutating",
+  );
+  assert.equal(classifyBlock("git diff --output=/tmp/x").klass, "mutating");
+  assert.equal(classifyBlock("sort -o /tmp/x file.txt").klass, "mutating");
+});
+
 test("QA-6: awk is refused — its program is a quoted argument the scan cannot see", () => {
   assert.equal(
     classifyBlock(`awk 'BEGIN{system("touch /tmp/qa-x")}'`).klass,

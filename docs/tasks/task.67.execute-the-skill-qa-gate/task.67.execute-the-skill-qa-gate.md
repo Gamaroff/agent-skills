@@ -5,18 +5,20 @@ type: task
 description: "QA reviews a prose skill's text and never runs it. Task 66 shipped accepted with a glob that collected 0 files on the default macOS shell; the first live run found it in minutes. Add an execution gate to qa-task/qa-story for skills whose deliverable is runnable prose."
 tags: [qa, gate, skills, shell-portability, dogfooding]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
+completed_date: 2026-09-01
+pr_number: 289
 assignee:
 estimated_effort_hours: 8
 ---
 
 # Technical Task: Make QA execute a prose skill, not only read it
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.67.review.1.execute-the-skill-qa-gate.md` implemented 2026-08-31
 
 ---
@@ -336,6 +338,8 @@ Tighten the deny-list or the disagreement heuristic; both are concentrated in on
 | 2026-08-31 |  | QA gate FAIL (0/100) — 18 findings; classifier fails open 13 verified ways, temp-copy containment disproven | qa-task |
 | 2026-08-31 |  | QA findings fixed — 13 fail-open holes closed, sandbox sentinel added as defence in depth, 61 tests, 16 mutation proofs; 1 cycle | qa-fix |
 | 2026-08-31 |  | QA gate PASS (90/100) — all findings closed and independently re-verified; 0 blocking issues | qa-task |
+| 2026-09-01 |  | DoD security review found 14 further fail-open routes (BUG-3) — all closed; trigger contract-tested; 36/36 attack inputs blocked | qa-fix |
+| 2026-09-01 | 1.3 | DoD passed — accepted (PR #289) | finalise |
 
 ---
 
@@ -377,6 +381,42 @@ is not evidence" failure this task exists to eliminate, reproduced inside the fi
 
 Step 4b itself works: it fired on this change set, recorded every skip with a reason, and with
 `--bind` supplied executed 5 real blocks under both shells with no findings.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**PR**: [#289](https://github.com/Gamaroff/agent-skills/pull/289) · **QA Gate**: PASS (90/100) ·
+**CI**: ✅ SUCCESS on the final head · **Accepted**: 2026-09-01
+
+| Criterion | Result |
+| --- | --- |
+| Acceptance Criteria | ✅ 14/14 |
+| PR Review & Tests | ✅ 2075 tests, 0 failures |
+| CI | ✅ SUCCESS (`test`, `validate`, `link-check`, branch policy) |
+| Documentation | ✅ CHANGELOG + rule document + both QA skills wired |
+| Security | ✅ PASS |
+| Compliance | ✅ PASS |
+
+**Detailed Verification Log:** [`task.67.dod.1.execute-the-skill-qa-gate.md`](./task.67.dod.1.execute-the-skill-qa-gate.md)
+
+### What the DoD gate caught that QA had not
+
+It is worth recording, because the gate could easily have been a formality:
+
+1. **CI was red** while `npm test` passed locally — `prettier --check` on the two new files. The repo
+   has a formatting gate beyond the test suite.
+2. **Two success criteria had prose as their only evidence** — the Step 4b trigger and the
+   not-applicable skip. Now held by `evals/shared/tests/qa-execution-step-parity.test.mjs`.
+3. **Fourteen more fail-open routes** past a boundary already fixed once and re-verified as closed —
+   including two deny-listed commands reached through quoted spellings. See
+   [BUG-3](./task.67.bug.3.obfuscated-names-and-flag-writes.md).
+
+QA cycle 2 was not wrong; it re-asked the question it had asked before. **A gate that only re-checks
+the last set of findings will keep passing a boundary that is still open**, which is the same lesson
+this task was written to teach, arriving one layer up.
 
 ---
 
