@@ -1,0 +1,82 @@
+schema: 1
+task: "task.71.selection-floor-matches-dispatcher"
+task_title: "Make the selection floor equal what the dispatching pipeline accepts"
+gate: PASS
+status_reason: "All success criteria met, 1999 tests green, 3/3 mutation proofs. The single MEDIUM finding from cycle 1 (literal escape sequences) is fixed and verified — 18 occurrences replaced, 0 remain — and the LOW recommendation was applied in the same pass. Re-verified adversarially: the assertion change was re-mutation-proved rather than accepted on a green suite."
+reviewer: "QA Engineer"
+updated: "2026-08-31T19:35:00Z"
+
+top_issues:
+  - id: TASK-71-QA1-01
+    issue: "Literal escape sequences in test-file comments render as raw text"
+    severity: medium
+    category: maintainability
+    finding: "evals/develop-next/unit/select-next.test.mjs lines 1818, 1823, 1826, 1828, 1829, 1831, 1833, 1901, 1913, 1916, 1939, 1947 contain the literal characters backslash-u-2-2-8-6 (and -2014, -2192) inside // comments, where JS performs no escape processing. The H1 section header — the first explanation a future author reads — is among them. Caused by \\u escapes written in a non-raw Python heredoc during authoring."
+    suggested_action: "Replace the literal sequences with the real characters in the twelve comment lines; optionally normalise the three template-literal occurrences for consistency. Text-only, no assertion depends on them."
+    suggested_owner: dev
+    bug_ref: "task.71.bug.1.literal-unicode-escapes-in-comments.md"
+    status: closed
+    fixed_date: "2026-08-31"
+    verification: "18 occurrences replaced (not the 12 this entry estimated — that counted lines; several carried two). grep for literal escapes returns 0. H1 header renders correctly. Mutation 2 re-applied after the assertion change: guard still fails correctly and the message renders a real arrow."
+
+waiver:
+  active: false
+
+quality_score: 98
+
+evidence:
+  tests_reviewed: 1999
+  tests_passing: 1998
+  tests_failing: 0
+  tests_skipped: 1
+  tests_added: 2
+  tests_rewritten: 3
+  phases_verified: "4/4"
+  mutation_proofs_executed: 3
+  mutation_proofs_passed: 3
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+    success_criteria_covered: 10
+    success_criteria_uncovered: 0
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No credential, network, filesystem-write or user-input surface touched. The change is one Set literal plus comments and tests. No new dependencies."
+  performance:
+    status: PASS
+    notes: "Set membership on a 4-element set instead of a 2-element set. Selection short-circuits at the first eligible row, so a wider floor can only reduce the number of documents read, never increase it."
+  reliability:
+    status: PASS
+    notes: "Excluded statuses are still exactly the three develop-task HALTs on, so the loop-cannot-self-recover failure task.65 identified remains prevented. Rollback is one line, documented in the task's §11. Roadmap precedence is unchanged and asserted in its strong form (loader never called)."
+  maintainability:
+    status: PASS
+    notes: "Rationale prose is thorough, rewritten rather than deleted at every site, and the reversed decision is explicitly narrated. The cycle-1 escape-sequence defect is fixed — 0 literal escapes remain and the H1 section header renders correctly. The vacuity guards carry a comment explaining why `===` makes them more load-bearing than the previous subset assertion."
+
+code_review:
+  bugs_found: 0
+  cleanups_found: 2
+  cleanups_resolved: 2
+  blocking_enabled: true
+  promoted_to_top_issues: 0
+  notes: "code_review_blocking=true was in effect. Zero category:bug findings, so nothing was promoted. The two findings are cleanups: the literal-escape defect (raised separately as a QA MEDIUM, since it is a documentation defect rather than a diff-correctness bug) and a LOW preference for assert.deepStrictEqual over assert.deepEqual."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "The bug-axis divergence (in-progress, ready-for-qa) remains deliberately open — file a task when closing it is wanted"
+      refs: ["skills/develop-next/scripts/select-next.mjs"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: "2026-08-31"
+  total_iterations: 1
+  verification_method: "Full suite (1999 tests) + prettier + repo-wide grep for literal escapes + re-run of mutation 2 against the changed assertion"
+  fix_commit: "885de04"
