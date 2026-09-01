@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-01'
@@ -13,7 +13,7 @@ description: "access-config-parity.test.mjs already separates 'the resolver refu
 
 **Bug ID**: bug.5.access-parity-js-probe-conflates-timeout
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-01
@@ -363,15 +363,57 @@ Suite: **38 pass / 0 fail**. `npm run ci:fast`: 2104 tests, 0 fail.
 | 2026-09-01 | In Progress | develop-bug | Reproduced deterministically by forcing the probe budget; root cause localised to `probeResolver` flattening never-ran into refused |
 | 2026-09-01 | Ready for QA | develop-bug | Fix implemented + 5 regression tests; 3 independent mutations confirmed red |
 | 2026-09-01 | Ready for QA | develop-bug | Verify cycle 1 FAIL — diff review found 9 issues (3 high, 2 self-inflicted); all fixed, 6th regression test added, re-proved |
+| 2026-09-01 | Closed | develop-bug | Verify cycle 2 PASS; DoD accepted; CI 4/4 green on the final head (PR #293) |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: ✅ Closed
+**Total Iterations**: 2 fix cycles (1 verify FAIL → 1 verify PASS)
+**Time to Resolution**: same day (filed and closed 2026-09-01)
 
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Fix Details**:
+
+The parity suite reported a reader divergence that had not happened, because `probeResolver`
+returned the same `{ mode: null, reason }` shape whether the resolver **ran and refused** or the
+child **never ran at all**. Both fail closed to `manual` — correct, and unchanged — but no caller
+could tell a reading of the config from a non-event, and `jsAnswer()` caught only a throw while the
+reader warns and returns.
+
+The fix classifies at the source (`kind`: `"never-ran"` | `"refused"` | `null`, now total across all
+five return paths), exposes it through an observation-only `onDiagnostic` channel that fires outside
+`warnOnce`'s dedupe, stops memoising a probe that never ran — without which the prescribed retry was
+a no-op served from cache — and makes `jsAnswer` retry on the shared budget then throw, mirroring
+`shellAnswer`. The probe budget became tunable, caller-passed and range-capped.
+
+Nothing about the production reader's return value, its warning, or its fail-closed semantics
+changed. All six production call sites pass no `onDiagnostic` and take a byte-identical path.
+
+**Lessons Learned**:
+
+1. **Fixing one side of a symmetry does not fix the symmetry.** `shellAnswer` had this exact fix,
+   with a docstring describing this exact failure, for a whole release. The JS side sat three
+   functions away and went untouched because nothing tied the two together. When a defect is
+   repaired on one of two parallel implementations, the second one is not a separate bug to be
+   filed later — it is the same bug, half-closed.
+
+2. **A fail-closed default is invisible from outside, and that is the hazard.** The reader doing the
+   *correct* production thing is what made the bug hard to see: `manual` is a legitimate answer, so
+   a non-answer wearing it is undetectable. Any caller that needs to distinguish a determination
+   from a non-event needs an explicit channel; it cannot be inferred from the value.
+
+3. **A cache keyed on the input must only hold properties of the input.** `_configAccessMemo` stored
+   "the box was busy for ten seconds" under a file path. That is not a fact about the file, and
+   caching it made the fail-closed answer sticky *and* silently defeated the retry that was supposed
+   to recover from it.
+
+4. **"It cannot escalate" is not the same as "it is safe".** The first version of the new timeout
+   knob read ambient `process.env`, justified on the grounds that no timeout value can loosen
+   access. The invariant it broke was the other one: a repo-local `.env` must not be able to
+   restrict — or via a typo hard-fail — every pipeline step behind the resolver's back. Two of the
+   three high findings in this bug's own review were defects introduced while fixing it.
+
+5. **A mutation test that cannot prove it mutated is not evidence.** One revert here reported green
+   because prettier had reflowed the target line and the mutation string never matched. Assert that
+   the edit applied before trusting the result.

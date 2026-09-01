@@ -1,6 +1,6 @@
 ---
 type: implementation-report
-status: in-progress
+status: complete
 bug: 'bug.5.access-parity-js-probe-conflates-timeout'
 mode: 'general'
 started: '2026-09-01T16:23:01Z'
@@ -9,8 +9,8 @@ started: '2026-09-01T16:23:01Z'
 # Implementation Report — bug.5.access-parity-js-probe-conflates-timeout
 
 **Started:** 2026-09-01T16:23:01Z
-**Finished:** —
-**Final Status:** In Progress
+**Finished:** 2026-09-01
+**Final Status:** ✅ Complete — bug closed, DoD accepted
 **Branch model:** bugfix (base: develop, PR target: develop)
 **Severity / Priority:** Major / High
 **Lite mode:** off
@@ -25,8 +25,8 @@ started: '2026-09-01T16:23:01Z'
 | 3 | investigate-fix | ✅ Done | Reproduced deterministically; root cause = `probeResolver` flattening never-ran into refused. Fix + 5 regression tests; 3 mutations red. Suite 32→37 pass | — |
 | 4 | create-pr | ✅ Done | PR #293 → develop. Two commits: `89d188f` fix, `0d11686` docs | — |
 | 5–6 | verify-fix loop | ✅ Done | 2 cycles. Cycle 1 FAIL (9 review findings, 3 high, 2 self-inflicted); cycle 2 PASS. Suite 38/38, ci:fast 2104/0 | — |
-| 7 | finalise-close | ⏳ Pending | | |
-| 8 | commit-changes | ⏳ Pending | | |
+| 7 | finalise-close | ✅ Done | DoD ACCEPTED (6/6). CI SUCCESS on final head. Bug closed; registry row 5 → closed; canonical PR comment posted | — |
+| 8 | commit-changes | ✅ Done | Final commit + push | — |
 
 ## Decisions Log
 
@@ -77,4 +77,22 @@ All nine findings addressed. See the bug file's Developer Fix Cycle for the full
 
 **Branch:** `bugfix/bug.5.access-parity-js-probe-conflates-timeout`
 **PR:** https://github.com/Gamaroff/agent-skills/pull/293
-**DoD Summary:** —
+**DoD Summary:** ✅ ACCEPTED — `bug.5.dod.1.access-parity-js-probe-conflates-timeout.md` (6/6 categories, CI 4/4 green)
+
+## Completion Summary
+
+Bug.5 is fixed, verified and closed. The root cause was a loss of information at the source:
+`probeResolver` flattened "the resolver refused" and "the child never ran" into one shape, so the
+parity suite compared a timed-out probe against a correct one and called it a reader divergence.
+
+Two defects were found beyond the filed one:
+
+1. **`_configAccessMemo` cached the timeout** under the file path, which made the fail-closed
+   `manual` sticky for the process *and* silently defeated the retry the bug report prescribed. The
+   prescribed remedy could not have worked without fixing this.
+2. **Two of the three high findings in verify cycle 1 were introduced by the fix itself** — the new
+   timeout knob reading ambient `process.env` (re-opening the `.env` door), and an out-of-range
+   budget throwing `ERR_OUT_OF_RANGE` from a function documented NEVER THROWS. The pipeline's own
+   diff-review gate caught both before they reached `develop`.
+
+Five independent mutation reverts confirm every part of the fix is held by a test.
