@@ -509,6 +509,42 @@ After fixes are applied:
    - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — per path 2 above. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch.
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 
+0a. **Run the fast gate before committing.** Only reached when step 0 found changes — there is
+   nothing to gate otherwise, and step 0's no-change path HALTs before this point. Capture to a log
+   rather than streaming:
+
+   ```bash
+   FIX_LOG=".claude/state/qa-fix-gate-${QA_CYCLE}-$(date +%s).log"
+   <fastGateCommand> > "$FIX_LOG" 2>&1
+   GATE_EXIT=$?
+   ```
+
+   `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
+   **`npm run ci:fast`** — the same fast tier the develop loop runs (see
+   [`develop-pipeline-step-3-develop-loop.md`](develop-pipeline-step-3-develop-loop.md) §"What the
+   loop runs"). The slow tier stays out of this cycle by design; it runs once at `develop-next`'s
+   merge gate.
+
+   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit — a
+   red tree is exactly what the cycle machinery is for. Triage per the step-3 pattern, feed the
+   finding back into this cycle's fixes, and re-run the gate.
+
+   **Bound this retry at 2 attempts.** After a second red gate in the same cycle, stop retrying:
+   commit nothing, record the failing output in the QA Iteration History, and let the cycle end so
+   the next QA review writes a gate. That is what actually reaches the convergence check and
+   MAX_ITER — both of which count *cycles*, so an unbounded inner re-run would never reach either.
+   An earlier revision of this block claimed "the MAX_ITER cap still bounds the loop"; it does not
+   bound this retry, and a stated guarantee that is not real is worse than an unstated one.
+
+   Cleanup mirrors step 3: `GATE_EXIT == 0` → `rm -f "$FIX_LOG"`; non-zero → retain for post-mortem.
+
+   > **Why the gate sits between 0 and 1, and not after the commit.** A qa-fix cycle pushes to the PR
+   > branch, so a red commit is a red PR the reviewer sees before the next cycle repairs it — and on
+   > the last cycle nothing repairs it at all. Formatting is the concrete case: `prettier --check` is
+   > not in `npm test`, so a cycle could close green, push, and fail CI on a file it had just
+   > rewritten. It sits *after* step 0 because gating a tree that step 0 is about to declare unchanged
+   > pays a full format+test run on the one path that always HALTs.
+
 1. **Exclude the implementation report's *updates* from this commit — and only that** — Step 8 owns the report's final state, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. The gate and QA report are **not** excluded; they ride along per the table above. The file itself is already tracked (Step 4 committed it), so this defers changes rather than withholding the file: no link to the report can dangle. Before invoking `/commit-changes`, unstage the report explicitly:
 
    ```bash

@@ -45,7 +45,7 @@ batch runs never diverge), plus one batch-only key. Every key has a default:
 | -------------------------------- | ------------------------------------------------ | ----------------- |
 | `developNext.roadmapPath`        | `docs/development/project-completion-roadmap.md` | Steps 0, 1, 3     |
 | `developNext.baseBranch`         | `develop`                                        | Steps 0, 2, 3     |
-| `developNext.qualityGateCommand` | `npm test`                                       | Step 3 merge gate |
+| `developNext.qualityGateCommand` | `npm run ci`                                     | Step 3 merge gate |
 | `developNext.mergeStrategy`      | `merge` (one of `merge` / `squash` / `rebase`)   | Step 3            |
 | `developBatch.maxParallel`       | `4`                                              | Step 2            |
 | `developBatch.requireTouches`    | `false`                                          | Step 1            |
@@ -352,8 +352,8 @@ and `inflight[r] ≤` a probe's effective capacity when one is configured. In-fl
 
 **Precondition: development is finished.** Step 3 begins only once the pending queue is
 empty and nothing is in flight. Merging is deliberately *not* interleaved with development —
-the merge gate runs `<qualityGateCommand>` per item, so it is itself a heavy scheduled
-workload. Interleaving it either lets it contend silently for the very resources the
+the merge gate runs `<qualityGateCommand>` per item — the project's **full** CI-equivalent,
+defaulting to `npm run ci` — so it is itself a heavy scheduled workload. Interleaving it either lets it contend silently for the very resources the
 scheduler is protecting, or makes it take a slot and compete with development for throughput.
 See [`references/execution-resources.md`](references/execution-resources.md) §"Rejected
 alternative — rolling merges" before re-litigating this under time pressure.

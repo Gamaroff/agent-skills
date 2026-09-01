@@ -123,7 +123,7 @@ Identical to `develop-next` — the per-item merge gate is layered, and all must
 - the PR's `headRefOid` matches the locally-tested HEAD **after the rebase** (never gate one
   commit and merge another);
 - if the PR has CI checks, `gh pr checks` all green;
-- `developNext.qualityGateCommand` (default `npm test`) clean on the branch being merged.
+- `developNext.qualityGateCommand` (default `npm run ci` — the project's full CI-equivalent) clean on the branch being merged.
 
 ## Operating model
 

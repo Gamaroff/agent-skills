@@ -1,0 +1,75 @@
+schema: 1
+task: "task.75.quality-gate-matches-ci"
+task_title: "Make the pipeline quality gate run what CI runs"
+gate: CONCERNS
+status_reason: "Cycle-1 findings both verified fixed. The mandated cycle-2 refute pass over the whole branch diff found two new defects in the parity test and its prose — both correct today and wrong the moment a second CI job or an unfixable fast gate appears."
+reviewer: "QA Engineer"
+updated: "2026-09-01T13:40:00Z"
+
+top_issues:
+  - id: "TASK-75-001"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Fast-gate block numbered 0a. but placed before step 0."
+    suggested_action: "Reorder to 0 -> 0a -> 1."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-01"
+
+  - id: "TASK-75-002"
+    severity: medium
+    file: "evals/shared/tests/ci-gate-parity.test.mjs"
+    finding: "`workflowScripts()` and `workflowInvocations()` both document themselves as covering 'the workflow's `test` job', but they scan EVERY `run:` line in test.yml. The file happens to define one job today, so the two coincide by accident. Add a second job — a lint lane, a coverage lane, a matrix build — that invokes any npm script, and the parity assertion demands the `ci` composite contain that script too. The test then fails on a workflow CI itself is perfectly happy with, which inverts its whole purpose: it exists to predict CI, and here it would block a merge CI would pass."
+    suggested_action: "Scope the scan to the steps of the `test` job specifically (parse from `jobs:` -> `test:` until the next same-indent job key), or rename the functions to say they cover the whole file and assert test.yml defines exactly one job so the assumption fails loudly instead of silently."
+    suggested_owner: dev
+    status: open
+
+  - id: "TASK-75-003"
+    severity: low
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Step 0a says a red fast gate should neither commit nor HALT, but 'feed the finding back into this cycle's fixes, and re-run', and claims 'The MAX_ITER cap still bounds the loop'. MAX_ITER bounds QA *cycles*; this inner re-run happens inside a single cycle and increments no counter, so the bound named does not actually apply to it. In practice the agent surfaces an unfixable gate, but the sentence asserts a guarantee the machinery does not provide."
+    suggested_action: "Either state honestly that the inner retry is bounded by agent judgement and the outer cycle, or give it an explicit small retry budget after which the cycle commits nothing and escalates."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 2093
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1 — no security surface touched."
+  performance:
+    status: PASS
+    notes: "Tiering verified at runtime this cycle: `ci:fast` expands to format:check + test with zero occurrences of the slow tier, so the loop cannot silently inherit it."
+  reliability:
+    status: CONCERNS
+    notes: "TASK-75-003 — step 0a's inner retry claims a bound (MAX_ITER) that does not govern it. Low impact, but a stated guarantee that is not real is worse than an unstated one."
+  maintainability:
+    status: CONCERNS
+    notes: "TASK-75-002 — the parity test's scope silently differs from its documented scope. Correct only while test.yml has one job."
+
+recommendations:
+  immediate:
+    - action: "Scope the workflow scan to the `test` job, or assert the single-job assumption"
+      refs: ["evals/shared/tests/ci-gate-parity.test.mjs"]
+    - action: "State the inner fast-gate retry's real bound"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+  future:
+    - action: "OUT OF SCOPE, carried from cycle 1: qa-execute-snippets.mjs no-ops through its own documented symlinked path. Warrants a general bug report."
+      refs: ["shared/resources/qa-execute-snippets.mjs"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Resolve TASK-75-002 and TASK-75-003 before merge"

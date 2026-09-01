@@ -296,6 +296,41 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The pipeline's quality gate now runs what CI runs.** `developNext.qualityGateCommand` defaults to
+  **`npm run ci`** instead of `npm test`. This is an **observable behaviour change**: a consumer that has
+  not set the key inherits a slower, stricter gate. That is the intent — the old default was quietly
+  weaker than the CI it exists to predict — but some runs will take longer. An explicit
+  `qualityGateCommand:` in `skills-config.yaml` still wins, so a consumer who wants the old behaviour
+  states it in one line.
+
+  **The divergence was measured.** `.github/workflows/test.yml` runs three commands — `npm run
+  format:check`, `npm test`, `npm run eval:all` — and the gate ran one of them, so two never executed
+  anywhere before a merge. On task 67 that shipped a red build: `prettier --check` flagged two new files
+  *after* `/finalise` had already accepted the task, costing a diagnosis round trip and a recovery
+  commit. `eval:all` had never run locally at any step of any pipeline; it passed in CI, which is the
+  only reason nobody noticed. Had it failed, the first signal would have been a red build on
+  already-accepted work.
+
+  **The gates are tiered, and the tiering is the point.** A new `develop.fastGateCommand` (default
+  **`npm run ci:fast`** — formatting plus the hermetic suite) is what the develop loop and each qa-fix
+  cycle run; the full `ci` runs once, at the merge gate. Putting the end-to-end evals in every qa-fix
+  cycle would make the correct fix feel expensive enough to be reverted, and a gate people route around
+  is a gate that does not exist. Formatting moves the other way — into the loop — because its absence
+  from `npm test` is the specific thing that shipped the task-67 red build, and it costs seconds.
+
+  **CI keeps its three separately named steps.** Collapsing them into one opaque `npm run ci` would make
+  every failure read the same; the workflow calls the same three scripts the composite calls, so there
+  is exactly one list. New contract test `evals/shared/tests/ci-gate-parity.test.mjs` asserts set
+  equality in **both** directions — a step in the workflow that the composite does not call is a gate the
+  pipeline cannot see, which is the original defect re-created one step at a time — and holds the
+  tiering invariant, both orchestrators' documented defaults, and the two shared step docs naming the
+  config key rather than a literal.
+
+  New `package.json` scripts: `ci` and `ci:fast`. Updated: `skills/develop-next/{SKILL,README}.md`,
+  `skills/develop-batch/{SKILL,README}.md` (its per-item merge gate reads the same key),
+  `skills/develop/SKILL.md`, `shared/resources/develop-pipeline-step-{3,5-6}-*.md`,
+  `docs/reference/configuration.md`.
+
 - **One commit and one push per QA cycle.** The QA loop's commit block said only what to *exclude*
   from the `fix(...)` commit (the implementation report, which Step 8 owns) and never said where the
   cycle's gate `.yml` and QA report `.md` go — so they fell into `/commit-changes`' default sweep and

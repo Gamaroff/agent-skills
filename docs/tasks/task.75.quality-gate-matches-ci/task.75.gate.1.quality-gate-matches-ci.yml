@@ -1,0 +1,60 @@
+schema: 1
+task: "task.75.quality-gate-matches-ci"
+task_title: "Make the pipeline quality gate run what CI runs"
+gate: CONCERNS
+status_reason: "All 4 phases implemented and all success criteria verified; full `npm run ci` green at 2092/0 and the parity test mutation-proved 7x. One MEDIUM: the new fast-gate block in the qa-fix cycle is labelled `0a.` but placed *before* step `0.`, so it runs the gate before the no-change HALT it should follow."
+reviewer: "QA Engineer"
+updated: "2026-09-01T13:10:00Z"
+
+top_issues:
+  - id: "TASK-75-001"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "The fast-gate block is numbered `0a.` (line 506) but sits BEFORE step `0.` (line 533). `0a` reads as 'follows 0', so the label contradicts the position. Worse, the position is itself wrong: step 0 checks whether qa-fix changed anything and HALTs when it did not, so as written the cycle runs a full format+test gate before discovering there is nothing to test."
+    suggested_action: "Move the fast-gate block to sit after the existing step `0.` no-change check and renumber so the sequence reads 0 -> 0a -> 1, or fold it into step 1 before the commit. The gate must still run before `/commit-changes`, which is the invariant that matters."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2092
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No security surface touched. No new dependencies, no credential handling, no network calls added. The change is npm script composition plus documentation."
+  performance:
+    status: PASS
+    notes: "The merge gate becomes slower by design — `eval:all` moves into it. This is the task's named and accepted trade, argued in Risk Assessment and recorded in CHANGELOG under Changed. Tiering keeps the per-iteration loop on the cheap tier, and the parity test asserts `ci:fast` is a strict subset of `ci` so the slow tier cannot silently leak into the loop."
+  reliability:
+    status: PASS
+    notes: "Rollback is one line (revert the default) and leaves CI untouched either way. The parity test fails closed in both directions, mutation-proved 7x."
+  maintainability:
+    status: PASS
+    notes: "Net improvement: six independently-drifting restatements of one default now have a contract test holding them together. The fast gate is a config key rather than a literal, so consumer repos without a `ci:fast` script are not instructed to run a command they lack."
+
+recommendations:
+  immediate:
+    - action: "Reorder/renumber the fast-gate block so it follows the no-change check"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+  future:
+    - action: "workflowScripts() filters on `name in scripts`, so a CI step invoking a nonexistent npm script is dropped rather than flagged. Low impact — such a step fails CI on its own — but the parity test could assert it instead of ignoring it."
+      refs: ["evals/shared/tests/ci-gate-parity.test.mjs"]
+    - action: "OUT OF SCOPE for this task, filed here as evidence: `qa-execute-snippets.mjs` silently no-ops when invoked through a symlinked path (`.agents/skills/...`, which is what its own documentation prescribes) — exit 0, zero output. `select-next.mjs` already carries the exact fix and a comment describing this defect. Warrants a general bug report."
+      refs: ["shared/resources/qa-execute-snippets.mjs"]
+    - action: "develop-bug's per-cycle fix loop does not run the fast gate; its develop loop does. Asymmetry noted by the implementer, out of this task's file list."
+      refs: ["shared/resources/develop-bug-step-5-6-verify-loop.md"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Resolve TASK-75-001 (fast-gate block ordering) before merge"

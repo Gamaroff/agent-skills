@@ -130,12 +130,30 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 
 When `/develop` runs tests during the develop loop, test output must be captured to a temp file. The raw log is never read into main context; only the triage summary is used.
 
+### What the loop runs — the fast gate
+
+`<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
+**`npm run ci:fast`**. It is the project's cheap CI-equivalent: formatting plus the hermetic suite,
+and deliberately **not** the slow tier.
+
+Two halves of that, and both are load-bearing:
+
+- **Formatting belongs in the loop.** Its absence is what shipped the task-67 red build — `npm test`
+  passed locally throughout, and CI failed on `prettier --check` after `/finalise` had already
+  accepted the task. It costs seconds; discovering it in CI costs a round trip.
+- **The slow tier does not.** Whatever a project's expensive end-to-end tier is (`eval:all` here),
+  paying it on every iteration is what makes the correct fix feel expensive enough to be reverted.
+  It runs once, at `develop-next`'s merge gate, via `<qualityGateCommand>`.
+
+A project that sets neither key gets `npm run ci:fast`; a project whose scripts are named differently
+sets `develop.fastGateCommand` and nothing else changes.
+
 ### Output Capture Pattern
 
 ```bash
 ITER=<current develop loop iteration>
 TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
-<test-command> > "$TEST_LOG" 2>&1
+<fastGateCommand> > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
 ```
 
