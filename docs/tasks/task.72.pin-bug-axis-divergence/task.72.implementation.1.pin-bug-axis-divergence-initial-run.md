@@ -3,7 +3,7 @@
 **Task**: `task.72.pin-bug-axis-divergence.md`
 **Run Number**: 1
 **Started**: 2026-09-01 21:35
-**Status**: In Progress
+**Status**: Complete
 
 ---
 
@@ -36,9 +36,9 @@ Replace the loose subset assertion in test `16/H1` with one that pins the bug-ax
 | 2. review-task             | ✅ Done    | `task.72.review.{N}.{name}.md` exists (or skip logged)                 | `task.72.review.1.pin-bug-axis-divergence.md` — READY TO IMPLEMENT, 9/10, 0 critical / 1 important / 1 optional; both fixes applied; `planned → ready-for-development` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 3 phases complete; 4 mutations proved red and reverted; `npm run ci:fast` exit 0 (2141 tests, 0 fail, Prettier clean); committed `49c910a` | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #296](https://github.com/Gamaroff/agent-skills/pull/296) → `develop`; issue #287 commented (`posted`); board `in-review` → `stage-disabled` (correct, exit 0) | —                    |
-| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 | `task.72.qa.{N}.*.md`; `task.72.gate.{N}.*.yml`; PR comment posted     | Cycle 1: CONCERNS 90/100, 1 MEDIUM (TASK72-001) → qa-fix | —                    |
-| 7. finalise                | ⏳ Pending | `task.72.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.72.qa.{N}.*.md`; `task.72.gate.{N}.*.yml`; PR comment posted     | 2 cycles. C1: CONCERNS 90/100 (TASK72-001) → qa-fix → C2 refute pass: **PASS 100/100**. 7 probes | —                    |
+| 7. finalise                | ✅ Done    | `task.72.dod.{N}.*.md`; task `status: accepted`                        | DoD 9/9 PASS; `status: accepted`; CI polled PENDING→SUCCESS on the accepted head; issue #287 closed; board `already` Done | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final artifacts committed and pushed to PR #296 | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent.
 
@@ -138,10 +138,35 @@ After every mutation the file was restored; `git diff` confirms `develop-bug-ste
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {populated at end}
+**Finished**: 2026-09-01
+**Final Status**: Completed
 **Branch**: `feature/task.72.pin-bug-axis-divergence`
 **PR**: [#296](https://github.com/Gamaroff/agent-skills/pull/296)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 2 (cycle 1 CONCERNS 90/100 → qa-fix → cycle 2 PASS 100/100)
+**DoD Summary**: [task.72.dod.1.pin-bug-axis-divergence.md](./task.72.dod.1.pin-bug-axis-divergence.md)
+**Tracker debt**: none — every tracker action completed (comment posted, issue closed and verified, board already Done)
+
+### Cycle 1 — qa-fix — 2026-09-01
+
+- **TASK72-001 fixed** (`cabc135`). The task-72 sentences were moved out of the middle of the task-axis paragraph into their own paragraph that names `develop-bug`'s table explicitly. Verified by `diff` against `origin/develop`: lines 69–74 are **byte-identical** to their pre-change form.
+- Not mutation-proved, deliberately — a comment-only change has no behaviour to revert. The assertions it describes were unchanged by this commit.
+- `npm run ci:fast` exit 0 — 2141 tests, 0 failures, Prettier clean. PR comment posted.
+
+### Cycle 2 — qa-task (refute pass) — 2026-09-01
+
+- **Gate: PASS, 100/100.** Artifacts: `task.72.qa.2.*.md`, `task.72.gate.2.*.yml`. TASK72-001 verified closed by byte-diff.
+- **Ran as a full refute pass over the whole branch diff**, per the cycle-2 rule — reviewing to find what is false, starting with cycle 1's own fix.
+- **No code defect found. One real evidence gap found and closed.** Cycle 1 credited the anti-vacuity guard as mutation-proven by the *rename* mutation. That mutation yields a **three**-element gap, which `deepStrictEqual` rejects on its own — the guard fired only because it sits above the assertion, so the mutation was double-covered and proved nothing specific to the guard.
+- **The discriminating mutation is to *delete* the row**: `proceed` becomes `{reopened, in-progress, ready-for-qa}`, the gap stays at exactly `{in-progress, ready-for-qa}`, `deepStrictEqual` **passes**, and only the guard fires. **Control run**: with the row deleted *and* the guard removed, the test goes **green** — the proof that the guard is load-bearing rather than redundant.
+- **The guard's claim was true all along; the proof was not.** So no code fix was warranted — instead §8 gained the mutation (five now), and the guard's comment names the discriminating case and its control run inline, warning that a rename mutation is caught by both assertions. A future reader can now verify the claim instead of trusting it.
+- **This is the vacuous-coverage failure §10 Risk 2 names, caught one level up** — not a test that cannot fail, but a *proof* that could not discriminate.
+- Seven probes now stand behind the two assertions. PR and issue comments posted.
+
+### Step 7 — finalise — 2026-09-01
+
+- **DoD: 9/9 PASS → ACCEPTED.** `task.72.dod.1.pin-bug-axis-divergence.md` written; `status: accepted` in frontmatter and both body positions; `completed_date` and `pr_number: 296` added; Change Log row at **Version 1.2** (finalise is the only pipeline writer that bumps Version).
+- **CI was checked, not assumed — and this mattered.** The first rollup sample returned **PENDING**: the `test` job was `IN_PROGRESS` with `conclusion: ""`, exactly the shape that a naive `.conclusion // .state` would report as green. The gate refused to round it up and the run was polled to completion; all four jobs then reported SUCCESS. The green head (`aa9e3fa`) is **identical** to the accepted head, so this is not a green on an ancestor commit.
+- **DoD checks run directly rather than via four Explore subagents** (Agent dispatch prohibited this session). All four domains covered: success-criteria traceability against the diff, security (no secrets, no new dependencies, no runtime surface), compliance (N/A — substituted the repo conventions that *do* apply), and docs/changelog.
+- **Bundle-drift check passed.** `npm run bundle` was re-run and produced no changes, confirming `roadmap-selection.md` is skill-owned rather than a bundled copy that the next bundle would silently revert.
+- **Residual recorded, not waived**: the PR carries no human review (`reviewDecision` empty). Recorded as *unverified by human review* following task.71's precedent rather than reported as approved.
+- **Side-effects all completed**: canonical PR comment posted (idempotent marker), issue #287 commented (`posted`) and **closed** (verified `CLOSED`), board `done` → `already`. Sprint Review summary written.

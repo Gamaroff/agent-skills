@@ -5,11 +5,13 @@ type: task
 description: "The bug eligibility floor is asserted as a subset of what develop-bug accepts, so the two-status gap between them can grow silently. Assert the gap exactly, and record why bugs keep a divergence the task axis does not."
 tags: [develop-next, selection, eligibility-floor, bugs, drift-detection]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-08-31
 updated: 2026-09-01
+completed_date: 2026-09-01
+pr_number: 296
 assignee:
 depends_on: task.71
 estimated_effort_hours: 4
@@ -18,7 +20,7 @@ github_issue: 287
 
 # Technical Task: Pin the bug-axis divergence exactly instead of asserting it loosely
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.72.review.1.pin-bug-axis-divergence.md` implemented 2026-09-01
 **GitHub Issue**: [#287](https://github.com/Gamaroff/agent-skills/issues/287)
 
@@ -352,6 +354,33 @@ Cycle 2's refute pass found **no code defect** but closed a real gap in the *evi
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.72.gate.2.pin-bug-axis-divergence.yml` — ✅ **PASS, 100/100** (2 QA cycles)
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 9/9 — 3 functional, 4 structural, 2 documentation
+✅ **Tests:** 2141 tests, 0 failures; develop-next unit lane 123/123
+✅ **CI:** ✅ SUCCESS — 4/4 jobs green on head `aa9e3fa`, which **equals** the accepted head (not an ancestor commit). Sampled `PENDING` first and polled to completion rather than assumed
+✅ **PR:** [#296](https://github.com/Gamaroff/agent-skills/pull/296) → `develop`
+✅ **Documentation:** rationale recorded at all three reader-facing sites; stale-reference sweep clean
+✅ **Security:** PASS — no secrets, no new dependencies, no runtime surface
+⚠️ **Compliance:** NOT_APPLICABLE — no personal data or user-facing surface. Repo conventions checked instead and all passed, including a `npm run bundle` re-run confirming **no drift**
+✅ **Verification depth:** seven mutation and vacuity probes, including a guard-removal control run
+
+**Residual, recorded not waived:** the PR carries **no human review** (`reviewDecision` empty). This repository is maintained solo, so this is not a process violation, but it is recorded as *unverified by human review* rather than reported as approved — following task.71's precedent.
+
+**Detailed Verification Log:** see [`task.72.dod.1.pin-bug-axis-divergence.md`](./task.72.dod.1.pin-bug-axis-divergence.md) for complete evidence.
+
+**Task marked as ACCEPTED on:** 2026-09-01
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -363,6 +392,7 @@ Cycle 2's refute pass found **no code defect** but closed a real gap in the *evi
 | 2026-09-01 |         | QA gate CONCERNS (90/100) — 1 medium finding (TASK72-001): inserted sentences stranded the `Pinned by …` clause on the wrong antecedent in `select-next.mjs`. All functional/structural criteria proven; 5 mutation/vacuity probes | qa-task |
 | 2026-09-01 |         | qa-fix: TASK72-001 closed — task-axis paragraph restored byte-identical to `origin/develop` | qa-fix |
 | 2026-09-01 |         | QA gate PASS (100/100) — cycle-2 refute pass found no code defect; closed an evidence gap by adding the discriminating guard mutation (delete the `new` row) plus a guard-removal control run. 7 probes total | qa-task |
+| 2026-09-01 | 1.2     | DoD verified 9/9 — accepted (PR #296). CI green on the final head; 7 mutation/vacuity probes; bundle drift check clean. Residual recorded: no human PR review | finalise |
 
 ---
 
@@ -408,7 +438,7 @@ Nothing is broken and nothing is blocked — the floor is correct today. What is
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.72.pin-bug-axis-divergence/task.72.pin-bug-axis-divergence.md`
