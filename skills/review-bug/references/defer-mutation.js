@@ -576,7 +576,24 @@ function resolveConfigPath(env = process.env, cwd = process.cwd()) {
  * `--probe-board`) and destroyed the deferral record along with the write. The
  * refusal has to arrive as a VALUE so those paths keep working.
  *
- * @returns {{mode: string|null, reason: string|null}}
+ * `kind` says WHY there is a reason, and exists because "the resolver refused"
+ * and "the resolver never ran" are different events that resolve to the same
+ * safe value:
+ *
+ *   "refused"   — the file was read and found wanting, or the resolver ran and
+ *                 exited non-zero. This is DATA: a determination about the file.
+ *   "never-ran" — the probe was killed on timeout, or never started (fork
+ *                 pressure, EAGAIN, no bash). This is an INFRASTRUCTURE FAILURE
+ *                 and says nothing about the file. Transient; worth retrying.
+ *   null        — no reason; `mode` is the answer (or nothing is declared).
+ *
+ * Both non-null kinds still fail closed to `manual` in resolveAccessTracker, and
+ * that must not change. The distinction is for callers that need to know whether
+ * they received a reading or a non-event — bug.5, where a parity suite compared
+ * a timed-out probe against a correct one and reported the two readers as
+ * disagreeing. They had not; one of them never ran.
+ *
+ * @returns {{mode: string|null, kind: string|null, reason: string|null}}
  */
 function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
   const { origin, file, raw } = resolveConfigPath(env, cwd);
@@ -596,12 +613,13 @@ function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
   if (origin === "env" && !usable) {
     return {
       mode: null,
+      kind: "refused",
       reason: `SKILLS_CONFIG_FILE=${raw} does not name a readable config file`,
     };
   }
 
   // No config file at all is not a failure — it is a repo that declares nothing.
-  if (!usable) return { mode: null, reason: null };
+  if (!usable) return { mode: null, kind: null, reason: null };
 
   let text;
   try {
@@ -609,6 +627,7 @@ function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
   } catch (e) {
     return {
       mode: null,
+      kind: "refused",
       reason: `${file} could not be read (${e.code || e.message})`,
     };
   }
@@ -625,7 +644,7 @@ function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
   // escalation — shell said `manual`, this said `full` — found in QA cycle 1
   // (T61-H2), and it is the reason the checks below are about what could
   // POSSIBLY spell the key rather than about the key itself.
-  if (!mayDeclareAccess(text)) return { mode: null, reason: null };
+  if (!mayDeclareAccess(text)) return { mode: null, kind: null, reason: null };
 
   const tier = String((env && env.AGENT_SKILLS_CONFIG_TIER) || "");
   // JSON rather than NUL-joined. The collision reported as T61-L2 was NOT real —
@@ -636,7 +655,13 @@ function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
   if (_configAccessMemo.has(memoKey)) return _configAccessMemo.get(memoKey);
 
   const answer = probeResolver(file, cwd, tier);
-  _configAccessMemo.set(memoKey, answer);
+  // A PROBE THAT NEVER RAN IS NOT A PROPERTY OF THE FILE. Memoising it caches
+  // "the box was busy for ten seconds" under a key made of the path, so the
+  // fail-closed `manual` becomes sticky for the rest of the process even after
+  // load subsides — and it makes retrying pointless, because the retry is served
+  // from the cache without re-spawning. Re-reading costs one subprocess and can
+  // only ever return what the file actually says, so it cannot escalate.
+  if (answer.kind !== "never-ran") _configAccessMemo.set(memoKey, answer);
   return answer;
 }
 
@@ -690,6 +715,41 @@ function mayDeclareAccess(text) {
   if (/<<\s*:/.test(body)) return true;
   if (/(^|\s)!!?[A-Za-z]/m.test(body)) return true;
   return false;
+}
+
+/** Default budget for one resolver probe, in ms. */
+const ACCESS_PROBE_TIMEOUT_MS = 10000;
+
+/**
+ * How long one resolver probe may take.
+ *
+ * This was a bare `timeout: 10000`. bug.2 established for the TEST tier that a
+ * spawn budget chosen against an idle machine is not the margin it looks like —
+ * a probe costing ~550ms idle inflates several-fold under the parallel load a
+ * dev box running the pipelines actually carries. The same reasoning applies
+ * here, and this is the one spawn site bug.2's remedy could not reach because it
+ * is production rather than test code.
+ *
+ * READ FROM THE AMBIENT ENVIRONMENT, unlike AGENT_SKILLS_CONFIG_TIER two
+ * functions down, and the asymmetry is deliberate. The tier hook materially
+ * LOOSENS the answer (forcing a tier the host cannot honour makes the reader
+ * answer nothing and the resolver exit 0 with `full`), so it is honoured only
+ * when a caller passes it explicitly (T61-M4). This knob cannot loosen anything
+ * in either direction: a shorter budget can only make the probe fail, and a
+ * failed probe fails CLOSED to `manual`; a longer one only waits. There is no
+ * setting of it that turns a declared restriction into a tracker write.
+ *
+ * Anything that is not a plain positive decimal integer is ignored in favour of
+ * the default — `Number()` reads "0x10" as a 16ms budget that would kill every
+ * probe, which is the shape of an operator typo, not an instruction.
+ */
+function accessProbeTimeoutMs(env = process.env) {
+  const raw = String(
+    (env && env.AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS) || "",
+  ).trim();
+  if (!/^\d+$/.test(raw)) return ACCESS_PROBE_TIMEOUT_MS;
+  const n = Number(raw);
+  return n >= 1 ? n : ACCESS_PROBE_TIMEOUT_MS;
 }
 
 /**
@@ -749,15 +809,22 @@ function probeResolver(file, cwd, tier) {
       "_",
       script,
     ],
-    { cwd, env: childEnv, encoding: "utf8", timeout: 10000 },
+    { cwd, env: childEnv, encoding: "utf8", timeout: accessProbeTimeoutMs() },
   );
 
   // No bash, a timeout, or a resolver that could not run at all. Reachable only
   // when the file mentions `access`, so this fails CLOSED without imposing a
   // restriction on any repo that declares none.
+  //
+  // `kind: "never-ran"` is what separates this from the refusal below. Both
+  // still resolve to `manual` and that is deliberate — a probe that did not run
+  // tells us nothing, so fail closed. But the two are not the same event, and a
+  // caller that cannot tell them apart reports contention as a behavioural
+  // divergence. See the `kind` contract on readConfiguredAccessTracker.
   if (r.error || r.status === null) {
     return {
       mode: null,
+      kind: "never-ran",
       reason: `could not run ${RESOLVER_SH} to read ${file} (${(r.error && r.error.message) || "no exit status"})`,
     };
   }
@@ -767,15 +834,23 @@ function probeResolver(file, cwd, tier) {
     // too, so strip the duplicate rather than printing it twice in one line.
     let why = firstRefusalLine(r.stderr) || "it could not be read correctly";
     if (why.startsWith(`${file}:`)) why = why.slice(file.length + 1).trim();
-    return { mode: null, reason: `${file} was refused \u2014 ${why}` };
+    return {
+      mode: null,
+      kind: "refused",
+      reason: `${file} was refused \u2014 ${why}`,
+    };
   }
 
   const out = String(r.stdout || "").trim();
   // An empty or unrecognised answer on a clean exit is not something to guess at.
   if (!out || !ACCESS_MODES.includes(out)) {
-    return { mode: null, reason: `${file} produced no usable access mode` };
+    return {
+      mode: null,
+      kind: "refused",
+      reason: `${file} produced no usable access mode`,
+    };
   }
-  return { mode: out, reason: null };
+  return { mode: out, kind: null, reason: null };
 }
 
 /** The first refusal line the resolver printed, trimmed for a one-line warning. */
@@ -829,8 +904,24 @@ function warnOnce(reason) {
  *
  * Both are fail-closed. Only the shape of the refusal differs.
  *
+ * `opts.onDiagnostic` is an OBSERVATION channel, not a control one. When the
+ * config tier produces a reason, it is called with `{kind, reason}` before the
+ * warning is emitted, and the return value is unaffected either way. It exists
+ * because the config tier's fail-closed `manual` is indistinguishable from a
+ * legitimately-declared `manual` from outside, so a caller that must know
+ * whether it received a READING or a NON-EVENT has no other way to ask (bug.5).
+ *
+ * Two properties it must keep:
+ *
+ *   - It fires EVERY time, where warnOnce deduplicates per process. A caller
+ *     retrying a transient failure needs the second failure as much as the
+ *     first, and a deduplicated diagnostic would silently go blind on it.
+ *   - It cannot change the answer. It is passed no way to do so, and a throw
+ *     from it is the caller's own bug, not this function's — it is deliberately
+ *     not caught, so a broken sink is loud rather than invisible.
+ *
  * @param {Record<string,string>} [env]
- * @param {{cwd?: string, config?: boolean}} [opts]
+ * @param {{cwd?: string, config?: boolean, onDiagnostic?: (d: {kind: string|null, reason: string}) => void}} [opts]
  * @returns {"full"|"read-only"|"approve"|"command"|"manual"}
  */
 function resolveAccessTracker(env = process.env, opts = {}) {
@@ -860,11 +951,12 @@ function resolveAccessTracker(env = process.env, opts = {}) {
   // for the suites that pin the env tier in isolation, not as a way for a call
   // site to skip the file.
   if (opts.config !== false) {
-    const { mode, reason } = readConfiguredAccessTracker(
+    const { mode, kind, reason } = readConfiguredAccessTracker(
       env,
       opts.cwd || process.cwd(),
     );
     if (reason) {
+      if (opts.onDiagnostic) opts.onDiagnostic({ kind: kind || null, reason });
       warnOnce(reason);
       seen.push("manual");
     } else if (mode) {
