@@ -3,7 +3,7 @@
 **Task:** task.69.qa-bitbucket-pr-comment
 **Run:** 1
 **Verification Started:** 2026-09-01
-**Status:** IN PROGRESS
+**Status:** COMPLETED — ACCEPTED
 
 ---
 
@@ -134,3 +134,65 @@ First sample resolved to **PENDING**, which is non-acceptance — waiting is the
 Note that the F3 doc fix above lands as a further commit, so CI is re-sampled against the final head rather than this one.
 
 ---
+## Step 6: Acceptance Decision
+
+**Decision:** ✅ ACCEPTED
+
+| Column | Result |
+|---|---|
+| All success criteria met | ✅ PASS (3 functional, 3 code-quality) |
+| Tests & PR approved | ✅ PASS |
+| **CI green** | ✅ **SUCCESS** — see below |
+| Documentation updated | ✅ PASS (after closing the F3 gap) |
+| Security passed | ✅ PASS |
+| Compliance passed | ⚠️ NOT APPLICABLE (counts as pass) |
+| QA gate | ✅ PASS (100/100) |
+
+### CI resolution — the gate that must not be assumed
+
+CI was re-sampled against the **final** head after the F3 doc fix landed, per the re-sampling rule:
+
+| Sample | Result |
+|---|---|
+| 1 | PENDING |
+| 2 | PENDING |
+| 3 | PENDING |
+| 4 | **SUCCESS** |
+
+**Final head `167d79a` — confirmed equal to local `HEAD`.** All four jobs green on that commit:
+
+| Job | Status | Conclusion |
+|---|---|---|
+| `test` | COMPLETED | SUCCESS |
+| `validate` | COMPLETED | SUCCESS |
+| `link-check` | COMPLETED | SUCCESS |
+| `PR into main comes from an allowed branch` | COMPLETED | SUCCESS |
+
+This is a green on the commit containing the final code, not on an ancestor. The first sample of this run was `PENDING` and was correctly treated as non-acceptance rather than as "nothing wrong yet".
+
+**Outcome:** Task meets all Definition of Done criteria.
+
+---
+
+## Verification Complete
+
+**Final Status:** ✅ ACCEPTED
+**Completion Time:** 2026-09-01
+
+**Artifacts Generated:**
+
+- ✅ Task document updated with DoD verification section
+- ✅ Sprint Review summary created — `sprint-review-summary.md`
+- ✅ PR canonical summary comment posted (idempotent, marker-guarded)
+- ⚠️ Tracker issue close — **N/A, nothing was owed**: task 69 carries no `github_issue`, so no issue exists to close. Recorded as an absence, not a failure.
+- ⚠️ Project board move — **N/A for the same reason**. No `gh-stage.js --stage done` call was made, because there is no issue to move.
+
+**One gap was found and closed during this verification** rather than after it: the `/review-code` cross-reference (F3). It is recorded above in full rather than quietly repaired, because the DoD is a record of what was actually checked — and this one was caught only by sweeping for documents that restate the changed behaviour, which is the drift class that otherwise ships silently.
+
+**Residuals accepted, with reasons:**
+
+1. **TASK69-003 (LOW, open)** — `COMMENT_RC` unset on an unreachable third `$VCS` branch.
+2. **The Bitbucket arm ships unexecuted** — GitHub-hosted repo; verified by inspection against two shipped call sites.
+3. **Step 4b can never execute these two steps' comment blocks** — they are correctly deny-listed as mutating.
+
+**Next Steps:** Task is ready for Sprint Review. Merge PR #295 to `develop`.

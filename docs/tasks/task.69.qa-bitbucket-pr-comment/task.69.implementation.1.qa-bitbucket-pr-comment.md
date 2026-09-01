@@ -3,7 +3,7 @@
 **Task**: `task.69.qa-bitbucket-pr-comment.md`
 **Run Number**: 1
 **Started**: 2026-09-01 20:35
-**Status**: In Progress
+**Status**: Complete
 
 ---
 
@@ -36,8 +36,8 @@ Add a `$VCS` branch to the QA gate PR-comment step in both `qa-task` (Step 13) a
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. 4/4 phases. ci:fast green: 2139 tests, 0 fail, prettier clean | — |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #295](https://github.com/Gamaroff/agent-skills/pull/295) → `develop`. 3 commits. Issue comment skipped (none linked) | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.69.qa.{N}.*.md`; `task.69.gate.{N}.*.yml`; PR comment posted     | 2 cycles: FAIL 60 → PASS 100. 2 findings closed, 1 LOW accepted | — |
-| 7. finalise                | ⏳ Pending | `task.69.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.69.dod.{N}.*.md`; task `status: accepted`                        | DoD passed; CI SUCCESS on final head. 1 doc gap found + closed | — |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 5 commits on the branch; working tree clean | — |
 
 ---
 
@@ -113,14 +113,56 @@ Add a `$VCS` branch to the QA gate PR-comment step in both `qa-task` (Step 13) a
 - Step 4b re-run on the changed file: `zero-blocks-executed`, unchanged and pre-existing on `origin/develop`. Carried into the gate's `future` recommendations so it stops being rediscovered each cycle.
 - Both bug reports closed. QA comment posted to PR #295 (exit 0).
 
+### Step 7 — finalise → ACCEPTED
+
+- DoD verified across success criteria, security, compliance (N/A, recorded as considered) and docs. Task `status: accepted`, `completed_date` and `pr_number: 295` written.
+- **CI was waited for, not assumed.** First rollup sample returned `PENDING` (the `test` job `IN_PROGRESS`) and was correctly treated as non-acceptance. Re-sampled to **SUCCESS** on head `167d79a`, confirmed equal to local `HEAD` — a green on the commit containing the final code, not an ancestor.
+- **One DoD gap found and closed during verification**: `skills/review-code/SKILL.md` still described task 69 as pending work and told implementers not to reference `/qa-story` "step 6" because "no such step exists". Both halves became false the moment this task landed. Rewritten to say the arm exists and is a legitimate reference for the *transport*, while keeping `/finalise` as the recipe for that step's *shape* (the QA comment is deliberately non-idempotent). Found only by sweeping documents that restate the changed behaviour — the drift class that otherwise ships silently.
+- Deliberately left alone: the `$(dirname "$0")` dot-source at `review-code/SKILL.md:98`. It is now the **last** such call site in `skills/*/SKILL.md`, and the §11 coverage floor of 1 depends on it existing. Normalising it would take the count to 0 and turn that guard into a check of nothing.
+- Sprint review summary and canonical PR comment written. Tracker: nothing owed (no `github_issue`).
+
+---
+
+## Completion Summary
+
+Task 69 gave both QA skills a Bitbucket PR-comment path and shipped it with real coverage. The work
+itself was small — one platform branch in each of two prose files. What the run is actually worth
+recording is the two defects it caught in its own output, both of the same shape: **a mechanism
+reporting success without having checked anything.**
+
+- The **review** caught Phase 3 describing itself as a spot-check when the preamble was absent from
+  both skills, and caught the two skills already sourcing the resolver differently — one of them via
+  `$(dirname "$0")`, which never resolved, so Phase 2 would have shipped a Bitbucket arm above a dead
+  resolver line.
+- **QA cycle 1** caught the change breaking the one criterion it promised not to: moving to a quoted
+  heredoc silently stopped `qa-story`'s body variables expanding. The comment still *posted*, so the
+  step's own BLOCKING exit-code check passed. Nothing was red.
+- The **coverage** that should have caught it could not. Three mutations had been recorded and all
+  three were structural, so they proved the structural assertions and nothing else. Coverage looked
+  complete because every mutation anyone thought to run was of the kind already covered.
+- **QA cycle 2** did not accept the fix on its author's word: it ran a mutation the developer had
+  not, then probed the *new* guard for vacuity and confirmed it fails loudly when its anchor moves.
+- **Finalise** caught a stale `/review-code` cross-reference that this task's own landing had made
+  false, and refused to accept on a PENDING CI rollup, waiting for a green on the final head.
+
+Three lessons worth carrying forward:
+
+1. **A structural mutation proves a structural assertion and nothing more.** Ask what *kind* of
+   mutation has not been tried before recording coverage as complete.
+2. **A step whose success check is an exit code cannot see a fault in its own output.** These two QA
+   steps also sit outside Step 4b's reach by design, so contract tests are their only guard —
+   which is exactly why the coverage gap was worth a full cycle.
+3. **When an instruction says "keep these two identical", check what they already differ in.** The
+   defect lived in content the instruction was read as not covering.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-01
+**Final Status**: Completed
 **Branch**: `feature/task.69.qa-bitbucket-pr-comment`
 **PR**: [#295](https://github.com/Gamaroff/agent-skills/pull/295)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 2 (cycle 1 FAIL 60/100 → cycle 2 PASS 100/100)
+**DoD Summary**: `task.69.dod.1.qa-bitbucket-pr-comment.md`
+**Tracker debt**: none — task 69 carries no `github_issue`, so no tracker mutation was ever due.

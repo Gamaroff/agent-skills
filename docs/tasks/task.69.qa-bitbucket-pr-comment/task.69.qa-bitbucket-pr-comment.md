@@ -5,18 +5,20 @@ type: task
 description: "The QA gate comment is GitHub-only in both QA skills, and it is marked BLOCKING. On a Bitbucket repo the step cannot succeed. Two other skills already point at it as the reference Bitbucket recipe, so the gap propagates."
 tags: [qa, bitbucket, pr-comment, platform-parity]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-08-31
 updated: 2026-09-01
+completed_date: 2026-09-01
+pr_number: 295
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Give `/qa-story` and `/qa-task` a Bitbucket PR-comment path
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ Actionable recommendations from `task.69.review.1.qa-bitbucket-pr-comment.md` implemented 2026-09-01 — 1 applied (Phase 3 scope + divergent resolver note), 1 deferred (tracker linkage; needs an opt-in `/sync-github-task`).
 
@@ -304,6 +306,44 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 
 ---
 
+## Definition of Done - PASSED
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**QA Report**: `task.69.qa.2.qa-bitbucket-pr-comment.md` · **Gate**: `task.69.gate.2.qa-bitbucket-pr-comment.yml`
+**Gate Status**: PASS · **Quality Score**: 100/100 · **QA Cycles**: 2 (FAIL 60 → PASS 100)
+
+All Definition of Done criteria verified:
+
+- **Success criteria** — all 6 met (3 functional, 3 code-quality), each with code and test evidence.
+- **Tests** — 25 contract tests across two new suites, both registered in `package.json`; full gate 2141 tests, 0 failures, prettier clean.
+- **CI** — SUCCESS on head `167d79a`, confirmed equal to local `HEAD`. All four jobs green on the commit containing the final code, not on an ancestor. The first sample was PENDING and was treated as non-acceptance rather than assumed green.
+- **Documentation** — Change Log current; cross-skill sweep performed, which found and closed one stale statement in `/review-code` (see below).
+- **Security** — PASS. No secrets; credential handling delegated to the shipped `bitbucket-auth.sh`, sourced guarded. The change **reduces** injection surface: backticks and `$(…)` in the comment body are no longer shell-evaluated.
+- **Compliance** — NOT APPLICABLE. Internal developer tooling; no personal, payment or health data and no user-facing surface. Recorded as considered.
+
+### One gap found and closed during finalisation
+
+`skills/review-code/SKILL.md` still said *"Giving `/qa-story` and `/qa-task` a Bitbucket PR-comment path of their own is task 69 … Do not point either arm at `/qa-story` 'step 6': no such step exists."* Both halves became false the moment this task landed. Rewritten to state that the arm now exists and is a legitimate reference for the **transport**, while keeping `/finalise` as the recipe for that step's *shape* — the QA comment is deliberately per-cycle and non-idempotent, so copying its shape there would import the wrong property.
+
+### Accepted residuals
+
+1. **TASK69-003 (LOW, open)** — `COMMENT_RC` unset on an unreachable third `$VCS` branch; degrades to a shell diagnostic, not a false success.
+2. **The Bitbucket arm ships unexecuted** — this repo is GitHub-hosted. Verified by inspection against the two shipped call sites it was copied from.
+3. **Step 4b can never execute these two steps' comment blocks** — they post comments and are correctly deny-listed as mutating. It is why the contract-test gap (TASK69-002) mattered as much as it did.
+
+### Tracker
+
+No `github_issue` linked — no tracker mutation was owed at any point in this run. Recorded as an absence, not a failure. **Tracker debt: none.**
+
+**Detailed Verification Log:** see [`task.69.dod.1.qa-bitbucket-pr-comment.md`](./task.69.dod.1.qa-bitbucket-pr-comment.md).
+
+**Task marked as ACCEPTED on:** 2026-09-01
+
+---
+
 ## Bug Reports
 
 ### In QA Verification
@@ -370,6 +410,7 @@ baseline restored                                        → 25 pass, 0 fail
 | 2026-09-01 |         | QA gate FAIL (60/100) — 1 HIGH, 1 MEDIUM, 1 LOW | qa-task |
 | 2026-09-01 |         | QA findings fixed — TASK69-001 + TASK69-002, 1 iteration; both mutation-proved | qa-fix |
 | 2026-09-01 |         | QA gate PASS (100/100) — both findings verified closed; 1 LOW accepted | qa-task |
+| 2026-09-01 | 1.3     | DoD verified — accepted (PR #295); CI green on final head; one stale /review-code cross-reference found and closed | finalise |
 
 ---
 
@@ -411,7 +452,7 @@ baseline restored                                        → 25 pass, 0 fail
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.69.qa-bitbucket-pr-comment/task.69.qa-bitbucket-pr-comment.md`
