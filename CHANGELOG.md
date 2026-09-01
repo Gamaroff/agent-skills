@@ -396,6 +396,43 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/review-code` posted PR comments on the wrong axis — it branched on `TRACKER` where the decision
+  belongs to `VCS`.** Step 4 chose its comment path by testing `TRACKER=github`, but a comment on a
+  **pull request** is a property of where the code is hosted, not of where the issues live. The two are
+  separate axes by design — `resolve-platform.sh` sets both precisely because a repo can host code on
+  Bitbucket while tracking work in Jira, or on Bitbucket with GitHub issues.
+
+  **In that configuration the failure was silent.** With `VCS=bitbucket` and `TRACKER=github` the step
+  took the `gh pr comment` arm against a Bitbucket PR. `gh` cannot address one at all, so the comment
+  never appeared — and the run reported success. Nothing was red, and nobody would look.
+
+  **The arm it fell through to did not exist either.** The alternative was labelled *"Bitbucket / Jira"*
+  — a VCS grouped with a tracker as though they were alternatives to each other, which is the same
+  category error that produced the wrong key — and it delegated to *"mirror `/qa-story` step 6"*.
+  `/qa-story` has **no numbered Step 6** in its main review flow; its workflow lives under an unnumbered
+  heading. An implementer following the instruction found nothing to mirror. The Bitbucket arm now names
+  the credential resolver, the actual REST endpoint, and the marker-based idempotency pattern, pointing
+  at `skills/finalise/SKILL.md` **Step 7**, which carries both platform arms side by side and works.
+
+  **`review-pr` already had this right and said so**, so the rule is now stated in `review-code` in
+  `review-pr`'s exact words — *"Branch on `$VCS` for everything PR-shaped, on `$TRACKER` for everything
+  issue-shaped"* — and a contract test asserts the two skills state it **identically**, so rewording one
+  fails until the other follows.
+
+  **`skills/review-code/tests/` is new** — the skill had none — with 12 contract tests and its glob added
+  to `package.json`, which hand-lists them (a suite absent from that list runs nowhere). All assertions
+  are scoped to the Step 4 section rather than the whole file: the rule is not "never mention `TRACKER`",
+  it is "do not branch PR-shaped work on it", and a file-wide ban would forbid a future issue-shaped
+  branch where `TRACKER` is correct. Five mutation reverts — branch key, Bitbucket arm, rule statement,
+  the dead pointer, the Bitbucket/Jira conflation — each **proved to have actually applied** before its
+  red was counted.
+
+  **A sweep classified all 64 `TRACKER=github` occurrences** across 20 source files. `review-code` was
+  the only PR-shaped one. Everything else — issue comments, board moves, milestones, tracker linkage,
+  sync dispatch — is issue-shaped and correctly keyed; `finalise`'s own PR-comment section already
+  branched on `$PLATFORM`/`$VCS`. Behaviour in a GitHub/GitHub repo is unchanged: the two keys resolve
+  identically there, which is why this survived as long as it did.
+
 - **The status-vocabulary fix missed one restatement, and the guard that should have caught it was
   too narrow.** `qa-story`'s Key Principle 11 still said *"(PASS/CONCERNS → Ready for Done, FAIL →
   Reopened)"* — the same rule in a parenthesised prose form, with no `Status:` prefix and no quotes,
