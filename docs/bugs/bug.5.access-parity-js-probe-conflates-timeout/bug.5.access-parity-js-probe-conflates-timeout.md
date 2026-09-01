@@ -1,6 +1,6 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-01'
@@ -13,7 +13,7 @@ description: "access-config-parity.test.mjs already separates 'the resolver refu
 
 **Bug ID**: bug.5.access-parity-js-probe-conflates-timeout
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: 🆕 New
+**Status**: ✅ Ready for QA
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-01
@@ -152,8 +152,150 @@ sleeps) and confirm the suite reports an infrastructure failure rather than a re
 
 ---
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-09-01
+**Developer**: develop-bug pipeline
+
+**Reproduction**: Deterministic, by forcing the reader's own probe budget. The internal
+`spawnSync` in `probeResolver` was temporarily set to `timeout: 1`, then:
+
+```
+node --test shared/resources/tests/access-config-parity.test.mjs
+  AssertionError: the two readers disagree:
+    mode-approve [tier=awk]: shell=approve js=manual
+    mode-read-only [tier=awk]: shell=read-only js=manual
+    ... 15 rows, every one js=manual
+```
+
+That is the reported symptom exactly, including the report's own `mode-approve` line. The shell
+tier answered correctly on every row; the JS probe never ran on any of them.
+
+**Root Cause Analysis**: The defect is a **loss of information at the source**, not in the test.
+
+`probeResolver` (`shared/resources/defer-mutation.js:703`) flattened three genuinely different
+outcomes into one `{ mode: null, reason }` shape:
+
+| Outcome | What it means |
+| --- | --- |
+| child killed / never started | infrastructure — says *nothing* about the file |
+| resolver ran, exited non-zero | data — a determination about the file |
+| resolver ran, unusable stdout | data |
+
+`resolveAccessTracker` (`:835`) then maps *any* non-null `reason` to `manual`. That is correct
+and safety-critical production behaviour — it refuses rather than escalating a declared
+restriction — but it leaves **no caller, including this suite, able to tell a reading from a
+non-event**. `jsAnswer()` caught only a `throw`, and the reader does not throw here: it warns and
+returns. So `manual` came back looking exactly like a legitimately-declared `manual`.
+
+`shellAnswer()` (`access-config-parity.test.mjs:147`) had already been given this distinction, and
+its docstring at `:131` describes the identical failure. The JS side never received the
+equivalent treatment — which is precisely what the bug report says.
+
+**A second defect found while fixing this, which blocked the prescribed remedy.**
+`readConfiguredAccessTracker` memoises the probe answer in `_configAccessMemo`, keyed on
+`[cwd, file, tier]`. A timed-out probe was cached under the *file path* — so "the box was busy for
+ten seconds" became a sticky property of that config for the rest of the process, and the retry
+the bug report asks for would have been served from the cache without re-spawning. The retry
+could not have worked without also fixing this.
+
+**Proposed Fix**: classify the failure where it happens, expose the classification through an
+observation-only channel, stop memoising non-events, and let the suite retry-then-throw exactly as
+`shellAnswer` does.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-09-01
+
+**Root Cause**: `probeResolver` conflated "the resolver refused" with "the probe never ran"; both
+became a bare `reason`, both fail-closed to `manual`, and nothing downstream could tell them
+apart.
+
+**Fix Description**:
+
+- **`probeResolver` now classifies.** Every return carries a `kind`: `"never-ran"` for a child
+  killed on timeout or never started, `"refused"` for a resolver that ran and refused (or produced
+  an unusable answer), `null` on success. Pure addition — no existing field changed.
+- **The probe timeout is tunable.** The bare `timeout: 10000` became
+  `accessProbeTimeoutMs()`, reading `AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS` and defaulting to the
+  same 10000. This is bug.2's remedy applied to the one spawn site that was out of its reach
+  because it is production rather than test code. It is read from the *ambient* environment,
+  unlike the neighbouring `AGENT_SKILLS_CONFIG_TIER` hook — deliberately, and the asymmetry is
+  documented at the function: the tier hook can loosen the answer, whereas no value of a timeout
+  can. A short budget only makes the probe fail, and a failed probe fails **closed**.
+- **A probe that never ran is no longer memoised.** Caching a transient contention event under a
+  path made the fail-closed `manual` sticky for the process and made retrying a no-op.
+- **`resolveAccessTracker` gained `opts.onDiagnostic`** — an observation channel, called with
+  `{ kind, reason }` when the config tier produces a reason. It fires **every** time (unlike
+  `warnOnce`, which deduplicates per process — a deduplicated diagnostic would make a retry loop
+  go blind on its second failure) and it cannot change the answer. Absent the option, every
+  production call site runs an identical code path.
+- **`jsAnswer()` now mirrors `shellAnswer()`**: on a `never-ran` diagnostic it retries on the
+  shared `SPAWN_RETRIES` budget, then throws an infrastructure-failure message naming contention
+  rather than divergence.
+
+**Nothing about the production reader's return value, its warning, or its fail-closed semantics
+changed** — the constraint the bug report states twice.
+
+**Files Modified**:
+
+- `shared/resources/defer-mutation.js` — `kind` classification, `accessProbeTimeoutMs()`, memo
+  guard, `onDiagnostic` channel
+- `shared/resources/tests/access-config-parity.test.mjs` — `jsAnswer()` retry/throw; five new
+  regression tests
+- `skills/*/references/defer-mutation.js` (38 bundled copies) — regenerated via `npm run bundle`
+
+**Testing**:
+
+Five regression tests added to the existing `the probe cannot fabricate an answer` block, which
+already held the shell-side equivalents:
+
+1. `a JS probe that never completes throws instead of reading as \`manual\`` — the mutation proof
+2. `the same JS probe, given time, does answer` — vacuity control
+3. `a probe that never ran is not memoised as a property of the file` — the memo fix
+4. `the diagnostic fires on every failure, not once per process` — the warnOnce-bypass property
+5. `a genuine refusal is NOT reported as an infrastructure failure` — the other direction, so the
+   fix cannot cry wolf by classifying everything as contention
+
+**Mutation proof** — each half of the fix reverted independently, all confirmed red:
+
+| Reverted | Result |
+| --- | --- |
+| `kind: "never-ran"` → `"refused"` | 3 tests red |
+| memo guard removed | 1 test red |
+| `jsAnswer` back to catch-only | red: `Missing expected exception` — it returned `manual`, the original defect |
+
+Suite: **37 pass / 0 fail** (was 32 before this change).
+
+**Verification Steps for QA**:
+
+1. `node --test shared/resources/tests/access-config-parity.test.mjs` → 37/37, no timeouts.
+2. Force the failure: `AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS=1 node --test --test-name-pattern "JS probe that never completes" …` → the test passes *because* the probe is killed and the suite throws an infrastructure error, not a divergence.
+3. Confirm the diagnostic names contention: the thrown message must contain `never ran` and `NOT a refusal`, and must not report a reader disagreement.
+4. Confirm production semantics are untouched: `resolveAccessTracker` with no `onDiagnostic` still returns `manual` on a refusal and `full` on a repo declaring nothing.
+
+---
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---------- | ------ | ---------- | ----- |
 | 2026-09-01 | New | QA Engineer | Filed from task.75 — failed 2 of 3 full runs; root cause traced to the JS probe |
+| 2026-09-01 | In Progress | develop-bug | Reproduced deterministically by forcing the probe budget; root cause localised to `probeResolver` flattening never-ran into refused |
+| 2026-09-01 | Ready for QA | develop-bug | Fix implemented + 5 regression tests; 3 independent mutations confirmed red |
+
+---
+
+## Resolution Summary
+
+[Will be completed when bug is closed]
+
+**Final Status**: [Closed status]
+**Total Iterations**: [Number]
+**Time to Resolution**: [Duration]
+**Final Fix Details**: [Summary]
+**Lessons Learned**: [Key takeaways]
