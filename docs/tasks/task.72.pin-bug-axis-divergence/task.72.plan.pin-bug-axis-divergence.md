@@ -160,7 +160,7 @@ npm test                                              # expect 0 failures
 
 ## Testing Approach
 
-Mutation proofs — run each against the real suite, then revert:
+Mutation proofs — four, each run against the real suite, then reverted:
 
 ```bash
 # 1. gap shrinks: add in-progress to the floor  → new assertion must go red
@@ -170,8 +170,21 @@ Mutation proofs — run each against the real suite, then revert:
 #    e.g. append:  | `awaiting-triage` | Proceed — probe. |
 #    to the "Status guards" table in develop-bug-step-0-resolve-bug.md
 
-# 3. guard survives: delete "new" from BUG_ELIGIBLE_STATUSES → must go red
+# 3. gap sensitivity, shrink-the-floor direction: delete "new" from
+#    BUG_ELIGIBLE_STATUSES → gap becomes {in-progress, ready-for-qa, new}
+#    → the GAP ASSERTION must go red
+
+# 4. guard survives: rename the `new` row in develop-bug-step-0-resolve-bug.md's
+#    "Status guards" table so proceedStatuses() returns the wrong rows
+#    → the ANTI-VACUITY GUARD must go red
 ```
+
+**Mutations 3 and 4 are separate, and only 4 proves the guard.** The guard reads `proceed`, which is
+derived solely from parsing `STEP0_BUG` — it never reads `BUG_ELIGIBLE_STATUSES`. So mutating that
+constant cannot exercise it; mutation 3 goes red through the gap comparison instead. Only corrupting
+the **parse** reaches the guard, which is the case it exists for: a parse returning the *wrong* rows,
+which an empty-check would not catch. Collapsing these two is how a proof ends up confirming an
+assertion other than the one it names.
 
 Mutation 2 is the one that matters most — it is the exact drift the old `⊆` was blind to, and the
 reason this task exists. Restore every mutated file and confirm `git status` is clean before

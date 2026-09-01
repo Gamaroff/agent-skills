@@ -68,7 +68,9 @@ export const DEFAULT_TASK_REGISTRY = "docs/tasks/task-registry.md";
 //
 // The rule was originally the weaker `⊆`. Task 71 tightened it to `===` on the
 // task axis, because a strict subset is a gap the selector cannot explain: it
-// refuses work the thing it dispatches to would happily accept. Pinned by
+// refuses work the thing it dispatches to would happily accept. Task 72 then
+// pinned the BUG axis's divergence exactly, so neither axis is `⊆` any more:
+// the task axis asserts equality, the bug axis asserts a known two-status gap. Pinned by
 // `evals/develop-next/unit/select-next.test.mjs` §"eligibility floor vs
 // dispatcher", which parses `develop-task`'s own status table and fails on a
 // divergence in EITHER direction — under-widening and over-widening both.
@@ -105,12 +107,21 @@ export const DEFAULT_TASK_REGISTRY = "docs/tasks/task-registry.md";
 //   task: draft → planned → ready-for-development → in-progress →
 //         ready-for-review → accepted | cancelled
 //
-// **The bug axis keeps the weaker `⊆`, on purpose.** Measured: `develop-bug`
-// proceeds on {new, reopened, in-progress, ready-for-qa} while the set below is
-// {new, reopened} — a real two-status gap. Closing it would put a `ready-for-qa`
-// bug (fix already written, awaiting verification) into an unattended loop,
-// which is a larger change than task.71 assessed. See the bug half of
-// §"eligibility floor vs dispatcher" in the test file.
+// **The bug axis keeps a divergence, and task 72 pinned it EXACTLY.** Measured:
+// `develop-bug` proceeds on {new, reopened, in-progress, ready-for-qa} while the
+// set below is {new, reopened} — a real two-status gap, now asserted as that
+// exact set rather than as a subset, so it fails on a change in either
+// direction.
+//
+// The reason it stays is semantic before it is about risk. `develop-bug`'s two
+// extra statuses are RESUME AFFORDANCES — `in-progress` is "a prior run may have
+// started; resume-aware", `ready-for-qa` is "proceed toward verification if a fix
+// already exists". They exist so a re-invoked pipeline does not HALT on its own
+// half-finished work; they are not a claim that work is available to nominate.
+// Selecting on them would hand an unattended loop a bug a human may be actively
+// holding, or one whose fix is written and only awaiting verification. That is
+// why task 71's equality rule is right for the task axis and wrong for this one.
+// See the bug half of §"eligibility floor vs dispatcher" in the test file.
 export const BUG_ELIGIBLE_STATUSES = new Set(["new", "reopened"]);
 export const TASK_ELIGIBLE_STATUSES = new Set([
   "draft",

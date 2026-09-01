@@ -5,11 +5,11 @@ type: task
 description: "The bug eligibility floor is asserted as a subset of what develop-bug accepts, so the two-status gap between them can grow silently. Assert the gap exactly, and record why bugs keep a divergence the task axis does not."
 tags: [develop-next, selection, eligibility-floor, bugs, drift-detection]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 assignee:
 depends_on: task.71
 estimated_effort_hours: 4
@@ -18,7 +18,8 @@ github_issue: 287
 
 # Technical Task: Pin the bug-axis divergence exactly instead of asserting it loosely
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.72.review.1.pin-bug-axis-divergence.md` implemented 2026-09-01
 **GitHub Issue**: [#287](https://github.com/Gamaroff/agent-skills/issues/287)
 
 ---
@@ -29,7 +30,7 @@ github_issue: 287
 
 Replace that subset assertion with one that pins the gap **exactly** — `{in-progress, ready-for-qa}` — so any change on either side fails loudly. Record why the bug axis keeps a divergence the task axis was made to close.
 
-**Key deliverables**: an exact-gap assertion, the rationale written where the next reader will find it, and three mutation proofs.
+**Key deliverables**: an exact-gap assertion, the rationale written where the next reader will find it, and four mutation proofs.
 
 **Expected outcome**: no behaviour change. The floor stays exactly as it is; what changes is that it can no longer drift without a test going red.
 
@@ -55,7 +56,7 @@ Replace that subset assertion with one that pins the gap **exactly** — `{in-pr
 
 That row says: **this is unstarted work, and the pipeline will start it.** Nominating such a task is exactly right, which is why task 71 made the floor equal that set.
 
-`develop-bug` Step 0 on the two statuses in the gap (`skills/develop-bug/references/develop-bug-step-0-resolve-bug.md:58-64`):
+`develop-bug` Step 0 on the two statuses in the gap (`skills/develop-bug/references/develop-bug-step-0-resolve-bug.md:57-63`):
 
 > `in-progress` → *"Proceed — a prior run may have started; resume-aware."*
 > `ready-for-qa` → *"Proceed directly toward Steps 5–6 verification **if a fix already exists**; else re-verify the fix record."*
@@ -161,10 +162,10 @@ Because nothing observable changes, this task deliberately adds **no** CHANGELOG
 **Risk Level**: Low
 **Files**: `evals/develop-next/unit/select-next.test.mjs`
 
-- [ ] Replace the `for (const status of BUG_ELIGIBLE_STATUSES)` loop with an exact-gap `assert.deepStrictEqual` on the sorted difference
-- [ ] Keep the `new`/`reopened` anti-vacuity guard **verbatim** — it catches a wrong parse, which an empty-check cannot
-- [ ] Fail with a message naming the unexpected statuses and stating what each direction means
-- [ ] Rename the test — its current title states the subset rule
+- [x] Replace the `for (const status of BUG_ELIGIBLE_STATUSES)` loop with an exact-gap `assert.deepStrictEqual` on the sorted difference
+- [x] Keep the `new`/`reopened` anti-vacuity guard **verbatim** — it catches a wrong parse, which an empty-check cannot
+- [x] Fail with a message naming the unexpected statuses and stating what each direction means
+- [x] Rename the test — now `16/H1: the bug-axis gap is exactly {in-progress, ready-for-qa}`
 
 **Dependencies**: none
 
@@ -177,9 +178,9 @@ Because nothing observable changes, this task deliberately adds **no** CHANGELOG
 
 > The comment above the bug assertion currently explains the gap in terms of **risk** ("would hand an unattended loop a fix already written"). That is true but secondary. The primary reason is **semantic**, and the comment should lead with it.
 
-- [ ] Rewrite the comment above the bug assertion to lead with the resume-affordance distinction (§2), quoting both dispatchers' rows
-- [ ] `roadmap-selection.md` — the eligibility table's *Relation to dispatcher* cell for the bug row: change `⊆ — diverges by …` to state the gap is pinned exactly, and why bugs differ from tasks
-- [ ] Check the two `select-next.mjs` comment blocks task 71 wrote: they describe the bug axis as keeping "the weaker `⊆`". That is about to stop being true — update the wording
+- [x] Rewrite the comment above the bug assertion to lead with the resume-affordance distinction (§2), quoting both dispatchers' rows
+- [x] `roadmap-selection.md` — the eligibility table's *Relation to dispatcher* cell for the bug row: change `⊆ — diverges by …` to state the gap is pinned exactly, and why bugs differ from tasks
+- [x] Check the two `select-next.mjs` comment blocks task 71 wrote: they describe the bug axis as keeping "the weaker `⊆`". That is about to stop being true — update the wording
 
 **Dependencies**: Phase 1
 
@@ -190,10 +191,10 @@ Because nothing observable changes, this task deliberately adds **no** CHANGELOG
 **Risk Level**: Low
 **Files**: none (verification only)
 
-- [ ] `node --test 'evals/develop-next/unit/*.test.mjs'` green
-- [ ] Full `npm test` green
-- [ ] `prettier --check` clean on the changed files
-- [ ] Three mutations executed and reverted (see §8)
+- [x] `node --test 'evals/develop-next/unit/*.test.mjs'` green — 123/123
+- [x] Full `npm test` green — 2141 tests, 0 failures
+- [x] `prettier --check` clean on the changed files — `npm run ci:fast` exit 0
+- [x] Four mutations executed and reverted (see §8)
 
 **Dependencies**: Phases 1-2
 
@@ -219,10 +220,10 @@ Because nothing observable changes, this task deliberately adds **no** CHANGELOG
 
 ### Unit Tests
 
-- [ ] The bug gap is exactly `{in-progress, ready-for-qa}`
-- [ ] The anti-vacuity guard still fails on a parse that returns the wrong rows
-- [ ] The task axis assertion is untouched and still passes
-- [ ] No bug's selectability changes — the existing `15` bug-eligibility tests pass unmodified
+- [x] The bug gap is exactly `{in-progress, ready-for-qa}`
+- [x] The anti-vacuity guard still fails on a parse that returns the wrong rows
+- [x] The task axis assertion is untouched and still passes
+- [x] No bug's selectability changes — the existing `15` bug-eligibility tests pass unmodified
 
 **Command**: `node --test 'evals/develop-next/unit/*.test.mjs'`
 
@@ -234,9 +235,19 @@ Because nothing observable changes, this task deliberately adds **no** CHANGELOG
 
 Each executed against the real suite and reverted:
 
-- [ ] Add `in-progress` to `BUG_ELIGIBLE_STATUSES` → gap shrinks to `{ready-for-qa}` → **the new assertion goes red** (proves it catches the gap closing)
-- [ ] Add a fifth proceed-row to `develop-bug`'s status table → gap grows → **red** (proves it catches the drift `⊆` was blind to — the whole point of the task)
-- [ ] Delete `new` from `BUG_ELIGIBLE_STATUSES` → the anti-vacuity guard or the gap assertion → **red** (proves the guard survived Phase 1)
+- [x] Add `in-progress` to `BUG_ELIGIBLE_STATUSES` → gap shrinks to `{ready-for-qa}` → **the new assertion goes red** (proves it catches the gap closing)
+- [x] Add a fifth proceed-row to `develop-bug`'s status table → gap grows → **red** (proves it catches the drift `⊆` was blind to — the whole point of the task)
+- [x] Delete `new` from `BUG_ELIGIBLE_STATUSES` → gap grows to `{in-progress, ready-for-qa, new}` → **the gap assertion goes red** (proves gap sensitivity in the shrink-the-floor direction)
+- [x] **Corrupt the dispatcher's status table** — rename the `new` row in `develop-bug-step-0-resolve-bug.md` so `proceedStatuses()` returns the wrong rows → **the anti-vacuity guard goes red** (proves the guard survived Phase 1)
+
+> **Why the last two are separate mutations, and why the fourth is the one that proves the guard.** The
+> anti-vacuity guard is `assert.ok(proceed.has("new") && proceed.has("reopened"))`, and `proceed` is
+> derived **solely** from parsing `STEP0_BUG` — the `develop-bug` step-0 document. It never reads
+> `BUG_ELIGIBLE_STATUSES`. So mutating that constant is structurally incapable of exercising the guard:
+> it goes red through the gap comparison instead. Only a mutation that corrupts the **parse** reaches the
+> guard, which is exactly the case §3 says the guard exists for — a parse returning the *wrong* rows,
+> which an empty-check would not catch. Collapsing these into one mutation is how a proof ends up
+> confirming an assertion other than the one it names, leaving §10's Risk 2 undefended.
 
 ---
 
@@ -244,21 +255,21 @@ Each executed against the real suite and reverted:
 
 ### Functional
 
-- [ ] No bug's selectability changes — `BUG_ELIGIBLE_STATUSES` is byte-identical
-- [ ] The task axis assertion is unchanged and passing
-- [ ] Full suite green
+- [x] No bug's selectability changes — `BUG_ELIGIBLE_STATUSES` is byte-identical
+- [x] The task axis assertion is unchanged and passing
+- [x] Full suite green — 2141 tests, 0 failures
 
 ### Structural
 
-- [ ] The bug gap is asserted **exactly**, not as a subset
-- [ ] Growing the gap fails the test
-- [ ] Closing the gap fails the test
-- [ ] The anti-vacuity guard is preserved and still catches a wrong parse
+- [x] The bug gap is asserted **exactly**, not as a subset
+- [x] Growing the gap fails the test
+- [x] Closing the gap fails the test
+- [x] The anti-vacuity guard is preserved and still catches a wrong parse
 
 ### Documentation
 
-- [ ] The comment at the assertion leads with the resume-affordance reason, not the risk one
-- [ ] `roadmap-selection.md` and `select-next.mjs` no longer describe the bug axis as keeping "the weaker `⊆`"
+- [x] The comment at the assertion leads with the resume-affordance reason, not the risk one
+- [x] `roadmap-selection.md` and `select-next.mjs` no longer describe the bug axis as keeping "the weaker `⊆`"
 
 ---
 
@@ -278,7 +289,7 @@ Each executed against the real suite and reverted:
 - **Risk**: an empty or mangled parse satisfies `deepStrictEqual` some other way.
 - **Probability**: Low.
 - **Impact**: Major if it happened — this repo's recurring failure mode.
-- **Mitigation**: `proceedStatuses()` already asserts `sawRow`; the `new`/`reopened` guard pins the content; and mutation 3 exists specifically to prove the guard survived. An empty parse yields `gap: []`, which fails the comparison.
+- **Mitigation**: `proceedStatuses()` already asserts `sawRow`; the `new`/`reopened` guard pins the content; and mutation 4 — the dispatcher-table corruption — exists specifically to prove the guard survived. An empty parse yields `gap: []`, which fails the comparison.
 
 **3. Someone later reads "pinned" as "the divergence is permanent"**
 
@@ -310,24 +321,27 @@ If the gap legitimately changes, update the expected array and record why in the
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft — filed from the divergence task 71 measured and deliberately deferred | create-task |
+| 2026-09-01 | 1.1     | Review passed (9/10) — 0 critical, 1 important: mutation 3 proved the gap assertion rather than the anti-vacuity guard it named, since the guard reads only the parsed dispatcher table. Split into two mutations (§8 now lists four); corrected the dispatcher line anchor to :57-63 | review-task |
+| 2026-09-01 |         | Status → ready-for-development | review-task |
+| 2026-09-01 |         | Implementation complete — bug half of `16/H1` now asserts the gap exactly; rationale rewritten to lead with the resume-affordance distinction across the test, `roadmap-selection.md` and `select-next.mjs`. Four mutations proved red, each firing the assertion it names. `BUG_ELIGIBLE_STATUSES` byte-identical. Status → ready-for-review | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Pin the gap
-- [ ] Exact-gap assertion replaces the subset loop
-- [ ] Anti-vacuity guard preserved verbatim
-- [ ] Test renamed
+- [x] Exact-gap assertion replaces the subset loop
+- [x] Anti-vacuity guard preserved verbatim
+- [x] Test renamed
 
 ### Phase 2: Rationale
-- [ ] Comment leads with the resume-affordance distinction
-- [ ] `roadmap-selection.md` bug row updated
-- [ ] `select-next.mjs` "weaker ⊆" wording updated
+- [x] Comment leads with the resume-affordance distinction
+- [x] `roadmap-selection.md` bug row updated
+- [x] `select-next.mjs` "weaker ⊆" wording updated
 
 ### Phase 3: Verify
-- [ ] Suite green, prettier clean
-- [ ] 3 mutations proved and reverted
+- [x] Suite green, prettier clean
+- [x] 4 mutations proved and reverted
 
 ---
 
@@ -335,7 +349,7 @@ If the gap legitimately changes, update the expected array and record why in the
 
 - **The assertion to change**: `evals/develop-next/unit/select-next.test.mjs` — bug half of `16/H1`
 - **The parser to reuse**: `proceedStatuses()` in the same file, with its `sawRow` guard
-- **The dispatcher, and the rows that decide this task's shape**: `skills/develop-bug/references/develop-bug-step-0-resolve-bug.md:58-64` — `in-progress` is *"resume-aware"*, `ready-for-qa` is *"if a fix already exists"*
+- **The dispatcher, and the rows that decide this task's shape**: `skills/develop-bug/references/develop-bug-step-0-resolve-bug.md:57-63` — `in-progress` is *"resume-aware"*, `ready-for-qa` is *"if a fix already exists"*
 - **The rule this task declines to apply**: [`task.71`](../task.71.selection-floor-matches-dispatcher/task.71.selection-floor-matches-dispatcher.md) — equality on the task axis, and its §4 deferring the bug axis
 - **The prose to update**: `skills/develop-next/references/roadmap-selection.md` §"Eligibility — the floor equals what the dispatcher accepts"
 
@@ -355,7 +369,7 @@ Nothing is broken and nothing is blocked — the floor is correct today. What is
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.72.pin-bug-axis-divergence/task.72.pin-bug-axis-divergence.md`
