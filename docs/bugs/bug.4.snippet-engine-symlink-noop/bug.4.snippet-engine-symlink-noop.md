@@ -1,6 +1,6 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-01'
@@ -13,7 +13,7 @@ description: "qa-execute-snippets.mjs guards its CLI entrypoint by comparing imp
 
 **Bug ID**: bug.4.snippet-engine-symlink-noop
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: 🆕 New
+**Status**: ✅ Ready for QA
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-01
@@ -153,8 +153,176 @@ whether the evidence behind a QA verdict exists.
 
 ---
 
+## Developer Fix Cycle
+
+[This section will be filled by developer during fix process]
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-09-01
+**Developer**: develop-bug
+
+**Reproduction**: Ran the engine twice against the same file, varying only the invocation
+path. Through the documented symlinked path the process is completely silent; through the
+real path it emits the full report and the correct non-zero exit code:
+
+```
+$ node .agents/skills/qa-task/references/qa-execute-snippets.mjs \
+    --file shared/resources/develop-pipeline-step-3-develop-loop.md --json
+exit=0                          # ← zero bytes of stdout and stderr
+
+$ node skills/qa-task/references/qa-execute-snippets.mjs \
+    --file shared/resources/develop-pipeline-step-3-develop-loop.md --json
+{ "file": "...", "blocks": 5, "counts": {...}, "findings": [ zero-blocks-executed ] }
+exit=1
+```
+
+Confirmed `.agents/skills -> ../skills` and `.claude/skills -> ../skills` are both symlinks.
+
+**Root Cause Analysis**: `shared/resources/qa-execute-snippets.mjs:996` guards its CLI
+entrypoint with a raw string comparison:
+
+```js
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+```
+
+Node realpath-resolves `import.meta.url` when it loads the module, but `process.argv[1]`
+is passed through verbatim as the user typed it. When the invocation path contains a
+symlink the two sides describe the same file by different names, the comparison is false,
+`main()` is never called, and the module falls off the end having done nothing —
+exiting 0 with no output, which is indistinguishable from a clean run.
+
+The repo already carries the correct form in three sibling CLIs
+(`select-next.mjs:1492`, `run-loop.mjs:1578`, `schedule.mjs:627`), each using an
+`isInvokedDirectly()` helper that realpaths both sides. `qa-execute-snippets.mjs` was
+written later and did not pick it up.
+
+**Proposed Fix**: Adopt the same `isInvokedDirectly()` helper in the shared source, then
+`npm run bundle` to propagate to the four generated copies; guard it with both a
+behavioural test (invoke through a symlink) and a structural scan (no naive guard may
+reappear in any ESM CLI).
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-09-01
+
+**Root Cause**: The ESM entrypoint guard at `shared/resources/qa-execute-snippets.mjs:996`
+compared `import.meta.url` — which Node has already realpath-resolved — against
+`pathToFileURL(process.argv[1])`, which is whatever the caller typed. Any symlink in the
+invocation path made the two sides name the same file differently, so the guard was false
+and `main()` was never called.
+
+**Fix Description**:
+
+- Replaced the raw comparison with an `isInvokedDirectly()` helper that resolves **both**
+  sides through `realpathSync`, falling back to a plain `resolve()` comparison if realpath
+  throws (deleted or unreadable path). This is the same helper already used by
+  `select-next.mjs`, `run-loop.mjs` and `schedule.mjs`; the engine is now the fourth
+  identical copy rather than the one outlier.
+- Swapped the now-unused `pathToFileURL` import for `fileURLToPath`, and added
+  `realpathSync` / `resolve` to the existing `node:fs` / `node:path` imports.
+- Ran `npm run bundle` to propagate to the four generated copies. The bundled copies are
+  what the documented invocations actually name, so a source-only fix would have left every
+  real caller broken.
+
+**Files Modified**:
+
+- `shared/resources/qa-execute-snippets.mjs` — realpath-resolved entrypoint guard (the only
+  hand-edited source)
+- `skills/qa-task/references/qa-execute-snippets.mjs` — bundle output
+- `skills/qa-story/references/qa-execute-snippets.mjs` — bundle output
+- `skills/develop-task/references/qa-execute-snippets.mjs` — bundle output
+- `skills/develop-story/references/qa-execute-snippets.mjs` — bundle output
+- `shared/resources/tests/qa-execute-snippets.test.mjs` — added three regression tests (see below)
+
+**Testing**:
+
+Three tests were added, and they are deliberately a pair-plus-one rather than a single check.
+The suite's other 1100 lines test the engine's exported functions in-process and therefore
+never reach the module-level guard — which is exactly why this bug survived in a
+well-tested file.
+
+| Test | Kind | What it holds |
+| --- | --- | --- |
+| `CLI: runs when invoked through a symlinked path` | behavioural | Symlinks the module into a temp dir, invokes it through the link, and asserts non-empty stdout **first, by length** — the failure mode is silence, and an empty-string assertion reports it far more legibly than a `JSON.parse` throw. |
+| `CLI: the symlinked and real invocation paths agree exactly` | behavioural | Pins stdout and exit status to be identical through both paths, so any future *divergence* fails, not only total silence. |
+| `CLI: no engine copy carries a naive entrypoint guard` | structural | Scans the source and all four bundled copies for the naive comparison, and requires a realpath-resolved guard that is actually wired up. Catches a source-only fix that was never bundled. |
+
+All three fail on the pre-fix code and pass after it.
+
+The three CLI tests fork a real node process (which itself forks a shell per block), so they
+are exactly the spawn-heavy shape `shared/resources/tests/spawn-budget.mjs` exists for —
+bug.2's remedy. They therefore spawn through a `runCli()` helper that takes its timeout and
+retry count from `spawnBudget("SNIPPETS")` and retries **only** when `neverRan()` says the
+child never produced an answer; a child that ran and exited non-zero is a result and is never
+retried away. They also pass `--no-zsh`: these tests assert the CLI runs *at all* through a
+symlink, and the dual-shell behaviour is already covered elsewhere in the suite, so forcing the
+bash arm halves the subprocesses each one costs.
+
+This was not cosmetic. A first cut without the budget ran at 1.5s / 30.3s under load; with it
+the same three run in 0.13s / 0.29s / 0.002s, and the engine suite as a whole is 69/69 in 1.7s.
+Left as they were, three slow spawn-heavy tests would have been added to a suite that runs four
+files concurrently — pushing on the very timeout pressure bug.2 fixed and B5 still exhibits.
+
+**Mutation proof** — four mutations, each confirming a different assertion is load-bearing:
+
+| # | Mutation | Result |
+| --- | --- | --- |
+| 1 | Restore the naive guard in the source | All three tests go **red** |
+| 2 | Source fixed, one bundled copy left naive (a stale bundle) | Behavioural tests pass; **structural test alone goes red** — proving the two guards cover genuinely different failures and that scanning the copies is load-bearing |
+| 3 | Delete the guard function entirely | Structural test goes **red** |
+| 4 | Guard defined but never called (`if (true)`) | Structural test goes **red** |
+
+Mutation 3 initially **passed**, and that is worth recording. The first cut of the
+anti-vacuous assertion matched the bare token `/realpathSync/`, which still appears in the
+`node:fs` import list after the guard function is deleted — so the scan reported success on
+a file with no entrypoint guard at all. This is precisely the vacuous pass this bug's own
+report warned a structural scan can give (and that bug.3 shipped). The assertion was
+tightened to match the full `realpathSync(fileURLToPath(import.meta.url))` comparison plus a
+reachable `if (isInvokedDirectly())` call site, after which mutations 3 and 4 both go red.
+
+**Verification Steps for QA**:
+
+1. Run the original reproduction from this report and confirm the two invocations now agree —
+   the `.agents/skills/...` path must emit the JSON report and exit 1, not exit 0 silently.
+2. Run `node --test --test-name-pattern='CLI:' shared/resources/tests/qa-execute-snippets.test.mjs`
+   and confirm three passes.
+3. Re-run mutation 1 (restore the naive guard in `shared/resources/qa-execute-snippets.mjs`)
+   and confirm all three tests go red, then restore.
+4. Run `npm run bundle` and confirm it reports the four skills **in sync** — i.e. the
+   committed bundle output matches the source.
+
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: [Date]
+**QA Engineer**: [Name]
+
+**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+
+**Notes**: [Testing notes]
+
+**Decision**: Closed | Reopened
+
+---
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | ---------- | ------ | ---------- | ----- |
 | 2026-09-01 | New | QA Engineer | Filed from task.75 QA cycle 1 — found while running Step 4b |
+| 2026-09-01 | In Progress | develop-bug | Reproduced through the symlinked path (exit 0, no output); root cause localised to `qa-execute-snippets.mjs:996` |
+| 2026-09-01 | Ready for QA | develop-bug | Realpath guard applied + bundled to 4 copies; 3 regression tests added, 4 mutations proven |
+
+---
+
+## Resolution Summary
+
+[Will be completed when bug is closed]
+
+**Final Status**: [Closed status]
+**Total Iterations**: [Number]
+**Time to Resolution**: [Duration]
+**Final Fix Details**: [Summary]
+**Lessons Learned**: [Key takeaways]
