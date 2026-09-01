@@ -503,7 +503,14 @@ section exists to prevent.
 
 After fixes are applied:
 
-0a. **Run the fast gate before committing.** Capture to a log rather than streaming:
+0. **Check for actual changes**: Before committing, run `git diff --stat HEAD` to verify qa-fix actually modified files. If no files changed (qa-fix made no code edits), do NOT increment the cycle counter. Instead:
+   - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
+   - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — per path 2 above. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch.
+   - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
+
+0a. **Run the fast gate before committing.** Only reached when step 0 found changes — there is
+   nothing to gate otherwise, and step 0's no-change path HALTs before this point. Capture to a log
+   rather than streaming:
 
    ```bash
    FIX_LOG=".claude/state/qa-fix-gate-${QA_CYCLE}-$(date +%s).log"
@@ -525,15 +532,12 @@ After fixes are applied:
 
    Cleanup mirrors step 3: `GATE_EXIT == 0` → `rm -f "$FIX_LOG"`; non-zero → retain for post-mortem.
 
-   > **Why the gate sits here and not after the commit.** A qa-fix cycle pushes to the PR branch, so
-   > a red commit is a red PR the reviewer sees before the next cycle repairs it — and on the last
-   > cycle nothing repairs it at all. Formatting is the concrete case: `prettier --check` is not in
-   > `npm test`, so a cycle could close green, push, and fail CI on a file it had just rewritten.
-
-0. **Check for actual changes**: Before committing, run `git diff --stat HEAD` to verify qa-fix actually modified files. If no files changed (qa-fix made no code edits), do NOT increment the cycle counter. Instead:
-   - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
-   - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — per path 2 above. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch.
-   - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
+   > **Why the gate sits between 0 and 1, and not after the commit.** A qa-fix cycle pushes to the PR
+   > branch, so a red commit is a red PR the reviewer sees before the next cycle repairs it — and on
+   > the last cycle nothing repairs it at all. Formatting is the concrete case: `prettier --check` is
+   > not in `npm test`, so a cycle could close green, push, and fail CI on a file it had just
+   > rewritten. It sits *after* step 0 because gating a tree that step 0 is about to declare unchanged
+   > pays a full format+test run on the one path that always HALTs.
 
 1. **Exclude the implementation report's *updates* from this commit — and only that** — Step 8 owns the report's final state, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. The gate and QA report are **not** excluded; they ride along per the table above. The file itself is already tracked (Step 4 committed it), so this defers changes rather than withholding the file: no link to the report can dangle. Before invoking `/commit-changes`, unstage the report explicitly:
 

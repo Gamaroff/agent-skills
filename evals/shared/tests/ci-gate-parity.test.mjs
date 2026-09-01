@@ -104,12 +104,22 @@ function expand(name, seen = new Set()) {
  * instrument for that.
  */
 function workflowScripts() {
+  return workflowInvocations().filter((name) => name in scripts);
+}
+
+/**
+ * Every npm script NAME the workflow invokes, including any that `package.json`
+ * does not define. `workflowScripts()` drops those so the parity comparison
+ * stays a comparison of real scripts; this raw form is what lets the test
+ * REPORT them instead of silently ignoring them.
+ */
+function workflowInvocations() {
   return workflow
     .split("\n")
     .map((line) => line.match(/^\s*run:\s*(.+?)\s*$/))
     .filter(Boolean)
     .map((m) => scriptInvokedBy(m[1]))
-    .filter((name) => name !== null && name in scripts);
+    .filter((name) => name !== null);
 }
 
 const sorted = (xs) => [...new Set(xs)].sort();
@@ -149,6 +159,18 @@ test("workflow steps and the `ci` composite run exactly the same commands", () =
       "which is the defect task 75 exists to close. Add it to both.",
   );
   assert.ok(fromWorkflow.length >= 3, "expected at least three CI tiers");
+});
+
+test("every npm script the workflow invokes actually exists", () => {
+  // Without this, an `npm run <typo>` step is filtered out of the parity
+  // comparison and the composite still matches — the workflow would go red in
+  // CI while the test that exists to predict CI stayed green.
+  const missing = workflowInvocations().filter((name) => !(name in scripts));
+  assert.deepEqual(
+    missing,
+    [],
+    `workflow invokes npm script(s) absent from package.json: ${missing.join(", ")}`,
+  );
 });
 
 test("CI still names each tier separately, so a red build says which broke", () => {

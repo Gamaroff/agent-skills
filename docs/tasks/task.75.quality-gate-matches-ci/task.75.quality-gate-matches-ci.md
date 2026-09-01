@@ -338,6 +338,37 @@ per item, or make the eval tier incremental.
 
 ---
 
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-01
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.75.qa.1.quality-gate-matches-ci.md](./task.75.qa.1.quality-gate-matches-ci.md)
+- **Gate File**: [task.75.gate.1.quality-gate-matches-ci.yml](./task.75.gate.1.quality-gate-matches-ci.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 2092 (full `npm run ci`, 0 failures)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM (TASK-75-001): the fast-gate block added to the qa-fix cycle is numbered `0a.` but sits
+before step `0.`, so it runs the gate ahead of the no-change check that would HALT the cycle anyway.
+Mechanical to fix. All success criteria verified; the parity test is mutation-proved 7×.
+
+A separate HIGH was found during review but is **out of scope** — `qa-execute-snippets.mjs` silently
+no-ops when invoked through the symlinked path its own docs prescribe. Pre-existing, untouched by this
+task, and recorded in the QA report for a follow-up bug.
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -349,6 +380,8 @@ per item, or make the eval tier incremental.
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.67 pipeline retrospective  | create-task |
 | 2026-09-01 | 1.1     | Review passed (8/10) — 0 critical, 5 important. Widened the doc sweep from 2 sites to 6 (`develop-batch` reads the same key); made the fast gate a config key rather than a literal, since the step docs ship to consumers with no `ci:fast`; named Phase 2's seam in the qa-fix cycle and marked Phase 3 as verify-not-edit | review-task |
 | 2026-09-01 |         | Implemented — 11 files changed, 1 new contract suite (8 tests), 7 mutation proofs. Phase 3 required no edit, as the review predicted | develop |
+| 2026-09-01 |         | QA gate CONCERNS (90/100) — 1 medium, 1 low; 4/4 phases verified, full `ci` green 2092/0 | qa-task |
+| 2026-09-01 |         | QA findings fixed — TASK-75-001 (fast-gate block reordered after the no-change check) + 1 low (parity test now flags unknown workflow scripts); 1 iteration | qa-fix |
 
 ---
 
