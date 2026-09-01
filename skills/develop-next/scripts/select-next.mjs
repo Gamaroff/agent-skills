@@ -1381,7 +1381,12 @@ function parseArgs(argv) {
         break;
       default:
         process.stderr.write(`select-next: unknown argument ${argv[i]}\n`);
-        process.exit(1);
+        // `process.exitCode` + `return`, never `process.exit()`: stdio is
+        // ASYNCHRONOUS on a pipe, and `process.exit()` tears the process down
+        // before the buffer drains, truncating output at ~64KB. Returning lets
+        // the event loop flush. See bug.3.stdout-truncation-on-exit.
+        process.exitCode = 1;
+        return null;
     }
   }
   return args;
@@ -1389,6 +1394,8 @@ function parseArgs(argv) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  // parseArgs returns null when it has already reported a bad argument.
+  if (args === null) return;
   let text;
   try {
     text = fs.readFileSync(args.roadmap, "utf-8");
@@ -1408,7 +1415,8 @@ function main() {
         2,
       ) + "\n",
     );
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   const model = parseRoadmap(text);
 
@@ -1459,7 +1467,8 @@ function main() {
         2,
       ) + "\n",
     );
-    process.exit(model.errors.length ? 1 : 0);
+    process.exitCode = model.errors.length ? 1 : 0;
+    return;
   }
   const result = args.batch
     ? {
@@ -1471,7 +1480,7 @@ function main() {
       }
     : { roadmap: args.roadmap, ...selectNext(model, { loadRegistries }) };
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");
-  process.exit(result.status === "halt" ? 1 : 0);
+  process.exitCode = result.status === "halt" ? 1 : 0;
 }
 
 // Resolve BOTH sides through realpath: consumer projects symlink

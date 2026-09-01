@@ -995,14 +995,18 @@ function render(report) {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   const r = main();
+  // `process.exitCode` + else-if, never `process.exit()`: stdio is ASYNCHRONOUS
+  // on a pipe, and `process.exit()` tears the process down before the buffer
+  // drains, truncating output at ~64KB. The --json report scales with the
+  // number of snippets, so the QA gate — the one caller that always pipes —
+  // is exactly what a truncating write breaks.
+  // See bug.3.stdout-truncation-on-exit.
+  process.exitCode = r.exitCode;
   if (r.error) {
     console.error(r.error);
-    process.exit(r.exitCode);
-  }
-  if (r.usage) {
+  } else if (r.usage) {
     console.log(r.usage);
-    process.exit(r.exitCode);
+  } else {
+    console.log(r.json ? JSON.stringify(r.report, null, 2) : render(r.report));
   }
-  console.log(r.json ? JSON.stringify(r.report, null, 2) : render(r.report));
-  process.exit(r.exitCode);
 }

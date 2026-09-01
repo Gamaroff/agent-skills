@@ -181,85 +181,98 @@ function insertBlock(src, block) {
   return block + "\n\n" + src;
 }
 
-if (!existsSync(PRDS_DIR)) {
-  console.log(`No PRD root at ${PRDS_DIR} — nothing to index.`);
-  process.exit(0);
-}
+// The whole imperative body lives in main() so that an early exit can be a
+// `return` with `process.exitCode` set, never `process.exit()`. Node's stdio
+// is ASYNCHRONOUS on a pipe: `process.exit()` tears the process down before
+// the buffer drains, truncating output at ~64KB. Top-level `return` is illegal
+// in an ES module, so the function wrapper is what makes the correct idiom
+// available here at all. See bug.3.stdout-truncation-on-exit.
+function main() {
+  if (!existsSync(PRDS_DIR)) {
+    console.log(`No PRD root at ${PRDS_DIR} — nothing to index.`);
+    process.exitCode = 0;
+    return;
+  }
 
-let changed = 0;
-let stale = 0;
-const skipped = [];
+  let changed = 0;
+  let stale = 0;
+  const skipped = [];
 
-for (const prdDir of listDirs(PRDS_DIR)) {
-  const p = basename(prdDir);
-  const prdFile = join(prdDir, `${p}.md`); // dir is already named prd.<name>, file is <dir>.md
-  const epicsDir = join(prdDir, "epics");
-  if (!existsSync(prdFile) || !existsSync(epicsDir)) continue;
+  for (const prdDir of listDirs(PRDS_DIR)) {
+    const p = basename(prdDir);
+    const prdFile = join(prdDir, `${p}.md`); // dir is already named prd.<name>, file is <dir>.md
+    const epicsDir = join(prdDir, "epics");
+    if (!existsSync(prdFile) || !existsSync(epicsDir)) continue;
 
-  const epics = [];
-  for (const epicDir of listDirs(epicsDir)) {
-    const d = basename(epicDir);
-    const epicFile = join(epicDir, `${d}.md`);
-    if (!existsSync(epicFile)) continue; // excludes review/QA siblings
-    const fm = readFileSync(epicFile, "utf8");
-    const number = parseInt(frontmatterField(fm, "epic_number"), 10);
-    if (Number.isNaN(number)) {
-      skipped.push(`${epicFile} (no epic_number)`);
+    const epics = [];
+    for (const epicDir of listDirs(epicsDir)) {
+      const d = basename(epicDir);
+      const epicFile = join(epicDir, `${d}.md`);
+      if (!existsSync(epicFile)) continue; // excludes review/QA siblings
+      const fm = readFileSync(epicFile, "utf8");
+      const number = parseInt(frontmatterField(fm, "epic_number"), 10);
+      if (Number.isNaN(number)) {
+        skipped.push(`${epicFile} (no epic_number)`);
+        continue;
+      }
+      epics.push({
+        number,
+        title: cleanTitle(frontmatterField(fm, "title")) || d,
+        status: frontmatterField(fm, "status"),
+        link: `epics/${d}/${d}.md`,
+      });
+    }
+    if (epics.length === 0) continue;
+    epics.sort((a, b) => a.number - b.number);
+
+    const block = buildBlock(epics);
+    const src = readFileSync(prdFile, "utf8");
+    const has = src.includes(START) && src.includes(END);
+    // The replacement MUST stay a function. A string replacement is a pattern, so an
+    // epic title carrying `$&`, `$\``, `$'` or `$$` would be expanded instead of
+    // inserted — `$&` splices the whole matched index block back inside a table cell,
+    // and because the regex is lazy each rerun nests another copy. A function argument
+    // suppresses all `$` expansion and is otherwise identical. Do not "simplify" it.
+    const next = has
+      ? src.replace(new RegExp(`${START}[\\s\\S]*?${END}`), () => block)
+      : insertBlock(src, block);
+
+    if (next === src) continue;
+    if (CHECK) {
+      stale++;
+      console.log(`STALE  ${prdFile}  (${epics.length} epics)`);
       continue;
     }
-    epics.push({
-      number,
-      title: cleanTitle(frontmatterField(fm, "title")) || d,
-      status: frontmatterField(fm, "status"),
-      link: `epics/${d}/${d}.md`,
-    });
+    writeFileSync(prdFile, next);
+    changed++;
+    console.log(
+      `${has ? "updated" : "added  "}  ${prdFile}  (${epics.length} epics)`,
+    );
   }
-  if (epics.length === 0) continue;
-  epics.sort((a, b) => a.number - b.number);
 
-  const block = buildBlock(epics);
-  const src = readFileSync(prdFile, "utf8");
-  const has = src.includes(START) && src.includes(END);
-  // The replacement MUST stay a function. A string replacement is a pattern, so an
-  // epic title carrying `$&`, `$\``, `$'` or `$$` would be expanded instead of
-  // inserted — `$&` splices the whole matched index block back inside a table cell,
-  // and because the regex is lazy each rerun nests another copy. A function argument
-  // suppresses all `$` expansion and is otherwise identical. Do not "simplify" it.
-  const next = has
-    ? src.replace(new RegExp(`${START}[\\s\\S]*?${END}`), () => block)
-    : insertBlock(src, block);
+  if (skipped.length) {
+    console.warn(`\n${skipped.length} epic file(s) skipped:`);
+    for (const s of skipped) console.warn(`  - ${s}`);
+  }
 
-  if (next === src) continue;
+  if (STRICT && skipped.length) {
+    console.error(
+      `\n${skipped.length} epic file(s) missing epic_number (--strict).`,
+    );
+    process.exitCode = 2;
+    return;
+  }
+
   if (CHECK) {
-    stale++;
-    console.log(`STALE  ${prdFile}  (${epics.length} epics)`);
-    continue;
+    console.log(
+      stale
+        ? `\n${stale} PRD(s) have a stale epics index.`
+        : "\nAll epics indexes up to date.",
+    );
+    process.exitCode = stale ? 1 : 0;
+    return;
   }
-  writeFileSync(prdFile, next);
-  changed++;
-  console.log(
-    `${has ? "updated" : "added  "}  ${prdFile}  (${epics.length} epics)`,
-  );
+  console.log(`\nDone: ${changed} PRD(s) updated.`);
 }
 
-if (skipped.length) {
-  console.warn(`\n${skipped.length} epic file(s) skipped:`);
-  for (const s of skipped) console.warn(`  - ${s}`);
-}
-
-if (STRICT && skipped.length) {
-  console.error(
-    `\n${skipped.length} epic file(s) missing epic_number (--strict).`,
-  );
-  process.exit(2);
-}
-
-if (CHECK) {
-  console.log(
-    stale
-      ? `\n${stale} PRD(s) have a stale epics index.`
-      : "\nAll epics indexes up to date.",
-  );
-  process.exit(stale ? 1 : 0);
-}
-console.log(`\nDone: ${changed} PRD(s) updated.`);
+main();

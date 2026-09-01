@@ -1,0 +1,55 @@
+---
+type: implementation-report
+status: in-progress
+bug: 'bug.3.stdout-truncation-on-exit'
+mode: 'general'
+started: '2026-09-01T08:30:00Z'
+---
+
+# Implementation Report — bug.3.stdout-truncation-on-exit
+
+**Started:** 2026-09-01T08:30:00Z
+**Finished:** —
+**Final Status:** In Progress
+**Branch model:** bugfix (base: develop, PR target: develop)
+**Severity / Priority:** Major / Critical
+**Lite mode:** off
+**Fix Iterations:** 1
+
+## Pipeline Progress
+
+| Step | Skill | Status | Notes | Subagent summary ref |
+|------|-------|--------|-------|----------------------|
+| 1 | create-branch | ✅ Done | Branch `bugfix/bug.3.stdout-truncation-on-exit` created at `61197c3`, base `develop` | |
+| 2 | review-bug | ✅ Done | 10/10 READY TO FIX. 0 Critical, 1 Important (applied). No duplicate, not stale — reproduced independently. | inline |
+| 3 | investigate-fix | ✅ Done | 10 sites fixed across 3 CLIs + 7 bundled copies; new 10-test guard suite; mutation-proven 3× | inline |
+| 4 | create-pr | ⏳ Pending | | |
+| 5–6 | verify-fix loop | ⏳ Pending | | |
+| 7 | finalise-close | ⏳ Pending | | |
+| 8 | commit-changes | ⏳ Pending | | |
+
+## Decisions Log
+
+- 2026-09-01T08:30:00Z — Bug resolved: docs/bugs/bug.3.stdout-truncation-on-exit/bug.3.stdout-truncation-on-exit.md (mode=general, prefix=bug.3.stdout-truncation-on-exit)
+- 2026-09-01T08:30:00Z — Invoked from `/develop-next` (roadmap item **B3**, PHASE 5 frontier). Autonomous run.
+- 2026-09-01T08:30:00Z — Phase 0d Q1 branch model: **bugfix** (auto-answered, recommended). Bug is a defect in dev tooling, not a production regression.
+- 2026-09-01T08:30:00Z — Phase 0d Q2 base branch: **develop** (auto-answered, derived from Q1).
+- 2026-09-01T08:30:00Z — Phase 0d Q3 PR target: **develop** (auto-answered, derived from Q1).
+- 2026-09-01T08:30:00Z — Lite mode: **off** — severity=Major (Major/Critical/Blocker always run full QA).
+- 2026-09-01T08:30:00Z — Platform resolved: TRACKER=github, VCS=github, access full/full. No `github_issue` in bug frontmatter → tracker signalling skipped throughout.
+- 2026-09-01T09:30:00Z — Step 1: branch named `bugfix/bug.3.stdout-truncation-on-exit`, following the `bugfix/bug.2.unbounded-test-concurrency` precedent (PR #279). `create-branch` has no bug row in its naming table; matched repo history rather than inventing a name.
+
+## Issues Log
+
+- 2026-09-01 — Step 3 (**follow-up, not fixed here**): the same `process.exit()`-after-write idiom exists in **15 further files** beyond the three bug.3 names — including `skills/develop-batch/scripts/schedule.mjs`, `skills/loop-supervisor/scripts/run-loop.mjs` and `shared/resources/defer-mutation.js`, which write orchestrator JSON to stdout and are read through a pipe, so they are latent 64KB bugs of exactly the shape that manifested. Not fixed in this PR: bug.3's Scope & Impact names three files, and migrating fifteen more would trade a known defect for an unknown regression surface across a dozen skills. They are named in `KNOWN_UNMIGRATED` in the new guard suite, which fails if the list goes stale, so the debt is visible and shrinking rather than silent. **Recommend filing as a follow-up bug or task.**
+- 2026-09-01 — Step 3 (**self-caught**): the first version of the structural guard walked back six *lines* from each `process.exit()` looking for a write. The write in the manifesting instance is a ~20-line `JSON.stringify(...)`, so the guard never reached it and **passed under mutation A** — it would not have caught the bug it was written for. Rewritten to scan by character offset. Only the mutation step exposed this; a guard asserted green without mutation would have shipped as decoration.
+
+- 2026-09-01 — Step 2 (review-bug, Important, **applied**): the bug's Evidence table listed 4 exit-after-write sites; a full grep of the three named files finds **10**. Corrected in the bug report. The fix scope is all ten — including the `console.error` sites, since `process.stderr` is asynchronous on a pipe for the same reason `process.stdout` is.
+
+- 2026-09-01 — Step 1: local `develop` was 3 commits ahead of `origin/develop` (including B3's own filing commit `39f2560`). Fast-forward-pushed `develop` before cutting the branch so the PR diff carries only the fix. No history rewritten.
+
+## Completion
+
+**Branch:** bugfix/bug.3.stdout-truncation-on-exit
+**PR:** —
+**DoD Summary:** —
