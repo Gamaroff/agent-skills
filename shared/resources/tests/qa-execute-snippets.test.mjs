@@ -1236,6 +1236,21 @@ test("CLI: the symlinked and real invocation paths agree exactly", () => {
   const viaLink = runCli([link, "--file", target, "--json", "--no-zsh"]);
   const viaReal = runCli([MODULE, "--file", target, "--json", "--no-zsh"]);
 
+  // Check BOTH arms ran before touching either one's stdout. Two distinct
+  // failures hide here, and the second is the dangerous one: if viaReal never
+  // ran, the vacuity guard below throws a TypeError on null and prints nothing;
+  // but if only viaLink never ran, control reaches the equality assertion and
+  // `null !== "{…}"` is reported as "the invocation path must not change the
+  // report" — a behavioural divergence that never happened, on a machine that
+  // was merely loaded. That is the precise false positive neverRan() exists to
+  // prevent, and it is the same class as the guard nine lines above in the
+  // previous test.
+  assert.ok(
+    !neverRan(viaLink) && !neverRan(viaReal),
+    `a CLI arm never ran (link: ${viaLink.error ?? viaLink.signal}, ` +
+      `real: ${viaReal.error ?? viaReal.signal}) — a load problem, not a divergence`,
+  );
+
   // Without this, the test passes vacuously if the entrypoint block is deleted
   // outright: both arms fall silent, and "" === "" with 0 === 0 satisfies both
   // assertions below. Test 1 covers deletion, but this pair must not agree by

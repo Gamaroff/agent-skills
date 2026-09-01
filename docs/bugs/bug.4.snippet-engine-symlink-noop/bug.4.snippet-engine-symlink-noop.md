@@ -366,6 +366,68 @@ passed and the symmetric one now fails.
 `if (pathToFileURL(process.argv[1] ?? "").href === import.meta.url) {` into the source and confirm
 `CLI: no engine copy carries a naive entrypoint guard` goes red.
 
+### Iteration 3
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-01
+**Trigger**: Verify Cycle 2, signal 3 (re-review of the PR #292 diff).
+
+The re-review confirmed all five Iteration 2 findings as genuinely fixed, and independently re-ran
+the engine through the real `.agents/skills` symlink (exit 1, 1132 bytes — not exit-0-silent). It
+found one new regression, and it is the same class as the one Iteration 2 had just removed:
+
+`the symlinked and real invocation paths agree exactly` dereferenced `viaReal.stdout.length` with
+no `neverRan()` check on either arm — nine lines below the guard Iteration 2 added to the sibling
+test for exactly that reason. Two failures hid there. If `viaReal` never ran, the vacuity guard
+throws a `TypeError` on null and prints nothing. Worse, if only `viaLink` never ran, control
+reaches the equality assertion and `null !== "{…}"` is reported as **"the invocation path must not
+change the report"** — a behavioural divergence that never happened, on a machine that was merely
+loaded. That is the precise false positive `neverRan()` exists to prevent.
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-01
+
+**Fix Description**: added `assert.ok(!neverRan(viaLink) && !neverRan(viaReal), …)` immediately
+after both `runCli` calls and before any `stdout` dereference, with a message naming which arm
+failed to start and stating that this is a load problem rather than a divergence.
+
+**Files Modified**:
+
+- `shared/resources/tests/qa-execute-snippets.test.mjs` — the guard above
+
+**Two further review observations were considered and deliberately not actioned:**
+
+- *The structural scan pins one exact idiom* (`realpathSync(fileURLToPath(import.meta.url))`), so a
+  different but correct fix — e.g. `pathToFileURL(realpathSync(process.argv[1])).href ===
+  import.meta.url` — would fail it. **The pin is intentional.** The looser alternative was tried
+  first and is what let mutation 3 pass vacuously: the bare token `realpathSync` is satisfied by the
+  `node:fs` import list alone. A scan that asserts a shape is the price of a scan that cannot be
+  satisfied by an import statement. The behavioural tests are what admit any correct implementation;
+  the scan exists to stop the one known-broken shape.
+- *The scan does not strip comments before matching*, so a maintainer writing the naive expression
+  verbatim inside a comment would turn it red. Not actioned: the repo's comment stripper is a private
+  helper in another test file, and duplicating one here trades a self-explaining false red (the
+  message names the file and the fix) for the risk that a mis-parsing stripper silently hides a real
+  defect in code it mistook for a comment. Given this bug is *about* a silent false pass, the
+  asymmetry favours leaving it. The engine's own guard comment does not contain the literal.
+
+**Testing**: engine suite 69/69, prettier clean, `npm run ci:fast` green. Five mutations re-proven
+against the final suite, with the differentiation intact:
+
+| Mutation | Behavioural | Structural |
+| --- | --- | --- |
+| M1 naive guard (canonical order) | ✖ red | ✖ red |
+| M5 naive guard (commuted order) | ✖ red | ✖ red |
+| M3 guard deleted entirely | ✖ red | ✖ red |
+| M4 guard defined but never called (`if (true)`) | ✔ pass (main still runs) | ✖ red |
+| M2 stale bundle (source fixed, one copy naive) | ✔ pass (source is correct) | ✖ red |
+| *(clean)* | ✔ pass | ✔ pass |
+
+M4 and M2 turning **only** the structural test red is the point of having both: the behavioural
+tests exercise the source, so neither a mis-wired guard nor an unbundled fix is visible to them.
+
 ---
 
 ## Status History
@@ -377,6 +439,8 @@ passed and the symmetric one now fails.
 | 2026-09-01 | Ready for QA | develop-bug | Realpath guard applied + bundled to 4 copies; 3 regression tests added, 4 mutations proven |
 | 2026-09-01 | Reopened | develop-bug | Verify cycle 1 signal 3: review-code found the fix clean but one regression test unbudgeted — false-positive risk under load |
 | 2026-09-01 | Ready for QA | develop-bug | Iteration 2: 5 review findings applied to the tests; 5 mutations proven |
+| 2026-09-01 | Reopened | develop-bug | Verify cycle 2: re-review confirmed all 5 fixes, found an unguarded stdout deref in the sibling test |
+| 2026-09-01 | Ready for QA | develop-bug | Iteration 3: neverRan guard on both arms; 5 mutations re-proven |
 
 ---
 
