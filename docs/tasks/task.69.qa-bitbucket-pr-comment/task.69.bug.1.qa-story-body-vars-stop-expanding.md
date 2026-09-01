@@ -4,7 +4,7 @@
 **Bug ID**: TASK-69-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-01
 
@@ -162,3 +162,4 @@ Covered by the new assertion added for TASK69-002, and mutation-proved in both d
 | 2026-09-01 | New | QA Engineer | Found in QA cycle 1 |
 | 2026-09-01 | In Progress | qa-fix | Investigation started |
 | 2026-09-01 | Ready for QA | qa-fix | Placeholders converted; mutation-proved both directions |
+| 2026-09-01 | Closed | QA Engineer | Verified by QA: no shell variables remain in either body; independently re-mutated ($PR_STATE) → suite red. |

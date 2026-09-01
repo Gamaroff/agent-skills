@@ -35,7 +35,7 @@ Add a `$VCS` branch to the QA gate PR-comment step in both `qa-task` (Step 13) a
 | 2. review-task             | ✅ Done    | `task.69.review.{N}.{name}.md` exists (or skip logged)                 | Ran (status was RfD but no report existed). 9/10 READY TO IMPLEMENT, 0 critical | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. 4/4 phases. ci:fast green: 2139 tests, 0 fail, prettier clean | — |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #295](https://github.com/Gamaroff/agent-skills/pull/295) → `develop`. 3 commits. Issue comment skipped (none linked) | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.69.qa.{N}.*.md`; `task.69.gate.{N}.*.yml`; PR comment posted     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.69.qa.{N}.*.md`; `task.69.gate.{N}.*.yml`; PR comment posted     | 2 cycles: FAIL 60 → PASS 100. 2 findings closed, 1 LOW accepted | — |
 | 7. finalise                | ⏳ Pending | `task.69.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -93,6 +93,25 @@ Add a `$VCS` branch to the QA gate PR-comment step in both `qa-task` (Step 13) a
 - **TASK69-003 (LOW)** — `COMMENT_RC` unset on the unreachable third `$VCS` branch. Not fixed; unreachable and degrades safely.
 - Step 4b: `zero-blocks-executed` on both skills — **verified pre-existing** by running the engine against `origin/develop` (14 and 13 blocks there). Not caused by this change and not fixable: the added blocks post PR comments and are correctly deny-listed as mutating.
 - QA comment posted to PR #295 (exit 0) — through the `--body-file` GitHub arm this task itself added.
+
+### Cycle 1 — qa-fix
+
+- **TASK69-001 fixed**: `qa-story`'s three body variables converted to `{SLOT}` placeholders. Rejected the alternative fix (unquoting the heredoc) on merit — the body carries a backtick pair, so that would have traded a display bug for command substitution.
+- **TASK69-002 fixed**: `bodyHeredoc` helper + no-`$VAR` assertion added to **both** suites, not just the failing one — the drift risk is symmetric.
+- **TASK69-003 accepted**, not fixed: unreachable third `$VCS` branch, degrades to a shell diagnostic.
+- Mutation-proved **both directions**: injecting the defect into `qa-story` → 1 fail; into `qa-task` → 1 fail; baseline 25/25. This is the property cycle 1's coverage lacked, so it was proved rather than asserted.
+- Validation: 25/25 targeted, `npm run ci:fast` **2141 tests, 0 failures, prettier clean, exit 0**.
+- Committed `df423f6`, pushed. Fix summary posted to PR #295 (exit 0).
+- Root cause recorded: Phase 2's "keep the wording identical" was read as *apply the same structural change to both* (done correctly) rather than *reconcile the content the two bodies already differed in* — which is where the defect lived.
+
+### Cycle 2 — qa-task → PASS (100/100)
+
+- Gate: **PASS**. TASK69-001 and TASK69-002 both verified closed; TASK69-003 (LOW) accepted with a stated reason. All four NFRs PASS (Reliability and Maintainability were CONCERNS in cycle 1 solely because of TASK69-001 and the body divergence behind it).
+- Verified by **re-mutation, not by reading the fix** — and QA ran a mutation develop had not: injecting `$PR_STATE` specifically → suite red.
+- **Vacuity probe**: renaming the heredoc opener so `bodyHeredoc`'s anchor vanishes makes two tests fail loudly rather than pass on an empty body. The guard cannot go silent — the task-68 failure mode was checked for explicitly rather than assumed absent.
+- Full refute pass over the **whole branch diff** (not the narrowed cycle-2 scope), reviewing the two fixes in combination. 0 new findings.
+- Step 4b re-run on the changed file: `zero-blocks-executed`, unchanged and pre-existing on `origin/develop`. Carried into the gate's `future` recommendations so it stops being rediscovered each cycle.
+- Both bug reports closed. QA comment posted to PR #295 (exit 0).
 
 ---
 

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-69-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-01
 
@@ -125,3 +125,4 @@ coverage lacked.
 | 2026-09-01 | New | QA Engineer | Found in QA cycle 1 |
 | 2026-09-01 | In Progress | qa-fix | Reproduced the vacuity |
 | 2026-09-01 | Ready for QA | qa-fix | Assertion added to both suites; mutation-proved |
+| 2026-09-01 | Closed | QA Engineer | Verified by QA: guard present in both suites, fails on injected defect in either, and fails loudly (not vacuously) when its anchor is renamed. |

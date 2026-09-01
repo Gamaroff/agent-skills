@@ -279,25 +279,28 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-01
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+**QA Cycles**: 2
 
 ### QA Report
-- **Full Report**: [task.69.qa.1.qa-bitbucket-pr-comment.md](./task.69.qa.1.qa-bitbucket-pr-comment.md)
-- **Gate File**: [task.69.gate.1.qa-bitbucket-pr-comment.yml](./task.69.gate.1.qa-bitbucket-pr-comment.yml)
+- **Latest Report**: [task.69.qa.2.qa-bitbucket-pr-comment.md](./task.69.qa.2.qa-bitbucket-pr-comment.md)
+- **Latest Gate**: [task.69.gate.2.qa-bitbucket-pr-comment.yml](./task.69.gate.2.qa-bitbucket-pr-comment.yml)
+- **Cycle 1**: [task.69.qa.1.qa-bitbucket-pr-comment.md](./task.69.qa.1.qa-bitbucket-pr-comment.md) · [gate 1](./task.69.gate.1.qa-bitbucket-pr-comment.yml) (FAIL, 60/100)
 
 ### Test Coverage Summary
-- **Tests Executed**: 2139 (0 failures)
-- **Phases Verified**: 4/4 implemented, 2/4 with concerns
-- **Critical Issues**: 1 HIGH, 1 MEDIUM, 1 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Tests Executed**: 2141 (0 failures)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 open (1 HIGH + 1 MEDIUM found and closed in cycle 1)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- **TASK69-001 (HIGH)** — `qa-story`'s comment body uses real shell variables inside a single-quoted heredoc, so `$PR_NUMBER` / `$PR_TITLE` / `$PR_STATE` are emitted literally. A silent regression on GitHub, the one platform the task promised to leave unchanged. [Bug report](./task.69.bug.1.qa-story-body-vars-stop-expanding.md)
-- **TASK69-002 (MEDIUM)** — no test can see the body's expansion semantics; the suites are green with the defect present and with it fixed. [Bug report](./task.69.bug.2.no-coverage-for-body-expansion.md)
+- Cycle 1 found **TASK69-001 (HIGH)** — `qa-story`'s comment body emitted literal `$PR_NUMBER` / `$PR_TITLE` / `$PR_STATE` after the move to a single-quoted heredoc — and **TASK69-002 (MEDIUM)**, that no test could see it. Both fixed in one qa-fix cycle and verified in cycle 2 by re-mutation, including a mutation QA chose that the developer had not run.
+- The new body guard was probed for vacuity: renaming its anchor makes it fail loudly rather than pass on an empty body.
+- **Accepted residuals**: TASK69-003 (LOW, unreachable `$VCS` branch), and the standing fact that Step 4b can never execute either skill's PR-comment blocks — so these two steps rest entirely on contract tests.
 
 ---
 
@@ -305,12 +308,12 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 
 ### In QA Verification
 
-- [TASK-69-BUG-1: qa-story's PR-comment body variables stop expanding](./task.69.bug.1.qa-story-body-vars-stop-expanding.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-01)
-- [TASK-69-BUG-2: contract tests cannot see the comment body's expansion semantics](./task.69.bug.2.no-coverage-for-body-expansion.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-09-01)
+_None._
 
 ### Closed Bugs
 
-_None yet — QA verifies in cycle 2._
+- [TASK-69-BUG-1: qa-story's PR-comment body variables stop expanding](./task.69.bug.1.qa-story-body-vars-stop-expanding.md) — ✅ Closed — verified by QA in cycle 2 (re-mutated independently)
+- [TASK-69-BUG-2: contract tests cannot see the comment body's expansion semantics](./task.69.bug.2.no-coverage-for-body-expansion.md) — ✅ Closed — verified by QA in cycle 2 (guard exists in both suites and fails loudly)
 
 ---
 
@@ -366,6 +369,7 @@ baseline restored                                        → 25 pass, 0 fail
 | 2026-09-01 |         | Implemented — 5 files (2 skills, 2 new test suites, package.json) + 1 shared test-guard floor; 23 new contract tests, 3 mutations proved | develop |
 | 2026-09-01 |         | QA gate FAIL (60/100) — 1 HIGH, 1 MEDIUM, 1 LOW | qa-task |
 | 2026-09-01 |         | QA findings fixed — TASK69-001 + TASK69-002, 1 iteration; both mutation-proved | qa-fix |
+| 2026-09-01 |         | QA gate PASS (100/100) — both findings verified closed; 1 LOW accepted | qa-task |
 
 ---
 
