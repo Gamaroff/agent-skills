@@ -277,6 +277,85 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-01
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.69.qa.1.qa-bitbucket-pr-comment.md](./task.69.qa.1.qa-bitbucket-pr-comment.md)
+- **Gate File**: [task.69.gate.1.qa-bitbucket-pr-comment.yml](./task.69.gate.1.qa-bitbucket-pr-comment.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 2139 (0 failures)
+- **Phases Verified**: 4/4 implemented, 2/4 with concerns
+- **Critical Issues**: 1 HIGH, 1 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+- **TASK69-001 (HIGH)** — `qa-story`'s comment body uses real shell variables inside a single-quoted heredoc, so `$PR_NUMBER` / `$PR_TITLE` / `$PR_STATE` are emitted literally. A silent regression on GitHub, the one platform the task promised to leave unchanged. [Bug report](./task.69.bug.1.qa-story-body-vars-stop-expanding.md)
+- **TASK69-002 (MEDIUM)** — no test can see the body's expansion semantics; the suites are green with the defect present and with it fixed. [Bug report](./task.69.bug.2.no-coverage-for-body-expansion.md)
+
+---
+
+## Bug Reports
+
+### In QA Verification
+
+- [TASK-69-BUG-1: qa-story's PR-comment body variables stop expanding](./task.69.bug.1.qa-story-body-vars-stop-expanding.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-01)
+- [TASK-69-BUG-2: contract tests cannot see the comment body's expansion semantics](./task.69.bug.2.no-coverage-for-body-expansion.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-09-01)
+
+### Closed Bugs
+
+_None yet — QA verifies in cycle 2._
+
+---
+
+## Dev Agent Record
+
+### Completion Notes
+
+**QA fix cycle 1** — both open findings from gate 1 addressed.
+
+- **TASK69-001 (HIGH)**: `qa-story`'s body used real shell variables inside a single-quoted heredoc.
+  Converted `$PR_NUMBER` / `$PR_TITLE` / `$PR_STATE` to `{SLOT}` placeholders, matching `qa-task`.
+  Deliberately **not** fixed by unquoting the heredoc: the body carries a backtick pair on the Code
+  Review Findings line, so that would have traded a display bug for command substitution.
+- **TASK69-002 (MEDIUM)**: added a `bodyHeredoc` helper and a no-`$VAR`-in-body assertion to **both**
+  suites. Added to both rather than only the copy that failed, because the drift risk is symmetric.
+- **TASK69-003 (LOW)**: not fixed, by instruction and on merit — `COMMENT_RC` is unset only on an
+  unreachable third `$VCS` branch, and the quoted test form degrades to a shell diagnostic rather
+  than a false success.
+
+The root cause of TASK69-001 is worth recording: Phase 2's "keep the wording identical" was read as
+*apply the same structural change to both*, which was done correctly. It was not read as *reconcile
+the content the two bodies already differed in* — and that is exactly where the defect lived. The
+two bodies now share one placeholder convention, so the instruction is satisfied in the sense that
+mattered.
+
+### File List
+
+**Modified**
+- `skills/qa-story/SKILL.md` — two body lines converted to `{SLOT}` placeholders
+- `skills/qa-story/tests/qa-story.test.js` — `bodyHeredoc` helper + body-expansion assertion
+- `skills/qa-task/tests/qa-task.test.js` — same
+
+### Debug Log References
+
+```
+node --test 'skills/qa-task/tests/*.test.js' 'skills/qa-story/tests/*.test.js'
+  → 25 tests, 25 pass, 0 fail   (was 23 before this cycle)
+
+mutation: re-introduce $PR_NUMBER/$PR_TITLE in qa-story  → 12 pass, 1 fail  ✅ red
+mutation: same defect injected into qa-task              → 11 pass, 1 fail  ✅ red
+baseline restored                                        → 25 pass, 0 fail
+```
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -285,6 +364,8 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 | 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
 | 2026-09-01 | 1.2     | Pipeline review (9/10, ready to implement) — every technical claim verified against the tree; Phase 3 corrected from "confirm" to "add to both" and given the divergent-resolver note | review-task |
 | 2026-09-01 |         | Implemented — 5 files (2 skills, 2 new test suites, package.json) + 1 shared test-guard floor; 23 new contract tests, 3 mutations proved | develop |
+| 2026-09-01 |         | QA gate FAIL (60/100) — 1 HIGH, 1 MEDIUM, 1 LOW | qa-task |
+| 2026-09-01 |         | QA findings fixed — TASK69-001 + TASK69-002, 1 iteration; both mutation-proved | qa-fix |
 
 ---
 

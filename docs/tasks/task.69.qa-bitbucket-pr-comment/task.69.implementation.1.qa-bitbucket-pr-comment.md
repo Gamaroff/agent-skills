@@ -34,7 +34,7 @@ Add a `$VCS` branch to the QA gate PR-comment step in both `qa-task` (Step 13) a
 | 1. create-branch           | ✅ Done    | Branch `feature/task.69.*` exists in git                               | `feature/task.69.qa-bitbucket-pr-comment` created from `develop` at `8128cc4`, pushed | — |
 | 2. review-task             | ✅ Done    | `task.69.review.{N}.{name}.md` exists (or skip logged)                 | Ran (status was RfD but no report existed). 9/10 READY TO IMPLEMENT, 0 critical | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. 4/4 phases. ci:fast green: 2139 tests, 0 fail, prettier clean | — |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #295](https://github.com/Gamaroff/agent-skills/pull/295) → `develop`. 3 commits. Issue comment skipped (none linked) | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.69.qa.{N}.*.md`; `task.69.gate.{N}.*.yml`; PR comment posted     |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.69.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -68,6 +68,9 @@ Add a `$VCS` branch to the QA gate PR-comment step in both `qa-task` (Step 13) a
 - Step 3 develop loop: **1 iteration**, exited on `Ready for Review`. No stall, no MAX_ITER pressure.
 - Step 3 internal gates: none fired — task was already `Ready for Development` (no draft/planned gate), `risk_level: low` (no high-risk qa-planning gate), and no code/document misalignment was found (no alignment gate).
 - **Mutation proving** (task §8 names three; all three executed): (1) delete the Bitbucket arm from qa-story → 4 tests red; (2) revert the qa-task GitHub arm to inline `--body` → 1 test red; (3) change the branch key to `$TRACKER` in both → 5 tests red. Baseline restored to 23/23 green after each.
+- Step 4 SCOPE_PATHS: `docs/tasks/task.69.qa-bitbucket-pr-comment`, `skills/qa-task`, `skills/qa-story`, `shared/resources`, `package.json`. Pre-flight guard held nothing — every untracked path fell inside scope. Post-commit leak check clean.
+- Step 4 `--issue`: omitted — `TRACKER=github` but `TRACKER_ISSUE` is empty, so `create-pr` Step 6b skipped silently.
+- Step 4 commits (3, ordered so the tree is green at each): `f68ae63` fix(tracker-access) floor 2→1 **first**, because `9232b90` feat(task.69) is what drops the dot-source count and would otherwise land red; then `8e6afc2` docs(task.69). Implementation report committed here per the Step 4 rule — a tracked document linking to an untracked file is a dangling link that fails only in CI.
 - Task review passed. Proceeding despite 1 outstanding Important finding: the task has no linked tracker issue. Not auto-fixed — creating a remote issue requires an explicit opt-in prompt and this run is non-interactive. Non-blocking for implementation.
 
 ---
@@ -82,7 +85,14 @@ Add a `$VCS` branch to the QA gate PR-comment step in both `qa-task` (Step 13) a
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — qa-task → FAIL (60/100)
+
+- Gate: **FAIL**. 1 HIGH, 1 MEDIUM, 1 LOW. NFRs: Security PASS, Performance PASS, Reliability CONCERNS, Maintainability CONCERNS.
+- **TASK69-001 (HIGH)** — `qa-story`'s comment body carries real shell variables (`$PR_NUMBER`, `$PR_TITLE`, `$PR_STATE`) but is written by a **single-quoted** heredoc, so they emit literally. `qa-task` is unaffected: its body uses `{SLOT}` placeholders. A silent regression on GitHub — delivery succeeds, so the step's own BLOCKING exit-code check passes.
+- **TASK69-002 (MEDIUM)** — no test covers body semantics. QA mutation-checked it independently: suite is 12/12 green both with the defect and with it fixed. The three mutations develop recorded were all *structural*, so they proved the structural assertions and nothing else — coverage looked complete because every mutation tried was of the kind already covered.
+- **TASK69-003 (LOW)** — `COMMENT_RC` unset on the unreachable third `$VCS` branch. Not fixed; unreachable and degrades safely.
+- Step 4b: `zero-blocks-executed` on both skills — **verified pre-existing** by running the engine against `origin/develop` (14 and 13 blocks there). Not caused by this change and not fixable: the added blocks post PR comments and are correctly deny-listed as mutating.
+- QA comment posted to PR #295 (exit 0) — through the `--body-file` GitHub arm this task itself added.
 
 ---
 
@@ -91,7 +101,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.69.qa-bitbucket-pr-comment`
-**PR**: {populated after Step 4}
+**PR**: [#295](https://github.com/Gamaroff/agent-skills/pull/295)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

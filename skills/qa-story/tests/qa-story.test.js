@@ -56,6 +56,21 @@ function prCommentStep(src) {
   return src.slice(start, end);
 }
 
+/**
+ * The comment body only — the lines between the single-quoted heredoc opener
+ * and its terminator. Everything in here is written VERBATIM: no expansion,
+ * no command substitution.
+ */
+function bodyHeredoc(src) {
+  const step = prCommentStep(src);
+  const start = step.indexOf("cat > \"$BODY_FILE\" <<'EOF'");
+  assert.notEqual(start, -1, "body heredoc not found");
+  const from = step.indexOf("\n", start) + 1;
+  const end = step.indexOf("\nEOF\n", from);
+  assert.notEqual(end, -1, "body heredoc terminator not found");
+  return step.slice(from, end);
+}
+
 test("step 6 branches the PR comment on $VCS, not $TRACKER", () => {
   const step = prCommentStep(SKILL);
   assert.match(
@@ -124,6 +139,21 @@ test("the body is written to a file before posting", () => {
     step,
     /cat > "\$BODY_FILE" <<'EOF'/,
     "body must be written via a quoted heredoc",
+  );
+});
+
+test("the quoted heredoc body carries no shell variables", () => {
+  // The body is written with <<'EOF' — single-quoted, so NOTHING expands.
+  // A `$PR_NUMBER` in here is emitted literally and the comment ships with
+  // placeholder text where PR metadata belongs. It posts successfully, so the
+  // step's own BLOCKING exit-code check passes and the fault is silent.
+  // Regression guard for TASK69-001.
+  const body = bodyHeredoc(SKILL);
+  const vars = body.match(/\$[A-Za-z_][A-Za-z0-9_]*/g) || [];
+  assert.deepEqual(
+    vars,
+    [],
+    `the heredoc is single-quoted, so ${vars.join(", ")} would be written literally — use a {SLOT} placeholder instead`,
   );
 });
 

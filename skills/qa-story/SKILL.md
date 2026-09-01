@@ -1533,8 +1533,8 @@ cat > "$BODY_FILE" <<'EOF'
 **Quality Score**: [score]/100
 **Reviewer**: QA Engineer
 **Date**: [date]
-**PR**: #$PR_NUMBER - $PR_TITLE
-**PR State**: $PR_STATE
+**PR**: #{PR_NUMBER} - {PR_TITLE}
+**PR State**: {PR_STATE}
 
 ---
 
