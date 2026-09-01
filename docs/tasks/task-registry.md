@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-08-29
-**Next Available Task Number:** **77**
+**Next Available Task Number:** **78**
 
 ## How to use
 
@@ -116,6 +116,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 74 | [A security re-review must re-probe, not re-read](task.74.security-re-review-reprobes/task.74.security-re-review-reprobes.md) | ready-for-development | infrastructure | High | 2026-09-01 | — | task.67 |
 | 75 | [Make the pipeline quality gate run what CI runs](task.75.quality-gate-matches-ci/task.75.quality-gate-matches-ci.md) | ready-for-development | infrastructure | High | 2026-09-01 | — | task.67 |
 | 76 | [State what a mutation proof does not tell you](task.76.mutation-proof-limits/task.76.mutation-proof-limits.md) | ready-for-development | infrastructure | Medium | 2026-09-01 | — | task.67 |
+| 77 | [Run the PR conformance review before a work item is finalised](task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md) | ready-for-development | infrastructure | High | 2026-09-01 | — | task.66 |
 
 - **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 
