@@ -180,17 +180,82 @@ function shellAnswer(dir, tier, opts = {}) {
   );
 }
 
-/** What the JS gates resolve in `dir`, with no env tier in play. */
-function jsAnswer(dir, tier) {
-  const env = {};
+/**
+ * What the JS gates resolve in `dir`, with no env tier in play.
+ *
+ * A CHILD THAT NEVER RAN IS NOT AN ANSWER — the same rule shellAnswer states
+ * above, and for a long time this side did not follow it. This used to be a bare
+ * `try { return dm.resolveAccessTracker(...) } catch { return "THREW" }`, which
+ * catches only a THROW. The production reader does not throw when its internal
+ * probe times out: it does the correct fail-closed thing, warns, and RETURNS
+ * `manual`. From outside that is indistinguishable from a config that declares
+ * `manual`, so a timed-out probe was recorded as a legitimate reading and
+ * asserted against the shell tier's correct one. The suite then reported
+ *
+ *     mode-approve [tier=awk]: shell=approve js=manual
+ *
+ * — a reader divergence that had not happened. That was bug.5, and it failed two
+ * of three full runs under the load task 75 put this suite under.
+ *
+ * The reader now exposes WHY it resolved as it did through `onDiagnostic`, which
+ * is an observation channel only: the return value, the warning and the
+ * fail-closed semantics are all untouched, and must stay that way. A
+ * `kind: "never-ran"` diagnostic means the probe was killed or never started, so
+ * whatever came back is not a reading of the file. Retry on the shared budget —
+ * the cause is transient contention — then throw, the same shape and the same
+ * budget as shellAnswer.
+ */
+function jsAnswer(dir, tier, opts = {}) {
+  const retries = opts.retries ?? SPAWN_RETRIES;
+  const timeout = opts.timeoutMs ?? SPAWN_TIMEOUT_MS;
+  // THE BUDGET IS PASSED IN, and both halves of that matter.
+  //
+  // It is passed at all because jsAnswer previously retried on SPAWN_RETRIES
+  // while the reader's own probe stayed on its hardcoded 10s default — so the JS
+  // side ran ~6x tighter than shellAnswer's 60s under exactly the load bug.2 and
+  // bug.5 measured, and would have gone on being the side that failed. The retry
+  // was on the shared budget; the thing being retried was not.
+  //
+  // It is passed through `env` rather than the ambient environment because the
+  // reader honours this knob only from a caller's snapshot — see
+  // accessProbeTimeoutMs. That is what keeps a repo-local .env from reaching the
+  // access reader, and it means a test cannot set the budget by poking
+  // process.env either.
+  const env = { AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS: String(timeout) };
   if (tier) env.AGENT_SKILLS_CONFIG_TIER = tier;
-  try {
-    return dm.resolveAccessTracker(env, { cwd: dir });
-  } catch {
-    // The config tier must never throw. Surfacing this as a distinct value makes
-    // a regression to cycle 4's shape fail loudly instead of looking restrictive.
-    return "THREW";
+
+  let neverRanReason = "";
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let infra = null;
+    let answer;
+    try {
+      answer = dm.resolveAccessTracker(env, {
+        cwd: dir,
+        onDiagnostic: (d) => {
+          if (d.kind === "never-ran") infra = d;
+        },
+      });
+    } catch {
+      // The config tier must never throw. Surfacing this as a distinct value
+      // makes a regression to cycle 4's shape fail loudly instead of looking
+      // restrictive. Note this is the READER throwing, which is a real result —
+      // not the infrastructure failure handled below.
+      return "THREW";
+    }
+    // The probe ran. Whatever it said — including a genuine `manual` — is data.
+    if (!infra) return answer;
+    neverRanReason = infra.reason;
   }
+
+  throw new Error(
+    `the JS reader never ran (${neverRanReason}) after ${retries + 1} ` +
+      `attempt(s) at tier "${tier}" — this is an infrastructure failure, NOT a ` +
+      `refusal. The reader fail-closed to "manual", which is correct of it and ` +
+      `is NOT a reading of the config. Raise PARITY_SPAWN_TIMEOUT_MS ` +
+      `(currently ${timeout}ms) if this box is slower than the probe budget. ` +
+      `Naming any other knob here would send you somewhere that has no effect ` +
+      `on this path.`,
+  );
 }
 
 /**
@@ -986,6 +1051,153 @@ describe("the probe cannot fabricate an answer", () => {
     // went wrong.
     withRepo("access:\n  tracker: read-only\n", (dir) => {
       assert.equal(shellAnswer(dir, "awk"), "read-only");
+    });
+  });
+
+  // -- bug.5: the same rule, on the JS side ---------------------------------
+  //
+  // Everything above proves it of shellAnswer. The JS probe went unexamined and
+  // had the identical defect, with one extra twist that made it harder to see:
+  // the shell probe FAILS (non-zero, no stdout) when it is killed, while the JS
+  // reader SUCCEEDS — it fail-closes to `manual`, warns, and returns normally.
+  // So there was no error for the caller to notice, only a plausible value.
+
+  /**
+   * Read the config tier directly, with an explicit probe budget.
+   *
+   * The budget travels in the env snapshot, not process.env — the reader
+   * honours this knob only from a caller (see accessProbeTimeoutMs), which is
+   * what keeps a repo-local .env out of the access reader. An earlier version of
+   * these tests set process.env and would have silently stopped forcing anything
+   * the moment that rule was enforced.
+   */
+  function readTier(dir, { timeoutMs, tier } = {}) {
+    const env = {};
+    if (timeoutMs !== undefined)
+      env.AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS = String(timeoutMs);
+    if (tier) env.AGENT_SKILLS_CONFIG_TIER = tier;
+    const seen = [];
+    const answer = dm.resolveAccessTracker(env, {
+      cwd: dir,
+      onDiagnostic: (d) => seen.push(d),
+    });
+    return { answer, seen };
+  }
+
+  test("a JS probe that never completes throws instead of reading as `manual`", () => {
+    // THE MUTATION PROOF for bug.5. A 1ms budget guarantees the reader's child
+    // is killed. The reader then does the correct production thing and returns
+    // `manual` — and before the fix jsAnswer handed that straight back, so the
+    // corpus compared it against the shell tier's `read-only` and reported a
+    // divergence. Revert either half of the fix (the `kind: "never-ran"`
+    // classification in defer-mutation.js, or the retry/throw here) and this
+    // test goes red with `manual` instead of throwing.
+    withRepo("access:\n  tracker: read-only\n", (dir) => {
+      assert.throws(
+        () => jsAnswer(dir, "awk", { timeoutMs: 1, retries: 0 }),
+        (err) => {
+          assert.match(err.message, /never ran/);
+          assert.match(err.message, /NOT a refusal/);
+          return true;
+        },
+        "a killed JS probe must not be reported as a mode",
+      );
+    });
+  });
+
+  test("the same JS probe, given time, does answer — so the guard is not vacuous", () => {
+    // The control. Without it the test above would pass on a box where the
+    // reader is broken for some entirely different reason.
+    withRepo("access:\n  tracker: read-only\n", (dir) => {
+      assert.equal(jsAnswer(dir, "awk"), "read-only");
+    });
+  });
+
+  test("a probe that never ran is not memoised as a property of the file", () => {
+    // The memo is keyed on [cwd, file, tier], so caching a timeout stored "the
+    // box was busy" under the path and made the fail-closed `manual` sticky for
+    // the rest of the process — and made the retry above pointless, because the
+    // retry would have been served from the cache without re-spawning. The same
+    // directory must still answer correctly once there is time to read it.
+    withRepo("access:\n  tracker: read-only\n", (dir) => {
+      // Matched, not bare: an unmatched assert.throws here would be satisfied by
+      // ANY exception, so a future refactor that threw a TypeError on the way in
+      // would leave the real assertion below testing nothing.
+      assert.throws(
+        () => jsAnswer(dir, "awk", { timeoutMs: 1, retries: 0 }),
+        /never ran/,
+      );
+      assert.equal(
+        jsAnswer(dir, "awk"),
+        "read-only",
+        "the timed-out probe poisoned the memo for this path",
+      );
+    });
+  });
+
+  test("the diagnostic fires on every failure, not once per process", () => {
+    // warnOnce deduplicates the stderr warning per reason, which is right for an
+    // operator and fatal for a retry loop: the second failure of a retry would
+    // report nothing and the loop would read it as success. onDiagnostic
+    // deliberately sits outside that cache.
+    withRepo("access:\n  tracker: read-only\n", (dir) => {
+      const seen = [];
+      for (let i = 0; i < 2; i++) {
+        seen.push(...readTier(dir, { timeoutMs: 1, tier: "awk" }).seen);
+      }
+      assert.equal(seen.length, 2, "the second failure was swallowed");
+      for (const d of seen) assert.equal(d.kind, "never-ran");
+    });
+  });
+
+  test("a genuine refusal is NOT reported as an infrastructure failure", () => {
+    // The other direction, and the one that matters for not crying wolf: a
+    // resolver that ran and refused must stay `manual`, must not throw, and must
+    // not be retried. Classifying everything as "never-ran" would pass the test
+    // above while making the suite unable to see a real refusal.
+    //
+    // Runs on the SHARED budget and retries a probe that never ran. Without that
+    // this test was itself flaky under the very load it is about: a killed probe
+    // yields kind "never-ran", and a test whose subject is "do not report
+    // contention as data" would have reported contention as a broken classifier.
+    withRepo("access:\n  tracker: not-a-mode\n", (dir) => {
+      let result;
+      for (let attempt = 0; attempt <= SPAWN_RETRIES; attempt++) {
+        result = readTier(dir, { timeoutMs: SPAWN_TIMEOUT_MS });
+        if (!result.seen.some((d) => d.kind === "never-ran")) break;
+      }
+      assert.ok(
+        !result.seen.some((d) => d.kind === "never-ran"),
+        `the probe never ran in ${SPAWN_RETRIES + 1} attempt(s) — contention, ` +
+          `not a classifier failure; raise PARITY_SPAWN_TIMEOUT_MS`,
+      );
+      assert.equal(result.answer, REFUSAL_AS, "a refusal still fails closed");
+      assert.equal(result.seen.length, 1);
+      assert.equal(
+        result.seen[0].kind,
+        "refused",
+        "a resolver that ran and refused is data, not contention",
+      );
+    });
+  });
+
+  test("an out-of-range probe budget falls back rather than throwing", () => {
+    // `/^\d+$/` alone accepts a 400-digit string, Number() makes it Infinity,
+    // and spawnSync({timeout: Infinity}) THROWS ERR_OUT_OF_RANGE — which would
+    // break readConfiguredAccessTracker's NEVER-THROWS contract from a config
+    // tier that is only supposed to return values. A merely huge finite value is
+    // just as wrong in a quieter way: it does not lengthen the budget, it
+    // removes it, so a hung resolver hangs the pipeline with nothing to stop it.
+    withRepo("access:\n  tracker: read-only\n", (dir) => {
+      for (const bad of ["9".repeat(400), "99999999999999", "0"]) {
+        const { answer, seen } = readTier(dir, { timeoutMs: bad });
+        assert.equal(
+          answer,
+          "read-only",
+          `budget "${bad.slice(0, 12)}…" should fall back to the default`,
+        );
+        assert.equal(seen.length, 0, "the default budget read the file fine");
+      }
     });
   });
 

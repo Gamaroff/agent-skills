@@ -31,7 +31,7 @@
 | 2 | [`npm test` runs `node --test` unbounded, so spawn-heavy suites time out for environmental reasons](bug.2.unbounded-test-concurrency/bug.2.unbounded-test-concurrency.md) | closed | Major | High | 2026-08-29 | test harness / CI |
 | 3 | [Three CLIs call `process.exit()` after an async stdout write, truncating piped output at ~64KB](bug.3.stdout-truncation-on-exit/bug.3.stdout-truncation-on-exit.md) | closed | Major | Critical | 2026-09-01 | CLI output / test harness |
 | 4 | [Snippet engine silently no-ops when invoked through a symlinked path](bug.4.snippet-engine-symlink-noop/bug.4.snippet-engine-symlink-noop.md) | closed | Major | High | 2026-09-01 | qa-task / Step 4b snippet engine |
-| 5 | [access-config parity JS probe records a timeout as a real answer](bug.5.access-parity-js-probe-conflates-timeout/bug.5.access-parity-js-probe-conflates-timeout.md) | new | Major | High | 2026-09-01 | test harness / config reader |
+| 5 | [access-config parity JS probe records a timeout as a real answer](bug.5.access-parity-js-probe-conflates-timeout/bug.5.access-parity-js-probe-conflates-timeout.md) | closed | Major | High | 2026-09-01 | test harness / config reader |
 
 ---
 
