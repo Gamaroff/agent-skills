@@ -1,6 +1,6 @@
 ---
 type: implementation-report
-status: in-progress
+status: complete
 bug: 'bug.4.snippet-engine-symlink-noop'
 mode: 'general'
 started: '2026-09-01T13:28:39Z'
@@ -9,12 +9,12 @@ started: '2026-09-01T13:28:39Z'
 # Implementation Report — bug.4.snippet-engine-symlink-noop
 
 **Started:** 2026-09-01T13:28:39Z
-**Finished:** —
-**Final Status:** In Progress
+**Finished:** 2026-09-01T15:58:59Z
+**Final Status:** ✅ Complete — bug closed, DoD accepted, PR #292 ready to merge
 **Branch model:** bugfix (base: develop, PR target: develop)
 **Severity / Priority:** Major / High
 **Lite mode:** off
-**Fix Iterations:** 1
+**Fix Iterations:** 3
 
 ## Pipeline Progress
 
@@ -23,10 +23,10 @@ started: '2026-09-01T13:28:39Z'
 | 1 | create-branch | ✅ Done | Branch `bugfix/bug.4.snippet-engine-symlink-noop` created at `700d81c` | |
 | 2 | review-bug | ✅ Done | READY TO FIX 10/10 · dup none · reproduces likely · 2 Critical auto-fixed | `bug.4.review.1.snippet-engine-symlink-noop.md` |
 | 3 | investigate-fix | ✅ Done | Realpath guard + bundle to 4 copies; 3 regression tests under spawnBudget; 4 mutations proven; `npm run ci:fast` **green** (2098 tests, 0 fail) | root cause pre-localised by Step 2 prepass |
-| 4 | create-pr | ⏳ Pending | | |
-| 5–6 | verify-fix loop | ⏳ Pending | | |
-| 7 | finalise-close | ⏳ Pending | | |
-| 8 | commit-changes | ⏳ Pending | | |
+| 4 | create-pr | ✅ Done | [PR #292](https://github.com/Gamaroff/agent-skills/pull/292) → develop; commit `6a2a74a` | |
+| 5–6 | verify-fix loop | ✅ Done | PASS on cycle 3/5 — 2 fix cycles, both on tests not the fix | 3 review passes |
+| 7 | finalise-close | ✅ Done | DoD **ACCEPTED**, CI 4/4 green; bug closed, registry row → closed; canonical PR comment posted | 2 DoD agents (security, docs) |
+| 8 | commit-changes | ✅ Done | Final report + DoD + registry committed and pushed | |
 
 ## Decisions Log
 
@@ -54,8 +54,75 @@ started: '2026-09-01T13:28:39Z'
 - 2026-09-01T15:22:14Z — **Real contribution found and fixed.** The first cut of the three CLI tests spawned without a budget and cost 1.5s/30.3s under load, adding genuine spawn pressure to a suite already running four files concurrently. Reworked them onto `spawnBudget("SNIPPETS")` + `neverRan()` retry (bug.2 remedy) and `--no-zsh`: same three now run in 0.13s/0.29s/0.002s, engine suite 69/69 in 1.7s. Mutation 1 re-proven red afterwards.
 - 2026-09-01T15:22:14Z — Run 3 of `npm run ci:fast`: **exit 0**, 2098 tests, 0 failures, prettier clean.
 
+- 2026-09-01T15:24:15Z — Step 4: committed `6a2a74a` (9 files, scope-clean — leak check OK, no secrets) and opened **PR #292** → `develop`. No `--issue` passed: general bug, no linked tracker issue. Pre-commit hook re-ran `npm run bundle` and reported all skills in sync.
+
+## QA Iteration History
+
+### Verify Cycle 1 — 2026-09-01
+**Regression test**: pass — 3/3, all established failing pre-fix in Step 3
+**Suite + lint**: pass — engine suite 69/69; prettier clean
+**Bug repro**: pass — documented symlinked path exits 1 with 1396 bytes (was exit 0, 0 bytes)
+**Code review**: **1 blocking finding** — the fix itself reviewed clean (faithful port, no unused/shadowed imports, bug.3's `process.exitCode` chain intact, reviewer re-ran the engine through the real symlink). But `the symlinked and real invocation paths agree exactly` still called `spawnSync` directly: no timeout, no `neverRan()` retry, 4 shells instead of 1 — false-divergence risk under load.
+**Verdict**: **FAIL**
+**Action**: fix cycle 2
+
+### Verify Cycle 2 — 2026-09-01 (commit `75c861c`)
+**Regression test**: pass — 3/3
+**Suite + lint**: pass — `npm run ci:fast` exit 0, 2098 tests, 0 failures
+**Code review**: all 5 cycle-1 findings VERIFIED fixed; **1 new blocking finding (NEW-1)** — `viaReal.stdout.length` dereferenced with no `neverRan()` on either arm, nine lines below the guard cycle 2 had just added to the sibling test. Same class, reintroduced.
+**Verdict**: **FAIL**
+**Action**: fix cycle 3
+
+### Verify Cycle 3 — 2026-09-01 (commit `7bd448e`)
+**Regression test**: pass — 3/3
+**Suite + lint**: pass — engine suite 69/69, prettier clean; full `ci:fast` re-run
+**Mutations**: 5/5 re-proven, differentiation intact (M4 and M2 turn only the structural test red)
+**Code review**: **clean** — reviewer verdict "ready to merge"; independently re-confirmed the engine runs through the real symlink, the 4 bundled copies are byte-identical to source, bug.3 chain untouched, and bug.2 spawn-budget rule still satisfied
+**Verdict**: **PASS** — proceeding to Step 7
+
+**Tracker signals**: `in-qa`, `changes-requested`, `ready-for-merge` all skipped — no linked tracker issue (general bug).
+
+- 2026-09-01T15:58:40Z — Step 7: `/finalise` → **ACCEPTED**. CI rollup SUCCESS (4/4) on head `7bd448e` = local HEAD. Security agent: no new surface (realpath is read-only, catch fallback cannot false-positive on import, execution allow-list untouched, temp-dir cleanup unlinks the symlink rather than following it). Docs agent: no other doc needed updating — `qa-task`/`qa-story` SKILL.md already document the symlinked invocation correctly; the script was the thing that was wrong. Change Log correctly absent (bug reports use Status History).
+- 2026-09-01T15:58:40Z — Step 7 Part B: Resolution Summary written (5 lessons), bug `status: closed`, registry row 4 → `closed` (Next Available Bug Number left at 6 — numbers are never reused), canonical PR comment posted. Tracker close + board move: **N/A**, no linked issue.
+- 2026-09-01T15:58:40Z — Sprint Review summary: **not generated** — it is a story/task artifact; a bug's equivalent closing artifact is its `## Resolution Summary`.
+
 ## Completion
 
 **Branch:** bugfix/bug.4.snippet-engine-symlink-noop
-**PR:** —
-**DoD Summary:** —
+**PR:** https://github.com/Gamaroff/agent-skills/pull/292
+**DoD Summary:** `bug.4.dod.1.snippet-engine-symlink-noop.md` — ✅ ACCEPTED (fix evidence 8/8, CI SUCCESS 4/4, security PASS, compliance N/A, docs PASS)
+
+## Completion Summary
+
+**Outcome:** bug.4 fixed, verified, closed and accepted. PR #292 is green and ready to merge.
+
+**What was wrong:** `shared/resources/qa-execute-snippets.mjs` compared a realpath-resolved
+`import.meta.url` against a raw `process.argv[1]`, so any symlink in the invocation path — which the
+documented path always has — made the entrypoint guard false. `main()` never ran and the process
+exited 0 silently, which is indistinguishable from a clean run. The QA step built to catch prose that
+is never executed was itself never executed, and recorded a pass.
+
+**What changed:** the six-line `isInvokedDirectly()` helper already used by three sibling CLIs,
+bundled to the four generated copies, plus three regression tests (two behavioural, one structural)
+proven against five mutations.
+
+**Shape of the work:** 3 fix iterations, 3 verify cycles, 3 adversarial review passes. **Both
+rejections were in the tests, not the fix** — the production change reviewed clean on the first pass
+and was never modified after Iteration 1. What needed the extra cycles was making the evidence
+trustworthy, which on a bug about a false pass is the substance rather than a detail.
+
+**Things this run got wrong, and how they were caught:**
+
+| # | Slip | Caught by |
+| --- | --- | --- |
+| 1 | Structural assertion matched a bare `realpathSync` token that the `node:fs` import list already satisfied — passed with the guard deleted | Running mutation 3, not reasoning about it |
+| 2 | An exact-string edit silently missed its second target because `prettier --write` had reflowed the code; the script asserted only that *some* replacement happened | Review cycle 1 |
+| 3 | Fixed a null-deref in one test and reintroduced it nine lines away in its sibling | Review cycle 2 |
+| 4 | Structural regex anchored on operand order, so the commuted defect passed | Review cycle 2 |
+
+Slips 1 and 4 are the same lesson twice: **a structural scan fails silently toward "pass"**, and only
+executing mutations reveals it. Slip 2 changed how the rest of the run edited files — per-replacement
+assertions with a write after each, rather than one aggregate check at the end.
+
+**Environment note:** a shell function shadows `node` with an `nvm` wrapper on this machine, so every
+Node invocation in this run used the absolute path `/usr/local/bin/node`.

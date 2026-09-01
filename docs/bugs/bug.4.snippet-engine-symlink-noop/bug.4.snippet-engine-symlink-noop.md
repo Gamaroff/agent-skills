@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-01'
@@ -13,7 +13,7 @@ description: "qa-execute-snippets.mjs guards its CLI entrypoint by comparing imp
 
 **Bug ID**: bug.4.snippet-engine-symlink-noop
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-01
@@ -296,14 +296,32 @@ reachable `if (isInvokedDirectly())` call site, after which mutations 3 and 4 bo
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-09-01
+**Verified by**: develop-bug (verify cycle 3)
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ✅ Fixed
 
-**Notes**: [Testing notes]
+**Notes**: All three verification signals green.
 
-**Decision**: Closed | Reopened
+1. **Regression tests** — 3/3 pass, and all three were established as failing on the pre-fix code.
+2. **Suite + lint** — `npm run ci:fast` exit 0: **2098 tests, 0 failures**, prettier clean.
+3. **Code review** — final adversarial pass returned **clean**, with the reviewer independently
+   re-running the engine through the real `.agents/skills` symlink and confirming a full JSON report
+   at exit 1 rather than a silent exit 0. It also confirmed the four bundled copies are byte-identical
+   to the source but for their AUTO-GENERATED banner, that bug.3's `process.exitCode` chain is
+   untouched, and that `tests/test-harness-concurrency.test.js` still passes — so bug.2's shared
+   spawn-budget rule remains satisfied.
+
+The reported failure no longer reproduces: the invocation path the engine's own documentation
+prescribes now produces its report.
+
+It took three verify cycles, and the two rejections were both in the *tests*, never in the fix — the
+fix reviewed clean on the first pass and was never modified after Iteration 1. Cycle 1 caught an
+unbudgeted spawn; cycle 2 caught an unguarded dereference reintroducing the same class nine lines
+from its own remedy. Both were false-positive-under-load hazards, which is the failure mode this
+bug is itself an instance of.
+
+**Decision**: Closed (finalised in Step 7)
 
 ### Iteration 2
 
@@ -441,15 +459,57 @@ tests exercise the source, so neither a mis-wired guard nor an unbundled fix is 
 | 2026-09-01 | Ready for QA | develop-bug | Iteration 2: 5 review findings applied to the tests; 5 mutations proven |
 | 2026-09-01 | Reopened | develop-bug | Verify cycle 2: re-review confirmed all 5 fixes, found an unguarded stdout deref in the sibling test |
 | 2026-09-01 | Ready for QA | develop-bug | Iteration 3: neverRan guard on both arms; 5 mutations re-proven |
+| 2026-09-01 | Ready for QA | develop-bug | Verify cycle 3 PASS — fix verified, bug scenario gone, code review clean |
+| 2026-09-01 | Closed | develop-bug | Fix verified and accepted — DoD PASS, CI 4/4 green, PR #292 |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 3
+**Time to Resolution**: Same day (filed and closed 2026-09-01)
+**PR**: [#292](https://github.com/Gamaroff/agent-skills/pull/292) → `develop`
+**DoD**: `bug.4.dod.1.snippet-engine-symlink-noop.md` — ACCEPTED, CI 4/4 green
 
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Fix Details**: `shared/resources/qa-execute-snippets.mjs` guarded its CLI entrypoint by
+comparing `import.meta.url` — which Node realpath-resolves — against a raw `process.argv[1]`. Any
+symlink in the invocation path made the two describe the same file differently, so the guard was
+false, `main()` never ran, and the process exited 0 with no output. Replaced with the
+`isInvokedDirectly()` helper that resolves both sides through `realpathSync` (with a `resolve()`
+fallback when realpath throws), lifted from `select-next.mjs:1492` where it had carried a comment
+describing this exact defect since bug.3's neighbourhood; `npm run bundle` propagated it to the four
+generated copies that the documented invocations actually name. Three regression tests were added —
+two behavioural, one structural — and proved against five mutations.
+
+**Lessons Learned**:
+
+1. **The repo already had the fix and the explanation, and neither reached the new file.** Three of
+   four ESM CLIs used the resolved form, one of them with a comment naming this failure mode. What
+   was missing was any mechanism to *transmit* that. The structural scan added here is that
+   mechanism: it fails on the naive shape in any engine copy, so the next file cannot quietly repeat
+   it. A comment in one file does not protect another.
+
+2. **A thoroughly tested file can be completely unable to run.** The suite had 1100 lines testing the
+   engine's exported functions in-process, and not one of them reached the module-level
+   `if (…) main()`. Coverage of a module's *functions* says nothing about its *entrypoint*. Any CLI
+   worth testing is worth invoking as a subprocess at least once.
+
+3. **A structural scan is the weakest guard, and it fails silently in the direction of "pass".**
+   Mutation 3 initially passed because the anti-vacuous assertion matched the bare token
+   `realpathSync`, which the `node:fs` import list satisfies with the guard deleted; mutation 5 —
+   the commuted operand order — passed the first regex because it anchored on a full `a === b`
+   comparison. Both were caught only by *running* mutations rather than reasoning about the
+   assertions. This is the second time in this repo a scan has passed on the bug it named.
+
+4. **The two verify-loop rejections were both in the tests, never in the fix.** The six-line
+   production change reviewed clean on the first pass and was never touched again. What needed three
+   cycles was making the *evidence* trustworthy — an unbudgeted spawn, then an unguarded dereference
+   that would have reported a divergence that never happened. On a bug about a false pass, tests that
+   can produce a false failure are not a lesser problem.
+
+5. **A silent success is the most expensive failure shape.** Exit 0 with no output is
+   indistinguishable from a clean run, so every `qa-task`/`qa-story` run since task 67 that reached
+   Step 4b through the documented path recorded a pass for a check that never executed. The code
+   those runs reviewed was not wrong; the evidence for one axis simply did not exist. Prefer a guard
+   that fails loudly over one that can only report success.
