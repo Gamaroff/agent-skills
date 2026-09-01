@@ -98,9 +98,7 @@ function runScript(source) {
 }
 
 test("mechanism: process.exit() after a large write truncates on a pipe", () => {
-  const { stdout } = runScript(
-    writeThenEnd(200_000, "process.exit(0);"),
-  );
+  const { stdout } = runScript(writeThenEnd(200_000, "process.exit(0);"));
 
   assert.ok(
     stdout.length < 200_000,
@@ -129,7 +127,13 @@ test("mechanism: process.exitCode after a large write drains on a pipe", () => {
  * Layer 2 — the live case that took npm test red
  * ------------------------------------------------------------------ */
 
-const SELECT_NEXT = join(REPO, "skills", "develop-next", "scripts", "select-next.mjs");
+const SELECT_NEXT = join(
+  REPO,
+  "skills",
+  "develop-next",
+  "scripts",
+  "select-next.mjs",
+);
 const LINT_FIXTURE = join(
   REPO,
   "evals",
@@ -143,7 +147,11 @@ test("select-next --lint emits complete, parseable JSON through a pipe", () => {
   const stdout = execFileSync(
     process.execPath,
     [SELECT_NEXT, "--lint", "--roadmap", LINT_FIXTURE],
-    { encoding: "utf-8", maxBuffer: 64 * 1024 * 1024, timeout: SPAWN_TIMEOUT_MS },
+    {
+      encoding: "utf-8",
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: SPAWN_TIMEOUT_MS,
+    },
   );
 
   assert.ok(
@@ -165,7 +173,11 @@ test("select-next preserves its exit codes under the exitCode idiom", () => {
   const clean = spawnSync(
     process.execPath,
     [SELECT_NEXT, "--lint", "--roadmap", LINT_FIXTURE],
-    { encoding: "utf-8", maxBuffer: 64 * 1024 * 1024, timeout: SPAWN_TIMEOUT_MS },
+    {
+      encoding: "utf-8",
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: SPAWN_TIMEOUT_MS,
+    },
   );
   assert.equal(clean.status, 0, "clean roadmap must exit 0");
 
@@ -200,11 +212,17 @@ const EQUIVALENCE_CASES = [
   },
   {
     name: "generate-prd-epic-index --check",
-    argv: [join(REPO, "shared", "resources", "generate-prd-epic-index.mjs"), "--check"],
+    argv: [
+      join(REPO, "shared", "resources", "generate-prd-epic-index.mjs"),
+      "--check",
+    ],
   },
   {
     name: "qa-execute-snippets (usage path)",
-    argv: [join(REPO, "shared", "resources", "qa-execute-snippets.mjs"), "--help"],
+    argv: [
+      join(REPO, "shared", "resources", "qa-execute-snippets.mjs"),
+      "--help",
+    ],
   },
 ];
 
@@ -290,7 +308,10 @@ export function findExitAfterWrite(src) {
   // character offset and line break exactly where it was.
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
-    .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + " ".repeat(m.length - p.length));
+    .replace(
+      /(^|[^:])\/\/[^\n]*/g,
+      (m, p) => p + " ".repeat(m.length - p.length),
+    );
 
   const hits = [];
   const exits = /(?<![\w.])process\.exit\s*\(/g;
@@ -351,7 +372,13 @@ const KNOWN_UNMIGRATED = [
 function shippedCliSources() {
   const r = spawnSync(
     "git",
-    ["ls-files", "shared/resources/*.mjs", "shared/resources/*.js", "skills/*/scripts/*.mjs", "skills/*/scripts/*.js"],
+    [
+      "ls-files",
+      "shared/resources/*.mjs",
+      "shared/resources/*.js",
+      "skills/*/scripts/*.mjs",
+      "skills/*/scripts/*.js",
+    ],
     { cwd: REPO, encoding: "utf-8", timeout: SPAWN_TIMEOUT_MS },
   );
   assert.equal(r.status, 0, `git ls-files failed: ${r.stderr}`);
@@ -381,7 +408,8 @@ test("guard: no NEW file adopts exit-after-write", () => {
   for (const rel of shippedCliSources()) {
     if (allowed.has(rel)) continue;
     const hits = findExitAfterWrite(readFileSync(join(REPO, rel), "utf-8"));
-    if (hits.length) offenders.push(`${rel}: ${hits.map((h) => `L${h.line}`).join(", ")}`);
+    if (hits.length)
+      offenders.push(`${rel}: ${hits.map((h) => `L${h.line}`).join(", ")}`);
   }
 
   assert.deepEqual(

@@ -14,7 +14,7 @@ started: '2026-09-01T08:30:00Z'
 **Branch model:** bugfix (base: develop, PR target: develop)
 **Severity / Priority:** Major / Critical
 **Lite mode:** off
-**Fix Iterations:** 1
+**Fix Iterations:** 1 (0 QA fix cycles — PASS first pass)
 
 ## Pipeline Progress
 
@@ -23,8 +23,8 @@ started: '2026-09-01T08:30:00Z'
 | 1 | create-branch | ✅ Done | Branch `bugfix/bug.3.stdout-truncation-on-exit` created at `61197c3`, base `develop` | |
 | 2 | review-bug | ✅ Done | 10/10 READY TO FIX. 0 Critical, 1 Important (applied). No duplicate, not stale — reproduced independently. | inline |
 | 3 | investigate-fix | ✅ Done | 10 sites fixed across 3 CLIs + 7 bundled copies; new 10-test guard suite; mutation-proven 3× | inline |
-| 4 | create-pr | ⏳ Pending | | |
-| 5–6 | verify-fix loop | ⏳ Pending | | |
+| 4 | create-pr | ✅ Done | [PR #290](https://github.com/Gamaroff/agent-skills/pull/290) → develop, commit `468067a` | |
+| 5–6 | verify-fix loop | ✅ Done | PASS on cycle 1 — 0 fix cycles. All signals green; no blocking review findings. | inline |
 | 7 | finalise-close | ⏳ Pending | | |
 | 8 | commit-changes | ⏳ Pending | | |
 
@@ -51,5 +51,5 @@ started: '2026-09-01T08:30:00Z'
 ## Completion
 
 **Branch:** bugfix/bug.3.stdout-truncation-on-exit
-**PR:** —
+**PR:** https://github.com/Gamaroff/agent-skills/pull/290
 **DoD Summary:** —

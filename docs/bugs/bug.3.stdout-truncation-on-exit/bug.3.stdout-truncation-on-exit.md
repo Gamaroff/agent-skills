@@ -249,6 +249,41 @@ structural guard so a new instance cannot be introduced silently.
 3. Confirm exit codes: clean roadmap → 0, unreadable roadmap → 1 (with halt JSON), bad argument → 1.
 4. Re-mutate any one site back to `process.exit()` and confirm the guard goes red.
 
+#### QA Verification (✅ Fixed)
+
+**Date**: 2026-09-01
+**Verified by**: develop-bug Steps 5–6, verify cycle 1 (PASS on first cycle)
+
+**Bug scenario re-tested**: `select-next.mjs --lint` piped now emits **68,812 bytes** and `JSON.parse`
+succeeds; pre-fix it emitted 65,268 and threw. The reported failure no longer occurs.
+
+**Signals**:
+
+| Signal | Result |
+| ------ | ------ |
+| Regression test (`stdout-drain-on-exit.test.mjs`) | 10 / 10 pass |
+| `generate-prd-epic-index.test.mjs` | 12 / 12 pass |
+| `qa-execute-snippets.test.mjs` | 66 / 66 pass |
+| shared/resources + develop-next node suites | 998 / 998 pass |
+| skills node suites | 641 / 641 pass |
+| evals node suites | 445 pass, 1 pre-existing skip, 0 fail |
+| 9 shell suites (incl. `tracker-access` 401) | all pass |
+| `prettier --check .` | clean repo-wide |
+| Diff code review | no blocking correctness findings |
+
+**Regressions**: none. Control-flow equivalence was checked directly rather than inferred —
+`parseArgs` has exactly one caller and it handles the new `null` return;
+`generate-prd-epic-index.mjs` is never imported as a module, so wrapping its body in `main()` changes
+nothing at import time; and its three exit paths were exercised by hand and return 0, 2 and 1 as
+before. The `else if` chain in `qa-execute-snippets.mjs` writes on exactly one branch and sets
+`exitCode` on all three.
+
+**Non-blocking observation**: the drain-equivalence layer is deterministic in the green state but
+racy as a *mutation* detector — it caught mutation A on one run and not another, because how much of
+an over-buffer write survives `process.exit()` depends on scheduling. It is therefore documented in
+the suite as characterisation rather than regression; the structural guard is what actually holds the
+two CLIs whose output is too small to truncate today.
+
 ---
 
 ## Status History
