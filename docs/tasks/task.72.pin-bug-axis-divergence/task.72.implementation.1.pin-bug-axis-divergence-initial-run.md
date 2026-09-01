@@ -34,7 +34,7 @@ Replace the loose subset assertion in test `16/H1` with one that pins the bug-ax
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.72.*` exists in git                               | `feature/task.72.pin-bug-axis-divergence` created from `develop` at `76fa87f`; pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.72.review.{N}.{name}.md` exists (or skip logged)                 | `task.72.review.1.pin-bug-axis-divergence.md` — READY TO IMPLEMENT, 9/10, 0 critical / 1 important / 1 optional; both fixes applied; `planned → ready-for-development` | —                    |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 3 phases complete; 4 mutations proved red and reverted; `npm run ci:fast` exit 0 (2141 tests, 0 fail, Prettier clean); committed `49c910a` | —                    |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.72.qa.{N}.*.md`; `task.72.gate.{N}.*.yml`; PR comment posted     |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.72.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
