@@ -34,9 +34,9 @@ Give CI and the pipeline quality gate a single source: `npm run ci` (full) and `
 | 1. create-branch           | ✅ Done    | Branch `feature/task.75.*` exists in git                               | `feature/task.75.quality-gate-matches-ci` created from `develop` at `33f3baa`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.75.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10 — 0 critical, 5 important; 7 fixes applied to the task doc, 1 skipped | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4/4 phases; Phase 3 needed no edit. Full `npm run ci` gate green: **2092 pass / 0 fail**, 0 `not ok`, exit 0 | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.75.qa.{N}.*.md`; `task.75.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.75.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #291: https://github.com/Gamaroff/agent-skills/pull/291 — commit `7bd7157`, 19 files. No issue linked, so no comment posted | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.75.qa.{N}.*.md`; `task.75.gate.{N}.*.yml`; PR comment posted     | 3 cycles: CONCERNS 90 → CONCERNS 80 → **PASS 100**. 5 findings raised, 5 closed. 10 mutation proofs | —                    |
+| 7. finalise                | ✅ Done    | `task.75.dod.{N}.*.md`; task `status: accepted`                        | DoD 10/10, CI SUCCESS 4/4, `status: accepted`; sprint-review summary + canonical PR comment | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -56,6 +56,9 @@ Give CI and the pipeline quality gate a single source: `npm run ci` (full) and `
 - review-task Step 9: no-op — task was already `Ready for Development`, no promotion needed.
 - review-task tracker-sync gate auto-answered: **Skip — leave unlinked** — an unattended run must not create a remote issue unprompted.
 - Review report: `docs/tasks/task.75.quality-gate-matches-ci/task.75.review.1.quality-gate-matches-ci.md` — READY TO IMPLEMENT (8/10), 0 critical / 5 important / 3 optional.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/291 (base `develop`, commit `7bd7157`).
+- Staging scope: 12 `--scope` paths; leak check clean, pre-flight guard held 0 files (all untracked files in scope).
+- GitHub board / issue comment: skipped — `TRACKER_ISSUE` empty.
 - Task review passed. Proceeding despite 1 skipped fix (tracker linkage — needs user input).
 - Tracker: `TRACKER=github`, no `github_issue` in frontmatter → `TRACKER_ISSUE` empty; tracker signals (Step 1 "Signal Work Started", board moves) skipped this run.
 - Implementation report stashed before branch creation, restored after — clean pop, no manual recovery needed.
@@ -150,10 +153,30 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-01
+**Final Status**: Completed
 **Branch**: `feature/task.75.quality-gate-matches-ci`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: [#291](https://github.com/Gamaroff/agent-skills/pull/291)
+**QA Iterations**: 3 (2 qa-fix cycles)
+**DoD Summary**: `task.75.dod.1.quality-gate-matches-ci.md` — 10/10 PASS
+**Tracker debt**: none — no tracker issue linked, so no tracker mutation was attempted or deferred
+
+---
+
+## QA Iteration History
+
+### QA Cycle 1 — gate CONCERNS (90/100)
+- **TASK-75-001** (medium): fast-gate block numbered `0a.` but placed before step `0.` — ordering and label both wrong.
+- LOW: `workflowScripts()` dropped unknown workflow scripts instead of flagging them.
+- Fixed in `ee204be`. Mutation proof M8 added.
+
+### QA Cycle 2 — gate CONCERNS (80/100), mandated refute pass
+Run as a full refute pass over the whole branch diff rather than a narrowed re-read — which is what found both defects, each correct today and wrong on a transition:
+- **TASK-75-002** (medium): parity test documented as reading the `test` job, actually scanned the whole workflow file. Correct only while `test.yml` holds one job.
+- **TASK-75-003** (low): step 0a claimed `MAX_ITER` bounded its inner retry; `MAX_ITER` counts cycles and never governed it.
+- Fixed in `ccc62d9`. Mutation proofs M9, M10, and M9-pre (which proves the scoping fix removes a real false failure).
+
+**The fast gate went red on this cycle** (`access-config-parity`, `spawnSync ETIMEDOUT`) and **no commit was made on it** — the 2-attempt budget added in this very cycle governed the retry. Attempt 2 green: 2094 pass / 0 fail.
+
+### QA Cycle 3 — gate PASS (100/100)
+All five findings verified closed; TASK-75-001 confirmed not regressed by cycle 2's edits to the same file. Verified in context that the one remaining occurrence of the old `MAX_ITER` phrasing is the deliberate negated mention, not a leftover claim — a naive grep would have read it as an incomplete fix.

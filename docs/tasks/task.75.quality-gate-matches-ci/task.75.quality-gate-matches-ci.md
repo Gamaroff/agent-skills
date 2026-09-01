@@ -5,18 +5,20 @@ type: task
 description: "CI's test job runs format:check, npm test and eval:all. The pipeline's quality gate runs npm test alone, so two of the three never execute locally. On task 67 that shipped a red build and cost a recovery commit; eval:all was never run locally at any step. Give both a single source."
 tags: [ci, quality-gate, develop-next, pipeline, tooling]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: low
 created: 2026-09-01
 updated: 2026-09-01
+completed_date: 2026-09-01
+pr_number: 291
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Make the pipeline quality gate run what CI runs
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.75.review.1.quality-gate-matches-ci.md` implemented 2026-09-01
 
 ---
@@ -342,30 +344,72 @@ per item, or make the eval tier incremental.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-01
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 3 of 3)
 
 ### QA Report
-- **Full Report**: [task.75.qa.1.quality-gate-matches-ci.md](./task.75.qa.1.quality-gate-matches-ci.md)
-- **Gate File**: [task.75.gate.1.quality-gate-matches-ci.yml](./task.75.gate.1.quality-gate-matches-ci.yml)
+- **Full Report**: [task.75.qa.3.quality-gate-matches-ci.md](./task.75.qa.3.quality-gate-matches-ci.md) (cycles [1](./task.75.qa.1.quality-gate-matches-ci.md), [2](./task.75.qa.2.quality-gate-matches-ci.md))
+- **Gate File**: [task.75.gate.3.quality-gate-matches-ci.yml](./task.75.gate.3.quality-gate-matches-ci.yml) (cycles [1](./task.75.gate.1.quality-gate-matches-ci.yml), [2](./task.75.gate.2.quality-gate-matches-ci.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 2092 (full `npm run ci`, 0 failures)
+- **Tests Executed**: 2094 (full `npm run ci`, 0 failures)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM (TASK-75-001): the fast-gate block added to the qa-fix cycle is numbered `0a.` but sits
-before step `0.`, so it runs the gate ahead of the no-change check that would HALT the cycle anyway.
-Mechanical to fix. All success criteria verified; the parity test is mutation-proved 7×.
 
-A separate HIGH was found during review but is **out of scope** — `qa-execute-snippets.mjs` silently
-no-ops when invoked through the symlinked path its own docs prescribe. Pre-existing, untouched by this
-task, and recorded in the QA report for a follow-up bug.
+Five findings across three cycles, **all closed and verified**:
+
+| ID | Cycle | Severity | Finding |
+| --- | --- | --- | --- |
+| TASK-75-001 | 1 | medium | Fast-gate block ordered before the no-change check it should follow |
+| — | 1 | low | Parity test dropped unknown workflow scripts instead of flagging them |
+| TASK-75-002 | 2 | medium | Parity scan read the whole workflow file, not the `test` job it documented |
+| TASK-75-003 | 2 | low | Step 0a claimed a bound (`MAX_ITER`) that never governed its inner retry |
+
+Contract test mutation-proved **10×**, including a proof that the cycle-2 scoping fix removes a real
+false failure rather than restating existing behaviour.
+
+**Three findings are carried forward as out of scope** — none gate this task, all recorded in
+`gate.3` under `recommendations.future`: the `qa-execute-snippets.mjs` symlink no-op (HIGH, fix
+already exists in `select-next.mjs`); the `access-config-parity` `spawnSync` flake, which this task
+promotes onto the mandatory merge path; and `develop-bug`'s per-cycle fix loop having no fast gate.
+
+---
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: [`task.75.gate.3.quality-gate-matches-ci.yml`](./task.75.gate.3.quality-gate-matches-ci.yml) — ✅ **PASS**, 100/100
+**QA Cycles**: 3 · **Findings**: 5 raised, 5 closed · **Mutation proofs**: 10
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria** — 10/10 (5 functional, 3 regression, 2 safety), each verified mechanically
+✅ **Tests** — `ci-gate-parity.test.mjs` 10/10; full `npm run ci` 2094 pass / 0 fail
+✅ **CI** — ✅ SUCCESS on all 4 jobs; PR head `ccc62d9` == gated commit
+✅ **Documentation** — CHANGELOG (Changed), config reference, 5 skill docs, 2 shared step docs, bundle in sync
+✅ **Security** — no secrets, no new dependencies, no network calls; the change makes the gate stricter
+⚠️ **Compliance** — N/A: internal build tooling, no regulated surface
+✅ **NFRs** — Security / Performance / Reliability / Maintainability all PASS
+
+**Three findings are carried forward as out of scope**, recorded in `gate.3` under
+`recommendations.future`: the `qa-execute-snippets.mjs` symlink no-op (HIGH — fix already exists in
+`select-next.mjs`), the `access-config-parity` flake that this task promotes onto the merge path, and
+`develop-bug`'s per-cycle fix loop lacking a fast gate.
+
+**Detailed Verification Log:** see [`task.75.dod.1.quality-gate-matches-ci.md`](./task.75.dod.1.quality-gate-matches-ci.md).
+
+**Task marked as ACCEPTED on:** 2026-09-01
 
 ---
 
@@ -383,6 +427,7 @@ task, and recorded in the QA report for a follow-up bug.
 | 2026-09-01 |         | QA gate CONCERNS (90/100) — 1 medium, 1 low; 4/4 phases verified, full `ci` green 2092/0 | qa-task |
 | 2026-09-01 |         | QA findings fixed — TASK-75-001 (fast-gate block reordered after the no-change check) + 1 low (parity test now flags unknown workflow scripts); 1 iteration | qa-fix |
 | 2026-09-01 |         | QA cycle 2 (refute pass) CONCERNS (80/100) — TASK-75-002 (parity test scanned whole workflow, not the `test` job) + TASK-75-003 (step 0a claimed a bound MAX_ITER does not give it); both fixed, 10 mutation proofs | qa-fix |
+| 2026-09-01 | 1.2     | DoD verified 10/10 — accepted (PR #291), final gate PASS 100/100 after 3 QA cycles | finalise |
 
 ---
 
