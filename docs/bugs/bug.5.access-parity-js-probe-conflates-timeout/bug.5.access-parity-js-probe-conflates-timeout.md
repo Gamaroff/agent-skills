@@ -273,10 +273,85 @@ Suite: **37 pass / 0 fail** (was 32 before this change).
 
 **Verification Steps for QA**:
 
-1. `node --test shared/resources/tests/access-config-parity.test.mjs` → 37/37, no timeouts.
-2. Force the failure: `AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS=1 node --test --test-name-pattern "JS probe that never completes" …` → the test passes *because* the probe is killed and the suite throws an infrastructure error, not a divergence.
-3. Confirm the diagnostic names contention: the thrown message must contain `never ran` and `NOT a refusal`, and must not report a reader disagreement.
-4. Confirm production semantics are untouched: `resolveAccessTracker` with no `onDiagnostic` still returns `manual` on a refusal and `full` on a repo declaring nothing.
+1. `node --test shared/resources/tests/access-config-parity.test.mjs` → 38/38, no timeouts.
+2. Force the failure: `jsAnswer(dir, tier, { timeoutMs: 1, retries: 0 })` → the suite throws an infrastructure error naming contention, not a divergence.
+3. Confirm production semantics are untouched: `resolveAccessTracker` with no `onDiagnostic` still returns `manual` on a refusal and `full` on a repo declaring nothing.
+4. Confirm the knob is not ambient: `AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS=1` in the real environment must have **no** effect on the reader.
+
+### Iteration 1 — Fix Cycle 2 (from the Step 5 diff review)
+
+**Date**: 2026-09-01
+
+The Step 5 adversarial diff review returned nine findings, three of them high. Two were genuine
+defects introduced by the Iteration 1 fix itself; the verdict was FAIL and the fixes below were
+applied before finalise.
+
+**F1 (high) — the new knob re-opened the `.env` door the design closes.** `accessProbeTimeoutMs()`
+was called with no argument, so it read `process.env` at probe time — *after* `loadDotEnv()` copies
+a repo-local `.env` into it. Every gate snapshots the access env *before* that call precisely so a
+committed `.env` cannot reach the reader. The original reasoning for allowing this ("no timeout
+value can loosen the answer") was wrong: the invariant is not only "nothing may escalate". As
+`gh-stage.js:726-731` states, the dot-env file must not be able to **restrict**, or via a typo
+hard-fail, every pipeline step behind the resolver's back — and `AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS=1`
+in a committed `.env` would do exactly that to every repo declaring `access`. The `env` parameter
+existed but was dead, which made it read as if it were already honoured.
+**Fixed**: threaded the caller's env through `readConfiguredAccessTracker → probeResolver →
+accessProbeTimeoutMs`, with no `process.env` default — the same treatment `AGENT_SKILLS_CONFIG_TIER`
+gets under T61-M4.
+
+**F2 (high) — an out-of-range budget threw, breaking the NEVER-THROWS contract.** `/^\d+$/` accepts
+a 400-digit string; `Number()` makes it `Infinity`; `spawnSync({timeout: Infinity})` throws
+`ERR_OUT_OF_RANGE`. Nothing catches it, so `readConfiguredAccessTracker` — documented "NEVER
+THROWS", carrying the cycle-4 incident in its own docstring — would have thrown for a config-tier
+reason. A merely huge finite value was quieter and no better: it does not lengthen the budget, it
+removes it. **Fixed**: `Number.isSafeInteger` plus a 300000 ms cap; anything else falls back to the
+default.
+
+**F3 (medium) — a return path omitted `kind`.** `probeResolver`'s missing-resolver arm returned no
+`kind`, and the `kind || null` coercion at the sink laundered that `undefined` into `null`, which
+the contract defines as "there is no reason". **Fixed**: explicit `kind: "refused"` on that arm
+(permanent condition — retrying it would waste the budget and answer with a "raise the timeout"
+message pointing at the wrong thing), and dropped the `|| null` so a future omission surfaces.
+
+**F4 (medium) — intra-process non-determinism.** Not memoising a never-ran probe means one process
+can answer `manual` at T1 and `read-only` at T2. Not exploitable — every caller resolves once —
+**accepted and documented at the call site** rather than left to be rediscovered.
+
+**F5 (medium) — the retry was on the shared budget but the thing retried was not.** `jsAnswer` took
+`SPAWN_RETRIES` from the shared budget while the reader's own probe stayed on its hardcoded 10s
+default, leaving the JS side ~6x tighter than `shellAnswer`'s 60s under exactly the load this bug is
+about — so it would have gone on being the side that failed. Its error message also named
+`PARITY_SPAWN_TIMEOUT_MS`, which had no effect on that path. **Fixed**: `jsAnswer` passes
+`SPAWN_TIMEOUT_MS` into the reader through the env snapshot, and the message names only the knob
+that applies.
+
+**F6 (medium) — the "genuine refusal" test was itself flaky under load.** It called the reader
+directly with no retry, so a killed probe would have made a test about *not* misreporting contention
+misreport contention. **Fixed**: routed through the shared budget with a retry and a message that
+names contention.
+
+**F7 (low)** bare `assert.throws` in the memo test now matches `/never ran/`.
+**F8 (low)** `warnOnce` now runs *before* `onDiagnostic`, so a caller's throwing sink cannot swallow
+the one operator-visible line explaining the fallback.
+**F9 (low)** the knob is documented in `platform-detection.md` under a "Not ambient" heading
+alongside `AGENT_SKILLS_CONFIG_TIER`.
+
+**Added test**: `an out-of-range probe budget falls back rather than throwing`, covering
+`Infinity`, a huge finite value, and `0`.
+
+**Mutation proof (cycle 2)**:
+
+| Reverted | Result |
+| --- | --- |
+| range check → bare `n >= 1` | red — `ERR_OUT_OF_RANGE` reaches `spawnSync` |
+| knob back to ambient `process.env` | 2 tests red |
+
+> A first attempt at the second mutation reported green. Prettier had reflowed the call site, so the
+> mutation string never matched and nothing was actually reverted. Re-run with an assertion that both
+> halves of the edit applied, it goes red as expected. A mutation test that cannot prove it mutated
+> is not evidence.
+
+Suite: **38 pass / 0 fail**. `npm run ci:fast`: 2104 tests, 0 fail.
 
 ---
 
@@ -287,6 +362,7 @@ Suite: **37 pass / 0 fail** (was 32 before this change).
 | 2026-09-01 | New | QA Engineer | Filed from task.75 — failed 2 of 3 full runs; root cause traced to the JS probe |
 | 2026-09-01 | In Progress | develop-bug | Reproduced deterministically by forcing the probe budget; root cause localised to `probeResolver` flattening never-ran into refused |
 | 2026-09-01 | Ready for QA | develop-bug | Fix implemented + 5 regression tests; 3 independent mutations confirmed red |
+| 2026-09-01 | Ready for QA | develop-bug | Verify cycle 1 FAIL — diff review found 9 issues (3 high, 2 self-inflicted); all fixed, 6th regression test added, re-proved |
 
 ---
 

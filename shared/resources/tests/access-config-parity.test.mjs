@@ -207,7 +207,21 @@ function shellAnswer(dir, tier, opts = {}) {
  */
 function jsAnswer(dir, tier, opts = {}) {
   const retries = opts.retries ?? SPAWN_RETRIES;
-  const env = {};
+  const timeout = opts.timeoutMs ?? SPAWN_TIMEOUT_MS;
+  // THE BUDGET IS PASSED IN, and both halves of that matter.
+  //
+  // It is passed at all because jsAnswer previously retried on SPAWN_RETRIES
+  // while the reader's own probe stayed on its hardcoded 10s default — so the JS
+  // side ran ~6x tighter than shellAnswer's 60s under exactly the load bug.2 and
+  // bug.5 measured, and would have gone on being the side that failed. The retry
+  // was on the shared budget; the thing being retried was not.
+  //
+  // It is passed through `env` rather than the ambient environment because the
+  // reader honours this knob only from a caller's snapshot — see
+  // accessProbeTimeoutMs. That is what keeps a repo-local .env from reaching the
+  // access reader, and it means a test cannot set the budget by poking
+  // process.env either.
+  const env = { AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS: String(timeout) };
   if (tier) env.AGENT_SKILLS_CONFIG_TIER = tier;
 
   let neverRanReason = "";
@@ -237,9 +251,10 @@ function jsAnswer(dir, tier, opts = {}) {
     `the JS reader never ran (${neverRanReason}) after ${retries + 1} ` +
       `attempt(s) at tier "${tier}" — this is an infrastructure failure, NOT a ` +
       `refusal. The reader fail-closed to "manual", which is correct of it and ` +
-      `is NOT a reading of the config. Raise PARITY_SPAWN_TIMEOUT_MS or ` +
-      `AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS if this box is slower than the ` +
-      `probe budget.`,
+      `is NOT a reading of the config. Raise PARITY_SPAWN_TIMEOUT_MS ` +
+      `(currently ${timeout}ms) if this box is slower than the probe budget. ` +
+      `Naming any other knob here would send you somewhere that has no effect ` +
+      `on this path.`,
   );
 }
 
@@ -1047,18 +1062,26 @@ describe("the probe cannot fabricate an answer", () => {
   // reader SUCCEEDS — it fail-closes to `manual`, warns, and returns normally.
   // So there was no error for the caller to notice, only a plausible value.
 
-  /** Run `fn` with the reader's internal probe budget forced to `ms`. */
-  function withProbeBudget(ms, fn) {
-    const KEY = "AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS";
-    const had = Object.prototype.hasOwnProperty.call(process.env, KEY);
-    const prev = process.env[KEY];
-    process.env[KEY] = String(ms);
-    try {
-      return fn();
-    } finally {
-      if (had) process.env[KEY] = prev;
-      else delete process.env[KEY];
-    }
+  /**
+   * Read the config tier directly, with an explicit probe budget.
+   *
+   * The budget travels in the env snapshot, not process.env — the reader
+   * honours this knob only from a caller (see accessProbeTimeoutMs), which is
+   * what keeps a repo-local .env out of the access reader. An earlier version of
+   * these tests set process.env and would have silently stopped forcing anything
+   * the moment that rule was enforced.
+   */
+  function readTier(dir, { timeoutMs, tier } = {}) {
+    const env = {};
+    if (timeoutMs !== undefined)
+      env.AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS = String(timeoutMs);
+    if (tier) env.AGENT_SKILLS_CONFIG_TIER = tier;
+    const seen = [];
+    const answer = dm.resolveAccessTracker(env, {
+      cwd: dir,
+      onDiagnostic: (d) => seen.push(d),
+    });
+    return { answer, seen };
   }
 
   test("a JS probe that never completes throws instead of reading as `manual`", () => {
@@ -1071,7 +1094,7 @@ describe("the probe cannot fabricate an answer", () => {
     // test goes red with `manual` instead of throwing.
     withRepo("access:\n  tracker: read-only\n", (dir) => {
       assert.throws(
-        () => withProbeBudget(1, () => jsAnswer(dir, "awk", { retries: 0 })),
+        () => jsAnswer(dir, "awk", { timeoutMs: 1, retries: 0 }),
         (err) => {
           assert.match(err.message, /never ran/);
           assert.match(err.message, /NOT a refusal/);
@@ -1097,8 +1120,12 @@ describe("the probe cannot fabricate an answer", () => {
     // retry would have been served from the cache without re-spawning. The same
     // directory must still answer correctly once there is time to read it.
     withRepo("access:\n  tracker: read-only\n", (dir) => {
-      assert.throws(() =>
-        withProbeBudget(1, () => jsAnswer(dir, "awk", { retries: 0 })),
+      // Matched, not bare: an unmatched assert.throws here would be satisfied by
+      // ANY exception, so a future refactor that threw a TypeError on the way in
+      // would leave the real assertion below testing nothing.
+      assert.throws(
+        () => jsAnswer(dir, "awk", { timeoutMs: 1, retries: 0 }),
+        /never ran/,
       );
       assert.equal(
         jsAnswer(dir, "awk"),
@@ -1115,14 +1142,9 @@ describe("the probe cannot fabricate an answer", () => {
     // deliberately sits outside that cache.
     withRepo("access:\n  tracker: read-only\n", (dir) => {
       const seen = [];
-      withProbeBudget(1, () => {
-        for (let i = 0; i < 2; i++) {
-          dm.resolveAccessTracker(
-            {},
-            { cwd: dir, onDiagnostic: (d) => seen.push(d) },
-          );
-        }
-      });
+      for (let i = 0; i < 2; i++) {
+        seen.push(...readTier(dir, { timeoutMs: 1, tier: "awk" }).seen);
+      }
       assert.equal(seen.length, 2, "the second failure was swallowed");
       for (const d of seen) assert.equal(d.kind, "never-ran");
     });
@@ -1133,19 +1155,49 @@ describe("the probe cannot fabricate an answer", () => {
     // resolver that ran and refused must stay `manual`, must not throw, and must
     // not be retried. Classifying everything as "never-ran" would pass the test
     // above while making the suite unable to see a real refusal.
+    //
+    // Runs on the SHARED budget and retries a probe that never ran. Without that
+    // this test was itself flaky under the very load it is about: a killed probe
+    // yields kind "never-ran", and a test whose subject is "do not report
+    // contention as data" would have reported contention as a broken classifier.
     withRepo("access:\n  tracker: not-a-mode\n", (dir) => {
-      const seen = [];
-      const answer = dm.resolveAccessTracker(
-        {},
-        { cwd: dir, onDiagnostic: (d) => seen.push(d) },
+      let result;
+      for (let attempt = 0; attempt <= SPAWN_RETRIES; attempt++) {
+        result = readTier(dir, { timeoutMs: SPAWN_TIMEOUT_MS });
+        if (!result.seen.some((d) => d.kind === "never-ran")) break;
+      }
+      assert.ok(
+        !result.seen.some((d) => d.kind === "never-ran"),
+        `the probe never ran in ${SPAWN_RETRIES + 1} attempt(s) — contention, ` +
+          `not a classifier failure; raise PARITY_SPAWN_TIMEOUT_MS`,
       );
-      assert.equal(answer, REFUSAL_AS, "a refusal still fails closed");
-      assert.equal(seen.length, 1);
+      assert.equal(result.answer, REFUSAL_AS, "a refusal still fails closed");
+      assert.equal(result.seen.length, 1);
       assert.equal(
-        seen[0].kind,
+        result.seen[0].kind,
         "refused",
         "a resolver that ran and refused is data, not contention",
       );
+    });
+  });
+
+  test("an out-of-range probe budget falls back rather than throwing", () => {
+    // `/^\d+$/` alone accepts a 400-digit string, Number() makes it Infinity,
+    // and spawnSync({timeout: Infinity}) THROWS ERR_OUT_OF_RANGE — which would
+    // break readConfiguredAccessTracker's NEVER-THROWS contract from a config
+    // tier that is only supposed to return values. A merely huge finite value is
+    // just as wrong in a quieter way: it does not lengthen the budget, it
+    // removes it, so a hung resolver hangs the pipeline with nothing to stop it.
+    withRepo("access:\n  tracker: read-only\n", (dir) => {
+      for (const bad of ["9".repeat(400), "99999999999999", "0"]) {
+        const { answer, seen } = readTier(dir, { timeoutMs: bad });
+        assert.equal(
+          answer,
+          "read-only",
+          `budget "${bad.slice(0, 12)}…" should fall back to the default`,
+        );
+        assert.equal(seen.length, 0, "the default budget read the file fine");
+      }
     });
   });
 

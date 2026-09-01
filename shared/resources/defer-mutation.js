@@ -653,13 +653,23 @@ function readConfiguredAccessTracker(env = process.env, cwd = process.cwd()) {
   const memoKey = JSON.stringify([cwd, file, tier]);
   if (_configAccessMemo.has(memoKey)) return _configAccessMemo.get(memoKey);
 
-  const answer = probeResolver(file, cwd, tier);
+  const answer = probeResolver(file, cwd, tier, env);
   // A PROBE THAT NEVER RAN IS NOT A PROPERTY OF THE FILE. Memoising it caches
   // "the box was busy for ten seconds" under a key made of the path, so the
   // fail-closed `manual` becomes sticky for the rest of the process even after
   // load subsides — and it makes retrying pointless, because the retry is served
   // from the cache without re-spawning. Re-reading costs one subprocess and can
   // only ever return what the file actually says, so it cannot escalate.
+  //
+  // ACCEPTED CONSEQUENCE, stated rather than discovered later: the config tier is
+  // no longer guaranteed to answer identically twice in one process. A run may
+  // read `manual` at T1 because a probe was killed and `read-only` at T2 because
+  // the next one was not — so a LATER read can be less restrictive than an
+  // earlier one. That is safe here because every caller resolves once
+  // (gh-stage.js, tracker-issue.js, tracker-comment.js resolve at a single point;
+  // jira-sync.js caches its own `resolved`), so no caller can hold both answers
+  // at once. A caller that needs one stable answer across a long-lived process
+  // must resolve once and pass it down, not call this repeatedly.
   if (answer.kind !== "never-ran") _configAccessMemo.set(memoKey, answer);
   return answer;
 }
@@ -720,6 +730,15 @@ function mayDeclareAccess(text) {
 const ACCESS_PROBE_TIMEOUT_MS = 10000;
 
 /**
+ * Upper bound on the probe budget. A budget is a budget: "five minutes" is
+ * already far past any plausible resolver, and anything above it is independent
+ * of intent — a typo, or a value large enough that the probe effectively has NO
+ * timeout, which is not a longer wait but an unbounded one. A hung mount or a
+ * blocked `python3` would then hang the pipeline with nothing to stop it.
+ */
+const ACCESS_PROBE_TIMEOUT_MAX_MS = 300000;
+
+/**
  * How long one resolver probe may take.
  *
  * This was a bare `timeout: 10000`. bug.2 established for the TEST tier that a
@@ -729,26 +748,35 @@ const ACCESS_PROBE_TIMEOUT_MS = 10000;
  * here, and this is the one spawn site bug.2's remedy could not reach because it
  * is production rather than test code.
  *
- * READ FROM THE AMBIENT ENVIRONMENT, unlike AGENT_SKILLS_CONFIG_TIER two
- * functions down, and the asymmetry is deliberate. The tier hook materially
- * LOOSENS the answer (forcing a tier the host cannot honour makes the reader
- * answer nothing and the resolver exit 0 with `full`), so it is honoured only
- * when a caller passes it explicitly (T61-M4). This knob cannot loosen anything
- * in either direction: a shorter budget can only make the probe fail, and a
- * failed probe fails CLOSED to `manual`; a longer one only waits. There is no
- * setting of it that turns a declared restriction into a tracker write.
+ * `env` IS REQUIRED AND IS NOT `process.env`. This knob is honoured only when a
+ * CALLER passes it in the env snapshot — the same rule as AGENT_SKILLS_CONFIG_TIER
+ * (T61-M4), and for a reason that is easy to get backwards. The gates snapshot
+ * the access env BEFORE `loadDotEnv()` precisely so a repo-local `.env` cannot
+ * reach the reader; reading `process.env` here would be a second resolution path
+ * `resolve-platform.sh` never sees, opening exactly the door that snapshot
+ * exists to shut. It is tempting to argue this key is exempt because it cannot
+ * ESCALATE — a short budget only kills the probe, and a killed probe fails
+ * closed. That argument is wrong, and gh-stage.js:726-731 says why: the
+ * invariant is not "nothing may loosen", it is that the dot-env file must not be
+ * able to restrict, or via a typo hard-fail, every pipeline step behind the
+ * resolver's back. `AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS=1` in a committed .env
+ * would do exactly that, silently, to every repo that declares access.
  *
- * Anything that is not a plain positive decimal integer is ignored in favour of
- * the default — `Number()` reads "0x10" as a 16ms budget that would kill every
- * probe, which is the shape of an operator typo, not an instruction.
+ * Range-checked, not merely digit-checked. `/^\d+$/` alone accepts a 400-digit
+ * string, `Number()` makes it `Infinity`, and `spawnSync({timeout: Infinity})`
+ * THROWS `ERR_OUT_OF_RANGE` — which would break the NEVER-THROWS contract two
+ * functions down, the one whose docstring still carries the cycle-4 incident
+ * that made an unreadable config take down the read-only CLI modes.
  */
-function accessProbeTimeoutMs(env = process.env) {
+function accessProbeTimeoutMs(env) {
   const raw = String(
     (env && env.AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS) || "",
   ).trim();
   if (!/^\d+$/.test(raw)) return ACCESS_PROBE_TIMEOUT_MS;
   const n = Number(raw);
-  return n >= 1 ? n : ACCESS_PROBE_TIMEOUT_MS;
+  if (!Number.isSafeInteger(n)) return ACCESS_PROBE_TIMEOUT_MS;
+  if (n < 1 || n > ACCESS_PROBE_TIMEOUT_MAX_MS) return ACCESS_PROBE_TIMEOUT_MS;
+  return n;
 }
 
 /**
@@ -760,11 +788,18 @@ function accessProbeTimeoutMs(env = process.env) {
  * answer here, and conflating them is safe precisely because `full` is the
  * identity element of that reduction.
  */
-function probeResolver(file, cwd, tier) {
+function probeResolver(file, cwd, tier, env) {
   const script = path.join(__dirname, RESOLVER_SH);
   if (!fs.existsSync(script)) {
+    // "refused", not "never-ran", even though no child ran. `kind` splits
+    // TRANSIENT from SETTLED, not process-started from not-started: a caller
+    // reacts to "never-ran" by retrying on a spawn budget and then reporting
+    // contention. A resolver that is not on disk is a permanent condition, so
+    // retrying it wastes the budget and answers with a "raise the timeout"
+    // message pointing at the wrong thing entirely.
     return {
       mode: null,
+      kind: "refused",
       reason: `${RESOLVER_SH} not found beside defer-mutation.js — cannot read ${file}`,
     };
   }
@@ -808,7 +843,12 @@ function probeResolver(file, cwd, tier) {
       "_",
       script,
     ],
-    { cwd, env: childEnv, encoding: "utf8", timeout: accessProbeTimeoutMs() },
+    {
+      cwd,
+      env: childEnv,
+      encoding: "utf8",
+      timeout: accessProbeTimeoutMs(env),
+    },
   );
 
   // No bash, a timeout, or a resolver that could not run at all. Reachable only
@@ -955,8 +995,17 @@ function resolveAccessTracker(env = process.env, opts = {}) {
       opts.cwd || process.cwd(),
     );
     if (reason) {
-      if (opts.onDiagnostic) opts.onDiagnostic({ kind: kind || null, reason });
+      // warnOnce FIRST. The operator-visible line is the one artifact explaining
+      // why the run fell back to `manual`; a caller's buggy sink must not be able
+      // to swallow it by throwing on the way past. The sink is strictly
+      // downstream of the behaviour it observes.
       warnOnce(reason);
+      // `kind` is passed through as it is. It used to be `kind || null`, which
+      // laundered a return path that forgot to set one into a value the contract
+      // defines as "there is no reason" — a reason with kind null. Every return
+      // now sets it explicitly, so an undefined here is a bug and should look
+      // like one.
+      if (opts.onDiagnostic) opts.onDiagnostic({ kind, reason });
       seen.push("manual");
     } else if (mode) {
       seen.push(mode);
