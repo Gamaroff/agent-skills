@@ -1936,30 +1936,70 @@ test("16/H1: the task eligibility floor EQUALS what develop-task proceeds on", (
   );
 });
 
-// The bug axis stays `⊆` — a deliberate, MEASURED divergence, not an oversight.
+// The bug axis keeps a divergence the task axis was made to close, and the
+// reason is SEMANTIC before it is about risk.
+//
+// `develop-task` says of its pre-work statuses:
+//   Draft → "Proceed — Step 2 (/review-task) will validate and update the
+//            status autonomously."
+// That is a claim that unstarted work is waiting. Nominating it is right, which
+// is why task.71 made the task floor EQUAL that set.
+//
+// `develop-bug` says of the two statuses in this gap:
+//   in-progress  → "Proceed — a prior run may have started; resume-aware."
+//   ready-for-qa → "Proceed directly toward verification IF A FIX ALREADY
+//                   EXISTS; else re-verify the fix record."
+// Those are resume affordances — written so a re-invoked pipeline does not HALT
+// on its own half-finished work. They are not a claim that work is available to
+// pick up. Selecting on them would hand an unattended loop a bug a human may be
+// actively holding, or one whose fix is written and only awaiting verification.
+//
+// So the equality rule is not a universal law the bug axis has failed to obey.
+// It is the right rule for a dispatcher whose pre-work statuses mean "not
+// started", and the wrong one for a dispatcher whose extra statuses mean
+// "already in flight".
 //
 //   develop-bug proceeds on : new, reopened, in-progress, ready-for-qa
 //   BUG_ELIGIBLE_STATUSES   : new, reopened
-//   gap                     : in-progress, ready-for-qa
+//   gap                     : in-progress, ready-for-qa   ← asserted exactly
 //
-// Task.71 tightened the TASK axis to `===` and deliberately declined to do the
-// same here. Closing this gap would hand an unattended loop a `ready-for-qa` bug
-// — one whose fix is already written and is only awaiting verification — and an
-// `in-progress` bug someone may be actively holding. That is a change with its
-// own Breaking Changes and Risk sections, not a corollary of this one. Recorded
-// so the next reader starts from a fact rather than an open question.
-test("16/H1: every bug eligibility status is one develop-bug proceeds on", () => {
+// The gap may still be closed deliberately. This assertion failing is how that
+// decision gets recorded, not a reason to avoid making it.
+test("16/H1: the bug-axis gap is exactly {in-progress, ready-for-qa}", () => {
   const proceed = proceedStatuses(readFileSync(STEP0_BUG, "utf-8"), null);
+
+  // Anti-vacuity guard — PREDATES the exact assertion below and is not made
+  // redundant by it. The discriminating case is a parse that DROPS `new` or
+  // `reopened`: `proceed` becomes {reopened, in-progress, ready-for-qa}, so the
+  // gap is still exactly {in-progress, ready-for-qa} and `deepStrictEqual`
+  // PASSES — the dispatcher has silently lost a status and only this guard
+  // notices. (Verified: delete the `new` row from develop-bug's table and
+  // remove these four lines, and this test goes green.) A parse that RENAMES a
+  // row instead is caught by both, so it does not prove the guard is needed.
   assert.ok(
     proceed.has("new") && proceed.has("reopened"),
     `parsed proceed-set looks wrong: ${[...proceed].join(", ")}`,
   );
-  for (const status of BUG_ELIGIBLE_STATUSES) {
-    assert.ok(
-      proceed.has(status),
-      `BUG_ELIGIBLE_STATUSES contains "${status}", which develop-bug does not proceed on`,
-    );
-  }
+
+  // The gap is asserted EXACTLY, not as a subset. `⊆` held for every possible
+  // widening of the dispatcher, so it was silent about the one change it existed
+  // to notice. Both directions now fail:
+  //   gap grew   → develop-bug gained a status the floor ignores
+  //   gap shrank → someone changed the floor; that is a policy decision, not a
+  //                passing side effect
+  const gap = [...proceed].filter((v) => !BUG_ELIGIBLE_STATUSES.has(v)).sort();
+
+  assert.deepStrictEqual(
+    gap,
+    ["in-progress", "ready-for-qa"],
+    `the bug-axis gap is no longer exactly {in-progress, ready-for-qa}.\n` +
+      `  parsed dispatcher set: ${[...proceed].sort().join(", ")}\n` +
+      `  eligibility floor:     ${[...BUG_ELIGIBLE_STATUSES].sort().join(", ")}\n` +
+      `  gap now:               ${gap.join(", ") || "(empty)"}\n` +
+      `  If develop-bug gained a status, decide whether the floor should follow —\n` +
+      `  and read the comment above before assuming it should.\n` +
+      `  If the floor changed, say why here; closing this gap is deliberate work.`,
+  );
 });
 
 test("16/H1: a ready-for-review task is not selected", () => {
