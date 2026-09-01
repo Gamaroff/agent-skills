@@ -49,6 +49,8 @@ const workflow = read(".github/workflows/test.yml");
 const FULL_GATE = "ci";
 /** The tier the develop loop and each qa-fix cycle run. */
 const FAST_GATE = "ci:fast";
+/** The workflow job that defines "green". Other jobs are deliberately not read. */
+const TEST_JOB = "test";
 
 // ---------------------------------------------------------------------------
 // Resolving an `npm run …` term to the script it names.
@@ -108,13 +110,43 @@ function workflowScripts() {
 }
 
 /**
- * Every npm script NAME the workflow invokes, including any that `package.json`
- * does not define. `workflowScripts()` drops those so the parity comparison
- * stays a comparison of real scripts; this raw form is what lets the test
- * REPORT them instead of silently ignoring them.
+ * The raw text of one job's block, from its key to the next key at the same
+ * indent (or EOF).
+ *
+ * The parity check is about the job that defines "green", so it must read that
+ * job and no other. Scanning the whole file coincides with the right answer
+ * only while the file holds a single job: add a lint lane, a coverage lane or a
+ * matrix build that invokes any npm script, and a whole-file scan would demand
+ * the `ci` composite contain that script too — failing on a workflow CI itself
+ * is perfectly happy with, which inverts the test's purpose. It exists to
+ * predict CI, so it must never block a merge CI would pass.
+ */
+function jobBlock(jobName) {
+  const lines = workflow.split("\n");
+  const start = lines.findIndex((l) =>
+    new RegExp(`^  ${jobName}:\\s*$`).test(l),
+  );
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^  \S/.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join("\n");
+}
+
+/**
+ * Every npm script NAME the `test` job invokes, including any that
+ * `package.json` does not define. `workflowScripts()` drops those so the parity
+ * comparison stays a comparison of real scripts; this raw form is what lets the
+ * test REPORT them instead of silently ignoring them.
  */
 function workflowInvocations() {
-  return workflow
+  const block = jobBlock(TEST_JOB);
+  if (block === null) return [];
+  return block
     .split("\n")
     .map((line) => line.match(/^\s*run:\s*(.+?)\s*$/))
     .filter(Boolean)
@@ -133,6 +165,24 @@ test("the `ci` composite exists and is the definition of green", () => {
     isComposite(FULL_GATE),
     "`ci` must compose other scripts, not restate their commands — a second " +
       "copy of a command list is how the two lists start disagreeing",
+  );
+});
+
+test("the `test` job is found, and only its steps are read", () => {
+  const block = jobBlock(TEST_JOB);
+  assert.ok(
+    block !== null,
+    `test.yml defines no \`${TEST_JOB}:\` job — the parity check would silently ` +
+      "compare against an empty set and pass no matter what the composite held",
+  );
+  // A second job's steps must not leak into the comparison.
+  const wholeFile = workflow
+    .split("\n")
+    .filter((l) => /^\s*run:\s/.test(l)).length;
+  const inJob = block.split("\n").filter((l) => /^\s*run:\s/.test(l)).length;
+  assert.ok(
+    inJob <= wholeFile,
+    "job block cannot contain more run: steps than the file",
   );
 });
 

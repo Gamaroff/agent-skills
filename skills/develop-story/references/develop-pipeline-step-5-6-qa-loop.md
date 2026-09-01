@@ -525,11 +525,16 @@ After fixes are applied:
    loop runs"). The slow tier stays out of this cycle by design; it runs once at `develop-next`'s
    merge gate.
 
-   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit and do
-   **not** HALT — a qa-fix cycle that leaves the tree red is exactly what the existing cycle
-   machinery is for. Triage per the step-3 pattern, feed the finding back into this cycle's fixes,
-   and re-run. The MAX_ITER cap still bounds the loop, so a gate that never goes green escalates
-   through the convergence-stall path rather than a bespoke one.
+   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit — a
+   red tree is exactly what the cycle machinery is for. Triage per the step-3 pattern, feed the
+   finding back into this cycle's fixes, and re-run the gate.
+
+   **Bound this retry at 2 attempts.** After a second red gate in the same cycle, stop retrying:
+   commit nothing, record the failing output in the QA Iteration History, and let the cycle end so
+   the next QA review writes a gate. That is what actually reaches the convergence check and
+   MAX_ITER — both of which count *cycles*, so an unbounded inner re-run would never reach either.
+   An earlier revision of this block claimed "the MAX_ITER cap still bounds the loop"; it does not
+   bound this retry, and a stated guarantee that is not real is worse than an unstated one.
 
    Cleanup mirrors step 3: `GATE_EXIT == 0` → `rm -f "$FIX_LOG"`; non-zero → retain for post-mortem.
 

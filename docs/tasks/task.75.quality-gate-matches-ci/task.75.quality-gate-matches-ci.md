@@ -382,6 +382,7 @@ task, and recorded in the QA report for a follow-up bug.
 | 2026-09-01 |         | Implemented — 11 files changed, 1 new contract suite (8 tests), 7 mutation proofs. Phase 3 required no edit, as the review predicted | develop |
 | 2026-09-01 |         | QA gate CONCERNS (90/100) — 1 medium, 1 low; 4/4 phases verified, full `ci` green 2092/0 | qa-task |
 | 2026-09-01 |         | QA findings fixed — TASK-75-001 (fast-gate block reordered after the no-change check) + 1 low (parity test now flags unknown workflow scripts); 1 iteration | qa-fix |
+| 2026-09-01 |         | QA cycle 2 (refute pass) CONCERNS (80/100) — TASK-75-002 (parity test scanned whole workflow, not the `test` job) + TASK-75-003 (step 0a claimed a bound MAX_ITER does not give it); both fixed, 10 mutation proofs | qa-fix |
 
 ---
 
