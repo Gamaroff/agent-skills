@@ -23,6 +23,29 @@ const assert = require("node:assert/strict");
 const ROOT = path.join(__dirname, "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 
+/**
+ * Read a SIBLING skill's file — `skills/<name>/<rel>`.
+ *
+ * Returns null when the sibling is absent instead of throwing. `tests/` ships
+ * inside the packaged skill (`package_skill.py` walks the whole skill dir and
+ * excludes only __pycache__/.git/node_modules/.DS_Store), so a consumer can run
+ * this suite with review-code installed and review-pr or finalise not. There the
+ * cross-skill assertions have nothing to compare against and are skipped.
+ *
+ * In THIS repo the siblings are always present, so the guards below always run —
+ * which is the point. A degradation that skipped everywhere would delete the
+ * drift guard while leaving a green suite behind, so the in-repo run is asserted
+ * separately rather than trusted.
+ */
+const readSibling = (name, rel) => {
+  try {
+    return fs.readFileSync(path.join(ROOT, "..", name, rel), "utf8");
+  } catch (err) {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  }
+};
+
 const SKILL = read("SKILL.md");
 
 /**
@@ -105,15 +128,15 @@ test("Step 4 states the VCS-vs-TRACKER rule in review-pr's wording", () => {
   );
 });
 
-test("review-pr and review-code state the identical rule", () => {
+test("review-pr and review-code state the identical rule", (t) => {
   // Cross-skill consistency: if review-pr's wording is ever reworded, this
   // fails and whoever changes one is told to change the other.
   const RULE =
     "**Branch on `$VCS` for everything PR-shaped, on `$TRACKER` for everything issue-shaped.**";
-  const reviewPr = fs.readFileSync(
-    path.join(ROOT, "..", "review-pr", "SKILL.md"),
-    "utf8",
-  );
+  const reviewPr = readSibling("review-pr", "SKILL.md");
+  if (reviewPr === null) {
+    return t.skip("review-pr not installed alongside review-code");
+  }
   assert.ok(reviewPr.includes(RULE), "review-pr states the rule");
   assert.ok(SKILL.includes(RULE), "review-code states the same rule");
 });
@@ -146,13 +169,13 @@ test("the dead /qa-story step 6 pointer is gone and stays gone", () => {
   );
 });
 
-test("the finalise pointer resolves to a real file with a real Step 7", () => {
+test("the finalise pointer resolves to a real file with a real Step 7", (t) => {
   // Guards the pointer against bit-rot: a cross-reference that names a section
   // is only useful while that section exists.
-  const finalise = fs.readFileSync(
-    path.join(ROOT, "..", "finalise", "SKILL.md"),
-    "utf8",
-  );
+  const finalise = readSibling("finalise", "SKILL.md");
+  if (finalise === null) {
+    return t.skip("finalise not installed alongside review-code");
+  }
   assert.match(
     finalise,
     /### Step 7: Mark as Accepted and Generate Artifacts/,

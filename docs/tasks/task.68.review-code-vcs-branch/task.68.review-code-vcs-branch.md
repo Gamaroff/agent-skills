@@ -221,6 +221,54 @@ None. In a GitHub/GitHub repo — which is every repo this has been exercised in
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-01
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.68.qa.1.review-code-vcs-branch.md](./task.68.qa.1.review-code-vcs-branch.md)
+- **Gate File**: [task.68.gate.1.review-code-vcs-branch.yml](./task.68.gate.1.review-code-vcs-branch.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 2116 (0 failures); 12 new contract tests
+- **Phases Verified**: 3/3 complete (Phase 2 CONCERNS)
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 2 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+`TASK68-001` (MEDIUM) — two of the new tests read sibling skills (`../review-pr`, `../finalise`), and `tests/` ships in the distributed zip, so the suite fails 2/12 with `ENOENT` outside this repo. Reproduced, not inferred. The fix itself is correct and independently mutation-verified.
+
+## Dev Agent Record — QA Fix Cycle 1
+
+**Date**: 2026-09-01
+**Gate addressed**: [task.68.gate.1.review-code-vcs-branch.yml](./task.68.gate.1.review-code-vcs-branch.yml) — CONCERNS, 90/100
+
+### TASK68-001 (MEDIUM) — shipped test suite failed outside this repository
+
+**Root cause**: two tests read sibling skills via `path.join(ROOT, "..", <sibling>, "SKILL.md")` with a bare `readFileSync`. `package_skill.py` walks the whole skill directory and excludes only `{__pycache__, .git, node_modules, .DS_Store}`, so `tests/` ships in the distributed zip. Wherever `review-code` is installed without `review-pr` and `finalise` beside it, those two reads throw `ENOENT` and the suite fails 2 of 12.
+
+**Fix**: added a `readSibling(name, rel)` helper that returns `null` on `ENOENT` and **rethrows every other error** (a bare try/catch would have swallowed `EACCES`/`EISDIR` and turned a real fault into a silent skip). Both cross-skill tests now take the node:test context and `t.skip(...)` when the sibling is absent. Both assertions are kept — the drift guard is the reason they exist.
+
+**Files modified**: `skills/review-code/tests/review-code.test.js`
+
+**Verification** — the risk in this fix is that it degrades the guard into a no-op that skips everywhere while leaving a green suite behind, so all three were run rather than the obvious one:
+
+| Check | Result |
+|---|---|
+| In-repo run | **12 pass, 0 skipped** — the guards genuinely execute here |
+| Standalone install (`SKILL.md` + `tests/` alone in a temp dir) | **10 pass, 0 fail, 2 skipped** — was 2 failing |
+| Mutation: reword `review-pr`'s rule statement, siblings present | **1 red, 0 skipped** — the guard still bites; mutation proved to have applied, then restored |
+
+`skills/review-pr/SKILL.md` confirmed unchanged after the mutation.
+
+### Deferred (advisory, per the gate)
+
+Both LOW findings were deliberately not fixed this cycle: the Bitbucket arm's undeclared `BB_*` variables (the `finalise` Step 7 pointer covers them), and the pre-existing `zero-blocks-executed` Step 4b result (verified byte-identical on `develop` — not a regression from this task).
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -229,6 +277,8 @@ None. In a GitHub/GitHub repo — which is every repo this has been exercised in
 | 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
 | 2026-09-01 | 1.2     | Review passed (9/10) — READY TO IMPLEMENT. Premise re-verified against the tree: the `TRACKER=github` branch is live at `skills/review-code/SKILL.md:98`, `skills/review-code/tests/` does not exist, and `review-pr`'s rule is at `skills/review-pr/SKILL.md:79`. Sharpened two imprecise claims: `/qa-story` has no Step 6 at all (dead pointer, not a GitHub-only one), and the replacement pointer now names `finalise` Step 7 explicitly. One Important gap left open: no `github_issue` linked | review-task |
 | 2026-09-01 |         | Implemented — 3 files, 12 tests. Step 4 now branches on `$VCS`; the Bitbucket arm names `finalise` Step 7 and the real REST endpoint; 5 mutation reverts all red. Sweep: 64 `TRACKER=github` occurrences across 20 source files classified — `review-code` was the only PR-shaped one | develop |
+| 2026-09-01 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 2 LOW. Fix and guards verified, incl. an independent mutation revert; the MEDIUM is in the new test file, which fails 2/12 outside this repo | qa-task |
+| 2026-09-01 |         | QA findings fixed — TASK68-001 (MEDIUM) closed, 1 iteration. Cross-skill test reads now degrade to a skip when the sibling skill is absent; guard proved still live in-repo under mutation | qa-fix |
 
 ---
 
