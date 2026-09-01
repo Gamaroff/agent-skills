@@ -68,12 +68,14 @@ export const DEFAULT_TASK_REGISTRY = "docs/tasks/task-registry.md";
 //
 // The rule was originally the weaker `⊆`. Task 71 tightened it to `===` on the
 // task axis, because a strict subset is a gap the selector cannot explain: it
-// refuses work the thing it dispatches to would happily accept. Task 72 then
-// pinned the BUG axis's divergence exactly, so neither axis is `⊆` any more:
-// the task axis asserts equality, the bug axis asserts a known two-status gap. Pinned by
+// refuses work the thing it dispatches to would happily accept. Pinned by
 // `evals/develop-next/unit/select-next.test.mjs` §"eligibility floor vs
 // dispatcher", which parses `develop-task`'s own status table and fails on a
 // divergence in EITHER direction — under-widening and over-widening both.
+//
+// Task 72 then pinned the BUG axis's divergence exactly, against `develop-bug`'s
+// own table. So neither axis is `⊆` any more: the task axis asserts equality,
+// the bug axis asserts a known two-status gap. See below.
 //
 // **There is no opt-out, and that is deliberate.** An earlier version of this
 // comment argued the opposite — that the floor itself *was* the opt-out, so a
