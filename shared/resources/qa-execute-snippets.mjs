@@ -34,12 +34,13 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ── Extraction ────────────────────────────────────────────────────────────────
 
@@ -993,7 +994,26 @@ function render(report) {
   return lines.join("\n");
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+// Resolve BOTH sides through realpath: `.agents/skills` and `.claude/skills` are
+// symlinks to `../skills`, here and in every consumer install, so argv[1] arrives
+// symlinked while import.meta.url is already real. Comparing them raw makes this
+// guard false and main() never runs: exit 0, no output — indistinguishable from a
+// clean run with nothing to report, which is precisely the silent-pass this engine
+// exists to catch. Falls back to the plain comparison if realpath throws
+// (deleted/unreadable path). See bug.4.snippet-engine-symlink-noop.
+function isInvokedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    return (
+      realpathSync(process.argv[1]) ===
+      realpathSync(fileURLToPath(import.meta.url))
+    );
+  } catch {
+    return resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+}
+
+if (isInvokedDirectly()) {
   const r = main();
   // `process.exitCode` + else-if, never `process.exit()`: stdio is ASYNCHRONOUS
   // on a pipe, and `process.exit()` tears the process down before the buffer

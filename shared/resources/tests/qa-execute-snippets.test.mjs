@@ -23,8 +23,11 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { neverRan, spawnBudget } from "./spawn-budget.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1105,4 +1108,212 @@ test("zsh being unavailable is recorded as information and never as a finding", 
     "a missing interpreter is not a defect in the work item",
   );
   rmSync(dir, { recursive: true, force: true });
+});
+
+// ── CLI entrypoint guard ──────────────────────────────────────────────────────
+//
+// Everything above this line tests the engine's exported functions in-process.
+// None of it reaches the module-level `if (…) main()` guard at the bottom of the
+// file, which is why bug.4 lived there undetected: the engine was thoroughly
+// tested and completely unable to run.
+//
+// The two tests below are deliberately a pair, and the reason is bug.3. That bug
+// shipped a structural scan which passed under mutation on the exact defect it
+// named — a scan can only ever assert that the source LOOKS right. So the
+// behavioural test is the one that holds this bug (it actually invokes the CLI
+// through a symlink and demands output), and the structural test only stops the
+// class from reappearing in some new file that no behavioural test covers yet.
+// Neither substitutes for the other.
+
+/**
+ * The engine's real path, plus every generated copy `npm run bundle` writes.
+ *
+ * The bundled copies are what the documented invocations actually name
+ * (`.agents/skills/qa-task/references/…`), so a fix that lands only in the
+ * source and is never bundled would leave every real caller broken. Scanning
+ * the copies is what makes that visible here rather than in production.
+ */
+const ENGINE_COPIES = [
+  join(__dirname, "..", "qa-execute-snippets.mjs"),
+  ...["qa-task", "qa-story", "develop-task", "develop-story"].map((s) =>
+    join(
+      __dirname,
+      "..",
+      "..",
+      "..",
+      "skills",
+      s,
+      "references",
+      "qa-execute-snippets.mjs",
+    ),
+  ),
+];
+
+/**
+ * Spawn the engine's CLI under the shared load budget — bug.2's remedy.
+ *
+ * The two CLI-invoking tests below fork a real node process (which itself forks a
+ * shell per block), so they are exactly the spawn-heavy shape `spawn-budget.mjs`
+ * exists for: their latency is a function of machine load, not of the code under
+ * test. (The third, the copies scan, only reads files.) Retrying only
+ * when the child NEVER RAN is the important half — a child that ran and exited
+ * non-zero is a result and must not be retried away.
+ *
+ * `--no-zsh` is deliberate. These tests assert that the CLI runs *at all* through a
+ * symlink; the dual-shell behaviour is covered by the suite above. Forcing the bash
+ * arm halves the subprocesses each one costs.
+ */
+const CLI_BUDGET = spawnBudget("SNIPPETS");
+
+function runCli(args) {
+  let result;
+  for (let attempt = 0; attempt <= CLI_BUDGET.retries; attempt++) {
+    result = spawnSync(process.execPath, args, {
+      encoding: "utf-8",
+      timeout: CLI_BUDGET.timeoutMs,
+    });
+    if (!neverRan(result)) return result;
+  }
+  return result;
+}
+
+test("CLI: runs when invoked through a symlinked path", () => {
+  // `.agents/skills` and `.claude/skills` are symlinks to `../skills`, in this
+  // repo and in every consumer install, so argv[1] arrives symlinked while
+  // import.meta.url has already been realpath-resolved by Node. Comparing them
+  // raw makes the direct-invocation guard false and main() never runs: exit 0,
+  // no output. That is indistinguishable from a clean run with nothing to
+  // report — so the QA step built to catch prose that never executes was itself
+  // never executing, and recording a pass. See bug.4.
+  const dir = tmp();
+  const link = join(dir, "qa-execute-snippets-link.mjs");
+  symlinkSync(MODULE, link);
+
+  // A file with one plainly runnable block: the engine must execute it and say so.
+  const target = join(dir, "SKILL.md");
+  writeFileSync(target, bash("echo ok"));
+
+  const r = runCli([link, "--file", target, "--json", "--no-zsh"]);
+
+  // A child that exhausted its retries has stdout === null, so the length
+  // assertion below would throw a TypeError and never print its message —
+  // losing exactly the legibility it exists for. Separate "never ran" (a load
+  // problem) from "ran and said nothing" (this bug).
+  assert.ok(
+    !neverRan(r),
+    `the CLI never ran: ${r.error ?? r.signal} — a load problem, not this bug`,
+  );
+
+  // Assert on stdout FIRST and by length. The failure mode is silence, and an
+  // empty-string assertion reports it far more legibly than a JSON.parse throw.
+  assert.ok(
+    r.stdout.length > 0,
+    `the CLI produced no stdout when invoked through a symlink — the entrypoint ` +
+      `guard did not fire (exit=${r.status}, stderr=${JSON.stringify(r.stderr)})`,
+  );
+
+  const report = JSON.parse(r.stdout);
+  assert.equal(
+    report.counts.runnable,
+    1,
+    "the block should have been executed",
+  );
+  assert.equal(r.status, 0, "a clean file exits 0");
+});
+
+test("CLI: the symlinked and real invocation paths agree exactly", () => {
+  // The bug was not that the symlinked path was *degraded* — it produced nothing
+  // at all. Pinning the two paths to identical stdout and identical exit status
+  // is what makes any future divergence between them a failure, rather than only
+  // the total-silence case the test above names.
+  const dir = tmp();
+  const link = join(dir, "qa-execute-snippets-link.mjs");
+  symlinkSync(MODULE, link);
+
+  const target = join(dir, "SKILL.md");
+  writeFileSync(target, bash("echo ok"));
+
+  const viaLink = runCli([link, "--file", target, "--json", "--no-zsh"]);
+  const viaReal = runCli([MODULE, "--file", target, "--json", "--no-zsh"]);
+
+  // Check BOTH arms ran before touching either one's stdout. Two distinct
+  // failures hide here, and the second is the dangerous one: if viaReal never
+  // ran, the vacuity guard below throws a TypeError on null and prints nothing;
+  // but if only viaLink never ran, control reaches the equality assertion and
+  // `null !== "{…}"` is reported as "the invocation path must not change the
+  // report" — a behavioural divergence that never happened, on a machine that
+  // was merely loaded. That is the precise false positive neverRan() exists to
+  // prevent, and it is the same class as the guard nine lines above in the
+  // previous test.
+  assert.ok(
+    !neverRan(viaLink) && !neverRan(viaReal),
+    `a CLI arm never ran (link: ${viaLink.error ?? viaLink.signal}, ` +
+      `real: ${viaReal.error ?? viaReal.signal}) — a load problem, not a divergence`,
+  );
+
+  // Without this, the test passes vacuously if the entrypoint block is deleted
+  // outright: both arms fall silent, and "" === "" with 0 === 0 satisfies both
+  // assertions below. Test 1 covers deletion, but this pair must not agree by
+  // agreeing on nothing.
+  assert.ok(
+    viaReal.stdout.length > 0,
+    "the real path produced no output — the comparison below would be vacuous",
+  );
+
+  assert.equal(
+    viaLink.stdout,
+    viaReal.stdout,
+    "the invocation path must not change the report",
+  );
+  assert.equal(
+    viaLink.status,
+    viaReal.status,
+    "the invocation path must not change the exit code",
+  );
+});
+
+test("CLI: no engine copy carries a naive entrypoint guard", () => {
+  // Structural companion to the behavioural tests above. It cannot prove the
+  // guard WORKS — only that no copy has regressed to comparing `import.meta.url`
+  // against an unresolved `process.argv[1]`, which is the one shape known to
+  // break under a symlink. `npm run bundle` regenerates the four copies from the
+  // source, so a source-only fix that was never bundled fails here.
+  // Match on the unresolved `pathToFileURL(process.argv[1])` alone rather than on
+  // a full `a === b` comparison. The operands commute, and
+  // `pathToFileURL(process.argv[1]).href === import.meta.url` is the identical
+  // defect written the other way round — a shape no formatter would rewrite for
+  // you. Anchoring on the comparison would have missed it.
+  const naive = /pathToFileURL\(\s*process\.argv\[1\]/;
+
+  for (const file of ENGINE_COPIES) {
+    const src = readFileSync(file, "utf-8");
+
+    assert.ok(
+      !naive.test(src),
+      `${file} compares import.meta.url against an unresolved process.argv[1]; ` +
+        `realpath both sides (see isInvokedDirectly in select-next.mjs)`,
+    );
+
+    // The negative above is satisfied vacuously by a file that has no entrypoint
+    // guard at all — including one where a bad edit deleted it, which reproduces
+    // bug.4's symptom exactly. So demand the resolved form is actually present.
+    //
+    // Match the full comparison, not the bare token `realpathSync`: that token
+    // also appears in the node:fs import list, so a first cut of this assertion
+    // passed with the entire guard function deleted. Caught by mutation 3 — the
+    // exact vacuous pass this bug's own report warned a structural scan can give.
+    assert.match(
+      src,
+      /realpathSync\(\s*fileURLToPath\(import\.meta\.url\)\s*\)/,
+      `${file} never realpath-resolves import.meta.url — no resolved entrypoint guard`,
+    );
+
+    // ...and that the guard is actually WIRED UP. A file can define
+    // isInvokedDirectly() correctly and still never call it.
+    assert.match(
+      src,
+      /if\s*\(isInvokedDirectly\(\)\)/,
+      `${file} defines no reachable isInvokedDirectly() call site`,
+    );
+  }
 });
