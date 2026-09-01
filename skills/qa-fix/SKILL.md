@@ -354,7 +354,7 @@ Pipeline paused. Review the full gate YAML and QA report manually, then re-invok
 Parse latest gate YAML for:
 
 - Gate status (PASS|CONCERNS|FAIL|WAIVED)
-- `top_issues[]` with id, severity, finding, suggested_action
+- `top_issues[]` with id, severity, `file`, finding, suggested_action
 - `nfr_validation.*.status` and notes
 - Trace coverage summary and gaps
 - `test_design.coverage_gaps[]`
@@ -513,6 +513,30 @@ Options:
 - Keep changes minimal and targeted
 - Follow project architecture and coding standards
 - When in doubt about scope or approach, ask rather than assume
+
+### Step 2.5: Honour the third strike — replace, do not patch again
+
+The develop-story / develop-task pipeline passes a **third strike** into this invocation when a
+file has been the subject of HIGH findings in three consecutive QA cycles. It names the file and
+the cycles. When you receive one:
+
+**You may not patch that file again.** A fourth correction to a mechanism that has been corrected
+three times is the loop's failure mode, not its progress. The permitted moves are exactly three,
+and the fix plan must record which one was chosen and why:
+
+| Move                       | When it is right                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| **Delete the artifact**    | What it was for is already covered elsewhere, or was never worth its cost.            |
+| **Replace its mechanism**  | The job is still needed but this approach cannot do it. A different approach — not another correction to this one. A rewrite that keeps the defeated mechanism is a patch wearing a rewrite's diff. |
+| **Waive**                  | The residual is tolerable. Record the reason in the fix summary so QA can write it into the gate's `waiver` block; a waiver with no stated reason is not one. |
+
+If none of the three is available — the file is load-bearing, the mechanism is the only one that
+works, the residual is not tolerable — say so explicitly in the fix summary and make no change to
+that file. The pipeline's convergence check will escalate to a human, which is the correct outcome
+and better than a fourth patch.
+
+Determining the strike is the pipeline's job, not yours: it reads the `file:` key on each gate's
+HIGH `top_issues[]` entries across the last three gates. You act on the strike you are given.
 
 ### Step 3: Apply Changes
 

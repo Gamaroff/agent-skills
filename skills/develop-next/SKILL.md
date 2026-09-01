@@ -150,9 +150,42 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      ```
 
    - **CI checks** — if the PR has them, all must be green.
-     - **GitHub:** `gh pr checks <PR#>`.
+     - **GitHub:** `gh pr checks <PR#>` — but see **How to wait for CI** below before treating a pending result as a wait.
      - **Bitbucket:** `GET ${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/commit/${PR_HEAD}/statuses` — every `values[].state` must be `SUCCESSFUL`. An **empty** `values[]` means no CI reported (Pipelines disabled, or the run has not posted yet) → treat as _no checks_, not as failure.
      - **Best-effort on Bitbucket:** this call needs the app password's `read:pipeline` scope. A `403 "Your credentials lack one or more required privilege scopes"` is **not** a merge blocker — log a warning and continue to the quality gate. Bitbucket app passwords are commonly scoped to PR + repository access only, and failing the merge on a _missing read permission_ would block every merge on an otherwise-green PR.
+
+     **How to wait for CI — `gh pr checks` does not block.** It returns immediately and uses a
+     dedicated **exit code 8** to mean "checks are still pending". Read the rollup one-shot
+     instead, discriminating on `.status == "COMPLETED"` before reading `.conclusion` — a running
+     CheckRun returns `conclusion: ""` (an empty string, not null), so `.conclusion // .state`
+     reports a running job as green. This is the form `/finalise` already uses; take it from there
+     rather than re-deriving it:
+
+     ```bash
+     gh pr view "$PR_ID" --json statusCheckRollup \
+       -q '[ .statusCheckRollup[]
+             | (.status // "") as $st
+             | (if   $st == ""          then (.state // "")
+                elif $st == "COMPLETED" then (.conclusion // "")
+                else "PENDING" end)
+             | if . == "" then "PENDING" else . end ]
+           | if length == 0 then "NONE"
+             elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "ERROR"
+                      or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "FAILURE"
+             elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
+                      or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
+             elif any(. == "CANCELLED") then "CANCELLED"
+             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN"
+     ```
+
+     If a genuine wait is needed, **background it** — a poll loop written to a file, checked on a
+     later turn. Never a foreground call that can outlive the tool timeout.
+
+     > **`gh pr checks --watch` is forbidden in the foreground.** It blocks until CI finishes.
+     > On a 23-minute serial CI lane it simply exceeds the 10-minute tool timeout, and an agent
+     > that reaches for it burns one full timeout per attempt learning nothing — observed three
+     > times on one PR. The flag appears nowhere in this repo for that reason.
+
    - **Always**, on both platforms and regardless of CI: run `<qualityGateCommand>` on the PR branch. This is the real gate — not every project runs CI on PRs, and on Bitbucket the CI read may be unavailable per the note above.
    - Any failure other than the tolerated 403 → **HALT**: report the failing command's output, do not merge, do not tick.
 

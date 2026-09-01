@@ -332,6 +332,7 @@ gate: PASS
 top_issues:
   - issue: "Task 2 checkboxes not marked"
     severity: medium
+    file: "docs/stories/story.1.3.auth/story.1.3.auth.md"
 ```
 
 Action: Perform re-review to check if checkboxes are now marked.
@@ -344,8 +345,10 @@ gate: CONCERNS
 top_issues:
   - issue: "Integration tests missing"
     severity: medium
+    file: "apps/api/src/auth/auth.controller.spec.ts"
   - issue: "No retry logic"
     severity: medium
+    file: "apps/api/src/auth/auth.service.ts"
 ```
 
 Action: Perform re-review to verify if issues were addressed.
@@ -762,25 +765,65 @@ If any parallel agent fails to complete or reports critical errors:
 
 #### Phase 1.6: Diff Code Review
 
-Adversarially review the story's change set **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the Phase 1.5 agents (coverage / TS-strict / a11y / DoD) and the document-anchored checks do **not** provide. Effort follows the **Phase 1.5 Adaptive decision tree**: a single light pass for lite/small/re-review; run it alongside the parallel agents for large/high-risk stories; skip entirely when the diff touches no reviewable code.
+Adversarially review the story's change set **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the Phase 1.5 agents (coverage / TS-strict / a11y / DoD) and the document-anchored checks do **not** provide. Effort follows the **Phase 1.5 Adaptive decision tree**: a single light pass for lite/small/re-review; run it alongside the parallel agents for large/high-risk stories; skip entirely when the diff touches no reviewable code. **One exception, and it overrides the tree: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
 
-1. **Scope the diff** (reuse the Phase 1 changed-file map; on a re-review, scope to files changed since the last gate's `updated:` date) and write it to a patch file (keeps diff bytes out of main context):
+1. **Scope the diff** and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → the Phase 1 changed-file map, scoped to files changed since the last gate's `updated:` date:
 
    ```bash
    BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # resolve the PR's actual base (default develop)
    BASE="origin/${BASE_REF:-develop}"
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
+   # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
+   PRIOR_GATES=$(ls "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | wc -l | tr -d ' ')
    # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
    LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
-   if [ -n "$LAST_GATE_DATE" ]; then                # re-review — scope to files changed since last gate
+   if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ]; then   # cycle 3+ — scope to files changed since last gate
+     REFUTE_PASS=false
      FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
      [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
-   else
+   else                                                             # first review, or cycle 2 — whole branch diff
+     [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
      git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
    fi
    ```
 
+   `$STORY_DIR` is the story directory resolved in Phase 0. The narrowing is a cost control, and on
+   cycle 2 it costs more than it saves: the files changed since the last gate are exactly cycle 1's
+   own fixes, so a narrowed cycle-2 review reads only the repairs and never re-reads the original
+   change with what cycle 1 learned. On one observed task, four narrowed re-reviews walked past a
+   defect that had been present in the *original* commit and surfaced only at cycle 5.
+
 2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context.
+
+   **Cycle 2 only (`REFUTE_PASS=true`) — refute, do not review.** Append this directive to the
+   subagent prompt. It is the one pass in the loop performed by an agent that did not write the
+   code and is not asked to agree with it:
+
+   ```
+   REFUTE PASS. This change set was written by the same pipeline that is now reviewing it, and
+   cycle 1's fixes are the least-reviewed code in it. Your job is not to confirm the change works —
+   it is to find the claim in it that is FALSE. Start with the fixes from the previous QA cycle:
+   a fix is new code, not the closure of a finding.
+
+   For every change that touches emission, subscription, caching or any lifecycle, probe these four
+   transitions explicitly — they are the states the original findings never mentioned, and the
+   steady-state suite structurally cannot see them:
+     • Bulk teardown     — on unmount/disconnect/cleanup, does it emit, persist or announce
+                           something it should not?
+     • In-flight         — if input arrives WHILE the operation runs, is it applied, queued, or
+                           silently dropped?
+     • Error path        — when it fails, is state left recoverable, or stranded so retry is
+                           impossible?
+     • Reconnect         — after a drop and re-establish, does it converge, or resume from stale
+                           state?
+
+   Review the COMBINATION, not only each change: at least one real defect of this shape was caused
+   by two earlier fixes that were each correct alone.
+   ```
+
+   This costs more than a narrowed cycle-2 pass and is expected to pay for itself, because the
+   develop-story pipeline's convergence check ends the loop shortly after cycle 3 when it is not
+   converging. The trade is **two deep cycles instead of five shallow ones**.
 
 3. **Record — always (advisory):** every finding (bugs + cleanups, with `file:line`) goes into the QA report `## Code Review` section and the PR comment.
 
@@ -797,7 +840,7 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }`; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
 5. `rm -f "$DIFF_FILE"`.
 
@@ -1250,7 +1293,15 @@ status_reason: '1-2 sentence explanation of gate decision'
 reviewer: 'QA Engineer'
 updated: '{ISO-8601 timestamp}'
 
-top_issues: [] # Empty if no issues
+top_issues: [] # Empty if no issues; otherwise a list of entries shaped:
+  # - id: '{PREFIX-###}'
+  #   severity: low|medium|high
+  #   file: '{repo-relative path the finding is IN}'   # REQUIRED — see note below
+  #   finding: '{what is wrong}'
+  #   suggested_action: '{the fix}'
+  #   suggested_owner: dev|sm|po
+  #   status: open|closed         # set closed when a later cycle resolves it
+  #   fixed_date: '{YYYY-MM-DD}'  # with status: closed
 waiver: { active: false } # Set active: true only if WAIVED
 
 # Extended fields (optional but recommended):
@@ -1286,6 +1337,13 @@ recommendations:
     - action: 'Consider caching'
       refs: ['services/data.ts']
 ````
+
+> **`file:` is required on every `top_issues[]` entry**, and it must be a repo-relative path that
+> appears in the change set — not a description, not a module name, not `unknown`. The develop-story
+> pipeline's **third-strike rule** reads it to detect a file that HIGH findings keep circling across
+> cycles, and the rule works only because `file:` is checkable against the diff. A finding that
+> genuinely spans several files names the one a fix would edit first. If a finding truly has no
+> file (a missing artifact, a process gap), write the path it *should* exist at.
 
 ### Gate Decision Criteria
 
@@ -1846,6 +1904,7 @@ Include bug count in gate file:
 top_issues:
   - issue: "Cache cleanup memory leak"
     severity: high
+    file: "libs/cache/src/cleanup.ts"
     bug_ref: "story.8.5.3.bug.1.cache-cleanup-memory-leak.md"
     suggested_owner: dev
 ```

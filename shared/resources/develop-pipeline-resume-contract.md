@@ -127,9 +127,14 @@ Set the cycle counter to `NEXT_CYCLE` (= completed + 1) before re-entering the l
 Examples:
 - 0 entries → `NEXT_CYCLE=1` (fresh start, equivalent to non-resume)
 - 2 entries → `NEXT_CYCLE=3` (cycles 1 + 2 complete, attempting 3 next)
-- 5 entries → `NEXT_CYCLE=6` → exceeds limit → trigger Loop Limit Escalation immediately
+- 5 entries → `NEXT_CYCLE=6` → exceeds limit → trigger **Loop Escalation** (loop-limit trigger) immediately
 
-This convention ensures the 5-cycle limit is respected across resumes. Mid-cycle resume (entry written but qa-fix not yet committed) is handled by re-running 5a — `/qa-story` / `/qa-task` is idempotent and will overwrite the same `qa.N.md` / `gate.N.yml` for the in-flight cycle.
+This convention ensures the 5-cycle limit is respected across resumes. **The convergence check
+also survives a resume**: it reads the per-cycle HIGH counts back out of the `### QA Cycle` entries
+in the implementation report (`**HIGH findings**: {n}`), so a resumed run at cycle 3 or later
+evaluates the same sequence a continuous run would. If an earlier cycle's entry has no HIGH count
+recorded (a run that predates the check), treat that cycle's count as unknown and do not trip the
+guard on it — the check needs three real readings. Mid-cycle resume (entry written but qa-fix not yet committed) is handled by re-running 5a — `/qa-story` / `/qa-task` is idempotent and will overwrite the same `qa.N.md` / `gate.N.yml` for the in-flight cycle.
 
 ## Branch and PR Cross-Check
 

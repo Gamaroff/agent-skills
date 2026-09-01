@@ -294,25 +294,65 @@ For each phase in the implementation plan:
 
 ### Step 3b: Diff Code Review
 
-Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code.
+Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code. **One exception, and it overrides the strategy: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
 
-1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). On a re-review (Phase 0 found a prior gate), scope to files changed since that gate's `updated:` date; otherwise review the whole branch diff:
+1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → files changed since the last gate's `updated:` date:
 
    ```bash
    BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # standalone tasks usually target develop
    BASE="origin/${BASE_REF:-develop}"
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
+   # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
+   PRIOR_GATES=$(ls "$TASK_DIR"/task.*.gate.*.yml 2>/dev/null | wc -l | tr -d ' ')
    # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
    LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
-   if [ -n "$LAST_GATE_DATE" ]; then                       # re-review (cycle ≥ 2) — scope to files changed since last gate
+   if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ]; then   # cycle 3+ — scope to files changed since last gate
+     REFUTE_PASS=false
      FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
      [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
-   else
+   else                                                             # first review, or cycle 2 — whole branch diff
+     [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
      git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
    fi
    ```
 
+   `$TASK_DIR` is the task directory resolved in Phase 0. The narrowing is a cost control, and on
+   cycle 2 it costs more than it saves: the files changed since the last gate are exactly cycle 1's
+   own fixes, so a narrowed cycle-2 review reads only the repairs and never re-reads the original
+   change with what cycle 1 learned. On one observed task, four narrowed re-reviews walked past a
+   defect that had been present in the *original* commit and surfaced only at cycle 5.
+
 2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context. In lite/direct-tools mode use one subagent; for large/high-risk tasks the Adaptive Review Strategy may run it alongside the other parallel agents.
+
+   **Cycle 2 only (`REFUTE_PASS=true`) — refute, do not review.** Append this directive to the
+   subagent prompt. It is the one pass in the loop performed by an agent that did not write the
+   code and is not asked to agree with it:
+
+   ```
+   REFUTE PASS. This change set was written by the same pipeline that is now reviewing it, and
+   cycle 1's fixes are the least-reviewed code in it. Your job is not to confirm the change works —
+   it is to find the claim in it that is FALSE. Start with the fixes from the previous QA cycle:
+   a fix is new code, not the closure of a finding.
+
+   For every change that touches emission, subscription, caching or any lifecycle, probe these four
+   transitions explicitly — they are the states the original findings never mentioned, and the
+   steady-state suite structurally cannot see them:
+     • Bulk teardown     — on unmount/disconnect/cleanup, does it emit, persist or announce
+                           something it should not?
+     • In-flight         — if input arrives WHILE the operation runs, is it applied, queued, or
+                           silently dropped?
+     • Error path        — when it fails, is state left recoverable, or stranded so retry is
+                           impossible?
+     • Reconnect         — after a drop and re-establish, does it converge, or resume from stale
+                           state?
+
+   Review the COMBINATION, not only each change: at least one real defect of this shape was caused
+   by two earlier fixes that were each correct alone.
+   ```
+
+   This costs more than a narrowed cycle-2 pass and is expected to pay for itself, because the
+   develop-task pipeline's convergence check ends the loop shortly after cycle 3 when it is not
+   converging. The trade is **two deep cycles instead of five shallow ones**.
 
 3. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13).
 
@@ -329,7 +369,7 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }` (Step 10's deterministic rules then decide). Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
 5. `rm -f "$DIFF_FILE"`.
 
@@ -548,7 +588,15 @@ status_reason: '1-2 sentence explanation of gate decision'
 reviewer: 'QA Engineer'
 updated: '{ISO-8601 timestamp}'
 
-top_issues: [] # Empty if no issues; list issues for CONCERNS/FAIL
+top_issues: [] # Empty if no issues; otherwise a list of entries shaped:
+  # - id: '{PREFIX-###}'
+  #   severity: low|medium|high
+  #   file: '{repo-relative path the finding is IN}'   # REQUIRED — see note below
+  #   finding: '{what is wrong}'
+  #   suggested_action: '{the fix}'
+  #   suggested_owner: dev|sm|po
+  #   status: open|closed         # set closed when a later cycle resolves it
+  #   fixed_date: '{YYYY-MM-DD}'  # with status: closed
 
 waiver:
   active: false # Set true only for WAIVED, with reason and approver
@@ -589,6 +637,13 @@ deployment_readiness:
   production: APPROVED|CONDITIONAL|BLOCKED
   conditions: [] # List conditions if CONDITIONAL
 ```
+
+> **`file:` is required on every `top_issues[]` entry**, and it must be a repo-relative path that
+> appears in the change set — not a description, not a module name, not `unknown`. The develop-task
+> pipeline's **third-strike rule** reads it to detect a file that HIGH findings keep circling across
+> cycles, and the rule works only because `file:` is checkable against the diff. A finding that
+> genuinely spans several files names the one a fix would edit first. If a finding truly has no
+> file (a missing artifact, a process gap), write the path it *should* exist at.
 
 **Deterministic gate decision rules (apply in order):**
 
@@ -1002,6 +1057,7 @@ updated: '2026-03-20T14:30:00Z'
 top_issues:
   - issue: 'Test expects removed tier'
     severity: medium
+    file: 'libs/billing/src/tier.spec.ts'
     bug_ref: 'task.1.bug.1.test-failure.md'
     status: closed
     fixed_date: '2026-03-20'

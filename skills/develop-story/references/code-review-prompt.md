@@ -165,11 +165,32 @@ the other behaviour-driving keys the QA skills already read (`status`, `github_i
 
 **QA (`/qa-story`, `/qa-task`) — bounded across the up-to-5-cycle QA loop:**
 - First review: `git diff <base>...HEAD > <DIFF_FILE>` (base = the resolved target branch, default `develop`).
-- Re-review (QA cycle ≥ 2): scope to files changed since the last gate — reuse the skill's existing
+- Re-review (QA cycle ≥ 3): scope to files changed since the last gate — reuse the skill's existing
   `git log --since="{gate_date}" --name-only` set, diff only those paths, so each cycle re-reviews
   only what changed.
+- **Re-review (QA cycle 2): the full branch diff, reviewed to refute.** See below.
 - Lite mode / small / re-review with no new code: skip or run a single light pass per the skill's
   Adaptive Review Strategy.
+
+**Cycle 2 is the exception: a full-diff refute pass, not a narrowed re-review.** The narrowing above
+is a cost control, and on cycle 2 it costs more than it saves. Files changed since the last gate are
+exactly cycle 1's own fixes, so a narrowed cycle-2 review reads only the repairs and never re-reads
+the original change with the knowledge cycle 1 produced. On one observed task, four narrowed
+re-reviews walked past a defect that had been in the *original* commit and surfaced only at cycle 5.
+
+So on **cycle 2 only** (exactly one prior gate exists):
+
+- Scope to the **whole branch diff** — `git diff <base>...HEAD` — not the changed-files subset.
+- Instruct the subagent to **refute rather than review**: the code under review was written by the
+  same pipeline that is now reviewing it, and cycle 1's fixes are the least-reviewed code in the
+  change set. Its job is to find the claim that is false, starting with the fixes.
+- Probe the four transitions the steady-state suite structurally cannot see — **teardown ·
+  in-flight · error path · reconnect** (the table in `qa-fix` Step 3.5). At least one real defect of
+  this shape was caused by two earlier fixes that were each correct alone.
+
+Cycles 3+ keep the narrowed scope. This is affordable because the pipeline's convergence check ends
+the loop shortly after cycle 3 when it is not converging: the trade is **two deep cycles instead of
+five shallow ones**, not six cycles instead of five.
 
 ## Cleanup
 

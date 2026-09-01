@@ -373,8 +373,42 @@ merge gate (Step 3) and roadmap tick (Step 4) verbatim per item:
    - **Head-SHA check:** `gh pr view <PR#> --json headRefOid,state` must match
      `git rev-parse HEAD` on the item's local PR branch after the rebase (never gate one
      commit and merge another).
-   - If the PR has CI checks, `gh pr checks <PR#>` all green. Additionally (always, since
-     not every project runs CI on PRs), run `<qualityGateCommand>` on the PR branch.
+   - If the PR has CI checks, all must be green. `gh pr checks <PR#>` reports the state — but
+     see **How to wait for CI** below before treating a pending result as a wait. Additionally
+     (always, since not every project runs CI on PRs), run `<qualityGateCommand>` on the PR branch.
+
+     **How to wait for CI — `gh pr checks` does not block.** It returns immediately and uses a
+     dedicated **exit code 8** to mean "checks are still pending". Read the rollup one-shot
+     instead, discriminating on `.status == "COMPLETED"` before reading `.conclusion` — a running
+     CheckRun returns `conclusion: ""` (an empty string, not null), so `.conclusion // .state`
+     reports a running job as green. This is the form `/finalise` already uses; take it from there
+     rather than re-deriving it:
+
+     ```bash
+     gh pr view <PR#> --json statusCheckRollup \
+       -q '[ .statusCheckRollup[]
+             | (.status // "") as $st
+             | (if   $st == ""          then (.state // "")
+                elif $st == "COMPLETED" then (.conclusion // "")
+                else "PENDING" end)
+             | if . == "" then "PENDING" else . end ]
+           | if length == 0 then "NONE"
+             elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "ERROR"
+                      or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "FAILURE"
+             elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
+                      or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
+             elif any(. == "CANCELLED") then "CANCELLED"
+             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN"
+     ```
+
+     If a genuine wait is needed, **background it** — a poll loop written to a file, checked on a
+     later turn. Never a foreground call that can outlive the tool timeout.
+
+     > **`gh pr checks --watch` is forbidden in the foreground.** It blocks until CI finishes.
+     > On a 23-minute serial CI lane it simply exceeds the 10-minute tool timeout, and an agent
+     > that reaches for it burns one full timeout per attempt learning nothing — observed three
+     > times on one PR. The flag appears nowhere in this repo for that reason.
+
 3. **Merge** with the configured strategy:
 
    ```bash

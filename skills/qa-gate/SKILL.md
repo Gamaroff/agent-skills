@@ -106,11 +106,13 @@ updated: "2025-01-12T10:15:00Z"
 top_issues:
   - id: "SEC-001"
     severity: high # ONLY: low|medium|high (no other values)
+    file: "apps/api/src/auth/login.controller.ts" # REQUIRED — repo-relative, in the change set
     finding: "No rate limiting on login endpoint"
     suggested_action: "Add rate limiting middleware before production"
     suggested_owner: "dev" # dev|sm|po
   - id: "TEST-001"
     severity: medium
+    file: "apps/api/src/auth/auth.controller.spec.ts"
     finding: "No integration tests for auth flow"
     suggested_action: "Add integration test coverage"
     suggested_owner: "dev"
@@ -131,6 +133,7 @@ updated: "2025-01-12T10:15:00Z"
 top_issues:
   - id: "PERF-001"
     severity: low
+    file: "apps/web/src/dashboard/DashboardList.tsx"
     finding: "Dashboard loads slowly with 1000+ items"
     suggested_action: "Implement pagination in next sprint"
 waiver:
@@ -155,6 +158,7 @@ updated: "2025-01-12T10:15:00Z"
 top_issues:
   - id: "SEC-001"
     severity: high
+    file: "apps/api/src/auth/login.controller.ts"
     finding: "No rate limiting on login endpoint"
     suggested_action: "Add rate limiting middleware"
     suggested_owner: "dev"
@@ -239,6 +243,13 @@ Apply these rules in sequence to determine gate status:
 - If security/data-loss P0 test missing → Gate = **FAIL**
 
 **3. Issue Severity**:
+
+> **`file:` is required on every `top_issues[]` entry.** It must be a repo-relative path that
+> appears in the change set — not a description, not a module name, not `unknown`. The develop
+> pipelines' **third-strike rule** reads it to detect a file that HIGH findings keep circling across
+> QA cycles, and that rule works only because `file:` is checkable against the diff. A finding that
+> spans several files names the one a fix would edit first; a finding with no file (a missing
+> artifact) names the path it *should* exist at.
 
 - If any `top_issues.severity == high` → Gate = **FAIL** (unless waived)
 - Else if any `top_issues.severity == medium` → Gate = **CONCERNS**
@@ -485,6 +496,7 @@ updated: "{ISO-8601 timestamp}"
 top_issues:
   - id: "{PREFIX-###}"
     severity: low|medium|high
+    file: "{repo-relative path the finding is IN}" # REQUIRED
     finding: "{description}"
     suggested_action: "{fix}"
     suggested_owner: dev|sm|po

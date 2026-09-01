@@ -222,7 +222,95 @@ All notable changes to this project will be documented in this file. Format foll
   `develop-pipeline.lock`, so a PID lock enforces single-flight. Additive: `/loop /develop-next` is
   unchanged, and the `loopSupervisor:` config block is optional with every key defaulted.
 
+- **The QA loop gains a stall guard, and stops running five cycles when it stopped converging after
+  three.** New **Convergence check** in `shared/resources/develop-pipeline-step-5-6-qa-loop.md`:
+  after each cycle's gate is written, count the HIGH entries in `top_issues[]`; from cycle 3 onward,
+  a count that has failed to *strictly decrease* across two consecutive cycles ends the loop.
+
+  **Measured, not hypothetical.** One task ran 4h52m from first commit to merge; implementation was
+  37 minutes and the QA loop was 2h52m. Its five committed gates carry HIGH counts of
+  `7, 7, 7, 7, 4` — four consecutive cycles that reduced nothing, and nothing in the pipeline
+  noticed. Meanwhile the deliverable changed by 193 lines while the machinery built to verify it
+  absorbed ~1,560 lines of rewrite and had both of its mechanisms deleted rather than kept.
+
+  **The structural cause was that the loop's subject drifts onto its own repairs.** Cycle N≥2 was
+  scoped to files changed since the last gate — which are exactly cycle N−1's fixes. The Step 3
+  develop loop has had a stall guard for exactly this shape (progress = a new tick or a new commit;
+  no progress → HALT); the QA loop had no equivalent. That asymmetry was the bug, and the two now
+  read alike.
+
+  **It escalates; it never silently accepts.** On the observed task a genuine defect in the
+  *shipped* artifact surfaced only at cycle 5 and had been present in the original commit — any rule
+  that quietly exits early loses it. The residual findings are handed to a person together with the
+  evidence that the loop had stopped working. Both halting exits (loop limit, convergence stall) now
+  share one **Loop Escalation** block rather than two escalation paths.
+
+  **`HIGH_N` counts what a gate *raised*, not what is still open, and that distinction is
+  load-bearing.** The QA skills stamp `status: closed` on a gate in place after its own cycle's
+  fixes land, so a counter that skipped closed entries would read `0` on every mature gate: the
+  observed task reads `7, 7, 7, 7, 4` raised versus `7, 0, 0, 0, 0` closed-excluded. The counter is
+  pinned to entry indent (gate findings carry multi-line `finding: >-` block scalars whose wrapped
+  text can begin with `- `, or contain the words `severity: high`) and carries no `\b`, which is a
+  GNU extension that matches nothing under the `awk` shipped on macOS — silently reporting every
+  gate as `0` and disarming the guard. Verified under `bash` and `zsh` against the five real gates.
+
+- **Third strike: a file that HIGH findings have circled for three consecutive cycles may not be
+  patched again.** The permitted moves are delete the artifact, replace its mechanism, or waive with
+  a documented reason — `qa-fix` gains **Step 2.5** to receive the constraint. On the observed task
+  the artifact was patched four times before being deleted, and its replacement was deleted too;
+  deletion was right both times and the loop took four cycles to reach it.
+
+  The trigger is the gate entry's **`file:`** key, now required on every `top_issues[]` entry
+  (`qa-task`, `qa-story`, `qa-gate` schemas, worked examples, and the code-review promotion shape).
+  `file:` is checkable against the diff. A field asking the fixer to classify its own findings would
+  be written by the party the rule constrains and could not be checked at all — an agent that
+  classified its residual findings favourably would exit the loop a cycle sooner and nothing could
+  catch it.
+
+- **Cycle 2 is now an independent refute pass over the full branch diff.** `qa-task` **Step 3b** and
+  `qa-story` **Phase 1.6** branch on the prior-gate count: cycle 2 reviews the whole branch diff and
+  instructs the subagent to *refute rather than review*, probing the four transitions a steady-state
+  suite structurally cannot see (teardown · in-flight · error path · reconnect). It overrides the
+  Adaptive Review Strategy, which previously made re-reviews *shallower* each cycle. Cycles 3+ keep
+  the narrowed scope. The trade is two deep cycles instead of five shallow ones.
+
+- **A waiting protocol for CI, so nobody reaches for `--watch` again.** `develop-next` and
+  `develop-batch` named `gh pr checks <PR#>` and stopped there. It does not block — it returns
+  immediately with a dedicated **exit code 8** for pending checks. Both skills now carry the
+  one-shot rollup read (discriminating on `.status == "COMPLETED"` before `.conclusion`, the form
+  `/finalise` already uses), say to background any genuine wait, and name foreground
+  `gh pr checks --watch` as forbidden: it burned three 10-minute tool timeouts on a 23-minute CI
+  lane.
+
+- **A fifth vacuity shape in `shared/resources/mutation-proving.md`: a textual rule standing in for
+  a semantic property.** Whether a spec is meaningful, un-narrowed, or actually executes is not a
+  property of its source text. One guard tried to prove it and was defeated nine times across four
+  cycles; its own docblock claimed the vocabulary was closed, which was false. Each defeating
+  spelling is evidence the *class* is undecidable, not that the rule needed one more case. Two
+  things work instead: execute and observe (respecting the lane contract), or make the subject its
+  own witness.
+
+  The procedure also gains a **mutation-application check** — diff against a pre-mutation copy and
+  confirm the edit landed before running anything. One mutation used a literal `…` where the source
+  had `...`, never applied, and the resulting green was recorded as a pass.
+
 ### Changed
+
+- **One commit and one push per QA cycle.** The QA loop's commit block said only what to *exclude*
+  from the `fix(...)` commit (the implementation report, which Step 8 owns) and never said where the
+  cycle's gate `.yml` and QA report `.md` go — so they fell into `/commit-changes`' default sweep and
+  an orchestrator invented a second `docs(...)` commit, pushed separately, seven times on one PR.
+  They are evidence for that cycle's fix and now ride in the same commit.
+
+  The three paths with no `fix(...)` commit are covered explicitly: the `PASS`/`WAIVED` exit commits
+  on the Step 7 transition *before* `/finalise` (waiting for Step 8's sweep would have `/finalise`
+  read a gate the PR does not yet contain), and the no-code-change HALT and the convergence-stall
+  escalation each commit before halting.
+
+  **The payoff is not mainly CI minutes.** Four of the five superseded runs on the observed PR died
+  within 3m35s — roughly ten minutes of runner time. It is that every fix commit reached merge with
+  no completed CI run of its own, because a cycle's own second push kept cancelling its in-flight
+  run.
 
 - **The selection floor now equals what the dispatching pipeline accepts, instead of being a strict
   subset of it.** `TASK_ELIGIBLE_STATUSES` in `skills/develop-next/scripts/select-next.mjs` gains
