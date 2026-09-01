@@ -5,18 +5,20 @@ type: task
 description: "review-code Step 4 chooses its PR-comment path from TRACKER, but posting a PR comment is a VCS operation. In a Bitbucket-VCS + GitHub-tracker repo it takes the gh branch against a Bitbucket PR and the comment silently never lands."
 tags: [review-code, platform-detection, bitbucket, bug]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-08-31
 updated: 2026-09-01
+completed_date: 2026-09-01
+pr_number: 294
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: `/review-code` branches on TRACKER where it should branch on VCS
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -223,24 +225,27 @@ None. In a GitHub/GitHub repo — which is every repo this has been exercised in
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-01
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 90/100)
+**QA Cycles**: 2
 
-### QA Report
-- **Full Report**: [task.68.qa.1.review-code-vcs-branch.md](./task.68.qa.1.review-code-vcs-branch.md)
-- **Gate File**: [task.68.gate.1.review-code-vcs-branch.yml](./task.68.gate.1.review-code-vcs-branch.yml)
+### QA Reports
+- **Cycle 2 (final)**: [task.68.qa.2.review-code-vcs-branch.md](./task.68.qa.2.review-code-vcs-branch.md) · [gate.2](./task.68.gate.2.review-code-vcs-branch.yml) — **PASS**
+- **Cycle 1**: [task.68.qa.1.review-code-vcs-branch.md](./task.68.qa.1.review-code-vcs-branch.md) · [gate.1](./task.68.gate.1.review-code-vcs-branch.yml) — CONCERNS
 
 ### Test Coverage Summary
 - **Tests Executed**: 2116 (0 failures); 12 new contract tests
 - **Phases Verified**: 3/3 complete (Phase 2 CONCERNS)
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 2 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM open (1 found and closed), 2 LOW accepted
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-`TASK68-001` (MEDIUM) — two of the new tests read sibling skills (`../review-pr`, `../finalise`), and `tests/` ships in the distributed zip, so the suite fails 2/12 with `ENOENT` outside this repo. Reproduced, not inferred. The fix itself is correct and independently mutation-verified.
+`TASK68-001` (MEDIUM) — found in cycle 1, **closed in cycle 2**. Two of the new tests read sibling skills (`../review-pr`, `../finalise`), and `tests/` ships in the distributed zip, so the suite failed 2/12 with `ENOENT` outside this repo. Reproduced, not inferred. Fixed by guarding the reads while keeping both assertions; verified three ways, including a mutation proving the guard still bites in-repo rather than having degraded into a skip-everywhere no-op.
+
+Cycle 2's refute pass re-read the whole branch diff and found nothing new. It targeted the highest-risk remaining claim — that the new Bitbucket arm names a recipe that actually exists, the same defect class this task fixes — and the claim held: `references/bitbucket-auth.sh` is present and was already bundled before this branch.
 
 ## Dev Agent Record — QA Fix Cycle 1
 
@@ -269,6 +274,34 @@ None. In a GitHub/GitHub repo — which is every repo this has been exercised in
 
 Both LOW findings were deliberately not fixed this cycle: the Bitbucket arm's undeclared `BB_*` variables (the `finalise` Step 7 pointer covers them), and the pre-existing `zero-blocks-executed` Step 4b result (verified byte-identical on `develop` — not a regression from this task).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate**: [task.68.gate.2.review-code-vcs-branch.yml](./task.68.gate.2.review-code-vcs-branch.yml) — ✅ **PASS**, 100/100, 0 open issues, no waiver.
+**QA cycles**: 2 (cycle 1 CONCERNS 90/100 → qa-fix → cycle 2 PASS).
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria** — 6/6 met, each against evidence rather than assertion. Step 4 now contains **0** occurrences of `TRACKER=`; the Bitbucket arm names `bitbucket-auth.sh` and `finalise` Step 7, both confirmed present.
+✅ **Implementation Phases** — 3/3 complete, 0 unchecked boxes.
+✅ **Tests** — 2116 tests, 0 failures; 12 new contract tests, confirmed to have *actually run* under `npm test`, not merely registered.
+✅ **Mutation proving** — **7 reverts**, all red: 5 by develop, 1 independent by QA, 1 of the cycle-1 fix itself. Each confirmed to have applied before its red was counted.
+✅ **CI** — SUCCESS on 4/4 jobs, and the PR head was verified equal to local `HEAD`, so the green is on the final code.
+✅ **Security** — PASS. No secrets in the diff; credential handling fails closed; the fix rethrows non-`ENOENT` errors rather than masking them.
+✅ **Compliance** — NOT APPLICABLE (internal skill documentation and tests), recorded rather than skipped.
+✅ **Documentation** — CHANGELOG entry, Change Log rows, sweep classification table, skill validation ✓, bundled `references/` in sync.
+
+### Accepted residuals
+
+Three, recorded so that "accepted" is not read as "nothing left": the Bitbucket arm's undeclared `BB_*` variables (LOW, covered by the `finalise` pointer); the `zero-blocks-executed` Step 4b result (**verified pre-existing** against a byte-identical `develop` baseline); and the fact that the corrected Bitbucket path cannot be executed on a GitHub/GitHub repo — verified by inspection and pinned by contract tests, stated plainly rather than implied.
+
+**Detailed Verification Log:** [task.68.dod.1.review-code-vcs-branch.md](./task.68.dod.1.review-code-vcs-branch.md)
+
+**Task marked as ACCEPTED on:** 2026-09-01
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -279,6 +312,8 @@ Both LOW findings were deliberately not fixed this cycle: the Bitbucket arm's un
 | 2026-09-01 |         | Implemented — 3 files, 12 tests. Step 4 now branches on `$VCS`; the Bitbucket arm names `finalise` Step 7 and the real REST endpoint; 5 mutation reverts all red. Sweep: 64 `TRACKER=github` occurrences across 20 source files classified — `review-code` was the only PR-shaped one | develop |
 | 2026-09-01 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 2 LOW. Fix and guards verified, incl. an independent mutation revert; the MEDIUM is in the new test file, which fails 2/12 outside this repo | qa-task |
 | 2026-09-01 |         | QA findings fixed — TASK68-001 (MEDIUM) closed, 1 iteration. Cross-skill test reads now degrade to a skip when the sibling skill is absent; guard proved still live in-repo under mutation | qa-fix |
+| 2026-09-01 |         | QA re-review PASS (100/100) — TASK68-001 closed and verified under mutation; refute pass over the whole branch diff found nothing new. 2 QA cycles | qa-task |
+| 2026-09-01 | 1.3     | DoD verified 6/6 — task accepted (PR #294). CI SUCCESS 4/4 on the final head; 7 mutation reverts; 2 QA cycles; three residuals accepted explicitly | finalise |
 
 ---
 
@@ -317,7 +352,7 @@ Both LOW findings were deliberately not fixed this cycle: the Bitbucket arm's un
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.68.review-code-vcs-branch/task.68.review-code-vcs-branch.md`

@@ -34,9 +34,9 @@ Correct `skills/review-code/SKILL.md` Step 4 to branch PR-comment posting on `$V
 | 1. create-branch           | ✅ Done    | Branch `feature/task.68.*` exists in git                               | `feature/task.68.review-code-vcs-branch` created from `develop` at `af18a14`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.68.review.{N}.{name}.md` exists (or skip logged)                 | `task.68.review.1.review-code-vcs-branch.md` — READY TO IMPLEMENT, 9/10, 0 critical. 4 fixes applied, 1 skipped (tracker link) | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 3 phases, 3 files, 12 contract tests, 5 mutation proofs. Sweep: 64 hits / 20 source files classified | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.68.qa.{N}.*.md`; `task.68.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.68.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #294](https://github.com/Gamaroff/agent-skills/pull/294) → `develop`. Commit `31b3184`, 7 files. Issue comment skipped — no linked issue | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.68.qa.{N}.*.md`; `task.68.gate.{N}.*.yml`; PR comment posted     | 2 cycles: gate.1 CONCERNS 90/100 (1 MEDIUM) → qa-fix → gate.2 **PASS 100/100**. 3 PR comments posted | —                    |
+| 7. finalise                | ✅ Done    | `task.68.dod.{N}.*.md`; task `status: accepted`                        | DoD 6/6 PASS, CI SUCCESS 4/4 on final head. `task.68.dod.1.*.md` + `sprint-review-summary.md` written; canonical PR comment posted. Tracker close/board move N/A — no linked issue | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -77,6 +77,8 @@ Correct `skills/review-code/SKILL.md` Step 4 to branch PR-comment posting on `$V
 
   **`review-code` was the only PR-shaped hit.** `review-bug` and `review-pr` have none — `review-pr`'s PR comment already carries GitHub and Bitbucket arms under the `$VCS` branch. Recording the correct hits matters as much as the fix: §10 Risk 1 is that a sweep "fixes" a branch that was right, introducing the mirror-image bug.
 - **Test scoping is deliberate.** Every branch-key assertion slices Step 4 out of the file first. A file-wide `doesNotMatch(/TRACKER=github/)` would have been easier and wrong — it would forbid the token in a future *issue-shaped* branch of the same skill, where it is correct.
+- **Step 4 staging scope**: `docs/tasks/task.68.review-code-vcs-branch`, `skills/review-code`, `CHANGELOG.md`, `package.json`. The step-4 algorithm derives scope dirs via `dirname` and skips `"."`, which would have dropped the two **root-level** files (`CHANGELOG.md`, `package.json`) from the commit — both are essential to this change, so they were added to the scope explicitly. Pre-flight guard found no out-of-scope untracked files; post-commit leak check clean (7 files, all in scope).
+- **The pre-commit hook ran `npm run bundle`** and reported every skill in sync, including `review-code` — confirming no bundled-`references/` drift from the `SKILL.md` edit.
 - Phase 0 fan-out and review-task Phase 1.5 pre-pass both run **inline rather than via subagents** — the resolver was unnecessary (explicit path supplied) and the tracker poller inapplicable (no linked issue); the lite-mode inputs were read directly from the task document. Session standing instruction prohibits dispatching subagents unless requested.
 
 ---
@@ -109,16 +111,44 @@ that cannot fail.
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — gate CONCERNS (90/100)
+
+**Found: TASK68-001 (MEDIUM)** — the new contract suite failed outside this repository. Two tests read sibling skills (`../review-pr/SKILL.md`, `../finalise/SKILL.md`) with a bare `readFileSync`; `package_skill.py` walks the whole skill dir and excludes only `{__pycache__, .git, node_modules, .DS_Store}`, so `tests/` ships in the packaged skill. **Reproduced, not inferred** — copying `SKILL.md` + `tests/` alone into a temp dir gave 2 of 12 failing with `ENOENT`.
+
+QA also ran an **independent** mutation the developer had not (`VCS=bitbucket` → `TRACKER=bitbucket`): 3 red, restored green. Two LOW observations recorded: the Bitbucket arm's undeclared `BB_*` variables, and a Step 4b `zero-blocks-executed` result **verified pre-existing** against a byte-identical `develop` baseline.
+
+### Cycle 1 fix — qa-fix
+
+`readSibling()` helper returning `null` on `ENOENT` and **rethrowing every other error**; both cross-skill tests `t.skip(...)` when the sibling is absent. Both assertions kept — deleting the drift guard would have been the cheaper, worse fix.
+
+The failure mode of this fix is that it degrades the guard into a skip-everywhere no-op that leaves a green suite behind, so three checks were run rather than the obvious one: in-repo **12 pass / 0 skipped**; standalone **10 pass / 0 fail / 2 skipped**; and a mutation of `review-pr`'s rule wording → **1 red / 0 skipped**, proving the guard still bites.
+
+### Cycle 2 — gate PASS (100/100)
+
+TASK68-001 closed. Per the Step 3b protocol, cycle 2 ran a **full refute pass over the whole branch diff** rather than a narrowed one — the files changed since gate 1 are cycle 1's own fixes, and a narrowed pass would read only the repairs.
+
+The refute targeted the original change's highest-risk claim, chosen because it is in the *same defect class as the bug being fixed*: "the Bitbucket arm names a recipe that actually exists". The old text got exactly this wrong. Probed — `skills/review-code/references/bitbucket-auth.sh` is present, and `git ls-tree develop` confirms it was bundled **before** this branch, so the pointer resolves independently of this change. **The refute failed; the claim holds.** All four NFRs PASS. No new findings.
 
 ---
 
+## Completion Summary
+
+Task 68 fixed a defect whose defining property was silence: `/review-code` chose its PR-comment path from `TRACKER` rather than `VCS`, so a Bitbucket-hosted repo took the `gh` arm against a Bitbucket PR, the comment never landed, and the run reported success.
+
+**Three things are worth carrying forward.**
+
+**First, the fix's own guard had the same shape as the bug.** QA found that the new test file crashed with `ENOENT` outside this repository — `tests/` ships in the packaged skill, and two tests read sibling skills. The obvious repair (make them skip) would have silently deleted the drift guard while leaving a green suite behind. That is the *same* failure mode as the original defect — a mechanism reporting success without having checked anything — reproduced one level up, inside the fix for it. It was caught only because the fix was verified three ways rather than one: in-repo (0 skipped), standalone (2 skipped, 0 failing), and under mutation (1 red, proving the guard still bites).
+
+**Second, a backgrounded gate reported an exit code that was not its own.** The first `npm run ci:fast` run ended in a `tail`, so the completion notification carried `tail`'s status. The gate had actually failed on `prettier --check`. Same shape again — and had it stood, this task would have shipped precisely the red build that `develop.fastGateCommand` exists to prevent. **A backgrounded gate must end on the gate's own status.**
+
+**Third, the sweep's value was in what it did not change.** 64 occurrences across 20 source files; exactly one was wrong. The other 63 — issue comments, board moves, milestones, tracker linkage — are correctly keyed on `TRACKER`, and recording them as deliberately kept is what stops the next sweep introducing the mirror-image bug, which the task's own risk register named as the hazard.
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-01 19:00
+**Final Status**: Completed
 **Branch**: `feature/task.68.review-code-vcs-branch`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/294
+**QA Iterations**: 2 (CONCERNS 90/100 → PASS 100/100)
+**DoD Summary**: `task.68.dod.1.review-code-vcs-branch.md` — 6/6 PASS
+**Tracker debt**: none — the task carries no `github_issue`, so no tracker mutation was ever due. Nothing deferred, nothing to reconcile.
