@@ -1,0 +1,58 @@
+schema: 1
+task: "task.68.review-code-vcs-branch"
+task_title: "/review-code branches on TRACKER where it should branch on VCS"
+gate: CONCERNS
+status_reason: "The fix itself is correct, complete and well guarded — branch key, both platform arms, the rule statement and the dead pointer are all mutation-proved, and the sweep is thorough. One MEDIUM defect in the new test file: two tests read sibling skills, so the suite fails with ENOENT (2 of 12) wherever the skill ships without them, which packaging does allow."
+reviewer: "QA Engineer"
+updated: "2026-09-01T18:15:00Z"
+
+top_issues:
+  - id: "TASK68-001"
+    severity: medium
+    file: "skills/review-code/tests/review-code.test.js"
+    finding: "Two tests read files outside the skill directory — `../review-pr/SKILL.md` and `../finalise/SKILL.md`. `package_skill.py` walks the whole skill dir and its EXCLUDE_DIRS is only {__pycache__, .git, node_modules, .DS_Store}, so `tests/` ships in the distributed zip. Run outside this repo the suite throws ENOENT and fails 2 of 12 — reproduced by copying SKILL.md + tests/ alone into a temp dir. The sibling this file was modelled on (review-pr/tests/review-pr.test.js) reads only within its own ROOT, so this is a new portability pattern, not an existing one."
+    suggested_action: "Keep both cross-skill assertions — the drift guard is the point — but make them degrade instead of crash: read the sibling inside a try/catch (or check fs.existsSync) and skip via `t.skip()` when the file is absent, so the guard is enforced in this repo and inert in a standalone install."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: "3/3"
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No credential handling changed. The new Bitbucket arm points at `bitbucket-auth.sh`, which fails closed when neither credential form is set — the correct posture, and the same one finalise Step 7 uses. No secrets in the diff."
+  performance:
+    status: PASS
+    notes: "Prose plus 12 assertions over already-read files. Suite went 2104 -> 2116 tests with no measurable change in runtime."
+  reliability:
+    status: PASS
+    notes: "The change makes a previously silent failure impossible to reach: gh can no longer be invoked against a Bitbucket PR. Behaviour in a GitHub/GitHub repo is provably unchanged — both keys resolve identically there."
+  maintainability:
+    status: CONCERNS
+    notes: "TASK68-001. Also, the Bitbucket arm names ${BB_API}/${BB_WORKSPACE}/${BB_REPO}/${PR_ID} without stating their derivation; the finalise Step 7 pointer covers it, so LOW, not blocking."
+
+recommendations:
+  immediate:
+    - action: "Make the two cross-skill assertions skip rather than throw when the sibling SKILL.md is absent (TASK68-001)."
+      refs: ["skills/review-code/tests/review-code.test.js"]
+  future:
+    - action: "Consider naming the derivation of BB_API / BB_WORKSPACE / BB_REPO in the Bitbucket arm, so it reads without a jump to finalise."
+      refs: ["skills/review-code/SKILL.md"]
+    - action: "Step 4b reports zero-blocks-executed for review-code. Verified pre-existing — the develop baseline is byte-identical (3 blocks, all mutating: write-redirection, `.` sourcing fail-closed, `rm -rf` deny-list). Out of scope here; worth a task of its own if the skill's snippets should be executable."
+      refs: ["skills/review-code/SKILL.md"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Resolve TASK68-001 — the shipped test suite must not fail outside this repo."

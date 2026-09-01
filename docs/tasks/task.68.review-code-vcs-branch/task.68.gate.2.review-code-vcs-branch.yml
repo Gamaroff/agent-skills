@@ -1,0 +1,63 @@
+schema: 1
+task: "task.68.review-code-vcs-branch"
+task_title: "/review-code branches on TRACKER where it should branch on VCS"
+gate: PASS
+status_reason: "TASK68-001 verified fixed, and verified fixed in the way that matters — the guard still bites in-repo under mutation rather than degrading into a skip-everywhere no-op. Cycle 2's refute pass re-read the whole branch diff and found nothing new; the highest-risk remaining claim (that the new Bitbucket arm names a recipe that actually exists) was probed and held."
+reviewer: "QA Engineer"
+updated: "2026-09-01T18:45:00Z"
+
+top_issues:
+  - id: "TASK68-001"
+    severity: medium
+    file: "skills/review-code/tests/review-code.test.js"
+    finding: "Two tests read sibling skills with a bare readFileSync; `tests/` ships in the packaged skill, so the suite failed 2/12 with ENOENT wherever review-code was installed without review-pr and finalise."
+    suggested_action: "Guard the sibling reads and skip when absent, keeping both assertions."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-01"
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 12
+  phases_verified: "3/3"
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. No credential handling introduced; the referenced bitbucket-auth.sh fails closed. The cycle-1 fix rethrows every non-ENOENT error rather than swallowing it, so a permissions fault surfaces instead of silently becoming a skip."
+  performance:
+    status: PASS
+    notes: "2116 tests, no measurable runtime change."
+  reliability:
+    status: PASS
+    notes: "The original silent failure is now unreachable: gh cannot be selected against a Bitbucket PR. Rollback remains a single revert."
+  maintainability:
+    status: PASS
+    notes: "Was CONCERNS in cycle 1 solely because of TASK68-001, now closed. The suite is portable, and the helper's docstring records why the guard must not degrade — which is the thing a future maintainer would otherwise 'simplify' into a defect."
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: "2026-09-01"
+  total_iterations: 1
+  verification_method: "Three independent checks — in-repo run (12 pass / 0 skipped), standalone install (10 pass / 0 fail / 2 skipped), and a mutation of review-pr's rule wording (1 red / 0 skipped) proving the guard still bites rather than having degraded to a no-op."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Consider naming the derivation of BB_API / BB_WORKSPACE / BB_REPO in the Bitbucket arm, so it reads without a jump to finalise. Accepted as LOW — the pointer is correct and the referenced bitbucket-auth.sh is confirmed present in this skill's bundled references/."
+      refs: ["skills/review-code/SKILL.md"]
+    - action: "Step 4b reports zero-blocks-executed for review-code. Verified pre-existing — the develop baseline classification is byte-identical. Worth its own task if the skill's snippets should be executable; out of scope here."
+      refs: ["skills/review-code/SKILL.md"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
