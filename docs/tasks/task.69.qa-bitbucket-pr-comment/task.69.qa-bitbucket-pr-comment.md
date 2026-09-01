@@ -5,18 +5,20 @@ type: task
 description: "The QA gate comment is GitHub-only in both QA skills, and it is marked BLOCKING. On a Bitbucket repo the step cannot succeed. Two other skills already point at it as the reference Bitbucket recipe, so the gap propagates."
 tags: [qa, bitbucket, pr-comment, platform-parity]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Give `/qa-story` and `/qa-task` a Bitbucket PR-comment path
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+
+**Review**: ✅ Actionable recommendations from `task.69.review.1.qa-bitbucket-pr-comment.md` implemented 2026-09-01 — 1 applied (Phase 3 scope + divergent resolver note), 1 deferred (tracker linkage; needs an opt-in `/sync-github-task`).
 
 ---
 
@@ -115,11 +117,11 @@ None on GitHub: same endpoint, same body, delivered via `--body-file` instead of
 **Files**: `skills/qa-task/SKILL.md`
 
 **Changes**:
-- [ ] Write the comment body to `.claude/state/qa-comment-body.md` before posting
-- [ ] Branch Step 13 on `$VCS`
-- [ ] GitHub arm: `tracker_call_with_retry gh pr comment "$PR_URL" --body-file …`
-- [ ] Bitbucket arm: REST POST with a `jq`-built payload, using `BB_*` resolved in the platform preamble
-- [ ] State that the Bitbucket arm is single-shot and why
+- [x] Write the comment body to `.claude/state/qa-comment-body.md` before posting
+- [x] Branch Step 13 on `$VCS`
+- [x] GitHub arm: `tracker_call_with_retry gh pr comment "$PR_URL" --body-file …`
+- [x] Bitbucket arm: REST POST with a `jq`-built payload, using `BB_*` resolved in the platform preamble
+- [x] State that the Bitbucket arm is single-shot and why
 
 **Dependencies**: none
 
@@ -132,8 +134,8 @@ None on GitHub: same endpoint, same body, delivered via `--body-file` instead of
 **Files**: `skills/qa-story/SKILL.md`
 
 **Changes**:
-- [ ] Apply the identical change to step 6
-- [ ] Keep the wording identical between the two skills — they are the same step and should not drift
+- [x] Apply the identical change to step 6
+- [x] Keep the wording identical between the two skills — they are the same step and should not drift
 
 **Dependencies**: Phase 1
 
@@ -146,9 +148,26 @@ None on GitHub: same endpoint, same body, delivered via `--body-file` instead of
 **Files**: both QA skills
 
 **Changes**:
-- [ ] Confirm each skill resolves `BB_WORKSPACE`, `BB_REPO`, `BB_API` and sources `bitbucket-auth.sh` before Step 13 / step 6 — the `create-pr` Step 0.5 preamble
-- [ ] Add it where missing, guarded `source … || exit 1`
-- [ ] Verify Bitbucket auth by status code, never by list length (404, not 401, on a private repo)
+- [x] Confirm each skill resolves `BB_WORKSPACE`, `BB_REPO`, `BB_API` and sources `bitbucket-auth.sh` before Step 13 / step 6 — the `create-pr` Step 0.5 preamble
+- [x] Add it where missing, guarded `source … || exit 1`
+- [x] Verify Bitbucket auth by status code, never by list length (404, not 401, on a private repo)
+- [x] Reconcile the two skills' **existing** resolver-sourcing lines, which already diverge (see note below)
+
+> **Verified at review time (2026-09-01): the preamble is absent from _both_ skills.** Neither
+> `qa-task/SKILL.md` nor `qa-story/SKILL.md` mentions `BB_WORKSPACE`, `BB_REPO`, `BB_API` or
+> `bitbucket-auth.sh` anywhere. So this phase is **add to both**, not "confirm and patch the odd one
+> out" — budget for it accordingly.
+>
+> **The two skills also already source the resolver differently**, which collides with Phase 2's
+> "keep the wording identical" goal:
+>
+> - `qa-task/SKILL.md:895` — `source references/resolve-platform.sh || exit 1` (canonical)
+> - `qa-story/SKILL.md:1505` — `. "$(dirname "$0")/references/resolve-platform.sh" || exit 1`
+>
+> The `qa-story` form is the wrong one: these snippets are executed by an agent from the repo root,
+> not run as a script, so `$0` is not the skill file and `$(dirname "$0")` does not resolve to the
+> skill directory. Normalise `qa-story` onto the `qa-task` form as part of this phase — otherwise
+> Phase 2 ships a Bitbucket arm above a resolver line that never resolved.
 
 **Dependencies**: Phase 1
 
@@ -161,11 +180,11 @@ None on GitHub: same endpoint, same body, delivered via `--body-file` instead of
 **Files**: `skills/qa-task/tests/`, `skills/qa-story/tests/` (both new), `package.json`
 
 **Changes**:
-- [ ] Assert both skills' PR-comment step branches on `$VCS`
-- [ ] Assert both arms exist and the Bitbucket arm hits `/pullrequests/{id}/comments`
-- [ ] Assert no inline `--body` remains on the GitHub arm
-- [ ] Assert the retry asymmetry is documented
-- [ ] Add both globs to `package.json`
+- [x] Assert both skills' PR-comment step branches on `$VCS`
+- [x] Assert both arms exist and the Bitbucket arm hits `/pullrequests/{id}/comments`
+- [x] Assert no inline `--body` remains on the GitHub arm
+- [x] Assert the retry asymmetry is documented
+- [x] Add both globs to `package.json`
 
 **Dependencies**: Phases 1-3
 
@@ -190,17 +209,17 @@ None on GitHub: same endpoint, same body, delivered via `--body-file` instead of
 
 ### Contract Tests
 
-- [ ] Both skills branch the PR comment on `$VCS`
-- [ ] Both have a GitHub arm and a Bitbucket arm
-- [ ] The Bitbucket arm targets `/pullrequests/{id}/comments` with a `content.raw` payload
-- [ ] The GitHub arm uses `--body-file`; no inline `--body` survives
-- [ ] The single-shot asymmetry is stated
+- [x] Both skills branch the PR comment on `$VCS`
+- [x] Both have a GitHub arm and a Bitbucket arm
+- [x] The Bitbucket arm targets `/pullrequests/{id}/comments` with a `content.raw` payload
+- [x] The GitHub arm uses `--body-file`; no inline `--body` survives
+- [x] The single-shot asymmetry is stated
 
 ### Mutation Proving
 
-- [ ] Delete the Bitbucket arm from either skill → a test goes red
-- [ ] Revert the GitHub arm to inline `--body` → a test goes red
-- [ ] Change the branch key to `$TRACKER` → a test goes red
+- [x] Delete the Bitbucket arm from either skill → a test goes red
+- [x] Revert the GitHub arm to inline `--body` → a test goes red
+- [x] Change the branch key to `$TRACKER` → a test goes red
 
 ---
 
@@ -208,15 +227,15 @@ None on GitHub: same endpoint, same body, delivered via `--body-file` instead of
 
 ### Functional
 
-- [ ] On `VCS=bitbucket`, both QA skills post the gate decision to the Bitbucket PR
-- [ ] On `VCS=github`, behaviour is unchanged apart from `--body-file`
-- [ ] `/review-code`'s "mirror `/qa-story` step 6" pointer becomes true
+- [x] On `VCS=bitbucket`, both QA skills post the gate decision to the Bitbucket PR
+- [x] On `VCS=github`, behaviour is unchanged apart from `--body-file`
+- [x] `/review-code`'s "mirror `/qa-story` step 6" pointer becomes true
 
 ### Code Quality
 
-- [ ] Both skills have a `tests/` directory registered in `package.json`
-- [ ] Every fix mutation-proved
-- [ ] Wording identical between the two skills
+- [x] Both skills have a `tests/` directory registered in `package.json`
+- [x] Every fix mutation-proved
+- [x] Wording identical between the two skills
 
 ---
 
@@ -264,22 +283,24 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft — found via /review-code's dead cross-reference | create-task |
 | 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
+| 2026-09-01 | 1.2     | Pipeline review (9/10, ready to implement) — every technical claim verified against the tree; Phase 3 corrected from "confirm" to "add to both" and given the divergent-resolver note | review-task |
+| 2026-09-01 |         | Implemented — 5 files (2 skills, 2 new test suites, package.json) + 1 shared test-guard floor; 23 new contract tests, 3 mutations proved | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: qa-task
-- [ ] Body file + VCS branch + both arms
+- [x] Body file + VCS branch + both arms
 
 ### Phase 2: qa-story
-- [ ] Identical change, identical wording
+- [x] Identical change, identical wording
 
 ### Phase 3: Platform preamble
-- [ ] Present and guarded in both
+- [x] Added to both (it was absent from both), guarded; qa-story's broken `$(dirname "$0")` dot-source normalised onto the canonical `source` form
 
 ### Phase 4: Tests
-- [ ] Both suites + package.json globs
+- [x] Both suites + package.json globs
 
 ---
 
@@ -305,7 +326,7 @@ Revert `qa-story` only, or `qa-task` only — the two changes are independent.
 
 ---
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.69.qa-bitbucket-pr-comment/task.69.qa-bitbucket-pr-comment.md`
