@@ -24,7 +24,7 @@ Read once per run from the consumer project's `skills-config.yaml` (`developNext
 | -------------------------------- | ------------------------------------------------ | ----------------- |
 | `developNext.roadmapPath`        | `docs/development/project-completion-roadmap.md` | Steps 1, 3, 4     |
 | `developNext.baseBranch`         | `develop`                                        | Steps 0, 3, 4     |
-| `developNext.qualityGateCommand` | `npm test`                                       | Step 3 merge gate |
+| `developNext.qualityGateCommand` | `npm run ci`                                     | Step 3 merge gate |
 | `developNext.mergeStrategy`      | `merge` (one of `merge` / `squash` / `rebase`)   | Step 3            |
 
 `mergeStrategy` is always written in `gh` vocabulary regardless of host; Step 3 translates it for Bitbucket (`merge` → `merge_commit`, `rebase` → `fast_forward`). Do not put Bitbucket strategy names in `skills-config.yaml`.
@@ -187,6 +187,19 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      > times on one PR. The flag appears nowhere in this repo for that reason.
 
    - **Always**, on both platforms and regardless of CI: run `<qualityGateCommand>` on the PR branch. This is the real gate — not every project runs CI on PRs, and on Bitbucket the CI read may be unavailable per the note above.
+
+     > **This gate must be the project's full CI-equivalent, and the default now is.** It defaulted
+     > to `npm test` until 2026-09-01, which ran one of the three commands the CI job runs — so a
+     > branch could pass every local gate the pipeline has and still go red. It did, on task 67:
+     > `prettier --check` flagged two new files after `/finalise` had already accepted the task, and
+     > `eval:all` had never run locally at any step of any pipeline. The default is now `npm run ci`,
+     > the composite CI itself calls. An explicit `qualityGateCommand` in `skills-config.yaml` still
+     > wins — a consumer who wants the cheaper, weaker gate states it.
+     >
+     > This is the **slow** tier and belongs here, at the last point before merge, not in the
+     > develop loop. The fast tier is `develop.fastGateCommand` (default `npm run ci:fast`), run per
+     > iteration and per qa-fix cycle; paying the eval tier on every iteration is what would make the
+     > correct fix feel expensive enough to be reverted.
    - Any failure other than the tolerated 403 → **HALT**: report the failing command's output, do not merge, do not tick.
 
 2. **Merge** with the configured strategy.

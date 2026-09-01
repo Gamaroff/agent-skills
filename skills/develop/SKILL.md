@@ -619,9 +619,16 @@ Always capture test output to a temp file — never stream raw test output to ma
 ```bash
 ITER=<current develop loop iteration, or 1 if not in an orchestrated loop>
 TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
-<test-command> > "$TEST_LOG" 2>&1
+<fastGateCommand> > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
 ```
+
+`<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
+**`npm run ci:fast`** — the project's cheap CI-equivalent (formatting plus the hermetic suite), and
+deliberately not its slow end-to-end tier. Running only the test suite here is what let a task ship a
+red build on formatting alone; running the slow tier here is what would make the correct fix feel
+expensive enough to be reverted. The slow tier runs once, at `develop-next`'s merge gate, via
+`<qualityGateCommand>`.
 
 On non-zero exit, dispatch the Agent tool with `subagent_type="Explore"` using the prompt from `references/test-failure-triage-prompt.md` (substitute `<log_path>` with `$TEST_LOG`). Persist the triage result per the output contract in that file. Main reads only the returned triage summary (counts + ≤10 failure bullets + `next_file` hint).
 

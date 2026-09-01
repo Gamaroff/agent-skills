@@ -5,7 +5,7 @@ type: task
 description: "CI's test job runs format:check, npm test and eval:all. The pipeline's quality gate runs npm test alone, so two of the three never execute locally. On task 67 that shipped a red build and cost a recovery commit; eval:all was never run locally at any step. Give both a single source."
 tags: [ci, quality-gate, develop-next, pipeline, tooling]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: low
 created: 2026-09-01
@@ -16,7 +16,8 @@ estimated_effort_hours: 4
 
 # Technical Task: Make the pipeline quality gate run what CI runs
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.75.review.1.quality-gate-matches-ci.md` implemented 2026-09-01
 
 ---
 
@@ -138,9 +139,9 @@ old behaviour states it.
 **Files**: `package.json`
 
 **Changes**:
-- [ ] Add `"ci:fast": "npm run format:check && npm test"`
-- [ ] Add `"ci": "npm run ci:fast && npm run eval:all"`
-- [ ] Leave the three existing scripts in place — they are the tiers, and CI names them individually
+- [x] Add `"ci:fast": "npm run format:check && npm test"`
+- [x] Add `"ci": "npm run ci:fast && npm run eval:all"`
+- [x] Leave the three existing scripts in place — they are the tiers, and CI names them individually
 
 **Dependencies**: none
 
@@ -150,14 +151,26 @@ old behaviour states it.
 
 **Risk Level**: Low
 
-**Files**: `shared/resources/develop-pipeline-step-3-develop-loop.md`, `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `skills/develop-next/SKILL.md`
+**Files**: `shared/resources/develop-pipeline-step-3-develop-loop.md`, `shared/resources/develop-pipeline-step-5-6-qa-loop.md`, `skills/develop-next/SKILL.md`, `skills/develop-batch/SKILL.md`, `docs/reference/configuration.md`
+
+**The fast gate is a config key, not a literal.** These two shared step docs ship verbatim into consumer
+repos, which have no `ci:fast` script of their own. Hardcoding the literal would instruct every
+downstream project to run a command that does not exist. Add `developNext.fastGateCommand` (default
+`npm run ci:fast`) and reference it in the step docs as `<fastGateCommand>`, matching the existing
+`<qualityGateCommand>` idiom. An explicit override wins, exactly as it does for the merge gate.
 
 **Changes**:
-- [ ] **Step 3 (develop loop)** and **each qa-fix cycle**: run `ci:fast`. Formatting is cheap and its
-      absence is what shipped the task-67 red build; `eval:all` here would be paid on every iteration
-- [ ] **`develop-next` Step 3 (merge gate)**: run the full `ci`. This is the last point before merge and
+- [x] Add `developNext.fastGateCommand`, default `npm run ci:fast` — the tier run inside the loop
+- [x] **Step 3 (develop loop)**: this is a **placeholder resolution, not an edit**. The triage capture
+      block already reads `<test-command>`; name `<fastGateCommand>` as what fills it. Formatting is
+      cheap and its absence is what shipped the task-67 red build; `eval:all` here would be paid on
+      every iteration
+- [x] **Each qa-fix cycle**: this is an **addition** — the qa-loop document names no test command today.
+      The seam is after fixes are applied and before the `fix(...)` commit, so a cycle cannot commit a
+      red tree. A non-zero exit feeds the existing cycle machinery rather than introducing a new halt
+- [x] **`develop-next` Step 3 (merge gate)**: run the full `ci`. This is the last point before merge and
       the only one that must match CI exactly
-- [ ] Change the `developNext.qualityGateCommand` default from `npm test` to `npm run ci`, and say in the
+- [x] Change the `developNext.qualityGateCommand` default from `npm test` to `npm run ci`, and say in the
       config table that it is expected to be the project's full CI-equivalent
 
 **Dependencies**: Phase 1
@@ -170,10 +183,15 @@ old behaviour states it.
 
 **Files**: `.github/workflows/test.yml`
 
+> **Verify, do not invent.** The workflow **already** runs `npm run format:check`, `npm test` and
+> `npm run eval:all` as three separately named steps — which is exactly what this phase asks for. Expect
+> this phase to require **no edit**. Its value is entirely that Phase 4 then locks the arrangement so a
+> future step cannot drift out of the composite. Do not manufacture a change to justify the phase.
+
 **Changes**:
-- [ ] Keep three named steps — `Formatting`, `Hermetic test suite (L1–L4)`, `End-to-end replay evals (L4)`
+- [x] Confirm three named steps — `Formatting`, `Hermetic test suite (L1–L4)`, `End-to-end replay evals (L4)`
       — so a red build still names which tier broke
-- [ ] Point them at the same three scripts the `ci` composite calls, so there is exactly one list
+- [x] Confirm they call the same three scripts the `ci` composite calls, so there is exactly one list
 
 **Dependencies**: Phase 1
 
@@ -186,11 +204,13 @@ old behaviour states it.
 **Files**: `evals/shared/tests/ci-gate-parity.test.mjs` (new)
 
 **Changes**:
-- [ ] Parse `.github/workflows/test.yml` for every `npm run …` / `npm test` the `test` job executes
-- [ ] Parse the `ci` script's composition from `package.json`
-- [ ] Assert the two sets are equal — a CI step the composite does not call is a gate the pipeline cannot
+- [x] Parse `.github/workflows/test.yml` for every `npm run …` / `npm test` the `test` job executes
+- [x] Parse the `ci` script's composition from `package.json`
+- [x] Assert the two sets are equal — a CI step the composite does not call is a gate the pipeline cannot
       see, which is precisely this task's defect
-- [ ] Assert `develop-next`'s documented default names the composite
+- [x] Assert `develop-next`'s **and `develop-batch`'s** documented defaults name the composite — both
+      restate the same `developNext.qualityGateCommand` key, and holding one but not the other is how
+      the two drift apart
 
 **Dependencies**: Phases 1–3
 
@@ -207,10 +227,20 @@ old behaviour states it.
 2. ✅ `package.json` — `ci` and `ci:fast` composites
 3. ✅ `.github/workflows/test.yml` — steps call the same scripts
 4. ✅ `skills/develop-next/SKILL.md` — config table default and Step 3 prose
-5. ✅ `shared/resources/develop-pipeline-step-3-develop-loop.md` — `ci:fast` in the develop loop
-6. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — `ci:fast` per qa-fix cycle
-7. ✅ `docs/reference/configuration.md` — `qualityGateCommand` default and rationale
-8. ✅ `CHANGELOG.md` — the default change is observable
+5. ✅ `skills/develop-next/README.md` — restates "(default `npm test`)"
+6. ✅ `skills/develop-batch/SKILL.md` — **carries an identical config table row**, and its per-item merge
+   gate reads the same key, so it inherits the new default whether or not its table is updated
+7. ✅ `skills/develop-batch/README.md` — restates "(default `npm test`)"
+8. ✅ `shared/resources/develop-pipeline-step-3-develop-loop.md` — `<fastGateCommand>` fills the existing
+   `<test-command>` placeholder
+9. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — `<fastGateCommand>` added to each qa-fix cycle
+10. ✅ `docs/reference/configuration.md` — both the YAML **example block** and the reference **table row**;
+    `qualityGateCommand` default + rationale, and the new `fastGateCommand`
+11. ✅ `CHANGELOG.md` — the default change is observable
+
+> **The default is restated in six places, not two.** `develop-batch` is the one that matters: it reads
+> `developNext.qualityGateCommand` for its own merge gate, so leaving its table at `npm test` makes two
+> sibling orchestrators document different defaults for one key. Sweep all six.
 
 ### Files Regenerated
 
@@ -222,22 +252,23 @@ old behaviour states it.
 
 ### Contract Tests
 
-- [ ] Workflow step commands == `ci` composite members
-- [ ] A step added to the workflow but not the composite fails the test
-- [ ] `develop-next`'s documented default names the composite
+- [x] Workflow step commands == `ci` composite members
+- [x] A step added to the workflow but not the composite fails the test
+- [x] `develop-next`'s documented default names the composite
 
 **Command**: `node --test evals/shared/tests/ci-gate-parity.test.mjs`
 
 ### Behaviour Verification
 
-- [ ] `npm run ci:fast` fails on a deliberately mis-formatted file and passes once formatted — the exact
+- [x] `npm run ci:fast` fails on a deliberately mis-formatted file and passes once formatted — the exact
       task-67 failure, reproduced and then closed
-- [ ] `npm run ci` runs all three tiers
+- [x] `npm run ci` runs all three tiers
 
 ### Mutation Proving
 
-- [ ] Remove `format:check` from the composite → the parity test goes red
-- [ ] Remove `eval:all` from the composite → the parity test goes red
+- [x] Remove `format:check` from the composite → the parity test goes red
+- [x] Remove `npm test` from the composite → the parity test goes red
+- [x] Remove `eval:all` from the composite → the parity test goes red
 
 ---
 
@@ -245,22 +276,22 @@ old behaviour states it.
 
 ### Functional
 
-- [ ] `npm run ci` runs formatting, tests and evals
-- [ ] `npm run ci:fast` runs formatting and tests only
-- [ ] The develop loop and each qa-fix cycle run `ci:fast`
-- [ ] `develop-next`'s merge gate runs the full `ci`
-- [ ] `qualityGateCommand` defaults to `npm run ci`
+- [x] `npm run ci` runs formatting, tests and evals
+- [x] `npm run ci:fast` runs formatting and tests only
+- [x] The develop loop and each qa-fix cycle run `ci:fast`
+- [x] `develop-next`'s merge gate runs the full `ci`
+- [x] `qualityGateCommand` defaults to `npm run ci`
 
 ### Regression
 
-- [ ] CI still reports three separately named steps
-- [ ] An explicit `qualityGateCommand` in `skills-config.yaml` still wins
-- [ ] No check is added or removed
+- [x] CI still reports three separately named steps
+- [x] An explicit `qualityGateCommand` in `skills-config.yaml` still wins
+- [x] No check is added or removed
 
 ### Safety
 
-- [ ] The parity test fails when the workflow and the composite diverge
-- [ ] The CHANGELOG records the default change as observable behaviour
+- [x] The parity test fails when the workflow and the composite diverge
+- [x] The CHANGELOG records the default change as observable behaviour
 
 ---
 
@@ -316,25 +347,27 @@ per item, or make the eval tier incremental.
 | Date       | Version | Description                                                  | Author      |
 | ---------- | ------- | ------------------------------------------------------------ | ----------- |
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.67 pipeline retrospective  | create-task |
+| 2026-09-01 | 1.1     | Review passed (8/10) — 0 critical, 5 important. Widened the doc sweep from 2 sites to 6 (`develop-batch` reads the same key); made the fast gate a config key rather than a literal, since the step docs ship to consumers with no `ci:fast`; named Phase 2's seam in the qa-fix cycle and marked Phase 3 as verify-not-edit | review-task |
+| 2026-09-01 |         | Implemented — 11 files changed, 1 new contract suite (8 tests), 7 mutation proofs. Phase 3 required no edit, as the review predicted | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: One definition of green
-- [ ] `ci` and `ci:fast` composites
+- [x] `ci` and `ci:fast` composites
 
 ### Phase 2: Tier the gates
-- [ ] `ci:fast` in develop loop and qa-fix
-- [ ] Full `ci` at the merge gate
-- [ ] Config default changed and documented
+- [x] `ci:fast` in develop loop and qa-fix
+- [x] Full `ci` at the merge gate
+- [x] Config default changed and documented
 
 ### Phase 3: Workflow calls the tiers
-- [ ] Three named steps, one list
+- [x] Three named steps, one list (verify — expected to already hold)
 
 ### Phase 4: Parity test
-- [ ] Workflow == composite
-- [ ] Mutation proofs
+- [x] Workflow == composite
+- [x] Mutation proofs
 
 ---
 

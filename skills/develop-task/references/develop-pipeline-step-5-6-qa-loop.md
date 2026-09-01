@@ -504,6 +504,33 @@ section exists to prevent.
 
 After fixes are applied:
 
+0a. **Run the fast gate before committing.** Capture to a log rather than streaming:
+
+   ```bash
+   FIX_LOG=".claude/state/qa-fix-gate-${QA_CYCLE}-$(date +%s).log"
+   <fastGateCommand> > "$FIX_LOG" 2>&1
+   GATE_EXIT=$?
+   ```
+
+   `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
+   **`npm run ci:fast`** — the same fast tier the develop loop runs (see
+   [`develop-pipeline-step-3-develop-loop.md`](develop-pipeline-step-3-develop-loop.md) §"What the
+   loop runs"). The slow tier stays out of this cycle by design; it runs once at `develop-next`'s
+   merge gate.
+
+   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit and do
+   **not** HALT — a qa-fix cycle that leaves the tree red is exactly what the existing cycle
+   machinery is for. Triage per the step-3 pattern, feed the finding back into this cycle's fixes,
+   and re-run. The MAX_ITER cap still bounds the loop, so a gate that never goes green escalates
+   through the convergence-stall path rather than a bespoke one.
+
+   Cleanup mirrors step 3: `GATE_EXIT == 0` → `rm -f "$FIX_LOG"`; non-zero → retain for post-mortem.
+
+   > **Why the gate sits here and not after the commit.** A qa-fix cycle pushes to the PR branch, so
+   > a red commit is a red PR the reviewer sees before the next cycle repairs it — and on the last
+   > cycle nothing repairs it at all. Formatting is the concrete case: `prettier --check` is not in
+   > `npm test`, so a cycle could close green, push, and fail CI on a file it had just rewritten.
+
 0. **Check for actual changes**: Before committing, run `git diff --stat HEAD` to verify qa-fix actually modified files. If no files changed (qa-fix made no code edits), do NOT increment the cycle counter. Instead:
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
    - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — per path 2 above. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch.
