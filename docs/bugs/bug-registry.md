@@ -1,7 +1,7 @@
 # Bug Registry
 
 **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
-**Last Updated:** 2026-08-29
+**Last Updated:** 2026-09-01
 **Next Available Bug Number:** **4**
 
 ## How to use
@@ -29,7 +29,7 @@
 | --- | ----- | ------ | -------- | -------- | ------- | ---- |
 | 1 | [`ready-for-development` cannot match a Jira column named "Ready for Development"](bug.1.ready-for-development-candidates/bug.1.ready-for-development-candidates.md) | closed | Minor | Medium | 2026-08-04 | jira-sync / status mapping |
 | 2 | [`npm test` runs `node --test` unbounded, so spawn-heavy suites time out for environmental reasons](bug.2.unbounded-test-concurrency/bug.2.unbounded-test-concurrency.md) | closed | Major | High | 2026-08-29 | test harness / CI |
-| 3 | [Three CLIs call `process.exit()` after an async stdout write, truncating piped output at ~64KB](bug.3.stdout-truncation-on-exit/bug.3.stdout-truncation-on-exit.md) | new | Major | Critical | 2026-09-01 | CLI output / test harness |
+| 3 | [Three CLIs call `process.exit()` after an async stdout write, truncating piped output at ~64KB](bug.3.stdout-truncation-on-exit/bug.3.stdout-truncation-on-exit.md) | closed | Major | Critical | 2026-09-01 | CLI output / test harness |
 
 ---
 

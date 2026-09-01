@@ -1,6 +1,6 @@
 ---
 type: implementation-report
-status: in-progress
+status: complete
 bug: 'bug.3.stdout-truncation-on-exit'
 mode: 'general'
 started: '2026-09-01T08:30:00Z'
@@ -9,8 +9,8 @@ started: '2026-09-01T08:30:00Z'
 # Implementation Report — bug.3.stdout-truncation-on-exit
 
 **Started:** 2026-09-01T08:30:00Z
-**Finished:** —
-**Final Status:** In Progress
+**Finished:** 2026-09-01
+**Final Status:** ✅ Complete — bug closed
 **Branch model:** bugfix (base: develop, PR target: develop)
 **Severity / Priority:** Major / Critical
 **Lite mode:** off
@@ -25,8 +25,8 @@ started: '2026-09-01T08:30:00Z'
 | 3 | investigate-fix | ✅ Done | 10 sites fixed across 3 CLIs + 7 bundled copies; new 10-test guard suite; mutation-proven 3× | inline |
 | 4 | create-pr | ✅ Done | [PR #290](https://github.com/Gamaroff/agent-skills/pull/290) → develop, commit `468067a` | |
 | 5–6 | verify-fix loop | ✅ Done | PASS on cycle 1 — 0 fix cycles. All signals green; no blocking review findings. | inline |
-| 7 | finalise-close | ⏳ Pending | | |
-| 8 | commit-changes | ⏳ Pending | | |
+| 7 | finalise-close | ✅ Done | DoD 9/9 PASS; Resolution Summary written; bug `closed`; registry row closed; PR comment posted | |
+| 8 | commit-changes | ✅ Done | Final commit + push | |
 
 ## Decisions Log
 
@@ -41,6 +41,8 @@ started: '2026-09-01T08:30:00Z'
 
 ## Issues Log
 
+- 2026-09-01 — Step 7 (**self-caught, fixed**): CI was **red** on the first PR head `468067a` — `prettier --check` failed on the new guard suite. Cause: I ran `prettier --write` on the test file *after* committing and never committed the result, so the formatting fix existed only in my working tree. The DoD CI gate caught it; fixed in `a2f826b` (formatting only). Worth noting the gate did its job: local `npm test` was green throughout, because `npm test` does not run `format:check` — only CI does.
+
 - 2026-09-01 — Step 3 (**follow-up, not fixed here**): the same `process.exit()`-after-write idiom exists in **15 further files** beyond the three bug.3 names — including `skills/develop-batch/scripts/schedule.mjs`, `skills/loop-supervisor/scripts/run-loop.mjs` and `shared/resources/defer-mutation.js`, which write orchestrator JSON to stdout and are read through a pipe, so they are latent 64KB bugs of exactly the shape that manifested. Not fixed in this PR: bug.3's Scope & Impact names three files, and migrating fifteen more would trade a known defect for an unknown regression surface across a dozen skills. They are named in `KNOWN_UNMIGRATED` in the new guard suite, which fails if the list goes stale, so the debt is visible and shrinking rather than silent. **Recommend filing as a follow-up bug or task.**
 - 2026-09-01 — Step 3 (**self-caught**): the first version of the structural guard walked back six *lines* from each `process.exit()` looking for a write. The write in the manifesting instance is a ~20-line `JSON.stringify(...)`, so the guard never reached it and **passed under mutation A** — it would not have caught the bug it was written for. Rewritten to scan by character offset. Only the mutation step exposed this; a guard asserted green without mutation would have shipped as decoration.
 
@@ -52,4 +54,19 @@ started: '2026-09-01T08:30:00Z'
 
 **Branch:** bugfix/bug.3.stdout-truncation-on-exit
 **PR:** https://github.com/Gamaroff/agent-skills/pull/290
-**DoD Summary:** —
+**DoD Summary:** 9/9 PASS — `bug.3.dod.1.stdout-truncation-on-exit.md`
+
+## Completion Summary
+
+**Outcome**: bug.3 fixed, verified, closed. PR [#290](https://github.com/Gamaroff/agent-skills/pull/290) open against `develop`, CI green on `a2f826b`, DoD 9/9.
+
+**What landed**: 10 `process.exit()`-after-write sites converted to `process.exitCode` across three CLIs (+7 bundled copies), plus a 10-test guard suite in four layers — mechanism, live >64KB case, pipe-vs-file equivalence, and a structural guard over every shipped CLI.
+
+**Pipeline shape**: 1 fix iteration, 0 QA fix cycles (verify passed first pass), 1 CI round-trip (a formatting miss of mine, caught by the DoD CI gate).
+
+**Two things caught by process rather than by review**:
+
+1. Mutation testing exposed that my own structural guard passed on the defect it was written for. A line-window could not see a 20-line write. Rewritten to scan by character offset.
+2. The DoD CI gate caught a `format:check` failure that local `npm test` could not, because `npm test` does not run `format:check`. Local green is not CI green.
+
+**Recommended follow-up**: file a bug for the 15 remaining files carrying the same idiom — `skills/develop-batch/scripts/schedule.mjs`, `skills/loop-supervisor/scripts/run-loop.mjs` and `shared/resources/defer-mutation.js` are the three that write orchestrator JSON to a pipe and are latent 64KB bugs of the identical shape.

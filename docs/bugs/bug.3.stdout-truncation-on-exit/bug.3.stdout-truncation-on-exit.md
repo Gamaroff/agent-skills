@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Critical'
 created: '2026-09-01'
@@ -11,7 +11,7 @@ description: 'Three shipped CLIs call process.exit() immediately after writing t
 
 **Bug ID**: bug.3.stdout-truncation-on-exit
 **Related**: None — cross-cutting bug (no single owner)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Critical
 **Severity**: Major
 **Created**: 2026-09-01
@@ -294,9 +294,47 @@ two CLIs whose output is too small to truncate today.
 | 2026-09-01 | New    | review-bug  | Fix-readiness 10/10 — READY TO FIX. Reproduced independently (pipe 65,268 B, `JSON.parse` throws). No duplicate; not stale. Evidence table corrected: **10** exit-after-write sites, not 4. Severity/priority unchanged. |
 | 2026-09-01 | In Progress | develop-bug | Reproduced through a pipe; root cause confirmed as `process.exit()` not flushing async stdio. Investigation opened. |
 | 2026-09-01 | Ready for QA | develop-bug | 10 sites fixed across 3 CLIs + 7 bundled copies; new 10-test guard suite; mutation-proven 3×. Full `npm test` chain green (2,085 node tests, 9 shell suites, 0 failures). |
+| 2026-09-01 | Closed | develop-bug | Fix verified and accepted. DoD 9/9 PASS, CI green on `a2f826b`, [PR #290](https://github.com/Gamaroff/agent-skills/pull/290). |
 
 ---
 
 ## Resolution Summary
 
-_Pending._
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1 (0 QA fix cycles — verification passed on the first pass)
+**Time to Resolution**: same day (filed and closed 2026-09-01)
+**PR**: [#290](https://github.com/Gamaroff/agent-skills/pull/290) → `develop`
+**DoD**: [`bug.3.dod.1.stdout-truncation-on-exit.md`](./bug.3.dod.1.stdout-truncation-on-exit.md) — 9/9 PASS
+
+**Final Fix Details**: Node's stdio is synchronous for files and TTYs but asynchronous for pipes, and
+`process.exit()` does not flush a pending asynchronous write. Three shipped CLIs ended an output path
+with a write immediately followed by `process.exit(code)`, truncating their own output at the ~64KB
+pipe buffer — but only for callers that pipe them, which is every orchestrator and the QA gate. All
+**10** such sites (not the 4 originally listed) now set `process.exitCode` and return, letting the
+event loop drain; every exit code is preserved and explicitly tested. `generate-prd-epic-index.mjs`
+additionally had its imperative body wrapped in `main()`, because top-level `return` is illegal in an
+ES module and the wrapper is what makes the correct idiom expressible there at all.
+
+**Lessons Learned**:
+
+1. **The asymmetry is the whole reason this hid.** File and TTY writes are synchronous, so the defect
+   is invisible to every way a human runs the command by hand, and visible only to the machine callers
+   that matter. When a bug's reproduction depends on *how output is captured*, test both capture modes
+   explicitly — the new suite's pipe-vs-file equivalence layer exists for exactly this.
+
+2. **A guard that has not been mutation-tested is decoration.** The first structural guard here walked
+   back six *lines* from each `process.exit()` looking for a write. The write in the manifesting
+   instance is a ~20-line `JSON.stringify`, so the guard never reached it and **passed on the exact
+   defect it was written to catch**. It went green, and only reverting the fix exposed it. Every guard
+   in this suite is now proven by reverting the behaviour it claims to hold.
+
+3. **Fixing the named sites is not fixing the pattern.** The bug named 4 sites; the files held 10, and
+   the repo holds 25 more across 15 other files. The bug's own advice — prefer a lint rule over
+   "fixing three sites and trusting memory" — was the right instinct. The structural guard with an
+   explicit `KNOWN_UNMIGRATED` allowlist turns the remainder into a visible, shrinking list that
+   fails if it goes stale, rather than debt nobody can see.
+
+4. **A gate that is red for unrelated reasons teaches people to merge over red** — the same secondary
+   cost [`bug.2`](../bug.2.unbounded-test-concurrency/bug.2.unbounded-test-concurrency.md) carried.
+   Two gate defects in short succession suggests the gate itself deserves the same scrutiny as the
+   code it guards.
