@@ -132,7 +132,7 @@ Creates: story.178.8.gate.1.initial-review.yml
 | Write gate YAML                 | Create co-located `.gate.N.*.yml` file                                   |
 | Update story/task file          | Add QA Results section, update status, link artifacts                    |
 | Create bug reports              | Create `.bug.N.*.md` files for HIGH/MEDIUM issues (if any)               |
-| Post PR comment                 | Post QA summary to PR via `gh pr comment`                                |
+| Post PR comment                 | Post QA summary to PR — `gh pr comment` on GitHub, REST on Bitbucket     |
 | Communicate to user             | Output final summary with gate decision and next steps                   |
 
 ---
@@ -1498,61 +1498,105 @@ After review:
 5. If files were modified during refactoring, list them in QA report and ask Dev to update File List
 6. **Post QA Summary to PR** — **CRITICAL / BLOCKING**: This step is mandatory. The review is NOT complete until the PR comment is confirmed posted. Do not skip, defer, or treat as optional.
 
-   Use the PR metadata stored in Prerequisites. Source the retry helper, then post the comment wrapped in `tracker_call_with_retry` (3× exponential backoff: 1s, 2s, 4s — see `references/resolve-platform.sh`). Transient GitHub API / Anthropic API errors are common on long QA runs; retry transparently before reporting failure:
+   Use the PR metadata stored in Prerequisites.
 
-   ```bash
-   # shellcheck source=references/resolve-platform.sh
-   . "$(dirname "$0")/references/resolve-platform.sh" || exit 1  # adjust path to wherever the bundled helper lives in this skill install
+   **Resolve the platform first.** Source the resolver with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value. It sets `VCS` (which this step branches on) and provides `tracker_call_with_retry` (3× exponential backoff: 1s, 2s, 4s). Transient GitHub API / Anthropic API errors are common on long QA runs; the helper retries transparently before reporting failure. On Bitbucket, derive the REST coordinates and resolve the credential — the same Step 0.5 preamble `create-pr` uses.
 
-   tracker_call_with_retry gh pr comment "$PR_URL" --body "## 🧪 QA Review: [GATE_DECISION]
+   The fences below start at column 0 deliberately: an indented terminator does not close a heredoc, and indented body lines would be written into the comment verbatim.
 
-   **Gate Decision**: ✅/⚠️/❌ [PASS/CONCERNS/FAIL]
-   **Quality Score**: [score]/100
-   **Reviewer**: QA Engineer
-   **Date**: [date]
-   **PR**: #$PR_NUMBER - $PR_TITLE
-   **PR State**: $PR_STATE
+```bash
+source references/resolve-platform.sh || exit 1
+# VCS = github | bitbucket; TRACKER = jira | github
 
-   ---
+if [ "$VCS" = "bitbucket" ]; then
+  # Two sed passes, not one lazy-quantified capture — `[^/]+?` is a GNU
+  # extension that BSD sed rejects.
+  BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+  # Sets BB_CURL_AUTH (curl args) and BB_AUTH_SCHEME; non-zero when neither an
+  # access token (Bearer) nor username + API token (Basic) is set.
+  source references/bitbucket-auth.sh || exit 1
+fi
+```
 
-   ### 📋 QA Artifacts
+   **Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads.
 
-   - **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
-   - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
+```bash
+mkdir -p .claude/state
+BODY_FILE=.claude/state/qa-comment-body.md
+cat > "$BODY_FILE" <<'EOF'
+## 🧪 QA Review: [GATE_DECISION]
 
-   ### ✅ Summary
+**Gate Decision**: ✅/⚠️/❌ [PASS/CONCERNS/FAIL]
+**Quality Score**: [score]/100
+**Reviewer**: QA Engineer
+**Date**: [date]
+**PR**: #{PR_NUMBER} - {PR_TITLE}
+**PR State**: {PR_STATE}
 
-   - **Tests Executed**: [Count]
-   - **AC Coverage**: [X/Y covered]
-   - **NFR Status**: Security: [PASS/CONCERNS/FAIL], Performance: [PASS/CONCERNS/FAIL], Reliability: [PASS/CONCERNS/FAIL], Maintainability: [PASS/CONCERNS/FAIL]
-   - **Critical Issues**: [count]
-   - **Coverage Gaps**: [count]
-   - **Code Review** (Phase 1.6): [B] bug(s), [C] cleanup(s) — [advisory, or '[N] promoted to gate (code_review_blocking)']
+---
 
-   ### 🔎 Code Review Findings
+### 📋 QA Artifacts
 
-   [Top correctness bugs + notable cleanups from Phase 1.6, each \`file:line — finding\`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking.]
+- **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
+- **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
 
-   ### 🎯 Critical Issues
+### ✅ Summary
 
-   [List critical issues if any, or "None identified"]
+- **Tests Executed**: [Count]
+- **AC Coverage**: [X/Y covered]
+- **NFR Status**: Security: [PASS/CONCERNS/FAIL], Performance: [PASS/CONCERNS/FAIL], Reliability: [PASS/CONCERNS/FAIL], Maintainability: [PASS/CONCERNS/FAIL]
+- **Critical Issues**: [count]
+- **Coverage Gaps**: [count]
+- **Code Review** (Phase 1.6): [B] bug(s), [C] cleanup(s) — [advisory, or '[N] promoted to gate (code_review_blocking)']
 
-   ### 🚀 Deployment Recommendation
+### 🔎 Code Review Findings
 
-   **Status**: ✅/⚠️/❌ [APPROVED/APPROVED WITH CONCERNS/BLOCKED]
+[Top correctness bugs + notable cleanups from Phase 1.6, each `file:line — finding`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking.]
 
-   **Conditions**: [Any conditions for deployment]
+### 🎯 Critical Issues
 
-   ### 📝 Next Steps
+[List critical issues if any, or "None identified"]
 
-   1. [Step 1]
-   2. [Step 2]
+### 🚀 Deployment Recommendation
 
-   ---
-   "
-   ```
+**Status**: ✅/⚠️/❌ [APPROVED/APPROVED WITH CONCERNS/BLOCKED]
 
-   **Verify the comment was posted**: Confirm `tracker_call_with_retry` exited with code 0. The helper retries 3× on transient failure (GitHub 5xx, rate limit, Anthropic API blip). If all 3 attempts fail, report the error to the user and provide the comment body for manual posting. Do NOT proceed to step 6b until the comment is confirmed posted.
+**Conditions**: [Any conditions for deployment]
+
+### 📝 Next Steps
+
+1. [Step 1]
+2. [Step 2]
+
+---
+EOF
+
+if [ "$VCS" = "github" ]; then
+  tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE"
+  COMMENT_RC=$?
+elif [ "$VCS" = "bitbucket" ]; then
+  BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$(cat "$BODY_FILE")" '{content: {raw: $raw}}')
+  curl -sf -X POST \
+    "${BB_CURL_AUTH[@]}" \
+    -H "Content-Type: application/json" \
+    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+    -d "$BB_COMMENT_PAYLOAD" >/dev/null
+  COMMENT_RC=$?
+fi
+
+if [ "$COMMENT_RC" -ne 0 ]; then
+  echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
+fi
+```
+
+   **The two arms are not symmetric on retry, deliberately.** `tracker_call_with_retry` wraps `gh` only, so the GitHub arm retries 3× with exponential backoff and the **Bitbucket arm is single-shot** — the same asymmetry `qa-fix` ships and states. A `bitbucket_call_with_retry` helper would close the gap across every Bitbucket call site in the repo and is worth its own task — do not smuggle one in here.
+
+   **This comment is per-cycle and deliberately not idempotent.** Each QA cycle posts its own decision, so the PR carries the history. Do **not** import `finalise`'s marker/update logic: `finalise` owns the single canonical summary at pipeline end, and this step owns the running commentary. Only the Bitbucket *transport* is borrowed from it.
+
+   **Verify the comment was posted**: Confirm `COMMENT_RC` is 0. On GitHub the helper retries 3× on transient failure (5xx, rate limit, Anthropic API blip); on Bitbucket there is one attempt. If it still fails, report the error to the user and provide the comment body (`.claude/state/qa-comment-body.md`) for manual posting. Do NOT proceed to step 6b until the comment is confirmed posted.
 
 6b. **Comment on Tracker Issue (graceful — non-blocking)**
 
@@ -1611,7 +1655,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] `## Change Log` row appended recording the gate verdict (blank `Version`, `Author` = `qa-story` / `qa-task`), with frontmatter `updated` bumped in the same edit
 - [ ] Bug report files created for all HIGH and MEDIUM severity issues (if any)
 - [ ] Story Bug Reports section updated with current bug statuses (if any)
-- [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (step 6 — BLOCKING): confirm exit code 0 after up to 3 attempts
+- [ ] PR comment posted via the `$VCS` arm (step 6 — BLOCKING): on GitHub, `tracker_call_with_retry gh pr comment "$PR_URL" --body-file` — confirm exit code 0 after up to 3 attempts; on Bitbucket, the single-shot REST POST to `…/pullrequests/${PR_NUMBER}/comments` — confirm exit code 0 (no retry)
 - [ ] Tracker Issue comment posted (step 6b — graceful): `tracker-comment.js` invoked and its `reason` read (skipped if `github_issue` / `jira_key` absent or null); non-blocking on persistent failure
 - [ ] Next steps communicated to user (step 7 — BLOCKING): gate decision + issues + next steps output
 

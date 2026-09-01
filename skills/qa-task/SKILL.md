@@ -103,7 +103,7 @@ Activate this skill when:
 | Write QA report                 | Create co-located `task.{id}.qa.N.*.md` report file                         |
 | Write gate YAML                 | Create co-located `task.{id}.gate.N.*.yml` file                             |
 | Update task file                | Add QA Results section, update status, link artifacts                        |
-| Post PR comment                 | Post QA gate decision to PR via `gh pr comment` — best-effort, non-blocking |
+| Post PR comment                 | Post QA gate decision to PR — `gh pr comment` on GitHub, REST on Bitbucket; best-effort, non-blocking |
 | Communicate to user             | Output final summary with gate decision and next steps                       |
 
 ---
@@ -892,10 +892,34 @@ touches the document. See [`docs/reference/anti-patterns.md`](../../docs/referen
 
 **This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
 
-Use the PR metadata stored in the Prerequisites step. Source the retry helper with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value — and wrap the comment in `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). Run:
+Use the PR metadata stored in the Prerequisites step.
+
+**Resolve the platform first.** Source the resolver with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value. It sets `VCS` (which this step branches on) and provides `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). On Bitbucket, derive the REST coordinates and resolve the credential — the same Step 0.5 preamble `create-pr` uses:
 
 ```bash
-tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
+source references/resolve-platform.sh || exit 1
+# VCS = github | bitbucket; TRACKER = jira | github
+
+if [ "$VCS" = "bitbucket" ]; then
+  # Two sed passes, not one lazy-quantified capture — `[^/]+?` is a GNU
+  # extension that BSD sed rejects.
+  BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+  # Sets BB_CURL_AUTH (curl args) and BB_AUTH_SCHEME; non-zero when neither an
+  # access token (Bearer) nor username + API token (Basic) is set.
+  source references/bitbucket-auth.sh || exit 1
+fi
+```
+
+**Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads.
+
+```bash
+mkdir -p .claude/state
+BODY_FILE=.claude/state/qa-comment-body.md
+cat > "$BODY_FILE" <<'EOF'
+## QA Review: {GATE_DECISION}
 
 **Gate Decision**: {PASS/CONCERNS/FAIL}
 **Quality Score**: {score}/100
@@ -937,8 +961,38 @@ tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECI
 2. {Step 2}
 
 ---
-" || echo "⚠️ PR comment failed after 3 retries — non-blocking. Final canonical summary will be posted by /finalise."
+EOF
+
+if [ "$VCS" = "github" ]; then
+  tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE"
+  COMMENT_RC=$?
+elif [ "$VCS" = "bitbucket" ]; then
+  BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$(cat "$BODY_FILE")" '{content: {raw: $raw}}')
+  curl -sf -X POST \
+    "${BB_CURL_AUTH[@]}" \
+    -H "Content-Type: application/json" \
+    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+    -d "$BB_COMMENT_PAYLOAD" >/dev/null
+  COMMENT_RC=$?
+fi
+
+if [ "$COMMENT_RC" -ne 0 ]; then
+  echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
+fi
 ```
+
+**The two arms are not symmetric on retry, deliberately.** `tracker_call_with_retry` wraps `gh`
+only, so the GitHub arm retries 3× with exponential backoff and the **Bitbucket arm is single-shot**
+— the same asymmetry `qa-fix` ships and states. A Bitbucket failure logs and continues. This is
+acceptable here for the same reason the whole step is best-effort: the QA report and gate file are
+committed to git and are the durable record; this comment is convenience. A
+`bitbucket_call_with_retry` helper would close the gap across every Bitbucket call site in the repo
+and is worth its own task — do not smuggle one in here.
+
+**This comment is per-cycle and deliberately not idempotent.** Each QA cycle posts its own decision,
+so the PR carries the history. Do **not** import `finalise`'s marker/update logic: `finalise` owns
+the single canonical summary at pipeline end, and this step owns the running commentary. Only the
+Bitbucket *transport* is borrowed from it.
 
 ### Step 13b: Comment on Tracker Issue (graceful — non-blocking)
 
@@ -1011,7 +1065,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] Gate YAML file created and saved (co-located with task)
 - [ ] Task file `## QA Testing Results` section updated with gate status and artifact links
 - [ ] Task status updated per gate decision
-- [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (Step 13 — BLOCKING): confirm exit code 0 after up to 3 attempts
+- [ ] PR comment posted via the `$VCS` arm (Step 13 — BLOCKING): on GitHub, `tracker_call_with_retry gh pr comment "$PR_URL" --body-file` — confirm exit code 0 after up to 3 attempts; on Bitbucket, the single-shot REST POST to `…/pullrequests/${PR_NUMBER}/comments` — confirm exit code 0 (no retry)
 - [ ] Tracker Issue comment posted (Step 13b — graceful): `tracker-comment.js` invoked and its `reason` read (skipped if `github_issue` / `jira_key` absent or null); non-blocking on persistent failure
 - [ ] User notified with gate decision, issues summary, and next steps (Step 14 — BLOCKING)
 

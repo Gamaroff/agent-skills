@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.69.qa-bitbucket-pr-comment'
+task_title: 'Give /qa-story and /qa-task a Bitbucket PR-comment path'
+gate: PASS
+status_reason: 'Both cycle-1 findings verified fixed and independently mutation-proved, including a mutation the developer did not run. Two residuals stand and are accepted explicitly rather than dropped: TASK69-003 (LOW, unreachable branch) and the standing fact that Step 4b can never execute either skill''s comment blocks.'
+reviewer: 'QA Engineer'
+updated: '2026-09-01T19:45:00Z'
+
+top_issues:
+  - id: 'TASK69-001'
+    severity: high
+    file: 'skills/qa-story/SKILL.md'
+    finding: "qa-story's PR-comment body used real shell variables inside a single-quoted heredoc, so they emitted literally."
+    suggested_action: 'Convert to {SLOT} placeholders matching qa-task.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-01'
+  - id: 'TASK69-002'
+    severity: medium
+    file: 'skills/qa-story/tests/qa-story.test.js'
+    finding: 'No test could see the comment body content; suites were green with the defect present and with it fixed.'
+    suggested_action: 'Assert the quoted-heredoc body contains no unescaped $VAR, in both suites, and mutation-prove it.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-01'
+  - id: 'TASK69-003'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'COMMENT_RC is unset on the unreachable third $VCS branch (no else arm).'
+    suggested_action: 'Accepted, not fixed. resolve-platform.sh admits only github|bitbucket and is sourced guarded, so the branch is unreachable; the quoted test form degrades to a shell diagnostic rather than a false success.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2141
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No secrets. Credential handling delegated to the shipped bitbucket-auth.sh, sourced guarded in both skills. The quoted heredoc reduces injection surface versus the inline --body it replaced — and the cycle-1 fix deliberately preserved that property by changing the body rather than unquoting the heredoc.'
+  performance:
+    status: PASS
+    notes: 'Prose-and-tests change; no runtime path affected. Suites grew 23 → 25 tests.'
+  reliability:
+    status: PASS
+    notes: 'Was CONCERNS in cycle 1 solely because of TASK69-001. Verified fixed: neither body contains a shell variable, and injecting one into either skill turns the suite red.'
+  maintainability:
+    status: PASS
+    notes: 'Was CONCERNS in cycle 1 because the two comment bodies still diverged in placeholder style — the very divergence that caused TASK69-001. Both now use {SLOT} throughout, so Phase 2''s identical-wording goal is met in the sense that matters. The cross-file drift guard and the new body guard both fail loudly when their anchors move, rather than skipping.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Step 4b can never execute either skill''s PR-comment blocks — they post comments and are correctly deny-listed as mutating. These two steps therefore rest entirely on contract tests. Recorded so it is not rediscovered each cycle.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'A bitbucket_call_with_retry helper would close the single-shot asymmetry repo-wide. Correctly deferred by this task.'
+      refs: ['shared/resources/resolve-platform.sh']
+    - action: 'The Bitbucket arm ships unexecuted on this GitHub-hosted repo, verified by inspection against two shipped call sites only.'
+      refs: ['skills/qa-fix/SKILL.md', 'skills/finalise/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-01'
+  total_iterations: 1
+  verification_method: 'Independent re-mutation in both skills plus a vacuity probe on the new guard; full npm run ci:fast'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
