@@ -30,7 +30,7 @@ github_issue: 287
 
 Replace that subset assertion with one that pins the gap **exactly** — `{in-progress, ready-for-qa}` — so any change on either side fails loudly. Record why the bug axis keeps a divergence the task axis was made to close.
 
-**Key deliverables**: an exact-gap assertion, the rationale written where the next reader will find it, and four mutation proofs.
+**Key deliverables**: an exact-gap assertion, the rationale written where the next reader will find it, and five mutation proofs.
 
 **Expected outcome**: no behaviour change. The floor stays exactly as it is; what changes is that it can no longer drift without a test going red.
 
@@ -194,7 +194,7 @@ Because nothing observable changes, this task deliberately adds **no** CHANGELOG
 - [x] `node --test 'evals/develop-next/unit/*.test.mjs'` green — 123/123
 - [x] Full `npm test` green — 2141 tests, 0 failures
 - [x] `prettier --check` clean on the changed files — `npm run ci:fast` exit 0
-- [x] Four mutations executed and reverted (see §8)
+- [x] Five mutations executed and reverted (see §8)
 
 **Dependencies**: Phases 1-2
 
@@ -239,8 +239,17 @@ Each executed against the real suite and reverted:
 - [x] Add a fifth proceed-row to `develop-bug`'s status table → gap grows → **red** (proves it catches the drift `⊆` was blind to — the whole point of the task)
 - [x] Delete `new` from `BUG_ELIGIBLE_STATUSES` → gap grows to `{in-progress, ready-for-qa, new}` → **the gap assertion goes red** (proves gap sensitivity in the shrink-the-floor direction)
 - [x] **Corrupt the dispatcher's status table** — rename the `new` row in `develop-bug-step-0-resolve-bug.md` so `proceedStatuses()` returns the wrong rows → **the anti-vacuity guard goes red** (proves the guard survived Phase 1)
+- [x] **Delete the `new` row outright** — `proceed` becomes `{reopened, in-progress, ready-for-qa}`, so the gap is *still exactly* `{in-progress, ready-for-qa}` and `deepStrictEqual` **passes**. Only the guard goes red. Removing the guard under this mutation turns the test **green**, which is the proof that the guard is load-bearing rather than redundant
 
-> **Why the last two are separate mutations, and why the fourth is the one that proves the guard.** The
+> **Why the rename mutation does not prove the guard on its own.** Renaming the `new` row yields
+> `proceed = {brand-new, reopened, in-progress, ready-for-qa}` and therefore a **three**-element gap,
+> which `deepStrictEqual` rejects too — the guard merely fires first because it sits above. To
+> discriminate, the mutation must leave the gap at exactly two elements while corrupting the parse,
+> and only **deleting** the `new` row does that. That is the fifth mutation, and it is the one whose
+> removal-of-guard control run goes green. Found by the cycle-2 refute pass: the claim was true, but
+> the mutation cited for it was double-covered and so proved nothing specific to the guard.
+>
+> **Why the constant-mutation and the parse-mutations are separate.** The
 > anti-vacuity guard is `assert.ok(proceed.has("new") && proceed.has("reopened"))`, and `proceed` is
 > derived **solely** from parsing `STEP0_BUG` — the `develop-bug` step-0 document. It never reads
 > `BUG_ELIGIBLE_STATUSES`. So mutating that constant is structurally incapable of exercising the guard:
@@ -316,6 +325,33 @@ If the gap legitimately changes, update the expected array and record why in the
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-01
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 90/100)
+
+### QA Reports
+- **Cycle 2 (final)**: [task.72.qa.2.pin-bug-axis-divergence.md](./task.72.qa.2.pin-bug-axis-divergence.md) · [gate.2](./task.72.gate.2.pin-bug-axis-divergence.yml)
+- **Cycle 1**: [task.72.qa.1.pin-bug-axis-divergence.md](./task.72.qa.1.pin-bug-axis-divergence.md) · [gate.1](./task.72.gate.1.pin-bug-axis-divergence.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 2141 (0 failures); develop-next unit lane 123/123
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Every functional, structural and documentation criterion met and independently proven. **Seven probes** now stand behind the two assertions.
+
+Cycle 1 found **TASK72-001** (MEDIUM) — the task-72 sentences inserted into `select-next.mjs` stranded the pre-existing `Pinned by …` clause on the wrong antecedent. Fixed and byte-verified against `origin/develop`.
+
+Cycle 2's refute pass found **no code defect** but closed a real gap in the *evidence*: cycle 1 credited the anti-vacuity guard as mutation-proven by the rename mutation, which yields a three-element gap that `deepStrictEqual` rejects anyway — so it could not discriminate. The guard's necessity is now proven by **deleting** the `new` row (gap stays exactly two elements, `deepStrictEqual` passes, only the guard fires) plus a control run showing the test goes **green** with the guard removed. The claim was true; the proof was not. §8 and the guard's comment now carry the discriminating mutation.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -324,6 +360,9 @@ If the gap legitimately changes, update the expected array and record why in the
 | 2026-09-01 | 1.1     | Review passed (9/10) — 0 critical, 1 important: mutation 3 proved the gap assertion rather than the anti-vacuity guard it named, since the guard reads only the parsed dispatcher table. Split into two mutations (§8 now lists four); corrected the dispatcher line anchor to :57-63 | review-task |
 | 2026-09-01 |         | Status → ready-for-development | review-task |
 | 2026-09-01 |         | Implementation complete — bug half of `16/H1` now asserts the gap exactly; rationale rewritten to lead with the resume-affordance distinction across the test, `roadmap-selection.md` and `select-next.mjs`. Four mutations proved red, each firing the assertion it names. `BUG_ELIGIBLE_STATUSES` byte-identical. Status → ready-for-review | develop |
+| 2026-09-01 |         | QA gate CONCERNS (90/100) — 1 medium finding (TASK72-001): inserted sentences stranded the `Pinned by …` clause on the wrong antecedent in `select-next.mjs`. All functional/structural criteria proven; 5 mutation/vacuity probes | qa-task |
+| 2026-09-01 |         | qa-fix: TASK72-001 closed — task-axis paragraph restored byte-identical to `origin/develop` | qa-fix |
+| 2026-09-01 |         | QA gate PASS (100/100) — cycle-2 refute pass found no code defect; closed an evidence gap by adding the discriminating guard mutation (delete the `new` row) plus a guard-removal control run. 7 probes total | qa-task |
 
 ---
 
@@ -341,7 +380,7 @@ If the gap legitimately changes, update the expected array and record why in the
 
 ### Phase 3: Verify
 - [x] Suite green, prettier clean
-- [x] 4 mutations proved and reverted
+- [x] 5 mutations proved and reverted
 
 ---
 

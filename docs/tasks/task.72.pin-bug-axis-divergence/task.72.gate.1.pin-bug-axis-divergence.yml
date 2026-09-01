@@ -1,0 +1,56 @@
+schema: 1
+task: "task.72.pin-bug-axis-divergence"
+task_title: "Pin the bug-axis divergence exactly instead of asserting it loosely"
+gate: CONCERNS
+status_reason: "The assertion change is correct, complete and proven non-vacuous by five probes. One MEDIUM documentation-accuracy regression was introduced by the change itself: an inserted sentence in select-next.mjs left the trailing 'Pinned by …' clause attached to the bug-axis sentence, though it describes the task-axis assertion."
+reviewer: "QA Engineer"
+updated: "2026-09-01T20:30:00Z"
+
+top_issues:
+  - id: "TASK72-001"
+    severity: medium
+    file: "skills/develop-next/scripts/select-next.mjs"
+    finding: "Line 73 — the two sentences added about task 72 were inserted mid-sentence, so the pre-existing clause 'Pinned by `evals/…/select-next.test.mjs` §\"eligibility floor vs dispatcher\", which parses `develop-task`'s own status table…' now trails directly after 'the bug axis asserts a known two-status gap.' A reader attaches that clause to the bug axis, but it describes the TASK axis assertion — the bug assertion parses develop-bug's table, not develop-task's. Line 73 is also 89 chars against the block's 73–81 wrap."
+    suggested_action: "Move the task-72 sentences to the END of the paragraph, after the 'Pinned by … EITHER direction' clause, so that clause keeps its original task-axis antecedent. Re-wrap to ~78 columns."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2141
+  phases_verified: "3/3"
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No security surface. Test-only change; no auth, input handling, secrets or dependency changes. No new dependencies."
+  performance:
+    status: PASS
+    notes: "No runtime path changes. The new assertion adds one array filter+sort over a 4-element set at test time; suite duration unchanged (2.16s for the develop-next unit lane)."
+  reliability:
+    status: PASS
+    notes: "Strictly increases what the build detects. Five probes confirm the assertion is non-vacuous and correctly scoped: four single-sided mutations go red, a coordinated two-sided widening correctly stays green. Rollback is one test file with no source change."
+  maintainability:
+    status: CONCERNS
+    notes: "The assertion and its rationale are excellent — the resume-affordance argument is now recorded at all three sites a reader lands on. But TASK72-001 degrades the accuracy of one comment block, which is the exact artifact class this task exists to make trustworthy."
+
+recommendations:
+  immediate:
+    - action: "Fix TASK72-001 — restore the 'Pinned by …' clause's task-axis antecedent by moving the task-72 sentences to the end of the paragraph."
+      refs: ["skills/develop-next/scripts/select-next.mjs"]
+  future:
+    - action: "None. The task correctly declines to widen BUG_ELIGIBLE_STATUSES, correctly declines an integration test, and correctly declines a CHANGELOG entry."
+      refs: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "TASK72-001 resolved and the suite re-run green."

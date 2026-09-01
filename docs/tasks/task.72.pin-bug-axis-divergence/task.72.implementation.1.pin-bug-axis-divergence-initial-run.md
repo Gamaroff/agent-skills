@@ -35,8 +35,8 @@ Replace the loose subset assertion in test `16/H1` with one that pins the bug-ax
 | 1. create-branch           | ✅ Done    | Branch `feature/task.72.*` exists in git                               | `feature/task.72.pin-bug-axis-divergence` created from `develop` at `76fa87f`; pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.72.review.{N}.{name}.md` exists (or skip logged)                 | `task.72.review.1.pin-bug-axis-divergence.md` — READY TO IMPLEMENT, 9/10, 0 critical / 1 important / 1 optional; both fixes applied; `planned → ready-for-development` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 3 phases complete; 4 mutations proved red and reverted; `npm run ci:fast` exit 0 (2141 tests, 0 fail, Prettier clean); committed `49c910a` | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.72.qa.{N}.*.md`; `task.72.gate.{N}.*.yml`; PR comment posted     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #296](https://github.com/Gamaroff/agent-skills/pull/296) → `develop`; issue #287 commented (`posted`); board `in-review` → `stage-disabled` (correct, exit 0) | —                    |
+| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 | `task.72.qa.{N}.*.md`; `task.72.gate.{N}.*.yml`; PR comment posted     | Cycle 1: CONCERNS 90/100, 1 MEDIUM (TASK72-001) → qa-fix | —                    |
 | 7. finalise                | ⏳ Pending | `task.72.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -122,7 +122,17 @@ After every mutation the file was restored; `git diff` confirms `develop-bug-ste
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — qa-task — 2026-09-01
+
+- **Gate: CONCERNS, 90/100.** 0 HIGH, 1 MEDIUM, 0 LOW. Artifacts: `task.72.qa.1.pin-bug-axis-divergence.md`, `task.72.gate.1.pin-bug-axis-divergence.yml`.
+- **Review strategy**: direct tools (3 phases, single module, low risk, test-and-comment-only diff). First review → whole-branch diff.
+- **All functional and structural success criteria verified**, including `BUG_ELIGIBLE_STATUSES` byte-identity against `origin/develop`.
+- **Five mutation/vacuity probes.** Four red (three via the gap assertion, one via the anti-vacuity guard), plus a QA-added fifth that correctly stays **green**: widening both sides by the same status leaves the gap unchanged. That fifth probe is the one establishing *scope* rather than sensitivity — it confirms the assertion pins the difference rather than either set.
+- **The review's mutation split was empirically vindicated.** Probe 3 (delete `new` from the floor) fired the *gap assertion* and never touched the guard, exactly as the Step 2 review predicted. Collapsed with probe 4 as originally written, the guard would have been recorded as proven while never being driven red.
+- **Stale-reference sweep** found no live document still describing the bug axis as `⊆`; the two hits (`task.65` docs, `CHANGELOG.md:387`) are historical records, correctly untouched.
+- **Step 4b not applicable** — no `SKILL.md` or `shared/resources/*.md` in the change set; verified rather than assumed.
+- **Finding TASK72-001 (MEDIUM)**: the task-72 sentences were inserted mid-paragraph in `select-next.mjs`, stranding the pre-existing `Pinned by …` clause on the wrong antecedent — it describes the task axis but now trails a bug-axis sentence. Introduced by this change, in the comment block the task exists to make accurate. → Step 6.
+- PR comment and issue comment both posted.
 
 ---
 
@@ -131,7 +141,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {populated at end}
 **Branch**: `feature/task.72.pin-bug-axis-divergence`
-**PR**: {populated after Step 4}
+**PR**: [#296](https://github.com/Gamaroff/agent-skills/pull/296)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

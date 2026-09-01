@@ -1969,9 +1969,13 @@ test("16/H1: the bug-axis gap is exactly {in-progress, ready-for-qa}", () => {
   const proceed = proceedStatuses(readFileSync(STEP0_BUG, "utf-8"), null);
 
   // Anti-vacuity guard — PREDATES the exact assertion below and is not made
-  // redundant by it. An empty parse yields `gap: []`, which `deepStrictEqual`
-  // already rejects; but a parse returning the WRONG rows can still yield a
-  // two-element gap, and only this guard catches that.
+  // redundant by it. The discriminating case is a parse that DROPS `new` or
+  // `reopened`: `proceed` becomes {reopened, in-progress, ready-for-qa}, so the
+  // gap is still exactly {in-progress, ready-for-qa} and `deepStrictEqual`
+  // PASSES — the dispatcher has silently lost a status and only this guard
+  // notices. (Verified: delete the `new` row from develop-bug's table and
+  // remove these four lines, and this test goes green.) A parse that RENAMES a
+  // row instead is caught by both, so it does not prove the guard is needed.
   assert.ok(
     proceed.has("new") && proceed.has("reopened"),
     `parsed proceed-set looks wrong: ${[...proceed].join(", ")}`,
