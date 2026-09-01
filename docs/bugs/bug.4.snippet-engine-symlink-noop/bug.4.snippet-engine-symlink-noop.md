@@ -305,6 +305,67 @@ reachable `if (isInvokedDirectly())` call site, after which mutations 3 and 4 bo
 
 **Decision**: Closed | Reopened
 
+### Iteration 2
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-01
+**Trigger**: Verify Cycle 1, signal 3 (`/review-code` on the PR #292 diff).
+
+The fix itself was reviewed clean — the `isInvokedDirectly()` port is line-for-line faithful to
+`select-next.mjs`, `pathToFileURL` has no remaining references, no new import shadows an existing
+binding (`resolve` was checked against every occurrence in the ~1030-line file), and bug.3's
+`process.exitCode` chain is untouched. The reviewer independently re-ran the engine through the real
+`.agents/skills` symlink and confirmed it now emits its report.
+
+**The blocking finding was in the regression tests, not the fix.** `CLI: the symlinked and real
+invocation paths agree exactly` was still calling `spawnSync` directly, bypassing the
+`spawnBudget` helper the other test had adopted — so it ran with no timeout, no `neverRan()` retry,
+and no `--no-zsh` (4 shells instead of 1). Under load that test would report *a behavioural
+divergence that never happened*, which is precisely the false positive `neverRan()` exists to
+prevent and the same class of failure B5 exhibits.
+
+**Root cause of the miss**: the edit that introduced `runCli` used exact-string replacement, and an
+earlier `prettier --write` had already reflowed those `spawnSync` calls across multiple lines. The
+replacement silently found no match. The script asserted only that *some* replacement had occurred,
+not that *each* had — so one of two edits landed and the run reported success. Fixed by asserting
+per replacement and writing after each.
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-01
+
+**Fix Description** — five review findings applied to `shared/resources/tests/qa-execute-snippets.test.mjs`:
+
+1. **(blocking)** Routed `the symlinked and real invocation paths agree exactly` through `runCli`
+   with `--no-zsh`, giving it the same budget, retry and cost profile as its sibling.
+2. Added an anti-vacuous guard to that test: it previously passed if the entrypoint block were
+   deleted outright, since both arms fall silent and `"" === ""` holds. Now asserts the real path
+   produced output before comparing the two.
+3. Added a `neverRan()` check ahead of the stdout-length assertion in
+   `runs when invoked through a symlinked path`. An exhausted retry leaves `stdout === null`, so
+   the length assertion threw a `TypeError` and never printed its message — losing exactly the
+   legibility it exists for. Now distinguishes "never ran" (load) from "ran and said nothing" (this bug).
+4. Made the structural scan's `naive` regex symmetric. It anchored on
+   `import.meta.url === pathToFileURL(argv[1])`, but the operands commute:
+   `pathToFileURL(argv[1]).href === import.meta.url` is the identical defect written the other way
+   round, and no formatter would rewrite it for you. Now matches on the unresolved
+   `pathToFileURL(process.argv[1])` alone, which is the real tell.
+5. Corrected the `runCli` JSDoc, which claimed all three tests fork a process and pass `--no-zsh`;
+   the copies scan does neither.
+
+**Files Modified**:
+
+- `shared/resources/tests/qa-execute-snippets.test.mjs` — the five changes above
+
+**Testing**: engine suite 69/69 (exit 0), prettier clean. Mutations 1–4 re-proven red against the
+tightened tests, plus a **fifth**: the commuted naive guard from finding 4, which the previous regex
+passed and the symmetric one now fails.
+
+**Verification Steps for QA**: as Iteration 1, plus — write
+`if (pathToFileURL(process.argv[1] ?? "").href === import.meta.url) {` into the source and confirm
+`CLI: no engine copy carries a naive entrypoint guard` goes red.
+
 ---
 
 ## Status History
@@ -314,6 +375,8 @@ reachable `if (isInvokedDirectly())` call site, after which mutations 3 and 4 bo
 | 2026-09-01 | New | QA Engineer | Filed from task.75 QA cycle 1 — found while running Step 4b |
 | 2026-09-01 | In Progress | develop-bug | Reproduced through the symlinked path (exit 0, no output); root cause localised to `qa-execute-snippets.mjs:996` |
 | 2026-09-01 | Ready for QA | develop-bug | Realpath guard applied + bundled to 4 copies; 3 regression tests added, 4 mutations proven |
+| 2026-09-01 | Reopened | develop-bug | Verify cycle 1 signal 3: review-code found the fix clean but one regression test unbudgeted — false-positive risk under load |
+| 2026-09-01 | Ready for QA | develop-bug | Iteration 2: 5 review findings applied to the tests; 5 mutations proven |
 
 ---
 

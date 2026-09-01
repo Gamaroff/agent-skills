@@ -1152,9 +1152,10 @@ const ENGINE_COPIES = [
 /**
  * Spawn the engine's CLI under the shared load budget — bug.2's remedy.
  *
- * These three tests fork a real node process (which itself forks a shell per block),
- * so they are exactly the spawn-heavy shape `spawn-budget.mjs` exists for: their
- * latency is a function of machine load, not of the code under test. Retrying only
+ * The two CLI-invoking tests below fork a real node process (which itself forks a
+ * shell per block), so they are exactly the spawn-heavy shape `spawn-budget.mjs`
+ * exists for: their latency is a function of machine load, not of the code under
+ * test. (The third, the copies scan, only reads files.) Retrying only
  * when the child NEVER RAN is the important half — a child that ran and exited
  * non-zero is a result and must not be retried away.
  *
@@ -1194,6 +1195,15 @@ test("CLI: runs when invoked through a symlinked path", () => {
 
   const r = runCli([link, "--file", target, "--json", "--no-zsh"]);
 
+  // A child that exhausted its retries has stdout === null, so the length
+  // assertion below would throw a TypeError and never print its message —
+  // losing exactly the legibility it exists for. Separate "never ran" (a load
+  // problem) from "ran and said nothing" (this bug).
+  assert.ok(
+    !neverRan(r),
+    `the CLI never ran: ${r.error ?? r.signal} — a load problem, not this bug`,
+  );
+
   // Assert on stdout FIRST and by length. The failure mode is silence, and an
   // empty-string assertion reports it far more legibly than a JSON.parse throw.
   assert.ok(
@@ -1223,19 +1233,16 @@ test("CLI: the symlinked and real invocation paths agree exactly", () => {
   const target = join(dir, "SKILL.md");
   writeFileSync(target, bash("echo ok"));
 
-  const viaLink = spawnSync(
-    process.execPath,
-    [link, "--file", target, "--json"],
-    {
-      encoding: "utf-8",
-    },
-  );
-  const viaReal = spawnSync(
-    process.execPath,
-    [MODULE, "--file", target, "--json"],
-    {
-      encoding: "utf-8",
-    },
+  const viaLink = runCli([link, "--file", target, "--json", "--no-zsh"]);
+  const viaReal = runCli([MODULE, "--file", target, "--json", "--no-zsh"]);
+
+  // Without this, the test passes vacuously if the entrypoint block is deleted
+  // outright: both arms fall silent, and "" === "" with 0 === 0 satisfies both
+  // assertions below. Test 1 covers deletion, but this pair must not agree by
+  // agreeing on nothing.
+  assert.ok(
+    viaReal.stdout.length > 0,
+    "the real path produced no output — the comparison below would be vacuous",
   );
 
   assert.equal(
@@ -1256,8 +1263,12 @@ test("CLI: no engine copy carries a naive entrypoint guard", () => {
   // against an unresolved `process.argv[1]`, which is the one shape known to
   // break under a symlink. `npm run bundle` regenerates the four copies from the
   // source, so a source-only fix that was never bundled fails here.
-  const naive =
-    /import\.meta\.url\s*===\s*pathToFileURL\(\s*process\.argv\[1\]/;
+  // Match on the unresolved `pathToFileURL(process.argv[1])` alone rather than on
+  // a full `a === b` comparison. The operands commute, and
+  // `pathToFileURL(process.argv[1]).href === import.meta.url` is the identical
+  // defect written the other way round — a shape no formatter would rewrite for
+  // you. Anchoring on the comparison would have missed it.
+  const naive = /pathToFileURL\(\s*process\.argv\[1\]/;
 
   for (const file of ENGINE_COPIES) {
     const src = readFileSync(file, "utf-8");
