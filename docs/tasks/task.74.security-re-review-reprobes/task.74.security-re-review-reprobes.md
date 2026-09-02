@@ -5,18 +5,20 @@ type: task
 description: "qa-task and qa-story scope a re-review to files changed since the last gate. That is right for efficiency and wrong after a security FAIL: QA cycle 2 confirmed 13 holes closed, found nothing new, and the DoD gate then found 14 more of the same class. Add a carve-out so a re-review after a security failure searches unscoped."
 tags: [qa, re-review, security, scoping, verification]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-01
 updated: 2026-09-02
+completed_date: 2026-09-02
+pr_number: 299
 assignee:
 estimated_effort_hours: 5
 ---
 
 # Technical Task: A security re-review must re-probe, not re-read
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.74.review.1.security-re-review-reprobes.md` implemented 2026-09-02
 
 ---
@@ -448,6 +450,35 @@ Found by **executing** the shipped prose, not by reading it — which is the cha
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Gate:** `task.74.gate.2.security-re-review-reprobes.yml` — ✅ **PASS 100/100** over 2 cycles
+**CI:** ✅ SUCCESS — 4/4 workflows green on `dff240db`, matching local HEAD
+**Merge gate:** ✅ `npm run ci` EXIT=0 — 2202 pass / 0 fail, including `eval:all`
+
+✅ **Success Criteria:** 46/46, none unchecked — each verified by execution, not by the checkbox
+✅ **Tests:** parity suite 34/34; proven to run inside the repo test glob by subtraction (181 − 34 = 147)
+✅ **Security:** `boundary: true`, **12 candidates executed, 0 reproduced** — the boundary held, including
+   `FAIL` in prose only, `FAILED` as a superstring, a near-miss key, malformed YAML, and the empty and
+   nonexistent `$LATEST_GATE` cases that were CR-1
+✅ **Documentation:** CHANGELOG entry present; two doc gaps found **and fixed** during the DoD run — a
+   dead `bug.7` link that had turned CI red, and a third stale copy of the scoping rule in
+   `code-review-prompt.md`
+⚠️ **Compliance:** NOT_APPLICABLE — no personal-data, payment, accessibility or retention surface
+
+**Assumption recorded:** this PR has no human review decision. The review column is satisfied by the QA
+gate, the green CI rollup and the mutation proofs under the repository's ratified auto-merge policy.
+
+**Tracker:** N/A — no linked issue, by the recorded decision in `task.74.review.1` §Optional-1.
+
+**Detailed Verification Log:** see [`task.74.dod.1.security-re-review-reprobes.md`](./task.74.dod.1.security-re-review-reprobes.md).
+
+**Task marked as ACCEPTED on:** 2026-09-02
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -462,6 +493,7 @@ Found by **executing** the shipped prose, not by reading it — which is the cha
 | 2026-09-02 |         | QA gate CONCERNS (90/100) — 1 medium: clause-1 probe hangs on empty `$LATEST_GATE` | qa-task |
 | 2026-09-02 |         | QA findings fixed — CR-1/CR-2/CR-3 closed, 3 regression tests added, 1 iteration | qa-fix |
 | 2026-09-02 |         | QA gate PASS (100/100) — cycle 2 refute pass found CR-2's fix ineffective; refiled as CR-4, fixed | qa-task |
+| 2026-09-02 | 1.2     | DoD verified — accepted (PR #299); fixed a dead bug.7 link that had turned CI red, and a third stale copy of the scoping rule in `code-review-prompt.md` | finalise |
 
 ---
 
