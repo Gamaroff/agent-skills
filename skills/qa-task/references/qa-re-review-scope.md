@@ -53,9 +53,11 @@ carry this exact snippet:
 ```bash
 # $LATEST_GATE is the prior gate file.
 SAFETY_REPROBE=false
-awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
-     f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" \
-  | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
+  awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
+       f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" </dev/null \
+    | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+fi
 ```
 
 > **POSIX character classes only.** `\s` is a GNU extension. BSD awk and mawk do not match it and
@@ -64,6 +66,15 @@ awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
 > is the same failure mode this task exists to prevent, one layer down. The first draft of this
 > snippet had exactly that bug; it was caught by replaying it against `task.67.gate.1` rather than
 > by reading it.
+
+> **The `[ -r "$LATEST_GATE" ]` guard and the `</dev/null` are both load-bearing, and neither is
+> defensive padding.** `LATEST_GATE` is empty by construction on a **first** review — it comes from
+> `ls -t … | head -1` with no gates on disk. `awk 'prog' ""` passes no filename, so awk falls back to
+> reading **stdin** and blocks **indefinitely**: a hang, not an error, with no diagnostic. Reproduced
+> under both bash and zsh. Only the prose heading *"For re-reviews"* keeps the block from running
+> then, and a prose guard in front of an indefinite hang is not a guard. The `if` makes the
+> precondition explicit and `</dev/null` makes the stdin fallback unreachable even if the `if` is
+> ever removed.
 
 ### Non-trigger — stated explicitly, because the narrowness is the point
 

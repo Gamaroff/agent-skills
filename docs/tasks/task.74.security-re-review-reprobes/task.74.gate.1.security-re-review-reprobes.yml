@@ -1,0 +1,61 @@
+schema: 1
+task: 'task.74.security-re-review-reprobes'
+task_title: 'A security re-review must re-probe, not re-read'
+gate: CONCERNS
+status_reason: 'All four phases complete and every success criterion met, but executing the shipped prose found one MEDIUM defect: the clause-1 trigger probe hangs when LATEST_GATE is empty, because awk with no filename falls back to reading stdin. Reproduced under both bash and zsh.'
+reviewer: 'QA Engineer'
+updated: '2026-09-02T09:15:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The clause-1 probe hangs when $LATEST_GATE is empty — awk with no filename argument reads stdin and blocks indefinitely. LATEST_GATE is empty by construction on a first review; only the prose heading "For re-reviews" keeps the block from running then. Failure mode is an indefinite hang with no diagnostic, not an error. Reproduced under bash and zsh.'
+    suggested_action: 'Guard with `[ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]` and add `</dev/null` to the awk invocation so the stdin fallback can never engage. Fix in shared/resources/ and re-run `npm run bundle` — editing the bundled references/ copies alone is silently reverted. Add a regression test asserting the probe returns false rather than hanging for an empty and a nonexistent LATEST_GATE.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2200
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'The change tightens a QA safety path and adds no new attack surface. The one boundary in the diff — the trigger predicate — was probed with four inputs including two negative controls (CONCERNS-on-maintainability, and a gate with no security axis) and classified correctly on all four under both bash and zsh. The snippet engine fail-closed refusals behaved correctly and were not overridden.'
+  performance:
+    status: PASS
+    notes: 'No runtime code path. Unscoped re-reviews are a deliberate, documented cost bounded by the trigger itself — once security passes, scoping returns to default.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1. A documented command that hangs rather than errors is a reliability defect regardless of how narrowly it is reachable, because the failure carries no diagnostic. The rest of the change is robust: unset SAFETY_REPROBE degrades correctly to default scoping under both shells, verified by execution.'
+  maintainability:
+    status: PASS
+    notes: 'Rule stated once; both consumers reference rather than restate, enforced by the parity suite. The identity guard added after the file-swap incident closes a structural blind spot in the suite itself. 15 mutation proofs, 3 independently re-run during this review.'
+
+recommendations:
+  immediate:
+    - action: 'Guard the clause-1 probe on a readable $LATEST_GATE, add </dev/null, re-bundle, and add a regression test for the empty and nonexistent cases.'
+      refs:
+        ['shared/resources/qa-re-review-scope.md', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'Make the parity suite read the shared rule lazily so `the shared rule exists` reports its own assertion instead of an import-time ENOENT (CR-2).'
+      refs: ['evals/shared/tests/qa-re-review-scope-parity.test.mjs']
+    - action: 'Anchor extractProbe to a single match so a later-added earlier block cannot silently redirect the replay tests (CR-3).'
+      refs: ['evals/shared/tests/qa-re-review-scope-parity.test.mjs']
+    - action: 'bug.7 (zero-blocks-executed on correct refusal) gains a third confirming data point — all three files in this change set trip it, and both SKILL.md files already tripped it on develop.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 fixed and re-verified'

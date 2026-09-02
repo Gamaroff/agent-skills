@@ -34,9 +34,24 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+// The spawn budget is the single source for child-process timeouts. A literal
+// chosen against an idle machine is roughly 1.2× the loaded worst case, which
+// is what bug.2 was about, and `tests/test-harness-concurrency.test.js` fails
+// the build on any `timeout: <number>` literal in a test file.
+import { spawnBudget } from "../../../shared/resources/tests/spawn-budget.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
+
+const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("QA_REREVIEW_SCOPE");
+
+/**
+ * The stdin-holder must outlast the timeout, or the test stops discriminating.
+ * A fixed `sleep 30` under a 60s budget lets the fifo EOF first: awk returns,
+ * the assertion passes, and reverting the guard no longer reddens anything.
+ * Derive it from the budget so the two can never drift apart.
+ */
+const HOLD_STDIN_SECONDS = Math.ceil(SPAWN_TIMEOUT_MS / 1000) + 5;
 
 const RULE_PATH = join(
   repoRoot,
@@ -56,7 +71,18 @@ test("the shared rule exists", () => {
   );
 });
 
-const rule = readFileSync(RULE_PATH, "utf-8");
+/**
+ * Read lazily. A top-level `readFileSync` runs at import, BEFORE the existence
+ * test above executes — so a missing rule crashed the whole file with a raw
+ * ENOENT and the assertion written for exactly that case never reported. The
+ * suite still failed, so it was never a false green, but the diagnostic was
+ * lost. Reading on first use lets the existence test speak for itself.
+ */
+let _rule = null;
+function ruleText() {
+  if (_rule === null) _rule = readFileSync(RULE_PATH, "utf-8");
+  return _rule;
+}
 const skillText = new Map(
   SKILLS.map(([name, path]) => [name, readFileSync(path, "utf-8")]),
 );
@@ -118,7 +144,7 @@ test("the two skills are not byte-identical", () => {
 test("the shared rule states every trigger clause", () => {
   for (const literal of TRIGGER_LITERALS) {
     assert.ok(
-      rule.includes(literal),
+      ruleText().includes(literal),
       `shared rule is missing trigger clause: ${literal}`,
     );
   }
@@ -269,7 +295,7 @@ test("the shared rule names the non-triggers explicitly", () => {
     "FAIL` on documentation or test coverage",
   ]) {
     assert.ok(
-      rule.includes(literal),
+      ruleText().includes(literal),
       `shared rule must state the non-trigger explicitly: ${literal}`,
     );
   }
@@ -277,12 +303,12 @@ test("the shared rule names the non-triggers explicitly", () => {
 
 test("the shared rule keeps REFUTE_PASS and SAFETY_REPROBE independent", () => {
   assert.ok(
-    rule.includes("does **not** set it"),
+    ruleText().includes("does **not** set it"),
     "the rule must say SAFETY_REPROBE does not set REFUTE_PASS — collapsing them " +
       "makes cycle 3+ lose the refute or cycle 2 lose the re-probe",
   );
   assert.ok(
-    /compose/i.test(rule),
+    /compose/i.test(ruleText()),
     "the rule must say the two directives compose where both apply",
   );
 });
@@ -304,12 +330,26 @@ test("the shared rule keeps REFUTE_PASS and SAFETY_REPROBE independent", () => {
  * suite is that copies drift.
  */
 function extractProbe() {
-  const m = rule.match(/```bash\n([^`]*?SAFETY_REPROBE=false\n[\s\S]*?)```/);
+  // Match ALL candidates, not the first. Taking the first would let a later
+  // edit that adds an earlier `SAFETY_REPROBE=false` block silently redirect
+  // every replay test below onto a different snippet — while they all still
+  // reported green, which is the failure this suite exists to prevent.
+  const all = [
+    ...ruleText().matchAll(
+      /```bash\n([^`]*?SAFETY_REPROBE=false\n[\s\S]*?)```/g,
+    ),
+  ];
   assert.ok(
-    m,
+    all.length > 0,
     "shared rule must contain the clause-1 probe in a ```bash block defining SAFETY_REPROBE",
   );
-  return m[1].trimEnd();
+  assert.equal(
+    all.length,
+    1,
+    `shared rule has ${all.length} bash blocks defining SAFETY_REPROBE; the clause-1 probe must ` +
+      `be the only one, or the replay tests below silently execute the wrong snippet`,
+  );
+  return all[0][1].trimEnd();
 }
 
 const CLAUSE_1 = extractProbe();
@@ -332,7 +372,7 @@ function normalise(text) {
 test("both skills carry the clause-1 probe verbatim from the shared rule", () => {
   const body = normalise(CLAUSE_1);
   assert.ok(
-    normalise(rule).includes(body),
+    normalise(ruleText()).includes(body),
     "shared rule must hold the canonical probe",
   );
   for (const [name, text] of skillText) {
@@ -351,6 +391,45 @@ test("the clause-1 probe uses no GNU-only regex escapes", () => {
   );
 });
 
+/**
+ * Run the real probe with LATEST_GATE set to `path` verbatim, under a stdin
+ * that STAYS OPEN, and return SAFETY_REPROBE.
+ *
+ * The open stdin is the whole point and was got wrong the first time. Passing
+ * `stdio: ["pipe", …]` and writing nothing makes Node close the child's stdin
+ * immediately, so awk sees EOF and returns at once — the test passed whether or
+ * not the guard was present. Mutation MF-1 (revert the guard entirely) left it
+ * green, which is how the vacuity was found.
+ *
+ * `exec 0< <(sleep ${HOLD_STDIN_SECONDS} 2>/dev/null)` gives the probe a stdin that is open and never
+ * delivers, which is what an agent's shell actually looks like. With the guard
+ * present awk is never reached; without it, awk reads that stdin and blocks,
+ * and `timeout` turns the block into a failure instead of a stalled suite.
+ *
+ * Only the sleep's STDERR is redirected, and the asymmetry is load-bearing.
+ * Its stdout IS the process-substitution fifo — that is what keeps stdin open
+ * with no data — so redirecting stdout removes the fifo's only writer, stdin
+ * EOFs at once, and the test passes with or without the guard. That was the
+ * second vacuous version of this test. Its stderr, meanwhile, inherits the
+ * shell's, and execFileSync waits for that pipe to close, so leaving it
+ * inherited blocks the call for the full sleep even when the probe returned
+ * immediately — a hang that is not one. Redirect stderr, keep stdout.
+ */
+function runClause1WithGatePath(path) {
+  return execFileSync(
+    "bash",
+    [
+      "-c",
+      `exec 0< <(sleep ${HOLD_STDIN_SECONDS} 2>/dev/null)\n${CLAUSE_1}\nprintf '%s' "$SAFETY_REPROBE"`,
+    ],
+    {
+      env: { ...process.env, LATEST_GATE: path },
+      encoding: "utf-8",
+      timeout: SPAWN_TIMEOUT_MS,
+    },
+  ).trim();
+}
+
 /** Run the real probe against a gate file and return its SAFETY_REPROBE value. */
 function runClause1(yaml) {
   const file = join(tmpdir(), `qa-scope-probe-${randomUUID()}.yml`);
@@ -362,6 +441,13 @@ function runClause1(yaml) {
       {
         env: { ...process.env, LATEST_GATE: file },
         encoding: "utf-8",
+        // A hang must FAIL, not stall the suite. Before the guard was added, an
+        // empty LATEST_GATE made awk fall back to reading stdin and block
+        // forever; without these two options this test would hang the runner
+        // instead of reporting. "pipe" gives the child a stdin nothing writes
+        // to, which is what reproduces the fallback.
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: SPAWN_TIMEOUT_MS,
       },
     ).trim();
   } finally {
@@ -419,5 +505,42 @@ test("replay: a gate with no security axis does not fire the trigger", () => {
       ].join("\n"),
     ),
     "false",
+  );
+});
+
+/* ---------------------------------------------------------------------------
+ * 6. The probe must not HANG when there is no prior gate.
+ *
+ * `LATEST_GATE` is empty by construction on a first review — it comes from
+ * `ls -t … | head -1` with nothing on disk. `awk 'prog' ""` passes no filename,
+ * so awk falls back to reading stdin and blocks INDEFINITELY: a hang, not an
+ * error, carrying no diagnostic. Only the prose heading "For re-reviews" kept
+ * the block from running then, and a prose guard in front of an indefinite hang
+ * is not a guard.
+ *
+ * These tests would have hung the runner before the fix; the spawn budget's timeout turns
+ * that into a failure instead of a stall.
+ * ------------------------------------------------------------------------- */
+
+test("clause-1 returns false, and does not hang, when LATEST_GATE is empty", () => {
+  assert.equal(runClause1WithGatePath(""), "false");
+});
+
+test("clause-1 returns false, and does not hang, when LATEST_GATE does not exist", () => {
+  const missing = join(tmpdir(), `qa-scope-absent-${randomUUID()}.yml`);
+  assert.ok(!existsSync(missing), "fixture path must not exist");
+  assert.equal(runClause1WithGatePath(missing), "false");
+});
+
+test("clause-1 guards the read before invoking awk", () => {
+  assert.match(
+    CLAUSE_1,
+    /\[ -n "\$LATEST_GATE" \] && \[ -r "\$LATEST_GATE" \]/,
+    "the probe must test that LATEST_GATE is set and readable before running awk",
+  );
+  assert.ok(
+    CLAUSE_1.includes("</dev/null"),
+    "the probe must close stdin so awk's read-stdin fallback is unreachable even " +
+      "if the guard is later removed",
   );
 });

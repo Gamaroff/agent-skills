@@ -230,10 +230,15 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    # $LATEST_GATE is the prior gate file resolved above. Trigger clause 1, per the shared rule.
    # POSIX character classes only: `\s` is a GNU extension that BSD/mawk silently never match,
    # which fails the trigger CLOSED — the carve-out would never fire and nothing would say so.
+   # LATEST_GATE is EMPTY on a first review. `awk 'prog' ""` passes no filename, falls back to
+   # reading stdin, and hangs indefinitely — a hang, not an error. Guard it, and close stdin so the
+   # fallback is unreachable even if the guard is ever removed.
    SAFETY_REPROBE=false
-   awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
-        f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" \
-     | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+   if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
+     awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
+          f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" </dev/null \
+       | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+   fi
    ```
 
    Clause 1 is mechanical and shown above. Clauses 2 and 3 are judgement calls made against the

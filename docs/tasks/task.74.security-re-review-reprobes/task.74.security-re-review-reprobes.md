@@ -393,6 +393,47 @@ every subsequent one.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-02
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.74.qa.1.security-re-review-reprobes.md](./task.74.qa.1.security-re-review-reprobes.md)
+- **Gate File**: [task.74.gate.1.security-re-review-reprobes.yml](./task.74.gate.1.security-re-review-reprobes.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2200 (`npm run ci:fast`, 2199 pass / 0 fail) + 31 in the new parity suite
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 2 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### QA Fix Cycle 1 — all three findings addressed
+
+| ID | Severity | Status | Fix |
+| --- | --- | --- | --- |
+| CR-1 | MEDIUM | ✅ Fixed | Probe guarded on `[ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]` plus `</dev/null`; fixed in `shared/resources/` and re-bundled. Three regression tests added and mutation-proven. |
+| CR-2 | LOW | ✅ Fixed | Shared rule now read lazily via `ruleText()`, so `the shared rule exists` reports its own assertion instead of an import-time ENOENT. |
+| CR-3 | LOW | ✅ Fixed | `extractProbe` uses `matchAll` and asserts exactly one match. |
+
+Suite: 31 → **34 tests**, all passing.
+
+### Key Findings
+
+**CR-1 (MEDIUM)** — the clause-1 trigger probe **hangs** when `$LATEST_GATE` is empty: `awk` with no
+filename argument falls back to reading stdin and blocks indefinitely. `LATEST_GATE` is empty by
+construction on a first review, and only the prose heading *"For re-reviews"* keeps the block from
+running then. Reproduced under both `bash` and `zsh`.
+
+Found by **executing** the shipped prose, not by reading it — which is the change this task is about.
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -404,6 +445,8 @@ every subsequent one.
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.67 pipeline retrospective    | create-task |
 | 2026-09-02 | 1.1     | Review passed (8/10) — §3 corrected: `61197c3` already gives cycle 2 a full-diff refute pass; task re-aimed at the cycle-3+ residual gap; Phase 2 now composes with the existing branch; third mutation proof added | review-task |
 | 2026-09-02 |         | Implemented — 4 files (1 new shared rule, 2 skills, 1 new parity test), 31 tests, 15 mutation proofs | develop |
+| 2026-09-02 |         | QA gate CONCERNS (90/100) — 1 medium: clause-1 probe hangs on empty `$LATEST_GATE` | qa-task |
+| 2026-09-02 |         | QA findings fixed — CR-1/CR-2/CR-3 closed, 3 regression tests added, 1 iteration | qa-fix |
 
 ---
 
