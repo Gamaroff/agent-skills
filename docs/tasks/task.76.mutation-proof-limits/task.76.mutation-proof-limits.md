@@ -5,18 +5,20 @@ type: task
 description: "mutation-proving.md answers one question well — is this test real? It never says what a suite of real tests still fails to cover, and it gives an unheld proof exactly one diagnosis when there are three. On task 67 nine proofs held while thirteen holes sat in the code, and both unheld proofs were true signals that the doc's advice would have discarded."
 tags: [testing, mutation-proving, verification, documentation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-01
 updated: 2026-09-02
+completed_date: 2026-09-02
+pr_number: 304
 assignee:
 estimated_effort_hours: 3
 ---
 
 # Technical Task: State what a mutation proof does not tell you
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.76.review.1.mutation-proof-limits.md` implemented 2026-09-02
 
 ---
@@ -381,6 +383,43 @@ _None._
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**QA Report**: [task.76.qa.2.mutation-proof-limits.md](./task.76.qa.2.mutation-proof-limits.md)
+**Gate File**: [task.76.gate.2.mutation-proof-limits.yml](./task.76.gate.2.mutation-proof-limits.yml)
+**Gate Status**: ✅ PASS · **Quality Score**: 100/100 · **QA Cycles**: 2 (CONCERNS 90 → PASS 100)
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria** — 10/10, each checked against the file rather than against the claim of meeting it
+✅ **CI** — `test`, `validate`, `link-check` and the branch check all green on head `0b688f0`, which
+   equals local HEAD. The rollup read `PENDING` on first sample and was **waited on, not assumed**
+✅ **Security** — no credentials, no executable code; Step 4b's fail-closed classifier correctly
+   refused the one fenced `bash` block rather than guessing
+✅ **Compliance** — source edited and copies generated, never hand-edited; no `SKILL.md` touched, so
+   §4 Out of Scope held
+✅ **Documentation** — the deliverable is the documentation; Change Log current across all six
+   pipeline stages; root `CHANGELOG.md` assessed and correctly not required
+✅ **Links** — 12/12 resolve in the **tracked** tree, verified through a detached worktree
+
+**Accepted residual (not gaps):** two LOW observations, both pre-existing and neither introduced
+here — the file's own `bash` block is unexecutable by Step 4b (`cp` off the fail-closed allow-list),
+and `skills/develop/SKILL.md` still says "the four shapes" against a five-shape document (forbidden
+to fix here by §4). Both carried in the gate's `recommendations.future`.
+
+**Mutation proving:** n/a — there is no behaviour to revert, and fabricating a proof would violate
+the very document this task changes.
+
+**Detailed Verification Log:** [task.76.dod.1.mutation-proof-limits.md](./task.76.dod.1.mutation-proof-limits.md)
+
+**Task marked as ACCEPTED on:** 2026-09-02
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -395,6 +434,7 @@ _None._
 | 2026-09-02 |         | QA gate CONCERNS (90/100) — 10/10 success criteria met, 1 MEDIUM (stale frontmatter description) | qa-task |
 | 2026-09-02 |         | QA findings fixed — TASK-76-001 closed (frontmatter description rewritten to 60 words covering all three questions, re-bundled), 1 iteration | qa-fix |
 | 2026-09-02 |         | QA gate PASS (100/100) — TASK-76-001 verified closed; cycle-2 refute pass found no false claim; links verified in the tracked tree | qa-task |
+| 2026-09-02 | 1.2     | DoD verified — accepted (PR #304), CI green on the final head, 2 QA cycles | finalise |
 
 ---
 
