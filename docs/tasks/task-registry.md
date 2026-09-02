@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-09-01
-**Next Available Task Number:** **79**
+**Last Updated:** 2026-09-02
+**Next Available Task Number:** **83**
 
 ## How to use
 
@@ -118,6 +118,10 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 76 | [State what a mutation proof does not tell you](task.76.mutation-proof-limits/task.76.mutation-proof-limits.md) | ready-for-development | infrastructure | Medium | 2026-09-01 | — | task.67 |
 | 77 | [Run the PR conformance review before a work item is finalised](task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md) | ready-for-development | infrastructure | High | 2026-09-01 | — | task.66 |
 | 78 | [Give develop-bug's fix cycle the same fast gate as the other pipelines](task.78.develop-bug-fast-gate/task.78.develop-bug-fast-gate.md) | ready-for-development | infrastructure | Medium | 2026-09-01 | — | task.75 |
+| 79 | [Write down the inputs that defeat each sink, once](task.79.security-input-corpus/task.79.security-input-corpus.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | — |
+| 80 | [Make a security probe runnable without widening the snippet allow-list](task.80.security-probe-engine/task.80.security-probe-engine.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | task.79 |
+| 81 | [Ship /review-security: prove a control engages, not that it is present](task.81.review-security-skill/task.81.review-security-skill.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | task.79, task.80 |
+| 82 | [Feed the measured security verdict into the QA gate](task.82.security-gate-evidence-field/task.82.security-gate-evidence-field.md) | ready-for-development | infrastructure | Medium | 2026-09-02 | — | task.81 |
 
 - **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 
