@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.45.0] - 2026-09-02
+
 ### Added
 
 - **A QA re-review after a safety failure now re-probes the surface instead of re-reading the fixes.**
