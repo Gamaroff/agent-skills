@@ -26,6 +26,7 @@ status: draft
 │
 ├── evals/                   # Four-layer eval suite
 │   ├── shared/              # Eval runner (runner.mjs, drivers, harness helpers)
+│   │   └── tests/           # Cross-cutting parity tests — in the `npm test` glob
 │   ├── <skill>/protocol/    # Protocol-level tests
 │   ├── <skill>/scenarios/   # Fixture scenarios (hermetic by default)
 │   ├── <skill>/step-isolation/  # Per-step isolation runs
