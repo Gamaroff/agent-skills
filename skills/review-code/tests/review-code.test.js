@@ -214,16 +214,58 @@ const FINDINGS_FIXTURE = JSON.stringify({
         finding: "null deref on `x`",
         suggested_action: "guard it",
       },
+      // Shapes an LLM plausibly emits from "file_line is path:line". jq is
+      // all-or-nothing inside `[ ... ]`, so before the test() guard each of these
+      // aborted the WHOLE program, emptied $INLINE_FILE and dropped every
+      // finding -- not degraded, dropped.
+      {
+        id: "CR-2",
+        category: "bug",
+        severity: "medium",
+        confidence: "medium",
+        file_line: "src/y.ts:10-24",
+        finding: "a range, not a line",
+        suggested_action: "n/a",
+      },
+      {
+        id: "CR-3",
+        category: "cleanup",
+        severity: "low",
+        confidence: "low",
+        file_line: "src/z.ts",
+        finding: "no line at all",
+        suggested_action: "n/a",
+      },
+      // suggested_action absent -- string concatenation with null aborts too.
+      {
+        id: "CR-4",
+        category: "cleanup",
+        severity: "low",
+        confidence: "low",
+        file_line: "src/w.ts:3",
+        finding: "no suggested action",
+      },
     ],
     truncated_count: 0,
   },
+  // Conformance findings carry `ref`, NOT `file_line` -- see
+  // references/pr-conformance-prompt.md. `ref` is a criterion id, a frontmatter
+  // field, an artifact path, OR a path:line; only the last can be anchored. A
+  // fixture that invents `file_line` here tests a shape production never emits.
   pr_conformance: {
     work_item: "task.70",
     findings: [
       {
         id: "PC-1",
         severity: "medium",
-        file_line: "docs/a.md:3",
+        ref: "AC-3",
+        finding: "criterion not evidenced",
+        suggested_action: "cite it",
+      },
+      {
+        id: "PC-2",
+        severity: "low",
+        ref: "docs/a.md:3",
         finding: "claim unsupported",
         suggested_action: "cite it",
       },
@@ -233,7 +275,8 @@ const FINDINGS_FIXTURE = JSON.stringify({
 
 /** Pull the jq program out of the SKILL.md snippet that feeds --findings-file. */
 function extractJqProgram(skillText) {
-  const m = skillText.match(/jq '(\[[\s\S]*?\])'\s*"\$FINDINGS_JSON"/);
+  // Tolerate a shell line-continuation between the program and its input file.
+  const m = skillText.match(/jq '(\[[\s\S]*?\])'[\s\\]*"\$FINDINGS_JSON"/);
   return m ? m[1] : null;
 }
 
@@ -258,6 +301,18 @@ test("the inline-comment jq snippet executes against a schema-shaped fixture", (
   assert.ok(
     out.length > 0,
     "the snippet extracted no findings from the fixture",
+  );
+  // The well-formed finding must SURVIVE its malformed neighbours. `length > 0`
+  // alone would pass while every entry but one was silently lost — jq aborts the
+  // whole array on a single bad entry, so this is the assertion that matters.
+  assert.ok(
+    out.some((f) => f.path === "src/x.ts" && f.line === 42),
+    "a well-formed finding must survive alongside a range file_line, a bare " +
+      "path, and a missing suggested_action",
+  );
+  assert.ok(
+    !out.some((f) => String(f.path).includes("y.ts")),
+    "a range file_line has no single line to anchor to — exclude it, never guess",
   );
   for (const f of out) {
     assert.ok(f.path && typeof f.path === "string", "each record needs a path");

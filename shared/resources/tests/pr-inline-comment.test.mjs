@@ -530,7 +530,13 @@ test("§3 a Bitbucket re-run UPDATES rather than posting a duplicate", async () 
   const dir = withRepo();
   const key = cli.findingId(FINDINGS[0]);
   const { fetchImpl, execImpl, posts, puts } = stubBb({
-    existing: [{ id: 77, content: { raw: `${cli.markerHtml(key)}\nold` } }],
+    existing: [
+      {
+        id: 77,
+        content: { raw: `${cli.markerHtml(key)}\nold` },
+        inline: { path: "src/a.ts", to: 12 },
+      },
+    ],
   });
   const r = await cli.run({
     argv: [
@@ -566,8 +572,16 @@ test("§3 a duplicate Bitbucket marker degrades — it is never dropped", async 
   const key = cli.findingId(FINDINGS[0]);
   const { fetchImpl, execImpl, posts, puts } = stubBb({
     existing: [
-      { id: 1, content: { raw: `${cli.markerHtml(key)}\nfirst` } },
-      { id: 2, content: { raw: `${cli.markerHtml(key)}\nsecond` } },
+      {
+        id: 1,
+        content: { raw: `${cli.markerHtml(key)}\nfirst` },
+        inline: { path: "src/a.ts", to: 12 },
+      },
+      {
+        id: 2,
+        content: { raw: `${cli.markerHtml(key)}\nsecond` },
+        inline: { path: "src/a.ts", to: 12 },
+      },
     ],
   });
   const r = await cli.run({
@@ -650,6 +664,66 @@ test("§4 an existing marker is updated in place, not duplicated", async () => {
   assert.match(patch.argv.join(" "), /pulls\/comments\/999/);
   assert.equal(r.findings.find((f) => f.line === 12).reason, "updated");
   assert.equal(r.posted, 1, "only the genuinely new finding posts");
+});
+
+test("§4 a multi-page comment list is parsed, not treated as unreadable", async () => {
+  // `gh api --paginate` emits ONE JSON DOCUMENT PER PAGE. Without --slurp the
+  // concatenation `[…]\n[…]` fails JSON.parse, the scan throws, and every finding
+  // degrades to `unverifiable` — the module silently reverting to summary-only on
+  // exactly the PRs that have accumulated the most comments.
+  const dir = withRepo();
+  const key = cli.findingId(FINDINGS[0]);
+  const page1 = [
+    { id: 1, body: "unrelated", path: "z.ts", line: 1, position: 1 },
+  ];
+  const page2 = [
+    {
+      id: 2,
+      body: `${cli.markerHtml(key)}\nold`,
+      path: "src/a.ts",
+      line: 12,
+      position: 5,
+    },
+  ];
+  const calls = [];
+  const execImpl = (bin, argv, opts) => {
+    calls.push({ bin, argv, input: opts && opts.input });
+    if (argv[0] === "auth") return "";
+    if (argv[0] === "repo")
+      return JSON.stringify({ owner: { login: "acme" }, name: "repo" });
+    if (argv[0] === "pr" && argv[1] === "view")
+      return JSON.stringify({ headRefOid: "abc123def456" });
+    if (argv[0] === "pr" && argv[1] === "comment") return "";
+    if (argv[0] === "api" && !argv.includes("--method")) {
+      assert.ok(
+        argv.includes("--slurp"),
+        "--slurp is what makes pages parseable",
+      );
+      // What --slurp actually returns: an outer array wrapping each page.
+      return JSON.stringify([page1, page2]);
+    }
+    if (argv[0] === "api") return "{}";
+    throw new Error(`unexpected gh call: ${argv.join(" ")}`);
+  };
+  const r = await cli.run({
+    argv: [
+      "node",
+      "cli",
+      "--pr",
+      "5",
+      "--findings-file",
+      findingsFile(dir),
+      "--json",
+    ],
+    execImpl,
+    repoRoot: dir,
+    env: { VCS: "github", ACCESS_TRACKER: "full" },
+  });
+  assert.equal(
+    r.findings.find((f) => f.line === 12).reason,
+    "updated",
+    "the marker on page 2 must be found — not reported unverifiable",
+  );
 });
 
 test("§4 a stale anchor degrades — it is not reported as updated", async () => {
@@ -1199,8 +1273,28 @@ test("§9 the inline marker prefix is distinct from the issue-comment one", () =
   );
 });
 
-test("§9 a caller-supplied id is the finding's identity across runs", () => {
-  assert.equal(cli.findingId({ id: "F1", path: "a.ts", line: 1 }), "F1");
+test("§9 a caller id is a NAMESPACE, never the identity on its own", () => {
+  // Both real producers emit CR-{n}/PC-{n}, documented as "stable within this
+  // run" — a per-run ordinal. Adopting it as identity means run 2's CR-1 is a
+  // different finding wearing run 1's name, so the body hash is always mixed in.
+  const a = cli.findingId({ id: "CR-1", path: "a.ts", line: 1, body: "first" });
+  const b = cli.findingId({
+    id: "CR-1",
+    path: "b.ts",
+    line: 9,
+    body: "second",
+  });
+  assert.notEqual(
+    a,
+    b,
+    "one ordinal, two different findings — must not collide",
+  );
+  assert.match(a, /^CR-1:[0-9a-f]{8}$/);
+  assert.equal(
+    cli.findingId({ id: "CR-1", path: "a.ts", line: 1, body: "first" }),
+    a,
+    "and the same finding text must still resolve to the same id",
+  );
   // A derived id is anchor PLUS a body hash — the anchor alone collides when two
   // findings sit on one line (see §4).
   assert.match(

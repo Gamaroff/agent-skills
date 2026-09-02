@@ -428,12 +428,23 @@ the shared primitive. It resolves `$VCS` itself, so this step does not branch:
 # WRAPPER's values (`reviewed`, the findings array, `truncated_count`), so
 # `select(.file_line != null)` indexes a string and jq aborts outright.
 # `.finding` is the schema's key; there is no `.summary`.
-jq '[ (.code_review.findings[]?), (.pr_conformance.findings[]?)
-      | select(.file_line != null)
-      | {path: (.file_line | split(":")[0]),
-         line: (.file_line | split(":")[1] | tonumber),
-         body: (.finding + "\n\n→ " + .suggested_action),
-         id:   .id} ]' "$FINDINGS_JSON" > "$INLINE_FILE"
+# Two lenses, two different anchor keys. `code_review` findings carry
+# `file_line`; `pr_conformance` findings carry `ref`, which is a criterion id, a
+# frontmatter field, an artifact path OR a `path:line` — only the last form can
+# be anchored. Both are normalised and then filtered by SHAPE, so a `ref` of
+# "AC-3" is excluded rather than aborting the program. jq is all-or-nothing
+# inside `[ … ]`: one malformed entry would otherwise empty the file and drop
+# every finding. Conformance findings that cannot anchor stay in the summary
+# comment, which is posted regardless.
+jq '[ (.code_review.findings[]? | . + {anchor: .file_line}),
+      (.pr_conformance.findings[]? | . + {anchor: .ref})
+      | select((.anchor? // "") | test("^.+:[0-9]+$"))
+      | {path: (.anchor | split(":")[0]),
+         line: (.anchor | split(":")[1] | tonumber),
+         body: (.finding
+                + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
+   "$FINDINGS_JSON" > "$INLINE_FILE" || {
+  echo "findings JSON did not match the schema — not posting inline"; exit 1; }
 
 node .agents/skills/review-pr/references/pr-inline-comment.js \
   --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \

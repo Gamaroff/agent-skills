@@ -204,13 +204,21 @@ const MARKER_RE = new RegExp(
 );
 
 /**
- * A finding's stable identity. The caller's `id` when it supplied one — it
- * knows better than we do which findings are "the same finding" across runs.
- * Otherwise path+line+side, which is stable for as long as the anchor is.
+ * A finding's identity ACROSS RUNS — which is not the same thing as the caller's
+ * `id`, and conflating the two broke convergence.
+ *
+ * Both real producers emit `CR-{n}` / `PC-{n}`, documented in their own prompts
+ * as "stable within this run": a per-run ORDINAL. Adopting it as identity means
+ * run 2's `CR-1` is a different finding wearing run 1's name — the marker hits,
+ * the anchor no longer matches, and the new finding is degraded while a comment
+ * about an already-fixed bug sits on the PR forever. So the caller's id is used
+ * only as a NAMESPACE, and the body hash is always mixed in: two runs agree on a
+ * finding exactly when its text agrees, which is the only signal either producer
+ * actually offers.
  */
 function findingId(f) {
   const raw = f.id
-    ? String(f.id)
+    ? `${f.id}:${shortHash(f.body)}`
     : // The body hash is not decoration. Without it the derived id is the
       // ANCHOR, so two different findings about the same line share one
       // identity: on a re-run both PATCH the same comment and the second body
@@ -420,13 +428,24 @@ function ghRepoSlug(execImpl) {
  * this module exists to prevent.
  */
 function ghExistingMarkers(execImpl, slug, pr) {
-  const list = ghJson(execImpl, [
+  // `--slurp` is REQUIRED, not tidiness. `gh api --paginate` emits one JSON
+  // document per page — `[…]\n[…]` — which `JSON.parse` rejects outright. Without
+  // it, any PR carrying more than one page of review comments (the default page
+  // size is 30, and three qa-fix cycles get there) throws here, the whole run
+  // degrades to `unverifiable`, and the module silently becomes the summary-only
+  // behaviour it was written to replace — on exactly the busiest PRs.
+  // `--slurp` wraps the pages in an outer array, so flatten one level.
+  const pages = ghJson(execImpl, [
     "api",
     "--paginate",
+    "--slurp",
+    "-f",
+    "per_page=100",
     `/repos/${slug}/pulls/${pr}/comments`,
   ]);
+  const list = Array.isArray(pages) ? pages.flat() : [];
   const seen = new Map();
-  for (const c of Array.isArray(list) ? list : []) {
+  for (const c of list) {
     const body = String((c && c.body) || "");
     const m = body.match(MARKER_RE);
     if (!m) continue;
@@ -712,12 +731,39 @@ async function runGithub({
         });
       }
     } catch (e) {
-      // A wholesale rejection says nothing about WHICH finding caused it, so
-      // fall back to per-comment posting, which isolates the rejection to the
+      // A wholesale ANCHOR rejection says nothing about WHICH finding caused it,
+      // so fall back to per-comment posting, which isolates the rejection to the
       // findings that actually earned it instead of losing the whole batch.
-      output.info(
-        `ℹ️  Batched review rejected (${String(e.message).split("\n")[0]}) — falling back to per-comment.`,
-      );
+      //
+      // But fall back ONLY for an anchor rejection. `gh` also exits non-zero when
+      // the request was accepted and the RESPONSE was lost (proxy timeout, reset
+      // connection). Retrying those blindly posts a second comment per marker,
+      // and the next run then sees count > 1 for every key and refuses to post or
+      // edit anything — permanently, with nothing to reconcile it. Converging to
+      // "never comments again" is worse than one lost batch, so a non-anchor
+      // failure degrades to the summary instead.
+      if (isAnchorRejection(e.message)) {
+        output.info(
+          `ℹ️  Batched review rejected (${String(e.message).split("\n")[0]}) — falling back to per-comment.`,
+        );
+      } else {
+        output.warn(
+          `⚠️  Batched review failed without an anchor rejection (${String(e.message).split("\n")[0]}) — degrading rather than risking duplicates.`,
+        );
+        for (const e2 of fresh) {
+          degraded.push({
+            ...e2,
+            why: "the batched review call failed and a retry could duplicate it",
+          });
+          results.push({
+            id: e2.key,
+            reason: "anchor-failed",
+            path: e2.finding.path,
+            line: e2.finding.line,
+          });
+        }
+        fresh.length = 0;
+      }
     }
     if (!batched) {
       for (const e of fresh) {
@@ -817,8 +863,12 @@ async function finishRun({
   ).length;
   const updated = results.filter((r) => r.reason === "updated").length;
   let reason;
-  if (unverifiable && !posted && !updated && !degraded.length)
-    reason = "unverifiable";
+  // Compare against the RESULTS, not against `degraded`. The cycle-1 fix made
+  // every `unverifiable` site also degrade (correctly — the finding must still be
+  // delivered), which silently made the old `!degraded.length` test unreachable:
+  // the run-level `unverifiable` in the contract's table could never be emitted,
+  // and `--strict` could never report the one condition it exists to report.
+  if (unverifiable && unverifiable === results.length) reason = "unverifiable";
   else if (degraded.length || unverifiable) reason = "partial";
   else if (!posted && updated) reason = "already";
   else reason = "posted";
@@ -963,7 +1013,15 @@ async function runBitbucket({
         if (!m) continue;
         const prev = existing.get(m[1]);
         if (prev) prev.count += 1;
-        else existing.set(m[1], { id: c.id, count: 1 });
+        // Capture the inline coordinates. The claim that Bitbucket "has no
+        // equivalent of GitHub's position: null" is true and beside the point —
+        // the two arms of the staleness check that actually fire are the path
+        // and line comparisons, and Bitbucket returns inline.path / inline.to on
+        // every inline comment. Without these the arm would PUT a moved comment
+        // and report `updated`, which is the misreport the invariant forbids,
+        // while GitHub degrades on the identical state.
+        else
+          existing.set(m[1], { id: c.id, count: 1, inline: c.inline || null });
       }
       next = page && page.next ? page.next : null;
     }
@@ -1019,6 +1077,30 @@ async function runBitbucket({
     }
 
     if (hit) {
+      const at = hit.inline || {};
+      const atLine = at.to !== undefined ? at.to : at.from;
+      const moved =
+        !hit.inline ||
+        (at.path !== undefined && at.path !== f.path) ||
+        (atLine !== undefined && atLine !== f.line);
+      if (moved) {
+        // Same rule as the GitHub arm. A marker on a comment that is no longer
+        // where this finding points — or on a conversation comment with no
+        // inline block at all — must not be rewritten in place and called
+        // `updated`.
+        degraded.push({
+          key,
+          finding: f,
+          why: "the existing comment's anchor is no longer where this finding points",
+        });
+        results.push({
+          id: key,
+          reason: "anchor-failed",
+          path: f.path,
+          line: f.line,
+        });
+        continue;
+      }
       try {
         const res = await doFetch(`${base}/comments/${hit.id}`, {
           method: "PUT",

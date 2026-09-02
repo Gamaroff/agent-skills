@@ -105,11 +105,20 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    # values (`reviewed`, the findings array, `truncated_count`), so the select
    # indexes a string and jq aborts. `.finding` is the schema's key, not
    # `.summary`; see `references/code-review-prompt.md` § Output contract.
-   jq '[ .code_review.findings[]? | select(.file_line != null)
+   #
+   # The `test()` guard is load-bearing: jq is all-or-nothing inside `[ … ]`, so a
+   # single `file_line` of `src/x.ts:42-58` (a range) or `src/x.ts` (no line) would
+   # abort the WHOLE program, leave `$INLINE_FILE` empty, and drop every finding —
+   # not degrade them, drop them. `suggested_action` is likewise made optional.
+   # A finding excluded here has no line to anchor to; carry it in your summary.
+   jq '[ .code_review.findings[]?
+         | select((.file_line? // "") | test("^.+:[0-9]+$"))
          | {path: (.file_line | split(":")[0]),
             line: (.file_line | split(":")[1] | tonumber),
-            body: (.finding + "\n\n→ " + .suggested_action),
-            id:   .id} ]' "$FINDINGS_JSON" > "$INLINE_FILE"
+            body: (.finding
+                   + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
+      "$FINDINGS_JSON" > "$INLINE_FILE" || {
+     echo "findings JSON did not match the schema — not posting inline"; exit 1; }
 
    node .agents/skills/review-code/references/pr-inline-comment.js \
      --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \
@@ -117,6 +126,12 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    ```
 
    **Anchoring failure degrades to the summary comment; it never drops a finding.** A line outside the diff hunk is rejected — routinely — and that finding is appended to the summary instead, reporting `anchor-failed` rather than `posted`. Pass `--summary-file` so the degraded findings land under your own summary rather than in a bare comment of their own. Read the per-finding `reason`s: a `partial` run delivered everything, just not all of it inline.
+
+   **Do not pass the finding's `id` through.** `CR-{n}` is an ordinal that is
+   stable *within a run*, so handing it over as a cross-run identity makes run 2's
+   `CR-1` a different finding wearing run 1's name. Omitting it lets the CLI derive
+   an identity from the anchor plus the body, which is the only signal this schema
+   actually offers.
 
    Contract, `reason` vocabulary and the re-run rule (marker + update-in-place): [`references/pr-inline-comment-contract.md`](references/pr-inline-comment-contract.md).
 3. **Summary-only fallback** — when no finding carries a `file_line`, or the CLI reports `no-credentials`. This step still branches, because the two platforms have no common transport for a conversation comment.

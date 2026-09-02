@@ -327,28 +327,32 @@ Keep the CLI and the GitHub path; disable the Bitbucket arm — they are indepen
 
 ## QA Testing Results
 
-**QA Status**: PASS (FAIL on cycle 1, resolved in qa-fix cycle 1)
+**QA Status**: PASS (2 cycles — cycle 1 FAIL, cycle 2 refute pass)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-02
-**Quality Score**: 95/100
+**Quality Score**: 92/100
 **Gate Decision**: PASS
 
-### QA Report
-- **Full Report**: [task.70.qa.1.inline-pr-comments.md](./task.70.qa.1.inline-pr-comments.md)
-- **Gate File**: [task.70.gate.1.inline-pr-comments.yml](./task.70.gate.1.inline-pr-comments.yml)
+### QA Reports
+- **Cycle 1**: [task.70.qa.1.inline-pr-comments.md](./task.70.qa.1.inline-pr-comments.md) · gate [task.70.gate.1.inline-pr-comments.yml](./task.70.gate.1.inline-pr-comments.yml) — FAIL (50/100), 9 issues
+- **Cycle 2 (refute)**: [task.70.qa.2.inline-pr-comments.md](./task.70.qa.2.inline-pr-comments.md) · gate [task.70.gate.2.inline-pr-comments.yml](./task.70.gate.2.inline-pr-comments.yml) — PASS (92/100), 8 further issues
 
 ### Test Coverage Summary
 - **Tests Executed**: 905 (shared) + 127 (repo guards) + 63 (skill contracts)
 - **Phases Verified**: 5/5 present — 2 FAIL, 3 CONCERNS
-- **Critical Issues**: 5 HIGH, 4 MEDIUM, 3 LOW — **all resolved**, 0 remaining
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Issues**: 17 total across 2 cycles (7 HIGH, 10 MEDIUM/LOW) — **16 resolved**, 1 deferred with a stated reason
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Mutation proofs**: 7, each turning exactly its own assertion red
 
 ### Key Findings
-Cycle 1 found the module violating its own core invariant on the duplicate-marker path, an id scheme
-that destroyed findings on re-run, and jq wiring in both review skills that could not execute at all.
-All nine issues were fixed in one qa-fix cycle and each is mutation-proven. The structural fix is the
-new guard that extracts the documented jq from each SKILL.md and runs it against a fixture — a
-snippet that is only read will drift again; one that is executed cannot.
+Cycle 1 found the module violating its own core invariant on two reachable paths, and jq wiring in
+both review skills that could not execute at all. Cycle 2 ran as a **refute pass over the whole
+diff** and found eight more — including two that were present in the original commit and invisible
+to cycle 1 (`gh api --paginate` needs `--slurp`; the jq aborted the entire array on one malformed
+`file_line`), and one case of a cycle-1 fix silently killing a neighbouring branch.
+
+The durable lesson is structural: cycle 1 fixed nine defects and created the conditions for two
+more. A narrowed cycle 2 would have re-read only its own repairs and passed.
 
 ---
 
@@ -362,6 +366,7 @@ snippet that is only read will drift again; one that is executed cannot.
 | 2026-09-02 |         | Implemented — 9 files (3 created, 6 modified), 38 tests, 2 mutation proofs; registered `bitbucket.pr.comment` as the roster's 24th kind | develop |
 | 2026-09-02 |         | QA gate FAIL (50/100) — 5 HIGH, 4 MEDIUM, 3 LOW; core invariant violated on the duplicate-marker path, wiring snippets non-functional, CI red | qa-task |
 | 2026-09-02 |         | qa-fix cycle 1 — all 9 issues resolved and mutation-proven; suite 40 → 46 tests; new executable jq guard in both review skill suites; gate PASS (95/100) | qa-fix |
+| 2026-09-02 |         | QA cycle 2 (refute pass) — 8 further issues, 2 dropping findings silently; all fixed and mutation-proven; gate PASS (92/100) | qa-task |
 
 ---
 

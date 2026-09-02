@@ -34,7 +34,7 @@ node .agents/skills/{skill}/references/pr-inline-comment.js \
 | `line`   | yes      | 1-based line number in the **destination** file                        |
 | `body`   | yes      | The finding's markdown                                                 |
 | `side`   | no       | `RIGHT` (default) or `LEFT`. `LEFT` anchors a **deleted** line         |
-| `id`     | no       | Caller's stable id for the finding; echoed back in the per-finding result |
+| `id`     | no       | A **namespace**, not an identity — the body is always hashed in. `CR-{n}` is stable only within one run, so a bare ordinal would make run 2's `CR-1` a different finding wearing run 1's name |
 
 **Never an inline `--body`.** Bodies carry backticks, `$(…)`, quotes and
 newlines; an interpolated body is a shell injection waiting for the first
@@ -139,10 +139,12 @@ this repo, and this CLI does not invent one. A transient failure degrades that
 finding to the summary comment like any other anchoring failure, which is the
 correct behaviour anyway.
 
-Bitbucket has no equivalent of GitHub's `position: null`, so the **stale-anchor**
-row below is GitHub-only: a Bitbucket comment whose anchor has moved is updated
-in place rather than degraded. That is the lesser of the two errors — the finding
-is still delivered, just possibly beside a line that has shifted.
+Bitbucket has no equivalent of GitHub's `position: null`, but that is not the
+check that matters: the two comparisons that actually fire are **path** and
+**line**, and Bitbucket returns `inline.path` / `inline.to` on every inline
+comment. Both arms therefore implement the stale-anchor row identically — a
+marker found on a comment that is no longer where the finding points is degraded,
+never rewritten in place and reported `updated`.
 
 > **The Bitbucket arm ships fixture-tested, not exercised.** This repository is
 > GitHub-hosted, so the payload shape is asserted against fixtures and the
