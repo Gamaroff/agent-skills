@@ -86,7 +86,7 @@ CATEGORIES = [
     ]),
     ("Content & Writing", [
         "extract", "simplify", "book-typesetter-pro",
-        "humaniser", "humanize-text",
+        "explain-simply", "humaniser", "humanize-text",
     ]),
     ("Research & Analysis", [
         "analyst", "brainstorming", "create-research-prompt", "deep-research-prompt",
@@ -175,7 +175,7 @@ def generate_catalog(skills_dir: Path, output_file: Path) -> None:
         "",
         "- **Orchestrators:** `develop-story`, `develop-task` — full lifecycle for a story or task",
         "- **Authoring:** `create-prd`, `create-epic`, `create-story`, `create-task`",
-        "- **Review:** `review-prd`, `review-epic`, `review-story`, `review-task`",
+        "- **Review:** `review-prd`, `review-epic`, `review-story`, `review-task`, `review-pr`",
         "- **QA:** `qa-story`, `qa-task`, `qa-fix`, `qa-gate`",
         "- **Git / PR:** `create-branch`, `commit-changes`, `create-pr`",
         "- **Meta:** `create-skill`, `find-skills`, `document-existing-project`",

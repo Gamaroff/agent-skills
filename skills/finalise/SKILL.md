@@ -366,6 +366,25 @@ Read each prompt file to get the template, substitute the placeholder values, th
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 
+> **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`.**
+> `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
+> validator, classifier or allow/deny-list — and it then generated candidate inputs, **executed** them
+> against the shipped code, and reported only those that reproduced. `boundary: false` means the rule did
+> not fire, which is the common and expected case.
+>
+> **Read `probes` together with `probes_executed`, never alone.** No reproduced probe with a high
+> `probes_executed` is the *good* outcome — the boundary was probed and held. No reproduced probe with
+> `probes_executed: 0` **or absent** is a **finding**, not a pass: the agent emits a `probe mode
+> executed no candidates` FAIL in `checks`, rendered like any other failed check. Branching on list
+> emptiness alone would report the best outcome and the worst one identically.
+>
+> **Three absences are three different things, and none of them is `false`.** A missing `boundary`
+> means the agent did not answer the question — render it as unverified, never as "not a boundary". A
+> missing `probes_executed` under `boundary: true` counts as zero, because a count that was never
+> reported is not evidence that work happened. And the held-case branch keys on *no probe having
+> reproduced*, not on the list being empty — an entry carrying `reproduced: false` must not be able to
+> suppress the verdict line by making the list non-empty. See `references/finalise-dod-security-prompt.md`.
+
 #### Step 3c: Aggregate Results
 
 After all 4 agents complete, parse each YAML result. Handle agent failures:
@@ -436,6 +455,46 @@ Append sections to the running summary file. **One append per section** — not 
 
 - **{check.check}**: {✅ PASS | ❌ FAIL}{check.citation ? " — `" + check.citation + "`" : ""}{check.note ? " — " + check.note : ""}
   {endfor}
+
+### Probe Results
+
+{if security_result.boundary is absent or not a boolean:}
+⚠️ **The security agent reported no boundary decision.** This is not the same as "not a boundary" —
+the question was not answered, so probe mode is **unverified**. Treat it as a finding and re-run the
+agent; do not read it as a skip.
+{else if security_result.boundary == false:}
+_Probe mode did not fire — the deliverable is not a boundary._
+{else:}
+**Candidates executed:** {security_result.probes_executed, or "not reported" if absent} — **reproduced:** {count of security_result.probes where reproduced == true}
+
+{if any probe in security_result.probes has reproduced == true:}
+{for each probe in security_result.probes where probe.reproduced:}
+- `{probe.input}` — expected **{probe.expected}**, got **{probe.actual}**
+{endfor}
+{endif}
+
+{if security_result.probes_executed is absent or == 0:}
+❌ **Probe mode executed no candidates.** A boundary was identified but nothing was run — this is a
+finding, not a pass. See the `probe mode executed no candidates` check above. An **absent**
+`probes_executed` counts as zero here: a count that was never reported is not evidence that work
+happened.
+{else if no probe in security_result.probes has reproduced == true:}
+✅ **The boundary held** — every candidate returned its expected verdict.
+{endif}
+{endif}
+
+<!--
+  The ✅/❌ pair is an if/else-if, so at most one verdict line is ever emitted. Written as two
+  independent `{if}` blocks, the state `probes_executed: 0` with nothing reproduced rendered BOTH
+  "executed no candidates" and "the boundary held" — asserting that every candidate passed when none
+  had run.
+
+  The findings list is separate and unconditional, so it renders whenever anything reproduced. That
+  means the ❌ callout can legitimately sit ABOVE a findings list, in the contradictory-input case
+  where an agent reports reproduced probes and a zero count; the callout is the warning about the
+  count, not a claim that the list is empty. The ✅ line, by contrast, is suppressed whenever
+  anything reproduced — it can only appear when the count is non-zero and nothing was found.
+-->
 
 **Agent summary:** {security_result.summary}
 

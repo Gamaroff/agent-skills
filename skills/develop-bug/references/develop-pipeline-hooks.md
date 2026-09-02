@@ -86,7 +86,7 @@ For the full lock-file format, half-done step recovery semantics, and verificati
 
 1. Bash — advance `current_step` in the lock
 2. Edit — mark the current step `✅ Done` in the implementation report
-3. Output banner — `═══ DEVELOP-{STORY,TASK} PIPELINE: STEP {N+1}/8 — {NAME} ═══`
+3. Output the Remaining Work Status block, then the banner — `═══ DEVELOP-{STORY,TASK} PIPELINE: STEP {N+1}/8 — {NAME} ═══` (see [`develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md))
 4. Invoke — the next sub-skill via the Skill tool
 
 The reason is injected as a system reminder in the next assistant turn, forcing forward motion before any prose can be emitted.

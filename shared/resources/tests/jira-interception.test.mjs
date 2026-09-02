@@ -2,6 +2,16 @@
  * jira-interception.test.mjs — the two layers that make a restricted
  * `access.tracker` real for Jira REST (task.53).
  *
+ * Every spawned driver below pins `FORCE_COLOR: "0"`. Its stdout is
+ * pattern-matched, and `console.log` styles non-string args through
+ * `util.inspect` when colour is on — so an ambient `FORCE_COLOR` turned
+ * `DEFERRED true` into `DEFERRED \x1b[33mtrue\x1b[39m` and failed two
+ * assertions that had nothing to do with the behaviour under test. Pinned at
+ * the spawn rather than fixed per-log so a future non-string arg cannot
+ * reintroduce it. This matters beyond tidiness: `develop-next` runs `npm test`
+ * as its pre-merge quality gate, so an env-sensitive suite fails every merge
+ * and blames the item being developed.
+ *
  * Hermetic: no network, no credentials, no tracker. Every non-GET assertion
  * runs against a `fetchImpl` stub that THROWS on any write, so "no mutation
  * reached the network" is proven by the suite rather than asserted by reading
@@ -30,8 +40,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { execFileSync, spawnSync } from "node:child_process";
+import { spawnBudget } from "./spawn-budget.mjs";
 
 const require = createRequire(import.meta.url);
+
+/**
+ * Every spawn in this file forks a child that boots Node and loads the sync library. Six bare
+ * `timeout:` literals used to live here, each chosen against an idle machine and none of them
+ * tunable — the asymmetry bug.2 was filed about, since the neighbouring parity suite had already
+ * fixed exactly this for itself. Override with JIRA_INTERCEPTION_SPAWN_TIMEOUT_MS (this file) or
+ * TEST_SPAWN_TIMEOUT_MS (every suite).
+ */
+const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("JIRA_INTERCEPTION");
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SHARED = path.join(HERE, "..");
 const REPO = path.join(SHARED, "..", "..");
@@ -759,7 +779,12 @@ test("§8 jsm_curl defers a non-GET and leaves JSM_HTTP_STATUS/JSM_BODY set", as
     `;
     const out = execFileSync("bash", ["-c", script], {
       encoding: "utf8",
-      env: { ...process.env, ACCESS_TRACKER: "manual", PATH: process.env.PATH },
+      env: {
+        ...process.env,
+        FORCE_COLOR: "0",
+        ACCESS_TRACKER: "manual",
+        PATH: process.env.PATH,
+      },
     });
     assert.match(out, /status=200/);
     assert.match(out, /completed/);
@@ -786,7 +811,7 @@ test("§8 the sprint gate resolves a restricted mode into caller scope", async (
     `;
     const out = execFileSync("bash", ["-c", script], {
       encoding: "utf8",
-      env: { ...process.env, ACCESS_TRACKER: "manual" },
+      env: { ...process.env, FORCE_COLOR: "0", ACCESS_TRACKER: "manual" },
     });
     assert.match(out, /ok/);
     assert.deepEqual(journal(dir), []);
@@ -811,7 +836,7 @@ function runSprintScript(script, args, dir) {
         JIRA_USER_EMAIL: "a@b.c",
         JIRA_API_TOKEN: "t",
       },
-      timeout: 30000,
+      timeout: SPAWN_TIMEOUT_MS,
     },
   );
 }
@@ -909,7 +934,7 @@ test("§9 jira-create-epic.js records and makes no network call under a restrict
           JIRA_USER_EMAIL: "a@b.c",
           JIRA_PROJECT_KEY: "PROJ",
         },
-        timeout: 20000,
+        timeout: SPAWN_TIMEOUT_MS,
       },
     );
     assert.match(
@@ -1317,7 +1342,7 @@ test("§13 CR-2 the sprint gate honours AGENT_SKILLS_ACCESS_TRACKER alone", asyn
           JIRA_USER_EMAIL: "a@b.c",
           JIRA_API_TOKEN: "t",
         },
-        timeout: 30000,
+        timeout: SPAWN_TIMEOUT_MS,
       },
     );
     assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
@@ -1415,8 +1440,8 @@ test("§13 QA-1 an unrecognised mode fails a write, not a read", () => {
   `;
   const r = spawnSync(process.execPath, ["-e", driver], {
     encoding: "utf8",
-    env: { ...process.env, ACCESS_TRACKER: "bogus" },
-    timeout: 20000,
+    env: { ...process.env, FORCE_COLOR: "0", ACCESS_TRACKER: "bogus" },
+    timeout: SPAWN_TIMEOUT_MS,
   });
   assert.match(
     r.stdout,
@@ -1694,8 +1719,8 @@ test("§15 C3-CR6 the mode is resolved once, into caller scope", async () => {
     const r = spawnSync("bash", ["-c", sh], {
       encoding: "utf8",
       cwd: dir,
-      env: { ...process.env },
-      timeout: 20000,
+      env: { ...process.env, FORCE_COLOR: "0" },
+      timeout: SPAWN_TIMEOUT_MS,
     });
     assert.match(
       r.stdout,
@@ -1833,8 +1858,8 @@ test("§17 G-CR9 an injected access may restrict, never escalate", async () => {
     `;
     const r = spawnSync(process.execPath, ["-e", driver], {
       encoding: "utf8",
-      env: { ...process.env, ACCESS_TRACKER: "manual" },
-      timeout: 20000,
+      env: { ...process.env, FORCE_COLOR: "0", ACCESS_TRACKER: "manual" },
+      timeout: SPAWN_TIMEOUT_MS,
     });
     assert.match(
       r.stdout,

@@ -1,0 +1,128 @@
+schema: 1
+task: 'task.65.registry-aware-selection'
+task_title: 'Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to /develop-next'
+gate: CONCERNS
+status_reason: 'All four cycle-1 findings verified FIXED and independently mutation-proved; H1 became an executable constraint rather than a corrected value. One new MEDIUM defect introduced by the M2 fix — the header-column state is never reset when a table ends, so any second table in a registry document is parsed as registry data and pollutes --lint. Held by no test; QA-verified one-line remedy.'
+reviewer: 'QA Engineer'
+updated: '2026-08-29T22:05:00Z'
+qa_cycle: 2
+previous_gate: 'task.65.gate.1.registry-aware-selection.yml'
+pr: 'https://github.com/Gamaroff/agent-skills/pull/281'
+
+top_issues:
+  - id: N1
+    issue: 'parseRegistry never resets column state, so a second table in the document is parsed as registry data'
+    severity: medium
+    introduced_by: 'the M2 fix (8f701cc)'
+    finding: '`cols` is assigned when a header is promoted and never cleared; `pendingHeader` is reset when a non-table line ends the table but `cols` is not. Once any header has been seen, every later table row in the document is treated as data. A `## Notes` key/value table yields 2 spurious "malformed row" entries; a second registry section''s own header row is reported as `id cell "#" is not a number`. Cannot cause a wrong selection (malformed rows never become candidates) but pollutes the --lint report SC6''s visibility guarantee depends on — the mirror image of the bug it came from. Does not fire in this repo today: both real registries hold exactly one table and parse with 0 malformed, 0 warnings.'
+    suggested_action: 'Reset `cols = null` alongside `pendingHeader` where a non-table line ends the table, AND add a test for a registry document containing a second table. QA verified the remedy against 6 probe scenarios, both real registries and the full unit suite; without the test the invariant is unheld, since the suite is green 113/113 both with and without it.'
+    suggested_owner: dev
+    status: open
+    mutation_proven: false
+    mutation_note: 'This is the finding: the suite stays green whether or not the remedy is present, which is why the fix cycle missed it.'
+
+low_issues:
+  - id: L5
+    issue: "SC11's wording is now unsatisfiable by construction"
+    finding: 'SC11 asserts a fresh --dry-run "selects from a registry rather than reporting a stop". It now reports roadmap-complete, because after the H1 fix the only outstanding item in this repo is task 65 itself, at ready-for-review and therefore correctly excluded. The criterion was only satisfiable before BECAUSE of the H1 defect. The mechanism is genuinely reachable — QA flipped one accepted task document to ready-for-development and the live selector returned selected/source:task-registry/T59, then restored it.'
+    suggested_action: 'Reword SC11 to assert the mechanism is reachable (demonstrated by a controlled check) rather than asserting a particular live selection, so it does not depend on the repo''s momentary backlog.'
+    suggested_owner: dev
+
+resolved_issues:
+  - id: H1
+    severity: high
+    status: closed
+    fixed_date: '2026-08-29'
+    bug_ref: 'task.65.bug.1.ready-for-review-selected-but-undispatchable.md'
+    verification: 'Floor narrowed to {ready-for-development, in-progress}; a ready-for-review task is rejected with the correct reason. The fix exceeded the finding: rather than correcting a value it made the rule executable, parsing develop-task''s and develop-bug''s own status tables from git-tracked paths. QA re-proved non-vacuity two ways — putting ready-for-review back reddens 3 tests including the structural one on the exact regression it names, and renaming the parsed section so the table yields nothing makes the test FAIL rather than pass on an empty set.'
+    mutation_proven: true
+  - id: M2
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-29'
+    verification: 'The header/typo distinction works — a `| T65 | … |` row is now reported and reaches --lint. Introduced N1 in doing so.'
+    mutation_proven: true
+  - id: M3
+    severity: medium
+    status: closed
+    fixed_date: '2026-08-29'
+    verification: 'Verified against the REAL registries rather than fixtures: docs/bugs/bug-registry.md 2 rows and docs/tasks/task-registry.md 65 rows, both 0 malformed and 0 warnings. A swapped-column registry now reads priority correctly and orders by it.'
+    mutation_proven: true
+  - id: L4
+    severity: low
+    status: closed
+    fixed_date: '2026-08-29'
+    verification: 'One shared isWorkItemHref(); a preceding non-work-item link no longer wins over the work-item one.'
+    mutation_proven: true
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 1938
+  tests_passing: 1937
+  tests_skipped: 1
+  tests_failing: 0
+  unit_tests_for_this_change: 113
+  phases_verified: '7/7'
+  success_criteria: '12 assessed — 11 PASS (one in substance, see L5), 1 CONCERNS (SC6), 0 FAIL'
+  state_machine_scenarios_probed: 6
+  state_machine_scenarios_defective: 3
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [1]
+
+mutation_proving:
+  performed_by_qa: true
+  note: 'Every cycle-1 fix was re-proved by QA independently of the fix report. 5 of 6 invariants are held by tests; N1 is held by nothing — the suite is green 113/113 with and without its remedy, which is precisely the finding.'
+  results:
+    - invariant: 'floor excludes ready-for-review'
+      mutation: 'put it back'
+      reddened: 3
+    - invariant: 'the structural test reads a live table'
+      mutation: 'rename the parsed section so nothing parses'
+      reddened: 1
+    - invariant: 'column state reset (N1 remedy)'
+      mutation: 'apply and remove the remedy'
+      reddened: 0
+      verdict: 'UNHELD — this is the finding'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged. No credentials, network calls or process execution; nothing written.'
+  performance:
+    status: CONCERNS
+    notes: 'Unchanged by the fixes. --lint reads one document per registry row (67 here); linear and unbounded. Selection still short-circuits at the first eligible row.'
+  reliability:
+    status: PASS
+    notes: 'Re-probed after the parser rewrite — absent, empty, header-only, table-less, 3-cell, non-.md-link, empty-status and non-numeric-id inputs all degrade without throwing. Halt path still returns before the fallback. N1 is a reporting defect, not a reliability one.'
+  maintainability:
+    status: PASS
+    notes: 'Improved from CONCERNS. The column contract is an executable mapping rather than prose, the floor ⊆ dispatcher rule is held by a test reading the dispatchers own tables rather than restating them, and isWorkItemHref removes a real drift risk between two sibling functions.'
+
+regression:
+  roadmap_selection: 'PASS — byte-identical to origin/develop across all 11 fixtures after the parser rewrite'
+  batch: 'PASS — selectBatch output byte-identical to origin/develop'
+  stop_precedence: 'PASS — all four stops returned, registry loader called 0× each'
+  real_registries: 'PASS — 2 and 65 rows, 0 malformed, 0 warnings'
+  protocol_shape: 'PASS — 19 tests, unchanged'
+  full_suite: 'PASS — 1937/1938, 1 pre-existing skip'
+
+recommendations:
+  immediate:
+    - action: 'Fix N1: reset cols when a table ends, and add a test for a registry document with a second table'
+      refs: ['skills/develop-next/scripts/select-next.mjs', 'evals/develop-next/unit/select-next.test.mjs']
+  future:
+    - action: 'Reword SC11 to assert reachability of the mechanism rather than a particular live selection (L5)'
+      refs: ['docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md']
+    - action: 'Measure --lint cost on a registry an order of magnitude larger'
+      refs: ['skills/develop-next/scripts/select-next.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'N1 fixed and covered by a test'

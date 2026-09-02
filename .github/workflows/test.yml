@@ -10,6 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history. `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs` replays
+          # bug.3's fourteen fail-open inputs against two historical commits to prove the corpus
+          # still discriminates. At the default depth of 1 NEITHER commit is present, so both
+          # history-backed tests skip and only the shipped-classifier direction is enforced here.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v7

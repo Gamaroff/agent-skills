@@ -18,7 +18,8 @@
  *   select-next.mjs [--roadmap <path>]                      # selection (default)
  *   select-next.mjs --batch [--roadmap <path>]              # parallel worktree batch
  *   select-next.mjs --batch --require-touches [...]         # defer un-annotated rows
- *   select-next.mjs --lint [--roadmap <path>]               # format lint only
+ *   select-next.mjs --lint [--roadmap <path>]               # format lint + registry frontier
+ *   select-next.mjs [--bug-registry <p>] [--task-registry <p>]  # override registry paths
  *
  * Output: JSON on stdout, always.
  * Exit codes:
@@ -35,21 +36,159 @@ import { fileURLToPath } from "node:url";
 
 export const DEFAULT_ROADMAP = "docs/development/project-completion-roadmap.md";
 
+// ── Registry fallback frontier ────────────────────────────────────────────────
+//
+// The roadmap is a hand-maintained index of work that already has two other
+// indexes. Filing a bug appends a row to the bug registry; creating a task
+// appends a row to the task registry. Both carry a path, a status and a
+// priority — everything selection needs. Asking a human to transcribe a subset
+// of that into a third place is one manual step between "work exists" and "the
+// loop can see it", and it is a step nobody notices skipping, because the
+// failure mode is SILENCE: the loop reports `roadmap-complete` and stops, which
+// is indistinguishable from there genuinely being nothing to do.
+//
+// So the registries are a **fallback frontier**, consulted at exactly one point
+// — the terminal `roadmap-complete` return — and never before it. Explicit
+// human sequencing in a phase always wins; the registries are a floor, not a
+// re-ranking. See references/roadmap-selection.md §"Registry fallback frontier".
+export const DEFAULT_BUG_REGISTRY = "docs/bugs/bug-registry.md";
+export const DEFAULT_TASK_REGISTRY = "docs/tasks/task-registry.md";
+
+// **The task floor EQUALS the set of statuses the dispatching pipeline accepts.**
+// That is the load-bearing rule, and it is not a stylistic one: the frontier
+// names a command, so a status the command refuses produces a selection nothing
+// can act on. `develop-task` Phase 0c HALTs on `Ready for Review`, `accepted`
+// and `Cancelled`, so a task in any of those states must stay out — it would
+// stop an unattended loop, and because `/develop-next` leaves its run-state file
+// in place across a pipeline HALT, the next invocation would resume at the same
+// item and stop again. The loop could not self-recover, which is a *worse*
+// failure than the silence this whole mechanism exists to remove: it is
+// silence's loud cousin, and equally terminal for an overnight run. Found by QA
+// (task.65 cycle 1).
+//
+// The rule was originally the weaker `⊆`. Task 71 tightened it to `===` on the
+// task axis, because a strict subset is a gap the selector cannot explain: it
+// refuses work the thing it dispatches to would happily accept. Pinned by
+// `evals/develop-next/unit/select-next.test.mjs` §"eligibility floor vs
+// dispatcher", which parses `develop-task`'s own status table and fails on a
+// divergence in EITHER direction — under-widening and over-widening both.
+//
+// Task 72 then pinned the BUG axis's divergence exactly, against `develop-bug`'s
+// own table. So neither axis is `⊆` any more: the task axis asserts equality,
+// the bug axis asserts a known two-status gap. See below.
+//
+// **There is no opt-out, and that is deliberate.** An earlier version of this
+// comment argued the opposite — that the floor itself *was* the opt-out, so a
+// `draft` task sat outside the frontier BY CONSTRUCTION and no `deferred` park
+// value was needed. That argument was coherent and it has been overturned
+// (task.71 §2). Three things answer it:
+//
+//   1. The opt-out was never free — it was paid for by everyone. It parked
+//      speculative filings at no cost to their author and charged every REAL
+//      filing a manual promotion step. `/create-task` emits `status: planned`,
+//      so under the old floor every task in existence entered the world
+//      invisible to `/develop-next` and stayed there until a human remembered
+//      to run `/review-task` — exactly the manual tracking the registry
+//      fallback above was built to remove.
+//   2. The failure it prevented costs one visible cycle. A speculative task
+//      selected by an unattended loop halts at `develop-task` Step 2 with review
+//      findings; nothing merges. The failure it caused costs indefinite silence.
+//      A wasted cycle is strictly better than a task nobody can see.
+//   3. The review gate moved, it did not disappear. A `draft` task still gets
+//      reviewed before any code is written — by `develop-task` Step 2, which is
+//      where the review belongs and where it already HALTs on NEEDS REVISION or
+//      REQUIRES REWORK.
+//
+// So a filing that should not be worked is `cancelled`, or is not filed. Adding
+// `deferred` to the lifecycle would re-import the "something new to remember"
+// cost the old argument correctly warned about.
+//
+// The two sets are deliberately different, because bugs and tasks do not share
+// a lifecycle (docs/standards/bug-documents.md says so explicitly):
+//   bug:  new → in-progress → ready-for-qa → closed | reopened
+//   task: draft → planned → ready-for-development → in-progress →
+//         ready-for-review → accepted | cancelled
+//
+// **The bug axis keeps a divergence, and task 72 pinned it EXACTLY.** Measured:
+// `develop-bug` proceeds on {new, reopened, in-progress, ready-for-qa} while the
+// set below is {new, reopened} — a real two-status gap, now asserted as that
+// exact set rather than as a subset, so it fails on a change in either
+// direction.
+//
+// The reason it stays is semantic before it is about risk. `develop-bug`'s two
+// extra statuses are RESUME AFFORDANCES — `in-progress` is "a prior run may have
+// started; resume-aware", `ready-for-qa` is "proceed toward verification if a fix
+// already exists". They exist so a re-invoked pipeline does not HALT on its own
+// half-finished work; they are not a claim that work is available to nominate.
+// Selecting on them would hand an unattended loop a bug a human may be actively
+// holding, or one whose fix is written and only awaiting verification. That is
+// why task 71's equality rule is right for the task axis and wrong for this one.
+// See the bug half of §"eligibility floor vs dispatcher" in the test file.
+export const BUG_ELIGIBLE_STATUSES = new Set(["new", "reopened"]);
+export const TASK_ELIGIBLE_STATUSES = new Set([
+  "draft",
+  "planned",
+  "ready-for-development",
+  "in-progress",
+]);
+
+// Ordering vocabularies. Lower rank sorts first. An unrecognised value sorts
+// LAST within its tier rather than throwing — a registry is hand-maintained and
+// a typo in a severity cell must not decide whether work is visible at all.
+const SEVERITY_RANK = {
+  blocker: 0,
+  critical: 0,
+  major: 1,
+  minor: 2,
+  trivial: 3,
+};
+const PRIORITY_RANK = {
+  highest: 0,
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  lowest: 4,
+};
+const UNRANKED = 99;
+
+const rankOf = (table, v) =>
+  (v && table[String(v).trim().toLowerCase()]) ?? UNRANKED;
+
 // Item ids: 5.1a, 8.4-2, 17.3-1, 13.1-1, 21.2a, 7.11-NFR2 …
-// …plus `T`-prefixed standalone-task ids: T22, T26. The prefix is load-bearing:
-// task and epic numbers share this namespace (Task 22 / Epic 22, Task 26 / Epic 26
-// can all exist), so a bare `22` would be ambiguous. Without the `T` alternative
-// these rows parsed as id-less and — worse — `deps: T22` was silently dropped,
-// letting a dependent be selected while its hard prerequisite was unbuilt.
-// `T` must be followed by a digit, so prose like "Task 22" still yields only `22`.
-const ID_RE_SRC = "T?\\d+(?:\\.\\d+)*[a-z]?(?:-[A-Za-z0-9]+)*";
+// …plus two prefixed standalone forms: `T` for tasks (T22, T26) and `B` for
+// general bugs (B2). The prefix is load-bearing: task, epic and bug numbers all
+// share this namespace (a Task 22, an Epic 22 and a Bug 22 can coexist), so a
+// bare `22` would be ambiguous. Without the `T` alternative those rows parsed as
+// id-less and — worse — `deps: T22` was silently dropped, letting a dependent be
+// selected while its hard prerequisite was unbuilt.
+//
+// `B` was added for the same reason, found the same way. A bug row could always
+// borrow a story-shaped id from its surrounding epic (`4.1`), but a GENERAL bug has
+// no parent epic to borrow from — so in a maintenance phase, which has no epic at
+// all, there was no correct id to write. `**B2**` fell outside the grammar, the row
+// was rejected as "no item id" and SILENTLY SKIPPED, and the loop selected the row
+// below it. A backlog row that cannot be named cannot be worked.
+//
+// Both letters must be followed by a digit, so prose like "Task 22" still yields
+// only `22`. The residual cost is the same for both: a bare `B2`-shaped token in
+// free text inside a `deps:` or `⛔` segment would read as an id.
+const ID_RE_SRC = "[TB]?\\d+(?:\\.\\d+)*[a-z]?(?:-[A-Za-z0-9]+)*";
 const ID_RE = new RegExp(ID_RE_SRC);
 const ID_TOKEN_RE = new RegExp(`(?<![\\w.-])(${ID_RE_SRC})`, "g");
 const ROW_RE = /^(\s*)[-*]\s*\[([ xX])\]\s*(.*)$/;
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 const EXCLUDED_HEADING_RE = /deferred|human.?gated|housekeeping|change\s*log/i;
+// The optional inline path must not start with `[`. Both an inline path and a
+// markdown link are documented as valid ways to name the work item, but without
+// that exclusion the inline alternative wins on a link-form row and captures the
+// SYNTAX rather than the href — `/develop-bug [bug](x/y.md)` yielded the literal
+// `[bug](x/y.md` (the class stops at `)`, so even the bracket is unbalanced).
+// That is worse than not matching: it is a malformed path the caller would go on
+// to dispatch, instead of falling through to MD_LINK_RE which resolves it
+// correctly. Excluding `[` makes the two forms unambiguous rather than racing.
 const COMMAND_RE =
-  /\/(develop-story|develop-task|develop-bug|create-story|create-epic|create-task)(?:\s+`?([^\s`)]+\.md))?/;
+  /\/(develop-story|develop-task|develop-bug|create-story|create-epic|create-task)(?:\s+`?([^\s`)\[]+\.md))?/;
 const MD_LINK_RE = /\[[^\]]*\]\(([^)\s]+)\)/g;
 const SKIP_RE = /⏭️|⏭|\bSKIP\b/;
 // `touches:` — the write-footprint field (see references/roadmap-selection.md and
@@ -83,9 +222,14 @@ function idTokens(text) {
   return [...text.matchAll(ID_TOKEN_RE)].map((m) => m[1]);
 }
 
-/** `T22`/`T26` — a standalone task row, as opposed to an epic story row. */
-function isTaskId(id) {
-  return /^T\d/.test(id);
+/**
+ * `T22` (task) or `B2` (general bug) — a STANDALONE row, as opposed to an epic
+ * story row. Both are excluded from their surrounding epic's completion set: they
+ * are conventionally written inside a consumer epic's section for readability, but
+ * an epic is complete once its own stories are accepted regardless of them.
+ */
+function isStandaloneId(id) {
+  return /^[TB]\d/.test(id);
 }
 
 /**
@@ -99,9 +243,24 @@ function isTaskId(id) {
  */
 function workItemPath(text) {
   for (const m of text.matchAll(MD_LINK_RE)) {
-    if (/(?:^|\/)(?:story|task|bug)\.[^/]*\.md$/i.test(m[1])) return m[1];
+    if (isWorkItemHref(m[1])) return m[1];
   }
   return null;
+}
+
+/**
+ * Does this href name a work-item document (`story.` / `task.` / `bug.` stem)?
+ *
+ * Shared by `workItemPath` (roadmap rows) and `parseRegistry` (registry rows).
+ * They used to disagree: the registry parser accepted any `.md`, so a title
+ * carrying a nested or preceding link — `[See [x](y.md)](task.1.a/task.1.a.md)` —
+ * resolved to `y.md`. That fails conservatively (the row is then rejected as
+ * "document missing", so nothing wrong is dispatched) but it makes work
+ * invisible for an unobvious reason, which is the failure this file exists to
+ * stop producing. One predicate, one behaviour.
+ */
+function isWorkItemHref(href) {
+  return /(?:^|\/)(?:story|task|bug)\.[^/]*\.md$/i.test(href);
 }
 
 /**
@@ -264,7 +423,8 @@ export function parseRoadmap(text) {
     // epic's section for readability — it is not a story of that epic, so epic
     // completion must not wait on it (otherwise a task row would strand its host
     // epic). It stays in `byId`/`idInstances`, so deps on it still resolve.
-    if (epic && !isTaskId(id)) model.epicSections[epic.num].rowIds.push(id);
+    if (epic && !isStandaloneId(id))
+      model.epicSections[epic.num].rowIds.push(id);
     if (sawPhaseHeading() && phaseIdx === null && !ticked) {
       model.warnings.push(
         `line ${ln}: outstanding row ${id} appears before the first PHASE heading — ignored`,
@@ -402,7 +562,7 @@ function flowBlockers(model, row) {
  * Run the selection algorithm over a parsed model.
  * @returns {{status: "selected"|"stop"|"halt", ...}}
  */
-export function selectNext(model) {
+export function selectNext(model, opts = {}) {
   const lint = { errors: model.errors, warnings: model.warnings };
   if (model.errors.length) {
     return {
@@ -531,6 +691,42 @@ export function selectNext(model) {
     );
   }
 
+  // ── The single point at which the registries are consulted ────────────────
+  //
+  // Every earlier `return {status:"stop"}` — human-gated, planning-gap,
+  // manual-checkpoint, phase-blocked — has already returned by now, untouched.
+  // That is the whole safety argument: the fallback replaces SILENCE, never a
+  // deliberate halt. A human gate must never be scanned past, and if the loop
+  // could reach the registries from any other stop it would look like it was
+  // working while quietly stepping over an operator's decision — the hardest
+  // failure in this file to detect in production. Pinned by one test per stop
+  // reason (§15/SC9), each asserting the loader was not merely ignored but
+  // never CALLED.
+  //
+  // The loader is injected and LAZY: no registry is read unless this line runs.
+  if (typeof opts.loadRegistries === "function") {
+    const frontier = registryFrontier(opts.loadRegistries());
+    if (frontier.selected) {
+      return {
+        status: "selected",
+        item: frontier.selected,
+        rationale: buildRegistryRationale(frontier, skipped),
+        skipped,
+        registryFrontier: { passedOver: frontier.passedOver },
+        lint,
+      };
+    }
+    return {
+      status: "stop",
+      stopReason: "roadmap-complete",
+      item: null,
+      detail: `no actionable candidate rows in any phase, and no outstanding registry item (${frontier.candidates} registry row(s) considered)`,
+      skipped,
+      registryFrontier: { passedOver: frontier.passedOver },
+      lint,
+    };
+  }
+
   return {
     status: "stop",
     stopReason: "roadmap-complete",
@@ -539,6 +735,35 @@ export function selectNext(model) {
     skipped,
     lint,
   };
+}
+
+function buildRegistryRationale(frontier, skipped) {
+  const it = frontier.selected;
+  const parts = [
+    `no phase held an actionable row; fell through to the ${it.source}`,
+    `selected ${it.id} (registry line ${it.line}) — document status ${it.documentStatus}`,
+  ];
+  if (it.registryStatus !== it.documentStatus) {
+    parts.push(
+      `registry row says ${it.registryStatus}; the document's frontmatter is authoritative and says ${it.documentStatus}`,
+    );
+  }
+  // Distinguish the two kinds of pass-over. Reporting them as one number reads
+  // as "32 rows were rejected" when 34 of them were never looked at, which is
+  // the kind of quietly-wrong count this feature exists to stop producing.
+  const rejected = frontier.passedOver.filter(
+    (r) => r.eligible === false,
+  ).length;
+  const unevaluated = frontier.passedOver.filter(
+    (r) => r.eligible === null,
+  ).length;
+  if (rejected || unevaluated)
+    parts.push(
+      `${rejected} registry row(s) rejected on document status, ${unevaluated} not evaluated (see registryFrontier.passedOver; --lint evaluates all)`,
+    );
+  if (skipped.length)
+    parts.push(`${skipped.length} roadmap row(s) skipped (see skipped[])`);
+  return parts.join("; ");
 }
 
 function pickItem(row, phase) {
@@ -550,6 +775,12 @@ function pickItem(row, phase) {
     command: row.command,
     commandArg: row.commandArg,
     raw: row.raw,
+    // `source` is emitted on EVERY selection, roadmap ones included. A field
+    // present only sometimes is an implicit contract — a consumer would have to
+    // infer "absent means roadmap", and that inference is exactly the kind of
+    // unwritten rule this selector exists to replace. Uniform shape, one code
+    // path, and the run report can always state provenance.
+    source: "roadmap",
   };
 }
 
@@ -564,6 +795,376 @@ function buildRationale(model, row, phase, skipped, phaseNotes) {
     parts.push(`${skipped.length} earlier row(s) skipped (see skipped[])`);
   if (phaseNotes.length) parts.push(...phaseNotes);
   return parts.join("; ");
+}
+
+// ── Registry parsing + the fallback frontier ─────────────────────────────────
+
+/**
+ * Read a `status:` value out of a document's YAML frontmatter.
+ *
+ * Deliberately minimal — this reads ONE scalar out of the leading `---` block
+ * and does not attempt to be a YAML parser. Returns null when there is no
+ * frontmatter or no `status:` key, which the caller treats as "not a candidate"
+ * rather than as an error.
+ *
+ * @param {string} text
+ * @returns {string|null} lowercase-kebab status, or null
+ */
+export function parseFrontmatterStatus(text) {
+  if (typeof text !== "string") return null;
+  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return null;
+  const line = m[1].split(/\r?\n/).find((l) => /^status\s*:/.test(l));
+  if (!line) return null;
+  let v = line.replace(/^status\s*:/, "").trim();
+  v = v.replace(/\s+#.*$/, "").trim(); // strip a trailing comment
+  v = v.replace(/^['"]|['"]$/g, "").trim();
+  return v ? v.toLowerCase() : null;
+}
+
+/** A markdown table separator row (`| --- | :--: |`). */
+const TABLE_SEPARATOR_RE = /^\|[\s:|-]*\|?\s*$/;
+
+/**
+ * Split one markdown table row into trimmed cells, or null for a non-row line.
+ * Separator rows are the caller's business — it needs to see them, because a
+ * separator is what promotes the line above it from "maybe a header" to "the
+ * header", which is how a header is told apart from a typo'd data row.
+ */
+function tableCells(line) {
+  const t = line.trim();
+  if (!t.startsWith("|")) return null;
+  const inner = t.replace(/^\|/, "").replace(/\|\s*$/, "");
+  return inner.split("|").map((c) => c.trim());
+}
+
+// Header cell name → the field it supplies. A consumer's registry is a
+// hand-maintained markdown table, so accept the obvious synonyms rather than
+// demanding one spelling.
+const COLUMN_ALIASES = {
+  "#": "n",
+  no: "n",
+  num: "n",
+  number: "n",
+  id: "n",
+  title: "title",
+  name: "title",
+  status: "status",
+  severity: "severity",
+  priority: "priority",
+};
+
+// Documented positions, used when a registry has no recognisable header.
+//   bug:  | # | Title | Status | Severity | Priority | Created | Area |
+//   task: | # | Title | Status | Category | Priority | Created | Issue | Deps |
+const DEFAULT_COLUMNS = {
+  bug: { n: 0, title: 1, status: 2, severity: 3, priority: 4 },
+  task: { n: 0, title: 1, status: 2, priority: 4 },
+};
+
+/** Map a header row's cells to field indices; null if it names nothing we know. */
+function mapHeader(cells) {
+  const cols = {};
+  cells.forEach((c, i) => {
+    const key = COLUMN_ALIASES[c.trim().toLowerCase()];
+    if (key !== undefined && cols[key] === undefined) cols[key] = i;
+  });
+  return cols.n !== undefined && cols.title !== undefined ? cols : null;
+}
+
+/**
+ * Parse a bug or task registry's markdown table.
+ *
+ * Tolerance is the whole point (SC7). A consumer repo may have neither
+ * registry; a hand-edited row may be malformed. Neither may suppress the rows
+ * around it, and neither may throw — a registry problem must degrade to today's
+ * behaviour, never to a HALT.
+ *
+ * **Columns are read by NAME when the table has a header**, falling back to the
+ * documented positions only when it does not. Reading `cells[4]` unconditionally
+ * was silently wrong for any consumer who ordered their columns differently: a
+ * registry with Priority and Category swapped parsed `priority` as `"infra"`,
+ * so the ordering this module documents as deterministic returned the wrong item
+ * first. It could never cause a wrong *selection* — the document's frontmatter
+ * owns eligibility — which is exactly why it would have gone unnoticed.
+ *
+ * **A non-numeric id is a malformed row, not a header.** The header is
+ * identified positionally (the line above the `| --- |` separator), so a row
+ * written `| T65 | … |` — the prefixed form the roadmap uses, an easy thing to
+ * carry across by hand — is now reported rather than silently skipped. The
+ * previous guard could not tell the two apart, so a typo made a work item
+ * invisible: out of the frontier *and* absent from `--lint`, which is the one
+ * outcome this design forbids.
+ *
+ * @param {string} text  registry markdown ("" or null for an absent registry)
+ * @param {"bug"|"task"} kind
+ * @param {string} registryPath  repo-root-relative path, used to resolve hrefs
+ * @returns {{rows: object[], malformed: object[], warnings: string[]}}
+ */
+export function parseRegistry(text, kind, registryPath) {
+  const rows = [];
+  const malformed = [];
+  const warnings = [];
+  if (typeof text !== "string" || !text.trim())
+    return { rows, malformed, warnings };
+
+  const dir = path.posix.dirname(
+    String(registryPath || "")
+      .split(path.sep)
+      .join("/"),
+  );
+  const defaults = DEFAULT_COLUMNS[kind] || DEFAULT_COLUMNS.task;
+  const lines = text.split(/\r?\n/);
+  let fenced = false;
+  let cols = null; // resolved from the header, once seen
+  let pendingHeader = null; // the line above a separator is the header
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // A pipe table inside a fenced block is an EXAMPLE, not the registry. The
+    // task registry's own "Quick commands" block is fenced; a future doc block
+    // showing a sample row must not enter the frontier.
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      pendingHeader = null;
+      continue;
+    }
+    if (fenced) continue;
+
+    const t = line.trim();
+    if (!t.startsWith("|")) {
+      // Prose or a blank line ends the table — and ends its COLUMN MAPPING too.
+      // Resetting `pendingHeader` alone left `cols` set for the rest of the
+      // document, so every later table was parsed as registry data: a `## Notes`
+      // key/value table produced spurious "malformed row" entries, and a second
+      // registry section's own header was reported as `id cell "#" is not a
+      // number`. That could not select anything wrong — malformed rows never
+      // become candidates — but it polluted the `--lint` report the visibility
+      // guarantee depends on, which is the same defect as the invisible-row one
+      // it was introduced to fix, pointed the other way.
+      //
+      // Resetting both is self-correcting rather than special-cased: a stray
+      // `| Key | Meaning |` header fails `mapHeader` (it names neither an id nor
+      // a title column), so `cols` stays null, the row becomes a header
+      // candidate, and the stray table is ignored. No allowlist of tables to
+      // skip is needed. Found by QA cycle 2; pinned by §17.
+      pendingHeader = null;
+      cols = null;
+      continue;
+    }
+    if (TABLE_SEPARATOR_RE.test(t)) {
+      if (pendingHeader) {
+        const mapped = mapHeader(pendingHeader);
+        if (mapped) {
+          cols = mapped;
+          for (const field of kind === "bug"
+            ? ["status", "severity", "priority"]
+            : ["status", "priority"]) {
+            if (cols[field] === undefined && defaults[field] !== undefined) {
+              cols[field] = defaults[field];
+              warnings.push(
+                `${registryPath}: header names no ${field} column — falling back to the documented position ${defaults[field]}`,
+              );
+            }
+          }
+        }
+      }
+      pendingHeader = null;
+      continue;
+    }
+
+    const cells = tableCells(line);
+    if (!cells) continue;
+    const idCell = cells[cols ? cols.n : defaults.n] || "";
+
+    if (!/^\d+$/.test(idCell)) {
+      // Before a header has been seen, a non-numeric first cell is a header
+      // candidate — hold it, and the next line decides. After one has been
+      // seen, every table row is data, so this is a malformed row and must be
+      // reported rather than skipped.
+      if (!cols) {
+        pendingHeader = cells;
+        continue;
+      }
+      malformed.push({
+        kind,
+        n: null,
+        line: i + 1,
+        raw: t,
+        reason: `malformed row — id cell ${JSON.stringify(idCell)} is not a number`,
+      });
+      continue;
+    }
+
+    const c = cols || defaults;
+    const n = Number(idCell);
+    const titleCell = cells[c.title] || "";
+    const status = (cells[c.status] || "").toLowerCase() || null;
+    const href =
+      [...titleCell.matchAll(MD_LINK_RE)]
+        .map((m) => m[1])
+        .find(isWorkItemHref) || null;
+
+    const base = { kind, n, line: i + 1, raw: t };
+
+    if (cells.length < 5 || !href || !status) {
+      malformed.push({
+        ...base,
+        reason: !href
+          ? "malformed row — no [title](story|task|bug.….md) link"
+          : !status
+            ? "malformed row — empty status cell"
+            : `malformed row — ${cells.length} cells, expected at least 5`,
+      });
+      continue;
+    }
+
+    rows.push({
+      ...base,
+      title: titleCell.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").trim(),
+      path: path.posix.normalize(path.posix.join(dir, href)),
+      registryStatus: status,
+      severity:
+        kind === "bug" && c.severity !== undefined
+          ? cells[c.severity] || null
+          : null,
+      priority: c.priority !== undefined ? cells[c.priority] || null : null,
+    });
+  }
+  return { rows, malformed, warnings };
+}
+
+/**
+ * Deterministic ordering for the fallback set.
+ *
+ * Bugs before tasks, unconditionally: a registered bug is known-broken
+ * behaviour, a filed task is intended work, and broken outranks intended.
+ * Within bugs: severity, then priority, then ascending number. Within tasks:
+ * priority, then ascending number. The trailing number tie-break is what makes
+ * the order total, so the frontier is stable under input reordering.
+ */
+function compareCandidates(a, b) {
+  if (a.kind !== b.kind) return a.kind === "bug" ? -1 : 1;
+  if (a.kind === "bug") {
+    const s =
+      rankOf(SEVERITY_RANK, a.severity) - rankOf(SEVERITY_RANK, b.severity);
+    if (s) return s;
+  }
+  const p =
+    rankOf(PRIORITY_RANK, a.priority) - rankOf(PRIORITY_RANK, b.priority);
+  if (p) return p;
+  return a.n - b.n;
+}
+
+const ELIGIBLE_FOR = {
+  bug: BUG_ELIGIBLE_STATUSES,
+  task: TASK_ELIGIBLE_STATUSES,
+};
+const COMMAND_FOR = { bug: "/develop-bug", task: "/develop-task" };
+const SOURCE_FOR = { bug: "bug-registry", task: "task-registry" };
+
+/**
+ * Rank the registry rows and decide which (if any) is the next item.
+ *
+ * **Frontmatter decides; the registry row only nominates.** The two demonstrably
+ * drift — three rows of this repo's own task registry read `draft` while their
+ * documents read `accepted` — so a row is a candidate only when the DOCUMENT it
+ * points at puts it inside its kind's eligible set, whatever the row says. That
+ * holds in both directions: a stale-open row with a terminal document is not
+ * selected, and a stale-closed row with an open document IS.
+ *
+ * Every row that is passed over records WHY. An item may be out of the frontier,
+ * but it must never be invisible — invisibility is the failure this whole
+ * mechanism exists to remove, and an escape hatch that reintroduces it silently
+ * would be the same bug wearing different clothes.
+ *
+ * @param {object} registries {bugRegistry:{path,text}, taskRegistry:{path,text}, readStatus(path)->string|null}
+ * @param {object} [opts] {evaluateAll:boolean} — lint evaluates every row; selection stops at the first hit
+ * @returns {{selected: object|null, passedOver: object[], candidates: number}}
+ */
+export function registryFrontier(registries, opts = {}) {
+  const evaluateAll = opts.evaluateAll === true;
+  const reg = registries || {};
+  const readStatus =
+    typeof reg.readStatus === "function" ? reg.readStatus : () => null;
+
+  const bugSrc = reg.bugRegistry || {};
+  const taskSrc = reg.taskRegistry || {};
+  const bugs = parseRegistry(
+    bugSrc.text,
+    "bug",
+    bugSrc.path || DEFAULT_BUG_REGISTRY,
+  );
+  const tasks = parseRegistry(
+    taskSrc.text,
+    "task",
+    taskSrc.path || DEFAULT_TASK_REGISTRY,
+  );
+
+  const passedOver = [...bugs.malformed, ...tasks.malformed].map((m) => ({
+    ...m,
+    eligible: false,
+  }));
+  const warnings = [...(bugs.warnings || []), ...(tasks.warnings || [])];
+
+  const ranked = [...bugs.rows, ...tasks.rows].sort(compareCandidates);
+
+  let selected = null;
+  for (const row of ranked) {
+    if (selected && !evaluateAll) {
+      passedOver.push({
+        ...row,
+        eligible: null,
+        reason: `not evaluated — ${selected.id} ranked higher`,
+      });
+      continue;
+    }
+
+    const docStatus = readStatus(row.path);
+    const entry = { ...row, documentStatus: docStatus };
+
+    if (docStatus === null) {
+      passedOver.push({
+        ...entry,
+        eligible: false,
+        reason: `document missing or unreadable: ${row.path}`,
+      });
+      continue;
+    }
+    if (!ELIGIBLE_FOR[row.kind].has(docStatus)) {
+      passedOver.push({
+        ...entry,
+        eligible: false,
+        reason: `document status ${docStatus} — outside the ${row.kind} eligibility floor (${[...ELIGIBLE_FOR[row.kind]].join(", ")})`,
+      });
+      continue;
+    }
+    if (selected) {
+      // evaluateAll: eligible, but a higher-ranked candidate already won.
+      passedOver.push({
+        ...entry,
+        eligible: true,
+        reason: `eligible, but ${selected.id} ranked higher`,
+      });
+      continue;
+    }
+    selected = {
+      id: `${row.kind === "bug" ? "B" : "T"}${row.n}`,
+      line: row.line,
+      phase: `(registry fallback — ${SOURCE_FOR[row.kind]})`,
+      epic: null,
+      command: COMMAND_FOR[row.kind],
+      commandArg: row.path,
+      raw: row.raw,
+      source: SOURCE_FOR[row.kind],
+      registryStatus: row.registryStatus,
+      documentStatus: docStatus,
+      severity: row.severity,
+      priority: row.priority,
+    };
+  }
+
+  return { selected, passedOver, warnings, candidates: ranked.length };
 }
 
 // ── Parallel batch (worktree fan-out) ─────────────────────────────────────────
@@ -765,6 +1366,8 @@ export function selectBatch(model, opts = {}) {
 function parseArgs(argv) {
   const args = {
     roadmap: DEFAULT_ROADMAP,
+    bugRegistry: DEFAULT_BUG_REGISTRY,
+    taskRegistry: DEFAULT_TASK_REGISTRY,
     lint: false,
     batch: false,
     requireTouches: false,
@@ -773,6 +1376,12 @@ function parseArgs(argv) {
     switch (argv[i]) {
       case "--roadmap":
         args.roadmap = argv[++i];
+        break;
+      case "--bug-registry":
+        args.bugRegistry = argv[++i];
+        break;
+      case "--task-registry":
+        args.taskRegistry = argv[++i];
         break;
       case "--lint":
         args.lint = true;
@@ -785,7 +1394,12 @@ function parseArgs(argv) {
         break;
       default:
         process.stderr.write(`select-next: unknown argument ${argv[i]}\n`);
-        process.exit(1);
+        // `process.exitCode` + `return`, never `process.exit()`: stdio is
+        // ASYNCHRONOUS on a pipe, and `process.exit()` tears the process down
+        // before the buffer drains, truncating output at ~64KB. Returning lets
+        // the event loop flush. See bug.3.stdout-truncation-on-exit.
+        process.exitCode = 1;
+        return null;
     }
   }
   return args;
@@ -793,6 +1407,8 @@ function parseArgs(argv) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
+  // parseArgs returns null when it has already reported a bad argument.
+  if (args === null) return;
   let text;
   try {
     text = fs.readFileSync(args.roadmap, "utf-8");
@@ -812,32 +1428,72 @@ function main() {
         2,
       ) + "\n",
     );
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   const model = parseRoadmap(text);
 
+  // Absent registry → empty text → zero rows. A consumer repo may have neither,
+  // and a missing registry must degrade to today's behaviour, never to a HALT.
+  const readOrEmpty = (p) => {
+    try {
+      return fs.readFileSync(p, "utf-8");
+    } catch {
+      return "";
+    }
+  };
+  const loadRegistries = () => ({
+    bugRegistry: {
+      path: args.bugRegistry,
+      text: readOrEmpty(args.bugRegistry),
+    },
+    taskRegistry: {
+      path: args.taskRegistry,
+      text: readOrEmpty(args.taskRegistry),
+    },
+    readStatus: (docPath) => {
+      const text = readOrEmpty(docPath);
+      return text ? parseFrontmatterStatus(text) : null;
+    },
+  });
+
   if (args.lint) {
+    // Lint evaluates EVERY registry row, not just up to the first eligible one:
+    // its job here is that no row can be both ineligible and unlisted.
+    const frontier = registryFrontier(loadRegistries(), { evaluateAll: true });
     process.stdout.write(
       JSON.stringify(
         {
           roadmap: args.roadmap,
           errors: model.errors,
           warnings: model.warnings,
+          registryFrontier: {
+            bugRegistry: args.bugRegistry,
+            taskRegistry: args.taskRegistry,
+            considered: frontier.candidates,
+            warnings: frontier.warnings,
+            selected: frontier.selected,
+            passedOver: frontier.passedOver,
+          },
         },
         null,
         2,
       ) + "\n",
     );
-    process.exit(model.errors.length ? 1 : 0);
+    process.exitCode = model.errors.length ? 1 : 0;
+    return;
   }
   const result = args.batch
     ? {
+        // `--batch` is deliberately registry-free. Registry rows carry no
+        // `touches:` data, so write-disjointness cannot be established for them
+        // and they must never enter a parallel batch.
         roadmap: args.roadmap,
         ...selectBatch(model, { requireTouches: args.requireTouches }),
       }
-    : { roadmap: args.roadmap, ...selectNext(model) };
+    : { roadmap: args.roadmap, ...selectNext(model, { loadRegistries }) };
   process.stdout.write(JSON.stringify(result, null, 2) + "\n");
-  process.exit(result.status === "halt" ? 1 : 0);
+  process.exitCode = result.status === "halt" ? 1 : 0;
 }
 
 // Resolve BOTH sides through realpath: consumer projects symlink

@@ -415,6 +415,22 @@ explicitly (`AGENT_SKILLS_CONFIG_TIER=python|awk`) rather than take whichever th
   `BITBUCKET_APP_PASSWORD` is still honoured as a fallback; see below.
 - `gh` CLI — assumed authenticated for GitHub paths
 
+**Not ambient — passed by a caller only.** These two are honoured only when a caller hands them in
+its env snapshot, never when they merely sit in the process environment. The gates snapshot the
+access env *before* `loadDotEnv()` so a repo-local `.env` cannot reach the access reader, and
+reading these from `process.env` would be a second resolution path `resolve-platform.sh` never
+sees:
+
+- `AGENT_SKILLS_CONFIG_TIER` — force the config reader's tier (`python` \| `awk`). Testing knob; it
+  materially loosens the answer, since forcing a tier the host cannot honour makes the reader
+  answer nothing (T61-M4).
+- `AGENT_SKILLS_ACCESS_PROBE_TIMEOUT_MS` — budget in ms for one `resolve-platform.sh` probe
+  (default `10000`, capped at `300000`; anything unparseable or out of range falls back to the
+  default). It cannot escalate access — a short budget only kills the probe, and a killed probe
+  fails closed to `manual` — but a committed `.env` setting it to `1` would restrict, or via a
+  typo hard-fail, every pipeline step in a repo that declares `access`. That is the same invariant,
+  in the restricting direction.
+
 ### The Bitbucket credential
 
 **Two credential types are supported, and the scheme differs between them.** Never hand-roll the

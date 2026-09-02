@@ -4,6 +4,567 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **A QA re-review after a safety failure now re-probes the surface instead of re-reading the fixes.**
+  `qa-task` and `qa-story` scope a re-review to files changed since the last gate — correct for cost,
+  and wrong on the one axis where it matters. After a security FAIL the files changed since the last
+  gate are precisely the *fixes*, so the re-review inspects the patch and never re-reads the surface
+  the patch was meant to protect.
+
+  **Measured on task 67.** Cycle 1 found 13 fail-open holes in a safety boundary and returned FAIL.
+  `qa-fix` closed all 13. Cycle 2 re-tested those 13, confirmed them closed, found nothing new, and
+  returned PASS 90/100 with `security: PASS`. The DoD gate then found **14 more of the same class**,
+  two of them commands the code deny-listed by name. Two green gates in a row read as converging
+  evidence; they were one piece of evidence counted twice.
+
+  **The carve-out is narrow and keyed on the prior gate's safety state, not on the cycle number.**
+  `SAFETY_REPROBE` fires when the prior gate has `nfr_validation.security.status: FAIL`, a
+  `severity: high` finding concerning a boundary, or a `gate: FAIL` on a work item whose own success
+  criteria say *never* / *must not* / *fails closed* / *refused*. CONCERNS on performance,
+  reliability or maintainability keep today's scoping, as does a FAIL on documentation or coverage —
+  the non-triggers are stated explicitly, because a trigger wide enough to catch them is one nobody
+  can afford to leave on.
+
+  **This composes with the existing cycle-2 refute pass rather than duplicating it.** Cycle 2 already
+  gets a full-branch diff and a "find the claim that is FALSE" directive. That directive anchors on
+  *the fixes*; the new one anchors on *the surface*, and the two are appended together where both
+  apply. The residual gap closed here is cycle 3 and later, where a work item whose security FAIL is
+  not fixed on the first attempt was still being narrowed to its own repairs.
+
+  **Widening the diff is half the fix, so the instruction changes too**, and the report must now
+  answer both questions: the Re-Review Context table says whether the previous findings were fixed,
+  and a new **New Findings This Cycle** section — required *even when empty* — says what else is
+  there. On an unscoped cycle reporting zero new findings, the section must state what was searched,
+  so "nothing found" is distinguishable from "nothing looked for". The scope decision itself is
+  recorded in the QA report's Review Methodology.
+
+  The rule is stated once in `shared/resources/qa-re-review-scope.md`; neither skill restates the
+  trigger, and `evals/shared/tests/qa-re-review-scope-parity.test.mjs` enforces that along with the
+  wiring and the report requirements. The suite also checks that each `SKILL.md` is the skill it
+  claims to be — every other assertion in it is a substring search over two files that should say
+  nearly the same things, which makes it blind to one file being overwritten by the other. That
+  happened while the suite was being written, and all its tests stayed green over the corrupted
+  tree. A parity check that cannot tell its two subjects apart is measuring one file twice. Its replay cases **execute** the trigger probe extracted from
+  the shared rule against the real `task.67.gate.1` / `gate.2` fixtures — which is how the probe's
+  first draft was caught using `\s`, a GNU extension that BSD awk and mawk neither match nor error
+  on, failing the carve-out closed and silently. Reading the snippet did not find that; running it
+  did, immediately.
+
+- **The DoD security check now executes candidate inputs instead of grepping for them.**
+  The `/finalise` security agent was a read-only inspector: every check asked whether a boundary
+  *existed*, none asked whether it *held*. It gains a gated **probe mode** — for work items whose
+  deliverable is a boundary, the agent generates candidate inputs, **executes** them against the
+  shipped code, and reports only what reproduced.
+
+  **The gap this closes was measured on this repository.** On task 67 a substituted prompt that
+  executed candidates found **fourteen fail-open routes** past a deny-list the grep prompt had
+  reported `PASS` — two of them commands the list named by hand, reached by adding a quote (`g\h`,
+  `cu'r'l`). A QA security gate had passed the same file an hour earlier. Both checks asked whether
+  the mechanism existed; neither asked whether it held.
+
+  **"Read-only" is redefined as *does not mutate*, not *does not run*.** The agent runs as an Explore
+  subagent and already had `Bash`; the old wording foreclosed a capability it had, and that
+  foreclosure was the defect. Execution is confined to a pure predicate, a temporary directory, no
+  network and no repository write — three prohibitions stated explicitly and held by contract tests.
+
+  **Detection is gated, and the negative case is explicit.** A boundary is a predicate that accepts or
+  rejects — a classifier, validator, sanitiser, allow/deny-list. A CRUD endpoint, renderer, report
+  writer, formatter or migration is **not**, however security-adjacent it looks, so the common work
+  item pays nothing.
+
+  **Absence is never an answer.** The returned YAML gains a required `boundary:` flag and, under it,
+  `probes_executed:`; `probes[]` carries reproduced findings only. A missing `boundary` renders as
+  *unverified*, never as "not a boundary" — the agent did not answer the question. A missing
+  `probes_executed` counts as zero. **A boundary that executed zero candidates is a finding, not a
+  pass**: a step reporting success without having run anything is the exact defect probe mode exists
+  to catch, so it is not allowed to hide inside its own output. `/finalise` renders each of these
+  states as its own branch, so a boundary that was probed and *held* can never be reported as one
+  that was never probed.
+
+  **It found real defects on its first run.** Replayed against the commit that closed the original
+  fourteen, probe mode surfaced **twelve further routes** — shell-keyword swallow via `if`/`while`/
+  `until`, no-space write redirects, `git -C log push`, sed's `w` write command, apostrophe-span
+  quote blanking, quote-unaware heredoc detection, plus two over-refusals of read-only `-o` usage.
+  All twelve reproduce deterministically on current `HEAD` and are filed as `bug.6`. That replay is
+  now a committed regression corpus rather than a one-off script.
+
+  New: `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` and
+  `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs`. Changed:
+  `shared/resources/finalise-dod-security-prompt.md` (the source) and `skills/finalise/SKILL.md`
+  (the render). CI now checks out full history so the replay's discriminating half runs rather than
+  skipping at depth 1. Task 73.
+
+- **QA now executes a skill's documented shell snippets instead of only reading them.**
+  `qa-task` gains **Step 4b** and `qa-story` gains **Phase 1.7**: when a change set adds or modifies a
+  `SKILL.md` or a `shared/resources/*.md` prompt containing fenced ```bash blocks, the documented blocks
+  are extracted, classified, and executed under **both `bash` and `zsh`**, with disagreements reported
+  as findings.
+
+  **The gap this closes was measured, not hypothetical.** Task 66 (`/review-pr`) shipped `accepted`
+  after two QA cycles, a DoD gate and forty passing contract tests, carrying a multi-glob `ls` that
+  collects the whole paper trail. Under zsh — the default macOS shell — a glob matching nothing aborts
+  the entire command, so one absent artifact kind suppressed every kind that was present: **6 files
+  under bash, 0 under zsh**. The first person to actually run the skill found it in minutes. Contract
+  tests structurally could not: they assert what prose *says*, never what it *does*.
+
+  **Exit status could not have caught it either.** Both shells exit `1` on the defective block. Only
+  *stdout* differs, which is why the stdout comparison is the load-bearing signal and is mutation-proved
+  as such — reverting it to a status comparison turns the regression fixture red.
+
+  **The safety boundary is an allow-list, and it fails closed.** Only recognised read-only commands
+  execute; anything unrecognised classifies as `mutating` and is skipped with a recorded reason. A
+  deny-list alone fails *open* — every command nobody thought to forbid runs. `gh` and `curl` are
+  excluded in every form, read-only included: a QA gate should not make network calls. Blocks carrying
+  template slots or variables nothing binds are skipped as `placeholder`. Execution happens in a
+  temporary working copy, never the live tree.
+
+  **A run where zero blocks executed is itself a finding.** That is this step's own failure mode — an
+  over-broad classification would make it quietly do nothing, recreating the silent skip it exists to
+  eliminate — so it is enforced rather than left to good sense. `zsh` being absent is deliberately *not*
+  that case: the arm is guarded on `command -v zsh`, runs bash alone, and records `zsh-unavailable` as
+  information, so a CI box without zsh cannot fail a work item for it.
+
+  New: `shared/resources/qa-execute-snippets.mjs` (library + CLI, exit `0`/`1`/`2`) and
+  `shared/resources/qa-runnable-prose-detection.md` (the rule, stated once, referenced by both QA skills
+  and cross-referenced from the pipeline's step 5–6 doc). Findings map onto the existing `code_review`
+  shape — no new report or gate schema.
+
+- **`/review-pr` — review a pull request against the paper trail that is supposed to justify it.**
+  The repo could review a *diff* (`/review-code`) and review a *document before implementation*
+  (`/review-story`, `/review-task`). Nothing asked the question a human asks when they open a PR:
+  *this says it implements task 65 — does it, and is the evidence there?*
+
+  **The gap was structural, not just a missing skill.** Every resolver in the repo ran
+  doc → branch → PR: `create-branch` builds a branch name from a document, `qa-fix` finds a PR from
+  the current branch. Nothing parsed `feature/task.65.registry-aware-selection` back into
+  `docs/tasks/task.65.registry-aware-selection/`. `/review-pr` adds that reverse lookup as a
+  six-rung, first-hit-wins cascade — branch stem, `pr_number` frontmatter, gate `pr:` URL, tracker
+  issue, a bounded Explore fallback, then degrading to a code-only review. The rung that matched is
+  reported as `resolved_via`, because a resolver that silently anchors on the wrong document
+  produces confidently wrong findings for every check downstream.
+
+  **Two lenses run over one scoped diff.** The code lens dispatches
+  `shared/resources/code-review-prompt.md` verbatim — the same reviewer `/review-code`, `/qa-story`
+  and `/qa-task` already use, so it inherits every future improvement to it. The conformance lens is
+  a new shared prompt, `shared/resources/pr-conformance-prompt.md`, checking four things the code
+  lens cannot see: `coverage` (a criterion the diff does not deliver), `scope` (the diff doing what
+  the doc never claimed), `trail` (a gate that never reached PASS, a `top_issues[]` never emptied, an
+  `accepted` status with no DoD file), and `consistency` (doc, PR and tracker disagreeing). A PR can
+  be flawless code implementing the wrong thing, or correct work whose evidence never closed;
+  neither lens sees the other's failures.
+
+  **Bitbucket gets PR review for the first time.** `/review-code`'s PR path resolved its base with
+  `gh pr view` and had no Bitbucket branch at all. `/review-pr` builds the diff from `git` rather
+  than a host API, so one path serves both platforms, and it branches on `$VCS` for PR-shaped work
+  and `$TRACKER` for issue-shaped work — separate axes, since a repo can host code on Bitbucket and
+  track work in Jira.
+
+  **Advisory by design.** It writes a co-located `.pr-review.{n}.` report and optionally posts one
+  idempotent summary PR comment. It never submits a formal review, never writes a gate `.yml` (only
+  `qa-*` skills do), and never edits code. The new artifact kind is registered in
+  `docs/standards/file-naming.md`, both Co-located artifacts tables and
+  `docs/reference/pipeline-artifacts.md` — a kind that exists in the wild but in no standard is the
+  drift this repo has been bitten by before.
+
+  Two sharp edges found by the skill's own QA and worth knowing about, because both fail *silently*:
+  `docs/**/…` needs `shopt -s globstar`, which is off by default — the first draft's gate glob
+  matched **0 of 110** gate files; and an unanchored `pr_number: ${N}` grep is a prefix match, so
+  reviewing PR 28 resolved to a document reading `pr_number: 281`.
+
+- **`/develop-next` now derives its frontier from the registries, so a filed bug or task cannot be
+  invisible to the loop.** `select-next.mjs` read exactly one file: the completion roadmap. Everything
+  else the repo tracks — `docs/bugs/bug-registry.md`, `docs/tasks/task-registry.md` — was invisible to
+  it. A bug could be filed, registered and never picked up, and the loop would cheerfully report
+  `roadmap-complete`.
+
+  **The failure mode is silence, which is why it went unnoticed.** `roadmap-complete` is
+  indistinguishable from "there is genuinely nothing to do", and `/loop /develop-next` and
+  `loop-supervisor` both terminate on it. An overnight run that stops at 23:05 with a Major bug sitting
+  registered and unreferenced has not finished the work; it has failed to find it, and reported
+  success. That happened here: `bug.2` was filed, registered Major/High, with a documented root cause,
+  and the selector reported `roadmap-complete` the same day.
+
+  When — and **only** when — no phase holds an actionable row, selection now falls through to the two
+  registries. **Roadmap precedence is absolute**: an authored phase always wins, because the registries
+  are a floor, not a re-ranking of deliberate human sequencing.
+
+  - **Only `roadmap-complete` is pre-empted.** `human-gated`, `planning-gap`, `manual-checkpoint` and
+    `phase-blocked` still stop the loop. A human gate is never scanned past. This is the sharpest edge
+    in the feature — a fallback reachable from any other stop would look like it was working while
+    stepping over an operator's decision — so there is one test per stop reason, each asserting the
+    strong form: not "no registry item was selected" but *the registry loader was never called*.
+  - **The eligibility floor equals what the dispatcher accepts.** A task enters the frontier at `draft`,
+    `planned`, `ready-for-development` or `in-progress`; a bug at `new` or `reopened`.
+
+    The floor must be **the set of statuses the dispatching pipeline accepts** — that is the rule, and
+    those values are only its current answer. `develop-task` HALTs on `Ready for Review`, `accepted` and
+    `Cancelled`, so a task in any of those states is excluded even though `ready-for-review` is
+    unambiguously "outstanding": selecting it would produce work the dispatcher refuses, stopping an
+    unattended loop that could not then self-recover. A test parses the dispatcher's own status table and
+    asserts the relation, so it re-checks itself if the dispatcher changes.
+
+    This bullet originally shipped the *opposite* decision — that the floor **was** the opt-out, so a
+    `draft` task was out of the frontier by construction and no `deferred` park value was needed. That
+    was reversed before release; see **Changed → the selection floor now equals what the dispatching
+    pipeline accepts** below for why. The relation is `===` on the task axis and remains `⊆` on the bug
+    axis, which diverges by `in-progress` and `ready-for-qa` deliberately.
+  - **Frontmatter decides; the registry row only nominates.** Indexes drift from what they index — six
+    rows of this repo's own task registry were stale when this shipped. A row is a candidate only when
+    the *document* it points at is eligible, whatever the row says, asserted in both directions.
+  - **Out of the frontier, never invisible.** `--lint` gains a `registryFrontier` section naming every
+    row considered and why each was passed over. An escape hatch that hid work silently would be the
+    original bug wearing different clothes.
+  - **`item.source`** (`roadmap` | `bug-registry` | `task-registry`) is on **every** selection,
+    roadmap ones included — a field present only sometimes is an implicit contract.
+  - `--batch` is unchanged and registry-free: registry rows carry no `touches:` data, so
+    write-disjointness cannot be established and they must never enter a parallel batch.
+
+  Absent, empty, header-only and malformed registries all degrade to the previous behaviour rather
+  than halting, so a consumer repo with neither registry is unaffected. Override the paths with
+  `--bug-registry` / `--task-registry`. Rules:
+  `skills/develop-next/references/roadmap-selection.md` §"Registry fallback frontier".
+
+- **`loop-supervisor` `status` and `watch` — an unattended run you can actually see, and one that
+  tells you when it stops.** The runner already wrote an accurate record of what it did; there was no
+  way to read it back while it was happening. The honest answer to *"how do I see what it's doing"*
+  was *tail a JSONL file and parse it in your head* — enough for the person who wrote it, on the day
+  they wrote it, and nobody afterwards. That matters more than it sounds, because the failure this
+  whole design exists to catch is **silent quality degradation**, and a run that has quietly idled for
+  four iterations looks identical to a healthy one until a human glances at it.
+
+  `run-loop.mjs status` prints a snapshot (`--json` for machines); `run-loop.mjs watch` repaints the
+  same content every ~2s. Both are **pure readers** — no lock, no writes, nothing spawned — so they are
+  safe from a second terminal, over SSH, twice at once, and mid-iteration. Looking cannot disturb the
+  run. `watch` repaints in place and **never clears scrollback**: an operator who scrolled up to read
+  something does not lose it to a repaint.
+
+  **The states worth knowing about are the last two.** `current.json` present with a live pid is
+  `running`; absent is `no run in flight` (the normal state after a clean exit — exit 0, not an
+  error); present with a **dead** pid is `CRASHED SUPERVISOR`, and it says the values are the last
+  recorded rather than live; present but **unparseable** is `HEARTBEAT UNREADABLE`, explicitly not
+  "no run in flight".
+
+  Both exist because the one thing a passive view must never do is state the opposite of the truth.
+  Reporting hours-old data as live is one way; answering "no run in flight" for a heartbeat it merely
+  failed to parse is the other, and it is worse — a crashed report makes someone look, while "no run
+  in flight" ends the investigation. QA caught the second during review of this very change. The
+  heartbeat is now written **atomically** (temp file, then rename) so a reader cannot catch it
+  half-written, and the reader distinguishes absent from unreadable regardless, rather than trusting
+  the writer to be careful.
+
+  Liveness is a `process.kill(pid, 0)` probe and deliberately **not** a heartbeat timeout — the
+  runner clears its heartbeat interval while no child is running, so `current.json` legitimately goes
+  untouched across the probe and the cooldown window, and a time-based rule would call a healthy loop
+  crashed between iterations.
+
+  **`runs.jsonl` has two row shapes, and the thin one is the common one.** A finished iteration
+  carries `durationMs`, `costUsd` and `turns`; a *probe-stop* row (`spawned: false`, written when
+  the probe finds no work) carries only `outcome`, `reason` and `at` — and that is the normal
+  **last** line of a healthy run. The renderer tolerates both and shows `—` for what is absent, never
+  `undefined`. Note the field is `turns`, not `num_turns`: the ledger renames the envelope's key on
+  write, and a reader written against the envelope's name silently renders nothing.
+
+  `--notify` (macOS `osascript`) and `--webhook <url>` (ntfy-shaped POST, for phone push) fire
+  **once, when the loop ends** — halt, error, budget cap or clean completion — naming the reason. Not
+  per iteration: a notifier that pings twenty times a night is one you have muted by morning, which is
+  worse than none. An eight-hour run that halts at 02:00 otherwise wastes six hours. **A failed
+  notification warns and leaves the run's exit status untouched**, proved by a test that breaks the
+  webhook on purpose. A double Ctrl-C is deliberately excluded — it exits from inside the signal
+  handler, and that operator is already at the keyboard.
+
+  The renderer is a pure function in `skills/loop-supervisor/references/render.js` that both
+  subcommands wrap, so the two views cannot drift apart, and the whole formatting surface is testable
+  without a terminal, a clock or a live supervisor.
+
+- **`loop-supervisor` — a fresh-context sequential loop runner.** `/loop /develop-next` re-invokes
+  the **same** conversation every iteration (both the cron path and the self-paced path do), so item
+  five is worked through a context mostly consumed by items one to four, and auto-compaction
+  summarises rather than clears. The failure is not a crash — it is **quality degradation with no
+  external signal**: the loop keeps reporting success while the work gets worse. `/loop` cannot fix
+  this from the inside, because the wakeup lands in the session that already exists and clearing
+  context is not an operation a skill can perform on itself.
+
+  `skills/loop-supervisor/scripts/run-loop.mjs` is a host process — launched from a terminal, it
+  spawns Claude rather than the reverse. Each iteration is one `claude -p` with a pinned
+  `--session-id`, so every iteration stays reopenable afterwards with `claude --resume`. It probes
+  `select-next.mjs` before spending a model invocation, tees `stream-json` to a raw log and a
+  human-readable one, and stops on an empty frontier, a halt, a budget cap, or consecutive
+  no-progress.
+
+  **Outcomes are classified from filesystem post-conditions, never from the assistant's prose.**
+  `/develop-next` signals its stop conditions only in its final message — no exit code distinguishes
+  them, no run-report file, no stop-marker — so grepping that message would put a model call inside a
+  control-flow decision and break silently the first time the wording changed. The classifier is a
+  pure module with 39 of the suite's tests to itself.
+
+  Three traps shape it, each tested on both sides of its boundary: **a halt file proves nothing by
+  existing** (it is never deleted by a successful run, so only its timestamp counts — a stale one must
+  classify `progress`); **a leftover lock is `incomplete`, not an error** (`on-stop.sh` blocks a
+  mid-pipeline stop, so a stalled iteration exits cleanly with the lock still on disk — that is the
+  system working as designed); and **empty probe stdout is an error, never "no work"**
+  (`select-next.mjs`'s direct-invocation guard exits 0 silently when reached through a path that does
+  not realpath to the module, and reading that as an empty frontier would report a clean night's sleep
+  while doing nothing).
+
+  Sequential by design — two supervisors in one working tree would collide on
+  `develop-pipeline.lock`, so a PID lock enforces single-flight. Additive: `/loop /develop-next` is
+  unchanged, and the `loopSupervisor:` config block is optional with every key defaulted.
+
+- **The QA loop gains a stall guard, and stops running five cycles when it stopped converging after
+  three.** New **Convergence check** in `shared/resources/develop-pipeline-step-5-6-qa-loop.md`:
+  after each cycle's gate is written, count the HIGH entries in `top_issues[]`; from cycle 3 onward,
+  a count that has failed to *strictly decrease* across two consecutive cycles ends the loop.
+
+  **Measured, not hypothetical.** One task ran 4h52m from first commit to merge; implementation was
+  37 minutes and the QA loop was 2h52m. Its five committed gates carry HIGH counts of
+  `7, 7, 7, 7, 4` — four consecutive cycles that reduced nothing, and nothing in the pipeline
+  noticed. Meanwhile the deliverable changed by 193 lines while the machinery built to verify it
+  absorbed ~1,560 lines of rewrite and had both of its mechanisms deleted rather than kept.
+
+  **The structural cause was that the loop's subject drifts onto its own repairs.** Cycle N≥2 was
+  scoped to files changed since the last gate — which are exactly cycle N−1's fixes. The Step 3
+  develop loop has had a stall guard for exactly this shape (progress = a new tick or a new commit;
+  no progress → HALT); the QA loop had no equivalent. That asymmetry was the bug, and the two now
+  read alike.
+
+  **It escalates; it never silently accepts.** On the observed task a genuine defect in the
+  *shipped* artifact surfaced only at cycle 5 and had been present in the original commit — any rule
+  that quietly exits early loses it. The residual findings are handed to a person together with the
+  evidence that the loop had stopped working. Both halting exits (loop limit, convergence stall) now
+  share one **Loop Escalation** block rather than two escalation paths.
+
+  **`HIGH_N` counts what a gate *raised*, not what is still open, and that distinction is
+  load-bearing.** The QA skills stamp `status: closed` on a gate in place after its own cycle's
+  fixes land, so a counter that skipped closed entries would read `0` on every mature gate: the
+  observed task reads `7, 7, 7, 7, 4` raised versus `7, 0, 0, 0, 0` closed-excluded. The counter is
+  pinned to entry indent (gate findings carry multi-line `finding: >-` block scalars whose wrapped
+  text can begin with `- `, or contain the words `severity: high`) and carries no `\b`, which is a
+  GNU extension that matches nothing under the `awk` shipped on macOS — silently reporting every
+  gate as `0` and disarming the guard. Verified under `bash` and `zsh` against the five real gates.
+
+- **Third strike: a file that HIGH findings have circled for three consecutive cycles may not be
+  patched again.** The permitted moves are delete the artifact, replace its mechanism, or waive with
+  a documented reason — `qa-fix` gains **Step 2.5** to receive the constraint. On the observed task
+  the artifact was patched four times before being deleted, and its replacement was deleted too;
+  deletion was right both times and the loop took four cycles to reach it.
+
+  The trigger is the gate entry's **`file:`** key, now required on every `top_issues[]` entry
+  (`qa-task`, `qa-story`, `qa-gate` schemas, worked examples, and the code-review promotion shape).
+  `file:` is checkable against the diff. A field asking the fixer to classify its own findings would
+  be written by the party the rule constrains and could not be checked at all — an agent that
+  classified its residual findings favourably would exit the loop a cycle sooner and nothing could
+  catch it.
+
+- **Cycle 2 is now an independent refute pass over the full branch diff.** `qa-task` **Step 3b** and
+  `qa-story` **Phase 1.6** branch on the prior-gate count: cycle 2 reviews the whole branch diff and
+  instructs the subagent to *refute rather than review*, probing the four transitions a steady-state
+  suite structurally cannot see (teardown · in-flight · error path · reconnect). It overrides the
+  Adaptive Review Strategy, which previously made re-reviews *shallower* each cycle. Cycles 3+ keep
+  the narrowed scope. The trade is two deep cycles instead of five shallow ones.
+
+- **A waiting protocol for CI, so nobody reaches for `--watch` again.** `develop-next` and
+  `develop-batch` named `gh pr checks <PR#>` and stopped there. It does not block — it returns
+  immediately with a dedicated **exit code 8** for pending checks. Both skills now carry the
+  one-shot rollup read (discriminating on `.status == "COMPLETED"` before `.conclusion`, the form
+  `/finalise` already uses), say to background any genuine wait, and name foreground
+  `gh pr checks --watch` as forbidden: it burned three 10-minute tool timeouts on a 23-minute CI
+  lane.
+
+- **A fifth vacuity shape in `shared/resources/mutation-proving.md`: a textual rule standing in for
+  a semantic property.** Whether a spec is meaningful, un-narrowed, or actually executes is not a
+  property of its source text. One guard tried to prove it and was defeated nine times across four
+  cycles; its own docblock claimed the vocabulary was closed, which was false. Each defeating
+  spelling is evidence the *class* is undecidable, not that the rule needed one more case. Two
+  things work instead: execute and observe (respecting the lane contract), or make the subject its
+  own witness.
+
+  The procedure also gains a **mutation-application check** — diff against a pre-mutation copy and
+  confirm the edit landed before running anything. One mutation used a literal `…` where the source
+  had `...`, never applied, and the resulting green was recorded as a pass.
+
+### Changed
+
+- **The pipeline's quality gate now runs what CI runs.** `developNext.qualityGateCommand` defaults to
+  **`npm run ci`** instead of `npm test`. This is an **observable behaviour change**: a consumer that has
+  not set the key inherits a slower, stricter gate. That is the intent — the old default was quietly
+  weaker than the CI it exists to predict — but some runs will take longer. An explicit
+  `qualityGateCommand:` in `skills-config.yaml` still wins, so a consumer who wants the old behaviour
+  states it in one line.
+
+  **The divergence was measured.** `.github/workflows/test.yml` runs three commands — `npm run
+  format:check`, `npm test`, `npm run eval:all` — and the gate ran one of them, so two never executed
+  anywhere before a merge. On task 67 that shipped a red build: `prettier --check` flagged two new files
+  *after* `/finalise` had already accepted the task, costing a diagnosis round trip and a recovery
+  commit. `eval:all` had never run locally at any step of any pipeline; it passed in CI, which is the
+  only reason nobody noticed. Had it failed, the first signal would have been a red build on
+  already-accepted work.
+
+  **The gates are tiered, and the tiering is the point.** A new `develop.fastGateCommand` (default
+  **`npm run ci:fast`** — formatting plus the hermetic suite) is what the develop loop and each qa-fix
+  cycle run; the full `ci` runs once, at the merge gate. Putting the end-to-end evals in every qa-fix
+  cycle would make the correct fix feel expensive enough to be reverted, and a gate people route around
+  is a gate that does not exist. Formatting moves the other way — into the loop — because its absence
+  from `npm test` is the specific thing that shipped the task-67 red build, and it costs seconds.
+
+  **CI keeps its three separately named steps.** Collapsing them into one opaque `npm run ci` would make
+  every failure read the same; the workflow calls the same three scripts the composite calls, so there
+  is exactly one list. New contract test `evals/shared/tests/ci-gate-parity.test.mjs` asserts set
+  equality in **both** directions — a step in the workflow that the composite does not call is a gate the
+  pipeline cannot see, which is the original defect re-created one step at a time — and holds the
+  tiering invariant, both orchestrators' documented defaults, and the two shared step docs naming the
+  config key rather than a literal.
+
+  New `package.json` scripts: `ci` and `ci:fast`. Updated: `skills/develop-next/{SKILL,README}.md`,
+  `skills/develop-batch/{SKILL,README}.md` (its per-item merge gate reads the same key),
+  `skills/develop/SKILL.md`, `shared/resources/develop-pipeline-step-{3,5-6}-*.md`,
+  `docs/reference/configuration.md`.
+
+- **One commit and one push per QA cycle.** The QA loop's commit block said only what to *exclude*
+  from the `fix(...)` commit (the implementation report, which Step 8 owns) and never said where the
+  cycle's gate `.yml` and QA report `.md` go — so they fell into `/commit-changes`' default sweep and
+  an orchestrator invented a second `docs(...)` commit, pushed separately, seven times on one PR.
+  They are evidence for that cycle's fix and now ride in the same commit.
+
+  The three paths with no `fix(...)` commit are covered explicitly: the `PASS`/`WAIVED` exit commits
+  on the Step 7 transition *before* `/finalise` (waiting for Step 8's sweep would have `/finalise`
+  read a gate the PR does not yet contain), and the no-code-change HALT and the convergence-stall
+  escalation each commit before halting.
+
+  **The payoff is not mainly CI minutes.** Four of the five superseded runs on the observed PR died
+  within 3m35s — roughly ten minutes of runner time. It is that every fix commit reached merge with
+  no completed CI run of its own, because a cycle's own second push kept cancelling its in-flight
+  run.
+
+- **The selection floor now equals what the dispatching pipeline accepts, instead of being a strict
+  subset of it.** `TASK_ELIGIBLE_STATUSES` in `skills/develop-next/scripts/select-next.mjs` gains
+  `draft` and `planned`, making it exactly the set `develop-task` proceeds on.
+
+  **Behavioural, and worth stating plainly**: an unattended `/loop /develop-next` will now pick up
+  `draft` and `planned` tasks it previously skipped. A stub or half-written task can consume one
+  pipeline run and halt at `develop-task` Step 2 with review findings, where before it was silently
+  ignored. That trade is deliberate — a wasted cycle is visible and recoverable; invisibility is
+  neither.
+
+  **The gap was the default path, not an edge case.** `/create-task` emits `status: planned`, and
+  `planned` was outside the floor. So every task ever filed entered the world invisible to
+  `/develop-next` and stayed there until a human remembered to run `/review-task` — reintroducing, for
+  tasks, exactly the manual tracking the registry fallback was built to remove for bugs. The effect was
+  preventive rather than observed: this repo's task registry holds no `planned` or `draft` rows only
+  because every filing so far was promoted by hand, and that hand-promotion is the toil being removed.
+
+  **This reverses a decision shipped earlier in this same `[Unreleased]` block** — *"the eligibility
+  floor **is** the opt-out"*, which argued that a `draft` task was a speculative filing and out of the
+  frontier by construction, strictly stronger than an opt-out marker because there is nothing new to
+  remember. That argument was coherent; three things answer it. The opt-out was never free — it parked
+  speculative filings at no cost to their author and charged every real filing a manual promotion step.
+  The failure it prevented costs one visible cycle, while the failure it caused costs indefinite
+  silence. And the review gate did not disappear, it moved to where it belongs: `develop-task` Step 2
+  reviews a `draft` before any code is written and HALTs on NEEDS REVISION or REQUIRES REWORK.
+
+  **There is now no opt-out, by decision.** A filing that should not be worked is `cancelled`, or is not
+  filed. No `deferred` park value is added to either lifecycle — that would re-import the "something new
+  to remember" cost the reversed argument correctly warned about.
+
+  **The assertion is now two-way.** The test parses `develop-task`'s own status table and fails on a
+  divergence in *either* direction, naming which statuses diverged and which way. The old `⊆` could only
+  catch a floor status the dispatcher refuses; it was structurally blind to a status the dispatcher
+  accepts that the floor withholds, which is precisely where `planned` sat. Over-widening (adding
+  `accepted`) now fails too.
+
+  **Bugs are unaffected, and the divergence there is now recorded rather than assumed.**
+  `BUG_ELIGIBLE_STATUSES` is unchanged, so no bug becomes newly selectable. Measured: `develop-bug`
+  proceeds on `new`, `reopened`, `in-progress` and `ready-for-qa` while the bug floor is `new`,
+  `reopened` — a real two-status gap, left open on purpose. Closing it would hand an unattended loop a
+  `ready-for-qa` bug whose fix is already written and only awaiting verification: a larger change with
+  its own risk profile.
+
+  **Eligibility, not precedence.** The registries remain a fallback consulted only at the terminal
+  `roadmap-complete` return, so a wider floor changes nothing while any phase still holds an actionable
+  row — asserted by its own test. No API or schema changes.
+
+### Fixed
+
+- **`/review-code` posted PR comments on the wrong axis — it branched on `TRACKER` where the decision
+  belongs to `VCS`.** Step 4 chose its comment path by testing `TRACKER=github`, but a comment on a
+  **pull request** is a property of where the code is hosted, not of where the issues live. The two are
+  separate axes by design — `resolve-platform.sh` sets both precisely because a repo can host code on
+  Bitbucket while tracking work in Jira, or on Bitbucket with GitHub issues.
+
+  **In that configuration the failure was silent.** With `VCS=bitbucket` and `TRACKER=github` the step
+  took the `gh pr comment` arm against a Bitbucket PR. `gh` cannot address one at all, so the comment
+  never appeared — and the run reported success. Nothing was red, and nobody would look.
+
+  **The arm it fell through to did not exist either.** The alternative was labelled *"Bitbucket / Jira"*
+  — a VCS grouped with a tracker as though they were alternatives to each other, which is the same
+  category error that produced the wrong key — and it delegated to *"mirror `/qa-story` step 6"*.
+  `/qa-story` has **no numbered Step 6** in its main review flow; its workflow lives under an unnumbered
+  heading. An implementer following the instruction found nothing to mirror. The Bitbucket arm now names
+  the credential resolver, the actual REST endpoint, and the marker-based idempotency pattern, pointing
+  at `skills/finalise/SKILL.md` **Step 7**, which carries both platform arms side by side and works.
+
+  **`review-pr` already had this right and said so**, so the rule is now stated in `review-code` in
+  `review-pr`'s exact words — *"Branch on `$VCS` for everything PR-shaped, on `$TRACKER` for everything
+  issue-shaped"* — and a contract test asserts the two skills state it **identically**, so rewording one
+  fails until the other follows.
+
+  **`skills/review-code/tests/` is new** — the skill had none — with 12 contract tests and its glob added
+  to `package.json`, which hand-lists them (a suite absent from that list runs nowhere). All assertions
+  are scoped to the Step 4 section rather than the whole file: the rule is not "never mention `TRACKER`",
+  it is "do not branch PR-shaped work on it", and a file-wide ban would forbid a future issue-shaped
+  branch where `TRACKER` is correct. Five mutation reverts — branch key, Bitbucket arm, rule statement,
+  the dead pointer, the Bitbucket/Jira conflation — each **proved to have actually applied** before its
+  red was counted.
+
+  **A sweep classified all 64 `TRACKER=github` occurrences** across 20 source files. `review-code` was
+  the only PR-shaped one. Everything else — issue comments, board moves, milestones, tracker linkage,
+  sync dispatch — is issue-shaped and correctly keyed; `finalise`'s own PR-comment section already
+  branched on `$PLATFORM`/`$VCS`. Behaviour in a GitHub/GitHub repo is unchanged: the two keys resolve
+  identically there, which is why this survived as long as it did.
+
+- **The status-vocabulary fix missed one restatement, and the guard that should have caught it was
+  too narrow.** `qa-story`'s Key Principle 11 still said *"(PASS/CONCERNS → Ready for Done, FAIL →
+  Reopened)"* — the same rule in a parenthesised prose form, with no `Status:` prefix and no quotes,
+  so `status-vocabulary.test.mjs` sailed straight past it. It was found by hand while porting the
+  fix into a consumer repo, which is precisely the place a guard exists to make unnecessary.
+
+  The test now matches the forbidden **value next to an arrow** in any phrasing, rather than one
+  sentence shape, and is mutation-proved against the exact text it previously missed.
+
+- **`qa-story` and `qa-fix` wrote a document status the canonical lifecycle forbids.** Both told the
+  agent to set `Ready for Done` on a gate PASS (and `Reopened` on FAIL), while
+  `document-status-lifecycle.md` has listed `Ready for Done` as **deprecated** since it was written.
+  The two skills were simply never updated to match it. A QA PASS therefore wrote `ready-for-done`
+  into the document, which is outside the canonical set
+  (`draft` · `planned` · `ready-for-development` · `in-progress` · `ready-for-review` · `accepted` ·
+  `cancelled`).
+
+  **Why it stayed hidden for so long.** `finalise` overwrites the value with `accepted` minutes
+  later, so nothing is wrong at rest and the bad status exists only inside a short window. The cost
+  lands in the *consumer* repo, and only when a commit happens to land inside that window. Observed
+  live in `tinker-city`, whose `docs-lint` runs ungated on every PR: it went red on `ready-for-done`
+  during a Definition-of-Done verification, and the fault was caught by that DoD pass rather than by
+  anything in this repository.
+
+  A gate PASS now **leaves the document at `ready-for-review`**, and a FAIL sends it to
+  `in-progress` — the QA loop's backward edge in the canonical state machine. Acceptance stays
+  `finalise`'s to write, and only after the DoD check: a PASS says the implementation is good, not
+  that the Definition of Done is met, and on a project where CI is a DoD gate it does not even say
+  the build is green.
+
+  ⚠️ **The lifecycle doc's own deprecation table gave the wrong replacement**, and that is corrected
+  here too. It mapped `Ready for Done` → `Accepted`. Following that advice would have traded a lint
+  failure for a worse defect, because `qa-story` runs *before* `finalise` — writing the terminal
+  state there announces acceptance ahead of the check that is allowed to refuse it. The mapping is
+  now `Ready for Done` → `Ready for Review`.
+
+  Pinned by `evals/develop-story/protocol/status-vocabulary.test.mjs`, so the next regression fails
+  **here** rather than in a consumer repo's pull request. The test was mutation-proved: restoring the
+  original wording turns it red. It also asserts the distinction an editor could easily collapse —
+  **bug-report** statuses are a separate lifecycle in which `Reopened` remains entirely correct, so a
+  blanket ban on the word would be wrong.
+
+
 ## [v0.44.0] - 2026-08-20
 
 ### Added

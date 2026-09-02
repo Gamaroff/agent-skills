@@ -1,0 +1,61 @@
+schema: 1
+task: "task.72.pin-bug-axis-divergence"
+task_title: "Pin the bug-axis divergence exactly instead of asserting it loosely"
+gate: PASS
+status_reason: "TASK72-001 resolved — the task-axis paragraph is byte-identical to its pre-change form. The cycle-2 refute pass found no defect in the code and one gap in the EVIDENCE, now closed: the guard's necessity is proven by a discriminating mutation whose guard-removal control run goes green."
+reviewer: "QA Engineer"
+updated: "2026-09-01T21:10:00Z"
+
+top_issues:
+  - id: "TASK72-001"
+    severity: medium
+    file: "skills/develop-next/scripts/select-next.mjs"
+    finding: "Inserted sentences stranded the pre-existing 'Pinned by …' clause on the wrong antecedent."
+    suggested_action: "Move the task-72 sentences to the end of the paragraph; re-wrap."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-01"
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2141
+  phases_verified: "3/3"
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No security surface. Test-and-comment-only change; no auth, input handling, secrets, network or dependency changes."
+  performance:
+    status: PASS
+    notes: "No runtime path changes; select-next.mjs behaviour byte-identical apart from comments. develop-next unit lane unchanged at ~2.2s."
+  reliability:
+    status: PASS
+    notes: "Strictly increases what the build detects. Seven probes now stand behind the two assertions, including a guard-removal control run that isolates the guard's unique coverage. Rollback remains one test file with no source change."
+  maintainability:
+    status: PASS
+    notes: "TASK72-001 closed; the task-axis paragraph is byte-identical to develop. The guard comment now names the discriminating mutation and warns that the rename mutation does not prove the guard, so the next reader can verify the claim rather than trusting it. Task §8 carries the strengthened five-mutation contract."
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: "2026-09-01"
+  total_iterations: 1
+  verification_method: "byte-diff against origin/develop + full suite + guard-removal control run"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "None. The task's three deliberate exclusions (not widening BUG_ELIGIBLE_STATUSES, no integration test, no CHANGELOG entry) were each independently checked and are correct."
+      refs: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

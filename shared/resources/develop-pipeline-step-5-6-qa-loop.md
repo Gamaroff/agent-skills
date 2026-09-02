@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-step-5-6-qa-loop
-description: Steps 5–6 (QA loop) shared by develop-story and develop-task. Covers QA cycle counter setup, gate file location, qa-story/qa-task invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, commit/push per cycle, escalation entry template, and loop limit HALT message. Story vs task variants called out where they differ (skill names, file patterns, gate sort field, commit message format, escalation text).
+description: Steps 5–6 (QA loop) shared by develop-story and develop-task. Covers QA cycle counter setup, gate file location, qa-story/qa-task invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, the convergence check (HIGH-count stall guard) and third-strike replace-don't-patch rule, one-commit-one-push-per-cycle, escalation entry template, and the loop-limit / not-converging HALT messages. Story vs task variants called out where they differ (skill names, file patterns, gate sort field, commit message format, escalation text).
 ---
 
 # Develop Pipeline — Steps 5–6: QA Loop
@@ -14,6 +14,11 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 ## Loop Setup (shared)
 
 This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **5 complete cycles**. A clean PASS on any QA review exits the loop immediately.
+
+The loop has **three** exits, not two: a clean gate (`PASS`/`WAIVED` → Step 7), the 5-cycle limit,
+and — from cycle 3 onward — the **Convergence check**, which halts the loop the moment it stops
+reducing HIGH findings. The last of those is the one that usually fires first; see its section
+below. Both halting exits land in the same **Loop Escalation** block.
 
 #### develop-story
 
@@ -86,6 +91,17 @@ Read the gate file to determine the gate result.
 ## Each Cycle
 
 ### 5a. Run QA Review
+
+> **When the work item's deliverable is runnable prose, the QA skill executes it.** A change set that
+> adds or modifies a `SKILL.md` or a `shared/resources/*.md` prompt containing fenced ```bash blocks
+> triggers an execution step inside the QA skill — `qa-task` **Step 4b**, `qa-story` **Phase 1.7** —
+> which runs the documented snippets under both `bash` and `zsh` and reports disagreements.
+>
+> The rule lives in one place: `shared/resources/qa-runnable-prose-detection.md`. It is **not** restated
+> here, and this orchestrator does nothing to trigger it — the QA skills own both the detection and the
+> execution. This note exists so a reader of the pipeline knows the step is there, and knows where the
+> rule is when a QA cycle reports a shell disagreement.
+
 
 #### develop-story
 
@@ -216,7 +232,11 @@ After completion, find and read the latest gate file:
 
 - `PASS` with no `top_issues` → signal `ready-for-merge` (below), exit loop, proceed to Step 7
 - `WAIVED` with `waiver.active: true` and a documented reason/approver → signal `ready-for-merge` (below), exit loop, proceed to Step 7 (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
-- `CONCERNS`, `FAIL`, or has `top_issues` → proceed to 5b
+- `CONCERNS`, `FAIL`, or has `top_issues` → run the **Convergence check** (below), then proceed to 5b unless it trips
+
+**On either loop-exiting gate**, commit this cycle's gate `.yml` and QA report `.md` and push once
+before invoking `/finalise` — there is no `fix(...)` commit on this path to carry them. See
+**Where the gate and QA report get committed** in 5b.
 
 **On a gate that exits the loop** (`PASS` or `WAIVED`), when `TRACKER=jira` and `TRACKER_ISSUE` is set:
 
@@ -235,8 +255,13 @@ Log the result in the QA Iteration History section:
 ### QA Cycle {N} — {YYYY-MM-DD}
 **Gate Result**: {PASS / CONCERNS / FAIL / WAIVED}
 **Issues Found**: {count and brief descriptions, or "none"}
-**Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
+**HIGH findings**: {HIGH_N}
+**Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5) / Escalating — loop not converging}
 ```
+
+The `**HIGH findings**` line is not decoration: it is the persisted sequence the **Convergence
+check** below compares across cycles, and the only place a resumed run can read the earlier counts
+back from. Write it on every cycle, including one that found none (`0`).
 
 **Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
@@ -261,6 +286,82 @@ node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-
 Read `reason` and act per the table in [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cycle {N} result comment posted to {TRACKER} issue {TRACKER_ISSUE}."
+
+**Remaining Work Status block (required, per cycle).** Before re-invoking the QA skill for the next cycle, emit the block with the position line `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {N}/5`. On the gate that exits the loop, the block is emitted as part of the Step 7 transition instead (`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate})`). Format: [`shared/resources/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
+
+### Convergence check (shared) — the QA loop's stall guard
+
+Perform this check **after the cycle's gate file has been written and read (5a), before entering
+5b**. A gate that exits the loop (`PASS` / `WAIVED`) has already left and never reaches it.
+
+The Step 3 develop loop halts when it stops making progress (`develop-pipeline-resume-contract.md`
+→ **Develop Loop — Stall Semantics and MAX_ITER Bound**). This is the same guard for the QA loop,
+and it reads the same way on purpose: define progress, and halt when a cycle produces none. Without
+it the QA loop always runs its full five cycles. One observed task produced HIGH counts of
+`7, 7, 7, 7, 4` across five gates — four consecutive cycles that reduced nothing — and nothing in
+the pipeline noticed.
+
+1. **Count the HIGH findings the latest gate raised.** Count every entry in `top_issues[]` whose
+   `severity` is `high`. Call it `HIGH_N`.
+
+   ```bash
+   HIGH_N=$(awk '
+     /^top_issues:/         { ti=1; next }
+     ti && /^[^[:space:]#]/ { ti=0 }
+     !ti                    { next }
+     { ind = match($0, /[^ ]/) - 1 }
+     /^[[:space:]]*-[[:space:]]/ {
+       if (!seen) { base = ind; seen = 1 }        # first entry sets the entry indent
+       if (ind == base) { n += hi; hi = 0 }       # a dash at that indent starts a new entry
+     }
+     seen && (ind == base + 2 || ind == base) && /severity:[[:space:]]*["'"'"']?high/ { hi = 1 }
+     END { n += hi; print n+0 }
+   ' "$LATEST_GATE")
+   ```
+
+   **Count what the gate raised, not what is still open — do not exclude `status: closed`.** The
+   QA skills update a gate *in place* after its cycle's fixes land, stamping `status: closed` and
+   `fixed_date` on each resolved entry. Every mature gate therefore has most of its HIGH entries
+   closed, and a counter that skips them reads `0` on all of them, compares `0 >= 0 >= 0`, and
+   trips on cycle 3 of every run — or, read the other way, measures nothing at all. Verified
+   against five real gates: the raised counts are `7, 7, 7, 7, 4` while the closed-excluded counts
+   are `7, 0, 0, 0, 0`. `HIGH_N` is the review's verdict at the moment it was written, which is the
+   only reading that makes the sequence comparable across cycles.
+
+   **Both indent rules are load-bearing, and each closes a way the simpler versions were fooled.**
+   Gate entries carry multi-line `finding: >-` block scalars, so (a) a wrapped line beginning with
+   `- ` splits one entry into two unless entry boundaries are pinned to the *first* entry's indent,
+   and (b) a `severity: high` written inside that prose is counted as a finding unless `severity:`
+   is required at the entry's own key indent (`base + 2`, or `base` for the inline
+   `- {severity: high}` form). Scoping to the `top_issues:` block additionally keeps a top-level or
+   sibling key from inflating the count. The pattern deliberately carries **no `\b` word
+   boundary** — that is a GNU extension, and the one-true-`awk` shipped on macOS silently matches
+   nothing with it, which would report every gate as `HIGH_N=0` and disarm this guard without ever
+   failing. Verified under both `bash` and `zsh` against the five real gate files of the observed
+   task (`7, 7, 7, 7, 4`) and against a fixture carrying every decoy above.
+
+2. **Keep the sequence across cycles.** Record `HIGH_N` in this cycle's QA Iteration History entry
+   as `**HIGH findings**: {HIGH_N}` — that entry is what a resume reads the earlier counts back
+   out of, and what the escalation entry tabulates.
+
+3. **From cycle 3 onward, if `HIGH_N >= HIGH_{N-1}` AND `HIGH_{N-1} >= HIGH_{N-2}` — i.e. the HIGH
+   count has failed to strictly decrease across two consecutive cycles — the loop is not
+   converging. Stop and escalate.** Do not run 5b. Go to **Loop Escalation** below and use the
+   *QA Loop Not Converging* variant.
+
+   Cycles 1 and 2 never trip it: the rule needs three readings to see a flat line, and a single
+   flat cycle is normal.
+
+   On the observed `7, 7, 7, 7, 4` sequence this trips at the end of cycle 3 — `7 >= 7` and
+   `7 >= 7` — cutting three futile cycles.
+
+**Escalate; do not silently accept.** The remaining HIGH findings are not noise to be dropped
+because the loop got tired of them. On the observed task a genuine defect in the *shipped* artifact
+surfaced only at cycle 5, and it had been present in the original commit; any rule that quietly
+exits early loses it. Escalation hands the residual to a person **together with the evidence that
+the loop had stopped working**, which is the project's Fail Loudly rule and the entire point of
+this check. A convergence stall is never a reason to write a PASS, to waive, or to proceed to
+Step 7.
 
 ### 5b. Run QA Fix (shared)
 
@@ -290,13 +391,160 @@ Log in Decisions Log, once per cycle: "QA Cycle {N} — changes-requested: {land
 
 Invoke the `/qa-fix` skill with the path to the most recent **gate file** (the `.yml` file located using the sort command above). The gate file is the authoritative source of issues for qa-fix.
 
+#### Third-strike rule — replace, do not patch again
+
+Before invoking `/qa-fix`, work out which files have been the subject of HIGH findings for three
+consecutive cycles. Every `top_issues[]` entry carries a **`file:`** key (gate schema: `qa-task`
+**Step 10: Create Quality Gate File**, `qa-story` **Output 2: Quality Gate File**), so this is
+*read off the gates*, not judged:
+
+```bash
+# Subject files of the HIGH findings ONE gate raised, one path per line.
+# Entry boundaries are the `- ` markers at the FIRST item's indent — deeper dashes belong to
+# wrapped `finding: >-` text, not to a new entry. `status: closed` is deliberately ignored: a
+# gate is updated in place after its own cycle's fixes, so filtering on it reads every mature
+# gate as empty.
+high_files() {
+  awk '
+    /^top_issues:/         { ti=1; next }
+    ti && /^[^[:space:]#]/ { ti=0 }
+    !ti                    { next }
+    { ind = match($0, /[^ ]/) - 1 }
+    /^[[:space:]]*-[[:space:]]/ {
+      if (!seen) { base = ind; seen = 1 }
+      if (ind == base) { if (hi && f != "") print f; hi = 0; f = "" }
+    }
+    seen && (ind == base + 2 || ind == base) && /severity:[[:space:]]*["'"'"']?high/ { hi=1 }
+    seen && (ind == base + 2 || ind == base) && /file:[[:space:]]*[^[:space:]]/ {
+      v=$0; sub(/^.*file:[[:space:]]*/, "", v); sub(/[},].*$/, "", v)
+      gsub(/["'"'"'[:space:]]/, "", v); f=v
+    }
+    END { if (hi && f != "") print f }
+  ' "$1" | sort -u
+}
+# Files on their third consecutive strike, given the last three gates oldest→newest:
+comm -12 <(comm -12 <(high_files "$GATE_N2") <(high_files "$GATE_N1")) <(high_files "$GATE_N")
+```
+
+**If the same file is the subject of HIGH findings in three consecutive cycles, `/qa-fix` may not
+patch it again.** The permitted moves are exactly three:
+
+1. **Delete the artifact** — if what it was for is already covered, or was never worth its cost.
+2. **Replace its mechanism** — a different approach to the same job, not another correction to this
+   one. A rewrite that keeps the defeated mechanism is a patch wearing a rewrite's diff.
+3. **Waive** — record the finding as accepted with a documented reason in the gate's `waiver`
+   block, and say why the residual is tolerable.
+
+Pass the constraint into the invocation, naming the files:
+
+```
+Skill(qa-fix, args="gate={gate-file-path}") — plus, in the prompt:
+"Third strike: {file} has been the subject of HIGH findings in cycles {N-2}, {N-1}, {N}.
+ You may NOT patch it again. Delete it, replace its mechanism, or waive with a documented reason,
+ and say in the fix summary which of the three you chose and why."
+```
+
+**Why this rule earns its keep.** On the observed task the verification artifact was patched four
+times before being deleted, and its replacement was then deleted too. Deletion was the right answer
+both times; the loop took four cycles to reach it, absorbing ~1,560 lines of rewrite while the
+deliverable itself changed by 193.
+
+**Why the trigger is `file:` and not a judgement field.** `file:` is checkable against the diff —
+anyone can confirm the entry names a path the change set touches. A field asking the fixer to
+classify its own findings (how important, what kind, whose fault) is written by the party the rule
+constrains and is unfalsifiable: an agent that classifies its residual findings favourably exits
+the loop a cycle sooner and nothing can catch it. Keep any future trigger for this rule on the same
+footing.
+
+#### Where the gate and QA report get committed (one commit, one push, per cycle)
+
+**This cycle's gate `.yml` and QA report `.md` are evidence for this cycle's fix, and belong in the
+same `fix(...)` commit as the fix.** Only the *implementation report* defers to Step 8. Stage all
+three together:
+
+| Artifact                                   | Commit                                   |
+| ------------------------------------------ | ---------------------------------------- |
+| Code/test changes from `/qa-fix`            | this cycle's `fix(...)` commit           |
+| `…gate.{N}.{name}.yml` (written by 5a)      | this cycle's `fix(...)` commit           |
+| `…qa.{N}.{name}.md` (written by 5a)         | this cycle's `fix(...)` commit           |
+| `…implementation.{name}.md`                 | **deferred to Step 8** (`docs(...)`)     |
+
+**There is exactly one `git push origin HEAD` per cycle**, at step 3 below, after that single
+commit. Do not create a separate `docs(...): QA cycle {N} gate + report` commit, and do not push
+twice in a cycle.
+
+Left unstated, the gate and report fall into `/commit-changes`' default sweep and an orchestrator
+invents a second commit for them and pushes it separately — observed seven times on one PR. The
+cost is not mainly CI minutes (four of the five superseded runs there died within 3m35s, so roughly
+ten minutes of runner time). It is that **every fix commit reached merge without a completed CI run
+of its own**, because a cycle's second push kept cancelling its own in-flight run.
+
+Staging the gate here does **not** conflict with qa-fix's "Dev does not modify gate YAML files"
+(`qa-fix` Step 6): this orchestrator stages a gate that `/qa-gate` wrote during 5a. `/qa-fix` never
+touches it. Nor does it move anything the resume contract reads — cycle reconstruction counts
+`### QA Cycle` headings in the working-tree implementation report, which stays where it is.
+
+**Two paths reach Step 7 or a HALT without a `fix(...)` commit. Both must still commit the cycle's
+gate and QA report — the evidence for a cycle that ran belongs on the branch, not only in the
+working tree, where a branch switch loses it and no reader of the PR ever sees it:**
+
+1. **`PASS` / `WAIVED` exit** (Outcome branching, above) — the loop exits before 5b, so no
+   `fix(...)` commit exists. Commit the final gate `.yml` and QA report `.md` as part of the
+   **Step 7 transition, before invoking `/finalise`**, and push once. Waiting for Step 8's sweep is
+   too late: `/finalise` reads the gate and posts a DoD comment on a PR that does not yet contain
+   it. Message: `docs(story.{epic}.{story}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
+2. **The no-code-change HALT** (step 0 below) — HALTs before any commit. Commit the gate `.yml` and
+   QA report `.md` before halting, same message shape, and push once.
+
+Those two, plus the convergence-stall escalation, are the **only** places a standalone `docs(...)`
+commit for the gate and QA report is correct — each because there is no `fix(...)` commit in that
+cycle to carry them. In a cycle that runs 5b, a second commit for these files is the defect this
+section exists to prevent.
+
 After fixes are applied:
 
 0. **Check for actual changes**: Before committing, run `git diff --stat HEAD` to verify qa-fix actually modified files. If no files changed (qa-fix made no code edits), do NOT increment the cycle counter. Instead:
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
+   - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — per path 2 above. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch.
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 
-1. **Exclude the implementation report's *updates* from this commit** — Step 8 owns the report's final state, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. The file itself is already tracked (Step 4 committed it), so this defers changes rather than withholding the file: no link to the report can dangle. Before invoking `/commit-changes`, unstage the report explicitly:
+0a. **Run the fast gate before committing.** Only reached when step 0 found changes — there is
+   nothing to gate otherwise, and step 0's no-change path HALTs before this point. Capture to a log
+   rather than streaming:
+
+   ```bash
+   FIX_LOG=".claude/state/qa-fix-gate-${QA_CYCLE}-$(date +%s).log"
+   <fastGateCommand> > "$FIX_LOG" 2>&1
+   GATE_EXIT=$?
+   ```
+
+   `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
+   **`npm run ci:fast`** — the same fast tier the develop loop runs (see
+   [`develop-pipeline-step-3-develop-loop.md`](develop-pipeline-step-3-develop-loop.md) §"What the
+   loop runs"). The slow tier stays out of this cycle by design; it runs once at `develop-next`'s
+   merge gate.
+
+   **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit — a
+   red tree is exactly what the cycle machinery is for. Triage per the step-3 pattern, feed the
+   finding back into this cycle's fixes, and re-run the gate.
+
+   **Bound this retry at 2 attempts.** After a second red gate in the same cycle, stop retrying:
+   commit nothing, record the failing output in the QA Iteration History, and let the cycle end so
+   the next QA review writes a gate. That is what actually reaches the convergence check and
+   MAX_ITER — both of which count *cycles*, so an unbounded inner re-run would never reach either.
+   An earlier revision of this block claimed "the MAX_ITER cap still bounds the loop"; it does not
+   bound this retry, and a stated guarantee that is not real is worse than an unstated one.
+
+   Cleanup mirrors step 3: `GATE_EXIT == 0` → `rm -f "$FIX_LOG"`; non-zero → retain for post-mortem.
+
+   > **Why the gate sits between 0 and 1, and not after the commit.** A qa-fix cycle pushes to the PR
+   > branch, so a red commit is a red PR the reviewer sees before the next cycle repairs it — and on
+   > the last cycle nothing repairs it at all. Formatting is the concrete case: `prettier --check` is
+   > not in `npm test`, so a cycle could close green, push, and fail CI on a file it had just
+   > rewritten. It sits *after* step 0 because gating a tree that step 0 is about to declare unchanged
+   > pays a full format+test run on the one path that always HALTs.
+
+1. **Exclude the implementation report's *updates* from this commit — and only that** — Step 8 owns the report's final state, so qa-fix cycles must not bring report mutations into a `fix(...)` commit. The gate and QA report are **not** excluded; they ride along per the table above. The file itself is already tracked (Step 4 committed it), so this defers changes rather than withholding the file: no link to the report can dangle. Before invoking `/commit-changes`, unstage the report explicitly:
 
    ```bash
    # develop-story
@@ -323,7 +571,7 @@ After fixes are applied:
 
 2. Run `git log --oneline -1` to capture the fix commit hash.
 
-3. Push to the remote branch so the PR reflects the latest changes:
+3. Push to the remote branch so the PR reflects the latest changes — **once, here, and nowhere else in this cycle**:
 
    ```bash
    git push origin HEAD
@@ -376,34 +624,54 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fi
 
    This is a no-op in all production runs where `EVAL_MODE` is unset.
 
-7. Increment the cycle counter and return to 5a.
+7. Increment the cycle counter and return to 5a. The **Convergence check** runs again after the
+   next gate is written — it, not this step, is what ends a loop that has stopped reducing HIGH
+   findings before the 5-cycle limit does.
 
 ---
 
-## Loop Limit Escalation (after 5 cycles without PASS)
+## Loop Escalation (shared)
 
-Before halting, write a thorough escalation entry in the Issues Log:
+**Two triggers reach this block, and they share everything below except the heading and the
+opening sentence.** There is deliberately no second escalation path: same artifact, same
+commit-and-HALT shape, one set of templates.
+
+| Trigger               | Entry heading           | Fires when                                                                                                             |
+| --------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Loop limit**        | `QA Loop Limit Reached` | 5 complete cycles finished without a clean PASS.                                                                        |
+| **Convergence stall** | `QA Loop Not Converging` | The **Convergence check** above tripped — cycle ≥ 3, and the HIGH count failed to strictly decrease across two consecutive cycles. |
+
+Before halting, write a thorough escalation entry in the Issues Log. Use the template for the
+work item type, substituting the heading and opening sentence for the trigger that fired, and
+listing the cycles that actually ran (`{N}`, which is 5 on the loop limit and usually 3 on a
+convergence stall).
 
 #### develop-story escalation template
 
 ```
-### QA Loop Limit Reached — {YYYY-MM-DD}
+### {QA Loop Limit Reached | QA Loop Not Converging} — {YYYY-MM-DD}
 
-The pipeline completed 5 qa-story/qa-fix cycles without a clean PASS.
+{Loop limit:        The pipeline completed 5 qa-story/qa-fix cycles without a clean PASS.}
+{Convergence stall: The pipeline stopped after {N} qa-story/qa-fix cycles: the HIGH finding
+                    count failed to strictly decrease across two consecutive cycles, so the
+                    loop was no longer converging. The remaining findings are NOT accepted —
+                    they are handed over below.}
 
 **Final gate status**: {status}
+**HIGH findings per cycle**: {HIGH_1}, {HIGH_2}, … {HIGH_N} — {flat from cycle {i} onward / still rising}
 **Remaining issues** (from final gate file):
-{List each top_issue: description, severity, file/location if known}
+{List each top_issue: description, severity, file (from the entry's `file:` key)}
 
 **What was attempted per cycle**:
 - Cycle 1: {fixes applied}
 - Cycle 2: {fixes applied}
 - Cycle 3: {fixes applied}
-- Cycle 4: {fixes applied}
-- Cycle 5: {fixes applied}
+- {…through cycle {N}}
 
 **Likely root cause**: {Assessment — e.g., architectural mismatch, missing test
-infrastructure, acceptance criteria that cannot be met with current approach}
+infrastructure, acceptance criteria that cannot be met with current approach; on a
+convergence stall, say which file the fixes kept circling and why patching it stopped
+working}
 
 **Recommended next steps**:
 1. {Specific action}
@@ -414,23 +682,29 @@ infrastructure, acceptance criteria that cannot be met with current approach}
 #### develop-task escalation template
 
 ```
-### QA Loop Limit Reached — {YYYY-MM-DD}
+### {QA Loop Limit Reached | QA Loop Not Converging} — {YYYY-MM-DD}
 
-The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
+{Loop limit:        The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.}
+{Convergence stall: The pipeline stopped after {N} qa-task/qa-fix cycles: the HIGH finding
+                    count failed to strictly decrease across two consecutive cycles, so the
+                    loop was no longer converging. The remaining findings are NOT accepted —
+                    they are handed over below.}
 
 **Final gate status**: {status}
+**HIGH findings per cycle**: {HIGH_1}, {HIGH_2}, … {HIGH_N} — {flat from cycle {i} onward / still rising}
 **Remaining issues** (from final gate file):
-{List each top_issue: description, severity, file/location if known}
+{List each top_issue: description, severity, file (from the entry's `file:` key)}
 
 **What was attempted per cycle**:
 - Cycle 1: {fixes applied}
 - Cycle 2: {fixes applied}
 - Cycle 3: {fixes applied}
-- Cycle 4: {fixes applied}
-- Cycle 5: {fixes applied}
+- {…through cycle {N}}
 
 **Likely root cause**: {Assessment — e.g., architectural mismatch, missing test
-infrastructure, success criteria that cannot be met with current approach}
+infrastructure, success criteria that cannot be met with current approach; on a
+convergence stall, say which file the fixes kept circling and why patching it stopped
+working}
 
 **Recommended next steps**:
 1. {Specific action}
@@ -438,7 +712,10 @@ infrastructure, success criteria that cannot be met with current approach}
 3. {Specific action — e.g., update task if issues reflect out-of-scope requirements}
 ```
 
-Set report status to `Escalated`. Invoke the `/commit-changes` skill to commit the implementation report:
+Set report status to `Escalated`. Invoke the `/commit-changes` skill to commit the implementation
+report — **and, on a convergence stall, this cycle's gate `.yml` and QA report `.md` alongside it**,
+since a stall halts before 5b and so has no `fix(...)` commit to carry them (see **Where the gate
+and QA report get committed** in 5b):
 
 #### develop-story escalation commit
 
@@ -457,14 +734,17 @@ git push origin HEAD
 #### develop-story HALT message
 
 ```
-⚠️ Story Development Paused — QA Loop Limit Reached
+⚠️ Story Development Paused — {QA Loop Limit Reached | QA Loop Not Converging}
 
 Story:               {story filename}
-QA cycles completed: 5
+QA cycles completed: {N}
+HIGH per cycle:      {HIGH_1}, {HIGH_2}, … {HIGH_N}
 Final gate status:   {status}
 Implementation Report: {report file path}
 
 The implementation report contains a full breakdown of every issue and fix attempted.
+On a convergence stall the remaining findings are outstanding, not accepted — the loop stopped
+because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-story
 2. Accept the current gate status and proceed manually with /finalise
@@ -474,14 +754,17 @@ Options:
 #### develop-task HALT message
 
 ```
-⚠️ Task Development Paused — QA Loop Limit Reached
+⚠️ Task Development Paused — {QA Loop Limit Reached | QA Loop Not Converging}
 
 Task:                {task filename}
-QA cycles completed: 5
+QA cycles completed: {N}
+HIGH per cycle:      {HIGH_1}, {HIGH_2}, … {HIGH_N}
 Final gate status:   {status}
 Implementation Report: {report file path}
 
 The implementation report contains a full breakdown of every issue and fix attempted.
+On a convergence stall the remaining findings are outstanding, not accepted — the loop stopped
+because it was no longer reducing them, which is a reason to look at them, not past them.
 Options:
 1. Fix remaining issues manually, then re-run /qa-task
 2. Accept the current gate status and proceed manually with /finalise

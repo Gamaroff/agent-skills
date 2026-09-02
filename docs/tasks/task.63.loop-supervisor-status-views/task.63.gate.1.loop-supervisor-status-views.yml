@@ -1,0 +1,64 @@
+schema: 1
+task: "task.63.loop-supervisor-status-views"
+task_title: "Make an unattended run watchable from a second terminal, and audible when it stops"
+gate: CONCERNS
+status_reason: "All nine success criteria met and the suite is green, but an unparseable current.json renders as 'no run in flight' — the most reassuring answer — while a run may be in flight, which is the exact failure class this task set out to prevent."
+reviewer: "QA Engineer"
+updated: "2026-08-28T14:05:00Z"
+
+top_issues:
+  - id: TASK-63-BUG-1
+    severity: medium
+    finding: "A corrupt or partially-written current.json is indistinguishable from an absent one: readCurrent() returns null on a JSON.parse failure, so runState() reports 'no run in flight' while the supervisor is still running. writeCurrent() (run-loop.mjs:846) writes non-atomically with fs.writeFileSync, so a reader genuinely can catch a partial file."
+    suggested_action: "Have readCurrent distinguish absent from unparseable, and render a fourth state (e.g. 'heartbeat unreadable') rather than collapsing it into the reassuring one. Optionally make writeCurrent atomic (write to a temp file in the same directory, then rename) so the window closes at the source."
+    suggested_owner: dev
+    source: code-review
+    confidence: high
+    category: bug
+    refs:
+      - "skills/loop-supervisor/scripts/run-loop.mjs:451"
+      - "skills/loop-supervisor/references/render.js:runState"
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 140
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Both views are read-only and take no input from the run. The webhook URL is operator-supplied and sent verbatim; no credential is read, logged or forwarded. osascript is invoked via spawnSync with an argv array and a JSON.stringify-quoted script, so a hostile reason string cannot break out into shell."
+  performance:
+    status: PASS
+    notes: "Two file reads per frame; recent[] capped at 5 rows so the payload is bounded (~2.5KB) regardless of ledger size — measured against a 4000-row ledger. Repaint at 2s against a 5s heartbeat."
+  reliability:
+    status: CONCERNS
+    notes: "Warn-and-continue on notification proven against an unreachable webhook; torn ledger lines are skipped; concurrent reads clean. But an unparseable heartbeat degrades to the WRONG state rather than an honest one — see TASK-63-BUG-1."
+  maintainability:
+    status: PASS
+    notes: "Renderer is a pure function with injected clock and liveness probe; one display model behind both text and --json so they cannot disagree. 30 new tests, five invariants mutation-proved."
+
+recommendations:
+  immediate:
+    - action: "Distinguish an absent current.json from an unparseable one so a torn heartbeat never renders as 'no run in flight'."
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs", "skills/loop-supervisor/references/render.js"]
+  future:
+    - action: "runStatus calls process.exit(0) immediately after process.stdout.write; stdout to a pipe is async in Node. Harmless today because the payload is bounded to ~2.5KB against a 64KB pipe buffer (verified: 3/3 runs emitted valid JSON against a 4000-row ledger), but the pattern is latent if recent[] is ever uncapped."
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs"]
+    - action: "`watch --json` parses but does nothing different. Either honour it (emit a JSON frame per repaint) or reject it, rather than accepting a flag that has no effect."
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs"]
+    - action: "A frame taller than the terminal breaks the cursor-up arithmetic, since the top of the frame has scrolled off. Inherent to in-place repaint; worth a note in the README rather than code."
+      refs: ["skills/loop-supervisor/references/render.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - "TASK-63-BUG-1 resolved, or explicitly accepted as a known transient."

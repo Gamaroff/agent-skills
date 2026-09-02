@@ -111,7 +111,7 @@ This prevents context accumulation across the 8-step pipeline.
 
 > Visual mnemonic:
 > ```
-> SUB-SKILL RETURNS → [Bash advance] → [Edit ✅] → [Banner] → [Skill]
+> SUB-SKILL RETURNS → [Bash advance] → [Edit ✅] → [Status + Banner] → [Skill]
 >                          ↑
 >                FIRST. ALWAYS. NO PROSE BEFORE.
 > ```
@@ -120,10 +120,21 @@ Every step ends with the same four actions, executed *in order, with no text out
 
 1. **Bash tool call** advancing the lock to the next step (use the helper: `bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}`). **This must be the first call** — it is the binding side-effect that anchors the orchestrator into "still working" mode and signals to the `Stop` hook that the pipeline has advanced. If the just-completed step was Step 8, use `--complete` instead, which removes the lock. (This call is idempotent: a sub-skill normally self-advances the lock as its own last action, so this re-advance noops — but issuing it unconditionally is the deterministic, single-instruction behaviour.)
 2. **Edit the implementation report** Pipeline Progress row for the just-completed step (`✅ Done`).
-3. **Emit the Step {N+1} banner** (or the Phase 2 Completion banner if N=8):
+3. **Emit the Remaining Work Status block, then the Step {N+1} banner** (or the Phase 2 Completion banner if N=8) — one contiguous output, nothing between them:
+
    ```
+   ═══ REMAINING WORK STATUS ═══
+   Pipeline position:  Step {N}/8 — {STEP-NAME} ✅ complete
+
+   Pipeline steps still ahead:
+     - Step {N+1}: {name}
+     - ...
+     - Step 8: commit-changes + push
+
    ═══ DEVELOP-TASK PIPELINE: STEP {N+1}/8 — {STEP-NAME} ═══
    ```
+
+   The status block is **required at every transition**, not optional garnish — it is what makes pipeline position legible after compaction and to a user reading the log later. Canonical format, the other firing points (each continuing develop-loop iteration, each QA/verify cycle, every HALT) and the "Remaining task phases" middle block that shows while Step 3 is open: [`references/develop-pipeline-remaining-work-banner.md`](references/develop-pipeline-remaining-work-banner.md).
 4. **Invoke the next sub-skill** via the Skill tool in the same assistant turn. Do NOT pause for user acknowledgement, do NOT summarise progress to the user, do NOT print "Returning to pipeline orchestrator" or any equivalent.
 
 Failure mode this defends against: a sub-skill returns control with a "complete" message and the orchestrator emits a natural-language summary before issuing the lock-update Bash call. Under context pressure the model may then yield to the user. **The lock-update Bash call must come FIRST** — emit it the moment the sub-skill returns, before any prose. The lock-update Bash call is the binding signal that the next step has started; without it the pipeline is considered stalled.

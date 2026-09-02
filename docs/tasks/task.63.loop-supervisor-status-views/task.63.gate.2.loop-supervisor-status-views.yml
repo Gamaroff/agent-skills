@@ -1,0 +1,70 @@
+schema: 1
+task: "task.63.loop-supervisor-status-views"
+task_title: "Make an unattended run watchable from a second terminal, and audible when it stops"
+gate: PASS
+status_reason: "TASK-63-BUG-1 verified fixed by independent re-test of all four states, both halves mutation-proved. A latent fragility found while verifying the fix — the sentinel was duck-typed and so forgeable by file content — was demonstrated, fixed and pinned in the same cycle."
+reviewer: "QA Engineer"
+updated: "2026-08-28T15:10:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 150
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. Read-only views; osascript invoked with an argv array and a JSON.stringify-quoted script; no credential read, logged or forwarded."
+  performance:
+    status: PASS
+    notes: "Unchanged. Bounded payload (~2.5KB against a 4000-row ledger); atomic write adds one rename per heartbeat, which is negligible against a 5s period."
+  reliability:
+    status: PASS
+    notes: "Was CONCERNS in cycle 1. The heartbeat reader now distinguishes absent from unreadable and the writer is atomic (temp + rename), so the view no longer degrades into the reassuring answer. Verified independently across all four states plus the teardown, stray-tmp and never-started transitions."
+  maintainability:
+    status: PASS
+    notes: "Improved during this cycle: the unreadable sentinel moved to the module that interprets it and is compared by identity, removing a magic key that crossed a module boundary."
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: "2026-08-28"
+  total_iterations: 1
+  verification_method: "Independent re-test of all four render states plus four lifecycle transitions; both halves of the fix mutation-proved; 150-test suite green."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "runStatus calls process.exit(0) immediately after an async stdout write. Verified harmless — recent[] is capped at 5 so the payload stays ~2.5KB against a 64KB pipe buffer — but latent if that cap is ever removed."
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs"]
+    - action: "`watch --json` parses and changes nothing. Honour it or reject it."
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs"]
+    - action: "A frame taller than the terminal defeats the cursor-up repaint arithmetic. Inherent to in-place repaint; worth a README note rather than code."
+      refs: ["skills/loop-supervisor/references/render.js"]
+    - action: |
+        UNRELATED TO THIS TASK, and proved so. Several spawn-heavy shell-integration tests carry 20-30s
+        wall-clock budgets and time out when node --test runs more files concurrently. Controlled
+        experiment: clean origin/develop is 1794/1794 green; clean origin/develop plus TWO FILLER TEST
+        FILES containing 30 trivial assertions and no task code fails FIVE tests, including the same
+        §8b move-sprint-issues.sh. This branch, with two real test files, fails one. The scripts
+        themselves are fine (move-sprint-issues.sh completes in 795ms against its 30s budget) and each
+        file passes in isolation. Needs its own bug. The likely fix is bounding node --test concurrency,
+        not raising five timeouts.
+      refs:
+        - "shared/resources/tests/jira-interception.test.mjs"
+        - "shared/resources/tests/access-config-parity.test.mjs"
+        - "package.json"
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

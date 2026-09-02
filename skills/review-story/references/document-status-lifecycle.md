@@ -71,7 +71,7 @@ stateDiagram-v2
 | `📋 Planned`     | `planned` (frontmatter) / `Planned` (body) | Emoji prefix in legacy docs; do not write in new skills                         |
 | `ready-for-dev`  | `ready-for-development`                    | Shortened form found in create-task / create-story; normalise on next touch     |
 | `Completed`      | `Accepted`                                 | qa-task used this for gate PASS; canonical is `accepted` / `Accepted`           |
-| `Ready for Done` | `Accepted`                                 | qa-story used this as an intermediate gate result; terminal state is `Accepted` |
+| `Ready for Done` | `Ready for Review`                         | qa-story used this as an intermediate gate result. ⚠️ The replacement is **`Ready for Review`, not `Accepted`** — qa-story runs *before* `finalise`, so mapping it to the terminal state would announce acceptance before the DoD check that can refuse it. Corrected 2026-08-26 after the original mapping was found to trade a lint failure for a worse defect |
 
 ---
 

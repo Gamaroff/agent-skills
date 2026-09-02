@@ -114,6 +114,13 @@ function collectDocs() {
   for (const skill of fs.readdirSync(skillsDir)) {
     const skillMd = path.join(skillsDir, skill, "SKILL.md");
     if (fs.existsSync(skillMd)) docs.push(skillMd);
+    // A skill's README is operator-facing prose full of real invocations — the
+    // same kind of instruction as SKILL.md, aimed at a human instead of an agent.
+    // It was outside this guard until a task whose Risk Assessment named this
+    // very test as the mitigation for "documents commands that do not ship"
+    // shipped a README of run commands the test never opened.
+    const readme = path.join(skillsDir, skill, "README.md");
+    if (fs.existsSync(readme)) docs.push(readme);
     // references/ only — examples/ and assets/ are illustrative by construction.
     const refs = path.join(skillsDir, skill, "references");
     if (fs.existsSync(refs)) {
@@ -121,6 +128,20 @@ function collectDocs() {
         if (f.endsWith(".md")) docs.push(path.join(refs, f));
       }
     }
+  }
+  // Runbooks are step-by-step operator walkthroughs — prose whose entire purpose
+  // is to be followed command by command. A runbook naming a script that does not
+  // ship fails the reader at the keyboard, which is exactly what this guard is for.
+  const runbooksDir = path.join(REPO_ROOT, "docs", "runbooks");
+  if (fs.existsSync(runbooksDir)) {
+    const walk = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) walk(full);
+        else if (e.name.endsWith(".md")) docs.push(full);
+      }
+    };
+    walk(runbooksDir);
   }
   return docs;
 }

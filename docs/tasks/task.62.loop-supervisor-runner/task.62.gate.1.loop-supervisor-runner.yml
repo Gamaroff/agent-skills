@@ -1,0 +1,86 @@
+schema: 1
+task: "task.62.loop-supervisor-runner"
+task_title: "Run each loop iteration in a fresh Claude process, and classify the outcome from the filesystem"
+gate: PASS
+status_reason: "LS-1 fixed at the mechanism level in cycle 1 — presence is now tracked rather than inferred from DEFAULTS, so the whole class of bug is closed, not just the --base symptom. Mutation-proven (3 tests flip on revert) and confirmed live against a disagreeing config. No new issues, no regressions; 110/110 unit tests."
+reviewer: "QA Engineer"
+updated: "2026-08-28T12:45:00Z"
+
+top_issues:
+  - id: LS-1
+    issue: "Config overrides an explicit CLI flag when the flag's value equals the built-in default"
+    severity: medium
+    category: correctness
+    finding: "run-loop.mjs infers 'flag not supplied' by comparing the parsed value against DEFAULTS, so `--base develop` is indistinguishable from unset and a config `baseBranch: main` wins over it. --base drives the progress oracle, so a wrong ref makes tickCommitOracle never fire and every healthy iteration classify `idle`, ending the loop at --max-idle while reporting no progress. README and configuration.md both promise the opposite precedence."
+    suggested_action: "Track explicitly-supplied flags in parseArgs (a Set of seen options) and apply config only to options absent from it. Add unit tests pinning 'explicit flag equal to the default still wins over config'."
+    suggested_owner: dev
+    refs:
+      - "skills/loop-supervisor/scripts/run-loop.mjs"
+    source: code-review
+    confidence: high
+    status: closed
+    fixed_date: "2026-08-28"
+    fix_commit: "55980ca"
+    verification: "9 regression tests; mutation-proven (restoring the === DEFAULTS comparison turns 3 red); confirmed live — with config baseBranch=main, `--base develop` yields develop while an unnamed base still yields main."
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 101
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [4]
+  success_criteria:
+    passed: 7
+    deferred: 1
+    notes: "SC5 (one real /develop-next iteration) deferred during review to a post-merge operator step — it cannot run inside the pipeline implementing this task without colliding on develop-next.state.json and develop-pipeline.lock."
+  mutation_probe:
+    mutants_run: 4
+    all_flipped: true
+    notes: "halt-freshness ignoring timestamp (6 red), leftover lock -> error (2 red), error/halt precedence removed (5 red), empty stdout -> stop (3 red). Suite green after each restore."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Pinned acceptEdits rather than --dangerously-skip-permissions, so an approval boundary survives an unattended run; force-push and rm -rf denied. Adapter config accepts path strings only — no mechanism to name a module for require(), closing the code-execution surface by construction. No credentials read, written or logged; the rendered log records tool-call names without inputs."
+  performance:
+    status: PASS
+    notes: "Probe runs before spawn, so an empty frontier costs a script invocation not a model invocation, and is skipped entirely on resume. Budget ceilings checked before each spawn, not after. Measured per-iteration cost fell $0.089 -> $0.010 across two identical prompts, matching the documented prompt-cache expectation."
+  reliability:
+    status: PASS
+    notes: "Signal handling never interrupts mid-merge; PID lock enforces single-flight; the classifier fails safe in every unknown direction (unprovable halt file treated as stale, unknown outcome stops, empty probe output is an error) — all exercised. Cycle-1 CONCERNS cleared: LS-1 closed at the mechanism level and mutation-proven, so the silent oracle-degradation path no longer exists."
+  maintainability:
+    status: PASS
+    notes: "classify.js performs no I/O and interpretProbe takes a captured result, so the whole correctness surface sits behind pure boundaries and is tested without subprocesses. Comments explain why at each non-obvious decision. House style matches schedule.mjs. The mutation probe demonstrates the suite can actually fail."
+
+code_review:
+  bugs: 1
+  cleanups: 1
+  blocking: true
+  promoted_to_gate: ["LS-1"]
+  resolved: ["LS-1"]
+  notes: "code_review_blocking=true supplied by the develop-task pipeline. The one cleanup (retry-once in a JSDoc type that parseArgs rejects and shouldStop does not implement) stays advisory."
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: "2026-08-28"
+  total_iterations: 1
+  verification_method: "9 regression unit tests + mutation probe + live behavioural check against a disagreeing config"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Guard KEY_OF against drift — a flag added to the switch but not the table loses explicit tracking silently. Verified complete for the current 14; a test deriving both lists from source would pin it"
+      refs: ["skills/loop-supervisor/scripts/run-loop.mjs"]
+    - action: "File a separate bug for the pre-existing 20-30s timeout flake in shared/resources/tests/jira-interception.test.mjs (reproduces on clean develop; out of scope here)"
+      refs: ["shared/resources/tests/jira-interception.test.mjs"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

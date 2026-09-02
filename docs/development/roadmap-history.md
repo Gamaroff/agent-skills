@@ -3,6 +3,8 @@
 Completed phases from [`project-completion-roadmap.md`](./project-completion-roadmap.md), archived
 at phase close so the live roadmap shows only what is still in play.
 
+**Phases 1, 2, 3 and 4 are archived here.**
+
 **These rows still satisfy `deps:`.** A `deps:` entry naming a row that appears in no current phase
 means _already shipped_, not a dangling reference — this file is where to resolve it.
 
@@ -90,6 +92,20 @@ caller changes until T45 removes them.
 
 ---
 
+## PHASE 3 — loop-supervisor: fresh-context sequential loop runner
+
+Design: [`.agents/plans/loop-supervisor.md`](../../.agents/plans/loop-supervisor.md). T62 is the only
+unit that has to exist — it delivers a usable runner with log files alone. T63 and T64 both depend on
+it and are independent of each other, but they hard-conflict on `run-loop.mjs`, so `--batch` will
+correctly take only one of them at a time.
+
+- [x] **T62** Run each loop iteration in a fresh Claude process, and classify the outcome from the filesystem · deps: none · touches: loop-supervisor!, docs-config~ · /develop-task docs/tasks/task.62.loop-supervisor-runner/task.62.loop-supervisor-runner.md
+- [x] **T63** Make an unattended run watchable from a second terminal, and audible when it stops · deps: T62 · touches: loop-supervisor!, docs-config~ · /develop-task docs/tasks/task.63.loop-supervisor-status-views/task.63.loop-supervisor-status-views.md ✅ **accepted + merged** ([PR #277](https://github.com/Gamaroff/agent-skills/pull/277), QA PASS 100/100)
+- [x] **T64** Publish the supervisor run over HTTP, and write the operator documentation that makes an overnight run repeatable · deps: T62 · touches: loop-supervisor!, orchestrators~, docs-config~ · /develop-task docs/tasks/task.64.loop-supervisor-dashboard-and-docs/task.64.loop-supervisor-dashboard-and-docs.md ✅ **accepted + merged** ([PR #278](https://github.com/Gamaroff/agent-skills/pull/278), QA PASS 100/100)
+
+
+---
+
 ## Where the narrative lives
 
 Each row above has a corresponding entry in the **Change Log** of
@@ -99,3 +115,26 @@ here — a document's own history stays with the document.
 
 Per-item detail sits in the task directories under [`docs/tasks/`](../tasks/), each with its review,
 QA, gate, DoD and implementation-report artifacts.
+
+---
+
+## PHASE 4 — maintenance backlog (retired)
+
+A **standing** phase rather than a planned sequence: it held whatever was currently outstanding so
+that `/develop-next` always had a frontier. Its ordering rule was that a known-broken thing outranks
+intended work.
+
+**It is retired, not merely emptied.** Its own preamble named T65 as the reason it existed — and T65
+removes the need for it, because selection now falls through to `docs/bugs/bug-registry.md` and
+`docs/tasks/task-registry.md` directly. A filed bug or task is visible to the loop without anyone
+hand-writing a row here, which is the transcription step this phase *was*. Leaving it standing would
+also have suppressed the new fallback outright: roadmap precedence is absolute, so while this phase
+held any actionable row the registries could never be reached.
+
+T65's row was archived **unticked** because it was in flight when the phase was retired — the archival
+is part of T65's own delivery, so ticking it then would have attested to a merge that had not happened.
+It merged as PR #281 on 2026-08-29 and is **now ticked**, with the acceptance recorded in the roadmap
+Change Log as promised. Nothing depends on it, so no `deps:` resolution was ever affected.
+
+- [x] **B2** `npm test` runs `node --test` unbounded, so spawn-heavy suites breach their timeouts and the suite fails for environmental reasons · deps: none · touches: test-harness! · /develop-bug docs/bugs/bug.2.unbounded-test-concurrency/bug.2.unbounded-test-concurrency.md
+- [x] **T65** Derive the selection frontier from the registries, so an outstanding bug or task cannot be invisible to `/develop-next` · deps: none · touches: orchestrators!, docs-config~ · /develop-task docs/tasks/task.65.registry-aware-selection/task.65.registry-aware-selection.md

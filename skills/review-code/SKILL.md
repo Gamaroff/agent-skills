@@ -90,13 +90,20 @@ If `truncated_count > 0`, note that N additional lower-severity findings were om
 
 Only if `--comment` is set and a PR exists for the current branch (or `target` named one):
 
-1. Source the platform helper and resolve the tracker:
+**Branch on `$VCS` for everything PR-shaped, on `$TRACKER` for everything issue-shaped.** They are separate axes — a repo can host code on Bitbucket and track work in Jira, or on Bitbucket with GitHub issues. Every branch in this step is PR-shaped and therefore keys off `$VCS`: a comment on a pull request is a property of where the code lives, not of where the issues live. `gh` cannot address a Bitbucket PR at all, so taking the GitHub arm on a Bitbucket repo does not degrade — the comment silently never lands and the run still reports success.
+
+1. Source the platform helper and resolve the platform:
    ```bash
    # shellcheck source=references/resolve-platform.sh
    . "$(dirname "$0")/references/resolve-platform.sh" || exit 1   # adjust to the bundled path in this install
+   # VCS = github | bitbucket   ← the axis this step branches on
    ```
-2. **GitHub** (`TRACKER=github`): post each finding as an inline review comment at its `file_line`; fall back to a single summary comment via `tracker_call_with_retry gh pr comment "$PR_URL"` when line anchoring fails or there is no PR.
-3. **Bitbucket / Jira**: post a summary comment via the platform's PR-comment path (mirror `/qa-story` step 6).
+2. **GitHub** (`VCS=github`): post each finding as an inline review comment at its `file_line`; fall back to a single summary comment via `tracker_call_with_retry gh pr comment "$PR_URL"` when line anchoring fails or there is no PR.
+3. **Bitbucket** (`VCS=bitbucket`): post one summary comment via the Bitbucket REST API. Resolve the credential with `source references/bitbucket-auth.sh` (Bearer or Basic, chosen by variable name; non-zero when neither is set), then `POST` a `{content: {raw: …}}` body to `${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}/comments`. Make it idempotent the way `/finalise` does: search the PR's existing comments for a leading HTML marker and `PUT` that comment id instead of posting a duplicate. The working dual-platform recipe is in [`skills/finalise/SKILL.md`](../finalise/SKILL.md) **Step 7 — "Mark as Accepted and Generate Artifacts"**, which carries both arms side by side; copy that shape rather than re-deriving it.
+
+   > Inline per-finding comments are GitHub-only today — the Bitbucket arm posts a single summary. Inline Bitbucket comments are **task 70**.
+   >
+   > `/qa-story` step 6 and `/qa-task` Step 13 now **do** carry a Bitbucket arm of their own (task 69), so they are a legitimate reference again — but reference them for the *transport*, not for this step's shape. They post one **per-cycle, deliberately non-idempotent** comment; this step wants the idempotent marker-and-`PUT` form, which is why `/finalise` remains the recipe to copy here.
 
 Wrap every remote call in `tracker_call_with_retry` (3× exponential backoff) — see [`references/resolve-platform.sh`](references/resolve-platform.sh). Both bugs and cleanups post; commenting never gates anything.
 

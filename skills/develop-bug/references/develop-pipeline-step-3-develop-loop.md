@@ -130,12 +130,30 @@ For the full develop loop setup (initial checkpoint variables, stall detection, 
 
 When `/develop` runs tests during the develop loop, test output must be captured to a temp file. The raw log is never read into main context; only the triage summary is used.
 
+### What the loop runs — the fast gate
+
+`<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
+**`npm run ci:fast`**. It is the project's cheap CI-equivalent: formatting plus the hermetic suite,
+and deliberately **not** the slow tier.
+
+Two halves of that, and both are load-bearing:
+
+- **Formatting belongs in the loop.** Its absence is what shipped the task-67 red build — `npm test`
+  passed locally throughout, and CI failed on `prettier --check` after `/finalise` had already
+  accepted the task. It costs seconds; discovering it in CI costs a round trip.
+- **The slow tier does not.** Whatever a project's expensive end-to-end tier is (`eval:all` here),
+  paying it on every iteration is what makes the correct fix feel expensive enough to be reverted.
+  It runs once, at `develop-next`'s merge gate, via `<qualityGateCommand>`.
+
+A project that sets neither key gets `npm run ci:fast`; a project whose scripts are named differently
+sets `develop.fastGateCommand` and nothing else changes.
+
 ### Output Capture Pattern
 
 ```bash
 ITER=<current develop loop iteration>
 TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
-<test-command> > "$TEST_LOG" 2>&1
+<fastGateCommand> > "$TEST_LOG" 2>&1
 TEST_EXIT=$?
 ```
 
@@ -227,49 +245,17 @@ Log in Decisions Log: "Development completion comment posted to {TRACKER} issue 
 
 ## Remaining Work Status Banner
 
-Required: output after each develop-loop iteration that continues, and after Steps 1, 2, 4, 5–6, and 7 complete.
+Canonical format, firing points and per-pipeline variants:
+[`references/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
+It is a pipeline-wide default — every step transition emits one, not just this step.
 
-#### develop-story banner
+Step 3 adds one firing point of its own: **every develop-loop iteration that
+continues** emits the block before re-invoking `/develop`, with the position
+line reading `Step 3/8 — DEVELOP ⏳ in progress, iter {ITER}/{MAX_ITER}`.
 
-Read the story file to get unchecked `[ ]` task names from the Tasks section. Output:
-
-```
-═══ REMAINING WORK STATUS ═══
-Pipeline position:  Step {N}/8 — {STEP-NAME} {✅ just completed / ⏳ in progress, iter {ITER}/{MAX_ITER}}
-
-Remaining story tasks ({X} of {M} tasks complete):
-  ✅ Task {n}: {name}      ← already ticked
-  ⬜ Task {n+1}: {name}   ← still to do
-  ...
-
-Pipeline steps still ahead:
-  - Step {next-step}: {name}
-  - ...
-  - Step 8: commit-changes + push
-```
-
-Omit the "Remaining story tasks" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
-
-#### develop-task banner
-
-Read the task file to get unchecked `[ ]` phase names from the Implementation Plan. Output:
-
-```
-═══ REMAINING WORK STATUS ═══
-Pipeline position:  Step {N}/8 — {STEP-NAME} {✅ just completed / ⏳ in progress, iter {ITER}/{MAX_ITER}}
-
-Remaining task phases ({X} of {M} phases complete):
-  ✅ Phase {n}: {name}      ← already ticked
-  ⬜ Phase {n+1}: {name}   ← still to do
-  ...
-
-Pipeline steps still ahead:
-  - Step {next-step}: {name}
-  - ...
-  - Step 8: commit-changes + push
-```
-
-Omit the "Remaining task phases" block once Step 3 is ✅ complete. Keep the banner brief — one block per event, not one per sub-step.
+Step 3 is also the only step where the middle block is populated — the unchecked
+`[ ]` story tasks / task phases / bug fix phases read straight out of the work
+item you already have open. From Step 4 onward that block is omitted.
 
 ---
 

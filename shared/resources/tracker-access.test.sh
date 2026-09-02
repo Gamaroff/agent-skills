@@ -319,18 +319,27 @@ DOTSRC_HITS=$(grep -rhE "$DOTSRC_RE" "$REPO_ROOT"/skills/*/SKILL.md 2>/dev/null 
 # A COVERAGE FLOOR, asserted before the guard check. This is the assertion whose absence let the
 # blind regex above pass as a clean bill of health for a whole cycle: a pattern that matches nothing
 # reports "no unguarded call sites" in exactly the same words as a pattern that matches everything.
-# The floors are deliberately below the current counts (18 and 2) so that legitimately removing a
-# call site does not fail the suite — but a pattern that goes blind, or a bulk edit that strips the
-# sourcing lines wholesale, cannot pass.
+# The floors are deliberately below the current counts so that legitimately removing a call site does
+# not fail the suite — but a pattern that goes blind, or a bulk edit that strips the sourcing lines
+# wholesale, cannot pass.
+#
+# The dot-source floor was 2 against a count of exactly 2, which did not honour that rule: it made
+# the *last* legitimate removal indistinguishable from the scanner going blind. Task 69 hit it —
+# normalising qa-story's `. "$(dirname "$0")/…"` onto the canonical `source` form (correct: these
+# snippets are executed by an agent from the repo root, so `$0` is not the skill file) dropped the
+# count to 1 and failed a suite that nothing had actually broken. The floor is 1 because 1 is what
+# still distinguishes "the regex matches something" from "the regex matches nothing", which is the
+# only thing this assertion can honestly claim to detect. If the last dot-source site is ever
+# normalised too, delete this arm rather than lowering the floor to 0 — a floor of 0 is not a check.
 if [ "$SOURCE_HITS" -ge 13 ]; then
   ok "call-site scan sees the source-form sites ($SOURCE_HITS found, floor 13)"
 else
   bad "call-site scan has gone blind to source-form sites" "found $SOURCE_HITS, expected >= 13"
 fi
-if [ "$DOTSRC_HITS" -ge 2 ]; then
-  ok "call-site scan sees the dot-source sites ($DOTSRC_HITS found, floor 2)"
+if [ "$DOTSRC_HITS" -ge 1 ]; then
+  ok "call-site scan sees the dot-source sites ($DOTSRC_HITS found, floor 1)"
 else
-  bad "call-site scan has gone blind to dot-source sites" "found $DOTSRC_HITS, expected >= 2"
+  bad "call-site scan has gone blind to dot-source sites" "found $DOTSRC_HITS, expected >= 1"
 fi
 
 # Whole lines, not -o fragments: the guard sits AFTER the path (and after its closing quote), so a

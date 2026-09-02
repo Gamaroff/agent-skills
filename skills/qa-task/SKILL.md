@@ -94,6 +94,7 @@ Activate this skill when:
 | Run test suite                  | Execute tests, lint, build; capture coverage output                          |
 | Verify implementation phases    | Check each phase checkbox; confirm changes match plan via git diff           |
 | Run diff code review            | Adversarially review the change-set diff for bugs + cleanups (Step 3b)        |
+| Execute documented commands     | Extract and run the skill's fenced bash blocks under bash + zsh (Step 4b)    |
 | Verify success criteria         | Check functional, performance, code quality criteria against actual results  |
 | Validate breaking changes       | Verify migration paths documented and consumer code updated                  |
 | Run NFR assessment              | Evaluate performance, reliability, security, maintainability                 |
@@ -102,7 +103,7 @@ Activate this skill when:
 | Write QA report                 | Create co-located `task.{id}.qa.N.*.md` report file                         |
 | Write gate YAML                 | Create co-located `task.{id}.gate.N.*.yml` file                             |
 | Update task file                | Add QA Results section, update status, link artifacts                        |
-| Post PR comment                 | Post QA gate decision to PR via `gh pr comment` — best-effort, non-blocking |
+| Post PR comment                 | Post QA gate decision to PR — `gh pr comment` on GitHub, REST on Bitbucket; best-effort, non-blocking |
 | Communicate to user             | Output final summary with gate decision and next steps                       |
 
 ---
@@ -217,15 +218,42 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    NEXT_QA_NUM=$((${LATEST_QA_NUM:-0} + 1))
    ```
 
-5. **For re-reviews: scope to what changed since last gate.**
+5. **For re-reviews: resolve the scope.**
 
-   Get the date of the previous gate's `updated:` field and run:
+   The scope decision — default narrowing, the safety carve-out that overrides it, and what each
+   changes — is stated once in [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md).
+   Read it and apply it; do not restate the trigger here.
+
+   Evaluate `SAFETY_REPROBE` from the prior gate **now**, before Step 3b needs it:
+
+   ```bash
+   # $LATEST_GATE is the prior gate file resolved above. Trigger clause 1, per the shared rule.
+   # POSIX character classes only: `\s` is a GNU extension that BSD/mawk silently never match,
+   # which fails the trigger CLOSED — the carve-out would never fire and nothing would say so.
+   # LATEST_GATE is EMPTY on a first review. `awk 'prog' ""` passes no filename, falls back to
+   # reading stdin, and hangs indefinitely — a hang, not an error. Guard it, and close stdin so the
+   # fallback is unreachable even if the guard is ever removed.
+   SAFETY_REPROBE=false
+   if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
+     awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
+          f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" </dev/null \
+       | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+   fi
+   ```
+
+   Clause 1 is mechanical and shown above. Clauses 2 and 3 are judgement calls made against the
+   gate's `top_issues[]` and the task's own Success Criteria — read the shared rule and set
+   `SAFETY_REPROBE=true` if either holds.
+
+   Default scoping (when `SAFETY_REPROBE` is false) narrows to files changed since the last gate:
 
    ```bash
    git log --since="{gate_date}" --name-only --format="" | sort -u
    ```
 
-   Focus re-review on files changed since the last gate. Include a **Re-Review Context** section at the top of the new QA report listing each previous issue and its current status (FIXED / PARTIAL / NOT FIXED).
+   Include a **Re-Review Context** section at the top of the new QA report listing each previous
+   issue and its current status (FIXED / PARTIAL / NOT FIXED), and a **New Findings This Cycle**
+   section — required even when empty, per the shared rule.
 
 ---
 
@@ -293,25 +321,86 @@ For each phase in the implementation plan:
 
 ### Step 3b: Diff Code Review
 
-Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code.
+Adversarially review the change set's **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the document-anchored checks above do not provide. Governed by the **Adaptive Review Strategy**: run a single light pass in lite/small/re-review; a full pass otherwise; skip entirely when the diff touches no reviewable code. **One exception, and it overrides the strategy: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
 
-1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). On a re-review (Phase 0 found a prior gate), scope to files changed since that gate's `updated:` date; otherwise review the whole branch diff:
+1. **Scope the diff** to this cycle's changes and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → files changed since the last gate's `updated:` date:
 
    ```bash
    BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # standalone tasks usually target develop
    BASE="origin/${BASE_REF:-develop}"
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
+   # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
+   PRIOR_GATES=$(ls "$TASK_DIR"/task.*.gate.*.yml 2>/dev/null | wc -l | tr -d ' ')
    # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
    LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
-   if [ -n "$LAST_GATE_DATE" ]; then                       # re-review (cycle ≥ 2) — scope to files changed since last gate
+   # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
+   # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
+   # silently stops mattering.
+   if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since last gate
+     REFUTE_PASS=false
      FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
      [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
-   else
+   else                                                             # first review, cycle 2, or safety re-probe — whole branch diff
+     [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
      git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
    fi
    ```
 
+   `$TASK_DIR` is the task directory resolved in Phase 0. The narrowing is a cost control, and on
+   cycle 2 it costs more than it saves: the files changed since the last gate are exactly cycle 1's
+   own fixes, so a narrowed cycle-2 review reads only the repairs and never re-reads the original
+   change with what cycle 1 learned. On one observed task, four narrowed re-reviews walked past a
+   defect that had been present in the *original* commit and surfaced only at cycle 5.
+
 2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context. In lite/direct-tools mode use one subagent; for large/high-risk tasks the Adaptive Review Strategy may run it alongside the other parallel agents.
+
+   **Cycle 2 only (`REFUTE_PASS=true`) — refute, do not review.** Append this directive to the
+   subagent prompt. It is the one pass in the loop performed by an agent that did not write the
+   code and is not asked to agree with it:
+
+   ```
+   REFUTE PASS. This change set was written by the same pipeline that is now reviewing it, and
+   cycle 1's fixes are the least-reviewed code in it. Your job is not to confirm the change works —
+   it is to find the claim in it that is FALSE. Start with the fixes from the previous QA cycle:
+   a fix is new code, not the closure of a finding.
+
+   For every change that touches emission, subscription, caching or any lifecycle, probe these four
+   transitions explicitly — they are the states the original findings never mentioned, and the
+   steady-state suite structurally cannot see them:
+     • Bulk teardown     — on unmount/disconnect/cleanup, does it emit, persist or announce
+                           something it should not?
+     • In-flight         — if input arrives WHILE the operation runs, is it applied, queued, or
+                           silently dropped?
+     • Error path        — when it fails, is state left recoverable, or stranded so retry is
+                           impossible?
+     • Reconnect         — after a drop and re-establish, does it converge, or resume from stale
+                           state?
+
+   Review the COMBINATION, not only each change: at least one real defect of this shape was caused
+   by two earlier fixes that were each correct alone.
+   ```
+
+   This costs more than a narrowed cycle-2 pass and is expected to pay for itself, because the
+   develop-task pipeline's convergence check ends the loop shortly after cycle 3 when it is not
+   converging. The trade is **two deep cycles instead of five shallow ones**.
+
+   **Safety re-probe (`SAFETY_REPROBE=true`) — search the surface, do not re-read the fixes.**
+   Resolved in Phase 0 step 5 from the prior gate, per
+   [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md). It is
+   **independent of `REFUTE_PASS`** — where both apply, append both directives, refute first.
+   Append verbatim:
+
+   ```
+   SAFETY RE-PROBE. The previous gate failed on a safety axis. Do NOT scope your attention to the
+   fixes: they are handled separately by the Re-Review Context table, and re-confirming them is not
+   your job. Search the surface again as if for the first time — enumerate the boundary's inputs
+   yourself and test them, rather than re-testing the inputs the previous cycle happened to name. A
+   fix cycle changes the behaviour of code its own diff never touched, so a defect of the same class
+   as the ones just closed is the expected finding, not a surprising one.
+   ```
+
+   Why both, rather than one flag: refuting the fixes and re-probing the surface have different
+   targets. Collapsing them would make cycle 3+ lose the refute, or cycle 2 lose the re-probe.
 
 3. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13).
 
@@ -328,7 +417,7 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }` (Step 10's deterministic rules then decide). Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
 5. `rm -f "$DIFF_FILE"`.
 
@@ -375,6 +464,47 @@ npm exec nx test {project} -- --testPathPattern=integration
 - Any test failures
 - Build success/failure
 - Lint errors
+
+### Step 4b: Execute the Documented Commands
+
+Applies only when this work item's deliverable is **runnable prose** — the diff adds or modifies a
+`SKILL.md` or a `shared/resources/*.md` prompt containing at least one fenced ```bash block. The full
+rule, including why the safety boundary is an allow-list rather than a deny-list, is stated once in
+`references/qa-runnable-prose-detection.md`. Read it before changing anything here.
+
+When the rule does not fire, record `Step 4b: not applicable — no runnable prose in the change set` in
+the QA report's Review Methodology and move on. The step is cheap where it does not apply.
+
+When it does fire, run the engine over each changed in-scope file:
+
+```bash
+node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
+```
+
+Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
+temp working directory from a real directory with `--copy <dir>` so the blocks see real data rather than
+an empty tree. Execution always happens in that temp copy — never the live tree.
+
+**Document results:**
+- Blocks found, and the count classified `runnable` / `placeholder` / `mutating`
+- **Every skipped block, with its line number and reason.** A silent skip recreates the exact failure
+  this step exists to prevent
+- Which shells actually ran; note `zsh-unavailable` when the host has no zsh
+- Each finding, mapped onto the existing `code_review` finding shape — `category: bug`, with
+  `severity` and `confidence` from the rule's table (`high` for an execution failure, `medium` for a
+  shell disagreement)
+
+An execution failure is eligible for gate `top_issues[]` under `code_review_blocking` exactly like any
+other `category: bug` finding. No new report or gate schema.
+
+> **A run where zero blocks executed is a finding, not a pass.** The engine raises
+> `zero-blocks-executed` for you; do not suppress it. An over-broad classification that skips everything
+> is the silent-skip shape this step was built to eliminate, and it would be easy to reintroduce here.
+>
+> `zsh` being absent is **not** that case — it never reduces the runnable count. Record it as
+> information and continue.
+
+**Lite mode**: the step still runs, but only over blocks in the changed file.
 
 ### Step 5: Verify Success Criteria
 
@@ -506,7 +636,15 @@ status_reason: '1-2 sentence explanation of gate decision'
 reviewer: 'QA Engineer'
 updated: '{ISO-8601 timestamp}'
 
-top_issues: [] # Empty if no issues; list issues for CONCERNS/FAIL
+top_issues: [] # Empty if no issues; otherwise a list of entries shaped:
+  # - id: '{PREFIX-###}'
+  #   severity: low|medium|high
+  #   file: '{repo-relative path the finding is IN}'   # REQUIRED — see note below
+  #   finding: '{what is wrong}'
+  #   suggested_action: '{the fix}'
+  #   suggested_owner: dev|sm|po
+  #   status: open|closed         # set closed when a later cycle resolves it
+  #   fixed_date: '{YYYY-MM-DD}'  # with status: closed
 
 waiver:
   active: false # Set true only for WAIVED, with reason and approver
@@ -547,6 +685,13 @@ deployment_readiness:
   production: APPROVED|CONDITIONAL|BLOCKED
   conditions: [] # List conditions if CONDITIONAL
 ```
+
+> **`file:` is required on every `top_issues[]` entry**, and it must be a repo-relative path that
+> appears in the change set — not a description, not a module name, not `unknown`. The develop-task
+> pipeline's **third-strike rule** reads it to detect a file that HIGH findings keep circling across
+> cycles, and the rule works only because `file:` is checkable against the diff. A finding that
+> genuinely spans several files names the one a fix would edit first. If a finding truly has no
+> file (a missing artifact, a process gap), write the path it *should* exist at.
 
 **Deterministic gate decision rules (apply in order):**
 
@@ -611,6 +756,37 @@ Create QA report co-located with the task document:
 ### Review Methodology
 
 {Direct tools / parallel agents / hybrid — rationale}
+
+**Re-reviews only — record the scope decision as one line**, per
+[`references/qa-re-review-scope.md`](references/qa-re-review-scope.md):
+
+```
+Re-review scope: unscoped (prior gate failed on security)
+Re-review scope: since {LAST_GATE_DATE} (default)
+```
+
+Naming the scope is what makes a quiet cycle auditable. Without it, "we found nothing" and "we did
+not look" are the same sentence.
+
+---
+
+## New Findings This Cycle
+
+_Re-reviews only. **Required even when empty** — `None` is an answer; an absent section is
+indistinguishable from a cycle that never asked the question. The Re-Review Context table above
+answers "were the previous findings fixed?"; this section answers "what else is there?"._
+
+[for each new finding not present in the previous review:]
+
+- **[{severity}]** `{file}:{line}` — {finding} → {suggested_action}
+
+On an **unscoped** re-review reporting zero new findings, state what was searched — a bare `None` is
+a defect in the report, not a clean result:
+
+```markdown
+None. Searched unscoped (prior gate: security FAIL): full `origin/develop...HEAD` diff, {N} files.
+Re-enumerated {the boundary's inputs, named} and tested each against the current implementation.
+```
 
 ---
 
@@ -795,10 +971,34 @@ touches the document. See [`docs/reference/anti-patterns.md`](../../docs/referen
 
 **This step is best-effort.** If the comment cannot be posted (network error, auth issue), log the failure and continue — do not halt. The final canonical summary is posted by `/finalise` at pipeline end.
 
-Use the PR metadata stored in the Prerequisites step. Source the retry helper with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value — and wrap the comment in `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). Run:
+Use the PR metadata stored in the Prerequisites step.
+
+**Resolve the platform first.** Source the resolver with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value. It sets `VCS` (which this step branches on) and provides `tracker_call_with_retry` (3× exponential backoff — handles transient GitHub/Anthropic API failures). On Bitbucket, derive the REST coordinates and resolve the credential — the same Step 0.5 preamble `create-pr` uses:
 
 ```bash
-tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECISION}
+source references/resolve-platform.sh || exit 1
+# VCS = github | bitbucket; TRACKER = jira | github
+
+if [ "$VCS" = "bitbucket" ]; then
+  # Two sed passes, not one lazy-quantified capture — `[^/]+?` is a GNU
+  # extension that BSD sed rejects.
+  BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+  # Sets BB_CURL_AUTH (curl args) and BB_AUTH_SCHEME; non-zero when neither an
+  # access token (Bearer) nor username + API token (Basic) is set.
+  source references/bitbucket-auth.sh || exit 1
+fi
+```
+
+**Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads.
+
+```bash
+mkdir -p .claude/state
+BODY_FILE=.claude/state/qa-comment-body.md
+cat > "$BODY_FILE" <<'EOF'
+## QA Review: {GATE_DECISION}
 
 **Gate Decision**: {PASS/CONCERNS/FAIL}
 **Quality Score**: {score}/100
@@ -840,8 +1040,38 @@ tracker_call_with_retry gh pr comment "$PR_URL" --body "## QA Review: {GATE_DECI
 2. {Step 2}
 
 ---
-" || echo "⚠️ PR comment failed after 3 retries — non-blocking. Final canonical summary will be posted by /finalise."
+EOF
+
+if [ "$VCS" = "github" ]; then
+  tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE"
+  COMMENT_RC=$?
+elif [ "$VCS" = "bitbucket" ]; then
+  BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$(cat "$BODY_FILE")" '{content: {raw: $raw}}')
+  curl -sf -X POST \
+    "${BB_CURL_AUTH[@]}" \
+    -H "Content-Type: application/json" \
+    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+    -d "$BB_COMMENT_PAYLOAD" >/dev/null
+  COMMENT_RC=$?
+fi
+
+if [ "$COMMENT_RC" -ne 0 ]; then
+  echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
+fi
 ```
+
+**The two arms are not symmetric on retry, deliberately.** `tracker_call_with_retry` wraps `gh`
+only, so the GitHub arm retries 3× with exponential backoff and the **Bitbucket arm is single-shot**
+— the same asymmetry `qa-fix` ships and states. A Bitbucket failure logs and continues. This is
+acceptable here for the same reason the whole step is best-effort: the QA report and gate file are
+committed to git and are the durable record; this comment is convenience. A
+`bitbucket_call_with_retry` helper would close the gap across every Bitbucket call site in the repo
+and is worth its own task — do not smuggle one in here.
+
+**This comment is per-cycle and deliberately not idempotent.** Each QA cycle posts its own decision,
+so the PR carries the history. Do **not** import `finalise`'s marker/update logic: `finalise` owns
+the single canonical summary at pipeline end, and this step owns the running commentary. Only the
+Bitbucket *transport* is borrowed from it.
 
 ### Step 13b: Comment on Tracker Issue (graceful — non-blocking)
 
@@ -914,7 +1144,7 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] Gate YAML file created and saved (co-located with task)
 - [ ] Task file `## QA Testing Results` section updated with gate status and artifact links
 - [ ] Task status updated per gate decision
-- [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (Step 13 — BLOCKING): confirm exit code 0 after up to 3 attempts
+- [ ] PR comment posted via the `$VCS` arm (Step 13 — BLOCKING): on GitHub, `tracker_call_with_retry gh pr comment "$PR_URL" --body-file` — confirm exit code 0 after up to 3 attempts; on Bitbucket, the single-shot REST POST to `…/pullrequests/${PR_NUMBER}/comments` — confirm exit code 0 (no retry)
 - [ ] Tracker Issue comment posted (Step 13b — graceful): `tracker-comment.js` invoked and its `reason` read (skipped if `github_issue` / `jira_key` absent or null); non-blocking on persistent failure
 - [ ] User notified with gate decision, issues summary, and next steps (Step 14 — BLOCKING)
 
@@ -960,6 +1190,7 @@ updated: '2026-03-20T14:30:00Z'
 top_issues:
   - issue: 'Test expects removed tier'
     severity: medium
+    file: 'libs/billing/src/tier.spec.ts'
     bug_ref: 'task.1.bug.1.test-failure.md'
     status: closed
     fixed_date: '2026-03-20'

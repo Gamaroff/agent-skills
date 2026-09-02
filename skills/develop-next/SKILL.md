@@ -24,7 +24,7 @@ Read once per run from the consumer project's `skills-config.yaml` (`developNext
 | -------------------------------- | ------------------------------------------------ | ----------------- |
 | `developNext.roadmapPath`        | `docs/development/project-completion-roadmap.md` | Steps 1, 3, 4     |
 | `developNext.baseBranch`         | `develop`                                        | Steps 0, 3, 4     |
-| `developNext.qualityGateCommand` | `npm test`                                       | Step 3 merge gate |
+| `developNext.qualityGateCommand` | `npm run ci`                                     | Step 3 merge gate |
 | `developNext.mergeStrategy`      | `merge` (one of `merge` / `squash` / `rebase`)   | Step 3            |
 
 `mergeStrategy` is always written in `gh` vocabulary regardless of host; Step 3 translates it for Bitbucket (`merge` → `merge_commit`, `rebase` → `fast_forward`). Do not put Bitbucket strategy names in `skills-config.yaml`.
@@ -95,10 +95,12 @@ node .agents/skills/develop-next/scripts/select-next.mjs --roadmap <roadmapPath>
 
 Selection rules, marker vocabulary, and edge-case semantics: [`references/roadmap-selection.md`](references/roadmap-selection.md). The script is the authoritative implementation; if its output looks wrong, fix the roadmap (or the script) — do not hand-pick an item.
 
+> **A selection may come from a registry, not the roadmap.** When no phase holds an actionable row — and *only* then — the selector falls through to `docs/bugs/bug-registry.md` and `docs/tasks/task-registry.md`, so a filed bug or task cannot be invisible to the loop. `item.source` names the provenance on **every** selection (`roadmap` | `bug-registry` | `task-registry`); report it. Precedence is absolute (an authored phase always wins), eligibility is the document's own frontmatter rather than the registry row, and the four deliberate stops below are **never** pre-empted — only `roadmap-complete` is. Full rules: [`references/roadmap-selection.md`](references/roadmap-selection.md) §"Registry fallback frontier".
+
 Act on the JSON `status`:
 
 - **`halt` with `missing: true`** (no roadmap file at `roadmapPath`) → this project has no completion roadmap yet. **Do not fabricate one.** In an interactive/one-shot run, offer to scaffold a starter from [`assets/project-completion-roadmap.template.md`](assets/project-completion-roadmap.template.md) at `roadmapPath` (create parent dirs), then **STOP** for the user to populate it with real items — an empty roadmap has nothing to build. In a `/loop` run, **STOP** and notify (no one is present to author it). Never auto-create-and-proceed.
-- **`selected`** → record the `item`, `rationale`, and `skipped[]` for the run report; write the run-state file. In `--dry-run`: print them and **stop here**.
+- **`selected`** → record the `item` (including `item.source`), `rationale`, and `skipped[]` for the run report; write the run-state file. In `--dry-run`: print them and **stop here**.
   - **Already-done guard:** if the item's document frontmatter is already `status: accepted` and its PR is merged, the roadmap tick was lost — skip straight to **Step 4**. Query per `VCS` (resolved in Step 0), or fall back to the document's own PR link:
 
     ```bash
@@ -110,7 +112,7 @@ Act on the JSON `status`:
       gh pr list --state merged --head "<branch>" --json number --jq '.[0].number // empty'
     fi
     ```
-- **`stop`** → **STOP**: report `stopReason` + `detail`, send a push notification, end the loop. Reasons: `human-gated` (`manual`/🚧 frontier), `planning-gap` (a `/create-story` / `/create-epic` row — authoring is interactive and its output needs human review, so it is never run unattended), `manual-checkpoint` (the next item names no runnable command — only `/develop-story`, `/develop-task` and `/develop-bug` are runnable — or no resolvable path — e.g. a "run `/review-prd`" checkpoint), `phase-blocked`, `roadmap-complete`.
+- **`stop`** → **STOP**: report `stopReason` + `detail`, send a push notification, end the loop. Reasons: `human-gated` (`manual`/🚧 frontier), `planning-gap` (a `/create-story` / `/create-epic` row — authoring is interactive and its output needs human review, so it is never run unattended), `manual-checkpoint` (the next item names no runnable command — only `/develop-story`, `/develop-task` and `/develop-bug` are runnable — or no resolvable path — e.g. a "run `/review-prd`" checkpoint), `phase-blocked`, `roadmap-complete`. The first four are deliberate operator decisions and are never scanned past; `roadmap-complete` now means the roadmap **and** both registries are exhausted.
 - **`halt`** (no parseable roadmap content, exit 1) → **HALT**: surface `lint.errors` verbatim. The selector is deliberately tolerant (archived deps, recap rows, and annotation rows are non-fatal warnings — see [`references/roadmap-selection.md`](references/roadmap-selection.md)); a halt means the file could not be parsed as a roadmap at all. `⏭️`/`SKIP` rows are stepped past automatically and never stop the loop. The dispatched command and its work-item path both come from the selector's `item.command` / `item.commandArg`.
 
 ## Step 2 — Dispatch the pipeline
@@ -148,10 +150,56 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      ```
 
    - **CI checks** — if the PR has them, all must be green.
-     - **GitHub:** `gh pr checks <PR#>`.
+     - **GitHub:** `gh pr checks <PR#>` — but see **How to wait for CI** below before treating a pending result as a wait.
      - **Bitbucket:** `GET ${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/commit/${PR_HEAD}/statuses` — every `values[].state` must be `SUCCESSFUL`. An **empty** `values[]` means no CI reported (Pipelines disabled, or the run has not posted yet) → treat as _no checks_, not as failure.
      - **Best-effort on Bitbucket:** this call needs the app password's `read:pipeline` scope. A `403 "Your credentials lack one or more required privilege scopes"` is **not** a merge blocker — log a warning and continue to the quality gate. Bitbucket app passwords are commonly scoped to PR + repository access only, and failing the merge on a _missing read permission_ would block every merge on an otherwise-green PR.
+
+     **How to wait for CI — `gh pr checks` does not block.** It returns immediately and uses a
+     dedicated **exit code 8** to mean "checks are still pending". Read the rollup one-shot
+     instead, discriminating on `.status == "COMPLETED"` before reading `.conclusion` — a running
+     CheckRun returns `conclusion: ""` (an empty string, not null), so `.conclusion // .state`
+     reports a running job as green. This is the form `/finalise` already uses; take it from there
+     rather than re-deriving it:
+
+     ```bash
+     gh pr view "$PR_ID" --json statusCheckRollup \
+       -q '[ .statusCheckRollup[]
+             | (.status // "") as $st
+             | (if   $st == ""          then (.state // "")
+                elif $st == "COMPLETED" then (.conclusion // "")
+                else "PENDING" end)
+             | if . == "" then "PENDING" else . end ]
+           | if length == 0 then "NONE"
+             elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "ERROR"
+                      or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "FAILURE"
+             elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
+                      or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
+             elif any(. == "CANCELLED") then "CANCELLED"
+             else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN"
+     ```
+
+     If a genuine wait is needed, **background it** — a poll loop written to a file, checked on a
+     later turn. Never a foreground call that can outlive the tool timeout.
+
+     > **`gh pr checks --watch` is forbidden in the foreground.** It blocks until CI finishes.
+     > On a 23-minute serial CI lane it simply exceeds the 10-minute tool timeout, and an agent
+     > that reaches for it burns one full timeout per attempt learning nothing — observed three
+     > times on one PR. The flag appears nowhere in this repo for that reason.
+
    - **Always**, on both platforms and regardless of CI: run `<qualityGateCommand>` on the PR branch. This is the real gate — not every project runs CI on PRs, and on Bitbucket the CI read may be unavailable per the note above.
+
+     > **This gate must be the project's full CI-equivalent, and the default now is.** It defaulted
+     > to `npm test` until 2026-09-01, which ran one of the three commands the CI job runs — so a
+     > branch could pass every local gate the pipeline has and still go red. It did, on task 67:
+     > `prettier --check` flagged two new files after `/finalise` had already accepted the task, and
+     > `eval:all` had never run locally at any step of any pipeline. The default is now `npm run ci`,
+     > the composite CI itself calls. An explicit `qualityGateCommand` in `skills-config.yaml` still
+     > wins — a consumer who wants the cheaper, weaker gate states it.
+     >
+     > This is the **slow** tier and belongs here, at the last point before merge, not in the
+     > develop loop. The fast tier is `develop.fastGateCommand` (default `npm run ci:fast`), run per
+     > iteration and per qa-fix cycle; paying the eval tier on every iteration is what would make the
+     > correct fix feel expensive enough to be reverted.
    - Any failure other than the tolerated 403 → **HALT**: report the failing command's output, do not merge, do not tick.
 
 2. **Merge** with the configured strategy.
@@ -265,3 +313,19 @@ Delete the run-state file, then end every run with a report: item id + title, PR
 ## Continuous mode
 
 `/loop /develop-next` (no interval — self-paced). Each iteration runs one item; when a run ends with a stop condition, end the loop (do not schedule another wakeup). One-time setup for unattended runs — permission allowlist, pipeline hooks, CI caveat — is in [`README.md`](README.md).
+
+> **For a long or overnight queue, prefer `loop-supervisor`.** `/loop` re-invokes **this** conversation
+> every iteration, so item five is worked through a context mostly consumed by items one to four — and a
+> skill cannot clear its own context, so the loop has to move outside the session to fix it.
+> `loop-supervisor` spawns one `claude -p` per iteration with a fresh context and a pinned session id,
+> classifies each outcome from filesystem post-conditions rather than from prose, and writes a
+> per-iteration ledger every line of which is reopenable with `claude --resume <sessionId>`.
+>
+> It is not free: every iteration re-primes `CLAUDE.md`, the skill files and the roadmap. That should be
+> largely prompt-cache-served since the prefix is identical across iterations, but it is a real
+> per-iteration floor. For two or three items with someone at the keyboard, `/loop /develop-next` is
+> simpler and cheaper; for a twelve-item overnight queue, the re-prime is what buys an iteration-12 as
+> sharp as iteration-1.
+>
+> See [`skills/loop-supervisor/README.md`](../loop-supervisor/README.md) and the
+> [Unattended Overnight Runs runbook](../../docs/runbooks/unattended-overnight-runs.md).

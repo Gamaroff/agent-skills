@@ -14,9 +14,25 @@ For each invariant a test claims to hold:
 
 1. **Break exactly that invariant** in the source — one line, the smallest edit
    that makes the behaviour wrong.
-2. **Re-run the suite.**
-3. **Confirm the test that names it fails.** Not "some test fails" — *that* one.
-4. **Restore the source.** Confirm green again.
+2. **Confirm the mutation actually landed.** Diff the file against a pre-mutation
+   copy and see the edit in the output. Do not skip this and do not assume it —
+   an edit that silently did not apply produces a green run that reads exactly
+   like a passing proof:
+
+   ```bash
+   cp path/to/source.ts /tmp/pre-mutation.ts   # before the edit
+   # …make the edit…
+   diff /tmp/pre-mutation.ts path/to/source.ts || echo "MUTATION APPLIED"
+   # No diff output ⇒ the mutation never applied ⇒ the green below proves nothing.
+   ```
+
+   This is not hypothetical. One mutation was written with a literal `…` where the
+   source had `...`; the string never matched, nothing changed, the suite stayed
+   green, and the green was recorded as a pass. Two lines of `diff` close that
+   class permanently.
+3. **Re-run the suite.**
+4. **Confirm the test that names it fails.** Not "some test fails" — *that* one.
+5. **Restore the source.** Confirm green again.
 
 If the suite stays green, the test is **vacuous**: it passes whether the
 behaviour is present or not, and it is worse than no test, because it reports
@@ -34,10 +50,11 @@ coverage that does not exist.
 Not every assertion needs this. The ones that do are the ones whose absence would
 be **silent** — where the wrong behaviour reports success.
 
-## The four shapes vacuity takes
+## The five shapes vacuity takes
 
-Each of these was found in one task's test suite, and every one was caught by
-reverting rather than by reading.
+Each of the first four was found in one task's test suite, and every one was caught
+by reverting rather than by reading. The fifth was found in another, and is the one
+that costs whole cycles rather than single tests.
 
 **1. Asserting the wrong channel.** A CLI's contract was that stdout carries the
 value a caller binds with `$( )`. The test passed `--json` and asserted the
@@ -68,6 +85,33 @@ left it green.
 
 > Strip frontmatter, comments and narrative before matching. Anchor on the thing,
 > not on a sentence about the thing.
+
+**5. A textual rule standing in for a semantic property.** Whether a spec is
+meaningful, un-narrowed, or actually executes is not a property of its source text.
+One guard tried to prove it by pattern-matching and was defeated **nine times across
+four QA cycles** — a `scope:` argument, a scope passed via a variable, a computed
+key, `sourceEntries.filter(...)`, a spread, an aliased import, a call inside a fake
+block comment, required titles satisfied by a **dead string**, and
+`describe.skipIf(true)` switching off nine tests while the pin vouched for them. Its
+own docblock claimed skip/only/todo was "a closed vocabulary, which is why this one
+IS reliably checkable by text". False: Vitest also has `skipIf`/`runIf`, and property
+access is not a vocabulary at all. A whole cycle went on discovering that.
+
+> Each defeating spelling is evidence the **class** is undecidable — not that the
+> rule needed one more case. Counting the spellings you have closed tells you
+> nothing about the ones you have not.
+
+Two things work instead.
+
+- **Execute and observe.** Run the thing and read what it did, rather than reading
+  what it says. But **respect the lane contract**: spawning `vitest` from a lane
+  contractually specified as textual-only is what turned CI red on the cycle that
+  tried it. If the guard's lane may not execute, the guard does not belong in that
+  lane.
+- **Make the subject its own witness.** Stop using synthetic probe files. Make the
+  probe every real file, byte-for-byte, with one comment prepended — so no property
+  distinguishes a probe from the file it came from, and there is no spelling for an
+  author to land on that the probe does not already have.
 
 ## Recording it
 

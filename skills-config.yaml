@@ -19,3 +19,13 @@ devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
   - docs/architecture/concepts/tech-stack.md
   - docs/architecture/concepts/source-tree.md
+
+# loop-supervisor — fresh-context sequential loop runner.
+# Every key is optional; these are the defaults made explicit for this repo.
+loopSupervisor:
+  baseBranch: develop
+  roadmapPath: docs/development/project-completion-roadmap.md
+  cooldownSeconds: 10
+  # dashboardUrl: https://dash.internal/api/loop   # optional; --dashboard overrides
+  # There is deliberately no dashboardToken key — this file is committed. The
+  # token comes from --dashboard-token or $LOOP_SUPERVISOR_DASHBOARD_TOKEN.

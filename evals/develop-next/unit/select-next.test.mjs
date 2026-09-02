@@ -27,9 +27,17 @@ const SCRIPT = path.join(
   "select-next.mjs",
 );
 
-const { parseRoadmap, selectNext, selectBatch, parseTouches } = await import(
-  pathToFileURL(SCRIPT).href
-);
+const {
+  parseRoadmap,
+  selectNext,
+  selectBatch,
+  parseTouches,
+  parseRegistry,
+  parseFrontmatterStatus,
+  registryFrontier,
+  TASK_ELIGIBLE_STATUSES,
+  BUG_ELIGIBLE_STATUSES,
+} = await import(pathToFileURL(SCRIPT).href);
 
 function fixture(name) {
   return readFileSync(path.join(__dirname, "fixtures", name), "utf-8");
@@ -974,4 +982,1442 @@ test("14: non-regression — a roadmap with zero bug rows selects exactly as bef
     b.worktrees.map((w) => w.branch),
     ["story/8-1", "story/8-2", "story/8-3"],
   );
+});
+
+// ── general-bug rows: the `B` id form ────────────────────────────────────────
+//
+// A bug row has always been expressible with a story-shaped id borrowed from its
+// surrounding epic (see BUG_ROADMAP above, which uses `4.1`). What did NOT exist
+// was a STANDALONE form — and a general bug has no parent epic to borrow from, so
+// in a maintenance phase there was nothing correct to write. `**B2**` fell outside
+// the id grammar, so the row was rejected as "checkbox row has no item id",
+// SILENTLY SKIPPED, and the row below it selected instead. Found by filing a real
+// bug into a maintenance phase and watching the loop step straight over it.
+
+const STANDALONE_BUG_ROADMAP = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [ ] **B2** the suite fails for environmental reasons · deps: none · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
+- [ ] **T65** something else entirely · deps: none · /develop-task docs/tasks/task.65.x/task.65.x.md
+`;
+
+test("B: a general-bug row is a first-class candidate, not an id-less skip", () => {
+  const r = select(STANDALONE_BUG_ROADMAP);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "B2");
+  assert.equal(r.item.command, "/develop-bug");
+  assert.equal(
+    r.item.commandArg,
+    "docs/bugs/bug.2.flake/bug.2.flake.md",
+    "the bug document path must survive parsing intact",
+  );
+  assert.deepEqual(r.lint.warnings, [], "a valid bug row must not warn");
+  assert.deepEqual(r.lint.errors, []);
+});
+
+test("B: ticking the bug row advances to the next item rather than stalling", () => {
+  const r = select(tick(STANDALONE_BUG_ROADMAP, "B2"));
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "T65");
+});
+
+test("B: a bug id satisfies deps like any other id", () => {
+  const text = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [x] **B2** already fixed · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
+- [ ] **T65** depends on the fix · deps: B2 · /develop-task docs/tasks/task.65.x/task.65.x.md
+`;
+  const r = select(text);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "T65", "a ticked B-dep must count as satisfied");
+});
+
+test("B: an outstanding bug dep blocks its dependent", () => {
+  const text = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [ ] **B2** not fixed yet · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
+- [ ] **T65** depends on the fix · deps: B2 · /develop-task docs/tasks/task.65.x/task.65.x.md
+`;
+  const r = select(text);
+  // B2 itself is eligible and comes first, so it is what gets selected — the point
+  // of the assertion is that `deps: B2` parsed as an id at all. Before the `B`
+  // form existed it was dropped silently, which would have let T65 run first.
+  assert.equal(r.item.id, "B2");
+});
+
+// ── the inline-path matcher must not swallow markdown-link syntax ────────────
+//
+// Both forms are documented. Without excluding `[` from the inline alternative it
+// won the race on a link-form row and captured the SYNTAX — `/develop-bug
+// [bug](x/y.md)` yielded the literal `[bug](x/y.md`, an unbalanced, undispatchable
+// string. Worse than not matching, because the caller would dispatch it.
+
+test("a link-form row resolves to the href, never to the link syntax", () => {
+  const text = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [ ] **B2** link form · /develop-bug [bug](docs/bugs/bug.2.flake/bug.2.flake.md)
+`;
+  const r = select(text);
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.commandArg, "docs/bugs/bug.2.flake/bug.2.flake.md");
+  assert.ok(
+    !r.item.commandArg.includes("["),
+    "the captured path must never contain link syntax",
+  );
+});
+
+test("the inline form still wins when there is no link", () => {
+  const text = `# Roadmap
+
+## PHASE 1 — maintenance
+
+- [ ] **T65** inline form · /develop-task docs/tasks/task.65.x/task.65.x.md
+`;
+  const r = select(text);
+  assert.equal(r.item.commandArg, "docs/tasks/task.65.x/task.65.x.md");
+});
+
+test("B: a bug row inside an epic section is excluded from that epic's completion set", () => {
+  // `isStandaloneId` governs this. Both `T` and `B` rows are conventionally written
+  // inside a consumer epic's section for readability, but neither is a story OF that
+  // epic — an epic is complete once its own stories are accepted, regardless of a
+  // cross-cutting task or bug parked in the same section.
+  //
+  // Asserted against the PARSED MODEL rather than through selectNext: routed through
+  // selection, the bug row is simply picked first (it is earlier in document order),
+  // so the epic-membership branch is never reached and the assertion proves nothing.
+  // A first attempt at this test did exactly that and survived the mutation.
+  const model = parseRoadmap(`# Roadmap
+
+## PHASE 1 — build
+
+## Epic 4
+
+- [x] **4.1** the only actual story · /develop-story docs/stories/story.4.1.x/story.4.1.x.md
+- [ ] **T65** a cross-cutting task · /develop-task docs/tasks/task.65.x/task.65.x.md
+- [ ] **B2** a cross-cutting bug · /develop-bug docs/bugs/bug.2.flake/bug.2.flake.md
+`);
+
+  const rowIds = model.epicSections[4].rowIds;
+  assert.deepEqual(
+    rowIds,
+    ["4.1"],
+    "an epic's completion set is its stories — not the standalone T/B rows filed beside them",
+  );
+  assert.ok(
+    !rowIds.includes("B2"),
+    "a general bug must never hold its host epic open",
+  );
+  assert.ok(!rowIds.includes("T65"), "nor must a standalone task");
+});
+
+// ── 15: registry fallback frontier (task.65) ─────────────────────────────────
+//
+// The roadmap is one hand-maintained index of work that already has two other
+// indexes. A bug filed into `docs/bugs/bug-registry.md` or a task filed into
+// `docs/tasks/task-registry.md` used to be invisible to selection, so the loop
+// reported `roadmap-complete` — indistinguishable from "nothing to do" — while
+// real work sat registered and unreferenced. That happened: bug.2 was filed,
+// registered Major/High, and the selector reported roadmap-complete the same day.
+//
+// The fallback is deliberately reachable from EXACTLY ONE place: the terminal
+// `roadmap-complete` return. The four other stops (`human-gated`,
+// `planning-gap`, `manual-checkpoint`, `phase-blocked`) are deliberate operator
+// decisions, and scanning past one of them would be the worst failure available
+// here — the loop would look like it was working. The §SC9 block below is the
+// guard against that, and it asserts the strong form: not merely "no registry
+// item was selected", but "the registry loader was never CALLED".
+
+const REG_BUG_PATH = "docs/bugs/bug-registry.md";
+const REG_TASK_PATH = "docs/tasks/task-registry.md";
+
+/** A loader that records every call, so a test can assert it was never invoked. */
+function countingLoader(result) {
+  const calls = { n: 0 };
+  const load = () => {
+    calls.n++;
+    return result;
+  };
+  return { load, calls };
+}
+
+/** Minimal in-memory registry pair + a doc-status map, for pure-function tests. */
+function registryOpts({ bugs = "", tasks = "", docs = {} } = {}) {
+  const reads = [];
+  return {
+    reads,
+    opts: {
+      registries: {
+        bugRegistry: { path: REG_BUG_PATH, text: bugs },
+        taskRegistry: { path: REG_TASK_PATH, text: tasks },
+        readStatus(p) {
+          reads.push(p);
+          return Object.prototype.hasOwnProperty.call(docs, p) ? docs[p] : null;
+        },
+      },
+    },
+  };
+}
+
+function bugRegistry(rows) {
+  return [
+    "# Bug Registry",
+    "",
+    "## Registry",
+    "",
+    "| #   | Title | Status | Severity | Priority | Created | Area |",
+    "| --- | ----- | ------ | -------- | -------- | ------- | ---- |",
+    ...rows,
+    "",
+  ].join("\n");
+}
+
+function taskRegistry(rows) {
+  return [
+    "# Task Registry",
+    "",
+    "## Registry",
+    "",
+    "| #   | Title | Status | Category | Priority | Created | Issue | Deps |",
+    "| --- | ----- | ------ | -------- | -------- | -------- | ----- | ---- |",
+    ...rows,
+    "",
+  ].join("\n");
+}
+
+const bugRow = (n, name, status, sev = "Major", pri = "High") =>
+  `| ${n} | [Bug ${n}](bug.${n}.${name}/bug.${n}.${name}.md) | ${status} | ${sev} | ${pri} | 2026-08-29 | area |`;
+
+const taskRow = (n, name, status, pri = "Medium") =>
+  `| ${n} | [Task ${n}](task.${n}.${name}/task.${n}.${name}.md) | ${status} | infrastructure | ${pri} | 2026-08-29 | — | — |`;
+
+// ── SC9: the four deliberate stops are never scanned past ────────────────────
+//
+// One test per stop reason. Each asserts BOTH halves: the stop is returned, and
+// the registry loader was never called — the registries are not merely ignored,
+// they are not read. Written before the fallback existed (per the task's review),
+// and mutation-proved afterwards by widening the fallback to fire on any stop.
+
+const SC9_CASES = [
+  {
+    reason: "human-gated",
+    roadmap: [
+      "# PHASE 1 — MVP",
+      "- [ ] **9.1** Needs an operator · manual · deps: —",
+      "- [ ] **9.2** Ready · deps: — · /develop-task docs/tasks/task.9.b/task.9.b.md",
+      "",
+    ].join("\n"),
+  },
+  {
+    reason: "planning-gap",
+    roadmap: [
+      "# PHASE 1 — MVP",
+      "- [ ] **9.1** Author it · deps: — · /create-story",
+      "",
+    ].join("\n"),
+  },
+  {
+    reason: "manual-checkpoint",
+    roadmap: [
+      "# PHASE 1 — MVP",
+      "- [ ] **9.1** Run /review-prd by hand · deps: —",
+      "",
+    ].join("\n"),
+  },
+  {
+    reason: "phase-blocked",
+    roadmap: [
+      "# PHASE 1 — MVP",
+      "- [ ] **9.1** Blocked · ⛔ BLOCKED until 9.9 accepted · deps: —",
+      "- [ ] **9.9** Also blocked · ⛔ BLOCKED until 9.1 accepted · deps: —",
+      "",
+    ].join("\n"),
+  },
+];
+
+for (const c of SC9_CASES) {
+  test(`15/SC9: ${c.reason} stops the loop — the registries are never read`, () => {
+    const { load, calls } = countingLoader({
+      bugRegistry: {
+        path: REG_BUG_PATH,
+        text: bugRegistry([bugRow(1, "outstanding", "new")]),
+      },
+      taskRegistry: { path: REG_TASK_PATH, text: taskRegistry([]) },
+      readStatus: () => "new",
+    });
+    const r = selectNext(parseRoadmap(c.roadmap), { loadRegistries: load });
+    assert.equal(r.status, "stop");
+    assert.equal(
+      r.stopReason,
+      c.reason,
+      "the deliberate stop must be returned",
+    );
+    assert.equal(
+      calls.n,
+      0,
+      `registries were read despite a ${c.reason} stop — the fallback scanned past a deliberate halt`,
+    );
+    assert.equal(r.item?.source ?? null, r.item ? "roadmap" : null);
+  });
+}
+
+// ── SC1: an actionable roadmap makes the registries unreachable ──────────────
+
+test("15/SC1: a roadmap selection is byte-identical to today's, modulo `source`", () => {
+  const roadmap = fixture("01-first-item.md");
+  const before = selectNext(parseRoadmap(roadmap));
+  const { load, calls } = countingLoader({
+    bugRegistry: {
+      path: REG_BUG_PATH,
+      text: bugRegistry([
+        bugRow(1, "outstanding", "new", "Blocker", "Critical"),
+      ]),
+    },
+    taskRegistry: { path: REG_TASK_PATH, text: taskRegistry([]) },
+    readStatus: () => "new",
+  });
+  const after = selectNext(parseRoadmap(roadmap), { loadRegistries: load });
+
+  assert.equal(
+    calls.n,
+    0,
+    "an actionable roadmap must not read the registries",
+  );
+  assert.equal(after.item.source, "roadmap");
+  // The ONLY difference in the whole verdict is the added `source` field.
+  const strip = (r) => {
+    const { source, ...rest } = r.item;
+    return { ...r, item: rest };
+  };
+  assert.deepEqual(strip(after), strip(before));
+});
+
+test("15/SC1: `source` is present on a roadmap selection even with no loader", () => {
+  const r = select(fixture("01-first-item.md"));
+  assert.equal(
+    r.item.source,
+    "roadmap",
+    "uniform shape — never an absent field",
+  );
+});
+
+// ── SC2/SC3: the fallback selects when the roadmap is genuinely silent ───────
+
+const EMPTY_ROADMAP = [
+  "# PHASE 1 — MVP",
+  "- [x] **9.1** Done · deps: —",
+  "",
+].join("\n");
+
+function fallback({ bugs = [], tasks = [], docs = {} } = {}) {
+  const { opts, reads } = registryOpts({
+    bugs: bugRegistry(bugs),
+    tasks: taskRegistry(tasks),
+    docs,
+  });
+  const r = selectNext(parseRoadmap(EMPTY_ROADMAP), {
+    loadRegistries: () => opts.registries,
+  });
+  return { r, reads };
+}
+
+test("15/SC2: an outstanding bug is selected once the roadmap is exhausted", () => {
+  const { r } = fallback({
+    bugs: [bugRow(7, "leak", "new")],
+    docs: { "docs/bugs/bug.7.leak/bug.7.leak.md": "new" },
+  });
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "B7");
+  assert.equal(r.item.command, "/develop-bug");
+  assert.equal(r.item.commandArg, "docs/bugs/bug.7.leak/bug.7.leak.md");
+  assert.equal(r.item.source, "bug-registry");
+});
+
+test("15/SC3: an outstanding task is selected once the roadmap is exhausted", () => {
+  const { r } = fallback({
+    tasks: [taskRow(9, "refactor", "ready-for-development")],
+    docs: {
+      "docs/tasks/task.9.refactor/task.9.refactor.md": "ready-for-development",
+    },
+  });
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "T9");
+  assert.equal(r.item.command, "/develop-task");
+  assert.equal(
+    r.item.commandArg,
+    "docs/tasks/task.9.refactor/task.9.refactor.md",
+  );
+  assert.equal(r.item.source, "task-registry");
+});
+
+test("15: a `reopened` bug is eligible; an `in-progress` bug is not", () => {
+  const open = fallback({
+    bugs: [bugRow(7, "leak", "reopened")],
+    docs: { "docs/bugs/bug.7.leak/bug.7.leak.md": "reopened" },
+  });
+  assert.equal(open.r.item.id, "B7");
+
+  const mid = fallback({
+    bugs: [bugRow(7, "leak", "in-progress")],
+    docs: { "docs/bugs/bug.7.leak/bug.7.leak.md": "in-progress" },
+  });
+  assert.equal(mid.r.status, "stop");
+  assert.equal(mid.r.stopReason, "roadmap-complete");
+});
+
+// ── SC4: bugs outrank tasks; ordering inside each kind is total ──────────────
+
+test("15/SC4: a bug outranks a task, whatever their priorities say", () => {
+  const { r } = fallback({
+    bugs: [bugRow(9, "small", "new", "Trivial", "Low")],
+    tasks: [taskRow(1, "urgent", "ready-for-development", "High")],
+    docs: {
+      "docs/bugs/bug.9.small/bug.9.small.md": "new",
+      "docs/tasks/task.1.urgent/task.1.urgent.md": "ready-for-development",
+    },
+  });
+  assert.equal(r.item.id, "B9", "known-broken outranks intended work");
+});
+
+test("15/SC4: bugs order by severity, then priority, then number", () => {
+  const rows = [
+    bugRow(1, "a", "new", "Minor", "High"),
+    bugRow(2, "b", "new", "Blocker", "Low"),
+    bugRow(3, "c", "new", "Major", "Low"),
+    bugRow(4, "d", "new", "Major", "Critical"),
+  ];
+  const docs = Object.fromEntries(
+    ["a", "b", "c", "d"].map((n, i) => [
+      `docs/bugs/bug.${i + 1}.${n}/bug.${i + 1}.${n}.md`,
+      "new",
+    ]),
+  );
+  const forward = fallback({ bugs: rows, docs });
+  assert.equal(forward.r.item.id, "B2", "Blocker first, despite Low priority");
+
+  // Deterministic under input reordering — the order is a property of the rows,
+  // not of the file.
+  const reversed = fallback({ bugs: [...rows].reverse(), docs });
+  assert.equal(reversed.r.item.id, "B2");
+});
+
+test("15/SC4: equal severity and priority tie-break on the lower number", () => {
+  const { r } = fallback({
+    bugs: [
+      bugRow(8, "later", "new", "Major", "High"),
+      bugRow(3, "earlier", "new", "Major", "High"),
+    ],
+    docs: {
+      "docs/bugs/bug.8.later/bug.8.later.md": "new",
+      "docs/bugs/bug.3.earlier/bug.3.earlier.md": "new",
+    },
+  });
+  assert.equal(r.item.id, "B3");
+});
+
+test("15/SC4: tasks order by priority, then number", () => {
+  const { r } = fallback({
+    tasks: [
+      taskRow(2, "low", "ready-for-development", "Low"),
+      taskRow(9, "high", "ready-for-development", "High"),
+      taskRow(4, "high2", "ready-for-development", "High"),
+    ],
+    docs: {
+      "docs/tasks/task.2.low/task.2.low.md": "ready-for-development",
+      "docs/tasks/task.9.high/task.9.high.md": "ready-for-development",
+      "docs/tasks/task.4.high2/task.4.high2.md": "ready-for-development",
+    },
+  });
+  assert.equal(r.item.id, "T4", "High before Low; 4 before 9");
+});
+
+// ── SC5: frontmatter decides, the registry row only nominates ────────────────
+//
+// The two demonstrably drift — three rows of THIS repo's task registry read
+// `draft` while their documents read `accepted`. That is the current state of
+// the file, not a hypothetical used to justify a guard. Asserted in BOTH
+// directions, because a check that only catches stale-open rows would let a
+// stale-closed row hide real work, which is the original bug pointed the other
+// way.
+
+test("15/SC5: registry stale-OPEN + terminal document → not selected", () => {
+  const { r } = fallback({
+    tasks: [taskRow(62, "shipped", "draft")], // the real drift shape
+    docs: { "docs/tasks/task.62.shipped/task.62.shipped.md": "accepted" },
+  });
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+  const row = r.registryFrontier.passedOver.find((p) => p.n === 62);
+  assert.match(row.reason, /document status accepted/);
+});
+
+test("15/SC5: registry stale-CLOSED + open document → selected anyway", () => {
+  const { r } = fallback({
+    tasks: [taskRow(70, "live", "accepted")],
+    docs: {
+      "docs/tasks/task.70.live/task.70.live.md": "ready-for-development",
+    },
+  });
+  assert.equal(r.status, "selected");
+  assert.equal(r.item.id, "T70");
+  assert.equal(r.item.registryStatus, "accepted");
+  assert.equal(r.item.documentStatus, "ready-for-development");
+  assert.match(r.rationale, /frontmatter is authoritative/);
+});
+
+test("15/SC5: the eligibility floor admits every status develop-task accepts", () => {
+  // The three excluded values are exactly the three `develop-task` Phase 0c
+  // HALTs on. `draft` and `planned` moved to the selectable sweep in task.71:
+  // both are accepted by the dispatcher, and `planned` is what `/create-task`
+  // emits, so excluding it made every freshly filed task invisible to
+  // `/develop-next`. The review gate did not disappear with them — it moved to
+  // `develop-task` Step 2, which HALTs on NEEDS REVISION / REQUIRES REWORK.
+  //
+  // This sweep is the BEHAVIOURAL half of the rule; the "eligibility floor vs
+  // dispatcher" block below is the STRUCTURAL half, parsing the dispatcher's own
+  // table. Both are needed: this one would still pass if the dispatcher changed
+  // its mind, and that one would still pass if the floor were never consulted.
+  for (const status of ["ready-for-review", "accepted", "cancelled"]) {
+    const { r } = fallback({
+      tasks: [taskRow(5, "spec", status)],
+      docs: { "docs/tasks/task.5.spec/task.5.spec.md": status },
+    });
+    assert.equal(r.status, "stop", `${status} must not be selectable`);
+  }
+  for (const status of [
+    "draft",
+    "planned",
+    "ready-for-development",
+    "in-progress",
+  ]) {
+    const { r } = fallback({
+      tasks: [taskRow(5, "spec", status)],
+      docs: { "docs/tasks/task.5.spec/task.5.spec.md": status },
+    });
+    assert.equal(r.status, "selected", `${status} must be selectable`);
+  }
+});
+
+// The repo's own task registry holds ZERO `draft` and ZERO `planned` rows — 66
+// `accepted` and 5 `ready-for-development` — because every task filed so far was
+// promoted by hand. So no real corpus exercises the widened floor, and the
+// fixture below has to be synthetic. The obvious alternative check ("--lint
+// reports tasks 67-70 as eligible") would be VACUOUS: all four are already
+// `ready-for-development`, already eligible, and pass identically before and
+// after the change.
+
+test("15/SC5: a draft row and a planned row are both eligible; priority decides", () => {
+  const rows = [
+    taskRow(80, "speculative", "draft", "Medium"),
+    taskRow(81, "fresh", "planned", "High"),
+  ];
+  const docs = {
+    "docs/tasks/task.80.speculative/task.80.speculative.md": "draft",
+    "docs/tasks/task.81.fresh/task.81.fresh.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  // High beats Medium even though 81 > 80 — so this proves ELIGIBILITY, not the
+  // ascending-number tie-break that would select T80 for free.
+  assert.equal(f.selected.id, "T81");
+  assert.equal(f.candidates, 2);
+
+  // The decisive assertion: T80 is passed over for being OUTRANKED, not for
+  // being outside the floor. Before task.71 both rows read
+  // "outside the task eligibility floor" and nothing was selected at all.
+  assert.equal(f.passedOver.length, 1);
+  assert.equal(f.passedOver[0].n, 80);
+  assert.doesNotMatch(
+    f.passedOver[0].reason,
+    /eligibility floor/,
+    `a draft row must no longer be excluded by the floor — got: ${f.passedOver[0].reason}`,
+  );
+});
+
+test("15/SC5: the widened floor does not disturb roadmap precedence", () => {
+  // The registries are a FALLBACK, consulted only at `roadmap-complete`. Widening
+  // the floor makes more rows eligible; it must not make them reachable sooner.
+  const roadmap = fixture("01-first-item.md");
+  const { load, calls } = countingLoader({
+    bugRegistry: { path: REG_BUG_PATH, text: bugRegistry([]) },
+    taskRegistry: {
+      path: REG_TASK_PATH,
+      text: taskRegistry([
+        taskRow(80, "speculative", "draft", "Critical"),
+        taskRow(81, "fresh", "planned", "Critical"),
+      ]),
+    },
+    readStatus: () => "draft",
+  });
+  const r = selectNext(parseRoadmap(roadmap), { loadRegistries: load });
+
+  assert.equal(r.item.source, "roadmap");
+  assert.equal(
+    calls.n,
+    0,
+    "an actionable roadmap must not read the registries, however wide the floor",
+  );
+});
+
+test("15/SC5: a document that does not exist is never a candidate", () => {
+  const { r } = fallback({
+    tasks: [taskRow(5, "ghost", "ready-for-development")],
+    docs: {}, // readStatus returns null
+  });
+  assert.equal(r.status, "stop");
+  assert.match(
+    r.registryFrontier.passedOver.find((p) => p.n === 5).reason,
+    /document missing or unreadable/,
+  );
+});
+
+// ── SC6: an item may be out of the frontier, never invisible ─────────────────
+
+test("15/SC6: every passed-over row is listed with a reason — none is unlisted", () => {
+  // Row 1 was `draft` until task.71 widened the floor to admit it. Its role in
+  // this fixture is "a row outside the floor, which must still be LISTED with a
+  // reason" — so it becomes `ready-for-review`, and rows 1/2/4 now spell out
+  // exactly the three statuses the floor still excludes.
+  const rows = [
+    taskRow(1, "a", "ready-for-review"),
+    taskRow(2, "b", "accepted"),
+    taskRow(3, "c", "ready-for-development"),
+    taskRow(4, "d", "cancelled"),
+  ];
+  const docs = {
+    "docs/tasks/task.1.a/task.1.a.md": "ready-for-review",
+    "docs/tasks/task.2.b/task.2.b.md": "accepted",
+    "docs/tasks/task.3.c/task.3.c.md": "ready-for-development",
+    "docs/tasks/task.4.d/task.4.d.md": "cancelled",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(f.selected.id, "T3");
+  assert.equal(f.candidates, 4);
+  assert.equal(
+    f.passedOver.length,
+    3,
+    "every non-selected row appears exactly once",
+  );
+  for (const p of f.passedOver) {
+    assert.ok(p.reason && p.reason.length > 0, `row ${p.n} has no reason`);
+  }
+  assert.deepEqual(f.passedOver.map((p) => p.n).sort(), [1, 2, 4]);
+});
+
+test("15/SC6: selection short-circuits, lint evaluates everything", () => {
+  const rows = [
+    taskRow(1, "a", "ready-for-development"),
+    taskRow(2, "b", "ready-for-development"),
+  ];
+  const docs = {
+    "docs/tasks/task.1.a/task.1.a.md": "ready-for-development",
+    "docs/tasks/task.2.b/task.2.b.md": "ready-for-development",
+  };
+  const { opts, reads } = registryOpts({ tasks: taskRegistry(rows), docs });
+
+  const sel = registryFrontier(opts.registries);
+  assert.equal(sel.selected.id, "T1");
+  assert.equal(
+    reads.length,
+    1,
+    "selection stops reading at the first eligible row",
+  );
+  assert.match(sel.passedOver[0].reason, /not evaluated — T1 ranked higher/);
+
+  reads.length = 0;
+  const lint = registryFrontier(opts.registries, { evaluateAll: true });
+  assert.equal(reads.length, 2, "lint reads every candidate document");
+  assert.match(lint.passedOver[0].reason, /eligible, but T1 ranked higher/);
+  assert.equal(lint.passedOver[0].eligible, true);
+});
+
+// ── SC7: absent, empty and malformed registries degrade, never halt ──────────
+
+test("15/SC7: an absent or empty registry yields no rows and never throws", () => {
+  for (const text of ["", null, undefined, "   \n\n"]) {
+    const p = parseRegistry(text, "task", REG_TASK_PATH);
+    assert.deepEqual(p.rows, []);
+    assert.deepEqual(p.malformed, []);
+  }
+  const { r } = fallback({});
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+});
+
+test("15/SC7: a header-only registry and one with no table are both empty", () => {
+  assert.deepEqual(
+    parseRegistry(taskRegistry([]), "task", REG_TASK_PATH).rows,
+    [],
+  );
+  assert.deepEqual(
+    parseRegistry(
+      "# Task Registry\n\nProse only, no table.\n",
+      "task",
+      REG_TASK_PATH,
+    ).rows,
+    [],
+  );
+});
+
+test("15/SC7: one malformed row does not suppress the well-formed rows around it", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      taskRow(1, "good", "ready-for-development"),
+      "| 2 | No link at all | ready-for-development | infra | High | 2026-08-29 | — | — |",
+      taskRow(3, "alsogood", "ready-for-development"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((x) => x.n),
+    [1, 3],
+  );
+  assert.equal(p.malformed.length, 1);
+  assert.equal(p.malformed[0].n, 2);
+  assert.match(p.malformed[0].reason, /no \[title\]\(story\|task\|bug/);
+});
+
+test("15/SC7: a malformed row is passed over with a reason, never silently dropped", () => {
+  const { opts } = registryOpts({
+    tasks: taskRegistry([
+      "| 2 | No link | ready-for-development | infra | High | 2026-08-29 | — | — |",
+    ]),
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  assert.equal(f.selected, null);
+  assert.equal(f.passedOver.length, 1);
+  assert.match(f.passedOver[0].reason, /malformed row/);
+});
+
+test("15/SC7: a registry whose rows are all terminal selects nothing", () => {
+  const { r } = fallback({
+    bugs: [bugRow(1, "a", "closed"), bugRow(2, "b", "closed")],
+    docs: {
+      "docs/bugs/bug.1.a/bug.1.a.md": "closed",
+      "docs/bugs/bug.2.b/bug.2.b.md": "closed",
+    },
+  });
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+});
+
+test("15/SC7: a pipe table inside a fenced block is an example, not the registry", () => {
+  const text = [
+    "# Task Registry",
+    "",
+    "```markdown",
+    taskRow(99, "sample", "ready-for-development"),
+    "```",
+    "",
+    "## Registry",
+    "",
+    "| #   | Title | Status | Category | Priority | Created | Issue | Deps |",
+    "| --- | ----- | ------ | -------- | -------- | ------- | ----- | ---- |",
+    taskRow(1, "real", "ready-for-development"),
+    "",
+  ].join("\n");
+  const p = parseRegistry(text, "task", REG_TASK_PATH);
+  assert.deepEqual(
+    p.rows.map((x) => x.n),
+    [1],
+    "the fenced sample row must not enter the frontier",
+  );
+});
+
+test("15/SC7: an unrecognised severity or priority sorts last, it does not throw", () => {
+  const { r } = fallback({
+    bugs: [
+      bugRow(1, "typo", "new", "Sever", "Urgnt"),
+      bugRow(2, "sane", "new", "Minor", "Low"),
+    ],
+    docs: {
+      "docs/bugs/bug.1.typo/bug.1.typo.md": "new",
+      "docs/bugs/bug.2.sane/bug.2.sane.md": "new",
+    },
+  });
+  assert.equal(r.item.id, "B2", "the parseable row outranks the typo'd one");
+});
+
+// ── SC8: roadmap-complete now means genuinely exhausted ──────────────────────
+
+test("15/SC8: roadmap-complete is returned only when the registries are empty too", () => {
+  const { r } = fallback({});
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.match(r.detail, /no outstanding registry item/);
+  assert.equal(r.registryFrontier.passedOver.length, 0);
+});
+
+test("15/SC8: with no loader supplied, behaviour is exactly today's", () => {
+  const r = selectNext(parseRoadmap(EMPTY_ROADMAP));
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.equal(r.detail, "no actionable candidate rows in any phase");
+  assert.equal(r.registryFrontier, undefined);
+});
+
+// ── SC10: --batch never sees a registry item ────────────────────────────────
+
+test("15/SC10: --batch is unchanged — registry items carry no touches: data", () => {
+  const before = selectBatch(parseRoadmap(BATCH_ROADMAP));
+  const after = selectBatch(parseRoadmap(BATCH_ROADMAP), {});
+  assert.deepEqual(after, before);
+  // selectBatch takes no registry loader at all: there is no way to inject one,
+  // so a registry row cannot reach a batch even by mistake.
+  const withLoader = selectBatch(parseRoadmap(EMPTY_ROADMAP), {
+    loadRegistries: () => {
+      throw new Error("selectBatch must never consult the registries");
+    },
+  });
+  assert.deepEqual(withLoader.batch, []);
+  const empty = selectBatch(parseRoadmap(EMPTY_ROADMAP));
+  assert.deepEqual(empty.batch, [], "an exhausted roadmap batches nothing");
+});
+
+// ── frontmatter reading ─────────────────────────────────────────────────────
+
+test("15: parseFrontmatterStatus reads one scalar and tolerates the rest", () => {
+  assert.equal(parseFrontmatterStatus("---\nstatus: new\n---\n# Bug"), "new");
+  assert.equal(
+    parseFrontmatterStatus("---\nstatus: 'Accepted'\n---\n"),
+    "accepted",
+  );
+  assert.equal(
+    parseFrontmatterStatus(
+      "---\nstatus: new # bug lifecycle: new → closed\n---\n",
+    ),
+    "new",
+    "a trailing comment is not part of the value",
+  );
+  assert.equal(parseFrontmatterStatus("---\nid: task.5\n---\n"), null);
+  assert.equal(parseFrontmatterStatus("# No frontmatter\n"), null);
+  assert.equal(parseFrontmatterStatus(""), null);
+  assert.equal(parseFrontmatterStatus(null), null);
+});
+
+test("15: registry hrefs resolve relative to the registry file, not the CWD", () => {
+  const p = parseRegistry(
+    bugRegistry([bugRow(4, "x", "new")]),
+    "bug",
+    "docs/bugs/bug-registry.md",
+  );
+  assert.equal(p.rows[0].path, "docs/bugs/bug.4.x/bug.4.x.md");
+});
+
+// ── 16: QA cycle-1 fixes (task.65 gate 1) ────────────────────────────────────
+
+// ── H1: eligibility floor vs dispatcher — `===` for tasks, `⊆` for bugs ───────
+//
+// The frontier names a command, so a status that command refuses produces a
+// selection nothing can act on. `develop-task` Phase 0c HALTs on
+// `Ready for Review`, and `/develop-next` leaves its run-state file in place
+// across a pipeline HALT — so an unattended loop would stop at such an item and
+// resume at the same one next invocation. It could not self-recover.
+//
+// The relation was `⊆` on both axes until task.71. It is now `===` on the TASK
+// axis: a strict subset is a gap the selector cannot explain, because it refuses
+// work the dispatcher would accept, and the one status that mattered — `planned`,
+// what `/create-task` actually emits — sat in that gap, making every freshly
+// filed task invisible to `/develop-next`. Equality also catches OVER-widening,
+// which `⊆` never could: adding `accepted` to the floor now fails here.
+//
+// The BUG axis deliberately keeps `⊆`. See the bug test below for the measured
+// gap and why closing it is a different change.
+//
+// This test parses the DISPATCHERS' OWN status tables rather than restating
+// them, so it re-checks itself if either pipeline changes what it accepts. Both
+// sources are git-tracked: `.agents/skills/` is a gitignored symlink, and a test
+// reading through it would pass locally and fail in CI, which is the most
+// expensive shape a defect can take.
+
+const STEP0_TASK = path.join(
+  REPO_ROOT,
+  "shared",
+  "resources",
+  "develop-pipeline-step-0-resolve-and-prepare.md",
+);
+const STEP0_BUG = path.join(
+  REPO_ROOT,
+  "skills",
+  "develop-bug",
+  "references",
+  "develop-bug-step-0-resolve-bug.md",
+);
+
+/** `Ready for Development` → `ready-for-development`; `accepted` → `accepted`. */
+const kebab = (v) => v.trim().toLowerCase().replace(/\s+/g, "-");
+
+/**
+ * Statuses a dispatcher's status table says it PROCEEDS on.
+ *
+ * A table row is `| \`Status\` | Action |`. A row whose action mentions HALT is a
+ * refusal; anything else proceeds. A status cell may name several values
+ * (`` `Ready for Review` / `accepted` ``), so split on the slash.
+ */
+function proceedStatuses(markdown, sectionHeading) {
+  let body = markdown;
+  if (sectionHeading) {
+    const start = markdown.indexOf(sectionHeading);
+    assert.ok(start > -1, `section ${sectionHeading} not found`);
+    const after = markdown.slice(start + sectionHeading.length);
+    const nextHeading = after.search(/\n#{1,4}\s/);
+    body = nextHeading === -1 ? after : after.slice(0, nextHeading);
+  }
+  const proceed = new Set();
+  let sawRow = false;
+  for (const line of body.split("\n")) {
+    const m = line.match(/^\|\s*(`[^|]*`(?:\s*\/\s*`[^|]*`)*)\s*\|(.*)\|\s*$/);
+    if (!m) continue;
+    sawRow = true;
+    const action = m[2];
+    if (/HALT/i.test(action)) continue;
+    for (const v of m[1].split("/")) {
+      const name = v.replace(/`/g, "").trim();
+      if (name) proceed.add(kebab(name));
+    }
+  }
+  assert.ok(sawRow, "no status-table rows parsed — the table shape changed");
+  return proceed;
+}
+
+test("16/H1: the task eligibility floor EQUALS what develop-task proceeds on", () => {
+  const md = readFileSync(STEP0_TASK, "utf-8");
+  // The develop-task variant of the "Autonomous status handling" table.
+  const idx = md.indexOf("**Autonomous status handling:**");
+  assert.ok(idx > -1, "autonomous status handling section not found");
+  const proceed = proceedStatuses(md.slice(idx), "#### develop-task");
+
+  // Both guards below predate task.71 and are what stops an empty or mangled
+  // parse from satisfying the comparison VACUOUSLY. `proceedStatuses` already
+  // asserts `sawRow`; these two pin the CONTENT. Converting ⊆ to === made them
+  // more load-bearing, not less: two empty sets are equal, so without an anchor
+  // a table-shape change would turn this test green by parsing nothing at all.
+  assert.ok(
+    proceed.has("ready-for-development") && proceed.has("in-progress"),
+    `parsed proceed-set looks wrong: ${[...proceed].join(", ")}`,
+  );
+  assert.ok(
+    !proceed.has("ready-for-review"),
+    "develop-task is documented as HALTing on Ready for Review — if that changed, revisit the floor",
+  );
+
+  // Two-way equality. ⊆ could only catch UNDER-widening (a floor status the
+  // dispatcher refuses); it was blind to OVER-restriction (a status the
+  // dispatcher accepts that the floor withholds), which is precisely how
+  // `planned` — what `/create-task` emits — stayed outside the frontier.
+  const onlyInFloor = [...TASK_ELIGIBLE_STATUSES].filter(
+    (v) => !proceed.has(v),
+  );
+  const onlyInDispatcher = [...proceed].filter(
+    (v) => !TASK_ELIGIBLE_STATUSES.has(v),
+  );
+
+  assert.deepStrictEqual(
+    { onlyInFloor, onlyInDispatcher },
+    { onlyInFloor: [], onlyInDispatcher: [] },
+    `the task eligibility floor and develop-task's accepted set have diverged.\n` +
+      `  only in floor:      ${onlyInFloor.join(", ") || "(none)"}\n` +
+      `      → the frontier would nominate work the dispatcher refuses; an\n` +
+      `        unattended loop would HALT on it and resume at the same item.\n` +
+      `  only in dispatcher: ${onlyInDispatcher.join(", ") || "(none)"}\n` +
+      `      → the selector refuses work develop-task would accept; that work is\n` +
+      `        invisible to /develop-next until a human promotes it by hand.\n` +
+      `  If a divergence is deliberate, say so here and in select-next.mjs — it\n` +
+      `  must not drift in silently.`,
+  );
+});
+
+// The bug axis keeps a divergence the task axis was made to close, and the
+// reason is SEMANTIC before it is about risk.
+//
+// `develop-task` says of its pre-work statuses:
+//   Draft → "Proceed — Step 2 (/review-task) will validate and update the
+//            status autonomously."
+// That is a claim that unstarted work is waiting. Nominating it is right, which
+// is why task.71 made the task floor EQUAL that set.
+//
+// `develop-bug` says of the two statuses in this gap:
+//   in-progress  → "Proceed — a prior run may have started; resume-aware."
+//   ready-for-qa → "Proceed directly toward verification IF A FIX ALREADY
+//                   EXISTS; else re-verify the fix record."
+// Those are resume affordances — written so a re-invoked pipeline does not HALT
+// on its own half-finished work. They are not a claim that work is available to
+// pick up. Selecting on them would hand an unattended loop a bug a human may be
+// actively holding, or one whose fix is written and only awaiting verification.
+//
+// So the equality rule is not a universal law the bug axis has failed to obey.
+// It is the right rule for a dispatcher whose pre-work statuses mean "not
+// started", and the wrong one for a dispatcher whose extra statuses mean
+// "already in flight".
+//
+//   develop-bug proceeds on : new, reopened, in-progress, ready-for-qa
+//   BUG_ELIGIBLE_STATUSES   : new, reopened
+//   gap                     : in-progress, ready-for-qa   ← asserted exactly
+//
+// The gap may still be closed deliberately. This assertion failing is how that
+// decision gets recorded, not a reason to avoid making it.
+test("16/H1: the bug-axis gap is exactly {in-progress, ready-for-qa}", () => {
+  const proceed = proceedStatuses(readFileSync(STEP0_BUG, "utf-8"), null);
+
+  // Anti-vacuity guard — PREDATES the exact assertion below and is not made
+  // redundant by it. The discriminating case is a parse that DROPS `new` or
+  // `reopened`: `proceed` becomes {reopened, in-progress, ready-for-qa}, so the
+  // gap is still exactly {in-progress, ready-for-qa} and `deepStrictEqual`
+  // PASSES — the dispatcher has silently lost a status and only this guard
+  // notices. (Verified: delete the `new` row from develop-bug's table and
+  // remove these four lines, and this test goes green.) A parse that RENAMES a
+  // row instead is caught by both, so it does not prove the guard is needed.
+  assert.ok(
+    proceed.has("new") && proceed.has("reopened"),
+    `parsed proceed-set looks wrong: ${[...proceed].join(", ")}`,
+  );
+
+  // The gap is asserted EXACTLY, not as a subset. `⊆` held for every possible
+  // widening of the dispatcher, so it was silent about the one change it existed
+  // to notice. Both directions now fail:
+  //   gap grew   → develop-bug gained a status the floor ignores
+  //   gap shrank → someone changed the floor; that is a policy decision, not a
+  //                passing side effect
+  const gap = [...proceed].filter((v) => !BUG_ELIGIBLE_STATUSES.has(v)).sort();
+
+  assert.deepStrictEqual(
+    gap,
+    ["in-progress", "ready-for-qa"],
+    `the bug-axis gap is no longer exactly {in-progress, ready-for-qa}.\n` +
+      `  parsed dispatcher set: ${[...proceed].sort().join(", ")}\n` +
+      `  eligibility floor:     ${[...BUG_ELIGIBLE_STATUSES].sort().join(", ")}\n` +
+      `  gap now:               ${gap.join(", ") || "(empty)"}\n` +
+      `  If develop-bug gained a status, decide whether the floor should follow —\n` +
+      `  and read the comment above before assuming it should.\n` +
+      `  If the floor changed, say why here; closing this gap is deliberate work.`,
+  );
+});
+
+test("16/H1: a ready-for-review task is not selected", () => {
+  const { r } = fallback({
+    tasks: [taskRow(9, "awaiting-qa", "ready-for-review")],
+    docs: {
+      "docs/tasks/task.9.awaiting-qa/task.9.awaiting-qa.md": "ready-for-review",
+    },
+  });
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.match(
+    r.registryFrontier.passedOver.find((p) => p.n === 9).reason,
+    /document status ready-for-review — outside the task eligibility floor/,
+  );
+});
+
+// ── M2: a typo'd id is a malformed row, not an invisible one ────────────────
+
+test("16/M2: a non-numeric id row is reported, not silently skipped", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      taskRow(1, "good", "ready-for-development"),
+      // The prefixed form the roadmap uses — an easy thing to carry across by
+      // hand. Previously indistinguishable from the header row, so it vanished.
+      "| T65 | [Task 65](task.65.x/task.65.x.md) | ready-for-development | infra | High | x | — | — |",
+      taskRow(3, "alsogood", "ready-for-development"),
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((x) => x.n),
+    [1, 3],
+    "the well-formed rows around it still parse",
+  );
+  assert.equal(
+    p.malformed.length,
+    1,
+    "the typo'd row is REPORTED, not skipped",
+  );
+  assert.match(p.malformed[0].reason, /id cell "T65" is not a number/);
+  assert.equal(p.malformed[0].line, 8);
+});
+
+test("16/M2: the header row itself is still not reported as malformed", () => {
+  const p = parseRegistry(
+    taskRegistry([taskRow(1, "good", "ready-for-development")]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.malformed.length, 0, "a header is a header, not a bad row");
+  assert.equal(p.rows.length, 1);
+});
+
+test("16/M2: a typo'd row reaches --lint rather than disappearing", () => {
+  const { opts } = registryOpts({
+    tasks: taskRegistry([
+      "| T65 | [Task 65](task.65.x/task.65.x.md) | ready-for-development | infra | High | x | — | — |",
+    ]),
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  assert.equal(f.selected, null);
+  assert.equal(
+    f.passedOver.length,
+    1,
+    "no row may be both ineligible and unlisted (SC6)",
+  );
+  assert.match(f.passedOver[0].reason, /not a number/);
+});
+
+// ── M3: columns are read by NAME when a header exists ───────────────────────
+
+test("16/M3: a consumer registry with reordered columns reads correctly", () => {
+  // Priority and Category swapped relative to this repo's own layout.
+  const swapped = [
+    "| #   | Title | Status | Priority | Category | Created |",
+    "| --- | ----- | ------ | -------- | -------- | ------- |",
+    "| 7 | [T](task.7.a/task.7.a.md) | ready-for-development | High | infra | 2026-01-01 |",
+  ].join("\n");
+  const p = parseRegistry(swapped, "task", REG_TASK_PATH);
+  assert.equal(p.rows.length, 1);
+  assert.equal(
+    p.rows[0].priority,
+    "High",
+    "priority must come from the Priority column, not from position 4",
+  );
+  assert.equal(p.rows[0].registryStatus, "ready-for-development");
+});
+
+test("16/M3: reordered columns actually change the ORDER, not just the field", () => {
+  const reg = [
+    "| #   | Title | Status | Priority | Category | Created |",
+    "| --- | ----- | ------ | -------- | -------- | ------- |",
+    "| 1 | [Low](task.1.low/task.1.low.md) | ready-for-development | Low | infra | x |",
+    "| 2 | [High](task.2.high/task.2.high.md) | ready-for-development | High | infra | x |",
+  ].join("\n");
+  const { opts } = registryOpts({
+    tasks: reg,
+    docs: {
+      "docs/tasks/task.1.low/task.1.low.md": "ready-for-development",
+      "docs/tasks/task.2.high/task.2.high.md": "ready-for-development",
+    },
+  });
+  const f = registryFrontier(opts.registries);
+  assert.equal(
+    f.selected.id,
+    "T2",
+    "the High-priority row must win; reading position 4 would have made both 'infra' and tie on number",
+  );
+});
+
+test("16/M3: bug severity is read by name too", () => {
+  const reg = [
+    "| #   | Title | Status | Priority | Severity | Created |",
+    "| --- | ----- | ------ | -------- | -------- | ------- |",
+    "| 1 | [A](bug.1.a/bug.1.a.md) | new | Low | Minor | x |",
+    "| 2 | [B](bug.2.b/bug.2.b.md) | new | Low | Blocker | x |",
+  ].join("\n");
+  const { opts } = registryOpts({
+    bugs: reg,
+    docs: {
+      "docs/bugs/bug.1.a/bug.1.a.md": "new",
+      "docs/bugs/bug.2.b/bug.2.b.md": "new",
+    },
+  });
+  const f = registryFrontier(opts.registries);
+  assert.equal(f.selected.id, "B2", "Blocker outranks Minor at equal priority");
+});
+
+test("16/M3: a headerless table still parses at the documented positions", () => {
+  // No separator row, so no header is ever promoted — the fallback must hold.
+  const headerless =
+    "| 4 | [T](task.4.a/task.4.a.md) | ready-for-development | infra | High | x | — | — |";
+  const p = parseRegistry(headerless, "task", REG_TASK_PATH);
+  assert.equal(p.rows.length, 1);
+  assert.equal(p.rows[0].priority, "High");
+  assert.equal(p.rows[0].registryStatus, "ready-for-development");
+});
+
+test("16/M3: a header missing a known column warns rather than reading blind", () => {
+  const noPriority = [
+    "| #   | Title | Status | Category | Created |",
+    "| --- | ----- | ------ | -------- | ------- |",
+    "| 4 | [T](task.4.a/task.4.a.md) | ready-for-development | infra | 2026-01-01 |",
+  ].join("\n");
+  const p = parseRegistry(noPriority, "task", REG_TASK_PATH);
+  assert.equal(p.rows.length, 1);
+  assert.equal(p.warnings.length, 1);
+  assert.match(p.warnings[0], /names no priority column/);
+});
+
+// ── L4: the work-item href test is shared with the roadmap parser ───────────
+
+test("16/L4: a preceding non-work-item link never wins over the work-item one", () => {
+  // The realistic shape: a title that cites something before naming the item.
+  const p = parseRegistry(
+    taskRegistry([
+      "| 1 | [design notes](../../.agents/plans/x.md) — [T](task.1.a/task.1.a.md) | ready-for-development | infra | High | x | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows.length, 1);
+  assert.equal(
+    p.rows[0].path,
+    "docs/tasks/task.1.a/task.1.a.md",
+    "the first .md href is not the work item — the first WORK-ITEM href is",
+  );
+});
+
+test("16/L4: a genuinely nested link degrades to malformed, not to a wrong path", () => {
+  // Nested links are not valid markdown, and `MD_LINK_RE` cannot span the inner
+  // `]`, so only the INNER href is visible. The honest outcome is to report the
+  // row rather than resolve it to `notes.md` and dispatch something wrong — and
+  // that is exactly what the work-item filter now buys: before it, this row
+  // resolved to `docs/tasks/notes.md` and was silently rejected downstream as
+  // "document missing", which named the wrong cause.
+  const p = parseRegistry(
+    taskRegistry([
+      "| 1 | [See [notes](notes.md) here](task.1.a/task.1.a.md) | ready-for-development | infra | High | x | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows.length, 0);
+  assert.equal(p.malformed.length, 1);
+  assert.match(p.malformed[0].reason, /no \[title\]\(story\|task\|bug/);
+});
+
+test("16/L4: a title whose only link is not a work item is malformed", () => {
+  const p = parseRegistry(
+    taskRegistry([
+      "| 1 | [Design](../../.agents/plans/design.md) | ready-for-development | infra | High | x | — | — |",
+    ]),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.equal(p.rows.length, 0);
+  assert.equal(p.malformed.length, 1);
+  assert.match(p.malformed[0].reason, /no \[title\]\(story\|task\|bug/);
+});
+
+// ── 17: column state is scoped to ONE table (task.65 gate 2, N1) ─────────────
+//
+// The M2 fix (§16) introduced this: `cols` was assigned when a header was
+// promoted and never cleared, so once ANY header had been seen every later
+// table row in the document was parsed as registry data. A `## Notes` key/value
+// table produced spurious "malformed row" entries, and a second registry
+// section's own header was reported as `id cell "#" is not a number`.
+//
+// It could not select anything wrong — malformed rows never become candidates —
+// but it polluted the `--lint` report the SC6 visibility guarantee rests on.
+// That is the invisible-row defect M2 fixed, pointed the other way: M2 made real
+// rows visible, and in doing so made NON-rows falsely visible.
+//
+// These tests exist because the suite was green 113/113 both with and without
+// the remedy, which is why the fix cycle that introduced it did not notice.
+
+const REG_HEAD = [
+  "| #   | Title | Status | Category | Priority | Created | Issue | Deps |",
+  "| --- | ----- | ------ | -------- | -------- | ------- | ----- | ---- |",
+];
+const regRow = (n) =>
+  `| ${n} | [T](task.${n}.a/task.${n}.a.md) | ready-for-development | infra | High | x | — | — |`;
+
+test("17/N1: a key/value table AFTER the registry contributes nothing", () => {
+  const p = parseRegistry(
+    [
+      ...REG_HEAD,
+      regRow(1),
+      "",
+      "## Notes",
+      "",
+      "| Key | Meaning |",
+      "| --- | ------- |",
+      "| foo | bar |",
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1],
+  );
+  assert.equal(
+    p.malformed.length,
+    0,
+    "a documentation table is not a registry row — it must not reach --lint",
+  );
+});
+
+test("17/N1: a term/definition table after the registry contributes nothing", () => {
+  const p = parseRegistry(
+    [
+      ...REG_HEAD,
+      regRow(1),
+      "",
+      "## Notes",
+      "",
+      "| Term | Definition |",
+      "| ---- | ---------- |",
+      "| SC | success criterion |",
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1],
+  );
+  assert.equal(p.malformed.length, 0);
+});
+
+test("17/N1: a second registry section parses, header and all", () => {
+  const p = parseRegistry(
+    [
+      ...REG_HEAD,
+      regRow(1),
+      "",
+      "## Archived",
+      "",
+      ...REG_HEAD,
+      regRow(2),
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1, 2],
+    "both sections' rows parse",
+  );
+  assert.equal(
+    p.malformed.length,
+    0,
+    'the second section\'s header is a header, not `id cell "#" is not a number`',
+  );
+});
+
+test("17/N1: a stray table's rows never reach --lint as passed-over rows", () => {
+  const { opts } = registryOpts({
+    tasks: [
+      ...REG_HEAD,
+      regRow(1),
+      "",
+      "## Notes",
+      "",
+      "| Key | Meaning |",
+      "| --- | ------- |",
+      "| foo | bar |",
+      "",
+    ].join("\n"),
+    docs: { "docs/tasks/task.1.a/task.1.a.md": "accepted" },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  assert.equal(f.candidates, 1, "only the real row is a candidate");
+  assert.equal(
+    f.passedOver.length,
+    1,
+    "exactly the one real row is reported — no documentation-table noise",
+  );
+  assert.match(f.passedOver[0].reason, /document status accepted/);
+});
+
+// The scenarios that already worked must keep working — the reset must not
+// throw away a mapping that is still in force.
+
+test("17/N1: a legend table BEFORE the registry does not disturb it", () => {
+  const p = parseRegistry(
+    [
+      "| Key | Meaning |",
+      "| --- | ------- |",
+      "| foo | bar |",
+      "",
+      "## Registry",
+      "",
+      ...REG_HEAD,
+      regRow(1),
+      "",
+    ].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1],
+  );
+  assert.equal(p.malformed.length, 0);
+});
+
+test("17/N1: a fenced block mid-table does not end the table, and the column mapping survives it", () => {
+  // A fence resets the header CANDIDATE but not the resolved mapping — the rows
+  // after it are still the same table.
+  //
+  // The columns here are deliberately SWAPPED relative to the documented
+  // positions (Priority at 3, Category at 4). Without that this test cannot tell
+  // the two apart: if the mapping were dropped at the fence, the parser would
+  // fall back to documented positions and, on a conventionally ordered table,
+  // produce exactly the same answer. Proved by mutation — an over-eager
+  // `cols = null` on the fence toggle reddens this test only in this form, and
+  // passed against the conventionally ordered version it replaced.
+  const head = [
+    "| #   | Title | Status | Priority | Category | Created |",
+    "| --- | ----- | ------ | -------- | -------- | ------- |",
+  ];
+  const row = (n) =>
+    `| ${n} | [T](task.${n}.a/task.${n}.a.md) | ready-for-development | High | infra | x |`;
+  const p = parseRegistry(
+    [...head, row(1), "```", "| 99 | fake |", "```", row(2), ""].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1, 2],
+    "the fenced sample is skipped; the real rows either side both parse",
+  );
+  assert.equal(p.malformed.length, 0);
+  assert.equal(
+    p.rows[1].priority,
+    "High",
+    "the row AFTER the fence still reads Priority by name, not by position",
+  );
+});
+
+test("17/N1: a separator with no header above it still falls back to positions", () => {
+  const p = parseRegistry(
+    [REG_HEAD[1], regRow(1), ""].join("\n"),
+    "task",
+    REG_TASK_PATH,
+  );
+  assert.deepEqual(
+    p.rows.map((r) => r.n),
+    [1],
+  );
+  assert.equal(p.rows[0].priority, "High");
+});
+
+test("17/N1: the real registries parse clean — no spurious malformed rows", () => {
+  // The strongest form of this test: the actual files, not fixtures. Both carry
+  // a `## Notes` section today, so a regression here reappears in this repo's
+  // own `--lint` output rather than only in a consumer's.
+  for (const [kind, rel] of [
+    ["bug", "docs/bugs/bug-registry.md"],
+    ["task", "docs/tasks/task-registry.md"],
+  ]) {
+    const text = readFileSync(path.join(REPO_ROOT, rel), "utf-8");
+    const p = parseRegistry(text, kind, rel);
+    assert.ok(p.rows.length > 0, `${rel} parsed no rows`);
+    assert.deepEqual(
+      p.malformed,
+      [],
+      `${rel} produced malformed rows: ${JSON.stringify(p.malformed)}`,
+    );
+    assert.deepEqual(p.warnings, [], `${rel} produced header warnings`);
+  }
 });

@@ -21,6 +21,7 @@ When invoked from the `/develop-story` orchestrator, the call may be prefixed wi
 
 - Skip parallel agents in the Adaptive Review Strategy decision — use the **Lite mode** rule (rule 0 in the decision tree, direct tools only) regardless of story size or risk.
 - **Phase 1.6 (Diff Code Review) still runs** — as a single read-only Explore subagent. It is the one exception to "skip parallel agents": it is not part of the Phase 1.5 parallel-agent set, and lite mode runs exactly one light code-review pass.
+- **Phase 1.7 (Execute the Documented Commands) still runs** — scoped to blocks in the changed file. It is deterministic script execution, not an agent, so it costs nothing lite mode is trying to save; and it catches the class of defect an inspection-only review structurally cannot.
 - All other phases (NFR, traceability, gate decision) run unchanged.
 - Log the override in the QA report's Review Methodology section: `Adaptive strategy override: lite mode — direct tools only`.
 
@@ -124,13 +125,14 @@ Creates: story.178.8.gate.1.initial-review.yml
 | Locate and read story/task      | Read story/task file, extract ACs, identify implementation files         |
 | Run test architecture review    | Assess test coverage, co-location, co-coverage                           |
 | Run diff code review            | Adversarially review the change-set diff for bugs + cleanups (Phase 1.6) |
+| Execute documented commands     | Extract and run the skill's fenced bash blocks under bash + zsh (Phase 1.7) |
 | Run NFR validation              | Evaluate security, performance, reliability, maintainability             |
 | Run requirements traceability   | Map ACs to test evidence; identify gaps                                  |
 | Write QA report                 | Create co-located `.qa.N.*.md` report file                               |
 | Write gate YAML                 | Create co-located `.gate.N.*.yml` file                                   |
 | Update story/task file          | Add QA Results section, update status, link artifacts                    |
 | Create bug reports              | Create `.bug.N.*.md` files for HIGH/MEDIUM issues (if any)               |
-| Post PR comment                 | Post QA summary to PR via `gh pr comment`                                |
+| Post PR comment                 | Post QA summary to PR — `gh pr comment` on GitHub, REST on Bitbucket     |
 | Communicate to user             | Output final summary with gate decision and next steps                   |
 
 ---
@@ -310,6 +312,17 @@ This review focuses on:
 - Validating test coverage for bug fixes
 ```
 
+**And record the scope decision as one line in Review Methodology**, per
+[`references/qa-re-review-scope.md`](references/qa-re-review-scope.md):
+
+```
+Re-review scope: unscoped (prior gate failed on security)
+Re-review scope: since {LAST_GATE_DATE} (default)
+```
+
+Naming the scope is what makes a quiet cycle auditable. Without it, "we found nothing" and "we did
+not look" are the same sentence.
+
 ### Example Re-Review Scenarios
 
 **Scenario 1: Clean PASS → Skip**
@@ -330,6 +343,7 @@ gate: PASS
 top_issues:
   - issue: "Task 2 checkboxes not marked"
     severity: medium
+    file: "docs/stories/story.1.3.auth/story.1.3.auth.md"
 ```
 
 Action: Perform re-review to check if checkboxes are now marked.
@@ -342,8 +356,10 @@ gate: CONCERNS
 top_issues:
   - issue: "Integration tests missing"
     severity: medium
+    file: "apps/api/src/auth/auth.controller.spec.ts"
   - issue: "No retry logic"
     severity: medium
+    file: "apps/api/src/auth/auth.service.ts"
 ```
 
 Action: Perform re-review to verify if issues were addressed.
@@ -417,14 +433,41 @@ Perform a comprehensive test architecture review with quality assessment. This a
    - List each previous issue and verify if it was fixed
    - Include "Re-Review Context" section in new QA report
 
-5. **For re-reviews: scope the review using diff exploration**
+5. **For re-reviews: resolve the scope**
 
-   Use the Agent tool with subagent_type="Explore" to identify what changed SINCE the previous gate:
+   The scope decision — default narrowing, the safety carve-out that overrides it, and what each
+   changes — is stated once in [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md).
+   Read it and apply it; do not restate the trigger here.
+
+   Evaluate `SAFETY_REPROBE` from the prior gate **now**, before Phase 1.6 needs it:
+
+   ```bash
+   # $LATEST_GATE is the prior gate file resolved above. Trigger clause 1, per the shared rule.
+   # POSIX character classes only: `\s` is a GNU extension that BSD/mawk silently never match,
+   # which fails the trigger CLOSED — the carve-out would never fire and nothing would say so.
+   # LATEST_GATE is EMPTY on a first review. `awk 'prog' ""` passes no filename, falls back to
+   # reading stdin, and hangs indefinitely — a hang, not an error. Guard it, and close stdin so the
+   # fallback is unreachable even if the guard is ever removed.
+   SAFETY_REPROBE=false
+   if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
+     awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
+          f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" </dev/null \
+       | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+   fi
+   ```
+
+   Clause 1 is mechanical and shown above. Clauses 2 and 3 are judgement calls made against the
+   gate's `top_issues[]` and the story's own Acceptance Criteria — read the shared rule and set
+   `SAFETY_REPROBE=true` if either holds.
+
+   When `SAFETY_REPROBE` is false, scope the re-review to what changed since the previous gate:
    - Get the date of the previous gate file from its `updated:` field
    - Run: `git log --since="{gate_date}" --name-only --format="" | sort -u`
    - Return: list of files changed since the last QA review
 
-   This scopes the re-review to only what changed — avoid re-checking unchanged files that already passed.
+   This scopes the re-review to only what changed — avoid re-checking unchanged files that already
+   passed. When `SAFETY_REPROBE` is true it does **not** apply: the surface is searched again in
+   full, and the report carries a **New Findings This Cycle** section stating what was searched.
    Log: "Re-review scope: {N} files changed since gate.{prev_num}"
 
 **See "QA Re-Review Logic" section above for detailed implementation.**
@@ -760,25 +803,86 @@ If any parallel agent fails to complete or reports critical errors:
 
 #### Phase 1.6: Diff Code Review
 
-Adversarially review the story's change set **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the Phase 1.5 agents (coverage / TS-strict / a11y / DoD) and the document-anchored checks do **not** provide. Effort follows the **Phase 1.5 Adaptive decision tree**: a single light pass for lite/small/re-review; run it alongside the parallel agents for large/high-risk stories; skip entirely when the diff touches no reviewable code.
+Adversarially review the story's change set **diff** for **correctness bugs** (logic errors, null/async/race, API misuse, broken invariants) and **cleanups** (reuse of existing utilities, simplification, efficiency) — the lens the Phase 1.5 agents (coverage / TS-strict / a11y / DoD) and the document-anchored checks do **not** provide. Effort follows the **Phase 1.5 Adaptive decision tree**: a single light pass for lite/small/re-review; run it alongside the parallel agents for large/high-risk stories; skip entirely when the diff touches no reviewable code. **One exception, and it overrides the tree: cycle 2 is always a full refute pass** (step 1 below). A re-review that gets shallower each cycle is how a loop runs five times and learns nothing after the first.
 
-1. **Scope the diff** (reuse the Phase 1 changed-file map; on a re-review, scope to files changed since the last gate's `updated:` date) and write it to a patch file (keeps diff bytes out of main context):
+1. **Scope the diff** and write it to a patch file (keeps diff bytes out of main context). First review → the whole branch diff. **Cycle 2 (exactly one prior gate) → the whole branch diff again, reviewed to refute** (see the refute directive under step 2). Cycle 3+ → the Phase 1 changed-file map, scoped to files changed since the last gate's `updated:` date:
 
    ```bash
    BASE_REF=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null)   # resolve the PR's actual base (default develop)
    BASE="origin/${BASE_REF:-develop}"
    DIFF_FILE=$(mktemp /tmp/qa-code-review-XXXXXX.diff)
+   # How many gates already exist? 0 = first review, 1 = cycle 2, 2+ = cycle 3 and later.
+   PRIOR_GATES=$(ls "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | wc -l | tr -d ' ')
    # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
    LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
-   if [ -n "$LAST_GATE_DATE" ]; then                # re-review — scope to files changed since last gate
+   # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
+   # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
+   # silently stops mattering.
+   if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since last gate
+     REFUTE_PASS=false
      FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
      [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
-   else
+   else                                                             # first review, cycle 2, or safety re-probe — whole branch diff
+     [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
      git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
    fi
    ```
 
+   `$STORY_DIR` is the story directory resolved in Phase 0. The narrowing is a cost control, and on
+   cycle 2 it costs more than it saves: the files changed since the last gate are exactly cycle 1's
+   own fixes, so a narrowed cycle-2 review reads only the repairs and never re-reads the original
+   change with what cycle 1 learned. On one observed task, four narrowed re-reviews walked past a
+   defect that had been present in the *original* commit and surfaced only at cycle 5.
+
 2. **Dispatch a read-only Explore subagent** with the prompt from `references/code-review-prompt.md` (the single source of truth — pass it verbatim), substituting `<DIFF_FILE>` and `<WORKING_DIR>` (repo root). It returns a `code_review:` YAML findings block. Never read the raw diff into main context.
+
+   **Cycle 2 only (`REFUTE_PASS=true`) — refute, do not review.** Append this directive to the
+   subagent prompt. It is the one pass in the loop performed by an agent that did not write the
+   code and is not asked to agree with it:
+
+   ```
+   REFUTE PASS. This change set was written by the same pipeline that is now reviewing it, and
+   cycle 1's fixes are the least-reviewed code in it. Your job is not to confirm the change works —
+   it is to find the claim in it that is FALSE. Start with the fixes from the previous QA cycle:
+   a fix is new code, not the closure of a finding.
+
+   For every change that touches emission, subscription, caching or any lifecycle, probe these four
+   transitions explicitly — they are the states the original findings never mentioned, and the
+   steady-state suite structurally cannot see them:
+     • Bulk teardown     — on unmount/disconnect/cleanup, does it emit, persist or announce
+                           something it should not?
+     • In-flight         — if input arrives WHILE the operation runs, is it applied, queued, or
+                           silently dropped?
+     • Error path        — when it fails, is state left recoverable, or stranded so retry is
+                           impossible?
+     • Reconnect         — after a drop and re-establish, does it converge, or resume from stale
+                           state?
+
+   Review the COMBINATION, not only each change: at least one real defect of this shape was caused
+   by two earlier fixes that were each correct alone.
+   ```
+
+   This costs more than a narrowed cycle-2 pass and is expected to pay for itself, because the
+   develop-story pipeline's convergence check ends the loop shortly after cycle 3 when it is not
+   converging. The trade is **two deep cycles instead of five shallow ones**.
+
+   **Safety re-probe (`SAFETY_REPROBE=true`) — search the surface, do not re-read the fixes.**
+   Resolved in Phase 0 step 5 from the prior gate, per
+   [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md). It is
+   **independent of `REFUTE_PASS`** — where both apply, append both directives, refute first.
+   Append verbatim:
+
+   ```
+   SAFETY RE-PROBE. The previous gate failed on a safety axis. Do NOT scope your attention to the
+   fixes: they are handled separately by the Re-Review Context table, and re-confirming them is not
+   your job. Search the surface again as if for the first time — enumerate the boundary's inputs
+   yourself and test them, rather than re-testing the inputs the previous cycle happened to name. A
+   fix cycle changes the behaviour of code its own diff never touched, so a defect of the same class
+   as the ones just closed is the expected finding, not a surprising one.
+   ```
+
+   Why both, rather than one flag: refuting the fixes and re-probing the surface have different
+   targets. Collapsing them would make cycle 3+ lose the refute, or cycle 2 lose the re-probe.
 
 3. **Record — always (advisory):** every finding (bugs + cleanups, with `file:line`) goes into the QA report `## Code Review` section and the PR comment.
 
@@ -795,11 +899,52 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    else CR_BLOCKING=false; fi
    ```
 
-   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, finding, suggested_action, suggested_owner: dev }`; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
+   `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Input Handling**). When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high` finding to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries; the existing **Gate Decision Criteria** then apply unchanged. Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
 5. `rm -f "$DIFF_FILE"`.
 
 This is the single diff-aware code reviewer for the story; Phase 2B below defers to it rather than duplicating it. It keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle. Under the develop-story pipeline (which sets the run-level override) this _is_ the code-review-and-fix loop; standalone, behaviour is unchanged unless the story opts in via frontmatter.
+
+#### Phase 1.7: Execute the Documented Commands
+
+Applies only when this story's deliverable is **runnable prose** — the diff adds or modifies a
+`SKILL.md` or a `shared/resources/*.md` prompt containing at least one fenced ```bash block. The full
+rule, including why the safety boundary is an allow-list rather than a deny-list, is stated once in
+`references/qa-runnable-prose-detection.md`. Read it before changing anything here.
+
+Phase 1.6 above reviews that prose by reading it. This phase runs it. The distinction is the whole
+point: a skill can pass an inspection-only review carrying a defect that breaks its core function on the
+default shell, which is exactly what happened to the `review-pr` skill — two clean QA cycles, a DoD
+gate, forty passing contract tests, and a `ls` glob that collected **nothing** under zsh.
+
+When the rule does not fire, record `Phase 1.7: not applicable — no runnable prose in the change set` in
+the QA report's Review Methodology and move on.
+
+When it does fire, run the engine over each changed in-scope file:
+
+```bash
+node references/qa-execute-snippets.mjs --file "$SKILL_FILE" --json
+```
+
+Bind any caller values the documented snippets expect with repeated `--bind NAME=VALUE`, and seed the
+temp working directory from a real directory with `--copy <dir>` so the blocks see real data. Execution
+always happens in that temp copy — never the live tree.
+
+Record in the QA report:
+
+1. **Counts** — blocks found, and how many classified `runnable` / `placeholder` / `mutating`.
+2. **Every skipped block, with its line number and reason.** A silent skip recreates the failure this
+   phase exists to prevent.
+3. **Shells used** — note `zsh-unavailable` when the host has no zsh.
+4. **Findings**, in the existing `code_review` shape: `category: bug`, `confidence: high` for an
+   execution failure and `medium` for a shell disagreement. They feed `top_issues[]` under
+   `code_review_blocking` on the same terms as any other Phase 1.6 finding — no new schema.
+
+> **A run where zero blocks executed is a finding, not a pass.** The engine raises
+> `zero-blocks-executed`; do not suppress it. `zsh` being absent is not that case — it never reduces the
+> runnable count, so record it as information and continue.
+
+**Lite mode**: this phase still runs, but only over blocks in the changed file.
 
 #### Phase 2: Comprehensive Analysis
 
@@ -1077,6 +1222,24 @@ stories/
 
 **Gate Recommendation**: [PASS/CONCERNS/FAIL]
 
+## New Findings This Cycle
+
+_Re-reviews only. **Required even when empty** — `None` is an answer; an absent section is
+indistinguishable from a cycle that never asked the question. The Re-Review Context table answers
+"were the previous findings fixed?"; this section answers "what else is there?"._
+
+[for each new finding not present in the previous review:]
+
+- **[{severity}]** `{file}:{line}` — {finding} → {suggested_action}
+
+On an **unscoped** re-review reporting zero new findings, state what was searched — a bare `None` is
+a defect in the report, not a clean result:
+
+```markdown
+None. Searched unscoped (prior gate: security FAIL): full `origin/develop...HEAD` diff, {N} files.
+Re-enumerated {the boundary's inputs, named} and tested each against the current implementation.
+```
+
 ## Code Review
 
 [From Phase 1.6 — advisory unless the story opted in via `code_review_blocking: true`. Omit if the diff had no reviewable code.]
@@ -1207,7 +1370,15 @@ status_reason: '1-2 sentence explanation of gate decision'
 reviewer: 'QA Engineer'
 updated: '{ISO-8601 timestamp}'
 
-top_issues: [] # Empty if no issues
+top_issues: [] # Empty if no issues; otherwise a list of entries shaped:
+  # - id: '{PREFIX-###}'
+  #   severity: low|medium|high
+  #   file: '{repo-relative path the finding is IN}'   # REQUIRED — see note below
+  #   finding: '{what is wrong}'
+  #   suggested_action: '{the fix}'
+  #   suggested_owner: dev|sm|po
+  #   status: open|closed         # set closed when a later cycle resolves it
+  #   fixed_date: '{YYYY-MM-DD}'  # with status: closed
 waiver: { active: false } # Set active: true only if WAIVED
 
 # Extended fields (optional but recommended):
@@ -1243,6 +1414,13 @@ recommendations:
     - action: 'Consider caching'
       refs: ['services/data.ts']
 ````
+
+> **`file:` is required on every `top_issues[]` entry**, and it must be a repo-relative path that
+> appears in the change set — not a description, not a module name, not `unknown`. The develop-story
+> pipeline's **third-strike rule** reads it to detect a file that HIGH findings keep circling across
+> cycles, and the rule works only because `file:` is checkable against the diff. A finding that
+> genuinely spans several files names the one a fix would edit first. If a finding truly has no
+> file (a missing artifact, a process gap), write the path it *should* exist at.
 
 ### Gate Decision Criteria
 
@@ -1357,10 +1535,26 @@ After review:
    ```
 
    c. **Update Story Status** based on gate decision:
-   - PASS → Status: "Ready for Done"
-   - CONCERNS → Status: "Ready for Done" (with notes about concerns)
-   - FAIL → Status: "Reopened" (requires fixes)
-   - WAIVED → Status: "Ready for Done" (with waiver notes)
+   - PASS → **leave at `ready-for-review`** — QA passing is not acceptance
+   - CONCERNS → **leave at `ready-for-review`** (with notes about concerns)
+   - FAIL → `in-progress` (requires fixes; this is the QA loop's backward edge)
+   - WAIVED → **leave at `ready-for-review`** (with waiver notes)
+
+   > **`accepted` is `finalise`'s to write, and only after the DoD check.** A gate PASS says the
+   > implementation is good; it does not say the Definition of Done is met, and on a repo where CI
+   > is a DoD gate it does not even say the build is green. Writing a terminal status here would
+   > announce acceptance before the check that can refuse it.
+   >
+   > ⚠️ **Do not write `Ready for Done` or `Reopened`.** Both are outside the canonical set in
+   > [`document-status-lifecycle.md`](references/document-status-lifecycle.md), which admits only
+   > `draft`, `planned`, `ready-for-development`, `in-progress`, `ready-for-review`, `accepted` and
+   > `cancelled`. A consumer repo that lints its status vocabulary will go **red** on either — and
+   > because `finalise` overwrites the value minutes later, the window is short enough that the
+   > fault only surfaces when a commit lands inside it. Observed live in `tinker-city`: `docs-lint`
+   > runs ungated on every PR there and failed on `ready-for-done` during a DoD verification.
+   >
+   > These are **story/task** statuses. **Bug-report** statuses are a separate lifecycle
+   > (`New | In Progress | Ready for QA | Reopened | Closed`) and `Reopened` remains correct there.
 
    d. **Append the verdict row to `## Change Log`** — in the same edit as (a)–(c), bumping
    frontmatter `updated`:
@@ -1381,61 +1575,105 @@ After review:
 5. If files were modified during refactoring, list them in QA report and ask Dev to update File List
 6. **Post QA Summary to PR** — **CRITICAL / BLOCKING**: This step is mandatory. The review is NOT complete until the PR comment is confirmed posted. Do not skip, defer, or treat as optional.
 
-   Use the PR metadata stored in Prerequisites. Source the retry helper, then post the comment wrapped in `tracker_call_with_retry` (3× exponential backoff: 1s, 2s, 4s — see `references/resolve-platform.sh`). Transient GitHub API / Anthropic API errors are common on long QA runs; retry transparently before reporting failure:
+   Use the PR metadata stored in Prerequisites.
 
-   ```bash
-   # shellcheck source=references/resolve-platform.sh
-   . "$(dirname "$0")/references/resolve-platform.sh" || exit 1  # adjust path to wherever the bundled helper lives in this skill install
+   **Resolve the platform first.** Source the resolver with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value. It sets `VCS` (which this step branches on) and provides `tracker_call_with_retry` (3× exponential backoff: 1s, 2s, 4s). Transient GitHub API / Anthropic API errors are common on long QA runs; the helper retries transparently before reporting failure. On Bitbucket, derive the REST coordinates and resolve the credential — the same Step 0.5 preamble `create-pr` uses.
 
-   tracker_call_with_retry gh pr comment "$PR_URL" --body "## 🧪 QA Review: [GATE_DECISION]
+   The fences below start at column 0 deliberately: an indented terminator does not close a heredoc, and indented body lines would be written into the comment verbatim.
 
-   **Gate Decision**: ✅/⚠️/❌ [PASS/CONCERNS/FAIL]
-   **Quality Score**: [score]/100
-   **Reviewer**: QA Engineer
-   **Date**: [date]
-   **PR**: #$PR_NUMBER - $PR_TITLE
-   **PR State**: $PR_STATE
+```bash
+source references/resolve-platform.sh || exit 1
+# VCS = github | bitbucket; TRACKER = jira | github
 
-   ---
+if [ "$VCS" = "bitbucket" ]; then
+  # Two sed passes, not one lazy-quantified capture — `[^/]+?` is a GNU
+  # extension that BSD sed rejects.
+  BB_PATH=$(git remote get-url origin | sed -E 's|.*bitbucket\.org[:/]||; s|\.git$||')
+  BB_WORKSPACE=$(echo "$BB_PATH" | cut -d'/' -f1)
+  BB_REPO=$(echo "$BB_PATH" | cut -d'/' -f2)
+  BB_API="https://api.bitbucket.org/2.0"
+  # Sets BB_CURL_AUTH (curl args) and BB_AUTH_SCHEME; non-zero when neither an
+  # access token (Bearer) nor username + API token (Basic) is set.
+  source references/bitbucket-auth.sh || exit 1
+fi
+```
 
-   ### 📋 QA Artifacts
+   **Write the body to a file, then post it.** Always `--body-file`, never an inline `--body`: the body below carries backticks, `$(…)` and newlines, and an inline string invites the shell to evaluate them before `gh` ever sees them. The file is also what the Bitbucket arm reads.
 
-   - **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
-   - **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
+```bash
+mkdir -p .claude/state
+BODY_FILE=.claude/state/qa-comment-body.md
+cat > "$BODY_FILE" <<'EOF'
+## 🧪 QA Review: [GATE_DECISION]
 
-   ### ✅ Summary
+**Gate Decision**: ✅/⚠️/❌ [PASS/CONCERNS/FAIL]
+**Quality Score**: [score]/100
+**Reviewer**: QA Engineer
+**Date**: [date]
+**PR**: #{PR_NUMBER} - {PR_TITLE}
+**PR State**: {PR_STATE}
 
-   - **Tests Executed**: [Count]
-   - **AC Coverage**: [X/Y covered]
-   - **NFR Status**: Security: [PASS/CONCERNS/FAIL], Performance: [PASS/CONCERNS/FAIL], Reliability: [PASS/CONCERNS/FAIL], Maintainability: [PASS/CONCERNS/FAIL]
-   - **Critical Issues**: [count]
-   - **Coverage Gaps**: [count]
-   - **Code Review** (Phase 1.6): [B] bug(s), [C] cleanup(s) — [advisory, or '[N] promoted to gate (code_review_blocking)']
+---
 
-   ### 🔎 Code Review Findings
+### 📋 QA Artifacts
 
-   [Top correctness bugs + notable cleanups from Phase 1.6, each \`file:line — finding\`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking.]
+- **QA Report**: [story.[epic].[story].qa.[number].[descriptive-name].md](path/to/report.md)
+- **Gate File**: [story.[epic].[story].gate.[number].[descriptive-name].yml](path/to/gate.yml)
 
-   ### 🎯 Critical Issues
+### ✅ Summary
 
-   [List critical issues if any, or "None identified"]
+- **Tests Executed**: [Count]
+- **AC Coverage**: [X/Y covered]
+- **NFR Status**: Security: [PASS/CONCERNS/FAIL], Performance: [PASS/CONCERNS/FAIL], Reliability: [PASS/CONCERNS/FAIL], Maintainability: [PASS/CONCERNS/FAIL]
+- **Critical Issues**: [count]
+- **Coverage Gaps**: [count]
+- **Code Review** (Phase 1.6): [B] bug(s), [C] cleanup(s) — [advisory, or '[N] promoted to gate (code_review_blocking)']
 
-   ### 🚀 Deployment Recommendation
+### 🔎 Code Review Findings
 
-   **Status**: ✅/⚠️/❌ [APPROVED/APPROVED WITH CONCERNS/BLOCKED]
+[Top correctness bugs + notable cleanups from Phase 1.6, each `file:line — finding`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking.]
 
-   **Conditions**: [Any conditions for deployment]
+### 🎯 Critical Issues
 
-   ### 📝 Next Steps
+[List critical issues if any, or "None identified"]
 
-   1. [Step 1]
-   2. [Step 2]
+### 🚀 Deployment Recommendation
 
-   ---
-   "
-   ```
+**Status**: ✅/⚠️/❌ [APPROVED/APPROVED WITH CONCERNS/BLOCKED]
 
-   **Verify the comment was posted**: Confirm `tracker_call_with_retry` exited with code 0. The helper retries 3× on transient failure (GitHub 5xx, rate limit, Anthropic API blip). If all 3 attempts fail, report the error to the user and provide the comment body for manual posting. Do NOT proceed to step 6b until the comment is confirmed posted.
+**Conditions**: [Any conditions for deployment]
+
+### 📝 Next Steps
+
+1. [Step 1]
+2. [Step 2]
+
+---
+EOF
+
+if [ "$VCS" = "github" ]; then
+  tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE"
+  COMMENT_RC=$?
+elif [ "$VCS" = "bitbucket" ]; then
+  BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$(cat "$BODY_FILE")" '{content: {raw: $raw}}')
+  curl -sf -X POST \
+    "${BB_CURL_AUTH[@]}" \
+    -H "Content-Type: application/json" \
+    "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_NUMBER}/comments" \
+    -d "$BB_COMMENT_PAYLOAD" >/dev/null
+  COMMENT_RC=$?
+fi
+
+if [ "$COMMENT_RC" -ne 0 ]; then
+  echo "⚠️ PR comment failed — non-blocking. Final canonical summary will be posted by /finalise."
+fi
+```
+
+   **The two arms are not symmetric on retry, deliberately.** `tracker_call_with_retry` wraps `gh` only, so the GitHub arm retries 3× with exponential backoff and the **Bitbucket arm is single-shot** — the same asymmetry `qa-fix` ships and states. A `bitbucket_call_with_retry` helper would close the gap across every Bitbucket call site in the repo and is worth its own task — do not smuggle one in here.
+
+   **This comment is per-cycle and deliberately not idempotent.** Each QA cycle posts its own decision, so the PR carries the history. Do **not** import `finalise`'s marker/update logic: `finalise` owns the single canonical summary at pipeline end, and this step owns the running commentary. Only the Bitbucket *transport* is borrowed from it.
+
+   **Verify the comment was posted**: Confirm `COMMENT_RC` is 0. On GitHub the helper retries 3× on transient failure (5xx, rate limit, Anthropic API blip); on Bitbucket there is one attempt. If it still fails, report the error to the user and provide the comment body (`.claude/state/qa-comment-body.md`) for manual posting. Do NOT proceed to step 6b until the comment is confirmed posted.
 
 6b. **Comment on Tracker Issue (graceful — non-blocking)**
 
@@ -1490,11 +1728,11 @@ If `jira_key` is absent or null, skip silently. Failure does NOT halt the skill.
 - [ ] QA report file created and saved (co-located with story/task)
 - [ ] Gate YAML file created and saved (co-located with story/task)
 - [ ] Story/task `## QA Testing Results` section updated with gate status, quality score, and links to artifacts
-- [ ] Story/task status updated (`Ready for Done` / `Reopened` / etc.) per gate decision
+- [ ] Story/task status correct per gate decision — `ready-for-review` on PASS/CONCERNS/WAIVED, `in-progress` on FAIL. Never `Ready for Done`, never `Reopened`, never `accepted` (that is `finalise`'s)
 - [ ] `## Change Log` row appended recording the gate verdict (blank `Version`, `Author` = `qa-story` / `qa-task`), with frontmatter `updated` bumped in the same edit
 - [ ] Bug report files created for all HIGH and MEDIUM severity issues (if any)
 - [ ] Story Bug Reports section updated with current bug statuses (if any)
-- [ ] PR comment posted via `tracker_call_with_retry gh pr comment "$PR_URL"` (step 6 — BLOCKING): confirm exit code 0 after up to 3 attempts
+- [ ] PR comment posted via the `$VCS` arm (step 6 — BLOCKING): on GitHub, `tracker_call_with_retry gh pr comment "$PR_URL" --body-file` — confirm exit code 0 after up to 3 attempts; on Bitbucket, the single-shot REST POST to `…/pullrequests/${PR_NUMBER}/comments` — confirm exit code 0 (no retry)
 - [ ] Tracker Issue comment posted (step 6b — graceful): `tracker-comment.js` invoked and its `reason` read (skipped if `github_issue` / `jira_key` absent or null); non-blocking on persistent failure
 - [ ] Next steps communicated to user (step 7 — BLOCKING): gate decision + issues + next steps output
 
@@ -1787,6 +2025,7 @@ Include bug count in gate file:
 top_issues:
   - issue: "Cache cleanup memory leak"
     severity: high
+    file: "libs/cache/src/cleanup.ts"
     bug_ref: "story.8.5.3.bug.1.cache-cleanup-memory-leak.md"
     suggested_owner: dev
 ```
@@ -2438,5 +2677,5 @@ docs/
 8. **Given-When-Then for Mapping**: Document test coverage, not test code
 9. **Interactive When Needed**: Use AskUserQuestion for unclear scope or thresholds
 10. **Integrated Outputs**: All assessments (direct tools + agents when used) feed into unified gate decision
-11. **Update Status Based on Gate**: Set story/task status according to gate decision (PASS/CONCERNS → Ready for Done, FAIL → Reopened)
+11. **Update Status Based on Gate**: Set story/task status according to gate decision (PASS/CONCERNS/WAIVED → leave at `ready-for-review`; FAIL → `in-progress`). `accepted` is `finalise`'s to write, and only after the DoD check
 12. **Re-Review When Concerns Exist**: ALWAYS check for existing gate files. Only skip re-review if gate is PASS with NO top_issues. Re-review when gate has CONCERNS/FAIL or any top_issues listed, to verify fixes were implemented.
