@@ -218,15 +218,37 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    NEXT_QA_NUM=$((${LATEST_QA_NUM:-0} + 1))
    ```
 
-5. **For re-reviews: scope to what changed since last gate.**
+5. **For re-reviews: resolve the scope.**
 
-   Get the date of the previous gate's `updated:` field and run:
+   The scope decision — default narrowing, the safety carve-out that overrides it, and what each
+   changes — is stated once in [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md).
+   Read it and apply it; do not restate the trigger here.
+
+   Evaluate `SAFETY_REPROBE` from the prior gate **now**, before Step 3b needs it:
+
+   ```bash
+   # $LATEST_GATE is the prior gate file resolved above. Trigger clause 1, per the shared rule.
+   # POSIX character classes only: `\s` is a GNU extension that BSD/mawk silently never match,
+   # which fails the trigger CLOSED — the carve-out would never fire and nothing would say so.
+   SAFETY_REPROBE=false
+   awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
+        f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" \
+     | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+   ```
+
+   Clause 1 is mechanical and shown above. Clauses 2 and 3 are judgement calls made against the
+   gate's `top_issues[]` and the task's own Success Criteria — read the shared rule and set
+   `SAFETY_REPROBE=true` if either holds.
+
+   Default scoping (when `SAFETY_REPROBE` is false) narrows to files changed since the last gate:
 
    ```bash
    git log --since="{gate_date}" --name-only --format="" | sort -u
    ```
 
-   Focus re-review on files changed since the last gate. Include a **Re-Review Context** section at the top of the new QA report listing each previous issue and its current status (FIXED / PARTIAL / NOT FIXED).
+   Include a **Re-Review Context** section at the top of the new QA report listing each previous
+   issue and its current status (FIXED / PARTIAL / NOT FIXED), and a **New Findings This Cycle**
+   section — required even when empty, per the shared rule.
 
 ---
 
@@ -306,11 +328,14 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    PRIOR_GATES=$(ls "$TASK_DIR"/task.*.gate.*.yml 2>/dev/null | wc -l | tr -d ' ')
    # Re-review only: derive the prior gate's date from its `updated:` field ($LATEST_GATE set in Phase 0).
    LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
-   if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ]; then   # cycle 3+ — scope to files changed since last gate
+   # $SAFETY_REPROBE was resolved in Phase 0 step 5 from the prior gate. It is a DISJUNCT on this
+   # guard, not a second block in front of it — two places assigning $DIFF_FILE is how one of them
+   # silently stops mattering.
+   if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since last gate
      REFUTE_PASS=false
      FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
      [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
-   else                                                             # first review, or cycle 2 — whole branch diff
+   else                                                             # first review, cycle 2, or safety re-probe — whole branch diff
      [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
      git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
    fi
@@ -353,6 +378,24 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    This costs more than a narrowed cycle-2 pass and is expected to pay for itself, because the
    develop-task pipeline's convergence check ends the loop shortly after cycle 3 when it is not
    converging. The trade is **two deep cycles instead of five shallow ones**.
+
+   **Safety re-probe (`SAFETY_REPROBE=true`) — search the surface, do not re-read the fixes.**
+   Resolved in Phase 0 step 5 from the prior gate, per
+   [`references/qa-re-review-scope.md`](references/qa-re-review-scope.md). It is
+   **independent of `REFUTE_PASS`** — where both apply, append both directives, refute first.
+   Append verbatim:
+
+   ```
+   SAFETY RE-PROBE. The previous gate failed on a safety axis. Do NOT scope your attention to the
+   fixes: they are handled separately by the Re-Review Context table, and re-confirming them is not
+   your job. Search the surface again as if for the first time — enumerate the boundary's inputs
+   yourself and test them, rather than re-testing the inputs the previous cycle happened to name. A
+   fix cycle changes the behaviour of code its own diff never touched, so a defect of the same class
+   as the ones just closed is the expected finding, not a surprising one.
+   ```
+
+   Why both, rather than one flag: refuting the fixes and re-probing the surface have different
+   targets. Collapsing them would make cycle 3+ lose the refute, or cycle 2 lose the re-probe.
 
 3. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13).
 
@@ -708,6 +751,37 @@ Create QA report co-located with the task document:
 ### Review Methodology
 
 {Direct tools / parallel agents / hybrid — rationale}
+
+**Re-reviews only — record the scope decision as one line**, per
+[`references/qa-re-review-scope.md`](references/qa-re-review-scope.md):
+
+```
+Re-review scope: unscoped (prior gate failed on security)
+Re-review scope: since {LAST_GATE_DATE} (default)
+```
+
+Naming the scope is what makes a quiet cycle auditable. Without it, "we found nothing" and "we did
+not look" are the same sentence.
+
+---
+
+## New Findings This Cycle
+
+_Re-reviews only. **Required even when empty** — `None` is an answer; an absent section is
+indistinguishable from a cycle that never asked the question. The Re-Review Context table above
+answers "were the previous findings fixed?"; this section answers "what else is there?"._
+
+[for each new finding not present in the previous review:]
+
+- **[{severity}]** `{file}:{line}` — {finding} → {suggested_action}
+
+On an **unscoped** re-review reporting zero new findings, state what was searched — a bare `None` is
+a defect in the report, not a clean result:
+
+```markdown
+None. Searched unscoped (prior gate: security FAIL): full `origin/develop...HEAD` diff, {N} files.
+Re-enumerated {the boundary's inputs, named} and tested each against the current implementation.
+```
 
 ---
 

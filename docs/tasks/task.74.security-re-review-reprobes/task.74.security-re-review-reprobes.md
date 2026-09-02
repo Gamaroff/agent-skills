@@ -5,18 +5,19 @@ type: task
 description: "qa-task and qa-story scope a re-review to files changed since the last gate. That is right for efficiency and wrong after a security FAIL: QA cycle 2 confirmed 13 holes closed, found nothing new, and the DoD gate then found 14 more of the same class. Add a carve-out so a re-review after a security failure searches unscoped."
 tags: [qa, re-review, security, scoping, verification]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 assignee:
 estimated_effort_hours: 5
 ---
 
 # Technical Task: A security re-review must re-probe, not re-read
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.74.review.1.security-re-review-reprobes.md` implemented 2026-09-02
 
 ---
 
@@ -50,6 +51,12 @@ the gate schema, the artifact numbering, or the default scoping.
    including two commands the code deny-listed **by name**.
 2. **Cycle 2 was not wrong.** It did exactly what the scoping rule asks. It re-asked the question that
    had already been answered.
+
+   > **What has since changed, and what has not.** `61197c3` (2026-09-01) gave *cycle 2* a full-branch
+   > diff and a refute directive on every work item, so the exact cycle measured above would now behave
+   > differently. That is not this task, and it does not close this task — see §3 "The residual gap".
+   > The incident stays here because it is how the class was found, not because the specific cycle is
+   > still unguarded.
 3. **The scoping rule is load-bearing in the wrong direction here.** After a security FAIL, the files
    changed since the last gate are precisely the *fixes* — so the re-review inspects the patch and not
    the surface the patch was meant to protect.
@@ -74,20 +81,55 @@ the gate schema, the artifact numbering, or the default scoping.
 
 ### Current architecture
 
-`qa-task` / `qa-story` Phase 0 decides skip-vs-re-review from the prior gate, then — on re-review —
-derives `LAST_GATE_DATE` from the gate's `updated:` field and scopes both the file set and the Step 3b
-diff review to files changed since:
+> **Corrected 2026-09-02 by `review-task`.** This section originally described the scoping as
+> unconditional. It was overtaken by `61197c3` — *feat(qa-loop): give the QA loop a stall guard, and
+> close the traps that fed it* — which landed on `develop` on 2026-09-01, the same day this task was
+> filed. Read the live block before implementing: `skills/qa-task/SKILL.md:299`,
+> `skills/qa-story/SKILL.md:770`.
+
+`qa-task` / `qa-story` Phase 0 decides skip-vs-re-review from the prior gate. Step 3b then chooses the
+diff scope from a **three-way branch on the number of gates that already exist**, and sets a
+`REFUTE_PASS` flag that the code-review subagent prompt reads:
+
+| Cycle | `PRIOR_GATES` | Diff scope | `REFUTE_PASS` | Instruction to the subagent |
+| ----- | ------------- | ------------------------- | ------------- | ------------------------------------------- |
+| 1     | 0             | whole branch              | `false`       | ordinary adversarial review                 |
+| 2     | 1             | **whole branch**          | **`true`**    | **refute — "find the claim that is FALSE"** |
+| 3+    | ≥2            | since `LAST_GATE_DATE`    | `false`       | ordinary re-review                          |
 
 ```bash
-FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
-[ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
+PRIOR_GATES=$(ls "$TASK_DIR"/task.*.gate.*.yml 2>/dev/null | wc -l | tr -d ' ')
+LAST_GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" 2>/dev/null | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
+if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ]; then   # cycle 3+ — scope to files changed since last gate
+  REFUTE_PASS=false
+  FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
+  [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
+else                                                             # first review, or cycle 2 — whole branch diff
+  [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
+  git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
+fi
 ```
+
+### The residual gap
+
+`61197c3` covers **cycle 2 on every work item**, keyed on the *cycle number*. This task is about the
+prior gate's *safety state*, which is a different key, and two gaps survive:
+
+**(a) Cycle 3 and later after a safety failure are still diff-scoped.** A work item whose security FAIL
+is not closed on the first attempt gets cycles 3, 4 and 5 narrowed to the fixes — the same substitution
+`61197c3` removed from cycle 2, reappearing one cycle later on exactly the items most likely to need it.
+
+**(b) The refute directive is anchored on the fixes, not on the surface.** It instructs the subagent to
+*"start with the fixes from the previous QA cycle"*. That is the right emphasis for a general cycle-2
+pass and the wrong one after a safety failure, where the point is that the fixes changed the behaviour of
+code the diff never touched. "Re-read the repairs adversarially" and "re-probe the boundary" are not the
+same instruction.
 
 ### Target architecture
 
-The same flow, plus a **scope decision** taken before that block. When the prior gate failed on a safety
-axis, the re-review runs **unscoped** — full branch diff, and the adversarial search repeated from
-scratch rather than narrowed to the fix.
+The same flow, plus a **scope decision** evaluated as part of the existing branch — not in front of it.
+When the prior gate failed on a safety axis, the re-review runs **unscoped at any cycle**: full branch
+diff, and the adversarial search repeated from scratch rather than narrowed to the fix.
 
 ### Important clarifications
 
@@ -132,15 +174,15 @@ None. A re-review whose prior gate did not fail on a safety axis behaves exactly
 **Files**: `shared/resources/qa-re-review-scope.md` (new)
 
 **Changes**:
-- [ ] State the rule once, in a shared resource both QA skills reference — the two copies of the
+- [x] State the rule once, in a shared resource both QA skills reference — the two copies of the
       current rule are already a drift risk and this task should not add a third
-- [ ] Trigger: the prior gate has **any** of
+- [x] Trigger: the prior gate has **any** of
       - `nfr_validation.security.status: FAIL`
       - a `top_issues[]` entry with `severity: high` whose finding concerns a boundary (a classifier,
         validator, parser, sanitiser, allow/deny-list, or authorisation check)
       - `gate: FAIL` where the work item's own Success Criteria contain *never*, *must not*,
         *fails closed*, or *refused*
-- [ ] Non-trigger, stated explicitly: CONCERNS on performance, reliability or maintainability; a FAIL on
+- [x] Non-trigger, stated explicitly: CONCERNS on performance, reliability or maintainability; a FAIL on
       documentation or coverage. Those re-reviews stay scoped
 
 **Dependencies**: none
@@ -154,12 +196,26 @@ None. A re-review whose prior gate did not fail on a safety axis behaves exactly
 **Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`
 
 **Changes**:
-- [ ] Before the `LAST_GATE_DATE` scoping block, evaluate the Phase 1 trigger
-- [ ] When it fires: use the **full** `BASE...HEAD` diff, not the since-last-gate subset
-- [ ] When it fires: the Step 3b / Phase 1.6 code-review prompt is dispatched with an explicit
+- [x] **Extend the existing `PRIOR_GATES` conditional — do not add a second one in front of it.** The
+      live block already computes `DIFF_FILE` and `REFUTE_PASS` in one place (§3). Evaluate the Phase 1
+      trigger into a variable (e.g. `SAFETY_REPROBE`) and add it as a disjunct on the narrowing guard,
+      so the cycle-3+ branch is taken only when the trigger has *not* fired:
+
+      ```bash
+      if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then
+      ```
+
+      Two independent blocks each assigning `DIFF_FILE` is the failure mode to avoid; the second would
+      silently win and the first would look implemented.
+- [x] When it fires: use the **full** `BASE...HEAD` diff, not the since-last-gate subset
+- [x] **Define what `REFUTE_PASS` is when the trigger fires**, since the subagent prompt reads it. The
+      safety re-probe instruction is *additional to* and distinct from the cycle-2 refute directive —
+      state whether they compose (both appended) or whether the safety instruction replaces it. Leaving
+      this undefined is how cycle 2 after a security FAIL ends up with two conflicting directives.
+- [x] When it fires: the Step 3b / Phase 1.6 code-review prompt is dispatched with an explicit
       instruction to search the surface again rather than verify the prior findings — the prior findings
       are handled separately by the Re-Review Context table
-- [ ] Record the decision in Review Methodology: `Re-review scope: unscoped (prior gate failed on
+- [x] Record the decision in Review Methodology: `Re-review scope: unscoped (prior gate failed on
       security)` or `Re-review scope: since {date} (default)`
 
 **Dependencies**: Phase 1
@@ -173,10 +229,10 @@ None. A re-review whose prior gate did not fail on a safety axis behaves exactly
 **Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`
 
 **Changes**:
-- [ ] The re-review report keeps the Re-Review Context table (question 1: were they fixed?)
-- [ ] It gains a short **New Findings This Cycle** section (question 2: what else is there?), which must
+- [x] The re-review report keeps the Re-Review Context table (question 1: were they fixed?)
+- [x] It gains a short **New Findings This Cycle** section (question 2: what else is there?), which must
       be present even when empty — `None` is an answer; an absent section is not
-- [ ] On an unscoped re-review, a cycle that reports zero new findings must say what was searched, so
+- [x] On an unscoped re-review, a cycle that reports zero new findings must say what was searched, so
       "nothing found" is distinguishable from "nothing looked for"
 
 **Dependencies**: Phase 2
@@ -190,10 +246,10 @@ None. A re-review whose prior gate did not fail on a safety axis behaves exactly
 **Files**: `evals/shared/tests/qa-re-review-scope-parity.test.mjs` (new)
 
 **Changes**:
-- [ ] Both QA skills reference the shared rule and do not restate the trigger
-- [ ] Both carry the unscoped path and the scope-decision recording
-- [ ] Both require the New Findings section, and require it when empty
-- [ ] The trigger list in the prose matches the one in the shared resource — the drift this repo has
+- [x] Both QA skills reference the shared rule and do not restate the trigger
+- [x] Both carry the unscoped path and the scope-decision recording
+- [x] Both require the New Findings section, and require it when empty
+- [x] The trigger list in the prose matches the one in the shared resource — the drift this repo has
       seen before between a rule and its two consumers
 
 **Dependencies**: Phase 3
@@ -214,7 +270,16 @@ None. A re-review whose prior gate did not fail on a safety axis behaves exactly
 
 ### Files Regenerated
 
-5. ✅ `skills/*/references/*` — `npm run bundle` output
+5. ✅ `skills/qa-task/references/qa-re-review-scope.md`, `skills/qa-story/references/qa-re-review-scope.md` —
+   `npm run bundle` output (the bundler also rewrites `shared/resources/qa-re-review-scope.md` →
+   `references/qa-re-review-scope.md` inside both `SKILL.md` files, which is why the parity test
+   accepts either spelling of the link)
+
+### Files NOT changed, and why
+
+- `package.json` — no edit needed. `evals/shared/tests/*.test.mjs` is already in the `npm test`
+  glob, so the new parity test runs under `npm run ci`. Verified by running it there, not by
+  reading the glob.
 
 ---
 
@@ -222,27 +287,35 @@ None. A re-review whose prior gate did not fail on a safety axis behaves exactly
 
 ### Contract Tests
 
-- [ ] Rule stated once; both skills reference rather than restate
-- [ ] Trigger list identical in prose and shared resource
-- [ ] Unscoped path present in both; scope decision recorded
-- [ ] New Findings section required, including when empty
+- [x] Rule stated once; both skills reference rather than restate
+- [x] Trigger list identical in prose and shared resource
+- [x] Unscoped path present in both; scope decision recorded
+- [x] New Findings section required, including when empty
 
 **Command**: `node --test evals/shared/tests/qa-re-review-scope-parity.test.mjs`
 
 ### Replay Verification
 
-- [ ] Against `task.67.gate.1` (`security: FAIL`) the trigger fires
-- [ ] Against a CONCERNS-on-maintainability gate it does not
-- [ ] Against `task.67.gate.2` (`security: PASS`, no top_issues) the skip logic is unaffected
+- [x] Against `task.67.gate.1` (`security: FAIL`) the trigger fires
+- [x] Against a CONCERNS-on-maintainability gate it does not
+- [x] Against `task.67.gate.2` (`security: PASS`, no top_issues) the skip logic is unaffected
 
 ### Mutation Proving
 
-- [ ] Remove the security-FAIL trigger → the task.67 replay stops firing
-- [ ] Remove the "search again" instruction → the unscoped diff is produced but the prompt still only
+- [x] Remove the security-FAIL trigger → the task.67 replay stops firing
+- [x] Remove the "search again" instruction → the unscoped diff is produced but the prompt still only
       verifies prior findings, which is the half-fix this task must not ship
+- [x] **Remove the trigger and replay at cycle 3** (`PRIOR_GATES=2`, prior gate `security: FAIL`) → the
+      re-review reverts to since-last-gate scoping
 
 That second proof matters most: widening the diff without changing the question is the shape of an
 apparent fix that changes nothing.
+
+> **Run the second proof at cycle 3, not cycle 2.** At cycle 2 `REFUTE_PASS` is already `true` from
+> `61197c3`, so an adversarial instruction reaches the subagent whether or not this task's change is
+> present — the mutation would pass for a reason that has nothing to do with the code under proof. The
+> third proof exists to isolate the new trigger from the pre-existing cycle-2 carve-out; without it, all
+> three proofs could pass on a change that does nothing at cycle 3+, which is the only place the gap is.
 
 ---
 
@@ -250,21 +323,24 @@ apparent fix that changes nothing.
 
 ### Functional
 
-- [ ] A re-review after a security FAIL runs unscoped and searches the surface again
-- [ ] A re-review after a non-safety CONCERNS keeps today's scoping
-- [ ] The scope decision appears in Review Methodology in both cases
-- [ ] The QA report carries a New Findings section, present even when empty
+- [x] A re-review after a security FAIL runs unscoped and searches the surface again
+- [x] **A cycle-3+ re-review after a security FAIL runs unscoped** — the gap `61197c3` left open (§3)
+- [x] `REFUTE_PASS` has a defined value when the safety trigger fires, and the two instructions do not
+      conflict
+- [x] A re-review after a non-safety CONCERNS keeps today's scoping
+- [x] The scope decision appears in Review Methodology in both cases
+- [x] The QA report carries a New Findings section, present even when empty
 
 ### Regression
 
-- [ ] The `task.67.gate.1` state triggers the carve-out
-- [ ] The skip-re-review path (clean PASS, unchanged code and doc) is unaffected
-- [ ] Artifact numbering and gate schema unchanged
+- [x] The `task.67.gate.1` state triggers the carve-out
+- [x] The skip-re-review path (clean PASS, unchanged code and doc) is unaffected
+- [x] Artifact numbering and gate schema unchanged
 
 ### Safety
 
-- [ ] The trigger cannot be satisfied by a gate that merely has issues — it requires a safety axis
-- [ ] An unscoped cycle reporting zero new findings states what was searched
+- [x] The trigger cannot be satisfied by a gate that merely has issues — it requires a safety axis
+- [x] An unscoped cycle reporting zero new findings states what was searched
 
 ---
 
@@ -326,28 +402,30 @@ every subsequent one.
 | Date       | Version | Description                                                    | Author      |
 | ---------- | ------- | -------------------------------------------------------------- | ----------- |
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.67 pipeline retrospective    | create-task |
+| 2026-09-02 | 1.1     | Review passed (8/10) — §3 corrected: `61197c3` already gives cycle 2 a full-diff refute pass; task re-aimed at the cycle-3+ residual gap; Phase 2 now composes with the existing branch; third mutation proof added | review-task |
+| 2026-09-02 |         | Implemented — 4 files (1 new shared rule, 2 skills, 1 new parity test), 31 tests, 15 mutation proofs | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Trigger
-- [ ] Shared resource stating the rule once
-- [ ] Trigger and non-trigger cases
+- [x] Shared resource stating the rule once
+- [x] Trigger and non-trigger cases
 
 ### Phase 2: Unscoped path
-- [ ] Full diff on trigger
-- [ ] Search-again instruction
-- [ ] Scope decision recorded
+- [x] Full diff on trigger
+- [x] Search-again instruction
+- [x] Scope decision recorded
 
 ### Phase 3: Both questions
-- [ ] New Findings section, required when empty
-- [ ] State what was searched
+- [x] New Findings section, required when empty
+- [x] State what was searched
 
 ### Phase 4: Contract test
-- [ ] Parity held
-- [ ] Replay against gate.1 / gate.2
-- [ ] Mutation proofs
+- [x] Parity held
+- [x] Replay against gate.1 / gate.2
+- [x] Mutation proofs
 
 ---
 
