@@ -37,7 +37,7 @@ Build `shared/resources/pr-inline-comment.js` — a dual-platform CLI that posts
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #308](https://github.com/Gamaroff/agent-skills/pull/308); 3 commits; issue comment skipped (none linked) | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.70.qa.{N}.*.md`; `task.70.gate.{N}.*.yml`; PR comment posted     | 2 cycles: FAIL 50/100 → PASS 92/100. 17 issues, 16 fixed, 7 mutation proofs | 2 Explore reviewers |
 | 7. finalise                | ✅ Done    | `task.70.dod.{N}.*.md`; task `status: accepted`                        | DoD PASSED; CI SUCCESS on final head; 29 boundary probes, 0 reproduced | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 4 commits: `c55e1c2`, `f3adeff`, `de4b484`, `b56cb5a`, `ebd7352`, `deb111d` — pushed to origin | —                    |
 
 ---
 
