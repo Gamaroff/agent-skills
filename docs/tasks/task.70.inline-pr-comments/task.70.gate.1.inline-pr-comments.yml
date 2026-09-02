@@ -1,0 +1,135 @@
+schema: 1
+task: 'task.70.inline-pr-comments'
+task_title: 'Build the inline PR comment primitive, on GitHub and Bitbucket'
+gate: PASS
+status_reason: 'All 9 issues fixed and mutation-proven in qa-fix cycle 1. The two invariant violations now degrade rather than drop, ids no longer collide, both jq snippets execute against a fixture under a new permanent guard, and the CI exit-after-write guard is green.'
+reviewer: 'QA Engineer'
+updated: '2026-09-02T21:20:00Z'
+
+top_issues:
+  - id: 'TASK70-001'
+    severity: high
+    file: 'shared/resources/pr-inline-comment.js'
+    finding: 'The duplicate-marker branch pushes reason `unverifiable` and continues WITHOUT pushing to `degraded`. The finding reaches no destination — no inline comment, no summary comment, and the stderr warning prints only the key, never the body. The branch immediately above it (unreadable comment list) does degrade, so the omission is asymmetric and unintentional.'
+    suggested_action: 'Push the entry into `degraded` with why: "the marker is present on N comments — cannot tell which to update", keeping the per-finding reason `unverifiable`.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'TASK70-002'
+    severity: high
+    file: 'shared/resources/pr-inline-comment.js'
+    finding: '`findingId` collapses to `path:line:side` when the caller supplies no `id`, so two DIFFERENT findings about the same line share one identity. Neither `fresh` nor the `existing` lookup de-duplicates, so on a re-run both entries PATCH the same comment and the second body overwrites the first — while both report `updated`. On a first run the collision posts two comments with an identical marker, which then permanently arms TASK70-001.'
+    suggested_action: 'Make the derived id unique per finding (append a short hash of `body`), and reject duplicate keys in `parseFindings` so a caller-supplied duplicate `id` is a usage error rather than a silent overwrite.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'TASK70-003'
+    severity: high
+    file: 'shared/resources/pr-inline-comment.js'
+    finding: 'The file calls `process.exit()` after writing to stdout/stderr, which truncates the write at ~64KB when the caller pipes it. `shared/resources/tests/stdout-drain-on-exit.test.mjs` guards against exactly this for NEW files and is RED in CI. The pattern was copied verbatim from `tracker-comment.js`, which is on the guard KNOWN_UNMIGRATED allowlist — a legacy shape faithfully reproduced into a new file.'
+    suggested_action: 'Set `process.exitCode` and let control flow return, rather than calling `process.exit()`.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'TASK70-004'
+    severity: high
+    file: 'skills/review-code/SKILL.md'
+    finding: 'The wiring jq snippet reads `body: .summary` — a field the findings schema does not define. `shared/resources/code-review-prompt.md:68` defines the key as `finding:`. jq emits `body: null`, `parseFindings` throws, the CLI exits 2, and the whole inline pass aborts with every finding dropped. Same defect at `skills/review-pr/SKILL.md`.'
+    suggested_action: 'Use `body: .finding` (optionally composing `.finding + "\n\n→ " + .suggested_action`) in both snippets.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'TASK70-005'
+    severity: high
+    file: 'skills/review-pr/SKILL.md'
+    finding: '`.code_review[], .pr_conformance[]` iterates the VALUES of the wrapper objects (`reviewed`, `findings`, `truncated_count`), not the findings. `select(.file_line != null)` then indexes a string and jq aborts. `skills/review-code/SKILL.md` has the same shape applied to the `code_review:` object rather than to `code_review.findings`.'
+    suggested_action: 'Use `.code_review.findings[]?` / `.pr_conformance.findings[]?`, and add a jq smoke assertion over a fixture so the snippet is executed rather than only read.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'TASK70-006'
+    severity: medium
+    file: 'shared/resources/handover-verify.js'
+    finding: 'The GitHub arm reuses the `github.pr.comment` kind for INLINE comments, but that kind verifies by reading `gh pr view --json comments` — PR conversation comments, where an inline comment never appears. So a deferred inline comment an operator actually posted always reads back as outstanding. The Bitbucket side was correctly given UNRELIABLE for this same reason; the GitHub side is asymmetric.'
+    suggested_action: 'Record `target.inline: true` and branch the recipe to read `gh api /repos/{slug}/pulls/{n}/comments`, or mark this record shape UNRELIABLE.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'TASK70-007'
+    severity: medium
+    file: 'shared/resources/pr-inline-comment.js'
+    finding: 'The Bitbucket arm never reads back existing comments — no marker scan, no update-in-place, no cardinality check. It writes the marker but nothing reads it, so every re-run posts a fresh copy of every finding. The contract states the re-run rule platform-neutrally, and the peer this file mirrors does scan on both arms.'
+    suggested_action: 'Add a GET .../comments marker scan with the same count>1 → unverifiable rule and PUT for the single hit; or scope the contract re-run table explicitly to GitHub and state plainly that Bitbucket re-runs duplicate.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'TASK70-008'
+    severity: medium
+    file: 'shared/resources/pr-inline-comment.js'
+    finding: 'The contract row "marker found, anchor no longer in the diff → degrade to anchor-failed" is unimplemented. `ghUpdateOne` PATCHes a body only, which GitHub accepts regardless of whether the anchor still falls in the diff, so the finding reports `updated` while sitting on an outdated line. The `line`/`path` fields captured into the marker map are dead — the tell that the check was never written.'
+    suggested_action: 'Compare hit.line/hit.path against the finding, or check `position !== null` in the comment list; on mismatch skip the PATCH and degrade.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'TASK70-009'
+    severity: medium
+    file: 'shared/resources/tests/pr-inline-comment.test.mjs'
+    finding: 'The duplicate-marker test asserts only the per-finding reason and that no PATCH was issued — it never asserts the finding TEXT reached anywhere, which is why TASK70-001 shipped. Every other degradation test does make that assertion; the one guarding the branch that actually loses data does not. There is also no test for two findings sharing an anchor, and no Bitbucket re-run test at all.'
+    suggested_action: 'Assert the summary body carries the text in the duplicate-marker test; add a same-anchor collision test and a Bitbucket idempotency test.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 905
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2, 3, 4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No secrets in the diff. Bodies travel as argv arrays and files, never interpolated into a shell string. Credentials read from env, mirroring bitbucket-auth.sh. The access gate sits between local work and the first remote call, and restricted-mode tests inject throwing transports so a leak fails the test.'
+  performance:
+    status: PASS
+    notes: 'The batched review is one API call and one notification instead of N. No hot paths touched.'
+  reliability:
+    status: PASS
+    notes: 'Every path that can fail to anchor now degrades to the summary comment: 422, duplicate marker, unreadable comment list, stale anchor, and update failure. Each is covered by a test asserting the finding TEXT reaches the summary, and four mutation proofs confirm those tests fail when the behaviour is reverted.'
+  maintainability:
+    status: PASS
+    notes: 'The test gap on the losing branch is closed and mutation-proven. The contract and the code now agree: the stale-anchor rule is implemented on GitHub, and the contract states plainly that Bitbucket cannot detect it. A new executable guard in both skill suites runs the documented jq against a fixture, so the wiring cannot silently rot again.'
+
+recommendations:
+  immediate:
+    - action: 'Degrade rather than drop on duplicate markers'
+      refs: ['shared/resources/pr-inline-comment.js']
+    - action: 'Make finding ids unique per finding, not per anchor'
+      refs: ['shared/resources/pr-inline-comment.js']
+    - action: 'Replace process.exit() with process.exitCode to clear the CI guard'
+      refs: ['shared/resources/pr-inline-comment.js']
+    - action: 'Fix the jq snippets in both review skills to match the real findings schema'
+      refs: ['skills/review-code/SKILL.md', 'skills/review-pr/SKILL.md']
+  future:
+    - action: 'Give the summary comment its own marker so re-runs update rather than append'
+      refs: ['shared/resources/pr-inline-comment.js']
+    - action: 'Thread the injected env through loadDotEnv so credentials and test env cannot disagree'
+      refs: ['shared/resources/pr-inline-comment.js']
+
+bug_resolution:
+  bugs_fixed: 9
+  bugs_remaining: 0
+  fix_date: '2026-09-02'
+  total_iterations: 1
+  verification_method: 'Automated tests (46 unit + 65 skill contract + 127 repo guards) plus four mutation proofs, each turning exactly its own assertion red and each restored to green'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

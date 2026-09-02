@@ -331,6 +331,13 @@ const RECIPES = {
   },
 
   async "github.pr.comment"(io, rec) {
+    // An INLINE comment (target.inline) lives under /pulls/{n}/comments and never
+    // appears in `gh pr view --json comments`, which returns CONVERSATION
+    // comments only. Reading it there would report every posted inline comment
+    // as still outstanding — and under `--apply` re-post it, duplicating the
+    // lot. There is no read-only recipe for it here, so say so honestly:
+    // "cannot confirm" is the safe direction over "not done".
+    if (rec.target && rec.target.inline) return UNRELIABLE;
     return readCommentMarker(
       io,
       rec,

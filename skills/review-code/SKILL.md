@@ -101,10 +101,14 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
 2. **Both platforms**: post the findings inline with the shared primitive. It resolves `$VCS` itself, so this call does not branch — and it is real code rather than the prose that used to sit here describing behaviour no file implemented:
 
    ```bash
-   jq '[ .[] | select(.file_line != null)
+   # `.findings[]`, NOT `.[]` — the latter iterates the `code_review:` wrapper's
+   # values (`reviewed`, the findings array, `truncated_count`), so the select
+   # indexes a string and jq aborts. `.finding` is the schema's key, not
+   # `.summary`; see `references/code-review-prompt.md` § Output contract.
+   jq '[ .code_review.findings[]? | select(.file_line != null)
          | {path: (.file_line | split(":")[0]),
             line: (.file_line | split(":")[1] | tonumber),
-            body: .summary,
+            body: (.finding + "\n\n→ " + .suggested_action),
             id:   .id} ]' "$FINDINGS_JSON" > "$INLINE_FILE"
 
    node .agents/skills/review-code/references/pr-inline-comment.js \

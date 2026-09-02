@@ -356,10 +356,26 @@ test("§2 a wholesale batch rejection falls back to per-comment, isolating the b
 
 // ── 3. Bitbucket payload shape ────────────────────────────────────────────
 
-function stubBb({ rejectLines = [] } = {}) {
+function stubBb({ rejectLines = [], existing = [], listFails = false } = {}) {
   const posts = [];
+  const puts = [];
   const fetchImpl = async (url, init) => {
+    // The marker scan — a GET, i.e. no init.method.
+    if (!init || !init.method) {
+      if (listFails)
+        return { ok: false, status: 500, text: async () => "boom" };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ values: existing, next: null }),
+        text: async () => "{}",
+      };
+    }
     const body = JSON.parse(init.body);
+    if (init.method === "PUT") {
+      puts.push({ url, body });
+      return { ok: true, status: 200, text: async () => "{}" };
+    }
     posts.push({ url, body });
     if (
       body.inline &&
@@ -373,7 +389,7 @@ function stubBb({ rejectLines = [] } = {}) {
     if (argv[0] === "remote") return "git@bitbucket.org:acme/repo.git";
     throw new Error(`unexpected exec: ${argv.join(" ")}`);
   };
-  return { fetchImpl, execImpl, posts };
+  return { fetchImpl, execImpl, posts, puts };
 }
 
 test("§3 the Bitbucket payload carries inline.path and inline.to", async () => {
@@ -508,6 +524,81 @@ test("§3 a failed Bitbucket summary is reported, not swallowed as posted", asyn
   assert.equal(r.summaryPosted, false);
 });
 
+test("§3 a Bitbucket re-run UPDATES rather than posting a duplicate", async () => {
+  // The arm used to write a marker nothing ever read, so a second run posted a
+  // fresh copy of every finding — and a qa-fix loop runs this five times.
+  const dir = withRepo();
+  const key = cli.findingId(FINDINGS[0]);
+  const { fetchImpl, execImpl, posts, puts } = stubBb({
+    existing: [{ id: 77, content: { raw: `${cli.markerHtml(key)}\nold` } }],
+  });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "cli",
+      "--pr",
+      "9",
+      "--findings-file",
+      findingsFile(dir),
+      "--json",
+    ],
+    execImpl,
+    fetchImpl,
+    repoRoot: dir,
+    env: {
+      VCS: "bitbucket",
+      ACCESS_TRACKER: "full",
+      BITBUCKET_ACCESS_TOKEN: "tok",
+    },
+  });
+  assert.equal(puts.length, 1, "the existing comment is updated in place");
+  assert.match(puts[0].url, /\/comments\/77$/);
+  assert.equal(
+    r.findings.find((f) => f.line === 12).reason,
+    "updated",
+    "and reported as updated, not posted again",
+  );
+  assert.equal(posts.length, 1, "only the genuinely new finding is posted");
+});
+
+test("§3 a duplicate Bitbucket marker degrades — it is never dropped", async () => {
+  const dir = withRepo();
+  const key = cli.findingId(FINDINGS[0]);
+  const { fetchImpl, execImpl, posts, puts } = stubBb({
+    existing: [
+      { id: 1, content: { raw: `${cli.markerHtml(key)}\nfirst` } },
+      { id: 2, content: { raw: `${cli.markerHtml(key)}\nsecond` } },
+    ],
+  });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "cli",
+      "--pr",
+      "9",
+      "--findings-file",
+      findingsFile(dir),
+      "--json",
+    ],
+    execImpl,
+    fetchImpl,
+    repoRoot: dir,
+    env: {
+      VCS: "bitbucket",
+      ACCESS_TRACKER: "full",
+      BITBUCKET_ACCESS_TOKEN: "tok",
+    },
+  });
+  assert.equal(r.findings.find((f) => f.line === 12).reason, "unverifiable");
+  assert.equal(puts.length, 0, "ambiguity means touch nothing");
+  const summary = posts.find((p) => !p.body.inline);
+  assert.match(
+    summary.body.content.raw,
+    /null deref on `x`/,
+    "but the finding must still be DELIVERED",
+  );
+});
+
 test("§3 no Bitbucket credential reports no-credentials and makes no call", async () => {
   const dir = withRepo();
   const r = await cli.run({
@@ -534,7 +625,7 @@ test("§3 no Bitbucket credential reports no-credentials and makes no call", asy
 
 test("§4 an existing marker is updated in place, not duplicated", async () => {
   const dir = withRepo();
-  const marker = cli.markerHtml("src/a.ts:12:RIGHT");
+  const marker = cli.markerHtml(cli.findingId(FINDINGS[0]));
   const { execImpl, calls } = stubGh({
     existing: [
       { id: 999, body: `${marker}\nold text`, path: "src/a.ts", line: 12 },
@@ -561,9 +652,58 @@ test("§4 an existing marker is updated in place, not duplicated", async () => {
   assert.equal(r.posted, 1, "only the genuinely new finding posts");
 });
 
+test("§4 a stale anchor degrades — it is not reported as updated", async () => {
+  // The contract's second re-run row. GitHub accepts a body-only PATCH whether
+  // or not the anchor is still live, so without an explicit check a stale
+  // comment reports `updated` — "landed where it was aimed" — while sitting on
+  // a line the diff no longer contains. `position: null` is GitHub's signal.
+  const dir = withRepo();
+  const marker = cli.markerHtml(cli.findingId(FINDINGS[0]));
+  const { execImpl, calls } = stubGh({
+    existing: [
+      {
+        id: 999,
+        body: `${marker}\nold text`,
+        path: "src/a.ts",
+        line: 12,
+        position: null,
+      },
+    ],
+  });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "cli",
+      "--pr",
+      "5",
+      "--findings-file",
+      findingsFile(dir),
+      "--json",
+    ],
+    execImpl,
+    repoRoot: dir,
+    env: { VCS: "github", ACCESS_TRACKER: "full" },
+  });
+  assert.equal(
+    r.findings.find((f) => f.line === 12).reason,
+    "anchor-failed",
+    "a stale anchor must not be reported as `updated`",
+  );
+  assert.equal(
+    calls.filter((c) => c.argv.includes("PATCH")).length,
+    0,
+    "the stale comment is left alone, per the contract",
+  );
+  assert.match(
+    summaryOf(calls),
+    /null deref on `x`/,
+    "and the finding is still DELIVERED via the summary",
+  );
+});
+
 test("§4 a duplicate marker is unverifiable — not resolved by taking the first", async () => {
   const dir = withRepo();
-  const marker = cli.markerHtml("src/a.ts:12:RIGHT");
+  const marker = cli.markerHtml(cli.findingId(FINDINGS[0]));
   const { execImpl, calls } = stubGh({
     existing: [
       { id: 1, body: `${marker}\nfirst`, path: "src/a.ts", line: 12 },
@@ -589,6 +729,60 @@ test("§4 a duplicate marker is unverifiable — not resolved by taking the firs
     calls.filter((c) => c.argv.includes("PATCH")).length,
     0,
     "adopting the first hides the second forever — do neither",
+  );
+  // THE INVARIANT, and the assertion whose absence let the drop ship. Asserting
+  // the reason and the absence of a PATCH says the code took the branch; only
+  // this says the finding reached a human. Ambiguity is a reason not to touch
+  // the existing comments — never a reason to discard the finding.
+  assert.match(
+    summaryOf(calls),
+    /null deref on `x`/,
+    "an ambiguous marker must still DELIVER the finding via the summary",
+  );
+});
+
+test("§4 two findings on one line keep both bodies — ids do not collide", async () => {
+  // Ordinary: a null check and a missing await on the same call. When the
+  // derived id is just the anchor, these share one identity — the re-run PATCHes
+  // one comment twice and the second body destroys the first, both reporting
+  // `updated`. On a first run it writes two comments under one marker, which
+  // arms the duplicate-marker rule permanently.
+  const dir = withRepo();
+  const two = [
+    { path: "src/a.ts", line: 12, body: "FINDING ONE" },
+    { path: "src/a.ts", line: 12, body: "FINDING TWO" },
+  ];
+  assert.notEqual(
+    cli.findingId(two[0]),
+    cli.findingId(two[1]),
+    "two findings on one anchor must not share an identity",
+  );
+
+  const { execImpl, calls } = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "cli",
+      "--pr",
+      "5",
+      "--findings-file",
+      findingsFile(dir, two),
+      "--json",
+    ],
+    execImpl,
+    repoRoot: dir,
+    env: { VCS: "github", ACCESS_TRACKER: "full" },
+  });
+  assert.equal(r.posted, 2);
+  const batch = calls.find((c) => c.argv.join(" ").includes("/reviews"));
+  const bodies = JSON.parse(batch.input).comments.map((c) => c.body);
+  assert.ok(
+    bodies.some((b) => b.includes("FINDING ONE")),
+    "first survives",
+  );
+  assert.ok(
+    bodies.some((b) => b.includes("FINDING TWO")),
+    "second survives",
   );
 });
 
@@ -710,6 +904,40 @@ test("§5 an unset ACCESS_TRACKER reads as full — never as restricted", async 
 });
 
 // ── 6. --dry-run ──────────────────────────────────────────────────────────
+
+test("§5 a restricted run journals the SUMMARY body too, not only findings", async () => {
+  // A run with a summary and no anchorable findings used to defer with an empty
+  // record list, discarding the summary text with no warning.
+  const dir = withRepo({
+    "sum.md": "## Review summary\n\nTwo things to note.",
+  });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "cli",
+      "--pr",
+      "5",
+      "--findings-file",
+      findingsFile(dir, []),
+      "--summary-file",
+      join(dir, "sum.md"),
+      "--json",
+    ],
+    execImpl: explode("execFileSync"),
+    fetchImpl: explode("fetch"),
+    repoRoot: dir,
+    env: { VCS: "github", ACCESS_TRACKER: "manual" },
+  });
+  assert.equal(
+    r.reason,
+    "deferred",
+    "a summary with no findings is still something to say — it must not " +
+      "short-circuit past the access gate as 'nothing to post'",
+  );
+  const journal = readJournal(dir);
+  assert.equal(journal.length, 1);
+  assert.match(journal[0].command.stdin, /Two things to note/);
+});
 
 test("§6 --dry-run resolves everything and makes no network call", async () => {
   const dir = withRepo();
@@ -973,7 +1201,12 @@ test("§9 the inline marker prefix is distinct from the issue-comment one", () =
 
 test("§9 a caller-supplied id is the finding's identity across runs", () => {
   assert.equal(cli.findingId({ id: "F1", path: "a.ts", line: 1 }), "F1");
-  assert.equal(cli.findingId({ path: "a.ts", line: 1 }), "a.ts:1:RIGHT");
+  // A derived id is anchor PLUS a body hash — the anchor alone collides when two
+  // findings sit on one line (see §4).
+  assert.match(
+    cli.findingId({ path: "a.ts", line: 1, body: "x" }),
+    /^a\.ts:1:RIGHT:[0-9a-f]{8}$/,
+  );
 });
 
 test("§9 an id the marker finder could not match is squeezed, not written raw", () => {
@@ -987,4 +1220,20 @@ test("§9 an id the marker finder could not match is squeezed, not written raw",
   );
   assert.ok(found, "the marker this id produces must be findable again");
   assert.equal(found[1], id);
+});
+
+test("§9 the CLI sets process.exitCode rather than calling process.exit", () => {
+  // process.exit() truncates a pending stdout write at ~64KB when the caller
+  // pipes us, and this CLI's --json payload grows with the finding count. The
+  // repo guard (stdout-drain-on-exit.test.mjs) enforces this for new files;
+  // asserting it here too means the module states its own contract.
+  const code = readFileSync(join(SHARED, "pr-inline-comment.js"), "utf-8")
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+    .join("\n");
+  assert.doesNotMatch(
+    code,
+    /process\.exit\(/,
+    "use `process.exitCode = code` and let control flow return",
+  );
 });

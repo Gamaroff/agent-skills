@@ -187,3 +187,85 @@ test("the finalise pointer resolves to a real file with a real Step 7", (t) => {
     "finalise Step 7 has a Bitbucket arm",
   );
 });
+
+// ---------------------------------------------------------------------------
+// The inline-comment jq snippet must RUN, not merely read well (task 70).
+//
+// Both review skills shipped a snippet that could not execute: `.code_review[]`
+// iterates the wrapper object's VALUES rather than its findings, so `select`
+// indexes a string and jq aborts; and `body: .summary` read a key the findings
+// schema does not define, which made the CLI exit 2 and dropped every finding.
+// Neither defect was visible to a reader, and qa-task's snippet executor skips
+// these blocks as `mutating` (they redirect to a file). Executing the extracted
+// program against a schema-shaped fixture is the only check that can see it.
+// ---------------------------------------------------------------------------
+const { spawnSync } = require("child_process");
+
+const FINDINGS_FIXTURE = JSON.stringify({
+  code_review: {
+    reviewed: "3 files",
+    findings: [
+      {
+        id: "CR-1",
+        category: "bug",
+        severity: "high",
+        confidence: "high",
+        file_line: "src/x.ts:42",
+        finding: "null deref on `x`",
+        suggested_action: "guard it",
+      },
+    ],
+    truncated_count: 0,
+  },
+  pr_conformance: {
+    work_item: "task.70",
+    findings: [
+      {
+        id: "PC-1",
+        severity: "medium",
+        file_line: "docs/a.md:3",
+        finding: "claim unsupported",
+        suggested_action: "cite it",
+      },
+    ],
+  },
+});
+
+/** Pull the jq program out of the SKILL.md snippet that feeds --findings-file. */
+function extractJqProgram(skillText) {
+  const m = skillText.match(/jq '(\[[\s\S]*?\])'\s*"\$FINDINGS_JSON"/);
+  return m ? m[1] : null;
+}
+
+test("the inline-comment jq snippet executes against a schema-shaped fixture", (t) => {
+  const probe = spawnSync("jq", ["--version"], { encoding: "utf8" });
+  if (probe.error) return t.skip("jq not installed");
+
+  const prog = extractJqProgram(read("SKILL.md"));
+  assert.ok(prog, "could not find the jq program feeding --findings-file");
+
+  const r = spawnSync("jq", ["-c", prog], {
+    input: FINDINGS_FIXTURE,
+    encoding: "utf8",
+  });
+  assert.equal(
+    r.status,
+    0,
+    `the documented jq program does not run:\n${r.stderr}\nProgram:\n${prog}`,
+  );
+
+  const out = JSON.parse(r.stdout);
+  assert.ok(
+    out.length > 0,
+    "the snippet extracted no findings from the fixture",
+  );
+  for (const f of out) {
+    assert.ok(f.path && typeof f.path === "string", "each record needs a path");
+    assert.ok(Number.isInteger(f.line), "each record needs an integer line");
+    assert.ok(
+      f.body && typeof f.body === "string" && f.body.trim(),
+      "each record needs a non-empty body — `.summary` is not a schema key, " +
+        "and a null body makes pr-inline-comment.js exit 2",
+    );
+  }
+});

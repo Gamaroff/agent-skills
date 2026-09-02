@@ -424,15 +424,20 @@ the shared primitive. It resolves `$VCS` itself, so this step does not branch:
 
 ```bash
 # Findings from both lenses, reshaped into the CLI's input contract.
-jq '[ .code_review[], .pr_conformance[]
+# `.code_review.findings[]`, NOT `.code_review[]` — the latter iterates the
+# WRAPPER's values (`reviewed`, the findings array, `truncated_count`), so
+# `select(.file_line != null)` indexes a string and jq aborts outright.
+# `.finding` is the schema's key; there is no `.summary`.
+jq '[ (.code_review.findings[]?), (.pr_conformance.findings[]?)
       | select(.file_line != null)
       | {path: (.file_line | split(":")[0]),
          line: (.file_line | split(":")[1] | tonumber),
-         body: .summary,
+         body: (.finding + "\n\n→ " + .suggested_action),
          id:   .id} ]' "$FINDINGS_JSON" > "$INLINE_FILE"
 
 node .agents/skills/review-pr/references/pr-inline-comment.js \
-  --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" --json
+  --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \
+  --summary-file "$BODY_FILE" --json
 ```
 
 **Anchoring failure degrades; it never drops a finding.** A line outside the diff hunk is rejected —

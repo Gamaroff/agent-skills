@@ -51,6 +51,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync, execSync } = require("child_process");
+const crypto = require("crypto");
 
 const dm = require("./defer-mutation.js");
 
@@ -179,10 +180,28 @@ function resolveVcs(explicit, env = process.env, execImpl = execFileSync) {
 // Markers
 // ---------------------------------------------------------------------------
 
+/** Eight hex chars of sha1 — enough to separate findings, short enough to read. */
+function shortHash(text) {
+  return crypto
+    .createHash("sha1")
+    .update(String(text || ""))
+    .digest("hex")
+    .slice(0, 8);
+}
+
 /** An HTML comment — invisible when rendered on both platforms. */
 function markerHtml(id) {
   return `<!-- ${INLINE_MARKER_PREFIX}${id} -->`;
 }
+
+/**
+ * One compiled marker matcher, shared by both arms. Built once rather than per
+ * comment, and from an ESCAPED prefix so the constant can never be read as
+ * pattern syntax.
+ */
+const MARKER_RE = new RegExp(
+  `<!--\\s*${INLINE_MARKER_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\s>]+?)\\s*-->`,
+);
 
 /**
  * A finding's stable identity. The caller's `id` when it supplied one — it
@@ -192,7 +211,16 @@ function markerHtml(id) {
 function findingId(f) {
   const raw = f.id
     ? String(f.id)
-    : `${f.path}:${f.line}:${(f.side || "RIGHT").toUpperCase()}`;
+    : // The body hash is not decoration. Without it the derived id is the
+      // ANCHOR, so two different findings about the same line share one
+      // identity: on a re-run both PATCH the same comment and the second body
+      // destroys the first, while both report `updated`. On a first run the
+      // collision writes two comments carrying one marker, which then trips the
+      // duplicate-marker rule forever. Two findings on one line is ordinary —
+      // a null check and a missing await on the same call.
+      `${f.path}:${f.line}:${(f.side || "RIGHT").toUpperCase()}:${shortHash(
+        f.body,
+      )}`;
   // Squeeze anything the marker's own finder cannot match back out. The finder
   // reads `<!-- prefix:([^\s>]+?) -->`, so a caller id containing a space or a
   // `>` would write a marker that can never be found again — and a marker that
@@ -400,14 +428,22 @@ function ghExistingMarkers(execImpl, slug, pr) {
   const seen = new Map();
   for (const c of Array.isArray(list) ? list : []) {
     const body = String((c && c.body) || "");
-    const m = body.match(
-      new RegExp(`<!--\\s*${INLINE_MARKER_PREFIX}([^\\s>]+?)\\s*-->`),
-    );
+    const m = body.match(MARKER_RE);
     if (!m) continue;
     const key = m[1];
     const prev = seen.get(key);
     if (prev) prev.count += 1;
-    else seen.set(key, { id: c.id, count: 1, line: c.line, path: c.path });
+    else
+      seen.set(key, {
+        id: c.id,
+        count: 1,
+        line: c.line,
+        path: c.path,
+        // GitHub sets `position` to null once a comment's anchor falls
+        // outside the current diff. It is the only signal that an
+        // existing inline comment has gone stale.
+        position: c.position === undefined ? undefined : c.position,
+      });
   }
   return seen;
 }
@@ -588,6 +624,16 @@ async function runGithub({
       output.warn(
         `⚠️  ${key} is marked on ${hit.count} comments — ambiguous, not posting.`,
       );
+      // DEGRADE, do not drop. Ambiguity is a reason not to touch the existing
+      // comments; it is not a reason to discard the finding. Without this push
+      // the finding reached nowhere at all — no inline comment, no summary, and
+      // the warning above prints only the key, never the body — which is the
+      // one outcome this module exists to prevent. The branch immediately above
+      // (unreadable comment list) degrades for exactly the same reason.
+      degraded.push({
+        ...entry,
+        why: `the marker is present on ${hit.count} comments — cannot tell which to update`,
+      });
       results.push({
         id: key,
         reason: "unverifiable",
@@ -598,6 +644,28 @@ async function runGithub({
       continue;
     }
     if (hit) {
+      // The contract's second row: marker found, but the anchor is no longer in
+      // the diff → leave the old comment alone and degrade. PATCHing a body is
+      // accepted by GitHub whether or not the anchor is still live, so without
+      // this check a stale comment is reported `updated` — "landed where it was
+      // aimed" — while sitting on a line the diff no longer contains.
+      const anchorMoved =
+        hit.position === null ||
+        (hit.line !== undefined && hit.line !== null && hit.line !== f.line) ||
+        (hit.path !== undefined && hit.path !== null && hit.path !== f.path);
+      if (anchorMoved) {
+        degraded.push({
+          ...entry,
+          why: "the existing comment's anchor is no longer in this diff",
+        });
+        results.push({
+          id: key,
+          reason: "anchor-failed",
+          path: f.path,
+          line: f.line,
+        });
+        continue;
+      }
       // Marker found and the anchor is still live: update in place. This is the
       // re-run rule, and it is update-in-place precisely BECAUSE resolving and
       // replying to threads is out of scope — a rule that needed either would
@@ -665,7 +733,10 @@ async function runGithub({
         } catch (err) {
           const why = isAnchorRejection(err.message)
             ? "the line is not part of this diff"
-            : `the platform rejected the anchor (${String(err.message).split("\n")[0]})`;
+            : // NOT an anchoring problem — a 403, a 500 or a rate-limit. Saying
+              // "rejected the anchor" here sends a human looking at the diff for
+              // a cause that is not there.
+              `the platform rejected the request (${String(err.message).split("\n")[0]})`;
           degraded.push({ ...e, why });
           results.push({
             id: e.key,
@@ -862,13 +933,46 @@ async function runBitbucket({
     if (!res || !res.ok) {
       const status = res ? res.status : "no response";
       let detail = "";
-      try {
-        detail = await res.text();
-      } catch (_) {}
+      if (res && typeof res.text === "function") {
+        try {
+          detail = await res.text();
+        } catch (_) {}
+      }
       throw new Error(`${status} ${String(detail).slice(0, 200)}`);
     }
     return res;
   };
+
+  // ── Read back what is already there ──────────────────────────────────────
+  // Without this the arm writes a marker nothing ever reads, so every re-run
+  // POSTs a fresh copy of every finding — and a qa-fix loop runs this five
+  // times. The contract states the re-run rule platform-neutrally, and the peer
+  // this file mirrors scans on both arms; an arm that only writes markers is
+  // not implementing the rule, it is decorating its comments.
+  const existing = new Map();
+  let markersReadable = true;
+  try {
+    let next = `${base}/comments?pagelen=100`;
+    while (next) {
+      const res = await doFetch(next, { headers });
+      if (!res || !res.ok) throw new Error(`HTTP ${res ? res.status : "none"}`);
+      const page = await res.json();
+      for (const c of (page && page.values) || []) {
+        const raw = String((c && c.content && c.content.raw) || "");
+        const m = raw.match(MARKER_RE);
+        if (!m) continue;
+        const prev = existing.get(m[1]);
+        if (prev) prev.count += 1;
+        else existing.set(m[1], { id: c.id, count: 1 });
+      }
+      next = page && page.next ? page.next : null;
+    }
+  } catch (e) {
+    markersReadable = false;
+    output.warn(
+      `⚠️  Could not read existing comments on PR #${pr}: ${e.message}`,
+    );
+  }
 
   const results = [];
   const degraded = [];
@@ -876,6 +980,78 @@ async function runBitbucket({
 
   for (const f of findings) {
     const key = findingId(f);
+
+    if (!markersReadable) {
+      // Same rule as the GitHub arm: posting blind is how a resume doubles
+      // every comment, so degrade — delivery without duplication.
+      degraded.push({
+        key,
+        finding: f,
+        why: "existing comments were unreadable",
+      });
+      results.push({
+        id: key,
+        reason: "unverifiable",
+        path: f.path,
+        line: f.line,
+      });
+      continue;
+    }
+
+    const hit = existing.get(key);
+    if (hit && hit.count > 1) {
+      output.warn(
+        `⚠️  ${key} is marked on ${hit.count} comments — ambiguous, not posting.`,
+      );
+      degraded.push({
+        key,
+        finding: f,
+        why: `the marker is present on ${hit.count} comments — cannot tell which to update`,
+      });
+      results.push({
+        id: key,
+        reason: "unverifiable",
+        matches: hit.count,
+        path: f.path,
+        line: f.line,
+      });
+      continue;
+    }
+
+    if (hit) {
+      try {
+        const res = await doFetch(`${base}/comments/${hit.id}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({
+            content: { raw: `${markerHtml(key)}\n${f.body}` },
+          }),
+        });
+        if (!res || !res.ok) {
+          throw new Error(`HTTP ${res ? res.status : "no response"}`);
+        }
+        results.push({
+          id: key,
+          reason: "updated",
+          path: f.path,
+          line: f.line,
+        });
+      } catch (e) {
+        degraded.push({
+          key,
+          finding: f,
+          why: `could not update the existing comment (${e.message})`,
+        });
+        results.push({
+          id: key,
+          reason: "anchor-failed",
+          path: f.path,
+          line: f.line,
+        });
+      }
+      continue;
+    }
+
     // `to` is the DESTINATION-file line; `from` anchors the source side, which
     // is what a finding about a DELETED line needs. Using `to` for a deletion
     // silently anchors to whatever now occupies that line number.
@@ -1014,6 +1190,12 @@ async function run({
   // An empty findings list is a no-op, not an error. A review with no findings
   // is the good outcome, and making the caller branch on it would put the check
   // in every call site instead of here.
+  //
+  // This sits ABOVE the access gate deliberately and narrowly: it fires only
+  // when there is nothing to post at all, so there is no mutation for the gate
+  // to defer. A run with a summary but no findings does NOT take this branch —
+  // it has something to say, and under a restricted mode that something must be
+  // journalled rather than discarded.
   if (!findings.length && !summaryPrefix.trim()) {
     output.info("ℹ️  No findings to post.");
     return emit({ posted: 0, reason: "posted", findings: [] }, 0);
@@ -1058,6 +1240,10 @@ async function run({
             target: {
               pr,
               issue: pr,
+              // `inline: true` is what tells handover-verify this record cannot
+              // be read back from the PR's conversation comments. Without it the
+              // verifier reports every posted inline comment as outstanding.
+              inline: true,
               url: `pull request #${pr}`,
               ui_url: `pull request #${pr} — ${f.path}:${f.line}`,
             },
@@ -1084,8 +1270,44 @@ async function run({
         );
       }
     }
+    // The summary body is a comment too. Journalling only the findings means a
+    // run invoked with --summary-file and no anchorable findings defers with an
+    // empty record list and the summary text is discarded silently.
+    if (summaryPrefix && summaryPrefix.trim()) {
+      try {
+        const rec = dm.defer(
+          {
+            kind,
+            system: vcs,
+            access,
+            intent: `Summary comment on PR #${pr}`,
+            target: {
+              pr,
+              issue: pr,
+              url: `pull request #${pr}`,
+              ui_url: `pull request #${pr}`,
+            },
+            desired: firstLineOf(summaryPrefix),
+            manual: {
+              deepLink: `pull request #${pr}`,
+              ui: "Open the PR → Comment → Paste → Save",
+              fields: [{ name: "Comment", value: summaryPrefix }],
+            },
+            command: {
+              argv: ["pr-inline-comment", vcs, pr, "--summary"],
+              stdin: summaryPrefix,
+            },
+            skill: "pr-inline-comment",
+          },
+          { cwd: root || process.cwd() },
+        );
+        records.push(rec.id);
+      } catch (e) {
+        output.warn(`⚠️  Could not record the deferred summary: ${e.message}`);
+      }
+    }
     output.info(
-      `⏸️  access.tracker=${access} — not commenting on #${pr}; recorded ${records.length} finding(s).`,
+      `⏸️  access.tracker=${access} — not commenting on #${pr}; recorded ${records.length} record(s).`,
     );
     return emit(
       { posted: 0, reason: "deferred", access, records, findings: [] },
@@ -1152,6 +1374,7 @@ function firstLineOf(text) {
 
 module.exports = {
   run,
+  MARKER_RE,
   parseArgs,
   bbAuthHeader,
   bbSlug,
@@ -1181,10 +1404,19 @@ if (require.main === module) {
   // Any unhandled throw exits 0, matching the peers: a pipeline step runs inside
   // a shell, and killing the run because a COMMENT failed would trade a missing
   // comment for a stopped pipeline.
+  // `process.exitCode` and return — never `process.exit()`. Exiting immediately
+  // after a write truncates it at ~64KB when the caller pipes us
+  // (bug.3.stdout-truncation-on-exit), and this CLI's `--json` payload grows
+  // with the finding count, so it is exactly the shape that gets cut off.
+  // tracker-comment.js still uses process.exit() and is on the guard's
+  // KNOWN_UNMIGRATED allowlist; mirroring it here would have imported a legacy
+  // shape into a new file, which is what that guard exists to stop.
   run()
-    .then((r) => process.exit(r && r.exitCode ? r.exitCode : 0))
+    .then((r) => {
+      process.exitCode = r && r.exitCode ? r.exitCode : 0;
+    })
     .catch((e) => {
       console.error(`⚠️  pr-inline-comment: ${e.message}`);
-      process.exit(0);
+      process.exitCode = 0;
     });
 }

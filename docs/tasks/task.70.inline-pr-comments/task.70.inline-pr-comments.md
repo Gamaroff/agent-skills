@@ -323,6 +323,35 @@ Keep the CLI and the GitHub path; disable the Bitbucket arm — they are indepen
 
 ---
 
+---
+
+## QA Testing Results
+
+**QA Status**: PASS (FAIL on cycle 1, resolved in qa-fix cycle 1)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-02
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.70.qa.1.inline-pr-comments.md](./task.70.qa.1.inline-pr-comments.md)
+- **Gate File**: [task.70.gate.1.inline-pr-comments.yml](./task.70.gate.1.inline-pr-comments.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 905 (shared) + 127 (repo guards) + 63 (skill contracts)
+- **Phases Verified**: 5/5 present — 2 FAIL, 3 CONCERNS
+- **Critical Issues**: 5 HIGH, 4 MEDIUM, 3 LOW — **all resolved**, 0 remaining
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Cycle 1 found the module violating its own core invariant on the duplicate-marker path, an id scheme
+that destroyed findings on re-run, and jq wiring in both review skills that could not execute at all.
+All nine issues were fixed in one qa-fix cycle and each is mutation-proven. The structural fix is the
+new guard that extracts the documented jq from each SKILL.md and runs it against a fixture — a
+snippet that is only read will drift again; one that is executed cannot.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -331,6 +360,8 @@ Keep the CLI and the GitHub path; disable the Bitbucket arm — they are indepen
 | 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
 | 2026-09-02 | 1.2     | Review passed (8/10, READY TO IMPLEMENT) — fixed the Out-of-Scope contradiction by fixing the re-run rule as marker + update-in-place; corrected the invalid `gh api --input` + `-f` snippet. Tracker linkage still absent (Important, non-blocking) | review-task |
 | 2026-09-02 |         | Implemented — 9 files (3 created, 6 modified), 38 tests, 2 mutation proofs; registered `bitbucket.pr.comment` as the roster's 24th kind | develop |
+| 2026-09-02 |         | QA gate FAIL (50/100) — 5 HIGH, 4 MEDIUM, 3 LOW; core invariant violated on the duplicate-marker path, wiring snippets non-functional, CI red | qa-task |
+| 2026-09-02 |         | qa-fix cycle 1 — all 9 issues resolved and mutation-proven; suite 40 → 46 tests; new executable jq guard in both review skill suites; gate PASS (95/100) | qa-fix |
 
 ---
 

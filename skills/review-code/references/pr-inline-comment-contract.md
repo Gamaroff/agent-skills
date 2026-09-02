@@ -133,10 +133,17 @@ findings that actually caused it.
 
 **Bitbucket** posts one comment per finding, `{content: {raw}, inline: {path, to}}`.
 `to` is the **destination**-file line; a finding anchored to a deleted line uses
-`from` instead. It is **single-shot** — there is no Bitbucket retry helper in
+`from` instead. The re-run rule applies here too: the arm scans
+`GET …/comments` for markers and `PUT`s the matching comment rather than posting
+again. It is **single-shot on write** — there is no Bitbucket retry helper in
 this repo, and this CLI does not invent one. A transient failure degrades that
 finding to the summary comment like any other anchoring failure, which is the
 correct behaviour anyway.
+
+Bitbucket has no equivalent of GitHub's `position: null`, so the **stale-anchor**
+row below is GitHub-only: a Bitbucket comment whose anchor has moved is updated
+in place rather than degraded. That is the lesser of the two errors — the finding
+is still delivered, just possibly beside a line that has shifted.
 
 > **The Bitbucket arm ships fixture-tested, not exercised.** This repository is
 > GitHub-hosted, so the payload shape is asserted against fixtures and the
