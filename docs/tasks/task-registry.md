@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-02
-**Next Available Task Number:** **83**
+**Next Available Task Number:** **85**
 
 ## How to use
 
@@ -122,6 +122,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 80 | [Make a security probe runnable without widening the snippet allow-list](task.80.security-probe-engine/task.80.security-probe-engine.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | task.79 |
 | 81 | [Ship /review-security: prove a control engages, not that it is present](task.81.review-security-skill/task.81.review-security-skill.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | task.79, task.80 |
 | 82 | [Feed the measured security verdict into the QA gate](task.82.security-gate-evidence-field/task.82.security-gate-evidence-field.md) | ready-for-development | infrastructure | Medium | 2026-09-02 | — | task.81 |
+| 83 | [Platform-aware skill exclusion in setup-consumer.sh](task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md) | planned | infrastructure | Medium | 2026-09-02 | — | — |
+| 84 | [Skill install profiles with dependency closure](task.84.skill-install-profiles/task.84.skill-install-profiles.md) | planned | infrastructure | Medium | 2026-09-02 | — | task.83 |
 
 - **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 
