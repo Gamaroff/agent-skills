@@ -5,7 +5,7 @@ type: task
 description: "The finalise DoD security agent is a grep-only inspector. On task 67 a substituted prompt that executed candidate inputs found 14 fail-open routes past a boundary the grep version reported as PASS — two of them commands the code deny-listed by name. Give the agent a probe mode for work items whose deliverable is a boundary."
 tags: [qa, dod, finalise, security, verification]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: medium
 created: 2026-09-01
@@ -16,7 +16,7 @@ estimated_effort_hours: 6
 
 # Technical Task: Make the DoD security check execute candidate inputs, not grep for them
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.73.review.1.dod-security-probe-not-grep.md` implemented 2026-09-02 (tracker linkage deliberately deferred — see report Q1)
 
 ---
@@ -362,6 +362,33 @@ Narrow the detection rule, or narrow the candidate axes. Both live in one file.
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-02
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.73.qa.1.dod-security-probe-not-grep.md](./task.73.qa.1.dod-security-probe-not-grep.md)
+- **Gate File**: [task.73.gate.1.dod-security-probe-not-grep.yml](./task.73.gate.1.dod-security-probe-not-grep.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 2161 (0 fail, 1 skipped)
+- **Phases Verified**: 3/4 pass, 1 concerns
+- **Critical Issues**: 4 HIGH, 3 MEDIUM, 3 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+One deliverable test file was untracked and absent from PR #297. The `probes: []` return shape conflates
+three states — not-a-boundary, boundary-probed-and-held, and boundary-with-nothing-executed — so a clean
+probe renders a false statement and the zero-executed-candidates guard is unverifiable from the artifact.
+Both are fixable within the change set. The approach itself is sound: the contract test is mutation-proved
+on seven mutations, and the deliverable found twelve real fail-open routes on its first run (`bug.6`).
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                                                          | Author      |
@@ -369,6 +396,7 @@ Narrow the detection rule, or narrow the candidate axes. Both live in one file.
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.67 pipeline retrospective          | create-task |
 | 2026-09-02 | 1.1     | Review passed (9/10) — Replay Verification labelled an agent-run step; tracker link still absent | review-task |
 | 2026-09-02 |         | Implemented — 4 files (prompt +83 lines, finalise/SKILL.md render, new contract test, bundle), 16 contract tests, 7 mutation proofs. Replay found 12 real open routes → filed bug.6 | develop |
+| 2026-09-02 |         | QA gate FAIL (70/100) — 10 findings; probes[] tri-state collision + one untracked deliverable file | qa-task |
 
 ---
 

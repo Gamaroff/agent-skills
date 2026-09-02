@@ -366,13 +366,17 @@ Read each prompt file to get the template, substitute the placeholder values, th
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 
-> **`SECURITY_RESULT` may carry an optional `probes` list.** It is present only when the security agent's
-> Step 1b identified a **boundary deliverable** — a predicate, validator, classifier or allow/deny-list —
-> in which case the agent generates candidate inputs, **executes** them against the shipped code, and
-> reports only those that reproduced. Absent or `[]` means the rule did not fire, which is the common and
-> expected case. A boundary work item that reports zero executed candidates is a **finding**, not a pass:
-> the agent emits a `probe mode executed no candidates` FAIL in `checks`, and it is rendered like any
-> other failed check. See `references/finalise-dod-security-prompt.md`.
+> **`SECURITY_RESULT` carries a `boundary:` flag and, when it is true, `probes_executed:` and `probes[]`.**
+> `boundary: true` means the security agent's Step 1b identified a **boundary deliverable** — a predicate,
+> validator, classifier or allow/deny-list — and it then generated candidate inputs, **executed** them
+> against the shipped code, and reported only those that reproduced. `boundary: false` means the rule did
+> not fire, which is the common and expected case.
+>
+> **Read `probes: []` together with `probes_executed`, never alone.** Empty `probes` with a high
+> `probes_executed` is the *good* outcome — the boundary was probed and held. Empty `probes` with
+> `probes_executed: 0` is a **finding**, not a pass: the agent emits a `probe mode executed no candidates`
+> FAIL in `checks`, rendered like any other failed check. Branching on list emptiness alone would report
+> the best outcome and the worst one identically. See `references/finalise-dod-security-prompt.md`.
 
 #### Step 3c: Aggregate Results
 
@@ -447,15 +451,22 @@ Append sections to the running summary file. **One append per section** — not 
 
 ### Probe Results
 
-{if security_result.probes is absent or empty:}
+{if security_result.boundary is not true:}
 _Probe mode did not fire — the deliverable is not a boundary._
 {else:}
-**Candidates executed:** {count of security_result.probes} — **reproduced:** {count of security_result.probes where reproduced == true}
+**Candidates executed:** {security_result.probes_executed} — **reproduced:** {count of security_result.probes where reproduced == true}
 
+{if security_result.probes_executed == 0:}
+❌ **Probe mode executed no candidates.** A boundary was identified but nothing was run — this is a
+finding, not a pass. See the `probe mode executed no candidates` check above.
+{else if security_result.probes is empty:}
+✅ The boundary held — every candidate returned its expected verdict.
+{else:}
 {for each probe in security_result.probes where probe.reproduced:}
 
 - `{probe.input}` — expected **{probe.expected}**, got **{probe.actual}**
   {endfor}
+  {endif}
   {endif}
 
 **Agent summary:** {security_result.summary}

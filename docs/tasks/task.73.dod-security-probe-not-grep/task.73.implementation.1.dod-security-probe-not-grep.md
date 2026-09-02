@@ -36,7 +36,7 @@ only what reproduced — instead of grepping for the boundary's existence.
 | 1. create-branch           | ✅ Done    | Branch `feature/task.73.*` exists in git                          | `feature/task.73.dod-security-probe-not-grep` created from `develop` at `4cb3906`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.73.review.{N}.{name}.md` exists (or skip logged)            | READY TO IMPLEMENT, 9/10. 0 Critical / 3 Important / 2 Optional. Report: `task.73.review.1.dod-security-probe-not-grep.md` | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                 | 4 files; 16 contract tests + 7 mutation proofs; `ci:fast` 2157 pass / 0 fail; replay found 12 real routes → bug.6 | — |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                      |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                      | PR #297: https://github.com/Gamaroff/agent-skills/pull/297 — 4 logical commits. Issue comment skipped (no linked issue) | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.73.qa.{N}.*.md`; `task.73.gate.{N}.*.yml`; PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.73.dod.{N}.*.md`; task `status: accepted`                   |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                |       | —                    |
@@ -67,6 +67,18 @@ only what reproduced — instead of grepping for the boundary's existence.
   `jira_key:` — `TRACKER_ISSUE` is empty, so all tracker signals (pipeline-start comment, board
   moves, PR-opened comment, issue close) are skipped for this run.
 - Task status at entry: `ready-for-development` → proceed normally per the Phase 0c status table.
+
+### Step 4 — create-pr — 2026-09-02
+
+- Base `develop` pre-supplied from Phase 0d — no prompt shown. Platform GitHub.
+- Staging scope: `docs/tasks/task.73.dod-security-probe-not-grep`, `docs/bugs`, `shared/resources`,
+  `skills/finalise`, `evals/shared/tests`. No untracked path fell outside scope, so the pre-flight
+  hold moved nothing and no leak check was needed.
+- `--issue` omitted — no tracker issue linked. Step 6b issue comment skipped silently.
+- Four logical commits: the prompt + render + bundle; the contract test; bug.6 + registry; the task
+  doc, review report and implementation report. The report is committed here per Step 4's rule, so a
+  reviewer can read the audit trail during QA.
+- PR **#297** → https://github.com/Gamaroff/agent-skills/pull/297
 
 ### Step 3 — develop — 2026-09-02
 
@@ -135,7 +147,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.73.dod-security-probe-not-grep`
-**PR**: {populated after Step 4}
+**PR**: [#297](https://github.com/Gamaroff/agent-skills/pull/297)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

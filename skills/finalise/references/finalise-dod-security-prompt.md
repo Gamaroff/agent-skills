@@ -50,8 +50,11 @@ Signals — any **one** is sufficient:
 writer, a formatter, a schema migration, a logging change — none of these are boundaries, however
 security-adjacent they look. Probe mode must **not** fire on them.
 
-Record the decision either way. If the rule did not fire, return `probes: []` and say so in `summary`.
-That is a legitimate, expected skip — not an omission.
+**Record the decision explicitly, either way**, as the `boundary:` field of the returned YAML —
+`true` when the rule fired, `false` when it did not. Do **not** signal the decision by leaving `probes`
+empty: an empty `probes` is also the correct output for a boundary that *was* probed and held, and those
+two outcomes must stay distinguishable. A `boundary: false` is a legitimate, expected skip, not an
+omission; say so in `summary`.
 
 ### Step 2: Run story-type-specific checklist
 
@@ -119,18 +122,28 @@ its caller, and not the code that acts on the verdict.
 calls it on each candidate, and **run it**. Do not reason abstractly about what the code would return —
 reasoning about it is precisely what the checklist already does, and what it gets wrong.
 
-**4. Report only what reproduced.** A candidate you did not run is not a finding. A candidate that ran
-and returned its expected verdict is not a finding either. Report only candidates whose `actual` differs
-from `expected`, each with the input attached verbatim so a reader can re-run it.
+**4. Report only what reproduced — but count everything you ran.** A candidate you did not run is not a
+finding. A candidate that ran and returned its expected verdict is not a finding either. `probes[]`
+therefore carries only candidates whose `actual` differs from `expected`, each with the input attached
+verbatim so a reader can re-run it.
+
+Because `probes[]` is filtered, it cannot also serve as the record of how much work was done. Report the
+total in **`probes_executed:`** — every candidate actually executed, including the legitimate inputs from
+step 5 and every candidate that behaved correctly. An empty `probes[]` with a high `probes_executed` is
+the *good* result; an empty `probes[]` with `probes_executed: 0` is the failure in the guard below. The
+two are indistinguishable without this count, which is why it is required rather than optional.
 
 **5. Probe the other direction too.** Include a set of **legitimate inputs that must still be accepted**,
 and assert that they are. A fix that closes a hole by refusing everything is also a defect, and without
 this direction an over-strict boundary looks identical to a correct one.
 
-**Zero executed candidates on a boundary deliverable is a finding, not a pass.** If Step 1b fired and no
-candidate was executed, emit a check with `status: FAIL` named `probe mode executed no candidates`. A
-step that reports success without having run anything is the exact defect this step exists to catch, and
-it must not be able to hide inside its own output.
+**Zero executed candidates on a boundary deliverable is a finding, not a pass.** If `boundary: true` and
+`probes_executed: 0`, emit a check with `status: FAIL` named `probe mode executed no candidates`. A step
+that reports success without having run anything is the exact defect this step exists to catch, and it
+must not be able to hide inside its own output.
+
+Note that the guard keys on the **execution count**, never on `probes` being empty. Keying it on an empty
+`probes` would condemn the one outcome everybody wants — a boundary that was probed thoroughly and held.
 
 ---
 
@@ -155,11 +168,15 @@ security_review:
       status: PASS | FAIL | NOT_APPLICABLE
       citation: null
       note: "optional"
-  probes: # optional. [] when Step 1b did not fire; see the probe rule below when it did
+  boundary: true | false # REQUIRED. Did Step 1b's rule fire? Never inferred from `probes`.
+  probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
+    # the legitimate inputs of step 5 and every candidate that behaved correctly.
+  probes: # only candidates that REPRODUCED a defect; [] is correct and good when none did
     - input: "gh pr comment --body x" # the candidate, verbatim and re-runnable
       expected: "denied"
       actual: "runnable"
-      reproduced: true # false ⇒ omit the entry entirely; unreproduced is not a finding
+      reproduced: true # entries are reproduced by construction; the field is kept explicit
+      # so an entry that somehow is not can be spotted and filtered rather than trusted
   overall: PASS | FAIL | NOT_APPLICABLE
   summary: "one-line summary of security review results"
 ```
@@ -167,6 +184,9 @@ security_review:
 **Citation rule**: `status: PASS` requires a non-null citation. Null → `FAIL`. `NOT_APPLICABLE` must include `note` explaining why.
 
 **Probe rule**: only entries with `reproduced: true` may appear in `probes` — an unreproduced suspicion
-is not a finding and must not be reported. If Step 1b identified a boundary and **no candidate was
-executed**, `checks` must carry the `probe mode executed no candidates` FAIL from Step 4. An empty
-`probes` on a boundary deliverable is never a pass.
+is not a finding and must not be reported. `boundary:` is always present; `probes_executed:` is required
+whenever `boundary: true`. If `boundary: true` and `probes_executed: 0`, `checks` must carry the `probe
+mode executed no candidates` FAIL from Step 4.
+
+**An empty `probes` is not by itself a failure — it is the good result when `probes_executed` is high.**
+What is never a pass is a boundary that executed nothing.

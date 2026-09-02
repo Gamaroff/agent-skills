@@ -1,0 +1,123 @@
+schema: 1
+task: "task.73.dod-security-probe-not-grep"
+task_title: "Make the DoD security check execute candidate inputs, not grep for them"
+gate: FAIL
+status_reason: "Probe mode is implemented and its contract test is mutation-proved, but `probes: []` conflates three distinct states — not-a-boundary, boundary-probed-and-held, and boundary-with-nothing-executed — so a clean probe renders a false statement and the zero-executed guard is unverifiable from the artifact. Separately, one of the two deliverable test files is untracked and absent from PR #297."
+reviewer: "QA Engineer"
+updated: "2026-09-02T06:30:00Z"
+
+top_issues:
+  - id: "TASK73-001"
+    severity: high
+    file: "evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs"
+    finding: "The replay regression test is untracked and appears in no commit, so one of the change set's two deliverable test files is absent from PR #297 and will neither ship nor run in CI."
+    suggested_action: "Stage and commit the file on the feature branch before merge."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-002"
+    severity: high
+    file: "shared/resources/finalise-dod-security-prompt.md"
+    finding: "`probes: []` is the specified output for BOTH a non-boundary (Step 1b) and a boundary that was probed and held (Step 4.4), and the Probe rule declares an empty `probes` on a boundary to be never a pass — so a genuinely secure boundary produces an output the prompt itself says cannot pass."
+    suggested_action: "Add explicit `boundary:` and `probes_executed:` scalars to the return shape; restate the guard as `boundary: true AND probes_executed == 0` rather than keying on list emptiness."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-003"
+    severity: high
+    file: "skills/finalise/SKILL.md"
+    finding: "The render's empty branch prints `Probe mode did not fire — the deliverable is not a boundary.` whenever `probes` is absent or empty, so every clean boundary probe writes a false statement into the DoD summary."
+    suggested_action: "Branch the render on the `boundary:` field rather than on list emptiness, and give the held case its own line."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-004"
+    severity: high
+    file: "skills/finalise/SKILL.md"
+    finding: "`**Candidates executed:** {count of security_result.probes}` cannot be satisfied by the specified YAML — only `reproduced: true` entries are admitted to `probes`, so the rendered candidate count is actually the count of reproduced failures."
+    suggested_action: "Render the new `probes_executed:` scalar as the candidate count."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-005"
+    severity: medium
+    file: "evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs"
+    finding: "`classifierAt()` creates the temp directory before `writeFileSync` and `await import(...)` but returns `cleanup` only on the success path, so a throw from either leaks the directory — the caller's try/finally has not started yet."
+    suggested_action: "Wrap the write and import in try/catch inside `classifierAt`, removing the directory before rethrowing."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-006"
+    severity: medium
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: "The `existsSync(sourcePath)` test is vacuous — `readFileSync(sourcePath)` at module scope throws ENOENT before any test runs, so the assertion can never observe a false and its message can never be shown."
+    suggested_action: "Read the files lazily inside the tests, or delete the existence test and keep the bundled-copy check which guards a distinct path."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-007"
+    severity: medium
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: "Three assertions embed hard line breaks from the prompt's current wrapping (`accept or\\nreject`, `report\\nwriter`, `An empty\\n\\`probes\\``), so a harmless rewrap fails the test with a message claiming the rule was deleted."
+    suggested_action: "Collapse `\\s+` in both source and needle before matching, so the assertion tests the rule rather than the wrap column."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-008"
+    severity: low
+    file: "evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs"
+    finding: "The two closed-direction assertions use `classifyBlock(input)?.klass === 'runnable'`, so a classifier returning null/undefined yields an empty filter and a vacuous green — the exact silent-pass shape the file's docstring says it prevents."
+    suggested_action: "Assert the verdict object is non-null per input before comparing `klass`."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-009"
+    severity: low
+    file: ".github/workflows/test.yml"
+    finding: "CI checks out at depth 1, so neither replay commit is present and the discriminating pre-fix half of the corpus skips in CI — only the shipped-classifier assertion is actually enforced there."
+    suggested_action: "Set `fetch-depth: 0` on the checkout step so the history-backed half runs where it is automated."
+    suggested_owner: dev
+    status: open
+  - id: "TASK73-010"
+    severity: low
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: "The four probe-field assertions match `input:`/`expected:`/`actual:`/`reproduced:` anywhere in the document rather than within the `probes:` entry, so moving those keys out of the probes block would still pass."
+    suggested_action: "Slice the fenced output block out of the source and assert the four keys against that substring."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 2161
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "The read-only contract is tightened, not loosened: execution is confined to a pure predicate, a temp directory, no network and no repository write, and all three clauses are held by contract tests. The change also found twelve real fail-open routes in shipped code (bug.6), which is the deliverable working."
+  performance:
+    status: PASS
+    notes: "Prompt grows 88 → 171 lines; probe mode is gated so non-boundary work items pay nothing. New tests add ~1.2s to the suite (2161 tests, 0 fail)."
+  reliability:
+    status: CONCERNS
+    notes: "The probes[] tri-state collision (TASK73-002/003/004) means the DoD artifact cannot distinguish a boundary that held from one that was never probed — precisely the distinction this task exists to make legible."
+  maintainability:
+    status: CONCERNS
+    notes: "Two vacuous or over-broad assertions (TASK73-006, TASK73-010) and three wrap-brittle ones (TASK73-007) in the new contract test. The test is otherwise well-targeted and mutation-proved on 7 mutations."
+
+recommendations:
+  immediate:
+    - action: "Commit the untracked replay test onto the feature branch"
+      refs: ["evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs"]
+    - action: "Add `boundary:` and `probes_executed:` to the return shape; branch the render and the zero-executed guard on them instead of on list emptiness"
+      refs: ["shared/resources/finalise-dod-security-prompt.md", "skills/finalise/SKILL.md"]
+    - action: "Close the vacuous and wrap-brittle assertions in the contract test"
+      refs: ["evals/shared/tests/finalise-dod-prompt-contract.test.mjs"]
+  future:
+    - action: "Fix the twelve classifier routes found by probe mode"
+      refs: ["docs/bugs/bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "TASK73-001 through TASK73-004 resolved"
