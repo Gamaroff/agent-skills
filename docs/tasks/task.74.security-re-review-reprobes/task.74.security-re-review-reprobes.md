@@ -395,16 +395,17 @@ every subsequent one.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-02
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 90/100)
+**QA Cycles**: 2
 
 ### QA Report
 
-- **Full Report**: [task.74.qa.1.security-re-review-reprobes.md](./task.74.qa.1.security-re-review-reprobes.md)
-- **Gate File**: [task.74.gate.1.security-re-review-reprobes.yml](./task.74.gate.1.security-re-review-reprobes.yml)
+- **Cycle 2 (final)**: [task.74.qa.2.security-re-review-reprobes.md](./task.74.qa.2.security-re-review-reprobes.md) · [gate.2](./task.74.gate.2.security-re-review-reprobes.yml) — PASS 100/100
+- **Cycle 1**: [task.74.qa.1.security-re-review-reprobes.md](./task.74.qa.1.security-re-review-reprobes.md) · [gate.1](./task.74.gate.1.security-re-review-reprobes.yml) — CONCERNS 90/100
 
 ### Test Coverage Summary
 
@@ -422,6 +423,19 @@ every subsequent one.
 | CR-3 | LOW | ✅ Fixed | `extractProbe` uses `matchAll` and asserts exactly one match. |
 
 Suite: 31 → **34 tests**, all passing.
+
+### QA Cycle 2 — refute pass
+
+`PRIOR_GATES=1` → whole-branch diff, `REFUTE_PASS=true`. `SAFETY_REPROBE=false` (gate.1's security axis
+was PASS) — the new machinery correctly declined to fire on its own gate.
+
+The refute pass found that **CR-2's fix did not work**: cycle 1 made the shared-rule read lazy but left
+`const CLAUSE_1 = extractProbe()` at module level, which calls it at import anyway, so the claimed
+change had no observable effect. Filed as **CR-4**, fixed and proven within the cycle. CR-1 and CR-3
+verified genuinely closed by executing the shipped blocks **verbatim, indentation preserved**, from all
+three files under both shells.
+
+Gate 2: **PASS 100/100**.
 
 ### Key Findings
 
@@ -447,6 +461,7 @@ Found by **executing** the shipped prose, not by reading it — which is the cha
 | 2026-09-02 |         | Implemented — 4 files (1 new shared rule, 2 skills, 1 new parity test), 31 tests, 15 mutation proofs | develop |
 | 2026-09-02 |         | QA gate CONCERNS (90/100) — 1 medium: clause-1 probe hangs on empty `$LATEST_GATE` | qa-task |
 | 2026-09-02 |         | QA findings fixed — CR-1/CR-2/CR-3 closed, 3 regression tests added, 1 iteration | qa-fix |
+| 2026-09-02 |         | QA gate PASS (100/100) — cycle 2 refute pass found CR-2's fix ineffective; refiled as CR-4, fixed | qa-task |
 
 ---
 

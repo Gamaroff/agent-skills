@@ -1,0 +1,69 @@
+schema: 1
+task: 'task.74.security-re-review-reprobes'
+task_title: 'A security re-review must re-probe, not re-read'
+gate: PASS
+status_reason: 'Cycle 2 ran as a refute pass and found that cycle 1 CR-2 fix did not work — a module-level extractProbe() call defeated the lazy read it claimed to introduce. Filed as CR-4, fixed and proven within this cycle. CR-1 and CR-3 verified genuinely closed by executing the shipped blocks verbatim under both shells. No HIGH or MEDIUM findings remain.'
+reviewer: 'QA Engineer'
+updated: '2026-09-02T10:40:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The clause-1 probe hung when $LATEST_GATE was empty — awk with no filename read stdin and blocked indefinitely.'
+    suggested_action: 'Guard on [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ] and add </dev/null.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+  - id: 'CR-4'
+    severity: low
+    file: 'evals/shared/tests/qa-re-review-scope-parity.test.mjs'
+    finding: 'const CLAUSE_1 = extractProbe() ran at import, defeating cycle 1 CR-2 lazy-read fix and demoting CR-3 exactly-one assertion to an import crash. Found by the cycle-2 refute pass: the fix claimed in cycle 1 changed nothing observable.'
+    suggested_action: 'Make clause1() lazy in the same shape as ruleText().'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2203
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'The trigger predicate was re-probed from all three shipped sources — verbatim, indentation preserved — with four inputs each including two negative controls, under bash and zsh. The hang path CR-1 identified is closed and mutation-proven; a hang in a safety-gate evaluator is itself a hazard on a security surface, and it no longer exists.'
+  performance:
+    status: PASS
+    notes: 'No runtime code path. When the guard is broken the hang tests take the full spawn-budget timeout to fail, which is correct — a hang should cost — and they return in ~250ms on the healthy path.'
+  reliability:
+    status: PASS
+    notes: 'Upgraded from CONCERNS. CR-1 and CR-4 both closed and proven. The regression tests were shown to discriminate rather than merely pass, at two different budget settings.'
+  maintainability:
+    status: PASS
+    notes: 'Rule stated once; both consumers reference it; the parity suite now reports its findings as assertions rather than import crashes. Three separate vacuity traps found during this task are documented in the test file beside the code they explain.'
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-02'
+  total_iterations: 1
+  verification_method: 'Verbatim execution of the shipped blocks under bash and zsh against real gate fixtures, plus mutation proofs (MF-1/MF-2/MF-3 for CR-1; two independent refutes for CR-4).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'bug.7 (zero-blocks-executed on correct refusal) gains a third confirming data point.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

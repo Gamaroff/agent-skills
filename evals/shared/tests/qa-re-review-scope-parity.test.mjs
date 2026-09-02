@@ -352,7 +352,22 @@ function extractProbe() {
   return all[0][1].trimEnd();
 }
 
-const CLAUSE_1 = extractProbe();
+/**
+ * Lazy, for the same reason `ruleText()` is.
+ *
+ * `const CLAUSE_1 = extractProbe()` at module level ran at IMPORT, which quietly
+ * defeated both: a missing rule, or a rule with two SAFETY_REPROBE blocks,
+ * crashed the file before any test executed — `tests 1 / fail 1` with a raw
+ * stack trace, and neither `the shared rule exists` nor extractProbe's own
+ * "exactly one" message ever reported. The suite still failed, so it was never
+ * a false green; but the fix claimed in QA cycle 1 did not actually do what it
+ * said, and the cycle-2 refute pass is what caught that.
+ */
+let _clause1 = null;
+function clause1() {
+  if (_clause1 === null) _clause1 = extractProbe();
+  return _clause1;
+}
 
 /**
  * Compare on content, not layout. The skills nest the block inside a numbered
@@ -370,7 +385,7 @@ function normalise(text) {
 }
 
 test("both skills carry the clause-1 probe verbatim from the shared rule", () => {
-  const body = normalise(CLAUSE_1);
+  const body = normalise(clause1());
   assert.ok(
     normalise(ruleText()).includes(body),
     "shared rule must hold the canonical probe",
@@ -386,7 +401,7 @@ test("both skills carry the clause-1 probe verbatim from the shared rule", () =>
 
 test("the clause-1 probe uses no GNU-only regex escapes", () => {
   assert.ok(
-    !/\\s|\\d|\\w/.test(CLAUSE_1),
+    !/\\s|\\d|\\w/.test(clause1()),
     "the probe must use POSIX classes only — \\s fails closed and silently on BSD awk/mawk",
   );
 });
@@ -420,7 +435,7 @@ function runClause1WithGatePath(path) {
     "bash",
     [
       "-c",
-      `exec 0< <(sleep ${HOLD_STDIN_SECONDS} 2>/dev/null)\n${CLAUSE_1}\nprintf '%s' "$SAFETY_REPROBE"`,
+      `exec 0< <(sleep ${HOLD_STDIN_SECONDS} 2>/dev/null)\n${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`,
     ],
     {
       env: { ...process.env, LATEST_GATE: path },
@@ -437,7 +452,7 @@ function runClause1(yaml) {
   try {
     return execFileSync(
       "bash",
-      ["-c", `${CLAUSE_1}\nprintf '%s' "$SAFETY_REPROBE"`],
+      ["-c", `${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`],
       {
         env: { ...process.env, LATEST_GATE: file },
         encoding: "utf-8",
@@ -534,12 +549,12 @@ test("clause-1 returns false, and does not hang, when LATEST_GATE does not exist
 
 test("clause-1 guards the read before invoking awk", () => {
   assert.match(
-    CLAUSE_1,
+    clause1(),
     /\[ -n "\$LATEST_GATE" \] && \[ -r "\$LATEST_GATE" \]/,
     "the probe must test that LATEST_GATE is set and readable before running awk",
   );
   assert.ok(
-    CLAUSE_1.includes("</dev/null"),
+    clause1().includes("</dev/null"),
     "the probe must close stdin so awk's read-stdin fallback is unreachable even " +
       "if the guard is later removed",
   );
