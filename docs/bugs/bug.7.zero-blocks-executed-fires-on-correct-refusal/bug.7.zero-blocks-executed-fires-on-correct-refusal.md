@@ -4,7 +4,7 @@ title: "`zero-blocks-executed` fires on skills whose every documented command is
 type: bug
 description: "The Step 4b anti-vacuity guard reports a finding whenever no block ran, conflating an under-configured run (fixable with --bind/--copy) with a skill whose documented commands are all genuinely mutating and can never execute. Six of ten skills surveyed trip it permanently, and for two of them the finding carries no remediation at all."
 tags: [qa, qa-task, snippet-engine, false-positive, anti-vacuity]
-status: open
+status: new
 severity: Minor
 priority: Medium
 created: 2026-09-02
@@ -15,7 +15,7 @@ component: shared/resources/qa-execute-snippets.mjs
 
 # Bug Report: `zero-blocks-executed` fires on correct refusal
 
-**Status:** Open
+**Status:** New
 **Severity:** Minor
 **Priority:** Medium
 

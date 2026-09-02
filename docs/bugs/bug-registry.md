@@ -33,7 +33,7 @@
 | 4 | [Snippet engine silently no-ops when invoked through a symlinked path](bug.4.snippet-engine-symlink-noop/bug.4.snippet-engine-symlink-noop.md) | closed | Major | High | 2026-09-01 | qa-task / Step 4b snippet engine |
 | 5 | [access-config parity JS probe records a timeout as a real answer](bug.5.access-parity-js-probe-conflates-timeout/bug.5.access-parity-js-probe-conflates-timeout.md) | closed | Major | High | 2026-09-01 | test harness / config reader |
 | 6 | [Ten more fail-open routes past the snippet classifier, plus two over-refusals](bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md) | open | Major | High | 2026-09-02 | qa-execute-snippets / classifier |
-| 7 | [`zero-blocks-executed` fires on skills whose every documented command is correctly refused](bug.7.zero-blocks-executed-fires-on-correct-refusal/bug.7.zero-blocks-executed-fires-on-correct-refusal.md) | open | Minor | Medium | 2026-09-02 | qa-task Step 4b / snippet engine |
+| 7 | [`zero-blocks-executed` fires on skills whose every documented command is correctly refused](bug.7.zero-blocks-executed-fires-on-correct-refusal/bug.7.zero-blocks-executed-fires-on-correct-refusal.md) | new | Minor | Medium | 2026-09-02 | qa-task Step 4b / snippet engine |
 
 ---
 
