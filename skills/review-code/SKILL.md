@@ -98,10 +98,49 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    . "$(dirname "$0")/references/resolve-platform.sh" || exit 1   # adjust to the bundled path in this install
    # VCS = github | bitbucket   ← the axis this step branches on
    ```
-2. **GitHub** (`VCS=github`): post each finding as an inline review comment at its `file_line`; fall back to a single summary comment via `tracker_call_with_retry gh pr comment "$PR_URL"` when line anchoring fails or there is no PR.
-3. **Bitbucket** (`VCS=bitbucket`): post one summary comment via the Bitbucket REST API. Resolve the credential with `source references/bitbucket-auth.sh` (Bearer or Basic, chosen by variable name; non-zero when neither is set), then `POST` a `{content: {raw: …}}` body to `${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}/comments`. Make it idempotent the way `/finalise` does: search the PR's existing comments for a leading HTML marker and `PUT` that comment id instead of posting a duplicate. The working dual-platform recipe is in [`skills/finalise/SKILL.md`](../finalise/SKILL.md) **Step 7 — "Mark as Accepted and Generate Artifacts"**, which carries both arms side by side; copy that shape rather than re-deriving it.
+2. **Both platforms**: post the findings inline with the shared primitive. It resolves `$VCS` itself, so this call does not branch — and it is real code rather than the prose that used to sit here describing behaviour no file implemented:
 
-   > Inline per-finding comments are GitHub-only today — the Bitbucket arm posts a single summary. Inline Bitbucket comments are **task 70**.
+   ```bash
+   # `.findings[]`, NOT `.[]` — the latter iterates the `code_review:` wrapper's
+   # values (`reviewed`, the findings array, `truncated_count`), so the select
+   # indexes a string and jq aborts. `.finding` is the schema's key, not
+   # `.summary`; see `references/code-review-prompt.md` § Output contract.
+   #
+   # The `test()` guard is load-bearing: jq is all-or-nothing inside `[ … ]`, so a
+   # single `file_line` of `src/x.ts:42-58` (a range) or `src/x.ts` (no line) would
+   # abort the WHOLE program, leave `$INLINE_FILE` empty, and drop every finding —
+   # not degrade them, drop them. `suggested_action` is likewise made optional.
+   # A finding excluded here has no line to anchor to; carry it in your summary.
+   jq '[ .code_review.findings[]?
+         | select((.file_line? // "") | test("^.+:[0-9]+$"))
+         | {path: (.file_line | split(":")[0]),
+            line: (.file_line | split(":")[1] | tonumber),
+            body: (.finding
+                   + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
+      "$FINDINGS_JSON" > "$INLINE_FILE" || {
+     echo "findings JSON did not match the schema — not posting inline"; exit 1; }
+
+   node .agents/skills/review-code/references/pr-inline-comment.js \
+     --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \
+     --summary-file "$SUMMARY_FILE" --json
+   ```
+
+   **Anchoring failure degrades to the summary comment; it never drops a finding.** A line outside the diff hunk is rejected — routinely — and that finding is appended to the summary instead, reporting `anchor-failed` rather than `posted`. Pass `--summary-file` so the degraded findings land under your own summary rather than in a bare comment of their own. Read the per-finding `reason`s: a `partial` run delivered everything, just not all of it inline.
+
+   **Do not pass the finding's `id` through.** `CR-{n}` is an ordinal that is
+   stable *within a run*, so handing it over as a cross-run identity makes run 2's
+   `CR-1` a different finding wearing run 1's name. Omitting it lets the CLI derive
+   an identity from the anchor plus the body, which is the only signal this schema
+   actually offers.
+
+   Contract, `reason` vocabulary and the re-run rule (marker + update-in-place): [`references/pr-inline-comment-contract.md`](references/pr-inline-comment-contract.md).
+3. **Summary-only fallback** — when no finding carries a `file_line`, or the CLI reports `no-credentials`. This step still branches, because the two platforms have no common transport for a conversation comment.
+
+   **GitHub** (`VCS=github`): one summary comment via `tracker_call_with_retry gh pr comment "$PR_URL" --body-file -`, inheriting 3× exponential backoff and the `ACCESS_TRACKER` deferral gate for free.
+
+   **Bitbucket** (`VCS=bitbucket`): via the Bitbucket REST API. Resolve the credential with `source references/bitbucket-auth.sh` (Bearer or Basic, chosen by variable name; non-zero when neither is set), then `POST` a `{content: {raw: …}}` body to `${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}/comments`. Make it idempotent the way `/finalise` does: search the PR's existing comments for a leading HTML marker and `PUT` that comment id instead of posting a duplicate. The working dual-platform recipe is in [`skills/finalise/SKILL.md`](../finalise/SKILL.md) **Step 7 — "Mark as Accepted and Generate Artifacts"**, which carries both arms side by side; copy that shape rather than re-deriving it.
+
+   > Inline comments now work on **both** platforms (task 70) — Bitbucket via the `inline: {path, to}` key, with `from` for a deletion. The Bitbucket arm is fixture-tested rather than exercised, since this repo is GitHub-hosted; treat a first Bitbucket run as a smoke test.
    >
    > `/qa-story` step 6 and `/qa-task` Step 13 now **do** carry a Bitbucket arm of their own (task 69), so they are a legitimate reference again — but reference them for the *transport*, not for this step's shape. They post one **per-cycle, deliberately non-idempotent** comment; this step wants the idempotent marker-and-`PUT` form, which is why `/finalise` remains the recipe to copy here.
 

@@ -544,3 +544,151 @@ test("the skill situates itself against its siblings", () => {
   }
   assert.match(SKILL, /do \*\*not\*\* call `\/review-pr`/);
 });
+
+// ---------------------------------------------------------------------------
+// The inline-comment jq snippet must RUN, not merely read well (task 70).
+//
+// Both review skills shipped a snippet that could not execute: `.code_review[]`
+// iterates the wrapper object's VALUES rather than its findings, so `select`
+// indexes a string and jq aborts; and `body: .summary` read a key the findings
+// schema does not define, which made the CLI exit 2 and dropped every finding.
+// Neither defect was visible to a reader, and qa-task's snippet executor skips
+// these blocks as `mutating` (they redirect to a file). Executing the extracted
+// program against a schema-shaped fixture is the only check that can see it.
+// ---------------------------------------------------------------------------
+const { spawnSync } = require("child_process");
+
+const FINDINGS_FIXTURE = JSON.stringify({
+  code_review: {
+    reviewed: "3 files",
+    findings: [
+      {
+        id: "CR-1",
+        category: "bug",
+        severity: "high",
+        confidence: "high",
+        file_line: "src/x.ts:42",
+        finding: "null deref on `x`",
+        suggested_action: "guard it",
+      },
+      // Shapes an LLM plausibly emits from "file_line is path:line". jq is
+      // all-or-nothing inside `[ ... ]`, so before the test() guard each of these
+      // aborted the WHOLE program, emptied $INLINE_FILE and dropped every
+      // finding -- not degraded, dropped.
+      {
+        id: "CR-2",
+        category: "bug",
+        severity: "medium",
+        confidence: "medium",
+        file_line: "src/y.ts:10-24",
+        finding: "a range, not a line",
+        suggested_action: "n/a",
+      },
+      {
+        id: "CR-3",
+        category: "cleanup",
+        severity: "low",
+        confidence: "low",
+        file_line: "src/z.ts",
+        finding: "no line at all",
+        suggested_action: "n/a",
+      },
+      // suggested_action absent -- string concatenation with null aborts too.
+      {
+        id: "CR-4",
+        category: "cleanup",
+        severity: "low",
+        confidence: "low",
+        file_line: "src/w.ts:3",
+        finding: "no suggested action",
+      },
+    ],
+    truncated_count: 0,
+  },
+  // Conformance findings carry `ref`, NOT `file_line` -- see
+  // references/pr-conformance-prompt.md. `ref` is a criterion id, a frontmatter
+  // field, an artifact path, OR a path:line; only the last can be anchored. A
+  // fixture that invents `file_line` here tests a shape production never emits.
+  pr_conformance: {
+    work_item: "task.70",
+    findings: [
+      {
+        id: "PC-1",
+        severity: "medium",
+        ref: "AC-3",
+        finding: "criterion not evidenced",
+        suggested_action: "cite it",
+      },
+      {
+        id: "PC-2",
+        severity: "low",
+        ref: "docs/a.md:3",
+        finding: "claim unsupported",
+        suggested_action: "cite it",
+      },
+    ],
+  },
+});
+
+/** Pull the jq program out of the SKILL.md snippet that feeds --findings-file. */
+function extractJqProgram(skillText) {
+  // Tolerate a shell line-continuation between the program and its input file.
+  const m = skillText.match(/jq '(\[[\s\S]*?\])'[\s\\]*"\$FINDINGS_JSON"/);
+  return m ? m[1] : null;
+}
+
+test("the inline-comment jq snippet executes against a schema-shaped fixture", (t) => {
+  const probe = spawnSync("jq", ["--version"], { encoding: "utf8" });
+  if (probe.error) return t.skip("jq not installed");
+
+  const prog = extractJqProgram(read("SKILL.md"));
+  assert.ok(prog, "could not find the jq program feeding --findings-file");
+
+  const r = spawnSync("jq", ["-c", prog], {
+    input: FINDINGS_FIXTURE,
+    encoding: "utf8",
+  });
+  assert.equal(
+    r.status,
+    0,
+    `the documented jq program does not run:\n${r.stderr}\nProgram:\n${prog}`,
+  );
+
+  const out = JSON.parse(r.stdout);
+  assert.ok(
+    out.length > 0,
+    "the snippet extracted no findings from the fixture",
+  );
+  // The well-formed finding must SURVIVE its malformed neighbours. `length > 0`
+  // alone would pass while every entry but one was silently lost — jq aborts the
+  // whole array on a single bad entry, so this is the assertion that matters.
+  assert.ok(
+    out.some((f) => f.path === "src/x.ts" && f.line === 42),
+    "a well-formed finding must survive alongside a range file_line, a bare " +
+      "path, and a missing suggested_action",
+  );
+  assert.ok(
+    !out.some((f) => String(f.path).includes("y.ts")),
+    "a range file_line has no single line to anchor to — exclude it, never guess",
+  );
+  // The conformance lens must be REACHABLE. Selecting on `file_line` dropped
+  // every PC finding silently, making `.pr_conformance.findings[]?` dead code
+  // that nothing reported.
+  assert.ok(
+    out.some((f) => f.path === "docs/a.md" && f.line === 3),
+    "a conformance finding whose `ref` IS a path:line must anchor",
+  );
+  assert.ok(
+    !out.some((f) => String(f.path) === "AC-3"),
+    "a `ref` that is a criterion id is not anchorable — it belongs in the summary",
+  );
+  for (const f of out) {
+    assert.ok(f.path && typeof f.path === "string", "each record needs a path");
+    assert.ok(Number.isInteger(f.line), "each record needs an integer line");
+    assert.ok(
+      f.body && typeof f.body === "string" && f.body.trim(),
+      "each record needs a non-empty body — `.summary` is not a schema key, " +
+        "and a null body makes pr-inline-comment.js exit 2",
+    );
+  }
+});

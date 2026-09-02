@@ -33,13 +33,14 @@ Do **not** use this for a pure diff review with no work item — use `/review-co
 
 ## Arguments
 
-Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--no-code] [--no-docs]`.
+Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--inline] [--no-code] [--no-docs]`.
 
 | Arg | Values | Default | Meaning |
 | --- | --- | --- | --- |
 | `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` | open PR for the current branch | Which PR to review |
 | `--effort` | `low` \| `medium` \| `high` \| `max` | `medium` | Breadth vs. precision, for **both** lenses |
 | `--comment` | flag | off | Post one summary comment to the PR |
+| `--inline` | flag | off | Additionally post each finding as an inline comment on its own line. Implies `--comment` |
 | `--no-code` | flag | off | Skip the code lens |
 | `--no-docs` | flag | off | Skip the conformance lens |
 
@@ -415,7 +416,49 @@ The GitHub path goes through `tracker_call_with_retry`, inheriting 3× exponenti
 
 Commenting never gates. Never post over an `unverifiable` reason.
 
-**Inline PR comments are out of scope.** No skill in this repo posts one, and building that primitive on two platforms is its own task.
+#### `--inline` — findings beside the lines they are about
+
+The summary comment above stays the default and is always posted. `--inline` adds a second delivery:
+each finding that carries a `file_line` is also posted as an inline comment anchored to that line, via
+the shared primitive. It resolves `$VCS` itself, so this step does not branch:
+
+```bash
+# Findings from both lenses, reshaped into the CLI's input contract.
+# `.code_review.findings[]`, NOT `.code_review[]` — the latter iterates the
+# WRAPPER's values (`reviewed`, the findings array, `truncated_count`), so
+# `select(.file_line != null)` indexes a string and jq aborts outright.
+# `.finding` is the schema's key; there is no `.summary`.
+# Two lenses, two different anchor keys. `code_review` findings carry
+# `file_line`; `pr_conformance` findings carry `ref`, which is a criterion id, a
+# frontmatter field, an artifact path OR a `path:line` — only the last form can
+# be anchored. Both are normalised and then filtered by SHAPE, so a `ref` of
+# "AC-3" is excluded rather than aborting the program. jq is all-or-nothing
+# inside `[ … ]`: one malformed entry would otherwise empty the file and drop
+# every finding. Conformance findings that cannot anchor stay in the summary
+# comment, which is posted regardless.
+jq '[ (.code_review.findings[]? | . + {anchor: .file_line}),
+      (.pr_conformance.findings[]? | . + {anchor: .ref})
+      | select((.anchor? // "") | test("^.+:[0-9]+$"))
+      | {path: (.anchor | split(":")[0]),
+         line: (.anchor | split(":")[1] | tonumber),
+         body: (.finding
+                + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
+   "$FINDINGS_JSON" > "$INLINE_FILE" || {
+  echo "findings JSON did not match the schema — not posting inline"; exit 1; }
+
+node .agents/skills/review-pr/references/pr-inline-comment.js \
+  --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \
+  --summary-file "$BODY_FILE" --json
+```
+
+**Anchoring failure degrades; it never drops a finding.** A line outside the diff hunk is rejected —
+routinely, since a finding about an unchanged function whose caller moved has no line to attach to —
+and that finding is appended to the summary comment instead, reporting `anchor-failed` rather than
+`posted`. Read the per-finding `reason`s, not just the top-level one: a run reporting `partial` has
+delivered everything, just not all of it inline.
+
+Full contract, the `reason` vocabulary and the marker-plus-update-in-place re-run rule:
+[`references/pr-inline-comment-contract.md`](references/pr-inline-comment-contract.md).
 
 ### Step 9 — Cleanup
 

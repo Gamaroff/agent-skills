@@ -96,6 +96,10 @@ const KIND_PRESENTATION = Object.freeze({
   "github.pr.create": { verb: "Open", noun: "pull request" },
   "github.pr.comment": { verb: "Comment on", noun: "pull request" },
   "github.pr.merge": { verb: "Merge", noun: "pull request" },
+  // Bitbucket's only kind. Same verb as its GitHub twin on purpose: an
+  // operator working a handover reads the intent line for the anchor, and the
+  // system prefix already says which platform.
+  "bitbucket.pr.comment": { verb: "Comment on", noun: "pull request" },
   // The GitHub twin of jira.unknown-mutation. `tracker_write` wraps ~38 `gh`
   // mutations generically and infers a kind from argv where it can; a shape it
   // does not recognise lands here rather than being dropped. The wording says
