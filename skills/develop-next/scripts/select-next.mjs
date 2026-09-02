@@ -874,7 +874,8 @@ const DEFAULT_COLUMNS = {
 // The number is captured WITH any dotted segments so a story-shaped reference is
 // consumed whole. Matching a bare `\d+` here would take `story.2.3` as story 2
 // plus a stray task 3 — inventing a dependency nobody declared.
-const DEP_REF_RE = /(?:\b(task|bug|story)\s*[.#-]?\s*|\b([TB]))?(\d+(?:\.\d+)*)\b/gi;
+const DEP_REF_RE =
+  /(?:\b(task|bug|story)\s*[.#-]?\s*|\b([TB]))?(\d+(?:\.\d+)*)\b/gi;
 
 // Cell values that mean "no dependency". A registry is hand-maintained, so the
 // em-dash this repo uses is only one of the spellings that show up.
@@ -1082,8 +1083,7 @@ export function parseRegistry(text, kind, registryPath) {
           ? cells[c.severity] || null
           : null,
       priority: c.priority !== undefined ? cells[c.priority] || null : null,
-      deps:
-        c.deps !== undefined ? parseDepCell(cells[c.deps] || "", kind) : [],
+      deps: c.deps !== undefined ? parseDepCell(cells[c.deps] || "", kind) : [],
     });
   }
   return { rows, malformed, warnings };
@@ -1269,7 +1269,12 @@ export function registryFrontier(registries, opts = {}) {
     // Checked AFTER the floor so the recorded reason names the nearer cause, and
     // BEFORE the ranked-lower branch so a blocked row is never reported as
     // merely outranked.
-    const depBlockers = registryDepBlockers(row, rowIndex, readStatus, warnings);
+    const depBlockers = registryDepBlockers(
+      row,
+      rowIndex,
+      readStatus,
+      warnings,
+    );
     if (depBlockers.length) {
       passedOver.push({
         ...entry,

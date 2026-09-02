@@ -2452,7 +2452,10 @@ test("deps: a dependent row is not selected while its dependency is unaccepted",
   const blocked = f.passedOver.find((p) => p.n === 84);
   assert.ok(blocked, "T84 must be recorded, never silently dropped");
   assert.equal(blocked.eligible, false);
-  assert.match(blocked.reason, /blocked on unaccepted dependency: task\.83 \(planned\)/);
+  assert.match(
+    blocked.reason,
+    /blocked on unaccepted dependency: task\.83 \(planned\)/,
+  );
 });
 
 test("deps: an accepted dependency does not block", () => {
@@ -2517,12 +2520,21 @@ test("deps: multiple dependencies are all reported, and any one blocks", () => {
 
 test("deps: an unresolvable dependency is satisfied, with a warning", () => {
   const rows = [taskRow(84, "dependent", "planned", "High", "task.999")];
-  const docs = { "docs/tasks/task.84.dependent/task.84.dependent.md": "planned" };
+  const docs = {
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
   const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
   const f = registryFrontier(opts.registries, { evaluateAll: true });
 
-  assert.equal(f.selected.id, "T84", "an unresolvable dep must not hide the row");
-  assert.match(f.warnings.join("\n"), /task\.999, which is not a row in either registry/);
+  assert.equal(
+    f.selected.id,
+    "T84",
+    "an unresolvable dep must not hide the row",
+  );
+  assert.match(
+    f.warnings.join("\n"),
+    /task\.999, which is not a row in either registry/,
+  );
 });
 
 test("deps: a cancelled dependency is satisfied, with a warning", () => {
@@ -2547,12 +2559,17 @@ test("deps: a dependency whose document is unreadable is satisfied, with a warni
     taskRow(84, "dependent", "planned", "High", "task.83"),
   ];
   // task.83's document is absent from `docs`, so readStatus returns null.
-  const docs = { "docs/tasks/task.84.dependent/task.84.dependent.md": "planned" };
+  const docs = {
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
   const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
   const f = registryFrontier(opts.registries, { evaluateAll: true });
 
   assert.equal(f.selected.id, "T84");
-  assert.match(f.warnings.join("\n"), /whose document is missing or unreadable/);
+  assert.match(
+    f.warnings.join("\n"),
+    /whose document is missing or unreadable/,
+  );
 });
 
 test("deps: a task may depend on a bug, resolved across registries", () => {
@@ -2569,7 +2586,10 @@ test("deps: a task may depend on a bug, resolved across registries", () => {
   // The bug outranks the task anyway; the point is that T84 is recorded as
   // dependency-blocked rather than merely outranked.
   const blocked = f.passedOver.find((p) => p.n === 84 && p.kind === "task");
-  assert.match(blocked.reason, /blocked on unaccepted dependency: bug\.4 \(new\)/);
+  assert.match(
+    blocked.reason,
+    /blocked on unaccepted dependency: bug\.4 \(new\)/,
+  );
 });
 
 test("deps: an empty cell places no constraint", () => {
@@ -2578,8 +2598,16 @@ test("deps: an empty cell places no constraint", () => {
     const docs = { "docs/tasks/task.84.free/task.84.free.md": "planned" };
     const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
     const f = registryFrontier(opts.registries, { evaluateAll: true });
-    assert.equal(f.selected?.id, "T84", `cell ${JSON.stringify(cell)} must not block`);
-    assert.equal(f.warnings.length, 0, `cell ${JSON.stringify(cell)} must not warn`);
+    assert.equal(
+      f.selected?.id,
+      "T84",
+      `cell ${JSON.stringify(cell)} must not block`,
+    );
+    assert.equal(
+      f.warnings.length,
+      0,
+      `cell ${JSON.stringify(cell)} must not warn`,
+    );
   }
 });
 
