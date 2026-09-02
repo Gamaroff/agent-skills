@@ -1,8 +1,8 @@
 # Bug Registry
 
 **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
-**Last Updated:** 2026-09-01
-**Next Available Bug Number:** **8**
+**Last Updated:** 2026-09-02
+**Next Available Bug Number:** **9**
 
 ## How to use
 
@@ -32,8 +32,9 @@
 | 3 | [Three CLIs call `process.exit()` after an async stdout write, truncating piped output at ~64KB](bug.3.stdout-truncation-on-exit/bug.3.stdout-truncation-on-exit.md) | closed | Major | Critical | 2026-09-01 | CLI output / test harness |
 | 4 | [Snippet engine silently no-ops when invoked through a symlinked path](bug.4.snippet-engine-symlink-noop/bug.4.snippet-engine-symlink-noop.md) | closed | Major | High | 2026-09-01 | qa-task / Step 4b snippet engine |
 | 5 | [access-config parity JS probe records a timeout as a real answer](bug.5.access-parity-js-probe-conflates-timeout/bug.5.access-parity-js-probe-conflates-timeout.md) | closed | Major | High | 2026-09-01 | test harness / config reader |
-| 6 | [Ten more fail-open routes past the snippet classifier, plus two over-refusals](bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md) | open | Major | High | 2026-09-02 | qa-execute-snippets / classifier |
+| 6 | [Ten more fail-open routes past the snippet classifier, plus two over-refusals](bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md) | new | Major | High | 2026-09-02 | qa-execute-snippets / classifier |
 | 7 | [`zero-blocks-executed` fires on skills whose every documented command is correctly refused](bug.7.zero-blocks-executed-fires-on-correct-refusal/bug.7.zero-blocks-executed-fires-on-correct-refusal.md) | new | Minor | Medium | 2026-09-02 | qa-task Step 4b / snippet engine |
+| 8 | [A bug status outside the lifecycle is silently invisible to selection](bug.8.bug-status-outside-lifecycle-is-invisible/bug.8.bug-status-outside-lifecycle-is-invisible.md) | new | Major | High | 2026-09-02 | selection / bug authoring / validation |
 
 ---
 

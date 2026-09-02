@@ -4,7 +4,7 @@ title: "Ten more fail-open routes past the snippet classifier, plus two over-ref
 type: bug
 description: "The qa-execute-snippets classifier still lets ten mutating inputs reach `runnable` after commit 0c4c05f closed bug.3's fourteen, and wrongly refuses two read-only `-o` usages. All twelve reproduce deterministically on current HEAD. Found by the probe mode delivered in task.73 — on its first real run."
 tags: [qa, security, snippet-engine, fail-open, classifier]
-status: open
+status: new
 severity: Major
 priority: High
 created: 2026-09-02
@@ -15,7 +15,7 @@ component: shared/resources/qa-execute-snippets.mjs
 
 # Bug Report: Ten more fail-open routes past the snippet classifier
 
-**Status:** Open
+**Status:** New
 **Severity:** Major
 **Priority:** High
 
