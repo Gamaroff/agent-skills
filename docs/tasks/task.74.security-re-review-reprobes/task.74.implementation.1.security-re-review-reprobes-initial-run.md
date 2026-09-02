@@ -35,9 +35,9 @@ Add a narrow carve-out to `qa-task` / `qa-story` so a re-review whose prior gate
 | 2. review-task             | ✅ Done    | `task.74.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10. 1 Critical + 3 Important applied. Report: `task.74.review.1.security-re-review-reprobes.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases, all checkboxes ticked. 31 parity tests, 15 mutation proofs, 4 executable replay cases | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #299](https://github.com/Gamaroff/agent-skills/pull/299) → `develop`. Two commits: `92af48c` (task.74), `1e7c542` (bundle drift, separated). Issue comment skipped — no tracker issue | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.74.qa.{N}.*.md`; `task.74.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.74.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.74.qa.{N}.*.md`; `task.74.gate.{N}.*.yml`; PR comment posted     | 2 cycles. gate.1 CONCERNS 90 → gate.2 **PASS 100**. Cycle 2 refute pass found CR-2's fix ineffective → CR-4 | —                    |
+| 7. finalise                | ✅ Done    | `task.74.dod.{N}.*.md`; task `status: accepted`                        | dod.1 + sprint-review-summary. Probe mode: 12 executed / 0 reproduced. Found and fixed a red-CI dead link and a third stale copy of the rule | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 8 commits on the branch, all pushed | —                    |
 
 ---
 
@@ -98,16 +98,40 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — gate.1 CONCERNS 90/100
+
+Found **CR-1 (MEDIUM)**: the clause-1 probe *hung* rather than erroring when `$LATEST_GATE` was empty —
+`awk` with no filename reads stdin and blocks indefinitely. Found by **executing** the shipped prose, not
+reading it. Plus two LOW findings in the new test file.
+
+`qa-fix` closed all three. Getting the regression test to actually hold took two attempts, both of which
+were **vacuous tests that passed**: a closed stdin (Node closes a written-to-nothing pipe immediately), and
+a `sleep` whose stdout was redirected away from the process-substitution fifo, removing its only writer.
+Mutation proving caught both. The repo's spawn-timeout convention test caught a hardcoded `timeout: 5000`
+on the first full run.
+
+### QA Cycle 2 — gate.2 PASS 100/100 (refute pass)
+
+`PRIOR_GATES=1` → whole-branch diff, `REFUTE_PASS=true`. `SAFETY_REPROBE=false`, since gate.1's security
+axis was PASS — the new machinery correctly declined to fire on its own gate.
+
+The refute pass found **CR-4**: cycle 1's CR-2 fix *did not work*. It made the shared-rule read lazy but
+left `const CLAUSE_1 = extractProbe()` at module level, which calls it at import anyway — so a claimed fix
+had changed nothing observable. Never a false green, but recorded as fixed when it was not. Fixed and
+proven within the cycle.
+
+Also probed beyond the prior findings: the **indented** SKILL.md copies were executed verbatim, because the
+parity test compares on normalised indentation and structurally cannot catch a block broken *by* its
+indentation. Both correct.
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-02
+**Final Status**: Completed
 **Branch**: `feature/task.74.security-re-review-reprobes`
 **PR**: [#299](https://github.com/Gamaroff/agent-skills/pull/299)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 2 (gate.1 CONCERNS 90/100 → gate.2 PASS 100/100)
+**DoD Summary**: `task.74.dod.1.security-re-review-reprobes.md` — ACCEPTED
+**Tracker debt**: none — no tracker issue was ever linked (recorded decision, `review.1` §Optional-1). No deferred mutations; the journal is empty, so there is deliberately no `## Tracker Actions Required` section.
