@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`/double-check` — an adversarial audit of work the agent has just produced.** Generation and
+  verification are different jobs: a finishing turn carries forward its own plan, its own
+  assumptions, and a transcript that reads like proof, and none of that is evidence about the
+  artifact. The skill discards that carry-forward and rebuilds the picture from the two sources
+  that cannot lie about themselves — the user's original words, and the current state of disk.
+
+  Four sequential gates. **A** reconciles every claimed write against `git status`, checks
+  wholeness (truncation, overwrite loss, unbalanced fences), hashes what `git diff` cannot speak
+  to, and runs the narrowest executable check first. **B** audits negative constraints and
+  boundaries — the highest-yield class, since prohibitions get satisfied by accident or not at
+  all. **C** re-derives deterministic logic, preferring an executed oracle to a re-derivation
+  (which is only another sample from the same model), and sweeps for placeholders sitting inside
+  work reported as complete. **D** maps every requirement to named evidence and flags delivered
+  work nobody asked for.
+
+  It is a gate, not a second implementation pass, and it runs **at most once per cycle** —
+  residual defects are surfaced to the user rather than chased in a loop. Verifying its own patch
+  is inside that cycle, not a new one; without that, an `AUTO-CORRECTED` verdict would ship
+  unchecked changes, which is the exact failure the skill exists to catch. Gate A is bounded away
+  from mutating and destructive commands: a check left unrun and reported honestly beats a green
+  bought by breaking the environment.
+
+  Sibling to `/review-code` (which reviews a *diff* for bugs) and to `/qa-story` / `/qa-task`
+  (which need a tracked work item and write a gate file). `/double-check` audits a *deliverable*
+  against its *contract* — prose, a plan, a calculation, or a config as readily as code — and
+  needs neither.
+
 ### Fixed
 
 - **The registry fallback frontier ignored the `Depends on` column, so it could nominate work whose

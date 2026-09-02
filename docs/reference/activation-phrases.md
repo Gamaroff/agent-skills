@@ -30,6 +30,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Review this bug report" / "Is this bug ready to fix?" | `review-bug` (the second phrasing picks `--validate`) |
 | "Review my changes" / "Review this diff" / "Review PR 123" | `review-code` |
 | "Review this PR" / "Does this PR match the task?" / "Is the evidence there for this PR?" | `review-pr` |
+| "Double check that" / "Verify your work" / "Are you sure?" / "Did you actually do that?" | `double-check` |
 
 ## Development
 
