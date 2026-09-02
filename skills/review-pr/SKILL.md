@@ -33,13 +33,14 @@ Do **not** use this for a pure diff review with no work item — use `/review-co
 
 ## Arguments
 
-Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--no-code] [--no-docs]`.
+Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--inline] [--no-code] [--no-docs]`.
 
 | Arg | Values | Default | Meaning |
 | --- | --- | --- | --- |
 | `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` | open PR for the current branch | Which PR to review |
 | `--effort` | `low` \| `medium` \| `high` \| `max` | `medium` | Breadth vs. precision, for **both** lenses |
 | `--comment` | flag | off | Post one summary comment to the PR |
+| `--inline` | flag | off | Additionally post each finding as an inline comment on its own line. Implies `--comment` |
 | `--no-code` | flag | off | Skip the code lens |
 | `--no-docs` | flag | off | Skip the conformance lens |
 
@@ -415,7 +416,33 @@ The GitHub path goes through `tracker_call_with_retry`, inheriting 3× exponenti
 
 Commenting never gates. Never post over an `unverifiable` reason.
 
-**Inline PR comments are out of scope.** No skill in this repo posts one, and building that primitive on two platforms is its own task.
+#### `--inline` — findings beside the lines they are about
+
+The summary comment above stays the default and is always posted. `--inline` adds a second delivery:
+each finding that carries a `file_line` is also posted as an inline comment anchored to that line, via
+the shared primitive. It resolves `$VCS` itself, so this step does not branch:
+
+```bash
+# Findings from both lenses, reshaped into the CLI's input contract.
+jq '[ .code_review[], .pr_conformance[]
+      | select(.file_line != null)
+      | {path: (.file_line | split(":")[0]),
+         line: (.file_line | split(":")[1] | tonumber),
+         body: .summary,
+         id:   .id} ]' "$FINDINGS_JSON" > "$INLINE_FILE"
+
+node .agents/skills/review-pr/references/pr-inline-comment.js \
+  --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" --json
+```
+
+**Anchoring failure degrades; it never drops a finding.** A line outside the diff hunk is rejected —
+routinely, since a finding about an unchanged function whose caller moved has no line to attach to —
+and that finding is appended to the summary comment instead, reporting `anchor-failed` rather than
+`posted`. Read the per-finding `reason`s, not just the top-level one: a run reporting `partial` has
+delivered everything, just not all of it inline.
+
+Full contract, the `reason` vocabulary and the marker-plus-update-in-place re-run rule:
+[`references/pr-inline-comment-contract.md`](references/pr-inline-comment-contract.md).
 
 ### Step 9 — Cleanup
 
