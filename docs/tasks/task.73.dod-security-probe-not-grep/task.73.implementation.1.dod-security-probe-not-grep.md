@@ -37,8 +37,8 @@ only what reproduced — instead of grepping for the boundary's existence.
 | 2. review-task             | ✅ Done    | `task.73.review.{N}.{name}.md` exists (or skip logged)            | READY TO IMPLEMENT, 9/10. 0 Critical / 3 Important / 2 Optional. Report: `task.73.review.1.dod-security-probe-not-grep.md` | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                 | 4 files; 16 contract tests + 7 mutation proofs; `ci:fast` 2157 pass / 0 fail; replay found 12 real routes → bug.6 | — |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                      | PR #297: https://github.com/Gamaroff/agent-skills/pull/297 — 4 logical commits. Issue comment skipped (no linked issue) | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.73.qa.{N}.*.md`; `task.73.gate.{N}.*.yml`; PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.73.dod.{N}.*.md`; task `status: accepted`                   |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.73.qa.{N}.*.md`; `task.73.gate.{N}.*.yml`; PR comment posted | 4 cycles. gate.1 FAIL(70) → gate.2 FAIL(80) → **gate.3 PASS(95)**. 21 findings all closed; 23 mutation proofs | — |
+| 7. finalise                | ✅ Done    | `task.73.dod.{N}.*.md`; task `status: accepted`                   | DoD PASSED. CI SUCCESS on `9b2f47d`. CHANGELOG gap found + closed. Tracker N/A (no linked issue) | — |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent.
@@ -67,6 +67,25 @@ only what reproduced — instead of grepping for the boundary's existence.
   `jira_key:` — `TRACKER_ISSUE` is empty, so all tracker signals (pipeline-start comment, board
   moves, PR-opened comment, issue close) are skipped for this run.
 - Task status at entry: `ready-for-development` → proceed normally per the Phase 0c status table.
+
+### Step 7 — finalise — 2026-09-02
+
+- Four DoD agents dispatched in parallel. Compliance NOT_APPLICABLE; Security PASS; AC 9/9 PASS;
+  Docs FAIL on one item.
+- **CI was checked, not assumed.** First sample returned `PENDING` (`test` IN_PROGRESS with
+  `conclusion: ""` — the empty-string case that would otherwise read as green). Polled to completion:
+  `SUCCESS` on head `9b2f47d`, matching local HEAD exactly.
+- **A real gap was found and closed**: the CHANGELOG entry was missing, flagged independently by the
+  AC and docs agents against the repo's own rule and the precedent of tasks 67 and 68. Written during
+  this step and re-verified — recorded as *found and closed*, not waived.
+- **The deliverable was exercised on its own change set.** The security agent returned
+  `boundary: false` with its reasoning (prose + tests, no accept/reject function added), which is the
+  new contract working: the decision is recorded rather than inferred from an empty list. The render
+  takes the `boundary == false` arm, so `probes_executed: 0` correctly does not trigger the
+  zero-executed finding.
+- Assumption recorded: PR #297 has no human review decision. Satisfied by the QA gate, the green CI
+  rollup and the mutation proofs under the repo's ratified auto-merge policy; no approval is claimed.
+- Tracker issue close and board move: **N/A** — no `github_issue`/`jira_key` on this task.
 
 ### Step 4 — create-pr — 2026-09-02
 
@@ -170,10 +189,10 @@ on the execution count. Six new mutation proofs, all red.
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-02
+**Final Status**: Completed
 **Branch**: `feature/task.73.dod-security-probe-not-grep`
 **PR**: [#297](https://github.com/Gamaroff/agent-skills/pull/297)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 4
+**DoD Summary**: `task.73.dod.1.dod-security-probe-not-grep.md`
+**Tracker debt**: none — no tracker issue was ever linked to this task, so no mutation was wanted or deferred

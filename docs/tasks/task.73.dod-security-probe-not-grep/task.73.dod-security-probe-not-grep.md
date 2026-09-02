@@ -5,18 +5,20 @@ type: task
 description: "The finalise DoD security agent is a grep-only inspector. On task 67 a substituted prompt that executed candidate inputs found 14 fail-open routes past a boundary the grep version reported as PASS — two of them commands the code deny-listed by name. Give the agent a probe mode for work items whose deliverable is a boundary."
 tags: [qa, dod, finalise, security, verification]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-01
 updated: 2026-09-02
+completed_date: 2026-09-02
+pr_number: 297
 assignee:
 estimated_effort_hours: 6
 ---
 
 # Technical Task: Make the DoD security check execute candidate inputs, not grep for them
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.73.review.1.dod-security-probe-not-grep.md` implemented 2026-09-02 (tracker linkage deliberately deferred — see report Q1)
 
 ---
@@ -370,6 +372,38 @@ Narrow the detection rule, or narrow the candidate axes. Both live in one file.
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Gate**: [`task.73.gate.3.dod-security-probe-not-grep.yml`](./task.73.gate.3.dod-security-probe-not-grep.yml) — ✅ **PASS**, 95/100
+**QA cycles**: 4 · **Findings**: 21, all closed · **Mutation proofs**: 23
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria** — 9/9, each with a code citation and a test that runs per PR
+✅ **CI** — `SUCCESS` on head `9b2f47d` (test · validate · link-check · branch-policy). First sampled
+as `PENDING` and waited for, not assumed
+✅ **Tests** — 2169 in the full gate, 0 fail; 28 across the two new suites
+✅ **Documentation** — prompt source + bundled copy in step, consumer skill updated, `bug.6` filed and
+registered. The CHANGELOG entry was **missing and was written during finalise** — found independently
+by two DoD agents, closed and re-verified rather than waived
+✅ **Security** — read-only contract tightened; the security agent ran against this very change set and
+correctly returned `boundary: false` with its reason, exercising the new contract on its own author
+⚠️ **Compliance** — NOT_APPLICABLE (no personal data, payment, healthcare or UI surface)
+
+**Assumption recorded**: PR #297 carries no human review decision. This repo merges green PRs through
+`/develop-next` under a user-ratified policy; the review column is satisfied by the QA gate, the green
+CI rollup and the mutation proofs, and no human approval is claimed.
+
+**Detailed Verification Log:** [`task.73.dod.1.dod-security-probe-not-grep.md`](./task.73.dod.1.dod-security-probe-not-grep.md)
+
+**Task marked as ACCEPTED on:** 2026-09-02
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -414,6 +448,7 @@ verdict string must occur exactly once.
 | 2026-09-02 |         | QA gate FAIL (70/100) — 10 findings; probes[] tri-state collision + one untracked deliverable file | qa-task |
 | 2026-09-02 |         | QA gate FAIL (80/100) — refute pass: the conflation had moved up to `boundary` | qa-task |
 | 2026-09-02 |         | QA findings fixed — gate PASS (95/100), 4 cycles, 21 findings, 23 mutation proofs | qa-fix |
+| 2026-09-02 | 1.2     | DoD verified — accepted (PR #297); CHANGELOG gap found and closed during verification | finalise |
 
 ---
 
