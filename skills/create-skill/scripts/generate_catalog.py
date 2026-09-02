@@ -40,7 +40,7 @@ CATEGORIES = [
     ("Quality Assurance", [
         "qa-fix", "qa-gate", "qa-planning", "qa-story", "qa-task",
         "finalise", "validate-story", "review-story", "review-task",
-        "review-epic", "review-prd",
+        "review-epic", "review-prd", "double-check",
     ]),
     ("Architecture & Design", [
         "architect", "create-architecture-doc", "execute-architect-checklist",
