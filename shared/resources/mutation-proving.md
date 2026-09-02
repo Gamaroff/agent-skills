@@ -34,9 +34,53 @@ For each invariant a test claims to hold:
 4. **Confirm the test that names it fails.** Not "some test fails" — *that* one.
 5. **Restore the source.** Confirm green again.
 
-If the suite stays green, the test is **vacuous**: it passes whether the
-behaviour is present or not, and it is worse than no test, because it reports
-coverage that does not exist.
+## What a held proof does not tell you
+
+A mutation proof falsifies **a check that exists**. Behaviour that no test names
+has nothing to revert, so a proof run is silent about it — not reassuring, silent.
+
+Task 67 measured the gap. **Nine proofs were recorded and four re-run
+independently in QA; all four held — while thirteen fail-open routes sat in the
+shipped classifier.** Every proof was honest: each reverted a real behaviour and
+turned the right test red. Not one of them could have found the thirteen.
+
+So after a proof run the open question is no longer *are these tests real?* — you
+have just answered that. It is *what is not tested at all?*, and that takes a
+different instrument: adversarial input generation against the real subject, not
+more proofs.
+
+> A held proof is evidence about a test. It is not evidence about coverage.
+
+## When the proof does not go red
+
+Three causes, and only the first is a defect in the test:
+
+| The suite stayed green because | Signal | Response |
+| ------------------------------ | ------ | -------- |
+| the test cannot observe the behaviour | **vacuous test** | the five shapes below; fix the test |
+| something else already enforces it | **redundant source** | the reverted code may be dead — decide whether to delete it, or make it defend a case nothing else covers |
+| the behaviour was never what you thought | **wrong premise** | the finding or fix rests on a false mechanism — verify the mechanism before writing anything |
+
+A vacuous test is the worst of the three: it passes whether the behaviour is
+present or not, so it reports coverage that does not exist.
+
+**An unheld proof is a finding, not a nuisance.** Investigate before strengthening
+the test — strengthening first is how a wrong premise gets hard-coded into the
+suite that then defends it. Both of task 67's unheld proofs were rows two and
+three, and in both the vacuous-test response would have been the wrong one.
+
+**Redundant source.** Disabling the `COMMAND_RUNNERS` check broke nothing: those
+commands were already absent from the allow-list, so the set was dead code.
+
+> A better test would have papered over that. The fix was a precedence test that
+> made the set defend a plausible future edit.
+
+**Wrong premise.** Removing `--timeout` validation broke nothing, because
+`spawnSync` *throws* on `NaN` and on negative values — the finding's stated
+mechanism was simply wrong. The real hole was `--timeout 0`.
+
+> Strengthening the test would have hard-coded a fiction. Measure the mechanism
+> first; the proof is what told you the story was false.
 
 ## When to do it
 
@@ -46,9 +90,19 @@ coverage that does not exist.
 | A QA cycle that fixes a defect | The test guarding the fix — a fix without a red-going test is unwatched |
 | A guard whose failure mode is silence | Always. These are the ones that rot unnoticed |
 | Reviewing someone else's test | The one or two it would hurt most to have wrong |
+| A fix to a boundary — validator, classifier, allow/deny-list, authorisation check | **Both directions**: that the refusal fires, *and* that legitimate input still passes |
 
 Not every assertion needs this. The ones that do are the ones whose absence would
 be **silent** — where the wrong behaviour reports success.
+
+**Both directions** is not symmetry for its own sake. Proving that the refusal
+fires says nothing about whether legitimate input still gets through, and an
+over-strict boundary is as broken as a permeable one — it fails just as silently,
+on the inputs nobody thinks to check. Two of task 67's fixes regressed exactly
+there: an arithmetic placeholder `0` was read as a command name, and splitting on
+`&` left the file descriptor in `2>&1` sitting in command position. No proof
+caught either. A separately maintained set of legitimate patterns did — and
+nothing above asks you to keep one.
 
 ## The five shapes vacuity takes
 

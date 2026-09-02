@@ -5,25 +5,26 @@ type: task
 description: "mutation-proving.md answers one question well — is this test real? It never says what a suite of real tests still fails to cover, and it gives an unheld proof exactly one diagnosis when there are three. On task 67 nine proofs held while thirteen holes sat in the code, and both unheld proofs were true signals that the doc's advice would have discarded."
 tags: [testing, mutation-proving, verification, documentation]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 assignee:
 estimated_effort_hours: 3
 ---
 
 # Technical Task: State what a mutation proof does not tell you
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.76.review.1.mutation-proof-limits.md` implemented 2026-09-02
 
 ---
 
 ## 1. Overview
 
 `shared/resources/mutation-proving.md` is a good document. It answers one question thoroughly — *is
-this test real?* — with a procedure, four worked shapes of vacuity, and a blunt rule against claiming
+this test real?* — with a procedure, five worked shapes of vacuity, and a blunt rule against claiming
 proofs you did not run.
 
 It never answers the adjacent question: **what does a suite of proven-real tests still fail to cover?**
@@ -39,9 +40,9 @@ schema change.
 
 ### Current Problems
 
-1. **A held proof is read as coverage, and it is not.** On task 67, **nine** mutation proofs were run
-   and all nine held — while **thirteen** fail-open routes sat in the shipped classifier. The proofs
-   were honest. Every one reverted a real behaviour and turned the right test red. They said nothing
+1. **A held proof is read as coverage, and it is not.** On task 67, **nine** mutation proofs were
+   recorded and **four** were re-run independently in QA — all four held — while **thirteen** fail-open
+   routes sat in the shipped classifier. The proofs were honest. Every one reverted a real behaviour and turned the right test red. They said nothing
    about the thirteen, because *a mutation proof can only falsify a check that exists.*
 2. **The document invites that misreading.** Line 21 says a vacuous test "reports coverage that does not
    exist" — framing the whole exercise in the vocabulary of coverage, then never stating the limit. A
@@ -74,10 +75,12 @@ schema change.
 
 ### Current architecture
 
-`shared/resources/mutation-proving.md`, 96 lines: *The procedure* · *When to do it* · *The four shapes
-vacuity takes* · *Recording it* · *Do not claim it unless you did it*.
+`shared/resources/mutation-proving.md`, 140 lines: *The procedure* · *When to do it* · *The five shapes
+vacuity takes* (the fifth — *a textual rule standing in for a semantic property* — and its *Two things
+work instead* coda were added after this task was filed) · *Recording it* · *Do not claim it unless you
+did it*.
 
-It is bundled into the skills that reference it — `develop`, `qa-task`, `qa-story`, `qa-fix` and others.
+It is bundled into the three skills that reference it — `develop`, `qa-task` and `qa-story`.
 `qa-task` Step 3c and `qa-story` defer to it by reference rather than restating it, so a change here
 reaches every consumer without touching a single SKILL.md.
 
@@ -91,7 +94,7 @@ The same document, three sections longer:
 
 ### Important clarifications
 
-- **The four shapes stay.** They are about vacuity and remain correct and useful.
+- **The five shapes stay.** They are about vacuity and remain correct and useful.
 - **No skill changes.** Consumers inherit this by reference; that is the design and this task should not
   disturb it.
 - **This adds no obligation.** It is guidance about interpreting a result, not a new gate.
@@ -111,7 +114,7 @@ The same document, three sections longer:
 
 ❌ **Any SKILL.md change** — consumers reference this file; that indirection is the point
 ❌ **Changing `mutation-proven: yes/no` in the QA report** — a richer recording is a separate question
-❌ **Rewriting the four shapes, the procedure, or the do-not-claim rule** — all correct as they stand
+❌ **Rewriting the five shapes, the procedure, or the do-not-claim rule** — all correct as they stand
 ❌ **Any new gate, check or enforcement**
 
 ---
@@ -131,11 +134,14 @@ None. Documentation only; no consumer behaviour changes unless a human acts on t
 **Files**: `shared/resources/mutation-proving.md`
 
 **Changes**:
-- [ ] Add a short section after *The procedure* stating the limit: a mutation proof falsifies **a check
+- [x] Add a short section after *The procedure* stating the limit: a mutation proof falsifies **a check
       that exists**. It cannot speak about behaviour no test names
-- [ ] Give it the task-67 number, because the abstraction alone does not land: **9 proofs held while 13
-      fail-open routes sat in the code**
-- [ ] Name the practical consequence — after a proof run, the open question is not "are these tests
+- [x] Give it the task-67 number, because the abstraction alone does not land: **9 proofs recorded — 4
+      re-run independently in QA, all 4 held — while 13 fail-open routes sat in the code**. State the
+      provenance, not a bare "9 held": this is the document whose closing section is *do not claim it
+      unless you did it*, and its own example of that failure is a commit message claiming proofs
+      nobody ran
+- [x] Name the practical consequence — after a proof run, the open question is not "are these tests
       real?" but "what is not tested at all?", and that question needs a different instrument
       (adversarial input generation), not more proofs
 
@@ -150,17 +156,17 @@ None. Documentation only; no consumer behaviour changes unless a human acts on t
 **Files**: `shared/resources/mutation-proving.md`
 
 **Changes**:
-- [ ] Replace the single "the test is vacuous" conclusion with a diagnosis table:
+- [x] Replace the single "the test is vacuous" conclusion with a diagnosis table:
 
       | The suite stayed green because | Signal | Response |
       | --- | --- | --- |
-      | the test cannot observe the behaviour | **vacuous test** | the four shapes below; fix the test |
+      | the test cannot observe the behaviour | **vacuous test** | the five shapes below; fix the test |
       | something else already enforces it | **redundant source** | the reverted code may be dead — decide whether to delete it, or make it defend a case nothing else covers |
       | the behaviour was never what you thought | **wrong premise** | the finding or fix is based on a false mechanism — verify the mechanism before writing anything |
 
-- [ ] State the rule plainly: **an unheld proof is a finding, not a nuisance.** Investigate before
+- [x] State the rule plainly: **an unheld proof is a finding, not a nuisance.** Investigate before
       strengthening the test — strengthening first is how a wrong premise gets hard-coded
-- [ ] Carry both task-67 cases as worked examples, in the style of the existing four shapes
+- [x] Carry both task-67 cases as worked examples, in the style of the existing five shapes
 
 **Dependencies**: Phase 1
 
@@ -173,11 +179,11 @@ None. Documentation only; no consumer behaviour changes unless a human acts on t
 **Files**: `shared/resources/mutation-proving.md`
 
 **Changes**:
-- [ ] Add a row to *When to do it*: **a fix to a boundary** (validator, classifier, allow/deny-list,
+- [x] Add a row to *When to do it*: **a fix to a boundary** (validator, classifier, allow/deny-list,
       authorisation check) — scope: *both directions*
-- [ ] Explain: proving the refusal fires does not prove legitimate input still passes. An over-strict
+- [x] Explain: proving the refusal fires does not prove legitimate input still passes. An over-strict
       fix is as broken as a permeable one and fails just as silently
-- [ ] Cite the measured case: two task-67 fixes regressed legitimate input and were caught only by a
+- [x] Cite the measured case: two task-67 fixes regressed legitimate input and were caught only by a
       separately maintained accept-set, not by any proof
 
 **Dependencies**: none — independent of Phases 1–2
@@ -191,9 +197,9 @@ None. Documentation only; no consumer behaviour changes unless a human acts on t
 **Files**: `skills/*/references/mutation-proving.md`
 
 **Changes**:
-- [ ] `npm run bundle` and commit the regenerated copies — `validate.yml`'s Bundle freshness check fails
+- [x] `npm run bundle` and commit the regenerated copies — `validate.yml`'s Bundle freshness check fails
       the PR otherwise
-- [ ] Confirm every consuming skill picked up the change
+- [x] Confirm every consuming skill picked up the change
 
 **Dependencies**: Phases 1–3
 
@@ -207,7 +213,9 @@ None. Documentation only; no consumer behaviour changes unless a human acts on t
 
 ### Files Regenerated (commit them — CI checks freshness)
 
-2. ✅ `skills/*/references/mutation-proving.md` — `npm run bundle` output
+2. ✅ `skills/develop/references/mutation-proving.md` — `npm run bundle` output
+3. ✅ `skills/qa-task/references/mutation-proving.md` — `npm run bundle` output
+4. ✅ `skills/qa-story/references/mutation-proving.md` — `npm run bundle` output
 
 > **Edit the source, not the bundled copies.** Each `skills/*/references/mutation-proving.md` carries the
 > `AUTO-GENERATED — DO NOT EDIT` banner; a change made there is reverted by the next bundle.
@@ -227,16 +235,16 @@ repository's existing structural ones.
 
 ### Structural checks
 
-- [ ] `npm run bundle` leaves the tree clean — the freshness check CI runs
-- [ ] `npx prettier --check` passes on the changed file
-- [ ] `link-check` passes — any new internal link resolves **in the tracked tree**, not merely in the
+- [x] `npm run bundle` leaves the tree clean — the freshness check CI runs
+- [x] `npx prettier --check` passes on the changed file
+- [x] `link-check` passes — any new internal link resolves **in the tracked tree**, not merely in the
       working tree
 
 ### Content verification
 
-- [ ] The three new sections are present and the four existing ones are unchanged
-- [ ] Each new claim carries its measured number, not just its assertion
-- [ ] A reader arriving from `qa-task` Step 3c reaches the diagnosis table without another hop
+- [x] The three new sections are present and the four existing ones are unchanged
+- [x] Each new claim carries its measured number, not just its assertion
+- [x] A reader arriving from `qa-task` Step 3c reaches the diagnosis table without another hop
 
 ### Mutation Proving
 
@@ -249,22 +257,26 @@ being changed is the one that says not to claim a proof you did not run.
 
 ### Functional
 
-- [ ] The document states that a held proof is evidence about a test, not about the input space
-- [ ] It carries the task-67 number (9 held, 13 holes) rather than the abstraction alone
-- [ ] An unheld proof has three named causes with distinct responses
-- [ ] "Investigate before strengthening the test" is stated explicitly
-- [ ] *When to do it* has a boundary row requiring both directions
+- [x] The document states that a held proof is evidence about a test, not about the input space
+- [x] It carries the task-67 number with its provenance (9 recorded / 4 independently re-run and held, 13 holes) rather than the abstraction alone
+- [x] An unheld proof has three named causes with distinct responses
+- [x] "Investigate before strengthening the test" is stated explicitly
+- [x] *When to do it* has a boundary row requiring both directions
 
 ### Regression
 
-- [ ] The procedure, the four shapes, *Recording it* and *Do not claim it* are unchanged
-- [ ] No SKILL.md is modified
-- [ ] Bundle freshness clean; Prettier clean; links resolve
+- [x] The procedure, the five shapes, *Recording it* and *Do not claim it* are unchanged
+- [x] No SKILL.md is modified
+- [x] Bundle freshness clean; Prettier clean; links resolve
 
 ### Quality
 
-- [ ] Both task-67 unheld cases appear as worked examples, matching the voice of the four shapes
-- [ ] The document does not grow past roughly 160 lines — it is read mid-task, and length is a cost
+- [x] Both task-67 unheld cases appear as worked examples, matching the voice of the five shapes
+- [x] The additions total **no more than ~55 lines** (≈195 lines overall, from the current 140) — it is
+      read mid-task, and length is a cost. The budget is stated as a delta on purpose: the file grew from
+      96 to 140 lines between this task being filed and being picked up, and an absolute cap silently
+      became unmeetable. If the examples push past the budget, cut prose inside the new sections — do
+      not drop an example, which the criterion above requires
 
 ---
 
@@ -278,18 +290,19 @@ None. A documentation change to a file no code parses.
 
 **1. The document becomes long enough that people stop reading it**
 
-- **Risk**: 96 → ~150 lines; it is consulted mid-task, when attention is short.
+- **Risk**: 140 → ~195 lines; it is consulted mid-task, when attention is short.
 - **Probability**: Medium.
 - **Impact**: Moderate — an unread document is the same as an absent one, which is the failure mode this
   whole task is about.
 - **Mitigation**: the diagnosis table replaces prose rather than adding to it; the success criteria cap
-  the length; the strongest sentence in each section goes first.
+  the added lines rather than the total, so the cap cannot expire; the strongest sentence in each
+  section goes first.
 
 **2. "An unheld proof is a finding" is read as "never strengthen the test"**
 
 - **Risk**: someone stops fixing genuinely vacuous tests.
 - **Impact**: Moderate.
-- **Mitigation**: vacuous-test stays the **first** row of the table and keeps the four shapes; the rule
+- **Mitigation**: vacuous-test stays the **first** row of the table and keeps the five shapes; the rule
   is *investigate before strengthening*, not *do not strengthen*.
 
 ---
@@ -303,7 +316,7 @@ None. A documentation change to a file no code parses.
 **Steps**: revert the commit; `npm run bundle`. Nothing consumes the new sections programmatically, so
 removal is complete and immediate.
 
-**Verification**: the file is 96 lines with its original five sections; bundle freshness clean.
+**Verification**: the file is 140 lines with its original six sections; bundle freshness clean.
 
 ### Forward Fix (< 2 hours)
 
@@ -321,31 +334,33 @@ than the content is the problem.
 | Date       | Version | Description                                                  | Author      |
 | ---------- | ------- | ------------------------------------------------------------ | ----------- |
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.67 pipeline retrospective  | create-task |
+| 2026-09-02 | 1.1     | Review passed (8/10) — corrected the target file's description (140 lines, five shapes, three consumers), re-derived the length cap as a ~55-line delta, and qualified the nine-proofs number with its provenance | review-task |
+| 2026-09-02 |         | Implemented — 4 files (1 authored + 3 regenerated), 0 tests added (documentation change; no behaviour to revert) | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: The coverage limit
-- [ ] Section added, with the 9-held / 13-holes number
+- [x] Section added, with the 9-held / 13-holes number
 
 ### Phase 2: Three causes
-- [ ] Diagnosis table replaces the single conclusion
-- [ ] "Investigate before strengthening" stated
-- [ ] Both task-67 cases as worked examples
+- [x] Diagnosis table replaces the single conclusion
+- [x] "Investigate before strengthening" stated
+- [x] Both task-67 cases as worked examples
 
 ### Phase 3: Both directions
-- [ ] Boundary row in *When to do it*
+- [x] Boundary row in *When to do it*
 
 ### Phase 4: Bundle
-- [ ] `npm run bundle`, regenerated copies committed
+- [x] `npm run bundle`, regenerated copies committed
 
 ---
 
 ## References
 
 - **The document**: [`shared/resources/mutation-proving.md`](../../../shared/resources/mutation-proving.md)
-- **Nine proofs held, thirteen holes open**: [`task.67.qa.1.execute-the-skill-qa-gate.md`](../task.67.execute-the-skill-qa-gate/task.67.qa.1.execute-the-skill-qa-gate.md) — Code Review section
+- **Nine proofs held, thirteen holes open**: [`task.67.qa.1.execute-the-skill-qa-gate.md`](../task.67.execute-the-skill-qa-gate/task.67.qa.1.execute-the-skill-qa-gate.md) — *Mutation-proof spot check (Step 3c)* section
 - **The two unheld proofs, and what they meant**: [`task.67.bug.2.extraction-and-coverage-gaps.md`](../task.67.execute-the-skill-qa-gate/task.67.bug.2.extraction-and-coverage-gaps.md) — the L3 correction
 - **The over-strict regressions caught by an accept-set**: [`task.67.bug.3.obfuscated-names-and-flag-writes.md`](../task.67.execute-the-skill-qa-gate/task.67.bug.3.obfuscated-names-and-flag-writes.md)
 - **The instrument for the question proofs cannot answer**: `task.73` — probe mode in the DoD security check
@@ -355,11 +370,51 @@ than the content is the problem.
 
 ## Notes
 
+### Implementation Record (develop, 2026-09-02)
+
+**What was built.** Three sections added to `shared/resources/mutation-proving.md`, in reading order:
+
+1. **`## What a held proof does not tell you`** — placed immediately after *The procedure*, where a
+   reader arrives having just been told the technique works. States the limit (a proof falsifies a
+   check that exists; behaviour no test names has nothing to revert), carries the task-67 number with
+   its provenance, and names the different instrument the remaining question needs. Closes on the
+   one-line form: *a held proof is evidence about a test, not about coverage.*
+2. **`## When the proof does not go red`** — replaces the old three-line single conclusion in place,
+   rather than adding beside it. Diagnosis table (vacuous test · redundant source · wrong premise),
+   the "investigate before strengthening" rule, then both task-67 cases as worked examples in the
+   voice of the five shapes, each closing on an indented takeaway.
+3. **A fifth row in `## When to do it`** plus a *Both directions* paragraph, citing the two
+   over-strict regressions and the accept-set that caught them.
+
+**Deliberate choices.**
+
+- The removed sentence's content was **kept**, not dropped: "a vacuous test … reports coverage that
+  does not exist" now sits under the diagnosis table as the reason the first row is the worst of the
+  three. The `git diff` shows exactly three removed lines and nothing else.
+- The task-67 number is written as *nine recorded, four re-run independently in QA and all four
+  held*. A bare "nine held" would have put the document in violation of its own closing section, which
+  is the failure it exists to prevent.
+- The new sections sit **before** the five shapes, because the diagnosis table's first row points down
+  at them. Ordering is load-bearing, not cosmetic.
+
+**Measurements.** 140 → **194 lines**; **54 added**, against a budget of ~55. `npm run bundle`
+regenerated all three consuming copies. `npm run ci:fast` (`format:check` + the full hermetic suite):
+**exit 0, zero failures**. No `SKILL.md` was modified — verified against `git status`.
+
+**Mutation proving:** not applicable, and saying so is the honest answer. There is no behaviour to
+revert; the change is editorial, and the document being changed is the one that says not to claim a
+proof you did not run.
+
+**One observation left for QA, deliberately not fixed.** `skills/develop/SKILL.md` points at this
+document with the phrase "the four shapes this takes". That count went stale when the fifth shape was
+added — *before* this task — so it is pre-existing drift, not drift this change introduced. §4 Out of
+Scope forbids any `SKILL.md` change, so it stands. Worth a one-line follow-up task.
+
 ### Important Reminders
 
 - **Do not touch a SKILL.md.** Every consumer reaches this file by reference; adding the guidance to a
   skill would create the duplicate that indirection prevents.
-- **Keep the four shapes.** They are about vacuity, they are correct, and they are the most-used part of
+- **Keep the five shapes.** They are about vacuity, they are correct, and they are the most-used part of
   the document.
 
 ### Why this is Medium and not High
