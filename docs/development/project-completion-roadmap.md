@@ -91,6 +91,8 @@ accepted task stalls the loop.
 - [ ] **T70** Build the inline PR comment primitive, on GitHub and Bitbucket · deps: none · touches: review-skills!, test-harness~ · /develop-task docs/tasks/task.70.inline-pr-comments/task.70.inline-pr-comments.md
 - [ ] **T77** Run the PR conformance review before a work item is finalised · deps: none · touches: pipeline-steps!, review-skills!, docs-pipeline!, test-harness~, bundles~ · /develop-task docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md
 - [ ] **T78** Give `develop-bug`'s fix cycle the same fast gate as the other pipelines · deps: none · touches: pipeline-steps!, test-harness~, bundles~ · /develop-task docs/tasks/task.78.develop-bug-fast-gate/task.78.develop-bug-fast-gate.md
+- [ ] **T83** Skip installing tracker-specific skills the consumer's platform can never fire · deps: none · touches: setup-consumer!, test-harness~, docs-pipeline~ · /develop-task docs/tasks/task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md
+- [ ] **T84** Skill install profiles with dependency closure · deps: T83 · touches: setup-consumer!, test-harness~, docs-config~, docs-pipeline~ · /develop-task docs/tasks/task.84.skill-install-profiles/task.84.skill-install-profiles.md
 
 ---
 

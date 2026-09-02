@@ -98,9 +98,21 @@ A registry is an index, and indexes drift from what they index. Three rows of th
 
 Bugs before tasks, unconditionally — a registered bug is known-broken behaviour, a filed task is intended work, and broken outranks intended. Within bugs: `severity`, then `priority`, then ascending number. Within tasks: `priority`, then ascending number. The trailing number tie-break is what makes the order **total**, so the frontier is stable under input reordering. An unrecognised severity or priority sorts last within its tier rather than throwing — a typo in a hand-maintained cell must not decide whether work is visible at all.
 
+### Dependencies — the `Depends on` column gates selection
+
+Ordering consults **nothing** about dependencies, so ranking alone will nominate a row whose prerequisite is unbuilt. A dependent row is therefore checked against its own `Depends on` cell after the eligibility floor and before the ranked-lower branch, so a blocked row is reported as blocked rather than as merely outranked.
+
+A dependency is satisfied when **the document it points at** reads `accepted` — the same "frontmatter decides, the row only nominates" rule the frontier already applies to the candidate itself. References resolve across **both** registries, so a task may depend on a bug and vice versa. The cell accepts the spellings a hand-maintained table carries: `task.83`, `T83`, `bug.4`, `B4`, `#83`, and a bare `83` read as the declaring row's own kind. An em-dash, `none`, `n/a` or `tbd` places no constraint. Story references and anything with a dotted number (`story.2.3`) are dropped — they name nothing a registry can resolve.
+
+**Three cases are treated as satisfied-with-a-warning rather than as blockers**: a `cancelled` dependency (waiting on work that will not happen waits forever — the roadmap path's `⏭️ SKIP` handling), a reference naming no row in either registry, and a reference whose document is missing or unreadable. The direction follows the same reasoning task.71 settled the eligibility floor on: selecting an item early costs **one visible cycle**, because `develop-*` Step 2 reviews before any code is written and HALTs on findings, while an unresolvable blocker costs **indefinite silence**. A wasted cycle beats an invisible row. All three still emit a `--lint` warning, so the condition is never mute.
+
+**The check is one level deep, by design.** It asks only whether each named dependency is accepted, never what that dependency in turn depends on. A transitive walk would need cycle detection over a hand-maintained table that nothing validates; the shallow check needs none, and the deeper ordering falls out anyway — a dependency cannot itself be selected until *its* dependencies are accepted, so a chain drains one accepted item at a time.
+
+Before this existed, the ascending-number tie-break hid the gap whenever a dependency happened to carry the lower number, which is the common case. Raise a dependent row's priority above its prerequisite's and the frontier nominated work that could not be built.
+
 ### Columns
 
-When the table has a header, columns are read **by name** (`#`/`No`/`Id`, `Title`/`Name`, `Status`, `Severity`, `Priority`), falling back to the documented positions only when no header is recognisable. A consumer who orders their registry differently is read correctly rather than silently mis-ranked; a header that names no `Status` or `Priority` column falls back to the documented position and says so in `--lint` warnings.
+When the table has a header, columns are read **by name** (`#`/`No`/`Id`, `Title`/`Name`, `Status`, `Severity`, `Priority`, `Deps`/`Depends on`/`Blocked by`), falling back to the documented positions only when no header is recognisable. A consumer who orders their registry differently is read correctly rather than silently mis-ranked; a header that names no `Status` or `Priority` column falls back to the documented position and says so in `--lint` warnings.
 
 Column mapping is scoped to **one table**: it is resolved from that table's header and discarded when the table ends, so a `## Notes` key/value table or a second registry section is parsed on its own terms rather than as more registry rows.
 
@@ -112,7 +124,7 @@ A consumer repo may have neither registry. An absent, empty, header-only or tabl
 
 ### Visibility — out of the frontier, never invisible
 
-`select-next.mjs --lint` emits a `registryFrontier` section listing **every** registry row the fallback considered, with the reason each was passed over (`document status draft — outside the task eligibility floor …`, `document missing or unreadable: …`, `malformed row — …`, `eligible, but T3 ranked higher`). An item may be out of the frontier, but it must never be invisible — invisibility is the exact failure this mechanism exists to remove, and an escape hatch that reintroduced it silently would be the same bug wearing different clothes. Selection short-circuits at the first eligible row (so it reads at most one document per candidate up to the hit); `--lint` evaluates every row.
+`select-next.mjs --lint` emits a `registryFrontier` section listing **every** registry row the fallback considered, with the reason each was passed over (`document status draft — outside the task eligibility floor …`, `blocked on unaccepted dependency: task.83 (planned)`, `document missing or unreadable: …`, `malformed row — …`, `eligible, but T3 ranked higher`). An item may be out of the frontier, but it must never be invisible — invisibility is the exact failure this mechanism exists to remove, and an escape hatch that reintroduced it silently would be the same bug wearing different clothes. Selection short-circuits at the first eligible row (so it reads at most one document per candidate up to the hit); `--lint` evaluates every row.
 
 ### `item.source`
 

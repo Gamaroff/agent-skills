@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **The registry fallback frontier ignored the `Depends on` column, so it could nominate work whose
+  prerequisite was unbuilt.** `compareCandidates` orders tasks by priority then ascending number and
+  consults nothing about dependencies, and `DEFAULT_COLUMNS.task` had no `deps` index at all — even
+  though the comment directly above it documented the header as `| # | Title | Status | Category |
+  Priority | Created | Issue | Deps |`. The `⛔ blocked until X accepted` machinery that handles this
+  correctly is **roadmap-only**; nothing equivalent guarded the registry path.
+
+  **The ascending-number tie-break is what hid it.** A dependency usually carries the lower number, so
+  it usually won on the tie-break and the ordering looked right by accident. Raise a dependent row's
+  priority above its prerequisite's — the exact case this repo's own tasks 83 and 84 would hit — and
+  the frontier nominated the dependent with its dependency still `planned`. Every fixture added here
+  therefore inverts the numbering or the priority, so a passing test cannot be explained by the
+  tie-break alone.
+
+  A dependency is satisfied when **the document it points at** reads `accepted` — the same
+  "frontmatter decides, the row only nominates" rule the frontier already applied to the candidate
+  itself. References resolve across both registries, so a task may depend on a bug and vice versa,
+  and the cell accepts the spellings a hand-maintained table carries (`task.83`, `T83`, `bug.4`,
+  `B4`, `#83`, bare `83`). The check runs after the eligibility floor and before the ranked-lower
+  branch, so a blocked row reports the dependency rather than claiming it was merely outranked.
+
+  **Three cases are satisfied-with-a-warning rather than blockers**: a `cancelled` dependency, a
+  reference naming no row in either registry, and one whose document is unreadable. The direction
+  follows the ground task 71 settled the eligibility floor on — selecting early costs one visible
+  cycle, since `develop-*` Step 2 reviews before any code is written and HALTs on findings, while an
+  unresolvable blocker costs indefinite silence. A wasted cycle beats an invisible row, and all three
+  still warn, so the condition is never mute.
+
+  **The check is one level deep by design.** A transitive walk would need cycle detection over a
+  hand-maintained table nothing validates; the shallow check needs none, and the deeper ordering
+  falls out anyway, because a dependency cannot itself be selected until *its* dependencies are
+  accepted. `/develop-batch` is unaffected — `selectBatch` works off the roadmap, where `⛔` already
+  covered this.
+
 ## [v0.45.0] - 2026-09-02
 
 ### Added

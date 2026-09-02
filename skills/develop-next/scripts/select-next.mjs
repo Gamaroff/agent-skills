@@ -852,6 +852,12 @@ const COLUMN_ALIASES = {
   status: "status",
   severity: "severity",
   priority: "priority",
+  deps: "deps",
+  dep: "deps",
+  "depends on": "deps",
+  "depends-on": "deps",
+  depends_on: "deps",
+  "blocked by": "deps",
 };
 
 // Documented positions, used when a registry has no recognisable header.
@@ -859,8 +865,55 @@ const COLUMN_ALIASES = {
 //   task: | # | Title | Status | Category | Priority | Created | Issue | Deps |
 const DEFAULT_COLUMNS = {
   bug: { n: 0, title: 1, status: 2, severity: 3, priority: 4 },
-  task: { n: 0, title: 1, status: 2, priority: 4 },
+  task: { n: 0, title: 1, status: 2, priority: 4, deps: 7 },
 };
+
+// A dependency reference inside a registry `Depends on` cell. Accepts the forms
+// a hand-maintained table actually carries: `task.83`, `T83`, `bug.4`, `B4`,
+// `#83`, and a bare `83` (read as the same kind as the row declaring it).
+// The number is captured WITH any dotted segments so a story-shaped reference is
+// consumed whole. Matching a bare `\d+` here would take `story.2.3` as story 2
+// plus a stray task 3 — inventing a dependency nobody declared.
+const DEP_REF_RE = /(?:\b(task|bug|story)\s*[.#-]?\s*|\b([TB]))?(\d+(?:\.\d+)*)\b/gi;
+
+// Cell values that mean "no dependency". A registry is hand-maintained, so the
+// em-dash this repo uses is only one of the spellings that show up.
+const DEP_EMPTY_RE = /^(?:[—–-]|none|n\/a|na|tbd)$/i;
+
+/**
+ * Parse a registry `Depends on` cell into `{kind, n}` references.
+ *
+ * `kind` defaults to the declaring row's kind, so a bare `83` in the task
+ * registry means task 83. Story references are dropped: stories are not
+ * registry rows and cannot be resolved here.
+ *
+ * @param {string} cell raw cell text
+ * @param {"bug"|"task"} kind kind of the row declaring the dependency
+ * @returns {{kind: "bug"|"task", n: number}[]} deduped, in declaration order
+ */
+export function parseDepCell(cell, kind) {
+  const text = (cell || "").trim();
+  if (!text || DEP_EMPTY_RE.test(text)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const m of text.matchAll(DEP_REF_RE)) {
+    const word = (m[1] || "").toLowerCase();
+    const letter = (m[2] || "").toUpperCase();
+    // Stories are not registry rows, and neither is anything carrying a dotted
+    // number (`story.2.3`, or a bare `2.3`) — there is nothing here to resolve
+    // it against, so declaring it a dependency would block on a phantom.
+    if (word === "story" || m[3].includes(".")) continue;
+    let k = kind;
+    if (word === "task" || letter === "T") k = "task";
+    else if (word === "bug" || letter === "B") k = "bug";
+    const n = Number(m[3]);
+    const key = `${k}${n}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ kind: k, n });
+  }
+  return out;
+}
 
 /** Map a header row's cells to field indices; null if it names nothing we know. */
 function mapHeader(cells) {
@@ -1029,9 +1082,75 @@ export function parseRegistry(text, kind, registryPath) {
           ? cells[c.severity] || null
           : null,
       priority: c.priority !== undefined ? cells[c.priority] || null : null,
+      deps:
+        c.deps !== undefined ? parseDepCell(cells[c.deps] || "", kind) : [],
     });
   }
   return { rows, malformed, warnings };
+}
+
+/**
+ * Which of `row`'s declared dependencies are not yet satisfied.
+ *
+ * A dependency is satisfied when the DOCUMENT it points at reads `accepted` —
+ * the same "frontmatter decides, the row only nominates" rule the frontier
+ * already applies to the candidate itself. Three cases are deliberately treated
+ * as satisfied-with-a-warning rather than as blockers:
+ *
+ *   - `cancelled` — the work will not happen, so waiting on it waits forever.
+ *     Mirrors the roadmap path's ⏭️ SKIP handling.
+ *   - a reference naming no row in either registry.
+ *   - a reference whose document is missing or unreadable.
+ *
+ * That direction is chosen on exactly the ground task 71 settled the
+ * eligibility floor on: selecting an item early costs ONE VISIBLE CYCLE, since
+ * `develop-*` Step 2 reviews before any code is written and HALTs on findings.
+ * An unresolvable blocker costs INDEFINITE SILENCE, and silence is the failure
+ * this whole mechanism exists to remove. A wasted cycle beats an invisible row.
+ * Every one of the three still emits a warning, so the condition is never mute.
+ *
+ * **The check is one level deep by design.** It asks only whether each named
+ * dependency is accepted, never what that dependency in turn depends on. A
+ * transitive walk would need cycle detection over a hand-maintained table that
+ * nothing validates; the shallow check needs none, and the deeper ordering falls
+ * out anyway — a dependency cannot itself be selected until ITS dependencies are
+ * accepted, so the chain drains one accepted item at a time.
+ *
+ * @param {object} row parsed registry row
+ * @param {Map<string, object>} rowIndex `${kind}${n}` → row, across both registries
+ * @param {(path: string) => string|null} readStatus document status reader
+ * @param {string[]} warnings mutated — one entry per dependency treated as satisfied
+ * @returns {string[]} human-readable blockers; empty means dependency-ready
+ */
+function registryDepBlockers(row, rowIndex, readStatus, warnings) {
+  const blockers = [];
+  const self = `${row.kind} ${row.n}`;
+  for (const dep of row.deps || []) {
+    const ref = `${dep.kind}.${dep.n}`;
+    const target = rowIndex.get(`${dep.kind}${dep.n}`);
+    if (!target) {
+      warnings.push(
+        `line ${row.line}: ${self} depends on ${ref}, which is not a row in either registry — dep treated as satisfied`,
+      );
+      continue;
+    }
+    const status = readStatus(target.path);
+    if (status === "accepted") continue;
+    if (status === null) {
+      warnings.push(
+        `line ${row.line}: ${self} depends on ${ref}, whose document is missing or unreadable (${target.path}) — dep treated as satisfied`,
+      );
+      continue;
+    }
+    if (status === "cancelled") {
+      warnings.push(
+        `line ${row.line}: ${self} depends on ${ref}, which is cancelled — dep treated as satisfied`,
+      );
+      continue;
+    }
+    blockers.push(`${ref} (${status})`);
+  }
+  return blockers;
 }
 
 /**
@@ -1109,6 +1228,11 @@ export function registryFrontier(registries, opts = {}) {
 
   const ranked = [...bugs.rows, ...tasks.rows].sort(compareCandidates);
 
+  // Resolve `Depends on` references against BOTH registries — a task may depend
+  // on a bug and vice versa, and the ranking already interleaves the two.
+  const rowIndex = new Map();
+  for (const r of ranked) rowIndex.set(`${r.kind}${r.n}`, r);
+
   let selected = null;
   for (const row of ranked) {
     if (selected && !evaluateAll) {
@@ -1136,6 +1260,21 @@ export function registryFrontier(registries, opts = {}) {
         ...entry,
         eligible: false,
         reason: `document status ${docStatus} — outside the ${row.kind} eligibility floor (${[...ELIGIBLE_FOR[row.kind]].join(", ")})`,
+      });
+      continue;
+    }
+    // Ordering is priority-then-number, which consults nothing about
+    // dependencies: raise a dependent row's priority above its dependency's and
+    // the frontier would otherwise nominate work whose prerequisite is unbuilt.
+    // Checked AFTER the floor so the recorded reason names the nearer cause, and
+    // BEFORE the ranked-lower branch so a blocked row is never reported as
+    // merely outranked.
+    const depBlockers = registryDepBlockers(row, rowIndex, readStatus, warnings);
+    if (depBlockers.length) {
+      passedOver.push({
+        ...entry,
+        eligible: false,
+        reason: `blocked on unaccepted ${depBlockers.length === 1 ? "dependency" : "dependencies"}: ${depBlockers.join(", ")}`,
       });
       continue;
     }

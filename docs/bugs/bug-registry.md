@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
 **Last Updated:** 2026-09-02
-**Next Available Bug Number:** **9**
+**Next Available Bug Number:** **10**
 
 ## How to use
 
@@ -35,6 +35,7 @@
 | 6 | [Ten more fail-open routes past the snippet classifier, plus two over-refusals](bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md) | new | Major | High | 2026-09-02 | qa-execute-snippets / classifier |
 | 7 | [`zero-blocks-executed` fires on skills whose every documented command is correctly refused](bug.7.zero-blocks-executed-fires-on-correct-refusal/bug.7.zero-blocks-executed-fires-on-correct-refusal.md) | new | Minor | Medium | 2026-09-02 | qa-task Step 4b / snippet engine |
 | 8 | [A bug status outside the lifecycle is silently invisible to selection](bug.8.bug-status-outside-lifecycle-is-invisible/bug.8.bug-status-outside-lifecycle-is-invisible.md) | new | Major | High | 2026-09-02 | selection / bug authoring / validation |
+| 9 | [The registry frontier ignores the `Depends on` column, so it can nominate work whose prerequisite is unbuilt](bug.9.registry-frontier-ignores-depends-on/bug.9.registry-frontier-ignores-depends-on.md) | ready-for-qa | Major | High | 2026-09-02 | selection / task registry |
 
 ---
 
