@@ -6,6 +6,50 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The DoD security check now executes candidate inputs instead of grepping for them.**
+  The `/finalise` security agent was a read-only inspector: every check asked whether a boundary
+  *existed*, none asked whether it *held*. It gains a gated **probe mode** — for work items whose
+  deliverable is a boundary, the agent generates candidate inputs, **executes** them against the
+  shipped code, and reports only what reproduced.
+
+  **The gap this closes was measured on this repository.** On task 67 a substituted prompt that
+  executed candidates found **fourteen fail-open routes** past a deny-list the grep prompt had
+  reported `PASS` — two of them commands the list named by hand, reached by adding a quote (`g\h`,
+  `cu'r'l`). A QA security gate had passed the same file an hour earlier. Both checks asked whether
+  the mechanism existed; neither asked whether it held.
+
+  **"Read-only" is redefined as *does not mutate*, not *does not run*.** The agent runs as an Explore
+  subagent and already had `Bash`; the old wording foreclosed a capability it had, and that
+  foreclosure was the defect. Execution is confined to a pure predicate, a temporary directory, no
+  network and no repository write — three prohibitions stated explicitly and held by contract tests.
+
+  **Detection is gated, and the negative case is explicit.** A boundary is a predicate that accepts or
+  rejects — a classifier, validator, sanitiser, allow/deny-list. A CRUD endpoint, renderer, report
+  writer, formatter or migration is **not**, however security-adjacent it looks, so the common work
+  item pays nothing.
+
+  **Absence is never an answer.** The returned YAML gains a required `boundary:` flag and, under it,
+  `probes_executed:`; `probes[]` carries reproduced findings only. A missing `boundary` renders as
+  *unverified*, never as "not a boundary" — the agent did not answer the question. A missing
+  `probes_executed` counts as zero. **A boundary that executed zero candidates is a finding, not a
+  pass**: a step reporting success without having run anything is the exact defect probe mode exists
+  to catch, so it is not allowed to hide inside its own output. `/finalise` renders each of these
+  states as its own branch, so a boundary that was probed and *held* can never be reported as one
+  that was never probed.
+
+  **It found real defects on its first run.** Replayed against the commit that closed the original
+  fourteen, probe mode surfaced **twelve further routes** — shell-keyword swallow via `if`/`while`/
+  `until`, no-space write redirects, `git -C log push`, sed's `w` write command, apostrophe-span
+  quote blanking, quote-unaware heredoc detection, plus two over-refusals of read-only `-o` usage.
+  All twelve reproduce deterministically on current `HEAD` and are filed as `bug.6`. That replay is
+  now a committed regression corpus rather than a one-off script.
+
+  New: `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` and
+  `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs`. Changed:
+  `shared/resources/finalise-dod-security-prompt.md` (the source) and `skills/finalise/SKILL.md`
+  (the render). CI now checks out full history so the replay's discriminating half runs rather than
+  skipping at depth 1. Task 73.
+
 - **QA now executes a skill's documented shell snippets instead of only reading them.**
   `qa-task` gains **Step 4b** and `qa-story` gains **Phase 1.7**: when a change set adds or modifies a
   `SKILL.md` or a `shared/resources/*.md` prompt containing fenced ```bash blocks, the documented blocks

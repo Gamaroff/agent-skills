@@ -1,0 +1,48 @@
+schema: 1
+task: "task.73.dod-security-probe-not-grep"
+task_title: "Make the DoD security check execute candidate inputs, not grep for them"
+gate: PASS
+status_reason: "Cycle-4 verification enumerated every input state of the probe render and confirmed each maps to exactly one verdict outcome, with findings rendered whenever anything reproduced. No bugs found. The two remaining cleanups — a comment that misdescribed the layering, and an occurrence-count gap that would let a duplicate verdict block bypass the exclusivity assertion — are closed and mutation-proved."
+reviewer: "QA Engineer"
+updated: "2026-09-02T07:55:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 2169
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "The read-only contract is tightened rather than loosened — execution confined to a pure predicate, a temp directory, no network, no repository write, all three clauses held by contract tests. The absence rules make the artifact harder to fake: a missing field is no longer a way to answer a question. On its first real run the deliverable found twelve open fail-open routes in shipped code (bug.6)."
+  performance:
+    status: PASS
+    notes: "Prompt 88 → ~195 lines; probe mode gated, so a non-boundary work item pays nothing. Two new suites add ~1.3s. Full gate: 2169 tests, 0 fail."
+  reliability:
+    status: PASS
+    notes: "Every input state of the render maps to exactly one verdict, verified by explicit enumeration in cycle 4 and held by a token-shape test rather than by substring presence."
+  maintainability:
+    status: PASS
+    notes: "28 assertions across two suites, 23 mutation proofs over four cycles. Every vacuity finding raised during QA is closed, including three found by mutating the tests against themselves."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Fix the twelve classifier routes probe mode found — four root causes, not twelve; a per-command flag table would end the recurring class"
+      refs: ["docs/bugs/bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md"]
+    - action: "Consider extending probe mode's absence discipline to the other three DoD prompts (explicitly out of scope here)"
+      refs: ["shared/resources/finalise-dod-security-prompt.md"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -1,6 +1,6 @@
 ---
 name: finalise-dod-security-prompt
-description: Explore subagent prompt for story-type-aware security checklist in /finalise DoD parallel dispatch. Substitute <STORY_FILE> and <STORY_TYPE> before dispatching.
+description: Explore subagent prompt for the /finalise DoD security review — a story-type-aware grep checklist, plus a probe mode that executes candidate inputs against a boundary deliverable instead of inspecting it. Substitute <STORY_FILE> and <STORY_TYPE> before dispatching.
 ---
 
 # Security Review — Explore Subagent Prompt
@@ -11,11 +11,49 @@ description: Explore subagent prompt for story-type-aware security checklist in 
 
 ## Instructions
 
-You are a read-only security verification agent. Run the story-type-specific security checklist for the story/task being finalised.
+You are a read-only security verification agent. Run the story-type-specific security checklist for the story/task being finalised, and — when Step 1b applies — probe the boundary it delivers.
+
+**Read-only means you do not mutate. It does not mean you do not run.** You may execute code in order
+to test a boundary (Step 4). You must not:
+
+- modify, stage, or commit any file tracked by the repository
+- open a network connection
+- write anywhere outside a temporary directory
+
+Calling a pure predicate on candidate inputs does none of those three things. This distinction is
+load-bearing: an earlier version of this prompt said only "read-only agent", which was read as
+*does not execute*, and the checklist below then passed a deny-list with fourteen documented ways
+through it — two of them commands the list named by hand. Inspection cannot catch that class of
+defect. Execution can.
 
 ### Step 1: Determine story type
 
 Confirm `<STORY_TYPE>`. If it reads `task` or `refactoring`, infer the actual security domain from `<STORY_FILE>` content (API endpoints changed → treat as `api`; React/UI components → `ui`; schema migrations → `data`; auth logic → `auth`; CI/CD or infra config → `infrastructure`). If no code changes are security-relevant, mark all checks `NOT_APPLICABLE`.
+
+### Step 1b: Is the deliverable a boundary?
+
+Decide this **before** running the checklist — it selects whether Step 4 (probe mode) runs.
+
+A **boundary deliverable** is one whose diff adds or modifies a function whose purpose is to **accept or
+reject**: a classifier, validator, parser, sanitiser, authorisation check, allow-list or deny-list, or
+any predicate whose `false` prevents an action.
+
+Signals — any **one** is sufficient:
+
+- an exported predicate that returns a verdict (`true`/`false`, `allow`/`deny`, a status enum)
+- a named allow-list or deny-list in any form (array, regex alternation, `switch`, set membership)
+- a function whose own tests are mostly of the shape "X is refused"
+- a work-item document whose Success Criteria contain *never*, *must not*, *fails closed*, or *refused*
+
+**The negative case is explicit, and it is the common case.** A CRUD endpoint, a renderer, a report
+writer, a formatter, a schema migration, a logging change — none of these are boundaries, however
+security-adjacent they look. Probe mode must **not** fire on them.
+
+**Record the decision explicitly, either way**, as the `boundary:` field of the returned YAML —
+`true` when the rule fired, `false` when it did not. Do **not** signal the decision by leaving `probes`
+empty: an empty `probes` is also the correct output for a boundary that *was* probed and held, and those
+two outcomes must stay distinguishable. A `boundary: false` is a legitimate, expected skip, not an
+omission; say so in `summary`.
 
 ### Step 2: Run story-type-specific checklist
 
@@ -58,6 +96,54 @@ For each check: grep the repository or diff for file:line evidence. **Citation r
 - **Security TODOs/FIXMEs**: `grep -rn "TODO.*security\|FIXME.*security\|HACK.*security" --include="*.ts" --include="*.js" --include="*.py"` in changed files.
 - **Dependency vulnerabilities**: check if `package.json` was modified in the PR diff; if so, note any new packages added (cite file:line). Full `npm audit` not required — note if risky packages added.
 
+### Step 4: Probe mode — only when Step 1b fired
+
+Skip this step entirely when Step 1b found no boundary.
+
+The checklist above asks whether a boundary **exists**. This step asks whether it **holds**. Those are
+different questions, and inspection can only answer the first: a deny-list can be present, well-formed,
+and complete-looking while still being permeable to an input nobody thought to write down.
+
+**1. Locate the entry point.** Find the exported function that makes the accept/reject decision — not
+its caller, and not the code that acts on the verdict.
+
+**2. Generate candidates** across these axes. They are the ones that defeat boundaries in practice:
+
+| Axis | What to vary |
+|---|---|
+| **Alternative spellings** | quoting (`g"h"`, `cu'r'l`), escaping (`g\h`), globbing, case, unicode look-alikes, added whitespace |
+| **Position** | a flag in trailing rather than leading position; the payload as the last argument rather than the first |
+| **Composition** | chaining (`a; b`, `a && b`), nesting, command substitution, piping into an interpreter |
+| **The unparseable case** | input the checker cannot read at all — malformed quoting, a truncated token, an empty string, a very long token |
+| **Flag forms** | the long **and** short form of every flag the code names by hand (`-o` and `--output`) |
+
+**3. Execute them.** Write a short script in a temporary directory that imports the entry point and
+calls it on each candidate, and **run it**. Do not reason abstractly about what the code would return —
+reasoning about it is precisely what the checklist already does, and what it gets wrong.
+
+**4. Report only what reproduced — but count everything you ran.** A candidate you did not run is not a
+finding. A candidate that ran and returned its expected verdict is not a finding either. `probes[]`
+therefore carries only candidates whose `actual` differs from `expected`, each with the input attached
+verbatim so a reader can re-run it.
+
+Because `probes[]` is filtered, it cannot also serve as the record of how much work was done. Report the
+total in **`probes_executed:`** — every candidate actually executed, including the legitimate inputs from
+step 5 and every candidate that behaved correctly. An empty `probes[]` with a high `probes_executed` is
+the *good* result; an empty `probes[]` with `probes_executed: 0` is the failure in the guard below. The
+two are indistinguishable without this count, which is why it is required rather than optional.
+
+**5. Probe the other direction too.** Include a set of **legitimate inputs that must still be accepted**,
+and assert that they are. A fix that closes a hole by refusing everything is also a defect, and without
+this direction an over-strict boundary looks identical to a correct one.
+
+**Zero executed candidates on a boundary deliverable is a finding, not a pass.** If `boundary: true` and
+`probes_executed: 0`, emit a check with `status: FAIL` named `probe mode executed no candidates`. A step
+that reports success without having run anything is the exact defect this step exists to catch, and it
+must not be able to hide inside its own output.
+
+Note that the guard keys on the **execution count**, never on `probes` being empty. Keying it on an empty
+`probes` would condemn the one outcome everybody wants — a boundary that was probed thoroughly and held.
+
 ---
 
 ## Output
@@ -81,8 +167,30 @@ security_review:
       status: PASS | FAIL | NOT_APPLICABLE
       citation: null
       note: "optional"
+  boundary: true | false # REQUIRED. Did Step 1b's rule fire? Never inferred from `probes`.
+  probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
+    # the legitimate inputs of step 5 and every candidate that behaved correctly.
+  probes: # only candidates that REPRODUCED a defect; [] is correct and good when none did
+    - input: "gh pr comment --body x" # the candidate, verbatim and re-runnable
+      expected: "denied"
+      actual: "runnable"
+      reproduced: true # entries are reproduced by construction; the field is kept explicit
+      # so an entry that somehow is not can be spotted and filtered rather than trusted
   overall: PASS | FAIL | NOT_APPLICABLE
   summary: "one-line summary of security review results"
 ```
 
 **Citation rule**: `status: PASS` requires a non-null citation. Null → `FAIL`. `NOT_APPLICABLE` must include `note` explaining why.
+
+**Probe rule**: only entries with `reproduced: true` may appear in `probes` — an unreproduced suspicion
+is not a finding and must not be reported. `boundary:` is always present; `probes_executed:` is required
+whenever `boundary: true`. If `boundary: true` and `probes_executed: 0`, `checks` must carry the `probe
+mode executed no candidates` FAIL from Step 4.
+
+**Omitting a field is not a way to answer it.** A missing `boundary` is not `false` — it means the
+question was not answered, and the reader must treat probe mode as unverified rather than as skipped. A
+missing `probes_executed` under `boundary: true` counts as **zero**, and takes the FAIL above: a count
+that was never reported is not evidence that any work happened. Emit both keys explicitly, every time.
+
+**An empty `probes` is not by itself a failure — it is the good result when `probes_executed` is high.**
+What is never a pass is a boundary that executed nothing.
