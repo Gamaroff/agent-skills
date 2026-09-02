@@ -103,7 +103,7 @@ new shared rule are:
 
 ### `zero-blocks-executed` — not suppressed, but classified
 
-This is **[bug.7](../../bugs/bug.7.zero-blocks-executed-fires-on-correct-refusal/bug.7.zero-blocks-executed-fires-on-correct-refusal.md)
+This is **[bug.7 (PR #298, not yet merged)](https://github.com/Gamaroff/agent-skills/pull/298)
 case B**: every block is *correctly* refused, and no `--bind` or `--copy` can move them to `runnable`.
 `awk` is not on the allow-list and write-redirection is denied by design.
 

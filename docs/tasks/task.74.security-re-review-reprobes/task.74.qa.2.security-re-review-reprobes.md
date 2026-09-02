@@ -108,7 +108,7 @@ cycle 1's fixes, so the following were probed independently and found sound:
 Fires again (the diff still modifies two `SKILL.md` files and a `shared/resources/*.md` prompt).
 
 `zero-blocks-executed` again on all three files — unchanged classification, still
-[bug.7](../../bugs/bug.7.zero-blocks-executed-fires-on-correct-refusal/bug.7.zero-blocks-executed-fires-on-correct-refusal.md)
+[bug.7 (PR #298, not yet merged)](https://github.com/Gamaroff/agent-skills/pull/298)
 case B, still pre-existing on `develop` for both skills. Not a finding.
 
 Executed manually instead, this cycle **from each shipped file separately** rather than only from the
