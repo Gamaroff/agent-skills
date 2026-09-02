@@ -167,7 +167,11 @@ the other behaviour-driving keys the QA skills already read (`status`, `github_i
 - First review: `git diff <base>...HEAD > <DIFF_FILE>` (base = the resolved target branch, default `develop`).
 - Re-review (QA cycle ≥ 3): scope to files changed since the last gate — reuse the skill's existing
   `git log --since="{gate_date}" --name-only` set, diff only those paths, so each cycle re-reviews
-  only what changed.
+  only what changed. **One carve-out overrides this**: when the prior gate failed on a safety axis,
+  the re-review runs unscoped at *any* cycle and the prompt gains a SAFETY RE-PROBE directive. The
+  trigger and its non-triggers are stated once in
+  [`references/qa-re-review-scope.md`](qa-re-review-scope.md) — read it there; this file
+  deliberately does not restate them, because a third copy of the rule is how the first two drift.
 - **Re-review (QA cycle 2): the full branch diff, reviewed to refute.** See below.
 - Lite mode / small / re-review with no new code: skip or run a single light pass per the skill's
   Adaptive Review Strategy.

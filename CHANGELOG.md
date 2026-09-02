@@ -6,6 +6,51 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A QA re-review after a safety failure now re-probes the surface instead of re-reading the fixes.**
+  `qa-task` and `qa-story` scope a re-review to files changed since the last gate — correct for cost,
+  and wrong on the one axis where it matters. After a security FAIL the files changed since the last
+  gate are precisely the *fixes*, so the re-review inspects the patch and never re-reads the surface
+  the patch was meant to protect.
+
+  **Measured on task 67.** Cycle 1 found 13 fail-open holes in a safety boundary and returned FAIL.
+  `qa-fix` closed all 13. Cycle 2 re-tested those 13, confirmed them closed, found nothing new, and
+  returned PASS 90/100 with `security: PASS`. The DoD gate then found **14 more of the same class**,
+  two of them commands the code deny-listed by name. Two green gates in a row read as converging
+  evidence; they were one piece of evidence counted twice.
+
+  **The carve-out is narrow and keyed on the prior gate's safety state, not on the cycle number.**
+  `SAFETY_REPROBE` fires when the prior gate has `nfr_validation.security.status: FAIL`, a
+  `severity: high` finding concerning a boundary, or a `gate: FAIL` on a work item whose own success
+  criteria say *never* / *must not* / *fails closed* / *refused*. CONCERNS on performance,
+  reliability or maintainability keep today's scoping, as does a FAIL on documentation or coverage —
+  the non-triggers are stated explicitly, because a trigger wide enough to catch them is one nobody
+  can afford to leave on.
+
+  **This composes with the existing cycle-2 refute pass rather than duplicating it.** Cycle 2 already
+  gets a full-branch diff and a "find the claim that is FALSE" directive. That directive anchors on
+  *the fixes*; the new one anchors on *the surface*, and the two are appended together where both
+  apply. The residual gap closed here is cycle 3 and later, where a work item whose security FAIL is
+  not fixed on the first attempt was still being narrowed to its own repairs.
+
+  **Widening the diff is half the fix, so the instruction changes too**, and the report must now
+  answer both questions: the Re-Review Context table says whether the previous findings were fixed,
+  and a new **New Findings This Cycle** section — required *even when empty* — says what else is
+  there. On an unscoped cycle reporting zero new findings, the section must state what was searched,
+  so "nothing found" is distinguishable from "nothing looked for". The scope decision itself is
+  recorded in the QA report's Review Methodology.
+
+  The rule is stated once in `shared/resources/qa-re-review-scope.md`; neither skill restates the
+  trigger, and `evals/shared/tests/qa-re-review-scope-parity.test.mjs` enforces that along with the
+  wiring and the report requirements. The suite also checks that each `SKILL.md` is the skill it
+  claims to be — every other assertion in it is a substring search over two files that should say
+  nearly the same things, which makes it blind to one file being overwritten by the other. That
+  happened while the suite was being written, and all its tests stayed green over the corrupted
+  tree. A parity check that cannot tell its two subjects apart is measuring one file twice. Its replay cases **execute** the trigger probe extracted from
+  the shared rule against the real `task.67.gate.1` / `gate.2` fixtures — which is how the probe's
+  first draft was caught using `\s`, a GNU extension that BSD awk and mawk neither match nor error
+  on, failing the carve-out closed and silently. Reading the snippet did not find that; running it
+  did, immediately.
+
 - **The DoD security check now executes candidate inputs instead of grepping for them.**
   The `/finalise` security agent was a read-only inspector: every check asked whether a boundary
   *existed*, none asked whether it *held*. It gains a gated **probe mode** — for work items whose
