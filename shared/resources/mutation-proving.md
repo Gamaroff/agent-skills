@@ -1,6 +1,6 @@
 ---
 name: mutation-proving
-description: How to establish that a test would actually fail if the behaviour it names regressed. Revert the behaviour, re-run, confirm red, restore. Reading a test does not tell you whether it can fail.
+description: How to establish that a test would actually fail if the behaviour it names regressed — revert the behaviour, re-run, confirm red, restore. Also what a held proof does NOT tell you (it is evidence about a test, not about coverage), and the three things an unheld proof can mean: a vacuous test, a redundant source, or a wrong premise.
 ---
 
 # Mutation-proving a test

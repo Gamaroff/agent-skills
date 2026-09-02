@@ -1,0 +1,59 @@
+schema: 1
+task: 'task.76.mutation-proof-limits'
+task_title: 'State what a mutation proof does not tell you'
+gate: CONCERNS
+status_reason: 'All ten success criteria verified against the file, and every task-67 claim holds against the source artefacts. One MEDIUM finding: the frontmatter description still describes a one-question document after the change made it a three-question one.'
+reviewer: 'QA Engineer'
+updated: '2026-09-02T13:20:00Z'
+
+top_issues:
+  - id: 'TASK-76-001'
+    severity: medium
+    file: 'shared/resources/mutation-proving.md'
+    finding: 'Frontmatter `description` was not updated. It still describes only "is this test real?" while the document now also answers what a held proof does not cover and what an unheld proof means. The description is the auto-activation signal, so the two new sections are undiscoverable by description match.'
+    suggested_action: 'Rewrite the description to name all three questions (keep under ~100 words), then `npm run bundle` to propagate to the three consuming copies.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.76.bug.1.stale-frontmatter-description.md'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Documentation change; no executable surface added. The one fenced bash block in the file was correctly refused execution by the fail-closed allow-list (Step 4b).'
+  performance:
+    status: PASS
+    notes: 'Not applicable to a documentation change. The relevant proxy — reading cost — was budgeted and respected: 54 lines added against a ~55 cap, 194 total against ~195.'
+  reliability:
+    status: PASS
+    notes: 'Rollback plan verified accurate: nothing parses these sections programmatically, so revert + `npm run bundle` is complete. All three generated copies confirmed byte-identical to source apart from the AUTO-GENERATED banner.'
+  maintainability:
+    status: CONCERNS
+    notes: 'TASK-76-001 — the discovery signal under-describes the document by two of three questions. Everything else is strong: the diagnosis table replaces prose rather than accreting beside it, and the removed conclusion survives in the new section rather than being dropped.'
+
+recommendations:
+  immediate:
+    - action: 'Update the frontmatter description to cover all three questions, then re-bundle.'
+      refs: ['shared/resources/mutation-proving.md']
+  future:
+    - action: 'The file''s one documented bash block (line 22 — the mutation-landed `diff` check) classifies as `mutating` because `cp` is absent from the Step 4b safe-command allow-list, so the runnable-prose step can execute nothing here. Pre-existing and correct fail-closed behaviour, but it means the mutation-proving procedure''s own worked example is the one snippet QA cannot verify. Worth a task to consider `cp` inside the temp copy.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md', 'shared/resources/mutation-proving.md']
+    - action: '`skills/develop/SKILL.md` points at this document with the phrase "the four shapes this takes" against a five-shape file. Pre-existing drift (the fifth shape predates task 76) and explicitly out of scope here; needs a one-line follow-up.'
+      refs: ['skills/develop/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-76-001 addressed, or consciously accepted — it is a discoverability gap, not a correctness one.'

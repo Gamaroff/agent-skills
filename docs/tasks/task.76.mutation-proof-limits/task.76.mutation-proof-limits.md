@@ -325,6 +325,55 @@ than the content is the problem.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS → fixes applied, awaiting re-review
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-02
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.76.qa.1.mutation-proof-limits.md](./task.76.qa.1.mutation-proof-limits.md)
+- **Gate File**: [task.76.gate.1.mutation-proof-limits.yml](./task.76.gate.1.mutation-proof-limits.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: `npm run ci:fast` (format:check + full hermetic suite) — exit 0, zero failures
+- **Phases Verified**: 4/4
+- **Success Criteria Verified**: 10/10
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+All ten success criteria were verified against the file itself, and all five of the document's
+empirical claims about task 67 were re-checked against the task 67 artefacts — every one accurate,
+including the "nine recorded, four independently re-run" provenance, which is what `task.67.qa.1`
+actually says rather than a rounding of it.
+
+One MEDIUM finding — [task.76.bug.1.stale-frontmatter-description.md](./task.76.bug.1.stale-frontmatter-description.md):
+the frontmatter `description` still describes a one-question document after this change made it a
+three-question one. It is the field `coding-standards.md` calls "the most-read line of any skill",
+so the two new sections are currently undiscoverable by description match.
+
+Two LOW observations, both pre-existing and neither introduced here: the file's own bash block cannot
+be executed by Step 4b (`cp` is off the fail-closed allow-list), and `skills/develop/SKILL.md` still
+says "the four shapes" against a five-shape document.
+
+### Bug Reports
+
+**In QA Verification**
+
+- [TASK-76-BUG-1: Frontmatter `description` still describes a one-question document](./task.76.bug.1.stale-frontmatter-description.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-09-02)
+
+**Closed Bugs**
+
+_None yet — QA closes on verification._
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -336,6 +385,8 @@ than the content is the problem.
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.67 pipeline retrospective  | create-task |
 | 2026-09-02 | 1.1     | Review passed (8/10) — corrected the target file's description (140 lines, five shapes, three consumers), re-derived the length cap as a ~55-line delta, and qualified the nine-proofs number with its provenance | review-task |
 | 2026-09-02 |         | Implemented — 4 files (1 authored + 3 regenerated), 0 tests added (documentation change; no behaviour to revert) | develop |
+| 2026-09-02 |         | QA gate CONCERNS (90/100) — 10/10 success criteria met, 1 MEDIUM (stale frontmatter description) | qa-task |
+| 2026-09-02 |         | QA findings fixed — TASK-76-001 closed (frontmatter description rewritten to 60 words covering all three questions, re-bundled), 1 iteration | qa-fix |
 
 ---
 
