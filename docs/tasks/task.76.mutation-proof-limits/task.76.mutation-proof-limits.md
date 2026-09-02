@@ -327,16 +327,17 @@ than the content is the problem.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS → fixes applied, awaiting re-review
+**QA Status**: PASS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-02
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.76.qa.1.mutation-proof-limits.md](./task.76.qa.1.mutation-proof-limits.md)
-- **Gate File**: [task.76.gate.1.mutation-proof-limits.yml](./task.76.gate.1.mutation-proof-limits.yml)
+- **Latest Report**: [task.76.qa.2.mutation-proof-limits.md](./task.76.qa.2.mutation-proof-limits.md) (cycle 2 — PASS)
+- **Latest Gate**: [task.76.gate.2.mutation-proof-limits.yml](./task.76.gate.2.mutation-proof-limits.yml)
+- **Cycle 1**: [task.76.qa.1.mutation-proof-limits.md](./task.76.qa.1.mutation-proof-limits.md) · [task.76.gate.1.mutation-proof-limits.yml](./task.76.gate.1.mutation-proof-limits.yml) (CONCERNS, 90/100)
 
 ### Test Coverage Summary
 
@@ -344,7 +345,8 @@ than the content is the problem.
 - **Phases Verified**: 4/4
 - **Success Criteria Verified**: 10/10
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **QA Cycles**: 2 (CONCERNS → PASS)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
@@ -353,10 +355,15 @@ empirical claims about task 67 were re-checked against the task 67 artefacts —
 including the "nine recorded, four independently re-run" provenance, which is what `task.67.qa.1`
 actually says rather than a rounding of it.
 
-One MEDIUM finding — [task.76.bug.1.stale-frontmatter-description.md](./task.76.bug.1.stale-frontmatter-description.md):
-the frontmatter `description` still describes a one-question document after this change made it a
-three-question one. It is the field `coding-standards.md` calls "the most-read line of any skill",
-so the two new sections are currently undiscoverable by description match.
+Cycle 1 raised one MEDIUM — [task.76.bug.1.stale-frontmatter-description.md](./task.76.bug.1.stale-frontmatter-description.md):
+the frontmatter `description` still described a one-question document after this change made it a
+three-question one. **Fixed in one line and verified closed in cycle 2.**
+
+Cycle 2's refute pass re-read the whole branch diff looking for a false claim rather than for
+confirmation, and found none — including a candidate it probed at length and dismissed on the
+evidence. It also verified all 12 relative links between the new artefacts **in the tracked tree**
+via a detached worktree, which is the one link failure mode in this repository that passes locally
+and goes red in CI.
 
 Two LOW observations, both pre-existing and neither introduced here: the file's own bash block cannot
 be executed by Step 4b (`cp` is off the fail-closed allow-list), and `skills/develop/SKILL.md` still
@@ -364,13 +371,13 @@ says "the four shapes" against a five-shape document.
 
 ### Bug Reports
 
-**In QA Verification**
-
-- [TASK-76-BUG-1: Frontmatter `description` still describes a one-question document](./task.76.bug.1.stale-frontmatter-description.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-09-02)
-
 **Closed Bugs**
 
-_None yet — QA closes on verification._
+- [TASK-76-BUG-1: Frontmatter `description` still describes a one-question document](./task.76.bug.1.stale-frontmatter-description.md) — ✅ Closed — Severity: MEDIUM (fixed and verified 2026-09-02)
+
+**Open Bugs**
+
+_None._
 
 ---
 
@@ -387,6 +394,7 @@ _None yet — QA closes on verification._
 | 2026-09-02 |         | Implemented — 4 files (1 authored + 3 regenerated), 0 tests added (documentation change; no behaviour to revert) | develop |
 | 2026-09-02 |         | QA gate CONCERNS (90/100) — 10/10 success criteria met, 1 MEDIUM (stale frontmatter description) | qa-task |
 | 2026-09-02 |         | QA findings fixed — TASK-76-001 closed (frontmatter description rewritten to 60 words covering all three questions, re-bundled), 1 iteration | qa-fix |
+| 2026-09-02 |         | QA gate PASS (100/100) — TASK-76-001 verified closed; cycle-2 refute pass found no false claim; links verified in the tracked tree | qa-task |
 
 ---
 

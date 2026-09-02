@@ -4,7 +4,7 @@
 **Bug ID**: TASK-76-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (qa-task cycle 1)
 **Date Found**: 2026-09-02
 
@@ -193,3 +193,24 @@ be scope the QA cycle did not ask for.
 | 2026-09-02 | New          | qa-task    | Found in QA cycle 1 (gate CONCERNS, 90/100)               |
 | 2026-09-02 | In Progress  | qa-fix     | Investigation started                                     |
 | 2026-09-02 | Ready for QA | qa-fix     | Description rewritten (60 words) and re-bundled; gate green |
+| 2026-09-02 | Closed       | qa-task    | Verified in QA cycle 2 — all three questions named, 1 insertion / 1 deletion, all three copies propagated. Gate 2 PASS. |
+
+---
+
+## QA Verification (cycle 2)
+
+**Date**: 2026-09-02
+**Verdict**: ✅ **Verified — closed**
+
+| Verification step | Result |
+| --- | --- |
+| `sed -n '3p' shared/resources/mutation-proving.md` | Names all three questions; 60 words, under the ~100-word cap |
+| `git diff --stat` on the source file | **1 insertion, 1 deletion** — the fix touched nothing else |
+| `grep -l 'three things an unheld proof can mean' skills/*/references/mutation-proving.md` | All three copies |
+| `AUTO-GENERATED` banners in the copies | Intact — the copies were regenerated, not hand-edited |
+| `npm run ci:fast` | exit 0, zero failures |
+
+The fix keeps the original procedure sentence first, so every match the previous description attracted
+still lands; the two new signal phrases are appended rather than substituted. That is the right shape
+for this field — a rewrite that displaced the original wording would have traded one discoverability
+gap for another.
