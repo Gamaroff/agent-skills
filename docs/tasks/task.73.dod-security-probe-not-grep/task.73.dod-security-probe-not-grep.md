@@ -122,8 +122,16 @@ The return shape gains one optional key, `probes[]`, carrying `{input, expected,
 
 ## 5. Breaking Changes
 
-None. Probe mode is additive and gated; a work item with no boundary in its diff sees the current
-behaviour exactly. The YAML gains an optional key that existing consumers ignore.
+None for consumers, but **the return shape gained a required key during QA** and this section is
+corrected accordingly. Probe mode is still additive and gated — a work item with no boundary in its diff
+sees the current behaviour exactly.
+
+`boundary:` is **required**, not optional, and an absent `boundary` is **not** equivalent to `false`: the
+render reports it as *unverified*, because the agent did not answer the question. `probes_executed:` is
+required whenever `boundary: true`, and its absence counts as zero. `skills/finalise/SKILL.md` is the
+only consumer and is updated in the same change set, so nothing downstream breaks — but the original
+wording ("an optional key that existing consumers ignore") was falsified by the cycle-1 QA fix and would
+have mis-described the contract to the next reader.
 
 ---
 

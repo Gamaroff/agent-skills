@@ -188,7 +188,20 @@ test("the read-only contract survives, redefined as does-not-mutate rather than 
 
 // --- Phase 3: return shape and the zero-probes guard -----------------------------------------
 
+/**
+ * Slice the fenced ```yaml block out and assert the return shape against THAT. Matching these keys
+ * against the whole document would pass even if they were moved out of the return shape entirely.
+ * Applied to every key set, not only the probe fields — a vacuity fix covering half the keys leaves
+ * the other half exactly as vacuous as before.
+ */
+function yamlBlock() {
+  const block = source().match(/```yaml\n([\s\S]*?)```/);
+  assert.ok(block, `${PROMPT}: no fenced yaml output block found`);
+  return block[1];
+}
+
 test("the returned YAML keeps the shape finalise/SKILL.md renders", () => {
+  const yaml = yamlBlock();
   for (const key of [
     "security_review:",
     "story_type:",
@@ -198,19 +211,14 @@ test("the returned YAML keeps the shape finalise/SKILL.md renders", () => {
     "summary:",
   ]) {
     assert.ok(
-      has(source(), key),
-      `${PROMPT}: returned YAML no longer carries "${key}" — skills/finalise/SKILL.md renders it`,
+      yaml.includes(key),
+      `${PROMPT}: the returned YAML block no longer carries "${key}" — skills/finalise/SKILL.md renders it`,
     );
   }
 });
 
 test("the returned YAML carries the probe fields, inside the fenced output block", () => {
-  // Slice the fenced ```yaml block out first. Matching these keys against the whole document would
-  // pass even if they were moved out of the return shape entirely — the vacuity this file exists
-  // to prevent elsewhere.
-  const block = source().match(/```yaml\n([\s\S]*?)```/);
-  assert.ok(block, `${PROMPT}: no fenced yaml output block found`);
-  const yaml = block[1];
+  const yaml = yamlBlock();
   for (const field of [
     "boundary:",
     "probes_executed:",
@@ -265,8 +273,11 @@ test("skills/finalise/SKILL.md renders probe results in the Security section", (
     has(skill(), "### Probe Results"),
     "skills/finalise/SKILL.md: the Probe Results sub-block is missing from the Security append",
   );
+  // Anchor `probes` — it is a strict prefix of `probes_executed`, so the bare form still passes
+  // if `probes` itself is dropped from the render and only the count survives.
   for (const marker of [
-    "security_result.probes",
+    "security_result.probes where",
+    "security_result.probes_executed",
     "Candidates executed:",
     "reproduced:",
   ]) {
@@ -279,12 +290,13 @@ test("skills/finalise/SKILL.md renders probe results in the Security section", (
 
 test("the probe render branches on boundary, not on list emptiness", () => {
   assert.ok(
-    has(skill(), "{if security_result.boundary is not true:}"),
-    "skills/finalise/SKILL.md: the probe render must branch on `boundary`. Branching on an empty " +
-      "`probes` reports a boundary that held and one that was never probed identically.",
+    has(skill(), "{else if security_result.boundary == false:}"),
+    "skills/finalise/SKILL.md: the probe render must branch on `boundary`, and `false` must be its " +
+      "own branch. Branching on an empty `probes` reports a boundary that held and one that was " +
+      "never probed identically.",
   );
   assert.ok(
-    has(skill(), "{security_result.probes_executed}"),
+    has(skill(), "**Candidates executed:** {security_result.probes_executed"),
     "skills/finalise/SKILL.md: the candidate count must render `probes_executed`, not the length " +
       "of the filtered `probes` list",
   );
@@ -296,6 +308,51 @@ test("the probe render branches on boundary, not on list emptiness", () => {
   assert.ok(
     has(skill(), "Probe mode executed no candidates"),
     "skills/finalise/SKILL.md: the zero-executed case has no render branch of its own",
+  );
+});
+
+test("an absent boundary renders as unverified, never as 'not a boundary'", () => {
+  assert.ok(
+    has(skill(), "{if security_result.boundary is absent or not a boolean:}"),
+    "skills/finalise/SKILL.md: a missing `boundary` falls into the `false` branch, so an agent that " +
+      "never answered the question is reported as having answered 'not a boundary'. That moves the " +
+      "conflation up a level rather than removing it.",
+  );
+  assert.ok(
+    has(skill(), "reported no boundary decision"),
+    "skills/finalise/SKILL.md: the unverified case has no render branch of its own",
+  );
+  assert.ok(
+    has(source(), "A missing `boundary` is not `false`"),
+    `${PROMPT}: the prompt no longer states that omitting boundary is not a way to answer it`,
+  );
+});
+
+test("an absent probes_executed counts as zero, not as a pass", () => {
+  assert.ok(
+    has(skill(), "{if security_result.probes_executed is absent or == 0:}"),
+    "skills/finalise/SKILL.md: `probes_executed` absent under `boundary: true` falls through to the " +
+      "held branch, granting the good verdict to an agent that reported a boundary and omitted the " +
+      "count — the zero-executed guard reachable by omission instead of by a zero.",
+  );
+  assert.ok(
+    has(
+      source(),
+      "missing `probes_executed` under `boundary: true` counts as **zero**",
+    ),
+    `${PROMPT}: the prompt no longer states that an absent probes_executed counts as zero`,
+  );
+});
+
+test("the held branch keys on no probe having reproduced, not on an empty list", () => {
+  assert.ok(
+    has(
+      skill(),
+      "{if any probe in security_result.probes has reproduced == true:}",
+    ),
+    "skills/finalise/SKILL.md: the held branch keys on list emptiness while the findings branch " +
+      "filters on `reproduced`, so a `reproduced: false` entry makes the list non-empty and " +
+      "suppresses the verdict line entirely — header, no bullets, no verdict.",
   );
 });
 

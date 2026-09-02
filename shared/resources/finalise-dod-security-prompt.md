@@ -187,5 +187,10 @@ is not a finding and must not be reported. `boundary:` is always present; `probe
 whenever `boundary: true`. If `boundary: true` and `probes_executed: 0`, `checks` must carry the `probe
 mode executed no candidates` FAIL from Step 4.
 
+**Omitting a field is not a way to answer it.** A missing `boundary` is not `false` — it means the
+question was not answered, and the reader must treat probe mode as unverified rather than as skipped. A
+missing `probes_executed` under `boundary: true` counts as **zero**, and takes the FAIL above: a count
+that was never reported is not evidence that any work happened. Emit both keys explicitly, every time.
+
 **An empty `probes` is not by itself a failure — it is the good result when `probes_executed` is high.**
 What is never a pass is a boundary that executed nothing.

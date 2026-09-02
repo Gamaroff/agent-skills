@@ -138,7 +138,33 @@ only what reproduced — instead of grepping for the boundary's existence.
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — 2026-09-02
+
+**qa-task → gate FAIL (70/100).** 10 findings: 4 HIGH, 3 MEDIUM, 3 LOW.
+Artifacts: `task.73.qa.1.*.md`, `task.73.gate.1.*.yml`.
+
+- Step 3b full adversarial pass returned 12 findings (9 bugs, 3 cleanups); 10 promoted under
+  `code_review_blocking=true`. Rule 1 (any high) → FAIL.
+- Step 4b fired on `skills/finalise/SKILL.md` (18 blocks, 0 runnable, zero executed). Recorded, not
+  suppressed — but **not attributable to this change set**: the diff adds zero bash blocks and all 17
+  mutating classifications are correct refusals of genuinely side-effecting commands.
+- The two substantive findings:
+  1. `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs` was **untracked** — written after
+     the four commits, so one of two deliverable test files was absent from PR #297 entirely.
+  2. **`probes: []` conflated three outcomes** — not-a-boundary, probed-and-held, and probed-nothing.
+     The render branched on emptiness, so the good case printed "probe mode did not fire"; the guard
+     condemned the good case; and the candidate count actually counted reproduced failures, leaving the
+     zero-executed guard unverifiable from its own artifact. This is the task's own defect class, one
+     level up again.
+
+**qa-fix → all 10 fixed** in `46f3f93`. The shape is now `boundary: true|false` +
+`probes_executed: <int>` + a filtered `probes[]`, with a render branch per outcome and the guard keyed
+on the execution count. Six new mutation proofs, all red.
+
+> One mutation (M8) first reported green. It had **not landed** — the literal `\n` in the match string
+> did not correspond to the file's actual wrap, so the edit was a no-op. Re-run against both guard
+> sites it goes red. Recorded because a mutation that silently fails to apply is indistinguishable
+> from a passing proof, which is precisely the failure mode this task exists to address.
 
 ---
 
