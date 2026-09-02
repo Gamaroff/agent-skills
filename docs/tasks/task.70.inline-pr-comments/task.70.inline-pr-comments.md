@@ -5,18 +5,20 @@ type: task
 description: "No skill in this repo posts an inline PR comment, yet /review-code documents the behaviour and /review-pr scopes it out. Build the primitive once as a shared CLI so a finding can be anchored to the line it is about."
 tags: [pr-comment, inline, github, bitbucket, shared-resource]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Low
 risk_level: medium
 created: 2026-08-31
 updated: 2026-09-02
+completed_date: 2026-09-02
+pr_number: 308
 assignee:
 estimated_effort_hours: 8
 ---
 
 # Technical Task: Build the inline PR comment primitive, on GitHub and Bitbucket
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All applied review recommendations from `task.70.review.1.inline-pr-comments.md` implemented 2026-09-02 (1 Important deferred: tracker linkage)
 
 ---
@@ -356,6 +358,42 @@ more. A narrowed cycle 2 would have re-read only its own repairs and passed.
 
 ---
 
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+| Cycle | Gate | Result |
+|---|---|---|
+| 1 | `task.70.gate.1.inline-pr-comments.yml` | FAIL (50/100) — 9 issues, all fixed |
+| 2 (refute) | `task.70.gate.2.inline-pr-comments.yml` | **PASS (92/100)** — 8 issues, 7 fixed, 1 deferred |
+
+**CI**: ✅ SUCCESS on the final head (`test`, `validate`, `link-check`, branch policy).
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 8/8 — functional (5) and contract (3)
+✅ **Tests:** 47 unit + 65 skill-contract + 127 repo guards; **7 mutation proofs** across two cycles, each turning exactly its own assertion red
+✅ **PR:** [#308](https://github.com/Gamaroff/agent-skills/pull/308)
+✅ **Documentation:** contract document, `AGENTS.md` section, both review skills wired; contract corrected twice during QA so it agrees with the code
+✅ **Security:** no credential literals; every remote call an argv array with bodies via stdin; access gate ahead of the first network call; 10 injected throwing transports prove a restricted run makes none
+✅ **Boundary probe:** 29 candidates executed against the shipped validators — **0 reproduced**
+⚠️ **Compliance:** NOT_APPLICABLE — developer tooling, no personal, payment or health data, no UI
+
+### Accepted with these recorded
+
+- **Maintainability: CONCERNS.** The two platform arms carry near-duplicate partition ladders, which already caused one defect here (the cycle-1 stale-anchor check landed on GitHub only). Follow-up: extract one `partitionFindings()`.
+- **`TASK70-C2-008` open** — the summary comment has no marker, so repeated runs append rather than update. Not a finding-loss path.
+- **The Bitbucket arm has never run against Bitbucket.** Payloads and re-run behaviour are fixture-tested; the transport is not. Stated in the contract.
+- **No tracker issue linked** — no `github_issue`, so no issue was closed and no board card moved. Run `/sync-github-task` to link it.
+
+**Detailed Verification Log:** see [`task.70.dod.1.inline-pr-comments.md`](./task.70.dod.1.inline-pr-comments.md).
+
+**Task marked as ACCEPTED on:** 2026-09-02
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -367,6 +405,7 @@ more. A narrowed cycle 2 would have re-read only its own repairs and passed.
 | 2026-09-02 |         | QA gate FAIL (50/100) — 5 HIGH, 4 MEDIUM, 3 LOW; core invariant violated on the duplicate-marker path, wiring snippets non-functional, CI red | qa-task |
 | 2026-09-02 |         | qa-fix cycle 1 — all 9 issues resolved and mutation-proven; suite 40 → 46 tests; new executable jq guard in both review skill suites; gate PASS (95/100) | qa-fix |
 | 2026-09-02 |         | QA cycle 2 (refute pass) — 8 further issues, 2 dropping findings silently; all fixed and mutation-proven; gate PASS (92/100) | qa-task |
+| 2026-09-02 | 1.3     | DoD verified — accepted (PR #308). CI green, boundary probe 29/0, 7 mutation proofs. Maintainability CONCERNS recorded with a named follow-up | finalise |
 
 ---
 
@@ -416,7 +455,7 @@ Nothing is broken today — the summary comment works on both platforms. This is
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.70.inline-pr-comments/task.70.inline-pr-comments.md`

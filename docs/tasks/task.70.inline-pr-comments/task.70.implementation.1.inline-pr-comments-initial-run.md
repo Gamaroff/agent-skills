@@ -34,9 +34,9 @@ Build `shared/resources/pr-inline-comment.js` — a dual-platform CLI that posts
 | 1. create-branch           | ✅ Done    | Branch `feature/task.70.*` exists in git                               | `feature/task.70.inline-pr-comments` created at `e68a444`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.70.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10. 0 Critical / 3 Important / 2 Optional. 2 fixes applied to the task doc | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 5 phases complete; `npm run ci:fast` green (2258 tests, 0 fail); 4 mutation proofs executed | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.70.qa.{N}.*.md`; `task.70.gate.{N}.*.yml`; PR comment posted     |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.70.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #308](https://github.com/Gamaroff/agent-skills/pull/308); 3 commits; issue comment skipped (none linked) | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.70.qa.{N}.*.md`; `task.70.gate.{N}.*.yml`; PR comment posted     | 2 cycles: FAIL 50/100 → PASS 92/100. 17 issues, 16 fixed, 7 mutation proofs | 2 Explore reviewers |
+| 7. finalise                | ✅ Done    | `task.70.dod.{N}.*.md`; task `status: accepted`                        | DoD PASSED; CI SUCCESS on final head; 29 boundary probes, 0 reproduced | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -150,16 +150,130 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — qa-task — 2026-09-02 — **FAIL (50/100)**
+
+5 HIGH, 4 MEDIUM, 3 LOW. Gate: `task.70.gate.1.inline-pr-comments.yml`.
+
+**The independent reviewer earned its cost.** Three of the four highest-severity findings came from
+the Step 3b Explore subagent, not from the self-check — and it verified two of them by *executing*
+`runGithub` rather than reading it. The suite was 40/40 green and the module still dropped findings
+on a reachable path. A pipeline that writes code and then reviews its own code with the same context
+will confirm what it already believes; this is the concrete instance of that.
+
+**Two findings I should have caught and did not:**
+
+- `TASK70-001` — the duplicate-marker branch drops the finding entirely. I wrote the adjacent
+  unreadable-list branch to degrade, then wrote this one not to, in the same function, in the same
+  sitting. The asymmetry was invisible to me because I *knew* what I meant.
+- `TASK70-004/005` — I wrote the jq wiring from memory of the findings schema instead of opening
+  `code-review-prompt.md`. Both field references are wrong. The irony is exact: this task exists
+  because `/review-code` documented behaviour that was never built, and I wired it up with a snippet
+  that cannot run.
+
+**Why the local gate passed and CI did not** (`TASK70-003`): `stdout-drain-on-exit.test.mjs`
+enumerates shipped CLIs from the **tracked** tree. `npm run ci:fast` ran while the new file was still
+untracked, so the guard could not see it; CI checks out only tracked files and went red at once.
+Re-running the identical command post-commit reproduces it locally. Known shape in this repo — a
+working-tree gate is blind to a file git does not yet know about — and worth remembering as: *run the
+guard suite again after the first commit of a new shipped file.*
+
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-02
+**Final Status**: Completed
 **Branch**: `feature/task.70.inline-pr-comments`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: [#308](https://github.com/Gamaroff/agent-skills/pull/308)
+**QA Iterations**: 2 (cycle 1 FAIL 50/100 → cycle 2 refute PASS 92/100)
+**DoD Summary**: `task.70.dod.1.inline-pr-comments.md`
+**Tracker debt**: none deferred — but the task has **no linked tracker issue** at all (no `github_issue`), so no issue was closed and no board card moved. Flagged Important in the cycle-1 review; run `/sync-github-task` to link one.
+
+### Cycle 1 — qa-fix — 2026-09-02 — all 9 issues resolved
+
+Every fix mutation-proven; four mutations run, each turning exactly its own assertion red and each
+restored to green (A: duplicate-marker degrade; B: id body-hash; C: the jq snippet; D: Bitbucket
+update-in-place). Suite 40 → 46 tests, plus a new executable guard in both skill suites.
+
+**The one structural fix, not just a bug fix:** TASK70-004/005 were invisible to every existing
+check. `qa-execute-snippets` skips those blocks as `mutating` (they redirect to a file), and a human
+reading them sees plausible jq. The fix therefore is not "correct the two snippets" — it is the new
+guard that **extracts the jq program from SKILL.md and runs it against a schema-shaped fixture**. A
+snippet that is only ever read will drift again; one that is executed cannot.
+
+**Two cleanups deliberately deferred**, both recorded in the QA report: the summary comment's own
+marker (changes the summary's identity semantics) and threading the injected `env` through
+`loadDotEnv` (touches credential resolution). Each is a legitimate change that does not belong at the
+end of a fix cycle.
+
+### Cycle 2 — qa-task (refute pass) + qa-fix — 2026-09-02 — **PASS (92/100)**
+
+Eight further issues, 2 HIGH. All fixed; one deferred with a stated reason. Three more mutation
+proofs (seven across both cycles). Gate: `task.70.gate.2.inline-pr-comments.yml`.
+
+**The refute rule paid for itself, and it is worth recording why.** The skill mandates that cycle 2
+re-reads the *whole* branch diff rather than narrowing to files changed since the last gate. Two of
+the eight findings — `gh api --paginate` needing `--slurp`, and the jq aborting the entire array on
+one malformed `file_line` — were present in the **original commit** and invisible to cycle 1. A
+narrowed cycle 2 would have read only cycle 1's repairs and passed clean.
+
+**Cycle 1's fixes created two of cycle 2's defects**, which is the honest headline:
+
+- `TASK70-C2-005` — cycle 1 correctly made every `unverifiable` site also push to `degraded`. That
+  silently made the run-level `unverifiable` branch unreachable, because it tested `!degraded.length`.
+  A documented reason could no longer be emitted and `--strict` could never report the condition it
+  exists for. The suite stayed green throughout: nothing covered the branch.
+- `TASK70-C2-003` — cycle 1 added the stale-anchor check to the GitHub arm only, and I wrote a
+  contract paragraph excusing the gap ("Bitbucket has no equivalent of `position: null`") that was
+  true and beside the point. The comparisons that actually fire are path and line, which Bitbucket
+  returns on every inline comment. I documented a limitation instead of noticing it was not one.
+
+**The worst finding was a false claim in my own docstring.** `findingId` said the caller "knows
+better than we do which findings are the same finding across runs". Both real producers emit
+`CR-{n}`, commented *"stable within this run"* in their own prompt files. I asserted a property the
+schema explicitly denies, and the cycle-1 body-hash fix therefore protected nothing for either real
+caller. Checking the two producer schemas would have taken one grep.
+
+**Deferred, with reasons** — the summary comment's own marker (changes identity semantics), and
+extracting one `partitionFindings()` so a rule cannot be added to one arm and missed by the other.
+The latter is the direct structural cause of `TASK70-C2-003` and is recorded as the standing
+Maintainability CONCERNS rather than waved at.
+
+---
+
+## Retrospective — what this run actually demonstrates
+
+The pipeline worked, and the interesting part is *how* it worked rather than that it did.
+
+**Development produced a 40/40-green suite and a module that dropped findings.** Not through
+carelessness — the invariant was stated in the docstring, the contract, and three tests. It was
+violated on a branch I wrote minutes after writing the branch beside it that handles the same
+situation correctly. Self-review could not see it because I knew what I meant.
+
+**The independent reviewers found what the self-check could not.** Three of cycle 1's four worst
+defects, and both of cycle 2's HIGH findings, came from an Explore agent that had not written the
+code — and it verified several by *executing* the module rather than reading it. Two agents across
+two cycles is the entire reason this task did not merge broken.
+
+**Cycle 1's fixes created cycle 2's defects.** Making every `unverifiable` site also degrade was
+correct, and it silently made a neighbouring branch unreachable. Adding the stale-anchor check to
+one arm was correct, and I then wrote a contract paragraph excusing its absence from the other —
+documenting a limitation instead of noticing it was not one. This is the specific value of the
+refute rule: a fix is new code, and it is the least-reviewed code in the change set.
+
+**Two defects were in the original commit and survived cycle 1 entirely.** `gh api --paginate`
+needing `--slurp`, and the jq aborting on one malformed `file_line`. A narrowed cycle 2 — scoped to
+files changed since the last gate — would have read only cycle 1's repairs and passed clean. The
+whole-diff rule is what caught them.
+
+**The most useful artifact is a guard, not a fix.** `TASK70-004/005` were invisible to every
+existing check: `qa-execute-snippets` skips those blocks as `mutating`, and a reader sees plausible
+jq. Correcting the two snippets would have left the next edit free to break them again. Extracting
+the jq from SKILL.md and executing it against a fixture is the change that persists.
+
+**Three claims I asserted as fact and did not check.** That the caller's `id` was stable across runs
+(both producer schemas say otherwise, in a comment, one grep away). That `gh api --paginate` merges
+pages (its own `--help` says otherwise). That Bitbucket could not detect a moved anchor (it returns
+`inline.path` on every comment). Each cost a QA cycle. The pattern is not carelessness about code —
+it is treating a remembered API contract as verified.
