@@ -366,6 +366,14 @@ Read each prompt file to get the template, substitute the placeholder values, th
 
 Each agent returns YAML. Capture: `AC_RESULT`, `SECURITY_RESULT`, `COMPLIANCE_RESULT`, `DOCS_RESULT`.
 
+> **`SECURITY_RESULT` may carry an optional `probes` list.** It is present only when the security agent's
+> Step 1b identified a **boundary deliverable** — a predicate, validator, classifier or allow/deny-list —
+> in which case the agent generates candidate inputs, **executes** them against the shipped code, and
+> reports only those that reproduced. Absent or `[]` means the rule did not fire, which is the common and
+> expected case. A boundary work item that reports zero executed candidates is a **finding**, not a pass:
+> the agent emits a `probe mode executed no candidates` FAIL in `checks`, and it is rendered like any
+> other failed check. See `references/finalise-dod-security-prompt.md`.
+
 #### Step 3c: Aggregate Results
 
 After all 4 agents complete, parse each YAML result. Handle agent failures:
@@ -436,6 +444,19 @@ Append sections to the running summary file. **One append per section** — not 
 
 - **{check.check}**: {✅ PASS | ❌ FAIL}{check.citation ? " — `" + check.citation + "`" : ""}{check.note ? " — " + check.note : ""}
   {endfor}
+
+### Probe Results
+
+{if security_result.probes is absent or empty:}
+_Probe mode did not fire — the deliverable is not a boundary._
+{else:}
+**Candidates executed:** {count of security_result.probes} — **reproduced:** {count of security_result.probes where reproduced == true}
+
+{for each probe in security_result.probes where probe.reproduced:}
+
+- `{probe.input}` — expected **{probe.expected}**, got **{probe.actual}**
+  {endfor}
+  {endif}
 
 **Agent summary:** {security_result.summary}
 
