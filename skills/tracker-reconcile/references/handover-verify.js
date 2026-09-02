@@ -577,6 +577,13 @@ const RECIPES = {
 
   "github.unknown-mutation": UNRELIABLE,
 
+  // Bitbucket has no read helper in this file and no `gh` equivalent to borrow,
+  // so an inline Bitbucket comment cannot be read back. UNRELIABLE is the honest
+  // answer: it reports "cannot confirm" rather than "not done", which is the
+  // safe direction — an operator re-checks a comment instead of being told a
+  // posted one is outstanding.
+  "bitbucket.pr.comment": UNRELIABLE,
+
   // ── Jira ─────────────────────────────────────────────────────────────────
 
   async "jira.transition"(io, rec) {
