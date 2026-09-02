@@ -5,18 +5,19 @@ type: task
 description: "No skill in this repo posts an inline PR comment, yet /review-code documents the behaviour and /review-pr scopes it out. Build the primitive once as a shared CLI so a finding can be anchored to the line it is about."
 tags: [pr-comment, inline, github, bitbucket, shared-resource]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: Low
 risk_level: medium
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 assignee:
 estimated_effort_hours: 8
 ---
 
 # Technical Task: Build the inline PR comment primitive, on GitHub and Bitbucket
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+**Review**: ✅ All applied review recommendations from `task.70.review.1.inline-pr-comments.md` implemented 2026-09-02 (1 Important deferred: tracker linkage)
 
 ---
 
@@ -65,8 +66,11 @@ gh api -X POST /repos/{owner}/{repo}/pulls/{n}/comments \
 or, better, one **review** carrying all findings at once:
 
 ```
-gh api -X POST /repos/{owner}/{repo}/pulls/{n}/reviews \
-  -f event=COMMENT -f body=… --input comments.json
+# `--input` supplies the WHOLE request body and cannot be combined with `-f`
+# field flags — build one JSON document and pipe it in.
+jq -n --arg body "…" --argjson comments "$(cat comments.json)" \
+  '{event:"COMMENT", body:$body, comments:$comments}' \
+| gh api --method POST /repos/{owner}/{repo}/pulls/{n}/reviews --input -
 ```
 
 The batched form is one API call and one notification instead of N — worth preferring.
@@ -101,7 +105,7 @@ The batched form is one API call and one notification instead of N — worth pre
 
 ### Out of Scope
 
-❌ **Resolving or replying to existing inline threads**
+❌ **Resolving or replying to existing inline threads** — which is why the re-run rule below is *update-in-place*, not resolve-then-repost
 ❌ **Suggested-change blocks** (GitHub's ```suggestion syntax) — a natural follow-up, not this
 ❌ **A Bitbucket retry helper** — the standing gap, tracked separately
 ❌ Changing either lens's finding schema
@@ -123,10 +127,10 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 **Files**: `shared/resources/pr-inline-comment.js`, `shared/resources/pr-inline-comment-contract.md`
 
 **Changes**:
-- [ ] Define the CLI surface: `--pr`, `--findings-file` (JSON array of `{path, line, side, body}`), `--json`, `--dry-run`, `--strict`
-- [ ] Mirror `tracker-comment.js` exit codes exactly: 0 for every normal outcome, 1 for a skip under `--strict`, 2 for usage error
-- [ ] Write the contract document, including the `reason` table and the degradation rule
-- [ ] Resolve `$VCS` internally so callers never branch — the property that makes `tracker-comment.js` pleasant to call
+- [x] Define the CLI surface: `--pr`, `--findings-file` (JSON array of `{path, line, side, body}`), `--json`, `--dry-run`, `--strict`
+- [x] Mirror `tracker-comment.js` exit codes exactly: 0 for every normal outcome, 1 for a skip under `--strict`, 2 for usage error
+- [x] Write the contract document, including the `reason` table, the degradation rule, and the **re-run rule** (marker + update-in-place — see §10 Medium Risk 1)
+- [x] Resolve `$VCS` internally so callers never branch — the property that makes `tracker-comment.js` pleasant to call
 
 **Dependencies**: none
 
@@ -139,11 +143,11 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 **Files**: `shared/resources/pr-inline-comment.js`
 
 **Changes**:
-- [ ] Resolve the PR head SHA for `commit_id`
-- [ ] Build the batched `/pulls/{n}/reviews` request with a `comments[]` array
-- [ ] On a 422 (line not in diff), retry that finding as a summary comment and report `anchor-failed` for it
-- [ ] Fall back to per-comment posting if the batched call is rejected wholesale
-- [ ] Route through `tracker_call_with_retry` semantics for the `ACCESS_TRACKER` gate
+- [x] Resolve the PR head SHA for `commit_id`
+- [x] Build the batched `/pulls/{n}/reviews` request with a `comments[]` array
+- [x] On a 422 (line not in diff), retry that finding as a summary comment and report `anchor-failed` for it
+- [x] Fall back to per-comment posting if the batched call is rejected wholesale
+- [x] Route through `tracker_call_with_retry` semantics for the `ACCESS_TRACKER` gate
 
 **Dependencies**: Phase 1
 
@@ -156,10 +160,10 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 **Files**: `shared/resources/pr-inline-comment.js`
 
 **Changes**:
-- [ ] POST per finding with `{content: {raw}, inline: {path, to}}`
-- [ ] Use `from` rather than `to` when the finding anchors a deleted line
-- [ ] Degrade to a summary comment on rejection
-- [ ] Single-shot, and say so — no retry helper exists
+- [x] POST per finding with `{content: {raw}, inline: {path, to}}`
+- [x] Use `from` rather than `to` when the finding anchors a deleted line
+- [x] Degrade to a summary comment on rejection
+- [x] Single-shot, and say so — no retry helper exists
 
 **Dependencies**: Phase 1
 
@@ -172,10 +176,10 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 **Files**: `skills/review-code/SKILL.md`, `skills/review-pr/SKILL.md`
 
 **Changes**:
-- [ ] `/review-code --comment`: replace the never-implemented prose with a call to the CLI
-- [ ] `/review-pr --comment`: keep the summary comment as the default; add `--inline` to post findings inline as well
-- [ ] Remove `review-pr`'s "inline PR comments are out of scope" note and point at the CLI
-- [ ] Both: state that anchoring failure degrades rather than drops
+- [x] `/review-code --comment`: replace the never-implemented prose with a call to the CLI
+- [x] `/review-pr --comment`: keep the summary comment as the default; add `--inline` to post findings inline as well
+- [x] Remove `review-pr`'s "inline PR comments are out of scope" note and point at the CLI
+- [x] Both: state that anchoring failure degrades rather than drops
 
 **Dependencies**: Phases 2-3
 
@@ -188,11 +192,11 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 **Files**: `shared/resources/tests/pr-inline-comment.test.mjs`, `package.json`
 
 **Changes**:
-- [ ] Payload shape for both platforms, from fixtures
-- [ ] A 422 degrades to summary and reports `anchor-failed`, and the finding is **not** lost
-- [ ] `--dry-run` performs no network call
-- [ ] Exit codes match `tracker-comment.js`
-- [ ] Contract-test both skills for the CLI call and the degradation statement
+- [x] Payload shape for both platforms, from fixtures
+- [x] A 422 degrades to summary and reports `anchor-failed`, and the finding is **not** lost
+- [x] `--dry-run` performs no network call
+- [x] Exit codes match `tracker-comment.js`
+- [x] Contract-test both skills for the CLI call and the degradation statement
 
 **Dependencies**: Phase 4
 
@@ -210,7 +214,22 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 
 4. ✅ `skills/review-code/SKILL.md` — Step 4 calls the CLI
 5. ✅ `skills/review-pr/SKILL.md` — `--inline`, and remove the out-of-scope note
-6. ✅ `package.json` — test glob (if not already covered by `shared/resources/tests/*`)
+6. ⬜ `package.json` — **not needed.** `shared/resources/tests/*.test.mjs` is already in the `test` script's glob, so the new suite is collected without an edit.
+
+### Files modified that this plan did not anticipate
+
+Registering a mutation kind is not optional: `defer-mutation.js` validates every emitted `kind`
+against the roster and **throws** on an unknown one, and the roster had no Bitbucket kinds at all.
+Without `bitbucket.pr.comment` the Bitbucket arm could not honour the `ACCESS_TRACKER` gate this task
+requires — it would throw, or bypass the gate. These four edits are therefore part of the in-scope
+requirement rather than an addition to it:
+
+7. ✅ `shared/resources/tracker-access-record.md` — new Bitbucket section + row; count 23 → 24
+8. ✅ `shared/resources/defer-mutation.js` — `EXPECTED_KIND_COUNT` 23 → 24
+9. ✅ `shared/resources/handover-render.js` — `KIND_PRESENTATION` entry (every kind must render)
+10. ✅ `shared/resources/handover-verify.js` — `UNRELIABLE`; Bitbucket has no read-back path
+11. ✅ `shared/resources/tests/handover-render.test.mjs` + `fixtures/handover-all-kinds.jsonl` — the totality assertions
+12. ✅ `AGENTS.md` — a "Inline PR Comments" section beside "Tracker Comments", since a new shared primitive skills must call belongs on the always-loaded surface
 
 ---
 
@@ -218,25 +237,25 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 
 ### Unit Tests
 
-- [ ] GitHub batched payload matches the API shape
-- [ ] Bitbucket payload carries `inline.path` and `inline.to`
-- [ ] Deletion anchors use `from`
-- [ ] 422 → `anchor-failed` + summary fallback, finding preserved
-- [ ] `--dry-run` makes no network call
-- [ ] Exit codes identical to `tracker-comment.js`
+- [x] GitHub batched payload matches the API shape
+- [x] Bitbucket payload carries `inline.path` and `inline.to`
+- [x] Deletion anchors use `from`
+- [x] 422 → `anchor-failed` + summary fallback, finding preserved
+- [x] `--dry-run` makes no network call
+- [x] Exit codes identical to `tracker-comment.js`
 
 **Command**: `node --test 'shared/resources/tests/pr-inline-comment.test.mjs'`
 
 ### Contract Tests
 
-- [ ] Both review skills call the CLI rather than describing the behaviour
-- [ ] Both document the degradation rule
-- [ ] `review-pr` no longer claims inline comments are out of scope
+- [x] Both review skills call the CLI rather than describing the behaviour
+- [x] Both document the degradation rule
+- [x] `review-pr` no longer claims inline comments are out of scope
 
 ### Mutation Proving
 
-- [ ] Remove the 422 fallback → a test goes red proving findings would be dropped
-- [ ] Swap `to` for `from` on the Bitbucket path → a test goes red
+- [x] Remove the 422 fallback → a test goes red proving findings would be dropped
+- [x] Swap `to` for `from` on the Bitbucket path → a test goes red
 
 ---
 
@@ -244,17 +263,17 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 
 ### Functional
 
-- [ ] A finding with a valid `file_line` posts as an inline comment on GitHub
-- [ ] The same works on Bitbucket via the `inline` key
-- [ ] A finding whose line is outside the diff degrades to a summary comment and is **never dropped**
-- [ ] GitHub posts one batched review rather than N comments where possible
-- [ ] `--dry-run` resolves everything and posts nothing
+- [x] A finding with a valid `file_line` posts as an inline comment on GitHub
+- [x] The same works on Bitbucket via the `inline` key
+- [x] A finding whose line is outside the diff degrades to a summary comment and is **never dropped**
+- [x] GitHub posts one batched review rather than N comments where possible
+- [x] `--dry-run` resolves everything and posts nothing
 
 ### Contract
 
-- [ ] Exit codes and `reason` vocabulary match `tracker-comment.js`
-- [ ] `--body-file` only; no inline `--body`
-- [ ] The CLI resolves `$VCS` itself so callers never branch
+- [x] Exit codes and `reason` vocabulary match `tracker-comment.js`
+- [x] `--body-file` only; no inline `--body`
+- [x] The CLI resolves `$VCS` itself so callers never branch
 
 ---
 
@@ -277,7 +296,7 @@ None. Both review skills keep their current summary-comment behaviour as the fal
 - **Risk**: a second run duplicates comments, or edits an anchor that no longer means what it did.
 - **Probability**: Medium
 - **Impact**: Major — duplicate inline comments are noisy and hard to clean up.
-- **Mitigation**: decide and document the rule **before** implementing. Suggested: a marker in each body plus resolve-then-repost, but the decision belongs in Phase 1, not in code review.
+- **Mitigation**: decide and document the rule **before** implementing. **Suggested: a marker in each body plus update-in-place** — on a re-run, `PATCH` the existing comment by id where the marker matches and the anchor is still valid; where the anchor has moved out of the diff, degrade that finding to the summary comment rather than re-anchoring it. This needs no thread resolution, so it stays inside the scope declared in §4. The decision is a Phase 1 deliverable, not a code-review discovery.
 
 **2. Bitbucket path ships unexecuted**
 
@@ -310,29 +329,31 @@ Keep the CLI and the GitHub path; disable the Bitbucket arm — they are indepen
 | ---------- | ------- | ------------- | ----------- |
 | 2026-08-31 | 1.0     | Initial draft — scoped out of task.66, filed here | create-task |
 | 2026-08-31 | 1.1     | Validation pass — 11/11 sections, card preflight clean, no placeholders, links resolve, effort rubric checked; status → ready-for-development | review-task |
+| 2026-09-02 | 1.2     | Review passed (8/10, READY TO IMPLEMENT) — fixed the Out-of-Scope contradiction by fixing the re-run rule as marker + update-in-place; corrected the invalid `gh api --input` + `-f` snippet. Tracker linkage still absent (Important, non-blocking) | review-task |
+| 2026-09-02 |         | Implemented — 9 files (3 created, 6 modified), 38 tests, 2 mutation proofs; registered `bitbucket.pr.comment` as the roster's 24th kind | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Contract and skeleton
-- [ ] CLI surface + contract doc
-- [ ] Re-run rule decided
+- [x] CLI surface + contract doc
+- [x] Re-run rule decided — marker + update-in-place
 
 ### Phase 2: GitHub
-- [ ] Batched review
-- [ ] 422 degradation
+- [x] Batched review
+- [x] 422 degradation
 
 ### Phase 3: Bitbucket
-- [ ] inline payload
-- [ ] Deletion anchors
+- [x] inline payload
+- [x] Deletion anchors
 
 ### Phase 4: Wire in
-- [ ] review-code
-- [ ] review-pr --inline
+- [x] review-code
+- [x] review-pr --inline
 
 ### Phase 5: Tests
-- [ ] Unit + contract + mutation proofs
+- [x] Unit + contract + mutation proofs (38 tests)
 
 ---
 
@@ -351,7 +372,7 @@ Keep the CLI and the GitHub path; disable the Bitbucket arm — they are indepen
 ### Important Reminders
 
 - **Degradation is the core requirement, not a nicety.** A review that silently drops findings is worse than one that posts none, because the reader believes they have seen everything.
-- Decide the re-run rule in Phase 1. Discovering it during code review is how the duplicate-comment problem gets shipped.
+- The re-run rule is **decided**: marker + update-in-place (§10 Medium Risk 1). Implement it in Phase 1 as the contract states. Discovering a re-run rule during code review is how the duplicate-comment problem gets shipped.
 
 ### Why Low priority
 
@@ -359,7 +380,7 @@ Nothing is broken today — the summary comment works on both platforms. This is
 
 ---
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/review-task docs/tasks/task.70.inline-pr-comments/task.70.inline-pr-comments.md`
