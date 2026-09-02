@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-02'
@@ -10,7 +10,7 @@ description: 'The registry fallback frontier never read the Depends on column, s
 
 **Bug ID**: bug.9
 **Related**: none — cross-cutting (selection · task registry)
-**Status**: 🧪 Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-02
@@ -248,9 +248,63 @@ test was added, and the mutation then failed as it should.
 | ---------- | ------------ | ---------- | ------------------------------------------------------------------------------------------- |
 | 2026-09-02 | New          | Claude     | Found while checking whether `/develop-next` honours task 84's `Depends on: task.83`          |
 | 2026-09-02 | Ready for QA | Claude     | Fix, 12 tests and 7 mutation proofs landed in the same change; awaiting PR review and merge |
+| 2026-09-02 | Closed       | Claude     | [PR #303](https://github.com/Gamaroff/agent-skills/pull/303) merged to `develop`; 4/4 CI checks green |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: ✅ Closed
+**Total Iterations**: 1 fix cycle
+**Time to Resolution**: same day (found, filed, fixed and merged 2026-09-02)
+**Merged**: [PR #303](https://github.com/Gamaroff/agent-skills/pull/303) → `develop` (`48d1ac2`), 4/4 CI checks green
+
+**Final Fix Details**:
+
+`registryFrontier()` now reads the `Depends on` column and gates on it. `COLUMN_ALIASES` gained the
+name-based keys and `DEFAULT_COLUMNS.task` gained `deps: 7`, so the column resolves on both the header
+path and the positional fallback — previously neither could see it. `parseDepCell()` parses the
+spellings a hand-maintained table carries; `registryDepBlockers()` resolves each reference across both
+registries and treats a dependency as satisfied when the **document** it points at reads `accepted`,
+matching the frontier's existing "frontmatter decides, the row only nominates" rule.
+
+The gate sits after the eligibility floor and before the ranked-lower branch, so a blocked row reports
+the dependency rather than claiming it was outranked — the inverted reason was half the defect, not a
+cosmetic detail.
+
+A `cancelled` dependency, a reference naming no row, and one whose document is unreadable are all
+satisfied-with-a-warning rather than blockers, on the ground task 71 settled the eligibility floor on:
+selecting early costs one visible cycle because `develop-*` Step 2 reviews before any code is written
+and HALTs, whereas an unresolvable blocker costs indefinite silence.
+
+Nothing about ranking, the eligibility floor, the roadmap path or `selectBatch` changed.
+
+**Verification**: 135/135 in the selector suite; 410 pass / 0 fail across `evals/develop-next`,
+`evals/develop-batch` and `evals/loop-supervisor`; 7 mutation proofs each observed to turn tests red.
+End-to-end on the real roadmap: T83 is selected while T84 waits, and ticking T83 yields
+`selected T84 — deps satisfied: T83`.
+
+**Lessons Learned**:
+
+1. **A documented field and a handled field are not the same field.** The header comment directly above
+   `DEFAULT_COLUMNS` listed `| Deps |` for as long as the map omitted it. The documentation was written
+   at the same time as the handling, and only one of the two was finished — so every later reader,
+   human or agent, saw a column that looked supported. Documenting a field is the cheap half; the
+   comment is not evidence the code reads it.
+
+2. **A total tie-break can hide a missing rule for as long as the data cooperates.** Ordering falls back
+   to ascending number, and a prerequisite conventionally carries the lower number, so the frontier
+   produced the right answer for the wrong reason on every dependency pair that ever existed here. The
+   fixtures added with the fix all invert the numbering or the priority precisely because a fixture that
+   the tie-break alone would satisfy proves nothing.
+
+3. **Machinery solving the same problem one path over is not reuse until someone reuses it.**
+   `blockedUntil` / `idDone` implemented this exact check — including the "blocker names no current row"
+   warning — for roadmap rows. When task 65 added the registry fallback it gained a second selection
+   path and inherited none of it. A new path beside an existing one should be audited against what the
+   old one already guarantees.
+
+4. **The mutation pass found an unheld line the test pass did not.** Removing `deps: 7` from
+   `DEFAULT_COLUMNS` initially failed nothing: every fixture used a headered table, so the positional
+   fallback was never exercised. The tests were green over a line that did nothing. Reverting each
+   change individually is what surfaced it, and a headerless-registry case was added in response.
