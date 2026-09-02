@@ -428,6 +428,24 @@ test("the two verdict lines are an if/else-if pair, so they cannot both render",
     elseIfAt !== -1 && heldAt > elseIfAt,
     "skills/finalise/SKILL.md: the ✅ held line must be emitted inside the else-if arm",
   );
+  // Count, don't just locate. `indexOf` finds the first occurrence, so a SECOND independent
+  // `{if …:} ✅ The boundary held {endif}` appended after the pair would leave every ordering
+  // assertion satisfied and the {if}/{endif} count balanced, while restoring exactly the double
+  // render this test exists to prevent.
+  for (const verdict of [
+    "The boundary held",
+    "Probe mode executed no candidates",
+  ]) {
+    const occurrences = block.split(verdict).length - 1;
+    assert.equal(
+      occurrences,
+      1,
+      `skills/finalise/SKILL.md: "${verdict}" appears ${occurrences} times in the Probe Results ` +
+        `block. A duplicate outside the if/else-if pair re-introduces the double render while ` +
+        `satisfying every ordering check.`,
+    );
+  }
+
   const zeroAt = block.indexOf("Probe mode executed no candidates");
   assert.ok(
     zeroAt !== -1 && zeroAt < elseIfAt,

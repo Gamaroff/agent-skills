@@ -484,10 +484,16 @@ happened.
 {endif}
 
 <!--
-  Exactly one verdict line, and the two are an if/else-if pair rather than two independent tests.
-  Written as two `{if}` blocks, the state `probes_executed: 0` with nothing reproduced rendered BOTH
+  The ✅/❌ pair is an if/else-if, so at most one verdict line is ever emitted. Written as two
+  independent `{if}` blocks, the state `probes_executed: 0` with nothing reproduced rendered BOTH
   "executed no candidates" and "the boundary held" — asserting that every candidate passed when none
-  had run. Where findings exist the findings ARE the verdict, so neither line is emitted.
+  had run.
+
+  The findings list is separate and unconditional, so it renders whenever anything reproduced. That
+  means the ❌ callout can legitimately sit ABOVE a findings list, in the contradictory-input case
+  where an agent reports reproduced probes and a zero count; the callout is the warning about the
+  count, not a claim that the list is empty. The ✅ line, by contrast, is suppressed whenever
+  anything reproduced — it can only appear when the count is non-zero and nothing was found.
 -->
 
 **Agent summary:** {security_result.summary}

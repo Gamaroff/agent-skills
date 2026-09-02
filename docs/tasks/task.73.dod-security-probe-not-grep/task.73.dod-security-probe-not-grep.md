@@ -5,7 +5,7 @@ type: task
 description: "The finalise DoD security agent is a grep-only inspector. On task 67 a substituted prompt that executed candidate inputs found 14 fail-open routes past a boundary the grep version reported as PASS — two of them commands the code deny-listed by name. Give the agent a probe mode for work items whose deliverable is a boundary."
 tags: [qa, dod, finalise, security, verification]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-09-01
@@ -16,7 +16,7 @@ estimated_effort_hours: 6
 
 # Technical Task: Make the DoD security check execute candidate inputs, not grep for them
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.73.review.1.dod-security-probe-not-grep.md` implemented 2026-09-02 (tracker linkage deliberately deferred — see report Q1)
 
 ---
@@ -372,28 +372,35 @@ Narrow the detection rule, or narrow the candidate axes. Both live in one file.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-02
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS (gate 3 — supersedes gate 1 FAIL and gate 2 FAIL)
 
-### QA Report
-- **Full Report**: [task.73.qa.1.dod-security-probe-not-grep.md](./task.73.qa.1.dod-security-probe-not-grep.md)
-- **Gate File**: [task.73.gate.1.dod-security-probe-not-grep.yml](./task.73.gate.1.dod-security-probe-not-grep.yml)
+### QA Reports
+- **Cycle 1**: [task.73.qa.1.dod-security-probe-not-grep.md](./task.73.qa.1.dod-security-probe-not-grep.md) — gate 1 FAIL (70/100)
+- **Cycles 2–4**: [task.73.qa.2.dod-security-probe-not-grep.md](./task.73.qa.2.dod-security-probe-not-grep.md) — gate 3 PASS (95/100)
+- **Gate files**: [gate.1](./task.73.gate.1.dod-security-probe-not-grep.yml) · [gate.2](./task.73.gate.2.dod-security-probe-not-grep.yml) · [gate.3](./task.73.gate.3.dod-security-probe-not-grep.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 2161 (0 fail, 1 skipped)
-- **Phases Verified**: 3/4 pass, 1 concerns
-- **Critical Issues**: 4 HIGH, 3 MEDIUM, 3 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Tests Executed**: 2169 (0 fail, 1 skipped)
+- **Phases Verified**: 4/4
+- **Findings**: 21 across four cycles, all closed. Convergence HIGH 4 → 2 → 1 → 0.
+- **Mutation proofs**: 23
+- **NFR Status**: Security PASS, Performance PASS, Reliability PASS, Maintainability PASS
 
 ### Key Findings
-One deliverable test file was untracked and absent from PR #297. The `probes: []` return shape conflates
-three states — not-a-boundary, boundary-probed-and-held, and boundary-with-nothing-executed — so a clean
-probe renders a false statement and the zero-executed-candidates guard is unverifiable from the artifact.
-Both are fixable within the change set. The approach itself is sound: the contract test is mutation-proved
-on seven mutations, and the deliverable found twelve real fail-open routes on its first run (`bug.6`).
+QA chased the same defect up three levels. `probes: []` meant three things; splitting it moved the
+conflation to `boundary`, where *absent* was rendered as the confident claim "not a boundary";
+fixing that made the two verdict lines independent, so a boundary that ran nothing rendered "❌
+executed no candidates" and "✅ the boundary held" together. Cycle 4 enumerated every input state and
+confirmed exactly one verdict per state.
+
+Twice a test that claimed to protect an invariant could not observe its violation — presence
+assertions passing through a contradictory render, and an emptied replay corpus passing every filter.
+Both are now structural: the render's control tokens are parsed and their shape asserted, and each
+verdict string must occur exactly once.
 
 ---
 
@@ -405,6 +412,8 @@ on seven mutations, and the deliverable found twelve real fail-open routes on it
 | 2026-09-02 | 1.1     | Review passed (9/10) — Replay Verification labelled an agent-run step; tracker link still absent | review-task |
 | 2026-09-02 |         | Implemented — 4 files (prompt +83 lines, finalise/SKILL.md render, new contract test, bundle), 16 contract tests, 7 mutation proofs. Replay found 12 real open routes → filed bug.6 | develop |
 | 2026-09-02 |         | QA gate FAIL (70/100) — 10 findings; probes[] tri-state collision + one untracked deliverable file | qa-task |
+| 2026-09-02 |         | QA gate FAIL (80/100) — refute pass: the conflation had moved up to `boundary` | qa-task |
+| 2026-09-02 |         | QA findings fixed — gate PASS (95/100), 4 cycles, 21 findings, 23 mutation proofs | qa-fix |
 
 ---
 
