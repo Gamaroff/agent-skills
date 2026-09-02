@@ -467,22 +467,28 @@ _Probe mode did not fire — the deliverable is not a boundary._
 {else:}
 **Candidates executed:** {security_result.probes_executed, or "not reported" if absent} — **reproduced:** {count of security_result.probes where reproduced == true}
 
+{if any probe in security_result.probes has reproduced == true:}
+{for each probe in security_result.probes where probe.reproduced:}
+- `{probe.input}` — expected **{probe.expected}**, got **{probe.actual}**
+{endfor}
+{endif}
+
 {if security_result.probes_executed is absent or == 0:}
 ❌ **Probe mode executed no candidates.** A boundary was identified but nothing was run — this is a
 finding, not a pass. See the `probe mode executed no candidates` check above. An **absent**
 `probes_executed` counts as zero here: a count that was never reported is not evidence that work
 happened.
+{else if no probe in security_result.probes has reproduced == true:}
+✅ **The boundary held** — every candidate returned its expected verdict.
+{endif}
 {endif}
 
-{if any probe in security_result.probes has reproduced == true:}
-{for each probe in security_result.probes where probe.reproduced:}
-
-- `{probe.input}` — expected **{probe.expected}**, got **{probe.actual}**
-  {endfor}
-  {else:}
-  ✅ The boundary held — every candidate returned its expected verdict.
-  {endif}
-  {endif}
+<!--
+  Exactly one verdict line, and the two are an if/else-if pair rather than two independent tests.
+  Written as two `{if}` blocks, the state `probes_executed: 0` with nothing reproduced rendered BOTH
+  "executed no candidates" and "the boundary held" — asserting that every candidate passed when none
+  had run. Where findings exist the findings ARE the verdict, so neither line is emitted.
+-->
 
 **Agent summary:** {security_result.summary}
 

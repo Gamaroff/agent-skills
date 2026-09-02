@@ -356,6 +356,104 @@ test("the held branch keys on no probe having reproduced, not on an empty list",
   );
 });
 
+/**
+ * Hold the EXCLUSIVITY, not the substrings.
+ *
+ * The three branch tests above assert that each marker is present. Presence is not the property that
+ * matters: an earlier revision had the zero-executed callout and the held verdict as two independent
+ * `{if}` blocks, so `probes_executed: 0` with nothing reproduced rendered BOTH "❌ executed no
+ * candidates" AND "✅ the boundary held" — and every presence assertion passed green. A test whose
+ * failure message claims to protect the verdict line has to be able to see that state.
+ *
+ * So parse the block's control tokens in order and assert the shape.
+ */
+function probeRenderTokens() {
+  const text = skill();
+  const start = text.indexOf("### Probe Results");
+  assert.ok(
+    start !== -1,
+    "skills/finalise/SKILL.md: the Probe Results block is gone",
+  );
+  // Anchor the end AFTER the start — `**Agent summary:**` also appears in earlier append blocks,
+  // and slicing to the first occurrence yields an empty string that silently passes every token
+  // check below.
+  const end = text.indexOf("**Agent summary:**", start);
+  assert.ok(
+    end !== -1,
+    "skills/finalise/SKILL.md: no agent-summary line after the Probe Results block",
+  );
+  // Strip HTML comments before tokenising: the block carries a note that mentions `{if}` in prose,
+  // and counting that as markup makes the balance check report a phantom imbalance.
+  const block = text.slice(start, end).replace(/<!--[\s\S]*?-->/g, "");
+  assert.ok(
+    block.length > 0,
+    "skills/finalise/SKILL.md: Probe Results block is empty",
+  );
+  return {
+    block,
+    tokens:
+      block.match(/\{(?:if|else if|else|endif|for each|endfor)[^}]*\}/g) ?? [],
+  };
+}
+
+test("the two verdict lines are an if/else-if pair, so they cannot both render", () => {
+  const { block, tokens } = probeRenderTokens();
+
+  const zeroIdx = tokens.findIndex((t) =>
+    t.includes("probes_executed is absent or == 0"),
+  );
+  assert.ok(
+    zeroIdx !== -1,
+    "skills/finalise/SKILL.md: the zero-executed test is gone",
+  );
+
+  const heldToken = tokens[zeroIdx + 1];
+  assert.ok(
+    heldToken !== undefined && heldToken.startsWith("{else if"),
+    `skills/finalise/SKILL.md: the token after the zero-executed test is ${heldToken} — the held ` +
+      `verdict must be an \`{else if}\` continuation of it. As two independent \`{if}\` blocks, ` +
+      `\`probes_executed: 0\` with nothing reproduced renders BOTH "executed no candidates" and ` +
+      `"the boundary held" — claiming every candidate passed when none ran.`,
+  );
+  assert.ok(
+    heldToken.includes("no probe") && heldToken.includes("reproduced"),
+    `skills/finalise/SKILL.md: the held verdict's condition is ${heldToken} — it must test that no ` +
+      `probe reproduced`,
+  );
+
+  // The ✅ line must sit between that {else if} and the {endif} that closes the pair.
+  const heldAt = block.indexOf("The boundary held");
+  const elseIfAt = block.indexOf(heldToken);
+  assert.ok(
+    elseIfAt !== -1 && heldAt > elseIfAt,
+    "skills/finalise/SKILL.md: the ✅ held line must be emitted inside the else-if arm",
+  );
+  const zeroAt = block.indexOf("Probe mode executed no candidates");
+  assert.ok(
+    zeroAt !== -1 && zeroAt < elseIfAt,
+    "skills/finalise/SKILL.md: the ❌ zero-executed line must precede the else-if that guards the ✅ line",
+  );
+});
+
+test("the probe render's control tokens balance", () => {
+  const { tokens } = probeRenderTokens();
+  const opens = tokens.filter((t) => t.startsWith("{if")).length;
+  const closes = tokens.filter((t) => t === "{endif}").length;
+  assert.equal(
+    opens,
+    closes,
+    `skills/finalise/SKILL.md: ${opens} {if} vs ${closes} {endif} in the Probe Results block — an ` +
+      `unbalanced template is read literally by the agent that renders it`,
+  );
+  const fors = tokens.filter((t) => t.startsWith("{for each")).length;
+  const endfors = tokens.filter((t) => t === "{endfor}").length;
+  assert.equal(
+    fors,
+    endfors,
+    `skills/finalise/SKILL.md: ${fors} {for each} vs ${endfors} {endfor}`,
+  );
+});
+
 test("the probe render sits inside the Security section, before the agent summary", () => {
   const probeAt = skill().indexOf("### Probe Results");
   const generalAt = skill().indexOf("### General Security");

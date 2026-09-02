@@ -1,0 +1,105 @@
+schema: 1
+task: "task.73.dod-security-probe-not-grep"
+task_title: "Make the DoD security check execute candidate inputs, not grep for them"
+gate: FAIL
+status_reason: "Cycle-2 refute pass found that cycle 1 relocated the defect rather than removing it: three absences — a missing `boundary`, a missing `probes_executed`, and a `reproduced: false` entry — still collapsed into confident render claims. All seven findings are fixed in the cycle-2 commit; this gate records the cycle and is superseded by gate 3."
+reviewer: "QA Engineer"
+updated: "2026-09-02T07:10:00Z"
+
+top_issues:
+  - id: "TASK73-011"
+    severity: high
+    file: "skills/finalise/SKILL.md"
+    finding: "The held-case branch keyed on `probes` being empty while the findings branch filtered `where probe.reproduced`, so a `reproduced: false` entry made the list non-empty and took the third branch — rendering a header, zero bullets and no verdict sentence at all. This also falsifies cycle 1's rationale for keeping the field defensive: the filter runs after branch selection, so it cannot hide anything."
+    suggested_action: "Key the held branch on 'no probe has reproduced == true' so the filter and the branch predicate agree."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-02"
+  - id: "TASK73-012"
+    severity: high
+    file: "skills/finalise/SKILL.md"
+    finding: "`{if security_result.boundary is not true:}` rendered the definite claim 'the deliverable is not a boundary' for three distinct inputs — `boundary: false`, `boundary` absent, and the unparseable-agent path. The headline conflation was moved from `probes` up to `boundary` rather than eliminated, and nothing enforced the key's presence."
+    suggested_action: "Give an absent or non-boolean `boundary` its own branch reporting the decision as unreported, and state the rule in the prompt."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-02"
+  - id: "TASK73-013"
+    severity: medium
+    file: "skills/finalise/SKILL.md"
+    finding: "No branch covered `boundary: true` with `probes_executed` absent: `undefined == 0` is false, so control fell to the held branch and printed '✅ The boundary held' with 'Candidates executed: {undefined}' — the good verdict handed to an agent that reported a boundary and omitted the count, making the zero-executed guard reachable by omission."
+    suggested_action: "Treat a missing `probes_executed` as the zero case."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-02"
+  - id: "TASK73-014"
+    severity: medium
+    file: "skills/finalise/SKILL.md"
+    finding: "For `boundary: true` + `probes_executed: 0` + non-empty `probes`, the zero-executed branch won and the reproduced escape routes — the single highest-value output of the feature — were never rendered."
+    suggested_action: "Render the reproduced list whenever there are reproduced probes, and layer the zero-executed callout on top rather than instead."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-02"
+  - id: "TASK73-015"
+    severity: low
+    file: "docs/tasks/task.73.dod-security-probe-not-grep/task.73.dod-security-probe-not-grep.md"
+    finding: "Section 5 still read 'The YAML gains an optional key that existing consumers ignore', which cycle 1 falsified by making `boundary` required and by making its absence meaningful rather than ignorable."
+    suggested_action: "State that `boundary:` is required and that an absent value is not equivalent to `false`."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-02"
+  - id: "TASK73-016"
+    severity: low
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: "The fenced-yaml-block slice added for TASK73-010 was applied only to the four probe fields; the adjacent six-key assertion still matched against the whole document, leaving half the return shape exactly as vacuous as before the fix."
+    suggested_action: "Hoist the slice into a shared helper and assert both key sets against it."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-02"
+  - id: "TASK73-017"
+    severity: low
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: "`security_result.probes` is a strict prefix of `security_result.probes_executed`, so the render assertion still passed if `probes` itself were removed and only the count survived."
+    suggested_action: "Anchor the marker so the count cannot satisfy the list assertion."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-02"
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 2164
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Read-only contract unchanged and still held by tests. The absence rules make the artifact harder to fake, not easier."
+  performance:
+    status: PASS
+    notes: "Render-only change. 2164 tests, 0 fail."
+  reliability:
+    status: CONCERNS
+    notes: "Fixed in this cycle — each input state now maps to its own rendered outcome — but the fix is unverified until cycle 3 confirms the branch set is exhaustive and mutually exclusive."
+  maintainability:
+    status: PASS
+    notes: "Both vacuity findings closed; six new mutation proofs on the absence branches, all red."
+
+recommendations:
+  immediate:
+    - action: "Verify the new three-way branch set is exhaustive and mutually exclusive (cycle 3)"
+      refs: ["skills/finalise/SKILL.md"]
+  future:
+    - action: "Fix the twelve classifier routes found by probe mode"
+      refs: ["docs/bugs/bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Cycle 3 confirms the branch set is exhaustive"
