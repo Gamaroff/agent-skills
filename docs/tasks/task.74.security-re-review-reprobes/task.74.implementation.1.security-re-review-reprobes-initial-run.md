@@ -34,7 +34,7 @@ Add a narrow carve-out to `qa-task` / `qa-story` so a re-review whose prior gate
 | 1. create-branch           | ✅ Done    | Branch `feature/task.74.*` exists in git                               | `feature/task.74.security-re-review-reprobes` created from `develop` at `ded36ba`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.74.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10. 1 Critical + 3 Important applied. Report: `task.74.review.1.security-re-review-reprobes.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases, all checkboxes ticked. 31 parity tests, 15 mutation proofs, 4 executable replay cases | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #299](https://github.com/Gamaroff/agent-skills/pull/299) → `develop`. Two commits: `92af48c` (task.74), `1e7c542` (bundle drift, separated). Issue comment skipped — no tracker issue | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.74.qa.{N}.*.md`; `task.74.gate.{N}.*.yml`; PR comment posted     |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.74.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -65,6 +65,7 @@ Add a narrow carve-out to `qa-task` / `qa-story` so a re-review whose prior gate
   7. `package.json` — verified: `evals/shared/tests/*.test.mjs` is already in the `npm test` glob, so the new Phase 4 test runs under `npm run ci` with no `package.json` edit
   8. `docs/tasks/task.67.execute-the-skill-qa-gate/task.67.gate.{1,2}.*.yml` — replay fixtures; gate.1 `security: FAIL`, gate.2 `security: PASS`, both present
 - **Step 3 — no plan file** (`task.74.plan.*.md` absent). Proceeding on the task's own Implementation Plan.
+- **Step 4 — create-pr**: base `develop` pre-supplied (Q2), 6 `--scope` paths, no `--issue`. Staged in scope mode (`git add -u` + explicit adds; never `git add -A`). Leak check clean. **Split into two commits deliberately** — the pre-existing `resolve-paths.sh` bundle drift is unrelated to task.74 and a reviewer should not have to work out why a path helper moved in a QA-scoping change. A pre-commit hook ran the bundler and independently flagged the same drift.
 - Phase 0b: no prior run — no `feature/task.74.*` branch (local or remote), no PR, no implementation report, no pipeline lock, no halt snapshot. Starting fresh.
 
 ---
@@ -106,7 +107,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.74.security-re-review-reprobes`
-**PR**: {populated after Step 4}
+**PR**: [#299](https://github.com/Gamaroff/agent-skills/pull/299)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
