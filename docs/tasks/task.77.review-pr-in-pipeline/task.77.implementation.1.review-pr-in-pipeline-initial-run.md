@@ -147,9 +147,15 @@ behavioural isolation, with the reasoning recorded in the task document.
 | `docs/reference/develop-story-pipeline-audit.2026-08-20.md` | A dated audit — a snapshot of the pipeline as it was, deliberately not updated. |
 | `docs/development/project-completion-roadmap.md` | The roadmap row and Change Log entry describe the task as *filed*; Step 4 of `develop-next` ticks it. |
 | `docs/runbooks/bug-fix.md`, `skills/develop-bug/README.md` | `develop-bug` is explicitly out of scope — separate verify loop, no 5c. |
-| `docs/reference/configuration.md`, `tracker-workflow.md`, `troubleshooting.md`, `anti-patterns.md` | Mention `qa-*` skills but restate no pipeline chain; `ready-for-merge` semantics are unchanged (same stage, same off-by-default, only its firing point moved). |
-| `docs/concepts/architecture.md`, `docs/contributing/evals/reference.md`, `docs/runbooks/first-week.md`, `docs/runbooks/sprint-cycle.md`, `docs/standards/bug-documents.md` | Checked line by line: no pipeline-shape restatement that 5c invalidates. |
+| ~~`docs/reference/configuration.md`, `tracker-workflow.md`~~, `troubleshooting.md`, `anti-patterns.md` | **This exclusion was WRONG and is reversed — see the post-gate-8 pass (DoD gap 3).** The stated reason ("only its firing point moved") is self-refuting: the stale column *is* the firing point. `configuration.md:332` and two rows in `tracker-workflow.md` gave `ready-for-merge` as firing at Step 6; both now read `Step 5c, on APPROVE / CONCERNS`. `troubleshooting.md` and `anti-patterns.md` remain legitimately excluded. |
+| ~~`docs/concepts/architecture.md`~~, `docs/contributing/evals/reference.md`, `docs/runbooks/first-week.md`, `docs/runbooks/sprint-cycle.md`, `docs/standards/bug-documents.md` | **The `architecture.md` exclusion was WRONG and is reversed — see the post-gate-8 pass (DoD gap 2).** "Checked line by line: no pipeline-shape restatement that 5c invalidates" was false: the file carried a fourth pipeline diagram routing Step 5 → 6 → 7 with no 5c, a flowchart omitting `review-pr`, and zero `review-pr` mentions. Both diagrams now carry 5c. The other four remain legitimately excluded. |
 | `docs/runbooks/restricted-access.md` | The task's premise ("the review's PR comment is a VCS mutation and defers like any other") does not hold: `resolve-platform.sh:469` accepts only `access.vcs: full` and hard-errors otherwise. The comment *does* defer, but on the **tracker** axis via `tracker_call_with_retry` — documented in `docs/concepts/restricted-access.md` instead, where the deferral model lives. |
+
+> **Two rows in this table were reversed after the fact, and are struck through above rather than
+> rewritten.** A ruled-out table is the one part of the trail nobody re-derives, which is exactly why
+> a wrong exclusion survives — `architecture.md` and the `ready-for-merge` firing point both did,
+> through eight gates. Correcting them silently would remove the evidence of how they were missed.
+> The reversals are recorded in the **post-gate-8 pass** section below (gate 9, finding CY9-1).
 
 **Files added to Phase 6 beyond the task's enumeration** (review finding I-1):
 `docs/standards/story-documents.md:106` and `docs/standards/task-documents.md:108` — both attributed
@@ -611,12 +617,42 @@ verb-less payload carries `5c` and passed the old regex; it fails the new one.
 
 The closing gate for this pass is **not** written by the agent that made these fixes.
 
+### Gate 9 — the pattern breaks — 2026-09-03
+
+`task.77.gate.9.review-pr-in-pipeline.yml` — ⚠️ **CONCERNS, 91/100**. Four consecutive gates had
+found the defect in the **reporting** rather than the change. This one did not. It executed **44
+mutations** — 23 trail-asserted, 21 of its own — and **no trail-asserted proof failed**, including
+the one honestly recorded as *not* holding. Its finding, verbatim: *"The trail is now honest — the
+two findings I raise are stale table rows, not false proofs."*
+
+**CY8-3 verified closed at the mechanism, not the matrix.** The reviewer checked from the *failure
+messages* rather than exit codes that removing the row-count canary makes a deletion fall through to
+the keying assertion and name its own value. Gate 8's own green mutations 20 and 21 are now red.
+
+Execution: `npm run ci` exit 0 (2285 tests, no flake) · parity 18/18 · lock 14/14 both shells ·
+`gh pr checks 309` 4/4 on head == local HEAD · 45 bundled copies, 0 mismatching — and the branch
+**reduces** repo-wide bundle staleness from 8 to 4. It independently confirmed gap 3's
+"one named, seven re-derived" as exact, and gap 8's out-of-scope claim as true on both halves.
+
+**It does not support `accepted`, and it is right.** Two of the three lifecycle conditions are
+unmet: this gate reads `CONCERNS`, and `dod.1` did not accept. Closing gaps 2–8 does not re-run
+`/finalise` — a `dod.2` is owed. That was a gap in the fixing agent's own reasoning, caught here.
+
+### Post-gate-9 pass — 2026-09-03
+
+| Finding | Sev | Resolution |
+| --- | --- | --- |
+| CY9-1 | LOW | The "consciously ruled out" table still vouched for excluding `architecture.md`, `configuration.md` and `tracker-workflow.md` — the three files **this branch edited because those exclusions were wrong** — with the reversal disclosed 430 lines below and never reconciled in place. Both rows are now struck through *at the table*, each naming why the exclusion was wrong, with a note that they are struck rather than rewritten so the evidence of how they were missed survives |
+| CY9-2 | LOW | Task doc `:517` read "residual deferred to task 88", written by the same commit that superseded task 88. Now states the residual was closed here |
+| CY9-4 | LOW | **Fixed although the operator's instruction named only CY9-1 and CY9-2.** Three stale counts sat in the section DoD gap 7 had just refreshed — "17 parity tests" (it is 18), "0 open HIGH in gate 4", NFR sourced to gate 5. Leaving known-false numbers in the trail while asking `/finalise` to verify that trail is self-defeating, and they would have resurfaced in `dod.2` minutes later. Recorded here rather than folded in silently |
+| CY9-3 | LOW | **Not fixed — carried.** Per-value *destination* is unasserted: `REQUEST CHANGES`→5c, swapped actions, and `review failed` losing its escalation bound all stay green. Gate 9 grades it a reasonable carry-forward and not a false claim — the commit claims only "a verb AND a destination", which is what it tests. Filing this rather than widening the guard again inside an escalated run |
+
 ---
 
 ## Completion
 
 **Finished**: in progress — QA loop escalated at cycle 5 of 5; gates 5–8 remediated; DoD gaps and the CY8 residual closed
-**Final Status**: In Progress — awaiting an independent gate 9 on the post-gate-8 pass; task 88 superseded
+**Final Status**: In Progress — gate 9 CONCERNS (91); CY9-1/2/4 closed, CY9-3 carried; `dod.2` and a gate 10 outstanding
 **Branch**: `feature/task.77.review-pr-in-pipeline`
 **PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
 **QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); 4 post-escalation remediation passes, each graded independently (gate 6 FAIL 75, gate 7 FAIL 78, gate 8 CONCERNS 87)

@@ -514,7 +514,7 @@ arms disables the gate while leaving every doc, test and contract in place.
 **QA Engineer**: QA Engineer — gates 5–8 issued by independent reviewers, none of whom wrote the fixes they graded
 **Testing Date**: 2026-09-03
 **Quality Score**: 87/100 (gate 8)
-**Gate Decision**: CONCERNS — residual deferred to task 88; acceptance needs a PASS/WAIVED gate or a recorded waiver
+**Gate Decision**: CONCERNS (gate 9, 91) — the CY8 residual was **closed here**, not deferred; task 88 was filed and then superseded. Acceptance still needs a PASS/WAIVED gate plus a passing DoD run
 
 > A gate-4 edit to PASS (92) was made and then **withdrawn** — Step 5c identified it as a
 > self-issued re-grade on the field that decides whether the loop exits. See the withdrawal note in
@@ -540,10 +540,10 @@ the 5-cycle budget was spent at gate 5 and three remediation passes do not resto
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 17 parity tests (none vacuous) plus full `npm run ci`. Not green on every cycle: it exited 1 at gate 5's assessment (finding CY5-1 — an unregistered artifact type in the work-item directory), which the independent reviewer caught against a written claim that it was green. Green since
+- **Tests Executed**: 18 parity tests (none vacuous) plus full `npm run ci`. Not green on every cycle: it exited 1 at gate 5's assessment (finding CY5-1 — an unregistered artifact type in the work-item directory), which the independent reviewer caught against a written claim that it was green. Green since
 - **Phases Verified**: 7/7
-- **Critical Issues**: 0 open HIGH in gate 4; Step 5c raised 4 further high-confidence trail findings
-- **NFR Status** (gate 5, independent): Security PASS, Performance PASS, Reliability CONCERNS, Maintainability FAIL
+- **Critical Issues**: 0 open HIGH in gate 9 (the latest); Step 5c raised 4 high-confidence trail findings, and gates 5–9 raised 22 more — every one in the trail or in test strength, none in pipeline behaviour
+- **NFR Status** (gate 9, independent — the latest): see `task.77.gate.9.review-pr-in-pipeline.yml`
 
 ### Key Findings
 
@@ -630,6 +630,8 @@ post-gate-5 remediation pass; the closing verdict on that pass is not self-issue
 | 2026-09-03 |         | Post-gate-7 pass — **mechanism replaced**, not patched a fourth time: the guard parses the resume sub-state table into rows and keys on the first cell, requiring each action to name a re-entry point. Mutation-proved on every row individually plus an actionless row. CR-3's banner fix pinned by a new test (suite now 18). Four trail errors corrected | qa-fix |
 | 2026-09-03 |         | Gate 8 CONCERNS (87/100), **issued independently** — first pass whose claims survive adversarial re-execution: 27 mutations run, all 17 trail-asserted proofs hold. CY5-4 closed after four assessments. Residual: 1 MEDIUM (stale count in 2 places) + guard-strength gaps | qa-task |
 | 2026-09-03 |         | Post-gate-8 pass — CY8-1/2/6/7 closed (count corrected in the PR body and this Change Log; CY7-3's phrase reconciled; the Format block's sample parenthetical pinned, mutation-proved). CY8-3/4/5 deliberately deferred as guard-strength gaps, not false claims | qa-fix |
+| 2026-09-03 |         | Gate 9 CONCERNS (91/100), **issued independently** — 44 mutations executed, **no trail-asserted proof failed**; CY8-3 verified closed at the mechanism. Four LOW findings, all stale table rows rather than false proofs. Explicitly does not support `accepted`: the gate is CONCERNS and `dod.1` did not accept | qa-task |
+| 2026-09-03 |         | Post-gate-9 pass — CY9-1 (ruled-out table reconciled in place, reversals struck through at the table), CY9-2 ("deferred to task 88" corrected) and CY9-4 (three stale counts) closed; CY9-3 carried as a reasonable follow-up | qa-fix |
 | 2026-09-03 |         | DoD verification run — NOT accepted, 8 gaps. AC 17/17, CI green on head, security PASS (228 probes); blocked on the `accepted` precondition (gate 8 is CONCERNS, not PASS/WAIVED) plus 7 trail defects incl. an undisclosed 4th pipeline diagram and a zsh-unparseable §5c snippet | finalise |
 | 2026-09-03 |         | Post-gate-8 pass — DoD gaps 2–8 closed (gap 3 was 7 instances, not 1: both pipeline READMEs, configuration.md, a 2nd copy in tracker-workflow.md, and the example YAML); §5c's zsh-unparseable invocation replaced and the parity assertion that pinned it updated. CY8-3/4/5 closed on operator decision — the row-count canary that made the matrix non-discriminating is replaced by a well-formedness check, one-row-per-value is enforced, and the action cell now needs a verb AND a destination. All six mutations fire the keying by name; task 88 superseded | qa-fix |
 
