@@ -35,6 +35,11 @@ its absence is not a protocol violation. Both rows are **instructed in §5c** of
 owns them, and a firing point declared mandatory here with nothing instructing it there is a
 defect in this table, not a licence to improvise.
 
+**The Steps 5–6 exit block carries the PR review verdict.** Its parenthetical is
+`({N} cycles, {gate}, PR review {verdict})` — the gate alone is not the loop's outcome any more,
+because a clean gate no longer exits the loop. §5c states the same line; this file is the format
+authority for it, so an example here that omits the verdict is the authority contradicting itself.
+
 Emit **one** block per moment — not one per sub-step, not one per tool call.
 
 **One exemption:** the graceful pause (PreCompact) path. Its hook-supplied summary
@@ -51,7 +56,7 @@ the next sub-skill is invoked in the same assistant turn.
 
 ```
 ═══ REMAINING WORK STATUS ═══
-Pipeline position:  {position line} {optional short parenthetical: "(1 cycle, PASS 100/100)"}
+Pipeline position:  {position line} {optional short parenthetical: "(1 cycle, PASS 100/100, PR review APPROVE)"}
 
 Remaining {work-item units} ({X} of {M} complete):
   ✅ {n}: {name}
@@ -108,7 +113,7 @@ Steps: 1 create-branch · 2 review-bug · 3 investigate & fix · 4 create-pr ·
 
 ```
 ═══ REMAINING WORK STATUS ═══
-Pipeline position:  Steps 5–6/8 — QA LOOP ✅ complete (1 cycle, PASS 100/100)
+Pipeline position:  Steps 5–6/8 — QA LOOP ✅ complete (1 cycle, PASS 100/100, PR review APPROVE)
 
 Pipeline steps still ahead:
   - Step 7: finalise

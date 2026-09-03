@@ -302,9 +302,12 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cy
 **Remaining Work Status block (required, per cycle).** Before re-invoking the QA skill for the next cycle, emit the block with the position line `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {N}/5`. On the cycle that exits the loop, the block is emitted as part of the Step 7 transition instead, in the form 5c specifies (`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate}, PR review {verdict})`). Format: [`references/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
 
 A cycle that reaches 5c emits **two further blocks**, both instructed in 5c below: one immediately
-before `/review-pr`, and one on the REQUEST CHANGES arm before re-entering 5b. Steps 5–6 therefore
-have **four** firing points, not two — this paragraph owns the first, the Step 7 transition owns
-the last, and 5c owns the middle pair.
+before `/review-pr`, and one on the REQUEST CHANGES arm before re-entering 5b. Ownership of the
+Steps 5–6 progress blocks is therefore: this paragraph owns the per-cycle one, **5c owns those
+two**, and the Step 7 transition owns the exit one. The banner's **HALT** row is additional to all
+of them and fires wherever these steps halt — 5c's `review failed` arm, 5b's step-0 no-change HALT,
+and Loop Escalation included. Do not read the progress blocks as an exhaustive list of the blocks
+Steps 5–6 emit.
 
 ### Convergence check (shared) — the QA loop's stall guard
 
@@ -754,13 +757,13 @@ path already exists.
 
 #### Invoking `/qa-fix` on a REQUEST CHANGES verdict
 
-The ordinary 5b invocation passes the latest **gate file**, and on this path that gate reads
-`PASS`/`WAIVED` with an empty `top_issues[]` — it carries none of the review's findings. Pass the
-**PR review report** as well:
-
 **Remaining Work Status block (required, before re-entering 5b).** Emit the block with the
 position line `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` before the
 invocation below — the second of the two firing points this section owns.
+
+The ordinary 5b invocation passes the latest **gate file**, and on this path that gate reads
+`PASS`/`WAIVED` with an empty `top_issues[]` — it carries none of the review's findings. Pass the
+**PR review report** as well:
 
 ```
 Skill(qa-fix, args="gate={gate-file-path} pr_review={pr-review-report-path}")

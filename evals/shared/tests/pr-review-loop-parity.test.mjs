@@ -489,9 +489,26 @@ test("the 5c resume check reads the report, not the filesystem", () => {
   // Every non-terminal value must have a stated resume action — the earlier version handled
   // `not reached` and blank but not `review failed`, which 5c writes and nothing read. The
   // enumeration then went stale the same way when 5a's `pending — 5c not yet run` placeholder
-  // was added to the loop doc's enum and to nothing else: the test that exists to catch a
-  // value with no resume action could not see the sixth one. Adding a value to the enum on
-  // line ~263 of the loop doc means adding it here and to the resume sub-state table.
+  // was added to the loop doc's enum and to nothing else. Adding a value to the enum on
+  // line ~263 of the loop doc means adding it here AND to the resume sub-state table.
+  //
+  // SCOPED TO THE TABLE, DELIBERATELY. This assertion was `resume.includes(v)` over the whole
+  // file, and the artifact-table sentences at lines ~82 and ~92 name every value in passing —
+  // so the guard was pre-satisfied and stayed green when the sub-state ROW it exists to require
+  // was deleted. That is the failure mode AGENTS.md names: a test that passes on the exact
+  // regression it was written to catch. The row is the artifact carrying the resume ACTION;
+  // being mentioned elsewhere in the file is not the same thing as having one.
+  const tableStart = resume.indexOf(
+    "| `**PR Review**` reads | Resume action |",
+  );
+  assert.ok(tableStart > -1, "the resume sub-state table must exist");
+  const tableEnd = resume.indexOf("\n>\n", tableStart);
+  assert.ok(
+    tableEnd > -1,
+    "the sub-state table must be followed by its rationale block — without an end marker this slice would widen to EOF and re-admit the artifact-table sentences",
+  );
+  const subState = resume.slice(tableStart, tableEnd);
+
   for (const v of [
     "pending — 5c not yet run",
     "REQUEST CHANGES",
@@ -499,8 +516,8 @@ test("the 5c resume check reads the report, not the filesystem", () => {
     "not reached",
   ]) {
     assert.ok(
-      resume.includes(v),
-      `the resume table must say what to do when PR Review reads "${v}"`,
+      subState.includes("`" + v + "`"),
+      `the resume sub-state TABLE must carry a row for PR Review = "${v}", not merely mention the value somewhere in the file`,
     );
   }
 });
