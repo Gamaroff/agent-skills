@@ -236,3 +236,70 @@ catch, in its own paperwork.
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
+
+
+### QA Cycle 3 — 2026-09-03
+
+**Gate Result**: FAIL
+**Issues Found**: 7 — 4 HIGH, 2 MEDIUM, 1 LOW
+**HIGH findings**: 3 (excluding TASK77-021, which is the third-strike ruling on the other two, not an independent defect)
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Escalating — loop not converging
+
+---
+
+## QA Loop Not Converging — 2026-09-03
+
+The pipeline stopped after **3** qa-task/qa-fix cycles: the HIGH finding count failed to strictly
+decrease across two consecutive cycles, so the loop was no longer converging. The remaining findings
+are **NOT accepted** — they are handed over below.
+
+**Final gate status**: FAIL (gate 3, 70/100)
+**HIGH findings per cycle**: 3, 3, 3 — flat from cycle 1 onward
+**Remaining issues** (from `task.77.gate.3.review-pr-in-pipeline.yml`):
+
+| id | severity | file | finding |
+| --- | --- | --- | --- |
+| TASK77-019 | high | `develop-pipeline-resume-contract.md` | resume predicate returns a FALSE PASS under zsh when the gate glob matches nothing |
+| TASK77-020 | high | `develop-pipeline-resume-contract.md` | the same predicate compares `gate.{N}` (per cycle) with `pr-review.{n}` (per 5c invocation) — false on any run whose first gate was not clean |
+| TASK77-021 | high | `develop-pipeline-resume-contract.md` | **third strike** on that one predicate — the repo's own rule forbids a fourth patch |
+| TASK77-022 | high | `qa-findings-ingester-prompt.md` | the ingester expects a finding schema `/review-pr` never writes to disk; sole carrier of the REQUEST CHANGES path |
+| TASK77-023 | medium | `develop-pipeline-step-5-6-qa-loop.md` | the push-budget fix contradicts two unmodified statements, one of them the executed numbered step |
+| TASK77-024 | medium | `develop-pipeline-resume-contract.md` | `review failed` is written by 5c and read by nothing |
+| TASK77-025 | low | `skills/qa-{story,task}/references/` | partial re-bundle — four shared files reached only 4 of 7 consumers |
+
+**What was attempted per cycle**:
+
+- **Cycle 1** — 7 findings (3 HIGH). Fixed the Loop Setup contradiction, the double increment, and the
+  undeliverable REQUEST CHANGES path, plus 4 lesser findings and 6 cleanups.
+- **Cycle 2** (refute pass) — 11 findings (3 HIGH), **2 of the 3 HIGH introduced by cycle 1's own
+  fixes**. Fixed the surviving second increment site, gave 5c a failure arm, bound the resume check to
+  the cycle, and corrected 8 further items.
+- **Cycle 3** — 7 findings (3 HIGH + the third-strike ruling). **9 of cycle 2's 11 closures verified
+  real.** The 3 that were not cluster on a single predicate, and **2 of this cycle's HIGH findings were
+  created by cycle 2's fix to it**.
+
+**Likely root cause**: The change is prose that *is* the product, and the loop has been correcting
+sentences rather than contracts. Each cycle fixed the sentence a finding quoted; the next cycle found
+that the sentence belonged to a contract stated in more than one place, or resting on an invariant the
+fix had just invalidated. That is a real convergence failure, not a run of bad luck — and the two
+cycle-3 HIGH findings on the resume predicate were demonstrated **by execution**, not by reading,
+which is a firmer basis than either earlier cycle had.
+
+**Why this escalates rather than continuing**: the repo's **third-strike rule** applies squarely.
+One predicate has now failed three consecutive cycles, and the rule's permitted moves — delete,
+replace the mechanism, or waive — are all decisions about *scope*, which belong to a human. A fourth
+correction is the loop's failure mode, not its progress.
+
+**Two decisions are needed:**
+
+1. **TASK77-021** — delete the index-comparison resume predicate, or replace the mechanism (e.g. have
+   5c name the gate it reviewed inside the report, making the check a content match rather than
+   arithmetic). Dropping the conditional check entirely is defensible: a run killed inside 5c would
+   then re-enter at 5a, costing one cycle and unable to silently finalise.
+2. **TASK77-022** — decide whether `/review-pr` should emit a machine-readable `findings:` block. This
+   contract carries the entire REQUEST CHANGES path and currently rests on an LLM reading a rendered
+   format the ingester does not describe.
+
+Everything else in the change is sound: the 5c wiring, the routing, the `ready-for-merge` move, the
+documentation sweep, and 15 non-vacuous parity tests. The two open decisions are narrow.
