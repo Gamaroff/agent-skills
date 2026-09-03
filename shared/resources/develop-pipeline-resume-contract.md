@@ -125,7 +125,7 @@ A `gate.yml` written manually (without running the QA skill) does NOT satisfy St
 > | --- | --- |
 > | `APPROVE` or `CONCERNS` | 5c cleared — Step 5–6 is complete, go to Step 7 |
 > | `REQUEST CHANGES` | 5c ran and routed back — set the counter to `N`, re-enter at **5b** |
-> | `review failed` | 5c could not run (usually the PR state). The operator is expected to have addressed the cause; set the counter to `N` and re-enter at **5c** |
+> | `review failed` | 5c could not run (usually the PR state). Set the counter to `N` and re-enter at **5c** — **once**. Its usual cause is not self-healing, so an unattended driver would otherwise re-run `/review-pr`, HALT, and repeat forever. On a **second consecutive** `review failed` for the same cycle `N`, do not re-enter: escalate to Loop Escalation with the review's own error text. |
 > | `not reached`, blank, or no row | The gate did not exit the loop, or the run died before 5c. If gate `{N}` reads `PASS`/`WAIVED`, re-enter at **5c**; otherwise at **5a** |
 >
 > **Why this reads the report rather than the filesystem.** An earlier version of this check compared

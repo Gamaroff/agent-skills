@@ -120,7 +120,7 @@ flowchart TD
     S5gate -- PASS / WAIVED --> S5c[Step 5c: review-pr<br/>--effort medium, low if lite<br/>--comment]
     S5gate -- CONCERNS / FAIL --> S6[Step 6: qa-fix]
     S5c --> S5cv{Verdict}
-    S5cv -- REQUEST CHANGES --> S6
+    S5cv -- REQUEST CHANGES<br/>commit only, push already spent --> S6
     S5cv -- APPROVE / CONCERNS --> S5cm[signal ready-for-merge] --> S7
     S6 --> S6chg{Code changed?}
     S6chg -- no --> HALTNOFIX[HALT: qa-fix made no changes]
@@ -281,6 +281,7 @@ sequenceDiagram
     participant TM as Explore<br/>QA traceability mapper
     participant Q as /qa-story
     participant F as /qa-fix
+    participant PR as /review-pr
     participant CC as /commit-changes
     participant PG as Explore<br/>tracker state poller
     participant FS as Filesystem
@@ -307,8 +308,22 @@ sequenceDiagram
         Q-->>-H: gate result
 
         H->>FS: read gate file
-        alt gate == PASS, no top_issues
-            note right of H: EXIT loop → Step 7
+        alt gate == PASS / WAIVED
+            H->>+CC: /commit-changes<br/>"docs(story.{epic}.{story}): QA cycle {N} gate + report"
+            CC-->>-H: committed + pushed (cycle's one push)
+            H->>+PR: /review-pr --effort {medium|low} --comment<br/>Step 5c — the loop's exit gate
+            PR->>FS: write story.{epic}.{story}.pr-review.{n}.*.md
+            PR-->>-H: verdict
+            alt verdict == REQUEST CHANGES
+                note right of H: back to 5b — same 5-cycle budget,<br/>counter incremented by 5b step 7
+                H->>+F: /qa-fix {gate} + {pr-review report}
+                F-->>-H: returns (commit only — push already spent)
+            else verdict == APPROVE / CONCERNS
+                H->>H: signal ready-for-merge
+                note right of H: EXIT loop → Step 7
+            else verdict == review failed
+                H->>H: HALT — 5c could not run (do NOT fall through to Step 7)
+            end
         else CONCERNS / FAIL / has top_issues
             H->>+F: /qa-fix {gate-file-path}
             F->>FS: edit code per gate findings
@@ -339,7 +354,7 @@ sequenceDiagram
         end
     end
 
-    alt cycle > 5 without PASS
+    alt cycle > 5 without clearing 5c
         H->>FS: write escalation entry<br/>(per-cycle summaries, root cause, next steps)
         H->>+CC: docs(story.{epic}.{story}): implementation report — qa loop escalation
         CC-->>-H: hash

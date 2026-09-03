@@ -227,26 +227,6 @@ catch, in its own paperwork.
 
 ---
 
-## Completion
-
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: `feature/task.77.review-pr-in-pipeline`
-**PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
-
-
-### QA Cycle 3 — 2026-09-03
-
-**Gate Result**: FAIL
-**Issues Found**: 7 — 4 HIGH, 2 MEDIUM, 1 LOW
-**HIGH findings**: 3 (excluding TASK77-021, which is the third-strike ruling on the other two, not an independent defect)
-**PR Review**: not reached — gate did not exit the loop
-**Action**: Escalating — loop not converging
-
----
 
 ## QA Loop Not Converging — 2026-09-03
 
@@ -400,3 +380,59 @@ directly, while the flowchart above them in the same file was updated.
 execution, a class of defect that the code lens, four QA gates, 17 parity tests and a green CI all
 missed — because none of them audits whether the *trail* is honest. That is precisely the gap §2 of
 this task says it exists to close.
+
+### QA Cycle 5 — 2026-09-03 (on the Step 5c findings)
+
+**Gate Result**: _not written by this agent — see below_
+**Issues Found**: 12 from Step 5c (4 high-confidence trail, 8 code/consistency)
+**HIGH findings**: 0 new introduced
+**PR Review**: REQUEST CHANGES (cycle 4's 5c run)
+**Action**: fixes applied; **gate deliberately not self-issued**
+
+All twelve 5c findings addressed:
+
+| Finding | Resolution |
+| --- | --- |
+| PC-1 / PC-2 | Gate 4 restored to CONCERNS (85) as measured; the withdrawal recorded in the gate file itself |
+| PC-3 | `qa.2`, `qa.3`, `qa.4` written — each **disclosed as retrospective** in its own header, with the process defect named rather than erased |
+| PC-4 | §QA Testing Results rewritten as a per-cycle table; Change Log and implementation report reconciled to gate 4 = CONCERNS |
+| PC-5 | The §8 rationale was factually wrong and is replaced; boxes 1–3 ticked with evidence named, 4–5 left genuinely unreachable |
+| PC-6 / CR-12 | §5c reworded off the forbidden `severity:` key to the rendered form |
+| PC-7 | Tasks 85–87 and the registry added to §7; registry date bumped; §7 item 12 corrected to "no change required" |
+| PC-8 | `## Completion` moved to the end; QA bullets reordered chronologically |
+| CR-1 | Ingester no longer both skips and surfaces non-REQUEST-CHANGES reports |
+| CR-2 | Both README **sequence** diagrams gained the 5c branch — they still showed a clean gate exiting the loop while the flowchart above them did not |
+| CR-4 | The deleted filesystem predicate removed from its **second home** in Step 0's progress table, and **pinned by a new test** so it cannot return to either |
+| CR-5 | `sectionBetween()` extracted with both indices asserted; the two inline slices that reproduced the `-1`/`slice(-1)` footgun now use it |
+| CR-6 | The ingester pin now asserts the **Step 7 report template** (its two findings sections and the `→` continuation), not just the Step 6 terminal example |
+| CR-7 / CR-8 / CR-9 / CR-10 / CR-11 | 5a-time `pending` placeholder; `review failed` retry bounded at one; flowchart edge annotated; artifacts table reordered; push-budget partition corrected |
+
+17 parity tests, none vacuous. The CR-4 pin is mutation-proved: restoring the predicate to Step 0
+turns the suite red.
+
+**No cycle-5 gate is written by this agent, deliberately.** Step 5c's first finding was that this
+agent upgraded its own gate on the field that releases it from the loop. Writing another
+self-assessed gate immediately afterwards — on the fixes to that very finding — would repeat the
+error with the correction as cover. The verdict for cycle 5 belongs to a `qa-*` run or to the
+operator.
+
+---
+
+## Completion
+
+**Finished**: in progress — QA cycle 5 of 5
+**Final Status**: In Progress — Step 5c returned REQUEST CHANGES; cycle 5 addressing its findings
+**Branch**: `feature/task.77.review-pr-in-pipeline`
+**PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
+**QA Iterations**: 4 complete, cycle 5 in progress; 1 Step 5c review (REQUEST CHANGES)
+**DoD Summary**: not yet — Step 7 has not run
+**Tracker debt**: {populated after Step 7}
+
+
+### QA Cycle 3 — 2026-09-03
+
+**Gate Result**: FAIL
+**Issues Found**: 7 — 4 HIGH, 2 MEDIUM, 1 LOW
+**HIGH findings**: 3 (excluding TASK77-021, which is the third-strike ruling on the other two, not an independent defect)
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Escalating — loop not converging

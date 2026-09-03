@@ -260,7 +260,7 @@ Log the result in the QA Iteration History section:
 **Gate Result**: {PASS / CONCERNS / FAIL / WAIVED}
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
-**PR Review**: {APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
+**PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
 **Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of 5) / Proceeding to finalise / Escalating — loop not converging}
 ```
 
@@ -268,8 +268,10 @@ The `**HIGH findings**` line is not decoration: it is the persisted sequence the
 check** below compares across cycles, and the only place a resumed run can read the earlier counts
 back from. Write it on every cycle, including one that found none (`0`).
 
-`**PR Review**` follows the same rule for the same reason. A cycle whose gate never reached 5c
-writes `not reached — gate did not exit the loop`; it is never omitted. An omitted row is
+`**PR Review**` follows the same rule for the same reason, but note **who writes it and when**: 5a
+writes the row when it writes the entry, and at that moment no 5c verdict exists. On a clean gate 5a
+writes `pending — 5c not yet run`, and **5c overwrites it** with its verdict. A cycle whose gate never
+reached 5c keeps `not reached — gate did not exit the loop`. It is never omitted. An omitted row is
 indistinguishable from a review that was skipped, and on resume the two must not be confused.
 
 **Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
@@ -489,8 +491,8 @@ three together:
 | `…qa.{N}.{name}.md` (written by 5a)         | this cycle's `fix(...)` commit           |
 | `…implementation.{name}.md`                 | **deferred to Step 8** (`docs(...)`)     |
 
-**There is exactly one `git push origin HEAD` per cycle** — at step 3 below on an ordinary cycle,
-or **before 5c** on the review-driven path (see path 1 above), never both. Do not create a separate
+**There is exactly one `git push origin HEAD` per cycle** — at step 3 below on a cycle that enters 5b
+from 5a, or **before 5c** on a cycle whose gate read `PASS`/`WAIVED` (path 1 above), never both. Do not create a separate
 `docs(...): QA cycle {N} gate + report` commit, and do not push twice in a cycle. The rule is about
 the **push**, not the commit: a review-driven cycle legitimately makes two commits (the pre-5c
 gate+report, then 5b's `fix(...)`), and still pushes once.
@@ -748,8 +750,9 @@ Skill(qa-fix, args="gate={gate-file-path} pr_review={pr-review-report-path}")
 ```
 
 The findings ingester globs `*.pr-review.*.md` for exactly this reason (see
-`qa-findings-ingester-prompt.md`), and treats a `severity: high` finding there as equivalent to a
-HIGH gate `top_issue`. Without both halves of this — the glob and the passed path — qa-fix reads a
+`qa-findings-ingester-prompt.md`), and treats a finding whose rendered severity field reads
+`high` as equivalent to a HIGH gate `top_issue` — the report carries no `severity:` key, and the
+ingester warns by name against searching for one. Without both halves of this — the glob and the passed path — qa-fix reads a
 clean gate, finds nothing, changes nothing, and 5b step 0 HALTs reporting the issues as unfixable
 when in fact they were never delivered.
 

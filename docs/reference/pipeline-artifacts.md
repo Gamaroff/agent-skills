@@ -49,10 +49,10 @@ The two pipelines are the same shape. Read `story.{E}.{S}` and `task.{N}` as int
 | 1 | `create-branch` | **Feature branch** `feature/story.{E}.{S}.*` / `feature/task.{N}.*`, plus the epic integration branch if you chose one that did not exist | n/a (git ref) |
 | 1 (end) | (orchestrator) | **Pipeline lock** `.claude/state/develop-pipeline.lock` | No |
 | 2 | `review-story` / `review-task` | **Review report** `*.review.{n}.{name}.md` | Yes — Step 8 |
-| 5c | `review-pr` | **PR review report** `*.pr-review.{n}.{name}.md` — the exit gate of the Steps 5–6 loop; also invocable standalone | Yes — Step 8 |
 | 3 | `develop` | Source changes, tests, and transient **test logs** `.claude/state/test-output-{ITER}-*.log` | Source yes, logs no |
 | 4 | `create-pr` | **Pull request** against the Q2 base | n/a (remote) |
 | 5 | `qa-story` / `qa-task` | **QA report** `*.qa.{n}.{name}.md` **and gate file** `*.gate.{n}.{name}.yml` — one pair per cycle | Yes — Step 8 |
+| 5c | `review-pr` | **PR review report** `*.pr-review.{n}.{name}.md` — the exit gate of the Steps 5–6 loop; also invocable standalone | Yes — Step 8 |
 | 6 | `qa-fix` | Fix commits pushed to the branch (no new document) | Yes — immediately |
 | 7 | `finalise` | **DoD summary** `*.dod.{n}.{name}.md`, a PR comment, a tracker-issue comment, a board move, and `status: accepted` on the work item | Yes — Step 8 |
 | Run end | `handover-render` | **Tracker handover** `*.handover.{n}.{name}.{md,sh,json}` — written only when the run deferred (or failed) a tracker mutation; an empty journal writes nothing | Yes — Step 8 |

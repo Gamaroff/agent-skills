@@ -58,14 +58,27 @@ function lineOf(text, re) {
  *     /REQUEST CHANGES.*5b/s matched prose there and would have passed even if the verdict table
  *     said the opposite.
  */
-function section5c() {
-  const start = loopDoc.indexOf("### 5c. ");
+/**
+ * A slice of the QA-loop doc between two markers, with BOTH indices asserted.
+ *
+ * The -1 trap is why this is a helper rather than inline `indexOf` calls: `slice(-1)` returns the
+ * file's LAST CHARACTER, not an empty string, so a renamed heading silently turns
+ * `assert.doesNotMatch(section, /…/)` into a test that passes on a one-character string while
+ * claiming to guard a whole section. `section5c()` was hardened against exactly this and then two
+ * inline slices reproduced it verbatim — which is the argument for having one guarded path.
+ */
+function sectionBetween(startMarker, endMarker) {
+  const start = loopDoc.indexOf(startMarker);
   assert.ok(
     start > -1,
-    "the 5c section must exist — every assertion below is about it",
+    `marker not found, so nothing below is being tested: ${startMarker}`,
   );
-  const end = loopDoc.indexOf("\n## ", start);
+  const end = loopDoc.indexOf(endMarker, start + startMarker.length);
   return loopDoc.slice(start, end > -1 ? end : undefined);
+}
+
+function section5c() {
+  return sectionBetween("### 5c. ", "\n## ");
 }
 
 // ── 1. Placement: 5c sits after 5b and before Loop Escalation ────────────────
@@ -89,11 +102,10 @@ test("the QA loop carries a 5c section between 5b and Loop Escalation", () => {
 // ── 2. The gate hands to 5c, rather than exiting on its own ──────────────────
 
 test("a clean QA gate routes to 5c, not straight to Step 7", () => {
-  const branching = loopDoc.slice(
-    loopDoc.indexOf("### Outcome branching (shared)"),
-    loopDoc.indexOf("### Convergence check"),
+  const branching = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
   );
-  assert.ok(branching.length > 0, "outcome branching section must exist");
 
   for (const gate of ["PASS", "WAIVED"]) {
     const arm = branching
@@ -187,9 +199,9 @@ test("ready-for-merge sits inside 5c, after the review clears", () => {
   );
 
   // And it must not have been left behind in the outcome branching too.
-  const branching = loopDoc.slice(
-    loopDoc.indexOf("### Outcome branching (shared)"),
-    loopDoc.indexOf("### Convergence check"),
+  const branching = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
   );
   assert.doesNotMatch(
     branching,
@@ -376,6 +388,30 @@ test("the ingester describes the format /review-pr actually renders", () => {
     header,
     "review-pr must render the header shape the ingester is told to parse",
   );
+
+  // The ingester parses the Step 7 REPORT, not the Step 6 terminal example. Without these, the
+  // report template could lose its findings sections and this test would stay green while the
+  // parse became unperformable — the exact failure its name warns about.
+  assert.match(
+    reviewPr,
+    /^## Conformance Findings$/m,
+    "the report template must keep the section the ingester reads PC-* findings from",
+  );
+  assert.match(
+    reviewPr,
+    /^## Code Review Findings$/m,
+    "the report template must keep the section the ingester reads CR-* findings from",
+  );
+  assert.match(
+    reviewPr,
+    /→ suggested action/,
+    "the continuation line the ingester is told to parse must exist in the renderer",
+  );
+  assert.match(
+    ingester,
+    /→/,
+    "the ingester must describe the arrow continuation it parses",
+  );
   assert.match(
     ingester,
     header,
@@ -423,6 +459,23 @@ test("the 5c resume check reads the report, not the filesystem", () => {
     resume,
     /`\*\*PR Review\*\*` row must hold a \*\*terminal verdict\*\*/,
     "completeness is decided by the report row, which is written every cycle by contract",
+  );
+
+  // The deleted predicate had TWO homes. Removing it from the resume contract while it survived
+  // in Step 0's progress table left two documents defining Step 5-6 completeness differently at
+  // the same resume moment — the cycle-1-to-3 pattern (fix the sentence, not the contract) again.
+  const step0 = read(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  assert.doesNotMatch(
+    step0,
+    /pr-review\.\{n\}\.\*\.md` \(Step 5c\)/,
+    "Step 0's progress rows must not require the pr-review FILE — same rule, one statement",
+  );
+  assert.match(
+    step0,
+    /`\*\*PR Review\*\*` row on the highest `### QA Cycle \{N\}`/,
+    "Step 0 must state the same report-row condition the resume contract does",
   );
   // Every non-terminal value must have a stated resume action — the earlier version handled
   // `not reached` and blank but not `review failed`, which 5c writes and nothing read.

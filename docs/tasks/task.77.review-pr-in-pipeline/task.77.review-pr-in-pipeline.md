@@ -345,8 +345,17 @@ implementation report**.
 
 ### Files Regenerated (commit them — CI checks freshness)
 
-11. ✅ `skills/{develop-task,develop-story}/references/*` — `npm run bundle`
-12. ✅ `docs/reference/skill-catalog.md` — `npm run generate-catalog`
+11. ✅ `skills/*/references/*` — `npm run bundle` (six consumers, not four — see the QA cycle 3 note)
+12. ⬜ `docs/reference/skill-catalog.md` — **no change required**: no `description:` field changed, so
+    `npm run generate-catalog` is a no-op and the file is absent from the diff
+
+### Files Added — follow-ups filed from QA (precedent: tasks 67–70 from task 66's dogfood)
+
+13. ✅ `docs/tasks/task.85.review-pr-machine-readable-findings/` — machine-readable findings block
+14. ✅ `docs/tasks/task.86.bundle-transitive-refresh/` — **High**: the bundler never refreshes a
+    transitively-bundled reference and reports `in sync` for a file it no longer examines
+15. ✅ `docs/tasks/task.87.execute-table-cell-snippets/` — table-cell commands escape the snippet gate
+16. ✅ `docs/tasks/task-registry.md` — three rows, counter 85 → 88
 
 ### Explicitly NOT modified
 
@@ -383,16 +392,20 @@ with a glob returning 6 files under bash and 0 under zsh. Contract tests that as
 
 ### End-to-end dogfood
 
-> **Not run — and deliberately not ticked.** This is a documentation-and-contract change: 5c does
-> not execute until a *subsequent* pipeline run reaches it, so no `*.pr-review.*` artifact can exist
-> on this branch. QA cycle 2 caught these as ticked-without-evidence; they are now deferred to the
-> first real run. The one that is already known to be wrong is struck through.
+> **Partly run — ticked only where there is evidence on disk.** QA cycle 2 caught these as
+> ticked-without-evidence and they were unticked; Step 5c then found the *stated reason* wrong. The
+> original claim — "no `*.pr-review.*` artifact can exist on this branch" — was false: gate 4 read
+> clean, this run reached 5c, and the artifact was written here. Boxes 1 and 2 are now met and
+> ticked with their evidence named. Boxes 4 and 5 remain genuinely unreachable on this branch.
 
-- [ ] `/develop-task` on a small task produces `task.{id}.pr-review.1.{name}.md` beside the QA report
-- [ ] The QA Cycle entry carries the PR Review row
+- [x] `/develop-task` on a small task produces `task.{id}.pr-review.1.{name}.md` beside the QA report
+      — **this task**: `task.77.pr-review.1.review-pr-in-pipeline.md`
+- [x] The QA Cycle entry carries the PR Review row — all five entries in the implementation report
+      carry a `**PR Review**:` row
 - [x] Step 8's `grep -q "⏳ Pending"` assertion still finds nothing
-- [ ] ~~A forced REQUEST CHANGES routes back into `/qa-fix` and increments the shared counter~~ —
-      restated: routes back into `/qa-fix`, and the counter is incremented **once, by 5b step 7**
+- [x] ~~A **forced** REQUEST CHANGES routes back into `/qa-fix`~~ — restated, and observed **unforced**:
+      Step 5c returned REQUEST CHANGES on this PR and the run re-entered 5b as cycle 5. The counter
+      is incremented **once, by 5b step 7**
 - [ ] One `/develop-next` run merges a PR that already has a pr-review report on disk — **with no
       orchestrator edit**
 
@@ -497,33 +510,40 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS at cycle 4; **Step 5c returned REQUEST CHANGES** — 4 trail findings, loop continues
+**QA Status**: CONCERNS (gate 4) — **Step 5c returned REQUEST CHANGES**; cycle 5 in progress
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-03
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 85/100 (gate 4, as measured)
+**Gate Decision**: CONCERNS
 
-### QA Report
+> A gate-4 edit to PASS (92) was made and then **withdrawn** — Step 5c identified it as a
+> self-issued re-grade on the field that decides whether the loop exits. See the withdrawal note in
+> the gate file and PC-1/PC-2 in the Step 5c report.
 
-- **Cycle 1**: [qa.1](./task.77.qa.1.review-pr-in-pipeline.md) · [gate.1](./task.77.gate.1.review-pr-in-pipeline.yml) — FAIL, 7 findings
-- **Cycle 2** (refute pass): [gate.2](./task.77.gate.2.review-pr-in-pipeline.yml) — FAIL, 11 findings, 2 of 3 HIGH introduced by cycle 1's own fixes
-- **Cycle 4**: [gate.4](./task.77.gate.4.review-pr-in-pipeline.yml) — CONCERNS (85), 0 HIGH. Both escalated decisions implemented as mechanism replacements; 2 items deferred to tasks 85/86/87
-- **Step 5c**: [pr-review.1](./task.77.pr-review.1.review-pr-in-pipeline.md) — 🚨 **REQUEST CHANGES**. First real execution of the step this task adds, on its own PR. Found 4 high-confidence trail defects four QA cycles missed, including a self-upgraded gate
-- **Cycle 3**: [gate.3](./task.77.gate.3.review-pr-in-pipeline.yml) — FAIL, **convergence stall**. 9 of 11 cycle-2 closures verified real; the 3 that were not cluster on one predicate that has now failed three cycles (third strike). Escalated — two scope decisions required
+### QA Artifacts
+
+| Cycle | Report | Gate | Verdict |
+| --- | --- | --- | --- |
+| 1 | [qa.1](./task.77.qa.1.review-pr-in-pipeline.md) | [gate.1](./task.77.gate.1.review-pr-in-pipeline.yml) | FAIL (70) — 3 HIGH |
+| 2 | [qa.2](./task.77.qa.2.review-pr-in-pipeline.md) ⚠️ retrospective | [gate.2](./task.77.gate.2.review-pr-in-pipeline.yml) | FAIL (70) — 3 HIGH, 2 self-inflicted |
+| 3 | [qa.3](./task.77.qa.3.review-pr-in-pipeline.md) ⚠️ retrospective | [gate.3](./task.77.gate.3.review-pr-in-pipeline.yml) | FAIL (70) — convergence stall, escalated |
+| 4 | [qa.4](./task.77.qa.4.review-pr-in-pipeline.md) ⚠️ retrospective | [gate.4](./task.77.gate.4.review-pr-in-pipeline.yml) | CONCERNS (85) — 0 HIGH |
+| 5c | [pr-review.1](./task.77.pr-review.1.review-pr-in-pipeline.md) | — (advisory, writes no gate) | 🚨 REQUEST CHANGES — 4 trail findings |
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 324 (plus full `npm run ci`, exit 0)
-- **Phases Verified**: 7/7 implemented, 3 with issues
-- **Critical Issues**: 3 HIGH
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Tests Executed**: 17 parity tests (none vacuous) plus full `npm run ci` — green on every cycle
+- **Phases Verified**: 7/7
+- **Critical Issues**: 0 open HIGH in gate 4; Step 5c raised 4 further high-confidence trail findings
+- **NFR Status** (gate 4): Security PASS, Performance PASS, Reliability FAIL, Maintainability CONCERNS
 
 ### Key Findings
 
-Every regression criterion holds and the design is sound, but three contradictions make the new path
-unrunnable: Loop Setup still says a clean PASS exits the loop (so 5c may never be entered), the shared
-cycle counter is incremented twice on a review-driven cycle, and the `REQUEST CHANGES` route cannot
-deliver its findings to `/qa-fix` so it dead-ends in the no-code-change HALT.
+The change itself is sound — Step 5c's own coverage and scope review found every functional
+criterion delivered, nothing on the Out-of-Scope list touched, and the documentation sweep complete.
+What did not hold was the **trail**: a self-upgraded gate, three cycles with no QA report, a verdict
+that propagated to no downstream artifact, and a deleted predicate surviving in a second file. All
+are addressed in cycle 5.
 
 ---
 

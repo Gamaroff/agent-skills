@@ -33,7 +33,8 @@ unfixable.
 
 ## What to Extract
 
-From the PR review report (when present, and only when its verdict is `REQUEST CHANGES`):
+From the PR review report (when present — read it whatever its verdict; the blocking
+distinction is made below, not by skipping the file):
 
 Findings are **rendered text, not YAML** — `/review-pr` writes its subagents' YAML into this fixed
 three-line shape and does not persist the raw fields. Parse that shape:
