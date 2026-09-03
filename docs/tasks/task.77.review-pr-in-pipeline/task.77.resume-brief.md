@@ -33,7 +33,7 @@ the fixes also write the gate that clears them.** That is the whole reason this 
 
 | | |
 | --- | --- |
-| Pipeline lock | `.claude/state/develop-pipeline.lock`, `current_step: 5` — **live, do not delete** |
+| Pipeline lock | **released** at session end. Resume context is in `.claude/state/develop-pipeline.last-halt.json` (`halt_step: 5-6`), whose `halt_reason` records this as an operator handover, **not a blockage**. A fresh `/develop-task` reads that snapshot in Phase 0b and offers *Resume from Step 5–6* or *Start fresh* — take Resume |
 | develop-next state | `.claude/state/develop-next.state.json` — `dispatched:false, merged:false, ticked:false` |
 | Task status | `ready-for-review` |
 | Working tree | clean, everything pushed |
