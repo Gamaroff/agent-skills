@@ -20,10 +20,11 @@ This is the iterative heart of the pipeline. Maintain a **QA cycle counter** sta
 means the work is ready to be *reviewed as a PR*, not that the loop is over. 5c
 (`/review-pr`) is the loop's exit gate, and its verdict can send the run back to 5b.
 
-There are **three ways the loop reaches Step 7 or escalation**: **5c returning `APPROVE` or
-`CONCERNS`** (→ Step 7), the 5-cycle limit, and — from cycle 3 onward — the **Convergence check**,
-which halts the moment the loop stops reducing HIGH findings. The last of those usually fires first;
-see its section below. The two halting ones land in the same **Loop Escalation** block.
+There is **one way the loop exits to Step 7**: **5c returning `APPROVE` or `CONCERNS`**.
+
+There are **two ways it escalates** instead: the 5-cycle limit, and — from cycle 3 onward — the
+**Convergence check**, which halts the moment the loop stops reducing HIGH findings. The convergence
+check usually fires first; see its section below. Both land in the same **Loop Escalation** block.
 
 Separately, several **HALT** paths end the run without reaching escalation: the no-code-change HALT
 and the mid-loop PR MERGED/CLOSED HALT (both in 5b), the twice-red fast-gate bail-out (5b step 0a),
@@ -489,9 +490,11 @@ three together:
 | `…qa.{N}.{name}.md` (written by 5a)         | this cycle's `fix(...)` commit           |
 | `…implementation.{name}.md`                 | **deferred to Step 8** (`docs(...)`)     |
 
-**There is exactly one `git push origin HEAD` per cycle**, at step 3 below, after that single
-commit. Do not create a separate `docs(...): QA cycle {N} gate + report` commit, and do not push
-twice in a cycle.
+**There is exactly one `git push origin HEAD` per cycle** — at step 3 below on an ordinary cycle,
+or **before 5c** on the review-driven path (see path 1 above), never both. Do not create a separate
+`docs(...): QA cycle {N} gate + report` commit, and do not push twice in a cycle. The rule is about
+the **push**, not the commit: a review-driven cycle legitimately makes two commits (the pre-5c
+gate+report, then 5b's `fix(...)`), and still pushes once.
 
 Left unstated, the gate and report fall into `/commit-changes`' default sweep and an orchestrator
 invents a second commit for them and pushes it separately — observed seven times on one PR. The
@@ -605,7 +608,17 @@ After fixes are applied:
 
 2. Run `git log --oneline -1` to capture the fix commit hash.
 
-3. Push to the remote branch so the PR reflects the latest changes — **once, here, and nowhere else in this cycle**:
+3. Push to the remote branch so the PR reflects the latest changes — **once per cycle**:
+
+   > **Skip this push when the cycle entered 5b from a 5c `REQUEST CHANGES` verdict.** Cycle N's
+   > push was already spent on the pre-5c commit (path 1). The `fix(...)` commit rides to the remote
+   > on the **next** push — the one taken by whichever cycle exits next, either at this step or
+   > before that cycle's 5c. A second push here is the one this section exists to prevent: it
+   > cancels the cycle's own in-flight CI run.
+   >
+   > **Consequence for step 5's PR-state poll**, which runs after this step: on the skipped-push
+   > path the local branch is ahead of the remote, so poll the PR's *state* (open / merged / closed)
+   > as usual and do **not** treat an unchanged head SHA as a failure.
 
    ```bash
    git push origin HEAD
@@ -712,7 +725,7 @@ gate.
 | 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings (see the invocation below). **Do not increment the counter here** — 5b's step 7 increments it on exit, exactly as on any other cycle. A review-driven fix is a cycle like any other, and it is counted in the same one place. |
 | ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
 | ✅ **APPROVE** | Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
-| ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, commit the gate and QA report if this cycle has not already done so, and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
+| ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
 
 > **Why the failure arm is spelled out.** The `PASS`/`WAIVED` path reaches 5c without entering 5b, so
 > it skips 5b step 5's mid-loop PR-state poll — which means a PR closed or merged underneath the run

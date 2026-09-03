@@ -303,3 +303,53 @@ correction is the loop's failure mode, not its progress.
 
 Everything else in the change is sound: the 5c wiring, the routing, the `ready-for-merge` move, the
 documentation sweep, and 15 non-vacuous parity tests. The two open decisions are narrow.
+
+
+### QA Cycle 4 — 2026-09-03 (mechanism replacement, on operator decision)
+
+**Gate Result**: CONCERNS
+**Issues Found**: 2 open — both **deferred by design** to filed follow-ups, neither unresolved
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Proceeding to finalise
+
+The escalation put two scope decisions to the operator; both were approved, and cycle 4 implemented
+them rather than attempting a fourth patch.
+
+**Decision 1 — the 5c resume predicate was replaced, not corrected.** The insight was that the check
+was in the wrong *place*, not merely wrong: it was a shell predicate in a table whose neighbours are
+shell predicates, when the adjacent question — how many cycles have run — is already answered by an
+agent reading `### QA Cycle` headings out of the implementation report. Step 5–6 completeness now
+reads the `**PR Review**` row of the last cycle entry, which this task already made mandatory every
+cycle. No index arithmetic, no globs, no shell portability surface, and the resume table now
+enumerates every possible value with its action — so a non-terminal verdict cannot go unhandled, the
+failure shape of the clause it replaces.
+
+**Decision 2 — the ingester now describes what is actually written**, and a test pins the header
+format across both files. They previously shared no assertion, which is why they could disagree at
+all. The structured-block version is filed as task 85 rather than smuggled in here, because it
+changes the output of an `accepted` skill.
+
+**Mutation proofs** — both replacements are held:
+
+| Proof | Result |
+| --- | --- |
+| Restore the index-comparison resume predicate | **Held** — parity suite 16/1 |
+| Revert the ingester to the `severity:` YAML description | **Held** — parity suite 16/1 |
+
+17 parity tests, none vacuous. Full `npm run ci` exit 0.
+
+**Three follow-ups filed** (registry updated to next=88):
+
+- **Task 85** — machine-readable `findings:` block from `/review-pr`.
+- **Task 86** (High) — `bundle_skill.py` never refreshes a transitively-bundled reference, and
+  reports `in sync` for a file it is no longer examining. This is why `qa-story` and `qa-task`
+  shipped a pipeline contract without Step 5c for four cycles. It affects any skill, not just these.
+- **Task 87** — commands in markdown table cells are invisible to `qa-execute-snippets.mjs`, which
+  is precisely why the zsh false-PASS survived three QA cycles and a full CI run.
+
+**The lesson of this run, recorded because it generalises.** Cycles 1–3 each fixed the sentence a
+finding quoted. Cycle 3's escalation named the pattern; cycle 4 broke it by asking, for each
+finding, *what contract does this sentence belong to, and where else is that contract stated?* Both
+cycle-4 changes are deletions of a mechanism rather than corrections to one — which is what the
+third-strike rule prescribes and what the operator authorised.

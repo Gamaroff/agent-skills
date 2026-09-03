@@ -3,6 +3,7 @@ name: develop-pipeline-step-0-resolve-and-prepare
 description: Phase 0 (resolve-and-prepare) shared by develop-story and develop-task. Covers Steps 0a–0f: file/issue resolution, pipeline state check, upfront context reading, tracker signal, upfront Q&A, implementation report creation, and pre-flight summary. Story vs task variants are called out in each sub-section where they differ.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/develop-pipeline-step-0-resolve-and-prepare.md. Regenerate via `npm run bundle`. -->
+
 # Develop Pipeline — Phase 0: Resolve & Prepare
 
 ## When This Document Applies
@@ -133,7 +134,7 @@ If not found: return { "error": "File not found — <input>" }.
 Prompt template (pass verbatim to Explore subagent):
 
 ```
-Run the tracker state poller (shared/resources/tracker-state-poller-subagent.md).
+Run the tracker state poller (references/tracker-state-poller-subagent.md).
 Inputs:
   PR_NUMBER=    # empty string (no PR yet in Phase 0)
   ISSUE_KEY={ISSUE_KEY}    # GitHub issue number or Jira key extracted from document frontmatter
@@ -157,7 +158,7 @@ condition from what the document actually says, and report the three inputs as s
 decide `pipeline_mode` by impression: the Aggregation block below recomputes it from your booleans, so
 your job is to report the inputs accurately, not to judge the outcome.
 
-Extract, per shared/resources/develop-pipeline-lite-mode.md (the canonical contract):
+Extract, per references/develop-pipeline-lite-mode.md (the canonical contract):
   - risk_level: from frontmatter `risk_level:`. Use "absent" if the field is missing — do not infer a
     level from the document's tone or subject matter.
   - phase_count: count of `## Tasks` subsections (stories) or implementation phases (tasks).
@@ -169,7 +170,7 @@ Extract, per shared/resources/develop-pipeline-lite-mode.md (the canonical contr
 Also check skills-config.yaml in the project root:
   - Does it exist?
   - If yes, extract the devLoadAlwaysFiles list (may be absent/empty).
-  - Source `shared/resources/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
+  - Source `references/resolve-paths.sh` (or its bundled `references/resolve-paths.sh`) to populate `PRD_ROOT` and `ARCH_ROOT` env vars. Defaults: `docs/prd` and `docs/architecture`. Pipeline steps below use these env vars for any path operation that touches the PRD or architecture trees.
 
 MERGE the document-derived fields with your skills-config discovery into the return shape below — every
 field is required. Omitting `skills_config_exists` / `always_load_files` breaks always-load resolution.
@@ -250,7 +251,7 @@ ls {task-directory}/task.{id}.implementation.*.md 2>/dev/null
 
 If resuming: read the existing implementation report, identify the last ✅ step, and verify each completed step's artifact before skipping it. Skip upfront questions already recorded in the Decisions Log.
 
-**Resume artifact verification**: see `shared/resources/develop-pipeline-resume-contract.md` for the full contract — per-step verification table, plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, and MAX_ITER=5 stall semantics.
+**Resume artifact verification**: see `references/develop-pipeline-resume-contract.md` for the full contract — per-step verification table, plan freshness check, gate file conflation warning, QA cycle count reconstruction, branch/PR cross-check, and MAX_ITER=5 stall semantics.
 
 If starting fresh: continue to 0c.
 
@@ -314,13 +315,13 @@ fi
 
 **Note (tasks only)**: if no `jira_key` is present (tasks are often purely technical), silently skip all Jira operations.
 
-**Lite mode detection**: `PIPELINE_MODE` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3), which **runs the production lite-mode CLI**. The Aggregation block then recomputes `PIPELINE_MODE` from the CLI's already-computed booleans (`risk_ok ∈ {low,absent} AND phase_count < 3 AND single_module`) as defence-in-depth. This mechanical boolean AND of pre-computed values is permitted — it is **not** the forbidden prose re-derivation of the FR3 rule from the document (which the CLI now owns). Do **not** re-parse the document's headings yourself. See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
+**Lite mode detection**: `PIPELINE_MODE` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3), which **runs the production lite-mode CLI**. The Aggregation block then recomputes `PIPELINE_MODE` from the CLI's already-computed booleans (`risk_ok ∈ {low,absent} AND phase_count < 3 AND single_module`) as defence-in-depth. This mechanical boolean AND of pre-computed values is permitted — it is **not** the forbidden prose re-derivation of the FR3 rule from the document (which the CLI now owns). Do **not** re-parse the document's headings yourself. See `references/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
 
 ---
 
 ## 0c-reg. Signal Work Started
 
-> **Execution timing — relocated.** This procedure is **defined here** but **invoked from Step 1** (after branch + lock creation). Do **not** execute during Phase 0. See `shared/resources/develop-pipeline-step-1-create-branch.md` §"Signal Work Started" for the call site.
+> **Execution timing — relocated.** This procedure is **defined here** but **invoked from Step 1** (after branch + lock creation). Do **not** execute during Phase 0. See `references/develop-pipeline-step-1-create-branch.md` §"Signal Work Started" for the call site.
 >
 > Rationale: previously fired in Phase 0c-reg before branch creation, which left trackers stuck `In Progress` when Step 1 failed. Moving the signal after the lock writes guarantees the branch named in the comment actually exists.
 
@@ -375,7 +376,7 @@ Do **not** run both paths. The CLI is authoritative whenever credentials exist.
    ```
 
    Read `reason` from the JSON:
-   - `no-credentials` → the CLI found no `JIRA_*` env. **Fall back** to `shared/resources/jira-transition-protocol.md` with `candidates = ["In Progress", "Doing", "Started", "Development"]` and `terminal = false`, driving it through the Atlassian MCP tools. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT pick a fallback transition.
+   - `no-credentials` → the CLI found no `JIRA_*` env. **Fall back** to `references/jira-transition-protocol.md` with `candidates = ["In Progress", "Doing", "Started", "Development"]` and `terminal = false`, driving it through the Atlassian MCP tools. The protocol's MUST-NOT clauses are binding: if no transition matches, log the skip and return without calling `transitionJiraIssue`. Do NOT pick a fallback transition.
    - anything else → the CLI has already resolved, transitioned and verified. Log its line and move on; it exits 0 for `already`, `stage-disabled` and `no-transition` alike, all of which are correct outcomes on some boards.
 
    Do **not** run both paths. The CLI is authoritative whenever credentials exist.
@@ -409,7 +410,7 @@ node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage
   --issue {TRACKER_ISSUE} --stage work-started --add-to-board --json
 ```
 
-Engine source: `shared/resources/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
+Engine source: `references/gh-stage.js` (bundled into each skill as `references/gh-stage.js`).
 
 `--add-to-board` is what makes this call, and only this call, ensure board **membership** before setting status — `ensureOnBoard` performs the `gh project item-add`, waits for Projects API propagation, and re-queries once if the first read comes back empty. Board membership is not board status, so no later moment passes this flag.
 
@@ -463,8 +464,13 @@ This is a **separate concern** that merely used to share a GraphQL response with
   P2_OPTION_ID=$(echo "$RESPONSE" | jq -r '.data.repository.issue.projectItems.nodes[0].project.fields.nodes[] | select(.name == "Priority") | .options[] | select(.name | startswith("P2")) | .id // empty')
 
   # Only when the field exists and is currently unset — never overwrite a human's choice.
+  #
+  # `tracker_write` wraps the mutation so a restricted run records a
+  # `github.board.field-set` instead of performing it. The READS above stay bare:
+  # they are GETs, and gating a read would break the very check that decides
+  # whether a mutation is needed at all.
   if [ -n "$ITEM_ID" ] && [ -n "$PROJECT_ID" ] && [ -n "$PRIORITY_FIELD_ID" ] && [ -n "$P2_OPTION_ID" ] && [ -z "$CURRENT_PRIORITY" ]; then
-    gh api graphql -f query='
+    tracker_write gh api graphql -f query='
     mutation {
       updateProjectV2ItemFieldValue(input: {
         projectId: "'"$PROJECT_ID"'"
@@ -616,7 +622,7 @@ If the user selects "Other" for Q1 or Q2, follow up with a plain text request fo
 
 Resume cases skip any question whose answer is already recorded in the Decisions Log (typical resume: 0 questions).
 
-If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `shared/resources/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
+If your count does not match the required count for the detected scenario, fix the call before invoking the tool. Do NOT invent additional questions ("Run mode?", "Auto-continue?", etc.) — pipeline mode is autonomous (lite-mode detection runs in 0a-parallel Agent 3) and any other policy comes from `references/develop-pipeline-autonomous-defaults.md`. Adding undocumented questions causes UX drift and may suppress the documented ones (observed regression in live-github-test).
 
 Decisions Log entry after the call must list every question that was asked and its answer, so reviewers can verify the count matches the table above.
 
@@ -668,11 +674,11 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |
 | 3. develop                  | ⏳ Pending | Story status == `Ready for Review`                                                           |       | —                    |
 | 4. create-pr                | ⏳ Pending | PR URL targets `develop` (or chosen base); issue/tracker comment posted                      |       | —                    |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted |       | —                    |
+| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; `story.{epic}.{story}.pr-review.{n}.*.md` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed                                                           |       | —                    |
 
-> The `Subagent summary ref` column points to the JSON artifact described in `shared/resources/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
+> The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
 ---
 
@@ -717,6 +723,7 @@ _Track each QA review/fix cycle._
 **PR**: {populated after Step 4}
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
+**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
 ```
 
 #### develop-task implementation report template
@@ -761,11 +768,11 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 | 2. review-task             | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               |       | —                    |
 | 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `task.{id}.pr-review.{n}.*.md` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
-> The `Subagent summary ref` column points to the JSON artifact described in `shared/resources/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
+> The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
 ---
 
@@ -810,6 +817,7 @@ _Track each QA review/fix cycle._
 **PR**: {populated after Step 4}
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
+**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
 ```
 
 ---

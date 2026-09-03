@@ -65,8 +65,10 @@ hands to `review-pr`, which reviews the PR against the work item and returns a v
 CHANGES` routes back to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE` and
 `CONCERNS` exit to Step 7. So a completed run leaves **one report per 5c
 invocation** — usually just one, plus one more for every `REQUEST CHANGES` verdict, since each of
-those sends the run back through 5b and then through 5c again. A clean gate whose number exceeds the
-highest `pr-review.{n}` beside it means the run stopped inside 5c.
+those sends the run back through 5b and then through 5c again. Do **not** try to infer completeness by comparing those numbers: `gate.{N}` counts QA
+cycles and `pr-review.{n}` counts 5c invocations, and since 5c runs only on a clean gate the two
+diverge on any run whose first gate was not clean. Whether 5c cleared is recorded in the
+implementation report's `**PR Review**` row, not derived from filenames.
 
 ## The eight documents, in plain terms
 

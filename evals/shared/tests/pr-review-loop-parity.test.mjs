@@ -40,6 +40,7 @@ const liteMode = read("shared/resources/develop-pipeline-lite-mode.md");
 const defaults = read(
   "shared/resources/develop-pipeline-autonomous-defaults.md",
 );
+const ingester = read("shared/resources/qa-findings-ingester-prompt.md");
 
 /** Line index of the first line matching `re`, or -1. */
 function lineOf(text, re) {
@@ -357,4 +358,78 @@ test("5c has a failure arm, and it does not fall through to Step 7", () => {
     /\*\*PR Review\*\*: \{[^}]*review failed[^}]*\}/i,
     "the QA Cycle template enum must be able to record a failed review for resume",
   );
+});
+
+// ── 9. The ingester and the report agree on a finding's shape ────────────────
+
+test("the ingester describes the format /review-pr actually renders", () => {
+  // THE defect this pins: the ingester block once described the SUBAGENT output contract
+  // (`severity:`, `file:line`) — YAML consumed in memory and never written to disk. The report
+  // actually carries a rendered three-line shape. Since the PR review report is the ONLY carrier
+  // of findings on the REQUEST CHANGES path, a mismatch here makes that whole path silently
+  // deliver nothing: qa-fix reads a clean gate, changes nothing, and 5b step 0 HALTs reporting
+  // the findings as unfixable. The two files shared no assertion until this one.
+  const header = /\[(?:PC|CR)-1\] \w+ · \w+ · confidence: \w+ —/;
+
+  assert.match(
+    reviewPr,
+    header,
+    "review-pr must render the header shape the ingester is told to parse",
+  );
+  assert.match(
+    ingester,
+    header,
+    "the ingester must quote the header shape review-pr renders",
+  );
+
+  // The specific wrong turn, forbidden by name so it cannot come back quietly.
+  assert.match(
+    ingester,
+    /there is no `severity:` key anywhere in the file/i,
+    "the ingester must warn against searching for the YAML key that never reaches disk",
+  );
+  assert.match(
+    ingester,
+    /`ref` is not always a `file:line`/i,
+    "conformance findings carry an AC id or a section ref, not a file:line",
+  );
+
+  // And the finding must have somewhere to go once parsed.
+  assert.match(
+    ingester,
+    /source: gate\|report\|pr-review\|bug/,
+    "the ingester's own output enum must admit a pr-review source",
+  );
+});
+
+test("the 5c resume check reads the report, not the filesystem", () => {
+  // Replaces a predicate that failed three consecutive QA cycles: it compared gate.{N} (per QA
+  // cycle) with pr-review.{n} (per 5c INVOCATION), and its shell implementation returned a false
+  // PASS under zsh when the glob matched nothing — verifying a run with no artifacts at all as
+  // complete. The repo's third-strike rule says replace the mechanism rather than patch again.
+  const resume = read("shared/resources/develop-pipeline-resume-contract.md");
+
+  assert.doesNotMatch(
+    resume,
+    /pr-review\.\{n\}.*must be \*\*≥/,
+    "the index-comparison predicate must not come back",
+  );
+  assert.doesNotMatch(
+    resume,
+    /ls \*\.gate\.\*\.yml/,
+    "no bare relative glob — it matches nothing from the repo root and zsh turns that into a pass",
+  );
+  assert.match(
+    resume,
+    /`\*\*PR Review\*\*` row must hold a \*\*terminal verdict\*\*/,
+    "completeness is decided by the report row, which is written every cycle by contract",
+  );
+  // Every non-terminal value must have a stated resume action — the earlier version handled
+  // `not reached` and blank but not `review failed`, which 5c writes and nothing read.
+  for (const v of ["REQUEST CHANGES", "review failed", "not reached"]) {
+    assert.ok(
+      resume.includes(v),
+      `the resume table must say what to do when PR Review reads "${v}"`,
+    );
+  }
 });
