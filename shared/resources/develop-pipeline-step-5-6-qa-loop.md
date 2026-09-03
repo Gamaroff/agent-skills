@@ -714,8 +714,19 @@ block the user's last position marker is the QA cycle that has already finished.
 #### Invoke the review
 
 ```bash
-/review-pr --effort {medium|low} --comment
+# standard mode
+/review-pr --effort medium --comment
+
+# lite mode — degrades the review, never skips it
+/review-pr --effort low --comment
 ```
+
+> **Written as two concrete invocations, not one `{medium|low}` placeholder.** zsh parses a
+> word-initial `{` as a brace-group keyword, so the single-line placeholder form was a **zsh parse
+> error** inside a ```` ```bash ```` fence — `bash -n` clean, `zsh -n` failing on `}`. That is Risk 1,
+> the defect class task 66 shipped, sitting in the line that invokes the review. The mid-word form
+> used elsewhere in this file (`.../{develop-story|develop-task|develop-bug}/...`) is unaffected and
+> parses in both shells.
 
 - **Target**: the open PR for this branch — pass nothing and `/review-pr` resolves it from the
   current branch.

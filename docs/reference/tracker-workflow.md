@@ -135,7 +135,7 @@ new moment.
 | `in-review`         | pull request opened                                    | Step 4                                       | ✅            |
 | `changes-requested` | a QA gate came back with issues — **once per cycle**    | Step 5b, before `/qa-fix`                    | ❌            |
 | `in-qa`             | QA review starts — **once**, not per cycle              | Step 5                                       | ❌            |
-| `ready-for-merge`   | QA passed, awaiting merge                              | Step 6, on a gate that exits the loop        | ❌            |
+| `ready-for-merge`   | the PR conformance review cleared, awaiting merge      | Step 5c, on APPROVE / CONCERNS               | ❌            |
 | `pr-merged`         | the PR actually landed on the base branch              | `/develop-next`, `/develop-batch` post-merge | ❌            |
 | `blocked`           | a pipeline gate failed and needs a human               | before a terminal HALT                       | ❌            |
 | `done`              | Definition of Done met, work accepted                  | Step 7 (`/finalise`)                         | ✅            |
@@ -905,7 +905,7 @@ statuses:
 #   in-review          pull request opened
 #   changes-requested  a QA gate came back with issues; fires ONCE PER FIX CYCLE
 #   in-qa              QA review starts
-#   ready-for-merge    QA passed, awaiting merge
+#   ready-for-merge    the PR conformance review cleared (Step 5c), awaiting merge
 #   pr-merged          the PR actually landed on the base branch
 #   blocked            a pipeline gate failed and needs a human
 #   done               Definition of Done met, work accepted

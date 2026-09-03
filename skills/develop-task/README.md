@@ -468,7 +468,7 @@ Every board move goes through a **moment** — a named point in the pipeline —
 | Step 4 (PR opened)             | `in-review`         | `/create-pr` passes `--issue {N}` + `gh-stage.js --stage in-review`                                                                                                                         |
 | Step 5 (QA start)              | `in-qa`             | `gh-stage.js --stage in-qa` — **once**, not per cycle. *Off by default.*                                                                                                                     |
 | Step 5b (entering a fix cycle) | `changes-requested` | `gh-stage.js --stage changes-requested` — **per cycle**, because it marks a state the card re-enters. *Off by default.*                                                                      |
-| Step 6 (gate exits the loop)   | `ready-for-merge`   | `gh-stage.js --stage ready-for-merge`. *Off by default.*                                                                                                                                     |
+| Step 5c (APPROVE / CONCERNS)   | `ready-for-merge`   | `gh-stage.js --stage ready-for-merge`. *Off by default.*                                                                                                                                     |
 | Step 5b (post qa-fix push)     | —                   | tracker state poller checks `pr.state` is OPEN                                                                                                                                              |
 | Step 7 (finalise)              | `done`              | `gh issue close {N}` + `gh-stage.js --stage done` + DoD body posted as PR comment                                                                                                            |
 | Terminal HALT                  | `blocked`           | `gh-stage.js --stage blocked` — only for a real blockage, never an interruption. *Off by default.*                                                                                           |
@@ -487,7 +487,7 @@ Same moments, same call sites, same off-by-default set — only the CLI differs.
 | Step 4         | `in-review`         | `tracker-comment.js --stage in-review` + `jira-stage.js --stage in-review`                        |
 | Step 5         | `in-qa`             | `jira-stage.js --stage in-qa` — once. *Off by default.*                                             |
 | Step 5b        | `changes-requested` | `jira-stage.js --stage changes-requested` — per cycle. *Off by default.*                            |
-| Step 6         | `ready-for-merge`   | `jira-stage.js --stage ready-for-merge`. *Off by default.*                                          |
+| Step 5c        | `ready-for-merge`   | `jira-stage.js --stage ready-for-merge`. *Off by default.*                                          |
 | Step 5b        | —                   | tracker state poller (Jira branch — board status read)                                              |
 | Step 7         | `done`              | `tracker-comment.js --stage done` + `jira-stage.js --stage done`                                   |
 | Terminal HALT  | `blocked`           | `jira-stage.js --stage blocked` — real blockage only. *Off by default.*                             |

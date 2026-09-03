@@ -291,10 +291,24 @@ test("the skill 5c invokes is installed and named as this file expects", () => {
   );
 
   // This is the assertion that is actually about 5c.
-  assert.match(
+  //
+  // Pinned as the TWO CONCRETE invocations rather than a `{medium|low}` placeholder. The
+  // placeholder form was a zsh parse error inside a ```bash fence — zsh reads a word-initial `{`
+  // as a brace group — which is Risk 1, the defect class task 66 shipped, in the line that invokes
+  // the review. This assertion held the broken form in place, so it is part of the fix, not a
+  // casualty of it: both effort levels must appear AND each must carry `--comment`.
+  for (const effort of ["medium", "low"]) {
+    assert.match(
+      section5c(),
+      new RegExp(`/review-pr --effort ${effort} --comment`),
+      `the ${effort}-effort invocation must carry both flags the contract depends on`,
+    );
+  }
+  // And the unparseable form must not come back.
+  assert.doesNotMatch(
     section5c(),
-    /\/review-pr --effort \{medium\|low\} --comment/,
-    "the invocation line must carry both flags the contract depends on",
+    /--effort \{medium\|low\}/,
+    "the `{medium|low}` placeholder is a zsh parse error in a bash fence — use the two concrete invocations",
   );
 });
 
@@ -554,26 +568,60 @@ test("the 5c resume check reads the report, not the filesystem", () => {
     .map((cells) => ({ key: cells[0].trim(), action: cells[1].trim() }))
     .filter((r) => !r.key.includes("reads"));
 
+  // PARSE SANITY WITHOUT A ROW COUNT. This was `subStateRows.length >= 5`, and that canary fired
+  // FIRST on every single-row deletion — so all four published mutations proved only that the table
+  // still had five rows. A guard that merely counted rows would have produced a byte-identical
+  // mutation matrix (gate 8, CY8-3): the proof could not discriminate the mechanism it cited.
+  // Well-formedness is the check that belongs here. With no count in the way, deleting a row falls
+  // through to the keying assertion below and fails by name.
   assert.ok(
-    subStateRows.length >= 5,
-    `expected the sub-state table to parse into at least 5 rows, got ${subStateRows.length} — if this drops, the parse broke and every assertion below is vacuous`,
+    subStateRows.length > 0,
+    "the sub-state table parsed to zero rows — the parse is broken, so every assertion below would be vacuous",
   );
+  for (const r of subStateRows) {
+    assert.ok(
+      r.key.length > 0 && r.action.length > 0,
+      `every sub-state row needs both a key and an action; got key=${JSON.stringify(r.key)} action=${JSON.stringify(r.action)}`,
+    );
+  }
 
+  const claimedBy = new Map();
   for (const v of [
     "pending — 5c not yet run",
     "REQUEST CHANGES",
     "review failed",
     "not reached",
   ]) {
-    const row = subStateRows.find((r) => r.key.includes("`" + v + "`"));
+    const matches = subStateRows.filter((r) => r.key.includes("`" + v + "`"));
+    assert.equal(
+      matches.length,
+      1,
+      `expected exactly ONE sub-state row keyed on PR Review = "${v}", found ${matches.length}. Being mentioned inside another row's prose is not a resume action — that is how the two previous versions of this guard stayed green with the row deleted. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+    );
+    const row = matches[0];
+
+    // ONE ROW PER VALUE. Merging several values into a single key and padding the table with
+    // decoys satisfied "every value has a row" while destroying per-value routing (gate 8, CY8-5):
+    // four values sharing one action is not four resume actions.
     assert.ok(
-      row,
-      `the resume sub-state table must carry a ROW KEYED on PR Review = "${v}". Being mentioned inside another row's prose is not a resume action — that is exactly how the two previous versions of this guard stayed green with the row deleted. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+      !claimedBy.has(row.key),
+      `"${v}" shares row "${row.key}" with "${claimedBy.get(row.key)}" — each value needs its OWN row, because each resumes somewhere different`,
+    );
+    claimedBy.set(row.key, v);
+
+    // A DESTINATION IS NOT AN ACTION. This was one mention-match, `/\b5[abc]\b|Step 7|escalat/i`,
+    // which an action reading "n/a — nothing to do here; see the 5c notes above" satisfied on the
+    // bare substring `5c` (gate 8, CY8-4) — while three artifacts described the assertion as
+    // requiring the row to say where the run resumes. Verb and destination are now separate.
+    assert.match(
+      row.action,
+      /re-enter|go to|proceed to|escalat/i,
+      `the row for "${v}" must state what the run DOES (re-enter / go to / proceed to / escalate); got: ${JSON.stringify(row.action.slice(0, 120))}`,
     );
     assert.match(
       row.action,
-      /\b5[abc]\b|Step 7|escalat/i,
-      `the row for "${v}" must say WHERE the run resumes (5a/5b/5c, Step 7, or escalation) — a row that exists without an action is the gap this guards`,
+      /\b5[abc]\b|Step 7|Loop Escalation/i,
+      `the row for "${v}" must name WHERE it resumes (5a/5b/5c, Step 7, or Loop Escalation); got: ${JSON.stringify(row.action.slice(0, 120))}`,
     );
   }
 });

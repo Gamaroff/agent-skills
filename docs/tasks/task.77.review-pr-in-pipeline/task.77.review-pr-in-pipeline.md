@@ -355,7 +355,7 @@ implementation report**.
 14. ✅ `docs/tasks/task.86.bundle-transitive-refresh/` — **High**: the bundler never refreshes a
     transitively-bundled reference and reports `in sync` for a file it no longer examines
 15. ✅ `docs/tasks/task.87.execute-table-cell-snippets/` — table-cell commands escape the snippet gate
-16. ✅ `docs/tasks/task-registry.md` — three rows, counter 85 → 88
+16. ✅ `docs/tasks/task-registry.md` — **four** rows (85, 86, 87, 88), counter 85 → **89**; task 88 was filed in the post-gate-8 pass and row 77's own status corrected to `ready-for-review`
 
 ### Explicitly NOT modified
 
@@ -510,11 +510,11 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (gate 4) — **Step 5c returned REQUEST CHANGES**; cycle 5 in progress
-**QA Engineer**: QA Engineer
+**QA Status**: CONCERNS (gate 8, independent) — Loop Escalation stands; the 5-cycle budget was spent at gate 5
+**QA Engineer**: QA Engineer — gates 5–8 issued by independent reviewers, none of whom wrote the fixes they graded
 **Testing Date**: 2026-09-03
-**Quality Score**: 70/100 (gate 5)
-**Gate Decision**: FAIL — escalated to a human
+**Quality Score**: 87/100 (gate 8)
+**Gate Decision**: CONCERNS — residual deferred to task 88; acceptance needs a PASS/WAIVED gate or a recorded waiver
 
 > A gate-4 edit to PASS (92) was made and then **withdrawn** — Step 5c identified it as a
 > self-issued re-grade on the field that decides whether the loop exits. See the withdrawal note in
@@ -530,6 +530,13 @@ arms disables the gate while leaving every doc, test and contract in place.
 | 4 | [qa.4](./task.77.qa.4.review-pr-in-pipeline.md) ⚠️ retrospective | [gate.4](./task.77.gate.4.review-pr-in-pipeline.yml) | CONCERNS (85) — 0 HIGH |
 | 5c | [pr-review.1](./task.77.pr-review.1.review-pr-in-pipeline.md) | — (advisory, writes no gate) | 🚨 REQUEST CHANGES — 4 trail findings |
 | 5 | [qa.5](./task.77.qa.5.review-pr-in-pipeline.md) **independent** | [gate.5](./task.77.gate.5.review-pr-in-pipeline.yml) | **FAIL (70)** — 13/20 closed, CR-3 dropped, 3 fresh contradictions. **Loop Escalation** |
+| — | [qa.6](./task.77.qa.6.review-pr-in-pipeline.md) **independent** | [gate.6](./task.77.gate.6.review-pr-in-pipeline.yml) | **FAIL (75)** — post-gate-5 remediation. CY6-1: a fabricated mutation proof, published in three artifacts |
+| — | [qa.7](./task.77.qa.7.review-pr-in-pipeline.md) **independent** | [gate.7](./task.77.gate.7.review-pr-in-pipeline.yml) | **FAIL (78)** — post-gate-6 remediation. CY7-1: the fix for CY6-1 still weaker than its claim |
+| — | [qa.8](./task.77.qa.8.review-pr-in-pipeline.md) **independent** | [gate.8](./task.77.gate.8.review-pr-in-pipeline.yml) | ⚠️ **CONCERNS (87)** — post-gate-7 remediation. 27 mutations run; all 17 trail-asserted proofs hold. Residual → task 88 |
+| — | [dod.1](./task.77.dod.1.review-pr-in-pipeline.md) | — (DoD verification, writes no gate) | ❌ **NOT ACCEPTED** — 8 gaps; AC 17/17, CI green, security PASS |
+
+**Rows 6–8 carry no cycle number deliberately.** They graded **remediation passes**, not QA cycles —
+the 5-cycle budget was spent at gate 5 and three remediation passes do not restore it.
 
 ### Test Coverage Summary
 
@@ -547,6 +554,57 @@ that propagated to no downstream artifact, and a deleted predicate surviving in 
 were addressed in cycle 5 — except **CR-3**, which cycle 5 dropped while claiming full closure.
 Gate 5, issued independently, caught that omission and six further findings. All are closed in the
 post-gate-5 remediation pass; the closing verdict on that pass is not self-issued either.
+
+---
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS (status deliberately unchanged — `ready-for-review`)
+**Verified at head:** `87e5bf9` · **Detailed log:** [`task.77.dod.1.review-pr-in-pipeline.md`](./task.77.dod.1.review-pr-in-pipeline.md)
+
+### What passed
+
+- **Acceptance criteria:** ✅ 17/17, verified against the diff and code with tests re-executed at head
+- **CI:** ✅ SUCCESS — 4/4 checks green on `87e5bf9`, which equals local HEAD
+- **Security:** ✅ PASS — 228 probes executed; the lock dispatcher failed closed on all 102 adversarial inputs across bash and zsh
+- **Change Log / OKF / artifact-naming / file-naming:** ✅ PASS
+
+### Blocking
+
+1. **`accepted` precondition unmet.** The latest gate (`gate.8`) reads **CONCERNS 87**;
+   `shared/resources/document-status-lifecycle.md:62` requires **PASS or WAIVED**. Either record a
+   waiver with reason and approver, or close the residual and issue a fresh gate. Gate 8's
+   `recommendations.immediate` asks for this operator decision, and Loop Escalation remains in force.
+
+### Trail defects — all verified by execution
+
+2. **`docs/concepts/architecture.md` is an undisclosed fourth pipeline diagram.** Sequence diagram
+   routes `Step 5 → Step 6 → Step 7 — finalise` with no 5c (`:139`); flowchart omits `review-pr`
+   (`:75-89`); **zero** `review-pr` mentions in the file. Ruled out at implementation report `:151`
+   with "Checked line by line: no pipeline-shape restatement that 5c invalidates" — contradicted.
+3. **`docs/reference/tracker-workflow.md:138`** gives `ready-for-merge`'s firing point as "Step 6, on
+   a gate that exits the loop". It fires at **5c**, only on APPROVE/CONCERNS. That table is the
+   closed-set authority for firing points.
+4. **`docs/tasks/task-registry.md:119`** — row 77 reads `ready-for-development`, document reads
+   `ready-for-review`. This PR edits that file without fixing it.
+5. **§7 item 16** claims "three rows, counter 85 → 88" — four rows were added and the counter is 89.
+6. **§QA Artifacts** table stops at cycle 5 / gate 5; gates 6–8 and qa.6–8 are committed.
+7. **§QA Testing Results** header reads "CONCERNS (gate 4)", "70/100 (gate 5)", "Gate Decision: FAIL"
+   — three gates behind the evidence beside it.
+8. **A §5c snippet is a zsh parse error.** `develop-pipeline-step-5-6-qa-loop.md:717` is fenced
+   `bash` and reads `/review-pr --effort {medium|low} --comment`; zsh parses word-initial `{` as a
+   brace group (`bash -n` OK, `zsh -n` → parse error). §8 requires both shells — this is Risk 1, the
+   defect class task 66 shipped, in the block that invokes the review.
+
+### Next steps
+
+- [ ] Fix gaps 2–8 (seven text corrections and one snippet form — Small, under an hour)
+- [ ] **Operator decision on gap 1**: waive the CONCERNS residual, or close it and issue a fresh gate
+- [ ] Re-run `/finalise`, writing `dod.2` — never editing `dod.1`
+
+**Estimated effort:** Small for 2–8. Gap 1 is a decision, not work.
+
+**Gap report generated:** 2026-09-03
 
 ---
 
@@ -572,6 +630,8 @@ post-gate-5 remediation pass; the closing verdict on that pass is not self-issue
 | 2026-09-03 |         | Post-gate-7 pass — **mechanism replaced**, not patched a fourth time: the guard parses the resume sub-state table into rows and keys on the first cell, requiring each action to name a re-entry point. Mutation-proved on every row individually plus an actionless row. CR-3's banner fix pinned by a new test (suite now 18). Four trail errors corrected | qa-fix |
 | 2026-09-03 |         | Gate 8 CONCERNS (87/100), **issued independently** — first pass whose claims survive adversarial re-execution: 27 mutations run, all 17 trail-asserted proofs hold. CY5-4 closed after four assessments. Residual: 1 MEDIUM (stale count in 2 places) + guard-strength gaps | qa-task |
 | 2026-09-03 |         | Post-gate-8 pass — CY8-1/2/6/7 closed (count corrected in the PR body and this Change Log; CY7-3's phrase reconciled; the Format block's sample parenthetical pinned, mutation-proved). CY8-3/4/5 deliberately deferred as guard-strength gaps, not false claims | qa-fix |
+| 2026-09-03 |         | DoD verification run — NOT accepted, 8 gaps. AC 17/17, CI green on head, security PASS (228 probes); blocked on the `accepted` precondition (gate 8 is CONCERNS, not PASS/WAIVED) plus 7 trail defects incl. an undisclosed 4th pipeline diagram and a zsh-unparseable §5c snippet | finalise |
+| 2026-09-03 |         | Post-gate-8 pass — DoD gaps 2–8 closed (gap 3 was 7 instances, not 1: both pipeline READMEs, configuration.md, a 2nd copy in tracker-workflow.md, and the example YAML); §5c's zsh-unparseable invocation replaced and the parity assertion that pinned it updated. CY8-3/4/5 closed on operator decision — the row-count canary that made the matrix non-discriminating is replaced by a well-formedness check, one-row-per-value is enforced, and the action cell now needs a verb AND a destination. All six mutations fire the keying by name; task 88 superseded | qa-fix |
 
 ---
 

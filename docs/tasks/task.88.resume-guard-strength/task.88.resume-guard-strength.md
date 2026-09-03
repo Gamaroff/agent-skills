@@ -5,7 +5,7 @@ type: task
 description: "The parity test guarding the resume sub-state table parses rows and keys on the first cell, but every mutation published as proving it fires the row-count canary rather than the keying — a row-counting guard would produce a byte-identical matrix. Three gaps behind that: the action cell is a mention-match rather than a re-entry check, per-value routing survives a merged key with decoy padding, and the published matrix cannot tell the two mechanisms apart."
 tags: [evals, test-strength, pipeline, resume-contract]
 category: infrastructure
-status: draft
+status: cancelled
 priority: Medium
 risk_level: low
 created: 2026-09-03
@@ -16,9 +16,20 @@ estimated_effort_hours: 3
 
 # Technical Task: The resume sub-state guard is pinned by mutations that do not discriminate it
 
-**Status:** Draft
+**Status:** Cancelled — superseded by task 77's post-gate-8 pass
 
 ---
+
+## 0. Superseded — 2026-09-03
+
+**This task was filed and then closed the same day without being worked.** It was created to carry
+gate 8's CY8-3/4/5 forward as a follow-up; the operator then decided to close the residual inside
+task 77 instead. All three are fixed and mutation-proved there — see the *post-gate-8 pass* section
+of `docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md`.
+
+Kept rather than deleted because the task number is spent and never reused, and because the filing
+and the reversal are both part of the trail. The scope below is retained as the record of what was
+handed over; do not implement it — it is already done.
 
 ## 1. Overview
 
@@ -89,3 +100,4 @@ Out of scope:
 | Date       | Version | Description                                                      | Author      |
 | ---------- | ------- | ---------------------------------------------------------------- | ----------- |
 | 2026-09-03 | 1.0     | Filed from task 77's gate 8 (CY8-3/4/5), deferred by operator decision rather than fixed in an escalated run | create-task |
+| 2026-09-03 | 1.1     | Cancelled — superseded. Operator reversed the deferral; all three closed and mutation-proved inside task 77's post-gate-8 pass | edit-task |

@@ -567,12 +567,56 @@ this task exists to catch — and were cheap. The three left open are test-stren
 continuing to harden a guard inside a run that has already escalated is the loop's failure mode
 rather than its progress. That is a scope decision, and it goes to the operator.
 
+### Post-gate-8 pass — DoD gaps and the CY8 residual — 2026-09-03
+
+`/finalise` ran at `87e5bf9` and **did not accept** (`task.77.dod.1.review-pr-in-pipeline.md`):
+AC 17/17, CI green on the exact head, security PASS on 228 executed probes — and **eight gaps**, all
+in the trail. On operator decision the residual was closed rather than deferred, so **task 88 is
+superseded by this pass** and should be closed as done-by-77.
+
+**The DoD gaps (2–8), and what re-derivation added.**
+
+| Gap | Resolution |
+| --- | --- |
+| 2 | `docs/concepts/architecture.md` was an **undisclosed fourth pipeline diagram** — sequence diagram routing Step 5 → 6 → 7 with no 5c, flowchart omitting `review-pr`, zero `review-pr` mentions. Both diagrams now carry 5c and the REQUEST-CHANGES-back-to-5b arm, plus a paragraph stating a clean gate no longer exits the loop. It had been ruled out at `:151` on a justification the file contradicted |
+| 3 | **The finding named one instance; re-deriving across the repo found seven.** Both pipeline READMEs (`Step 6 (gate exits the loop)` in two stage tables each), `docs/reference/configuration.md:332`, a **second** copy in `tracker-workflow.md:908`'s closed-set comment block, and `docs/examples/tracker-workflow.default.yaml`. All now read `Step 5c, on APPROVE / CONCERNS`. Fixing only the cited line would have reproduced the cycle-1-to-3 pattern exactly |
+| 4 | `task-registry.md:119` — row 77 corrected from `ready-for-development` |
+| 5 | §7 item 16 corrected: four rows, counter 89 |
+| 6 | §QA Artifacts extended with gates 6–8 and the DoD row; rows 6–8 carry no cycle number, because they graded remediation passes |
+| 7 | §QA Testing Results header moved from "gate 4 / 70 / FAIL" to "gate 8 / 87 / CONCERNS" |
+| 8 | `/review-pr --effort {medium|low} --comment` was a **zsh parse error** inside a ```` ```bash ```` fence (`bash -n` clean, `zsh -n` failing on `}`) — Risk 1, in the line that invokes the review. Replaced with two concrete invocations. **A parity assertion was pinning the broken form**, so it was updated as part of the fix rather than treated as a casualty of it, and now pins both effort levels plus a `doesNotMatch` on the placeholder. Re-derived across all 16 bash blocks under both shells |
+
+One block, `<fastGateCommand>` (`:563`), fails under **both** shells — an angle-bracket placeholder,
+pre-existing on `develop` and untouched here, so not a shell-divergence defect and out of §8's scope.
+Recorded rather than fixed.
+
+**The CY8 residual — mechanism, not patch.** The root cause of CY8-3 was the
+`subStateRows.length >= 5` canary: it fired *first* on every single-row deletion, so all four
+published mutations demonstrated only that the table still had five rows. A row-counting guard would
+have produced a byte-identical matrix. The count is replaced by a **well-formedness** check, so a
+deletion now falls through to the keying assertion.
+
+| Mutation | Fires | Result |
+| --- | --- | --- |
+| delete the `pending — 5c not yet run` row, **no decoy** | keying, by name | red |
+| delete the `REQUEST CHANGES` row, **no decoy** | keying, by name | red |
+| delete the `review failed` row, **no decoy** | keying, by name | red |
+| delete the `not reached` row, **no decoy** | keying, by name | red |
+| merge all four values into one key + 3 decoys so the count holds (CY8-5) | one-row-per-value | red |
+| row present, action `n/a — nothing to do here; see the 5c notes above` (CY8-4, gate 8's mutation 20) | action-verb | red |
+| restore | — | 18/18 green, byte-identical |
+
+CY8-4 is now two assertions rather than one substring: an action **verb** and a **destination**. The
+verb-less payload carries `5c` and passed the old regex; it fails the new one.
+
+The closing gate for this pass is **not** written by the agent that made these fixes.
+
 ---
 
 ## Completion
 
-**Finished**: in progress — QA loop escalated at cycle 5 of 5; gates 5–8 remediated, gate 8 CONCERNS (87)
-**Final Status**: In Progress — gate 8 CONCERNS (accept-eligible); operator decision pending on merge vs. a follow-up for the three deferred guard-strength gaps
+**Finished**: in progress — QA loop escalated at cycle 5 of 5; gates 5–8 remediated; DoD gaps and the CY8 residual closed
+**Final Status**: In Progress — awaiting an independent gate 9 on the post-gate-8 pass; task 88 superseded
 **Branch**: `feature/task.77.review-pr-in-pipeline`
 **PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
 **QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); 4 post-escalation remediation passes, each graded independently (gate 6 FAIL 75, gate 7 FAIL 78, gate 8 CONCERNS 87)
