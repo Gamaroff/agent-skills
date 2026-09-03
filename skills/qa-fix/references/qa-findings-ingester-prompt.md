@@ -14,16 +14,30 @@ parse them, and return a compact risk-sorted Findings Summary. Do not modify any
 Discover artifacts using the following globs under <dir>:
 
 Story mode (mode=<mode> where <mode>=story):
-  Gate:       story.<epic>.<story>.gate.*.yml   (all matches — use highest number)
-  QA Report:  story.<epic>.<story>.qa.*.md      (all matches — use highest number)
-  Bug Reports: story.<epic>.<story>.bug.*.md    (all matches)
+  Gate:       story.<epic>.<story>.gate.*.yml       (all matches — use highest number)
+  QA Report:  story.<epic>.<story>.qa.*.md          (all matches — use highest number)
+  PR Review:  story.<epic>.<story>.pr-review.*.md   (all matches — use highest number)
+  Bug Reports: story.<epic>.<story>.bug.*.md        (all matches)
 
 Task mode (mode=<mode> where <mode>=task):
-  Gate:       task.<id>.gate.*.yml              (all matches — use highest number)
-  QA Report:  task.<id>.qa.*.md                 (all matches — use highest number)
-  Bug Reports: task.<id>.bug.*.md               (all matches)
+  Gate:       task.<id>.gate.*.yml                  (all matches — use highest number)
+  QA Report:  task.<id>.qa.*.md                     (all matches — use highest number)
+  PR Review:  task.<id>.pr-review.*.md              (all matches — use highest number)
+  Bug Reports: task.<id>.bug.*.md                   (all matches)
+
+The **PR Review** report is written by Step 5c (`/review-pr`) and is the ONLY carrier of findings on
+the review-driven path: 5c runs when the gate is already `PASS`/`WAIVED`, so a `REQUEST CHANGES`
+verdict has no gate `top_issues[]` to travel in. Omitting this glob makes that path silently
+findings-free — qa-fix would change nothing and the loop would HALT reporting the issues as
+unfixable.
 
 ## What to Extract
+
+From the PR review report (when present, and only when its verdict is `REQUEST CHANGES`):
+- Each finding, as `severity`, `file:line`, `finding`, `suggested_action`
+- Treat a `severity: high` finding as equivalent to a HIGH gate `top_issue`
+- An `APPROVE` or `CONCERNS` report is advisory — surface its findings but do not treat them as
+  blocking, since neither verdict returns the run to qa-fix
 
 From each gate YAML:
 - Gate status (PASS|CONCERNS|FAIL|WAIVED)

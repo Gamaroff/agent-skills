@@ -46,6 +46,27 @@ function lineOf(text, re) {
   return text.split("\n").findIndex((l) => re.test(l));
 }
 
+/**
+ * The 5c section ONLY — from its heading to the next H2.
+ *
+ * Two failure modes this closes, both of which made assertions silently weaker:
+ *   - `indexOf` returns -1 when the section is absent, and `slice(-1)` then yields the file's LAST
+ *     CHARACTER rather than an empty string. Comparisons against that index (`x > s5c`) are then
+ *     trivially true.
+ *   - Slicing to end-of-file swept in the whole Loop Escalation section, so a regex like
+ *     /REQUEST CHANGES.*5b/s matched prose there and would have passed even if the verdict table
+ *     said the opposite.
+ */
+function section5c() {
+  const start = loopDoc.indexOf("### 5c. ");
+  assert.ok(
+    start > -1,
+    "the 5c section must exist — every assertion below is about it",
+  );
+  const end = loopDoc.indexOf("\n## ", start);
+  return loopDoc.slice(start, end > -1 ? end : undefined);
+}
+
 // ── 1. Placement: 5c sits after 5b and before Loop Escalation ────────────────
 
 test("the QA loop carries a 5c section between 5b and Loop Escalation", () => {
@@ -89,16 +110,16 @@ test("a clean QA gate routes to 5c, not straight to Step 7", () => {
 // ── 3. Verdict routing — the graph, not just the vocabulary ──────────────────
 
 test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
-  const s5c = loopDoc.slice(loopDoc.indexOf("### 5c. "));
+  const s5c = section5c();
   assert.match(
     s5c,
-    /REQUEST CHANGES.*5b/s,
-    "REQUEST CHANGES must route back to 5b",
+    /\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*5b[^|\n]*\|/,
+    "the REQUEST CHANGES table ROW must route back to 5b — not merely prose mentioning both",
   );
   assert.match(
     s5c,
-    /increment the shared QA cycle counter/i,
-    "a review-driven fix must consume a cycle from the shared budget",
+    /budget is \*\*shared\*\*, not additional/i,
+    "a review-driven fix must consume a cycle from the shared budget, not extend it",
   );
   assert.match(
     s5c,
@@ -108,8 +129,12 @@ test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
 });
 
 test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
-  const s5c = loopDoc.slice(loopDoc.indexOf("### 5c. "));
-  assert.match(s5c, /APPROVE.*exit the loop|APPROVE.*proceed to Step 7/s);
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /\|[^|\n]*APPROVE[^|\n]*\|[^|\n]*(exit the loop|Step 7)[^|\n]*\|/,
+    "the APPROVE table ROW must exit the loop",
+  );
   assert.match(
     s5c,
     /CONCERNS.*\*\*Do not block\.\*\*/s,
@@ -118,7 +143,7 @@ test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
 });
 
 test("the 5-cycle bound covers 5c rather than being extended by it", () => {
-  const s5c = loopDoc.slice(loopDoc.indexOf("### 5c. "));
+  const s5c = section5c();
   assert.match(
     s5c,
     /budget is \*\*shared\*\*, not additional/i,
@@ -132,6 +157,10 @@ test("ready-for-merge sits inside 5c, after the review clears", () => {
   const s5c = loopDoc.indexOf("### 5c. ");
   const stage = loopDoc.indexOf("--stage ready-for-merge");
 
+  assert.ok(
+    s5c > -1,
+    "the 5c section must exist for this comparison to mean anything",
+  );
   assert.ok(stage > -1, "the ready-for-merge stage call must still exist");
   assert.ok(
     stage > s5c,
@@ -153,7 +182,7 @@ test("ready-for-merge sits inside 5c, after the review clears", () => {
 });
 
 test("ready-for-merge is not signalled on REQUEST CHANGES", () => {
-  const s5c = loopDoc.slice(loopDoc.indexOf("### 5c. "));
+  const s5c = section5c();
   assert.match(
     s5c,
     /never on REQUEST CHANGES/i,
@@ -164,7 +193,7 @@ test("ready-for-merge is not signalled on REQUEST CHANGES", () => {
 // ── 5. The advisory contract survives the wiring ─────────────────────────────
 
 test("5c consults /review-pr; it does not let it gate", () => {
-  const s5c = loopDoc.slice(loopDoc.indexOf("### 5c. "));
+  const s5c = section5c();
   assert.match(
     s5c,
     /writes no gate/i,
@@ -207,6 +236,9 @@ test("the autonomous defaults record the explicit --comment", () => {
 // ── 8. The prose names a skill that actually exists ──────────────────────────
 
 test("the skill 5c invokes is installed and named as this file expects", () => {
+  // The existsSync + frontmatter pair are preconditions, not claims about task 77 — /review-pr
+  // shipped before this change. They are kept so that a rename or deletion fails HERE with a
+  // clear message rather than as a confusing mismatch below.
   assert.ok(
     existsSync(join(repoRoot, "skills/review-pr/SKILL.md")),
     "5c invokes /review-pr — its SKILL.md must exist",
@@ -214,11 +246,61 @@ test("the skill 5c invokes is installed and named as this file expects", () => {
   assert.match(
     reviewPr,
     /^name: review-pr$/m,
-    "frontmatter name must match the /review-pr invocation in the step file",
+    "frontmatter name must match the invocation",
   );
+
+  // This is the assertion that is actually about 5c.
   assert.match(
-    loopDoc.slice(loopDoc.indexOf("### 5c. ")),
+    section5c(),
     /\/review-pr --effort \{medium\|low\} --comment/,
     "the invocation line must carry both flags the contract depends on",
+  );
+});
+
+test("the REQUEST CHANGES path can actually deliver its findings to qa-fix", () => {
+  // The regression this pins: 5c runs on a PASS/WAIVED gate, so a REQUEST CHANGES verdict has no
+  // gate `top_issues[]` to travel in. If the ingester does not glob the pr-review report AND 5c
+  // does not pass its path, qa-fix reads a clean gate, changes nothing, and the loop HALTs
+  // reporting the findings as unfixable when they were never delivered.
+  const ingester = read("shared/resources/qa-findings-ingester-prompt.md");
+  assert.match(
+    ingester,
+    /pr-review\.\*\.md/,
+    "the findings ingester must glob the PR review report",
+  );
+  assert.match(
+    section5c(),
+    /pr_review=/,
+    "5c must pass the PR review report path into the qa-fix invocation",
+  );
+});
+
+test("Loop Setup does not still claim a clean gate exits the loop", () => {
+  // The highest-value contradiction: Loop Setup is the first section an agent reads, and if it
+  // says a clean PASS exits immediately, 5c is never entered and the whole feature is a silent
+  // no-op. Scope to Loop Setup so 5c's own prose cannot satisfy this.
+  const start = loopDoc.indexOf("## Loop Setup");
+  assert.ok(start > -1, "Loop Setup section must exist");
+  const setup = loopDoc.slice(start, loopDoc.indexOf("\n## ", start));
+  assert.doesNotMatch(
+    setup,
+    /clean PASS on any[^.]*exits the loop immediately/i,
+    "Loop Setup must not say a clean PASS exits the loop — it hands to 5c",
+  );
+  assert.match(
+    setup,
+    /hands to \*\*5c\*\*/,
+    "Loop Setup must name 5c as where a clean gate goes",
+  );
+});
+
+test("the cycle counter is incremented in exactly one place", () => {
+  // 5b step 7 increments on exit. If 5c ALSO increments, one review-driven fix pass burns two of
+  // the five cycles and resume desynchronises (it reconstructs the count from `### QA Cycle`
+  // headings, which the extra increment does not write).
+  assert.match(
+    section5c(),
+    /Do not increment the counter here/i,
+    "5c must defer the increment to 5b step 7, not perform its own",
   );
 });

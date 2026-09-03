@@ -13,20 +13,24 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 
 ## Loop Setup (shared)
 
-This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **5 complete cycles**. A clean PASS on any QA review exits the loop immediately.
+This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **5 complete cycles**.
 
-The loop has **three** exits, not two: a clean gate (`PASS`/`WAIVED` → Step 7), the 5-cycle limit,
+**A clean gate does not exit the loop — it hands to 5c.** `PASS` or `WAIVED` from the QA review
+means the work is ready to be *reviewed as a PR*, not that the loop is over. 5c
+(`/review-pr`) is the loop's exit gate, and its verdict can send the run back to 5b.
+
+The loop has **three** exits: **5c returning `APPROVE` or `CONCERNS`** (→ Step 7), the 5-cycle limit,
 and — from cycle 3 onward — the **Convergence check**, which halts the loop the moment it stops
 reducing HIGH findings. The last of those is the one that usually fires first; see its section
 below. Both halting exits land in the same **Loop Escalation** block.
 
 #### develop-story
 
-Each cycle = one `/qa-story` + one `/qa-fix`. A clean PASS on any qa-story exits the loop immediately.
+Each cycle = one `/qa-story` + one `/qa-fix`. A clean gate from `qa-story` hands to **5c**, which is what exits the loop.
 
 #### develop-task
 
-Each cycle = one `/qa-task` + one `/qa-fix`. A clean PASS on any qa-task review exits the loop immediately.
+Each cycle = one `/qa-task` + one `/qa-fix`. A clean gate from `qa-task` hands to **5c**, which is what exits the loop.
 
 ### Signal the `in-qa` stage (when `TRACKER=jira` and `TRACKER_ISSUE` is set)
 
@@ -251,7 +255,7 @@ Log the result in the QA Iteration History section:
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
 **PR Review**: {APPROVE / CONCERNS / REQUEST CHANGES / not reached — gate did not exit the loop}
-**Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5) / Escalating — loop not converging}
+**Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of 5) / Proceeding to finalise / Escalating — loop not converging}
 ```
 
 The `**HIGH findings**` line is not decoration: it is the persisted sequence the **Convergence
@@ -270,8 +274,8 @@ cat > .claude/state/comment-body.md <<'EOF'
 ## 🔍 QA Cycle {N} — Gate: {PASS / CONCERNS / FAIL}
 
 **Issues found**: {count, or 'none'}
-{top 3 issues from gate file top_issues list, or 'No issues — proceeding to finalise'}
-**Action**: {Proceeding to finalise / Running qa-fix (cycle {N} of 5)}
+{top 3 issues from gate file top_issues list, or 'No issues — proceeding to the PR conformance review (Step 5c)'}
+**Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle {N} of 5)}
 EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
@@ -286,12 +290,20 @@ Read `reason` and act per the table in [`shared/resources/tracker-comment-contra
 
 On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cycle {N} result comment posted to {TRACKER} issue {TRACKER_ISSUE}."
 
-**Remaining Work Status block (required, per cycle).** Before re-invoking the QA skill for the next cycle, emit the block with the position line `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {N}/5`. On the gate that exits the loop, the block is emitted as part of the Step 7 transition instead (`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate})`). Format: [`shared/resources/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
+**Remaining Work Status block (required, per cycle).** Before re-invoking the QA skill for the next cycle, emit the block with the position line `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {N}/5`. On the cycle that exits the loop, the block is emitted as part of the Step 7 transition instead, in the form 5c specifies (`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate}, PR review {verdict})`). Format: [`shared/resources/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
 
 ### Convergence check (shared) — the QA loop's stall guard
 
 Perform this check **after the cycle's gate file has been written and read (5a), before entering
-5b**. A gate that exits the loop (`PASS` / `WAIVED`) has already left and never reaches it.
+5b**. A gate that hands to 5c (`PASS` / `WAIVED`) skips it — its HIGH count is zero by construction,
+so there is nothing for a stall guard to measure.
+
+> **A `REQUEST CHANGES` re-entry into 5b is deliberately not convergence-checked.** The guard measures
+> whether the *gate's* HIGH count is still falling, and a review-driven cycle produces no gate reading
+> to compare. The 5-cycle limit is what bounds that path — which is why 5c consumes cycles from the
+> shared budget rather than running outside it. On such a cycle, write `**HIGH findings**: n/a
+> (review-driven cycle — no gate written)` so the sequence the escalation tabulates has an explicit
+> hole rather than a silent one.
 
 The Step 3 develop loop halts when it stops making progress (`develop-pipeline-resume-contract.md`
 → **Develop Loop — Stall Semantics and MAX_ITER Bound**). This is the same guard for the QA loop,
@@ -483,15 +495,17 @@ Staging the gate here does **not** conflict with qa-fix's "Dev does not modify g
 touches it. Nor does it move anything the resume contract reads — cycle reconstruction counts
 `### QA Cycle` headings in the working-tree implementation report, which stays where it is.
 
-**Two paths reach Step 7 or a HALT without a `fix(...)` commit. Both must still commit the cycle's
+**Two paths leave 5a without a `fix(...)` commit. Both must still commit the cycle's
 gate and QA report — the evidence for a cycle that ran belongs on the branch, not only in the
 working tree, where a branch switch loses it and no reader of the PR ever sees it:**
 
-1. **`PASS` / `WAIVED` exit** (Outcome branching, above) — the loop exits before 5b, so no
-   `fix(...)` commit exists. Commit the final gate `.yml` and QA report `.md` as part of the
-   **Step 7 transition, before invoking `/finalise`**, and push once. Waiting for Step 8's sweep is
-   too late: `/finalise` reads the gate and posts a DoD comment on a PR that does not yet contain
-   it. Message: `docs(story.{epic}.{story}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
+1. **`PASS` / `WAIVED` → 5c** (Outcome branching, above) — the cycle reaches 5c without entering
+   5b, so no `fix(...)` commit exists. Commit the gate `.yml` and QA report `.md` **before invoking
+   `/review-pr` at 5c**, and push once. This is the single stated commit point for this path.
+   Committing here rather than at the Step 7 transition is load-bearing twice over: 5c reads the
+   artifact trail **off the branch**, so an uncommitted gate is invisible to the very review that
+   audits it; and if 5c returns `REQUEST CHANGES`, the Step 7 transition never happens on this
+   cycle. Message: `docs(story.{epic}.{story}): QA cycle {N} gate + report` (or `docs(task.{id}): …`).
 2. **The no-code-change HALT** (step 0 below) — HALTs before any commit. Commit the gate `.yml` and
    QA report `.md` before halting, same message shape, and push once.
 
@@ -503,6 +517,11 @@ section exists to prevent.
 After fixes are applied:
 
 0. **Check for actual changes**: Before committing, run `git diff --stat HEAD` to verify qa-fix actually modified files. If no files changed (qa-fix made no code edits), do NOT increment the cycle counter. Instead:
+   - **First, if this cycle entered 5b from a 5c `REQUEST CHANGES` verdict**, confirm the PR review
+     report path was actually passed in the invocation. A no-change result on that path is far more
+     likely to mean the findings never reached qa-fix than that they are unfixable — the gate it
+     reads is the clean one. If the path was omitted, re-invoke once with it before treating this as
+     a HALT, and log the re-invocation.
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
    - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — per path 2 above. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch.
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
@@ -661,8 +680,9 @@ it. And an adverse verdict still has somewhere to go, because `/qa-fix` is live.
   posting, and the pipeline cannot prompt. Steps 5–6 and 7 already comment on the PR, so this is
   authorised ground rather than a new outward-facing capability.
 - `/review-pr` writes `{story|task}.{id}.pr-review.{n}.{name}.md` beside the work item. The grammar
-  is already defined in [`docs/standards/file-naming.md`](../../docs/standards/file-naming.md);
-  before this step existed, nothing emitted it.
+  is already defined in `docs/standards/file-naming.md` (named in prose rather than linked: this
+  file is bundled into skill `references/` directories, where a `../../` link resolves to a path
+  that does not exist); before this step existed, nothing emitted it.
 
 **`/review-pr` remains advisory and its contract is unchanged.** It writes no gate `.yml`, never
 submits a formal review, and never edits code. The orchestrator acts on a verdict the skill merely
@@ -673,7 +693,7 @@ gate.
 
 | Verdict | Action |
 | --- | --- |
-| 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings. **Increment the shared QA cycle counter** — a review-driven fix is a cycle like any other. |
+| 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings (see the invocation below). **Do not increment the counter here** — 5b's step 7 increments it on exit, exactly as on any other cycle. A review-driven fix is a cycle like any other, and it is counted in the same one place. |
 | ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
 | ✅ **APPROVE** | Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
 
@@ -681,6 +701,22 @@ The 5-cycle budget is **shared**, not additional. A run whose review returns REQ
 therefore consumes a cycle it would not have consumed before, and can reach Loop Escalation on a
 run that previously exited clean. That is the gate working, not a regression — and the escalation
 path already exists.
+
+#### Invoking `/qa-fix` on a REQUEST CHANGES verdict
+
+The ordinary 5b invocation passes the latest **gate file**, and on this path that gate reads
+`PASS`/`WAIVED` with an empty `top_issues[]` — it carries none of the review's findings. Pass the
+**PR review report** as well:
+
+```
+Skill(qa-fix, args="gate={gate-file-path} pr_review={pr-review-report-path}")
+```
+
+The findings ingester globs `*.pr-review.*.md` for exactly this reason (see
+`qa-findings-ingester-prompt.md`), and treats a `severity: high` finding there as equivalent to a
+HIGH gate `top_issue`. Without both halves of this — the glob and the passed path — qa-fix reads a
+clean gate, finds nothing, changes nothing, and 5b step 0 HALTs reporting the issues as unfixable
+when in fact they were never delivered.
 
 > **REQUEST CHANGES re-enters 5b, not 5a.** The gate for this cycle has already been written and
 > read; what is wanted is a fix pass against the review's findings, after which the loop returns to
@@ -690,10 +726,16 @@ path already exists.
 #### Signal the `ready-for-merge` stage
 
 Only on **APPROVE** or **CONCERNS** — never on REQUEST CHANGES, which is still inside the loop.
-When `TRACKER=jira` and `TRACKER_ISSUE` is set:
+When `TRACKER_ISSUE` is set, branch on `TRACKER` — the same shape as the `changes-requested` signal
+in 5b, which has always covered both:
 
 ```bash
+# TRACKER=jira
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
+  --issue {TRACKER_ISSUE} --stage ready-for-merge --json
+
+# TRACKER=github
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/gh-stage.js \
   --issue {TRACKER_ISSUE} --stage ready-for-merge --json
 ```
 

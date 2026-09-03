@@ -42,9 +42,11 @@ These are shipped behaviour, not caveats:
    Step 2 is the one that is easy to skip, and skipping it is silent: re-running without it changes nothing, every time, and a run that appears to do nothing twice is indistinguishable from a broken one. See [troubleshooting → *I re-ran it and it did nothing again*](../reference/troubleshooting.md).
 5. **Step 5c still runs, and still reviews.** `/review-pr` reads the diff and the artifact trail —
    both local — so a restricted run gets the same verdict and the same
-   `*.pr-review.{n}.{name}.md` report. Only its **summary PR comment** is a gated call: it goes
-   through `tracker_call_with_retry` and so inherits the `ACCESS_TRACKER` deferral gate like any
-   other, landing in the handover instead of on the PR. The verdict still routes normally —
+   `*.pr-review.{n}.{name}.md` report. Only its **summary PR comment** is a gated call, and only
+   on GitHub: there it goes through `tracker_call_with_retry` and so inherits the `ACCESS_TRACKER`
+   deferral gate like any other, landing in the handover instead of on the PR. **On Bitbucket it is
+   single-shot** — neither retried nor deferred, the same known gap `review-pr`'s own SKILL.md
+   records. The verdict still routes normally —
    `REQUEST CHANGES` still returns the run to `qa-fix`. Note this is the **tracker** axis, not the
    VCS one: `access.vcs` accepts only `full`, so there is no mode in which pushing the branch itself
    defers.

@@ -107,7 +107,11 @@ qa-story / qa-task → gate file
     ↓
 Fix Cycle (if needed):
 qa-fix → code/test changes → ready for review
-review-pr → verdict → qa-fix (REQUEST CHANGES) or finalise (APPROVE / CONCERNS)
+
+# On a PASS/WAIVED gate the loop does not end — it hands to Step 5c:
+qa-story / qa-task (PASS/WAIVED) → review-pr → verdict
+  → qa-fix (REQUEST CHANGES, same 5-cycle budget)
+  → finalise (APPROVE / CONCERNS)
     ↓
 Done or repeat fix cycle
 ```
