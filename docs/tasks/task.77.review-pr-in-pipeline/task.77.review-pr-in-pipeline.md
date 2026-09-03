@@ -171,7 +171,8 @@ that previously exited clean. That is the point of the gate, and the escalation 
       "exit loop, proceed to Step 7" to "proceed to 5c"
 - [x] Add a **§5c — PR conformance review** section invoking
       `/review-pr --effort {medium|low} --comment` against the open PR
-- [x] Add the verdict branch: REQUEST CHANGES → 5b (increment the shared counter); APPROVE and
+- [x] Add the verdict branch: REQUEST CHANGES → 5b (**counter incremented once, by 5b step 7, on
+      exit** — QA cycle 1 found that incrementing at 5c too burns two cycles per fix); APPROVE and
       CONCERNS → signal `ready-for-merge`, exit to Step 7
 - [x] Move the `ready-for-merge` stage block so it fires **after** 5c clears, not on the QA gate
 - [x] Add a **PR Review** row to the `### QA Cycle {N}` template
@@ -201,9 +202,10 @@ that previously exited clean. That is the point of the gate, and the escalation 
 - [x] `develop-pipeline-autonomous-defaults.md` — the pipeline passes `--comment` explicitly,
       because `/review-pr` otherwise asks before posting and the pipeline cannot prompt. Already
       -authorised ground: Steps 5–6 and 7 both comment on the PR
-- [x] `pipeline-resume-detector-prompt.md` — 5c dispatches subagents, so it writes
-      `.summaries/step-5-pr-review-{N}.json`. Step 5 is already non-exempt; the `[1, 2, 4, 8]` list
-      is unchanged
+- [x] `pipeline-resume-detector-prompt.md` — **corrected during implementation**: 5c dispatches no
+      summary-writing subagent of its own (`/review-pr` runs its lenses internally), so it writes no
+      `.summaries/step-*.json` and its absence is never a gap. Step 5 is already non-exempt; the
+      `[1, 2, 4, 8]` list is unchanged either way
 - [x] `develop-pipeline-remaining-work-banner.md` — the 5c cycle banner
 
 ### Phase 4: Skill prose
@@ -270,8 +272,10 @@ finalise. Keep the house theme in `develop-pipeline-readme-mermaid-theme.md`; au
 - [x] `docs/runbooks/unattended-overnight-runs.md` — what one `/develop-next` iteration now includes
 - [x] `docs/runbooks/first-week/day-1-tasks.md` (L97), `day-2-stories.md` (L81) — the one-line
       pipeline shapes new developers read first
-- [x] `docs/runbooks/restricted-access.md`, `docs/concepts/restricted-access.md` — the review's PR
-      comment is a VCS mutation and defers like any other
+- [x] ~~`docs/runbooks/restricted-access.md`~~ **ruled out** (the task's premise does not hold:
+      `resolve-platform.sh` accepts only `access.vcs: full`, so nothing defers on the VCS axis);
+      `docs/concepts/restricted-access.md` — updated instead, on the **tracker** axis, qualified to
+      GitHub since the Bitbucket comment path is single-shot
 
 **Reference and concept docs**:
 - [x] `docs/reference/pipeline-artifacts.md` — **the direct contradiction**, line 50:
@@ -379,11 +383,17 @@ with a glob returning 6 files under bash and 0 under zsh. Contract tests that as
 
 ### End-to-end dogfood
 
-- [x] `/develop-task` on a small task produces `task.{id}.pr-review.1.{name}.md` beside the QA report
-- [x] The QA Cycle entry carries the PR Review row
+> **Not run — and deliberately not ticked.** This is a documentation-and-contract change: 5c does
+> not execute until a *subsequent* pipeline run reaches it, so no `*.pr-review.*` artifact can exist
+> on this branch. QA cycle 2 caught these as ticked-without-evidence; they are now deferred to the
+> first real run. The one that is already known to be wrong is struck through.
+
+- [ ] `/develop-task` on a small task produces `task.{id}.pr-review.1.{name}.md` beside the QA report
+- [ ] The QA Cycle entry carries the PR Review row
 - [x] Step 8's `grep -q "⏳ Pending"` assertion still finds nothing
-- [x] A forced REQUEST CHANGES routes back into `/qa-fix` and increments the shared counter
-- [x] One `/develop-next` run merges a PR that already has a pr-review report on disk — **with no
+- [ ] ~~A forced REQUEST CHANGES routes back into `/qa-fix` and increments the shared counter~~ —
+      restated: routes back into `/qa-fix`, and the counter is incremented **once, by 5b step 7**
+- [ ] One `/develop-next` run merges a PR that already has a pr-review report on disk — **with no
       orchestrator edit**
 
 ### Mutation Proving
@@ -487,7 +497,7 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: FAIL (cycle 2 — all 11 findings fixed, cycle 3 pending)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-03
 **Quality Score**: 70/100
@@ -495,8 +505,8 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 ### QA Report
 
-- **Full Report**: [task.77.qa.1.review-pr-in-pipeline.md](./task.77.qa.1.review-pr-in-pipeline.md)
-- **Gate File**: [task.77.gate.1.review-pr-in-pipeline.yml](./task.77.gate.1.review-pr-in-pipeline.yml)
+- **Cycle 1**: [qa.1](./task.77.qa.1.review-pr-in-pipeline.md) · [gate.1](./task.77.gate.1.review-pr-in-pipeline.yml) — FAIL, 7 findings
+- **Cycle 2** (refute pass): [gate.2](./task.77.gate.2.review-pr-in-pipeline.yml) — FAIL, 11 findings, 2 of 3 HIGH introduced by cycle 1's own fixes
 
 ### Test Coverage Summary
 
@@ -523,6 +533,7 @@ deliver its findings to `/qa-fix` so it dead-ends in the no-code-change HALT.
 | 2026-09-03 |         | Status → ready-for-review — all 7 phases implemented, full `npm run ci` green (format:check + npm test + eval:all) | develop |
 | 2026-09-03 |         | QA gate FAIL (70/100) — 3 HIGH, 2 MEDIUM, 2 LOW. Status → in-progress | qa-task |
 | 2026-09-03 |         | QA findings fixed — all 7 gate issues plus 6 advisory cleanups, 1 iteration. Status → ready-for-review | qa-fix |
+| 2026-09-03 |         | QA gate 2 FAIL (70/100, refute pass) — 11 findings, 2 of 3 HIGH introduced by cycle 1's fixes; all closed | qa-task |
 
 ---
 

@@ -79,7 +79,7 @@ For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<
 | 1. create-branch | Branch exists in git | `git branch --list "feature/story.{epic}.{story}.*"` returns the branch |
 | 3. develop | All tasks complete | Story file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional**: once the latest gate reads `PASS`/`WAIVED`, `story.{epic}.{story}.pr-review.{n}.*.md` must also exist — 5c is the loop's exit gate, so a clean gate with no review report means the run stopped inside 5c. A mid-loop resume on a `CONCERNS`/`FAIL` gate legitimately has none. | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient |
+| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional**: when the latest gate reads `PASS`/`WAIVED`, the highest-numbered `story.{epic}.{story}.pr-review.{n}.*.md` must be **≥ that gate's number** — mere existence is not enough. 5c runs once per clean gate, so a run with an earlier `REQUEST CHANGES` already has `pr-review.1` on disk; an existence check would let a run killed inside cycle 2's 5c pass on cycle 1's report and resume straight to Step 7, finalising with no review of the final gate. A mid-loop resume on a `CONCERNS`/`FAIL` gate legitimately has none. | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then, when the latest gate is `PASS`/`WAIVED`: `G=$(ls *.gate.*.yml \| sed -E 's/.*\.gate\.([0-9]+)\..*/\1/' \| sort -n \| tail -1); R=$(ls *.pr-review.*.md 2>/dev/null \| sed -E 's/.*\.pr-review\.([0-9]+)\..*/\1/' \| sort -n \| tail -1); [ "${R:-0}" -ge "$G" ]` |
 | 7. finalise | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep -iE "^status:\s*accepted" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ### develop-task artifact table
@@ -89,7 +89,7 @@ For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<
 | 1. create-branch | Branch exists in git | `git branch --list "feature/task.{id}.*"` returns the branch |
 | 3. develop | All phases complete | Task file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional**: once the latest gate reads `PASS`/`WAIVED`, `task.{id}.pr-review.{n}.*.md` must also exist — 5c is the loop's exit gate, so a clean gate with no review report means the run stopped inside 5c. A mid-loop resume on a `CONCERNS`/`FAIL` gate legitimately has none. | `ls {task-directory}/task.{id}.qa.*.md` AND `ls {task-directory}/task.{id}.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient |
+| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional**: when the latest gate reads `PASS`/`WAIVED`, the highest-numbered `task.{id}.pr-review.{n}.*.md` must be **≥ that gate's number** — mere existence is not enough. 5c runs once per clean gate, so a run with an earlier `REQUEST CHANGES` already has `pr-review.1` on disk; an existence check would let a run killed inside cycle 2's 5c pass on cycle 1's report and resume straight to Step 7, finalising with no review of the final gate. A mid-loop resume on a `CONCERNS`/`FAIL` gate legitimately has none. | `ls {task-directory}/task.{id}.qa.*.md` AND `ls {task-directory}/task.{id}.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then, when the latest gate is `PASS`/`WAIVED`: `G=$(ls *.gate.*.yml \| sed -E 's/.*\.gate\.([0-9]+)\..*/\1/' \| sort -n \| tail -1); R=$(ls *.pr-review.*.md 2>/dev/null \| sed -E 's/.*\.pr-review\.([0-9]+)\..*/\1/' \| sort -n \| tail -1); [ "${R:-0}" -ge "$G" ]` |
 | 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep -iE "^status:\s*accepted" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ## Plan Freshness (Step 3 Prerequisite)
@@ -114,6 +114,13 @@ If the plan is stale (older than the story/task file), do **not** reuse it — d
 A `gate.yml` written manually (without running the QA skill) does NOT satisfy Step 5–6. The required artifacts are the `qa.N.md` report file (created by `/qa-story` or `/qa-task`) AND the `gate.N.yml`. Similarly, updating DoD checkboxes in the story/task doc does NOT satisfy Step 7 — `/finalise` must write a separate `dod.N.md` file AND post an acceptance comment to the PR.
 
 ## QA Cycle Count Reconstruction (if resuming at Step 5–6)
+
+> **Resume inside 5c re-enters at 5c, not 5a.** The `### QA Cycle {N}` heading is written at 5a as
+> soon as the gate is read, so a run killed *inside* 5c already has N headings and naive
+> reconstruction would set `NEXT_CYCLE=N+1` and re-run the whole QA review against an unchanged tree
+> — burning a cycle to re-derive the gate that just passed. Detect the 5c sub-state instead: if the
+> highest `### QA Cycle {N}` entry's `**PR Review**` row reads `not reached` or is blank **while**
+> gate `{N}` reads `PASS`/`WAIVED`, set the counter to `N` and re-enter at **5c**.
 
 If the last completed step was within the QA loop, count the number of `### QA Cycle` entries in the QA Iteration History section of the implementation report:
 

@@ -95,7 +95,7 @@ document, runbook and diagram that describes the pipeline shape.
 | 2 | `review-pr` added to the lock's noop arm + header comment; shell test gained loop-member coverage. |
 | 3 | Resume contract (both rows, conditional on a clean gate), both Step-0 progress templates, lite mode, autonomous defaults, remaining-work banner, resume-detector exemption note. |
 | 4 | `review-pr` SKILL.md relationship section rewritten and its line-33 caveat re-scoped; both orchestrator SKILL.md Step 5–6 sections and Related Skills lists. |
-| 5 | Both `pipeline-shape` EXPECTED_STEPS + both stale titles; both `STEP_KEYWORDS["5-6"]`; new `evals/shared/tests/pr-review-loop-parity.test.mjs` (11 tests); `review-pr.test.js` inverted assertion. |
+| 5 | Both `pipeline-shape` EXPECTED_STEPS + both stale titles; both `STEP_KEYWORDS["5-6"]`; new `evals/shared/tests/pr-review-loop-parity.test.mjs` (11 tests at first write; 15 after two QA cycles); `review-pr.test.js` inverted assertion. |
 | 6 | 3 diagrams, 7 runbooks, reference/concept/standards docs, CHANGELOG. |
 | 7 | `npm run bundle`, `npm run generate-catalog`. |
 
@@ -160,13 +160,70 @@ second grep was widened to `docs/standards/` and a word-boundary `review-pr` gre
 
 ## Issues Log
 
-_Problems encountered and how they were resolved or escalated._
+- **Bundle leak, twice.** Referencing the QA-loop step file **by path** from a shared resource makes
+  `bundle_skill.py` follow it and copy that file plus its transitive dependencies into every skill
+  bundling the referrer. It hit `develop-bug` (via `develop-pipeline-autonomous-defaults.md`) and
+  then `review-pr` (via its own SKILL.md). Verified against a clean `origin/develop` worktree that
+  the baseline bundles clean, so both were introduced here. Fixed by naming the section in prose.
+  Note the second attempt at the fix initially failed to match, because the bundler had already
+  rewritten the link in the source file (`shared/resources/X` → `references/X`).
+- **`zero-blocks-executed` on the QA-loop file (Step 4b).** All 16 fenced blocks classify as
+  `mutating` and none executes. **Pre-existing** — the `origin/develop` baseline of the same file
+  returns the identical finding for its 15 blocks. Recorded, not suppressed; worth its own task.
+- **A review script hit the bash/zsh split it was checking for.** The first link-check written for
+  QA cycle 1 reported six false `DANGLING` results because zsh does not word-split unquoted
+  parameters. Re-run under bash, every link resolved. Logged because it is precisely the defect class
+  task 66 shipped and task 67 exists to catch — encountered inside the review of the task citing both.
 
 ---
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-03
+
+**Gate Result**: FAIL
+**Issues Found**: 7 — 3 HIGH, 2 MEDIUM, 2 LOW
+**HIGH findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Running qa-fix (cycle 1 of 5)
+
+The three HIGH findings each made the new 5c path unrunnable in a different way: Loop Setup still
+said a clean PASS exits the loop (so 5c might never be entered); the shared counter was incremented
+by both 5c and 5b step 7; and the `REQUEST CHANGES` route had no way to deliver its findings to
+`/qa-fix`, so it dead-ended in the no-code-change HALT. All 7 issues plus 6 advisory cleanups fixed;
+commit `9842551`.
+
+### QA Cycle 2 — 2026-09-03 (refute pass)
+
+**Gate Result**: FAIL
+**Issues Found**: 11 — 3 HIGH, 5 MEDIUM, 3 LOW
+**HIGH findings**: 3
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Running qa-fix (cycle 2 of 5)
+
+Cycle 2 is a **refute pass** by contract, and it earned that design. **Two of its three HIGH findings
+were introduced by cycle 1's own fixes**, and the pattern behind them is worth recording:
+
+> **Cycle 1 fixed the sentence each finding quoted, rather than the contract that sentence belonged
+> to.** TASK77-002 corrected the increment rule in the QA-loop file and left it standing in
+> `develop-pipeline-autonomous-defaults.md` — the table an *unattended* run actually consults for
+> that fork — and the new test named "the cycle counter is incremented in exactly one place" greps
+> only the QA-loop file, so it stayed green while the contradiction stood. TASK77-004 moved a commit
+> point without re-checking the one-push-per-cycle invariant it lives under. TASK77-005 documented a
+> re-entry using a cycle model TASK77-002 had just changed.
+
+The largest untouched hole was the **5c error path**: cycle 1 made 5c the loop's sole exit and
+hardened its happy-path routing without asking what happens when `/review-pr` itself HALTs — and the
+`PASS`→5c path skips 5b's mid-loop PR-state poll, so a PR closed underneath the run is discovered
+*by* 5c. The likeliest improvisation was falling through to Step 7, silently finalising with no
+review at all.
+
+Cycle 2 also found that two of cycle 1's "hardened" test assertions had become **vacuous** (they pass
+against the pre-change file), and that three "End-to-end dogfood" boxes in the task document were
+ticked with no artifact on disk to support them — the conformance failure this very task exists to
+catch, in its own paperwork.
+
+---
 
 ---
 

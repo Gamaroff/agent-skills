@@ -116,10 +116,18 @@ test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
     /\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*5b[^|\n]*\|/,
     "the REQUEST CHANGES table ROW must route back to 5b — not merely prose mentioning both",
   );
+  // NOT `budget is **shared**` — that sentence predates the fixes and is already asserted by
+  // "the 5-cycle bound covers 5c". Assert what this path actually needs to work: the row points at
+  // the invocation block, and that block exists and passes the report.
   assert.match(
     s5c,
-    /budget is \*\*shared\*\*, not additional/i,
-    "a review-driven fix must consume a cycle from the shared budget, not extend it",
+    /\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*see the invocation below[^|\n]*\|/,
+    "the REQUEST CHANGES row must point at the invocation that delivers the findings",
+  );
+  assert.match(
+    s5c,
+    /#### Invoking `\/qa-fix` on a REQUEST CHANGES verdict/,
+    "that invocation block must exist — without it the path has no way to pass its findings",
   );
   assert.match(
     s5c,
@@ -130,10 +138,18 @@ test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
 
 test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
   const s5c = section5c();
+  // The APPROVE row's wording is unchanged from the original 5c section, so asserting it alone
+  // pins nothing this cycle fixed. Assert the CONCERNS semantics instead, which is the one of the
+  // three verdicts whose behaviour is easy to get wrong (it exits WITHOUT blocking).
   assert.match(
     s5c,
     /\|[^|\n]*APPROVE[^|\n]*\|[^|\n]*(exit the loop|Step 7)[^|\n]*\|/,
     "the APPROVE table ROW must exit the loop",
+  );
+  assert.match(
+    s5c,
+    /\|[^|\n]*CONCERNS[^|\n]*\|[^|\n]*Do not block[^|\n]*Step 7[^|\n]*\|/,
+    "the CONCERNS row must record findings, not block, AND still exit to Step 7",
   );
   assert.match(
     s5c,
@@ -302,5 +318,43 @@ test("the cycle counter is incremented in exactly one place", () => {
     section5c(),
     /Do not increment the counter here/i,
     "5c must defer the increment to 5b step 7, not perform its own",
+  );
+
+  // The rule is stated in TWO files, and an earlier version of this test could only see one of
+  // them. The QA loop was corrected while develop-pipeline-autonomous-defaults.md — the table an
+  // UNATTENDED run actually consults for this fork — still said to increment at 5c, and this test
+  // was green throughout. A test named "exactly one place" that cannot see the second place is
+  // worse than no test: it certifies the contradiction it was written to prevent.
+  assert.doesNotMatch(
+    defaults,
+    /return to 5b and increment the shared cycle counter/i,
+    "the autonomous-defaults table must not instruct a second increment at 5c",
+  );
+  assert.match(
+    defaults,
+    /incremented once, by 5b step 7, on exit/i,
+    "the autonomous-defaults table must name 5b step 7 as the single increment site",
+  );
+});
+
+test("5c has a failure arm, and it does not fall through to Step 7", () => {
+  // 5c is the loop's only exit, so an unhandled /review-pr failure is the one state that could
+  // silently finalise a run with no review at all. The PASS->5c path also skips 5b step 5's
+  // mid-loop PR-state poll, so a PR closed underneath the run is FIRST discovered by /review-pr.
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /Review failed/i,
+    "the verdict table must carry a failure row, not only the three verdicts",
+  );
+  assert.match(
+    s5c,
+    /Do \*\*not\*\* fall through to Step 7/i,
+    "a 5c failure must HALT — falling through skips the check the step exists to add",
+  );
+  assert.match(
+    loopDoc,
+    /\*\*PR Review\*\*: \{[^}]*review failed[^}]*\}/i,
+    "the QA Cycle template enum must be able to record a failed review for resume",
   );
 });

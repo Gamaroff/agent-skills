@@ -63,9 +63,10 @@ Steps 5–6 loop up to 5 cycles. Cycle *n* produces `qa.{n}` **and** `gate.{n}` 
 **Step 5c is the loop's exit.** A gate reading `PASS` or `WAIVED` does not go straight to Step 7: it
 hands to `review-pr`, which reviews the PR against the work item and returns a verdict. `REQUEST
 CHANGES` routes back to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE` and
-`CONCERNS` exit to Step 7. So a completed run leaves **one** `pr-review.{n}` report, written on the
-cycle that exited — not one per cycle. A clean gate with no `pr-review` report beside it means the
-run stopped inside 5c.
+`CONCERNS` exit to Step 7. So a completed run leaves **one report per 5c
+invocation** — usually just one, plus one more for every `REQUEST CHANGES` verdict, since each of
+those sends the run back through 5b and then through 5c again. A clean gate whose number exceeds the
+highest `pr-review.{n}` beside it means the run stopped inside 5c.
 
 ## The eight documents, in plain terms
 
