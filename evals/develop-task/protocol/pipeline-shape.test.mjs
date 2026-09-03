@@ -21,7 +21,8 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const SKILL_PATH = path.join(REPO_ROOT, "skills", "develop-task", "SKILL.md");
 const STEP_RESOURCES_DIR = path.join(REPO_ROOT, "shared", "resources");
 
-// The 8 sub-skill names that must appear in order in SKILL.md
+// The 9 sub-skill names that must appear in order in SKILL.md.
+// review-pr is Step 5c — the QA loop's exit gate — and sits between qa-fix and finalise.
 const EXPECTED_STEPS = [
   "create-branch",
   "review-task",
@@ -29,6 +30,7 @@ const EXPECTED_STEPS = [
   "create-pr",
   "qa-task",
   "qa-fix",
+  "review-pr",
   "finalise",
   "commit-changes",
 ];
@@ -38,7 +40,7 @@ test("SKILL.md: exists and is non-empty", async () => {
   assert.ok(content.length > 100, "SKILL.md is unexpectedly short");
 });
 
-test("SKILL.md: lists all 8 pipeline steps in order", async () => {
+test("SKILL.md: lists all 9 pipeline sub-skills in order", async () => {
   const content = await readFile(SKILL_PATH, "utf-8");
   let lastIdx = -1;
   for (const step of EXPECTED_STEPS) {

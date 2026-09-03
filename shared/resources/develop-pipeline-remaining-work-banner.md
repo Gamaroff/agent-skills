@@ -23,6 +23,8 @@ in the same way a missing step banner is.
 | Every step transition, Steps 1–8 — emitted as part of action 3 of the Step Transition Protocol, immediately **before** the `═══ … STEP {N+1}/8 … ═══` banner, in the same contiguous output | `Step {N}/8 — {STEP-NAME} ✅ complete`                            |
 | Each develop-loop iteration that continues (Step 3, before re-invoking `/develop`) | `Step 3/8 — DEVELOP ⏳ in progress, iter {ITER}/{MAX_ITER}`       |
 | Each QA/verify cycle that continues (Steps 5–6, before re-invoking the QA skill) | `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {CYCLE}/5`            |
+| Step 5c, before invoking `/review-pr` on a gate that exited 5a clean    | `Steps 5–6/8 — QA LOOP ⏳ PR conformance review, cycle {CYCLE}/5` |
+| Step 5c returning REQUEST CHANGES (before re-entering 5b)              | `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` |
 | Every HALT — emitted immediately **before** the halt banner, so the user sees what did not run | `Step {N}/8 — {STEP-NAME} ❌ halted`                              |
 | Pipeline completion (after Step 8)                                      | `Step 8/8 — COMMIT CHANGES ✅ complete`                            |
 

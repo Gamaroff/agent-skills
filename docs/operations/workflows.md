@@ -9,7 +9,7 @@ The unit of work in most chains is a **story** or **task**. For step-by-step wal
 ### Story pipeline
 
 ```
-review-story --validate → develop → qa-story → qa-fix (if needed) → finalise
+review-story --validate → develop → qa-story → qa-fix (if needed) → review-pr → finalise
 ```
 
 Automated orchestrator (preferred):
@@ -17,7 +17,8 @@ Automated orchestrator (preferred):
 ```
 develop-story [story-file-path]
   └── create-branch → review-story → develop → create-pr → qa-story
-        → qa-fix (up to 5 cycles) → finalise → commit-changes
+        → qa-fix (up to 5 cycles) → review-pr (Step 5c, loop exit gate)
+        → finalise → commit-changes
 ```
 
 Reference: [`skills/develop-story/README.md`](../../skills/develop-story/README.md).
@@ -26,7 +27,7 @@ Walkthrough: [Story Development Runbook](../runbooks/story-development.md).
 ### Task pipeline
 
 ```
-create-task → review-task → develop → qa-task → qa-fix (if needed) → finalise
+create-task → review-task → develop → qa-task → qa-fix (if needed) → review-pr → finalise
 ```
 
 Automated orchestrator (preferred):
@@ -34,7 +35,8 @@ Automated orchestrator (preferred):
 ```
 develop-task [task-file-path]
   └── create-branch → review-task → develop → create-pr → qa-task
-        → qa-fix (up to 5 cycles) → finalise → commit-changes
+        → qa-fix (up to 5 cycles) → review-pr (Step 5c, loop exit gate)
+        → finalise → commit-changes
 ```
 
 Reference: [`skills/develop-task/README.md`](../../skills/develop-task/README.md).
@@ -105,6 +107,7 @@ qa-story / qa-task → gate file
     ↓
 Fix Cycle (if needed):
 qa-fix → code/test changes → ready for review
+review-pr → verdict → qa-fix (REQUEST CHANGES) or finalise (APPROVE / CONCERNS)
     ↓
 Done or repeat fix cycle
 ```

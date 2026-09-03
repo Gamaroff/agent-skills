@@ -29,6 +29,8 @@ The rows below apply to both `develop-story` and `develop-task`. Where the two s
 | Implementation report in create-pr commit | EXCLUDE — unstage before create-pr commits; Step 8 commits it |
 | Pre-develop codebase mapping | Always run Explore subagent; pass summary to `/develop`, do not re-read files |
 | qa-fix with no file changes | HALT — do not increment cycle; log as unfixable and surface to user |
+| Step 5c `/review-pr` — post the summary PR comment? | Pass `--comment` explicitly. `/review-pr` otherwise asks before posting and the pipeline cannot prompt. Already-authorised ground: Steps 5–6 and 7 both comment on the PR. |
+| Step 5c `/review-pr` verdict | `REQUEST CHANGES` → return to 5b and increment the shared cycle counter. `CONCERNS` → record findings, do not block, exit to Step 7. `APPROVE` → exit to Step 7. The full routing lives in the Steps 5–6 QA loop step file, §5c — not linked by path here, because this file is bundled into `develop-bug` too and a path reference would drag the story/task QA loop into a skill that runs its own verify loop. |
 | Resume state validation | Per-step artifact verification AND branch + PR cross-check before skipping any ✅ step — full contract in `shared/resources/develop-pipeline-resume-contract.md` |
 | Completion status (story or task) | `accepted` (lowercase, matches finalise canonical YAML schema). Note: document `Status:` fields use Title Case (`Draft`, `Planned`, `In Progress`, `Ready for Review`) — `accepted` is the YAML frontmatter value only. |
 | Pipeline mode (lite vs standard) | See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions and behaviour. Default to `standard` if any condition fails. |

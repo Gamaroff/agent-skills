@@ -29,7 +29,7 @@ A PR can be flawless code that implements the wrong thing, or correct work whose
 - Reviewing someone else's pipeline-produced PR before merging it
 - Auditing a merged PR after the fact — the trail is still on disk
 
-Do **not** use this for a pure diff review with no work item — use `/review-code`. Do **not** use it as a QA gate — use `/qa-story` or `/qa-task`.
+Do **not** use this for a pure diff review with no work item — use `/review-code`. Do **not** use it *as* a QA gate — it writes no gate file; `/qa-story` and `/qa-task` do. (The develop pipelines run it at **Step 5c**, inside their QA loop, and act on its verdict themselves — that is consultation, not gating. See *Relationship to the develop pipelines*.)
 
 ## Arguments
 
@@ -484,4 +484,29 @@ After editing, run `npm run bundle`.
 
 ## Relationship to the develop pipelines
 
-`/develop-story` and `/develop-task` do **not** call `/review-pr`. Their QA step already runs the code reviewer every cycle with `code_review_blocking=true`. `/review-pr` is for the human-in-the-loop moment those pipelines do not cover: someone opening a finished PR and asking whether to merge it.
+`/develop-story` and `/develop-task` **do** call `/review-pr`, as **Step 5c** — the exit gate of
+their Steps 5–6 QA loop. It runs once a QA gate reads `PASS` or `WAIVED`, and nothing leaves that
+loop without passing through it. The full routing lives in the pipelines' Steps 5–6 QA loop step
+file, §5c — deliberately not linked by path, because the bundler follows such a reference and would
+copy that file and its transitive dependencies into this skill, which does not need them to run.
+(`/develop-bug` does not call this skill — it runs its own verify loop.)
+
+**Only the conformance lens is new value there.** Those pipelines' QA step already runs the code
+reviewer every cycle with `code_review_blocking=true`, so 5c's code lens is duplication. Its
+conformance lens is not duplicated anywhere: whether the diff *covers* what the work item promised,
+whether it drifted outside that *scope*, whether the artifact *trail* is complete and honest, and
+whether the work item is *consistent* with what shipped. That gap is why the wiring exists.
+
+**Being consulted by a pipeline is not the same as gating one, and this skill still does not gate.**
+The distinction is the whole reason the wiring is legitimate:
+
+- `/review-pr` **reports** a verdict. It writes no gate `.yml`, never submits a formal GitHub
+  review, and never edits code — exactly as before.
+- The **orchestrator** acts on that verdict: `REQUEST CHANGES` sends the run back to `/qa-fix` on
+  the shared 5-cycle budget; `CONCERNS` records findings without blocking; `APPROVE` exits to
+  Step 7.
+
+Gate files remain the exclusive output of `/qa-story` and `/qa-task`.
+
+Invoking it by hand is unchanged and still worthwhile — someone opening a finished PR and asking
+whether to merge it is the same question, asked outside a pipeline run.

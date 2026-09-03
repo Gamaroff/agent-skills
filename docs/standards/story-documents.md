@@ -103,7 +103,7 @@ These files are generated automatically by skills during the pipeline. Do not cr
 |---|---|---|---|
 | Plan file | `story.{E}.{S}.plan.{name}.md` | `create-story` | Story implementation guide |
 | Review report | `story.{E}.{S}.review.{N}.{name}.md` | `review-story` (Step 2) | Review findings |
-| PR review report | `story.{E}.{S}.pr-review.{N}.{name}.md` | `review-pr` (standalone) | PR-vs-work-item conformance + code findings |
+| PR review report | `story.{E}.{S}.pr-review.{N}.{name}.md` | `review-pr` (Step 5c of the develop pipelines, and standalone) | PR-vs-work-item conformance + code findings |
 | Implementation report | `story.{E}.{S}.implementation.{N}.{name}.md` | `develop-story` pipeline | Pipeline run record |
 | QA report | `story.{E}.{S}.qa.{N}.{name}.md` | `qa-story` (Step 5) | QA assessment narrative |
 | Definition of Done | `story.{E}.{S}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |

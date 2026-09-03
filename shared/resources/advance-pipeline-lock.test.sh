@@ -13,6 +13,9 @@
 #   4.   Terminal commit-changes (current_step 8) removes lock
 #   5.   Explicit --complete removes lock unconditionally (current_step 4)
 #   6.   No lock file → exit 0, noop
+#   7.   Every Steps 5–6 loop member (qa-story, qa-task, qa-fix, review-pr)
+#        noops — lock preserved, current_step untouched. review-pr is Step 5c,
+#        the loop's exit gate, and joined the arm with task 77.
 
 PASS=0
 FAIL=0
@@ -75,6 +78,36 @@ if [ "$RC" -eq 0 ] && [ ! -f "$LOCK_FILE" ]; then
 else
   fail "no lock file → exit 0 noop" "rc=$RC, lock present=$([ -f "$LOCK_FILE" ] && echo yes || echo no)"
 fi
+
+# ── Scenario 7: Steps 5–6 loop members noop, leaving the lock untouched ──────
+#
+# The orchestrator drives this loop explicitly, so no member may advance the
+# lock. Note what this does and does NOT prove: an unlisted skill also exits 0
+# via the `*)` catch-all, so removing any name from the loop arm leaves these
+# assertions green. They pin the CONTRACT (a loop member must not advance the
+# lock), not the presence of the arm. See task 77 §8 — that mutation is
+# expected not to hold, and the diagnosis is redundant source, not a vacuous
+# test.
+for SKILL in qa-story qa-task qa-fix review-pr; do
+  for STEP in 5 6; do
+    LOCK_FILE="$TMPDIR_TEST/loop-$SKILL-$STEP.lock"
+    write_lock "$STEP"
+    PIPELINE_LOCK="$LOCK_FILE" bash "$SCRIPT" --skill "$SKILL" >/dev/null 2>&1
+    RC=$?
+    if [ ! -f "$LOCK_FILE" ]; then
+      fail "$SKILL at step $STEP noops" "lock file was removed"
+    elif [ "$RC" -ne 0 ]; then
+      fail "$SKILL at step $STEP noops" "exit code $RC, expected 0"
+    else
+      GOT=$(jq -r '.current_step' "$LOCK_FILE")
+      if [ "$GOT" = "$STEP" ]; then
+        pass "$SKILL at step $STEP noops (lock preserved, step unchanged)"
+      else
+        fail "$SKILL at step $STEP noops" "current_step changed: $STEP → $GOT"
+      fi
+    fi
+  done
+done
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""

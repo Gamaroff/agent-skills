@@ -231,24 +231,18 @@ recorded, not the findings.
 
 After completion, find and read the latest gate file:
 
-- `PASS` with no `top_issues` → signal `ready-for-merge` (below), exit loop, proceed to Step 7
-- `WAIVED` with `waiver.active: true` and a documented reason/approver → signal `ready-for-merge` (below), exit loop, proceed to Step 7 (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
+- `PASS` with no `top_issues` → **proceed to 5c** (the loop's exit gate), not straight to Step 7
+- `WAIVED` with `waiver.active: true` and a documented reason/approver → **proceed to 5c** (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
 - `CONCERNS`, `FAIL`, or has `top_issues` → run the **Convergence check** (below), then proceed to 5b unless it trips
 
-**On either loop-exiting gate**, commit this cycle's gate `.yml` and QA report `.md` and push once
-before invoking `/finalise` — there is no `fix(...)` commit on this path to carry them. See
-**Where the gate and QA report get committed** in 5b.
+**On either gate that reaches 5c**, commit this cycle's gate `.yml` and QA report `.md` and push once
+before invoking `/review-pr` — there is no `fix(...)` commit on this path to carry them, and 5c reads
+the artifact trail off the branch. See **Where the gate and QA report get committed** in 5b.
 
-**On a gate that exits the loop** (`PASS` or `WAIVED`), when `TRACKER=jira` and `TRACKER_ISSUE` is set:
-
-```bash
-node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
-  --issue {TRACKER_ISSUE} --stage ready-for-merge --json
-```
-
-Like `in-qa`, this stage is **off by default** and opted into per issue type in the workflow record; `reason: "stage-disabled"` is the expected outcome on a board without a merge-queue column. Non-blocking either way.
-
-Note the ordering: this fires on the QA gate, **before** Step 7. Step 7 is what moves the issue to `done`, and it runs while the PR is still open — merging happens later, by hand or via `/develop-next`. A board that wants a card to sit in a merge queue until the PR actually lands should leave `done` to a human, not turn this stage off.
+> **A clean gate no longer exits the loop on its own.** It hands to **5c**, which runs
+> `/review-pr` over the open PR and is the only thing that can exit to Step 7. The
+> `ready-for-merge` stage moved there with it: signalling merge-readiness the moment the gate
+> read PASS advertised a card as mergeable while the run could still loop back into `/qa-fix`.
 
 Log the result in the QA Iteration History section:
 
@@ -257,12 +251,17 @@ Log the result in the QA Iteration History section:
 **Gate Result**: {PASS / CONCERNS / FAIL / WAIVED}
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
+**PR Review**: {APPROVE / CONCERNS / REQUEST CHANGES / not reached — gate did not exit the loop}
 **Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5) / Escalating — loop not converging}
 ```
 
 The `**HIGH findings**` line is not decoration: it is the persisted sequence the **Convergence
 check** below compares across cycles, and the only place a resumed run can read the earlier counts
 back from. Write it on every cycle, including one that found none (`0`).
+
+`**PR Review**` follows the same rule for the same reason. A cycle whose gate never reached 5c
+writes `not reached — gate did not exit the loop`; it is never omitted. An omitted row is
+indistinguishable from a review that was skipped, and on resume the two must not be confused.
 
 **Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
@@ -631,6 +630,95 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fi
 
 ---
 
+### 5c. PR Conformance Review (shared)
+
+Perform this step **after a gate exits 5a with `PASS` or `WAIVED`, before Step 7**. A gate that
+routes to 5b never reaches it. This is the loop's **exit gate**: 5a and 5b can cycle without it,
+but nothing leaves the loop except through here.
+
+**Why this exists, and what is genuinely new.** `/qa-story` and `/qa-task` already dispatch the
+**code** reviewer every cycle, so 5c's code lens is duplication and is not the reason it runs. Its
+**conformance** lens has no counterpart anywhere in the pipeline: does the diff *cover* what the
+work item promised, did it drift outside that *scope*, is the artifact *trail* complete and honest,
+is the work item *consistent* with what shipped. A run can otherwise reach `accepted` with a
+complete-looking trail that does not hold — which is exactly how `/review-pr` itself shipped, and
+what its own dogfood run on PR #283 caught.
+
+**Why here and not earlier.** By the time a gate reads PASS the trail 5c audits already exists —
+implementation report, review report, QA report, gate. Only the DoD is missing, and Step 7 writes
+it. And an adverse verdict still has somewhere to go, because `/qa-fix` is live.
+
+#### Invoke the review
+
+```bash
+/review-pr --effort {medium|low} --comment
+```
+
+- **Target**: the open PR for this branch — pass nothing and `/review-pr` resolves it from the
+  current branch.
+- **`--effort`**: `medium` in standard mode, `low` in lite mode. Lite **degrades** the review; it
+  never skips it. See [`references/develop-pipeline-lite-mode.md`](develop-pipeline-lite-mode.md).
+- **`--comment` is passed explicitly and is not optional here.** `/review-pr` otherwise asks before
+  posting, and the pipeline cannot prompt. Steps 5–6 and 7 already comment on the PR, so this is
+  authorised ground rather than a new outward-facing capability.
+- `/review-pr` writes `{story|task}.{id}.pr-review.{n}.{name}.md` beside the work item. The grammar
+  is already defined in [`docs/standards/file-naming.md`](../../docs/standards/file-naming.md);
+  before this step existed, nothing emitted it.
+
+**`/review-pr` remains advisory and its contract is unchanged.** It writes no gate `.yml`, never
+submits a formal review, and never edits code. The orchestrator acts on a verdict the skill merely
+reports — that separation is what makes this wiring legitimate. Do not give 5c the power to write a
+gate.
+
+#### Verdict branching
+
+| Verdict | Action |
+| --- | --- |
+| 🚨 **REQUEST CHANGES** | Return to **5b** and run `/qa-fix` with the review's findings. **Increment the shared QA cycle counter** — a review-driven fix is a cycle like any other. |
+| ⚠️ **CONCERNS** | Record the findings in the QA Cycle entry and the implementation report. **Do not block.** Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
+| ✅ **APPROVE** | Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
+
+The 5-cycle budget is **shared**, not additional. A run whose review returns REQUEST CHANGES
+therefore consumes a cycle it would not have consumed before, and can reach Loop Escalation on a
+run that previously exited clean. That is the gate working, not a regression — and the escalation
+path already exists.
+
+> **REQUEST CHANGES re-enters 5b, not 5a.** The gate for this cycle has already been written and
+> read; what is wanted is a fix pass against the review's findings, after which the loop returns to
+> 5a for a fresh gate in the normal way. Entering at 5a instead would re-run QA against an unchanged
+> tree and re-derive the gate that just passed.
+
+#### Signal the `ready-for-merge` stage
+
+Only on **APPROVE** or **CONCERNS** — never on REQUEST CHANGES, which is still inside the loop.
+When `TRACKER=jira` and `TRACKER_ISSUE` is set:
+
+```bash
+node .agents/skills/{develop-story|develop-task|develop-bug}/references/jira-stage.js \
+  --issue {TRACKER_ISSUE} --stage ready-for-merge --json
+```
+
+Like `in-qa`, this stage is **off by default** and opted into per issue type in the workflow record;
+`reason: "stage-disabled"` is the expected outcome on a board without a merge-queue column.
+Non-blocking either way.
+
+Note the ordering: this fires once the review has cleared, still **before** Step 7. Step 7 is what
+moves the issue to `done`, and it runs while the PR is still open — merging happens later, by hand
+or via `/develop-next`. A board that wants a card to sit in a merge queue until the PR actually
+lands should leave `done` to a human, not turn this stage off.
+
+> **This block moved here from 5a's Outcome branching with task 77.** It used to fire the moment
+> the gate read PASS, which advertised a card as merge-ready while the run could still loop back
+> into `/qa-fix`. It now fires only once nothing can send the run backwards.
+
+#### Record the outcome
+
+Write the verdict into this cycle's `### QA Cycle {N}` entry on the `**PR Review**` row, and record
+the report path in the implementation report. Then emit the Step 7 transition block with
+`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate}, PR review {verdict})`.
+
+---
+
 ## Loop Escalation (shared)
 
 **Two triggers reach this block, and they share everything below except the heading and the
@@ -639,13 +727,20 @@ commit-and-HALT shape, one set of templates.
 
 | Trigger               | Entry heading           | Fires when                                                                                                             |
 | --------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Loop limit**        | `QA Loop Limit Reached` | 5 complete cycles finished without a clean PASS.                                                                        |
+| **Loop limit**        | `QA Loop Limit Reached` | 5 complete cycles finished without reaching Step 7 — whether because no gate read clean, or because 5c returned REQUEST CHANGES and sent the run back to 5b. |
 | **Convergence stall** | `QA Loop Not Converging` | The **Convergence check** above tripped — cycle ≥ 3, and the HIGH count failed to strictly decrease across two consecutive cycles. |
 
 Before halting, write a thorough escalation entry in the Issues Log. Use the template for the
 work item type, substituting the heading and opening sentence for the trigger that fired, and
 listing the cycles that actually ran (`{N}`, which is 5 on the loop limit and usually 3 on a
 convergence stall).
+
+**5c adds no third trigger.** A REQUEST CHANGES verdict routes back to 5b and consumes a cycle from
+the same 5-cycle budget, so a loop exhausted by review verdicts escalates through the **Loop limit**
+trigger above like any other. There is still exactly one escalation path. Where a cycle was consumed
+by a review rather than by a failing gate, say so in **What was attempted per cycle** — the final
+gate may read `PASS` while the run still escalated, and an entry that does not explain that reads as
+a contradiction to whoever picks it up.
 
 #### develop-story escalation template
 

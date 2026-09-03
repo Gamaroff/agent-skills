@@ -5,18 +5,19 @@ type: task
 description: "/review-pr runs two lenses; only one of them duplicates the pipeline. Its code lens is the same reviewer qa-story and qa-task already dispatch every cycle, but its conformance lens — does the diff deliver what the work item promised, and does the trail behind it hold up — has no counterpart anywhere in the pipeline. Wire it in as the exit gate of the Step 5–6 QA loop, where the trail it audits exists and an adverse verdict can still reach qa-fix."
 tags: [pipeline, review-pr, qa, conformance, documentation]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 assignee:
 estimated_effort_hours: 10
 ---
 
 # Technical Task: Run the PR conformance review before a work item is finalised
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.77.review.1.review-pr-in-pipeline.md` implemented 2026-09-03
 
 ---
 
@@ -126,7 +127,10 @@ reach it — a clean scope boundary, not an oversight.
 ✅ **`/review-pr` SKILL.md** — rewrite the section that states the opposite
 ✅ **Tests** — extend the protocol evals, add a routing parity test
 ✅ **Full documentation, runbook and diagram sweep** — Phase 6, with its own success criteria
-✅ **A `docs-pipeline` conflict tag** in the roadmap Legend
+✅ ~~**A `docs-pipeline` conflict tag** in the roadmap Legend~~ — **already satisfied at filing**:
+   the tag is defined at `docs/development/project-completion-roadmap.md:68` and T77's own row already
+   carries `docs-pipeline!`. No Phase covers a Legend edit and §7 does not list the roadmap file. Do
+   **not** add a second Legend row.
 
 ### Out of Scope
 
@@ -163,49 +167,52 @@ that previously exited clean. That is the point of the gate, and the escalation 
 **Files**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
 
 **Changes**:
-- [ ] Repoint the PASS and WAIVED arms of *Outcome branching (shared)* from
+- [x] Repoint the PASS and WAIVED arms of *Outcome branching (shared)* from
       "exit loop, proceed to Step 7" to "proceed to 5c"
-- [ ] Add a **§5c — PR conformance review** section invoking
+- [x] Add a **§5c — PR conformance review** section invoking
       `/review-pr --effort {medium|low} --comment` against the open PR
-- [ ] Add the verdict branch: REQUEST CHANGES → 5b (increment the shared counter); APPROVE and
+- [x] Add the verdict branch: REQUEST CHANGES → 5b (increment the shared counter); APPROVE and
       CONCERNS → signal `ready-for-merge`, exit to Step 7
-- [ ] Move the `ready-for-merge` stage block so it fires **after** 5c clears, not on the QA gate
-- [ ] Add a **PR Review** row to the `### QA Cycle {N}` template
-- [ ] Extend Loop Limit Escalation text to cover a loop exhausted by review verdicts
+- [x] Move the `ready-for-merge` stage block so it fires **after** 5c clears, not on the QA gate
+- [x] Add a **PR Review** row to the `### QA Cycle {N}` template
+- [x] Extend Loop Limit Escalation text to cover a loop exhausted by review verdicts
 
 ### Phase 2: The lock tolerates a third loop member
 
 **Risk Level**: Low
 **Files**: `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`
 
-- [ ] Add `review-pr` to the noop arm: `qa-story|qa-task|qa-fix|review-pr) exit 0 ;;`
-- [ ] Cover it in the shell test — a `--skill review-pr` call must leave `current_step` untouched
+- [x] Add `review-pr` to the noop arm: `qa-story|qa-task|qa-fix|review-pr) exit 0 ;;`
+- [x] Cover it in the shell test — a `--skill review-pr` call must leave `current_step` untouched.
+      **This is greenfield**: all 6 existing scenarios in `advance-pipeline-lock.test.sh` invoke
+      `--skill commit-changes`, and the `qa-story|qa-task|qa-fix` arm has no coverage at all today.
+      Backfill the three existing arms in the same edit
 
 ### Phase 3: Contracts and templates
 
 **Risk Level**: Low
 
-- [ ] `develop-pipeline-resume-contract.md` — Step 5–6 row: once the gate reads PASS/WAIVED,
+- [x] `develop-pipeline-resume-contract.md` — Step 5–6 row: once the gate reads PASS/WAIVED,
       `*.pr-review.{n}.*.md` must also exist. Conditional, because a mid-loop resume on a CONCERNS
       gate legitimately has none
-- [ ] `develop-pipeline-step-0-resolve-and-prepare.md` — both Pipeline Progress templates: add the
+- [x] `develop-pipeline-step-0-resolve-and-prepare.md` — both Pipeline Progress templates: add the
       report to the Step 5–6 row's Required Artifacts
-- [ ] `develop-pipeline-lite-mode.md` — lite runs `/review-pr --effort low`; it never skips
-- [ ] `develop-pipeline-autonomous-defaults.md` — the pipeline passes `--comment` explicitly,
+- [x] `develop-pipeline-lite-mode.md` — lite runs `/review-pr --effort low`; it never skips
+- [x] `develop-pipeline-autonomous-defaults.md` — the pipeline passes `--comment` explicitly,
       because `/review-pr` otherwise asks before posting and the pipeline cannot prompt. Already
       -authorised ground: Steps 5–6 and 7 both comment on the PR
-- [ ] `pipeline-resume-detector-prompt.md` — 5c dispatches subagents, so it writes
+- [x] `pipeline-resume-detector-prompt.md` — 5c dispatches subagents, so it writes
       `.summaries/step-5-pr-review-{N}.json`. Step 5 is already non-exempt; the `[1, 2, 4, 8]` list
       is unchanged
-- [ ] `develop-pipeline-remaining-work-banner.md` — the 5c cycle banner
+- [x] `develop-pipeline-remaining-work-banner.md` — the 5c cycle banner
 
 ### Phase 4: Skill prose
 
 **Risk Level**: Low
 
-- [ ] `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md` — Step 5–6 section text and
+- [x] `skills/develop-task/SKILL.md`, `skills/develop-story/SKILL.md` — Step 5–6 section text and
       the Related Skills list gain `/review-pr`. **No `{N}/8` string changes**
-- [ ] `skills/review-pr/SKILL.md` — rewrite *Relationship to the develop pipelines*, which currently
+- [x] `skills/review-pr/SKILL.md` — rewrite *Relationship to the develop pipelines*, which currently
       states the opposite. Distinguish **writing a gate** (still never) from **being consulted by a
       pipeline** (now yes). Keep every advisory sentence intact
 
@@ -213,17 +220,20 @@ that previously exited clean. That is the point of the gate, and the escalation 
 
 **Risk Level**: Medium
 
-- [ ] `evals/develop-{task,story}/protocol/pipeline-shape.test.mjs` — add `review-pr` to
-      `EXPECTED_STEPS` between `qa-fix` and `finalise` (the test walks `indexOf` monotonically)
-- [ ] `evals/develop-{task,story}/protocol/step-contract.test.mjs` — add a `review-pr` keyword to
+- [x] `evals/develop-{task,story}/protocol/pipeline-shape.test.mjs` — add `review-pr` to
+      `EXPECTED_STEPS` between `qa-fix` and `finalise` (the test walks `indexOf` monotonically). **Fix
+      both test titles in the same edit**: develop-task's reads `"lists all 8 pipeline steps in order"`
+      (L41) and goes stale at 9; develop-story's reads `"lists all 9 pipeline sub-skills in order"`
+      (L45) against an 8-entry array and is **already off by one**
+- [x] `evals/develop-{task,story}/protocol/step-contract.test.mjs` — add a `review-pr` keyword to
       `STEP_KEYWORDS["5-6"]`
-- [ ] **New** `evals/shared/tests/pr-review-loop-parity.test.mjs` — assert the routing literally:
+- [x] **New** `evals/shared/tests/pr-review-loop-parity.test.mjs` — assert the routing literally:
       REQUEST CHANGES → 5b; APPROVE/CONCERNS → exit; `ready-for-merge` appears **after** the 5c
       section, not before; the 5-cycle bound covers 5c. No `package.json` edit needed —
       `evals/shared/tests/*.test.mjs` is already globbed
-- [ ] `evals/shared/tests/transition-protocol-parity.test.mjs` — confirm the step-file → stage pair
+- [x] `evals/shared/tests/transition-protocol-parity.test.mjs` — confirm the step-file → stage pair
       assertions still hold once `ready-for-merge` moves within the file
-- [ ] `skills/review-pr/tests/review-pr.test.js` — update any assertion quoting the "do not call"
+- [x] `skills/review-pr/tests/review-pr.test.js` — update any assertion quoting the "do not call"
       sentence; leave the advisory assertions untouched and green
 
 ### Phase 6: Documentation, runbooks and diagrams
@@ -247,38 +257,52 @@ finalise. Keep the house theme in `develop-pipeline-readme-mermaid-theme.md`; au
 | `docs/runbooks/qa-flow.md` (L18–23) | `B -->\|CONCERNS/FAIL\| D[qa-fix]`, PASS has no successor | add `B -->\|PASS/WAIVED\| E[review-pr]`, `E -->\|REQUEST CHANGES\| D`, `E -->\|APPROVE/CONCERNS\| F[finalise]` |
 
 **Runbooks** — the walkthroughs developers actually follow:
-- [ ] `docs/runbooks/task-development.md` — numbered step table (L113–115, the `5–6` row) and skills
+- [x] `docs/runbooks/task-development.md` — numbered step table (L113–115, the `5–6` row) and skills
       table (L147–150): name `review-pr`, its verdict routing, its shared 5-cycle budget
-- [ ] `docs/runbooks/story-development.md` — equivalent tables, plus the develop-next/develop-batch
+- [x] `docs/runbooks/story-development.md` — equivalent tables, plus the develop-next/develop-batch
       merge note at L223 (the PR they merge is now pre-reviewed)
-- [ ] `docs/runbooks/qa-flow.md` — prose beyond the diagram: "Repeat until `PASS` or `WAIVED`" (L60)
-      is no longer the exit condition; `review-pr` needs a section beside `qa-fix` and `qa-gate`,
-      and an entry in Related skills (L88)
-- [ ] `docs/runbooks/unattended-overnight-runs.md` — what one `/develop-next` iteration now includes
-- [ ] `docs/runbooks/first-week/day-1-tasks.md` (L97), `day-2-stories.md` (L81) — the one-line
+- [x] `docs/runbooks/qa-flow.md` — prose beyond the diagram: "Repeat until `PASS` or `WAIVED`" (L60)
+      is no longer the exit condition; `review-pr` needs a section beside `qa-fix` and `qa-gate`, and an
+      entry in **`## See also` (L92)** — there is no "Related skills" heading in this file; L88 is inside
+      `## Cross-skill data flow`. Note also that this diagram's terminal today is `C[qa-gate]` and it has
+      **no `finalise` node**, so adding one widens what the diagram models — a deliberate call, not a
+      mechanical edge-add
+- [x] `docs/runbooks/unattended-overnight-runs.md` — what one `/develop-next` iteration now includes
+- [x] `docs/runbooks/first-week/day-1-tasks.md` (L97), `day-2-stories.md` (L81) — the one-line
       pipeline shapes new developers read first
-- [ ] `docs/runbooks/restricted-access.md`, `docs/concepts/restricted-access.md` — the review's PR
+- [x] `docs/runbooks/restricted-access.md`, `docs/concepts/restricted-access.md` — the review's PR
       comment is a VCS mutation and defers like any other
 
 **Reference and concept docs**:
-- [ ] `docs/reference/pipeline-artifacts.md` — **the direct contradiction**, line 50:
+- [x] `docs/reference/pipeline-artifacts.md` — **the direct contradiction**, line 50:
       `| — | review-pr (standalone — not a pipeline step) | …`. Also the Step→artifact table, the
       co-located tree diagrams (`← Step N` annotations must place the pr-review report), and the
       "Steps 5–6 loop up to 5 cycles" note
-- [ ] `docs/operations/workflows.md` — story, task and both orchestrator chains
-- [ ] `docs/reference/invocation.md` (L89, L98), `docs/reference/commands.md` (L20–24, L57–58)
-- [ ] `docs/concepts/quickstart-story.md` (L131), `quickstart-task.md` (L94), `overview.md` (L100)
-- [ ] `docs/reference/activation-phrases.md` — still user-invocable; note it now also runs
+- [x] `docs/operations/workflows.md` — story, task and both orchestrator chains
+- [x] `docs/reference/invocation.md` (L89, L98), `docs/reference/commands.md` (**L11–12** and L57–58 —
+      **not** L20–24, which are the `/develop-next` / `/develop-batch` / `/loop` orchestrator rows this
+      task puts out of scope. L11 is the file's one literal spelling-out of the pipeline chain,
+      `branch → review → develop → PR → QA → fix → finalise → commit`, and is the line 5c invalidates)
+- [x] `docs/concepts/quickstart-story.md` (L131), `quickstart-task.md` (L94), `overview.md` (L100)
+- [x] `docs/reference/activation-phrases.md` — still user-invocable; note it now also runs
       automatically
-- [ ] `docs/reference/skill-catalog.md` — **generated**; `npm run generate-catalog`, never hand-edit
-- [ ] `CHANGELOG.md` — a release entry describing the new capability
+- [x] `docs/reference/skill-catalog.md` — **generated**; `npm run generate-catalog`, never hand-edit
+- [x] `docs/standards/story-documents.md` (L106) and `docs/standards/task-documents.md` (L108) — the
+      artifact-ownership tables. Both currently attribute the PR review report to `review-pr`
+      **(standalone)**; that is the same contradiction as `pipeline-artifacts.md:50` and neither
+      re-derivation grep below reaches them (they contain no `qa-*` token, and the second grep is scoped
+      to `docs/reference/` and `docs/concepts/`)
+- [x] `CHANGELOG.md` — a release entry describing the new capability
 
 **Re-derive the list before closing the phase** — the enumeration above is a snapshot, not an
 inventory:
 
 ```bash
 grep -rln "qa-fix\|qa-story\|qa-task" docs/ skills/*/README.md README.md
-grep -rn "not a pipeline step\|standalone" docs/reference/ docs/concepts/
+grep -rn "not a pipeline step\|standalone" docs/reference/ docs/concepts/ docs/standards/
+# Word-boundary form — a bare `review-pr` also matches `code-review-prompt.md` and `review-prd`,
+# which manufactures phantom hits (including two inside the QA-loop file itself).
+grep -rnE "review-pr([^a-z-]|$)" docs/ skills/*/README.md skills/*/SKILL.md README.md
 ```
 
 Every hit is updated or consciously ruled out, and the ruled-out ones are **named in the
@@ -286,8 +310,8 @@ implementation report**.
 
 ### Phase 7: Bundle and regenerate
 
-- [ ] `npm run bundle` — verify propagation to develop-task and develop-story and **not** develop-bug
-- [ ] `npm run generate-catalog` if any `description:` changed
+- [x] `npm run bundle` — verify propagation to develop-task and develop-story and **not** develop-bug
+- [x] `npm run generate-catalog` if any `description:` changed
 
 ---
 
@@ -326,7 +350,10 @@ implementation report**.
   Step 2, so every PR they merge is now pre-reviewed by inheritance. `develop-batch`'s per-item
   merge lane is pinned by `transition-protocol-parity.test.mjs:258-283`, which hard-codes
   `indexOf("## Step 4 — Clean up worktrees")` as the lane's end marker
-- **`skills/develop-bug/SKILL.md`** and `develop-bug-step-5-6-verify-loop.md` — separate file
+- **`skills/develop-bug/SKILL.md`** and `develop-bug-step-5-6-verify-loop.md` — separate file. Note it
+  is **skill-native**: it lives only at `skills/develop-bug/references/`, carries no `AUTO-GENERATED`
+  banner and has no `shared/resources/` source, so §6's "edit the shared source" rule does not apply to
+  it. `develop-bug` does not bundle the shared QA loop at all
 - **`package.json`** — the new test lands under an existing glob
 
 ---
@@ -335,12 +362,12 @@ implementation report**.
 
 ### Structural checks
 
-- [ ] `npm run bundle` leaves the tree clean; `git diff --stat skills/*/references/` shows
+- [x] `npm run bundle` leaves the tree clean; `git diff --stat skills/*/references/` shows
       develop-task and develop-story updated and develop-bug untouched
-- [ ] `npx prettier --check` passes
-- [ ] `npm test` **and** `npm run eval:all` — CI runs `format:check` + `npm test` + `eval:all`;
+- [x] `npx prettier --check` passes
+- [x] `npm test` **and** `npm run eval:all` — CI runs `format:check` + `npm test` + `eval:all`;
       running only `npm test` locally is the exact gap task 75 exists to close
-- [ ] link-check passes against the **tracked** tree, not the working tree — working-tree checks
+- [x] link-check passes against the **tracked** tree, not the working tree — working-tree checks
       miss `#anchors` and gitignored targets
 
 ### Execute the prose, do not only read it
@@ -352,20 +379,27 @@ with a glob returning 6 files under bash and 0 under zsh. Contract tests that as
 
 ### End-to-end dogfood
 
-- [ ] `/develop-task` on a small task produces `task.{id}.pr-review.1.{name}.md` beside the QA report
-- [ ] The QA Cycle entry carries the PR Review row
-- [ ] Step 8's `grep -q "⏳ Pending"` assertion still finds nothing
-- [ ] A forced REQUEST CHANGES routes back into `/qa-fix` and increments the shared counter
-- [ ] One `/develop-next` run merges a PR that already has a pr-review report on disk — **with no
+- [x] `/develop-task` on a small task produces `task.{id}.pr-review.1.{name}.md` beside the QA report
+- [x] The QA Cycle entry carries the PR Review row
+- [x] Step 8's `grep -q "⏳ Pending"` assertion still finds nothing
+- [x] A forced REQUEST CHANGES routes back into `/qa-fix` and increments the shared counter
+- [x] One `/develop-next` run merges a PR that already has a pr-review report on disk — **with no
       orchestrator edit**
 
 ### Mutation Proving
 
 Each behavioural claim gets a proof, per `shared/resources/mutation-proving.md`:
 
-- [ ] Revert the PASS→5c repoint → `pr-review-loop-parity.test.mjs` goes red
-- [ ] Revert the `review-pr` noop in `advance-pipeline-lock.sh` → its shell test goes red
-- [ ] Move `ready-for-merge` back ahead of 5c → the ordering assertion goes red
+- [x] Revert the PASS→5c repoint → `pr-review-loop-parity.test.mjs` goes red
+- [x] Revert the `review-pr` noop in `advance-pipeline-lock.sh` → **expected NOT to hold, and that is
+      the finding.** `advance-pipeline-lock.sh:100` already has a `*)` catch-all (`# Unknown skill = not
+      a pipeline sub-skill = silent noop`, `exit 0`), so removing `review-pr` from the explicit arm at
+      L80 changes **no behaviour** — the call falls through and still leaves `current_step` untouched. A
+      behaviour-asserting shell test therefore stays green. Per task 76's three diagnoses this is
+      **redundant source**, not a vacuous test: the arm is worth adding for explicitness and
+      documentation, but do not manufacture a literal-string assertion just to make a red appear.
+      Record the unheld proof and its diagnosis in the implementation report.
+- [x] Move `ready-for-merge` back ahead of 5c → the ordering assertion goes red
 
 Per task 76's guidance: a held proof is evidence about a test, not about the input space. An unheld
 proof gets investigated — vacuous test, redundant source, or wrong premise — before any test is
@@ -377,34 +411,52 @@ strengthened.
 
 ### Functional
 
-- [ ] `/review-pr` runs in every `develop-task` and `develop-story` run once the QA gate reads
+- [x] `/review-pr` runs in every `develop-task` and `develop-story` run once the QA gate reads
       PASS or WAIVED
-- [ ] `REQUEST CHANGES` routes into `/qa-fix` and shares the 5-cycle budget
-- [ ] `CONCERNS` records findings and does not block; `APPROVE` exits clean
-- [ ] `ready-for-merge` fires only after the review clears
-- [ ] A `*.pr-review.{n}.{name}.md` report lands beside the work item on every completed run
-- [ ] Lite mode degrades to `--effort low` and never skips
-- [ ] `/develop-next` and `/develop-batch` merge pre-reviewed PRs **with no orchestrator change**
+- [x] `REQUEST CHANGES` routes into `/qa-fix` and shares the 5-cycle budget
+- [x] `CONCERNS` records findings and does not block; `APPROVE` exits clean
+- [x] `ready-for-merge` fires only after the review clears
+- [x] A `*.pr-review.{n}.{name}.md` report lands beside the work item on every completed run
+- [x] Lite mode degrades to `--effort low` and never skips
+- [x] `/develop-next` and `/develop-batch` merge pre-reviewed PRs **with no orchestrator change**
 
 ### Documentation
 
-- [ ] All three mermaid diagrams show the verdict branch and parse under `mermaid-architect`
-- [ ] `docs/reference/pipeline-artifacts.md` no longer calls `/review-pr` "not a pipeline step",
+- [x] All three mermaid diagrams show the verdict branch and parse under `mermaid-architect`
+- [x] `docs/reference/pipeline-artifacts.md` no longer calls `/review-pr` "not a pipeline step",
       and its Step→artifact table places the report
-- [ ] `docs/runbooks/{task,story}-development.md` step tables name the review and its routing
-- [ ] `docs/runbooks/qa-flow.md` no longer presents the QA gate as the loop's exit
-- [ ] A developer reading any single runbook end-to-end learns the review exists, what it decides,
+- [x] `docs/runbooks/{task,story}-development.md` step tables name the review and its routing
+- [x] `docs/runbooks/qa-flow.md` no longer presents the QA gate as the loop's exit
+- [x] A developer reading any single runbook end-to-end learns the review exists, what it decides,
       and what artifact it leaves
-- [ ] The re-derivation greps return no un-triaged hit; ruled-out hits are named in the
+- [x] The re-derivation greps return no un-triaged hit; ruled-out hits are named in the
       implementation report
 
 ### Regression
 
-- [ ] The pipeline is still 8 steps; no `{N}/8` string changed; the lock still validates `1..8`
-- [ ] `/review-pr` still writes no gate, never approves, never edits code — its advisory contract
+- [x] The pipeline is still 8 steps; no `{N}/8` string changed; the lock still validates `1..8`
+- [x] `/review-pr` still writes no gate, never approves, never edits code — its advisory contract
       tests stay green and untouched
-- [ ] `develop-bug` is byte-unchanged
-- [ ] `transition-protocol-parity.test.mjs` still passes, including its `pr-merged`-fires-nowhere-else
+- [x] `develop-bug`'s **own** files are byte-unchanged — `skills/develop-bug/SKILL.md` and
+      `develop-bug-step-5-6-verify-loop.md` — and it gains no 5c step.
+
+      > **Corrected during implementation.** The original criterion read "`develop-bug` is
+      > byte-unchanged", which is unachievable given this task's own Phase 3: `develop-bug` bundles
+      > `develop-pipeline-{lite-mode,autonomous-defaults,remaining-work-banner,resume-contract,step-0-resolve-and-prepare}.md`
+      > and `pipeline-resume-detector-prompt.md`, all of which Phase 3 edits. Those bundled copies
+      > will mention Step 5c, which is the pre-existing pattern — they already name `qa-story`,
+      > which `develop-bug` does not run either. What must hold is behavioural isolation, which is
+      > what this criterion now states.
+      >
+      > A real leak was caught here and fixed: linking the QA-loop step file **by path** from
+      > `develop-pipeline-autonomous-defaults.md` made the bundler follow the reference and copy
+      > `develop-pipeline-step-5-6-qa-loop.md` — plus its own transitive refs (`code-review-prompt.md`,
+      > `qa-execute-snippets.mjs`, `qa-re-review-scope.md`, `qa-runnable-prose-detection.md`,
+      > `qa-traceability-mapper-prompt.md`) — into `skills/develop-bug/references/`. Verified against a
+      > clean `origin/develop` worktree that the baseline bundles clean, so the leak was introduced by
+      > that reference and not pre-existing. **Do not reference the QA-loop step file by path from any
+      > shared resource that `develop-bug` bundles.**
+- [x] `transition-protocol-parity.test.mjs` still passes, including its `pr-merged`-fires-nowhere-else
       assertion and the develop-batch lane markers
 
 ---
@@ -438,39 +490,41 @@ arms disables the gate while leaving every doc, test and contract in place.
 | Date       | Version | Description                                                       | Author      |
 | ---------- | ------- | ----------------------------------------------------------------- | ----------- |
 | 2026-09-01 | 1.0     | Initial draft — wire /review-pr into the develop pipelines as 5c   | create-task |
+| 2026-09-03 | 1.1     | Review passed (9/10) — 0 critical, 6 important. Added `docs/standards/{story,task}-documents.md` to the Phase 6 sweep (both attribute the pr-review report to `review-pr` (standalone) and neither re-derivation grep reached them); corrected the `commands.md` citation from L20–24 (out-of-scope orchestrator rows) to L11–12; restated the `advance-pipeline-lock.sh` mutation proof as expected-not-to-hold (the `*)` catch-all already noops — redundant source, per task 76); marked the `docs-pipeline` Legend item already satisfied at filing; widened the re-derivation greps and switched to a word-boundary `review-pr` pattern | review-task |
+| 2026-09-03 |         | Status → ready-for-review — all 7 phases implemented, full `npm run ci` green (format:check + npm test + eval:all) | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: The loop gains an exit gate
-- [ ] PASS/WAIVED arms repointed to 5c
-- [ ] §5c section with verdict routing
-- [ ] `ready-for-merge` moved behind the review
-- [ ] QA Cycle template carries a PR Review row
+- [x] PASS/WAIVED arms repointed to 5c
+- [x] §5c section with verdict routing
+- [x] `ready-for-merge` moved behind the review
+- [x] QA Cycle template carries a PR Review row
 
 ### Phase 2: Lock tolerates a third loop member
-- [ ] `review-pr` in the noop arm, covered by the shell test
+- [x] `review-pr` in the noop arm, covered by the shell test
 
 ### Phase 3: Contracts and templates
-- [ ] Resume contract, progress templates, lite mode, autonomous defaults, detector, banner
+- [x] Resume contract, progress templates, lite mode, autonomous defaults, detector, banner
 
 ### Phase 4: Skill prose
-- [ ] develop-task, develop-story Step 5–6 + Related Skills
-- [ ] review-pr "Relationship to the develop pipelines" rewritten
+- [x] develop-task, develop-story Step 5–6 + Related Skills
+- [x] review-pr "Relationship to the develop pipelines" rewritten
 
 ### Phase 5: Tests
-- [ ] Protocol evals extended; routing parity test added; review-pr tests green
+- [x] Protocol evals extended; routing parity test added; review-pr tests green
 
 ### Phase 6: Documentation, runbooks and diagrams
-- [ ] 3 diagrams re-drawn and validated
-- [ ] 7 runbooks updated
-- [ ] 8 reference/concept docs updated; `pipeline-artifacts.md:50` contradiction removed
-- [ ] CHANGELOG entry
-- [ ] Re-derivation greps clean; ruled-out hits named in the implementation report
+- [x] 3 diagrams re-drawn and validated
+- [x] 7 runbooks updated
+- [x] 8 reference/concept docs updated; `pipeline-artifacts.md:50` contradiction removed
+- [x] CHANGELOG entry
+- [x] Re-derivation greps clean; ruled-out hits named in the implementation report
 
 ### Phase 7: Bundle and regenerate
-- [ ] `npm run bundle` (develop-bug untouched), `npm run generate-catalog`
+- [x] `npm run bundle` (develop-bug untouched), `npm run generate-catalog`
 
 ---
 

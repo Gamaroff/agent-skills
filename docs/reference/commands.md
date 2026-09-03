@@ -8,7 +8,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 
 | Command | What it does | Reference |
 |---|---|---|
-| `/develop-story <path>` | Full story lifecycle: branch → review → develop → PR → QA → fix → finalise → commit | [Story Development](../runbooks/story-development.md) |
+| `/develop-story <path>` | Full story lifecycle: branch → review → develop → PR → QA → fix → PR review (5c) → finalise → commit | [Story Development](../runbooks/story-development.md) |
 | `/develop-task <path>` | Full task lifecycle (no epic) | [Task Development](../runbooks/task-development.md) |
 | `/develop-bug <path>` | Full bug-fix lifecycle: branch → review-bug → investigate & fix → PR → verify loop → close | [Bug Fix Runbook](../runbooks/bug-fix.md), [`develop-bug` README](../../skills/develop-bug/README.md) |
 | `/develop <path>` | Just the implementation loop — used inside the orchestrators | [`develop` SKILL.md](../../skills/develop/SKILL.md) |
@@ -54,7 +54,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/review-bug --validate <path>` | Non-interactive GO/NO-GO fix-readiness score (the gate `develop-bug` Step 2 runs) | [`review-bug`](../../skills/review-bug/SKILL.md) |
 | `/review-code` | Adversarial diff review of the working tree or a PR — advisory by default | [`review-code`](../../skills/review-code/SKILL.md) |
 | `/review-code --comment` / `--fix` | Post findings as inline PR comments, or apply them to the working tree | [`review-code`](../../skills/review-code/SKILL.md) |
-| `/review-pr [PR\|branch]` | Review a PR against its work item and pipeline artifacts — conformance + code, advisory | [`review-pr`](../../skills/review-pr/SKILL.md) |
+| `/review-pr [PR\|branch]` | Review a PR against its work item and pipeline artifacts — conformance + code, advisory. Also runs automatically as **Step 5c**, the exit gate of the develop pipelines' QA loop | [`review-pr`](../../skills/review-pr/SKILL.md) |
 | `/review-pr --comment` / `--no-code` / `--no-docs` | Post one summary PR comment, or run a single lens | [`review-pr`](../../skills/review-pr/SKILL.md) |
 | `/double-check [target]` | Adversarial audit of the work just produced — disk state, negative constraints, clean-room re-derivation, requirement coverage | [`double-check`](../../skills/double-check/SKILL.md) |
 | `/double-check --report-only` / `--fresh-eyes` | Report defects without correcting, or run the non-empirical gates in a subagent with no reasoning trace | [`double-check`](../../skills/double-check/SKILL.md) |

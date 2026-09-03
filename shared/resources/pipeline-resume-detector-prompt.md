@@ -109,7 +109,9 @@ For each file found:
 
 **Summary-exempt steps** (never dispatch Explore subagents — absence is expected, never a gap):
 
-Exemption list: `[1, 2, 4, 8]`
+Exemption list: `[1, 2, 4, 8]` — **unchanged by Step 5c.** 5c is a sub-step of Step 5, which is
+already non-exempt, and its subagents write under the same `step-5-*` shape (e.g.
+`step-5-pr-review-{N}.json`). The list is keyed by whole integer step, so no sub-step can alter it.
 - Step 1 (create-branch): no subagent
 - Step 2 (review-task / review-story): no subagent
 - Step 4 (create-pr): no subagent

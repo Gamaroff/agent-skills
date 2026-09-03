@@ -220,7 +220,7 @@ Three things to know if you pick it:
 
 1. **Q1 and Q2 must agree.** Basing a story on `epic/178.feature-ui` and targeting `develop` produces a PR whose diff includes every earlier story in the epic — the base is in `develop`'s future, not its past. The pipeline re-asks rather than proceeding.
 2. **Selecting the option does not update the epic document.** Record `branch_model:` / `integration_branch:` in the epic's frontmatter so later stories get the recommendation instead of relying on whoever runs them next remembering.
-3. **Nothing promotes the integration branch.** `develop-next` / `develop-batch` merge each story PR into the base the PR declares, but the final `epic/{N}.{slug}` → `develop` PR is raised by hand. Every roadmap row ticked ≠ the epic has landed.
+3. **Nothing promotes the integration branch.** `develop-next` / `develop-batch` merge each story PR into the base the PR declares, but the final `epic/{N}.{slug}` → `develop` PR is raised by hand. Every roadmap row ticked ≠ the epic has landed. (The PRs they merge are pre-reviewed: both orchestrators delegate to `/develop-story` / `/develop-task`, whose Step 5c ran `review-pr` before the run ever reached the merge.)
 
 > `epic/{N}.{name}` (integration branch) is **not** `feature/epic.{N}.{name}` — an ordinary short-lived branch for editing the epic *document*, which `/review-epic` creates.
 
@@ -232,7 +232,7 @@ Three things to know if you pick it:
 | 2    | `review-story`        | Runs the interactive review (skipped if the story was reviewed recently and is still `ready-for-development`).                                                      |
 | 3    | `develop`             | Implements the story. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → DoD check.                                                                   |
 | 4    | `create-pr`           | Pushes the branch, opens a PR with auto-generated description. `--base` is the Q2 answer, pre-supplied from Phase 0.                                                |
-| 5–6  | `qa-story` → `qa-fix` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). If `CONCERNS`/`FAIL`, `qa-fix` runs. Up to 5 cycles.                                      |
+| 5–6  | `qa-story` → `qa-fix` → `review-pr` | QA review produces a gate file (`PASS` / `CONCERNS` / `FAIL` / `WAIVED`). If `CONCERNS`/`FAIL`, `qa-fix` runs. Up to 5 cycles. **Step 5c is the loop's exit gate**: a `PASS`/`WAIVED` gate hands to `review-pr`, which reviews the PR against the story. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `story.{E}.{S}.pr-review.{n}.{name}.md`. |
 | 7    | `finalise`            | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Runs full side-effects even in lite mode.** |
 | 8    | `commit-changes`      | Stages and commits any final artifacts (implementation report, DoD summary, status updates).                                                                        |
 
@@ -269,7 +269,8 @@ What the orchestrator invokes internally, top-down.
 | [`develop`](../../skills/develop/SKILL.md)               | Actual implementation loop (plan → code → test → DoD).             |
 | [`create-pr`](../../skills/create-pr/SKILL.md)           | Pushes branch, opens PR with `--base` = the Q2 answer.             |
 | [`qa-story`](../../skills/qa-story/SKILL.md)             | Produces QA gate file. Dev skills must not edit gate files.        |
-| [`qa-fix`](../../skills/qa-fix/SKILL.md)                 | Applies fixes for `CONCERNS`/`FAIL` gates. Up to 5 cycles.         |
+| [`qa-fix`](../../skills/qa-fix/SKILL.md)                 | Applies fixes for `CONCERNS`/`FAIL` gates, and for `review-pr`'s `REQUEST CHANGES`. Up to 5 cycles. |
+| [`review-pr`](../../skills/review-pr/SKILL.md)           | Step 5c — the QA loop's exit gate. Reviews the PR against the story (conformance + code). Advisory: writes no gate file; the orchestrator acts on its verdict. |
 | [`finalise`](../../skills/finalise/SKILL.md)             | DoD check, PR comment, tracker comment, board update.              |
 | [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of artifacts and status updates.                      |
 

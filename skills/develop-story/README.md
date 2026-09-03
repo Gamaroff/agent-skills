@@ -117,8 +117,11 @@ flowchart TD
     S5map --> S5
     S5[Step 5: qa-story<br/>traceability_matrix arg if mapper ran<br/>lite directive if PIPELINE_MODE=lite]
     S5 --> S5gate{Gate result}
-    S5gate -- PASS no top_issues --> S7
+    S5gate -- PASS / WAIVED --> S5c[Step 5c: review-pr<br/>--effort medium, low if lite<br/>--comment]
     S5gate -- CONCERNS / FAIL --> S6[Step 6: qa-fix]
+    S5c --> S5cv{Verdict}
+    S5cv -- REQUEST CHANGES --> S6
+    S5cv -- APPROVE / CONCERNS --> S5cm[signal ready-for-merge] --> S7
     S6 --> S6chg{Code changed?}
     S6chg -- no --> HALTNOFIX[HALT: qa-fix made no changes]
     S6chg -- yes --> S6commit[/commit-changes + push/]
