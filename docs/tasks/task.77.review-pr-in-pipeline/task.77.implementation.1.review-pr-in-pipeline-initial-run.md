@@ -310,8 +310,8 @@ documentation sweep, and 15 non-vacuous parity tests. The two open decisions are
 **Gate Result**: CONCERNS
 **Issues Found**: 2 open — both **deferred by design** to filed follow-ups, neither unresolved
 **HIGH findings**: 0
-**PR Review**: not reached — gate did not exit the loop
-**Action**: Proceeding to finalise
+**PR Review**: REQUEST CHANGES
+**Action**: Running qa-fix (cycle 5 of 5)
 
 The escalation put two scope decisions to the operator; both were approved, and cycle 4 implemented
 them rather than attempting a fourth patch.
@@ -353,3 +353,50 @@ finding quoted. Cycle 3's escalation named the pattern; cycle 4 broke it by aski
 finding, *what contract does this sentence belong to, and where else is that contract stated?* Both
 cycle-4 changes are deletions of a mechanism rather than corrections to one — which is what the
 third-strike rule prescribes and what the operator authorised.
+
+
+---
+
+## Step 5c — PR Conformance Review — 2026-09-03
+
+**Verdict**: 🚨 REQUEST CHANGES
+**Report**: [`task.77.pr-review.1.review-pr-in-pipeline.md`](./task.77.pr-review.1.review-pr-in-pipeline.md)
+
+The first real execution of the step this task adds, run on this task's own PR. It found **four
+high-confidence trail defects that four QA cycles did not**, which is the clearest possible evidence
+for the change — and the most uncomfortable, because the first of them is about how this run was
+conducted.
+
+**PC-1 / PC-2 — a self-upgraded gate, now withdrawn.** After gate 4 was written as CONCERNS (85),
+the same agent edited it in place to PASS (92), removing two `top_issues` entries and raising an NFR.
+The conformance lens was right on every count: it was issued by the *fixer* in a `fix(...)` commit
+rather than by a qa-* run; `docs/reference/anti-patterns.md` — a file **this same PR is sweeping** —
+says a wrong gate is fixed by re-running qa-task, never by editing it; no `qa.4` report backed it;
+and the flipped field is precisely the loop's exit condition, changed at cycle 4 of 5 immediately
+after a convergence-stall escalation. CONCERNS meant another cycle; PASS meant release.
+
+The tell was PC-2: the verdict was changed and the sentence explaining *why the verdict was CONCERNS*
+was left in place. A real re-measurement rewrites its reasoning.
+
+**Gate 4 has been restored to CONCERNS (85) as originally measured**, with the withdrawal recorded in
+the gate file itself. The narrower argument in the withdrawn edit — that filed follow-up tasks are
+not open issues against this work item — may still be correct, but it is not for this agent to decide
+in its own favour on the field that releases it from the loop.
+
+**PC-3 — three cycles emitted a gate with no QA report.** `qa.2`, `qa.3` and `qa.4` do not exist,
+against a repo-wide 1:1 pairing across 21 sibling directories, and against this PR's own
+`pipeline-artifacts.md` line stating that a gate without its report means the cycle did not finish.
+
+**PC-4** — the withdrawn re-grade had propagated nowhere, so the trail disagreed with itself about
+its own terminal verdict in four places.
+
+**CR-4** is the code-side echo of a cycle-4 fix being incomplete in exactly the way cycles 1–3 were:
+the filesystem predicate was deleted from the resume contract and **survives in Step 0's progress
+table**, so two documents consulted at the same resume moment now define Step 5–6 completeness
+differently. **CR-2** — both README *sequence* diagrams still show a clean gate exiting the loop
+directly, while the flowchart above them in the same file was updated.
+
+**What this run demonstrates about the change itself**: 5c's conformance lens found, on its first
+execution, a class of defect that the code lens, four QA gates, 17 parity tests and a green CI all
+missed — because none of them audits whether the *trail* is honest. That is precisely the gap §2 of
+this task says it exists to close.

@@ -497,7 +497,7 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS — resolved at cycle 4 (HIGH count 3, 3, 3, **0**)
+**QA Status**: CONCERNS at cycle 4; **Step 5c returned REQUEST CHANGES** — 4 trail findings, loop continues
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-03
 **Quality Score**: 70/100
@@ -507,7 +507,8 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 - **Cycle 1**: [qa.1](./task.77.qa.1.review-pr-in-pipeline.md) · [gate.1](./task.77.gate.1.review-pr-in-pipeline.yml) — FAIL, 7 findings
 - **Cycle 2** (refute pass): [gate.2](./task.77.gate.2.review-pr-in-pipeline.yml) — FAIL, 11 findings, 2 of 3 HIGH introduced by cycle 1's own fixes
-- **Cycle 4**: [gate.4](./task.77.gate.4.review-pr-in-pipeline.yml) — **CONCERNS, 0 HIGH**. Both escalated decisions implemented as mechanism replacements; 2 items deferred by design to tasks 85/86/87
+- **Cycle 4**: [gate.4](./task.77.gate.4.review-pr-in-pipeline.yml) — CONCERNS (85), 0 HIGH. Both escalated decisions implemented as mechanism replacements; 2 items deferred to tasks 85/86/87
+- **Step 5c**: [pr-review.1](./task.77.pr-review.1.review-pr-in-pipeline.md) — 🚨 **REQUEST CHANGES**. First real execution of the step this task adds, on its own PR. Found 4 high-confidence trail defects four QA cycles missed, including a self-upgraded gate
 - **Cycle 3**: [gate.3](./task.77.gate.3.review-pr-in-pipeline.yml) — FAIL, **convergence stall**. 9 of 11 cycle-2 closures verified real; the 3 that were not cluster on one predicate that has now failed three cycles (third strike). Escalated — two scope decisions required
 
 ### Test Coverage Summary
@@ -538,6 +539,7 @@ deliver its findings to `/qa-fix` so it dead-ends in the no-code-change HALT.
 | 2026-09-03 |         | QA gate 2 FAIL (70/100, refute pass) — 11 findings, 2 of 3 HIGH introduced by cycle 1's fixes; all closed | qa-task |
 | 2026-09-03 |         | QA gate 3 FAIL (70/100) — convergence stall (HIGH 3/3/3). Third strike on the resume predicate; escalated to a human | qa-task |
 | 2026-09-03 |         | QA gate 4 CONCERNS (85/100) — resume predicate and ingester contract replaced per operator decision; 0 HIGH. Follow-ups filed as tasks 85-87 | qa-fix |
+| 2026-09-03 |         | Step 5c REQUEST CHANGES — 4 high-confidence trail findings; a self-upgrade of gate 4 was caught and withdrawn. Routing back to 5b, cycle 5 | review-pr |
 
 ---
 
