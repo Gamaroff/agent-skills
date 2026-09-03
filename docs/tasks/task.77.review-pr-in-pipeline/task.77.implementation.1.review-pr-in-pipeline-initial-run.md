@@ -647,14 +647,52 @@ unmet: this gate reads `CONCERNS`, and `dod.1` did not accept. Closing gaps 2–
 | CY9-4 | LOW | **Fixed although the operator's instruction named only CY9-1 and CY9-2.** Three stale counts sat in the section DoD gap 7 had just refreshed — "17 parity tests" (it is 18), "0 open HIGH in gate 4", NFR sourced to gate 5. Leaving known-false numbers in the trail while asking `/finalise` to verify that trail is self-defeating, and they would have resurfaced in `dod.2` minutes later. Recorded here rather than folded in silently |
 | CY9-3 | LOW | **Not fixed — carried.** Per-value *destination* is unasserted: `REQUEST CHANGES`→5c, swapped actions, and `review failed` losing its escalation bound all stay green. Gate 9 grades it a reasonable carry-forward and not a false claim — the commit claims only "a verb AND a destination", which is what it tests. Filing this rather than widening the guard again inside an escalated run |
 
+### Gate 10 — a real MEDIUM, found where nobody had looked — 2026-09-03
+
+`task.77.gate.10.review-pr-in-pipeline.yml` — ⚠️ **CONCERNS, 90/100**, from **47 mutations**.
+
+**CY10-1 (MEDIUM) is the best finding of the run.** The parity suite's assertion on the **5c verdict
+table** — the loop's *primary* routing table — was a row-shaped regex that reads as a mapping check
+and is not one. Because the REQUEST CHANGES action cell contains the clause *"5b's step 7 increments
+it"*, it supplies the `5b` the regex wants no matter where the row actually routes. Gate 10 rewrote
+`REQUEST CHANGES` to `5a`, then to *exit to Step 7*, `APPROVE` to `5a`, the failure arm's `HALT` to
+*proceed to Step 7*, and swapped the lite/standard effort levels — **all five stayed 18/18 green.**
+
+That is the **fifth instance of mention-standing-in-for-mapping** in this task, and the first on the
+verdict table: gate 9's 44 mutations all landed on the *resume* table, so nobody had aimed here.
+
+**What gate 10 confirmed held:** all five of `a74962b`'s claims true (including the YAML escape
+parsing and the catalog being CI-guarded by `tests/skill-frontmatter.test.js`); `dod.1`
+byte-unchanged since `8293765`; **29 trail-asserted proofs re-executed, none failed**; `dod.2`'s
+security numbers reproduced exactly — the same 25 files failing at head and at baseline. It also
+diagnosed its own first `npm run ci` exit 1 as **14 pure timeouts provoked by its parallel sweeps**,
+and re-ran to exit 0 on an idle machine.
+
+Its own summary: *"The reporting-defect pattern largely broke. This is CONCERNS because of a MEDIUM
+I found myself with mutations aimed where no previous gate looked — not because the trail lies."*
+
+### Post-gate-10 pass — the mapping mechanism, applied to both tables — 2026-09-03
+
+| Finding | Sev | Resolution |
+| --- | --- | --- |
+| **CY10-1** | MEDIUM | The verdict table is now **parsed into rows** and each verdict's destination read off **its own action cell** — the same mechanism that survived attack on the resume table. Positive *and* negative assertions per verdict: REQUEST CHANGES must route to 5b and must **not** exit or re-enter at 5a; APPROVE/CONCERNS must exit and must not route back; the failure arm must HALT and must forbid falling through. The effort mapping is pinned directionally |
+| **CY9-3** | LOW (carried from gate 9) | **Closed in the same pass, because it is the identical defect on the other table.** The resume rows now assert *which* destination each value resumes at, not merely that one is named — REQUEST CHANGES→5b, `review failed`→5c with its retry bound intact, and the two conditional rows→5c-if-clean-otherwise-5a |
+| CY10-2 | LOW | §7 item 12 still said the catalog was "absent from the diff" and the generator "a no-op" — falsified by `a74962b` itself. The row now records that the reasoning was circular and what replaced it |
+| CY10-3 | LOW | `## Completion` was stale in five places, including "Step 7 has not run" when it had run twice, and a `{populated after Step 7}` placeholder. Rewritten, and the tracker line now states the substantive fact — this task was never on a board |
+| CY10-4 | LOW | Task 88 claimed "all three are fixed" while CY8-5's second half was still open and CY9-3 was filed nowhere. Corrected **in place** on task 88, disclosing the gap rather than amending the claim silently |
+| CY10-5 | LOW | "3 diagrams / 8 reference-concept docs" → 5 and 11, with the reason the counts rose |
+
+**Mutation proof.** All seven previously-green mutations now fail: gate 10's 33, 34, 35, 36 and 45,
+and gate 9's 30 and 31. Control restores byte-identically at 20/20.
+
 ---
 
 ## Completion
 
-**Finished**: in progress — QA loop escalated at cycle 5 of 5; gates 5–8 remediated; DoD gaps and the CY8 residual closed
-**Final Status**: In Progress — gate 9 CONCERNS (91); CY9-1/2/4 closed, CY9-3 carried; `dod.2` and a gate 10 outstanding
+**Finished**: in progress — QA loop escalated at cycle 5 of 5; gates 5–10 remediated
+**Final Status**: In Progress — gate 10 CONCERNS (90); CY10-1…5 and CY9-3 closed in the post-gate-10 pass; a gate 11 and a `dod.3` are outstanding
 **Branch**: `feature/task.77.review-pr-in-pipeline`
 **PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
-**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); 4 post-escalation remediation passes, each graded independently (gate 6 FAIL 75, gate 7 FAIL 78, gate 8 CONCERNS 87)
-**DoD Summary**: not yet — Step 7 has not run
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); **6 post-escalation remediation passes**, each graded independently — gate 6 FAIL 75, gate 7 FAIL 78, gate 8 CONCERNS 87, gate 9 CONCERNS 91, gate 10 CONCERNS 90
+**DoD Summary**: **Step 7 has run twice, and accepted neither time.** `dod.1` (at `87e5bf9`) — NOT ACCEPTED, 8 gaps. `dod.2` (at `3bbd506`) — NOT ACCEPTED, blocked solely on the `accepted` precondition, plus 5 trail-currency defects closed in-pass. A `dod.3` is owed once a gate reads PASS or WAIVED
+**Tracker debt**: none — this task carries no `github_issue` and no `jira_key`, so Step 7's issue-close and board-move steps are NOT_APPLICABLE. Worth recording rather than leaving as a placeholder: **this task was never on a board**

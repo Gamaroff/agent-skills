@@ -40,7 +40,7 @@ of the existing Step 5–6 QA loop — and updates every consumer document, runb
 describes the pipeline shape.
 
 **Scope**: one behavioural file, one shell guard, six contracts/templates, three SKILL.md files,
-five test files, and a documentation sweep across roughly fifteen consumer docs and three diagrams.
+five test files, and a documentation sweep across roughly fifteen consumer docs and five diagrams.
 
 ---
 
@@ -341,12 +341,12 @@ implementation report**.
 
 ### Files to Modify — documentation (Phase 6)
 
-10. ✅ 3 diagrams, 7 runbooks, 8 reference/concept docs, `CHANGELOG.md` — enumerated in Phase 6
+10. ✅ 5 diagrams, 7 runbooks, 11 reference/concept docs, `CHANGELOG.md` — enumerated in Phase 6. The diagram and doc counts rose from 3 and 8 during the DoD runs: `architecture.md` carried an undisclosed fourth and fifth diagram (gap 2), and the `ready-for-merge` firing point reached three further files (gap 3)
 
 ### Files Regenerated (commit them — CI checks freshness)
 
 11. ✅ `skills/*/references/*` — `npm run bundle` (six consumers, not four — see the QA cycle 3 note)
-12. ⬜ `docs/reference/skill-catalog.md` — **no change required**: no `description:` field changed, so
+12. ✅ `docs/reference/skill-catalog.md` — **regenerated.** This row previously read "no change required: no `description:` field changed, so `npm run generate-catalog` is a no-op and the file is absent from the diff". That reasoning was **circular** — the catalog was clean only because the stale source was never touched. Both orchestrator `SKILL.md` descriptions still restated the pre-5c chain; they now name 5c, and the catalog is regenerated from them (`dod.2`, and gate 10's CY10-2).
     `npm run generate-catalog` is a no-op and the file is absent from the diff
 
 ### Files Added — follow-ups filed from QA (precedent: tasks 67–70 from task 66's dogfood)
@@ -619,6 +619,8 @@ rather than silently corrected.
 | 2026-09-03 |         | Gate 9 CONCERNS (91/100), **issued independently** — 44 mutations executed, **no trail-asserted proof failed**; CY8-3 verified closed at the mechanism. Four LOW findings, all stale table rows rather than false proofs. Explicitly does not support `accepted`: the gate is CONCERNS and `dod.1` did not accept | qa-task |
 | 2026-09-03 |         | Post-gate-9 pass — CY9-1 (ruled-out table reconciled in place, reversals struck through at the table), CY9-2 ("deferred to task 88" corrected) and CY9-4 (three stale counts) closed; CY9-3 carried as a reasonable follow-up | qa-fix |
 | 2026-09-03 |         | DoD run 2 — NOT accepted, blocked solely on the gate precondition (gate 9 CONCERNS, no active waiver). AC 17/17, CI green on head, security PASS (1560 probes, 0 reproduced). Five trail-currency defects found and closed in-pass: both orchestrator SKILL.md descriptions still restated the pre-5c chain (and the catalog with them), the QA tables and header were a gate stale again, this Change Log's append-only rule had been breached by 3bbd506, and the DoD gaps section was two commits stale | finalise |
+| 2026-09-03 |         | Gate 10 CONCERNS (90/100), **issued independently** — 47 mutations. CY10-1 (MEDIUM): the 5c **verdict table**'s routing was mention-matched, so REQUEST CHANGES could be repointed at 5a or at Step 7 with the suite green — fifth instance of mention-for-mapping, first on the primary routing table. 29 trail-asserted proofs re-executed, none failed | qa-task |
+| 2026-09-03 |         | Post-gate-10 pass — CY10-1 closed by parsing the verdict table into rows and asserting each destination off its own action cell, with negative assertions per verdict; **CY9-3 closed in the same pass** as the identical defect on the resume table. CY10-2/3/4/5 closed. All 7 previously-green mutations now fail; control restores byte-identically | qa-fix |
 
 ---
 
@@ -644,9 +646,9 @@ rather than silently corrected.
 - [x] Protocol evals extended; routing parity test added; review-pr tests green
 
 ### Phase 6: Documentation, runbooks and diagrams
-- [x] 3 diagrams re-drawn and validated
+- [x] 5 diagrams re-drawn and validated
 - [x] 7 runbooks updated
-- [x] 8 reference/concept docs updated; `pipeline-artifacts.md:50` contradiction removed
+- [x] 11 reference/concept docs updated; `pipeline-artifacts.md:50` contradiction removed
 - [x] CHANGELOG entry
 - [x] Re-derivation greps clean; ruled-out hits named in the implementation report
 

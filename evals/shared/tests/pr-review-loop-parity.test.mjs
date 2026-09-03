@@ -134,6 +134,105 @@ test("a clean QA gate routes to 5c, not straight to Step 7", () => {
 
 // ── 3. Verdict routing — the graph, not just the vocabulary ──────────────────
 
+/**
+ * The 5c verdict table, parsed into {verdict, action} rows.
+ *
+ * WHY PARSED, NOT MATCHED. The assertion this replaces was
+ * `/\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*5b[^|\n]*\|/` — a row-shaped regex, which reads as a
+ * mapping check and is not one. The REQUEST CHANGES action cell contains the clause "5b's step 7
+ * increments it", so it supplies the `5b` the regex wants no matter where the row actually routes.
+ * Gate 10 rewrote that row to `5a`, and to "exit to Step 7", and the suite stayed 18/18 green — on
+ * the loop's PRIMARY routing table. Same defect class as the resume guard, fifth instance in this
+ * task: a MENTION standing in for a MAPPING.
+ *
+ * A verdict's destination is carried by its own row's action cell, so that is what gets read.
+ */
+function verdictRows() {
+  const s5c = section5c();
+  const start = s5c.indexOf("| Verdict | Action |");
+  assert.ok(start > -1, "the 5c verdict table must exist");
+  const end = s5c.indexOf("\n\n", start);
+  assert.ok(
+    end > -1,
+    "the verdict table must be followed by a blank line — without one this slice would run past the table",
+  );
+  const rows = s5c
+    .slice(start, end)
+    .split("\n")
+    .filter((l) => l.startsWith("|") && !/^\|[\s-]+\|[\s-]+\|?$/.test(l))
+    .map((l) => l.replace(/^\|/, "").split("|"))
+    .filter((c) => c.length >= 2)
+    .map((c) => ({ verdict: c[0].trim(), action: c[1].trim() }))
+    .filter((r) => r.verdict !== "Verdict");
+  assert.ok(
+    rows.length >= 4,
+    `expected at least 4 verdict rows, parsed ${rows.length} — if this drops the parse broke and every assertion below is vacuous`,
+  );
+  return rows;
+}
+
+/** The single row whose verdict cell names `v`. */
+function verdictRow(v) {
+  const matches = verdictRows().filter((r) => r.verdict.includes(v));
+  assert.equal(
+    matches.length,
+    1,
+    `expected exactly ONE verdict row for "${v}", found ${matches.length}: ${verdictRows()
+      .map((r) => r.verdict)
+      .join(" / ")}`,
+  );
+  return matches[0].action;
+}
+
+test("each 5c verdict maps to ONE destination, read off its own row", () => {
+  // Gate 10's mutations 33-36 and 45, which were all green against the old assertion.
+  const rc = verdictRow("REQUEST CHANGES");
+  assert.match(
+    rc,
+    /Return to \*\*5b\*\*/,
+    "REQUEST CHANGES must route back to 5b as a DIRECTIVE — a clause elsewhere in the cell mentioning 5b is not a destination",
+  );
+  assert.doesNotMatch(
+    rc,
+    /exit the loop|proceed to Step 7|Return to \*\*5a\*\*/,
+    "REQUEST CHANGES is still inside the loop — it must not exit, and must not re-enter at 5a",
+  );
+
+  for (const v of ["APPROVE", "CONCERNS"]) {
+    const a = verdictRow(v);
+    assert.match(a, /exit the loop/, `${v} must exit the loop`);
+    assert.match(a, /Step 7/, `${v} must proceed to Step 7`);
+    assert.doesNotMatch(
+      a,
+      /Return to \*\*5[ab]\*\*/,
+      `${v} is terminal for the loop — it must not route back into 5a or 5b`,
+    );
+  }
+
+  const failed = verdictRow("Review failed");
+  assert.match(failed, /\bHALT\b/, "the failure arm must HALT");
+  assert.match(
+    failed,
+    /Do \*\*not\*\* fall through to Step 7/,
+    "the failure arm must forbid falling through — 5c is the only exit, so a skipped review silently finalises",
+  );
+  assert.doesNotMatch(
+    failed,
+    /exit the loop/,
+    "a failed review is not an exit",
+  );
+});
+
+test("lite mode maps to low effort and standard to medium, not the reverse", () => {
+  // Gate 10's mutation 45: swapping the two levels left the suite green, because the lite-mode
+  // assertion only checked that `--effort low` appeared SOMEWHERE.
+  assert.match(
+    section5c(),
+    /`--effort`\*\*: `medium` in standard mode, `low` in lite mode/,
+    "the effort mapping is directional — swapping the levels degrades the standard path and over-runs the lite one",
+  );
+});
+
 test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
   const s5c = section5c();
   assert.match(
@@ -622,6 +721,42 @@ test("the 5c resume check reads the report, not the filesystem", () => {
       row.action,
       /\b5[abc]\b|Step 7|Loop Escalation/i,
       `the row for "${v}" must name WHERE it resumes (5a/5b/5c, Step 7, or Loop Escalation); got: ${JSON.stringify(row.action.slice(0, 120))}`,
+    );
+  }
+
+  // PER-VALUE DESTINATION (gate 9's CY9-3, and the same defect class as gate 10's CY10-1 on the
+  // verdict table). The assertions above prove each value has a row, a verb and *a* destination —
+  // not that it is the RIGHT destination. Gate 9 demonstrated the gap: `REQUEST CHANGES` could be
+  // repointed at 5c, `APPROVE` at 5a, and `review failed` could lose its escalation bound, all
+  // green. Each value resumes somewhere specific, so each is asserted specifically.
+  const dest = (v) =>
+    subStateRows.find((r) => r.key.includes("`" + v + "`")).action;
+
+  assert.match(
+    dest("REQUEST CHANGES"),
+    /re-enter at \*\*5b\*\*/,
+    "a run killed after 5c routed back must resume at 5b — 5a would re-run QA against an unchanged tree and re-derive the gate that just passed",
+  );
+  assert.match(
+    dest("review failed"),
+    /re-enter at \*\*5c\*\*/,
+    "`review failed` resumes at 5c — the review is what did not run",
+  );
+  assert.match(
+    dest("review failed"),
+    /second\*{0,2} consecutive|escalate to Loop Escalation/i,
+    "the `review failed` retry must stay bounded — its usual cause is not self-healing, so an unbounded retry loops forever",
+  );
+  for (const v of ["pending — 5c not yet run", "not reached"]) {
+    assert.match(
+      dest(v),
+      /re-enter at \*\*5c\*\*/,
+      `"${v}" resumes at 5c when the gate is clean`,
+    );
+    assert.match(
+      dest(v),
+      /otherwise at \*\*5a\*\*/,
+      `"${v}" resumes at 5a when the gate is not clean — the conditional is the whole point of the row`,
     );
   }
 });

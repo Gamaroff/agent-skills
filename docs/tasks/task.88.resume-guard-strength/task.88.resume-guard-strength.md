@@ -27,6 +27,13 @@ gate 8's CY8-3/4/5 forward as a follow-up; the operator then decided to close th
 task 77 instead. All three are fixed and mutation-proved there — see the *post-gate-8 pass* section
 of `docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md`.
 
+**One correction to that claim, recorded rather than quietly amended (gate 10, CY10-4).** When this
+note was first written, CY8-5's *second half* — asserting that each value routes to its **own**
+destination, not merely to *a* destination — was still open. Gate 9 raised it again as CY9-3 and
+graded it a carry-forward; it was filed nowhere, while this file said the work was done. It is now
+genuinely closed, in the same post-gate-10 pass that closed gate 10's CY10-1 (the identical defect
+on the 5c verdict table), and mutation-proved with gate 9's mutations 30–32 and gate 10's 33–36/45.
+
 Kept rather than deleted because the task number is spent and never reused, and because the filing
 and the reversal are both part of the trail. The scope below is retained as the record of what was
 handed over; do not implement it — it is already done.
