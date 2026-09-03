@@ -513,8 +513,8 @@ arms disables the gate while leaving every doc, test and contract in place.
 **QA Status**: CONCERNS (gate 4) — **Step 5c returned REQUEST CHANGES**; cycle 5 in progress
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-03
-**Quality Score**: 85/100 (gate 4, as measured)
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100 (gate 5)
+**Gate Decision**: FAIL — escalated to a human
 
 > A gate-4 edit to PASS (92) was made and then **withdrawn** — Step 5c identified it as a
 > self-issued re-grade on the field that decides whether the loop exits. See the withdrawal note in
@@ -529,13 +529,14 @@ arms disables the gate while leaving every doc, test and contract in place.
 | 3 | [qa.3](./task.77.qa.3.review-pr-in-pipeline.md) ⚠️ retrospective | [gate.3](./task.77.gate.3.review-pr-in-pipeline.yml) | FAIL (70) — convergence stall, escalated |
 | 4 | [qa.4](./task.77.qa.4.review-pr-in-pipeline.md) ⚠️ retrospective | [gate.4](./task.77.gate.4.review-pr-in-pipeline.yml) | CONCERNS (85) — 0 HIGH |
 | 5c | [pr-review.1](./task.77.pr-review.1.review-pr-in-pipeline.md) | — (advisory, writes no gate) | 🚨 REQUEST CHANGES — 4 trail findings |
+| 5 | [qa.5](./task.77.qa.5.review-pr-in-pipeline.md) **independent** | [gate.5](./task.77.gate.5.review-pr-in-pipeline.yml) | **FAIL (70)** — 13/20 closed, CR-3 dropped, 3 fresh contradictions. **Loop Escalation** |
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 17 parity tests (none vacuous) plus full `npm run ci` — green on every cycle
 - **Phases Verified**: 7/7
 - **Critical Issues**: 0 open HIGH in gate 4; Step 5c raised 4 further high-confidence trail findings
-- **NFR Status** (gate 4): Security PASS, Performance PASS, Reliability FAIL, Maintainability CONCERNS
+- **NFR Status** (gate 5, independent): Security PASS, Performance PASS, Reliability CONCERNS, Maintainability FAIL
 
 ### Key Findings
 
@@ -560,6 +561,8 @@ are addressed in cycle 5.
 | 2026-09-03 |         | QA gate 3 FAIL (70/100) — convergence stall (HIGH 3/3/3). Third strike on the resume predicate; escalated to a human | qa-task |
 | 2026-09-03 |         | QA gate 4 CONCERNS (85/100) — resume predicate and ingester contract replaced per operator decision; 0 HIGH. Follow-ups filed as tasks 85-87 | qa-fix |
 | 2026-09-03 |         | Step 5c REQUEST CHANGES — 4 high-confidence trail findings; a self-upgrade of gate 4 was caught and withdrawn. Routing back to 5b, cycle 5 | review-pr |
+| 2026-09-03 |         | QA cycle 5 fixes — gate 4 restored, qa.2-4 written retrospectively, 9 shared resources and the task registry edited, tasks 85-87 filed | qa-fix |
+| 2026-09-03 |         | QA gate 5 FAIL (70/100), **issued independently** — 13/20 findings closed, CR-3 dropped undisclosed, 3 fresh contradictions. Budget spent → Loop Escalation | qa-task |
 
 ---
 

@@ -1,8 +1,12 @@
 # Resume Brief — Task 77, mid-pipeline handover
 
-> **Not a pipeline artifact kind.** `.handover.` is reserved for deferred *tracker* mutations
-> rendered by `handover-render.js`; this is a plain briefing for a fresh context window and is named
-> so it cannot be mistaken for one. Delete it when the task closes.
+> **Lives in `.agents/plans/`, deliberately.** It was first written into the task directory as
+> `task.77-resume-brief.md` and **that broke CI** — `tests/work-item-artifact-naming.test.js` rejects
+> any unregistered artifact type, and the shape `task.{n}.{slug}.md` is the *primary task-document*
+> pattern, so every glob enumerating tasks would have counted this briefing as one and could hand it
+> to `/develop-task`. `.handover.` is a registered type but means deferred *tracker* mutations
+> rendered by `handover-render.js`; `plan` means a *pre-implementation* plan the pipeline reads and
+> mtime-checks. This is neither, so it lives with general plans. Delete it when the task closes.
 
 **Written**: 2026-09-03 · **Branch**: `feature/task.77.review-pr-in-pipeline` · **HEAD**: `9c0f5a7`
 **PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309) — OPEN, MERGEABLE, targets `develop`
@@ -12,7 +16,7 @@
 ## The one thing outstanding
 
 **Run `/qa-task` to produce an independent cycle-5 gate.** Everything else is done, committed and
-pushed; `npm run ci` is green.
+pushed; `npm run ci` is green **as of this move** — it was red at the commit that first introduced this file, which is finding CY5-1 below.
 
 ```bash
 /qa-task docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md

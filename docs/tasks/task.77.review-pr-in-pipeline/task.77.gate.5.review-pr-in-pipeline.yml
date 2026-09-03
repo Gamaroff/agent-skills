@@ -1,0 +1,125 @@
+schema: 1
+task: "task.77.review-pr-in-pipeline"
+task_title: "Run the PR conformance review before a work item is finalised"
+gate: FAIL
+status_reason: "Independent cycle-5 assessment. 13 of the 20 findings from Step 5c are fully closed and the withdrawal of the self-upgraded gate is complete and honest, but five are only PARTIAL, one (CR-3) was dropped with no disclosure while full closure was claimed, and the fixes introduced three fresh contradictions on the same trail/resume axis that produced HIGH findings in cycles 1-3. The loop budget is spent (5 of 5), so this FAIL means Loop Escalation to a human, not a sixth cycle."
+reviewer: "QA Engineer (independent subagent — see provenance below)"
+updated: "2026-09-03T00:00:00Z"
+
+# ── PROVENANCE — why this gate is not self-issued ─────────────────────────────
+# Step 5c's first finding (PC-1) was that the agent which wrote this task's code
+# had also written the gate clearing it, and had upgraded that gate on the exact
+# field deciding whether the loop released it. That gate was withdrawn.
+#
+# This gate is therefore NOT authored by the fixing agent. It transcribes the
+# verdict of an independent reviewer dispatched with no account of how the fixes
+# were made, instructed to treat every repo artifact as a hypothesis to test and
+# to verify by execution. It did, and it caught a false claim: `npm run ci` was
+# exiting 1 on branch HEAD while the handover brief asserted it was green.
+#
+# ONE ITEM WAS CLEARED AFTER THE ASSESSMENT, disclosed rather than folded in:
+# CY5-1 (the CI failure) was fixed by moving `task.77.resume-brief.md` out of the
+# work-item directory to `.agents/plans/task.77-resume-brief.md`. `npm run ci` now
+# exits 0, verified. That fix is recorded as `status: closed` below WITHOUT
+# re-grading the gate: the verdict stays FAIL because the reviewer's other six
+# findings stand unaddressed and re-grading on the strength of my own subsequent
+# fix is precisely the move PC-1 was about.
+# ──────────────────────────────────────────────────────────────────────────────
+
+top_issues:
+  - id: "CY5-1"
+    severity: high
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.resume-brief.md"
+    finding: "`npm run ci` exited 1 on branch HEAD (d7370db) — `tests/work-item-artifact-naming.test.js` rejected `task.77.resume-brief.md` because `resume-brief` is not a registered artifact type. The hazard is not cosmetic: `task.{n}.{slug}.md` is the PRIMARY task-document shape, so every glob enumerating tasks counted this briefing as one and could have handed it to `/develop-task`. `gh pr checks 309` confirmed the `test` job red on the same SHA. The file was added AFTER the cycle-5 fix commit, and the brief itself asserted CI was green — false at the commit that introduced it."
+    suggested_action: "Move out of the work-item directory or register the type."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "CY5-2"
+    severity: medium
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+    finding: "The PC-4 reconciliation introduced a fresh contradiction on the axis it was reconciling: the task doc records 'NFR Status (gate 4): ... Reliability FAIL' while gate 4 records `reliability: PASS`. The cycle-1..3 reliability FAIL was carried forward and relabelled '(gate 4)'. Third consecutive cycle in which a fix for self-contradiction reintroduced one."
+    suggested_action: "Set it to Reliability PASS to match gate 4, or state which measurement is authoritative."
+    suggested_owner: dev
+    status: open
+  - id: "CY5-3"
+    severity: medium
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+    finding: "A finding was dropped while full closure was claimed. The implementation report's closure table and the cycle-5 commit message both assert 'All twelve 5c findings addressed', but CR-3 appears in neither and `develop-pipeline-remaining-work-banner.md` is absent from the commit. The same table also claims '`## Completion` moved to the end' when it is not. Two false closure claims in the artifact a reviewer reads to CHECK closure — the exact failure §2 of this task exists to catch."
+    suggested_action: "Add a CR-3 row stating the fix or an explicit deferral; correct the PC-8 row or actually move the block."
+    suggested_owner: dev
+    status: open
+  - id: "CY5-4"
+    severity: medium
+    file: "shared/resources/develop-pipeline-resume-contract.md"
+    finding: "Cycle 5's own CR-7 fix broke the invariant gate 4 closed TASK77-024 on. A sixth `**PR Review**` value (`pending — 5c not yet run`) was added to the loop doc and no matching row was added to the resume sub-state table, so a run killed between 5a writing the row and 5c writing its verdict resumes with no stated action. The parity test written to prevent exactly this still enumerates only three values and was not extended — so the test certifies the gap it was written to prevent."
+    suggested_action: "Add the row (same action as `not reached`) and add the literal to the test's enumeration loop."
+    suggested_owner: dev
+    status: open
+  - id: "CY5-5"
+    severity: medium
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+    finding: "On the new resume contract's first live application, the artifact is filled in a way the contract does not sanction: cycle 5's `**PR Review**` row records cycle 4's verdict. The two resume mechanisms then disagree about this very run — the sub-state table says re-enter at 5b, while counting `### QA Cycle` headings gives NEXT_CYCLE=6 and loop-limit escalation. Compounded by `### QA Cycle 3` sitting after Cycle 5 in file order, so 'the last entry' and 'the highest {N}' resolve differently."
+    suggested_action: "Set the row to `pending — 5c not yet run`; reorder QA Cycle 3 into numeric order."
+    suggested_owner: dev
+    status: open
+  - id: "CY5-6"
+    severity: low
+    file: "evals/shared/tests/pr-review-loop-parity.test.mjs"
+    finding: "`sectionBetween()`'s comment says 'with BOTH indices asserted'; the code asserts only `start`. A renamed end marker silently widens the slice to EOF rather than failing by name — the weaker cousin of the footgun the helper was extracted to close, in a helper written to stop a comment overstating a guarantee."
+    suggested_action: "Assert `end > -1`, or reword the comment."
+    suggested_owner: dev
+    status: open
+  - id: "CY5-7"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+    finding: "No Change Log row exists for QA cycle 5, though it rewrote a gate verdict, added three QA reports, edited nine shared resources and the registry. PC-7 asked specifically for a row recording the registry edit. Also: the PR #309 body still says the parity suite has 11 tests (it has 17) and points at a CI run that was red."
+    suggested_action: "Add the cycle-5 Change Log row; refresh the PR body."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 2284
+  phases_verified: "7/7"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [3, 6]
+  execution:
+    npm_run_ci_at_assessment: "exit 1 (CY5-1)"
+    npm_run_ci_after_fix: "exit 0 — verified"
+    parity_tests: "17/17, and 17/17 FAIL against origin/develop (re-verified independently, none vacuous)"
+    lock_test: "14/14 under bash AND zsh"
+    bundle_freshness: "45 bundled copies compared by content against their sources — 0 mismatching"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No auth, credential or secret surface touched. The change net-REMOVES shell surface — the zsh-fragile glob predicate was deleted rather than patched. The only executable change is one added `review-pr)` noop arm, green under bash and zsh."
+  performance:
+    status: PASS
+    notes: "One additional advisory subagent per clean-gate cycle, bounded by the pre-existing 5-cycle budget. No runtime hot path, no new I/O in any loop."
+  reliability:
+    status: CONCERNS
+    notes: "The routing graph is sound and pinned by 17 non-vacuous tests, but three contract gaps remain on the resume/failure path: a sixth PR-Review enum value with no action row (CY5-4), a `review failed` retry bound that cannot be evaluated from the artifact the contract reads, and two banner firing points declared mandatory with nothing instructing them (CR-3, unfixed)."
+  maintainability:
+    status: FAIL
+    notes: "Assessed against a branch whose suite did not pass (CY5-1, since fixed) and a trail carrying two demonstrably false closure claims. The rating is left as the independent reviewer set it: the closure-claim defects (CY5-3) are unaddressed, and they are the substantive half of the finding."
+
+recommendations:
+  immediate:
+    - action: "Operator decision — the loop budget is spent. Accept the residual, or take the six open findings as a new work item"
+      refs: ["docs/tasks/task.77.review-pr-in-pipeline/task.77.gate.5.review-pr-in-pipeline.yml"]
+  future:
+    - action: "Task 86 (High) — the bundler defect is independent of this change and went stale three times during this run"
+      refs: ["docs/tasks/task.86.bundle-transitive-refresh/"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "Loop Escalation — 5 of 5 cycles used. A human decides whether the six open findings block the merge or become a follow-up."
