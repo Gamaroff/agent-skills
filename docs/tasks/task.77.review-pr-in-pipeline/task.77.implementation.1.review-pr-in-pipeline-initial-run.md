@@ -414,7 +414,7 @@ remediation pass after gate 5, not in cycle 5.
 | PC-8 | `## Completion` moved to the end; QA bullets reordered chronologically |
 | CR-1 | Ingester no longer both skips and surfaces non-REQUEST-CHANGES reports |
 | CR-2 | Both README **sequence** diagrams gained the 5c branch — they still showed a clean gate exiting the loop while the flowchart above them did not |
-| CR-3 *(post-gate-5)* | **Dropped in cycle 5 with no disclosure** — this row is the one that was missing. Closed since: §5c now instructs **both** banner firing points (a Remaining Work Status block before `/review-pr`, and one on the REQUEST CHANGES arm before re-entering 5b), the per-cycle banner paragraph enumerates all four Steps 5–6 moments rather than two, and the two rows in `develop-pipeline-remaining-work-banner.md` are footnoted as develop-story/develop-task only — `develop-bug` has no 5c — with §5c named as their owner |
+| CR-3 *(post-gate-5)* | **Dropped in cycle 5 with no disclosure** — this row is the one that was missing. Closed since: §5c now instructs **both** banner firing points (a Remaining Work Status block before `/review-pr`, and one on the REQUEST CHANGES arm before re-entering 5b), the per-cycle banner paragraph names 5c as the owner of the two blocks 5c emits (the count of Steps 5–6 moments was asserted here and later removed as wrong — the HALT row fires there too; see CY6-2), and the two rows in `develop-pipeline-remaining-work-banner.md` are footnoted as develop-story/develop-task only — `develop-bug` has no 5c — with §5c named as their owner |
 | CR-4 | The deleted filesystem predicate removed from its **second home** in Step 0's progress table, and **pinned by a new test** so it cannot return to either |
 | CR-5 *(completed post-gate-5)* | `sectionBetween()` extracted and the two inline slices that reproduced the `-1`/`slice(-1)` footgun now use it. The claim "both indices asserted" was **untrue as written in cycle 5** — only `start` was asserted, and a missing end marker silently widened the slice to EOF (gate 5's CY5-6). `end > -1` is now asserted too, and the assertion is mutation-proved by renaming `### Convergence check` in the loop doc |
 | CR-6 | The ingester pin now asserts the **Step 7 report template** (its two findings sections and the `→` continuation), not just the Step 6 terminal example |
@@ -450,7 +450,7 @@ six findings left open by gate 5 were closed as follows.
 | Gate-5 finding | Resolution |
 | --- | --- |
 | CY5-2 | Task doc's NFR line set to gate 5's measured values |
-| CR-3 (carried from 5c, dropped in cycle 5) | §5c now instructs both Remaining Work Status firing points; the per-cycle paragraph enumerates all four Steps 5–6 moments; the banner table's two 5c rows are footnoted develop-story/develop-task only, with §5c named as owner |
+| CR-3 (carried from 5c, dropped in cycle 5) | §5c now instructs both Remaining Work Status firing points; the per-cycle paragraph states ownership of the Steps 5–6 progress blocks (it briefly asserted a count of four, corrected under CY6-2); the banner table's two 5c rows are footnoted develop-story/develop-task only, with §5c named as owner |
 | CY5-3 | CR-3 row added to the cycle-5 closure table and the "all twelve" claim replaced with the real count and an explicit note that the row was missing; the CR-5 row corrected too |
 | CY5-4 | `pending — 5c not yet run` row added to the resume sub-state table (same action as `not reached`) and to both artifact-table enumerations; the parity test's enumeration loop extended to the literal. **The mutation proof claimed here was false** — see CY6-1 below; the guard was inert until the post-gate-6 pass scoped it to the table |
 | CY5-5 | Cycle 5's `**PR Review**` row set to `pending — 5c not yet run` (it recorded cycle 4's verdict); `### QA Cycle 3` moved into numeric order, so "the last entry" and "the highest {N}" now resolve to the same entry and `## Completion` is genuinely last |
@@ -463,9 +463,11 @@ rule that produced gate 5 applies to its remediation unchanged.
 ### Gate 6 — the remediation graded independently — 2026-09-03
 
 `task.77.gate.6.review-pr-in-pipeline.yml` — **FAIL, 75/100**, issued by a reviewer dispatched with
-no account of how the remediation was made. Five of the seven gate-5 findings verified genuinely
-closed (CR-3, CY5-1, CY5-2, CY5-5, CY5-6, CY5-7); execution all green; bundle freshness confirmed by
-content across all 11 copies.
+no account of how the remediation was made. **Six** of the eight findings it assessed were verified
+genuinely closed — CR-3, CY5-1, CY5-2, CY5-5, CY5-6 and CY5-7 — with CY5-3 and CY5-4 left PARTIAL.
+(An earlier version of this sentence said "five of the seven" and then listed six; the count was
+wrong and the list was right.) Execution all green; bundle freshness confirmed by content across all
+11 copies.
 
 **Its headline finding, CY6-1 (HIGH), was a fabricated mutation proof — and it was mine.** Three
 artifacts (the `741117f` commit message, this report, and the PR #309 body) asserted that deleting
@@ -487,7 +489,7 @@ recorded as not holding.
 | CY6-2 | The "**four** firing points" claim was wrong on its own axis: the banner's HALT row also fires inside Steps 5–6. Reworded to state *ownership* of the progress blocks and to say explicitly that HALT is additional and not in that count |
 | CY6-3 | The banner doc is the format authority §5c points at, and both its format line and worked example still rendered the exit parenthetical without `PR review {verdict}` — the field task 77 exists to add. Both updated, and the rule stated |
 | CY6-4 | The new banner paragraph had been inserted between "Pass the **PR review report** as well:" and the block that colon introduces; moved above it |
-| CY5-3 (carried PARTIAL) | Open only because this table had replaced two false claims with a third. That claim is now corrected in all three artifacts it appeared in |
+| CY5-3 (carried PARTIAL) | Open only because this table had replaced two false claims with a third. That claim is corrected in the two artifacts that can still be edited — this report and the PR body. The third, `741117f`'s commit message, is immutable; see the note below, which this row deliberately does not contradict |
 
 The `741117f` commit message cannot be rewritten — it is pushed and public. The correction is
 recorded here and in the PR body instead, which is the honest remedy rather than a force-push that
@@ -495,14 +497,60 @@ would erase the evidence.
 
 The closing gate for **this** pass is likewise not self-issued.
 
+### Gate 7 — the post-gate-6 pass graded independently — 2026-09-03
+
+`task.77.gate.7.review-pr-in-pipeline.yml` — **FAIL, 78/100**. CY6-2, CY6-3 and CY6-4 verified
+closed; execution green; bundles content-clean. It executed **ten** mutation proofs, including two
+of its own devising, and both of its own found defects this trail had not:
+
+- **CY7-1 (HIGH)** — the CY6-1 fix was still weaker than its published claim, on CY6-1's own axis.
+  Three artifacts said the guard "requires a row rather than a mention". Deleting the
+  `` `not reached` `` row — one of the four values in the assertion's own loop, and the table's
+  **default** arm — left the suite green, because `` `not reached` `` appears backticked inside the
+  `pending` row's prose. The haystack had been narrowed from file to table; `includes(mention)`
+  never became `match(row)`.
+- **CY7-2 (MEDIUM)** — the rationale published for the end-marker assertion was impossible. It
+  claimed widening to EOF would "re-admit the artifact-table sentences"; those sit at lines 82 and
+  92, *above* the table at 124. A slice widening downward cannot reach them.
+
+Plus four smaller trail errors (CY7-3…CY7-6) and CY7-7: CR-3's banner fix was held by no test.
+
+**This is the third strike on one predicate**, and the repo's rule was applied rather than patched
+around: the mechanism was **replaced**, and the scope decision went to the operator first.
+
+### Post-gate-7 pass — the guard mechanism replaced — 2026-09-03
+
+The assertion no longer searches text. It **parses the sub-state table into rows**, keys on the
+first cell, and requires the action cell to name where the run re-enters (`5a`/`5b`/`5c`, Step 7, or
+escalation). A value named anywhere else — including inside another row's prose — no longer
+satisfies it, which is precisely what defeated both previous versions.
+
+Mutation matrix, every row deleted individually plus an actionless row:
+
+| Mutation | Result |
+| --- | --- |
+| delete the `pending — 5c not yet run` row | red |
+| delete the `REQUEST CHANGES` row | red |
+| delete the `review failed` row | red |
+| delete the `not reached` row (green under both earlier versions) | red |
+| row present, action cell blanked to `TBD` | red — names the row and the missing action |
+| restore | 18/18 green, file byte-identical |
+
+CY7-7 closed with a new test pinning the banner doc's exit line: gate 7's mutation I — reverting the
+worked example — was green and is now red. Suite is **18** tests.
+
+CY7-3…CY7-6 corrected: the "all four Steps 5–6 moments" claim removed from both rows still carrying
+it, "five of the seven" corrected to six of eight, the "all three artifacts" row reconciled with the
+immutable-commit note two lines below it, and the Completion line renamed off the gate-5 pass.
+
 ---
 
 ## Completion
 
-**Finished**: in progress — QA loop escalated at cycle 5 of 5; gate-5 and gate-6 findings remediated
-**Final Status**: In Progress — awaiting an independent verdict on the post-gate-5 remediation
+**Finished**: in progress — QA loop escalated at cycle 5 of 5; gate-5, gate-6 and gate-7 findings remediated
+**Final Status**: In Progress — awaiting an independent verdict on the post-gate-7 remediation
 **Branch**: `feature/task.77.review-pr-in-pipeline`
 **PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
-**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); 2 post-escalation remediation passes, each graded independently (gate 6 FAIL 75)
+**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); 3 post-escalation remediation passes, each graded independently (gate 6 FAIL 75, gate 7 FAIL 78)
 **DoD Summary**: not yet — Step 7 has not run
 **Tracker debt**: {populated after Step 7}

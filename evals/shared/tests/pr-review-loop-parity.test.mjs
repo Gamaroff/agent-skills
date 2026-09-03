@@ -41,6 +41,9 @@ const defaults = read(
   "shared/resources/develop-pipeline-autonomous-defaults.md",
 );
 const ingester = read("shared/resources/qa-findings-ingester-prompt.md");
+const banner = read(
+  "shared/resources/develop-pipeline-remaining-work-banner.md",
+);
 
 /** Line index of the first line matching `re`, or -1. */
 function lineOf(text, re) {
@@ -447,6 +450,30 @@ test("the ingester describes the format /review-pr actually renders", () => {
   );
 });
 
+test("the banner doc carries the PR review verdict in the Steps 5-6 exit line", () => {
+  // 5c states the exit position line as `({N} cycles, {gate}, PR review {verdict})` and points at
+  // the banner doc as the format authority for it. That doc rendered the parenthetical WITHOUT the
+  // verdict in both its format line and its worked example — the authority omitting the one field
+  // task 77 exists to add. It was fixed, and held by nothing: reverting the example went green.
+  assert.match(
+    banner,
+    /PR review \{verdict\}/,
+    "the banner doc must state that the Steps 5-6 exit parenthetical carries the PR review verdict",
+  );
+  assert.match(
+    banner,
+    /QA LOOP ✅ complete \([^)]*PR review [A-Z]+\)/,
+    "the worked example must RENDER the verdict, not merely describe it — the example is what gets copied",
+  );
+  // And 5c must still state the line the banner doc is the authority for, so the two documents
+  // cannot drift apart while each looks self-consistent.
+  assert.match(
+    section5c(),
+    /QA LOOP ✅ complete \(\{N\} cycles, \{gate\}, PR review \{verdict\}\)/,
+    "5c must state the exit line the banner doc is the format authority for",
+  );
+});
+
 test("the 5c resume check reads the report, not the filesystem", () => {
   // Replaces a predicate that failed three consecutive QA cycles: it compared gate.{N} (per QA
   // cycle) with pr-review.{n} (per 5c INVOCATION), and its shell implementation returned a false
@@ -486,18 +513,19 @@ test("the 5c resume check reads the report, not the filesystem", () => {
     /`\*\*PR Review\*\*` row on the highest `### QA Cycle \{N\}`/,
     "Step 0 must state the same report-row condition the resume contract does",
   );
-  // Every non-terminal value must have a stated resume action — the earlier version handled
-  // `not reached` and blank but not `review failed`, which 5c writes and nothing read. The
-  // enumeration then went stale the same way when 5a's `pending — 5c not yet run` placeholder
-  // was added to the loop doc's enum and to nothing else. Adding a value to the enum on
-  // line ~263 of the loop doc means adding it here AND to the resume sub-state table.
+  // Every non-terminal value must have a stated resume action.
   //
-  // SCOPED TO THE TABLE, DELIBERATELY. This assertion was `resume.includes(v)` over the whole
-  // file, and the artifact-table sentences at lines ~82 and ~92 name every value in passing —
-  // so the guard was pre-satisfied and stayed green when the sub-state ROW it exists to require
-  // was deleted. That is the failure mode AGENTS.md names: a test that passes on the exact
-  // regression it was written to catch. The row is the artifact carrying the resume ACTION;
-  // being mentioned elsewhere in the file is not the same thing as having one.
+  // THIRD ATTEMPT AT THIS GUARD; the first two both passed on the regression they named, which is
+  // why this one reads the table as a TABLE rather than searching it as text.
+  //   v1 — `resume.includes(v)` over the whole file. The artifact-table sentences at ~:82 and ~:92
+  //        name every value in passing, so deleting a sub-state row left the suite green.
+  //   v2 — same `includes`, haystack narrowed to the table. `not reached` appears backticked inside
+  //        the `pending` row's own prose, so deleting the `not reached` row STILL left it green —
+  //        and `not reached` is the table's default arm.
+  // The defect both versions share is searching for a MENTION. What the contract owes each value is
+  // a resume ACTION, and an action is carried by a row's key. So: parse rows, key on the first cell,
+  // and require the action cell to name where the run re-enters. A value named anywhere else in the
+  // file — including inside another row's prose — is not a resume action and must not satisfy this.
   const tableStart = resume.indexOf(
     "| `**PR Review**` reads | Resume action |",
   );
@@ -505,9 +533,23 @@ test("the 5c resume check reads the report, not the filesystem", () => {
   const tableEnd = resume.indexOf("\n>\n", tableStart);
   assert.ok(
     tableEnd > -1,
-    "the sub-state table must be followed by its rationale block — without an end marker this slice would widen to EOF and re-admit the artifact-table sentences",
+    "the sub-state table must be followed by its rationale block — without an end marker this slice runs to EOF and the row parse below would absorb the rows of any blockquote table added later in the file",
   );
-  const subState = resume.slice(tableStart, tableEnd);
+
+  const subStateRows = resume
+    .slice(tableStart, tableEnd)
+    .split("\n")
+    .map((l) => l.replace(/^>\s*/, ""))
+    .filter((l) => l.startsWith("|") && !/^\|[\s-]+\|[\s-]+\|?$/.test(l))
+    .map((l) => l.replace(/^\|/, "").split("|"))
+    .filter((cells) => cells.length >= 2)
+    .map((cells) => ({ key: cells[0].trim(), action: cells[1].trim() }))
+    .filter((r) => !r.key.includes("reads"));
+
+  assert.ok(
+    subStateRows.length >= 5,
+    `expected the sub-state table to parse into at least 5 rows, got ${subStateRows.length} — if this drops, the parse broke and every assertion below is vacuous`,
+  );
 
   for (const v of [
     "pending — 5c not yet run",
@@ -515,9 +557,15 @@ test("the 5c resume check reads the report, not the filesystem", () => {
     "review failed",
     "not reached",
   ]) {
+    const row = subStateRows.find((r) => r.key.includes("`" + v + "`"));
     assert.ok(
-      subState.includes("`" + v + "`"),
-      `the resume sub-state TABLE must carry a row for PR Review = "${v}", not merely mention the value somewhere in the file`,
+      row,
+      `the resume sub-state table must carry a ROW KEYED on PR Review = "${v}". Being mentioned inside another row's prose is not a resume action — that is exactly how the two previous versions of this guard stayed green with the row deleted. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+    );
+    assert.match(
+      row.action,
+      /\b5[abc]\b|Step 7|escalat/i,
+      `the row for "${v}" must say WHERE the run resumes (5a/5b/5c, Step 7, or escalation) — a row that exists without an action is the gap this guards`,
     );
   }
 });
