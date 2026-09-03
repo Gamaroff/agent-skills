@@ -543,14 +543,38 @@ CY7-3…CY7-6 corrected: the "all four Steps 5–6 moments" claim removed from b
 it, "five of the seven" corrected to six of eight, the "all three artifacts" row reconciled with the
 immutable-commit note two lines below it, and the Completion line renamed off the gate-5 pass.
 
+### Gate 8 — CONCERNS (87) — the trail's claims hold — 2026-09-03
+
+`task.77.gate.8.review-pr-in-pipeline.yml` — **CONCERNS, 87/100**, the first of the four independent
+gates whose claims survive an adversarial reading. The reviewer executed **27 mutations**: all 17
+asserted anywhere in this trail hold, including the one honestly recorded as *not* holding, and ten
+were its own. CY7-1…CY7-7 closed but for CY7-4; **CY5-4 closed** after four assessments as PARTIAL.
+
+Its findings, and what was done:
+
+| Finding | Sev | Resolution |
+| --- | --- | --- |
+| CY8-1 | MEDIUM | CY7-4's count was corrected in the implementation report and published as corrected, while the PR body and the task doc's Change Log kept it — a **fourth** instance of the class. Both corrected |
+| CY8-2 | LOW | The exact phrase CY7-3 named still stood in the task doc's Change Log; reconciled with the immutable-commit note |
+| CY8-6 | LOW | CY7-7's pin covered the worked example but not the Format block's sample. Both now pinned — gate 8's mutation 26 was green and is red |
+| CY8-7 | LOW | The PR body asserted "closed all of it" ahead of the verdict that would judge it; replaced with what gate 8 actually measured |
+| CY8-3 / CY8-4 / CY8-5 | LOW | **Not fixed — deliberately deferred.** These are guard-*strength* gaps the reviewer devised, not false claims: the published mutation matrix fires the row-count canary rather than the keying; the action cell is a mention-match rather than a re-entry check; and per-value routing survives a merged key with decoy padding. Each is real; none makes a statement in this trail untrue. They are the right shape for a follow-up work item, not a fifth remediation round |
+| CY5-3 | LOW | Closes with CY8-1 and CY8-2 above |
+
+**Why this pass stops here.** Gate 8 is `CONCERNS`, which the loop's own contract treats as
+accept-eligible and non-blocking. The four items closed above are claim-accuracy defects — the class
+this task exists to catch — and were cheap. The three left open are test-strength gaps, and
+continuing to harden a guard inside a run that has already escalated is the loop's failure mode
+rather than its progress. That is a scope decision, and it goes to the operator.
+
 ---
 
 ## Completion
 
-**Finished**: in progress — QA loop escalated at cycle 5 of 5; gate-5, gate-6 and gate-7 findings remediated
-**Final Status**: In Progress — awaiting an independent verdict on the post-gate-7 remediation
+**Finished**: in progress — QA loop escalated at cycle 5 of 5; gates 5–8 remediated, gate 8 CONCERNS (87)
+**Final Status**: In Progress — gate 8 CONCERNS (accept-eligible); operator decision pending on merge vs. a follow-up for the three deferred guard-strength gaps
 **Branch**: `feature/task.77.review-pr-in-pipeline`
 **PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
-**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); 3 post-escalation remediation passes, each graded independently (gate 6 FAIL 75, gate 7 FAIL 78)
+**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); 4 post-escalation remediation passes, each graded independently (gate 6 FAIL 75, gate 7 FAIL 78, gate 8 CONCERNS 87)
 **DoD Summary**: not yet — Step 7 has not run
 **Tracker debt**: {populated after Step 7}

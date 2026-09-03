@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-03
-**Next Available Task Number:** **88**
+**Next Available Task Number:** **89**
 
 ## How to use
 
@@ -127,6 +127,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 85 | [Give /review-pr a machine-readable findings block](task.85.review-pr-machine-readable-findings/task.85.review-pr-machine-readable-findings.md) | draft | infrastructure | Medium | 2026-09-03 | — | task.77 |
 | 86 | [bundle_skill.py never refreshes transitively-bundled references](task.86.bundle-transitive-refresh/task.86.bundle-transitive-refresh.md) | draft | infrastructure | High | 2026-09-03 | — | — |
 | 87 | [Shell commands in table cells escape the snippet-execution gate](task.87.execute-table-cell-snippets/task.87.execute-table-cell-snippets.md) | draft | infrastructure | Medium | 2026-09-03 | — | task.67 |
+| 88 | [The resume sub-state guard is pinned by mutations that do not discriminate it](task.88.resume-guard-strength/task.88.resume-guard-strength.md) | draft | infrastructure | Medium | 2026-09-03 | — | task.77 |
 
 - **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 

@@ -465,6 +465,14 @@ test("the banner doc carries the PR review verdict in the Steps 5-6 exit line", 
     /QA LOOP ✅ complete \([^)]*PR review [A-Z]+\)/,
     "the worked example must RENDER the verdict, not merely describe it — the example is what gets copied",
   );
+  // BOTH examples, not just the worked one. The Format block's parenthetical is the sample a reader
+  // copies before ever reaching the worked example, and pinning only one of the two left the other
+  // free to be reverted with the suite green.
+  assert.match(
+    banner,
+    /optional short parenthetical: "\([^)]*PR review [A-Z]+\)"/,
+    "the Format block's sample parenthetical must carry the verdict too",
+  );
   // And 5c must still state the line the banner doc is the authority for, so the two documents
   // cannot drift apart while each looks self-consistent.
   assert.match(
