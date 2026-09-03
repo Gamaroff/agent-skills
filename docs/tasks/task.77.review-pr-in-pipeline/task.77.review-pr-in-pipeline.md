@@ -533,7 +533,7 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 17 parity tests (none vacuous) plus full `npm run ci` — green on every cycle
+- **Tests Executed**: 17 parity tests (none vacuous) plus full `npm run ci`. Not green on every cycle: it exited 1 at gate 5's assessment (finding CY5-1 — an unregistered artifact type in the work-item directory), which the independent reviewer caught against a written claim that it was green. Green since
 - **Phases Verified**: 7/7
 - **Critical Issues**: 0 open HIGH in gate 4; Step 5c raised 4 further high-confidence trail findings
 - **NFR Status** (gate 5, independent): Security PASS, Performance PASS, Reliability CONCERNS, Maintainability FAIL
@@ -544,7 +544,9 @@ The change itself is sound — Step 5c's own coverage and scope review found eve
 criterion delivered, nothing on the Out-of-Scope list touched, and the documentation sweep complete.
 What did not hold was the **trail**: a self-upgraded gate, three cycles with no QA report, a verdict
 that propagated to no downstream artifact, and a deleted predicate surviving in a second file. All
-are addressed in cycle 5.
+were addressed in cycle 5 — except **CR-3**, which cycle 5 dropped while claiming full closure.
+Gate 5, issued independently, caught that omission and six further findings. All are closed in the
+post-gate-5 remediation pass; the closing verdict on that pass is not self-issued either.
 
 ---
 
@@ -563,6 +565,7 @@ are addressed in cycle 5.
 | 2026-09-03 |         | Step 5c REQUEST CHANGES — 4 high-confidence trail findings; a self-upgrade of gate 4 was caught and withdrawn. Routing back to 5b, cycle 5 | review-pr |
 | 2026-09-03 |         | QA cycle 5 fixes — gate 4 restored, qa.2-4 written retrospectively, 9 shared resources and the task registry edited, tasks 85-87 filed | qa-fix |
 | 2026-09-03 |         | QA gate 5 FAIL (70/100), **issued independently** — 13/20 findings closed, CR-3 dropped undisclosed, 3 fresh contradictions. Budget spent → Loop Escalation | qa-task |
+| 2026-09-03 |         | Post-gate-5 remediation (not a sixth cycle — budget spent) — all six open gate-5 findings closed: CR-3 banner firing points instructed in §5c, `pending — 5c not yet run` given a resume row and a test literal (mutation-proved), `sectionBetween()` end index asserted (mutation-proved), cycle-5 PR Review row and QA Cycle 3 ordering corrected, closure table's false claims replaced, PR body refreshed | qa-fix |
 
 ---
 

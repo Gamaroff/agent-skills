@@ -66,6 +66,11 @@ function lineOf(text, re) {
  * `assert.doesNotMatch(section, /…/)` into a test that passes on a one-character string while
  * claiming to guard a whole section. `section5c()` was hardened against exactly this and then two
  * inline slices reproduced it verbatim — which is the argument for having one guarded path.
+ *
+ * The END index is asserted for the weaker cousin of the same reason: falling back to EOF on a
+ * missing end marker does not fail, it silently WIDENS the slice — sweeping in the sections the
+ * marker exists to exclude, which is how a `doesNotMatch` guard turns into prose-matching
+ * elsewhere in the file. A renamed end marker must fail by name.
  */
 function sectionBetween(startMarker, endMarker) {
   const start = loopDoc.indexOf(startMarker);
@@ -74,7 +79,11 @@ function sectionBetween(startMarker, endMarker) {
     `marker not found, so nothing below is being tested: ${startMarker}`,
   );
   const end = loopDoc.indexOf(endMarker, start + startMarker.length);
-  return loopDoc.slice(start, end > -1 ? end : undefined);
+  assert.ok(
+    end > -1,
+    `end marker not found after ${JSON.stringify(startMarker)}, so the slice would silently widen to EOF: ${JSON.stringify(endMarker)}`,
+  );
+  return loopDoc.slice(start, end);
 }
 
 function section5c() {
@@ -478,8 +487,17 @@ test("the 5c resume check reads the report, not the filesystem", () => {
     "Step 0 must state the same report-row condition the resume contract does",
   );
   // Every non-terminal value must have a stated resume action — the earlier version handled
-  // `not reached` and blank but not `review failed`, which 5c writes and nothing read.
-  for (const v of ["REQUEST CHANGES", "review failed", "not reached"]) {
+  // `not reached` and blank but not `review failed`, which 5c writes and nothing read. The
+  // enumeration then went stale the same way when 5a's `pending — 5c not yet run` placeholder
+  // was added to the loop doc's enum and to nothing else: the test that exists to catch a
+  // value with no resume action could not see the sixth one. Adding a value to the enum on
+  // line ~263 of the loop doc means adding it here and to the resume sub-state table.
+  for (const v of [
+    "pending — 5c not yet run",
+    "REQUEST CHANGES",
+    "review failed",
+    "not reached",
+  ]) {
     assert.ok(
       resume.includes(v),
       `the resume table must say what to do when PR Review reads "${v}"`,

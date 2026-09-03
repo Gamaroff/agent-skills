@@ -223,6 +223,14 @@ against the pre-change file), and that three "End-to-end dogfood" boxes in the t
 ticked with no artifact on disk to support them — the conformance failure this very task exists to
 catch, in its own paperwork.
 
+### QA Cycle 3 — 2026-09-03
+
+**Gate Result**: FAIL
+**Issues Found**: 7 — 4 HIGH, 2 MEDIUM, 1 LOW
+**HIGH findings**: 3 (excluding TASK77-021, which is the third-strike ruling on the other two, not an independent defect)
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Escalating — loop not converging
+
 ---
 
 ---
@@ -386,10 +394,14 @@ this task says it exists to close.
 **Gate Result**: _not written by this agent — see below_
 **Issues Found**: 12 from Step 5c (4 high-confidence trail, 8 code/consistency)
 **HIGH findings**: 0 new introduced
-**PR Review**: REQUEST CHANGES (cycle 4's 5c run)
+**PR Review**: pending — 5c not yet run
 **Action**: fixes applied; **gate deliberately not self-issued**
 
-All twelve 5c findings addressed:
+All **20** Step 5c findings (PC-1…PC-8, CR-1…CR-12) are accounted for below — one row each,
+grouped where a single edit closed several. **This table originally read "All twelve 5c findings
+addressed" and carried no CR-3 row**, which is gate 5's finding CY5-3: a closure claim asserted in
+the very artifact a reviewer reads to check closure. Rows marked *(post-gate-5)* were closed in the
+remediation pass after gate 5, not in cycle 5.
 
 | Finding | Resolution |
 | --- | --- |
@@ -402,8 +414,9 @@ All twelve 5c findings addressed:
 | PC-8 | `## Completion` moved to the end; QA bullets reordered chronologically |
 | CR-1 | Ingester no longer both skips and surfaces non-REQUEST-CHANGES reports |
 | CR-2 | Both README **sequence** diagrams gained the 5c branch — they still showed a clean gate exiting the loop while the flowchart above them did not |
+| CR-3 *(post-gate-5)* | **Dropped in cycle 5 with no disclosure** — this row is the one that was missing. Closed since: §5c now instructs **both** banner firing points (a Remaining Work Status block before `/review-pr`, and one on the REQUEST CHANGES arm before re-entering 5b), the per-cycle banner paragraph enumerates all four Steps 5–6 moments rather than two, and the two rows in `develop-pipeline-remaining-work-banner.md` are footnoted as develop-story/develop-task only — `develop-bug` has no 5c — with §5c named as their owner |
 | CR-4 | The deleted filesystem predicate removed from its **second home** in Step 0's progress table, and **pinned by a new test** so it cannot return to either |
-| CR-5 | `sectionBetween()` extracted with both indices asserted; the two inline slices that reproduced the `-1`/`slice(-1)` footgun now use it |
+| CR-5 *(completed post-gate-5)* | `sectionBetween()` extracted and the two inline slices that reproduced the `-1`/`slice(-1)` footgun now use it. The claim "both indices asserted" was **untrue as written in cycle 5** — only `start` was asserted, and a missing end marker silently widened the slice to EOF (gate 5's CY5-6). `end > -1` is now asserted too, and the assertion is mutation-proved by renaming `### Convergence check` in the loop doc |
 | CR-6 | The ingester pin now asserts the **Step 7 report template** (its two findings sections and the `→` continuation), not just the Step 6 terminal example |
 | CR-7 / CR-8 / CR-9 / CR-10 / CR-11 | 5a-time `pending` placeholder; `review failed` retry bounded at one; flowchart edge annotated; artifacts table reordered; push-budget partition corrected |
 
@@ -418,21 +431,43 @@ operator.
 
 ---
 
+## QA Loop Limit Reached — 2026-09-03
+
+Cycle 5's gate was issued by an **independent reviewer**, dispatched with no account of how the
+fixes were made and instructed to verify by execution:
+`task.77.gate.5.review-pr-in-pipeline.yml` — **FAIL, 70/100**. It caught a false claim the fixing
+agent had made in writing: `npm run ci` was exiting 1 on branch HEAD while the handover brief
+asserted it was green.
+
+**5 of 5 cycles are spent**, so this FAIL is **Loop Escalation**, not a sixth cycle. Seven findings
+(CY5-1 … CY5-7); CY5-1 was fixed and disclosed without re-grading the gate.
+
+### Post-gate-5 remediation — 2026-09-03
+
+Not a QA cycle: no gate was written for it by the agent that did the work, per the same rule. The
+six findings left open by gate 5 were closed as follows.
+
+| Gate-5 finding | Resolution |
+| --- | --- |
+| CY5-2 | Task doc's NFR line set to gate 5's measured values |
+| CR-3 (carried from 5c, dropped in cycle 5) | §5c now instructs both Remaining Work Status firing points; the per-cycle paragraph enumerates all four Steps 5–6 moments; the banner table's two 5c rows are footnoted develop-story/develop-task only, with §5c named as owner |
+| CY5-3 | CR-3 row added to the cycle-5 closure table and the "all twelve" claim replaced with the real count and an explicit note that the row was missing; the CR-5 row corrected too |
+| CY5-4 | `pending — 5c not yet run` row added to the resume sub-state table (same action as `not reached`) and to both artifact-table enumerations; the parity test's enumeration loop extended to the literal. **Mutation-proved** — deleting the row turns the suite red |
+| CY5-5 | Cycle 5's `**PR Review**` row set to `pending — 5c not yet run` (it recorded cycle 4's verdict); `### QA Cycle 3` moved into numeric order, so "the last entry" and "the highest {N}" now resolve to the same entry and `## Completion` is genuinely last |
+| CY5-6 | `sectionBetween()` asserts `end > -1`. **Mutation-proved** — renaming `### Convergence check` in the loop doc turns the suite red with the new message instead of silently widening the slice |
+| CY5-7 | Cycle-5 Change Log rows already written; PR #309 body refreshed (17 parity tests, current CI) |
+
+The closing gate for this remediation is **not** written by the agent that made these fixes — the
+rule that produced gate 5 applies to its remediation unchanged.
+
+---
+
 ## Completion
 
-**Finished**: in progress — QA cycle 5 of 5
-**Final Status**: In Progress — Step 5c returned REQUEST CHANGES; cycle 5 addressing its findings
+**Finished**: in progress — QA loop escalated at cycle 5 of 5; gate-5 findings remediated
+**Final Status**: In Progress — awaiting an independent verdict on the post-gate-5 remediation
 **Branch**: `feature/task.77.review-pr-in-pipeline`
 **PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
-**QA Iterations**: 4 complete, cycle 5 in progress; 1 Step 5c review (REQUEST CHANGES)
+**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); 1 post-gate-5 remediation pass
 **DoD Summary**: not yet — Step 7 has not run
 **Tracker debt**: {populated after Step 7}
-
-
-### QA Cycle 3 — 2026-09-03
-
-**Gate Result**: FAIL
-**Issues Found**: 7 — 4 HIGH, 2 MEDIUM, 1 LOW
-**HIGH findings**: 3 (excluding TASK77-021, which is the third-strike ruling on the other two, not an independent defect)
-**PR Review**: not reached — gate did not exit the loop
-**Action**: Escalating — loop not converging

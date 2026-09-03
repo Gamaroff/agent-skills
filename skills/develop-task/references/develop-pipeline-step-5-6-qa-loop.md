@@ -301,6 +301,11 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cy
 
 **Remaining Work Status block (required, per cycle).** Before re-invoking the QA skill for the next cycle, emit the block with the position line `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {N}/5`. On the cycle that exits the loop, the block is emitted as part of the Step 7 transition instead, in the form 5c specifies (`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate}, PR review {verdict})`). Format: [`references/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
 
+A cycle that reaches 5c emits **two further blocks**, both instructed in 5c below: one immediately
+before `/review-pr`, and one on the REQUEST CHANGES arm before re-entering 5b. Steps 5–6 therefore
+have **four** firing points, not two — this paragraph owns the first, the Step 7 transition owns
+the last, and 5c owns the middle pair.
+
 ### Convergence check (shared) — the QA loop's stall guard
 
 Perform this check **after the cycle's gate file has been written and read (5a), before entering
@@ -697,6 +702,13 @@ what its own dogfood run on PR #283 caught.
 implementation report, review report, QA report, gate. Only the DoD is missing, and Step 7 writes
 it. And an adverse verdict still has somewhere to go, because `/qa-fix` is live.
 
+**Remaining Work Status block (required, before the review).** Emit the block with the position
+line `Steps 5–6/8 — QA LOOP ⏳ PR conformance review, cycle {CYCLE}/5` immediately before invoking
+`/review-pr`. This is a mandatory firing point in
+[`references/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md)
+and **this section owns it**: the review is a subagent dispatch that can run long, and without the
+block the user's last position marker is the QA cycle that has already finished.
+
 #### Invoke the review
 
 ```bash
@@ -745,6 +757,10 @@ path already exists.
 The ordinary 5b invocation passes the latest **gate file**, and on this path that gate reads
 `PASS`/`WAIVED` with an empty `top_issues[]` — it carries none of the review's findings. Pass the
 **PR review report** as well:
+
+**Remaining Work Status block (required, before re-entering 5b).** Emit the block with the
+position line `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` before the
+invocation below — the second of the two firing points this section owns.
 
 ```
 Skill(qa-fix, args="gate={gate-file-path} pr_review={pr-review-report-path}")
