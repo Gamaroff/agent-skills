@@ -5,7 +5,7 @@ type: task
 description: "/review-pr runs two lenses; only one of them duplicates the pipeline. Its code lens is the same reviewer qa-story and qa-task already dispatch every cycle, but its conformance lens — does the diff deliver what the work item promised, and does the trail behind it hold up — has no counterpart anywhere in the pipeline. Wire it in as the exit gate of the Step 5–6 QA loop, where the trail it audits exists and an adverse verdict can still reach qa-fix."
 tags: [pipeline, review-pr, qa, conformance, documentation]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: medium
 created: 2026-09-01
@@ -16,7 +16,7 @@ estimated_effort_hours: 10
 
 # Technical Task: Run the PR conformance review before a work item is finalised
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.77.review.1.review-pr-in-pipeline.md` implemented 2026-09-03
 
 ---
@@ -485,6 +485,35 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-03
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.77.qa.1.review-pr-in-pipeline.md](./task.77.qa.1.review-pr-in-pipeline.md)
+- **Gate File**: [task.77.gate.1.review-pr-in-pipeline.yml](./task.77.gate.1.review-pr-in-pipeline.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 324 (plus full `npm run ci`, exit 0)
+- **Phases Verified**: 7/7 implemented, 3 with issues
+- **Critical Issues**: 3 HIGH
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+
+### Key Findings
+
+Every regression criterion holds and the design is sound, but three contradictions make the new path
+unrunnable: Loop Setup still says a clean PASS exits the loop (so 5c may never be entered), the shared
+cycle counter is incremented twice on a review-driven cycle, and the `REQUEST CHANGES` route cannot
+deliver its findings to `/qa-fix` so it dead-ends in the no-code-change HALT.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                                                       | Author      |
@@ -492,6 +521,7 @@ arms disables the gate while leaving every doc, test and contract in place.
 | 2026-09-01 | 1.0     | Initial draft — wire /review-pr into the develop pipelines as 5c   | create-task |
 | 2026-09-03 | 1.1     | Review passed (9/10) — 0 critical, 6 important. Added `docs/standards/{story,task}-documents.md` to the Phase 6 sweep (both attribute the pr-review report to `review-pr` (standalone) and neither re-derivation grep reached them); corrected the `commands.md` citation from L20–24 (out-of-scope orchestrator rows) to L11–12; restated the `advance-pipeline-lock.sh` mutation proof as expected-not-to-hold (the `*)` catch-all already noops — redundant source, per task 76); marked the `docs-pipeline` Legend item already satisfied at filing; widened the re-derivation greps and switched to a word-boundary `review-pr` pattern | review-task |
 | 2026-09-03 |         | Status → ready-for-review — all 7 phases implemented, full `npm run ci` green (format:check + npm test + eval:all) | develop |
+| 2026-09-03 |         | QA gate FAIL (70/100) — 3 HIGH, 2 MEDIUM, 2 LOW. Status → in-progress | qa-task |
 
 ---
 

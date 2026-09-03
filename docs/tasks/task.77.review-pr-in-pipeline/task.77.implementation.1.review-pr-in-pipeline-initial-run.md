@@ -36,7 +36,7 @@ document, runbook and diagram that describes the pipeline shape.
 | 1. create-branch           | ✅ Done    | Branch `feature/task.77.*` exists in git | Branch created at `9291efa`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.77.review.1.review-pr-in-pipeline.md`                            | READY TO IMPLEMENT, 9/10. 0 critical, 6 important, 8 optional — all important fixes applied to the task doc | Pre-pass B (arch alignment) + C (already-implemented) — summarised in the review report's Review Metadata |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 7 phases; 1 develop iteration; full `npm run ci` green (exit 0); 2 of 3 mutation proofs held, the third correctly did not | Pre-develop surface map (9 target areas) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #309](https://github.com/Gamaroff/agent-skills/pull/309) → `develop`; commit `b3945e4` (86 files). Issue comment skipped — no tracker issue linked | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.77.qa.{N}.*.md`; `task.77.gate.{N}.*.yml`; PR comment posted     |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.77.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -175,7 +175,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.77.review-pr-in-pipeline`
-**PR**: {populated after Step 4}
+**PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
