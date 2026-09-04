@@ -358,33 +358,35 @@ before its result was read):
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-04
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2)
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.89.qa.1.relationship-assertion-lint.md](./task.89.qa.1.relationship-assertion-lint.md)
-- **Gate File**: [task.89.gate.1.relationship-assertion-lint.yml](./task.89.gate.1.relationship-assertion-lint.yml)
+- **Cycle 2 (current)**: [task.89.qa.2.relationship-assertion-lint.md](./task.89.qa.2.relationship-assertion-lint.md) · [gate.2](./task.89.gate.2.relationship-assertion-lint.yml) — PASS 100/100
+- **Cycle 1**: [task.89.qa.1.relationship-assertion-lint.md](./task.89.qa.1.relationship-assertion-lint.md) · [gate.1](./task.89.gate.1.relationship-assertion-lint.yml) — CONCERNS 90/100
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 22 (lint) / 2311 (full suite)
+- **Tests Executed**: 31 (lint) / 2320 (full suite)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 1 LOW (theoretical, covered by a guard)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
 Every numeric claim re-derived independently and reproduced (89 files / 2188 call sites counted three
 ways; 61 → 0 unsuppressed; all six mutation proofs re-run with the mutation confirmed applied first).
 The suite is non-vacuous under an always-flagging analyser, a broken corpus walk, and a deleted
-fixture. **CY1-1 (MEDIUM)**: `regexCanStartAfter` omits `>`, so a regex after `=>` is scanned as code
-and an odd quote count inside it silently blinds the analyser to the rest of the file. 0 of 89 files
-affected today, so no coverage is lost — but the failure is silent, which is the one mode this
-deliverable cannot ship with.
+fixture. **CY1-1 (MEDIUM) — closed in cycle 1 and verified in cycle 2 by attack.** `regexCanStartAfter`
+omitted `>`, so a regex after `=>` was scanned as code and an odd quote count inside it silently
+blinded the analyser to the rest of the file. Both arms of the fix are independently mutation-proved,
+and the corpus-level reachability sweep was proved **able to fail** (M13) — which is what
+distinguishes a live guard from one that merely happens to pass. 6 regression probes confirm
+legitimate division is unaffected.
 
 ---
 
@@ -416,6 +418,7 @@ deliverable cannot ship with.
 | 2026-09-04 | 1.0     | Filed from task 77's retrospective — six instances of one bug class across eleven gates | create-task |
 | 2026-09-04 | 1.1     | Review passed (9/10 post-fix) — added the 9 missing mandatory sections (Motivation, Technical Background, Breaking Changes, Implementation Plan, Files Summary, Testing Strategy, Risk Assessment, Rollback Plan, Progress Tracking); pinned each of the six instances to its gate finding and closing commit, which criterion 1 referenced but §2 did not carry; gave the false-positive criterion a denominator (1742 assertions / 81 files) and a reporting location; added `shared/resources/tests/` to the target globs; named the lint's path and its no-package.json-change CI wiring | review-task |
 | 2026-09-04 |         | Status → ready-for-development                                    | review-task |
+| 2026-09-04 |         | QA gate PASS (100/100) cycle 2 — CY1-1 verified closed by mutation; 1 LOW recorded, not fixed | qa-task |
 | 2026-09-04 |         | QA findings fixed — CY1-1 closed (scanner value positions + reachability guard), 1 iteration | qa-fix |
 | 2026-09-04 |         | QA gate CONCERNS (90/100) — 1 MEDIUM (CY1-1, silent scanner desync), 1 LOW | qa-task |
 | 2026-09-04 |         | Implemented: 4-rule lint + 8 fixtures; FP rate 61 → 0 unsuppressed over 2188 call sites; 6 live true positives fixed; 6 mutation proofs; status → ready-for-review | develop |

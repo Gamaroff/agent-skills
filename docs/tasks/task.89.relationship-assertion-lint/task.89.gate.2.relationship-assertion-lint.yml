@@ -1,0 +1,56 @@
+schema: 1
+task: "task.89.relationship-assertion-lint"
+task_title: "Lint for prose-matching assertions that claim a relationship but test only co-occurrence"
+gate: PASS
+status_reason: "CY1-1 is closed at the mechanism, not patched, and the closure was verified by attack rather than by reading the fix. Both arms are independently mutation-proved — reverting `>` reddens 5 tests, reverting the keyword arm reddens 3 — and critically the corpus-level reachability sweep was proved capable of failing at all: with `>` reverted AND a real odd-quote line injected into a live corpus file, it goes red and NAMES that file. That matters because a guard over a corpus where nothing currently triggers it is otherwise indistinguishable from a guard that cannot fire. Six regression probes confirm the `>`/`<` addition does not eat legitimate division, including `obj.return / 2`. Numbers re-derived once more at the new HEAD: 89 files, 2191 call sites, 4 raw findings (all four suppressed with written reasons), 0 blind. The cycle-1 fix also disclosed a defect in its OWN first guard — the probe's quotes paired up and re-synced the mask, leaving the keyword arm unproven — and corrected it by isolating each shape. That self-catch is the strongest evidence in the change set that the discipline this task exists to install is actually operating. One LOW, theoretical and non-silent, recorded rather than fixed."
+reviewer: "QA Engineer"
+updated: "2026-09-04T13:00:00Z"
+
+top_issues:
+  - id: "CY1-1"
+    severity: medium
+    file: "tests/lib/relationship-assertion-lint.js"
+    finding: "`regexCanStartAfter` omitted `>`, so a regex literal after `=>` was scanned as code and an odd quote count inside it opened a phantom string that ran to EOF, silently hiding every later assertion in that file."
+    suggested_action: "Accept `>` as a value position and add a per-file reachability guard."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged by the fix. Pure file reads; no network, subprocess, eval or writes anywhere in the change set."
+  performance:
+    status: PASS
+    notes: "The reachability sweep re-analyses each of the 89 files a second time with the bait appended, roughly doubling the lint's own cost to ~340ms. Immaterial against a 2320-test ci:fast run, and it is what converts a silent failure into a named one."
+  reliability:
+    status: PASS
+    notes: "Was the CONCERNS axis at gate 1. Now PASS: the silent-degradation path is closed for `=>`, `>`, `<` and 14 keywords, and — more importantly — any REMAINING member of the class is now loud rather than silent, because the corpus sweep names the blind file. Proved able to fail (M13), not merely present."
+  maintainability:
+    status: PASS
+    notes: "The guard's own near-miss is written down at the definition of VALUE_POSITIONS, including why the shapes are asserted one at a time. A future reader who tries to consolidate them back into one probe file will find the reason they must not."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "The keyword arm treats a property access spelled like a keyword (`obj.return / 2`) as a value position, so that line misparses. Bounded to one line — a regex scan bails at newline, unlike a string — with 0 occurrences in the corpus and any resulting blindness now caught by the reachability guard. Exclude a word preceded by `.` if the idiom ever appears."
+      refs: ["tests/lib/relationship-assertion-lint.js"]
+    - action: "`assert.strictEqual(x.includes(y), true, msg)` remains unmodelled. 0 occurrences; already disclosed in the README's limitations."
+      refs: ["tests/lib/relationship-assertion-lint.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
