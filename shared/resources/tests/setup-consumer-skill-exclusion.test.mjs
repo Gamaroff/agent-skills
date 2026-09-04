@@ -85,11 +85,16 @@ const NEVER_EXCLUDED = [
  * assertion, which is the worst shape a test failure can take — it fails against
  * correct code, or passes without testing the fixture.
  *
- * Kept as ONE list rather than per-helper copies. It was two copies once, and
- * the second was written by copying the first and not extending it: it omitted
- * `SKILLS_CONFIG_FILE`, which resolve-platform.sh honours as an override of
- * *which file to read*, so an exported value redirected every parity case away
- * from its fixture. If you add a variable either resolver reads, add it here.
+ * Kept as ONE list rather than per-helper copies. It was THREE copies once —
+ * `callFn`, `runtimeTracker` and `runInstall` — and the rot is visible in the
+ * shape they had: the first scrubbed three variables, and the two written after
+ * it by copying scrubbed two apiece, each having quietly dropped one. Only
+ * `runtimeTracker`'s omission was ever exposed (it dropped `SKILLS_CONFIG_FILE`,
+ * which resolve-platform.sh honours as an override of *which file to read*, so
+ * an exported value redirected every parity case away from its fixture) — but a
+ * list maintained in three places was going to lose an entry somewhere, and
+ * which copy got caught first was luck. If you add a variable either resolver
+ * reads, add it here, and resist adding a second list anywhere.
  *
  *   JIRA_URL                — identity fallback in BOTH resolvers
  *   SKILLS_CONFIG_FILE      — resolve-platform.sh: names the config file to read
