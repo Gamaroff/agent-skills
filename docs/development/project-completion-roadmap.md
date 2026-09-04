@@ -96,6 +96,7 @@ accepted task stalls the loop.
 - [x] **T78** Give `develop-bug`'s fix cycle the same fast gate as the other pipelines · deps: none · touches: pipeline-steps!, test-harness~, bundles~ · /develop-task docs/tasks/task.78.develop-bug-fast-gate/task.78.develop-bug-fast-gate.md — ✅ **accepted + merged** ([PR #314](https://github.com/Gamaroff/agent-skills/pull/314), QA PASS 100/100)
 - [x] **T83** Skip installing tracker-specific skills the consumer's platform can never fire · deps: none · touches: setup-consumer!, test-harness~, docs-pipeline~ · /develop-task docs/tasks/task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md — ✅ **accepted + merged** ([PR #315](https://github.com/Gamaroff/agent-skills/pull/315), DoD PASS, QA PASS 95/100 over 3 cycles, CI 3/3) — QA found the filter **inverted** for quoted config, then found the follow-on defect in its own fix
 - [ ] **T84** Skill install profiles with dependency closure · deps: T83 · touches: setup-consumer!, test-harness~, docs-config~, docs-pipeline~ · /develop-task docs/tasks/task.84.skill-install-profiles/task.84.skill-install-profiles.md
+- [ ] **T91** Reconcile install-time and run-time tracker resolution · deps: T83 · touches: setup-consumer!, platform-detection!, test-harness~, docs-config~ · /develop-task docs/tasks/task.91.reconcile-tracker-resolution/task.91.reconcile-tracker-resolution.md
 
 ---
 

@@ -11,6 +11,7 @@ created: 2026-09-02
 updated: 2026-09-04
 completed_date: 2026-09-04
 pr_number: 315
+github_issue: 316
 assignee:
 estimated_effort_hours: 4
 ---
@@ -530,8 +531,10 @@ and never exported still resolves differently at install and run time. Bounded, 
 escapable via `--all-skills`, documented in the code and pinned by a test that names the follow-up.
 Closing it properly means teaching `resolve-platform.sh` to read `.env` — its own task, un-filed.
 
-**Tracker:** N/A — this task carries no `github_issue` / `jira_key`, so every tracker signal in this
-pipeline run was skipped. Run `/sync-github-task` on this file to link it.
+**Tracker:** N/A *at the time of this run* — the task carried no `github_issue`, so every tracker
+signal in the pipeline was skipped. **Linked retrospectively on 2026-09-04**: issue
+[#316](https://github.com/Gamaroff/agent-skills/issues/316), closed, on the board at Done. The
+record above is left as it stood at finalise rather than rewritten.
 
 **Detailed Verification Log:** See `task.83.dod.1.platform-aware-skill-exclusion.md` for the full
 evidence, including the executed probe set and the shellcheck baseline comparison.
@@ -557,6 +560,8 @@ evidence, including the executed probe set and the shellcheck baseline compariso
 | 2026-09-04 |         | QA cycle 2 findings fixed — three copies of the test env-scrub list consolidated to hermeticEnv(); 2 mutations proven | qa-fix |
 | 2026-09-04 |         | QA cycle 3 gate PASS (95/100) — all findings closed and re-verified; shellcheck criterion escalated to Step 7 | qa-task |
 | 2026-09-04 | 1.2     | DoD verified — accepted (PR #315); shellcheck closed at 0 new warnings | finalise |
+| 2026-09-04 |         | GitHub issue created (#316) | sync-github-task |
+| 2026-09-04 |         | Status → accepted (issue closed) | sync-github-task |
 
 ---
 

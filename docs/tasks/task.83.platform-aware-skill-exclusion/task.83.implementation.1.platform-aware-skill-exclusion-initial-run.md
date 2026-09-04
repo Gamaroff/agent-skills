@@ -276,9 +276,16 @@ gate carries the history", which would have fed the third-strike detector a fals
 
 ### Outstanding after merge
 
-1. **File the `resolve-platform.sh` `.env` follow-up.** The one residual that ships: a repo with no
-   `tracker:` key whose `JIRA_URL` is in `.env` and never exported resolves differently at install and
-   run time. Bounded, tested, documented — but un-owned.
-2. **Link this task to a tracker issue** (`/sync-github-task`).
+1. ~~**File the `resolve-platform.sh` `.env` follow-up.**~~ ✅ **Done 2026-09-04** — filed as
+   [task 91](../task.91.reconcile-tracker-resolution/task.91.reconcile-tracker-resolution.md) and
+   queued on the roadmap. It covers both resolver-parity residuals: the `.env` source asymmetry and
+   the malformed-input grading difference (CR-003 / RF-002), which are the same divergence in the
+   same function.
+2. ~~**Link this task to a tracker issue**~~ ✅ **Done 2026-09-04** — issue
+   [#316](https://github.com/Gamaroff/agent-skills/issues/316), closed, milestone
+   `Technical Tasks (standalone)`, on the board at Done. Note this was **not** added to the
+   `/develop-next` queue: the selector treats a row naming anything but `/develop-story`,
+   `/develop-task` or `/develop-bug` as a `manual-checkpoint` and **stops the loop**
+   (`select-next.mjs:645`), so queueing a `/sync-github-task` row would have halted the next run.
 3. Optional, recorded in `gate.3` under `future`: a `shellcheck` CI lane, and deciding whether the
    installer should refuse malformed `tracker:` input rather than defaulting.
