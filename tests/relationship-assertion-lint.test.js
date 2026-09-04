@@ -331,6 +331,96 @@ test("the live suite is scanned — the corpus is not empty", () => {
   );
 });
 
+/**
+ * The bait: a textbook rule-A defect. Appended to a file, it must be found. If
+ * it is not, the scanner desynced somewhere earlier in that file and everything
+ * after the desync is invisible — the analyser reports a blind file and a clean
+ * one identically.
+ */
+const BAIT = `\nassert.match(doc, /ALPHA[^|]*BRAVO/, "ALPHA must route to BRAVO");\n`;
+
+function baitIsFound(source) {
+  return analyze(source + BAIT, "bait").some((f) =>
+    f.snippet.includes("ALPHA"),
+  );
+}
+
+/**
+ * Regex literals in value positions the scanner once rejected. Each carries an
+ * ODD number of quote characters, so a misparse opens a phantom string that
+ * runs to end of file and swallows the bait.
+ *
+ * Asserted ONE AT A TIME, and that is the whole point. The first version of this
+ * guard put all of them in a single probe file — where the apostrophe in
+ * `return /it's/` was closed by the apostrophe in a LATER line, re-syncing the
+ * mask and leaving the keyword arm unproven. Reverting the keyword arm kept the
+ * suite green: the guard had the exact defect it was written to catch, one level
+ * down, which is instance 2 and instance 6 of this task's own corpus wearing a
+ * different hat. Isolation is what stops one shape rescuing another.
+ */
+const VALUE_POSITIONS = [
+  {
+    name: "after `=>` (arrow body)",
+    code: `const f = (l) => /it's here/.test(l);`,
+  },
+  { name: "after `>` (comparison)", code: `const c = a > /don't/.test(b);` },
+  { name: "after `return`", code: `function g(x) { return /it's/.test(x); }` },
+  { name: "after `typeof`", code: `const t = typeof /won't/.source;` },
+  { name: "after `case`", code: `switch (k) { case /isn't/.source: break; }` },
+  {
+    name: "backtick inside the regex",
+    code: "const f = (l) => /a`b/.test(l);",
+  },
+  {
+    name: "escaped slash then apostrophe",
+    code: `const f = (l) => /a\\/b'c/.test(l);`,
+  },
+];
+
+for (const vp of VALUE_POSITIONS) {
+  test(`the scanner survives a regex literal ${vp.name} (CY1-1)`, () => {
+    assert.ok(
+      baitIsFound(vp.code + "\n"),
+      `the scanner went blind on a regex literal ${vp.name}. It was parsed as division, so the quote ` +
+        `inside it opened a phantom string that ran to end of file — every assertion after this point ` +
+        `is invisible to every rule, and the analyser cannot tell such a file from a clean one. ` +
+        `Silent under-detection, in the one tool whose purpose is catching checks that cannot observe ` +
+        `what they claim.\n  code: ${vp.code}`,
+    );
+  });
+}
+
+test("the scanner survives all value positions together, in one file", () => {
+  // The combination, not only each shape — two individually-handled positions
+  // can still interact through the shared quote state.
+  const probe = fs.readFileSync(
+    path.join(FIXTURE_DIR, "scanner-hostile.probe.js"),
+    "utf8",
+  );
+  assert.ok(
+    baitIsFound(probe),
+    "the scanner went blind somewhere in the combined probe, even though each value position passes " +
+      "in isolation — the desync comes from their interaction",
+  );
+});
+
+test("no file in the live corpus is invisible to the scanner", () => {
+  const blind = [];
+  for (const file of liveSuiteFiles()) {
+    if (!baitIsFound(fs.readFileSync(file, "utf8"))) {
+      blind.push(path.relative(REPO_ROOT, file));
+    }
+  }
+  assert.deepEqual(
+    blind,
+    [],
+    "the scanner is blind to the tail of these files, so the clean-suite result below is not " +
+      "trustworthy for them — it reports 'no findings' because it stopped looking, not because " +
+      "there are none:\n" +
+      blind.map((f) => `  ${f}`).join("\n"),
+  );
+});
+
 test("the live suite carries no unsuppressed relationship-assertion findings", () => {
   const offenders = [];
   for (const file of liveSuiteFiles()) {

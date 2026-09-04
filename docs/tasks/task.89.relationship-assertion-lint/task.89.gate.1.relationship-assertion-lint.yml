@@ -1,0 +1,56 @@
+schema: 1
+task: "task.89.relationship-assertion-lint"
+task_title: "Lint for prose-matching assertions that claim a relationship but test only co-occurrence"
+gate: CONCERNS
+status_reason: "The deliverable does what it claims and every numeric claim in it reproduces under independent re-derivation — 89 files / 2188 call sites counted three ways, 61 → 0 unsuppressed, and all six mutation proofs reproduce with the mutation confirmed applied before the result was read. The suite is genuinely non-vacuous: an always-flagging analyser turns 14 tests red, a broken corpus walk trips the >=60 guard, and a deleted fixture trips the completeness guard. ONE MEDIUM: the scanner's regex-literal detector rejects value positions it should accept (`>`, hence `=>`), so a regex literal there is scanned as code; an ODD number of quote characters inside it opens a phantom string that swallows the remainder of the file, and every later assertion becomes invisible. A full reachability sweep proves 0 of 89 files are affected today — the two live instances carry BALANCED backticks, which re-sync the mask — so no coverage is lost and the 0% figure stands. But the failure is SILENT, and silent under-detection in a lint built to catch silent under-detection is the one defect this task cannot ship with. The fix is small; the guard that keeps it fixed is the point."
+reviewer: "QA Engineer"
+updated: "2026-09-04T12:00:00Z"
+
+top_issues:
+  - id: "CY1-1"
+    severity: medium
+    file: "tests/lib/relationship-assertion-lint.js"
+    finding: "`regexCanStartAfter` accepts only `(,=:[!&|?{};+-*%~^` as value positions. `>` is absent, so the extremely common `(l) => /re/.test(l)` idiom is parsed as division: the regex body is scanned as CODE. Any quote character inside it (`'` or a backtick) then opens a phantom string/template that runs until the next matching quote — and with an odd count, to EOF. Every assertion after that point is invisible to every rule, and the analyser reports zero findings for the file exactly as it would for a clean one. Verified by construction: `const f = (l) => /it's here/.test(l);` followed by a textbook rule-A defect yields NONE, while the same defect alone yields A. Also reproduces after a bare `>` comparison and with a backtick or an escaped slash in the regex. NOT currently costing coverage — a bait-assertion sweep appending a known-defective assertion to each of the 89 corpus files finds it in all 89, because the two live `=> /…/` regexes containing backticks (tracker-workflow.test.mjs:278, pr-inline-comment.test.mjs:255) carry them in balanced pairs and the mask re-syncs. It fires the first time somebody writes an apostrophe in such a regex, and it fires silently."
+    suggested_action: "Two parts, and the second matters more than the first. (1) Add `>` to the value-position set in `regexCanStartAfter` so `=>` is handled; consider `return`/`typeof`/`case` too, though `>` covers the live idiom. (2) Add a REACHABILITY GUARD to tests/relationship-assertion-lint.test.js: for every file in the live corpus, append a known-defective bait assertion and assert the analyser finds it — `assert.match(doc, /ALPHA[^|]*BRAVO/, \"ALPHA must route to BRAVO\")` is sufficient and is what this review used. That converts a silent per-file blindness into a named failure and is the mechanism that stops it being reintroduced; the one-character fix alone would leave the next desync just as silent. Mutation-prove the guard by reverting the `>` addition and confirming the guard goes red on a file that has the odd-quote shape."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Pure file reads. No network, no subprocess, no eval, no writes. The analyser takes source text and returns findings; the test walks a fixed set of roots under the repo. Nothing in the change set touches credentials, tracker calls or shell execution."
+  performance:
+    status: PASS
+    notes: "~300ms to scan 89 files / 2188 call sites, measured in the live-suite test. Comparable to tests/mutation-call-site-coverage.test.js, which walks a similar corpus. No measurable effect on ci:fast wall time (2311 tests, unchanged shape)."
+  reliability:
+    status: CONCERNS
+    notes: "CY1-1. The scanner degrades SILENTLY rather than loudly — a desync yields 'no findings', which is indistinguishable from a clean file. Everything else is robust: probes with regexes containing commas, parens, escaped slashes and double quotes all parse correctly, `t.assert.match` is picked up, and assertions quoted inside comments and strings are correctly ignored."
+  maintainability:
+    status: PASS
+    notes: "Rules are separate named functions with the historical instance each one carries documented at the definition. The FP record at tests/fixtures/relationship-assertion/README.md states the measurement, the narrowings and the two analyser bugs found by measuring — including a false mutation proof, disclosed rather than quietly re-run. Fixtures are reconstructed from named commits, so a reader can verify them independently."
+
+recommendations:
+  immediate:
+    - action: "Accept `>` as a regex value position, and add the per-file reachability guard that makes the class non-silent"
+      refs: ["tests/lib/relationship-assertion-lint.js", "tests/relationship-assertion-lint.test.js"]
+  future:
+    - action: "`assert.strictEqual(x.includes(y), true, msg)` expresses a co-occurrence claim the rules do not model. Zero occurrences in the corpus today and already disclosed in the README's limitations — worth modelling only if the idiom appears."
+      refs: ["tests/lib/relationship-assertion-lint.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - "CY1-1 fixed: `>` accepted as a value position, and the reachability guard added"

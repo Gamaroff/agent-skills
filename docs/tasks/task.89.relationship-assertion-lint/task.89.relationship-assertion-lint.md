@@ -315,6 +315,79 @@ lint, so rollback is a deletion rather than a migration.
 
 ---
 
+## Dev Agent Record — QA Fix Cycle 1
+
+**Finding closed**: CY1-1 (MEDIUM) — `regexCanStartAfter` rejected `>`, so a regex literal after `=>`
+was scanned as code; a quote inside it opened a phantom string that, with an odd count, ran to end of
+file and made every later assertion invisible to every rule.
+
+**Fix (both halves — the second matters more)**
+
+1. `tests/lib/relationship-assertion-lint.js` — added `>` and `<` to the value-position set, and a
+   keyword arm (`return`, `typeof`, `case`, `throw`, `await`, `in`, `of`, …) so the rest of the class
+   is closed too. `prevWord` tracking was added to distinguish `return /re/` from `median / 2`, and is
+   cleared after a string or regex so it cannot go stale.
+2. `tests/relationship-assertion-lint.test.js` — added a **reachability guard**: a bait assertion
+   (a textbook rule-A defect) is appended to each probe and to **every file in the live corpus**, and
+   must be found. Silent per-file blindness is now a named failure.
+
+**A defect was found in the fix's own guard, by mutation-proving it.** The first version put all seven
+value-position shapes in one probe file. The apostrophe in `return /it's/` was closed by the
+apostrophe in a *later* line, re-syncing the mask — so reverting the keyword arm left the suite green
+and that arm was unproven. That is instance 2 and instance 6 of this task's own corpus, one level
+down, inside the fix for the finding. The shapes are now asserted **one at a time**, with the combined
+probe kept as a separate interaction check.
+
+**Mutation proofs added** (baseline 31 pass / 0 fail; each mutation confirmed applied via `diff`
+before its result was read):
+
+| # | Mutation | Result | Proves |
+| - | --- | --- | --- |
+| M11 | Revert the `>` addition | 26 / **5 fail** | `=>`, `>`, backtick and escaped-slash arms |
+| M12 | Revert the keyword arm | 28 / **3 fail** | `return`, `typeof`, `case` arms |
+
+**Files modified**
+
+- `tests/lib/relationship-assertion-lint.js`
+- `tests/relationship-assertion-lint.test.js`
+- `tests/fixtures/relationship-assertion/scanner-hostile.probe.js` (added)
+
+**Verification**: 31/31 lint tests; `npm run ci:fast` exit 0. Live corpus reachability: 0 blind of 89.
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-04
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.89.qa.1.relationship-assertion-lint.md](./task.89.qa.1.relationship-assertion-lint.md)
+- **Gate File**: [task.89.gate.1.relationship-assertion-lint.yml](./task.89.gate.1.relationship-assertion-lint.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 22 (lint) / 2311 (full suite)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+Every numeric claim re-derived independently and reproduced (89 files / 2188 call sites counted three
+ways; 61 → 0 unsuppressed; all six mutation proofs re-run with the mutation confirmed applied first).
+The suite is non-vacuous under an always-flagging analyser, a broken corpus walk, and a deleted
+fixture. **CY1-1 (MEDIUM)**: `regexCanStartAfter` omits `>`, so a regex after `=>` is scanned as code
+and an odd quote count inside it silently blinds the analyser to the rest of the file. 0 of 89 files
+affected today, so no coverage is lost — but the failure is silent, which is the one mode this
+deliverable cannot ship with.
+
+---
+
 ## 12. References
 
 - `evals/shared/tests/pr-review-loop-parity.test.mjs` — all six instances and their fixes
@@ -343,4 +416,6 @@ lint, so rollback is a deletion rather than a migration.
 | 2026-09-04 | 1.0     | Filed from task 77's retrospective — six instances of one bug class across eleven gates | create-task |
 | 2026-09-04 | 1.1     | Review passed (9/10 post-fix) — added the 9 missing mandatory sections (Motivation, Technical Background, Breaking Changes, Implementation Plan, Files Summary, Testing Strategy, Risk Assessment, Rollback Plan, Progress Tracking); pinned each of the six instances to its gate finding and closing commit, which criterion 1 referenced but §2 did not carry; gave the false-positive criterion a denominator (1742 assertions / 81 files) and a reporting location; added `shared/resources/tests/` to the target globs; named the lint's path and its no-package.json-change CI wiring | review-task |
 | 2026-09-04 |         | Status → ready-for-development                                    | review-task |
+| 2026-09-04 |         | QA findings fixed — CY1-1 closed (scanner value positions + reachability guard), 1 iteration | qa-fix |
+| 2026-09-04 |         | QA gate CONCERNS (90/100) — 1 MEDIUM (CY1-1, silent scanner desync), 1 LOW | qa-task |
 | 2026-09-04 |         | Implemented: 4-rule lint + 8 fixtures; FP rate 61 → 0 unsuppressed over 2188 call sites; 6 live true positives fixed; 6 mutation proofs; status → ready-for-review | develop |

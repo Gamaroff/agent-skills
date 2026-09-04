@@ -80,6 +80,10 @@ function codeMask(src) {
   let i = 0;
   // Last significant code character, used to decide whether `/` opens a regex.
   let prev = "";
+  // The identifier immediately before it, so a keyword value position
+  // (`return /re/`) is distinguishable from an identifier one (`a / b`).
+  let prevWord = "";
+  let wordBuf = "";
   while (i < src.length) {
     const c = src[i];
     const next = src[i + 1];
@@ -109,9 +113,11 @@ function codeMask(src) {
         i++;
       }
       prev = quote;
+      prevWord = "";
+      wordBuf = "";
       continue;
     }
-    if (c === "/" && regexCanStartAfter(prev)) {
+    if (c === "/" && regexCanStartAfter(prev, prevWord)) {
       i++;
       let inClass = false;
       while (i < src.length) {
@@ -129,10 +135,23 @@ function codeMask(src) {
       }
       while (i < src.length && /[dgimsuvy]/.test(src[i])) i++;
       prev = "/";
+      prevWord = "";
+      wordBuf = "";
       continue;
     }
 
     mask[i] = 1;
+    if (/[A-Za-z0-9_$]/.test(c)) {
+      // Accumulate the identifier so `regexCanStartAfter` sees the whole word,
+      // not just its last letter — `return` and `median` both end in `n`.
+      wordBuf += c;
+    } else {
+      // The word ended. Whitespace preserves it as the preceding word;
+      // punctuation ends it AND invalidates it, because `foo) /re/` is a
+      // division after a paren, not a regex after `foo`.
+      prevWord = /\s/.test(c) ? wordBuf || prevWord : "";
+      wordBuf = "";
+    }
     if (!/\s/.test(c)) prev = c;
     i++;
   }
@@ -140,12 +159,47 @@ function codeMask(src) {
 }
 
 /**
+ * Keywords after which a `/` begins a regex literal rather than a division.
+ * `return /re/.test(x)` is the common one; the rest are cheap to include and
+ * each would otherwise desync the mask exactly as `=>` did.
+ */
+const VALUE_POSITION_KEYWORDS = new Set([
+  "return",
+  "typeof",
+  "case",
+  "throw",
+  "do",
+  "else",
+  "await",
+  "yield",
+  "in",
+  "of",
+  "instanceof",
+  "new",
+  "void",
+  "delete",
+]);
+
+/**
  * A `/` opens a regex literal only where a value may begin. After an
  * identifier, a closing paren/bracket or a numeral it is division instead.
+ *
+ * `>` is in the set because of `=>`, and its absence was a real defect rather
+ * than a theoretical one (gate 1, CY1-1). A regex in a rejected position is
+ * scanned as CODE, so a quote inside it opens a phantom string; with an odd
+ * count that string runs to end of file and every later assertion becomes
+ * invisible to every rule. The analyser then reports a clean file and a blind
+ * one identically — silent under-detection, in a lint whose whole purpose is
+ * catching checks that cannot observe what they claim.
+ *
+ * `>` alone would have closed the live idiom. The keyword arm closes the rest
+ * of the class, and the reachability guard in the test suite is what stops any
+ * remaining member of it from ever being silent again.
  */
-function regexCanStartAfter(prev) {
+function regexCanStartAfter(prev, prevWord) {
   if (prev === "") return true;
-  return "(,=:[!&|?{};+-*%~^".includes(prev);
+  if (prevWord && VALUE_POSITION_KEYWORDS.has(prevWord)) return true;
+  return "(,=:[!&|?{};+-*%~^><".includes(prev);
 }
 
 /**
