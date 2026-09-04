@@ -31,8 +31,13 @@ of `docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-
 note was first written, CY8-5's *second half* — asserting that each value routes to its **own**
 destination, not merely to *a* destination — was still open. Gate 9 raised it again as CY9-3 and
 graded it a carry-forward; it was filed nowhere, while this file said the work was done. It is now
-genuinely closed, in the same post-gate-10 pass that closed gate 10's CY10-1 (the identical defect
-on the 5c verdict table), and mutation-proved with gate 9's mutations 30–32 and gate 10's 33–36/45.
+closed for **four of its five values** in the post-gate-10 pass, alongside gate 10's CY10-1 (the
+identical defect on the 5c verdict table). Gate 11 then found the fifth — the terminal
+`APPROVE`/`CONCERNS` exit arm — still unasserted and deletable with the suite green, and raised it
+as CY11-1. **That** is where it was genuinely closed. This paragraph previously claimed full closure
+at the earlier pass; the correction is recorded rather than rewritten, because the overstatement is
+the point. Of gate 9's mutations 30–32, #31 was the green one and was reported under a different
+mutation's number — see the corrected proof block in task 77's implementation report.
 
 Kept rather than deleted because the task number is spent and never reused, and because the filing
 and the reversal are both part of the trail. The scope below is retained as the record of what was

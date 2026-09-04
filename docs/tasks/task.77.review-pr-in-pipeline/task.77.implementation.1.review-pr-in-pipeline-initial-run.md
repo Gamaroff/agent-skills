@@ -676,23 +676,62 @@ I found myself with mutations aimed where no previous gate looked — not becaus
 | Finding | Sev | Resolution |
 | --- | --- | --- |
 | **CY10-1** | MEDIUM | The verdict table is now **parsed into rows** and each verdict's destination read off **its own action cell** — the same mechanism that survived attack on the resume table. Positive *and* negative assertions per verdict: REQUEST CHANGES must route to 5b and must **not** exit or re-enter at 5a; APPROVE/CONCERNS must exit and must not route back; the failure arm must HALT and must forbid falling through. The effort mapping is pinned directionally |
-| **CY9-3** | LOW (carried from gate 9) | **Closed in the same pass, because it is the identical defect on the other table.** The resume rows now assert *which* destination each value resumes at, not merely that one is named — REQUEST CHANGES→5b, `review failed`→5c with its retry bound intact, and the two conditional rows→5c-if-clean-otherwise-5a |
+| **CY9-3** | LOW (carried from gate 9) | **Closed for FOUR of its five values, and claimed as fully closed — corrected under CY11-1 below.** The resume rows assert which destination each value resumes at — REQUEST CHANGES→5b, `review failed`→5c with its retry bound intact, and the two conditional rows→5c-if-clean-otherwise-5a — but the terminal **APPROVE/CONCERNS exit arm** was omitted, and could be deleted outright with the suite green |
 | CY10-2 | LOW | §7 item 12 still said the catalog was "absent from the diff" and the generator "a no-op" — falsified by `a74962b` itself. The row now records that the reasoning was circular and what replaced it |
 | CY10-3 | LOW | `## Completion` was stale in five places, including "Step 7 has not run" when it had run twice, and a `{populated after Step 7}` placeholder. Rewritten, and the tracker line now states the substantive fact — this task was never on a board |
 | CY10-4 | LOW | Task 88 claimed "all three are fixed" while CY8-5's second half was still open and CY9-3 was filed nowhere. Corrected **in place** on task 88, disclosing the gap rather than amending the claim silently |
 | CY10-5 | LOW | "3 diagrams / 8 reference-concept docs" → 5 and 11, with the reason the counts rose |
 
-**Mutation proof.** All seven previously-green mutations now fail: gate 10's 33, 34, 35, 36 and 45,
-and gate 9's 30 and 31. Control restores byte-identically at 20/20.
+**Mutation proof — with one row corrected under CY11-1.** Six of the seven hold: gate 10's 33, 34,
+35, 36 and 45, and gate 10's 30. The seventh was **mislabelled**: this block reported
+`gate 9 #31 resume 'review failed' -> 5a -> red`, but gate 10's mutation table defines **#31 as the
+APPROVE/CONCERNS exit arm**, which stayed green. The mutation actually executed (`review failed`→5a)
+is a different one, and does fire — so the substitute was real, but it was reported under the number
+of the mutation that did *not* hold, and the genuinely-green member left no trace. Diagnosed by gate
+11 as labelling rather than fabrication; recorded here because a proof reported under a claim it
+does not support is this task's own defect class. Control restored byte-identically at 20/20.
+
+### Gate 11 — the sixth mention-for-mapping, inside the fix — 2026-09-04
+
+`task.77.gate.11.review-pr-in-pipeline.yml` — ⚠️ **CONCERNS, 90/100**, from **71 mutations**. It was
+briefed to hunt a sixth instance of mention-standing-in-for-mapping on surfaces nobody had aimed at.
+It found one, and it was **inside the CY9-3 fix**.
+
+**CY11-1 (MEDIUM).** CY9-3 was closed for four of its five values. The fifth — the resume table's
+`APPROVE`/`CONCERNS` row, **the loop's exit arm and the row that decides Step 5–6 is complete** —
+was left unasserted. It could be repointed at `5a` or **deleted outright**, both 20/0 green, while
+four artifacts asserted the opposite: the fix's own comment (*"each is asserted specifically"*), the
+commit message, this report, and task 88.
+
+**And the proof row was mislabelled** — see the corrected mutation block above.
+
+**Surfaces gate 11 cleared, and said so:** `advance-pipeline-lock.sh` (a real mapping check — it
+runs the script and asserts the resulting step, 14/14 under both shells), the ingester contract, and
+`tracker-workflow.md`. It reproduced 45 of gate 10's 47 published rows exactly, and recorded two
+mis-targets as its own.
+
+### Post-gate-11 pass — 2026-09-04
+
+| Finding | Sev | Resolution |
+| --- | --- | --- |
+| **CY11-1** | MEDIUM | The exit arm is now asserted explicitly: the row must exist, must state *"Step 5–6 is complete"*, must route to Step 7, and must **not** re-enter 5a/5b. Deleting the row and repointing it both go red |
+| **CY11-2** | LOW | *"ready-for-merge sits inside 5c"* was an **ordering** comparison (`indexOf(stage) > indexOf(5c)`), satisfied by any position after 5c begins — including Loop Escalation, i.e. merge-ready on a failed run. Now a containment check against the bounded `section5c()`. **Hardening it exposed the same trap one level down:** `--stage ready-for-merge` is a *prefix* of `--stage ready-for-merge-RELOCATED`, so the first fix was defeated by substring matching and needed a negative lookahead |
+| CY11-3 | LOW | CY10-2's fix left an orphaned continuation line still asserting the claim it had just retracted |
+| CY11-4 | LOW | Four task-doc sections a gate stale, made so by `ef3a0c1` itself: header ×4, no qa.10/gate.10 row, the parity count (fixed once under CY9-4 and overtaken again), and §DoD saying *"a gate 10 is outstanding"* with gate.10 on disk |
+| CY11-5 | LOW | Both Step 5c banner firing points, §5c's two instructions, and Step 0's 5c completeness condition were all deletable with the suite green. Firing point and owner are a **mapping**: the banner table declares the moment, §5c instructs it, and each must now name the other's position line verbatim |
+
+**Mutation proof.** All six previously-green mutations now fail — the exit-arm deletion and
+repointing, `ready-for-merge` out of 5c, both banner instructions, and Step 0's condition. Control
+restores byte-identically at 22/22.
 
 ---
 
 ## Completion
 
-**Finished**: in progress — QA loop escalated at cycle 5 of 5; gates 5–10 remediated
-**Final Status**: In Progress — gate 10 CONCERNS (90); CY10-1…5 and CY9-3 closed in the post-gate-10 pass; a gate 11 and a `dod.3` are outstanding
+**Finished**: in progress — QA loop escalated at cycle 5 of 5; gates 5–11 remediated
+**Final Status**: In Progress — gate 11 CONCERNS (90); CY11-1…5 closed in the post-gate-11 pass, including the exit arm CY9-3 had missed. A gate reading PASS or WAIVED, and a passing `dod.3`, are what remain
 **Branch**: `feature/task.77.review-pr-in-pipeline`
 **PR**: [#309](https://github.com/Gamaroff/agent-skills/pull/309)
-**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); **6 post-escalation remediation passes**, each graded independently — gate 6 FAIL 75, gate 7 FAIL 78, gate 8 CONCERNS 87, gate 9 CONCERNS 91, gate 10 CONCERNS 90
+**QA Iterations**: 5 complete (gate 5 FAIL, independent — Loop Escalation); 1 Step 5c review (REQUEST CHANGES); **7 post-escalation remediation passes**, each graded independently — gate 6 FAIL 75, gate 7 FAIL 78, gate 8 CONCERNS 87, gate 9 CONCERNS 91, gate 10 CONCERNS 90, gate 11 CONCERNS 90
 **DoD Summary**: **Step 7 has run twice, and accepted neither time.** `dod.1` (at `87e5bf9`) — NOT ACCEPTED, 8 gaps. `dod.2` (at `3bbd506`) — NOT ACCEPTED, blocked solely on the `accepted` precondition, plus 5 trail-currency defects closed in-pass. A `dod.3` is owed once a gate reads PASS or WAIVED
 **Tracker debt**: none — this task carries no `github_issue` and no `jira_key`, so Step 7's issue-close and board-move steps are NOT_APPLICABLE. Worth recording rather than leaving as a placeholder: **this task was never on a board**

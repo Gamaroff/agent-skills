@@ -347,7 +347,6 @@ implementation report**.
 
 11. ✅ `skills/*/references/*` — `npm run bundle` (six consumers, not four — see the QA cycle 3 note)
 12. ✅ `docs/reference/skill-catalog.md` — **regenerated.** This row previously read "no change required: no `description:` field changed, so `npm run generate-catalog` is a no-op and the file is absent from the diff". That reasoning was **circular** — the catalog was clean only because the stale source was never touched. Both orchestrator `SKILL.md` descriptions still restated the pre-5c chain; they now name 5c, and the catalog is regenerated from them (`dod.2`, and gate 10's CY10-2).
-    `npm run generate-catalog` is a no-op and the file is absent from the diff
 
 ### Files Added — follow-ups filed from QA (precedent: tasks 67–70 from task 66's dogfood)
 
@@ -510,11 +509,11 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (gate 9, independent) — Loop Escalation stands; the 5-cycle budget was spent at gate 5
-**QA Engineer**: QA Engineer — gates 5–9 issued by independent reviewers, none of whom wrote the fixes they graded
+**QA Status**: CONCERNS (gate 11, independent) — Loop Escalation stands; the 5-cycle budget was spent at gate 5
+**QA Engineer**: QA Engineer — gates 5–11 issued by independent reviewers, none of whom wrote the fixes they graded
 **Testing Date**: 2026-09-03
-**Quality Score**: 91/100 (gate 9)
-**Gate Decision**: CONCERNS (gate 9, 91) — the CY8 residual was **closed here**, not deferred; task 88 was filed and then superseded. Acceptance still needs a PASS/WAIVED gate plus a passing DoD run
+**Quality Score**: 90/100 (gate 11)
+**Gate Decision**: CONCERNS (gate 11, 90) — acceptance needs a PASS/WAIVED gate plus a passing DoD run. Gates 5–11 were each issued by an independent reviewer who did not write the fixes being graded
 
 > A gate-4 edit to PASS (92) was made and then **withdrawn** — Step 5c identified it as a
 > self-issued re-grade on the field that decides whether the loop exits. See the withdrawal note in
@@ -536,6 +535,8 @@ arms disables the gate while leaving every doc, test and contract in place.
 | — | [qa.9](./task.77.qa.9.review-pr-in-pipeline.md) **independent** | [gate.9](./task.77.gate.9.review-pr-in-pipeline.yml) | ⚠️ **CONCERNS (91)** — post-gate-8 pass. **44 mutations run; no trail-asserted proof failed.** CY8-3 verified closed at the mechanism |
 | — | [dod.1](./task.77.dod.1.review-pr-in-pipeline.md) | — (DoD verification, writes no gate) | ❌ **NOT ACCEPTED** — 8 gaps; AC 17/17, CI green, security PASS |
 | — | [dod.2](./task.77.dod.2.review-pr-in-pipeline.md) | — (DoD verification, writes no gate) | ❌ **NOT ACCEPTED** — blocked on the gate precondition; 5 trail defects found and closed in-pass |
+| — | [qa.10](./task.77.qa.10.review-pr-in-pipeline.md) **independent** | [gate.10](./task.77.gate.10.review-pr-in-pipeline.yml) | ⚠️ **CONCERNS (90)** — 47 mutations. **CY10-1 (MEDIUM)**: the 5c verdict table's routing was mention-matched, so REQUEST CHANGES could be repointed at 5a or Step 7 with the suite green |
+| — | [qa.11](./task.77.qa.11.review-pr-in-pipeline.md) **independent** | [gate.11](./task.77.gate.11.review-pr-in-pipeline.yml) | ⚠️ **CONCERNS (90)** — 71 mutations. **CY11-1 (MEDIUM)**: the sixth mention-for-mapping, inside the CY9-3 fix — the exit arm was unasserted and deletable |
 
 **Rows 6–9 and the DoD rows carry no cycle number deliberately.** They graded **remediation passes**
 and **DoD verification runs**, not QA cycles — the 5-cycle budget was spent at gate 5, and no number
@@ -543,7 +544,7 @@ of remediation passes restores it.
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 18 parity tests (none vacuous) plus full `npm run ci`. Not green on every cycle: it exited 1 at gate 5's assessment (finding CY5-1 — an unregistered artifact type in the work-item directory), which the independent reviewer caught against a written claim that it was green. Green since
+- **Tests Executed**: 22 parity tests (none vacuous — all fail against `origin/develop`) plus full `npm run ci`. Not green on every cycle: it exited 1 at gate 5's assessment (finding CY5-1 — an unregistered artifact type in the work-item directory), which the independent reviewer caught against a written claim that it was green. Green since
 - **Phases Verified**: 7/7
 - **Critical Issues**: 0 open HIGH in gate 9 (the latest); Step 5c raised 4 high-confidence trail findings, and gates 5–9 raised 22 more — every one in the trail or in test strength, none in pipeline behaviour
 - **NFR Status** (gate 9, independent — the latest): see `task.77.gate.9.review-pr-in-pipeline.yml`
@@ -580,7 +581,7 @@ Gaps **2–8 are closed** and were independently re-verified at head by three se
 
 **Gap 1 remains the only blocker** and is unchanged: `shared/resources/document-status-lifecycle.md:62`
 requires the QA gate to read `PASS` or `WAIVED`. The latest gate on disk is `gate.9` — `CONCERNS`,
-91, with `waiver.active: false`. A gate 10 is outstanding.
+90, with `waiver.active: false`. Gates 10 and 11 have since been issued and are on disk; a gate reading PASS or WAIVED is what remains.
 
 ### What `dod.2` found and closed in-pass
 
@@ -621,6 +622,8 @@ rather than silently corrected.
 | 2026-09-03 |         | DoD run 2 — NOT accepted, blocked solely on the gate precondition (gate 9 CONCERNS, no active waiver). AC 17/17, CI green on head, security PASS (1560 probes, 0 reproduced). Five trail-currency defects found and closed in-pass: both orchestrator SKILL.md descriptions still restated the pre-5c chain (and the catalog with them), the QA tables and header were a gate stale again, this Change Log's append-only rule had been breached by 3bbd506, and the DoD gaps section was two commits stale | finalise |
 | 2026-09-03 |         | Gate 10 CONCERNS (90/100), **issued independently** — 47 mutations. CY10-1 (MEDIUM): the 5c **verdict table**'s routing was mention-matched, so REQUEST CHANGES could be repointed at 5a or at Step 7 with the suite green — fifth instance of mention-for-mapping, first on the primary routing table. 29 trail-asserted proofs re-executed, none failed | qa-task |
 | 2026-09-03 |         | Post-gate-10 pass — CY10-1 closed by parsing the verdict table into rows and asserting each destination off its own action cell, with negative assertions per verdict; **CY9-3 closed in the same pass** as the identical defect on the resume table. CY10-2/3/4/5 closed. All 7 previously-green mutations now fail; control restores byte-identically | qa-fix |
+| 2026-09-04 |         | Gate 11 CONCERNS (90/100), **issued independently** — 71 mutations. **CY11-1 (MEDIUM)**: the sixth mention-for-mapping, and it was inside the CY9-3 fix — the terminal APPROVE/CONCERNS exit arm was unasserted and deletable while four artifacts claimed full closure; a proof row was also mislabelled. Cleared `advance-pipeline-lock.sh`, the ingester contract and `tracker-workflow.md` as real mapping checks | qa-task |
+| 2026-09-04 |         | Post-gate-11 pass — CY11-1…5 closed: the exit arm asserted explicitly, `ready-for-merge` changed from an ordering check to containment (whose first fix was itself defeated by substring matching and needed a negative lookahead), both 5c banner firing points and Step 0's condition pinned, and the overstated CY9-3 closure claims corrected in all three artifacts that carried them | qa-fix |
 
 ---
 

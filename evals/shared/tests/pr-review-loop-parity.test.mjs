@@ -294,19 +294,21 @@ test("the 5-cycle bound covers 5c rather than being extended by it", () => {
 // ── 4. ready-for-merge fires AFTER the review, not on the QA gate ────────────
 
 test("ready-for-merge sits inside 5c, after the review clears", () => {
-  const s5c = loopDoc.indexOf("### 5c. ");
-  const stage = loopDoc.indexOf("--stage ready-for-merge");
-
-  assert.ok(
-    s5c > -1,
-    "the 5c section must exist for this comparison to mean anything",
-  );
-  assert.ok(stage > -1, "the ready-for-merge stage call must still exist");
-  assert.ok(
-    stage > s5c,
+  // CONTAINMENT, not ordering. This compared `indexOf("--stage ready-for-merge") > indexOf("### 5c.")`,
+  // which is satisfied by ANY position after 5c begins — including inside Loop Escalation, i.e.
+  // signalling a card merge-ready on a run that failed. Gate 11 relocated the call there and the
+  // suite stayed 20/0 green. `section5c()` is already bounded at the next H2, so ask the question
+  // directly: is the stage call in 5c?
+  // The lookahead is load-bearing: `--stage ready-for-merge` is a PREFIX of
+  // `--stage ready-for-merge-RELOCATED`, so a bare match is satisfied by a renamed call. Caught by
+  // mutating this very fix — the substring trap that produced six findings, one level down.
+  assert.match(
+    section5c(),
+    /--stage ready-for-merge(?![-\w])/,
     "ready-for-merge must sit INSIDE 5c. Before task 77 it fired in 5a's " +
       "outcome branching, which advertised a card as merge-ready while the " +
-      "run could still loop back into qa-fix.",
+      "run could still loop back into qa-fix — and an ordering-only check let " +
+      "it drift forward into Loop Escalation instead.",
   );
 
   // And it must not have been left behind in the outcome branching too.
@@ -563,6 +565,57 @@ test("the ingester describes the format /review-pr actually renders", () => {
   );
 });
 
+test("5c's two banner firing points are instructed, and belong to 5c", () => {
+  // CR-3 was "two firing points declared mandatory with nothing instructing them". The fix added
+  // the instructions; nothing pinned them, so gate 11 deleted both from §5c and swapped the two
+  // rows in the banner table — 20/0 green each time. Firing point and owner are a MAPPING: the
+  // banner table declares the moment, §5c instructs it, and each must name the other's position
+  // line verbatim or the two documents drift while each stays self-consistent.
+  const s5c = section5c();
+  const pairs = [
+    ["PR conformance review", "before invoking\n`/review-pr`"],
+    ["review requested changes", "before re-entering 5b"],
+  ];
+  for (const [line] of pairs) {
+    const position = `Steps 5–6/8 — QA LOOP ⏳ ${line}, cycle {CYCLE}/5`;
+    assert.ok(
+      banner.includes(position),
+      `the banner table must declare the firing point "${line}"`,
+    );
+    assert.ok(
+      s5c.includes(position),
+      `§5c must INSTRUCT the "${line}" block it owns, with the position line the banner table declares verbatim — a declared-but-uninstructed firing point is CR-3`,
+    );
+  }
+
+  // And the two must not be interchangeable: the review block precedes the REQUEST CHANGES block,
+  // because one runs before the review and the other only on an adverse verdict.
+  assert.ok(
+    s5c.indexOf("QA LOOP ⏳ PR conformance review") <
+      s5c.indexOf("QA LOOP ⏳ review requested changes"),
+    "the pre-review block must be instructed before the REQUEST-CHANGES block — swapping them inverts which moment each describes",
+  );
+});
+
+test("Step 0's 5c completeness condition lives on the QA-loop row", () => {
+  // Gate 11: the condition could be deleted from develop-task's progress table, or MOVED to the
+  // Step 7 row, with the suite green — an ownership claim that was never asserted as one.
+  const step0 = read(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  const condition = "`**PR Review**` row on the highest `### QA Cycle {N}`";
+  for (const loop of ["qa-story / qa-fix loop", "qa-task / qa-fix loop"]) {
+    const row = step0
+      .split("\n")
+      .find((l) => l.includes(loop) && l.startsWith("|"));
+    assert.ok(row, `Step 0 must carry a progress row for the ${loop}`);
+    assert.ok(
+      row.includes(condition),
+      `the 5c completeness condition belongs to the ${loop} ROW — moving it to another step's row makes it unreachable at the resume moment it exists for`,
+    );
+  }
+});
+
 test("the banner doc carries the PR review verdict in the Steps 5-6 exit line", () => {
   // 5c states the exit position line as `({N} cycles, {gate}, PR review {verdict})` and points at
   // the banner doc as the format authority for it. That doc rendered the parenthetical WITHOUT the
@@ -728,7 +781,9 @@ test("the 5c resume check reads the report, not the filesystem", () => {
   // verdict table). The assertions above prove each value has a row, a verb and *a* destination —
   // not that it is the RIGHT destination. Gate 9 demonstrated the gap: `REQUEST CHANGES` could be
   // repointed at 5c, `APPROVE` at 5a, and `review failed` could lose its escalation bound, all
-  // green. Each value resumes somewhere specific, so each is asserted specifically.
+  // green. Each value resumes somewhere specific, so each is asserted specifically — INCLUDING the
+  // terminal APPROVE/CONCERNS arm below, which the first version of this block omitted while
+  // claiming otherwise (gate 11, CY11-1).
   const dest = (v) =>
     subStateRows.find((r) => r.key.includes("`" + v + "`")).action;
 
@@ -747,6 +802,34 @@ test("the 5c resume check reads the report, not the filesystem", () => {
     /second\*{0,2} consecutive|escalate to Loop Escalation/i,
     "the `review failed` retry must stay bounded — its usual cause is not self-healing, so an unbounded retry loops forever",
   );
+  // THE EXIT ARM, asserted explicitly — it is the row that decides Step 5-6 is COMPLETE, and it was
+  // the one value the first version of this block left out. Gate 11 deleted the row outright and
+  // repointed it at 5a; both stayed 20/0 green, while this block's own comment claimed "each is
+  // asserted specifically". A guard that covers four of five values, omitting the terminal one, is
+  // the sixth instance of mention-standing-in-for-mapping in this task.
+  const exit = subStateRows.find(
+    (r) => r.key.includes("`APPROVE`") && r.key.includes("`CONCERNS`"),
+  );
+  assert.ok(
+    exit,
+    `the sub-state table must carry the terminal APPROVE/CONCERNS row. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+  );
+  assert.match(
+    exit.action,
+    /Step 5–6 is complete/,
+    "the exit arm must state that Step 5-6 is COMPLETE — that is the whole content of the verdict",
+  );
+  assert.match(
+    exit.action,
+    /go to Step 7/,
+    "the exit arm must route to Step 7",
+  );
+  assert.doesNotMatch(
+    exit.action,
+    /re-enter at \*\*5[abc]\*\*/,
+    "a cleared 5c does not re-enter the loop — re-entering would re-run QA against a tree that already passed",
+  );
+
   for (const v of ["pending — 5c not yet run", "not reached"]) {
     assert.match(
       dest(v),
