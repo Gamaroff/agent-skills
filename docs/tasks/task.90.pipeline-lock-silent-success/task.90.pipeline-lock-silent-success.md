@@ -238,7 +238,8 @@ None to any documented interface. Two behaviour changes worth naming:
       `lite-mode.md`), and lumping in an executable would make every doc-editing row falsely conflict
       with lock edits.
 - [x] Run `npm run bundle`, then verify each of the 9 copies **by content** (`diff` or checksum
-      against the source) — the bundler prints `in sync` for stale transitive copies (task 86).
+      against the source, skipping the `AUTO-GENERATED` banner the bundler inserts at line 2 — a raw
+      checksum never matches, however fresh the copy).
 - [x] Add the roadmap Change Log row.
 
 **Dependencies**: Phases 1–2 (the bundled copies must carry the fixed script).
@@ -288,8 +289,9 @@ the local lock file.
 - [x] All cases covered in `advance-pipeline-lock.test.sh`, green under bash **and** zsh (30 scenarios).
 - [x] The 14 pre-existing scenarios remain green.
 - [x] Mutation-proved: revert each fix, confirm the new test goes red, restore.
-- [x] All 9 bundled copies refreshed and verified **by content** (the bundler prints `in sync` for
-      stale transitive copies — see task 86).
+- [x] All 9 bundled copies refreshed and verified **by content** — a bundled copy is the source plus
+      the `AUTO-GENERATED` banner line, so a raw checksum never matches and the comparison must skip
+      that line (`diff <(sed '2d' "$copy") "$source"`).
 - [x] **A `touches:` tag covering this script exists in the roadmap legend, and this row is retagged
       to use it.** No tag covers `shared/resources/advance-pipeline-lock.sh` today: `pipeline-steps`
       is scoped to `develop-pipeline-step-*.md` and `lite-mode.md`, and `test-harness` covers
@@ -298,7 +300,8 @@ the local lock file.
       with another row editing the same script and the two would conflict for real. Do **not** widen
       `pipeline-steps` to cover it: that tag is prose, and lumping in an executable would make every
       doc-editing row falsely conflict with lock edits. Add a distinct tag instead.
-- [x] `npm run ci` exits 0.
+- [x] `npm run ci` exits 0 — re-run against head `d74bce3` after the QA-cycle-1 fixes, closing
+      PR-review finding PC-2 (the tick had been carried from a pre-`a1e836a` run).
 
 ## 10. Risk Assessment
 
@@ -489,7 +492,7 @@ evidence for or against it**, and should not be cited as having reproduced it.
 | `zsh shared/resources/advance-pipeline-lock.test.sh` | **22 passed, 0 failed** |
 | `bash -n` / `zsh -n` on the changed script | clean |
 | `npm run ci:fast` (`format:check` + `npm test`) | **exit 0** |
-| `npm run ci` (`ci:fast` + `eval:all`) | **exit 0** — 432 shell assertions, node suite, and every replay eval green |
+| `npm run ci` (`ci:fast` + `eval:all`) | **exit 0** — re-run at head `d74bce3`: 440 shell assertions, full node suite, every replay eval green |
 | Bundled-copy content verification | 9 checked, 0 stale |
 
 The 14 pre-existing scenarios — the `commit-changes` nesting contract and the Steps 5–6 loop noops —
@@ -513,3 +516,4 @@ stayed green throughout, including under both mutations.
 | 2026-09-04 |         | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 1 LOW; all 10 success criteria met, findings are in the artifacts shipped alongside the fix | qa-task |
 | 2026-09-04 |         | QA findings fixed — 1 HIGH + 2 MEDIUM closed in 1 iteration: report rebuilt 480,884 → 218 lines, false "single hole" claim corrected in task/CHANGELOG/PR, non-object lock guard added (scenario 12); guard restructured to one falsifiable predicate on mutation-proof evidence | qa-fix |
 | 2026-09-04 |         | QA gate PASS (100/100) cycle 2 — all 3 findings closed and verified by execution; refute pass found no new HIGH/MEDIUM; 3 LOW pre-existing observations recorded | qa-task |
+| 2026-09-04 |         | Step 5c `/review-pr` CONCERNS — 0 code findings; 2 medium conformance findings closed: the retracted task-86 bundler claim removed from §6 and §9 (it appeared twice; the review named one), and `npm run ci` re-run at head `d74bce3` so criterion 11's tick is earned rather than inherited | review-pr |
