@@ -116,7 +116,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 74 | [A security re-review must re-probe, not re-read](task.74.security-re-review-reprobes/task.74.security-re-review-reprobes.md) | ready-for-development | infrastructure | High | 2026-09-01 | — | task.67 |
 | 75 | [Make the pipeline quality gate run what CI runs](task.75.quality-gate-matches-ci/task.75.quality-gate-matches-ci.md) | ready-for-development | infrastructure | High | 2026-09-01 | — | task.67 |
 | 76 | [State what a mutation proof does not tell you](task.76.mutation-proof-limits/task.76.mutation-proof-limits.md) | ready-for-development | infrastructure | Medium | 2026-09-01 | — | task.67 |
-| 77 | [Run the PR conformance review before a work item is finalised](task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md) | ready-for-review | infrastructure | High | 2026-09-01 | — | task.66 |
+| 77 | [Run the PR conformance review before a work item is finalised](task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md) | accepted | infrastructure | High | 2026-09-01 | — | task.66 |
 | 78 | [Give develop-bug's fix cycle the same fast gate as the other pipelines](task.78.develop-bug-fast-gate/task.78.develop-bug-fast-gate.md) | ready-for-development | infrastructure | Medium | 2026-09-01 | — | task.75 |
 | 79 | [Write down the inputs that defeat each sink, once](task.79.security-input-corpus/task.79.security-input-corpus.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | — |
 | 80 | [Make a security probe runnable without widening the snippet allow-list](task.80.security-probe-engine/task.80.security-probe-engine.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | task.79 |

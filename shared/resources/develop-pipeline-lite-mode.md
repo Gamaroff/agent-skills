@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-lite-mode
-description: Lite-mode contract for the develop-story and develop-task pipeline orchestrators. Covers trigger conditions, PIPELINE_MODE=lite behavior, and the directive format passed to qa-story/qa-task. QA-side effect details (Adaptive Review Strategy override) stay in each qa skill's own section.
+description: Lite-mode contract for the develop-story and develop-task pipeline orchestrators. Covers trigger conditions, PIPELINE_MODE=lite behavior, the directive format passed to qa-story/qa-task, and Step 5c's `/review-pr --effort low` degradation (lite degrades the PR conformance review; it never skips it). QA-side effect details (Adaptive Review Strategy override) stay in each qa skill's own section.
 ---
 
 # Develop Pipeline — Lite Mode

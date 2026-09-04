@@ -5,18 +5,20 @@ type: task
 description: "/review-pr runs two lenses; only one of them duplicates the pipeline. Its code lens is the same reviewer qa-story and qa-task already dispatch every cycle, but its conformance lens — does the diff deliver what the work item promised, and does the trail behind it hold up — has no counterpart anywhere in the pipeline. Wire it in as the exit gate of the Step 5–6 QA loop, where the trail it audits exists and an adverse verdict can still reach qa-fix."
 tags: [pipeline, review-pr, qa, conformance, documentation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-01
-updated: 2026-09-03
-assignee:
+updated: 2026-09-04
+completed_date: 2026-09-04
+assignee: TBD
+pr_number: 309
 estimated_effort_hours: 10
 ---
 
 # Technical Task: Run the PR conformance review before a work item is finalised
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.77.review.1.review-pr-in-pipeline.md` implemented 2026-09-03
 
 ---
@@ -511,9 +513,9 @@ arms disables the gate while leaving every doc, test and contract in place.
 
 **QA Status**: CONCERNS (gate 11, independent) — Loop Escalation stands; the 5-cycle budget was spent at gate 5
 **QA Engineer**: QA Engineer — gates 5–11 issued by independent reviewers, none of whom wrote the fixes they graded
-**Testing Date**: 2026-09-03
+**Testing Date**: 2026-09-04
 **Quality Score**: 90/100 (gate 11)
-**Gate Decision**: CONCERNS (gate 11, 90) — acceptance needs a PASS/WAIVED gate plus a passing DoD run. Gates 5–11 were each issued by an independent reviewer who did not write the fixes being graded
+**Gate Decision**: WAIVED (gate 12) — an operator waiver over the residual, recorded after gate 11 (CONCERNS 90), which stands as the last independent verdict. Gates 5–11 were each issued by an independent reviewer who did not write the fixes being graded; gate 12 deliberately is not, and says so
 
 > A gate-4 edit to PASS (92) was made and then **withdrawn** — Step 5c identified it as a
 > self-issued re-grade on the field that decides whether the loop exits. See the withdrawal note in
@@ -537,8 +539,9 @@ arms disables the gate while leaving every doc, test and contract in place.
 | — | [dod.2](./task.77.dod.2.review-pr-in-pipeline.md) | — (DoD verification, writes no gate) | ❌ **NOT ACCEPTED** — blocked on the gate precondition; 5 trail defects found and closed in-pass |
 | — | [qa.10](./task.77.qa.10.review-pr-in-pipeline.md) **independent** | [gate.10](./task.77.gate.10.review-pr-in-pipeline.yml) | ⚠️ **CONCERNS (90)** — 47 mutations. **CY10-1 (MEDIUM)**: the 5c verdict table's routing was mention-matched, so REQUEST CHANGES could be repointed at 5a or Step 7 with the suite green |
 | — | [qa.11](./task.77.qa.11.review-pr-in-pipeline.md) **independent** | [gate.11](./task.77.gate.11.review-pr-in-pipeline.yml) | ⚠️ **CONCERNS (90)** — 71 mutations. **CY11-1 (MEDIUM)**: the sixth mention-for-mapping, inside the CY9-3 fix — the exit arm was unasserted and deletable |
+| — | — (no assessment — a waiver is not a review) | [gate.12](./task.77.gate.12.review-pr-in-pipeline.yml) | ✅ **WAIVED** — operator waiver over the residual. **Not independent, and labelled as such**; gate 11 remains the last independent grade |
 
-**Rows 6–9 and the DoD rows carry no cycle number deliberately.** They graded **remediation passes**
+**Rows 6–12 and the DoD rows carry no cycle number deliberately.** They graded **remediation passes**
 and **DoD verification runs**, not QA cycles — the 5-cycle budget was spent at gate 5, and no number
 of remediation passes restores it.
 
@@ -546,8 +549,8 @@ of remediation passes restores it.
 
 - **Tests Executed**: 22 parity tests (none vacuous — all fail against `origin/develop`) plus full `npm run ci`. Not green on every cycle: it exited 1 at gate 5's assessment (finding CY5-1 — an unregistered artifact type in the work-item directory), which the independent reviewer caught against a written claim that it was green. Green since
 - **Phases Verified**: 7/7
-- **Critical Issues**: 0 open HIGH in gate 9 (the latest); Step 5c raised 4 high-confidence trail findings, and gates 5–9 raised 22 more — every one in the trail or in test strength, none in pipeline behaviour
-- **NFR Status** (gate 9, independent — the latest): see `task.77.gate.9.review-pr-in-pipeline.yml`
+- **Critical Issues**: 0 open HIGH in gate 11 (the last independent grade); Step 5c raised 4 high-confidence trail findings, and gates 5–11 raised 30 more — every one in the trail or in test strength, none in pipeline behaviour
+- **NFR Status** (gate 11, independent — the last independent grade): see `task.77.gate.11.review-pr-in-pipeline.yml`. Gate 12 is an operator waiver, not an assessment, and carries gate 11's ratings forward unchanged
 
 ### Key Findings
 
@@ -564,7 +567,7 @@ post-gate-5 remediation pass; the closing verdict on that pass is not self-issue
 ## Definition of Done - Gaps Identified
 
 **Status:** IN PROGRESS (status deliberately unchanged — `ready-for-review`)
-**Current run:** [`task.77.dod.2.review-pr-in-pipeline.md`](./task.77.dod.2.review-pr-in-pipeline.md) — verified at head `3bbd506`
+**Current run:** [`task.77.dod.3.review-pr-in-pipeline.md`](./task.77.dod.3.review-pr-in-pipeline.md) — verified at head `18dd5b5`
 **Run 1:** [`task.77.dod.1.review-pr-in-pipeline.md`](./task.77.dod.1.review-pr-in-pipeline.md) — NOT ACCEPTED, 8 gaps, verified at `87e5bf9`. Historical; never edited.
 
 > **This section previously restated run 1's eight gaps and went stale.** It sat stamped at
@@ -579,9 +582,16 @@ Gaps **2–8 are closed** and were independently re-verified at head by three se
 — `architecture.md`'s fourth diagram, the seven-instance `ready-for-merge` sweep, the registry row,
 §7 item 16, the QA tables, and the zsh parse error (11/11 blocks now clean under both shells).
 
-**Gap 1 remains the only blocker** and is unchanged: `shared/resources/document-status-lifecycle.md:62`
-requires the QA gate to read `PASS` or `WAIVED`. The latest gate on disk is `gate.9` — `CONCERNS`,
-90, with `waiver.active: false`. Gates 10 and 11 have since been issued and are on disk; a gate reading PASS or WAIVED is what remains.
+**Gap 1 — the gate precondition — is now met, by waiver rather than by a PASS.**
+`shared/resources/document-status-lifecycle.md:62` requires the QA gate to read `PASS` or `WAIVED`.
+The latest gate on disk is `gate.12`, an **operator waiver** (`waiver.active: true`), recorded after
+seven independent gates none of which reached PASS. The last independent grade is `gate.11`
+(`CONCERNS`, 90); `gate.9` read `CONCERNS`, **91**.
+
+> This paragraph is a worked example of the defect it sits inside. It previously named `gate.9` as
+> "the latest" two gates after that stopped being true, asserted a blocker `gate.12` had already
+> cleared, and misquoted gate 9's score as 90 — an error introduced by the very edit that was
+> "refreshing" it. Found by `dod.3`'s AC and compliance agents independently.
 
 ### What `dod.2` found and closed in-pass
 
@@ -624,6 +634,8 @@ rather than silently corrected.
 | 2026-09-03 |         | Post-gate-10 pass — CY10-1 closed by parsing the verdict table into rows and asserting each destination off its own action cell, with negative assertions per verdict; **CY9-3 closed in the same pass** as the identical defect on the resume table. CY10-2/3/4/5 closed. All 7 previously-green mutations now fail; control restores byte-identically | qa-fix |
 | 2026-09-04 |         | Gate 11 CONCERNS (90/100), **issued independently** — 71 mutations. **CY11-1 (MEDIUM)**: the sixth mention-for-mapping, and it was inside the CY9-3 fix — the terminal APPROVE/CONCERNS exit arm was unasserted and deletable while four artifacts claimed full closure; a proof row was also mislabelled. Cleared `advance-pipeline-lock.sh`, the ingester contract and `tracker-workflow.md` as real mapping checks | qa-task |
 | 2026-09-04 |         | Post-gate-11 pass — CY11-1…5 closed: the exit arm asserted explicitly, `ready-for-merge` changed from an ordering check to containment (whose first fix was itself defeated by substring matching and needed a negative lookahead), both 5c banner firing points and Step 0's condition pinned, and the overstated CY9-3 closure claims corrected in all three artifacts that carried them | qa-fix |
+| 2026-09-04 |         | **Gate 12 WAIVED** — operator waiver over the residual, not an independent grade and explicitly labelled as such. Gate 11 (CONCERNS 90) stands as the last independent verdict; its CY11-1…5 are closed and mutation-proved. Waives the standing likelihood of further LOW trail-currency findings on an eighth review, not any open defect | qa-gate |
+| 2026-09-04 | 1.2     | DoD run 3 — NOT accepted at 18dd5b5 (6 defects, incl. CY11-4 partially closed, which falsified the waiver's own precondition, and a gate-9 misquote introduced by the edit that refreshed it); all six closed in-pass and **accepted** at the corrected head. AC 17/17, security PASS on 3029 probes, CI green. Status → accepted | finalise |
 
 ---
 
