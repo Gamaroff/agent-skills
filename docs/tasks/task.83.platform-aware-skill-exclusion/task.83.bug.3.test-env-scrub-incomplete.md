@@ -4,7 +4,7 @@
 **Bug ID**: TASK-83-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass)
 **Date Found**: 2026-09-04
 
@@ -131,3 +131,4 @@ unset or stale — the same class of hole, reached by a different route.
 | 2026-09-04 | New          | qa-task    | Found by the cycle 2 refute pass, in cycle 1's own fix        |
 | 2026-09-04 | In Progress  | qa-fix     | Enumeration found three copies of the list, not two          |
 | 2026-09-04 | Ready for QA | qa-fix     | Consolidated to `hermeticEnv()`; mutation-proven (M7, M8)     |
+| 2026-09-04 | Closed       | qa-task    | Verified closed in QA cycle 3 under real pollution — suite re-run with SKILLS_CONFIG_FILE and AGENT_SKILLS_ACCESS_TRACKER genuinely exported |

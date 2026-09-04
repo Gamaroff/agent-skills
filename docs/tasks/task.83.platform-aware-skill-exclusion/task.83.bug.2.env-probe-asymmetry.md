@@ -4,7 +4,7 @@
 **Bug ID**: TASK-83-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-04
 
@@ -152,3 +152,4 @@ acceptable or whether the `resolve-platform.sh` follow-up should be filed now.
 | 2026-09-04 | New          | qa-task    | Found during QA cycle 1                             |
 | 2026-09-04 | In Progress  | qa-fix     | Weighed both gate options; chose keep + document    |
 | 2026-09-04 | Ready for QA | qa-fix     | Comment + CHANGELOG corrected, asymmetry pinned (M6) |
+| 2026-09-04 | Closed       | qa-task    | Verified closed in QA cycle 2: asymmetry documented and pinned by test; residual recorded in gate.3 recommendations.future |

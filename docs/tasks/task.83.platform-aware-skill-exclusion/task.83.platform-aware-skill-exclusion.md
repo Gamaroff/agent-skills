@@ -5,17 +5,19 @@ type: task
 description: "Skip installing tracker-specific skills that can never fire on the consumer's configured platform — 11 Jira skills on a GitHub repo, 6 GitHub skills on a Jira repo."
 tags: [setup-consumer, install, platform-detection]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-02
 updated: 2026-09-04
+completed_date: 2026-09-04
+pr_number: 315
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Platform-aware skill exclusion in setup-consumer.sh
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.83.review.1.platform-aware-skill-exclusion.md` implemented 2026-09-04
 
 ---
@@ -365,12 +367,16 @@ The filter is a substring match over a 17-line constant per skill. No baseline n
 ### Code Quality
 
 - [x] `npm test` green, including the new suite and the updated `setup-consumer-config.test.mjs` — `npm run ci:fast`: 2343 tests, 0 failures
-- [x] New suite observed to run under the existing `shared/resources/tests/*.test.mjs` glob — its 34
-      tests appear in the full-run output and `package.json` is unmodified (22 at first implementation;
-      QA cycle 1 added the 12-case install/run-time parity block)
+- [x] New suite observed to run under the existing `shared/resources/tests/*.test.mjs` glob — its 35
+      tests appear in the full-run output and `package.json` is unmodified (22 at first implementation; QA cycle 1
+      added the 12-case install/run-time parity block, QA cycle 2 the SKILLS_CONFIG_FILE decoy case)
 - [x] The classification-parity test exists and fails when a tracker skill is unclassified
 - [x] Every fix mutation-proven per §8
-- [ ] `shellcheck scripts/setup-consumer.sh` no new warnings — **NOT VERIFIED**: `shellcheck` is not installed on this machine. `bash -n` parses clean; run shellcheck in CI or locally before merge
+- [x] `shellcheck scripts/setup-consumer.sh` no new warnings — **VERIFIED at Step 7** via the official
+      `koalaman/shellcheck:stable` container (the binary is not installed on this host and no CI
+      workflow runs it). Baseline `origin/develop`: 1 warning. This branch: 1 warning. Same warning,
+      `SC2209` at `:223` (`ACCESS_TRACKER=command` — a false positive on a literal access-mode value),
+      in code this task never touches: line 223 falls inside no hunk of the diff. **0 new warnings.**
 - [x] New functions defined above the `SETUP_CONSUMER_NO_MAIN` hook so tests can reach them
 
 ### Migration
@@ -488,11 +494,49 @@ installed with none of its 11 Jira skills. Cycle 2's refute pass found the follo
 1's own fix: an incomplete environment scrub in the new test helper. Cycle 3 confirmed all three
 findings closed, each re-verified by re-running the check that produced it.
 
-### Known gap carried to Step 7
+### The gap QA carried to Step 7 — closed there
 
-The `shellcheck` success criterion is **unverified and cannot be closed by the QA loop** — the binary
-is not installed on this host and no CI workflow runs it. Either run it before merging, or file the
-CI lane as a follow-up. It is the five points held back from the quality score.
+The `shellcheck` criterion could not be closed by the QA loop (binary absent, no CI lane). Step 7
+resolved it with the official `koalaman/shellcheck:stable` container: baseline 1 warning, this branch
+1 warning, the same pre-existing `SC2209` in code the diff never touches. **0 new warnings** — met,
+not waived. See `task.83.dod.1.*.md` § Step 4b.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Gate File:** `task.83.gate.3.platform-aware-skill-exclusion.yml`
+**Gate Status:** ✅ PASS · **Quality Score:** 95/100 · **QA Cycles:** 3 (FAIL 70 → CONCERNS 80 → PASS 95)
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** 20/20 §9 success criteria met, each evidenced by a named test rather than a claim
+✅ **Tests:** `npm run ci:fast` — 2356 tests, 0 failures, 1 skipped, prettier clean
+✅ **CI:** SUCCESS on head `6d2e644` (= local HEAD); all remaining changes are documentation only
+✅ **PR Review:** Step 5c `/review-pr` — CONCERNS, no high-severity finding, all 3 findings actioned
+✅ **Documentation:** CHANGELOG, `getting-started.md` step 8 and the script header all current; the CHANGELOG's token claim independently recomputed (1,505/11,702 = 12.9% vs the documented ~13%)
+✅ **Security:** boundary probe mode fired on the install classifier — **14 candidates executed, 0 reproduced**. Probes covered substrings, superstrings, case, whitespace, regex and glob metacharacters, the empty name and both tracker sides
+✅ **Code quality:** `shellcheck` **0 new warnings** vs the `origin/develop` baseline, run via the official container
+⚠️ **Compliance:** NOT_APPLICABLE — a local install-time filter processes no regulated data
+✅ **Bug reports:** 3 filed, 3 closed
+✅ **Mutation proving:** 8 QA proofs (M1–M8) plus the developer's 7 — including the two properties this task named as its highest risks (the grandfather rule and the classification drift guard)
+
+**Residual, recorded rather than hidden:** a repo with no `tracker:` key whose `JIRA_URL` is in `.env`
+and never exported still resolves differently at install and run time. Bounded, grandfathered,
+escapable via `--all-skills`, documented in the code and pinned by a test that names the follow-up.
+Closing it properly means teaching `resolve-platform.sh` to read `.env` — its own task, un-filed.
+
+**Tracker:** N/A — this task carries no `github_issue` / `jira_key`, so every tracker signal in this
+pipeline run was skipped. Run `/sync-github-task` on this file to link it.
+
+**Detailed Verification Log:** See `task.83.dod.1.platform-aware-skill-exclusion.md` for the full
+evidence, including the executed probe set and the shellcheck baseline comparison.
+
+**Task marked as ACCEPTED on:** 2026-09-04
 
 ---
 
@@ -512,6 +556,7 @@ CI lane as a follow-up. It is the five points held back from the quality score.
 | 2026-09-04 |         | QA cycle 2 gate CONCERNS (80/100) — both cycle-1 findings closed; refute pass found 1 new MEDIUM (test env scrub) | qa-task |
 | 2026-09-04 |         | QA cycle 2 findings fixed — three copies of the test env-scrub list consolidated to hermeticEnv(); 2 mutations proven | qa-fix |
 | 2026-09-04 |         | QA cycle 3 gate PASS (95/100) — all findings closed and re-verified; shellcheck criterion escalated to Step 7 | qa-task |
+| 2026-09-04 | 1.2     | DoD verified — accepted (PR #315); shellcheck closed at 0 new warnings | finalise |
 
 ---
 
@@ -521,8 +566,8 @@ CI lane as a follow-up. It is the five points held back from the quality score.
 - [x] Phase 2 — Wire the filter into the copy loop
 - [x] Phase 3 — Tests
 - [x] Phase 4 — Documentation
-- [ ] QA review complete
-- [ ] Quality gate PASS
+- [x] QA review complete — 3 cycles (FAIL 70 → CONCERNS 80 → PASS 95)
+- [x] Quality gate PASS
 
 ---
 

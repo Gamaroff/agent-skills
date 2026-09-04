@@ -4,7 +4,7 @@
 **Bug ID**: TASK-83-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-04
 
@@ -189,3 +189,4 @@ dead code.
 | 2026-09-04 | New          | qa-task    | Found during QA cycle 1                  |
 | 2026-09-04 | In Progress  | qa-fix     | Root cause identified — two defects      |
 | 2026-09-04 | Ready for QA | qa-fix     | Fix implemented, mutation-proven (M4, M5) |
+| 2026-09-04 | Closed       | qa-task    | Verified closed in QA cycle 2: the resolver differential and the end-to-end fixture install both re-run and both agree |
