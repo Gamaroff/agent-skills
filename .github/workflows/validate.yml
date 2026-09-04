@@ -4,12 +4,20 @@ on:
   pull_request:
     paths:
       - 'skills/**'
+      - 'scripts/generate-skill-dependencies.mjs'
+      # The generated graph and the profiles that consume it. Without this the
+      # drift check below cannot fire on the very file it checks.
+      - 'shared/resources/skill-dependencies.json'
+      - 'shared/resources/skill-profiles.json'
       - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
   push:
     branches: [main, develop]
     paths:
       - 'skills/**'
+      - 'scripts/generate-skill-dependencies.mjs'
+      - 'shared/resources/skill-dependencies.json'
+      - 'shared/resources/skill-profiles.json'
       - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
 
@@ -30,6 +38,14 @@ jobs:
       - name: Install PyYAML
         run: pip install pyyaml
 
+      # The catalog and bundle checks below are pure Python, but the
+      # skill-dependencies generator is Node — this job had no Node at all, so
+      # adding the drift check without this step would fail on `node: not found`.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Validate all skills
         run: |
           failed=0
@@ -48,6 +64,19 @@ jobs:
             echo "::error::Skill catalog is out of date."
             echo "Run 'npm run generate-catalog' locally and commit the diff."
             git --no-pager diff docs/reference/skill-catalog.md | head -100
+            exit 1
+          fi
+
+      - name: Skill dependency graph up-to-date check
+        run: |
+          # The graph is generated from each SKILL.md's `invokes:` frontmatter.
+          # A stale graph means install profiles resolve the wrong closure — a
+          # consumer gets a pipeline missing a step, and finds out mid-run.
+          node scripts/generate-skill-dependencies.mjs
+          if ! git diff --quiet shared/resources/skill-dependencies.json; then
+            echo "::error::skill-dependencies.json is out of date."
+            echo "Run 'npm run generate-skill-deps' locally and commit the diff."
+            git --no-pager diff shared/resources/skill-dependencies.json | head -100
             exit 1
           fi
 

@@ -58,6 +58,16 @@ jobs:
             exit 1
           fi
 
+      - name: Skill dependency graph up-to-date check
+        run: |
+          npm run generate-skill-deps
+          if ! git diff --quiet shared/resources/skill-dependencies.json; then
+            echo "::error::skill-dependencies.json is out of date for this tag."
+            echo "Run 'npm run generate-skill-deps' locally, commit the diff, and re-tag."
+            git --no-pager diff shared/resources/skill-dependencies.json | head -100
+            exit 1
+          fi
+
       - name: Validate all skills
         run: |
           failed=0
