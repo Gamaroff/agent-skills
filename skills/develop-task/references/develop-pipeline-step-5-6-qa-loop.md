@@ -424,6 +424,21 @@ Invoke the `/qa-fix` skill with the path to the most recent **gate file** (the `
 
 #### Third-strike rule — replace, do not patch again
 
+> **A gate carries only its OWN cycle's findings.** This is a precondition of the rule below, not a
+> style preference, and it is the one way to feed the detector a wrong answer.
+>
+> The detector reads the `file:` of every HIGH `top_issues[]` entry across the last three gates and
+> **deliberately ignores `status: closed`** — see the comment in `high_files()` for why. That is
+> correct *given* one gate per cycle carrying that cycle's findings. Copy a closed HIGH forward into
+> the next gate "so the gate carries the history" and one real finding now looks like a file struck
+> twice; a third cycle trips "replace, do not patch again" on a file with nothing wrong with it, in a
+> loop that was converging cleanly.
+>
+> It is an easy mistake to make for good reasons — the phrasing above is the actual justification an
+> agent wrote before doing it on task 83, and it took a later cycle to catch. Put the history where it
+> belongs instead: `bug_resolution`, the QA report's Re-Review Context table, and the bug reports.
+> Those are read by people; `top_issues[]` is read by this rule.
+
 Before invoking `/qa-fix`, work out which files have been the subject of HIGH findings for three
 consecutive cycles. Every `top_issues[]` entry carries a **`file:`** key (gate schema: `qa-task`
 **Step 10: Create Quality Gate File**, `qa-story` **Output 2: Quality Gate File**), so this is

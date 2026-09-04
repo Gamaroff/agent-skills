@@ -66,6 +66,28 @@ const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("STDOUT_DRAIN");
 /** Node's pipe buffer. Output must exceed this for truncation to be observable. */
 const PIPE_BUFFER_BYTES = 65536;
 
+/**
+ * Payload for the two mechanism tests, sized at 128x the pipe buffer.
+ *
+ * It was 200_000 — barely 3x — and that made the truncation test a RACE rather
+ * than an observation. It went red twice on CI in one afternoon, on docs-only
+ * commits that could not reach it, and the roadmap's own change log had already
+ * diagnosed the same failure once before as "a scheduling race … re-running the
+ * identical commit went green". A premise test that fails when the machine is
+ * merely busy teaches everyone to re-run red builds, which is the opposite of
+ * what a gate is for.
+ *
+ * The fix is not "a bigger number". What escapes before `process.exit()` ends
+ * the process is bounded by the PIPE BUFFER, not by how much was written —
+ * measured across 70 local runs at 200KB, 1MB and 8MB payloads, the most that
+ * ever escaped was 131072 bytes (2x the buffer) in every case. So any payload
+ * far above the buffer cannot fully drain no matter how the scheduler behaves,
+ * and 8 MiB clears even a Linux pipe grown to its 1 MiB F_SETPIPE_SZ maximum by
+ * a factor of eight. Cost is unchanged: the payload size does not measurably
+ * affect runtime, because the process dies long before it has written it all.
+ */
+const MECHANISM_PAYLOAD_BYTES = 128 * PIPE_BUFFER_BYTES; // 8 MiB
+
 /* ------------------------------------------------------------------ *
  * Layer 1 — the mechanism
  * ------------------------------------------------------------------ */
@@ -98,14 +120,19 @@ function runScript(source) {
 }
 
 test("mechanism: process.exit() after a large write truncates on a pipe", () => {
-  const { stdout } = runScript(writeThenEnd(200_000, "process.exit(0);"));
+  const { stdout } = runScript(
+    writeThenEnd(MECHANISM_PAYLOAD_BYTES, "process.exit(0);"),
+  );
 
   assert.ok(
-    stdout.length < 200_000,
+    stdout.length < MECHANISM_PAYLOAD_BYTES,
     "PREMISE FAILED: process.exit() no longer truncates a large piped write on " +
-      `this Node (${process.version}). If Node has made pipe writes synchronous, ` +
-      "this whole suite is now vacuous and the structural guard below is the only " +
-      "thing still doing work — say so rather than deleting it.",
+      `this Node (${process.version}). It got ${stdout.length} of ` +
+      `${MECHANISM_PAYLOAD_BYTES} bytes through, and at this payload size a busy ` +
+      "scheduler is NOT a plausible explanation — what escapes is capped by the " +
+      "pipe buffer. So if Node has made pipe writes synchronous, this whole suite " +
+      "is now vacuous and the structural guard below is the only thing still " +
+      "doing work — say so rather than deleting it.",
   );
   assert.throws(
     () => JSON.parse(stdout),
@@ -115,11 +142,11 @@ test("mechanism: process.exit() after a large write truncates on a pipe", () => 
 
 test("mechanism: process.exitCode after a large write drains on a pipe", () => {
   const { stdout, status } = runScript(
-    writeThenEnd(200_000, "process.exitCode = 3;"),
+    writeThenEnd(MECHANISM_PAYLOAD_BYTES, "process.exitCode = 3;"),
   );
 
   const parsed = JSON.parse(stdout); // must not throw
-  assert.equal(parsed.payload.length, 200_000);
+  assert.equal(parsed.payload.length, MECHANISM_PAYLOAD_BYTES);
   assert.equal(status, 3, "exitCode must still reach the caller");
 });
 

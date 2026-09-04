@@ -1347,6 +1347,14 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 #### Output 2: Quality Gate File
 
+> **`top_issues[]` holds THIS cycle's findings only.** Do not copy a previous cycle's entries
+> forward, even annotated `status: closed`, and even though carrying the history reads as helpful.
+> The develop pipeline's **third-strike rule** reads the `file:` of every HIGH entry across the last
+> three gates and deliberately ignores `status: closed`, so a copied-forward HIGH makes one finding
+> look like a file struck twice — and a third cycle then refuses to let `/qa-fix` patch a file that
+> was never the problem. The history belongs in `bug_resolution`, in the QA report's Re-Review
+> Context table, and in the bug reports.
+
 **CRITICAL: Gate files MUST be co-located with story/task files (Updated 2025-12-09)**
 
 **Gate File Location and Naming:**

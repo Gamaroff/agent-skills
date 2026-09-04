@@ -621,6 +621,14 @@ For each HIGH or MEDIUM severity issue found:
 
 ### Step 10: Create Quality Gate File
 
+> **`top_issues[]` holds THIS cycle's findings only.** Do not copy a previous cycle's entries
+> forward, even annotated `status: closed`, and even though carrying the history reads as helpful.
+> The develop pipeline's **third-strike rule** reads the `file:` of every HIGH entry across the last
+> three gates and deliberately ignores `status: closed`, so a copied-forward HIGH makes one finding
+> look like a file struck twice — and a third cycle then refuses to let `/qa-fix` patch a file that
+> was never the problem. The history belongs in `bug_resolution`, in the QA report's Re-Review
+> Context table, and in the bug reports.
+
 Create gate file co-located with the task document:
 
 **Location**: `{task-directory}/task.{id}.gate.{number}.{descriptive-name}.yml`
