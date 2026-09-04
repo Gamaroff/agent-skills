@@ -77,12 +77,22 @@ writeFileSync(
 "generate-skill-deps": "node scripts/generate-skill-dependencies.mjs"
 ```
 
-**CI drift check.** Mirror the catalog check already in `.github/workflows/release.yml` — regenerate, `git diff --exit-code` on the JSON.
+**CI drift check.** The catalog check exists in **two** places and only one of them is a merge gate:
 
-**Known-good fixture.** Assert these exact edge sets, so a generator regression fails loudly:
+- `.github/workflows/release.yml:51-58` — runs at tag time. Copy the shape from here (`npm run generate-skill-deps` then `git diff --quiet … || exit 1`).
+- `.github/workflows/validate.yml:43-51` — the **PR gate**, and the one that actually stops a bad merge. Add the check here too.
+
+Two obstacles in `validate.yml`, both of which must be fixed or the job never fires:
+
+1. Its job sets up **Python only** (the comment there notes `generate-catalog` is pure Python). A Node generator needs `actions/setup-node` added to that job.
+2. Its `paths:` filter lists `skills/**`, `docs/reference/skill-catalog.md` and the workflow itself — **not** `shared/resources/**`. A change to `skill-dependencies.json` alone would not trigger the workflow at all. Add `shared/resources/**`.
+
+Mirroring `release.yml` alone leaves PR-level drift uncaught, which is most of the value.
+
+**Known-good fixture.** Assert these exact edge sets, so a generator regression fails loudly. Re-verify the two sets against the tree when implementing — the counts below were taken on v0.45.0 and the library has grown since:
 
 ```js
-// develop-story invokes eight; review-story invokes ten (both verified on v0.45.0)
+// develop-story invokes eight; review-story invokes ten (re-verify before pinning)
 expect(graph['develop-story']).toEqual(expect.arrayContaining([
   'create-branch','review-story','develop','create-pr',
   'qa-story','qa-fix','finalise','commit-changes',
@@ -115,7 +125,9 @@ expect(graph['develop-story']).toEqual(expect.arrayContaining([
 }
 ```
 
-**New file:** `shared/resources/resolve-skill-set.mjs`
+**Two new files.** `shared/resources/resolve-skill-set.mjs` holds the pure resolver; `shared/resources/resolve-skill-set-cli.mjs` is the thin argv/IO wrapper the installer shells out to. The split is what keeps the resolver unit-testable against injected fixtures — the CLI is the only part that touches the real JSON files, argv, stdout and stderr.
+
+**New file 1:** `shared/resources/resolve-skill-set.mjs`
 
 Closure lives in Node, not bash: it is a graph traversal with a conflict report, and it needs unit tests over injected fixtures rather than the real files.
 
@@ -185,6 +197,8 @@ export function resolveSkillSet({
    develop-story from your profile.
 ```
 
+**New file 2:** `shared/resources/resolve-skill-set-cli.mjs` — parses `--profile/--include/--exclude/--tracker`, loads `skill-profiles.json` and `skill-dependencies.json`, calls `resolveSkillSet`, then prints **resolved names one per line on stdout** and **the closure/conflict/dropped report on stderr**, so a `$( )` capture yields only names. It also owns the `isExcludedForTracker` bridge back to bash's `_skill_excluded_for_tracker` (pass the tracker in; re-implement the two lists' membership test against the same source, or have bash pass the exclusion list through — do not fork the lists).
+
 **Bash side** — in `setup-consumer.sh`:
 
 ```bash
@@ -201,7 +215,7 @@ _resolve_skill_set() {
 
 The CLI wrapper prints the resolved names one per line on stdout, and the closure/conflict report on stderr — so `$( )` capture yields only names.
 
-> **`node` is already a hard prerequisite.** `check_prereqs` (line 145) requires node ≥ 22, so invoking node here adds no new dependency.
+> **`node` is already a hard prerequisite.** `check_prereqs` (`setup-consumer.sh:149`) requires node ≥ 22, so invoking node here adds no new dependency.
 
 ---
 
@@ -212,10 +226,13 @@ The CLI wrapper prints the resolved names one per line on stdout, and the closur
 ```bash
 select_skill_profile() {
   heading "Skill selection"
-  echo "  All 119 skill descriptions stay in the agent's context permanently"
-  echo "  (~11,600 tokens). Install only what this project uses."
+  # Counts come from the resolver, not from a literal: a hardcoded 119 was
+  # already wrong by the time this was written (120 skills, ~41k bytes).
+  echo "  Every installed skill's description stays in the agent's context"
+  echo "  permanently (~${_full_tokens} tokens for all ${_full_count})."
+  echo "  Install only what this project uses."
   echo ""
-  echo "  1) full      — every skill (119). Today's behaviour."
+  echo "  1) full      — every skill (${_full_count}). Today's behaviour."
   echo "  2) pipeline  — story/task/bug lifecycle: create → review → develop → QA → finalise."
   echo "  3) minimal   — branching, commits, PRs, code review only."
   echo ""
@@ -237,6 +254,8 @@ select_skill_profile() {
   fi
 }
 ```
+
+`_full_count` / `_full_tokens` come from one `resolve-skill-set-cli.mjs --profile full --count` call made just before the menu prints — not from a literal. That call is offline (both JSON files are committed), so it costs nothing and cannot go stale.
 
 Call from `main()` **after `select_platform`, before `write_skills_config`**:
 
@@ -275,7 +294,7 @@ skills:
   exclude: [] # skills to leave out (a closure-required entry is reported, never silently re-added)
 ```
 
-**Reading it back on `--update`.** Same constraint as task 83: `main()` calls `install_skills` at line 1115 and returns before `select_platform`. So the profile MUST come from the config file, with the in-process wizard variable second:
+**Reading it back on `--update`.** Same constraint as task 83: `main()`'s `--update` short-circuit (`setup-consumer.sh:1312-1316`) calls `install_skills`, then `print_summary`, then `return` — all before `select_platform` at :1318. So the profile MUST come from the config file, with the in-process wizard variable second:
 
 ```bash
 _config_skills_profile() {
@@ -338,12 +357,16 @@ const profiles = { test: { seeds: ['develop-story'] }, full: { seeds: '*' } };
 
 Integration cases (real tarball fixture, temp dir): profile installs, the `pipeline`+`tracker: github` interaction (case 7 end-to-end), `--update` from config with no wizard, `--update` prunes nothing, `--dry-run` parity.
 
-**Context-saving assertion** — the claim in the task doc must be measured, not asserted:
+**Context-saving assertion** — measure **both** sides in the same run. A hardcoded baseline asserts a fact about a past release, not about the resolver, and goes stale on the next skill added; the 46,408/119 figures this plan originally pinned already do not match the tree (120 skills, 41,246 bytes on 2026-09-04):
 
 ```js
-// Baseline on v0.45.0: 119 skills, 46,408 description bytes (~11,602 tokens).
-const pipelineBytes = sumDescriptionBytes(resolved.skills);
-assert(pipelineBytes < 46408 * 0.55, `pipeline should cut description budget; got ${pipelineBytes}`);
+// Both operands computed from the same tree, in the same run. No literal.
+const fullBytes     = sumDescriptionBytes(resolveSkillSet({ profile: 'full',     ...ctx }).skills);
+const pipelineBytes = sumDescriptionBytes(resolveSkillSet({ profile: 'pipeline', ...ctx }).skills);
+assert(
+  pipelineBytes < fullBytes * 0.55,
+  `pipeline should cut the description budget: ${pipelineBytes} vs full ${fullBytes}`
+);
 ```
 
 **`shared/resources/tests/skill-dependencies-drift.test.mjs`**
@@ -352,7 +375,9 @@ assert(pipelineBytes < 46408 * 0.55, `pipeline should cut description budget; go
 - `develop-story` / `review-story` known-good edge fixtures
 - **Report** (not fail) skills in no profile — `full` is legitimately everything, so this cannot be an assertion; print it in CI output where a reviewer sees it
 
-**Register both suites in `package.json`** and confirm the reported test count rises. `package.json` lists globs by hand and has orphaned a whole suite before; registration is the step most likely to be skipped.
+**No `package.json` edit is needed for these two suites.** The `test` script already globs `shared/resources/tests/*.test.mjs`, which is where both land — alongside task 83's `setup-consumer-skill-exclusion.test.mjs` and 25 others. Confirm by running `npm test` and watching the reported count rise; that observation is the check, not an edit to `package.json`.
+
+> The general warning still holds and is why this is called out rather than assumed: `package.json` lists globs by hand and has orphaned a whole suite before. It bites for a **new directory** or a new `*.test.sh` (those are listed individually at the head of the `test` script). It does not bite here.
 
 **Mutation proving** — revert each, confirm red:
 
@@ -368,18 +393,23 @@ assert(pipelineBytes < 46408 * 0.55, `pipeline should cut description budget; go
 
 ## Key Patterns and References
 
-- **Prompt idiom**: `select_platform()` at `setup-consumer.sh:169` — numbered menu, `read -r`, `case`. Match it; do not introduce a TUI.
-- **Sourcing hook**: line 1135 — new bash functions must be above it to be testable.
-- **Config-first resolution**: task 83's `_resolve_install_tracker`. Same reason, same order; reuse the shape.
-- **Node availability**: `check_prereqs` (line 145) already requires node ≥ 22.
+- **Prompt idiom**: `select_platform()` at `setup-consumer.sh:173` — numbered menu, `read -r`, `case`. Match it; do not introduce a TUI.
+- **Sourcing hook**: the final line of the file — `[[ -n "${SETUP_CONSUMER_NO_MAIN:-}" ]] || main "$@"`. New bash functions must be defined above it to be testable; the existing setup-consumer suites source the wizard with `SETUP_CONSUMER_NO_MAIN=1` to load functions without running it.
+- **Config-first resolution**: task 83's `_resolve_install_tracker` (`setup-consumer.sh:820`). Same reason, same order; reuse the shape.
+- **Node availability**: `check_prereqs` (`setup-consumer.sh:149`) already requires node ≥ 22.
+
+> Line numbers re-verified 2026-09-04 against `develop` at `a0ac4b8`. Grep the function name rather than trusting the number.
 - **Counter idiom**: `(( _x++ )) || true` — required under `set -e`.
 - **Generated-file drift check**: the catalog check in `.github/workflows/release.yml` is the pattern to copy.
-- **Bundling**: `skill-profiles.json`, `skill-dependencies.json` and `resolve-skill-set.mjs` live in `shared/resources/`. Edit them **there**, never in a skill's bundled `references/` — `npm run bundle` silently reverts a fix applied to the bundled copy.
+- **Bundling**: all four new files live in `shared/resources/`. Edit them **there**. The bundler caveat applies unevenly and it is worth knowing which half you are in:
+  - `resolve-skill-set.mjs` / `resolve-skill-set-cli.mjs` — `bundle_skill.py` globs `.md/.js/.mjs/.sh/.py`, so these **are** copied into skills' `references/`. A fix applied to a bundled copy is silently reverted by `npm run bundle`.
+  - `skill-profiles.json` / `skill-dependencies.json` — `.json` is **not** in the bundler's glob, so no bundled copy exists and there is nothing to revert.
+  - Either way the installer does not read a bundled copy: it reads `${_tmpdir}/shared/resources/…` straight out of the extracted tarball, exactly as `install_skills` already does for `generate-prd-epic-index.mjs` (`setup-consumer.sh:1014-1017`). That is the delivery path — confirm the files land in the release tarball.
 
 ## Testing Approach
 
 1. `npm run generate-skill-deps`, commit the JSON, confirm the drift test passes
 2. `npm test` — confirm both new suites are registered and the count rose
 3. Manual: scratch repo, choose `pipeline`, verify `develop-story` plus all eight callees present and `sync-jira-story` absent under `tracker: github`
-4. Manual grandfather: repo with all 119, add `skills.profile: pipeline`, `--update`, confirm count stays 119 and the summary explains why
+4. Manual grandfather: repo with every skill installed, add `skills.profile: pipeline`, `--update`, confirm the installed count is unchanged and the summary explains why
 5. `shellcheck scripts/setup-consumer.sh`

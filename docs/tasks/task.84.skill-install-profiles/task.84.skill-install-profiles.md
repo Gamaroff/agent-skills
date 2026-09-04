@@ -5,23 +5,28 @@ type: task
 description: "Let a consumer pick an install profile (minimal/pipeline/full) plus per-skill add-ons, resolve the dependency closure so a chosen skill's callees come with it, and persist the choice in skills-config.yaml."
 tags: [setup-consumer, install, configuration, context-budget]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 assignee:
 estimated_effort_hours: 8
+github_issue: 317
 ---
 
 # Technical Task: Skill install profiles with dependency closure
 
-**Status:** Planned
+**Status:** Ready for Review
+**GitHub Issue**: [#317](https://github.com/Gamaroff/agent-skills/issues/317)
+**Review**: ✅ All review recommendations from `task.84.review.1.skill-install-profiles.md` implemented 2026-09-04
 
 ---
 
 ## 1. Overview
 
-`setup-consumer.sh` installs all 119 skills. Their `description` fields total 46,408 bytes — roughly **11,602 tokens permanently in the agent's context**, before it reads a single instruction. Most consumers use a fraction of the library.
+`setup-consumer.sh` installs every skill in the library — **120** as of 2026-09-04. Their `description` fields total **41,246 bytes**, roughly **10,300 tokens permanently in the agent's context**, before it reads a single instruction. Most consumers use a fraction of the library.
+
+> **The baseline is measured, dated, and its method is stated — because two methods disagree.** Summing the `description:` frontmatter value across the 120 skills that have one gives 41,246 bytes; counting the whole frontmatter block, or a different multi-line-scalar rule, gives ~45k. The figure above is the first method. No test may hardcode it — see §8.
 
 This task adds a profile choice to the wizard (`minimal` / `pipeline` / `full`), optional per-skill add-ons on top, a dependency-closure pass so choosing `develop-story` also brings the eight skills it invokes, and persistence of the decision in `skills-config.yaml` so `--update` is reproducible.
 
@@ -33,7 +38,7 @@ This task adds a profile choice to the wizard (`minimal` / `pipeline` / `full`),
 2. A dependency-closure resolver that expands a selection to its transitive callees and reports what it added.
 3. `skills.profile` / `skills.include` / `skills.exclude` in `skills-config.yaml`, read on every `--update`.
 
-**Expected outcome**: A consumer choosing `pipeline` installs roughly 45 skills instead of 119, recovering an estimated ~7k tokens of context budget, with no possibility of a half-installed pipeline.
+**Expected outcome**: A consumer choosing `pipeline` installs roughly 45 skills instead of all 120, recovering an estimated ~6k tokens of context budget, with no possibility of a half-installed pipeline. The estimate is replaced by a measured figure in the CHANGELOG once Phase 1 computes the closure — see §9.
 
 ---
 
@@ -41,19 +46,19 @@ This task adds a profile choice to the wizard (`minimal` / `pipeline` / `full`),
 
 ### Current Problems
 
-1. **The metadata tier is the real cost and it is paid on every single request.** 119 descriptions × ~100 words is ~11.6k tokens that never leave context. Disk (25MB) is irrelevant. Task 83 recovers ~1.5k of it; the rest is only reachable by not installing skills the consumer does not use.
+1. **The metadata tier is the real cost and it is paid on every single request.** 120 descriptions total ~41.2k bytes / ~10.3k tokens that never leave context. Disk (25MB) is irrelevant. Task 83 recovers a slice of it (11 Jira-only or 6 GitHub-only skills, depending on tracker); the rest is only reachable by not installing skills the consumer does not use.
 
 2. **A flat per-skill list is a footgun, because the skills form a call graph.** `develop-story` invokes eight others by slash command — `create-branch`, `review-story`, `develop`, `create-pr`, `qa-story`, `qa-fix`, `finalise`, `commit-changes`. `review-story` invokes ten more. Unchecking `create-pr` does not produce an install error; it produces a **Step 4 failure in the middle of a real story**, hours later, with the cause buried in the install. Any selection UI that lets a user break this graph without telling them is worse than no selection at all.
 
-3. **A 119-item checkbox list is not a usable control.** Descriptions average ~390 bytes; the list does not fit on a screen, cannot be read in one pass, and forces 119 decisions to express what is really one decision ("I want the pipeline").
+3. **A 120-item checkbox list is not a usable control.** Descriptions average ~340 bytes; the list does not fit on a screen, cannot be read in one pass, and forces 120 decisions to express what is really one decision ("I want the pipeline").
 
 4. **A selection that is not persisted is undone by the next `--update`.** `install_skills()` loops the tarball unconditionally, and `main()` reuses it verbatim on the `--update` path. Without persistence, the first `--update` silently reinstalls everything and the consumer's choice evaporates with no message.
 
 ### Benefits
 
-1. **~7k tokens of context budget returned** on a `pipeline` install — the large share of the ~11.6k total, and the reason this task exists rather than task 83 alone.
+1. **~6k tokens of context budget returned** on a `pipeline` install — the large share of the ~10.3k total, and the reason this task exists rather than task 83 alone. Estimated here; measured and recorded by the Phase 5 test and the CHANGELOG entry.
 2. **A broken selection becomes unrepresentable** — closure runs before install, so a chosen skill's callees are always present.
-3. **One decision instead of 119** — the profile is the unit people actually think in.
+3. **One decision instead of 120** — the profile is the unit people actually think in.
 4. **Reproducible installs** — the config is committed, so every developer and CI resolve the same set.
 5. **Add-ons keep the long tail reachable** — a team wanting `jira-sprint-retrospective` on a `minimal` install adds one line, without dropping to `full`.
 
@@ -86,18 +91,18 @@ check_prereqs → select_platform → collect_env_vars → write_env_files
 Two constraints this task inherits:
 
 - **`write_skills_config` runs before `install_skills`.** The profile answer must be collected early enough to be written into the config in the same pass, or the config write needs a second visit.
-- **`--update` returns at line 1115, before `select_platform`.** It must resolve the profile from the config file alone — same constraint task 83's resolver solves for `tracker`.
+- **The `--update` short-circuit (`setup-consumer.sh:1312-1316`) calls `install_skills` and returns before `select_platform` (:1318).** It must therefore resolve the profile from the config file alone — the same constraint task 83's resolver solves for `tracker`.
 
 ### The dependency graph
 
-Measured on v0.45.0 by extracting `/slash-command` references from each `SKILL.md` where a matching `skills/` directory exists:
+Measured by extracting `/slash-command` references from each `SKILL.md` where a matching `skills/` directory exists. The two edge sets below are the known-good fixture §8 asserts; re-verify them against the tree when implementing, and update both here and in the fixture together:
 
 | Skill | Invokes |
 |---|---|
 | `develop-story` | `create-branch`, `review-story`, `develop`, `create-pr`, `qa-story`, `qa-fix`, `finalise`, `commit-changes` |
 | `review-story` | `create-branch`, `create-epic`, `create-story`, `create-task`, `develop`, `develop-story`, `develop-task`, `finalise`, `review-task`, `sync-github-story`, `sync-jira-story` |
 
-Highest fan-in (count of other `SKILL.md` files naming them): `create-pr` 25, `finalise` 22, `develop-story` 22, `review-story` 20, `develop-task` 20, `create-story` 19, `qa-fix` 16.
+Highest fan-in (count of other `SKILL.md` files naming them): `create-pr` 25, `finalise` 22, `develop-story` 22, `review-story` 20, `develop-task` 20, `create-story` 19, `qa-fix` 16. (Those counts are *prose mentions*, which is precisely why they cannot be used as edges — see the design note above.)
 
 Two properties matter:
 
@@ -125,15 +130,52 @@ install_skills
 
 **Where the graph comes from.** Generated at package time into `shared/resources/skill-dependencies.json`, not computed by grepping at install time. Grepping in bash at install is slow, fragile against prose that merely mentions a skill, and untestable in isolation. A generated manifest is diffable in review and can be regenerated by `npm run generate-catalog`'s sibling.
 
+> **⚠️ DESIGN CHANGED DURING IMPLEMENTATION — the edges are declared, not scraped from prose.**
+> This section originally specified extracting `/slash-command` tokens from each `SKILL.md` (and its
+> `references/`). That was built first and **measured**, and it does not work. Every variant fails in
+> one of two directions:
+>
+> | Extractor | `develop-story` edges | `minimal` closure | `pipeline` closure |
+> |---|---|---|---|
+> | `SKILL.md` + `references/` | 22 (real: 9) | 35 | 36 |
+> | `SKILL.md` only | 9 ✓ | 33 | 35 |
+> | …minus `## Related Skills` | 8 ✓ | 33 | 35 |
+> | …minus called-by phrasing | 8 ✓ | 33 | 35 |
+> | …invocation verbs only | **3** (loses 6 real steps) | 28 | 34 |
+>
+> The middle variants reproduce this task's own known-good fixtures exactly, and **still** collapse
+> `minimal` (5 seeds) and `pipeline` (26 seeds) to the same ~34 of 120 skills. The profiles become
+> indistinguishable — the feature ships worthless while reporting success, which is §10 Risk 3's
+> silent-under-install failure arriving from the opposite direction.
+>
+> The cause is **direction**. A `/slash-command` token carries none, and prose is full of reverse
+> references: a leaf naming its callers, cross-references, and — decisively — negations.
+> `skills/review-code/SKILL.md:180` reads "`/develop-story` and `/develop-task` do **not** call
+> `/review-code`", and the scrape turns that sentence into two edges. From any leaf you then reach
+> the orchestrators, and from an orchestrator you reach everything. Tightening the pattern trades one
+> failure for the other, and a *missing* edge is the worse one — a mid-pipeline failure in a
+> consumer's repo, hours from the install.
+>
+> **So each `SKILL.md` declares its own edges** in frontmatter: `invokes: [create-branch, develop, …]`.
+> Absent key ⇒ no outgoing edges, the safe default (a profile then resolves to exactly its seeds).
+> Everything this task wanted from a generated manifest is preserved — diffable in review,
+> regenerated by `npm run generate-skill-deps`, CI-checked for drift — and strengthened, because the
+> declaration lives beside the skill whose behaviour it describes. 20 skills declare edges today.
+>
+> The prose scrape survives as **§10 Risk 1's mitigation**, demoted to a report:
+> `npm run skill-deps:candidates` lists prose mentions not declared in `invokes:`. Advisory by
+> design — most candidates are legitimate prose, and a check that cries wolf is one people learn to
+> ignore.
+
 ### Profile definitions
 
 | Profile | Contents | Rough size |
 |---|---|---|
 | `minimal` | `commit-changes`, `create-branch`, `create-pr`, `create-issue`, `review-code` + closure | ~8 |
 | `pipeline` | the story/task/bug lifecycle: `create-*`, `review-*`, `develop*`, `qa-*`, `finalise`, `sync-*`, `ensure-*` + closure | ~45 |
-| `full` | everything (today's behaviour) | 119 |
+| `full` | everything (today's behaviour) | 120 (all) |
 
-Sizes are estimates to be fixed during Phase 1 once closure is computed; the success criteria assert the *computed* size is reported, not a hardcoded number.
+Sizes are estimates to be fixed during Phase 1 once closure is computed; the success criteria assert the *computed* size is reported, not a hardcoded number. `full` is written as "all" rather than a literal for the same reason — the count moves every time a skill is added.
 
 ---
 
@@ -169,10 +211,12 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 
 | | Before | After |
 |---|---|---|
-| Fresh install, no answer given | 119 | 119 (`full` is the default) |
-| Fresh install, `pipeline` chosen | 119 | ~45 |
-| `--update`, no `skills:` block in config | 119 | 119 (absent block ≡ `full`) |
-| `--update`, `skills.profile: pipeline` | 119 | ~45 installed, **nothing pruned** |
+| Fresh install, no answer given | all | all (`full` is the default) |
+| Fresh install, `pipeline` chosen | all | ~45 |
+| `--update`, no `skills:` block in config | all | all (absent block ≡ `full`) |
+| `--update`, `skills.profile: pipeline` | all | ~45 installed, **nothing pruned** |
+
+("all" = every skill in the tarball minus task 83's tracker exclusions — 120 skills at time of writing. Deliberately not a literal: the count changes whenever a skill is added.)
 
 **New config keys are additive and optional.** An absent `skills:` block means `full`, which is exactly today's behaviour. No existing `skills-config.yaml` becomes invalid.
 
@@ -188,10 +232,10 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 
 **Files**: `scripts/generate-skill-dependencies.mjs`, `shared/resources/skill-dependencies.json`, `package.json`
 
-- [ ] Extract `/slash-command` tokens from each `SKILL.md`, keep those matching a `skills/` directory, drop self-references
-- [ ] Emit `{ "skill": ["callee", ...] }`, keys sorted, committed
-- [ ] Add `npm run generate-skill-deps`
-- [ ] Add a CI check that the committed file matches a fresh generation (same pattern as the catalog check in `release.yml`)
+- [x] Extract `/slash-command` tokens from each `SKILL.md`, keep those matching a `skills/` directory, drop self-references
+- [x] Emit `{ "skill": ["callee", ...] }`, keys sorted, committed
+- [x] Add `npm run generate-skill-deps`
+- [x] Add a CI check that the committed file matches a fresh generation — **in `validate.yml`, not only `release.yml`**. The catalog check exists in both: `release.yml` runs at tag time (too late to stop a bad merge) and `validate.yml` is the PR gate. Two things must be handled for the PR gate to actually fire: `validate.yml`'s job has `setup-python` only, so a Node generator needs `actions/setup-node` added; and its `paths:` filter does not include `shared/resources/**`, so the job would not even trigger on a change to the generated JSON. Fix both, or the check silently never runs.
 
 **Dependencies**: none.
 
@@ -199,12 +243,12 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 
 **Files**: `shared/resources/skill-profiles.json`, `scripts/setup-consumer.sh`
 
-- [ ] Author the three profiles as explicit membership lists (pre-closure seeds)
-- [ ] `_resolve_skill_set()`: seed → +include → −exclude → closure → tracker filter
-- [ ] Closure is a visited-set worklist — the graph has cycles (`develop-story` ↔ `review-story`)
-- [ ] Run the task-83 tracker predicate **over the closure output**, so an inapplicable sibling pulled in by a dependency is dropped
-- [ ] `skills.exclude` is applied to the seed, then re-applied after closure, and a skill removed by `exclude` but required by closure is **reported as a conflict**, not silently re-added
-- [ ] Implemented in a Node helper invoked from bash, not in bash — JSON traversal in pure bash is the wrong tool
+- [x] Author the three profiles as explicit membership lists (pre-closure seeds)
+- [x] `_resolve_skill_set()`: seed → +include → −exclude → closure → tracker filter
+- [x] Closure is a visited-set worklist — the graph has cycles (`develop-story` ↔ `review-story`)
+- [x] Run the task-83 tracker predicate **over the closure output**, so an inapplicable sibling pulled in by a dependency is dropped
+- [x] `skills.exclude` is applied to the seed, then re-applied after closure, and a skill removed by `exclude` but required by closure is **reported as a conflict**, not silently re-added
+- [x] Implemented in a Node helper invoked from bash, not in bash — JSON traversal in pure bash is the wrong tool
 
 **Dependencies**: Phase 1, task 83.
 
@@ -212,10 +256,10 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 
 **Files**: `scripts/setup-consumer.sh`
 
-- [ ] `select_skill_profile()` — numbered prompt matching `select_platform`'s existing idiom, default `full`
-- [ ] Optional add-on prompt: numbered, comma-separated answer, skippable with Enter
-- [ ] Call from `main()` after `select_platform`, before `write_skills_config`
-- [ ] Print the resolved count and the closure additions before installing
+- [x] `select_skill_profile()` — numbered prompt matching `select_platform`'s existing idiom, default `full`
+- [x] Optional add-on prompt: numbered, comma-separated answer, skippable with Enter
+- [x] Call from `main()` after `select_platform`, before `write_skills_config`
+- [x] Print the resolved count and the closure additions before installing
 
 **Dependencies**: Phase 2.
 
@@ -223,10 +267,10 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 
 **Files**: `scripts/setup-consumer.sh`, `docs/reference/configuration.md`
 
-- [ ] `write_skills_config` emits the `skills:` block when a non-`full` profile is chosen
-- [ ] `_resolve_skill_set` reads profile/include/exclude from config when the wizard has not run
-- [ ] Grandfather branch: an installed skill outside the resolved set is kept and reported
-- [ ] Document the three keys in `configuration.md` "Full schema" and "Key reference"
+- [x] `write_skills_config` emits the `skills:` block when a non-`full` profile is chosen
+- [x] `_resolve_skill_set` reads profile/include/exclude from config when the wizard has not run
+- [x] Grandfather branch: an installed skill outside the resolved set is kept and reported
+- [x] Document the three keys in `configuration.md` "Full schema" and "Key reference"
 
 **Dependencies**: Phases 2-3.
 
@@ -234,10 +278,10 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 
 **Files**: `shared/resources/tests/setup-consumer-skill-profiles.test.mjs`, `package.json`, `docs/concepts/getting-started.md`, `CHANGELOG.md`
 
-- [ ] Closure, cycle, conflict, tracker-interaction and `--update` cases (§8)
-- [ ] Register the suite in `package.json` and confirm the count rises
-- [ ] Mutation-prove each guarantee
-- [ ] Document profiles in `getting-started.md`; CHANGELOG entry
+- [x] Closure, cycle, conflict, tracker-interaction and `--update` cases (§8)
+- [x] Confirm both suites are collected. **No `package.json` edit is required for these two**: the `test` script already globs `shared/resources/tests/*.test.mjs`, which is where both land. Verify by running `npm test` and observing the reported test count rise — that is the actual check. (Hand-registration is only needed for a new `*.test.sh`, which is listed individually.)
+- [x] Mutation-prove each guarantee
+- [x] Document profiles in `getting-started.md`; CHANGELOG entry
 
 **Dependencies**: Phases 1-4.
 
@@ -250,7 +294,8 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 1. ✅ `scripts/generate-skill-dependencies.mjs` — new generator
 2. ✅ `shared/resources/skill-dependencies.json` — new, generated, committed
 3. ✅ `shared/resources/skill-profiles.json` — new, hand-authored
-4. ✅ `shared/resources/resolve-skill-set.mjs` — new, closure resolver
+4. ✅ `shared/resources/resolve-skill-set.mjs` — new, closure resolver (pure `export function`, no side effects — unit-tested against injected fixtures)
+4a. ✅ `shared/resources/resolve-skill-set-cli.mjs` — new, the thin CLI the installer shells out to: parses `--profile/--include/--exclude/--tracker`, loads the two JSON files, prints resolved names one-per-line on **stdout** and the closure/conflict report on **stderr** so `$( )` capture yields only names. Split from the resolver so the resolver stays pure and testable
 5. ✅ `scripts/setup-consumer.sh` — `select_skill_profile`, `_resolve_skill_set` call, config write, grandfather
 6. ✅ `package.json` — `generate-skill-deps` script, test glob registration
 
@@ -288,12 +333,13 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 
 - `pipeline` profile → resolved set installed, `develop-story` and all eight callees present
 - `minimal` → `create-pr` present (fan-in 25), `jira-sprint-retrospective` absent
-- `full` → 119 minus task-83 exclusions
+- `full` → every skill in the tarball minus task-83 exclusions (assert against a computed count, never a literal)
 - `minimal` + `include: [jira-sprint-manager]` under `tracker: jira` → present
 - **Tracker interaction**: `pipeline` + `tracker: github` → `sync-jira-story` absent *even though `review-story` names it*. This is the case that catches closure defeating task 83.
 - `--update` with `skills.profile: pipeline` in config, no wizard → same set
 - `--update` over a full install → nothing pruned, extras reported as kept
-- `--dry-run` → writes nothing, reports the counts the real run would produce
+- `--dry-run` → writes nothing, and reports **the resolved-set count computed offline** from the committed `skill-profiles.json` + `skill-dependencies.json`.
+  > **This is narrower than "the counts the real run would produce", deliberately.** `install_skills`' dry-run branch never downloads the tarball — that is an explicit design rule there, so a dry run makes no network request and has no tarball skill list to count against. The profile, closure and tracker-filter counts *are* computable without the network, because both JSON files are committed; a count of "what is actually in the tarball" is not. Report the former and say so; do not add a download to the dry-run path to satisfy this.
 
 ### Drift Tests
 
@@ -315,7 +361,9 @@ Per `shared/resources/mutation-proving.md` — revert each, confirm red:
 
 ### Performance
 
-Closure over 119 nodes is trivial. The measurable claim is the **context saving**, asserted directly: a test sums `description` bytes for the resolved set and requires `pipeline` to be materially below `full`. Baseline recorded now: 46,408 bytes / ~11,602 tokens for all 119.
+Closure over ~120 nodes is trivial. The measurable claim is the **context saving**, asserted directly: a test sums `description` bytes for the resolved set and requires `pipeline` to be materially below `full`.
+
+> **Measure both sides in the same run; never hardcode the baseline.** The assertion is `pipelineBytes < fullBytes * 0.55`, where *both* operands are computed from the same tree in the same test. Pinning a literal (`46408 * 0.55`) makes the test assert a fact about a past release rather than about the resolver, and it goes stale the moment a skill is added or a description is reworded — which has already happened once: the 46,408/119 figures in the original draft no longer match the tree. Record the measured numbers in the CHANGELOG, where staleness is harmless; keep them out of assertions, where it is not.
 
 ---
 
@@ -323,36 +371,36 @@ Closure over 119 nodes is trivial. The measurable claim is the **context saving*
 
 ### Functional
 
-- [ ] `minimal`, `pipeline`, `full` each resolve to a set containing every transitive callee of every seed
-- [ ] Choosing `develop-story` by any route installs all eight skills it invokes
-- [ ] The cyclic pair `develop-story` ↔ `review-story` resolves without hanging or duplicating
-- [ ] `pipeline` + `tracker: github` does not install `sync-jira-story`, despite `review-story` naming it
-- [ ] `skills.exclude` of a closure-required skill reports a conflict rather than silently re-adding or silently breaking
-- [ ] `--update` with no wizard resolves the profile from `skills-config.yaml`
-- [ ] `--update` over an existing install prunes nothing
-- [ ] Absent `skills:` block behaves exactly as today (119 minus task-83 exclusions)
-- [ ] The wizard prints the resolved count and names each closure addition before installing
+- [x] `minimal`, `pipeline`, `full` each resolve to a set containing every transitive callee of every seed
+- [x] Choosing `develop-story` by any route installs all eight skills it invokes
+- [x] The cyclic pair `develop-story` ↔ `review-story` resolves without hanging or duplicating
+- [x] `pipeline` + `tracker: github` does not install `sync-jira-story`, despite `review-story` naming it
+- [x] `skills.exclude` of a closure-required skill reports a conflict rather than silently re-adding or silently breaking
+- [x] `--update` with no wizard resolves the profile from `skills-config.yaml`
+- [x] `--update` over an existing install prunes nothing
+- [x] Absent `skills:` block behaves exactly as today (every skill minus task-83 exclusions)
+- [x] The wizard prints the resolved count and names each closure addition before installing
 
 ### Performance
 
-- [ ] `pipeline` resolves to a set whose total `description` bytes are materially below the 46,408-byte baseline, asserted by test against the computed value
-- [ ] Closure resolution adds < 1s to the wizard
-- [ ] Tarball download unchanged — one request
+- [x] `pipeline` resolves to a set whose total `description` bytes are materially below `full`'s — asserted by **measuring both in the same test run** and comparing them. No baseline literal appears in the assertion
+- [x] Closure resolution adds < 1s to the wizard
+- [x] Tarball download unchanged — one request
 
 ### Code Quality
 
-- [ ] `npm test` green, both new suites registered in `package.json` and observed to run
-- [ ] Every guarantee in §8 mutation-proven
-- [ ] `shellcheck scripts/setup-consumer.sh` no new warnings
-- [ ] `skill-dependencies.json` regenerable and CI-checked for drift
-- [ ] Closure logic lives in Node with unit tests over injected fixtures, not in untestable inline bash
+- [x] `npm test` green, and both new suites **observed to run** (the reported test count rises). They land in `shared/resources/tests/`, which the `test` script already globs — so "registered in `package.json`" is not the check and must not be treated as one
+- [x] Every guarantee in §8 mutation-proven
+- [x] `shellcheck scripts/setup-consumer.sh` no new warnings
+- [x] `skill-dependencies.json` regenerable and CI-checked for drift
+- [x] Closure logic lives in Node with unit tests over injected fixtures, not in untestable inline bash
 
 ### Migration
 
-- [ ] `configuration.md` documents all three keys in "Full schema" and "Key reference"
-- [ ] `getting-started.md` documents the profiles, add-ons, and how to change profile later
-- [ ] CHANGELOG entry states the measured context saving, not an estimate
-- [ ] A real `--update` against a full existing install verified to remove nothing
+- [x] `configuration.md` documents all three keys in "Full schema" and "Key reference"
+- [x] `getting-started.md` documents the profiles, add-ons, and how to change profile later. **Note the step number**: `#### Step 8 — the platform skill filter` is already taken by task 83, so this is Step 9 (or a sibling subsection under Step 8) — do not overwrite the existing Step 8
+- [x] CHANGELOG entry states the measured context saving (bytes and skill counts for `full` vs `pipeline`, with the measurement method named), not an estimate
+- [x] A real `--update` against a full existing install verified to remove nothing
 
 ---
 
@@ -388,7 +436,7 @@ Closure over 119 nodes is trivial. The measurable claim is the **context saving*
 
 **4. Config and installed state diverge**
 
-- **Risk**: Config says `pipeline`, disk holds 119 because of grandfather. A later reader trusts the config and assumes the extras are absent.
+- **Risk**: Config says `pipeline`, disk still holds every skill because of grandfather. A later reader trusts the config and assumes the extras are absent.
 - **Probability**: High — this is the *expected* state for every existing consumer who adopts a profile.
 - **Impact**: Medium — confusing, not breaking.
 - **Mitigation**: `print_summary` states the divergence explicitly and gives the prune recipe. Documented in `getting-started.md` as normal, not as an error.
@@ -417,7 +465,7 @@ Closure over 119 nodes is trivial. The measurable claim is the **context saving*
   1. `git revert <merge-commit>`
   2. `npm test`
   3. Patch release — consumers pin to a tag
-  4. Affected consumers: `--update` restores all 119 (task 83's filter still applies)
+  4. Affected consumers: `--update` restores the full set (task 83's filter still applies)
 - **Validation**: a scratch consumer `--update` installs the full task-83 set.
 
 ### Partial Rollback (1-2 hours)
@@ -442,16 +490,19 @@ Closure over 119 nodes is trivial. The measurable claim is the **context saving*
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-02 | 1.0     | Initial draft | create-task |
+| 2026-09-04 | 1.1     | Review passed (9/10) — 0 critical, 8 important, 3 optional. Corrected six stale `setup-consumer.sh` line citations; replaced the 119-skill / 46,408-byte baseline with a measured, dated 120 / 41,246 and moved the context-saving assertion off a hardcoded literal onto a both-sides-measured comparison; declared `resolve-skill-set-cli.mjs` as its own deliverable; corrected the package.json-registration criterion (the `shared/resources/tests/` glob already collects it); routed the drift check to `validate.yml` (the PR gate) as well as `release.yml`, naming its missing `setup-node` and `paths:` filter; corrected the bundler warning (`.json` is not bundled); resolved the `--dry-run` count conflict against the no-download rule; noted `getting-started.md` Step 8 is already taken | review-task |
+| 2026-09-04 |         | Status → ready-for-development | review-task |
+| 2026-09-04 |         | Implemented — 5 phases, 12 files (4 new in `shared/resources/`, 1 new generator, 20 SKILL.md `invokes:` declarations), 42 new/updated tests, all 6 guarantees mutation-proven. Graph design changed from prose-scrape to declared `invokes:` frontmatter after measurement showed the scrape collapses every profile to the same ~34 skills — see §3 | develop |
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1 — Dependency graph generation
-- [ ] Phase 2 — Profile definitions and closure resolver
-- [ ] Phase 3 — Wizard prompt
-- [ ] Phase 4 — Persistence and `--update`
-- [ ] Phase 5 — Tests and documentation
+- [x] Phase 1 — Dependency graph generation
+- [x] Phase 2 — Profile definitions and closure resolver
+- [x] Phase 3 — Wizard prompt
+- [x] Phase 4 — Persistence and `--update`
+- [x] Phase 5 — Tests and documentation
 - [ ] QA review complete
 - [ ] Quality gate PASS
 
@@ -460,9 +511,15 @@ Closure over 119 nodes is trivial. The measurable claim is the **context saving*
 ## References
 
 - [Task 83](../task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md) — platform exclusion; **must land first**
-- `scripts/setup-consumer.sh:755` — `install_skills()`
-- `scripts/setup-consumer.sh:1100-1130` — `main()` step order
-- `scripts/setup-consumer.sh:169` — `select_platform()`, the prompt idiom to match
+- `scripts/setup-consumer.sh:908` — `install_skills()`
+- `scripts/setup-consumer.sh:1298-1329` — `main()` step order; the `--update` short-circuit (`install_skills`; `print_summary`; `return`) is at **1312-1316**, before `select_platform` at 1318
+- `scripts/setup-consumer.sh:173` — `select_platform()`, the prompt idiom to match
+- `scripts/setup-consumer.sh:820` — `_resolve_install_tracker()` (task 83); `:875` — `_skill_excluded_for_tracker()`; `:754-771` — the two exclusion lists; `:971-993` — the grandfather branch to copy
+- `scripts/setup-consumer.sh:435` — `write_skills_config()`; `:149` — `check_prereqs()` (node ≥ 22 already required)
+- `scripts/setup-consumer.sh:1014-1017` — the existing precedent for shipping a `shared/resources/*.mjs` file to consumers out of the extracted tarball
+- `shared/resources/tests/setup-consumer-skill-exclusion.test.mjs` — task 83's suite; sources the wizard with `SETUP_CONSUMER_NO_MAIN=1`, the idiom the new suites must use
+
+> **Line numbers go stale.** Every citation above was re-verified on 2026-09-04 against `develop` at `a0ac4b8`; the originals (`:755`, `:1100-1130`, `:169`, `:1115`) were 4 to ~200 lines out. Grep for the function name rather than trusting the number.
 - [`docs/reference/configuration.md`](../../reference/configuration.md) — schema to extend
 - [`shared/resources/mutation-proving.md`](../../../shared/resources/mutation-proving.md)
 
