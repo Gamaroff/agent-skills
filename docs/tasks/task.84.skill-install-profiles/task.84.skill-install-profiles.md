@@ -8,7 +8,7 @@ category: infrastructure
 status: ready-for-review
 priority: Medium
 created: 2026-09-02
-updated: 2026-09-04
+updated: 2026-09-05
 assignee:
 estimated_effort_hours: 8
 github_issue: 317
@@ -527,6 +527,38 @@ Worth recording how they were found, because the three lenses were disjoint: the
 
 ---
 
+## Definition of Done — Gaps Identified
+
+**Status:** IN PROGRESS (`ready-for-review`) — **NOT accepted**
+
+**Full report:** [`task.84.dod.1.skill-install-profiles.md`](./task.84.dod.1.skill-install-profiles.md)
+
+Blocked five independent ways; any one alone is disqualifying:
+
+1. **CI PENDING** — the `test` job had not finished on the final head
+2. **No approving review** on PR #318
+3. **Three QA gates read CONCERNS**, none PASS
+4. **Two success criteria unmet** — `shellcheck` (never run) and the real `--update` (dry-run evidence only, on the path that deletes files)
+5. **Step 5c returned REQUEST CHANGES**, six documentation findings still open
+
+### Next Steps
+
+- [ ] Run `shellcheck scripts/setup-consumer.sh`; record before/after counts
+- [ ] Perform a genuine non-dry `--update` against a full install, or extract the per-skill decision into a testable helper
+- [ ] Obtain human review of PR #318 — see below
+- [ ] Wait for CI to finish green
+- [ ] Clear PC-5…PC-9, PC-11 (documentation consistency)
+
+**Estimated effort:** Medium (2–4 hours) plus the review.
+
+**Why human review is a gap rather than a formality:** four independent passes found 27 defects, and
+every pass found the previous pass's fixes defective — same author throughout. The most severe was
+introduced in the same commit as a comment warning against it, and was invisible to its own test
+because that test ran under `set +e`. The implementation is good; self-certification on it has been
+demonstrably unreliable, in a file that can delete a consumer's installed skills.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -543,6 +575,7 @@ Worth recording how they were found, because the three lenses were disjoint: the
 | 2026-09-04 |         | QA gate 3 CONCERNS (80/100) — confirmation pass found 5 more, 2 HIGH, 3 introduced by cycle 2's fixes; worst was a bare assignment aborting the wizard under errexit | qa-task |
 | 2026-09-04 |         | qa-fix cycle 3 — all 5 fixed; comment-asserting vacuous test replaced; mutation proofs now assert the mutation applied | qa-fix |
 | 2026-09-05 |         | review-pr (Step 5c) — REQUEST CHANGES: two success criteria were ticked without evidence, and the implementation report undercounted cycle 3. Corrected | review-pr |
+| 2026-09-05 |         | DoD incomplete — 5 blocking gaps (CI pending, no approving review, 3 CONCERNS gates, 2 criteria unmet, 5c REQUEST CHANGES). Status NOT advanced to accepted | finalise |
 ---
 
 ## Progress Tracking
