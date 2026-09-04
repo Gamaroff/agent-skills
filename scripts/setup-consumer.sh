@@ -956,9 +956,14 @@ _skill_excluded_for_tracker() {
 _config_skills_profile() {
   local _p=""
   if [[ -f skills-config.yaml ]]; then
+    # The header rule tolerates a trailing comment (`skills:  # which skills`),
+    # and the close rule EXCLUDES the header line itself. Without the `!/^skills:/`
+    # guard the close rule matches the very line that opened the block — so any
+    # trailing content made the whole block invisible, silently, and the installer
+    # fell back to `full` without even reaching the "could not resolve" warning.
     _p=$(awk '
-      /^skills:[[:space:]]*$/ { inblock=1; next }
-      /^[^[:space:]#]/        { inblock=0 }
+      /^skills:[[:space:]]*(#.*)?$/ { inblock=1; next }
+      !/^skills:/ && /^[^[:space:]#]/ { inblock=0 }
       inblock && /^[[:space:]]+profile:/ {
         v = $0
         sub(/^[[:space:]]+profile:[[:space:]]*/, "", v)
@@ -985,20 +990,30 @@ _config_skills_profile() {
 _config_skills_list() {
   local _key="$1" _v=""
   if [[ -f skills-config.yaml ]]; then
+    # Same header/close handling as _config_skills_profile — see the note there.
+    # `found` is printed as a sentinel prefix so the caller can tell an explicit
+    # `include: []` from an absent key: they are different instructions, and
+    # treating them alike let a stale env var override an explicit empty list.
     _v=$(awk -v key="$_key" '
-      /^skills:[[:space:]]*$/ { inblock=1; next }
-      /^[^[:space:]#]/        { inblock=0 }
+      /^skills:[[:space:]]*(#.*)?$/ { inblock=1; next }
+      !/^skills:/ && /^[^[:space:]#]/ { inblock=0 }
       inblock && $0 ~ "^[[:space:]]+" key ":" {
         v = $0
         sub("^[[:space:]]+" key ":[[:space:]]*", "", v)
         sub(/[[:space:]]+#.*$/, "", v)
         gsub(/[][]/, "", v)
         gsub(/[[:space:]]/, "", v)
-        print v; exit
+        gsub(/["'"'"']/, "", v)
+        print "found:" v; exit
       }
     ' skills-config.yaml 2>/dev/null || true)
   fi
   _v=${_v%$'\r'}
+  # An explicit key (even an empty list) suppresses the env fallback.
+  if [[ "$_v" == found:* ]]; then
+    printf '%s' "${_v#found:}"
+    return
+  fi
   if [[ -z "$_v" ]]; then
     case "$_key" in
       include) _v="${SKILLS_INCLUDE:-}" ;;
@@ -1031,8 +1046,14 @@ _resolve_skill_set() {
   _exc=$(_config_skills_list exclude); [[ -n "$_exc" ]] && _args+=(--exclude "$_exc")
   [[ "${ALL_SKILLS:-false}" == true ]] && _args+=(--all-skills)
 
-  local _out
-  _out=$(node "$_cli" "${_args[@]}") || return 1
+  # Discriminate on the EXIT CODE, not on emptiness. The CLI exits 0 for a
+  # legitimately-empty set (every seed excluded, say) and 2 for a data-file or
+  # resolution failure. Treating empty output as failure inverted the user's
+  # intent in the worst possible direction: `--exclude` every seed asked for
+  # almost nothing and installed everything.
+  local _out _rc
+  _out=$(node "$_cli" "${_args[@]}"); _rc=$?
+  [[ $_rc -eq 0 ]] || return 1
 
   # Validate the shape before trusting it. A zero exit is NOT enough: `node` can
   # be shadowed by a shell function (nvm defines one) that prints help text and
@@ -1041,7 +1062,13 @@ _resolve_skill_set() {
   # success. Observed while testing this very function. Skill names are
   # lowercase-kebab and nothing else, so a single bad line rejects the batch and
   # the caller falls back to the unfiltered install.
-  [[ -n "$_out" ]] || return 1
+  # An empty set is a legitimate answer and is returned as such — the caller
+  # distinguishes it from failure by this function's own exit code.
+  if [[ -z "$_out" ]]; then
+    printf ''
+    return 0
+  fi
+
   local _line
   while IFS= read -r _line; do
     [[ "$_line" =~ ^[a-z0-9][a-z0-9-]*$ ]] || return 1
@@ -1119,11 +1146,18 @@ install_skills() {
       # deliberately never downloads it — so the count below is "what the
       # profile resolves to", and is labelled as such rather than implying it
       # counted the release.
-      local _dry_profile; _dry_profile=$(_config_skills_profile)
-      if [[ "$_dry_profile" != "full" ]]; then
+      local _dry_profile _dry_n _dry_inc _dry_exc
+      _dry_profile=$(_config_skills_profile)
+      _dry_inc=$(_config_skills_list include)
+      _dry_exc=$(_config_skills_list exclude)
+      if [[ "$_dry_profile" != "full" || -n "$_dry_exc" ]]; then
         local _dry_cli="$(dirname "${BASH_SOURCE[0]}")/../shared/resources/resolve-skill-set-cli.mjs"
-        if [[ -f "$_dry_cli" ]] && _dry_n=$(node "$_dry_cli" --profile "$_dry_profile" \
-              --tracker "$_dry_tracker" --count 2>/dev/null); then
+        # Pass include/exclude too — a dry run that previews a different set than
+        # the real run would install defeats the point of previewing.
+        local _dry_args=(--profile "$_dry_profile" --tracker "$_dry_tracker" --count)
+        [[ -n "$_dry_inc" ]] && _dry_args+=(--include "$_dry_inc")
+        [[ -n "$_dry_exc" ]] && _dry_args+=(--exclude "$_dry_exc")
+        if [[ -f "$_dry_cli" ]] && _dry_n=$(node "$_dry_cli" "${_dry_args[@]}" 2>/dev/null); then
           echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' resolves to ${_dry_n} skills (closure computed offline; not counted against the release tarball)"
           _dry_detail="${_dry_detail}, profile ${_dry_profile} (${_dry_n})"
         else
@@ -1152,7 +1186,7 @@ install_skills() {
       tar -xzf "$_archive" -C "$_tmpdir" --strip-components=1
       mkdir -p .agents/skills
       local _tracker; _tracker=$(_resolve_install_tracker)
-      local _installed=0 _updated=0 _skipped=0 _kept=0 _outside=0
+      local _installed=0 _updated=0 _skipped=0 _kept=0 _outside=0 _not_in_profile=0
 
       if [[ "$ALL_SKILLS" == true ]]; then
         info "--all-skills: installing every skill, no platform filter"
@@ -1184,18 +1218,30 @@ install_skills() {
         [[ -f "${_skill_dir}SKILL.md" ]] || continue
         local _name; _name=$(basename "$_skill_dir")
 
+        # ORDER: the tracker test comes FIRST, and it must. The resolver has
+        # already removed tracker-excluded skills from _RESOLVED_SET, so a
+        # profile-first check consumed every one of them — _kept was always 0,
+        # Jira-only skills were reported as "outside profile", and the tracker
+        # grandfather warning (which carries the --all-skills and prune advice)
+        # was unreachable whenever a profile was active.
+        #
         # PROFILE GRANDFATHER: a skill outside the resolved set that is ALREADY
         # on disk is KEPT, never deleted — the same guarantee task 83 makes for
         # the tracker filter, and for the same reason: pruning a working install
         # breaks the consumer's workflow days later and far from the cause.
         # The `continue` is what protects it; removing it drops through to the
         # rm -rf below.
-        if [[ "$_have_set" == true ]] && ! grep -qxF "$_name" <<<"$_RESOLVED_SET"; then
+        if ! _skill_excluded_for_tracker "$_name" "$_tracker" \
+           && [[ "$_have_set" == true ]] \
+           && ! grep -qxF "$_name" <<<"$_RESOLVED_SET"; then
           if [[ -d ".agents/skills/${_name}" ]]; then
             info "  kept     ${_name} (already installed; outside profile '${_profile}')"
             (( _outside++ )) || true
           else
-            (( _skipped++ )) || true
+            # Counted separately from _skipped: the summary attributes _skipped
+            # to the tracker, and folding profile skips into it reported ~85
+            # skills as "not applicable to github" when ~11 were.
+            (( _not_in_profile++ )) || true
           fi
           continue
         fi
@@ -1241,7 +1287,8 @@ install_skills() {
       local _detail="${_installed} new, ${_updated} updated"
       (( _skipped > 0 )) && _detail="${_detail}, ${_skipped} skipped (${_tracker})"
       (( _kept > 0 ))    && _detail="${_detail}, ${_kept} kept"
-      (( _outside > 0 )) && _detail="${_detail}, ${_outside} outside profile"
+      (( _outside > 0 )) && _detail="${_detail}, ${_outside} kept outside profile"
+      (( _not_in_profile > 0 )) && _detail="${_detail}, ${_not_in_profile} not in profile '${_profile}'"
       ok "Skills ${_version} installed into .agents/skills/ (${_detail})"
       if (( _kept > 0 )); then
         record_warning "${_kept} skill(s) do not apply to tracker '${_tracker}' but were kept because they are already installed. Delete .agents/skills/ and re-run the wizard to prune, or pass --all-skills to disable the filter entirely."

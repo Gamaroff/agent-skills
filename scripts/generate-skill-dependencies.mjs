@@ -93,7 +93,13 @@ export function parseInvokes(text, skill = "<unknown>") {
   if (!fm) return [];
   const line = fm[1].match(/^invokes:[ \t]*(.*)$/m);
   if (!line) return [];
-  const raw = line[1].trim();
+  // Strip a trailing YAML comment BEFORE the bracket checks. Without this,
+  // `invokes: [a, b]  # steps 1-2` — legal YAML — fails `endsWith("]")` and
+  // throws "unterminated list, missing ]" about a line whose bracket is plainly
+  // there. Both CI drift checks then fail with a message that sends the reader
+  // to the wrong place. The awk parsers in setup-consumer.sh already do this;
+  // this parser was the odd one out.
+  const raw = line[1].replace(/\s+#.*$/, "").trim();
   if (!raw) return [];
   if (!raw.startsWith("[")) {
     throw new Error(

@@ -5,8 +5,11 @@ on:
     paths:
       - 'skills/**'
       - 'scripts/generate-skill-dependencies.mjs'
-      # The generated graph and the profiles that consume it. Without this the
-      # drift check below cannot fire on the very file it checks.
+      # `skill-dependencies.json` is the file the drift check regenerates and
+      # diffs — without it here, a hand-edit of the graph would not even trigger
+      # this workflow. `skill-profiles.json` is listed so a profile edit re-runs
+      # the catalog and bundle checks; the drift step does not read it (its seed
+      # validation lives in skill-dependencies-drift.test.mjs, run by test.yml).
       - 'shared/resources/skill-dependencies.json'
       - 'shared/resources/skill-profiles.json'
       - 'docs/reference/skill-catalog.md'
@@ -38,9 +41,11 @@ jobs:
       - name: Install PyYAML
         run: pip install pyyaml
 
-      # The catalog and bundle checks below are pure Python, but the
-      # skill-dependencies generator is Node — this job had no Node at all, so
-      # adding the drift check without this step would fail on `node: not found`.
+      # The catalog and bundle checks below are pure Python; the
+      # skill-dependencies generator is Node. `ubuntu-latest` does ship a Node,
+      # so this is not about availability — it pins the same major that
+      # release.yml's drift check runs on, so the two cannot disagree about the
+      # generated file and produce a PR that is green here and red at tag time.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:

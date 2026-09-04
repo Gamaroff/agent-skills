@@ -626,3 +626,252 @@ test("pipeline's description budget is materially below full's — both measured
     `minimal (${minimalBytes}) must be below pipeline (${pipelineBytes})`,
   );
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QA cycle 1 regressions (TASK-84-001 … 010)
+//
+// Every one of these is a path that SILENTLY INSTALLED EVERY SKILL, broke CI on
+// legal input, or misreported what it did. They share a shape: the mechanism was
+// right and the input handling around it was not, so the happy-path tests above
+// all passed while these cases were broken.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("001: an unknown or mis-cased include is rejected loudly, not echoed to stdout", () => {
+  // Echoing it made the installer's per-line shape guard reject the WHOLE batch,
+  // downgrading a typo into a full unfiltered install blamed on node/PATH.
+  const r = execFileSync(
+    "bash",
+    [
+      "-c",
+      `${JSON.stringify(process.execPath)} ${JSON.stringify(CLI)} --profile minimal --tracker github --include Create-PR,NotARealSkill >/tmp/dn-inc.$$ 2>/tmp/dn-incerr.$$; echo "rc=$?"; echo "OUT:$(wc -c </tmp/dn-inc.$$)"; cat /tmp/dn-incerr.$$; rm -f /tmp/dn-inc.$$ /tmp/dn-incerr.$$`,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.match(
+    r,
+    /rc=2/,
+    "an unknown include must be an error, not a silent pass",
+  );
+  assert.match(
+    r,
+    /OUT:\s*0/,
+    "nothing may reach stdout — the installer reads every line as a skill",
+  );
+  assert.match(r, /unknown skill\(s\) in include: Create-PR, NotARealSkill/);
+});
+
+test("002: an empty resolved set exits 0 and is honoured, not read as failure", () => {
+  // Excluding every seed of `minimal` legitimately resolves to nothing. Treating
+  // empty stdout as failure made the installer install EVERYTHING — the user
+  // asked for almost nothing and got the maximum.
+  const r = execFileSync(
+    "bash",
+    [
+      "-c",
+      `${JSON.stringify(process.execPath)} ${JSON.stringify(CLI)} --profile minimal --tracker github --exclude commit-changes,create-branch,create-issue,create-pr,review-code >/tmp/dn-e.$$ 2>/dev/null; echo "rc=$?"; echo "lines=$(grep -c . /tmp/dn-e.$$ || true)"; rm -f /tmp/dn-e.$$`,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.match(r, /rc=0/, "an empty set is a legitimate answer, not an error");
+  assert.match(r, /lines=0/);
+});
+
+test("002b: _resolve_skill_set discriminates on exit code, not on emptiness", () => {
+  const src = readFileSync(WIZARD, "utf8");
+  assert.match(
+    src,
+    /_out=\$\(node "\$_cli" "\$\{_args\[@\]\}"\); _rc=\$\?/,
+    "the exit code must be captured — emptiness is not a failure signal",
+  );
+  assert.doesNotMatch(
+    src,
+    /\[\[ -n "\$_out" \]\] \|\| return 1/,
+    "treating empty output as failure inverts the user's intent",
+  );
+});
+
+test("003: `skills:` with a trailing comment still opens the block", () => {
+  // The open rule required nothing after `skills:`, and the close rule then
+  // matched that same line — so any trailing content made the whole block
+  // invisible and fell back to `full` with NO warning at all.
+  for (const header of ["skills:", "skills:   ", "skills:  # which skills"]) {
+    const dir = scratch(`${header}\n  profile: minimal\n`);
+    try {
+      assert.equal(
+        inWizard(dir, "_config_skills_profile"),
+        "minimal",
+        `header ${JSON.stringify(header)} must open the block`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("003b: a `profile:` outside the block is still not picked up", () => {
+  // The fix must not widen the block. This is the property the close rule exists
+  // for, re-asserted alongside the loosened open rule.
+  const dir = scratch(
+    "other:  # not skills\n  profile: minimal\ntracker: github\n",
+  );
+  try {
+    assert.equal(inWizard(dir, "_config_skills_profile"), "full");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an explicit empty include list beats a stale environment variable", () => {
+  // `include: []` and an absent key are different instructions. Conflating them
+  // let a leftover $SKILLS_INCLUDE override what the config explicitly said.
+  const withKey = scratch("skills:\n  profile: minimal\n  include: []\n");
+  const withoutKey = scratch("skills:\n  profile: minimal\n");
+  try {
+    assert.equal(
+      inWizard(withKey, "_config_skills_list include", {
+        SKILLS_INCLUDE: "stale",
+      }),
+      "",
+      "an explicit empty list must win",
+    );
+    assert.equal(
+      inWizard(withoutKey, "_config_skills_list include", {
+        SKILLS_INCLUDE: "stale",
+      }),
+      "stale",
+      "an absent key may still fall back to the env var",
+    );
+  } finally {
+    rmSync(withKey, { recursive: true, force: true });
+    rmSync(withoutKey, { recursive: true, force: true });
+  }
+});
+
+test("quoted and unquoted include lists parse identically", () => {
+  const q = scratch(
+    'skills:\n  profile: minimal\n  include: ["create-pr", "review-pr"]\n',
+  );
+  const u = scratch(
+    "skills:\n  profile: minimal\n  include: [create-pr, review-pr]\n",
+  );
+  try {
+    assert.equal(
+      inWizard(q, "_config_skills_list include"),
+      inWizard(u, "_config_skills_list include"),
+    );
+    assert.equal(
+      inWizard(u, "_config_skills_list include"),
+      "create-pr,review-pr",
+    );
+  } finally {
+    rmSync(q, { recursive: true, force: true });
+    rmSync(u, { recursive: true, force: true });
+  }
+});
+
+test("005: the tracker test precedes the profile test in the install loop", () => {
+  // The resolver already removes tracker-excluded skills from the resolved set,
+  // so a profile-first check consumed every one of them: `_kept` was always 0,
+  // Jira-only skills were reported as "outside profile", and the tracker
+  // grandfather warning — which carries the --all-skills and prune advice — was
+  // unreachable whenever a profile was active.
+  const src = readFileSync(WIZARD, "utf8");
+  assert.match(
+    src,
+    /if ! _skill_excluded_for_tracker "\$_name" "\$_tracker"[\s\S]{0,120}_have_set/,
+    "the profile branch must exclude tracker-filtered skills so they reach the tracker branch",
+  );
+});
+
+test("006: profile skips are counted separately from tracker skips", () => {
+  // `_skipped` is rendered as `skipped (${_tracker})`. Folding profile skips into
+  // it reported ~85 skills as "not applicable to github" when ~11 were.
+  const src = readFileSync(WIZARD, "utf8");
+  assert.match(
+    src,
+    /_not_in_profile\+\+/,
+    "profile skips need their own counter",
+  );
+  assert.match(
+    src,
+    /\$\{_not_in_profile\} not in profile/,
+    "and their own summary phrasing, not the tracker's",
+  );
+});
+
+test("008: a graph lookup cannot reach Object.prototype or iterate a string", () => {
+  // `graph[name] ?? []` walked the prototype chain: a skill named `toString`
+  // yielded a function and threw "not iterable", which escaped and left the
+  // installer with an empty result it read as failure.
+  const r = resolveSkillSet({
+    profiles: { t: { seeds: ["toString"] } },
+    graph: { toString: "not-an-array", other: ["x"] },
+    allSkills: ["toString", "other", "x"],
+    profile: "t",
+  });
+  assert.deepEqual(
+    r.skills,
+    ["toString"],
+    "a non-array value contributes no edges",
+  );
+});
+
+test("009: a `$`-prefixed profile name is rejected, not silently empty", () => {
+  // skill-profiles.json carries a `$comment` documentation key. Accepting it as a
+  // profile returned an empty set and exit 0, which the installer then read as a
+  // resolver failure — producing a FULL install for a typo'd profile name.
+  assert.throws(
+    () =>
+      resolveSkillSet({
+        ...base,
+        profile: "$comment",
+        profiles: { ...profiles, $comment: { seeds: [] } },
+      }),
+    /Unknown profile: \$comment/,
+  );
+});
+
+test("conflicts are reported once per skill, naming every requirer", () => {
+  // Previously one excluded skill required by four things printed the same
+  // four-line warning four times, while the `.some()` dedupe it had was dead code.
+  const r = resolveSkillSet({
+    ...base,
+    profile: "test",
+    exclude: ["create-pr"],
+  });
+  const entries = r.conflicts.filter((c) => c.skill === "create-pr");
+  assert.equal(entries.length, 1, "one entry per skill");
+  assert.match(entries[0].requiredBy, /develop-story/);
+});
+
+test("010: the dry-run count applies the config's include and exclude", () => {
+  // A preview that resolves a different set than the real run would install
+  // defeats the purpose of previewing.
+  const src = readFileSync(WIZARD, "utf8");
+  assert.match(src, /_dry_args\+=\(--include/, "dry-run must pass include");
+  assert.match(src, /_dry_args\+=\(--exclude/, "dry-run must pass exclude");
+  assert.match(
+    src,
+    /local _dry_profile _dry_n/,
+    "_dry_n must not leak to global scope",
+  );
+});
+
+test("011: the CLI never calls process.exit() — its stdout is piped", () => {
+  // Caught by the repo-wide stdout-drain guard, not by this suite, and it was a
+  // real defect: setup-consumer.sh consumes this CLI's stdout through a pipe, and
+  // `process.exit()` after a write truncates at the pipe buffer (~64KB). 120 skill
+  // names sit well under that today — which is exactly why it would have gone
+  // unnoticed until the library grew past it.
+  const src = readFileSync(CLI, "utf8");
+  const code = src
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("//"))
+    .join("\n");
+  assert.doesNotMatch(
+    code,
+    /process\.exit\(/,
+    "use `process.exitCode = N` and return; see bug.3.stdout-truncation-on-exit",
+  );
+  assert.match(code, /process\.exitCode = 2/);
+});

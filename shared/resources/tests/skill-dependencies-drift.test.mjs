@@ -216,3 +216,38 @@ test("REPORT: skills in no profile, and prose mentions not declared as edges", (
 
   assert.ok(existsSync(GRAPH_FILE));
 });
+
+test("004: `invokes:` tolerates a trailing YAML comment", () => {
+  // `invokes: [a, b]  # steps 1-2` is legal YAML. Checking `endsWith("]")` without
+  // stripping the comment threw "unterminated list — missing ]" about a line whose
+  // bracket is plainly there, failing BOTH CI drift checks with a message that
+  // sends the reader to the wrong place.
+  assert.deepEqual(
+    parseInvokes(
+      "---\ninvokes: [create-branch, develop]  # steps 1-2\n---\n",
+      "x",
+    ),
+    ["create-branch", "develop"],
+  );
+  assert.deepEqual(
+    parseInvokes("---\ninvokes: []  # none yet\n---\n", "x"),
+    [],
+  );
+  assert.deepEqual(
+    parseInvokes("---\ninvokes: [create-branch]\n---\n", "x"),
+    ["create-branch"],
+    "the no-comment form must be unaffected",
+  );
+});
+
+test("004b: a genuinely unterminated list still throws", () => {
+  // The comment strip must not swallow a real syntax error.
+  assert.throws(
+    () => parseInvokes("---\ninvokes: [create-branch, develop\n---\n", "x"),
+    /unterminated/,
+  );
+  assert.throws(
+    () => parseInvokes("---\ninvokes: create-branch\n---\n", "x"),
+    /inline form/,
+  );
+});

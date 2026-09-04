@@ -43,7 +43,12 @@ export function resolveSkillSet({
   if (!profiles || typeof profiles !== "object") {
     throw new Error("resolveSkillSet: `profiles` is required");
   }
-  const def = profiles[profile];
+  // `$`-prefixed keys are documentation (`$comment` in skill-profiles.json), not
+  // profiles. Rejecting them only in the error message left `--profile '$comment'`
+  // returning an empty set and exiting 0 — which the installer reads as a resolver
+  // failure and turns into a FULL install. A typo'd profile must be an error, not
+  // silently the opposite of what was asked for.
+  const def = profile.startsWith("$") ? undefined : profiles[profile];
   if (!def) {
     const known = Object.keys(profiles)
       .filter((k) => !k.startsWith("$"))
@@ -65,10 +70,9 @@ export function resolveSkillSet({
 
   // A seed the user asked to exclude is a conflict too — they asked for it in
   // the profile and asked for it gone. Report rather than resolve.
-  const conflicts = [];
+  const conflictsBySkill = new Map(); // skill -> Set of things requiring it
   for (const s of chosen) {
-    if (excludeSet.has(s))
-      conflicts.push({ skill: s, requiredBy: "(profile seed)" });
+    if (excludeSet.has(s)) conflictsBySkill.set(s, new Set(["(profile seed)"]));
   }
 
   // 2. Transitive closure. A visited SET with a worklist, never recursion:
@@ -81,7 +85,15 @@ export function resolveSkillSet({
     const name = worklist.pop();
     if (resolved.has(name)) continue;
     resolved.add(name);
-    for (const dep of graph[name] ?? []) {
+    // `Object.hasOwn` + `Array.isArray`, not `graph[name] ?? []`: a bare lookup
+    // walks the prototype chain, so a skill named `toString` yields a FUNCTION and
+    // throws "not iterable"; and a hand-edited graph with a string value would
+    // iterate its characters as skill names.
+    const deps =
+      Object.hasOwn(graph, name) && Array.isArray(graph[name])
+        ? graph[name]
+        : [];
+    for (const dep of deps) {
       if (resolved.has(dep)) continue;
       if (excludeSet.has(dep)) {
         // NEVER silently re-add. The user asked for it gone; the graph says it
@@ -89,9 +101,14 @@ export function resolveSkillSet({
         // proceeds without it and names what will break, because silently
         // re-adding overrides an explicit instruction and silently omitting it
         // produces a mid-pipeline failure with no clue as to the cause.
-        if (!conflicts.some((c) => c.skill === dep && c.requiredBy === name)) {
-          conflicts.push({ skill: dep, requiredBy: name });
-        }
+        // Collect by skill. The previous `.some(...)` scan was dead code — the
+        // visited-set guard means each `name` expands exactly once, so that exact
+        // pair could never repeat. Meanwhile the duplication that DOES occur (one
+        // skill required by several others, and also an excluded seed) went
+        // unmerged and printed the same four-line warning once per relationship.
+        const seen = conflictsBySkill.get(dep);
+        if (seen) seen.add(name);
+        else conflictsBySkill.set(dep, new Set([name]));
         continue;
       }
       if (!addedBy.has(dep)) addedBy.set(dep, name);
@@ -123,7 +140,11 @@ export function resolveSkillSet({
       .filter(([name]) => resolved.has(name) && !chosenSet.has(name))
       .map(([skill, requiredBy]) => ({ skill, requiredBy }))
       .sort((a, b) => a.skill.localeCompare(b.skill)),
-    conflicts: conflicts.sort((a, b) => a.skill.localeCompare(b.skill)),
+    // One entry per excluded-but-required skill, naming every requirer, so the
+    // installer prints one warning per skill rather than one per relationship.
+    conflicts: [...conflictsBySkill]
+      .map(([skill, by]) => ({ skill, requiredBy: [...by].sort().join(", ") }))
+      .sort((a, b) => a.skill.localeCompare(b.skill)),
     droppedForTracker: droppedForTracker.sort(),
   };
 }

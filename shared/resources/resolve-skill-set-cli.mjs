@@ -91,8 +91,16 @@ function main() {
     // Exit 2, not 1, and print NOTHING to stdout. The installer treats an
     // empty stdout as "install nothing", so a data-file problem must be
     // distinguishable from a legitimately empty set.
+    //
+    // `process.exitCode` + return, never `process.exit()`. This CLI's stdout is
+    // consumed through a pipe by setup-consumer.sh, and `process.exit()` after a
+    // write truncates it at the pipe buffer (~64KB) — the repo already has a bug
+    // and a standing guard for exactly this (bug.3.stdout-truncation-on-exit).
+    // 120 skill names is well under 64KB today, which is precisely why this would
+    // have gone unnoticed until the library grew.
     console.error(`resolve-skill-set: cannot read data files — ${e.message}`);
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
 
   // Prefer the tarball's own skill list when available: `full` must mean
@@ -109,11 +117,30 @@ function main() {
     if (onDisk.length) allSkills = onDisk;
   }
 
+  // Validate `include` BEFORE resolving. An unknown or mis-cased name would
+  // otherwise be echoed to stdout verbatim, fail the installer's per-line name
+  // shape guard, and cause it to reject the whole batch — downgrading to a full
+  // unfiltered install and blaming node/PATH. A typo must name itself.
+  const known = new Set(allSkills);
+  const includes = list(arg("include"));
+  const unknown = includes.filter((n) => !known.has(n));
+  if (unknown.length) {
+    console.error(
+      `resolve-skill-set: unknown skill(s) in include: ${unknown.join(", ")}`,
+    );
+    console.error(
+      "  Names are lowercase-kebab and must match a directory under skills/.",
+    );
+    console.error("  See docs/reference/skill-catalog.md for the full list.");
+    process.exitCode = 2;
+    return;
+  }
+
   let result;
   try {
     result = resolveSkillSet({
       profile: arg("profile", "full"),
-      include: list(arg("include")),
+      include: includes,
       exclude: list(arg("exclude")),
       profiles,
       graph,
@@ -125,7 +152,8 @@ function main() {
     });
   } catch (e) {
     console.error(`resolve-skill-set: ${e.message}`);
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
 
   if (flag("json")) {
@@ -185,5 +213,12 @@ function isMain() {
 }
 
 if (isMain()) {
-  main();
+  try {
+    main();
+  } catch (e) {
+    // Exit 2 with nothing on stdout. An escaping exception would otherwise let
+    // the installer see empty output and treat it as "resolved nothing".
+    console.error(`resolve-skill-set: ${e && e.message ? e.message : e}`);
+    process.exitCode = 2;
+  }
 }
