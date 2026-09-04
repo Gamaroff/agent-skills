@@ -5,18 +5,20 @@ type: task
 description: "Task 75 put a fast gate before the commit in the develop loop and in each qa-fix cycle. develop-bug shares the develop loop, so it picked that half up for free — but its per-cycle fix loop lives in its own document and got nothing. A bug fix cycle can still commit an unformatted tree where a task fix cycle now cannot."
 tags: [ci, quality-gate, develop-bug, pipeline, tooling]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-01
 updated: 2026-09-04
+completed_date: 2026-09-04
+pr_number: 314
 assignee:
 estimated_effort_hours: 2
 ---
 
 # Technical Task: Give develop-bug's fix cycle the same fast gate as the other pipelines
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.78.review.1.develop-bug-fast-gate.md` implemented 2026-09-04
 
 ---
@@ -360,6 +362,39 @@ None. One document gains a step that two others already have.
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
 
+## Definition of Done - PASSED
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Gate**: `task.78.gate.2.develop-bug-fast-gate.yml` — ✅ **PASS**, 100/100 (2 cycles; gate 1 was
+CONCERNS 80/100 with three MEDIUM findings, all closed)
+**PR conformance** (Step 5c `/review-pr`): ⚠️ CONCERNS — non-blocking; its one medium finding closed
+before finalise ran.
+
+All Definition of Done criteria verified:
+
+- ✅ **Success Criteria:** 6/6 met, each traced to a specific line
+- ✅ **Safety criterion held by a mutation proof, not a green test:** each of the three loop documents
+  was stripped of the gate in turn, the parity test went red on each, and all three restored green
+- ✅ **CI:** SUCCESS on `302ed3f` — the PR's current head, waited for rather than assumed (the first
+  sample read PENDING with three jobs in progress)
+- ✅ **Documentation:** CHANGELOG entry, both consumer reference sites, task Change Log
+- ✅ **Security:** no executable code, no new command, retained `$FIX_LOG` confirmed gitignored
+- ⚠️ **Compliance:** NOT_APPLICABLE — no regulated surface
+
+**Out of scope, recorded rather than deferred:** widening the Step 4b runnable-prose rule to
+skill-native `references/*.md` (this task's own blind spot, one layer up), and the uncommitted-fix
+handover on a fifth-cycle twice-red gate — which is identical to the story/task qa-fix loop, so
+changing it here alone would break the parity this task exists to establish.
+
+**Detailed Verification Log:** see [`task.78.dod.1.develop-bug-fast-gate.md`](./task.78.dod.1.develop-bug-fast-gate.md).
+
+**Task marked as ACCEPTED on:** 2026-09-04
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -404,6 +439,7 @@ transition.
 | 2026-09-04 |         | QA findings fixed — all 3 closed, 1 iteration; a fourth defect found by the adversarial pass over the fixes themselves | qa-fix |
 | 2026-09-04 |         | QA cycle 2 — gate PASS (100/100), all three findings verified closed, refute pass found nothing new | qa-task |
 | 2026-09-04 |         | Step 5c review-pr — CONCERNS; PC-1 closed (§7 Files Summary now lists all five modified files) | review-pr |
+| 2026-09-04 | 1.2     | DoD verified — accepted (PR #314), CI green on the final head | finalise |
 
 ---
 

@@ -35,9 +35,9 @@ Add `<fastGateCommand>` to `develop-bug`'s per-cycle verify loop at its own pre-
 | 1. create-branch           | ✅ Done    | Branch `feature/task.78.*` exists in git                               | `feature/task.78.develop-bug-fast-gate` created at `a41eb0c`, pushed | —                    |
 | 2. review-task             | ✅ Done    | `task.78.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT 9/10; 1 Critical + 3 Important, 5/6 fixes applied | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, 4/4 phases; fast gate green (2319 pass / 0 fail) | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.78.qa.{N}.*.md`; `task.78.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.78.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #314: https://github.com/Gamaroff/agent-skills/pull/314 (commit `0b32cd3`); issue comment skipped — no linked issue | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.78.qa.{N}.*.md`; `task.78.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles: CONCERNS 80 → PASS 100. Step 5c **PR Review: CONCERNS**, PC-1 closed | —                    |
+| 7. finalise                | ✅ Done    | `task.78.dod.{N}.*.md`; task `status: accepted`                        | ACCEPTED. CI SUCCESS on final head `302ed3f` — waited, not assumed | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -64,6 +64,8 @@ Add `<fastGateCommand>` to `develop-bug`'s per-cycle verify loop at its own pre-
 - Bundle drift check: `npm run bundle` produced no diff, confirming the corrected Phase 4 premise (neither changed file is bundled).
 - Fast gate (`npm run ci:fast`, `develop.fastGateCommand` default): **exit 0** — 2319 pass / 0 fail, run over the final tree.
 - Mutation proving: `<fastGateCommand>` + `develop.fastGateCommand` stripped from each of the three loop documents in turn → parity test red each time; green on restore.
+- Step 4 SCOPE_PATHS: `docs/tasks/task.78.develop-bug-fast-gate`, `evals/shared/tests`, `skills/develop-bug/references`, `CHANGELOG.md`. Leak check clean — no out-of-scope path staged. No pre-flight hold needed (both untracked files sat inside the work-item dir).
+- Step 4 commit `0b32cd3` includes the implementation report's first commit, per the Step 4 rule that the report becomes readable to reviewers during the QA loop.
 - Implementation report stashed before branch creation, restored after (clean pop).
 - Step 1: branch `feature/task.78.develop-bug-fast-gate` created from `develop` at `a41eb0c`; tracker signal skipped (no linked issue).
 
@@ -78,16 +80,64 @@ Add `<fastGateCommand>` to `develop-bug`'s per-cycle verify loop at its own pre-
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-04
+
+**qa-task gate**: CONCERNS (80/100) — 0 HIGH, 3 MEDIUM, 2 LOW. 2320 tests, 0 fail. NFRs: Security/Performance/Reliability PASS, Maintainability CONCERNS.
+**Findings**: TASK-78-001 (ambiguous "step-3" cross-reference), TASK-78-002 (gate failure output directed at a template with no field for it), TASK-78-003 (three live docs still describing two gate sites).
+**qa-fix**: all three closed. Commit `dec34d1`, pushed. Fast gate green before commit (2319 pass / 0 fail).
+**Fast gate**: pass — run before the qa-fix commit, which is this task's own gate applied to its delivery.
+**Extra finding, self-caught**: the Step 3.5 adversarial pass found that the first TASK-78-002 fix also added the field to the tracker-comment template, which is a single POST made at the end of 5a — before 5b runs the gate — so the field could never be filled. Reverted; asymmetry documented in the file.
+**Action**: QA cycle 2 re-review.
+
+### QA Cycle 2 — 2026-09-04
+
+**qa-task gate**: PASS (100/100). All three cycle-1 findings verified closed against the current files. Unscoped refute pass over the whole branch diff found nothing false. NFRs all PASS (Maintainability recovered from CONCERNS).
+**Fast gate**: n/a — the cycle passed at 5a and never reached 5b.
+**Action**: exit to Step 5c.
+
+### Step 5c — /review-pr (loop exit gate) — 2026-09-04
+
+**Verdict**: CONCERNS (non-blocking → exits to Step 7). Report: `task.78.pr-review.1.develop-bug-fast-gate.md`, comment posted to PR #314.
+**Traceability**: 6/6 success criteria met, each traced to a line; the safety criterion traced to a mutation proof rather than a passing test.
+**Findings**: PC-1 (medium) §7 Files Summary listed 3 files where 5 changed — **closed immediately**, since it is a two-line correction and shipping a knowingly-stale inventory into Step 7's DoD check would be worse. PC-2 (low, PR body predates the doc sweep) and CR-1 (low, pre-existing bare `readFileSync`) need no action.
+**Scope note**: the default `*/references/*` exclusion was deliberately **not** applied — this PR's primary deliverable is a skill-native file under `references/`, and excluding it would have reviewed everything except the change. Verified no changed file carries an `AUTO-GENERATED` header.
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-04 19:10
+**Final Status**: Completed
 **Branch**: `feature/task.78.develop-bug-fast-gate`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: [#314](https://github.com/Gamaroff/agent-skills/pull/314)
+**QA Iterations**: 2 (+ Step 5c review-pr)
+**DoD Summary**: `task.78.dod.1.develop-bug-fast-gate.md` — ACCEPTED
+**Tracker debt**: none — no linked issue, so nothing was deferred. Link it with `/sync-github-task` if board visibility is wanted.
+
+---
+
+## Completion Summary
+
+Delivered in **1 develop iteration and 2 QA cycles**, accepted with CI green on the final head.
+
+**What shipped**: the fast gate at `develop-bug`'s own pre-commit seam (step 3a of 5b), an honest
+2-attempt retry bound, a parity test iterating all three loop documents at their real sources, and a
+three-site doc sweep.
+
+**Three things the pipeline caught that the plan did not**:
+
+1. **`/review-task` (Critical)** — the task named a `shared/resources/` path for a file that is
+   skill-native. The fix was about to reproduce the exact mistake it was fixing.
+2. **`/qa-task` cycle 1 (3× MEDIUM)** — two port artifacts (a cross-reference that is unambiguous in
+   the source document and collides in this one; a failure instruction pointing at a template with no
+   field for it) and a doc sweep the plan did not include.
+3. **`/qa-fix` Step 3.5 (self-caught)** — the first version of one fix added a field to a comment that
+   is posted *before* the gate runs, so it could never be filled. Found by the adversarial pass over
+   the fixes themselves, reverted, and the asymmetry documented in place.
+
+**The gate governed its own delivery.** `npm run ci:fast` ran before the qa-fix commit — which is the
+gate this task adds, applied to the task that adds it.
+
+**Deliberately not done** (recorded, not deferred): widening the Step 4b runnable-prose rule to
+skill-native `references/*.md`, and the uncommitted-fix handover on a fifth-cycle twice-red gate —
+the latter identical to the story/task qa-fix loop, so it must change in both documents or neither.
