@@ -29,7 +29,7 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Validate story 2.3" / "Is story 2.3 ready?" | `review-story --validate` |
 | "Review this bug report" / "Is this bug ready to fix?" | `review-bug` (the second phrasing picks `--validate`) |
 | "Review my changes" / "Review this diff" / "Review PR 123" | `review-code` |
-| "Review this PR" / "Does this PR match the task?" / "Is the evidence there for this PR?" | `review-pr` |
+| "Review this PR" / "Does this PR match the task?" / "Is the evidence there for this PR?" | `review-pr` (also runs automatically as Step 5c of `/develop-story` and `/develop-task`) |
 | "Double check that" / "Verify your work" / "Are you sure?" / "Did you actually do that?" | `double-check` |
 
 ## Development

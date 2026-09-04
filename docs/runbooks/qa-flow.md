@@ -20,7 +20,15 @@ flowchart TD
     B -->|gate file + NFR + traceability| C[qa-gate]
     B -->|CONCERNS/FAIL| D[qa-fix]
     D --> B
+    B -->|PASS/WAIVED| E[review-pr]
+    E -->|REQUEST CHANGES| D
+    E -->|APPROVE/CONCERNS| F[finalise]
 ```
+
+The `finalise` node is here because the QA gate is no longer where this flow ends. `review-pr`
+(**Step 5c** in `/develop-story` and `/develop-task`) is the loop's exit gate, so the first thing
+outside the loop belongs on the diagram — otherwise the picture stops one step before the decision
+that matters.
 
 ## Phase 1 — Pre-implementation (optional)
 
@@ -57,7 +65,34 @@ If the gate is `CONCERNS` or `FAIL`:
 /qa-fix <story-or-task-path>
 ```
 
-`qa-fix` ingests the gate file, prioritises findings risk-first, applies fixes, and updates the story/task. Re-run `qa-story` / `qa-task` after fixes land. Repeat until `PASS` or `WAIVED`.
+`qa-fix` ingests the gate file, prioritises findings risk-first, applies fixes, and updates the story/task. Re-run `qa-story` / `qa-task` after fixes land.
+
+**A `PASS` or `WAIVED` gate is no longer where this ends.** Inside `/develop-story` and
+`/develop-task` a clean gate hands to **Step 5c**, `review-pr` — see below. `qa-fix` also runs on
+that step's `REQUEST CHANGES` verdict, and those cycles come out of the same 5-cycle budget.
+
+## Phase 3b — PR conformance review (`review-pr`, Step 5c)
+
+The exit gate of the QA loop, and the only way out of it.
+
+```bash
+/review-pr --effort medium --comment
+```
+
+`qa-story` / `qa-task` validate the work against its acceptance or success criteria and dispatch the
+code reviewer. `review-pr` asks a different question: does the PR *deliver what the work item
+promised*, did it drift outside that scope, and is the artifact trail behind it complete and honest?
+Nothing else in the pipeline asks it.
+
+| Verdict | What happens |
+| --- | --- |
+| 🚨 `REQUEST CHANGES` | Back to `qa-fix`, consuming a cycle from the shared 5-cycle budget |
+| ⚠️ `CONCERNS` | Findings recorded, run continues to `finalise` |
+| ✅ `APPROVE` | Straight on to `finalise` |
+
+It writes `*.pr-review.{n}.{name}.md` beside the work item and is **advisory**: no gate file, no
+formal PR review, no code edits. The orchestrator acts on the verdict. Lite mode degrades it to
+`--effort low` and never skips it.
 
 ## Phase 4 — Gate decision (manual override only)
 
@@ -88,6 +123,8 @@ Tasks follow the same pattern under `docs/tasks/task.{N}.{name}/`. See [Story do
 - `qa-planning` → `qa-story`: risk profile and test design feed into review assessments.
 - `qa-story` → `qa-gate`: NFR validation, trace data, and issues feed into gate decisions.
 - `qa-planning` → `qa-gate`: risk summary directly influences gate status (≥9 → FAIL, ≥6 → CONCERNS).
+- `qa-story` / `qa-task` → `review-pr`: a `PASS`/`WAIVED` gate hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
+- `review-pr` → `qa-fix`: a `REQUEST CHANGES` verdict re-enters the fix cycle with the review's findings.
 
 ## See also
 
@@ -96,6 +133,7 @@ Tasks follow the same pattern under `docs/tasks/task.{N}.{name}/`. See [Story do
 - [`qa-task` SKILL.md](../../skills/qa-task/SKILL.md)
 - [`qa-gate` SKILL.md](../../skills/qa-gate/SKILL.md)
 - [`qa-fix` SKILL.md](../../skills/qa-fix/SKILL.md)
+- [`review-pr` SKILL.md](../../skills/review-pr/SKILL.md) — Step 5c, the QA loop's exit gate
 - [Story Development Runbook](./story-development.md)
 - [Task Development Runbook](./task-development.md)
 - [Operations / Workflows](../operations/workflows.md)

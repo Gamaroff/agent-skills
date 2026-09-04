@@ -28,7 +28,7 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **Satellite runbook** | Focused single-scenario runbook (~80–150 lines). Examples: hotfix, bug-fix, sprint-cycle.                                              |
 | **Lite mode**         | Optional flag that skips pre-develop context-gathering for low-risk stories/tasks. Step 7 (`finalise`) side-effects still run in full. |
 | **Resume**            | Re-invoking an orchestrator on an interrupted run. Detects per-step artifacts and continues from the first incomplete step.            |
-| **MAX_ITER**          | Bounded-loop cap (5) on develop and qa-fix iterations, to prevent runaway agent costs.                                                 |
+| **MAX_ITER**          | Bounded-loop cap (5) on develop and qa-fix iterations, to prevent runaway agent costs. The QA loop's 5 cycles are shared with Step 5c — a `review-pr` `REQUEST CHANGES` consumes one. |
 
 ## QA
 

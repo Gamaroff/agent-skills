@@ -542,7 +542,19 @@ test("the skill situates itself against its siblings", () => {
   for (const sib of ["/review-code", "/review-task", "/qa-task", "/finalise"]) {
     assert.ok(SKILL.includes(sib), `sibling ${sib} named`);
   }
-  assert.match(SKILL, /do \*\*not\*\* call `\/review-pr`/);
+  // Task 77 inverted this: the pipelines now DO call /review-pr, at Step 5c.
+  // What must stay true is the distinction that makes the wiring legitimate —
+  // the skill is consulted by the pipeline, and still gates nothing itself.
+  assert.match(SKILL, /\*\*do\*\* call `\/review-pr`, as \*\*Step 5c\*\*/);
+  assert.match(
+    SKILL,
+    /Being consulted by a pipeline is not the same as gating one/,
+    "the consulted-vs-gating distinction is what keeps the advisory contract intact",
+  );
+  assert.match(
+    SKILL,
+    /Gate files remain the exclusive output of `\/qa-story` and `\/qa-task`/,
+  );
 });
 
 // ---------------------------------------------------------------------------

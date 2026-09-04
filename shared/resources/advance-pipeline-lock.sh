@@ -22,8 +22,8 @@
 #   • next > current  → atomic write via tmpfile + mv, print confirmation to stdout
 #
 # Skill→next-step mapping (--skill mode). Only unambiguous transitions advance;
-# qa-story/qa-fix are noops because Steps 5–6 form an iterative loop the
-# orchestrator must manage explicitly.
+# qa-story/qa-fix/review-pr are noops because Steps 5–6 form an iterative loop
+# the orchestrator must manage explicitly.
 #
 #   create-branch   → 2   (Step 1 done)
 #   review-story    → 3   (Step 2 done)
@@ -33,6 +33,7 @@
 #   qa-story        → noop (loop)
 #   qa-task         → noop (loop)
 #   qa-fix          → noop (loop)
+#   review-pr       → noop (loop — Step 5c, the loop's exit gate)
 #   finalise        → 8   (Step 7 done)
 #   commit-changes  → remove lock ONLY when current_step >= 8 (terminal commit);
 #                     nested invocations (create-pr Step 4, qa-fix Steps 5–6) preserve the lock
@@ -77,7 +78,11 @@ case "$1" in
       review-story|review-task)   NEXT=3 ;;
       develop)                    NEXT=4 ;;
       create-pr)                  NEXT=5 ;;
-      qa-story|qa-task|qa-fix)    exit 0 ;;  # iterative loop, orchestrator manages
+      # review-pr is Step 5c, the QA loop's exit gate. It is listed explicitly
+      # rather than left to the `*)` catch-all below: both arms exit 0, so this
+      # is a documentation and testability change, not a behavioural one.
+      qa-story|qa-task|qa-fix|review-pr)
+                                  exit 0 ;;  # iterative loop, orchestrator manages
       finalise)                   NEXT=8 ;;
       commit-changes)
         # commit-changes is the ONLY pipeline sub-skill invoked at more than one step:

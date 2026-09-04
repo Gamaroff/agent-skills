@@ -1,0 +1,191 @@
+schema: 1
+task: "task.77.review-pr-in-pipeline"
+task_title: "Run the PR conformance review before a work item is finalised"
+gate: CONCERNS
+status_reason: "Grades the POST-GATE-7 REMEDIATION PASS (commit a0ced9b), NOT a QA cycle — the 5-cycle budget was spent at gate 5 and Loop Escalation stands; a third remediation pass does not restore it. This is the first pass in four whose headline mechanism is as strong as the sentence describing it. CY7-1 (HIGH) is genuinely closed: the guard was REPLACED rather than narrowed a third time, and it survives the adversarial test the trail did not publish — deleting each enumerated row while holding the parsed row count at 5 with a decoy goes red for ALL FOUR values, each naming its own value. CY7-2's impossible rationale was retired and its replacement is not merely plausible but SIMULATED TRUE (with the end marker removed, the row parse absorbs a later blockquote table's rows). CY7-7 is now held by three live assertions. CY5-4, PARTIAL for four consecutive assessments, is closed. Execution is green everywhere it can be measured: npm run ci exit 0, 2285 tests / 0 fail; parity 18/18; lock 14/14 under bash AND zsh; 4/4 PR checks on head SHA a0ced9b == local HEAD; 45/45 bundled copies content-identical at branch scope. It is not a PASS because CY7-4 is PARTIAL and asserted closed: the wrong count still stands in the PR #309 body (:43) and the task doc Change Log (:569), in a PR body that WAS edited in this same pass. Four narrow test-strength residuals found by attacking the guard from angles the trail did not try. No HIGH open; nothing is a runtime risk."
+reviewer: "QA Engineer (independent subagent — see provenance below)"
+updated: "2026-09-03T00:00:00Z"
+
+# ── PROVENANCE — why this gate is not self-issued ─────────────────────────────
+# I was dispatched with NO ACCOUNT of how any of these fixes were made, and did
+# not ask for one. I did not write the code, the docs, or the commit under
+# review. Every claim in every repo artifact — the a0ced9b commit message, the
+# implementation report's post-gate-7 section and mutation matrix, the PR #309
+# body's mutation table, the task doc's Change Log, and gates 5, 6 and 7 — was
+# treated as a HYPOTHESIS TO TEST by execution, never as evidence. I made no
+# fixes here and have none to defend.
+#
+# This continues the rule that produced gates 5, 6 and 7, which itself existed
+# because Step 5c's finding PC-1 was that the agent writing this task's code had
+# also written the gate clearing it.
+#
+# WHAT EXECUTION FOUND THAT READING WOULD NOT — in both directions this time.
+#
+# IN THE FIX'S FAVOUR: the published mutation matrix (delete each row, one at a
+# time) is NOT the test that proves the new mechanism — every one of those four
+# deletions fires the row-count canary `subStateRows.length >= 5`, not the
+# first-cell keying the paragraph above the matrix describes. A guard that only
+# counted rows would produce a byte-identical matrix. So I ran the sharp version
+# the trail did not: delete a row AND add a decoy so the count stays 5. All four
+# values go red, each naming ITSELF. The keying is real. After three rounds in
+# which the mechanism was weaker than the claim, this one is not.
+#
+# AGAINST IT: a0ced9b says "CY7-4 … Corrected to six of eight" without
+# qualification, and the implementation report repeats it. Gate 7 named three
+# artifacts and its suggested_action said "and the PR body in place". The PR
+# body still reads "Five of the seven were verified genuinely closed" at line 43
+# — and that body WAS edited in this pass, gaining a gate-7 paragraph at line 44
+# and a rewritten mutation row at line 32. The task doc's Change Log carries a
+# fourth instance ("5 of 7") gate 7 had not enumerated, and the exact phrase
+# CY7-3 named ("corrected in all three artifacts") still stands there too.
+#
+# I executed 27 mutations — 17 asserted somewhere in this trail, 10 of my own.
+# Every trail-asserted proof holds, including the one the trail honestly records
+# as NOT holding. Three of my ten found gaps; none is a false claim, all are
+# residual coverage. That is a different failure profile from gates 5, 6 and 7,
+# and the grade reflects it.
+# ──────────────────────────────────────────────────────────────────────────────
+
+top_issues:
+  - id: "CY8-1"
+    severity: medium
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+    finding: "CY7-4 is PARTIAL and is asserted closed in two artifacts. `a0ced9b`'s message says 'CY7-4 — \"Five of the seven\" was followed by a list of six; the count was wrong and the list was right. Corrected to six of eight, matching gate 6.' The implementation report (:543) repeats it unqualified. Gate 7's CY7-4 named THREE artifacts and its suggested_action said explicitly 'Correct the commit trail by note (not force-push) AND THE PR BODY IN PLACE.' On disk: the implementation report (:466-468) IS corrected, and well — it annotates what the earlier version said. The PR #309 body line 43 still reads 'Five of the seven were verified genuinely closed'. The task doc Change Log at `task.77.review-pr-in-pipeline.md:569` still reads '5 of 7 gate-5 findings verified closed' — a fourth instance gate 7 did not enumerate. Aggravating: the PR body was EDITED in this same pass (a gate-7 paragraph added at :44, the mutation row at :32 rewritten to 'third version of this guard'), so the sentence nine lines above was passed over, not unreachable. One of three named artifacts corrected, published as corrected — the axis this branch keeps failing on, now at its narrowest."
+    suggested_action: "Edit the PR #309 body line 43 to 'Six of the eight items gate 5 left open were verified genuinely closed' and the task doc Change Log :569 the same way. Then reword the implementation report's :543 summary and any future commit note to say which artifacts were corrected, rather than asserting the correction is complete."
+    suggested_owner: dev
+    status: open
+  - id: "CY8-2"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+    finding: "The exact phrase CY7-3 named survives in the task doc's Change Log. CY7-3 quoted 'That claim is now corrected in **all three artifacts it appeared in**' and called it a false closure claim. The implementation report's row 492 was reconciled properly and honestly ('corrected in the two artifacts that can still be edited — this report and the PR body. The third, `741117f`'s commit message, is immutable; see the note below, which this row deliberately does not contradict'), and I verified the PR body does carry the disclosure. But `task.77.review-pr-in-pipeline.md:570` still ends '…orphaned colon fixed; the false claim corrected in all three artifacts'. `grep -rn 'all three artifacts'` over the task directory finds it in one line. CY7-3 as scoped (the implementation report) is closed; this is a fresh instance of the same class in the sibling artifact."
+    suggested_action: "Amend the post-gate-6 Change Log row to '…the false claim corrected in the implementation report and the PR body; `741117f`'s message is immutable and keeps it by design'."
+    suggested_owner: dev
+    status: open
+  - id: "CY8-3"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+    finding: "The published mutation matrix does not discriminate the new mechanism from a trivially weaker one. The implementation report puts the row-keying paragraph immediately above the matrix and offers the matrix as its proof; the PR body says 'The assertion now parses the table into rows and keys on the first cell… Proved on all four rows individually'. Executed: all four row deletions fire `expected the sub-state table to parse into at least 5 rows, got 4` — the vacuity canary, whose own message reads 'if this drops, the parse broke and every assertion below is vacuous'. The `subStateRows.find(r => r.key.includes(...))` assertion the paragraph describes is never reached by any published mutation. A guard that only counted rows and never looked at a key would produce a byte-identical matrix. IMPORTANT DIFFERENCE FROM CY6-1 AND CY7-1: the keying is NOT inert — I proved it holds with mutations that add a decoy row to hold the count at 5, and it goes red for all four values naming each one. So this is evidence weaker than the sentence it supports, not a false sentence. Recorded because it is the fourth consecutive pass in which that gap appears and a decoy row costs one line."
+    suggested_action: "Replace the matrix's four deletion rows with substitution rows — 'replace row X with a decoy so the parsed count is unchanged' — which is the mutation that actually exercises the keying. Keep the plain deletions if you like, but label them as exercising the row-count canary."
+    suggested_owner: dev
+    status: open
+  - id: "CY8-4"
+    severity: low
+    file: "evals/shared/tests/pr-review-loop-parity.test.mjs"
+    finding: "The action-cell assertion is a mention-match, not a re-entry check, and three artifacts describe it as the latter. `a0ced9b`'s message, the implementation report and the PR body all say the guard 'requires the action cell to name where the run re-enters (5a/5b/5c, Step 7, or escalation)'. The predicate is `assert.match(row.action, /\\b5[abc]\\b|Step 7|escalat/i)`. Executed: replacing the `not reached` row's action with 'n/a — nothing to do here; see the 5c notes above' leaves 18 tests / 18 pass / 0 fail. A blank or `TBD` action IS caught (the trail's own mutation 5 holds); a meaningless one containing the token is not. Same shape as CY6-1/CY7-1 one cell further down, on a much smaller surface — hence low, not a repeat of the HIGH."
+    suggested_action: "Anchor the action rather than searching it: require the cell to match `/re-enter at \\*\\*5[abc]\\*\\*|go to Step 7|escalate to Loop Escalation/`, which is the vocabulary the five real rows already use, and mutation-prove with the 'n/a — see the 5c notes above' string above."
+    suggested_owner: dev
+    status: open
+  - id: "CY8-5"
+    severity: low
+    file: "evals/shared/tests/pr-review-loop-parity.test.mjs"
+    finding: "Per-value resume routing can be destroyed with the suite green. Executed: merge all four enumerated values into ONE row key with one shared action — `> | \\`REQUEST CHANGES\\` / \\`review failed\\` / \\`pending — 5c not yet run\\` / \\`not reached\\` | All: re-enter at **5a** |` — and pad to five rows with four content-free decoys. Result: 18 tests / 18 pass / 0 fail. Yet `REQUEST CHANGES` no longer routes to 5b, `review failed` loses its once-only retry AND its second-consecutive escalation bound (the arm that stops an unattended driver looping forever), and `pending`/`not reached` lose their gate-conditional branch. `key.includes(value)` matches a merged key and the count canary is satisfied by the decoys. This sits OUTSIDE the sentence `a0ced9b` claims — a value named in another row's PROSE genuinely no longer satisfies the guard, which is what CY6-1 and CY7-1 were about — so it is a residual coverage gap, not a false claim. It is the strongest remaining hole in the contract's pinning."
+    suggested_action: "Require exactly one row per value (`subStateRows.filter(r => r.key.includes('`'+v+'`')).length === 1`) and assert the DISTINCT action each value owes: `REQUEST CHANGES` → 5b; `review failed` → 5c plus an escalation clause; `pending`/`not reached` → the gate-conditional 5c-or-5a branch. Mutation-prove with the merged-key table above."
+    suggested_owner: dev
+    status: open
+  - id: "CY8-6"
+    severity: low
+    file: "shared/resources/develop-pipeline-remaining-work-banner.md"
+    finding: "CY7-7's fix pins one of the two renderings gate 7 named. Gate 7's CY7-7 named lines 59 and 116. Executed: reverting BOTH (gate 7's mutation I verbatim) is red; reverting :116 alone is red; reverting ONLY :59 — the generic `{optional short parenthetical: \"(1 cycle, PASS 100/100, PR review APPROVE)\"}` placeholder — leaves 18 tests / 18 pass / 0 fail. Minor, because :59 is the generic format illustration for every step rather than the Steps 5–6 exit specimen, and the field task 77 exists to add is pinned where it matters (:39 format line, :116 worked example, and 5c's own statement at qa-loop:816 — all three go red, verified individually)."
+    suggested_action: "Either extend the existing `assert.match(banner, /QA LOOP ✅ complete \\([^)]*PR review [A-Z]+\\)/)` with a second match on the generic placeholder line, or accept it and drop :59 from the CY7-7 closure wording so the trail does not imply both are held."
+    suggested_owner: dev
+    status: open
+  - id: "CY8-7"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+    finding: "An exhaustive closure claim published ahead of the verdict. PR #309 body line 44 ends 'A post-gate-7 pass closed all of it.' That is asserted before any independent verdict on the pass, and is contradicted by CY8-1 nine lines above it in the same document, where line 43 still carries the uncorrected count. The same shape appears in the task doc's Change Log post-gate-7 row ('Four trail errors corrected') — three of the four are corrected in the implementation report; CY7-4 is not corrected in the other two artifacts it was named in."
+    suggested_action: "Reword to 'A post-gate-7 pass addressed all seven; its verdict, like gates 6 and 7, is not self-issued' — the same construction the report already uses correctly for the earlier passes."
+    suggested_owner: dev
+    status: open
+  - id: "CY5-3"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+    finding: "CARRIED FORWARD — STILL PARTIAL, fifth consecutive assessment, but materially narrower. Its own stated close condition from gate 7 is 'Closes when CY7-3, CY7-4, CY7-5 and CY7-6 are corrected.' Verified closed: CY7-3 (in the file it named), CY7-5 (`grep -rn 'all four Steps|four Steps 5|four firing'` finds no surviving assertion of the count outside the historical gate/qa records), CY7-6 (the Completion block now names the post-gate-7 pass and its three neighbouring lines agree). NOT closed: CY7-4 (CY8-1). CY8-2 adds one fresh instance of the class. Two of the four remaining items are single-sentence edits in artifacts that are still editable."
+    suggested_action: "Closes when CY8-1 and CY8-2 are corrected."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 87
+
+evidence:
+  tests_reviewed: 2285
+  phases_verified: "7/7"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [6]
+  execution:
+    npm_run_ci: "exit 0 — captured as `npm run ci > log 2>&1; ec=$?; echo CI_EXIT=$ec >> log` so no echo sat between the command and $?. ℹ tests 2285 / pass 2284 / fail 0 / skipped 1 / duration 479.9s. `prettier --check .` → 'All matched files use Prettier code style!'. eval:all ran and finished ('[replay] 03-tick-and-cleanup: 4/4 assertions passed'). qa-execute-snippets did NOT flake on this run — its drain-equivalence assertion passed in 535ms — so no single-file re-run was needed. The only ⚠️ lines are deliberate fixture output from the tracker-comment negative paths"
+    parity_tests: "18/18 green (up one from gate 7's 17 — the new banner test)"
+    lock_test: "14/14 under bash AND zsh; exit codes captured directly into variables, not read through a pipe (BASH_EXIT=0, ZSH_EXIT=0)"
+    gh_pr_checks_309: "4/4 pass (allowed-branch, link-check, test, validate) on head SHA a0ced9b34f483937a1c62d72be83569147dc3f79 — verified byte-identical to local HEAD, so the green checks are not stale against the commit under review. `test` was still pending at first poll and went green on the same SHA"
+    bundle_freshness: "a0ced9b touches NO file under shared/resources/, so it cannot introduce drift. Checked at BRANCH scope anyway, which is wider than the commit's own '11 copies' claim: the branch touches TEN sources with 45 bundled copies (advance-pipeline-lock.sh x9, autonomous-defaults x6, lite-mode x6, banner x3, resume-contract x6, step-0 x6, qa-loop x2, resume-detector x6, ingester x1); all 45 compared BY CONTENT after stripping the AUTO-GENERATED line and applying the shared/resources->references rewrite — 0 mismatching. Repo-wide sweep of all 709 bundled copies with a shared source found 4 genuinely stale (create-story + create-task set-github-project-priority.sh; qa-story + qa-task develop-pipeline-step-1-create-branch.md); `git diff --name-only origin/develop...HEAD` is EMPTY for all four and their sources, so they are the SAME pre-existing task-86 instances gates 6 and 7 found on develop, NOT regressions. My first sweep pass reported 202 — that was my own false positive from applying the .md/.js rewrite to .sh copies, corrected before reporting"
+  mutation_proofs_executed:
+    - "TRAIL 1-4. Delete each enumerated sub-state row individually (resume-contract :127 `REQUEST CHANGES`, :128 `review failed`, :129 `pending — 5c not yet run`, :130 `not reached`) — trail claims RED for all four; observed 17 pass / 1 fail for all four. RED — but EVERY ONE fires `expected the sub-state table to parse into at least 5 rows, got 4`, the vacuity canary, NOT the first-cell keying the trail offers them as proof of. See CY8-3"
+    - "TRAIL 5. Row present, action cell blanked to `TBD` — trail claims RED naming the missing action; observed 17/1, message `the row for \"not reached, blank, or no row\" must say WHERE the run resumes (5a/5b/5c, Step 7, or escalation)`. TRUE"
+    - "TRAIL 6. Restore — trail claims 18/18 green and file byte-identical; observed 18 pass / 0 fail, `git status --porcelain` empty. TRUE"
+    - "TRAIL 7. Remove the sub-state table's end marker (lone `>` at :131) — trail claims RED; observed 17/1 on the end-marker assertion with its NEW message. TRUE"
+    - "TRAIL 8. THE REPLACEMENT CY7-2 RATIONALE, SIMULATED: end marker removed AND a blockquote table appended later in the file. Trail claims 'it stops the row parse absorbing any blockquote table added later in the file'; observed tableEnd = -1, rows parsed 8, keys include `bogus row A` and `bogus row B`, ABSORBED = true. TRUE — unlike the rationale it replaces, this one is physically real"
+    - "TRAIL 9. The RETIRED CY7-2 claim re-checked: does the widened slice contain the artifact-table sentence? Observed FALSE, confirming gate 7's CY7-2 was right — and the phrase 're-admit the artifact-table sentences' no longer appears in any live artifact. Correctly retired"
+    - "TRAIL 10. Revert the banner worked example (:116) to `(1 cycle, PASS 100/100)` — trail claims RED; observed 17/1, message `the worked example must RENDER the verdict, not merely describe it — the example is what gets copied`. TRUE"
+    - "TRAIL 11. Remove `PR review {verdict}` from the banner format line (:39) — trail claims RED; observed 17/1, message `the banner doc must state that the Steps 5-6 exit parenthetical carries the PR review verdict`. TRUE"
+    - "TRAIL 12. Gate 7's mutation I VERBATIM — revert BOTH banner renderings (:59 and :116) — trail claims 'was green and is now red'; observed 17/1. TRUE"
+    - "TRAIL 13. Revert the PASS arm (qa-loop:243) from 5c back to Step 7 — PR body claims Held; observed 17/1, `the PASS arm must hand to 5c — a clean gate is no longer the loop's exit`. TRUE"
+    - "TRAIL 14. Restore `--stage ready-for-merge` into 5a's outcome branching — PR body claims Held by name; observed 17/1, `ready-for-merge must sit INSIDE 5c. Before task 77 it fired in 5a's outcome branching…`. TRUE"
+    - "TRAIL 15. Rename `### Convergence check` in the QA-loop doc — PR body claims Held; observed 16 pass / 2 fail, `end marker not found after \"### Outcome branching (shared)\", so the slice would silently widen to EOF`. TRUE"
+    - "TRAIL 16. Remove `review-pr` from the lock noop arm (advance-pipeline-lock.sh:84) — PR body records this as 'Did not hold — as predicted'; observed bash 14/14, zsh 14/14, parity 18/18 all GREEN. The honest disclosure is ACCURATE"
+    - "TRAIL 17. Run all 18 parity tests inside a detached origin/develop worktree — PR body claims 'All fail against origin/develop; none is vacuous'; observed ℹ tests 18 / pass 0 / fail 18. TRUE"
+    - "MINE 18. THE DISCRIMINATING TEST THE TRAIL DID NOT RUN — delete the `not reached` row AND add a decoy row so the parsed count stays 5; observed 17/1 on the RIGHT assertion: `the resume sub-state table must carry a ROW KEYED on PR Review = \"not reached\"`. THE KEYING HOLDS"
+    - "MINE 19. Same substitution for `REQUEST CHANGES`, `review failed` and `pending — 5c not yet run`, count held at 5 each time; observed 17/1 each, each naming ITS OWN value. THE KEYING HOLDS PER VALUE — this is what closes CY7-1 and CY5-4"
+    - "MINE 20. Keep the `not reached` row key; replace its action with `n/a — nothing to do here; see the 5c notes above`; observed 18 pass / 0 fail. GREEN — the action assertion is a mention-match. See CY8-4"
+    - "MINE 21. Merge all four values into ONE row key with one shared action `All: re-enter at **5a**`, pad to 5 rows with four content-free decoys; observed 18 pass / 0 fail. GREEN — per-value routing can be destroyed silently. See CY8-5"
+    - "MINE 22. Reorder rows (swap :127 and :130); observed 18/18 green. Correct — row order is not contractual"
+    - "MINE 23. Strip the blockquote `>` markers from the header, separator and all five rows; observed 18/18 green. Robust by design — the parser does `replace(/^>\\s*/, '')`"
+    - "MINE 24. Move the whole table block to EOF; observed 17/1 on the end-marker assertion. Caught"
+    - "MINE 25. Delete the `APPROVE`/`CONCERNS` row (:126) — the PR body claims 'Delete ANY single row … Held'; observed 17/1 via the row-count canary. The 'any single row' wording is literally true"
+    - "MINE 26. Revert ONLY the banner's generic format placeholder at :59, leaving :116 and :39 intact; observed 18 pass / 0 fail. GREEN. See CY8-6"
+    - "MINE 27. Remove `, PR review {verdict}` from 5c's own statement of the exit line (qa-loop:816); observed 17/1, `5c must state the exit line the banner doc is the format authority for`. TRUE — the new test's third assertion is live, not decorative"
+  tree_state: "git status --porcelain empty before the first mutation, after every restore, and at the end; git rev-parse HEAD unchanged at a0ced9b throughout. A detached origin/develop worktree was created for mutation 17 and removed with `git worktree remove --force` + `git worktree prune` (`git worktree list` shows only the main tree). Only the two files this gate comprises are added; neither is committed by this reviewer"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged by this pass — a0ced9b touches one test file and three markdown documents, and no file under shared/resources/ at all. No auth, credential or secret surface. The branch still net-REMOVES shell surface: the zsh-fragile glob predicate was deleted rather than patched. The one executable change on the branch, the `review-pr)` noop arm, is green under bash and zsh (14/14 each) and remains green when removed (mutation 16), confirming it is documentation rather than behaviour, exactly as the trail says."
+  performance:
+    status: PASS
+    notes: "Unchanged. One additional advisory subagent per clean-gate cycle, bounded by the pre-existing 5-cycle budget. No runtime hot path, no new I/O in any loop. This pass is one test rewrite plus documentation. Suite duration 479.9s for 2285 tests."
+  reliability:
+    status: PASS
+    notes: "Upgraded from CONCERNS. The sixth PR-Review enum value has a resume action row, and for the first time that row is pinned by a guard that fires when the row is REPLACED, not merely when the table shrinks — verified per value by mutations 18 and 19, which the trail did not run. The end-marker guard is real and its published rationale is now true rather than merely plausible (mutation 8 absorbs a later blockquote table's rows). The format-authority specimen this task exists to correct is held by three independent assertions (mutations 10, 11, 27). What remains is residual rather than a defect: the action cell accepts a meaningless string containing a re-entry token (CY8-4), and a merged-key table with decoy padding passes (CY8-5). Residual, NOT a regression and NOT introduced here: `❌ halted` is instructed nowhere in the repo, equally true on origin/develop; and the `review failed` retry bound still cannot be evaluated from the artifact the contract reads."
+  maintainability:
+    status: CONCERNS
+    notes: "Held at CONCERNS, but for a materially smaller reason than in gates 5, 6 and 7. What improved genuinely: the repo's third-strike rule was applied as written — the mechanism was REPLACED rather than narrowed a fourth time — and the replacement survives an adversarial reading it was never published as surviving. The impossible rationale was retired and its successor is simulated true. Four trail errors were corrected in the artifact a reviewer reads first. What keeps it out of PASS: CY7-4 was corrected in one of the three artifacts it was named in and published as corrected (CY8-1), with a fourth uncorrected instance in the task doc; the exact phrase CY7-3 named still stands in the task doc's Change Log (CY8-2); and the mutation matrix published as proof of the row-keying exercises only the row-count canary (CY8-3). Sixth consecutive assessment in which the artifact a reviewer reads to check closure contains a claim disk contradicts — but the first in which the CODE claim survives and only the BOOKKEEPING does not."
+
+recommendations:
+  immediate:
+    - action: "Close CY8-1 and CY8-2 together — they are four single-sentence edits in two editable artifacts. PR #309 body line 43 ('Five of the seven') and task doc Change Log :569 ('5 of 7') both become 'six of the eight items gate 5 left open'; task doc Change Log :570 ('the false claim corrected in all three artifacts') gets the same reconciliation the implementation report's row 492 already has. Then stop writing unqualified 'corrected' in a commit message — say which artifacts, the way row 492 now does"
+      refs:
+        - "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+        - "https://github.com/Gamaroff/agent-skills/pull/309"
+    - action: "CY8-3 is the cheapest structural improvement on the list: replace the matrix's four deletion rows with SUBSTITUTION rows (delete the row, add a decoy, count unchanged). That is the mutation that exercises the keying, it is one line of table per row, and publishing it would have made this gate's headline finding unavailable. Keep the plain deletions if wanted, labelled as exercising the row-count canary"
+      refs:
+        - "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+        - "evals/shared/tests/pr-review-loop-parity.test.mjs"
+    - action: "Operator decision — the loop budget was spent at gate 5 and no remediation pass restores it. This is the FIRST of the three post-escalation passes to be graded above FAIL by an independent reviewer, and the profile has changed: no HIGH is open, every mutation the trail asserts holds, and the one MEDIUM is four sentences of bookkeeping. Accept the residual (one MEDIUM, seven LOW; nothing broken at runtime, everything green in CI and on the PR), or clear CY8-1/CY8-2 — a ten-minute edit — and merge. Carrying the four test-strength residuals (CY8-4, CY8-5, CY8-6, and CY8-3's proof rewrite) into a follow-up work item is reasonable; none of them blocks"
+      refs: ["docs/tasks/task.77.review-pr-in-pipeline/task.77.gate.8.review-pr-in-pipeline.yml"]
+  future:
+    - action: "Task 86 (High) — the bundler transitive-refresh defect did NOT bite this commit or this branch (45/45 copies verified content-identical at branch scope), but the repo-wide sweep still finds the same 4 stale copies on develop. Independent of this change"
+      refs: ["docs/tasks/task.86.bundle-transitive-refresh/"]
+    - action: "Gate 7 proposed a lint rejecting an `includes()` assertion whose failure message names a specific ROW, TABLE or SECTION. This gate extends the case: the pre-satisfaction failure mode has now appeared FOUR times (the transition-protocol no-credentials guard; CY6-1 at file scope; CY7-1 at table scope; CY8-4 at cell scope). The generalisation is that the guard must assert the SHAPE of the artifact it names, and that a vacuity canary must not be allowed to stand in for the assertion it protects — CY8-3 is what happens when it does"
+      refs: ["evals/shared/tests/pr-review-loop-parity.test.mjs"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Loop Escalation remains in force — 5 of 5 cycles were spent at gate 5, and three remediation passes do not reset the budget. A human decides whether the open findings block the merge"
+    - "CY8-1 should be cleared before merge: the PR body a reviewer reads first still states a count that both the implementation report and gate 6 contradict, and the same body claims the pass 'closed all of it' nine lines below it"
+    - "CY8-2 is the same edit in the sibling artifact and should go with it"
+    - "CY8-3, CY8-4, CY8-5 and CY8-6 are test-strength residuals, not correctness defects. None blocks a merge; all four are reasonable carry-forward items"
+    - "Nothing here is a runtime blocker. npm run ci exits 0 (2285 tests, 0 fail), all four PR #309 checks are green on the exact head SHA a0ced9b == local HEAD, the lock suite is 14/14 under both shells, and all 45 bundled copies of the branch's ten touched sources are content-identical to their sources"

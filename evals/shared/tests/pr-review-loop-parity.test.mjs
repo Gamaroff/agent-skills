@@ -1,0 +1,845 @@
+/**
+ * Asserts that Step 5c — the PR conformance review — is wired into the shared
+ * QA loop, wired at the right PLACE, and routes the way the contract says.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * Three things drift independently, and none of them is caught by the protocol
+ * evals (which only check that a keyword appears somewhere in the step file):
+ *
+ *   1. THE ROUTING. `REQUEST CHANGES` must return to 5b and consume a cycle
+ *      from the shared 5-cycle budget; `APPROVE` and `CONCERNS` must exit to
+ *      Step 7. A file can name review-pr and still describe the wrong graph.
+ *   2. THE ORDER OF `ready-for-merge`. It moved out of 5a's outcome branching
+ *      and into 5c with task 77, because signalling merge-readiness the moment
+ *      a gate read PASS advertised a card as mergeable while the run could
+ *      still loop back into qa-fix. A later edit that moves it back would be
+ *      invisible to every other test — transition-protocol-parity only asserts
+ *      the stage appears SOMEWHERE in this file.
+ *   3. THE ADVISORY CONTRACT. 5c is legitimate only because /review-pr reports
+ *      a verdict and the ORCHESTRATOR acts on it. If the step file ever gives
+ *      5c the power to write a gate, the wiring becomes the thing task 66
+ *      deliberately refused to build.
+ *
+ * Run: node --test evals/shared/tests/pr-review-loop-parity.test.mjs
+ */
+import test from "node:test";
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(__dirname, "..", "..", "..");
+
+const read = (p) => readFileSync(join(repoRoot, p), "utf-8");
+
+const loopDoc = read("shared/resources/develop-pipeline-step-5-6-qa-loop.md");
+const reviewPr = read("skills/review-pr/SKILL.md");
+const liteMode = read("shared/resources/develop-pipeline-lite-mode.md");
+const defaults = read(
+  "shared/resources/develop-pipeline-autonomous-defaults.md",
+);
+const ingester = read("shared/resources/qa-findings-ingester-prompt.md");
+const banner = read(
+  "shared/resources/develop-pipeline-remaining-work-banner.md",
+);
+
+/** Line index of the first line matching `re`, or -1. */
+function lineOf(text, re) {
+  return text.split("\n").findIndex((l) => re.test(l));
+}
+
+/**
+ * The 5c section ONLY — from its heading to the next H2.
+ *
+ * Two failure modes this closes, both of which made assertions silently weaker:
+ *   - `indexOf` returns -1 when the section is absent, and `slice(-1)` then yields the file's LAST
+ *     CHARACTER rather than an empty string. Comparisons against that index (`x > s5c`) are then
+ *     trivially true.
+ *   - Slicing to end-of-file swept in the whole Loop Escalation section, so a regex like
+ *     /REQUEST CHANGES.*5b/s matched prose there and would have passed even if the verdict table
+ *     said the opposite.
+ */
+/**
+ * A slice of the QA-loop doc between two markers, with BOTH indices asserted.
+ *
+ * The -1 trap is why this is a helper rather than inline `indexOf` calls: `slice(-1)` returns the
+ * file's LAST CHARACTER, not an empty string, so a renamed heading silently turns
+ * `assert.doesNotMatch(section, /…/)` into a test that passes on a one-character string while
+ * claiming to guard a whole section. `section5c()` was hardened against exactly this and then two
+ * inline slices reproduced it verbatim — which is the argument for having one guarded path.
+ *
+ * The END index is asserted for the weaker cousin of the same reason: falling back to EOF on a
+ * missing end marker does not fail, it silently WIDENS the slice — sweeping in the sections the
+ * marker exists to exclude, which is how a `doesNotMatch` guard turns into prose-matching
+ * elsewhere in the file. A renamed end marker must fail by name.
+ */
+function sectionBetween(startMarker, endMarker) {
+  const start = loopDoc.indexOf(startMarker);
+  assert.ok(
+    start > -1,
+    `marker not found, so nothing below is being tested: ${startMarker}`,
+  );
+  const end = loopDoc.indexOf(endMarker, start + startMarker.length);
+  assert.ok(
+    end > -1,
+    `end marker not found after ${JSON.stringify(startMarker)}, so the slice would silently widen to EOF: ${JSON.stringify(endMarker)}`,
+  );
+  return loopDoc.slice(start, end);
+}
+
+function section5c() {
+  return sectionBetween("### 5c. ", "\n## ");
+}
+
+// ── 1. Placement: 5c sits after 5b and before Loop Escalation ────────────────
+
+test("the QA loop carries a 5c section between 5b and Loop Escalation", () => {
+  const s5a = lineOf(loopDoc, /^### 5a\. /);
+  const s5b = lineOf(loopDoc, /^### 5b\. /);
+  const s5c = lineOf(loopDoc, /^### 5c\. /);
+  const esc = lineOf(loopDoc, /^## Loop Escalation /);
+
+  assert.ok(s5a > -1, "5a heading must exist");
+  assert.ok(s5b > -1, "5b heading must exist");
+  assert.ok(s5c > -1, "5c must exist — this is the exit gate task 77 adds");
+  assert.ok(esc > -1, "Loop Escalation heading must exist");
+  assert.ok(
+    s5a < s5b && s5b < s5c && s5c < esc,
+    `expected 5a(${s5a}) < 5b(${s5b}) < 5c(${s5c}) < escalation(${esc})`,
+  );
+});
+
+// ── 2. The gate hands to 5c, rather than exiting on its own ──────────────────
+
+test("a clean QA gate routes to 5c, not straight to Step 7", () => {
+  const branching = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
+  );
+
+  for (const gate of ["PASS", "WAIVED"]) {
+    const arm = branching
+      .split("\n")
+      .find((l) => l.startsWith(`- \`${gate}\``));
+    assert.ok(arm, `${gate} arm must exist in outcome branching`);
+    assert.match(
+      arm,
+      /proceed to 5c/i,
+      `the ${gate} arm must hand to 5c — a clean gate is no longer the loop's exit`,
+    );
+  }
+});
+
+// ── 3. Verdict routing — the graph, not just the vocabulary ──────────────────
+
+/**
+ * The 5c verdict table, parsed into {verdict, action} rows.
+ *
+ * WHY PARSED, NOT MATCHED. The assertion this replaces was
+ * `/\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*5b[^|\n]*\|/` — a row-shaped regex, which reads as a
+ * mapping check and is not one. The REQUEST CHANGES action cell contains the clause "5b's step 7
+ * increments it", so it supplies the `5b` the regex wants no matter where the row actually routes.
+ * Gate 10 rewrote that row to `5a`, and to "exit to Step 7", and the suite stayed 18/18 green — on
+ * the loop's PRIMARY routing table. Same defect class as the resume guard, fifth instance in this
+ * task: a MENTION standing in for a MAPPING.
+ *
+ * A verdict's destination is carried by its own row's action cell, so that is what gets read.
+ */
+function verdictRows() {
+  const s5c = section5c();
+  const start = s5c.indexOf("| Verdict | Action |");
+  assert.ok(start > -1, "the 5c verdict table must exist");
+  const end = s5c.indexOf("\n\n", start);
+  assert.ok(
+    end > -1,
+    "the verdict table must be followed by a blank line — without one this slice would run past the table",
+  );
+  const rows = s5c
+    .slice(start, end)
+    .split("\n")
+    .filter((l) => l.startsWith("|") && !/^\|[\s-]+\|[\s-]+\|?$/.test(l))
+    .map((l) => l.replace(/^\|/, "").split("|"))
+    .filter((c) => c.length >= 2)
+    .map((c) => ({ verdict: c[0].trim(), action: c[1].trim() }))
+    .filter((r) => r.verdict !== "Verdict");
+  assert.ok(
+    rows.length >= 4,
+    `expected at least 4 verdict rows, parsed ${rows.length} — if this drops the parse broke and every assertion below is vacuous`,
+  );
+  return rows;
+}
+
+/** The single row whose verdict cell names `v`. */
+function verdictRow(v) {
+  const matches = verdictRows().filter((r) => r.verdict.includes(v));
+  assert.equal(
+    matches.length,
+    1,
+    `expected exactly ONE verdict row for "${v}", found ${matches.length}: ${verdictRows()
+      .map((r) => r.verdict)
+      .join(" / ")}`,
+  );
+  return matches[0].action;
+}
+
+test("each 5c verdict maps to ONE destination, read off its own row", () => {
+  // Gate 10's mutations 33-36 and 45, which were all green against the old assertion.
+  const rc = verdictRow("REQUEST CHANGES");
+  assert.match(
+    rc,
+    /Return to \*\*5b\*\*/,
+    "REQUEST CHANGES must route back to 5b as a DIRECTIVE — a clause elsewhere in the cell mentioning 5b is not a destination",
+  );
+  assert.doesNotMatch(
+    rc,
+    /exit the loop|proceed to Step 7|Return to \*\*5a\*\*/,
+    "REQUEST CHANGES is still inside the loop — it must not exit, and must not re-enter at 5a",
+  );
+
+  for (const v of ["APPROVE", "CONCERNS"]) {
+    const a = verdictRow(v);
+    assert.match(a, /exit the loop/, `${v} must exit the loop`);
+    assert.match(a, /Step 7/, `${v} must proceed to Step 7`);
+    assert.doesNotMatch(
+      a,
+      /Return to \*\*5[ab]\*\*/,
+      `${v} is terminal for the loop — it must not route back into 5a or 5b`,
+    );
+  }
+
+  const failed = verdictRow("Review failed");
+  assert.match(failed, /\bHALT\b/, "the failure arm must HALT");
+  assert.match(
+    failed,
+    /Do \*\*not\*\* fall through to Step 7/,
+    "the failure arm must forbid falling through — 5c is the only exit, so a skipped review silently finalises",
+  );
+  assert.doesNotMatch(
+    failed,
+    /exit the loop/,
+    "a failed review is not an exit",
+  );
+});
+
+test("lite mode maps to low effort and standard to medium, not the reverse", () => {
+  // Gate 10's mutation 45: swapping the two levels left the suite green, because the lite-mode
+  // assertion only checked that `--effort low` appeared SOMEWHERE.
+  assert.match(
+    section5c(),
+    /`--effort`\*\*: `medium` in standard mode, `low` in lite mode/,
+    "the effort mapping is directional — swapping the levels degrades the standard path and over-runs the lite one",
+  );
+});
+
+test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*5b[^|\n]*\|/,
+    "the REQUEST CHANGES table ROW must route back to 5b — not merely prose mentioning both",
+  );
+  // NOT `budget is **shared**` — that sentence predates the fixes and is already asserted by
+  // "the 5-cycle bound covers 5c". Assert what this path actually needs to work: the row points at
+  // the invocation block, and that block exists and passes the report.
+  assert.match(
+    s5c,
+    /\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*see the invocation below[^|\n]*\|/,
+    "the REQUEST CHANGES row must point at the invocation that delivers the findings",
+  );
+  assert.match(
+    s5c,
+    /#### Invoking `\/qa-fix` on a REQUEST CHANGES verdict/,
+    "that invocation block must exist — without it the path has no way to pass its findings",
+  );
+  assert.match(
+    s5c,
+    /re-enters 5b, not 5a/i,
+    "entering at 5a would re-run QA against an unchanged tree",
+  );
+});
+
+test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
+  const s5c = section5c();
+  // The APPROVE row's wording is unchanged from the original 5c section, so asserting it alone
+  // pins nothing this cycle fixed. Assert the CONCERNS semantics instead, which is the one of the
+  // three verdicts whose behaviour is easy to get wrong (it exits WITHOUT blocking).
+  assert.match(
+    s5c,
+    /\|[^|\n]*APPROVE[^|\n]*\|[^|\n]*(exit the loop|Step 7)[^|\n]*\|/,
+    "the APPROVE table ROW must exit the loop",
+  );
+  assert.match(
+    s5c,
+    /\|[^|\n]*CONCERNS[^|\n]*\|[^|\n]*Do not block[^|\n]*Step 7[^|\n]*\|/,
+    "the CONCERNS row must record findings, not block, AND still exit to Step 7",
+  );
+  assert.match(
+    s5c,
+    /CONCERNS.*\*\*Do not block\.\*\*/s,
+    "CONCERNS records findings without blocking",
+  );
+});
+
+test("the 5-cycle bound covers 5c rather than being extended by it", () => {
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /budget is \*\*shared\*\*, not additional/i,
+    "5c must share the existing 5-cycle budget, never add to it",
+  );
+});
+
+// ── 4. ready-for-merge fires AFTER the review, not on the QA gate ────────────
+
+test("ready-for-merge sits inside 5c, after the review clears", () => {
+  // CONTAINMENT, not ordering. This compared `indexOf("--stage ready-for-merge") > indexOf("### 5c.")`,
+  // which is satisfied by ANY position after 5c begins — including inside Loop Escalation, i.e.
+  // signalling a card merge-ready on a run that failed. Gate 11 relocated the call there and the
+  // suite stayed 20/0 green. `section5c()` is already bounded at the next H2, so ask the question
+  // directly: is the stage call in 5c?
+  // The lookahead is load-bearing: `--stage ready-for-merge` is a PREFIX of
+  // `--stage ready-for-merge-RELOCATED`, so a bare match is satisfied by a renamed call. Caught by
+  // mutating this very fix — the substring trap that produced six findings, one level down.
+  assert.match(
+    section5c(),
+    /--stage ready-for-merge(?![-\w])/,
+    "ready-for-merge must sit INSIDE 5c. Before task 77 it fired in 5a's " +
+      "outcome branching, which advertised a card as merge-ready while the " +
+      "run could still loop back into qa-fix — and an ordering-only check let " +
+      "it drift forward into Loop Escalation instead.",
+  );
+
+  // And it must not have been left behind in the outcome branching too.
+  const branching = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
+  );
+  assert.doesNotMatch(
+    branching,
+    /--stage ready-for-merge/,
+    "outcome branching must no longer signal ready-for-merge",
+  );
+});
+
+test("ready-for-merge is not signalled on REQUEST CHANGES", () => {
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /never on REQUEST CHANGES/i,
+    "a run still inside the loop must not be advertised as merge-ready",
+  );
+});
+
+// ── 5. The advisory contract survives the wiring ─────────────────────────────
+
+test("5c consults /review-pr; it does not let it gate", () => {
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /writes no gate/i,
+    "the step file must restate that /review-pr writes no gate",
+  );
+  assert.match(
+    reviewPr,
+    /Being consulted by a pipeline is not the same as gating one/,
+    "review-pr's own SKILL.md must keep the consulted-vs-gating distinction",
+  );
+  assert.match(
+    reviewPr,
+    /Gate files remain the exclusive output of `\/qa-story` and `\/qa-task`/,
+  );
+});
+
+// ── 6. Lite mode degrades, never skips ───────────────────────────────────────
+
+test("lite mode degrades 5c to --effort low and never skips it", () => {
+  assert.match(liteMode, /Step 5c \(review-pr\)/, "lite mode must name 5c");
+  assert.match(liteMode, /--effort low/);
+  assert.match(
+    liteMode,
+    /never skipped|never skips/i,
+    "skipping would remove the conformance check entirely, not shorten it",
+  );
+});
+
+// ── 7. --comment is passed explicitly, because the pipeline cannot prompt ────
+
+test("the autonomous defaults record the explicit --comment", () => {
+  assert.match(
+    defaults,
+    /`--comment`/,
+    "the pipeline passes --comment explicitly — /review-pr otherwise asks first",
+  );
+  assert.match(defaults, /Step 5c/);
+});
+
+// ── 8. The prose names a skill that actually exists ──────────────────────────
+
+test("the skill 5c invokes is installed and named as this file expects", () => {
+  // The existsSync + frontmatter pair are preconditions, not claims about task 77 — /review-pr
+  // shipped before this change. They are kept so that a rename or deletion fails HERE with a
+  // clear message rather than as a confusing mismatch below.
+  assert.ok(
+    existsSync(join(repoRoot, "skills/review-pr/SKILL.md")),
+    "5c invokes /review-pr — its SKILL.md must exist",
+  );
+  assert.match(
+    reviewPr,
+    /^name: review-pr$/m,
+    "frontmatter name must match the invocation",
+  );
+
+  // This is the assertion that is actually about 5c.
+  //
+  // Pinned as the TWO CONCRETE invocations rather than a `{medium|low}` placeholder. The
+  // placeholder form was a zsh parse error inside a ```bash fence — zsh reads a word-initial `{`
+  // as a brace group — which is Risk 1, the defect class task 66 shipped, in the line that invokes
+  // the review. This assertion held the broken form in place, so it is part of the fix, not a
+  // casualty of it: both effort levels must appear AND each must carry `--comment`.
+  for (const effort of ["medium", "low"]) {
+    assert.match(
+      section5c(),
+      new RegExp(`/review-pr --effort ${effort} --comment`),
+      `the ${effort}-effort invocation must carry both flags the contract depends on`,
+    );
+  }
+  // And the unparseable form must not come back.
+  assert.doesNotMatch(
+    section5c(),
+    /--effort \{medium\|low\}/,
+    "the `{medium|low}` placeholder is a zsh parse error in a bash fence — use the two concrete invocations",
+  );
+});
+
+test("the REQUEST CHANGES path can actually deliver its findings to qa-fix", () => {
+  // The regression this pins: 5c runs on a PASS/WAIVED gate, so a REQUEST CHANGES verdict has no
+  // gate `top_issues[]` to travel in. If the ingester does not glob the pr-review report AND 5c
+  // does not pass its path, qa-fix reads a clean gate, changes nothing, and the loop HALTs
+  // reporting the findings as unfixable when they were never delivered.
+  const ingester = read("shared/resources/qa-findings-ingester-prompt.md");
+  assert.match(
+    ingester,
+    /pr-review\.\*\.md/,
+    "the findings ingester must glob the PR review report",
+  );
+  assert.match(
+    section5c(),
+    /pr_review=/,
+    "5c must pass the PR review report path into the qa-fix invocation",
+  );
+});
+
+test("Loop Setup does not still claim a clean gate exits the loop", () => {
+  // The highest-value contradiction: Loop Setup is the first section an agent reads, and if it
+  // says a clean PASS exits immediately, 5c is never entered and the whole feature is a silent
+  // no-op. Scope to Loop Setup so 5c's own prose cannot satisfy this.
+  const start = loopDoc.indexOf("## Loop Setup");
+  assert.ok(start > -1, "Loop Setup section must exist");
+  const setup = loopDoc.slice(start, loopDoc.indexOf("\n## ", start));
+  assert.doesNotMatch(
+    setup,
+    /clean PASS on any[^.]*exits the loop immediately/i,
+    "Loop Setup must not say a clean PASS exits the loop — it hands to 5c",
+  );
+  assert.match(
+    setup,
+    /hands to \*\*5c\*\*/,
+    "Loop Setup must name 5c as where a clean gate goes",
+  );
+});
+
+test("the cycle counter is incremented in exactly one place", () => {
+  // 5b step 7 increments on exit. If 5c ALSO increments, one review-driven fix pass burns two of
+  // the five cycles and resume desynchronises (it reconstructs the count from `### QA Cycle`
+  // headings, which the extra increment does not write).
+  assert.match(
+    section5c(),
+    /Do not increment the counter here/i,
+    "5c must defer the increment to 5b step 7, not perform its own",
+  );
+
+  // The rule is stated in TWO files, and an earlier version of this test could only see one of
+  // them. The QA loop was corrected while develop-pipeline-autonomous-defaults.md — the table an
+  // UNATTENDED run actually consults for this fork — still said to increment at 5c, and this test
+  // was green throughout. A test named "exactly one place" that cannot see the second place is
+  // worse than no test: it certifies the contradiction it was written to prevent.
+  assert.doesNotMatch(
+    defaults,
+    /return to 5b and increment the shared cycle counter/i,
+    "the autonomous-defaults table must not instruct a second increment at 5c",
+  );
+  assert.match(
+    defaults,
+    /incremented once, by 5b step 7, on exit/i,
+    "the autonomous-defaults table must name 5b step 7 as the single increment site",
+  );
+});
+
+test("5c has a failure arm, and it does not fall through to Step 7", () => {
+  // 5c is the loop's only exit, so an unhandled /review-pr failure is the one state that could
+  // silently finalise a run with no review at all. The PASS->5c path also skips 5b step 5's
+  // mid-loop PR-state poll, so a PR closed underneath the run is FIRST discovered by /review-pr.
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /Review failed/i,
+    "the verdict table must carry a failure row, not only the three verdicts",
+  );
+  assert.match(
+    s5c,
+    /Do \*\*not\*\* fall through to Step 7/i,
+    "a 5c failure must HALT — falling through skips the check the step exists to add",
+  );
+  assert.match(
+    loopDoc,
+    /\*\*PR Review\*\*: \{[^}]*review failed[^}]*\}/i,
+    "the QA Cycle template enum must be able to record a failed review for resume",
+  );
+});
+
+// ── 9. The ingester and the report agree on a finding's shape ────────────────
+
+test("the ingester describes the format /review-pr actually renders", () => {
+  // THE defect this pins: the ingester block once described the SUBAGENT output contract
+  // (`severity:`, `file:line`) — YAML consumed in memory and never written to disk. The report
+  // actually carries a rendered three-line shape. Since the PR review report is the ONLY carrier
+  // of findings on the REQUEST CHANGES path, a mismatch here makes that whole path silently
+  // deliver nothing: qa-fix reads a clean gate, changes nothing, and 5b step 0 HALTs reporting
+  // the findings as unfixable. The two files shared no assertion until this one.
+  const header = /\[(?:PC|CR)-1\] \w+ · \w+ · confidence: \w+ —/;
+
+  assert.match(
+    reviewPr,
+    header,
+    "review-pr must render the header shape the ingester is told to parse",
+  );
+
+  // The ingester parses the Step 7 REPORT, not the Step 6 terminal example. Without these, the
+  // report template could lose its findings sections and this test would stay green while the
+  // parse became unperformable — the exact failure its name warns about.
+  assert.match(
+    reviewPr,
+    /^## Conformance Findings$/m,
+    "the report template must keep the section the ingester reads PC-* findings from",
+  );
+  assert.match(
+    reviewPr,
+    /^## Code Review Findings$/m,
+    "the report template must keep the section the ingester reads CR-* findings from",
+  );
+  assert.match(
+    reviewPr,
+    /→ suggested action/,
+    "the continuation line the ingester is told to parse must exist in the renderer",
+  );
+  assert.match(
+    ingester,
+    /→/,
+    "the ingester must describe the arrow continuation it parses",
+  );
+  assert.match(
+    ingester,
+    header,
+    "the ingester must quote the header shape review-pr renders",
+  );
+
+  // The specific wrong turn, forbidden by name so it cannot come back quietly.
+  assert.match(
+    ingester,
+    /there is no `severity:` key anywhere in the file/i,
+    "the ingester must warn against searching for the YAML key that never reaches disk",
+  );
+  assert.match(
+    ingester,
+    /`ref` is not always a `file:line`/i,
+    "conformance findings carry an AC id or a section ref, not a file:line",
+  );
+
+  // And the finding must have somewhere to go once parsed.
+  assert.match(
+    ingester,
+    /source: gate\|report\|pr-review\|bug/,
+    "the ingester's own output enum must admit a pr-review source",
+  );
+});
+
+test("5c's two banner firing points are instructed, and belong to 5c", () => {
+  // CR-3 was "two firing points declared mandatory with nothing instructing them". The fix added
+  // the instructions; nothing pinned them, so gate 11 deleted both from §5c and swapped the two
+  // rows in the banner table — 20/0 green each time. Firing point and owner are a MAPPING: the
+  // banner table declares the moment, §5c instructs it, and each must name the other's position
+  // line verbatim or the two documents drift while each stays self-consistent.
+  const s5c = section5c();
+  const pairs = [
+    ["PR conformance review", "before invoking\n`/review-pr`"],
+    ["review requested changes", "before re-entering 5b"],
+  ];
+  for (const [line] of pairs) {
+    const position = `Steps 5–6/8 — QA LOOP ⏳ ${line}, cycle {CYCLE}/5`;
+    assert.ok(
+      banner.includes(position),
+      `the banner table must declare the firing point "${line}"`,
+    );
+    assert.ok(
+      s5c.includes(position),
+      `§5c must INSTRUCT the "${line}" block it owns, with the position line the banner table declares verbatim — a declared-but-uninstructed firing point is CR-3`,
+    );
+  }
+
+  // And the two must not be interchangeable: the review block precedes the REQUEST CHANGES block,
+  // because one runs before the review and the other only on an adverse verdict.
+  assert.ok(
+    s5c.indexOf("QA LOOP ⏳ PR conformance review") <
+      s5c.indexOf("QA LOOP ⏳ review requested changes"),
+    "the pre-review block must be instructed before the REQUEST-CHANGES block — swapping them inverts which moment each describes",
+  );
+});
+
+test("Step 0's 5c completeness condition lives on the QA-loop row", () => {
+  // Gate 11: the condition could be deleted from develop-task's progress table, or MOVED to the
+  // Step 7 row, with the suite green — an ownership claim that was never asserted as one.
+  const step0 = read(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  const condition = "`**PR Review**` row on the highest `### QA Cycle {N}`";
+  for (const loop of ["qa-story / qa-fix loop", "qa-task / qa-fix loop"]) {
+    const row = step0
+      .split("\n")
+      .find((l) => l.includes(loop) && l.startsWith("|"));
+    assert.ok(row, `Step 0 must carry a progress row for the ${loop}`);
+    assert.ok(
+      row.includes(condition),
+      `the 5c completeness condition belongs to the ${loop} ROW — moving it to another step's row makes it unreachable at the resume moment it exists for`,
+    );
+  }
+});
+
+test("the banner doc carries the PR review verdict in the Steps 5-6 exit line", () => {
+  // 5c states the exit position line as `({N} cycles, {gate}, PR review {verdict})` and points at
+  // the banner doc as the format authority for it. That doc rendered the parenthetical WITHOUT the
+  // verdict in both its format line and its worked example — the authority omitting the one field
+  // task 77 exists to add. It was fixed, and held by nothing: reverting the example went green.
+  assert.match(
+    banner,
+    /PR review \{verdict\}/,
+    "the banner doc must state that the Steps 5-6 exit parenthetical carries the PR review verdict",
+  );
+  assert.match(
+    banner,
+    /QA LOOP ✅ complete \([^)]*PR review [A-Z]+\)/,
+    "the worked example must RENDER the verdict, not merely describe it — the example is what gets copied",
+  );
+  // BOTH examples, not just the worked one. The Format block's parenthetical is the sample a reader
+  // copies before ever reaching the worked example, and pinning only one of the two left the other
+  // free to be reverted with the suite green.
+  assert.match(
+    banner,
+    /optional short parenthetical: "\([^)]*PR review [A-Z]+\)"/,
+    "the Format block's sample parenthetical must carry the verdict too",
+  );
+  // And 5c must still state the line the banner doc is the authority for, so the two documents
+  // cannot drift apart while each looks self-consistent.
+  assert.match(
+    section5c(),
+    /QA LOOP ✅ complete \(\{N\} cycles, \{gate\}, PR review \{verdict\}\)/,
+    "5c must state the exit line the banner doc is the format authority for",
+  );
+});
+
+test("the 5c resume check reads the report, not the filesystem", () => {
+  // Replaces a predicate that failed three consecutive QA cycles: it compared gate.{N} (per QA
+  // cycle) with pr-review.{n} (per 5c INVOCATION), and its shell implementation returned a false
+  // PASS under zsh when the glob matched nothing — verifying a run with no artifacts at all as
+  // complete. The repo's third-strike rule says replace the mechanism rather than patch again.
+  const resume = read("shared/resources/develop-pipeline-resume-contract.md");
+
+  assert.doesNotMatch(
+    resume,
+    /pr-review\.\{n\}.*must be \*\*≥/,
+    "the index-comparison predicate must not come back",
+  );
+  assert.doesNotMatch(
+    resume,
+    /ls \*\.gate\.\*\.yml/,
+    "no bare relative glob — it matches nothing from the repo root and zsh turns that into a pass",
+  );
+  assert.match(
+    resume,
+    /`\*\*PR Review\*\*` row must hold a \*\*terminal verdict\*\*/,
+    "completeness is decided by the report row, which is written every cycle by contract",
+  );
+
+  // The deleted predicate had TWO homes. Removing it from the resume contract while it survived
+  // in Step 0's progress table left two documents defining Step 5-6 completeness differently at
+  // the same resume moment — the cycle-1-to-3 pattern (fix the sentence, not the contract) again.
+  const step0 = read(
+    "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
+  );
+  assert.doesNotMatch(
+    step0,
+    /pr-review\.\{n\}\.\*\.md` \(Step 5c\)/,
+    "Step 0's progress rows must not require the pr-review FILE — same rule, one statement",
+  );
+  assert.match(
+    step0,
+    /`\*\*PR Review\*\*` row on the highest `### QA Cycle \{N\}`/,
+    "Step 0 must state the same report-row condition the resume contract does",
+  );
+  // Every non-terminal value must have a stated resume action.
+  //
+  // THIRD ATTEMPT AT THIS GUARD; the first two both passed on the regression they named, which is
+  // why this one reads the table as a TABLE rather than searching it as text.
+  //   v1 — `resume.includes(v)` over the whole file. The artifact-table sentences at ~:82 and ~:92
+  //        name every value in passing, so deleting a sub-state row left the suite green.
+  //   v2 — same `includes`, haystack narrowed to the table. `not reached` appears backticked inside
+  //        the `pending` row's own prose, so deleting the `not reached` row STILL left it green —
+  //        and `not reached` is the table's default arm.
+  // The defect both versions share is searching for a MENTION. What the contract owes each value is
+  // a resume ACTION, and an action is carried by a row's key. So: parse rows, key on the first cell,
+  // and require the action cell to name where the run re-enters. A value named anywhere else in the
+  // file — including inside another row's prose — is not a resume action and must not satisfy this.
+  const tableStart = resume.indexOf(
+    "| `**PR Review**` reads | Resume action |",
+  );
+  assert.ok(tableStart > -1, "the resume sub-state table must exist");
+  const tableEnd = resume.indexOf("\n>\n", tableStart);
+  assert.ok(
+    tableEnd > -1,
+    "the sub-state table must be followed by its rationale block — without an end marker this slice runs to EOF and the row parse below would absorb the rows of any blockquote table added later in the file",
+  );
+
+  const subStateRows = resume
+    .slice(tableStart, tableEnd)
+    .split("\n")
+    .map((l) => l.replace(/^>\s*/, ""))
+    .filter((l) => l.startsWith("|") && !/^\|[\s-]+\|[\s-]+\|?$/.test(l))
+    .map((l) => l.replace(/^\|/, "").split("|"))
+    .filter((cells) => cells.length >= 2)
+    .map((cells) => ({ key: cells[0].trim(), action: cells[1].trim() }))
+    .filter((r) => !r.key.includes("reads"));
+
+  // PARSE SANITY WITHOUT A ROW COUNT. This was `subStateRows.length >= 5`, and that canary fired
+  // FIRST on every single-row deletion — so all four published mutations proved only that the table
+  // still had five rows. A guard that merely counted rows would have produced a byte-identical
+  // mutation matrix (gate 8, CY8-3): the proof could not discriminate the mechanism it cited.
+  // Well-formedness is the check that belongs here. With no count in the way, deleting a row falls
+  // through to the keying assertion below and fails by name.
+  assert.ok(
+    subStateRows.length > 0,
+    "the sub-state table parsed to zero rows — the parse is broken, so every assertion below would be vacuous",
+  );
+  for (const r of subStateRows) {
+    assert.ok(
+      r.key.length > 0 && r.action.length > 0,
+      `every sub-state row needs both a key and an action; got key=${JSON.stringify(r.key)} action=${JSON.stringify(r.action)}`,
+    );
+  }
+
+  const claimedBy = new Map();
+  for (const v of [
+    "pending — 5c not yet run",
+    "REQUEST CHANGES",
+    "review failed",
+    "not reached",
+  ]) {
+    const matches = subStateRows.filter((r) => r.key.includes("`" + v + "`"));
+    assert.equal(
+      matches.length,
+      1,
+      `expected exactly ONE sub-state row keyed on PR Review = "${v}", found ${matches.length}. Being mentioned inside another row's prose is not a resume action — that is how the two previous versions of this guard stayed green with the row deleted. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+    );
+    const row = matches[0];
+
+    // ONE ROW PER VALUE. Merging several values into a single key and padding the table with
+    // decoys satisfied "every value has a row" while destroying per-value routing (gate 8, CY8-5):
+    // four values sharing one action is not four resume actions.
+    assert.ok(
+      !claimedBy.has(row.key),
+      `"${v}" shares row "${row.key}" with "${claimedBy.get(row.key)}" — each value needs its OWN row, because each resumes somewhere different`,
+    );
+    claimedBy.set(row.key, v);
+
+    // A DESTINATION IS NOT AN ACTION. This was one mention-match, `/\b5[abc]\b|Step 7|escalat/i`,
+    // which an action reading "n/a — nothing to do here; see the 5c notes above" satisfied on the
+    // bare substring `5c` (gate 8, CY8-4) — while three artifacts described the assertion as
+    // requiring the row to say where the run resumes. Verb and destination are now separate.
+    assert.match(
+      row.action,
+      /re-enter|go to|proceed to|escalat/i,
+      `the row for "${v}" must state what the run DOES (re-enter / go to / proceed to / escalate); got: ${JSON.stringify(row.action.slice(0, 120))}`,
+    );
+    assert.match(
+      row.action,
+      /\b5[abc]\b|Step 7|Loop Escalation/i,
+      `the row for "${v}" must name WHERE it resumes (5a/5b/5c, Step 7, or Loop Escalation); got: ${JSON.stringify(row.action.slice(0, 120))}`,
+    );
+  }
+
+  // PER-VALUE DESTINATION (gate 9's CY9-3, and the same defect class as gate 10's CY10-1 on the
+  // verdict table). The assertions above prove each value has a row, a verb and *a* destination —
+  // not that it is the RIGHT destination. Gate 9 demonstrated the gap: `REQUEST CHANGES` could be
+  // repointed at 5c, `APPROVE` at 5a, and `review failed` could lose its escalation bound, all
+  // green. Each value resumes somewhere specific, so each is asserted specifically — INCLUDING the
+  // terminal APPROVE/CONCERNS arm below, which the first version of this block omitted while
+  // claiming otherwise (gate 11, CY11-1).
+  const dest = (v) =>
+    subStateRows.find((r) => r.key.includes("`" + v + "`")).action;
+
+  assert.match(
+    dest("REQUEST CHANGES"),
+    /re-enter at \*\*5b\*\*/,
+    "a run killed after 5c routed back must resume at 5b — 5a would re-run QA against an unchanged tree and re-derive the gate that just passed",
+  );
+  assert.match(
+    dest("review failed"),
+    /re-enter at \*\*5c\*\*/,
+    "`review failed` resumes at 5c — the review is what did not run",
+  );
+  assert.match(
+    dest("review failed"),
+    /second\*{0,2} consecutive|escalate to Loop Escalation/i,
+    "the `review failed` retry must stay bounded — its usual cause is not self-healing, so an unbounded retry loops forever",
+  );
+  // THE EXIT ARM, asserted explicitly — it is the row that decides Step 5-6 is COMPLETE, and it was
+  // the one value the first version of this block left out. Gate 11 deleted the row outright and
+  // repointed it at 5a; both stayed 20/0 green, while this block's own comment claimed "each is
+  // asserted specifically". A guard that covers four of five values, omitting the terminal one, is
+  // the sixth instance of mention-standing-in-for-mapping in this task.
+  const exit = subStateRows.find(
+    (r) => r.key.includes("`APPROVE`") && r.key.includes("`CONCERNS`"),
+  );
+  assert.ok(
+    exit,
+    `the sub-state table must carry the terminal APPROVE/CONCERNS row. Rows present: ${subStateRows.map((r) => r.key).join(" / ")}`,
+  );
+  assert.match(
+    exit.action,
+    /Step 5–6 is complete/,
+    "the exit arm must state that Step 5-6 is COMPLETE — that is the whole content of the verdict",
+  );
+  assert.match(
+    exit.action,
+    /go to Step 7/,
+    "the exit arm must route to Step 7",
+  );
+  assert.doesNotMatch(
+    exit.action,
+    /re-enter at \*\*5[abc]\*\*/,
+    "a cleared 5c does not re-enter the loop — re-entering would re-run QA against a tree that already passed",
+  );
+
+  for (const v of ["pending — 5c not yet run", "not reached"]) {
+    assert.match(
+      dest(v),
+      /re-enter at \*\*5c\*\*/,
+      `"${v}" resumes at 5c when the gate is clean`,
+    );
+    assert.match(
+      dest(v),
+      /otherwise at \*\*5a\*\*/,
+      `"${v}" resumes at 5a when the gate is not clean — the conditional is the whole point of the row`,
+    );
+  }
+});

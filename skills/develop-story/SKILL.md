@@ -1,6 +1,6 @@
 ---
 name: develop-story
-description: 'Automates the full end-to-end story development lifecycle: create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Story branches are cut from `develop` and PR back to `develop` (short-lived feature branches — standard Gitflow), and an epic is an organisational construct with no branch of its own — unless the epic opts in to `branch_model: epic-integration`, in which case its stories are cut from and PR into that epic''s integration branch (`epic/{n}.{name}`), created on demand. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume with per-step artifact verification; bounded develop loop (MAX_ITER=5); `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".'
+description: 'Automates the full end-to-end story development lifecycle: create-story-branch → review-story → develop → create-pr → qa-story → qa-fix (iterative, up to 5 cycles) → review-pr (Step 5c, the QA loop''s exit gate) → finalise → commit-changes. Story branches are cut from `develop` and PR back to `develop` (short-lived feature branches — standard Gitflow), and an epic is an organisational construct with no branch of its own — unless the epic opts in to `branch_model: epic-integration`, in which case its stories are cut from and PR into that epic''s integration branch (`epic/{n}.{name}`), created on demand. Features: Explore subagent for story resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk stories; resume with per-step artifact verification; bounded develop loop (MAX_ITER=5); `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-story [story-file-path]` or "develop and QA this story end to end".'
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -193,11 +193,20 @@ See `references/develop-pipeline-step-4-create-pr.md` for the full Step 4 protoc
 
 See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 protocol: QA cycle counter setup, gate file location, QA skill invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, commit/push per cycle, escalation entry, and loop limit HALT message.
 
+**The loop's exit gate is Step 5c — `/review-pr`, not the QA gate.** A gate that reads `PASS` or
+`WAIVED` hands to 5c, which runs `/review-pr --effort {medium|low} --comment` over the open PR.
+`REQUEST CHANGES` routes back to 5b `/qa-fix` and consumes a cycle from the **shared** 5-cycle
+budget; `CONCERNS` records findings without blocking; `APPROVE` exits to Step 7. The
+`ready-for-merge` stage fires there, after the review clears — not on the QA gate. `/review-pr`
+stays advisory throughout: it writes no gate file and never edits code, and this orchestrator is
+what acts on its verdict. Lite mode degrades it to `--effort low` and never skips it. It leaves
+`story.{epic}.{story}.pr-review.{n}.{name}.md` beside the work item.
+
 ### Step 7: Finalise
 
 See `references/develop-pipeline-step-7-finalise.md` for the full Step 7 protocol: `/finalise` invocation, completion detection, DoD gaps halt (with commit + push), DoD-body-to-PR comment, tracker issue update (GitHub close + board Done, Jira Done transition), DoD summary file location, Step 7 Completion Checklist, and Pipeline Progress update.
 
-**Lite mode applies to Step 5 only.** Step 7 (finalise + PR DoD comment + issue close + board Done) runs in full in every mode. Do NOT inline `/finalise` by writing the DoD file directly — invoke the skill. See the Step 7 Completion Checklist before marking the row ✅.
+**Lite mode applies to Step 5 only** (and degrades Step 5c to `--effort low` without skipping it). Step 7 (finalise + PR DoD comment + issue close + board Done) runs in full in every mode. Do NOT inline `/finalise` by writing the DoD file directly — invoke the skill. See the Step 7 Completion Checklist before marking the row ✅.
 
 ### Step 8: Commit Changes
 
@@ -308,5 +317,6 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 - `/create-pr` — Step 4
 - `/qa-story` — Step 5
 - `/qa-fix` — Step 6
+- `/review-pr` — Step 5c (the QA loop's exit gate; advisory — the orchestrator acts on its verdict)
 - `/finalise` — Step 7
 - `/commit-changes` — Step 8

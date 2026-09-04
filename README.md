@@ -66,7 +66,7 @@ Featured starting points:
 - **Development orchestrators:** [`develop-next`](./skills/develop-next/SKILL.md), [`develop-story`](./skills/develop-story/SKILL.md), [`develop-task`](./skills/develop-task/SKILL.md)
 - **Authoring:** [`create-story`](./skills/create-story/SKILL.md), [`create-task`](./skills/create-task/SKILL.md), [`create-epic`](./skills/create-epic/SKILL.md), [`create-prd`](./skills/create-prd/SKILL.md)
 - **Review:** [`review-story`](./skills/review-story/SKILL.md), [`review-task`](./skills/review-task/SKILL.md), [`review-epic`](./skills/review-epic/SKILL.md), [`review-prd`](./skills/review-prd/SKILL.md), [`review-pr`](./skills/review-pr/SKILL.md)
-- **QA:** [`qa-story`](./skills/qa-story/SKILL.md), [`qa-task`](./skills/qa-task/SKILL.md), [`qa-fix`](./skills/qa-fix/SKILL.md)
+- **QA:** [`qa-story`](./skills/qa-story/SKILL.md), [`qa-task`](./skills/qa-task/SKILL.md), [`qa-fix`](./skills/qa-fix/SKILL.md), [`review-pr`](./skills/review-pr/SKILL.md)
 - **Git/PR:** [`create-branch`](./skills/create-branch/SKILL.md), [`commit-changes`](./skills/commit-changes/SKILL.md), [`create-pr`](./skills/create-pr/SKILL.md)
 - **Meta:** [`create-skill`](./skills/create-skill/SKILL.md), [`find-skills`](./skills/find-skills/SKILL.md), [`document-existing-project`](./skills/document-existing-project/SKILL.md)
 

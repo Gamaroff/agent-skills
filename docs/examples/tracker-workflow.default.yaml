@@ -55,7 +55,7 @@ statuses:
 #   in-review          pull request opened
 #   changes-requested  a QA gate came back with issues; fires ONCE PER FIX CYCLE
 #   in-qa              QA review starts
-#   ready-for-merge    QA passed, awaiting merge
+#   ready-for-merge    the PR conformance review cleared (Step 5c), awaiting merge
 #   pr-merged          the PR actually landed on the base branch
 #   blocked            a pipeline gate failed and needs a human
 #   done               Definition of Done met, work accepted

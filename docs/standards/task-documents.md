@@ -105,7 +105,7 @@ The **Implementation Plan** section must contain a checkbox list. `develop-task`
 |---|---|---|---|
 | Plan file | `task.{N}.plan.{name}.md` | `create-task` | Detailed implementation guide |
 | Review report | `task.{N}.review.{N}.{name}.md` | `review-task` (Step 2) | Review findings |
-| PR review report | `task.{N}.pr-review.{N}.{name}.md` | `review-pr` (standalone) | PR-vs-work-item conformance + code findings |
+| PR review report | `task.{N}.pr-review.{N}.{name}.md` | `review-pr` (Step 5c of the develop pipelines, and standalone) | PR-vs-work-item conformance + code findings |
 | Implementation report | `task.{N}.implementation.{N}.{name}.md` | `develop-task` pipeline | Pipeline run record |
 | QA report | `task.{N}.qa.{N}.{name}.md` | `qa-task` (Step 5) | QA assessment narrative |
 | Definition of Done | `task.{N}.dod.{N}.{name}.md` | `finalise` (Step 7) | DoD checklist outcome |

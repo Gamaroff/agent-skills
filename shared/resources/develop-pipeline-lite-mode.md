@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-lite-mode
-description: Lite-mode contract for the develop-story and develop-task pipeline orchestrators. Covers trigger conditions, PIPELINE_MODE=lite behavior, and the directive format passed to qa-story/qa-task. QA-side effect details (Adaptive Review Strategy override) stay in each qa skill's own section.
+description: Lite-mode contract for the develop-story and develop-task pipeline orchestrators. Covers trigger conditions, PIPELINE_MODE=lite behavior, the directive format passed to qa-story/qa-task, and Step 5c's `/review-pr --effort low` degradation (lite degrades the PR conformance review; it never skips it). QA-side effect details (Adaptive Review Strategy override) stay in each qa skill's own section.
 ---
 
 # Develop Pipeline — Lite Mode
@@ -19,6 +19,7 @@ If **any** condition is not met, `PIPELINE_MODE=standard` (default — no change
 
 - Step 5 (qa-story / qa-task) uses **Direct Tools only** — skips parallel agents regardless of the Adaptive Review Strategy decision
 - Step 5b (qa-fix) still runs if issues are found
+- Step 5c (review-pr) runs with `--effort low` — **degraded, never skipped**. It is the loop's exit gate, and its conformance lens has no counterpart elsewhere in the pipeline; skipping it would remove the check entirely rather than shorten it
 - All other steps run unchanged
 
 ### What Lite Mode Does NOT Skip (CRITICAL)

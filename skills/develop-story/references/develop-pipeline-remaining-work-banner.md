@@ -24,8 +24,22 @@ in the same way a missing step banner is.
 | Every step transition, Steps 1–8 — emitted as part of action 3 of the Step Transition Protocol, immediately **before** the `═══ … STEP {N+1}/8 … ═══` banner, in the same contiguous output | `Step {N}/8 — {STEP-NAME} ✅ complete`                            |
 | Each develop-loop iteration that continues (Step 3, before re-invoking `/develop`) | `Step 3/8 — DEVELOP ⏳ in progress, iter {ITER}/{MAX_ITER}`       |
 | Each QA/verify cycle that continues (Steps 5–6, before re-invoking the QA skill) | `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {CYCLE}/5`            |
+| Step 5c, before invoking `/review-pr` on a gate that exited 5a clean † | `Steps 5–6/8 — QA LOOP ⏳ PR conformance review, cycle {CYCLE}/5` |
+| Step 5c returning REQUEST CHANGES (before re-entering 5b) †            | `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` |
 | Every HALT — emitted immediately **before** the halt banner, so the user sees what did not run | `Step {N}/8 — {STEP-NAME} ❌ halted`                              |
 | Pipeline completion (after Step 8)                                      | `Step 8/8 — COMMIT CHANGES ✅ complete`                            |
+
+† **The two Step 5c rows are `develop-story` / `develop-task` only.** `develop-bug`'s
+Steps 5–6 verify-and-fix loop has no 5c, so neither moment ever arrives on that pipeline and
+its absence is not a protocol violation. Both rows are **instructed in §5c** of
+[`develop-pipeline-step-5-6-qa-loop.md`](develop-pipeline-step-5-6-qa-loop.md) — that section
+owns them, and a firing point declared mandatory here with nothing instructing it there is a
+defect in this table, not a licence to improvise.
+
+**The Steps 5–6 exit block carries the PR review verdict.** Its parenthetical is
+`({N} cycles, {gate}, PR review {verdict})` — the gate alone is not the loop's outcome any more,
+because a clean gate no longer exits the loop. §5c states the same line; this file is the format
+authority for it, so an example here that omits the verdict is the authority contradicting itself.
 
 Emit **one** block per moment — not one per sub-step, not one per tool call.
 
@@ -43,7 +57,7 @@ the next sub-skill is invoked in the same assistant turn.
 
 ```
 ═══ REMAINING WORK STATUS ═══
-Pipeline position:  {position line} {optional short parenthetical: "(1 cycle, PASS 100/100)"}
+Pipeline position:  {position line} {optional short parenthetical: "(1 cycle, PASS 100/100, PR review APPROVE)"}
 
 Remaining {work-item units} ({X} of {M} complete):
   ✅ {n}: {name}
@@ -100,7 +114,7 @@ Steps: 1 create-branch · 2 review-bug · 3 investigate & fix · 4 create-pr ·
 
 ```
 ═══ REMAINING WORK STATUS ═══
-Pipeline position:  Steps 5–6/8 — QA LOOP ✅ complete (1 cycle, PASS 100/100)
+Pipeline position:  Steps 5–6/8 — QA LOOP ✅ complete (1 cycle, PASS 100/100, PR review APPROVE)
 
 Pipeline steps still ahead:
   - Step 7: finalise

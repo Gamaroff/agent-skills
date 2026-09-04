@@ -198,7 +198,7 @@ One line per finished iteration. This is the whole night in twenty seconds.
 | `progress` | The item moved. A roadmap tick landed on the base branch. | Review the PR as normal. |
 | `idle` | Spawned, cost money, changed nothing. | Two in a row ends the run. Check the probe. |
 | `incomplete` | The pipeline stalled mid-run with its lock still on disk. **Not a failure.** | The supervisor already retried. See below. |
-| `halt` | A pipeline HALT — a review gate, five QA cycles, a merge conflict. | Read the halt file. This one wants you. |
+| `halt` | A pipeline HALT — a review gate, five QA cycles (which now include any consumed by a Step 5c `REQUEST CHANGES`), a merge conflict. | Read the halt file. This one wants you. |
 | `error` | The child failed — non-zero exit, spawn failure, `is_error`. | Read `iter-NNN.txt`. |
 | `done` | The probe found nothing to do. Clean stop. | Nothing. The queue is empty. |
 

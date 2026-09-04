@@ -53,7 +53,7 @@ Ordered step-by-step reference for the full story/task development pipeline. Use
 | `develop-pipeline-step-2-review.md` | Pre-implementation review gate |
 | `develop-pipeline-step-3-develop-loop.md` | Implementation loop with quality checks |
 | `develop-pipeline-step-4-create-pr.md` | Open pull request |
-| `develop-pipeline-step-5-6-qa-loop.md` | QA review + fix loop |
+| `develop-pipeline-step-5-6-qa-loop.md` | QA review + fix loop, and Step 5c's PR conformance review — the loop's exit gate |
 | `develop-pipeline-step-7-finalise.md` | Finalise and close story |
 | `develop-pipeline-step-8-commit.md` | Commit uncommitted changes |
 | `develop-pipeline-pause.md` | Mid-pipeline pause/resume protocol |

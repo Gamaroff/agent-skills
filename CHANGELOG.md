@@ -6,6 +6,39 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The PR conformance review now runs inside the develop pipelines, as Step 5c.** `/review-pr`
+  shipped deliberately standalone: its **code** lens duplicates the reviewer `/qa-story` and
+  `/qa-task` already dispatch every cycle, so wiring it in looked like paying twice. That reasoning
+  was sound about the code lens and silent about the **conformance** lens — does the diff *cover*
+  what the work item promised, did it drift outside that *scope*, is the artifact *trail* complete
+  and honest, is the work item *consistent* with what shipped — which had no counterpart anywhere
+  in the pipeline. A run could reach `accepted` on a complete-looking trail that did not hold.
+
+  That is not hypothetical. `/review-pr` itself shipped `accepted` through two QA cycles, a DoD gate
+  and 40 contract tests while carrying a glob that collected six files under bash and **zero** under
+  zsh, the default macOS shell. What caught it was pointing the instrument at its own PR.
+
+  It runs as the **exit gate of the existing Steps 5–6 QA loop**, not as a ninth pipeline step: a
+  gate reading `PASS` or `WAIVED` hands to 5c instead of going straight to `finalise`.
+  `REQUEST CHANGES` routes back into `/qa-fix` and consumes a cycle from the **same** 5-cycle
+  budget; `CONCERNS` records findings without blocking; `APPROVE` exits. Lite mode degrades it to
+  `--effort low` and never skips it. Each completed run leaves one `*.pr-review.{n}.{name}.md`
+  beside the work item — a filename `docs/standards/file-naming.md` has defined all along while
+  nothing emitted it.
+
+  **`/review-pr` gains no new power.** It still writes no gate file, never submits a formal review
+  and never edits code; the orchestrator is what acts on the verdict it reports. Being consulted by
+  a pipeline is not the same as gating one, and that distinction is what makes the wiring
+  legitimate.
+
+  **`ready-for-merge` moved behind the review.** It used to fire the moment the QA gate read PASS,
+  which advertised a card as merge-ready while the run could still loop back into `/qa-fix`. It now
+  fires only once nothing can send the run backwards.
+
+  `/develop-next` and `/develop-batch` needed no change — they delegate, so every PR they merge is
+  pre-reviewed by inheritance. `/develop-bug` is untouched: it runs its own verify loop. The
+  pipeline is still 8 steps, the lock still validates `1..8`, and no `{N}/8` string changed.
+
 - **`/double-check` — an adversarial audit of work the agent has just produced.** Generation and
   verification are different jobs: a finishing turn carries forward its own plan, its own
   assumptions, and a transcript that reads like proof, and none of that is evidence about the

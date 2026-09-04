@@ -24,7 +24,8 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const SKILL_PATH = path.join(REPO_ROOT, "skills", "develop-story", "SKILL.md");
 const STEP_RESOURCES_DIR = path.join(REPO_ROOT, "shared", "resources");
 
-// The 8 sub-skill names that must appear in order in SKILL.md.
+// The 9 sub-skill names that must appear in order in SKILL.md.
+// review-pr is Step 5c — the QA loop's exit gate — and sits between qa-fix and finalise.
 // Step 1 cuts the story branch from develop (no epic integration branch).
 const EXPECTED_STEPS = [
   "create-story-branch",
@@ -33,6 +34,7 @@ const EXPECTED_STEPS = [
   "create-pr",
   "qa-story",
   "qa-fix",
+  "review-pr",
   "finalise",
   "commit-changes",
 ];

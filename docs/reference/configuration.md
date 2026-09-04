@@ -329,7 +329,7 @@ configures the second; the workflow record configures the first.
 | `work-started`    | Step 1, once the branch and lock exist      | on      |
 | `in-review`       | Step 4, once the PR URL is confirmed        | on      |
 | `in-qa`           | Step 5, once, on entering the QA loop       | **off** |
-| `ready-for-merge` | Step 6, on a gate that exits the loop       | **off** |
+| `ready-for-merge` | Step 5c, on APPROVE / CONCERNS              | **off** |
 | `blocked`         | before a terminal HALT, real blockages only | **off** |
 | `done`            | Step 7, by `/finalise`                      | on      |
 

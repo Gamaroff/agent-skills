@@ -1,0 +1,194 @@
+schema: 1
+task: "task.77.review-pr-in-pipeline"
+task_title: "Run the PR conformance review before a work item is finalised"
+gate: CONCERNS
+status_reason: "Grades the POST-GATE-8 PASS (commit 8293765) — DoD gaps 2-8 plus gate 8's CY8-3/4/5 residual — NOT a QA cycle. The 5-cycle budget was spent at gate 5; Loop Escalation stands and a fourth remediation pass does not restore it. This is the first pass in five whose published mutation matrix is exactly as strong as the sentence above it. All six published rows executed: every one fires the assertion the matrix names, and the four row-deletions each name their own value on the keying assertion at pr-review-loop-parity.test.mjs:596 — the `subStateRows.length >= 5` canary that made gate 8's CY8-3 available is gone, replaced by a well-formedness check, so a deletion falls through to the keying. CY8-4 and CY8-5 are closed against gate 8's own mutations 20 and 21 verbatim, both green then and red now. Ten further trail-asserted proofs from across the whole task re-execute correctly, including the one the trail honestly records as NOT holding. Gap 3's re-derivation is exact — one named plus seven found, eight rows across five files — and its surviving hit (task.41's own task document) is covered by a named category exclusion. Both halves of gap 8's out-of-scope admission verified: the `<fastGateCommand>` block fails under bash AND zsh, is byte-identical on origin/develop, and is untouched by this branch; the other 15 of 16 blocks parse under both. Execution green everywhere measurable: npm run ci exit 0, 2285 tests / 0 fail, no qa-execute-snippets flake; parity 18/18; lock 14/14 under bash AND zsh; 4/4 PR checks on head SHA 8293765 == local HEAD; 45/45 bundled copies content-identical at branch scope, and the branch NET-REDUCES repo-wide staleness from 8 to 4. It is not a PASS because two rows of the implementation report's `consciously ruled out` table still vouch for exclusions this same branch reversed (CY9-1), and the status header defers the residual to a task the same commit cancelled (CY9-2). Both are single-line edits in one file. Two further LOW residuals: per-value DESTINATION is still unasserted, so seven inversions of the resume contract stay green (CY9-3), and three counts under the section gap 7 refreshed are stale (CY9-4). No HIGH, no MEDIUM, nothing a runtime risk."
+reviewer: "QA Engineer (independent subagent — see provenance below)"
+updated: "2026-09-03T00:00:00Z"
+
+# ── PROVENANCE — why this gate is not self-issued ─────────────────────────────
+# I was dispatched with NO ACCOUNT of how any of these fixes were made, and did
+# not ask for one. I did not write the code, the docs, or the commit under
+# review, and I have no fix here to defend. Every claim in every repo artifact —
+# the 8293765 commit message and its mutation matrix, the implementation
+# report's post-gate-8 section, the PR #309 body, the task doc's Change Log,
+# task.77.dod.1, and gates 5 through 8 — was treated as a HYPOTHESIS TO TEST by
+# execution, never as evidence.
+#
+# This continues the rule that produced gates 5, 6, 7 and 8, which itself
+# existed because Step 5c's finding PC-1 was that the agent writing this task's
+# code had also written the gate clearing it.
+#
+# WHAT I WAS TOLD, AND WHAT EXECUTION FOUND.
+#
+# I was told as fact that this branch has failed four consecutive independent
+# gates, that every time the defect was in the REPORTING rather than the
+# pipeline change, that a mutation proof had been published three times and was
+# weaker than its claim twice, and that gate 8's CY8-3 was exactly "the
+# published matrix does not discriminate the mechanism it cites". I was told to
+# attack the claims, and the matrix hardest.
+#
+# I did. The matrix holds. All six published rows were executed with the
+# assertion message captured, not just the exit code, because "red" alone cannot
+# distinguish the keying from the canary. Four row-deletions fire
+# `expected exactly ONE sub-state row keyed on PR Review = "<value>", found 0`;
+# the merged-key row fires the one-row-per-value assertion; the verb-less action
+# fires the action-verb assertion. The mechanism was REPLACED, not narrowed a
+# fifth time, and the replacement is what the matrix says it is.
+#
+# I then built the mutations the published set would miss, as instructed: a key
+# with a plausible-but-wrong action, two actions swapped between rows, a right
+# key naming the wrong destination, four backtick/whitespace forms of a key, the
+# table moved, and the blockquote markers stripped. Twenty-one of my own devising,
+# on top of twenty-three asserted or recorded somewhere in this trail and
+# re-executed from across the entire task. Seven came back GREEN and are CY9-3 —
+# all of them on the same axis: the guard is strong on WHICH values own a row and
+# silent on WHAT each row's action says.
+#
+# I executed 44 mutations in total — 44 distinct edits, listed below as 38 rows
+# because a few rows bundle the variants of one edit. One of the 44 (removing
+# `, PR review {verdict}` from qa-loop:301 rather than :827) was a MIS-TARGET of
+# gate 8's mutation 27; it is reported as mutation 42, its correct form as 16,
+# and the mis-target is kept in the record rather than deleted because it found
+# the unpinned third rendering. NOT ONE trail-asserted proof failed. The two
+# findings I raise are stale sentences in tables — not false proofs, and not
+# overstated closures. Four FAILs is not a reason to find a fifth. On the axis
+# this branch has been failing on, the trail is now honest, and this gate says so
+# plainly.
+# ──────────────────────────────────────────────────────────────────────────────
+
+top_issues:
+  - id: "CY9-1"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+    finding: "The `Phase 6 — files consciously ruled out` table still vouches for two exclusions this same branch reversed. Lines 150-151 are unchanged by 87e5bf9 and 8293765 and still read `docs/reference/configuration.md`, `tracker-workflow.md`, … | '…`ready-for-merge` semantics are unchanged (same stage, same off-by-default, only its firing point moved)' and `docs/concepts/architecture.md`, … | 'Checked line by line: no pipeline-shape restatement that 5c invalidates.' All three files were edited by 8293765 BECAUSE those exclusions were wrong: DoD gap 2 quoted :151 verbatim as 'contradicted' and gap 3 called :150's rationale 'self-refuting'. That table is the evidence artifact for an ACCEPTANCE-GATING criterion — task doc :455, 'The re-derivation greps return no un-triaged hit; ruled-out hits are named in the implementation report', ticked [x] — so a reader checking the sweep's scope is told these files were correctly excluded. LOW rather than MEDIUM because the reversal IS disclosed, unambiguously, in the same document's post-gate-8 gap table (rows 2 and 3), and no closure is asserted over the stale rows. But the report's own convention — row 492, which gate 8 singled out as the right way to do this — is to reconcile such a row IN PLACE, and that was not done."
+    suggested_action: "Annotate both rows in place rather than rewriting them, the way row 492 already does: append '— REVERSED in the post-gate-8 pass; see the DoD gap table below' to the `configuration.md`/`tracker-workflow.md` row and to the `architecture.md` row. Two sentences, no history erased."
+    suggested_owner: dev
+    status: open
+  - id: "CY9-2"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+    finding: "The status header defers the residual to a task the same commit cancelled. `task.77.review-pr-in-pipeline.md:517`, written BY 8293765, reads '**Gate Decision**: CONCERNS — residual deferred to task 88; acceptance needs a PASS/WAIVED gate or a recorded waiver', and the §QA Artifacts gate-8 row at :539 ends 'Residual → task 88'. The same commit sets task.88 `status: cancelled`, gives it a `## 0. Superseded` section, updates its registry row to 'superseded, closed inside 77', and closes CY8-3/4/5 here. §QA Testing Results is the field a reader consults for CURRENT status; it now defers work to a cancelled follow-up that this very commit performed. The :539 row is defensible as historical narrative of what gate 8 recommended; :517 is not — it is a present-tense status assertion, and gap 7 existed precisely because that header had gone stale before."
+    suggested_action: "Edit :517 to '**Gate Decision**: CONCERNS — residual closed in the post-gate-8 pass (task 88 superseded); acceptance needs a PASS/WAIVED gate or a recorded waiver.' Optionally append '(later superseded — closed inside 77)' to :539 so the artifacts table does not read as a live pointer either."
+    suggested_owner: dev
+    status: open
+  - id: "CY9-3"
+    severity: low
+    file: "evals/shared/tests/pr-review-loop-parity.test.mjs"
+    finding: "Per-value DESTINATION is still unasserted, so seven inversions of the resume contract stay green. The rewritten guard requires each enumerated value to own exactly one row and that row's action to contain a verb AND a destination — it does not check the destination is the RIGHT one. Executed, all 18 tests / 18 pass / 0 fail: (A1) `REQUEST CHANGES` routed to 5c instead of 5b; (A2) the actions of `REQUEST CHANGES` and `review failed` SWAPPED; (A3) `not reached` routed unconditionally to Step 7, inverting the gate-conditional arm; (A4) an action reading 'no escalation needed; proceed to reading the 5c notes above' — verb and destination both present, meaning absent; (A5) the EXIT arm itself inverted, `APPROVE`/`CONCERNS` → 're-enter at **5a**'; (A6) `review failed` losing its once-only retry AND the second-consecutive escalation bound, the arm that stops an unattended driver looping forever; (A7) `pending` losing its PASS/WAIVED → 5c branch. This is NOT a false claim: 8293765 says only 'an action VERB and a DESTINATION', which is exactly what is asserted, and gate 8's CY8-5 finding — the merged-key table with decoy padding — is genuinely RED now (mutation T5, gate 8's mutation 21 verbatim). But gate 8's CY8-5 suggested_action asked for TWO things, exactly-one-row-per-value AND 'the DISTINCT action each value owes', and only the first was built. The harm CY8-5 described remains reachable by a slightly different route."
+    suggested_action: "Add a per-value expected-destination map alongside the existing verb check — `REQUEST CHANGES` → /\\b5b\\b/; `review failed` → /\\b5c\\b/ AND /escalat/i; `pending — 5c not yet run` and `not reached` → both /\\b5c\\b/ and /\\b5a\\b/ (the gate-conditional branch); `APPROVE`/`CONCERNS` → /Step 7/. Mutation-prove with A1 (wrong destination), A2 (swapped actions) and A6 (dropped escalation bound), all of which are green today."
+    suggested_owner: dev
+    status: open
+  - id: "CY9-4"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+    finding: "Three stale lines survive inside the section gap 7 refreshed. 8293765 moved the §QA Testing Results header from gate 4/5 to gate 8, but the §Test Coverage Summary three lines below was not swept with it. :543 reads '**Tests Executed**: 17 parity tests (none vacuous)' — the suite is 18, and the task doc's own Change Log row for the post-gate-7 pass says 'suite now 18'. :545 reads '**Critical Issues**: 0 open HIGH in gate 4'. :546 reads '**NFR Status** (gate 5, independent): … Maintainability FAIL', where gate 8 records Maintainability CONCERNS. Same class as gap 7, in the adjacent subsection, missed because gap 7's finding cited a line range that stopped at :517."
+    suggested_action: "Three single-line edits in the same pass as CY9-1 and CY9-2: '18 parity tests', '0 open HIGH (gate 8)', and re-source the NFR line to gate 8 (Security PASS, Performance PASS, Reliability PASS, Maintainability CONCERNS)."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 91
+
+evidence:
+  tests_reviewed: 2285
+  phases_verified: "7/7"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [6]
+  execution:
+    npm_run_ci: "exit 0 — captured as `npm run ci > ci.log 2>&1; ec=$?` with the exit read from the variable, never through an echo after a redirect. ℹ tests 2285 / pass 2284 / fail 0 / skipped 1 / duration_ms 421477.8. `prettier --check .` → 'All matched files use Prettier code style!'. eval:all ran to completion ('[replay] 03-tick-and-cleanup: 4/4 assertions passed'). `grep -c 'not ok' ci.log` → 0. shared/resources/tests/qa-execute-snippets.test.mjs did NOT flake on this run, so the documented single-file re-run was not needed"
+    parity_tests: "18/18 green (ℹ tests 18 / pass 18 / fail 0 / duration_ms 156.6)"
+    lock_test: "14/14 under bash AND zsh, exit codes captured directly into variables (BASH_EXIT=0, ZSH_EXIT=0). Also re-run with the `review-pr` noop arm REMOVED: still 14/14 under both shells, confirming the trail's honest 'did not hold — as predicted' disclosure"
+    gh_pr_checks_309: "4/4 pass (allowed-branch, link-check, test, validate) on head SHA 829376567681c83e40013005d52def032e94c434, verified byte-identical to `git rev-parse HEAD`, so the green checks are not stale against the commit under review. GitHub's clean-room `test` job is green on this exact head"
+    shell_snippet_parse: "All 16 fenced ```bash blocks in shared/resources/develop-pipeline-step-5-6-qa-loop.md extracted, de-indented and run under `bash -n` AND `zsh -n`. 15 clean under both. Block 9 (@:562, the `<fastGateCommand>` block) fails under BOTH (bash exit 2 'syntax error near unexpected token >', zsh exit 1 'parse error near >') — so it is NOT a shell-divergence defect, which is what Risk 1 is about. Confirmed pre-existing: origin/develop's copy of the file has 15 blocks and the same one fails identically, and `git diff origin/develop...HEAD -- <file> | grep 'FIX_LOG\\|fastGateCommand'` is EMPTY. Block 14 (@:717), the block gap 8 was about, parses under both shells. The claim 're-derived across all 16 bash blocks under both shells' is exact"
+    bundle_freshness: "Checked BY CONTENT, not by `npm run bundle`'s 'in sync' output (task 86: transitive copies go stale while it prints in sync). Every skills/*/references/<name> compared against shared/resources/<name> after stripping the AUTO-GENERATED banner line and normalising the shared/resources->references rewrite. BRANCH SCOPE: 9 sources changed vs origin/develop, 45 bundled copies, 0 mismatching. REPO-WIDE on this branch: 709 copies, 4 mismatching. REPO-WIDE on origin/develop: 709 copies, 8 mismatching. The 4 remaining (create-story + create-task set-github-project-priority.sh; qa-story + qa-task develop-pipeline-step-1-create-branch.md) are untouched by this branch — `git diff --name-only origin/develop...HEAD` is empty for each and for their sources — and are a SUBSET of develop's 8. This branch NET-REDUCES staleness by re-bundling four of them. Same pre-existing task-86 instances gates 6, 7 and 8 recorded; no regression. NOTE: 8293765's message says '8 shared sources, 36 bundled copies'; branch scope is 9 sources / 45 copies. 87e5bf9 said '8 shared MARKDOWN sources', which was exact; dropping 'markdown' made the sentence narrow — the omitted source is advance-pipeline-lock.sh with 9 copies, which I verified clean. A claim narrower than reality, so recorded as an observation rather than a finding"
+    mermaid: "Both diagrams gap 2 touched in docs/concepts/architecture.md validated with a real Mermaid parser: the dependency flowchart (valid: true, type flowchart) and the pipeline sequence diagram (valid: true, type sequence)"
+    gap3_rederivation: "Re-derived independently before reading the commit's list. `git grep -n 'gate exits the loop'` outside docs/tasks/task.77 returns three hits: the parity guard's own test name (not a restatement), task.76's implementation report in an unrelated sense, and docs/tasks/task.41.pipeline-moments-and-scaffolding/task.41.pipeline-moments-and-scaffolding.md:93, which carries the exact pre-5c row `| ready-for-merge | Step 6, on a gate that exits the loop |` and IS a hit of the task's Phase-6 grep (3 matches for qa-fix|qa-story|qa-task). That exclusion is LEGITIMATE and disclosed: the implementation report's ruled-out table names `docs/tasks/**`, `docs/bugs/**` as 'prior task/bug documents and their artifacts', the same immutability principle the branch applies to 741117f's commit message. The eight rows actually rewritten (develop-story/README x2, develop-task/README x2, configuration.md:332, tracker-workflow.md:138 AND :908, tracker-workflow.default.yaml) reconcile exactly with 'one named plus seven re-derived'. Separately swept every file under docs/ and skills/ mentioning qa-fix but not review-pr for surviving pre-5c PIPELINE-SHAPE restatements: none outside the legitimately excluded historical records. docs/reference/troubleshooting.md's 'Resume picked up the wrong step' artifact table omits the pr-review report — a completeness gap, not a shape defect, recorded as an observation"
+  mutation_proofs_executed:
+    - "MATRIX 1-4. The four published row deletions (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`), no decoy — 8293765 claims each fires the KEYING BY NAME rather than a count canary; observed 17 pass / 1 fail for all four, each firing `expected exactly ONE sub-state row keyed on PR Review = \"<its own value>\", found 0` at pr-review-loop-parity.test.mjs:596. Assertion message captured from the failure trace, not inferred from the exit code. TRUE — and this is precisely what gate 8's CY8-3 said the previous matrix could not do"
+    - "MATRIX 5. Merge all four values into ONE key padded with 3 decoys so the parsed count holds (gate 8's mutation 21 VERBATIM, green then) — claims RED on one-row-per-value; observed 17/1, `\"REQUEST CHANGES\" shares row \"…\" with \"pending — 5c not yet run\" — each value needs its OWN row`. TRUE"
+    - "MATRIX 6. Row present, action `n/a — nothing to do here; see the 5c notes above` (gate 8's mutation 20 VERBATIM, green then) — claims RED on the action verb; observed 17/1, `the row for \"not reached\" must state what the run DOES (re-enter / go to / proceed to / escalate)`. TRUE"
+    - "MATRIX 7. Restore — claims 18/18 green and byte-identical; observed 18 pass / 0 fail, `git status --porcelain` empty. TRUE"
+    - "TRAIL 8. Revert the PASS arm (qa-loop:243) from 5c back to Step 7 — PR body claims Held; observed 17/1, `the PASS arm must hand to 5c — a clean gate is no longer the loop's exit`. TRUE"
+    - "TRAIL 9. Restore `--stage ready-for-merge` into 5a's outcome branching — PR body claims Held by name; observed 17/1, `ready-for-merge must sit INSIDE 5c…`. TRUE"
+    - "TRAIL 10. Rename `### Convergence check` in the QA-loop doc — PR body claims Held; observed 16 pass / 2 fail, `end marker not found after \"### Outcome branching (shared)\"`. TRUE"
+    - "TRAIL 11. Revert the banner worked example (:116) to `(1 cycle, PASS 100/100)` — claims RED; observed 17/1, `the worked example must RENDER the verdict, not merely describe it`. TRUE"
+    - "TRAIL 12. Remove `PR review {verdict}` from the banner format line (:39) — claims RED; observed 17/1, `the banner doc must state that the Steps 5-6 exit parenthetical carries the PR review verdict`. TRUE"
+    - "TRAIL 13. Revert ONLY the generic placeholder at :59 — gate 8's CY8-6, closed by 87e5bf9; observed 17/1, `the Format block's sample parenthetical must carry the verdict too`. TRUE — CY8-6 is closed"
+    - "TRAIL 14. Revert BOTH banner renderings (gate 7's mutation I verbatim) — claims Held; observed 17/1. TRUE"
+    - "TRAIL 15. Remove `review-pr` from the lock noop arm (advance-pipeline-lock.sh:84) — PR body records this as 'Did not hold — as predicted'; observed parity 18/18 GREEN, lock bash 14/14, zsh 14/14. The honest disclosure is ACCURATE"
+    - "TRAIL 16. Remove `, PR review {verdict}` from 5c's OWN exit-line statement (qa-loop:827, gate 8's mutation 27) — claims RED; observed 17/1, `5c must state the exit line the banner doc is the format authority for`. TRUE"
+    - "TRAIL 17. Run all 18 parity tests inside a detached origin/develop worktree — PR body claims 'All fail against origin/develop; none is vacuous'; observed ℹ tests 18 / pass 0 / fail 18. TRUE"
+    - "GAP8 18. Restore `/review-pr --effort {medium|low} --comment`, the zsh parse error gap 8 removed; observed 17/1, `the medium-effort invocation must carry both flags the contract depends on`. The replacement assertion is live"
+    - "GAP8 19. Drop the `--effort low` invocation, keeping only medium; observed 17/1, `the low-effort invocation must carry both flags…`. Both effort levels are pinned"
+    - "GAP8 20. Drop `--comment` from the lite invocation; observed 17/1. GAP8 21. Drop `--comment` from the standard invocation; observed 17/1. Both flags pinned on both invocations"
+    - "GAP8 22. Keep both concrete invocations AND re-add the `{medium|low}` placeholder elsewhere in 5c; observed 17/1, `the {medium|low} placeholder is a zsh parse error in a bash fence`. The doesNotMatch is live, not decorative"
+    - "MINE 23. `REQUEST CHANGES` action → `re-enter at **5c**` (the contract says 5b) — right key, plausible-but-WRONG action; observed 18 pass / 0 fail. GREEN. See CY9-3"
+    - "MINE 24. SWAP the actions of `REQUEST CHANGES` and `review failed`; observed 18/0. GREEN — two values swapped between rows is invisible. See CY9-3"
+    - "MINE 25. `not reached` action → `go to Step 7` (unconditional, inverting the gate-conditional arm) — right key, action naming the WRONG destination; observed 18/0. GREEN. See CY9-3"
+    - "MINE 26. `not reached` action → `no escalation needed; proceed to reading the 5c notes above` — verb regex and destination regex both satisfied, meaning absent; observed 18/0. GREEN — CY8-4's fix is two mention-matches rather than one. See CY9-3"
+    - "MINE 27. `APPROVE`/`CONCERNS` action → `re-enter at **5a**`, inverting the LOOP'S EXIT; observed 18/0. GREEN. See CY9-3"
+    - "MINE 28. `review failed` action → `re-enter at **5c**`, dropping the once-only retry AND the second-consecutive escalation bound; observed 18/0. GREEN — the arm that stops an unattended driver looping forever is unpinned. See CY9-3"
+    - "MINE 29. `pending — 5c not yet run` action → `re-enter at **5a**`, dropping the PASS/WAIVED → 5c branch; observed 18/0. GREEN. See CY9-3"
+    - "MINE 30. Strip the backticks from the `review failed` key; observed 17/1 on the keying, by name. Caught"
+    - "MINE 31. Pad the key with spaces INSIDE the backticks (` review failed `); observed 17/1 on the keying, by name. Caught"
+    - "MINE 32. Render the key with DOUBLE backticks (``review failed``); observed 18/0. GREEN — benign, the single-backtick substring survives; a rendering variant, not a contract change"
+    - "MINE 33. Add a SECOND row also keyed on `review failed`; observed 17/1, `…found 2`. The exactly-one assertion holds in BOTH directions, not just against deletion"
+    - "MINE 34. Strip the blockquote `>` markers from the header, separator and all five rows; observed 18/0. GREEN by design — the parser does `replace(/^>\\s*/, '')`. Confirms gate 8's mutation 23"
+    - "MINE 35. Move the whole table block to EOF; observed 17/1 on the end-marker assertion. Caught"
+    - "MINE 36. Delete ALL FIVE data rows, leaving header and separator; observed 17/1, `the sub-state table parsed to zero rows — the parse is broken`. The replacement well-formedness check fires only where a total wipe makes it correct to fire, NOT ahead of a single-row deletion"
+    - "MINE 37. Remove the table's end marker (lone `>` at :131); observed 17/1 on the end-marker assertion. Confirms gate 8's TRAIL 7"
+    - "MINE 38. Blank the `not reached` action to `TBD` (a0ced9b's mutation 5); observed 17/1, action-verb assertion quoting the cell contents. TRUE"
+    - "MINE 39. Empty the `not reached` action cell entirely; observed 17/1, `every sub-state row needs both a key and an action`. The per-row well-formedness check is live"
+    - "MINE 40. Delete `review failed` AND add a decoy so the parsed count is unchanged — the discrimination test gate 8 had to invent because the old matrix could not; observed 17/1 on the KEYING, by name. The mechanism now survives it as published"
+    - "MINE 41. Delete `review failed` and mention it inside `not reached`'s ACTION prose — the CY6-1/CY7-1 regression shape; observed 17/1 on the keying, by name. Caught"
+    - "MINE 42. Remove `, PR review {verdict}` from the 5b RESTATEMENT at qa-loop:301 (not inside section5c); observed 18/0. GREEN — a third, unpinned rendering of the exit line, same class as CY8-6 one document further out. Recorded as an OBSERVATION, not a finding: nothing in the trail claims it is pinned"
+  tree_state: "git status --porcelain empty before the first mutation, after every restore, and at the end; git rev-parse HEAD unchanged at 8293765 throughout. Every mutation restored the touched shared/resources file from an in-memory copy and the tree was re-checked after each. The detached origin/develop worktree created for TRAIL 17 was removed with `git worktree remove --force` + `git worktree prune`; `git worktree list` shows only the main tree. Only the two files this gate comprises are added; neither is committed by this reviewer"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged by this pass on the risk axis. 8293765 touches one test file, one shared markdown file with its two bundled copies, six consumer docs, one example YAML, the registry, and the task's own artifacts — no auth, credential or secret surface. The one executable change on the branch, the `review-pr)` noop arm in advance-pipeline-lock.sh, is green under bash and zsh (14/14 each) and remains green when removed, confirming it is documentation rather than behaviour exactly as the trail says. The branch still net-REMOVES shell surface: the zsh-fragile glob predicate was deleted rather than patched, and this pass removes one more zsh parse error (the `{medium|low}` placeholder in a ```bash fence). All 16 bash blocks in the QA-loop file were parse-checked under both shells; the single failing block is pre-existing on develop and untouched."
+  performance:
+    status: PASS
+    notes: "Unchanged. One additional advisory subagent per clean-gate cycle, bounded by the pre-existing 5-cycle budget. No runtime hot path, no new I/O in any loop. Suite duration 421.5s for 2285 tests, comparable to gate 8's 479.9s."
+  reliability:
+    status: PASS
+    notes: "Held at PASS and strengthened. The vacuity canary that gate 8's CY8-3 named is gone: `subStateRows.length >= 5` is now `> 0` plus a per-row well-formedness check, so a single-row deletion falls THROUGH to the keying assertion and fails by name — verified by reading the failure trace on all four rows, not inferred from an exit code. Exactly-one-per-value holds against deletion AND duplication (mutations 33, 40, 41). Both of gate 8's own green mutations (20 and 21) are red. The end-marker guard and the three format-authority assertions all remain live. What is residual: per-value DESTINATION is unasserted, so the `review failed` retry bound and the gate-conditional 5c-or-5a branches can be rewritten with the suite green (CY9-3, mutations 23-29). Residual, NOT a regression and NOT introduced here."
+  maintainability:
+    status: CONCERNS
+    notes: "Held at CONCERNS, and for the smallest reason in this gate series. What improved genuinely: for the FIRST time the published mutation matrix discriminates the mechanism it cites — every row fires the assertion named, verified from the failure messages — and the CY8-3/4/5 fix is mechanism-level rather than matrix-level. Every one of the ten trail-asserted proofs re-executed from across the whole task holds, including the one honestly recorded as not holding. Gap 3's count is exact and its exclusions are legitimate; both halves of gap 8's out-of-scope admission are verifiably true; CY8-1, CY8-2, CY8-6, CY8-7 and the long-carried CY5-3 are all closed. What keeps it out of PASS is narrower than at any previous gate: two rows in the implementation report's ruled-out table are false on disk today because this same branch reversed the exclusions they defend (CY9-1), and the status header defers the residual to a task the same commit cancelled (CY9-2). Seventh consecutive assessment in which the artifact a reviewer reads to check closure contains a claim disk contradicts — but for the second time running the CODE claim survives, and this time the stale statements are two table rows rather than a false proof."
+
+recommendations:
+  immediate:
+    - action: "Close CY9-1 and CY9-2 together — three single-line edits in two files, and they are the ONLY two items standing between this branch and a PASS. Annotate implementation report :150 and :151 in place with '— REVERSED in the post-gate-8 pass; see the DoD gap table below' (the row-492 convention gate 8 endorsed), and change task doc :517 to '…residual closed in the post-gate-8 pass (task 88 superseded)…'. Sweep CY9-4's three stale counts in the same edit while the file is open"
+      refs:
+        - "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+        - "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+    - action: "OPERATOR DECISION on the `accepted` precondition — unchanged from gate 8 and still not the reviewer's to make. `shared/resources/document-status-lifecycle.md:62` requires 'DoD checklist passed, QA gate PASS or WAIVED'. TWO of those three are unmet: this gate reads CONCERNS, and task.77.dod.1 did NOT accept. Closing gaps 2-8 does not itself re-run /finalise — a dod.2 is still owed, and dod.1 must not be edited. Either (a) clear CY9-1/CY9-2 (ten minutes), issue gate 10, re-run /finalise for dod.2, and merge; or (b) record a waiver with a reason and an approver over the four LOW residuals and re-run /finalise. Loop Escalation stands either way — the 5-cycle budget was spent at gate 5 and a fourth remediation pass does not restore it"
+      refs:
+        - "docs/tasks/task.77.review-pr-in-pipeline/task.77.dod.1.review-pr-in-pipeline.md"
+        - "shared/resources/document-status-lifecycle.md"
+    - action: "CY9-3 is the only structural improvement left on the list and it is cheap: a per-value expected-destination map beside the verb check. Seven inversions of the resume contract are green today, including the exit arm itself and the escalation bound that stops an unattended driver looping forever. Carrying it to a follow-up is defensible — it is test strength, not a runtime defect, and the contract prose on disk is correct — but note that filing a follow-up for exactly this was tried once already (task 88) and reversed"
+      refs: ["evals/shared/tests/pr-review-loop-parity.test.mjs"]
+  future:
+    - action: "Task 86 (High) — the bundler transitive-refresh defect did NOT bite this commit or this branch (45/45 copies content-identical at branch scope) and this branch net-reduces repo-wide staleness from 8 stale copies to 4. The remaining 4 are the same pre-existing instances on develop. Independent of this change"
+      refs: ["docs/tasks/task.86.bundle-transitive-refresh/"]
+    - action: "The lint gates 7 and 8 proposed now has a fifth data point and a sharper shape. The failure mode is no longer only 'an includes() assertion whose message names a specific artifact' — CY9-3 is a guard that asserts the PRESENCE of a vocabulary token where the artifact's contract is a MAPPING. Generalisation: when a guard enumerates N values, it must pin what distinguishes them, not merely that each is mentioned. A vacuity canary must never stand in for the assertion it protects (CY8-3), and a mention-match must never stand in for a mapping (CY9-3)"
+      refs: ["evals/shared/tests/pr-review-loop-parity.test.mjs"]
+    - action: "Nothing in the repo tests docs/concepts/architecture.md, docs/reference/tracker-workflow.md or either pipeline README, so the eight pipeline-shape statements gap 3 corrected can drift again invisibly — which is how gap 3 came to have seven undetected instances in the first place. A cheap parity assertion over the ready-for-merge firing-point row in the closed-set authority table would close the class"
+      refs: ["docs/reference/tracker-workflow.md", "docs/concepts/architecture.md"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Loop Escalation remains in force — 5 of 5 cycles were spent at gate 5, and four remediation passes do not reset the budget. A human decides whether the open findings block the merge"
+    - "This gate grades the POST-GATE-8 PASS, not a QA cycle. It does not by itself satisfy the `accepted` precondition: document-status-lifecycle.md:62 needs a PASS or WAIVED gate AND a passed DoD checklist, and task.77.dod.1 did not accept. A dod.2 is owed regardless of which route is taken"
+    - "CY9-1 and CY9-2 should be cleared before merge. They are the only two items holding this back from PASS, and together they are three single-line edits in one pass"
+    - "CY9-3 and CY9-4 are residuals — test strength and three stale counts. Neither blocks a merge; both are reasonable carry-forward items"
+    - "Nothing here is a runtime blocker. npm run ci exits 0 (2285 tests, 0 fail, no flake), all four PR #309 checks are green on the exact head SHA 8293765 == local HEAD, the lock suite is 14/14 under both shells, 15 of 16 bash snippets parse under both shells with the sixteenth pre-existing on develop, and all 45 bundled copies of the branch's touched sources are content-identical to their sources"
+    - "Stated plainly, because four consecutive gates found the opposite: the trail is now honest. 44 mutations were executed against it and not one trail-asserted proof failed"
