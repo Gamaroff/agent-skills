@@ -1,0 +1,72 @@
+schema: 1
+task: 'task.90.pipeline-lock-silent-success'
+task_title: 'advance-pipeline-lock.sh reports success for an advance that did not happen'
+gate: PASS
+status_reason: 'All three cycle-1 findings verified FIXED by execution, not by reading the fix notes. The refute pass over the whole branch diff found no new HIGH or MEDIUM. Two LOW observations recorded, both pre-existing and both arguably correct behaviour.'
+reviewer: 'QA Engineer'
+updated: '2026-09-04T14:55:00Z'
+
+top_issues:
+  - id: 'T90-QA1-001'
+    severity: high
+    file: 'docs/tasks/task.90.pipeline-lock-silent-success/task.90.implementation.1.pipeline-lock-silent-success-initial-run.md'
+    finding: 'Implementation report corrupted to 480,884 lines / 28 MB and committed.'
+    suggested_action: 'Rebuild from real content; verify line count before committing.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-04'
+  - id: 'T90-QA1-002'
+    severity: medium
+    file: 'docs/tasks/task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md'
+    finding: 'The "single hole in an otherwise well-behaved validator" rationale was false; 6 of the 8 inputs it named advanced and exited 0. Shipped in CHANGELOG.md and the PR body.'
+    suggested_action: 'Correct in task, CHANGELOG.md and PR body; state the parse/object distinction.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-04'
+  - id: 'T90-QA1-003'
+    severity: medium
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'A whole-file `null` lock fabricated {"current_step":5} and reported success.'
+    suggested_action: 'Extend the guard to reject non-object locks, or record the exclusion.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-04'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 30
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Symlink hardening re-verified. Additionally probed this cycle: with $LOCK ITSELF a symlink, the write no longer reaches the target — mv replaces the link with a regular file, leaving the target untouched. That is the safer outcome for a hardening change, and it is pre-existing mv semantics rather than anything this task introduced.'
+  performance:
+    status: PASS
+    notes: 'One `jq -e` and at most one `tr` per lock advance, on a script that runs once per pipeline step. Immaterial.'
+  reliability:
+    status: PASS
+    notes: 'Error paths executed, not reasoned about: a read-only lock directory makes mktemp fail cleanly (exit 1, lock byte-intact, no stray temp file); jq genuinely absent from PATH still takes the documented degraded path (exit 0, warning to stderr, lock untouched); the --skill commit-changes arm rejects a non-object lock; --complete still clears one. The cycle-1 residual is closed.'
+  maintainability:
+    status: PASS
+    notes: 'Report rebuilt to 218 lines with all seven required sections present and no implausible repetition (max identical-line count is 7, all `---` separators). The guard now has ONE decision predicate; the emptiness test sits inside it and selects the error message only — verified structurally: a single `exit 1` in the block. Every corrected claim was re-executed rather than re-read.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'No gate in this repo can see an artifact orders of magnitude larger than plausible — prettier --check passes on a 28 MB markdown file. A cheap size sanity-check on committed markdown would have caught T90-QA1-001 at commit time rather than at QA.'
+      refs: ['package.json']
+    - action: 'A NUL-byte-only lock makes bash print `warning: command substitution: ignored null byte in input` to stderr before the guard correctly fires. Cosmetic.'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

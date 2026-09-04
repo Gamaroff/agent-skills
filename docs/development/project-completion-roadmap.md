@@ -66,6 +66,7 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `finalise`         | `skills/finalise/SKILL.md`, `shared/resources/finalise-dod-*-prompt.md`  |
 | `mutation-proving` | `shared/resources/mutation-proving.md`                                  |
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
+| `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
 
 ---
 
@@ -91,7 +92,7 @@ accepted task stalls the loop.
 - [x] **T70** Build the inline PR comment primitive, on GitHub and Bitbucket · deps: none · touches: review-skills!, test-harness~ · /develop-task docs/tasks/task.70.inline-pr-comments/task.70.inline-pr-comments.md — ✅ **accepted + merged** ([PR #308](https://github.com/Gamaroff/agent-skills/pull/308), QA PASS 92/100)
 - [x] **T77** Run the PR conformance review before a work item is finalised · deps: none · touches: pipeline-steps!, review-skills!, docs-pipeline!, test-harness~, bundles~ · /develop-task docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md
 - [x] **T89** Lint for prose-matching assertions that claim a relationship but test only co-occurrence · deps: none · touches: test-harness! · /develop-task docs/tasks/task.89.relationship-assertion-lint/task.89.relationship-assertion-lint.md — ✅ **accepted + merged** ([PR #312](https://github.com/Gamaroff/agent-skills/pull/312), DoD PASS, QA PASS 100/100 over 2 cycles, CI 4/4) — found **6 live instances of its own bug class** on its first run
-- [ ] **T90** `advance-pipeline-lock.sh` reports success for an advance that did not happen · deps: none · touches: bundles!, test-harness~ · /develop-task docs/tasks/task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md
+- [ ] **T90** `advance-pipeline-lock.sh` reports success for an advance that did not happen · deps: none · touches: pipeline-lock!, bundles! · /develop-task docs/tasks/task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md
 - [ ] **T78** Give `develop-bug`'s fix cycle the same fast gate as the other pipelines · deps: none · touches: pipeline-steps!, test-harness~, bundles~ · /develop-task docs/tasks/task.78.develop-bug-fast-gate/task.78.develop-bug-fast-gate.md
 - [ ] **T83** Skip installing tracker-specific skills the consumer's platform can never fire · deps: none · touches: setup-consumer!, test-harness~, docs-pipeline~ · /develop-task docs/tasks/task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md
 - [ ] **T84** Skill install profiles with dependency closure · deps: T83 · touches: setup-consumer!, test-harness~, docs-config~, docs-pipeline~ · /develop-task docs/tasks/task.84.skill-install-profiles/task.84.skill-install-profiles.md

@@ -1,0 +1,79 @@
+schema: 1
+task: 'task.90.pipeline-lock-silent-success'
+task_title: 'advance-pipeline-lock.sh reports success for an advance that did not happen'
+gate: FAIL
+status_reason: 'The code fix is correct, complete and mutation-proved — but a 28 MB corrupted implementation report was committed and pushed to PR #313, and the task rationale repeated verbatim in CHANGELOG.md and the PR body is factually false on 6 of the 8 inputs it names.'
+reviewer: 'QA Engineer'
+updated: '2026-09-04T14:05:00Z'
+
+top_issues:
+  - id: 'T90-QA1-001'
+    severity: high
+    file: 'docs/tasks/task.90.pipeline-lock-silent-success/task.90.implementation.1.pipeline-lock-silent-success-initial-run.md'
+    finding: 'The implementation report is corrupted: 480,884 lines / 28 MB, with the Step 3 retraction block duplicated 12,326 times and the original report structure destroyed. Committed in 293da69 and pushed to PR #313. Cause: a correction script computed s[start:end] where end preceded start, yielding an empty needle, and Python str.replace("", X) inserts X between every character. `prettier --check` passes on it, so no existing gate catches it.'
+    suggested_action: 'Rebuild the implementation report from its real content (Pipeline Configuration, Pipeline Progress, Decisions Log, Issues Log incl. the bundler retraction, QA Iteration History, Completion) and amend or add a commit. Verify with `wc -l` before committing — the file should be a few hundred lines.'
+    suggested_owner: dev
+    status: open
+
+  - id: 'T90-QA1-002'
+    severity: medium
+    file: 'docs/tasks/task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md'
+    finding: '§2 claims 18 executed `current_step` values "all correctly preserve the lock and exit non-zero" and that the zero-byte case is "the single hole in an otherwise well-behaved validator". Executed: of the 8 values named, 6 (`null`, absent, `"abc"`, `-3`, `3.7`, `1e400`) ADVANCE and exit 0, rewriting the lock. Only malformed-JSON and non-JSON exit non-zero. The claim is shipped verbatim in CHANGELOG.md (user-facing) and in the PR #313 body.'
+    suggested_action: 'Correct the claim in the task §2, CHANGELOG.md and the PR body to what actually holds: unparseable input fails closed; a parseable object with a garbage `current_step` advances to a valid step (defensible, and not what this task changes). Do not restate "single hole".'
+    suggested_owner: dev
+    status: open
+
+  - id: 'T90-QA1-003'
+    severity: medium
+    file: 'shared/resources/advance-pipeline-lock.sh'
+    finding: 'A lock file whose entire content is the 4 bytes `null` still reports `advance-pipeline-lock: step 0 → 5`, exits 0, and FABRICATES `{"current_step":5}` from a lock that held no object — the exact silent-success shape this task exists to close. Pre-existing (byte-identical behaviour on origin/develop) and outside the task''s stated §4 scope, but it is the counterexample that falsifies the "single hole" rationale, and the guard is one predicate away from covering it.'
+    suggested_action: 'Either extend `require_parsable_lock` to reject a lock that is not a JSON object (`jq -e "type == \"object\"" >/dev/null`), adding a test scenario; or state the exclusion explicitly in §4 Out of scope so the residual is recorded rather than implied absent.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 22
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Symlink hardening verified by execution: a symlink planted at $LOCK.tmp pointing at a canary is not followed, canary content intact, advance still succeeds. mktemp is O_EXCL on an unpredictable name. Mode tightening 0644 → 0600 is documented in §5. No new attack surface.'
+  performance:
+    status: PASS
+    notes: 'One additional `tr` invocation per lock advance. Immaterial — the script runs once per pipeline step.'
+  reliability:
+    status: CONCERNS
+    notes: 'The stated defect is closed and fails closed correctly. T90-QA1-003 leaves an adjacent input (whole-file `null`) on the same silent-success path — pre-existing, but undocumented as a residual.'
+  maintainability:
+    status: CONCERNS
+    notes: 'T90-QA1-001 destroys the run''s audit trail — the implementation report is the pipeline''s own record and is currently unreadable. T90-QA1-002 puts a false factual claim into CHANGELOG.md, a user-facing document this repo holds to a high accuracy bar (cf. task 76).'
+
+recommendations:
+  immediate:
+    - action: 'Rebuild the corrupted implementation report and verify its line count before committing'
+      refs: ['docs/tasks/task.90.pipeline-lock-silent-success/task.90.implementation.1.pipeline-lock-silent-success-initial-run.md']
+    - action: 'Correct the falsified §2 rationale in the task, CHANGELOG.md and the PR body'
+      refs: ['docs/tasks/task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md', 'CHANGELOG.md']
+    - action: 'Close or explicitly record the whole-file `null` residual'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+  future:
+    - action: 'A NUL-byte-only lock makes bash print `warning: command substitution: ignored null byte in input` to stderr before the guard correctly fires. Cosmetic; the outcome is right.'
+      refs: ['shared/resources/advance-pipeline-lock.sh']
+    - action: 'No gate in this repo catches an artifact that is orders of magnitude larger than plausible. prettier --check passes on the 28 MB file. A cheap size sanity-check on committed markdown would have caught T90-QA1-001 at commit time.'
+      refs: ['package.json']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'T90-QA1-001 must be fixed — a 28 MB corrupted artifact cannot merge'
+    - 'T90-QA1-002 must be corrected before CHANGELOG.md ships the false claim'
