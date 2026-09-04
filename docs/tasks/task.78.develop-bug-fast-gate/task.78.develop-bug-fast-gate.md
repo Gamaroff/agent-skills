@@ -190,6 +190,13 @@ deliberately rather than sweeping it in.
 1. ✅ `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` — the fast gate
 2. ✅ `evals/shared/tests/ci-gate-parity.test.mjs` — cover all three loop documents
 3. ✅ `CHANGELOG.md` — observable for `develop-bug` runs
+4. ✅ `docs/reference/configuration.md` — the two descriptions of where the fast gate runs
+5. ✅ `skills/develop-next/SKILL.md` — the same description, one site
+
+Files 4 and 5 were **not** in the original plan. They came from QA finding **TASK-78-003**: all three
+sites described the gate as running in two places, which this change makes wrong. Recorded here
+rather than only in the QA trail, because this section is the file inventory a reviewer diffs
+against.
 
 ### Files Regenerated
 
@@ -396,6 +403,7 @@ transition.
 | 2026-09-04 |         | QA gate CONCERNS (80/100) — 3 MEDIUM findings, none in the gate's behaviour | qa-task |
 | 2026-09-04 |         | QA findings fixed — all 3 closed, 1 iteration; a fourth defect found by the adversarial pass over the fixes themselves | qa-fix |
 | 2026-09-04 |         | QA cycle 2 — gate PASS (100/100), all three findings verified closed, refute pass found nothing new | qa-task |
+| 2026-09-04 |         | Step 5c review-pr — CONCERNS; PC-1 closed (§7 Files Summary now lists all five modified files) | review-pr |
 
 ---
 
