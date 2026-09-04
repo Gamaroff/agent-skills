@@ -5,7 +5,7 @@ type: task
 description: "A zero-byte lock file passes the jq guard — jq on empty input emits nothing and exits 0 — so the script prints 'step 0 → 5', exits 0, and leaves the lock empty. Success is reported for a state transition that never occurred, in the pipeline's own state machine. Second, lower-severity defect in the same script: the $LOCK.tmp redirect follows a pre-existing symlink on a predictable path."
 tags: [pipeline, shell, silent-failure, state-machine]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-09-04
@@ -16,7 +16,7 @@ estimated_effort_hours: 5
 
 # Technical Task: `advance-pipeline-lock.sh` reports success for an advance that did not happen
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.90.review.1.pipeline-lock-silent-success.md` implemented 2026-09-04
 
 ---
@@ -350,33 +350,35 @@ the pre-existing 14 scenarios.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-04
-**Quality Score**: 60/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2 of max 5)
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.90.qa.1.pipeline-lock-silent-success.md](./task.90.qa.1.pipeline-lock-silent-success.md)
-- **Gate File**: [task.90.gate.1.pipeline-lock-silent-success.yml](./task.90.gate.1.pipeline-lock-silent-success.yml)
+| Cycle | Gate | Score | Report | Gate file |
+| --- | --- | --- | --- | --- |
+| 1 | FAIL | 60/100 | [task.90.qa.1.*.md](./task.90.qa.1.pipeline-lock-silent-success.md) | [gate.1](./task.90.gate.1.pipeline-lock-silent-success.yml) |
+| 2 | **PASS** | 100/100 | [task.90.qa.2.*.md](./task.90.qa.2.pipeline-lock-silent-success.md) | [gate.2](./task.90.gate.2.pipeline-lock-silent-success.yml) |
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 22 (bash) + 22 (zsh) + 9 adversarial malformed-input probes + 2 mutation proofs
-- **Phases Verified**: 5/5
-- **Success Criteria**: 10/10 met, each verified by execution
-- **Critical Issues**: 1 HIGH, 2 MEDIUM, 1 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Tests Executed**: 30 bash + 30 zsh; 20 input shapes probed; 7 refute probes; 3 mutation proofs
+- **Phases Verified**: 5/5 · **Success Criteria**: 11/11, each verified by execution
+- **Open Issues**: 0 HIGH, 0 MEDIUM, 3 LOW (all pre-existing, report-only)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-**The code change is sound and its tests are real** — both mutation proofs were independently re-derived, and all 10 success criteria were verified by executing their evidence. The gate fails on what ships alongside the fix:
+Cycle 1 (FAIL, 60/100) found a 28 MB corrupted implementation report already pushed to the PR, a false "single hole" rationale shipped in `CHANGELOG.md`, and a whole-file `null` lock that fabricated an advance. All three are closed and **verified by execution** in cycle 2.
 
-- **HIGH** ([bug 1](./task.90.bug.1.implementation-report-corrupted.md)) — the implementation report was corrupted to 480,884 lines / 28 MB by a `str.replace("", …)` in a correction script, and committed in `293da69` and pushed to PR #313. No existing gate catches it: it is well-formed markdown, so `prettier --check` passes.
-- **MEDIUM** ([bug 2](./task.90.bug.2.false-single-hole-claim.md)) — §2's "single hole in an otherwise well-behaved validator" is false: 6 of the 8 malformed inputs it names advance and exit 0. The claim was inherited from task 77's DoD unverified and ships in `CHANGELOG.md` and the PR body.
-- **MEDIUM** ([bug 3](./task.90.bug.3.whole-file-null-lock.md)) — a whole-file `null` lock still fabricates `{"current_step":5}` and reports success. Pre-existing and out of the stated scope, but it is the counterexample that falsifies the §2 rationale.
-- **LOW** — a NUL-byte-only lock emits a bash stderr warning before the guard correctly fires. Outcome is right; noise only.
+Fixing the third surfaced a fourth, which the fix cycle caught on itself: appending the type check after the existing emptiness check left the original mutation proof silently broken — neutering the emptiness branch kept all 30 tests green. That branch had become control flow no test could falsify. Resolved by restructuring to one decision predicate rather than keeping both.
+
+Cycle 2 specifically checked whether the *replacement* claims repeat cycle 1's unverified-claim pattern. They do not: 9/9 and 4/4 probes hold, and cycle 1's own modest coverage claim about scenario 12 turned out to be exactly right.
+
+Three LOW observations remain, all pre-existing and none a defect introduced here: a symlinked `$LOCK` is replaced rather than followed (safer for a hardening change), `PIPELINE_LOCK` as a directory is a silent noop (matches the documented contract), and a NUL-byte lock emits a cosmetic bash warning before the guard correctly fires.
 
 ---
 
@@ -510,3 +512,4 @@ stayed green throughout, including under both mutations.
 | 2026-09-04 |         | Implemented — 12 files (1 script, 1 test file, 2 docs, 9 bundled copies), 22 tests green under bash and zsh, both fixes mutation-proved | develop |
 | 2026-09-04 |         | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 1 LOW; all 10 success criteria met, findings are in the artifacts shipped alongside the fix | qa-task |
 | 2026-09-04 |         | QA findings fixed — 1 HIGH + 2 MEDIUM closed in 1 iteration: report rebuilt 480,884 → 218 lines, false "single hole" claim corrected in task/CHANGELOG/PR, non-object lock guard added (scenario 12); guard restructured to one falsifiable predicate on mutation-proof evidence | qa-fix |
+| 2026-09-04 |         | QA gate PASS (100/100) cycle 2 — all 3 findings closed and verified by execution; refute pass found no new HIGH/MEDIUM; 3 LOW pre-existing observations recorded | qa-task |

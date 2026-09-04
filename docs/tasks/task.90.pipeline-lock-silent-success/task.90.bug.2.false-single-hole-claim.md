@@ -4,7 +4,7 @@
 **Bug ID**: TASK-90-BUG-2
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1)
 **Date Found**: 2026-09-04
 
@@ -77,3 +77,9 @@ Replace with what holds: *unparseable* input fails closed; a parseable object wi
 | Date | Status | Changed By | Notes |
 | ---- | ------ | ---------- | ----- |
 | 2026-09-04 | Ready for QA | qa-fix | Corrected in task doc, CHANGELOG and PR body |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-04 · **Verified by**: QA Engineer (cycle 2)
+
+Both replacement claims re-executed rather than re-read. Claim A ("fails closed on anything that is not a JSON object") holds for **9/9** shapes; Claim B ("inside a valid object a garbage `current_step` still advances") holds for **4/4**. The only surviving "single hole" mentions are the retraction itself and the QA finding that raised it. The replacement does **not** repeat the unverified-claim pattern. **Closed.**

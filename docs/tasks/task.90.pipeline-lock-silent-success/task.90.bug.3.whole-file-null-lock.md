@@ -4,7 +4,7 @@
 **Bug ID**: TASK-90-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (qa-task cycle 1)
 **Date Found**: 2026-09-04
 
@@ -74,3 +74,11 @@ plus a test scenario — **or** record the exclusion explicitly in §4 Out of sc
 | Date | Status | Changed By | Notes |
 | ---- | ------ | ---------- | ----- |
 | 2026-09-04 | Ready for QA | qa-fix | Fixed + scenario 12; guard restructured on mutation-proof evidence |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-04 · **Verified by**: QA Engineer (cycle 2)
+
+`printf 'null'` → rc=1, lock byte-intact, stdout empty. Nine non-object shapes all fail closed. Mutation proof re-derived: removing the predicate turns 6 scenarios red (empty, whitespace, `null` × 2 shells).
+
+The stated honest limit was itself checked: with the predicate removed, `[]`, `"str"` and `42` still exit 1 via the write path, so only `null` binds it — **exactly as the fix note claimed**. **Closed.**
