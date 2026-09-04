@@ -5,18 +5,20 @@ type: task
 description: "A zero-byte lock file passes the jq guard — jq on empty input emits nothing and exits 0 — so the script prints 'step 0 → 5', exits 0, and leaves the lock empty. Success is reported for a state transition that never occurred, in the pipeline's own state machine. Second, lower-severity defect in the same script: the $LOCK.tmp redirect follows a pre-existing symlink on a predictable path."
 tags: [pipeline, shell, silent-failure, state-machine]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-04
 updated: 2026-09-04
-assignee: TBD
+completed_date: 2026-09-04
+pr_number: 313
+assignee: Claude
 estimated_effort_hours: 5
 ---
 
 # Technical Task: `advance-pipeline-lock.sh` reports success for an advance that did not happen
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.90.review.1.pipeline-lock-silent-success.md` implemented 2026-09-04
 
 ---
@@ -385,6 +387,39 @@ Three LOW observations remain, all pre-existing and none a defect introduced her
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+| Cycle | Gate | Score |
+| --- | --- | --- |
+| 1 | ❌ FAIL | 60/100 — 1 HIGH, 2 MEDIUM, 1 LOW |
+| 2 | ✅ **PASS** | **100/100** — all three verified fixed by execution |
+
+**Step 5c `/review-pr`:** ⚠️ CONCERNS — 0 code findings, 2 medium conformance findings, **both closed** in `1cb04a0`.
+
+All Definition of Done criteria verified, each by **executing** its evidence rather than reading the checkbox:
+
+✅ **Success Criteria:** 11/11 — every one run at verification time
+✅ **Tests:** 30/30 under bash **and** 30/30 under zsh; the 14 pre-existing scenarios green throughout
+✅ **Mutation proof:** removing the guard predicate turns 6 scenarios red; reverting `mktemp` turns 2 red; restored 30/30
+✅ **CI:** `CI_ROLLUP` = **SUCCESS** on `1cb04a0` — the commit carrying the final code. Sampled as `PENDING` first and **waited**, rather than rounding up
+✅ **Security:** probe mode fired (the deliverable is a validator) — **24 candidates executed**, 23 held. The one exception is pre-existing, cosmetic, and not a false success
+✅ **Documentation:** CHANGELOG, task Change Log (9 rows), roadmap legend, 9 bundled copies content-verified
+⚠️ **Compliance:** NOT_APPLICABLE — no personal data, no UI, no auth surface
+
+**Residuals carried rather than suppressed:** 4 LOW observations (all pre-existing); scenario 12 is partly declarative — only `null` binds the new predicate, `[]`/`"str"`/`42` already failed closed via the write path; and an **unowned follow-up** — nothing in this repo can see a committed artifact orders of magnitude larger than plausible, which is how a 480,884-line file reached this PR.
+
+**Three self-inflicted defects are kept in the record**, all caught inside the pipeline and none shipped: a false finding about the bundler (retracted, with its cause named), a 28 MB corrupted implementation report (rebuilt to 218 lines), and a mutation proof that silently stopped holding when a fix was appended rather than integrated.
+
+**Detailed Verification Log:** See [`task.90.dod.1.pipeline-lock-silent-success.md`](./task.90.dod.1.pipeline-lock-silent-success.md) for complete evidence, the 24 executed probes, and the CI rollup.
+
+**Task marked as ACCEPTED on:** 2026-09-04
+
+---
+
 ## 13. Implementation Record
 
 **Implemented**: 2026-09-04 · **Branch**: `feature/task.90.pipeline-lock-silent-success`
@@ -517,3 +552,4 @@ stayed green throughout, including under both mutations.
 | 2026-09-04 |         | QA findings fixed — 1 HIGH + 2 MEDIUM closed in 1 iteration: report rebuilt 480,884 → 218 lines, false "single hole" claim corrected in task/CHANGELOG/PR, non-object lock guard added (scenario 12); guard restructured to one falsifiable predicate on mutation-proof evidence | qa-fix |
 | 2026-09-04 |         | QA gate PASS (100/100) cycle 2 — all 3 findings closed and verified by execution; refute pass found no new HIGH/MEDIUM; 3 LOW pre-existing observations recorded | qa-task |
 | 2026-09-04 |         | Step 5c `/review-pr` CONCERNS — 0 code findings; 2 medium conformance findings closed: the retracted task-86 bundler claim removed from §6 and §9 (it appeared twice; the review named one), and `npm run ci` re-run at head `d74bce3` so criterion 11's tick is earned rather than inherited | review-pr |
+| 2026-09-04 | 1.3     | DoD passed — accepted (PR #313). 11/11 criteria executed, CI green on the final head, 24 security probes run, 4 LOW residuals and one unowned follow-up recorded | finalise |

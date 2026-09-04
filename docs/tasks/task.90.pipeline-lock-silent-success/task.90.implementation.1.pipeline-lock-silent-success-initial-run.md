@@ -41,9 +41,9 @@ zsh, add a roadmap legend `touches:` tag covering the script, and refresh all 9 
 | 2. review-task             | ✅ Done       | `task.90.review.1.*.md`                                | READY TO IMPLEMENT, 8.6/10 (5.2/10 as filed). 2 Critical + 5 Important + 3 Optional, all applied. `draft` → `ready-for-development`.                                                          |
 | 3. develop                 | ✅ Done       | Task status == `Ready for Review`                      | 5/5 phases in one iteration. 22 tests green under bash **and** zsh. Both fixes mutation-proved. 9 bundled copies refreshed. `npm run ci` exit 0.                                              |
 | 4. create-pr               | ✅ Done       | PR URL; issue comment posted                           | [PR #313](https://github.com/Gamaroff/agent-skills/pull/313) → `develop`. Commits `a1e836a` (fix) + `293da69` (docs). Issue comment skipped — no tracker issue. No out-of-scope leak.         |
-| 5–6. qa-task / qa-fix loop | 🔄 In Progress | `task.90.qa.N.*.md`; `task.90.gate.N.*.yml`; Step 5c   | Cycle 1: gate **FAIL** 60/100 — 1 HIGH, 2 MEDIUM, 1 LOW. qa-fix cycle 1 applied. Awaiting cycle 2.                                                                                            |
-| 7. finalise                | ⏳ Pending    | `task.90.dod.N.*.md`; task `status: accepted`          |                                                                                                                                                                                              |
-| 8. commit-changes          | ⏳ Pending    | All artifacts committed and pushed                     |                                                                                                                                                                                              |
+| 5–6. qa-task / qa-fix loop | ✅ Done       | `task.90.qa.N.*.md`; `task.90.gate.N.*.yml`; Step 5c   | 2 of 5 cycles. Cycle 1 **FAIL** 60/100 (1 HIGH, 2 MEDIUM, 1 LOW) → qa-fix → cycle 2 **PASS** 100/100, all verified by execution. Step 5c `/review-pr` CONCERNS, both findings closed in `1cb04a0`. |
+| 7. finalise                | ✅ Done       | `task.90.dod.N.*.md`; task `status: accepted`          | `task.90.dod.1.*.md`. 11/11 criteria executed. CI SUCCESS on the final head (sampled PENDING first and waited). 24 security probes, 23 held. |
+| 8. commit-changes          | ✅ Done       | All artifacts committed and pushed                     | Terminal commit; lock removed.                                                                                                                                                               |
 
 ---
 
@@ -204,15 +204,17 @@ document intent; they do not bind it.
 | Cycle | Gate | Score | Findings | Outcome |
 | ----- | ---- | ----- | -------- | ------- |
 | 1     | FAIL | 60/100 | 1 HIGH, 2 MEDIUM, 1 LOW | All 10 success criteria met and both mutation proofs independently re-derived by QA; failed on a 28 MB corrupted artifact in the PR and a false claim in `CHANGELOG.md`. qa-fix cycle 1 applied all three. |
+| 2     | **PASS** | **100/100** | 0 HIGH, 0 MEDIUM, 3 LOW | Unscoped refute pass over the whole branch diff. All three cycle-1 findings verified fixed **by execution**. Cycle 1's own honest-limit claim about scenario 12 checked and confirmed accurate. |
+| 5c    | CONCERNS | — | 0 code, 2 conformance | `/review-pr`: a self-contradicting criterion (the retracted task-86 claim — found in **two** places, the review named one) and a stale `npm run ci` tick. Both closed in `1cb04a0`. |
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-04
+**Final Status**: Completed — ACCEPTED
 **Branch**: `feature/task.90.pipeline-lock-silent-success`
 **PR**: [#313](https://github.com/Gamaroff/agent-skills/pull/313)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 2 of a 5-cycle budget (plus one Step 5c review)
+**DoD Summary**: [`task.90.dod.1.pipeline-lock-silent-success.md`](./task.90.dod.1.pipeline-lock-silent-success.md) — ACCEPTED
 **Tracker debt**: none — no tracker issue linked, nothing deferred
