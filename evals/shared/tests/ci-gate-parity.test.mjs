@@ -302,14 +302,35 @@ test("the configuration reference documents both gate tiers", () => {
   );
 });
 
-test("the develop loop and qa-fix cycle name the fast gate, not a literal", () => {
-  // These two documents ship verbatim into consumer repos, which have no
-  // `ci:fast` script of their own. A hardcoded literal would instruct every
-  // downstream project to run a command that does not exist.
-  for (const p of [
-    "shared/resources/develop-pipeline-step-3-develop-loop.md",
-    "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
-  ]) {
+/**
+ * Every loop document that commits — read at its own authoritative source.
+ *
+ * The mixed shape of this list is the point, not an oversight. Two entries are
+ * shared resources bundled into each skill; the third is skill-native, authored
+ * directly in `skills/develop-bug/references/` with no `shared/resources/`
+ * counterpart. That asymmetry is exactly why task 75 missed it: a file list
+ * drawn from `shared/resources/` cannot see a document that does not live
+ * there, so `develop-bug`'s fix cycle kept committing an unformatted tree for a
+ * full release after the other two stopped. Naming each document at its real
+ * source is what makes the omission impossible to repeat.
+ */
+const LOOP_DOCUMENTS = [
+  "shared/resources/develop-pipeline-step-3-develop-loop.md",
+  "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
+  "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md",
+];
+
+test("every loop document names the fast gate, not a literal", () => {
+  // These documents ship verbatim into consumer repos, which have no `ci:fast`
+  // script of their own. A hardcoded literal would instruct every downstream
+  // project to run a command that does not exist.
+  assert.equal(
+    LOOP_DOCUMENTS.length,
+    3,
+    "all three commit-bearing loop documents must be covered — the develop " +
+      "loop, the story/task qa-fix cycle, and develop-bug's verify cycle",
+  );
+  for (const p of LOOP_DOCUMENTS) {
     const doc = read(p);
     assert.ok(
       doc.includes("<fastGateCommand>"),

@@ -198,8 +198,8 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      >
      > This is the **slow** tier and belongs here, at the last point before merge, not in the
      > develop loop. The fast tier is `develop.fastGateCommand` (default `npm run ci:fast`), run per
-     > iteration and per qa-fix cycle; paying the eval tier on every iteration is what would make the
-     > correct fix feel expensive enough to be reverted.
+     > iteration, per qa-fix cycle and per `develop-bug` verify cycle; paying the eval tier on every
+     > iteration is what would make the correct fix feel expensive enough to be reverted.
    - Any failure other than the tolerated 403 → **HALT**: report the failing command's output, do not merge, do not tick.
 
 2. **Merge** with the configured strategy.

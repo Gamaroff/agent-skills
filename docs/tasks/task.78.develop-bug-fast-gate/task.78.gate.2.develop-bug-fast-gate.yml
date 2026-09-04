@@ -1,0 +1,74 @@
+schema: 1
+task: "task.78.develop-bug-fast-gate"
+task_title: "Give develop-bug's fix cycle the same fast gate as the other pipelines"
+gate: PASS
+status_reason: "All three cycle-1 findings verified closed by reading the current file, not by trusting the fix summary. The cycle-2 refute pass over the whole branch diff found nothing false, including in cycle 1's own fixes — which had already self-corrected one defect of exactly the shape the refute pass looks for."
+reviewer: "QA Engineer"
+updated: "2026-09-04T18:40:00Z"
+
+top_issues:
+  - id: "TASK-78-001"
+    severity: medium
+    file: "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md"
+    finding: 'Ambiguous "step-3" cross-reference colliding with 5b''s own step 3.'
+    suggested_action: "Name the develop loop's Test Failure Triage explicitly."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+  - id: "TASK-78-002"
+    severity: medium
+    file: "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md"
+    finding: "Fast-gate failure output directed at a template with no field for it."
+    suggested_action: "Add a Fast gate field to the Verify Cycle report entry."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+  - id: "TASK-78-003"
+    severity: medium
+    file: "docs/reference/configuration.md"
+    finding: "Three live docs still described the fast gate as running in two places."
+    suggested_action: "Sweep configuration.md (x2) and develop-next/SKILL.md."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2320
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. No executable code in the change set. Additionally confirmed this cycle that `.claude/state/` is gitignored (`.gitignore:19`), so a FIX_LOG deliberately retained on a red gate cannot be committed by a later broad `git add`."
+  performance:
+    status: PASS
+    notes: "Unchanged. One bounded fast-tier run per develop-bug fix cycle, after the no-change check, slow tier excluded."
+  reliability:
+    status: PASS
+    notes: "Placement, retry bound and the honest MAX_ITER wording re-verified by reading the current file. Both cross-reference targets confirmed to exist: `## Test Failure Triage (…)` at :129 and `### What the loop runs — the fast gate` at :133 of the linked document."
+  maintainability:
+    status: PASS
+    notes: "Was CONCERNS. All three findings closed. The two port artifacts are now not merely fixed but explained in place — the cross-reference carries a note on why it is named rather than numbered, and the report/comment asymmetry carries a note on why the comment has no Fast gate field. Both are the kind of note that has to be argued with rather than merely not noticed."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Widen the Step 4b runnable-prose rule beyond `SKILL.md` and `shared/resources/*.md` — it structurally cannot fire on a skill-native `skills/*/references/*.md` document, which is this task's own blind spot one layer up. Carried forward from cycle 1; deliberately out of scope here."
+      refs: ["shared/resources/qa-runnable-prose-detection.md"]
+    - action: "On a twice-red gate the fix stays uncommitted, and if that cycle is the fifth the Loop Limit Escalation hands over a working tree with uncommitted work without mentioning it. Identical to the story/task qa-fix loop's behaviour, so diverging here would break the parity this task establishes — worth fixing in both documents together, or neither."
+      refs:
+        - "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md"
+        - "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

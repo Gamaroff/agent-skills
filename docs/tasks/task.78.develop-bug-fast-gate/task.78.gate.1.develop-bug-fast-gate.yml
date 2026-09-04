@@ -1,0 +1,76 @@
+schema: 1
+task: "task.78.develop-bug-fast-gate"
+task_title: "Give develop-bug's fix cycle the same fast gate as the other pipelines"
+gate: CONCERNS
+status_reason: "The gate lands at the correct seam and the parity test is mutation-proved on all three loop documents. Three MEDIUM findings, none of them in the gate's behaviour: an ambiguous cross-reference the port introduced, a failure output directed at a template with no slot for it, and three consumer-facing docs that still describe the gate as running in two places."
+reviewer: "QA Engineer"
+updated: "2026-09-04T18:05:00Z"
+
+top_issues:
+  - id: "TASK-78-001"
+    severity: medium
+    file: "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md"
+    finding: 'Line 173, "Triage per the step-3 pattern", is ambiguous in this document. The phrase was ported from the qa-fix loop, where the local sub-steps are numbered 0/0a/1/2 so "step-3" can only mean the pipeline''s Step 3. This document''s 5b HAS its own step 3 — the no-change check — and the same added block refers to it in that local sense twice (lines 153 and 189). An agent following the prose literally resolves the wrong referent, and the one it lands on is a HALT check with no triage in it.'
+    suggested_action: "Name the target instead of numbering it: \"Triage per the develop loop's test-failure triage (`develop-pipeline-step-3-develop-loop.md` §Test Failure Triage)\". The task document warned that this file's cycle shape differs and that the gate must adapt rather than be copied; that warning applies to the block's prose references too."
+    suggested_owner: dev
+    status: open
+  - id: "TASK-78-002"
+    severity: medium
+    file: "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md"
+    finding: "The gate's failure output is directed to \"the Verify Cycle entry\", but that entry is a fixed five-field template (lines 60–66: Regression test / Suite + lint / Code review / Verdict / Action) with no slot for a gate result — as is the tracker-comment template at lines 71–77 that mirrors it. The qa-fix loop's equivalent points at the free-form QA Iteration History, so the instruction survived the port while the place it names did not. An agent would either invent a field or drop the output, and a twice-red gate that leaves no trace in the cycle record is the failure this whole step exists to make visible."
+    suggested_action: "Add a `**Fast gate**: {pass / fail — log path}` line to both templates. Recording it every cycle rather than only on failure is what makes a green gate auditable instead of merely assumed."
+    suggested_owner: dev
+    status: open
+  - id: "TASK-78-003"
+    severity: medium
+    file: "docs/reference/configuration.md"
+    finding: "Three live consumer-facing sites still describe the fast gate as running in two places, which this change makes wrong: `docs/reference/configuration.md:96` (\"fast gate run in the develop loop and each qa-fix cycle\"), `docs/reference/configuration.md:178` (the reference table row, same wording), and `skills/develop-next/SKILL.md:200` (\"run per iteration and per qa-fix cycle\"). The task's §7 Files to Modify listed three files and included no doc sweep. `ci-gate-parity.test.mjs` already reads configuration.md, but only asserts the default VALUE, so it passes over the stale prose."
+    suggested_action: "Update all three to name the third site. Historical records — the roadmap change log and task 75's own artifacts — are correct as written and must not be edited: they describe what was true when written."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 2320
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No executable code changed. The added prose introduces no new command, no new credential path, and no network call — it invokes the same configured `<fastGateCommand>` the other two loop documents already invoke. Placeholder-only bash block; nothing is executed by the change itself."
+  performance:
+    status: PASS
+    notes: "Adds one fast-tier run per develop-bug fix cycle, bounded at 2 attempts. Deliberately excludes the slow tier, and sits after the no-change check so the always-HALT path pays nothing. The parity test adds one file read."
+  reliability:
+    status: PASS
+    notes: "The gate is placed after the step-3 no-change HALT and before the step-4 commit — the ordering TASK-75-001 identified as the mistake to avoid. Retry is bounded at 2 attempts with MAX_ITER described honestly as bounding cycles, not this inner retry. Mutation-proved: stripping the gate from any one of the three loop documents turns the parity test red."
+  maintainability:
+    status: CONCERNS
+    notes: "TASK-78-001 and TASK-78-002 are both port artifacts — prose carried from the qa-fix loop into a document whose local numbering and templates differ. TASK-78-003 leaves three consumer-facing docs understating where a configured command runs. None affects the gate's behaviour; all three affect whether the next reader can follow it."
+
+recommendations:
+  immediate:
+    - action: "Disambiguate the step-3 cross-reference (TASK-78-001)"
+      refs: ["skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md"]
+    - action: "Give the fast-gate result a field in both Verify Cycle templates (TASK-78-002)"
+      refs: ["skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md"]
+    - action: "Sweep the three docs that still say the gate runs in two places (TASK-78-003)"
+      refs:
+        - "docs/reference/configuration.md"
+        - "skills/develop-next/SKILL.md"
+  future:
+    - action: "The Step 4b runnable-prose rule scopes to `SKILL.md` and `shared/resources/*.md`, so it structurally cannot fire on a skill-native `skills/*/references/*.md` document — the same blind spot, one layer up, that this task exists to close. Worth its own item; out of scope here."
+      refs: ["shared/resources/qa-runnable-prose-detection.md"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "TASK-78-001, TASK-78-002 and TASK-78-003 addressed"

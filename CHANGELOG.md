@@ -68,6 +68,29 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`develop-bug`'s fix cycle could commit an unformatted tree where the other two pipelines could
+  not.** Task 75 put a fast gate (`develop.fastGateCommand`, default `npm run ci:fast`) at two
+  points: the develop loop, and each `qa-fix` cycle before its commit. `develop-bug` shares the
+  develop-loop document, so it picked that half up for free — but its per-cycle **verify** loop is a
+  different document and got nothing. The consequence was concrete rather than theoretical:
+  `npm test` does not run `format:check`, so a bug fix cycle could close green, push, and fail CI on
+  a file it had just rewritten. That is the task-67 failure, still live for bug fixes only, and it is
+  the run least able to afford a round trip through red CI.
+
+  The gate now sits at that document's own pre-commit seam — step **3a** of `5b. Fix`, after the
+  no-change check that HALTs and before the commit, mirroring where the qa-fix loop's step `0a`
+  sits. It is not a copy: the retry budget is stated as **2 attempts** with `MAX_ITER` described
+  honestly as bounding *cycles* rather than this inner retry, and the log filename uses this
+  document's own `{N}` cycle-counter convention instead of importing a shell variable it does not
+  have.
+
+  **Why it was missed is the durable part.** The other two loop documents live in
+  `shared/resources/`; this one is skill-native, authored directly in
+  `skills/develop-bug/references/` with no shared counterpart — so a file list drawn from
+  `shared/resources/` could not see it. `evals/shared/tests/ci-gate-parity.test.mjs` now iterates
+  all three documents at their real sources and fails if any one loses the gate, which is what stops
+  the next loop document from drifting out the same way.
+
 - **`advance-pipeline-lock.sh` reported a successful advance for a transition that never happened.**
   The lock file is the develop pipelines' state machine — every `develop-*` orchestrator advances it
   as the last action of each step, and both the `PreCompact` and `Stop` hooks read `current_step` from
