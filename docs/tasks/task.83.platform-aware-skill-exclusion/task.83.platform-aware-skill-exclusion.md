@@ -457,34 +457,36 @@ The filter is a substring match over a 17-line constant per skill. No baseline n
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-04
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+**QA Cycles**: 2
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.83.qa.1.platform-aware-skill-exclusion.md](./task.83.qa.1.platform-aware-skill-exclusion.md)
-- **Gate File**: [task.83.gate.1.platform-aware-skill-exclusion.yml](./task.83.gate.1.platform-aware-skill-exclusion.yml)
-- **Bug Reports**: [bug.1 — tracker resolution divergence](./task.83.bug.1.tracker-resolution-divergence.md), [bug.2 — .env probe asymmetry](./task.83.bug.2.env-probe-asymmetry.md)
+- **Cycle 2 (current)**: [task.83.qa.2.platform-aware-skill-exclusion.md](./task.83.qa.2.platform-aware-skill-exclusion.md) — CONCERNS, 80/100
+- **Cycle 1**: [task.83.qa.1.platform-aware-skill-exclusion.md](./task.83.qa.1.platform-aware-skill-exclusion.md) — FAIL, 70/100
+- **Gate File**: [task.83.gate.2.platform-aware-skill-exclusion.yml](./task.83.gate.2.platform-aware-skill-exclusion.yml)
+- **Bug Reports**: [bug.1 — tracker resolution divergence](./task.83.bug.1.tracker-resolution-divergence.md) (Ready for QA), [bug.2 — .env probe asymmetry](./task.83.bug.2.env-probe-asymmetry.md) (Ready for QA), [bug.3 — test env scrub](./task.83.bug.3.test-env-scrub-incomplete.md) (Ready for QA)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 2343 (`npm run ci:fast`, exit 0 — 0 failures, 1 skipped, prettier clean)
-- **Phases Verified**: 4/4 complete — 3 PASS, 1 CONCERNS (Phase 1)
-- **Critical Issues**: 1 HIGH, 1 MEDIUM, 2 LOW
+- **Tests Executed**: 2355 (`npm run ci:fast`, exit 0 — 0 failures, 1 skipped, prettier clean)
+- **Phases Verified**: 4/4 complete — 3 PASS, 1 CONCERNS (Phase 3)
+- **Open Issues**: 1 MEDIUM (RF-001); cycle 1's HIGH and MEDIUM both closed
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
-- **Mutation proofs**: 3 run by QA (grandfather prune, dropped `continue`, classification drift) — all red as intended
+- **Mutation proofs**: 6 by QA across two cycles (M1–M3 on the original change, M4–M6 on the fixes)
 
 ### Key Findings
 
-`_resolve_install_tracker` re-derives the config parse instead of mirroring
-`resolve-platform.sh`, which Phase 1 explicitly instructs and the CHANGELOG advertises. A quoted
-(`tracker: "jira"`) or CRLF `tracker:` value resolves `jira` at runtime and `github` at install, so
-a Jira repo installs without any of its 11 Jira skills — reproduced end-to-end. The `.env` probe
-diverges the other way. Everything else verified: the grandfather rule and the classification drift
-guard are genuinely mutation-proven, and the CHANGELOG's token claim reproduces to within 1%.
+Cycle 1 found the install-time resolver re-deriving the config parse instead of mirroring
+`resolve-platform.sh`; a quoted or CRLF `tracker:` resolved the wrong platform and a Jira repo
+installed with none of its 11 Jira skills. Fixed and verified by re-running the differential and the
+end-to-end repro. Cycle 2's refute pass found one new MEDIUM — in cycle 1's own test helper, which
+scrubs `JIRA_URL` and `TRACKER` from the environment but not `SKILLS_CONFIG_FILE`, so an ambient
+value can flip the parity guard protecting the HIGH fix.
 
 ---
 
@@ -501,6 +503,8 @@ guard are genuinely mutation-proven, and the CHANGELOG's token claim reproduces 
 | 2026-09-04 |         | Status → in-progress (QA FAIL, fixes required) | qa-task |
 | 2026-09-04 |         | QA findings fixed — CR-001 (resolver value parsing) and CR-002 (.env asymmetry documented + pinned), 1 iteration, 3 mutations proven; suite 22 → 34 tests | qa-fix |
 | 2026-09-04 |         | Status → ready-for-review (awaiting QA re-review) | qa-fix |
+| 2026-09-04 |         | QA cycle 2 gate CONCERNS (80/100) — both cycle-1 findings closed; refute pass found 1 new MEDIUM (test env scrub) | qa-task |
+| 2026-09-04 |         | QA cycle 2 findings fixed — three copies of the test env-scrub list consolidated to hermeticEnv(); 2 mutations proven | qa-fix |
 
 ---
 

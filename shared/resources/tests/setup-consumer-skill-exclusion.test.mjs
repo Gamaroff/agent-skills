@@ -80,15 +80,44 @@ const NEVER_EXCLUDED = [
 ];
 
 /**
+ * The environment every helper here starts from: the developer's, minus every
+ * variable either resolver consults. An ambient one silently flips a resolver
+ * assertion, which is the worst shape a test failure can take — it fails against
+ * correct code, or passes without testing the fixture.
+ *
+ * Kept as ONE list rather than per-helper copies. It was two copies once, and
+ * the second was written by copying the first and not extending it: it omitted
+ * `SKILLS_CONFIG_FILE`, which resolve-platform.sh honours as an override of
+ * *which file to read*, so an exported value redirected every parity case away
+ * from its fixture. If you add a variable either resolver reads, add it here.
+ *
+ *   JIRA_URL                — identity fallback in BOTH resolvers
+ *   SKILLS_CONFIG_FILE      — resolve-platform.sh: names the config file to read
+ *   AGENT_SKILLS_ACCESS_*   — resolve-platform.sh: an invalid value makes it
+ *                             `return 1`, leaving TRACKER unset or stale
+ *   TRACKER / ALL_SKILLS    — setup-consumer.sh globals the tests set explicitly
+ */
+function hermeticEnv(env = {}) {
+  const clean = { ...process.env };
+  for (const k of [
+    "JIRA_URL",
+    "SKILLS_CONFIG_FILE",
+    "AGENT_SKILLS_ACCESS_TRACKER",
+    "AGENT_SKILLS_ACCESS_VCS",
+    "TRACKER",
+    "ALL_SKILLS",
+  ]) {
+    delete clean[k];
+  }
+  return { ...clean, ...env };
+}
+
+/**
  * Source the wizard with SETUP_CONSUMER_NO_MAIN=1 and run `snippet` against its
- * function definitions. JIRA_URL is unset by default so an ambient one in the
- * developer's shell cannot silently flip a resolver assertion.
+ * function definitions, in the scrubbed environment above.
  */
 function callFn(snippet, { cwd = REPO, env = {} } = {}) {
-  const clean = { ...process.env };
-  delete clean.JIRA_URL;
-  delete clean.TRACKER;
-  delete clean.ALL_SKILLS;
+  const clean = hermeticEnv();
   return execFileSync(
     "bash",
     [
@@ -133,14 +162,25 @@ function resolveTracker(cwd, env = {}) {
  * drifted together.
  */
 function runtimeTracker(cwd, env = {}) {
-  const clean = { ...process.env };
-  delete clean.JIRA_URL;
-  delete clean.TRACKER;
-  return execFileSync(
+  // Print the resolver's own exit status alongside the value. Without it a
+  // future regression that makes resolve-platform.sh REFUSE a legal config is
+  // reported as "the two resolvers disagree", which sends the reader to the
+  // wrong file.
+  const out = execFileSync(
     "bash",
-    ["-c", `source '${RESOLVER}' >/dev/null 2>&1; printf '%s' "\${TRACKER:-}"`],
-    { cwd, env: { ...clean, ...env }, encoding: "utf8" },
-  ).trim();
+    [
+      "-c",
+      `source '${RESOLVER}' >/dev/null 2>&1; rc=$?; printf '%s\\n%s' "$rc" "\${TRACKER:-}"`,
+    ],
+    { cwd, env: hermeticEnv(env), encoding: "utf8" },
+  );
+  const [rc, ...rest] = out.split("\n");
+  assert.equal(
+    rc,
+    "0",
+    `resolve-platform.sh exited ${rc} for this config — it refused to resolve, which is a different failure from disagreeing with the installer`,
+  );
+  return rest.join("\n").trim();
 }
 
 function inTempRepo(fn) {
@@ -347,6 +387,38 @@ test("the .env probe is a DELIBERATE asymmetry, not an oversight", () => {
   });
 });
 
+test("an ambient SKILLS_CONFIG_FILE cannot redirect a fixture", () => {
+  // The regression guard for the scrub list. resolve-platform.sh honours
+  // SKILLS_CONFIG_FILE as an override of WHICH FILE to read, so an exported
+  // value points the runtime resolver at someone else's config while the
+  // installer still reads ./skills-config.yaml — and every parity case above
+  // fails against code that is correct. Pointed the decoy at the OPPOSITE
+  // tracker so a scrub that stops working cannot pass by coincidence.
+  inTempRepo((dir) => {
+    const decoyDir = mkdtempSync(path.join(tmpdir(), "skill-exclusion-decoy-"));
+    try {
+      writeFileSync(path.join(dir, "skills-config.yaml"), "tracker: jira\n");
+      writeFileSync(
+        path.join(decoyDir, "skills-config.yaml"),
+        "tracker: github\n",
+      );
+      process.env.SKILLS_CONFIG_FILE = path.join(
+        decoyDir,
+        "skills-config.yaml",
+      );
+      assert.equal(runtimeTracker(dir), "jira", "the decoy won at run time");
+      assert.equal(
+        resolveTracker(dir),
+        "jira",
+        "the decoy won at install time",
+      );
+    } finally {
+      delete process.env.SKILLS_CONFIG_FILE;
+      rmSync(decoyDir, { recursive: true, force: true });
+    }
+  });
+});
+
 // ── 5. classification drift guard ────────────────────────────────────────────
 
 test("every tracker-specific skill in the tree is classified exactly once", () => {
@@ -445,12 +517,7 @@ function runInstall(dir, tarball, { env = {}, args = "" } = {}) {
     {
       cwd: dir,
       input: "Y\n",
-      env: (() => {
-        const clean = { ...process.env };
-        delete clean.JIRA_URL;
-        delete clean.TRACKER;
-        return { ...clean, ...env, SETUP_CONSUMER_NO_MAIN: "1" };
-      })(),
+      env: { ...hermeticEnv(env), SETUP_CONSUMER_NO_MAIN: "1" },
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
     },

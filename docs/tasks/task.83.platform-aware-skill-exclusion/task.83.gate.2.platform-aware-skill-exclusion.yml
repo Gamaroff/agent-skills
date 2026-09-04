@@ -1,0 +1,88 @@
+schema: 1
+task: "task.83.platform-aware-skill-exclusion"
+task_title: "Platform-aware skill exclusion in setup-consumer.sh"
+gate: CONCERNS
+status_reason: "Both cycle-1 findings are closed and verified by re-running the differential and the end-to-end repro that found them. The refute pass found one new MEDIUM in cycle 1's own test helper — an incomplete environment scrub that lets an ambient SKILLS_CONFIG_FILE flip the parity guard protecting the HIGH fix."
+reviewer: "QA Engineer"
+updated: "2026-09-04T21:05:00Z"
+
+top_issues:
+  - id: "RF-001"
+    severity: medium
+    file: "shared/resources/tests/setup-consumer-skill-exclusion.test.mjs"
+    finding: "The new runtimeTracker() helper deletes JIRA_URL and TRACKER from the test environment but not SKILLS_CONFIG_FILE, which resolve-platform.sh honours as an explicit override of which config file to read. An ambient value redirects all ten parity cases away from their fixture — demonstrated with a decoy file: fixture says jira, decoy says github, runtime=github while install=jira, so every parity case fails against correct code. callFn()'s own comment names this exact hazard ('so an ambient one in the developer's shell cannot silently flip a resolver assertion'); the new helper copied the list without extending it."
+    suggested_action: "Add `delete clean.SKILLS_CONFIG_FILE` to runtimeTracker() and, for symmetry, to callFn(). Add a regression test that exports a decoy SKILLS_CONFIG_FILE pointing at a config with the opposite tracker and asserts the fixture still wins."
+    suggested_owner: dev
+    status: open
+    bug_ref: "task.83.bug.3.test-env-scrub-incomplete.md"
+
+  # Cycle 1 issues, closed this cycle — retained so the gate carries the history.
+  - id: "CR-001"
+    severity: high
+    file: "scripts/setup-consumer.sh"
+    finding: "Quoted and CRLF `tracker:` values resolved github at install and jira at runtime, pruning all 11 Jira skills from a Jira repo."
+    suggested_action: "Normalise the token before the case; widen the awk pattern past [a-z]."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+  - id: "CR-002"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "The installer probes .env for JIRA_URL; resolve-platform.sh reads only the environment."
+    suggested_action: "Keep the probe, correct the over-claiming comment and CHANGELOG, pin the asymmetry with a test."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 2355
+  phases_verified: "4/4 complete; 3/4 PASS, 1 CONCERNS"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. The fix adds no network, credential or filesystem surface — it is string normalisation on a value already being read."
+  performance:
+    status: PASS
+    notes: "Two bash parameter expansions and three awk sub() calls on one line. The parity tests add ~9s to the suite by sourcing the real resolver eleven times — a deliberate trade for testing the real thing rather than a mock."
+  reliability:
+    status: CONCERNS
+    notes: "The headline mode is closed and the guard is a parity assertion against the real resolver, so the two implementations cannot drift together and still pass. Two residuals keep this off PASS: the documented .env divergence for a config-less repo whose JIRA_URL is never exported (tested and argued, but its proper close — teaching resolve-platform.sh to read .env — is un-filed), and RF-001, by which the guard for all of this can be flipped by an ambient environment variable."
+  maintainability:
+    status: PASS
+    notes: "Improved this cycle. The header comment now explains why the value parsing must mirror and not just the order, and explicitly warns against 'correcting' the .env probe by deleting it — the exact wrong move a reasonable person would otherwise make. The CHANGELOG no longer claims more than the code delivers."
+
+recommendations:
+  immediate:
+    - action: "Scrub SKILLS_CONFIG_FILE in the test helpers and pin it with a decoy-file regression test (RF-001)."
+      refs: ["shared/resources/tests/setup-consumer-skill-exclusion.test.mjs"]
+  future:
+    - action: "Have runtimeTracker() assert the resolver exited 0, so a future refusal is diagnosed as a refusal rather than as a disagreement."
+      refs: ["shared/resources/tests/setup-consumer-skill-exclusion.test.mjs"]
+    - action: "Decide whether the installer should refuse malformed tracker: input rather than defaulting, matching the runtime's halt. Covers CR-003 (unrecognised scalar) and RF-002 (tab separator, pre-existing — the pre-fix script at 9edb699 behaves identically, and the value is malformed YAML that yaml.safe_load itself rejects)."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "File the resolve-platform.sh .env follow-up so the documented residual has an owner."
+      refs: ["shared/resources/resolve-platform.sh"]
+    - action: "Run shellcheck scripts/setup-consumer.sh on a host or CI lane that has it, and tick the outstanding Code Quality criterion."
+      refs: ["scripts/setup-consumer.sh"]
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: "2026-09-04"
+  total_iterations: 1
+  verification_method: "Re-ran the resolver differential and the end-to-end fixture install that produced the original findings; three mutation proofs (M4, M5, M6)"
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "RF-001 fixed, with a regression test that exports a decoy SKILLS_CONFIG_FILE"
