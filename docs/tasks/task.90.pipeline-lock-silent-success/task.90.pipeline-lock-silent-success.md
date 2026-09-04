@@ -79,6 +79,7 @@ Out of scope:
 - [ ] Both cases covered in `advance-pipeline-lock.test.sh`, green under bash **and** zsh.
 - [ ] Mutation-proved: revert each fix, confirm the new test goes red, restore.
 - [ ] All 10 bundled copies refreshed and verified **by content** (the bundler prints `in sync` for stale transitive copies — see task 86).
+- [ ] **A `touches:` tag covering this script exists in the roadmap legend, and this row is retagged to use it.** No tag covers `shared/resources/advance-pipeline-lock.sh` today: `pipeline-steps` is scoped to `develop-pipeline-step-*.md` and `lite-mode.md`, and `test-harness` covers `shared/resources/tests/*`, which does not include `advance-pipeline-lock.test.sh`. This row is therefore tagged `bundles!, test-harness~` — honest but approximate, so `--batch` could pair it with another row editing the same script and the two would conflict for real. Do **not** widen `pipeline-steps` to cover it: that tag is prose, and lumping in an executable would make every doc-editing row falsely conflict with lock edits. Add a distinct tag instead.
 - [ ] `npm run ci` exits 0.
 
 ## 5. References
@@ -93,3 +94,4 @@ Out of scope:
 | Date       | Version | Description                                                      | Author      |
 | ---------- | ------- | ---------------------------------------------------------------- | ----------- |
 | 2026-09-04 | 1.0     | Filed from task 77's DoD security probe — pre-existing on develop, out of scope there | create-task |
+| 2026-09-04 | 1.1     | Added the legend-tag success criterion — the gap was recorded in PR #310 but owned by nobody; folded into the scope of the task that already edits this script | edit-task |
