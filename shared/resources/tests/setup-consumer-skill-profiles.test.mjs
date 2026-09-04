@@ -875,3 +875,195 @@ test("011: the CLI never calls process.exit() — its stdout is piped", () => {
   );
   assert.match(code, /process\.exitCode = 2/);
 });
+
+test("012: an unknown exclude warns and is ignored, rather than failing the install", () => {
+  // Asymmetric with `include` on purpose. An unknown include is always a mistake.
+  // An unknown exclude is usually a typo — the skill the user wanted gone is
+  // still installed, silently — but is legitimately reachable when a committed
+  // config outlives a renamed or removed skill, and failing every install for
+  // that would be worse than the typo. So it names the entry and proceeds.
+  const r = execFileSync(
+    "bash",
+    [
+      "-c",
+      `${JSON.stringify(process.execPath)} ${JSON.stringify(CLI)} --profile minimal --tracker github --exclude NotARealSkill --count >/tmp/dn-x.$$ 2>/tmp/dn-xe.$$; echo "rc=$?"; echo "count=$(cat /tmp/dn-x.$$)"; cat /tmp/dn-xe.$$; rm -f /tmp/dn-x.$$ /tmp/dn-xe.$$`,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.match(r, /rc=0/, "a stale config must not fail the install");
+  assert.match(r, /count=5/, "an unknown exclude removes nothing");
+  assert.match(r, /exclude names unknown skill\(s\), ignored: NotARealSkill/);
+  assert.match(
+    r,
+    /still being installed/,
+    "the consequence must be stated, not just the name",
+  );
+});
+
+test("012b: a VALID exclude still removes the skill", () => {
+  // Guards against the warning path swallowing real excludes.
+  const n = Number(
+    runCli([
+      "--profile",
+      "minimal",
+      "--tracker",
+      "github",
+      "--exclude",
+      "review-code",
+      "--count",
+    ]).trim(),
+  );
+  const base = Number(
+    runCli(["--profile", "minimal", "--tracker", "github", "--count"]).trim(),
+  );
+  assert.equal(n, base - 1, "a known exclude must still take effect");
+});
+
+test("the resolved set never contains a tracker-excluded skill — the precondition the install loop's ordering relies on", () => {
+  // Fix 005 reordered the install loop so the tracker test runs first. That
+  // reorder is only correct BECAUSE the resolver has already stripped
+  // tracker-excluded skills from the set the loop greps. Asserted here
+  // behaviourally, so the ordering guard is not resting solely on a source-text
+  // check of the loop itself.
+  for (const [tracker, forbidden] of [
+    ["github", SKILLS_JIRA_ONLY],
+    ["jira", SKILLS_GITHUB_ONLY],
+  ]) {
+    for (const profile of ["minimal", "pipeline", "full"]) {
+      const set = new Set(
+        runCli(["--profile", profile, "--tracker", tracker])
+          .split("\n")
+          .filter(Boolean),
+      );
+      for (const skill of forbidden) {
+        assert.ok(
+          !set.has(skill),
+          `${profile}/${tracker} must not resolve ${skill} — the install loop assumes it cannot`,
+        );
+      }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QA cycle 2 — REFUTE PASS regressions.
+//
+// Two of these were introduced BY cycle 1's fixes. That is the case for running
+// cycle 2 as a refute pass over the whole diff rather than a narrowed re-read of
+// the repairs: a fix is new code, and it is the least-reviewed code in the set.
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("C2-H2: the CLI's exit code is PROPAGATED, so a config typo is not blamed on node", () => {
+  // Cycle 1 added `include` validation whose stated purpose was to stop a typo
+  // "downgrading to a full unfiltered install and blaming node/PATH". It still
+  // did both: _resolve_skill_set collapsed every non-zero rc to 1, so exit 2
+  // (config error, already named on stderr) and 127 (node missing) took the same
+  // branch and produced the same "check that node is on PATH" advice.
+  const src = readFileSync(WIZARD, "utf8");
+  assert.match(src, /return \$_rc/, "the CLI's code must reach the caller");
+  assert.match(
+    src,
+    /_resolve_rc -eq 2/,
+    "install_skills must branch on 2 and say the config is wrong, not that node is missing",
+  );
+
+  const dir = scratch(
+    "skills:\n  profile: minimal\n  include: [NotARealSkill]\n",
+  );
+  const fake = mkdtempSync(path.join(tmpdir(), "rc-tarball-"));
+  try {
+    mkdirSync(path.join(fake, "shared", "resources"), { recursive: true });
+    for (const f of [
+      "resolve-skill-set.mjs",
+      "resolve-skill-set-cli.mjs",
+      "skill-profiles.json",
+      "skill-dependencies.json",
+    ]) {
+      writeFileSync(
+        path.join(fake, "shared", "resources", f),
+        readFileSync(path.join(REPO, "shared", "resources", f)),
+      );
+    }
+    const rc = execFileSync(
+      "bash",
+      [
+        "-c",
+        `export SETUP_CONSUMER_NO_MAIN=1
+         cd ${JSON.stringify(dir)}
+         source ${JSON.stringify(WIZARD)} >/dev/null 2>&1
+         set +e
+         _resolve_skill_set github ${JSON.stringify(fake)} >/dev/null 2>&1
+         echo $?`,
+      ],
+      {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH, HOME: process.env.HOME },
+      },
+    ).trim();
+    assert.equal(rc, "2", "a config error must surface as 2, not 1");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(fake, { recursive: true, force: true });
+  }
+});
+
+test("C2-M1: a zero-skill resolution is honoured but warned about, never silent", () => {
+  // Cycle 1's fix #2 made rc-0-with-empty-output authoritative, which is right —
+  // but it also made an empty install reachable, and the surrounding comments
+  // still claimed that could not happen. "You excluded everything" and
+  // "something broke" produce the same `0 new, 0 updated` summary otherwise.
+  const src = readFileSync(WIZARD, "utf8");
+  assert.match(
+    src,
+    /resolved to ZERO skills/,
+    "the empty case must warn before installing",
+  );
+  assert.match(
+    src,
+    /EVEN IF EMPTY/,
+    "and the function's documented contract must match what it now does",
+  );
+});
+
+test("C2-M2: the dry-run preview forwards --all-skills", () => {
+  // Without it the preview applies a tracker filter the real run does not:
+  // 35 previewed against 41 installed. Cycle 1's test for this greps the very
+  // lines the bug was on and could not see it — hence the behavioural check too.
+  const src = readFileSync(WIZARD, "utf8");
+  assert.match(src, /ALL_SKILLS" == true \]\] && _dry_args\+=\(--all-skills\)/);
+
+  const withFilter = Number(
+    runCli(["--profile", "pipeline", "--tracker", "github", "--count"]).trim(),
+  );
+  const without = Number(
+    runCli([
+      "--profile",
+      "pipeline",
+      "--tracker",
+      "github",
+      "--all-skills",
+      "--count",
+    ]).trim(),
+  );
+  assert.ok(
+    without > withFilter,
+    `--all-skills must widen the set (${withFilter} -> ${without}); if these are equal the flag is inert and this test proves nothing`,
+  );
+});
+
+test("C2-L1: an explicitly included skill dropped by the tracker filter is announced", () => {
+  // An explicit request and a closure by-product are different events. Listing
+  // both as `− name (not applicable)` let a user believe they had installed
+  // something they had not.
+  const err = execFileSync(
+    "bash",
+    [
+      "-c",
+      `${JSON.stringify(process.execPath)} ${JSON.stringify(CLI)} --profile minimal --tracker github --include sync-jira-story --count 2>&1 >/dev/null`,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.match(err, /You asked for sync-jira-story in skills\.include/);
+  assert.match(err, /NOT installed/);
+  assert.match(err, /--all-skills/, "the escape hatch must be named");
+});

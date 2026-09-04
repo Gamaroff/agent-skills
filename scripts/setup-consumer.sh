@@ -1029,10 +1029,23 @@ _config_skills_list() {
 # Resolve the concrete skill list. Prints one name per line on stdout; the
 # closure/conflict report goes to stderr and is shown to the user as-is.
 #
-# On ANY failure this returns non-zero WITHOUT printing names. The caller must
-# treat that as "install everything" rather than "install nothing" — an empty
-# list would silently produce an empty install, which is far worse than an
-# unfiltered one.
+# Exit codes, which the caller MUST distinguish:
+#   0  — authoritative. The printed set is what to install, EVEN IF EMPTY (every
+#        seed excluded is a legitimate answer, not a failure).
+#   2  — user-input error, already named on stderr by the CLI (unknown skill in
+#        `include`, unknown profile). The config is wrong; node is fine.
+#   *  — environment failure (node missing, CLI absent, malformed output).
+#
+# For 2 and anything else the caller installs the UNFILTERED set rather than an
+# empty one — an unfiltered install is recoverable, an empty one leaves the
+# consumer with no skills at all. For 0-with-empty-output the caller honours it
+# but warns first, because "you asked for nothing" and "something went wrong"
+# look identical in a summary line.
+# CALL THIS INSIDE A CONDITION. It returns non-zero on a resolver failure, which
+# is a normal outcome the caller handles by installing the unfiltered set — but
+# under `set -e` a BARE call would abort the whole wizard instead. `install_skills`
+# calls it as `if _RESOLVED_SET=$(_resolve_skill_set …); then`, which suppresses
+# errexit for the call. Verified both ways; keep it that way.
 _resolve_skill_set() {
   local _tracker="$1" _tmpdir="$2"
   local _cli="${_tmpdir}/shared/resources/resolve-skill-set-cli.mjs"
@@ -1053,7 +1066,13 @@ _resolve_skill_set() {
   # almost nothing and installed everything.
   local _out _rc
   _out=$(node "$_cli" "${_args[@]}"); _rc=$?
-  [[ $_rc -eq 0 ]] || return 1
+  # PROPAGATE the CLI's code, do not collapse it. Exit 2 is a user-input error
+  # the CLI has already named on stderr (an unknown skill in `include`, an
+  # unknown profile); anything else is an environment failure. Collapsing both
+  # to 1 made install_skills advise "check that node is on PATH" for a typo in
+  # skills-config.yaml — the very mis-blaming the include validation was added
+  # to stop.
+  [[ $_rc -eq 0 ]] || return $_rc
 
   # Validate the shape before trusting it. A zero exit is NOT enough: `node` can
   # be shadowed by a shell function (nvm defines one) that prints help text and
@@ -1157,6 +1176,9 @@ install_skills() {
         local _dry_args=(--profile "$_dry_profile" --tracker "$_dry_tracker" --count)
         [[ -n "$_dry_inc" ]] && _dry_args+=(--include "$_dry_inc")
         [[ -n "$_dry_exc" ]] && _dry_args+=(--exclude "$_dry_exc")
+        # --all-skills too, or the preview applies a tracker filter the real run
+        # would not: 35 previewed against 41 actually installed.
+        [[ "$ALL_SKILLS" == true ]] && _dry_args+=(--all-skills)
         if [[ -f "$_dry_cli" ]] && _dry_n=$(node "$_dry_cli" "${_dry_args[@]}" 2>/dev/null); then
           echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' resolves to ${_dry_n} skills (closure computed offline; not counted against the release tarball)"
           _dry_detail="${_dry_detail}, profile ${_dry_profile} (${_dry_n})"
@@ -1204,10 +1226,22 @@ install_skills() {
       # install. Falling back to the unfiltered set keeps a broken data file or
       # a missing node from bricking the install.
       local _profile; _profile=$(_config_skills_profile)
-      local _RESOLVED_SET="" _have_set=false
+      local _RESOLVED_SET="" _have_set=false _resolve_rc=0
       if [[ "$_profile" != "full" || -n "$(_config_skills_list exclude)" ]]; then
-        if _RESOLVED_SET=$(_resolve_skill_set "$_tracker" "$_tmpdir"); then
+        _RESOLVED_SET=$(_resolve_skill_set "$_tracker" "$_tmpdir"); _resolve_rc=$?
+        if [[ $_resolve_rc -eq 0 ]]; then
           _have_set=true
+          # An empty-but-successful resolution is honoured — but never quietly.
+          # "You excluded everything" and "something broke" produce the same
+          # `0 new, 0 updated` summary otherwise.
+          if [[ -z "$_RESOLVED_SET" ]]; then
+            warn "Profile '${_profile}' resolved to ZERO skills — check your skills.exclude list"
+            record_warning "Profile '${_profile}' resolved to zero skills, so nothing was installed. This is what the config asks for (every seed is excluded); if it is not what you meant, fix skills.exclude and re-run --update."
+          fi
+        elif [[ $_resolve_rc -eq 2 ]]; then
+          # The CLI has already printed the specific problem to stderr.
+          warn "skills-config.yaml names something that does not exist (see above) — installing the unfiltered set"
+          record_warning "Your skills-config.yaml 'skills:' block names a skill or profile that does not exist; the message above says which. Every applicable skill was installed instead. Fix the config and re-run --update — this is a config error, not a node/PATH problem."
         else
           warn "Could not resolve skill profile '${_profile}' — installing the unfiltered set"
           record_warning "Skill profile '${_profile}' could not be resolved; every applicable skill was installed instead. Re-run --update after checking that node is on PATH."

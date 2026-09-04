@@ -127,8 +127,8 @@ test("the tracker-sibling chain that task 83 depends on is intact", () => {
 });
 
 test("`invokes:` uses the inline flow form everywhere it appears", () => {
-  // The parser supports only `invokes: [a, b]`. A block list would parse as
-  // empty, which is the silent under-collection this guards against.
+  // Every SKILL.md in the tree parses. Kept, but it is NOT the guard against the
+  // block form — see the next test for that, and see why below.
   for (const skill of names) {
     const text = readFileSync(
       path.join(REPO, "skills", skill, "SKILL.md"),
@@ -139,6 +139,37 @@ test("`invokes:` uses the inline flow form everywhere it appears", () => {
       `${skill}: malformed invokes:`,
     );
   }
+});
+
+test("the block form of `invokes:` is REJECTED, not silently read as empty", () => {
+  // This test exists because its predecessor was vacuous. That one asserted only
+  // `doesNotThrow` over the real tree, with a comment claiming it guarded against
+  // "a block list parsing as empty" — but the block form returned `[]` WITHOUT
+  // throwing, so the test passed for precisely the input it named. It would also
+  // have passed with the trailing-comment fix reverted, since no SKILL.md in the
+  // tree carries one.
+  //
+  // A silently-empty edge list is the worst failure this file has: the generator
+  // succeeds, the committed JSON matches a fresh generation, the drift check is
+  // green, and a consumer on a profile install gets a skill with none of the
+  // steps it invokes — dying mid-pipeline in their repo, hours after the install.
+  assert.throws(
+    () =>
+      parseInvokes("---\ninvokes:\n  - create-branch\n  - develop\n---\n", "x"),
+    /must use the inline form/,
+    "a YAML block list must be rejected loudly",
+  );
+
+  // The forms that must keep working, asserted on VALUE rather than on "no throw":
+  assert.deepEqual(
+    parseInvokes("---\ninvokes: [create-branch, develop]\n---\n", "x"),
+    ["create-branch", "develop"],
+  );
+  assert.deepEqual(parseInvokes("---\ninvokes: []\n---\n", "x"), []);
+  assert.deepEqual(parseInvokes("---\nname: x\n---\n", "x"), [], "absent key");
+  // Both comment spacings — `\s+#` missed the no-space form for a cycle.
+  assert.deepEqual(parseInvokes("---\ninvokes: [a]  # sp\n---\n", "x"), ["a"]);
+  assert.deepEqual(parseInvokes("---\ninvokes: [a]# nosp\n---\n", "x"), ["a"]);
 });
 
 test("every skill named in a profile exists", () => {

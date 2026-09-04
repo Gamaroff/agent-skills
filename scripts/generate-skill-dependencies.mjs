@@ -84,22 +84,37 @@ export function skillNames(skillsDir = SKILLS_DIR) {
  * Parsed with a narrow regex rather than a YAML library on purpose: this runs
  * in the release path and in the installer's orbit, and adding a dependency
  * for one flow-sequence line is not worth it. Only the inline form
- * `invokes: [a, b, c]` is supported — the block form is rejected loudly rather
- * than silently returning nothing, because a silently-empty edge list is
- * exactly the under-collection failure this file exists to avoid.
+ * `invokes: [a, b, c]` is supported. The block form IS rejected loudly (see the
+ * check below) — a silently-empty edge list is exactly the under-collection
+ * failure this file exists to avoid, and it went undetected for one cycle
+ * because the guard asserted only that parsing did not throw.
  */
 export function parseInvokes(text, skill = "<unknown>") {
   const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!fm) return [];
   const line = fm[1].match(/^invokes:[ \t]*(.*)$/m);
   if (!line) return [];
+
+  // BLOCK FORM. `invokes:` followed by `  - name` lines captures the empty
+  // string above, so without this the `!raw` early-return below swallowed it and
+  // returned no edges — silently, which is the exact under-collection failure
+  // this file exists to prevent. The header comment claimed the block form was
+  // "rejected loudly"; it was not, and the drift guard asserting `doesNotThrow`
+  // passed for precisely the input it was written to catch.
+  const afterKey = fm[1].slice(line.index + line[0].length);
+  if (!line[1].trim() && /^\r?\n[ \t]+-[ \t]/.test(afterKey)) {
+    throw new Error(
+      `${skill}: 'invokes:' must use the inline form 'invokes: [a, b]'. ` +
+        `Found a YAML block list, which this parser does not read.`,
+    );
+  }
   // Strip a trailing YAML comment BEFORE the bracket checks. Without this,
   // `invokes: [a, b]  # steps 1-2` — legal YAML — fails `endsWith("]")` and
   // throws "unterminated list, missing ]" about a line whose bracket is plainly
   // there. Both CI drift checks then fail with a message that sends the reader
   // to the wrong place. The awk parsers in setup-consumer.sh already do this;
   // this parser was the odd one out.
-  const raw = line[1].replace(/\s+#.*$/, "").trim();
+  const raw = line[1].replace(/\s*#.*$/, "").trim();
   if (!raw) return [];
   if (!raw.startsWith("[")) {
     throw new Error(

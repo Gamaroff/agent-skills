@@ -136,12 +136,30 @@ function main() {
     return;
   }
 
+  // `exclude` is WARNED about, not rejected — deliberately asymmetric with
+  // `include` above. An unknown include is always a mistake: the user asked for
+  // a skill that does not exist and would get a silently smaller set. An unknown
+  // exclude is usually a typo (the skill they wanted gone is still installed,
+  // silently) but is legitimately reachable when a config outlives a skill that
+  // was renamed or removed, and failing the install for that would be worse than
+  // the typo. So: name it, keep going.
+  const excludes = list(arg("exclude"));
+  const unknownExcludes = excludes.filter((n) => !known.has(n));
+  if (unknownExcludes.length) {
+    console.error(
+      `resolve-skill-set: exclude names unknown skill(s), ignored: ${unknownExcludes.join(", ")}`,
+    );
+    console.error(
+      "  If that is a typo, the skill you meant is still being installed.",
+    );
+  }
+
   let result;
   try {
     result = resolveSkillSet({
       profile: arg("profile", "full"),
       include: includes,
-      exclude: list(arg("exclude")),
+      exclude: excludes,
       profiles,
       graph,
       allSkills,
@@ -179,6 +197,22 @@ function main() {
   for (const name of result.droppedForTracker) {
     console.error(
       `    − ${name} (not applicable to tracker: ${arg("tracker")})`,
+    );
+  }
+  // A skill the user NAMED in `include` and did not get is a different event
+  // from a closure by-product being filtered out, and must not scroll past in
+  // the same list. They asked for it explicitly; say plainly that it is absent.
+  const askedButDropped = includes.filter((n) =>
+    result.droppedForTracker.includes(n),
+  );
+  if (askedButDropped.length) {
+    console.error(
+      `⚠  You asked for ${askedButDropped.join(", ")} in skills.include, but ` +
+        `${askedButDropped.length === 1 ? "it does" : "they do"} not apply to ` +
+        `tracker '${arg("tracker")}' and ${askedButDropped.length === 1 ? "was" : "were"} NOT installed.`,
+    );
+    console.error(
+      "   Pass --all-skills to install regardless of tracker, or remove the entry.",
     );
   }
   // A conflict is a real problem the user must act on, so it is a warning with
