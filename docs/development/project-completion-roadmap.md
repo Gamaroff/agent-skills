@@ -97,6 +97,7 @@ accepted task stalls the loop.
 - [x] **T83** Skip installing tracker-specific skills the consumer's platform can never fire · deps: none · touches: setup-consumer!, test-harness~, docs-pipeline~ · /develop-task docs/tasks/task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md — ✅ **accepted + merged** ([PR #315](https://github.com/Gamaroff/agent-skills/pull/315), DoD PASS, QA PASS 95/100 over 3 cycles, CI 3/3) — QA found the filter **inverted** for quoted config, then found the follow-on defect in its own fix
 - [ ] **T84** Skill install profiles with dependency closure · deps: T83 · touches: setup-consumer!, test-harness~, docs-config~, docs-pipeline~ · /develop-task docs/tasks/task.84.skill-install-profiles/task.84.skill-install-profiles.md
 - [ ] **T91** Reconcile install-time and run-time tracker resolution · deps: T83 · touches: setup-consumer!, platform-detection!, test-harness~, docs-config~ · /develop-task docs/tasks/task.91.reconcile-tracker-resolution/task.91.reconcile-tracker-resolution.md
+- [ ] **T92** Add a shellcheck CI lane for the repo's shell scripts · deps: none · touches: ci-workflows!, shell-scripts!, platform-detection~, setup-consumer~ · /develop-task docs/tasks/task.92.shellcheck-ci-lane/task.92.shellcheck-ci-lane.md
 
 ---
 
