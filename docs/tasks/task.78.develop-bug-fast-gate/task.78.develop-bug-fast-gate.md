@@ -355,16 +355,16 @@ None. One document gains a step that two others already have.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-04
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 80/100)
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.78.qa.1.develop-bug-fast-gate.md](./task.78.qa.1.develop-bug-fast-gate.md)
-- **Gate File**: [task.78.gate.1.develop-bug-fast-gate.yml](./task.78.gate.1.develop-bug-fast-gate.yml)
+- **Cycle 2 (latest)**: [task.78.qa.2.develop-bug-fast-gate.md](./task.78.qa.2.develop-bug-fast-gate.md) · [gate](./task.78.gate.2.develop-bug-fast-gate.yml)
+- **Cycle 1**: [task.78.qa.1.develop-bug-fast-gate.md](./task.78.qa.1.develop-bug-fast-gate.md) · [gate](./task.78.gate.1.develop-bug-fast-gate.yml)
 
 ### Test Coverage Summary
 
@@ -375,10 +375,14 @@ None. One document gains a step that two others already have.
 
 ### Key Findings
 
-The gate is at the right seam and the parity test is mutation-proved on all three documents. Three
-MEDIUM findings, none in the gate's behaviour: **TASK-78-001** — "step-3" collides with 5b's own
-step 3; **TASK-78-002** — the failure output is directed at a template with no field for it;
-**TASK-78-003** — three live docs still describe the gate as running in two places.
+Cycle 1 raised three MEDIUM findings, none in the gate's behaviour: **TASK-78-001** — "step-3"
+collided with 5b's own step 3; **TASK-78-002** — the failure output was directed at a template with
+no field for it; **TASK-78-003** — three live docs still described the gate as running in two places.
+
+All three verified closed in cycle 2 by reading the current files. The cycle-2 refute pass over the
+whole branch diff found nothing false. The fix cycle had itself already caught and reverted one
+defect of the shape that pass looks for — a change correct in the steady state and wrong in a
+transition.
 
 ---
 
@@ -391,6 +395,7 @@ step 3; **TASK-78-002** — the failure output is directed at a template with no
 | 2026-09-04 |         | Implemented — 4 files, parity test extended to 3 loop documents and mutation-proved on each | develop |
 | 2026-09-04 |         | QA gate CONCERNS (80/100) — 3 MEDIUM findings, none in the gate's behaviour | qa-task |
 | 2026-09-04 |         | QA findings fixed — all 3 closed, 1 iteration; a fourth defect found by the adversarial pass over the fixes themselves | qa-fix |
+| 2026-09-04 |         | QA cycle 2 — gate PASS (100/100), all three findings verified closed, refute pass found nothing new | qa-task |
 
 ---
 
