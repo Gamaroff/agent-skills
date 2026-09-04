@@ -100,6 +100,16 @@ test("the wizard's github config carries no jira block at all", () => {
   assert.ok(!/^jira:/m.test(out));
 });
 
+// task 83: the config must NAME its tracker on both platforms. GitHub used to be
+// the implicit default and was written as nothing at all, which left
+// install_skills' resolver with nothing to read on the --update path (where
+// select_platform never runs) — so the platform skill filter was silently inert
+// for exactly the consumers it was built for.
+test("the wizard writes a scalar tracker: key for both platforms", () => {
+  assert.match(generateConfig("github"), /^tracker: github$/m);
+  assert.match(generateConfig("jira"), /^tracker: jira$/m);
+});
+
 test("the generated jira config parses under every hand-rolled reader", () => {
   const out = generateConfig("jira");
 

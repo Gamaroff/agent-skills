@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **`setup-consumer.sh` now installs only the tracker skills a consumer's platform can actually
+  fire.** 17 of the shipped skills are tracker-specific and mutually exclusive — 11 Jira-only, 6
+  GitHub-only — and every consumer received all 17 regardless of platform. A GitHub repo got
+  `sync-jira-story`, `jira-sprint-manager` and nine others that can never run.
+
+  The cost worth fixing is **mis-selection**, not disk. Auto-activation matches on the `description`
+  field, and the two siblings differ there only in the platform noun, so an agent asked to "sync this
+  story to the tracker" can pick the one that cannot work — and the failure is not a clean error at
+  the top, because `resolve-platform.sh` is sourced *inside* the skill and the run gets some distance
+  in first. The context saving is real but secondary: ~1,493 tokens of ~11,602 for a GitHub consumer,
+  about 13%. Install profiles are where the larger saving lives.
+
+  **No existing install loses a skill.** An excluded skill already on disk is *kept*, not pruned, and
+  reported as such — the grandfather branch is evaluated before any delete, and is held by a test
+  that fails if the branch or its `continue` is removed. `--update` over an existing install is
+  therefore byte-for-byte unchanged in what it leaves behind. To prune, delete `.agents/skills/` and
+  re-run the wizard; to disable the filter entirely, pass the new `--all-skills` flag.
+
+  Which tracker is resolved mirrors `resolve-platform.sh` — config, then the wizard answer, then
+  `JIRA_URL`, otherwise `github` — in **order and in value parsing both**, so a quoted scalar
+  (`tracker: "jira"`) or a CRLF line ending resolves the same at install time as at run time. That
+  second half is not a detail: while the parse was `awk '{print $2}'` against an `[a-z]` pattern, a
+  quoted or CRLF `tracker: jira` fell through to the `github` default and a Jira repo installed with
+  none of its eleven Jira skills — silently, the failure surfacing days later inside a pipeline step.
+  A parity test now asserts the two resolvers agree across ten spellings rather than asserting a
+  hardcoded answer on each side. One asymmetry is deliberate and pinned by its own test: the
+  installer additionally reads `.env` for `JIRA_URL`, because it runs once in a plain shell whereas
+  the skills run later in a shell that has the variable. That default is load-bearing rather than cosmetic: `write_skills_config` wrote a `tracker:`
+  key only for Jira consumers, so a GitHub consumer running `--update` (the path that never runs the
+  wizard) matched no probe at all, and an earlier design that resolved such a repo to "unknown" would
+  have left the filter inert for precisely the consumers it was built for. The wizard now writes
+  `tracker: github` explicitly as well, so a generated config states its own platform.
+
 ### Added
 
 - **The PR conformance review now runs inside the develop pipelines, as Step 5c.** `/review-pr`
