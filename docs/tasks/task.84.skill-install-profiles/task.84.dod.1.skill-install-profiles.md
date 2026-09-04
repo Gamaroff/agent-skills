@@ -31,7 +31,7 @@
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| `shellcheck scripts/setup-consumer.sh` no new warnings | ❌ **NOT MET** | Never run. shellcheck is not installed on the host and the repo has no lane (task 92 owns that). Would likely have caught C3-001. |
+| `shellcheck scripts/setup-consumer.sh` no new warnings | ✅ **MET** (see below) | Run via the official container. Baseline 1 finding, branch 2 (a new SC2155 — `local` masking a return value), fixed → **0 new**. |
 | A real `--update` against a full existing install verified to remove nothing | ⚠️ **PARTIAL** | Only `--update --dry-run` against **6** skills. A dry run writes nothing by construction, so it cannot exercise the destructive path at all. |
 
 The second sits on the only code path that can delete a consumer's installed skills.
@@ -68,12 +68,12 @@ correct action, assuming is not.
 
 **Decision: ❌ NOT ACCEPTED — GAPS IDENTIFIED**
 
-Blocked five independent ways. Any one of these alone is disqualifying:
+Blocked four independent ways (was five — shellcheck has since been run and passes). Any one alone is disqualifying:
 
 1. **CI is PENDING**, not green, on the final head.
 2. **No approving review** on PR #318.
 3. **Three QA gates read CONCERNS**, none PASS.
-4. **Two success criteria unmet** — one of them covering the destructive path.
+4. **One success criterion unmet** — the real `--update`, covering the destructive path.
 5. **Step 5c returned REQUEST CHANGES**, with six documentation findings still open.
 
 > **Re-sampling CI would not change this verdict.** Even a green `test` job leaves blockers 2–5
@@ -81,10 +81,28 @@ Blocked five independent ways. Any one of these alone is disqualifying:
 
 ---
 
+## Correction — shellcheck WAS runnable, and it found something
+
+This report first recorded shellcheck as unverifiable: "not installed on the host and the repo has
+no lane". **That was wrong.** Docker is available, and the roadmap's own T83 entry records shellcheck
+being run for the previous task via `docker run koalaman/shellcheck` — evidence sitting in this
+repository that the check was routine.
+
+Run properly: baseline `origin/develop` gives 1 finding (SC2209, pre-existing, in code this diff
+never touches). The branch gave **2** — a new **SC2155** on
+`local _dry_cli="$(dirname …)"`, *"declare and assign separately to avoid masking return values"*.
+That is the same defect class this change explicitly guards against two functions away in
+`_resolve_skill_set`. Split and re-run: 1 finding, **0 new**.
+
+The check I recorded as impossible found a real defect on the first attempt. **Recording a check as
+unrunnable is a claim, and it deserves the same scrutiny as recording it as passed** — arguably more,
+because it removes the check rather than reporting on it.
+
+---
+
 ## Blocking Issues
 
-1. **Run `shellcheck scripts/setup-consumer.sh`** and record before/after warning counts. This is the criterion covering ~420 new lines of bash in the script that can `rm -rf` a consumer's skills, and it would very likely have caught C3-001 — the bare command-substitution assignment that aborted the wizard under errexit.
-2. **Perform a genuine non-dry `--update`** against a full existing install; record `ls .agents/skills | wc -l` before and after. Alternatively extract the per-skill keep/copy decision into a testable helper and drive the eight-case truth table behaviourally.
+1. **Perform a genuine non-dry `--update`** against a full existing install; record `ls .agents/skills | wc -l` before and after. Alternatively extract the per-skill keep/copy decision into a testable helper and drive the eight-case truth table behaviourally.
 3. **Obtain a human review of PR #318.** See the rationale below — this is the substantive gap, not a formality.
 4. **Wait for CI** to finish green on the final head.
 5. **Clear PC-5 … PC-9 and PC-11** — task doc §10 Risk 1 and §3's edge table still describe the abandoned prose-scrape design; the plan still ships the old generator with no superseded banner; `invokes:` is a new authoring contract documented nowhere.

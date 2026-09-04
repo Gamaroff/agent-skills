@@ -1174,7 +1174,12 @@ install_skills() {
       _dry_inc=$(_config_skills_list include)
       _dry_exc=$(_config_skills_list exclude)
       if [[ "$_dry_profile" != "full" || -n "$_dry_exc" ]]; then
-        local _dry_cli="$(dirname "${BASH_SOURCE[0]}")/../shared/resources/resolve-skill-set-cli.mjs"
+        # Declared and assigned separately (SC2155): `local x="$(cmd)"` makes the
+        # declaration's exit status the one that survives, masking the command's.
+        # The same class this file already guards against in `_resolve_skill_set`
+        # — caught here by shellcheck, which the DoD had recorded as unrunnable.
+        local _dry_cli
+        _dry_cli="$(dirname "${BASH_SOURCE[0]}")/../shared/resources/resolve-skill-set-cli.mjs"
         # Pass include/exclude too — a dry run that previews a different set than
         # the real run would install defeats the point of previewing.
         local _dry_args=(--profile "$_dry_profile" --tracker "$_dry_tracker" --count)

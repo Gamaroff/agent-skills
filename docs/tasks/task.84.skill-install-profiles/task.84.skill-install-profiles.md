@@ -369,10 +369,14 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 ## 9. Success Criteria
 
-> **Status of this section, stated plainly.** Two criteria below are **unticked and will not be
-> ticked by this change**: shellcheck (unverified — no lane exists yet) and the real `--update`
-> (partial — only a dry run was performed). Every other criterion is met with evidence named in the
-> QA reports. All three QA gates read **CONCERNS**, not PASS.
+> **Status of this section, stated plainly.** **One** criterion below is unticked: the real
+> `--update` (partial — only a dry run was performed, which by construction cannot exercise the path
+> that deletes files). Every other criterion is met with evidence named in the QA reports. All three
+> QA gates read **CONCERNS**, not PASS.
+>
+> shellcheck was previously recorded here as unverifiable. It was not — it ran via the official
+> container and found a new SC2155 warning in this change, now fixed. Recording a check as
+> impossible is a claim that deserves the same scrutiny as recording it as passed.
 >
 > An earlier revision of this document had all 21 criteria ticked, including those two. That was a
 > blanket checkbox pass, not an assessment, and it asserted completion the gates and the
@@ -402,7 +406,9 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 - [x] `npm test` green, and both new suites **observed to run** (the reported test count rises). They land in `shared/resources/tests/`, which the `test` script already globs — so "registered in `package.json`" is not the check and must not be treated as one
 - [x] Every guarantee in §8 mutation-proven
-- [ ] `shellcheck scripts/setup-consumer.sh` no new warnings — **UNVERIFIED, not met.** shellcheck is not installed on the development host and this repo has no shellcheck lane (that is task 92's scope). This criterion was ticked in error by a blanket checkbox pass; every gate and the implementation report record it as unverified. It is the one criterion this PR cannot honestly claim, on ~420 new lines of bash in the script that can `rm -rf` a consumer's skills.
+- [x] `shellcheck scripts/setup-consumer.sh` no new warnings — **MET, and it caught one.** Run via the official container (`docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable`), the same way task 83 ran it. Baseline `origin/develop`: 1 finding (SC2209, line 269, pre-existing, untouched by this diff). Branch before the fix: **2** — the pre-existing one plus a **new SC2155** at the `local _dry_cli="$(dirname …)"` line, "declare and assign separately to avoid masking return values". That is the same class this change already guards against in `_resolve_skill_set`, introduced two functions away. Split and re-run: **1 finding, 0 new**.
+
+  > This criterion had been recorded across three gates and the DoD as "unverified — shellcheck is not installed and there is no lane". That was **wrong**: docker is available, and the roadmap's own T83 entry says it was run exactly this way. The check I claimed could not run found a real defect on the first attempt.
 - [x] `skill-dependencies.json` regenerable and CI-checked for drift
 - [x] Closure logic lives in Node with unit tests over injected fixtures, not in untestable inline bash
 
@@ -538,12 +544,11 @@ Blocked five independent ways; any one alone is disqualifying:
 1. **CI PENDING** — the `test` job had not finished on the final head
 2. **No approving review** on PR #318
 3. **Three QA gates read CONCERNS**, none PASS
-4. **Two success criteria unmet** — `shellcheck` (never run) and the real `--update` (dry-run evidence only, on the path that deletes files)
+4. **One success criterion unmet** — the real `--update` (dry-run evidence only, on the path that deletes files). *(shellcheck has since been run and now passes with 0 new warnings.)*
 5. **Step 5c returned REQUEST CHANGES**, six documentation findings still open
 
 ### Next Steps
 
-- [ ] Run `shellcheck scripts/setup-consumer.sh`; record before/after counts
 - [ ] Perform a genuine non-dry `--update` against a full install, or extract the per-skill decision into a testable helper
 - [ ] Obtain human review of PR #318 — see below
 - [ ] Wait for CI to finish green
@@ -576,6 +581,7 @@ demonstrably unreliable, in a file that can delete a consumer's installed skills
 | 2026-09-04 |         | qa-fix cycle 3 — all 5 fixed; comment-asserting vacuous test replaced; mutation proofs now assert the mutation applied | qa-fix |
 | 2026-09-05 |         | review-pr (Step 5c) — REQUEST CHANGES: two success criteria were ticked without evidence, and the implementation report undercounted cycle 3. Corrected | review-pr |
 | 2026-09-05 |         | DoD incomplete — 5 blocking gaps (CI pending, no approving review, 3 CONCERNS gates, 2 criteria unmet, 5c REQUEST CHANGES). Status NOT advanced to accepted | finalise |
+| 2026-09-05 |         | shellcheck run via container after all — found and fixed a new SC2155 (`local` masking a return value). 0 new warnings vs baseline; that criterion now met, 1 gap remains | finalise |
 ---
 
 ## Progress Tracking
