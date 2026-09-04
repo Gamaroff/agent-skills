@@ -487,16 +487,16 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (2 cycles)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-04
 **Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Gate Decision**: CONCERNS — cycle 3 confirmation pass recommended
 
 ### QA Report
 
-- **Full Report**: [task.84.qa.1.skill-install-profiles.md](./task.84.qa.1.skill-install-profiles.md)
-- **Gate File**: [task.84.gate.1.skill-install-profiles.yml](./task.84.gate.1.skill-install-profiles.yml)
+- **Cycle 1**: [task.84.qa.1.skill-install-profiles.md](./task.84.qa.1.skill-install-profiles.md) · [gate.1](./task.84.gate.1.skill-install-profiles.yml)
+- **Cycle 2 (refute)**: [task.84.qa.2.skill-install-profiles.md](./task.84.qa.2.skill-install-profiles.md) · [gate.2](./task.84.gate.2.skill-install-profiles.yml)
 
 ### Test Coverage Summary
 
@@ -526,6 +526,8 @@ Worth recording how they were found, because the three lenses were disjoint: the
 
 | 2026-09-04 |         | QA gate CONCERNS (80/100) — 0 HIGH, 7 MEDIUM, 3 LOW; four reachable configs silently install every skill | qa-task |
 | 2026-09-04 |         | qa-fix cycle 1 — all 11 defects fixed (10 from adversarial review, 1 from the repo stdout-drain guard); 16 regression tests added, 6 mutation-proven | qa-fix |
+| 2026-09-04 |         | QA gate 2 CONCERNS (80/100) — refute pass found 5 more, 2 HIGH, both introduced by cycle 1's own fixes; 4 cycle-1 tests found vacuous | qa-task |
+| 2026-09-04 |         | qa-fix cycle 2 — all 5 fixed with behavioural tests; vacuous drift guard replaced and mutation-proven | qa-fix |
 ---
 
 ## Progress Tracking

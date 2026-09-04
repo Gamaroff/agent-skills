@@ -35,7 +35,7 @@ Add install profiles (minimal/pipeline/full) plus per-skill add-ons to `setup-co
 | 2. review-task             | ✅ Done    | `task.84.review.{N}.{name}.md` exists (or skip logged)                 | `task.84.review.1.skill-install-profiles.md` — READY TO IMPLEMENT, 9/10; 0 critical / 8 important / 3 optional, all important applied. Status Planned → Ready for Development | 2 Explore pre-pass agents (architecture alignment → `drift`; codebase scan → `not-started`) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 5 phases; 12 files + 20 SKILL.md `invokes:` declarations; 30 new tests; `npm run ci:fast` green (2398 tests, 0 fail); 6 guarantees mutation-proven. **Graph design changed** from prose-scrape to declared frontmatter — see Issues Log | 2 Explore pre-pass agents (Step 2); no third dispatched — their output was a superset of the pre-develop surface map |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #318](https://github.com/Gamaroff/agent-skills/pull/318) → `develop`; 5 conventional commits; issue #317 commented (`in-review`) | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.84.qa.{N}.*.md`; `task.84.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | 🔄 In progress | `task.84.qa.{N}.*.md`; `task.84.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.84.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -180,6 +180,40 @@ claimed the menu could call the resolver for a count "because both JSON files ar
 are committed in *agent-skills*, not in the consumer repo the wizard runs against, where the
 resolver arrives with the tarball six steps after the prompt. Implementing it would have required
 adding a download to the prompt, breaking the installer's one-request property for a cosmetic gain.
+
+---
+
+### QA Cycle 2 — refute pass — 2026-09-04
+
+**Gate**: CONCERNS (80/100) — 5 findings, **2 HIGH**, plus 4 vacuous tests from cycle 1.
+
+**Both HIGH findings were introduced by cycle 1's own fixes.** That is the entire justification for
+running cycle 2 unscoped: the narrowing rule would have pointed it at cycle 1's repairs, which is
+where the defects were — but C2-003 lives in a *comment block the fix never touched*, and only an
+unscoped read surfaces a claim that has quietly become false.
+
+| ID | Sev | Defect | Fix |
+|---|---|---|---|
+| C2-001 | HIGH | Block-form `invokes:` returned `[]` **silently**; the header claimed it was "rejected loudly". Cycle 1's fix rewrote that very line and left the false claim | Detect the block form explicitly and throw |
+| C2-002 | HIGH | `_resolve_skill_set` collapsed exit 2 → `return 1`, so a config typo was reported as a node/PATH problem — the exact mis-blaming the exit-2 validation was added to stop | `return $_rc`; `install_skills` branches on 2 |
+| C2-003 | MED | Cycle 1's fix #2 made an empty install reachable while the surrounding comments still said it could not happen | Honour it, but warn loudly; contract corrected |
+| C2-004 | MED | Dry-run forwarded include/exclude but not `--all-skills` — previewed 35 where the real run installs 41 | Forward it |
+| C2-005 | LOW | An explicitly-included, tracker-excluded skill was dropped as if it were a closure by-product | Distinct warning naming `--all-skills` |
+
+Also: two cycle-1 fixes were **incomplete** — `\s+#` missed `[a]# note` (no space), and the dry-run
+flag forwarding missed `--all-skills`. Three cleanups: exclude list hoisted, comment regex widened,
+call-contract note added (verified: a bare `_resolve_skill_set` call under `set -e` aborts the
+wizard; the real call site is inside an `if`, so it is safe).
+
+**Four of cycle 1's tests were vacuous.** The worst asserted `doesNotThrow` while its comment claimed
+it guarded against "a block list parsing as empty" — the block form returned `[]` *without* throwing,
+so it passed for exactly the input it named. Replaced with a mutation-proven throw assertion. Two
+others were strengthened with behavioural companions. The fourth — the grandfather guarantee — is an
+**accepted, argued limitation**: testing it behaviourally means restructuring the only code here that
+can delete a user's skills, late in a QA loop, on code already verified across all eight cases. Filed
+as follow-up rather than done under time pressure.
+
+Suite: 57 → 66 tests.
 
 ---
 
