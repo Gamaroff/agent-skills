@@ -34,7 +34,7 @@ Add install profiles (minimal/pipeline/full) plus per-skill add-ons to `setup-co
 | 1. create-branch           | ✅ Done    | Branch `feature/task.84.*` exists in git                               | `feature/task.84.skill-install-profiles` created from `develop` at `a0ac4b8`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.84.review.{N}.{name}.md` exists (or skip logged)                 | `task.84.review.1.skill-install-profiles.md` — READY TO IMPLEMENT, 9/10; 0 critical / 8 important / 3 optional, all important applied. Status Planned → Ready for Development | 2 Explore pre-pass agents (architecture alignment → `drift`; codebase scan → `not-started`) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 5 phases; 12 files + 20 SKILL.md `invokes:` declarations; 30 new tests; `npm run ci:fast` green (2398 tests, 0 fail); 6 guarantees mutation-proven. **Graph design changed** from prose-scrape to declared frontmatter — see Issues Log | 2 Explore pre-pass agents (Step 2); no third dispatched — their output was a superset of the pre-develop surface map |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #318](https://github.com/Gamaroff/agent-skills/pull/318) → `develop`; 5 conventional commits; issue #317 commented (`in-review`) | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.84.qa.{N}.*.md`; `task.84.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.84.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -130,7 +130,56 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-04
+
+**Gate**: CONCERNS (80/100) — 0 HIGH, 7 MEDIUM, 3 LOW.
+
+**The finding that matters most is about the review itself.** The first pass, run by the same
+pipeline that wrote the code, verified the headline guarantees and the happy paths and found
+**one** issue. An independent adversarial Explore subagent — given a refute-shaped brief and no
+sight of the implementer's reasoning — found **ten**. Every one was then reproduced directly
+before being accepted. A self-review of one's own change converges on confirming it; the
+independent lens is what made this cycle worth running.
+
+The defects shared a shape: the mechanism was right, the input handling around it was not. Four
+reachable configurations **silently installed every skill** — the exact outcome the feature
+exists to prevent.
+
+| ID | Severity | Defect | Fix |
+|---|---|---|---|
+| 001 | MEDIUM | `include` echoed unvalidated → bash shape guard rejected the whole batch → full install | CLI validates against `allSkills`, exits 2 naming the entry |
+| 002 | MEDIUM | Empty resolved set indistinguishable from failure → excluding every seed installed everything | Discriminate on the CLI's exit code, not on emptiness |
+| 003 | MEDIUM | `skills:  # comment` voided the whole block, silently, with no warning | Header rule accepts a comment; close rule excludes the header line |
+| 004 | MEDIUM | `parseInvokes` threw on a legal trailing comment → both CI drift checks failed | Strip a trailing `#…` before the bracket checks |
+| 005 | MEDIUM | Profile branch preceded tracker branch → `_kept` always 0, tracker warning unreachable | Tracker test first |
+| 006 | MEDIUM | Profile skips counted into `_skipped`, rendered as `skipped (github)` | Separate `_not_in_profile` counter and phrasing |
+| 007 | MEDIUM | Plan documented wizard counts the code does not print | **Plan corrected** — the resolver does not exist at prompt time (tarball arrives six steps later), so the counts are printed by `install_skills` where the data exists |
+| 008 | LOW | `graph[name] ?? []` prototype lookup; `--include toString` threw uncaught | `Object.hasOwn` + `Array.isArray` guard |
+| 009 | LOW | `$comment` accepted as a profile name → empty set → read as failure → full install | Reject `$`-prefixed names in the lookup |
+| 010 | LOW | Dry-run count ignored include/exclude; `_dry_n` leaked to global scope | Pass both; declare `local` |
+
+Plus four cleanups: conflict dedupe (one warning per skill naming every requirer, replacing dead
+`.some()` code and four duplicate warnings), quote stripping in list values, explicit `include: []`
+now beats a stale env var, and two inaccurate `validate.yml` comments corrected.
+
+**011 — found by a pre-existing repo guard, after the ten above were fixed.** The full gate went
+red on `stdout-drain-on-exit.test.mjs`'s *"no NEW file adopts exit-after-write"* check:
+`resolve-skill-set-cli.mjs` called `process.exit(2)` at four sites. This repo already carries a bug
+and a standing guard for that pattern (`bug.3.stdout-truncation-on-exit`) — `process.exit()` after a
+write truncates at the pipe buffer (~64KB), and `setup-consumer.sh` consumes this CLI's stdout
+*through a pipe*. 120 skill names sit well under 64KB today, which is precisely why it would have
+gone unnoticed until the library grew past it. Replaced with `process.exitCode` + `return`; all four
+exit codes re-verified (2 / 2 / 2 / 0). A repo-wide guard catching a brand-new file adopting a
+known-bad pattern is the cheapest possible place to catch this.
+
+**16 regression tests added** (14 + 2), one per defect. Five fixes mutation-proven — 001, 002, 003,
+004 and 009 each reverted and confirmed red. Suite: 42 → 57 tests.
+
+007 is worth singling out: it was resolved by correcting the **plan**, not the code. The plan
+claimed the menu could call the resolver for a count "because both JSON files are committed" — they
+are committed in *agent-skills*, not in the consumer repo the wizard runs against, where the
+resolver arrives with the tarball six steps after the prompt. Implementing it would have required
+adding a download to the prompt, breaking the installer's one-request property for a cosmetic gain.
 
 ---
 
@@ -139,7 +188,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.84.skill-install-profiles`
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/318
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

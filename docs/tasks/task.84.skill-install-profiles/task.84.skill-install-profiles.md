@@ -485,6 +485,36 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-04
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.84.qa.1.skill-install-profiles.md](./task.84.qa.1.skill-install-profiles.md)
+- **Gate File**: [task.84.gate.1.skill-install-profiles.yml](./task.84.gate.1.skill-install-profiles.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2398 (42 new)
+- **Phases Verified**: 5/5 implemented, 4 with concerns
+- **Critical Issues**: 0 HIGH, 7 MEDIUM, 3 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+The core mechanism is correct and mutation-proven, and the graph design change is well evidenced. Eleven defects sat in the input handling and reporting around it — **all now fixed**, each with a regression test, six mutation-proven.
+
+Four had silently installed **every** skill in reachable configurations: a typo'd `include`, an `exclude` list that empties the profile, a trailing comment on the `skills:` line, and a `$`-prefixed profile name. One broke both CI drift checks on a legal YAML comment. Two misreported what the installer had done.
+
+Worth recording how they were found, because the three lenses were disjoint: the self-review (same pipeline that wrote the code) found **1**; an independent adversarial reviewer found **10**; the repo's own pre-existing `stdout-drain-on-exit` guard found the **11th**, a class neither reviewer probed.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -494,6 +524,8 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 | 2026-09-04 |         | Status → ready-for-development | review-task |
 | 2026-09-04 |         | Implemented — 5 phases, 12 files (4 new in `shared/resources/`, 1 new generator, 20 SKILL.md `invokes:` declarations), 42 new/updated tests, all 6 guarantees mutation-proven. Graph design changed from prose-scrape to declared `invokes:` frontmatter after measurement showed the scrape collapses every profile to the same ~34 skills — see §3 | develop |
 
+| 2026-09-04 |         | QA gate CONCERNS (80/100) — 0 HIGH, 7 MEDIUM, 3 LOW; four reachable configs silently install every skill | qa-task |
+| 2026-09-04 |         | qa-fix cycle 1 — all 11 defects fixed (10 from adversarial review, 1 from the repo stdout-drain guard); 16 regression tests added, 6 mutation-proven | qa-fix |
 ---
 
 ## Progress Tracking

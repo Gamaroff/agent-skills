@@ -226,13 +226,11 @@ The CLI wrapper prints the resolved names one per line on stdout, and the closur
 ```bash
 select_skill_profile() {
   heading "Skill selection"
-  # Counts come from the resolver, not from a literal: a hardcoded 119 was
-  # already wrong by the time this was written (120 skills, ~41k bytes).
+  # NO COUNTS HERE — and not for want of trying. See the note below.
   echo "  Every installed skill's description stays in the agent's context"
-  echo "  permanently (~${_full_tokens} tokens for all ${_full_count})."
-  echo "  Install only what this project uses."
+  echo "  permanently. Install only what this project uses."
   echo ""
-  echo "  1) full      — every skill (${_full_count}). Today's behaviour."
+  echo "  1) full      — every skill. Today's behaviour."
   echo "  2) pipeline  — story/task/bug lifecycle: create → review → develop → QA → finalise."
   echo "  3) minimal   — branching, commits, PRs, code review only."
   echo ""
@@ -255,7 +253,19 @@ select_skill_profile() {
 }
 ```
 
-`_full_count` / `_full_tokens` come from one `resolve-skill-set-cli.mjs --profile full --count` call made just before the menu prints — not from a literal. That call is offline (both JSON files are committed), so it costs nothing and cannot go stale.
+> **The menu cannot print skill counts, and this was checked rather than assumed.**
+> An earlier draft of this plan had it calling `resolve-skill-set-cli.mjs --profile full --count`
+> just before the menu, on the reasoning that the JSON files are committed so the call is free.
+> They are committed **in agent-skills**, not in the consumer's repo. The wizard is run as
+> `bash <(curl …)` against a repo that has no `shared/resources/` and no `.agents/skills/` yet —
+> the resolver and both JSON files arrive with the tarball, which `install_skills` downloads at
+> step 8, six steps after this prompt.
+>
+> So the counts are printed where the data exists: `install_skills` shows the resolved count and
+> every closure addition on stderr immediately before copying anything, which is what §9's
+> "the wizard prints the resolved count and names each closure addition before installing"
+> actually requires. Adding a download to the prompt to get a number would break the installer's
+> one-request property for a cosmetic gain.
 
 Call from `main()` **after `select_platform`, before `write_skills_config`**:
 
