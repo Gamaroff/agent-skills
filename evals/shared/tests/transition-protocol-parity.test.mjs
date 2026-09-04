@@ -270,9 +270,12 @@ test("`--stage pr-merged` sits INSIDE develop-batch's per-item merge loop", () =
     "per-item merge lane not found",
   );
   const body = src.slice(loopStart, loopEnd);
+  // Task 89: the lookahead is load-bearing. `--stage pr-merged` is a PREFIX of
+  // `--stage pr-merged-DEFERRED`, so a renamed call satisfied a bare match while the lane no
+  // longer signalled the stage this asserts it signals.
   assert.match(
     body,
-    /--stage pr-merged/,
+    /--stage pr-merged(?![-\w])/,
     "pr-merged must be invoked inside the per-item serial merge lane",
   );
   assert.match(
