@@ -89,7 +89,7 @@ test("the wizard emits no active jira.statusMap", () => {
   );
   assert.match(
     out,
-    /--probe-workflow/,
+    /--probe-workflow(?![-\w])/,
     "the guidance should point at the probe",
   );
 });

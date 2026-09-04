@@ -385,9 +385,11 @@ function assertNotVacuous(cells) {
 describe("access-config parity: read-config.sh vs the JS tier", () => {
   test("the corpus is present and covers the refusal classes", () => {
     const names = corpus().map((c) => c.name);
+    // relationship-assertion-lint: allow — the 14 names enumerated below are a DELIBERATE subset
+    // of the 25+ this guard promises, not an omission. The aliasing family is what a line-oriented
+    // scanner cannot bound and is the class task 53 kept re-opening, so those members are named
+    // individually to make deleting one visible; the rest are covered by the corpus-wide checks.
     assert.ok(names.length >= 25, `corpus too small: ${names.length}`);
-    // The aliasing family is what a line-oriented scanner cannot bound, and is
-    // the class task 53 kept re-opening. Name them so deleting one is visible.
     for (const required of [
       "merge-key",
       "anchor",

@@ -235,17 +235,23 @@ test("lite mode maps to low effort and standard to medium, not the reverse", () 
 
 test("REQUEST CHANGES returns to 5b and consumes a shared cycle", () => {
   const s5c = section5c();
+  // Task 89: these two were the LAST survivors of the class gate 10 named — a row-scoped regex
+  // whose second half is satisfied by any cell after the verdict, not by the action cell itself.
+  // They stood harmlessly beside the `verdictRow()` reads above, which is exactly what makes them
+  // dangerous: a reader auditing this file finds an assertion that says it checks the row. Read the
+  // action cell instead, with the mechanism this file already carries.
+  const rc = verdictRow("REQUEST CHANGES");
   assert.match(
-    s5c,
-    /\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*5b[^|\n]*\|/,
+    rc,
+    /Return to \*\*5b\*\*/,
     "the REQUEST CHANGES table ROW must route back to 5b — not merely prose mentioning both",
   );
   // NOT `budget is **shared**` — that sentence predates the fixes and is already asserted by
   // "the 5-cycle bound covers 5c". Assert what this path actually needs to work: the row points at
   // the invocation block, and that block exists and passes the report.
   assert.match(
-    s5c,
-    /\|[^|\n]*REQUEST CHANGES[^|\n]*\|[^|\n]*see the invocation below[^|\n]*\|/,
+    rc,
+    /see the invocation below/,
     "the REQUEST CHANGES row must point at the invocation that delivers the findings",
   );
   assert.match(
@@ -265,9 +271,11 @@ test("APPROVE and CONCERNS exit the loop, and CONCERNS does not block", () => {
   // The APPROVE row's wording is unchanged from the original 5c section, so asserting it alone
   // pins nothing this cycle fixed. Assert the CONCERNS semantics instead, which is the one of the
   // three verdicts whose behaviour is easy to get wrong (it exits WITHOUT blocking).
+  // Task 89: read off the APPROVE row's own action cell, not "APPROVE somewhere, then an exit
+  // phrase somewhere later in the row" — same class as the two above.
   assert.match(
-    s5c,
-    /\|[^|\n]*APPROVE[^|\n]*\|[^|\n]*(exit the loop|Step 7)[^|\n]*\|/,
+    verdictRow("APPROVE"),
+    /exit the loop|Step 7/,
     "the APPROVE table ROW must exit the loop",
   );
   assert.match(
@@ -582,6 +590,10 @@ test("5c's two banner firing points are instructed, and belong to 5c", () => {
       banner.includes(position),
       `the banner table must declare the firing point "${line}"`,
     );
+    // relationship-assertion-lint: allow — `position` is the full constructed instruction line,
+    // not a short enumerated value, and the haystack is the 5c slice rather than the whole file.
+    // Containment of a whole distinctive line inside a bounded section IS the mapping; this is the
+    // mechanism rule C recommends, not the one rules A and B exist to catch.
     assert.ok(
       s5c.includes(position),
       `§5c must INSTRUCT the "${line}" block it owns, with the position line the banner table declares verbatim — a declared-but-uninstructed firing point is CR-3`,
@@ -609,6 +621,9 @@ test("Step 0's 5c completeness condition lives on the QA-loop row", () => {
       .split("\n")
       .find((l) => l.includes(loop) && l.startsWith("|"));
     assert.ok(row, `Step 0 must carry a progress row for the ${loop}`);
+    // relationship-assertion-lint: allow — `row` is a SINGLE table row already keyed on the loop
+    // name three lines above, so this reads the condition off that row's own text. Row-scoped
+    // keying is exactly the replacement this lint suggests; flagging it would punish the fix.
     assert.ok(
       row.includes(condition),
       `the 5c completeness condition belongs to the ${loop} ROW — moving it to another step's row makes it unreachable at the resume moment it exists for`,

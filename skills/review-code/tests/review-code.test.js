@@ -151,9 +151,12 @@ test("the Bitbucket arm names a real, resolvable recipe", () => {
     /pullrequests\/\$\{PR_ID\}\/comments/,
     "names the actual REST endpoint rather than gesturing at 'the platform's PR-comment path'",
   );
+  // Task 89: `/…/s` let the two halves sit anywhere in STEP_4, so any mention of finalise plus
+  // any mention of Step 7 satisfied a claim about ONE pointer. Pin the link to the section it
+  // points at: the href and the step must be adjacent, which is what "points at" actually means.
   assert.match(
     STEP_4,
-    /finalise\/SKILL\.md.*Step 7/s,
+    /\]\(\.\.\/finalise\/SKILL\.md\)\s+\*\*Step 7\b/,
     "points at finalise Step 7, which carries both arms",
   );
 });

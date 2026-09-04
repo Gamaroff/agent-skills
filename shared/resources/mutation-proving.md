@@ -57,7 +57,7 @@ Three causes, and only the first is a defect in the test:
 
 | The suite stayed green because | Signal | Response |
 | ------------------------------ | ------ | -------- |
-| the test cannot observe the behaviour | **vacuous test** | the five shapes below; fix the test |
+| the test cannot observe the behaviour | **vacuous test** | the six shapes below; fix the test |
 | something else already enforces it | **redundant source** | the reverted code may be dead — decide whether to delete it, or make it defend a case nothing else covers |
 | the behaviour was never what you thought | **wrong premise** | the finding or fix rests on a false mechanism — verify the mechanism before writing anything |
 
@@ -104,11 +104,12 @@ there: an arithmetic placeholder `0` was read as a command name, and splitting o
 caught either. A separately maintained set of legitimate patterns did — and
 nothing above asks you to keep one.
 
-## The five shapes vacuity takes
+## The six shapes vacuity takes
 
 Each of the first four was found in one task's test suite, and every one was caught
 by reverting rather than by reading. The fifth was found in another, and is the one
-that costs whole cycles rather than single tests.
+that costs whole cycles rather than single tests. The sixth is the one with a lint —
+it recurred six times in a single task before anyone named the class.
 
 **1. Asserting the wrong channel.** A CLI's contract was that stdout carries the
 value a caller binds with `$( )`. The test passed `--json` and asserted the
@@ -166,6 +167,31 @@ Two things work instead.
   probe every real file, byte-for-byte, with one comment prepended — so no property
   distinguishes a probe from the file it came from, and there is no spelling for an
   author to land on that the probe does not already have.
+
+**6. A mention standing in for a mapping.** An assertion claimed a *relationship* —
+`REQUEST CHANGES` routes to `5b`, `ready-for-merge` fires at `5c`, this row owns
+that action — while establishing only that both names occur in the same slice of
+prose. Task 77 produced **six instances across eleven gates**, and **two of the six
+were written inside the fix for the previous one**: widening the regex is the
+natural repair and is the defect. The sharpest needed a negative lookahead —
+`--stage ready-for-merge` is a strict PREFIX of `--stage ready-for-merge-RELOCATED`,
+so a renamed call satisfied the match.
+
+> The property under test is a MAPPING; co-occurrence is not one. Parse the
+> structure and read the destination off the row that carries it — a value named
+> anywhere else, including inside another row's prose, must not satisfy the
+> assertion.
+
+This shape is the one that is mechanically checkable, and **`tests/relationship-assertion-lint.test.js`
+now checks it** — four rules over every test file in the repository, validated against all six
+historical instances and against the two mechanisms that survived adversarial attack. It runs in
+`npm run ci`. Its corpus, its measured false-positive rate and its own mutation proofs are in
+[`tests/fixtures/relationship-assertion/README.md`](../../tests/fixtures/relationship-assertion/README.md).
+
+Do not read the lint as coverage of the class. It models the six shapes that
+happened; a seventh in a shape none of its rules models will pass, and shape 5's
+warning applies to the lint itself — counting the spellings it closes tells you
+nothing about the ones it does not.
 
 ## Recording it
 
