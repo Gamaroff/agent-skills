@@ -68,6 +68,43 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`advance-pipeline-lock.sh` reported a successful advance for a transition that never happened.**
+  The lock file is the develop pipelines' state machine — every `develop-*` orchestrator advances it
+  as the last action of each step, and both the `PreCompact` and `Stop` hooks read `current_step` from
+  it to decide where to resume. Given a **zero-byte** lock, the script printed
+  `advance-pipeline-lock: step 0 → 5`, exited `0`, and left the file empty.
+
+  The cause is a property of `jq` that is silent in both directions: on empty input it emits nothing
+  and exits **0**. So the defensive read fell back to `0`, and — the actual hole — the
+  `if ! jq … > "$LOCK.tmp"` write guard did not fire either, so `mv` installed an empty file and the
+  caller was told the pipeline had moved. A whitespace-only lock was worse: the same path *truncated*
+  a file that had content, and still reported success.
+
+  **Everything around it was already right, which is why it survived.** Eighteen other malformed
+  `current_step` values — `null`, absent, `"abc"`, `-3`, `3.7`, `1e400`, malformed JSON, non-JSON —
+  all correctly preserve the lock and exit non-zero. Empty input was the single case where jq's
+  "success" was indistinguishable from a real one.
+
+  An empty or whitespace-only lock now fails closed at every site that reads or writes the lock JSON:
+  non-zero exit, file untouched, nothing on stdout. **`--complete` is deliberately exempt** — it
+  removes the lock without parsing it, and gating it would make a corrupt lock permanently
+  unclearable, which is a worse failure than the one being fixed. That exemption is pinned by its own
+  test so a later widening of the guard breaks rather than ships.
+
+  Also fixed in the same script: the temp write went to `$LOCK.tmp`, a predictable path whose
+  redirect **followed a pre-existing symlink**, writing the JSON through to the target before `mv`.
+  It now writes through `mktemp` in the lock's own directory — `O_EXCL` on an unpredictable name, so
+  a planted symlink is never opened. (`set -o noclobber` was the weaker alternative: it refuses to
+  overwrite an existing file, but a symlink pointing at a *non-existent* target is still created
+  through it.) One deliberate side effect: the lock's mode becomes `0600` rather than umask-derived
+  `0644`. `.claude/state/` is per-user state, so this is a tightening with no reader affected.
+
+  Both defects were found by the DoD security probe on task 77 (3029 executed probes) and verified
+  byte-identical on `develop` before any change was made. The four new test scenarios run under
+  **bash and zsh**, and each fix was mutation-proved individually — reverting the guard turns the two
+  malformed-lock scenarios red on both interpreters and nothing else; reverting `mktemp` turns only
+  the symlink scenario red.
+
 - **The registry fallback frontier ignored the `Depends on` column, so it could nominate work whose
   prerequisite was unbuilt.** `compareCandidates` orders tasks by priority then ascending number and
   consults nothing about dependencies, and `DEFAULT_COLUMNS.task` had no `deps` index at all — even

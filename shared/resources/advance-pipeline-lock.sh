@@ -18,8 +18,11 @@
 # Behaviour:
 #   • No lock file  → exit 0, silent noop (no active pipeline)
 #   • jq missing    → exit 0, warn to stderr (degraded mode, same as on-stop.sh)
+#   • empty/whitespace-only lock → exit 1, lock untouched, no success line.
+#                     Applies to every path that reads or writes the lock JSON;
+#                     --complete is exempt so a corrupt lock stays clearable.
 #   • next <= current → exit 0, idempotent noop (already advanced)
-#   • next > current  → atomic write via tmpfile + mv, print confirmation to stdout
+#   • next > current  → atomic write via mktemp + mv, print confirmation to stdout
 #
 # Skill→next-step mapping (--skill mode). Only unambiguous transitions advance;
 # qa-story/qa-fix/review-pr are noops because Steps 5–6 form an iterative loop
@@ -63,6 +66,33 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
+# Fail closed on an empty or whitespace-only lock, at every site that reads or
+# writes the lock JSON.
+#
+# `jq` given empty input emits NOTHING and exits 0. Both consequences are silent:
+# the read below falls back to 0, and the `if ! jq` write guard does not fire, so
+# `mv` installs a zero-byte file and the caller is told "step 0 -> 5" for an
+# advance that did not happen — in the pipeline's own state machine. A
+# whitespace-only lock is worse: it TRUNCATES a file that had content.
+#
+# Every other malformed input (null, absent, "abc", -3, 3.7, 1e400, malformed
+# JSON, non-JSON) already fails closed here. This was the one hole.
+#
+# Tested textually rather than with a second `jq` call: it tests exactly the
+# stated condition and does not depend on jq's empty-input exit code, which is 4
+# for `-e .` but 0 for a filter — the very inconsistency that caused the bug.
+#
+# NOT called from `--complete`, which removes the lock without parsing it.
+# Gating that would make a corrupt lock permanently unclearable, which is a worse
+# failure than the one being fixed. Pinned by a test so a later widening of this
+# guard fails rather than ships.
+require_parsable_lock() {
+  if [ ! -s "$LOCK" ] || [ -z "$(tr -d '[:space:]' < "$LOCK")" ]; then
+    echo "advance-pipeline-lock: lock file '$LOCK' is empty or whitespace-only; refusing to advance" >&2
+    exit 1
+  fi
+}
+
 NEXT=""
 case "$1" in
   --complete)
@@ -92,6 +122,7 @@ case "$1" in
         # Only the Step 8 invocation means "pipeline complete". For the nested
         # invocations the lock MUST be preserved so the PreCompact/Stop hooks keep
         # working through the back half of the run.
+        require_parsable_lock
         CUR=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
         case "$CUR" in ''|null) CUR=0 ;; esac
         if [ "$CUR" -ge 8 ] 2>/dev/null; then
@@ -125,6 +156,7 @@ case "$NEXT" in
     ;;
 esac
 
+require_parsable_lock
 CURRENT=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
 if [ -z "$CURRENT" ] || [ "$CURRENT" = "null" ]; then
   CURRENT=0
@@ -135,11 +167,27 @@ if [ "$NEXT" -le "$CURRENT" ] 2>/dev/null; then
   exit 0
 fi
 
-if ! jq --argjson n "$NEXT" '.current_step = $n' "$LOCK" > "$LOCK.tmp"; then
-  rm -f "$LOCK.tmp"
+# Write through a `mktemp` file in the lock's own directory, not `$LOCK.tmp`.
+# The old redirect FOLLOWED a pre-existing symlink on that predictable path,
+# writing the JSON through to the target before `mv`. `mktemp` creates O_EXCL on
+# an unpredictable name, so a planted symlink is never opened.
+#
+# `set -o noclobber` was the other candidate and is weaker: it refuses to
+# overwrite an existing file, but a symlink pointing at a NON-EXISTENT target is
+# still created through it, leaving the hole open.
+#
+# Side effect, deliberate: the lock's mode becomes 0600 (mktemp's default) rather
+# than umask-derived 0644. `.claude/state/` is per-user state, so this is a
+# tightening with no reader affected.
+TMP=$(mktemp "$(dirname "$LOCK")/.advance-pipeline-lock.XXXXXX") || {
+  echo "advance-pipeline-lock: could not create temp file beside '$LOCK'" >&2
+  exit 1
+}
+if ! jq --argjson n "$NEXT" '.current_step = $n' "$LOCK" > "$TMP"; then
+  rm -f "$TMP"
   echo "advance-pipeline-lock: jq write failed" >&2
   exit 1
 fi
-mv "$LOCK.tmp" "$LOCK"
+mv "$TMP" "$LOCK"
 echo "advance-pipeline-lock: step $CURRENT → $NEXT"
 exit 0
