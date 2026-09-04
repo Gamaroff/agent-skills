@@ -274,14 +274,14 @@ Phase 4 wires it in.
 - [x] It does **not** flag the mechanisms that survived attack — the parsed-row keying in
       `pr-review-loop-parity.test.mjs`, and `advance-pipeline-lock.test.sh`, which gate 11 verified is a
       real mapping check because it *runs* the script and asserts the resulting step.
-- [x] False-positive rate measured against the current suite (measured at **2188 candidate assertions
-      across 89 files**) and **reported in `tests/fixtures/relationship-assertion/README.md`**, not
+- [x] False-positive rate measured against the current suite (measured at **2191 candidate assertions
+      across 89 files** at `de19e1c`) and **reported in `tests/fixtures/relationship-assertion/README.md`**, not
       assumed. Every flag on the current suite is triaged: fixed, filed, or suppressed with a written
       reason.
 - [x] Each of the four rules is mutation-proved — reverting the rule turns its fixtures red (M1–M4),
       plus M5 (the live gate is live) and M6 (a bare suppression does not suppress).
 - [x] Runs in `npm run ci` via the existing `tests/*.test.js` glob, with no `package.json` change.
-- [x] `npm run ci` exits 0 — `ci:fast` 2311 tests / 2310 pass / 0 fail / 1 skipped, `eval:all` exit 0.
+- [x] `npm run ci` exits 0 — at `de19e1c`: `ci:fast` 2320 tests / 2319 pass / 0 fail / 1 skipped; `eval:all` exit 0 (last run at `fe7f617`; untouched since).
 
 ---
 
@@ -405,7 +405,7 @@ legitimate division is unaffected.
 ## Progress Tracking
 
 - [x] Phase 1 — detector implemented, **four** rules (D added; see the note in §6)
-- [x] Phase 2 — six instance fixtures + two negative controls, all passing (22 tests, 0 fail)
+- [x] Phase 2 — six instance fixtures + two negative controls, all passing (31 tests at `de19e1c`, 0 fail)
 - [x] Phase 3 — full-suite false-positive triage complete and recorded: 61 → 0 unsuppressed
 - [x] Phase 4 — CI verified, `mutation-proving.md` updated (shape 6 of six) + bundled, `npm run ci` exit 0
 
@@ -421,4 +421,4 @@ legitimate division is unaffected.
 | 2026-09-04 |         | QA gate PASS (100/100) cycle 2 — CY1-1 verified closed by mutation; 1 LOW recorded, not fixed | qa-task |
 | 2026-09-04 |         | QA findings fixed — CY1-1 closed (scanner value positions + reachability guard), 1 iteration | qa-fix |
 | 2026-09-04 |         | QA gate CONCERNS (90/100) — 1 MEDIUM (CY1-1, silent scanner desync), 1 LOW | qa-task |
-| 2026-09-04 |         | Implemented: 4-rule lint + 8 fixtures; FP rate 61 → 0 unsuppressed over 2188 call sites; 6 live true positives fixed; 6 mutation proofs; status → ready-for-review | develop |
+| 2026-09-04 |         | Implemented: 4-rule lint + 8 fixtures; FP rate 61 → 0 unsuppressed over 2188 call sites (`fe7f617`); 6 live true positives fixed; 6 mutation proofs; status → ready-for-review | develop |

@@ -32,16 +32,22 @@ mechanism, so a lint that flagged it would punish the fix it recommends.
 
 ## False-positive measurement
 
-Corpus: **2188 assertion call sites across 89 test files**, over the four roots the lint walks
-(`evals/`, `tests/`, `shared/resources/tests/`, `skills/*/tests/`).
+Corpus: **2191 assertion call sites across 89 test files** at `de19e1c`, over the four roots the lint
+walks (`evals/`, `tests/`, `shared/resources/tests/`, `skills/*/tests/`).
 
-| Stage                                    | Findings | Rate  |
-| ---------------------------------------- | -------- | ----- |
-| First implementation (shape only)        | 61       | 2.8%  |
-| After narrowing (shape **and** claim)    | 11       | 0.50% |
-| After fixing the 6 true positives        | 4        | 0.18% |
-| Suppressed with a written reason         | 4        | —     |
-| **Unsuppressed findings on a clean tree** | **0**   | **0%** |
+> **Every figure below names the commit it was measured at.** The triage columns were measured at
+> `fe7f617`, when the corpus held 2188 call sites; the scanner fix at `183a19e` added nine assertions
+> to this suite, taking it to 2191. Quoting a measurement without its commit is how a record starts
+> describing a tree that no longer exists — and this is the lint that exists to stop assertions
+> claiming more than they establish, so its own record is held to the same rule.
+
+| Stage                                     | Findings | Rate   | Measured at |
+| ----------------------------------------- | -------- | ------ | ----------- |
+| First implementation (shape only)         | 61       | 2.8%   | `fe7f617` (2188 sites) |
+| After narrowing (shape **and** claim)     | 11       | 0.50%  | `fe7f617` |
+| After fixing the 6 true positives         | 4        | 0.18%  | `fe7f617` |
+| Suppressed with a written reason          | 4        | —      | `fe7f617` |
+| **Unsuppressed findings on a clean tree** | **0**    | **0%** | re-derived at `de19e1c` (2191 sites) |
 
 ### What the narrowing changed, and why
 
@@ -103,7 +109,9 @@ is the outlet, and it makes the deliberate subset explicit, which is an improvem
 
 ## Mutation proofs
 
-Per `shared/resources/mutation-proving.md`. Baseline is 22 pass / 0 fail.
+Per `shared/resources/mutation-proving.md`. **Nine proofs.** M1–M6 were taken at `fe7f617` against a
+22-test baseline; M11–M13 at `de19e1c` against the current **31-test** baseline, after the scanner fix
+added the value-position guards.
 
 | # | Mutation                                                   | Result       | Proves                                    |
 | - | ---------------------------------------------------------- | ------------ | ----------------------------------------- |
@@ -113,6 +121,24 @@ Per `shared/resources/mutation-proving.md`. Baseline is 22 pass / 0 fail.
 | 4 | `ruleD` returns `[]`                                       | 20 / 2 fail  | Rule D carries instance 4                 |
 | 5 | Drop `(?![-\w])` from the `pr-merged` fix                  | 21 / 1 fail  | The live gate is live, not decorative     |
 | 6 | Strip the REASON from a suppression, leaving a bare marker | 21 / 1 fail  | A bare suppression does not suppress      |
+
+### M11–M13 — the scanner fix (gate 1, finding CY1-1)
+
+| #   | Mutation                                                                   | Result       | Proves                                             |
+| --- | -------------------------------------------------------------------------- | ------------ | -------------------------------------------------- |
+| 11  | Revert `>` from the value-position set                                     | 26 / 5 fail  | the `=>`, `>`, backtick and escaped-slash arms      |
+| 12  | Revert the keyword arm (`return`, `typeof`, `case`, …)                     | 28 / 3 fail  | the keyword arms                                    |
+| 13  | Revert `>` **and** inject a real odd-quote line into a live corpus file    | 25 / 6 fail  | **the corpus reachability sweep is a live guard**   |
+
+M13 is the one that matters. M11 and M12 only show the *isolated* probes fire; the corpus-wide sweep
+passes today because no live file carries the shape — which is exactly what a guard that could never
+fire would also look like. M13 distinguishes them, and it names the offending file when it fails.
+
+> **The first version of the M11/M12 guard was itself vacuous.** All seven value-position shapes were
+> put in one probe file, where the apostrophe in `return /it's/` was closed by the apostrophe in a
+> *later* line, re-syncing the mask — so reverting the keyword arm left the suite green and that arm
+> was vouched for by nothing. That is instance 2 and instance 6 of this corpus, one level down, inside
+> the fix for the finding that named the class. The shapes are now asserted one at a time.
 
 > **M5 first reported GREEN, and that was a false proof.** The `perl` substitution had been swallowed
 > by shell escaping and the file was unchanged, so the "mutation" tested nothing. It was caught by
