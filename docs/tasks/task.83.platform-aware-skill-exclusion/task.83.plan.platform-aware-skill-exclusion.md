@@ -11,7 +11,13 @@ task-ref: task.83.platform-aware-skill-exclusion.md
 
 ## Overview
 
-Add two pure helper functions and one branch inside the existing copy loop of `install_skills()`. The classification lives in two shell constants; the resolver reads `skills-config.yaml` first so the `--update` path (which never runs the wizard) resolves correctly. An excluded skill that is already on disk is kept, never deleted.
+Add two pure helper functions and one branch inside the existing copy loop of `install_skills()`. The classification lives in two shell constants; the resolver reads `skills-config.yaml` first so the `--update` path (which never runs the wizard) resolves correctly, and falls back to the same `github` default `resolve-platform.sh` applies. An excluded skill that is already on disk is kept, never deleted.
+
+> **Amended 2026-09-04 after `/review-task`.** Three things in the original draft were wrong and are
+> corrected below: the resolver's final fallback (`""` could never prune for a GitHub consumer on
+> `--update` — the task's own headline path), the claim that `package.json` needs a new glob entry (it
+> already globs this directory), and the `--dry-run` count-parity requirement (that branch never
+> downloads the tarball, so it has no skill list to count).
 
 ---
 
@@ -73,8 +79,8 @@ Then the resolver:
 # it, and trusting it over an explicit `tracker: github` would exclude the six
 # GitHub-sync skills the consumer actually uses.
 #
-# Unresolvable → "" → exclude nothing. Deliberate: 119 skills is a working
-# install; 108 of the wrong 108 is not.
+# Anything unresolved → `github`, the same default resolve-platform.sh applies,
+# so install time and run time cannot disagree about what this repo is.
 _resolve_install_tracker() {
   local _t=""
 
@@ -87,15 +93,21 @@ _resolve_install_tracker() {
   # 2. wizard answer, when select_platform has run in this process
   [[ -z "$_t" && -n "${TRACKER:-}" ]] && _t="$TRACKER"
 
-  # 3. a JIRA_URL in .env implies Jira
-  if [[ -z "$_t" && -f .env ]]; then
-    grep -qE '^JIRA_URL=.+' .env 2>/dev/null && _t="jira"
-  fi
-
+  # 3 + 4. `auto`, unset, or an unrecognised value resolves the way
+  #        resolve-platform.sh does: a JIRA_URL implies jira, otherwise github.
   case "$_t" in
-    jira|github) printf '%s' "$_t" ;;
-    *)           printf '' ;;
+    jira|github) : ;;
+    *)
+      if [[ -n "${JIRA_URL:-}" ]] \
+        || { [[ -f .env ]] && grep -qE '^JIRA_URL=.+' .env 2>/dev/null; }; then
+        _t="jira"
+      else
+        _t="github"
+      fi
+      ;;
   esac
+
+  printf '%s' "$_t"
 }
 
 # Return 0 (excluded) when $1 cannot fire under tracker $2.
@@ -189,7 +201,15 @@ Update the usage header comment at line 17:
 
 and when `_kept > 0`, a `record_warning` pointing at `--all-skills` and at task 84's config keys, so the consumer learns why an inapplicable skill is still on disk.
 
-**Dry-run parity.** The `DRY_RUN` branch currently prints one line and returns. It must resolve the tracker and run the same predicate over the tarball listing, or `--dry-run` will under-report. Integration case 5 asserts this.
+**Dry-run.** The `DRY_RUN` branch prints and returns *before the tarball is downloaded*, so it has no
+skill list to run the predicate over. Do not make it download one: that would put a network request in a
+dry run and break the "one request, whole archive" property. Instead it resolves the tracker and reports
+**which exclusion set would apply**, without per-skill counts. Integration case 11 asserts exactly that,
+and asserts nothing was written.
+
+**`write_skills_config`.** Add `tracker: github` for GitHub consumers — it currently writes the key only
+for Jira, which is why the resolver had nothing to read on `--update`. `setup-consumer-config.test.mjs`
+asserts on this function's output and is updated in the same commit.
 
 ---
 
@@ -220,15 +240,20 @@ function callFn(snippet, { cwd = process.cwd(), env = {} } = {}) {
 2. **Never-exclude set.** `create-pr`, `create-branch`, `create-issue`, `develop-story`, `finalise` are not excluded under either tracker. This is the `vcs`-axis guard.
 3. **Resolver order — the `--update` case.** In a temp dir with `skills-config.yaml` saying `tracker: github` and `TRACKER=jira` exported, `_resolve_install_tracker` returns `github`. Reversing the order makes this fail.
 4. **Resolver — stale `.env`.** `skills-config.yaml` says `tracker: github`, `.env` has `JIRA_URL=...` → resolves `github`.
-5. **Resolver — map form ignored.** A `tracker:` key with only a nested `workflowFile:` resolves to `""`, not to the word `workflowFile`.
-6. **Unresolvable → exclude nothing.** Empty tracker excludes none of the 17.
+5. **Resolver — map form ignored.** A `tracker:` key with only a nested `workflowFile:` must not resolve to the word `workflowFile`; it falls through to the default chain.
+6. **Nothing to go on → `github`.** No config key, no `$TRACKER`, no `JIRA_URL` → `github`, not `""`. This is the `--update` case that motivated the task; `""` made the filter inert.
+6b. **An empty tracker argument excludes nothing.** Defence in depth for a caller that passes `""` directly.
 7. **`--all-skills`.** `ALL_SKILLS=true` excludes nothing under either tracker.
 8. **Drift guard.** Every `skills/*jira*` and `skills/*github*` directory appears in exactly one constant. Fails CI when a new tracker skill is added unclassified.
 9. **Integration — fresh prune.** Fixture tarball + `tracker: github` → the 11 absent from `.agents/skills/`, `create-pr` present.
 10. **Integration — grandfather.** Pre-create `.agents/skills/sync-jira-story/SKILL.md`, run with `tracker: github` → still present, summary says `kept`.
-11. **Integration — dry-run parity.** `--dry-run` writes nothing and reports the counts case 9 produces.
+11. **Integration — dry-run.** `--dry-run` writes nothing to `.agents/skills/` and names the resolved tracker and the exclusion set that would apply.
 
-**Register the suite.** `package.json` lists test globs by hand; a new file under `shared/resources/tests/` runs nowhere until it is added. After registering, assert the reported test count rises — the registration itself is the thing most likely to be forgotten.
+**Registration is NOT needed.** `package.json:26` already globs `shared/resources/tests/*.test.mjs`, so
+a new `.test.mjs` there is picked up with no edit. (The hand-listed-glob hazard in this repo is real but
+applies to `skills/*/tests/`, which are enumerated one by one.) Verify by observing the reported test
+count rise; do not add a redundant glob entry, which would imply this directory needs per-file
+registration.
 
 **Mutation proving** (per `shared/resources/mutation-proving.md` — revert each, confirm red):
 
@@ -238,14 +263,15 @@ function callFn(snippet, { cwd = process.cwd(), env = {} } = {}) {
 | Swap resolver steps 1 and 2 | case 3 |
 | `_skill_excluded_for_tracker` always returns 1 | cases 1, 9 |
 | Add `create-pr` to `SKILLS_JIRA_ONLY` | case 2 |
-| `grep -qF` instead of `grep -qxF` | add a `sync-jira-epic-v2` fixture; case 1 must fail |
+| `grep -qF` instead of `grep -qxF` | the whole-line case — assert a **substring** name (`sync-jira`, which `-F` matches against the line `sync-jira-epic`), not a longer one; `-F` fails to match a longer name too, so testing that direction proves nothing |
+| Final fallback `github` → `""` | case 6 and the fresh-prune-with-no-config integration case |
 | Drop the `continue` after grandfather | case 10 (skill deleted) |
 
 ---
 
 ### Phase 4 — Documentation
 
-**`docs/concepts/getting-started.md`** — "What the wizard does", step 8. State: the platform filter, both counts, the grandfather rule, `--all-skills`, and that deleting `.agents/skills/` + re-running is the manual way to prune an existing install.
+**`docs/concepts/getting-started.md`** — "What the wizard does", step 8. State: the platform filter, the resolution order, the grandfather rule, `--all-skills`, and that deleting `.agents/skills/` + re-running is the manual way to prune an existing install. Describe the sets relatively (11 Jira-only / 6 GitHub-only), not as absolute install totals — those go stale on every skill added.
 
 **`scripts/setup-consumer.sh`** header (line 14) — amend step 8's one-liner to mention the filter.
 
@@ -264,6 +290,6 @@ function callFn(snippet, { cwd = process.cwd(), env = {} } = {}) {
 ## Testing Approach
 
 - Run `npm test` after Phase 3; confirm the suite count rose (registration check)
-- Manual smoke: scratch repo with `tracker: github`, run the wizard, `ls .agents/skills | wc -l` → 108
-- Manual grandfather check: in a repo with all 119, run `--update`, confirm the count stays 119
+- Manual smoke: scratch repo with `tracker: github`, run the wizard, `ls .agents/skills | wc -l` → total − 11
+- Manual grandfather check: in a repo holding every skill, run `--update`, confirm the count is unchanged
 - `shellcheck scripts/setup-consumer.sh` — no new warnings

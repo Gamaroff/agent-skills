@@ -11,13 +11,15 @@
 #   5. skills-config.yaml         (PRD path, architecture path, coding-standards path)
 #   6. Registry creation          (docs/development/epic-registry.md, docs/tasks/task-registry.md)
 #   7. docs/ scaffold             (PRD root, architecture/concepts/ stubs)
-#   8. Skills install             (latest release from github.com/Gamaroff/agent-skills)
+#   8. Skills install             (latest release from github.com/Gamaroff/agent-skills;
+#                                  skips the other tracker's skills — see --all-skills)
 #   9. Pipeline hook install      (.claude/settings.json via inline jq)
 #
 # Usage:
 #   bash scripts/setup-consumer.sh               # full wizard
 #   bash scripts/setup-consumer.sh --dry-run     # print actions, write nothing
 #   bash scripts/setup-consumer.sh --update      # re-download skills only (skip wizard)
+#   bash scripts/setup-consumer.sh --all-skills  # install every skill, no platform filter
 #
 # Requires: node ≥ 22, git, jq, curl
 
@@ -37,10 +39,12 @@ ask()     { echo -en "${BOLD}$1${NC} "; }
 # ── flags ────────────────────────────────────────────────────────────────────
 DRY_RUN=false
 UPDATE_ONLY=false
+ALL_SKILLS=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)  DRY_RUN=true;    shift ;;
     --update)   UPDATE_ONLY=true; shift ;;
+    --all-skills) ALL_SKILLS=true; shift ;;
     --help|-h)
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -466,7 +470,11 @@ write_skills_config() {
     access_block=$'\n# How much access the agent has to each system. Absent means `full`.\n# Values: full | read-only | approve | command | manual. An unrecognised value\n# halts the run rather than falling through to a default.\n# Env override AGENT_SKILLS_ACCESS_TRACKER is combined most-restrictive-wins,\n# so it can lock a run down further but never loosen this setting.\naccess:\n  tracker: '"${ACCESS_TRACKER}"$'\n'
   fi
 
-  local tracker_block=""
+  # Written for BOTH trackers. GitHub used to be the implicit default and was
+  # written as nothing at all, which left a GitHub consumer's config unable to
+  # state its own platform — install_skills' resolver then had nothing to read
+  # on the --update path. A config that names its tracker is self-describing.
+  local tracker_block=$'\ntracker: github\n'
   if [[ "$TRACKER" == "jira" ]]; then
     tracker_block=$'\ntracker: jira\n\njira:\n  # devEstimateField: customfield_10594  # optional — Jira numeric custom field id for estimated dev hours\n  # defaultAssignee: 712020:00000000-0000-0000-0000-000000000000  # optional — Jira accountId every card is assigned to. Frontmatter assignee overrides. Unset = leave Jira alone.\n  #\n  # statusMap — local document status -> your Jira workflow status name(s).\n  # MOST PROJECTS NEED NONE. The built-in candidate lists already cover the\n  # common vocabularies (In Review / Code Review / Waiting for Review / ...).\n  # An override REPLACES the candidate list for that status, so adding one\n  # NARROWS matching. Run --probe-workflow first and add only the statuses it\n  # shows being skipped — as ordered lists, not single names:\n  #\n  # statusMap:\n  #   ready-for-review: [Waiting for Review, In Review]'
   fi
@@ -729,6 +737,111 @@ scaffold_docs() {
 SKILLS_REPO="https://github.com/Gamaroff/agent-skills"
 SKILLS_API="https://api.github.com/repos/Gamaroff/agent-skills/releases/latest"
 
+# ── platform-scoped skills ───────────────────────────────────────────────────
+# Skills that exist only for one tracker. Installing the other tracker's set is
+# not merely wasted disk: both siblings carry near-identical `description`
+# fields, and description text is what drives skill auto-activation, so the
+# wrong-platform sibling is a live mis-selection risk.
+#
+# MAINTENANCE: setup-consumer-skill-exclusion.test.mjs asserts every
+# skills/*jira* and skills/*github* directory appears in exactly one list.
+# A new tracker skill fails CI until it is classified here.
+#
+# Do NOT add anything here on the `vcs:` axis. `create-pr`, `create-branch` and
+# `create-issue` serve GitHub *and* Bitbucket from one skill by sourcing
+# resolve-platform.sh internally — there is no per-VCS sibling to exclude, and
+# excluding on vcs would remove a skill the consumer needs.
+SKILLS_JIRA_ONLY="ensure-epic-jira-issue
+ensure-story-jira-issue
+ensure-task-jira-issue
+sync-jira-epic
+sync-jira-story
+sync-jira-task
+jira-epic-creator
+jira-sprint-manager
+jira-sprint-retrospective
+jira-sprint-review-prep
+jira-standup-auditor"
+
+SKILLS_GITHUB_ONLY="ensure-epic-github-issue
+ensure-story-github-issue
+ensure-task-github-issue
+sync-github-epic
+sync-github-story
+sync-github-task"
+
+# Resolve which tracker this install targets.
+#
+# This MIRRORS shared/resources/resolve-platform.sh — the resolver every skill
+# sources at runtime — deliberately, so install time and run time cannot
+# disagree about what platform this repo is. It does not *source* that script:
+# resolve-platform.sh validates and can `exit 1` on an unrecognised value, which
+# would abort an install over a key the installer only wants a hint from.
+#
+# Order matters and is asserted by test:
+#
+#   1. skills-config.yaml `tracker:` — FIRST because main() calls install_skills
+#      on the --update path and returns before select_platform ever runs, so on
+#      the path consumers use most $TRACKER is unset. A resolver that trusted
+#      $TRACKER first would be silently inert exactly where it is needed.
+#   2. $TRACKER, when select_platform has run in this process.
+#   3. JIRA_URL (environment or .env) implies jira. LAST of the positive probes
+#      because a stale JIRA_URL outlives the setup that wrote it, and trusting
+#      it over an explicit `tracker: github` would exclude the six GitHub-sync
+#      skills the consumer actually uses.
+#   4. Otherwise `github` — the same default resolve-platform.sh applies.
+#
+# The github default is load-bearing, not a convenience. write_skills_config
+# writes a `tracker:` key only for Jira consumers, so before this default
+# existed a GitHub consumer running --update missed every probe and resolved to
+# nothing — leaving the filter inert on its own headline path. Defaulting to
+# github cannot disagree with runtime, because runtime defaults to github too:
+# a repo where this guesses github is a repo where every Jira skill already
+# fails when invoked. The grandfather rule and --all-skills remain the net.
+_resolve_install_tracker() {
+  local _t=""
+
+  # 1. skills-config.yaml scalar `tracker:`. The map form (`tracker:` with a
+  #    nested workflowFile:) carries no platform identity — the pattern requires
+  #    a value on the same line, so the map form correctly does not match.
+  if [[ -f skills-config.yaml ]]; then
+    _t=$(awk '/^tracker:[[:space:]]*[a-z]/ {print $2; exit}' skills-config.yaml 2>/dev/null || true)
+  fi
+
+  # 2. wizard answer, when select_platform has run in this process
+  [[ -z "$_t" ]] && _t="${TRACKER:-}"
+
+  # 3 + 4. `auto`, unset, or an unrecognised value resolves the way
+  #        resolve-platform.sh does: a JIRA_URL implies jira, otherwise github.
+  case "$_t" in
+    jira|github) : ;;
+    *)
+      if [[ -n "${JIRA_URL:-}" ]] \
+        || { [[ -f .env ]] && grep -qE '^JIRA_URL=.+' .env 2>/dev/null; }; then
+        _t="jira"
+      else
+        _t="github"
+      fi
+      ;;
+  esac
+
+  printf '%s' "$_t"
+}
+
+# Return 0 (excluded) when skill $1 cannot fire under tracker $2.
+#
+# `grep -qxF` matches a whole line, fixed-string — so `sync-jira-epic` never
+# matches a hypothetical `sync-jira-epic-v2`.
+_skill_excluded_for_tracker() {
+  local _name="$1" _tracker="${2:-}"
+  [[ "${ALL_SKILLS:-false}" == true ]] && return 1
+  case "$_tracker" in
+    github) grep -qxF "$_name" <<<"$SKILLS_JIRA_ONLY"   && return 0 ;;
+    jira)   grep -qxF "$_name" <<<"$SKILLS_GITHUB_ONLY" && return 0 ;;
+  esac
+  return 1
+}
+
 _resolve_skills_version() {
   # Honour explicit override first
   if [[ -n "${SKILLS_VERSION:-}" ]]; then
@@ -776,7 +889,23 @@ install_skills() {
   if [[ "${_install:-Y}" =~ ^[Yy]$ ]]; then
     if [[ "$DRY_RUN" == true ]]; then
       echo -e "${YELLOW}[dry-run]${NC} would download ${_tarball} and extract into .agents/skills/"
-      record_step "Skills install" "ok" "${_version} (dry-run)"
+      # Report the filter decision, not per-skill counts. This branch never
+      # downloads the tarball, so it has no skill list to count — and making it
+      # download one would put a network request in a dry run and break the
+      # "one request, whole archive" property the real path relies on.
+      local _dry_tracker; _dry_tracker=$(_resolve_install_tracker)
+      local _dry_detail="${_version} (dry-run)"
+      if [[ "$ALL_SKILLS" == true ]]; then
+        echo -e "${YELLOW}[dry-run]${NC} --all-skills: no platform filter would be applied"
+        _dry_detail="${_dry_detail}, no filter (--all-skills)"
+      else
+        case "$_dry_tracker" in
+          github) echo -e "${YELLOW}[dry-run]${NC} tracker resolves to 'github' — would skip the $(grep -c . <<<"$SKILLS_JIRA_ONLY") Jira-only skills (kept if already installed)" ;;
+          jira)   echo -e "${YELLOW}[dry-run]${NC} tracker resolves to 'jira' — would skip the $(grep -c . <<<"$SKILLS_GITHUB_ONLY") GitHub-only skills (kept if already installed)" ;;
+        esac
+        _dry_detail="${_dry_detail}, tracker ${_dry_tracker}"
+      fi
+      record_step "Skills install" "ok" "$_dry_detail"
     else
       info "Downloading skills ${_version} ..."
       local _tmpdir; _tmpdir=$(mktemp -d)
@@ -796,10 +925,33 @@ install_skills() {
       fi
       tar -xzf "$_archive" -C "$_tmpdir" --strip-components=1
       mkdir -p .agents/skills
-      local _installed=0 _updated=0
+      local _tracker; _tracker=$(_resolve_install_tracker)
+      local _installed=0 _updated=0 _skipped=0 _kept=0
+
+      if [[ "$ALL_SKILLS" == true ]]; then
+        info "--all-skills: installing every skill, no platform filter"
+      elif [[ -n "$_tracker" ]]; then
+        info "Filtering skills for tracker: ${_tracker}"
+      fi
+
       for _skill_dir in "$_tmpdir"/skills/*/; do
         [[ -f "${_skill_dir}SKILL.md" ]] || continue
         local _name; _name=$(basename "$_skill_dir")
+
+        if _skill_excluded_for_tracker "$_name" "$_tracker"; then
+          # GRANDFATHER: an excluded skill that is already installed is KEPT.
+          # This branch must be evaluated BEFORE the rm -rf below — reordering
+          # it, or dropping the `continue`, silently deletes a skill from a
+          # working install, which is the one outcome this must never produce.
+          if [[ -d ".agents/skills/${_name}" ]]; then
+            info "  kept     ${_name} (already installed; not pruned)"
+            (( _kept++ )) || true
+          else
+            (( _skipped++ )) || true
+          fi
+          continue
+        fi
+
         if [[ -d ".agents/skills/${_name}" ]]; then
           rm -rf ".agents/skills/${_name}"
           cp -r "$_skill_dir" ".agents/skills/${_name}"
@@ -824,12 +976,18 @@ install_skills() {
         info "  vendored scripts/generate-prd-epic-index.mjs (vendor-managed — do not hand-edit)"
       fi
       rm -rf "$_tmpdir"
-      ok "Skills ${_version} installed into .agents/skills/ (${_installed} new, ${_updated} updated)"
+      local _detail="${_installed} new, ${_updated} updated"
+      (( _skipped > 0 )) && _detail="${_detail}, ${_skipped} skipped (${_tracker})"
+      (( _kept > 0 ))    && _detail="${_detail}, ${_kept} kept"
+      ok "Skills ${_version} installed into .agents/skills/ (${_detail})"
+      if (( _kept > 0 )); then
+        record_warning "${_kept} skill(s) do not apply to tracker '${_tracker}' but were kept because they are already installed. Delete .agents/skills/ and re-run the wizard to prune, or pass --all-skills to disable the filter entirely."
+      fi
       if [[ "$_unpinned" == true ]]; then
-        record_step "Skills install" "warn" "${_version} unpinned (${_installed} new, ${_updated} updated)"
+        record_step "Skills install" "warn" "${_version} unpinned (${_detail})"
         record_warning "Skills pinned to main — set SKILLS_VERSION=<tag> once a release exists, then re-run --update"
       else
-        record_step "Skills install" "ok" "${_version} (${_installed} new, ${_updated} updated)"
+        record_step "Skills install" "ok" "${_version} (${_detail})"
       fi
     fi
   else

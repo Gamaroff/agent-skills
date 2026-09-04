@@ -5,23 +5,24 @@ type: task
 description: "Skip installing tracker-specific skills that can never fire on the consumer's configured platform — 11 Jira skills on a GitHub repo, 6 GitHub skills on a Jira repo."
 tags: [setup-consumer, install, platform-detection]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-04
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Platform-aware skill exclusion in setup-consumer.sh
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.83.review.1.platform-aware-skill-exclusion.md` implemented 2026-09-04
 
 ---
 
 ## 1. Overview
 
-`scripts/setup-consumer.sh` installs every skill in the release tarball unconditionally. Of the 119 skills shipped, 17 are tracker-specific and mutually exclusive by platform: 11 exist only for Jira, 6 only for GitHub Issues. A consumer on GitHub receives all 11 Jira skills; a consumer on Jira receives all 6 GitHub-sync skills. Neither set can ever fire.
+`scripts/setup-consumer.sh` installs every skill in the release tarball unconditionally. Of the skills shipped, 17 are tracker-specific and mutually exclusive by platform: 11 exist only for Jira, 6 only for GitHub Issues. A consumer on GitHub receives all 11 Jira skills; a consumer on Jira receives all 6 GitHub-sync skills. Neither set can ever fire.
 
 This task teaches `install_skills()` to resolve the consumer's tracker and skip the set that cannot apply.
 
@@ -33,7 +34,13 @@ This task teaches `install_skills()` to resolve the consumer's tracker and skip 
 2. `install_skills()` filters by resolved tracker, on both call sites in `main()`.
 3. A grandfather rule so no existing install loses a skill on `--update`.
 
-**Expected outcome**: A fresh GitHub consumer installs 108 skills instead of 119; a fresh Jira consumer installs 113. Existing installs are untouched until they opt in.
+**Expected outcome**: A fresh GitHub consumer installs every skill **except** the 11 Jira-only ones; a fresh Jira consumer installs every skill except the 6 GitHub-only ones. Existing installs are untouched until they opt in.
+
+> **Counts are expressed relatively on purpose.** At the time of writing the tree holds 120 installable
+> skills, so the numbers today are 109 and 114 — but an earlier draft of this task hard-coded 119/108/113
+> and was already wrong by one before development started. A success criterion that goes false because
+> somebody added an unrelated skill is one a developer learns to ignore. Assert `total − 11` and
+> `total − 6`, never a literal.
 
 ---
 
@@ -125,14 +132,35 @@ for _skill_dir in "$_tmpdir"/skills/*/; do
 done
 ```
 
-`_resolve_install_tracker` resolution order — **config first, because `--update` has no wizard answer**:
+`_resolve_install_tracker` **mirrors `shared/resources/resolve-platform.sh`** — the canonical resolver
+every skill already sources at runtime — with config first, because `--update` has no wizard answer:
 
-1. `tracker:` in `skills-config.yaml` (scalar form)
+1. `tracker:` in `skills-config.yaml` (scalar form: `jira` | `github` | `auto`)
 2. `$TRACKER` if already set by `select_platform` in this run
-3. `JIRA_URL` present in `.env` → `jira`
-4. Otherwise `""` → **exclude nothing**
+3. `JIRA_URL` present in `.env` (or the environment) → `jira`
+4. Otherwise → **`github`** (the same default `resolve-platform.sh:438` applies)
 
-An unresolvable tracker installs everything. This is the safe direction: a consumer who gets 119 skills has a working setup; one who gets 108 of the wrong 108 does not.
+> **Why the default is `github` and not "exclude nothing", which an earlier draft specified.**
+>
+> The draft's fourth branch returned `""` and excluded nothing, reasoning that guessing wrong prunes
+> skills a consumer needs. That is the right instinct applied to the wrong branch — and as specified it
+> made the whole task inert for the majority case.
+>
+> `write_skills_config` (`setup-consumer.sh:470-473`) writes a `tracker:` key **only when the answer was
+> Jira**; GitHub is the implicit default and is written as nothing at all. So a GitHub consumer running
+> `--update` misses step 1 (no key), misses step 2 (`select_platform` never runs on that path), misses
+> step 3 (no `JIRA_URL`) — and fell straight to `""`. The 11 Jira skills were never pruned on the one
+> path §2 problem 4 exists to fix.
+>
+> Defaulting to `github` cannot disagree with runtime, because **runtime defaults to `github` too**. A
+> repo where this resolver would guess `github` is a repo where every Jira skill already fails when it is
+> invoked. The real hazard is install time and run time disagreeing, and mirroring one resolver removes
+> it. The grandfather rule and `--all-skills` remain the safety net for anything unforeseen.
+
+**Companion change**: `write_skills_config` must also emit `tracker: github` for a GitHub consumer, so a
+freshly generated config states its platform rather than relying on a default two layers away. Note this
+changes that function's output — `setup-consumer-config.test.mjs` asserts on it and must be updated in
+the same commit.
 
 ---
 
@@ -167,12 +195,13 @@ The one behaviour change is scoped to fresh installs:
 
 | | Before | After |
 |---|---|---|
-| Fresh install, `tracker: github` | 119 skills | 108 skills |
-| Fresh install, `tracker: jira` | 119 skills | 113 skills |
-| Fresh install, tracker unresolvable | 119 skills | 119 skills (unchanged) |
-| **`--update` over an existing install** | **119 skills** | **119 skills (unchanged)** |
+| Fresh install, tracker resolves `github` | all skills | all **− 11** Jira-only |
+| Fresh install, tracker resolves `jira` | all skills | all **− 6** GitHub-only |
+| **`--update` over an existing install** | **all skills** | **all skills (unchanged — grandfathered)** |
 
-**Migration path — none required.** An existing consumer running `--update` after this ships keeps every skill they already have. The `kept ... (already installed; not pruned)` line tells them a skill is now considered inapplicable, and `print_summary` points at `--all-skills` and at task 84's config keys as the two ways to make the choice explicit. Nobody has to act.
+(With today's tree of 120 installable skills that is 109 and 114 respectively.)
+
+**Migration path — none required.** An existing consumer running `--update` after this ships keeps every skill they already have, on either tracker: the grandfather branch fires before any delete, so a resolved tracker prunes nothing that is already on disk. The `kept ... (already installed; not pruned)` line tells them a skill is now considered inapplicable, and `print_summary` points at `--all-skills` and at task 84's config keys as the two ways to make the choice explicit. Nobody has to act.
 
 **For a consumer who wants the pruning**: delete `.agents/skills/` and re-run the wizard. Documented in `getting-started.md`; deliberately manual, because deleting a skill someone's custom workflow calls is not something to do on their behalf.
 
@@ -186,10 +215,13 @@ The one behaviour change is scoped to fresh installs:
 
 **Files**: `scripts/setup-consumer.sh`
 
-- [ ] Add `SKILLS_JIRA_ONLY` and `SKILLS_GITHUB_ONLY` as newline-delimited string constants near `SKILLS_REPO` (line 729)
-- [ ] Implement `_resolve_install_tracker()` with the 4-step order from §3
-- [ ] Implement `_skill_excluded_for_tracker(name, tracker)` returning 0 when excluded
-- [ ] Both functions defined above `install_skills()` so the `SETUP_CONSUMER_NO_MAIN=1` sourcing hook exposes them
+- [x] Add `SKILLS_JIRA_ONLY` and `SKILLS_GITHUB_ONLY` as newline-delimited string constants near `SKILLS_REPO` (line 729)
+- [x] Implement `_resolve_install_tracker()` with the 4-step order from §3, **including the `github`
+      default** — mirror `shared/resources/resolve-platform.sh`, do not re-derive it
+- [x] Make `write_skills_config` emit `tracker: github` for a GitHub consumer (it currently writes the
+      key only for Jira), and update `setup-consumer-config.test.mjs` in the same commit
+- [x] Implement `_skill_excluded_for_tracker(name, tracker)` returning 0 when excluded
+- [x] Both functions defined above `install_skills()` so the `SETUP_CONSUMER_NO_MAIN=1` sourcing hook exposes them
 
 **Dependencies**: none.
 
@@ -197,12 +229,16 @@ The one behaviour change is scoped to fresh installs:
 
 **Files**: `scripts/setup-consumer.sh`
 
-- [ ] Resolve the tracker once before the loop
-- [ ] Add the exclusion branch with the grandfather check on `.agents/skills/${_name}`
-- [ ] Track `_skipped` and `_kept` counters alongside `_installed` / `_updated`
-- [ ] Extend the `ok` line and `record_step` detail with the skipped count
-- [ ] Add `--all-skills` to the flag parser (line 41) and short-circuit `_skill_excluded_for_tracker` when set
-- [ ] Honour `DRY_RUN` — the dry-run branch must report the same counts it would write
+- [x] Resolve the tracker once before the loop
+- [x] Add the exclusion branch with the grandfather check on `.agents/skills/${_name}`
+- [x] Track `_skipped` and `_kept` counters alongside `_installed` / `_updated`
+- [x] Extend the `ok` line and `record_step` detail with the skipped count
+- [x] Add `--all-skills` to the flag parser (line 41) and short-circuit `_skill_excluded_for_tracker` when set
+- [x] Honour `DRY_RUN` — the dry-run branch reports the **resolved tracker** and **which exclusion set
+      would apply**, and writes nothing. It deliberately does **not** report per-skill counts: that
+      branch returns before the tarball is downloaded (`setup-consumer.sh:777-779`), so it has no skill
+      list to count, and making it download one would put a network request in a dry run and contradict
+      §9's "tarball download unchanged"
 
 **Dependencies**: Phase 1.
 
@@ -210,15 +246,21 @@ The one behaviour change is scoped to fresh installs:
 
 ### Phase 3 — Tests (Risk: Low)
 
-**Files**: `shared/resources/tests/setup-consumer-skill-exclusion.test.mjs`, `package.json`
+**Files**: `shared/resources/tests/setup-consumer-skill-exclusion.test.mjs`
 
-- [ ] Source the script with `SETUP_CONSUMER_NO_MAIN=1` and assert `_skill_excluded_for_tracker` on all 17 named skills, both trackers
-- [ ] Assert the resolver prefers `skills-config.yaml` over `$TRACKER` (the `--update` case)
-- [ ] Assert an unresolvable tracker excludes nothing
-- [ ] Assert a `create-pr` / `create-branch` / `create-issue` are never excluded under either tracker
-- [ ] End-to-end over a fixture tarball: fresh install prunes; install with the skill already present keeps it
-- [ ] **Mutation-prove**: revert the grandfather branch and confirm the keep test goes red
-- [ ] Register the new suite in `package.json`'s test glob — a new file under `shared/resources/tests/` runs nowhere until it is listed
+- [x] Source the script with `SETUP_CONSUMER_NO_MAIN=1` and assert `_skill_excluded_for_tracker` on all 17 named skills, both trackers
+- [x] Assert the resolver prefers `skills-config.yaml` over `$TRACKER` (the `--update` case)
+- [x] Assert an unresolvable tracker excludes nothing
+- [x] Assert a `create-pr` / `create-branch` / `create-issue` are never excluded under either tracker
+- [x] End-to-end over a fixture tarball: fresh install prunes; install with the skill already present keeps it
+- [x] **Classification-parity test** (§10 Risk 3's mitigation — mandatory, not optional): assert every
+      `skills/*jira*` and `skills/*github*` directory appears in exactly one of the two lists, so a newly
+      added tracker skill fails CI until it is classified
+- [x] **Mutation-prove**: revert the grandfather branch and confirm the keep test goes red
+- [x] Verify the new suite actually runs — `package.json:26` already globs
+      `shared/resources/tests/*.test.mjs`, so **no registration is needed**; confirm by observing the
+      reported test count rise. (The hand-listed-glob hazard in this repo applies to `skills/*/tests/`,
+      which are enumerated one by one, not to this directory.)
 
 **Dependencies**: Phases 1-2.
 
@@ -226,9 +268,9 @@ The one behaviour change is scoped to fresh installs:
 
 **Files**: `docs/concepts/getting-started.md`, `CHANGELOG.md`
 
-- [ ] Update "What the wizard does" step 8 to state the platform filter and the grandfather rule
-- [ ] Document `--all-skills` in the usage block at the top of `setup-consumer.sh` and in `getting-started.md`
-- [ ] CHANGELOG `[Unreleased]` → `### Changed`
+- [x] Update "What the wizard does" step 8 to state the platform filter and the grandfather rule
+- [x] Document `--all-skills` in the usage block at the top of `setup-consumer.sh` and in `getting-started.md`
+- [x] CHANGELOG `[Unreleased]` → `### Changed`
 
 **Dependencies**: Phases 1-3.
 
@@ -243,7 +285,7 @@ The one behaviour change is scoped to fresh installs:
 **Tests**
 
 2. ✅ `shared/resources/tests/setup-consumer-skill-exclusion.test.mjs` — new suite
-3. ✅ `package.json` — register the suite in the test glob
+3. ✅ `shared/resources/tests/setup-consumer-config.test.mjs` — updated for the new `tracker: github` line
 
 **Documentation**
 
@@ -252,7 +294,11 @@ The one behaviour change is scoped to fresh installs:
 
 **Unchanged by design**
 
-- ❌ `shared/resources/resolve-platform.sh` — the runtime guard stays as the backstop
+- ❌ `package.json` — `:26` already globs `shared/resources/tests/*.test.mjs`; the new suite is picked up
+  with no edit. Adding a redundant entry would imply the directory needs per-file registration, which it
+  does not.
+- ❌ `shared/resources/resolve-platform.sh` — the runtime guard stays as the backstop. This task *mirrors*
+  its resolution order in the installer; it does not change the file.
 - ❌ Any `skills/*/SKILL.md` — no skill changes behaviour
 
 ---
@@ -273,8 +319,9 @@ The one behaviour change is scoped to fresh installs:
   1. Fresh + `tracker: github` → the 11 Jira skills absent, `create-pr` present
   2. Fresh + `tracker: jira` → the 6 GitHub-sync skills absent
   3. `sync-jira-story` pre-existing + `tracker: github` → **still present** after run (grandfather)
-  4. No resolvable tracker → all 119 present
-  5. `--dry-run` → writes nothing, reports the same counts as the real run
+  4. No config key, no `JIRA_URL` → resolves `github` (the `--update` case that motivated this task), the
+     11 Jira skills absent
+  5. `--dry-run` → writes nothing; reports the resolved tracker and the exclusion set that would apply
 
 ### Regression Tests
 
@@ -286,8 +333,10 @@ Per `shared/resources/mutation-proving.md`, each of these must turn a test red w
 
 - Remove the grandfather branch → case 3 fails
 - Reverse the resolver order (`$TRACKER` before config) → the `--update` case fails
+- Change the final fallback from `github` back to `""` → integration case 4 fails
 - Return "not excluded" unconditionally → cases 1 and 2 fail
 - Add `create-pr` to an exclusion list → the never-exclude test fails
+- Delete a skill from both classification lists → the parity test fails
 
 ### No Performance Testing
 
@@ -299,34 +348,36 @@ The filter is a substring match over a 17-line constant per skill. No baseline n
 
 ### Functional
 
-- [ ] Fresh install with `tracker: github` installs 108 skills; none of the 11 Jira-only skills is on disk
-- [ ] Fresh install with `tracker: jira` installs 113 skills; none of the 6 GitHub-only skills is on disk
-- [ ] An already-installed excluded skill survives `--update` and is reported as `kept`
-- [ ] An unresolvable tracker installs all 119
-- [ ] `--all-skills` installs all 119 regardless of tracker
-- [ ] `--update` resolves the tracker from `skills-config.yaml` with no wizard run
-- [ ] `--dry-run` writes nothing and reports the counts the real run would produce
-- [ ] `create-pr`, `create-branch`, `create-issue` install under both trackers
+- [x] Fresh install resolving `github` installs `total − 11`; none of the 11 Jira-only skills is on disk
+- [x] Fresh install resolving `jira` installs `total − 6`; none of the 6 GitHub-only skills is on disk
+- [x] An already-installed excluded skill survives `--update` and is reported as `kept`
+- [x] A repo with no `tracker:` key and no `JIRA_URL` resolves `github` — **not** "exclude nothing"
+- [x] `--all-skills` installs every skill regardless of tracker
+- [x] `--update` resolves the tracker with no wizard run, on both a Jira config and a GitHub one
+- [x] `--dry-run` writes nothing and names the resolved tracker and the exclusion set that would apply
+- [x] `create-pr`, `create-branch`, `create-issue` install under both trackers
 
 ### Performance
 
-- [ ] No measurable change in wizard wall-clock time (filter is O(skills × 17) string matching)
-- [ ] Tarball download unchanged — one request, whole archive
+- [x] No measurable change in wizard wall-clock time (filter is O(skills × 17) string matching)
+- [x] Tarball download unchanged — one request, whole archive
 
 ### Code Quality
 
-- [ ] `npm test` green, including the new suite
-- [ ] New suite registered in `package.json` and observed to run (assert the count rises)
-- [ ] Every fix mutation-proven per §8
-- [ ] `shellcheck scripts/setup-consumer.sh` no new warnings
-- [ ] New functions defined above the `SETUP_CONSUMER_NO_MAIN` hook so tests can reach them
+- [x] `npm test` green, including the new suite and the updated `setup-consumer-config.test.mjs` — `npm run ci:fast`: 2343 tests, 0 failures
+- [x] New suite observed to run under the existing `shared/resources/tests/*.test.mjs` glob — its 22
+      tests appear in the full-run output and `package.json` is unmodified
+- [x] The classification-parity test exists and fails when a tracker skill is unclassified
+- [x] Every fix mutation-proven per §8
+- [ ] `shellcheck scripts/setup-consumer.sh` no new warnings — **NOT VERIFIED**: `shellcheck` is not installed on this machine. `bash -n` parses clean; run shellcheck in CI or locally before merge
+- [x] New functions defined above the `SETUP_CONSUMER_NO_MAIN` hook so tests can reach them
 
 ### Migration
 
-- [ ] `getting-started.md` step 8 describes the filter and the grandfather rule
-- [ ] `--all-skills` documented in both the script header and `getting-started.md`
-- [ ] CHANGELOG `[Unreleased]` entry naming both counts and the grandfather guarantee
-- [ ] A real `--update` run against a full existing install verified to remove nothing
+- [x] `getting-started.md` step 8 describes the filter and the grandfather rule
+- [x] `--all-skills` documented in both the script header and `getting-started.md`
+- [x] CHANGELOG `[Unreleased]` entry naming both counts and the grandfather guarantee
+- [x] A real `--update` run against a full existing install verified to remove nothing — 20 skills before, 20 after, all 11 excluded-but-installed directories left byte-identical (local marker files survived)
 
 ---
 
@@ -346,10 +397,10 @@ The filter is a substring match over a 17-line constant per skill. No baseline n
 
 **2. The tracker resolves wrong on the `--update` path**
 
-- **Risk**: `--update` runs without the wizard. If the resolver prefers an unset `$TRACKER` over the config file, it silently excludes nothing (benign) — or, if `.env` is read before config, a stale `JIRA_URL` in a GitHub repo excludes the six GitHub-sync skills the consumer actually needs (not benign).
+- **Risk**: `--update` runs without the wizard. If `.env` is read before config, a stale `JIRA_URL` in a GitHub repo excludes the six GitHub-sync skills the consumer actually needs. The inverse also bit the first draft of this task: with a `""` final fallback, a GitHub consumer resolved *nothing* and the filter never fired at all — silently reverting the task to today's behaviour on its own headline path.
 - **Probability**: Medium — `.env` files outlive the setup they were written for.
 - **Impact**: High — removes working skills.
-- **Mitigation**: `skills-config.yaml` is first in the resolution order and the `.env` probe is last; the order is asserted directly. Grandfather means an existing install is unaffected regardless.
+- **Mitigation**: `skills-config.yaml` is first in the resolution order and the `.env` probe is second-to-last; the order is asserted directly, including the `github` default (integration case 4). Grandfather means an existing install is unaffected regardless.
 - **Rollback**: `--all-skills`, then re-run.
 
 **3. The classification goes stale as skills are added**
@@ -408,15 +459,19 @@ The filter is a substring match over a 17-line constant per skill. No baseline n
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-02 | 1.0     | Initial draft | create-task |
+| 2026-09-04 | 1.1     | Review 9/10 — fixed a Critical resolver defect (the order could never yield `github`, so the filter was inert for GitHub consumers on `--update`); corrected a false `package.json` glob claim; added the mandatory classification-parity test to Phase 3; relaxed the unachievable `--dry-run` parity criterion; restated skill counts relatively | review-task |
+| 2026-09-04 |         | Status → ready-for-development | review-task |
+| 2026-09-04 |         | Implemented — 6 files, 22 new tests (7 mutations proven) | develop |
+| 2026-09-04 |         | Status → ready-for-review | develop |
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1 — Classification and resolver
-- [ ] Phase 2 — Wire the filter into the copy loop
-- [ ] Phase 3 — Tests
-- [ ] Phase 4 — Documentation
+- [x] Phase 1 — Classification and resolver
+- [x] Phase 2 — Wire the filter into the copy loop
+- [x] Phase 3 — Tests
+- [x] Phase 4 — Documentation
 - [ ] QA review complete
 - [ ] Quality gate PASS
 
