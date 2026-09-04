@@ -217,14 +217,27 @@ function main() {
   }
   // A conflict is a real problem the user must act on, so it is a warning with
   // the consequence spelled out — not a line in the additions list.
-  for (const { skill, requiredBy } of result.conflicts) {
+  for (const { skill, requiredBy, chosenDirectly } of result.conflicts) {
+    // Two distinct causes, two distinct sentences. Merging them produced
+    // "drop (profile seed), develop-story from your profile", which names no
+    // action a user can take.
+    const causes = [];
+    if (chosenDirectly)
+      causes.push("named directly by your profile or include list");
+    if (requiredBy) causes.push(`required by ${requiredBy}`);
     console.error(
-      `⚠  ${skill} is in skills.exclude but required by ${requiredBy} — not installed.`,
+      `⚠  ${skill} is in skills.exclude but ${causes.join(", and ")} — not installed.`,
     );
-    console.error(
-      `   Anything invoking ${skill} will fail at that step. Remove it from ` +
-        `skills.exclude, or drop ${requiredBy} from your profile.`,
-    );
+    if (requiredBy) {
+      console.error(
+        `   ${requiredBy} will fail at the step that invokes ${skill}. ` +
+          `Remove ${skill} from skills.exclude, or drop ${requiredBy} from your profile.`,
+      );
+    } else {
+      console.error(
+        `   Remove ${skill} from skills.exclude, or stop naming it in your profile/include.`,
+      );
+    }
   }
 }
 

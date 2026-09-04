@@ -70,9 +70,17 @@ export function resolveSkillSet({
 
   // A seed the user asked to exclude is a conflict too — they asked for it in
   // the profile and asked for it gone. Report rather than resolve.
-  const conflictsBySkill = new Map(); // skill -> Set of things requiring it
+  const conflictsBySkill = new Map(); // skill -> Set of REAL skills requiring it
+  // Tracked separately from `requiredBy`. Folding a "(profile seed)" sentinel
+  // into that set put it into the CLI's remediation sentence, which then read
+  // "drop (profile seed), develop-story from your profile" — not an action
+  // anyone can take. Origin and requirers are different facts.
+  const chosenAndExcluded = new Set();
   for (const s of chosen) {
-    if (excludeSet.has(s)) conflictsBySkill.set(s, new Set(["(profile seed)"]));
+    if (excludeSet.has(s)) {
+      conflictsBySkill.set(s, new Set());
+      chosenAndExcluded.add(s);
+    }
   }
 
   // 2. Transitive closure. A visited SET with a worklist, never recursion:
@@ -143,7 +151,14 @@ export function resolveSkillSet({
     // One entry per excluded-but-required skill, naming every requirer, so the
     // installer prints one warning per skill rather than one per relationship.
     conflicts: [...conflictsBySkill]
-      .map(([skill, by]) => ({ skill, requiredBy: [...by].sort().join(", ") }))
+      .map(([skill, by]) => ({
+        skill,
+        requiredBy: [...by].sort().join(", "),
+        // Was the skill named directly by the profile or by `include`, as well
+        // as being required by others? The CLI renders the two causes as
+        // different sentences.
+        chosenDirectly: chosenAndExcluded.has(skill),
+      }))
       .sort((a, b) => a.skill.localeCompare(b.skill)),
     droppedForTracker: droppedForTracker.sort(),
   };

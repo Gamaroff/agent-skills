@@ -18,6 +18,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -142,66 +143,93 @@ test("`invokes:` uses the inline flow form everywhere it appears", () => {
 });
 
 test("the block form of `invokes:` is REJECTED, not silently read as empty", () => {
-  // This test exists because its predecessor was vacuous. That one asserted only
-  // `doesNotThrow` over the real tree, with a comment claiming it guarded against
-  // "a block list parsing as empty" — but the block form returned `[]` WITHOUT
-  // throwing, so the test passed for precisely the input it named. It would also
-  // have passed with the trailing-comment fix reverted, since no SKILL.md in the
-  // tree carries one.
+  // EXHAUSTIVE BY DESIGN. This function was patched four times, one YAML shape
+  // per QA cycle — `\\s+#` missed the no-space comment, then a blank line slipped
+  // through, then a comment on the key line, then a zero-indent sequence. Each
+  // fix was correct for the shape it named and blind to the next one.
   //
-  // A silently-empty edge list is the worst failure this file has: the generator
-  // succeeds, the committed JSON matches a fresh generation, the drift check is
-  // green, and a consumer on a profile install gets a skill with none of the
-  // steps it invokes — dying mid-pipeline in their repo, hours after the install.
-  // Every block-list shape YAML permits, not just the tightest one. Cycle 3
-  // found that requiring the first `- item` on the very NEXT line let
-  // `invokes:` / blank / `  - name` through as a silent empty list — the same
-  // defect the check was added for, one newline away.
-  for (const [shape, text] of [
-    ["items on the next line", "---\ninvokes:\n  - create-branch\n---\n"],
-    ["blank line first", "---\ninvokes:\n\n  - create-branch\n---\n"],
-    ["two blank lines", "---\ninvokes:\n\n\n  - create-branch\n---\n"],
-    [
-      "comment between",
-      "---\ninvokes:\n  # the steps\n  - create-branch\n---\n",
-    ],
-    ["tab indent", "---\ninvokes:\n\t- create-branch\n---\n"],
+  // So the table below enumerates the SPACE rather than the shapes that happen to
+  // have been found: every combination of {comment on the key line or not} x
+  // {blank/comment lines between or not} x {indent style}. A silently-empty edge
+  // list is invisible to CI — the generator and the committed JSON agree on it,
+  // so both drift checks stay green — which is why this must be caught here.
+  for (const [shape, body] of [
+    ["plain", "invokes:\n  - a\n"],
+    ["zero indent", "invokes:\n- a\n"],
+    ["tab indent", "invokes:\n\t- a\n"],
+    ["four-space indent", "invokes:\n    - a\n"],
+    ["comment on the key line", "invokes:  # why\n  - a\n"],
+    ["comment on the key line, no space", "invokes:# why\n  - a\n"],
+    ["blank line first", "invokes:\n\n  - a\n"],
+    ["two blank lines", "invokes:\n\n\n  - a\n"],
+    ["comment line between", "invokes:\n  # note\n  - a\n"],
+    ["comment on key AND between", "invokes: # k\n  # b\n  - a\n"],
+    ["CRLF", "invokes:\r\n  - a\r\n"],
   ]) {
     assert.throws(
-      () => parseInvokes(text, "x"),
+      () => parseInvokes("---\n" + body + "---\n", "x"),
       /must use the inline form/,
-      `block list (${shape}) must be rejected loudly`,
+      `block list (${shape}) must be rejected loudly, not returned as []`,
     );
   }
 
-  // The legitimately-empty shapes must NOT throw — an over-eager guard would
-  // fail every skill that declares nothing, which is most of them.
-  assert.deepEqual(
-    parseInvokes("---\nname: x\ninvokes:\n---\n", "x"),
-    [],
-    "bare key, last in frontmatter",
-  );
-  assert.deepEqual(
-    parseInvokes("---\ninvokes:\ntags: [x]\n---\n", "x"),
-    [],
-    "bare key followed by another key",
-  );
-  assert.deepEqual(
-    parseInvokes("---\ninvokes: [a]\ntags:\n  - x\n---\n", "x"),
-    ["a"],
-    "a DIFFERENT key's block list must not be mistaken for this one's",
-  );
+  // And every legitimate shape must still parse to the RIGHT VALUE — an
+  // over-eager guard that throws on `invokes:` with nothing after it would fail
+  // 100 of the 120 skills.
+  for (const [shape, body, want] of [
+    ["inline", "invokes: [a, b]\n", ["a", "b"]],
+    ["inline + comment", "invokes: [a]  # c\n", ["a"]],
+    ["inline + comment, no space", "invokes: [a]# c\n", ["a"]],
+    ["empty inline", "invokes: []\n", []],
+    ["empty inline + comment", "invokes: []  # none\n", []],
+    ["bare key, last in frontmatter", "name: x\ninvokes:\n", []],
+    ["bare key, then another key", "invokes:\ntags: [x]\n", []],
+    ["a DIFFERENT key's block list", "invokes: [a]\ntags:\n  - x\n", ["a"]],
+    ["quoted names", 'invokes: ["a", "b"]\n', ["a", "b"]],
+  ]) {
+    assert.deepEqual(
+      parseInvokes("---\n" + body + "---\n", "x"),
+      want,
+      `${shape} must parse to ${JSON.stringify(want)}`,
+    );
+  }
+});
 
-  // The forms that must keep working, asserted on VALUE rather than on "no throw":
+test("minimal is a subset of pipeline, which is a subset of full", () => {
+  // The wizard presents the three as narrowing tiers ("1) full — every skill /
+  // 2) pipeline — … / 3) minimal — branching, commits, PRs, code review only").
+  // They were not nested: `create-issue` was a minimal seed reachable from no
+  // pipeline seed, so choosing the BROADER-sounding tier silently dropped a
+  // capability the narrower one granted, with nothing in the output saying so.
+  const resolve = (profile) =>
+    new Set(
+      execFileSync(
+        process.execPath,
+        [
+          path.join(REPO, "shared", "resources", "resolve-skill-set-cli.mjs"),
+          "--profile",
+          profile,
+          "--tracker",
+          "github",
+        ],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      )
+        .split("\n")
+        .filter(Boolean),
+    );
+
+  const minimal = resolve("minimal");
+  const pipeline = resolve("pipeline");
+  const full = resolve("full");
+
+  const missingFromPipeline = [...minimal].filter((s) => !pipeline.has(s));
   assert.deepEqual(
-    parseInvokes("---\ninvokes: [create-branch, develop]\n---\n", "x"),
-    ["create-branch", "develop"],
+    missingFromPipeline,
+    [],
+    "every minimal skill must be in pipeline — the wizard presents them as tiers",
   );
-  assert.deepEqual(parseInvokes("---\ninvokes: []\n---\n", "x"), []);
-  assert.deepEqual(parseInvokes("---\nname: x\n---\n", "x"), [], "absent key");
-  // Both comment spacings — `\s+#` missed the no-space form for a cycle.
-  assert.deepEqual(parseInvokes("---\ninvokes: [a]  # sp\n---\n", "x"), ["a"]);
-  assert.deepEqual(parseInvokes("---\ninvokes: [a]# nosp\n---\n", "x"), ["a"]);
+  const missingFromFull = [...pipeline].filter((s) => !full.has(s));
+  assert.deepEqual(missingFromFull, [], "every pipeline skill must be in full");
 });
 
 test("every skill named in a profile exists", () => {

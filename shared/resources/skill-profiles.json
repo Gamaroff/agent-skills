@@ -1,11 +1,11 @@
 {
   "$comment": [
-    "Install profiles for setup-consumer.sh. Each profile names SEED skills only —",
+    "Install profiles for setup-consumer.sh. Each profile names SEED skills only \u2014",
     "resolve-skill-set.mjs expands the seeds over skill-dependencies.json, so a seed's",
     "callees do not need listing here and must not be listed defensively: a hand-copied",
     "closure is a second source of truth that goes stale silently.",
     "",
-    "`full` uses the sentinel \"*\" rather than an enumerated list for the same reason —",
+    "`full` uses the sentinel \"*\" rather than an enumerated list for the same reason \u2014",
     "the set changes every time a skill is added, and an enumerated list would have to be",
     "regenerated to stay correct.",
     "",
@@ -31,6 +31,7 @@
       "create-branch",
       "create-bug-report",
       "create-epic",
+      "create-issue",
       "create-pr",
       "create-prd",
       "create-story",

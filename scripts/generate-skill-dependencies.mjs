@@ -95,33 +95,32 @@ export function parseInvokes(text, skill = "<unknown>") {
   const line = fm[1].match(/^invokes:[ \t]*(.*)$/m);
   if (!line) return [];
 
-  // BLOCK FORM. `invokes:` followed by `  - name` lines captures the empty
-  // string above, so without this the `!raw` early-return below swallowed it and
-  // returned no edges — silently, which is the exact under-collection failure
-  // this file exists to prevent. The header comment claimed the block form was
-  // "rejected loudly"; it was not, and the drift guard asserting `doesNotThrow`
-  // passed for precisely the input it was written to catch.
+  // ORDER MATTERS, and getting it wrong is how this function has now been
+  // patched four times. Strip the trailing comment FIRST, then decide what the
+  // remaining value is. The previous version tested the block form against the
+  // RAW capture and stripped afterwards, so `invokes:  # the callees` made the
+  // raw value truthy, the block guard never fired, and the strip then reduced it
+  // to "" — falling into the empty-return with a block list sitting right below.
+  const raw = line[1].replace(/\s*#.*$/, "").trim();
+
+  // BLOCK FORM. `invokes:` with nothing left on the line, followed by a YAML
+  // sequence, is not readable by this parser and must never be swallowed — a
+  // silently-empty edge list is the under-collection failure the whole file
+  // exists to prevent, and it is invisible to CI (the generator and the
+  // committed JSON agree on the empty list, so both drift checks stay green).
+  //
+  // The pattern accepts every shape YAML allows between the key and the first
+  // item: blank lines, comment lines, and ANY indent including none. Each of
+  // those was a separate silent hole found in a separate QA cycle; the indent
+  // is `[ \t]*` rather than `+` because `invokes:\n- name` is valid YAML.
   const afterKey = fm[1].slice(line.index + line[0].length);
-  // Skip blank and comment lines between the key and the first item. YAML
-  // permits `invokes:` / blank / `  - name`, and requiring the item on the very
-  // next line let exactly that shape slip through as a silent empty list again —
-  // the same defect this check was added for, one newline away.
-  if (
-    !line[1].trim() &&
-    /^\r?\n(?:[ \t]*(?:#[^\n]*)?\r?\n)*[ \t]+-[ \t]/.test(afterKey)
-  ) {
+  if (!raw && /^\r?\n(?:[ \t]*(?:#[^\n]*)?\r?\n)*[ \t]*-[ \t]/.test(afterKey)) {
     throw new Error(
       `${skill}: 'invokes:' must use the inline form 'invokes: [a, b]'. ` +
         `Found a YAML block list, which this parser does not read.`,
     );
   }
-  // Strip a trailing YAML comment BEFORE the bracket checks. Without this,
-  // `invokes: [a, b]  # steps 1-2` — legal YAML — fails `endsWith("]")` and
-  // throws "unterminated list, missing ]" about a line whose bracket is plainly
-  // there. Both CI drift checks then fail with a message that sends the reader
-  // to the wrong place. The awk parsers in setup-consumer.sh already do this;
-  // this parser was the odd one out.
-  const raw = line[1].replace(/\s*#.*$/, "").trim();
+
   if (!raw) return [];
   if (!raw.startsWith("[")) {
     throw new Error(

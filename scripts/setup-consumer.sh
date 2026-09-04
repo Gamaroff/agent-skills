@@ -1187,24 +1187,45 @@ install_skills() {
         # discarding it reproduced the very mis-attribution fix #3 removed from
         # the real path — a dry run is where a config typo should be cheapest to
         # find, not the one place it is hidden.
-        local _dry_err; _dry_err=$(mktemp)
+        # `|| _dry_err=""` — a BARE `_x=$(mktemp)` aborts under errexit when TMPDIR
+        # is unset or read-only, which is the same class of defect as the bare
+        # resolver assignment this file already carries a warning about. Writing a
+        # temp file at all is also the only filesystem write on a path that
+        # announces "no files will be written", so it degrades to passing stderr
+        # straight through rather than failing.
+        local _dry_err; _dry_err=$(mktemp 2>/dev/null) || _dry_err=""
         if [[ ! -f "$_dry_cli" ]]; then
-          echo -e "${YELLOW}[dry-run]${NC} resolver not available locally — count not computed"
+          # Name the real reason. `_dry_cli` is resolved from BASH_SOURCE, which
+          # is `/dev/fd/NN` under the advertised `bash <(curl …)` invocation — so
+          # for most consumers this branch is STRUCTURAL, not a transient
+          # environment problem, and "unavailable" read like something they could
+          # fix. The resolver arrives with the tarball, which a dry run
+          # deliberately does not download.
+          if [[ "${BASH_SOURCE[0]}" == /dev/fd/* || "${BASH_SOURCE[0]}" == /proc/self/fd/* ]]; then
+            echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' — count not previewable when piped from curl (the resolver ships with the tarball). Run from a checkout to preview counts."
+          else
+            echo -e "${YELLOW}[dry-run]${NC} resolver not available locally — count not computed"
+          fi
           _dry_detail="${_dry_detail}, profile ${_dry_profile}"
-          rm -f "$_dry_err"
-        elif _dry_n=$(node "$_dry_cli" "${_dry_args[@]}" 2>"$_dry_err"); then
+          if [[ -n "$_dry_err" ]]; then rm -f "$_dry_err"; fi
+        elif _dry_n=$(node "$_dry_cli" "${_dry_args[@]}" 2>"${_dry_err:-/dev/stderr}"); then
+          # SHOW the report on success too. It carries the closure additions AND
+          # the `⚠ X is in skills.exclude but required by Y` conflict warnings —
+          # the real install prints them, so a preview that swallows them fails at
+          # its only job. Previously this branch deleted them unread.
+          if [[ -n "$_dry_err" ]]; then cat "$_dry_err" >&2; fi
           echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' resolves to ${_dry_n} skills (closure computed offline; not counted against the release tarball)"
           _dry_detail="${_dry_detail}, profile ${_dry_profile} (${_dry_n})"
-          rm -f "$_dry_err"
+          if [[ -n "$_dry_err" ]]; then rm -f "$_dry_err"; fi
         elif [[ $? -eq 2 ]]; then
-          cat "$_dry_err" >&2
+          if [[ -n "$_dry_err" ]]; then cat "$_dry_err" >&2; fi
           echo -e "${YELLOW}[dry-run]${NC} skills-config.yaml names something that does not exist (above) — the real run would install the unfiltered set"
           _dry_detail="${_dry_detail}, profile ${_dry_profile} (config error)"
-          rm -f "$_dry_err"
+          if [[ -n "$_dry_err" ]]; then rm -f "$_dry_err"; fi
         else
           echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' — resolver failed, count not computed"
           _dry_detail="${_dry_detail}, profile ${_dry_profile}"
-          rm -f "$_dry_err"
+          if [[ -n "$_dry_err" ]]; then rm -f "$_dry_err"; fi
         fi
       fi
       record_step "Skills install" "ok" "$_dry_detail"

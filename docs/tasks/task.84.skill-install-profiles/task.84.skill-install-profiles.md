@@ -232,7 +232,7 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 
 **Files**: `scripts/generate-skill-dependencies.mjs`, `shared/resources/skill-dependencies.json`, `package.json`
 
-- [x] Extract `/slash-command` tokens from each `SKILL.md`, keep those matching a `skills/` directory, drop self-references
+- [x] Read the `invokes:` frontmatter key from each `SKILL.md`, validate every name against `skills/`, and reject the YAML block form loudly (**superseded the original prose-scrape bullet — see the §3 design note**)
 - [x] Emit `{ "skill": ["callee", ...] }`, keys sorted, committed
 - [x] Add `npm run generate-skill-deps`
 - [x] Add a CI check that the committed file matches a fresh generation — **in `validate.yml`, not only `release.yml`**. The catalog check exists in both: `release.yml` runs at tag time (too late to stop a bad merge) and `validate.yml` is the PR gate. Two things must be handled for the PR gate to actually fire: `validate.yml`'s job has `setup-python` only, so a Node generator needs `actions/setup-node` added; and its `paths:` filter does not include `shared/resources/**`, so the job would not even trigger on a change to the generated JSON. Fix both, or the check silently never runs.
@@ -369,6 +369,17 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 ## 9. Success Criteria
 
+> **Status of this section, stated plainly.** Two criteria below are **unticked and will not be
+> ticked by this change**: shellcheck (unverified — no lane exists yet) and the real `--update`
+> (partial — only a dry run was performed). Every other criterion is met with evidence named in the
+> QA reports. All three QA gates read **CONCERNS**, not PASS.
+>
+> An earlier revision of this document had all 21 criteria ticked, including those two. That was a
+> blanket checkbox pass, not an assessment, and it asserted completion the gates and the
+> implementation report both contradict. Corrected here — a criteria table that disagrees with its
+> own trail is worse than one with unticked boxes.
+
+
 ### Functional
 
 - [x] `minimal`, `pipeline`, `full` each resolve to a set containing every transitive callee of every seed
@@ -391,7 +402,7 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 - [x] `npm test` green, and both new suites **observed to run** (the reported test count rises). They land in `shared/resources/tests/`, which the `test` script already globs — so "registered in `package.json`" is not the check and must not be treated as one
 - [x] Every guarantee in §8 mutation-proven
-- [x] `shellcheck scripts/setup-consumer.sh` no new warnings
+- [ ] `shellcheck scripts/setup-consumer.sh` no new warnings — **UNVERIFIED, not met.** shellcheck is not installed on the development host and this repo has no shellcheck lane (that is task 92's scope). This criterion was ticked in error by a blanket checkbox pass; every gate and the implementation report record it as unverified. It is the one criterion this PR cannot honestly claim, on ~420 new lines of bash in the script that can `rm -rf` a consumer's skills.
 - [x] `skill-dependencies.json` regenerable and CI-checked for drift
 - [x] Closure logic lives in Node with unit tests over injected fixtures, not in untestable inline bash
 
@@ -400,7 +411,7 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 - [x] `configuration.md` documents all three keys in "Full schema" and "Key reference"
 - [x] `getting-started.md` documents the profiles, add-ons, and how to change profile later. **Note the step number**: `#### Step 8 — the platform skill filter` is already taken by task 83, so this is Step 9 (or a sibling subsection under Step 8) — do not overwrite the existing Step 8
 - [x] CHANGELOG entry states the measured context saving (bytes and skill counts for `full` vs `pipeline`, with the measurement method named), not an estimate
-- [x] A real `--update` against a full existing install verified to remove nothing
+- [ ] A real `--update` against a full existing install verified to remove nothing — **PARTIAL.** What was run is `--update --dry-run` against a scratch repo holding **6** skills. A dry run writes nothing by construction, so it cannot exercise the destructive path at all, and 6 skills is not a full install. In-repo the guarantee is asserted only structurally (the grandfather test regex-matches the wizard source for the `continue` and for `keepIdx < rmIdx`; it never runs the loop). This is the weakest evidence in the change, and it sits on the only code path that deletes user files.
 
 ---
 
@@ -487,7 +498,7 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (2 cycles)
+**QA Status**: CONCERNS (3 cycles)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-04
 **Quality Score**: 80/100
@@ -497,6 +508,7 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 - **Cycle 1**: [task.84.qa.1.skill-install-profiles.md](./task.84.qa.1.skill-install-profiles.md) · [gate.1](./task.84.gate.1.skill-install-profiles.yml)
 - **Cycle 2 (refute)**: [task.84.qa.2.skill-install-profiles.md](./task.84.qa.2.skill-install-profiles.md) · [gate.2](./task.84.gate.2.skill-install-profiles.yml)
+- **Cycle 3 (confirmation)**: [task.84.qa.3.skill-install-profiles.md](./task.84.qa.3.skill-install-profiles.md) · [gate.3](./task.84.gate.3.skill-install-profiles.yml)
 
 ### Test Coverage Summary
 
@@ -528,6 +540,9 @@ Worth recording how they were found, because the three lenses were disjoint: the
 | 2026-09-04 |         | qa-fix cycle 1 — all 11 defects fixed (10 from adversarial review, 1 from the repo stdout-drain guard); 16 regression tests added, 6 mutation-proven | qa-fix |
 | 2026-09-04 |         | QA gate 2 CONCERNS (80/100) — refute pass found 5 more, 2 HIGH, both introduced by cycle 1's own fixes; 4 cycle-1 tests found vacuous | qa-task |
 | 2026-09-04 |         | qa-fix cycle 2 — all 5 fixed with behavioural tests; vacuous drift guard replaced and mutation-proven | qa-fix |
+| 2026-09-04 |         | QA gate 3 CONCERNS (80/100) — confirmation pass found 5 more, 2 HIGH, 3 introduced by cycle 2's fixes; worst was a bare assignment aborting the wizard under errexit | qa-task |
+| 2026-09-04 |         | qa-fix cycle 3 — all 5 fixed; comment-asserting vacuous test replaced; mutation proofs now assert the mutation applied | qa-fix |
+| 2026-09-05 |         | review-pr (Step 5c) — REQUEST CHANGES: two success criteria were ticked without evidence, and the implementation report undercounted cycle 3. Corrected | review-pr |
 ---
 
 ## Progress Tracking
