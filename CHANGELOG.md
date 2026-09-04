@@ -24,9 +24,16 @@ All notable changes to this project will be documented in this file. Format foll
   therefore byte-for-byte unchanged in what it leaves behind. To prune, delete `.agents/skills/` and
   re-run the wizard; to disable the filter entirely, pass the new `--all-skills` flag.
 
-  Which tracker is resolved mirrors `resolve-platform.sh` exactly — config, then the wizard answer,
-  then `JIRA_URL`, otherwise `github` — so install time and run time cannot disagree about what a
-  repo is. That default is load-bearing rather than cosmetic: `write_skills_config` wrote a `tracker:`
+  Which tracker is resolved mirrors `resolve-platform.sh` — config, then the wizard answer, then
+  `JIRA_URL`, otherwise `github` — in **order and in value parsing both**, so a quoted scalar
+  (`tracker: "jira"`) or a CRLF line ending resolves the same at install time as at run time. That
+  second half is not a detail: while the parse was `awk '{print $2}'` against an `[a-z]` pattern, a
+  quoted or CRLF `tracker: jira` fell through to the `github` default and a Jira repo installed with
+  none of its eleven Jira skills — silently, the failure surfacing days later inside a pipeline step.
+  A parity test now asserts the two resolvers agree across ten spellings rather than asserting a
+  hardcoded answer on each side. One asymmetry is deliberate and pinned by its own test: the
+  installer additionally reads `.env` for `JIRA_URL`, because it runs once in a plain shell whereas
+  the skills run later in a shell that has the variable. That default is load-bearing rather than cosmetic: `write_skills_config` wrote a `tracker:`
   key only for Jira consumers, so a GitHub consumer running `--update` (the path that never runs the
   wizard) matched no probe at all, and an earlier design that resolved such a repo to "unknown" would
   have left the filter inert for precisely the consumers it was built for. The wizard now writes

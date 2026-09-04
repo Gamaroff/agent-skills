@@ -37,6 +37,7 @@ const REPO = path.resolve(
   "../../..",
 );
 const WIZARD = path.join(REPO, "scripts", "setup-consumer.sh");
+const RESOLVER = path.join(REPO, "shared", "resources", "resolve-platform.sh");
 
 // The two constants, mirrored here so the drift guard has something to compare
 // the tree against. Kept as literals on purpose: reading them back out of the
@@ -122,6 +123,24 @@ function excluded(name, tracker, prelude = "") {
 
 function resolveTracker(cwd, env = {}) {
   return callFn("_resolve_install_tracker", { cwd, env });
+}
+
+/**
+ * Resolve TRACKER the way a skill does at RUN time — by sourcing
+ * resolve-platform.sh, the real thing, not a re-implementation. Comparing the
+ * two resolvers directly is what makes the parity test below falsifiable: an
+ * assertion against a hardcoded expectation would still pass if both sides
+ * drifted together.
+ */
+function runtimeTracker(cwd, env = {}) {
+  const clean = { ...process.env };
+  delete clean.JIRA_URL;
+  delete clean.TRACKER;
+  return execFileSync(
+    "bash",
+    ["-c", `source '${RESOLVER}' >/dev/null 2>&1; printf '%s' "\${TRACKER:-}"`],
+    { cwd, env: { ...clean, ...env }, encoding: "utf8" },
+  ).trim();
 }
 
 function inTempRepo(fn) {
@@ -253,6 +272,78 @@ test("the resolver only ever returns jira or github", () => {
   inTempRepo((dir) => {
     writeFileSync(path.join(dir, "skills-config.yaml"), "tracker: nonsense\n");
     assert.ok(["jira", "github"].includes(resolveTracker(dir)));
+  });
+});
+
+// ── 4b. install-time / run-time parity on how the VALUE is spelled ───────────
+
+// The order was mirrored from the start; the value parsing was not. The
+// installer read the config with `awk '{print $2}'` against a `[a-z]` pattern,
+// so a quoted scalar did not match the pattern at all and a CRLF line left a
+// trailing carriage return on the token — both fell through to the `github`
+// default while resolve-platform.sh parsed them as `jira`. The consequence was
+// a Jira repo installing with none of its eleven Jira skills, silently, the
+// failure surfacing days later inside a pipeline step.
+//
+// Each case asserts the two resolvers AGREE, and separately what they agree on.
+// The first half is the property that matters; the second half stops a future
+// change from making them agree on the wrong answer.
+const PARITY_CASES = [
+  ["tracker: jira\n", "jira", "bare scalar"],
+  ['tracker: "jira"\n', "jira", "double-quoted"],
+  ["tracker: 'jira'\n", "jira", "single-quoted"],
+  ["tracker: jira\r\n", "jira", "CRLF line ending"],
+  ['tracker: "github"\n', "github", "double-quoted github"],
+  ["tracker: github\r\n", "github", "CRLF github"],
+  ["tracker: jira   # which tracker\n", "jira", "trailing comment"],
+  ["tracker: jira    \n", "jira", "trailing whitespace"],
+  ["tracker: auto\n", "github", "auto with no JIRA_URL"],
+  ["tracker:\n  workflowFile: tracker-workflow.yaml\n", "github", "map form"],
+];
+
+for (const [config, expected, label] of PARITY_CASES) {
+  test(`install and run time agree on \`${label}\``, () => {
+    inTempRepo((dir) => {
+      writeFileSync(path.join(dir, "skills-config.yaml"), config);
+      const install = resolveTracker(dir);
+      const runtime = runtimeTracker(dir);
+      assert.equal(
+        install,
+        runtime,
+        `installer resolved "${install}" but resolve-platform.sh resolved "${runtime}" — ` +
+          `install time and run time must not disagree about what platform this repo is`,
+      );
+      assert.equal(install, expected, `${label} should resolve ${expected}`);
+    });
+  });
+}
+
+test("a lone unmatched quote is not silently repaired", () => {
+  // Strip a MATCHED pair only. `tracker: "jira` is malformed, not a Jira repo,
+  // and should land on the default rather than be guessed at.
+  inTempRepo((dir) => {
+    writeFileSync(path.join(dir, "skills-config.yaml"), 'tracker: "jira\n');
+    assert.equal(resolveTracker(dir), "github");
+  });
+});
+
+test("the .env probe is a DELIBERATE asymmetry, not an oversight", () => {
+  // `_resolve_install_tracker` reads .env as well as the environment;
+  // resolve-platform.sh reads only the environment. Do not "fix" this by
+  // deleting the probe: the installer runs once, often in a plain shell, while
+  // the skills run later in a shell that has JIRA_URL because they need it, so
+  // dropping it trades a rare disagreement for a common one. Closing it
+  // properly means teaching resolve-platform.sh to read .env — which changes
+  // every skill's resolution and belongs in its own task. If you do that, this
+  // test is the one that tells you to update both sides together.
+  inTempRepo((dir) => {
+    writeFileSync(path.join(dir, ".env"), "JIRA_URL=https://x.atlassian.net\n");
+    assert.equal(resolveTracker(dir), "jira", "the installer reads .env");
+    assert.equal(
+      runtimeTracker(dir),
+      "github",
+      "resolve-platform.sh does not read .env — if you changed that, update the installer and this test together",
+    );
   });
 });
 

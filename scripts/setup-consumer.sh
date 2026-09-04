@@ -778,6 +778,15 @@ sync-github-task"
 # resolve-platform.sh validates and can `exit 1` on an unrecognised value, which
 # would abort an install over a key the installer only wants a hint from.
 #
+# Because it re-implements rather than sources, the VALUE PARSING has to mirror
+# too, not just the order. It did not, once: `print $2` returned the raw token,
+# so `tracker: "jira"`, `tracker: 'jira'` and a CRLF line ending all missed the
+# case arm below and fell through to the github default — while the runtime
+# reader parses them all as `jira`. A Jira repo then installed with none of its
+# eleven Jira skills, silently, and the failure surfaced days later inside a
+# pipeline step. Quoting a YAML scalar is idiomatic and CRLF arrives with any
+# Windows or WSL checkout; neither is exotic. Hence the normalisation below.
+#
 # Order matters and is asserted by test:
 #
 #   1. skills-config.yaml `tracker:` — FIRST because main() calls install_skills
@@ -790,6 +799,16 @@ sync-github-task"
 #      it over an explicit `tracker: github` would exclude the six GitHub-sync
 #      skills the consumer actually uses.
 #   4. Otherwise `github` — the same default resolve-platform.sh applies.
+#
+# ONE DELIBERATE ASYMMETRY, in step 3: this reads `.env` as well as the
+# environment; resolve-platform.sh reads only the environment. That is not an
+# oversight and must not be "corrected" by deleting the probe. The installer
+# runs once, often in a plain shell; the skills run later in a shell that has
+# JIRA_URL because they need it. Dropping the probe would make the installer
+# resolve github for a Jira consumer whose JIRA_URL lives in .env — trading a
+# rare disagreement for a common one. Closing it properly means teaching
+# resolve-platform.sh to read .env, which changes every skill's resolution and
+# belongs in its own task. Pinned by test so the choice stays visible.
 #
 # The github default is load-bearing, not a convenience. write_skills_config
 # writes a `tracker:` key only for Jira consumers, so before this default
@@ -804,9 +823,30 @@ _resolve_install_tracker() {
   # 1. skills-config.yaml scalar `tracker:`. The map form (`tracker:` with a
   #    nested workflowFile:) carries no platform identity — the pattern requires
   #    a value on the same line, so the map form correctly does not match.
+  #
+  #    The pattern is `[^[:space:]]`, NOT `[a-z]`: a quoted value starts with a
+  #    quote character, and `[a-z]` refused to match it at all. Take the rest of
+  #    the line rather than $2 so a missing space (`tracker:jira`) and a trailing
+  #    `# comment` are both handled in one place.
   if [[ -f skills-config.yaml ]]; then
-    _t=$(awk '/^tracker:[[:space:]]*[a-z]/ {print $2; exit}' skills-config.yaml 2>/dev/null || true)
+    _t=$(awk '/^tracker:[[:space:]]*[^[:space:]]/ {
+                v = $0
+                sub(/^tracker:[[:space:]]*/, "", v)
+                sub(/[[:space:]]+#.*$/, "", v)
+                sub(/[[:space:]]+$/, "", v)
+                print v; exit
+              }' skills-config.yaml 2>/dev/null || true)
   fi
+
+  # Normalise the way the runtime YAML reader does: a CRLF checkout leaves a
+  # trailing carriage return, and a quoted scalar arrives with its quotes. Strip
+  # a matched surrounding pair only — a lone quote is a malformed value and
+  # should fall through to the default rather than be silently repaired.
+  _t=${_t%$'\r'}
+  case "$_t" in
+    '"'*'"') _t=${_t#'"'}; _t=${_t%'"'} ;;
+    "'"*"'") _t=${_t#\'}; _t=${_t%\'} ;;
+  esac
 
   # 2. wizard answer, when select_platform has run in this process
   [[ -z "$_t" ]] && _t="${TRACKER:-}"
