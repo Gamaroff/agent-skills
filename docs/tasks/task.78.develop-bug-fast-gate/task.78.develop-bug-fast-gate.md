@@ -252,6 +252,30 @@ stripped in turn, the test re-run, and the file restored:
 All three go red under mutation and green on restore, which is what distinguishes a genuinely
 iterated list from one that happens to pass on its first element.
 
+### QA Fix Cycle 1 — 2026-09-04
+
+All three MEDIUM findings from gate 1 closed.
+
+- **TASK-78-001** — replaced the numbered "step-3" reference with a named one (the develop loop's
+  Test Failure Triage, linked), plus a note recording *why* it is named rather than numbered: the
+  qa-fix loop can say "step-3" unambiguously because it has no local step 3, and this file does.
+- **TASK-78-002** — added a `**Fast gate**` field to the Verify Cycle report entry, stating that 5b
+  step 3a fills it, that it reads `n/a` on a cycle that passed at 5a, and that it is recorded on a
+  pass as well as a failure — a result that appears only on failure is indistinguishable from a gate
+  that never ran.
+- **TASK-78-003** — swept the three live sites that still described the gate as running in two
+  places: `docs/reference/configuration.md` (×2) and `skills/develop-next/SKILL.md`. Historical
+  records left untouched.
+
+**Found by the Step 3.5 adversarial pass, in this cycle's own fix.** The first version of the
+TASK-78-002 fix added the `**Fast gate**` field to *both* the report entry and the tracker-comment
+template. The report entry is a document the cycle keeps writing to, so it can be completed later;
+the tracker comment is a single POST made at the end of **5a**, before 5b runs the gate — so on a
+FAIL cycle that field could never be filled at post time. That is the same defect TASK-78-002
+described, inverted: a slot with no value rather than a value with no slot. The comment-template
+half was reverted and the asymmetry is now documented in the file so the next editor does not
+"restore" it.
+
 ### Deferred Work
 
 None. One Important review finding stays open and is **not** deferred implementation work: the task
@@ -329,6 +353,35 @@ None. One document gains a step that two others already have.
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-04
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.78.qa.1.develop-bug-fast-gate.md](./task.78.qa.1.develop-bug-fast-gate.md)
+- **Gate File**: [task.78.gate.1.develop-bug-fast-gate.yml](./task.78.gate.1.develop-bug-fast-gate.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2320 (2319 pass, 0 fail)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+The gate is at the right seam and the parity test is mutation-proved on all three documents. Three
+MEDIUM findings, none in the gate's behaviour: **TASK-78-001** — "step-3" collides with 5b's own
+step 3; **TASK-78-002** — the failure output is directed at a template with no field for it;
+**TASK-78-003** — three live docs still describe the gate as running in two places.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                                                  | Author      |
@@ -336,6 +389,8 @@ None. One document gains a step that two others already have.
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.75 QA trail               | create-task |
 | 2026-09-04 | 1.1     | Review passed (9/10) — corrected the target document's path throughout (it is skill-native, not a shared resource), rewrote Phase 4 as a bundle drift check, and pinned the `{N}` cycle-counter convention | review-task |
 | 2026-09-04 |         | Implemented — 4 files, parity test extended to 3 loop documents and mutation-proved on each | develop |
+| 2026-09-04 |         | QA gate CONCERNS (80/100) — 3 MEDIUM findings, none in the gate's behaviour | qa-task |
+| 2026-09-04 |         | QA findings fixed — all 3 closed, 1 iteration; a fourth defect found by the adversarial pass over the fixes themselves | qa-fix |
 
 ---
 
