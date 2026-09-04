@@ -49,6 +49,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate-catalog": "python3 skills/create-skill/scripts/generate_catalog.py",
+    "generate-skill-deps": "node scripts/generate-skill-dependencies.mjs",
+    "skill-deps:candidates": "node scripts/generate-skill-dependencies.mjs --report-candidates",
     "package": "cd skills/create-skill/scripts && for d in ../../*/; do name=$(basename \"${d%/}\"); [ -f \"${d}SKILL.md\" ] && python3 package_skill.py \"$d\" \"$d\"; done",
     "package:skill": "cd skills/create-skill/scripts && python3 package_skill.py",
     "bundle": "python3 skills/create-skill/scripts/bundle_skill.py --all",

@@ -1,6 +1,7 @@
 ---
 name: develop-next
 description: "Roadmap orchestrator: deterministically selects the next unblocked item from the project completion roadmap (via scripts/select-next.mjs), runs its named pipeline (/develop-story, /develop-task or /develop-bug) fully autonomously (Upfront Setup auto-answered with the recommended options), merges the green PR (story/task → develop), ticks the roadmap + Change Log, and reports. Crash-safe via a run-state file; re-running resumes where the last run stopped. Stops at manual/blocked items, planning gaps (/create-* rows), or any pipeline HALT. Invoke with `/develop-next`, `/develop-next --dry-run` (read-only selection preview), or wrap in `/loop /develop-next` for continuous runs."
+invokes: [develop-story, develop-task, develop-bug]
 ---
 
 # Develop Next — Roadmap Loop Orchestrator

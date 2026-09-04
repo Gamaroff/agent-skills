@@ -1,6 +1,7 @@
 ---
 name: review-bug
 description: 'Bug report review with two modes. Interactive mode (default): asks batched clarifying questions to resolve missing reproduction detail, wrong severity/priority, and linkage gaps — use when a bug report needs tightening before anyone fixes it. Validate mode (--validate flag or "is this bug ready to fix?"): automated non-interactive GO/NO-GO gate with a 1–10 fix-readiness score — use for pre-fix gates, batch triage, or CI. Checks template/frontmatter compliance, reproducibility-from-the-report, severity/priority correctness, and mode/linkage correctness; runs two read-only pre-pass scans — a duplicate scan (sibling bugs + bug-registry) and an already-fixed/stale scan of the root-cause area. Handles all three bug modes (story / task / general). Bug-side sibling of review-story / review-task; slots into develop-bug as Step 2. Invoke with `/review-bug [bug-file-path]` or "review this bug report".'
+invokes: [create-branch]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md). Note: review-bug reports on fix-readiness but **never mutates the bug lifecycle `status`** (`new → in-progress → …`) — a ready bug stays `new`; `develop-bug` Step 3 is what moves it to `in-progress`.

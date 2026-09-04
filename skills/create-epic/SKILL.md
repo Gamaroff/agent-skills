@@ -1,6 +1,7 @@
 ---
 name: create-epic
 description: Create single epic for medium-sized brownfield enhancements (1-3 stories). Use when enhancement follows existing patterns, has minimal architectural changes, and manageable integration complexity.
+invokes: [epic-registry-manager, mermaid-architect]
 ---
 
 # Brownfield Epic Creation

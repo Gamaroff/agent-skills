@@ -1,6 +1,7 @@
 ---
 name: review-task
 description: Interactive task document review that asks clarifying questions instead of making assumptions. Identifies inaccuracies, gaps, inconsistencies, and implementability issues. Provides user-aligned recommendations based on collaborative input.
+invokes: [create-branch, ensure-task-github-issue, ensure-task-jira-issue, mermaid-architect, sync-jira-task]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)

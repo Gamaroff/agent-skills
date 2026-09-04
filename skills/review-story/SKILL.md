@@ -1,6 +1,7 @@
 ---
 name: review-story
 description: 'Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements or you need user input. Validate mode (--validate flag or "is this story ready?"): automated non-interactive GO/NO-GO gate with 1–10 readiness score — use for pre-implementation gates, batch validation across multiple stories, CI pipelines, or quick sanity checks without user interaction.'
+invokes: [create-branch, ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
