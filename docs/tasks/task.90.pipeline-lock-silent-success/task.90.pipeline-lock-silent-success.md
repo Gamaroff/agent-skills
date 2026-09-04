@@ -5,7 +5,7 @@ type: task
 description: "A zero-byte lock file passes the jq guard — jq on empty input emits nothing and exits 0 — so the script prints 'step 0 → 5', exits 0, and leaves the lock empty. Success is reported for a state transition that never occurred, in the pipeline's own state machine. Second, lower-severity defect in the same script: the $LOCK.tmp redirect follows a pre-existing symlink on a predictable path."
 tags: [pipeline, shell, silent-failure, state-machine]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 risk_level: medium
 created: 2026-09-04
@@ -16,7 +16,7 @@ estimated_effort_hours: 5
 
 # Technical Task: `advance-pipeline-lock.sh` reports success for an advance that did not happen
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.90.review.1.pipeline-lock-silent-success.md` implemented 2026-09-04
 
 ---
@@ -39,6 +39,10 @@ PIPELINE_LOCK=$T/lk bash shared/resources/advance-pipeline-lock.sh 5   # $T/lk i
 `jq` on empty input emits nothing and exits **0**, so the `if ! jq` guard at `:138` does not fire and
 `mv` installs the empty file. The caller is told the pipeline advanced. It did not.
 
+The same fabrication happens for any input `jq` parses but that holds no object — a bare `null`, `[]`,
+`"str"` or `42`, where `.current_step = $n` invents `{"current_step":5}` out of nothing. QA found that
+neighbour while probing the fix for the empty case; both are closed by the same guard.
+
 A whitespace-only lock is worse in one respect: the same path *truncates* a file that had content to
 zero bytes, and still reports success.
 
@@ -55,10 +59,21 @@ pre-existing symlink at that path, writing the JSON through to the target before
   written, and nothing in the output distinguishes it from a real advance.
 - Both `PreCompact` and `Stop` hooks read `current_step` from this file. An empty lock makes both
   hooks read `0` and re-drive the pipeline from the wrong position after a compaction.
-- The script otherwise fails **closed on every other malformed input** — 18 executed `current_step`
-  values (`null`, absent, `"abc"`, `-3`, `3.7`, `1e400`, malformed JSON, non-JSON) all correctly
-  preserve the lock and exit non-zero. The zero-byte case is the single hole in an otherwise
-  well-behaved validator, which is why it survived: every neighbouring case is right.
+- **The inherited "single hole" claim was false, and QA caught it.** This task was filed asserting
+  that 18 executed `current_step` values (`null`, absent, `"abc"`, `-3`, `3.7`, `1e400`, malformed
+  JSON, non-JSON) "all correctly preserve the lock and exit non-zero", making the zero-byte case the
+  lone defect in an otherwise sound validator. Executed against the pre-fix script, **6 of those 8
+  advance and exit 0** — only the two *unparseable* inputs failed closed. The claim came from task
+  77's DoD probe and was carried into this document unverified.
+
+  What actually held before this task: the script failed closed on input `jq` could not **parse**,
+  and advanced on anything it could. Both the empty file and a bare `null` fall in the second group,
+  which is why neither was caught.
+
+  What holds after it: the script fails closed on anything that is not a **JSON object**. Inside a
+  valid object a garbage `current_step` (`"abc"`, `-3`, `3.7`) still falls back to `0` and advances —
+  deliberate, long-standing, and untouched here: the lock ends up in a *valid* state, so nothing is
+  misreported.
 
 ### Benefits
 
@@ -107,9 +122,11 @@ unpredictable name and is created `O_EXCL` — a pre-existing symlink at `$LOCK.
 
 In scope:
 
-- Treat an empty or whitespace-only lock file as malformed: fail closed, exit non-zero, leave the
-  lock untouched — matching the existing behaviour for every other malformed input. Applies to the
-  main advance path and the `--skill commit-changes` arm; **not** to `--complete`.
+- Treat any lock that is **not a JSON object** as malformed — empty, whitespace-only, malformed, or
+  parseable-but-not-an-object (`null`, `[]`, `"str"`, `42`): fail closed, exit non-zero, leave the
+  lock untouched. Applies to the main advance path and the `--skill commit-changes` arm; **not** to
+  `--complete`. (Widened from "empty or whitespace-only" after QA found the `null` case — same defect
+  class, one predicate away.)
 - Harden the temp write with `mktemp` in the lock's directory, so the redirect cannot follow a
   symlink.
 - Extend `shared/resources/advance-pipeline-lock.test.sh` with both cases, and add a zsh interpreter
@@ -264,9 +281,11 @@ the local lock file.
 
 - [x] A zero-byte lock file exits non-zero, leaves the file untouched, and prints no success line.
 - [x] A whitespace-only lock file behaves identically, and is not truncated.
+- [x] A lock that parses but is not an object (`null`, `[]`, `"str"`, `42`) fails closed and is left
+      byte-identical.
 - [x] `--complete` on a malformed lock still removes it (the deliberate exemption, pinned by a test).
 - [x] A pre-existing symlink at `$LOCK.tmp` does not receive the write.
-- [x] All four cases covered in `advance-pipeline-lock.test.sh`, green under bash **and** zsh.
+- [x] All cases covered in `advance-pipeline-lock.test.sh`, green under bash **and** zsh (30 scenarios).
 - [x] The 14 pre-existing scenarios remain green.
 - [x] Mutation-proved: revert each fix, confirm the new test goes red, restore.
 - [x] All 9 bundled copies refreshed and verified **by content** (the bundler prints `in sync` for
@@ -326,6 +345,38 @@ the pre-existing 14 scenarios.
 - [x] Phase 3 — scenarios 8–11 + zsh pass
 - [x] Phase 4 — mutation proof recorded
 - [x] Phase 5 — legend tag, row retag, 9 copies re-bundled and content-verified
+
+---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-04
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.90.qa.1.pipeline-lock-silent-success.md](./task.90.qa.1.pipeline-lock-silent-success.md)
+- **Gate File**: [task.90.gate.1.pipeline-lock-silent-success.yml](./task.90.gate.1.pipeline-lock-silent-success.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 22 (bash) + 22 (zsh) + 9 adversarial malformed-input probes + 2 mutation proofs
+- **Phases Verified**: 5/5
+- **Success Criteria**: 10/10 met, each verified by execution
+- **Critical Issues**: 1 HIGH, 2 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+**The code change is sound and its tests are real** — both mutation proofs were independently re-derived, and all 10 success criteria were verified by executing their evidence. The gate fails on what ships alongside the fix:
+
+- **HIGH** ([bug 1](./task.90.bug.1.implementation-report-corrupted.md)) — the implementation report was corrupted to 480,884 lines / 28 MB by a `str.replace("", …)` in a correction script, and committed in `293da69` and pushed to PR #313. No existing gate catches it: it is well-formed markdown, so `prettier --check` passes.
+- **MEDIUM** ([bug 2](./task.90.bug.2.false-single-hole-claim.md)) — §2's "single hole in an otherwise well-behaved validator" is false: 6 of the 8 malformed inputs it names advance and exit 0. The claim was inherited from task 77's DoD unverified and ships in `CHANGELOG.md` and the PR body.
+- **MEDIUM** ([bug 3](./task.90.bug.3.whole-file-null-lock.md)) — a whole-file `null` lock still fabricates `{"current_step":5}` and reports success. Pre-existing and out of the stated scope, but it is the counterexample that falsifies the §2 rationale.
+- **LOW** — a NUL-byte-only lock emits a bash stderr warning before the guard correctly fires. Outcome is right; noise only.
 
 ---
 
@@ -457,3 +508,5 @@ stayed green throughout, including under both mutations.
 | 2026-09-04 | 1.2     | Review passed (8.6/10) — restructured to the 11-section template (added Motivation, Technical Background, Breaking Changes, Implementation Plan, Files Summary, Testing Strategy, Risk Assessment, Rollback Plan, Progress Tracking); corrected three factual errors: the failing guard is at `:138`, not `:94-104`; there are **9** bundled copies, not 10; the test file does **not** run under zsh today, so that coverage is added rather than extended. Resolved the unstated scope gap on which invocation paths the new guard covers (`--complete` exempt, pinned by a test) | review-task |
 | 2026-09-04 |         | Status → ready-for-development                                   | review-task |
 | 2026-09-04 |         | Implemented — 12 files (1 script, 1 test file, 2 docs, 9 bundled copies), 22 tests green under bash and zsh, both fixes mutation-proved | develop |
+| 2026-09-04 |         | QA gate FAIL (60/100) — 1 HIGH, 2 MEDIUM, 1 LOW; all 10 success criteria met, findings are in the artifacts shipped alongside the fix | qa-task |
+| 2026-09-04 |         | QA findings fixed — 1 HIGH + 2 MEDIUM closed in 1 iteration: report rebuilt 480,884 → 218 lines, false "single hole" claim corrected in task/CHANGELOG/PR, non-object lock guard added (scenario 12); guard restructured to one falsifiable predicate on mutation-proof evidence | qa-fix |

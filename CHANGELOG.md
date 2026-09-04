@@ -80,16 +80,27 @@ All notable changes to this project will be documented in this file. Format foll
   caller was told the pipeline had moved. A whitespace-only lock was worse: the same path *truncated*
   a file that had content, and still reported success.
 
-  **Everything around it was already right, which is why it survived.** Eighteen other malformed
-  `current_step` values — `null`, absent, `"abc"`, `-3`, `3.7`, `1e400`, malformed JSON, non-JSON —
-  all correctly preserve the lock and exit non-zero. Empty input was the single case where jq's
-  "success" was indistinguishable from a real one.
+  **The same fabrication happened for any input `jq` could parse but that held no object** — a bare
+  `null`, `[]`, `"str"` or `42`, where `.current_step = $n` invents `{"current_step":5}` out of
+  nothing and reports it as an advance.
 
-  An empty or whitespace-only lock now fails closed at every site that reads or writes the lock JSON:
-  non-zero exit, file untouched, nothing on stdout. **`--complete` is deliberately exempt** — it
-  removes the lock without parsing it, and gating it would make a corrupt lock permanently
-  unclearable, which is a worse failure than the one being fixed. That exemption is pinned by its own
-  test so a later widening of the guard breaks rather than ships.
+  The task was filed claiming that eighteen other malformed `current_step` values — `null`, absent,
+  `"abc"`, `-3`, `3.7`, `1e400`, malformed JSON, non-JSON — "all correctly preserve the lock and exit
+  non-zero", making the empty file a lone hole in a sound validator. **That claim was inherited
+  unverified and is false**: executed against the old script, six of those eight advance and exit 0.
+  What actually held is simpler — it failed closed on input `jq` could not *parse*, and advanced on
+  everything else. The empty file and the bare `null` both sat in the second group.
+
+  A lock that is **not a JSON object** — empty, whitespace-only, malformed, or parseable-but-not-an-
+  object — now fails closed at every site that reads or writes the lock JSON: non-zero exit, file
+  untouched, nothing on stdout. One predicate decides (`jq -e 'type == "object"'`); an earlier
+  revision tested emptiness separately and mutation proof retired that branch, because with the type
+  check present, deleting it left every test green. It survives only to choose the error message.
+
+  **`--complete` is deliberately exempt** — it removes the lock without parsing it, and gating it
+  would make a corrupt lock permanently unclearable, which is a worse failure than the one being
+  fixed. That exemption is pinned by its own test so a later widening of the guard breaks rather than
+  ships.
 
   Also fixed in the same script: the temp write went to `$LOCK.tmp`, a predictable path whose
   redirect **followed a pre-existing symlink**, writing the JSON through to the target before `mv`.
@@ -99,11 +110,14 @@ All notable changes to this project will be documented in this file. Format foll
   through it.) One deliberate side effect: the lock's mode becomes `0600` rather than umask-derived
   `0644`. `.claude/state/` is per-user state, so this is a tightening with no reader affected.
 
-  Both defects were found by the DoD security probe on task 77 (3029 executed probes) and verified
-  byte-identical on `develop` before any change was made. The four new test scenarios run under
-  **bash and zsh**, and each fix was mutation-proved individually — reverting the guard turns the two
-  malformed-lock scenarios red on both interpreters and nothing else; reverting `mktemp` turns only
-  the symlink scenario red.
+  The two original defects were found by the DoD security probe on task 77 (3029 executed probes) and
+  verified byte-identical on `develop` before any change was made; the `null` case and the false
+  "single hole" claim were both found by QA on this task's own PR. The new test scenarios run under
+  **bash and zsh** (30 total), and each fix was mutation-proved individually — removing the guard
+  predicate turns the empty, whitespace and `null` scenarios red on both interpreters; reverting
+  `mktemp` turns only the symlink scenario red. Scenario 12's `[]`, `"str"` and `42` shapes are
+  asserted but **not** mutation-proved against that predicate: they already failed closed through the
+  write path, so they document intent rather than bind it.
 
 - **The registry fallback frontier ignored the `Depends on` column, so it could nominate work whose
   prerequisite was unbuilt.** `compareCandidates` orders tasks by priority then ascending number and

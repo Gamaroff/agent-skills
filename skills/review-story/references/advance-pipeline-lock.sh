@@ -19,9 +19,10 @@
 # Behaviour:
 #   • No lock file  → exit 0, silent noop (no active pipeline)
 #   • jq missing    → exit 0, warn to stderr (degraded mode, same as on-stop.sh)
-#   • empty/whitespace-only lock → exit 1, lock untouched, no success line.
-#                     Applies to every path that reads or writes the lock JSON;
-#                     --complete is exempt so a corrupt lock stays clearable.
+#   • lock that is not a JSON OBJECT (empty, whitespace-only, bare null/array/
+#                     scalar, or malformed) → exit 1, lock untouched, no success
+#                     line. Applies to every path that reads or writes the lock
+#                     JSON; --complete is exempt so a corrupt lock stays clearable.
 #   • next <= current → exit 0, idempotent noop (already advanced)
 #   • next > current  → atomic write via mktemp + mv, print confirmation to stdout
 #
@@ -88,8 +89,31 @@ fi
 # failure than the one being fixed. Pinned by a test so a later widening of this
 # guard fails rather than ships.
 require_parsable_lock() {
-  if [ ! -s "$LOCK" ] || [ -z "$(tr -d '[:space:]' < "$LOCK")" ]; then
-    echo "advance-pipeline-lock: lock file '$LOCK' is empty or whitespace-only; refusing to advance" >&2
+  # ONE decision predicate. `jq -e 'type == "object"'` rejects every shape that
+  # cannot carry pipeline state:
+  #   • empty            — jq exits 4 on empty input
+  #   • whitespace-only  — same
+  #   • malformed JSON   — parse error
+  #   • parses, but is not an object (`null`, `[]`, `"str"`, `42`) — the case
+  #     that matters most, because `jq` accepts these and `.current_step = $n`
+  #     on any of them FABRICATES `{"current_step":5}` from a file that never
+  #     held an object. Reported as a real advance. That is the defect this
+  #     whole task exists to close, wearing a different shape.
+  #
+  # An earlier revision tested emptiness separately, as its own `exit 1` ahead
+  # of this. Mutation proof retired it: with this predicate in place, deleting
+  # that branch left all 30 tests green — it was control flow no test could
+  # falsify. It survives below only to CHOOSE THE MESSAGE, never to decide.
+  #
+  # Not called from `--complete`, which removes the lock without parsing it.
+  # Gating that would make a corrupt lock permanently unclearable — worse than
+  # the bug being fixed. Pinned by scenario 11 so a later widening breaks.
+  if ! jq -e 'type == "object"' "$LOCK" >/dev/null 2>&1; then
+    if [ ! -s "$LOCK" ] || [ -z "$(tr -d '[:space:]' < "$LOCK")" ]; then
+      echo "advance-pipeline-lock: lock file '$LOCK' is empty or whitespace-only; refusing to advance" >&2
+    else
+      echo "advance-pipeline-lock: lock file '$LOCK' is not a JSON object; refusing to advance" >&2
+    fi
     exit 1
   fi
 }

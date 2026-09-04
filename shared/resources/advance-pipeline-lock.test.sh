@@ -26,6 +26,11 @@
 #   11.  --complete still removes a zero-byte lock. This exemption is deliberate
 #        and pinned here: gating --complete on the new guard would make a corrupt
 #        lock permanently unclearable, which is worse than the bug being fixed.
+#   12.  A lock that PARSES but is not a JSON object (bare `null`, `[]`, `"str"`,
+#        `42`) fails closed. `jq` accepts all of these, and `.current_step = 5`
+#        on any of them FABRICATES `{"current_step":5}` from a file that never
+#        held an object — the empty case's defect wearing a different shape.
+#        Found by QA probing the fix for scenario 8.
 #
 # Scenarios 8–11 run under BOTH bash and zsh. macOS logins are zsh and task 51
 # found a real bash/zsh divergence in a sibling shared resource, so the
@@ -193,6 +198,27 @@ run_malformed_lock_scenarios() {
   else
     pass "[$SH] symlink at \$LOCK.tmp is not followed (canary intact, lock advanced 1 → 3)"
   fi
+
+  # ── 12. A parseable non-object lock fails closed ───────────────────────────
+  # Four shapes, because `jq` accepts every one of them and the assignment
+  # fabricates an object from each. Asserting only `null` would leave the arm
+  # satisfiable by a guard that special-cased that one literal.
+  for SHAPE in 'null' '[]' '"str"' '42'; do
+    LOCK_FILE="$TMPDIR_TEST/nonobject-$SH-$(echo "$SHAPE" | tr -dc '[:alnum:]').lock"
+    printf '%s' "$SHAPE" > "$LOCK_FILE"
+    OUT=$(PIPELINE_LOCK="$LOCK_FILE" "$SH" "$SCRIPT" 5 2>/dev/null)
+    RC=$?
+    AFTER=$(cat "$LOCK_FILE")
+    if [ "$RC" -eq 0 ]; then
+      fail "[$SH] non-object lock $SHAPE fails closed" "exit 0, expected non-zero"
+    elif [ "$AFTER" != "$SHAPE" ]; then
+      fail "[$SH] non-object lock $SHAPE fails closed" "lock rewritten: $SHAPE -> $AFTER"
+    elif [ -n "$OUT" ]; then
+      fail "[$SH] non-object lock $SHAPE fails closed" "success line on stdout: $OUT"
+    else
+      pass "[$SH] non-object lock $SHAPE fails closed (exit $RC, untouched, silent)"
+    fi
+  done
 
   # ── 11. --complete stays exempt from the new guard ─────────────────────────
   # Pins the §4 exemption. A corrupt lock that cannot be cleared is a worse
