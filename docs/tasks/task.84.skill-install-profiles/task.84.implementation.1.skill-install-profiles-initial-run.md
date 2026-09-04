@@ -217,6 +217,36 @@ Suite: 57 → 66 tests.
 
 ---
 
+### QA Cycle 3 — confirmation pass — 2026-09-04
+
+**One finding, in cycle 2's own fix.** The block-form guard added in cycle 2 required the first
+`- item` on the line immediately after `invokes:`. YAML permits a blank line (or a comment) between
+them, and that shape slipped through as a silent empty list again — the same defect, one newline
+away. Widened to skip blank and comment lines; five block shapes now throw, and the four
+legitimately-empty shapes still parse.
+
+**Three consecutive cycles have now caught an incomplete fix**, which is the durable finding of this
+task:
+
+| Cycle | Fix | What the next cycle found |
+|---|---|---|
+| 1 | `\s+#` comment strip | Missed `[a]# note` (no space) |
+| 1 | dry-run flag forwarding | Missed `--all-skills` |
+| 2 | block-form detection | Missed a blank line before the first item |
+
+**A mutation proof that did not mutate.** The first attempt to prove the widened guard reported
+`0 fail` — because the `perl` substitution silently failed to apply, so the "mutation" run tested
+unmodified code. That is the same vacuity being found in the tests themselves, one level up: a
+mutation test that does not mutate proves nothing and looks identical to a passing one. Re-run with
+an asserted substitution; narrowing the regex now fails with `block list (blank line first) must be
+rejected loudly`. **Always assert that the mutation applied before believing the result.**
+
+Convergence: 11 → 5 → 1 findings, each cycle's blast radius strictly narrower (installs everything →
+one skill's edges → one skill's edges under an unusual YAML shape). All prior high-severity fixes
+spot-verified still in place.
+
+---
+
 ## Completion
 
 **Finished**: {populated at end}

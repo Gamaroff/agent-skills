@@ -1008,27 +1008,137 @@ test("C2-H2: the CLI's exit code is PROPAGATED, so a config typo is not blamed o
 });
 
 test("C2-M1: a zero-skill resolution is honoured but warned about, never silent", () => {
-  // Cycle 1's fix #2 made rc-0-with-empty-output authoritative, which is right —
-  // but it also made an empty install reachable, and the surrounding comments
-  // still claimed that could not happen. "You excluded everything" and
-  // "something broke" produce the same `0 new, 0 updated` summary otherwise.
+  // The original version of this test asserted `match(src, /EVEN IF EMPTY/)` —
+  // the text of a CODE COMMENT. A comment cannot fail. It would have passed with
+  // the warning emitted after the install loop, with `_have_set` never set, or —
+  // as was actually the case — with the surrounding rc dispatch aborting the
+  // shell. It proved two strings were in a file.
+  //
+  // This version drives the real function under real errexit.
+  const dir = scratch(
+    "skills:\n  profile: minimal\n  exclude: [commit-changes, create-branch, create-issue, create-pr, review-code]\n",
+  );
+  const fake = mkdtempSync(path.join(tmpdir(), "zero-tarball-"));
+  try {
+    mkdirSync(path.join(fake, "shared", "resources"), { recursive: true });
+    for (const f of [
+      "resolve-skill-set.mjs",
+      "resolve-skill-set-cli.mjs",
+      "skill-profiles.json",
+      "skill-dependencies.json",
+    ]) {
+      writeFileSync(
+        path.join(fake, "shared", "resources", f),
+        readFileSync(path.join(REPO, "shared", "resources", f)),
+      );
+    }
+    // NO `set +e` — errexit stays on, exactly as install_skills runs.
+    const out = execFileSync(
+      "bash",
+      [
+        "-c",
+        `export SETUP_CONSUMER_NO_MAIN=1
+         cd ${JSON.stringify(dir)}
+         source ${JSON.stringify(WIZARD)} >/dev/null 2>&1
+         if OUT=$(_resolve_skill_set github ${JSON.stringify(fake)} 2>/dev/null); then RC=0; else RC=$?; fi
+         echo "rc=$RC lines=$(printf '%s' "$OUT" | grep -c . || true) alive=yes"`,
+      ],
+      {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH, HOME: process.env.HOME },
+      },
+    ).trim();
+    assert.match(
+      out,
+      /alive=yes/,
+      "the shell must survive — errexit is on in production",
+    );
+    assert.match(out, /rc=0/, "an empty set is a legitimate answer");
+    assert.match(out, /lines=0/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(fake, { recursive: true, force: true });
+  }
+});
+
+test("C2-M1b: install_skills reaches its rc branches under errexit — they are not dead code", () => {
+  // THE test this cycle exists for. Cycle 2 rewrote the call site as a bare
+  // assignment `_X=$(_resolve_skill_set …); _rc=$?`. Under `set -euo pipefail`
+  // that aborts the shell the moment the substitution fails, so both rc branches
+  // were unreachable and every resolver failure bricked the install — after the
+  // tarball was extracted, before any skill was copied.
+  //
+  // The old test could not see it: it ran the call under an explicit `set +e`,
+  // which is precisely the condition that does not hold in production, and
+  // offered `match(src, /_resolve_rc -eq 2/)` — a grep for a dead branch — as its
+  // evidence for the caller.
   const src = readFileSync(WIZARD, "utf8");
   assert.match(
     src,
-    /resolved to ZERO skills/,
-    "the empty case must warn before installing",
+    /if _RESOLVED_SET=\$\(_resolve_skill_set "\$_tracker" "\$_tmpdir"\); then/,
+    "the call MUST be in condition form; a bare assignment aborts under errexit",
   );
-  assert.match(
+  assert.doesNotMatch(
     src,
-    /EVEN IF EMPTY/,
-    "and the function's documented contract must match what it now does",
+    /^\s*_RESOLVED_SET=\$\(_resolve_skill_set[^)]*\); _resolve_rc=\$\?/m,
+    "the bare-assignment form is the regression",
   );
+
+  // And prove it behaviourally, with errexit ON.
+  const dir = scratch(
+    "skills:\n  profile: minimal\n  include: [NotARealSkill]\n",
+  );
+  const fake = mkdtempSync(path.join(tmpdir(), "rc-live-"));
+  try {
+    mkdirSync(path.join(fake, "shared", "resources"), { recursive: true });
+    for (const f of [
+      "resolve-skill-set.mjs",
+      "resolve-skill-set-cli.mjs",
+      "skill-profiles.json",
+      "skill-dependencies.json",
+    ]) {
+      writeFileSync(
+        path.join(fake, "shared", "resources", f),
+        readFileSync(path.join(REPO, "shared", "resources", f)),
+      );
+    }
+    const out = execFileSync(
+      "bash",
+      [
+        "-c",
+        `export SETUP_CONSUMER_NO_MAIN=1
+         cd ${JSON.stringify(dir)}
+         source ${JSON.stringify(WIZARD)} >/dev/null 2>&1
+         if OUT=$(_resolve_skill_set github ${JSON.stringify(fake)} 2>/dev/null); then RC=0; else RC=$?; fi
+         echo "REACHED rc=$RC"`,
+      ],
+      {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH, HOME: process.env.HOME },
+      },
+    ).trim();
+    assert.match(
+      out,
+      /REACHED rc=2/,
+      "execution must continue past a failed resolve so the caller can recover",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(fake, { recursive: true, force: true });
+  }
 });
 
 test("C2-M2: the dry-run preview forwards --all-skills", () => {
   // Without it the preview applies a tracker filter the real run does not:
-  // 35 previewed against 41 installed. Cycle 1's test for this greps the very
-  // lines the bug was on and could not see it — hence the behavioural check too.
+  // 35 previewed against 41 installed.
+  //
+  // HONEST SCOPE: the grep below catches a revert of the _dry_args line. The
+  // second half exercises the CLI flag directly and does NOT touch
+  // setup-consumer.sh — it only proves --all-skills is live, so it would pass
+  // with the forwarding deleted. The dry-run path itself is not behaviourally
+  // covered, because reaching it means running install_skills, which downloads a
+  // tarball. Stated rather than implied: an earlier version of this comment
+  // claimed a behavioural backstop the assertions do not provide.
   const src = readFileSync(WIZARD, "utf8");
   assert.match(src, /ALL_SKILLS" == true \]\] && _dry_args\+=\(--all-skills\)/);
 

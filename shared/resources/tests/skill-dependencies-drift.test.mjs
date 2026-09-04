@@ -153,11 +153,43 @@ test("the block form of `invokes:` is REJECTED, not silently read as empty", () 
   // succeeds, the committed JSON matches a fresh generation, the drift check is
   // green, and a consumer on a profile install gets a skill with none of the
   // steps it invokes — dying mid-pipeline in their repo, hours after the install.
-  assert.throws(
-    () =>
-      parseInvokes("---\ninvokes:\n  - create-branch\n  - develop\n---\n", "x"),
-    /must use the inline form/,
-    "a YAML block list must be rejected loudly",
+  // Every block-list shape YAML permits, not just the tightest one. Cycle 3
+  // found that requiring the first `- item` on the very NEXT line let
+  // `invokes:` / blank / `  - name` through as a silent empty list — the same
+  // defect the check was added for, one newline away.
+  for (const [shape, text] of [
+    ["items on the next line", "---\ninvokes:\n  - create-branch\n---\n"],
+    ["blank line first", "---\ninvokes:\n\n  - create-branch\n---\n"],
+    ["two blank lines", "---\ninvokes:\n\n\n  - create-branch\n---\n"],
+    [
+      "comment between",
+      "---\ninvokes:\n  # the steps\n  - create-branch\n---\n",
+    ],
+    ["tab indent", "---\ninvokes:\n\t- create-branch\n---\n"],
+  ]) {
+    assert.throws(
+      () => parseInvokes(text, "x"),
+      /must use the inline form/,
+      `block list (${shape}) must be rejected loudly`,
+    );
+  }
+
+  // The legitimately-empty shapes must NOT throw — an over-eager guard would
+  // fail every skill that declares nothing, which is most of them.
+  assert.deepEqual(
+    parseInvokes("---\nname: x\ninvokes:\n---\n", "x"),
+    [],
+    "bare key, last in frontmatter",
+  );
+  assert.deepEqual(
+    parseInvokes("---\ninvokes:\ntags: [x]\n---\n", "x"),
+    [],
+    "bare key followed by another key",
+  );
+  assert.deepEqual(
+    parseInvokes("---\ninvokes: [a]\ntags:\n  - x\n---\n", "x"),
+    ["a"],
+    "a DIFFERENT key's block list must not be mistaken for this one's",
   );
 
   // The forms that must keep working, asserted on VALUE rather than on "no throw":

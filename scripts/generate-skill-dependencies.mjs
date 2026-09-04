@@ -102,7 +102,14 @@ export function parseInvokes(text, skill = "<unknown>") {
   // "rejected loudly"; it was not, and the drift guard asserting `doesNotThrow`
   // passed for precisely the input it was written to catch.
   const afterKey = fm[1].slice(line.index + line[0].length);
-  if (!line[1].trim() && /^\r?\n[ \t]+-[ \t]/.test(afterKey)) {
+  // Skip blank and comment lines between the key and the first item. YAML
+  // permits `invokes:` / blank / `  - name`, and requiring the item on the very
+  // next line let exactly that shape slip through as a silent empty list again —
+  // the same defect this check was added for, one newline away.
+  if (
+    !line[1].trim() &&
+    /^\r?\n(?:[ \t]*(?:#[^\n]*)?\r?\n)*[ \t]+-[ \t]/.test(afterKey)
+  ) {
     throw new Error(
       `${skill}: 'invokes:' must use the inline form 'invokes: [a, b]'. ` +
         `Found a YAML block list, which this parser does not read.`,

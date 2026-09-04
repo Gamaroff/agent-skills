@@ -1000,7 +1000,11 @@ _config_skills_list() {
       inblock && $0 ~ "^[[:space:]]+" key ":" {
         v = $0
         sub("^[[:space:]]+" key ":[[:space:]]*", "", v)
-        sub(/[[:space:]]+#.*$/, "", v)
+        # `[[:space:]]*#`, not `+`: this reads a FLOW SEQUENCE, where YAML does
+        # treat an unspaced `#` as a comment — `exclude: [qa-story]# off` is
+        # `['qa-story']`. The scalar parsers above keep `+` deliberately, because
+        # in a plain scalar an unspaced `#` is part of the value.
+        sub(/[[:space:]]*#.*$/, "", v)
         gsub(/[][]/, "", v)
         gsub(/[[:space:]]/, "", v)
         gsub(/["'"'"']/, "", v)
@@ -1179,12 +1183,28 @@ install_skills() {
         # --all-skills too, or the preview applies a tracker filter the real run
         # would not: 35 previewed against 41 actually installed.
         [[ "$ALL_SKILLS" == true ]] && _dry_args+=(--all-skills)
-        if [[ -f "$_dry_cli" ]] && _dry_n=$(node "$_dry_cli" "${_dry_args[@]}" 2>/dev/null); then
+        # Keep stderr: on rc 2 the CLI has already named the offending entry, and
+        # discarding it reproduced the very mis-attribution fix #3 removed from
+        # the real path — a dry run is where a config typo should be cheapest to
+        # find, not the one place it is hidden.
+        local _dry_err; _dry_err=$(mktemp)
+        if [[ ! -f "$_dry_cli" ]]; then
+          echo -e "${YELLOW}[dry-run]${NC} resolver not available locally — count not computed"
+          _dry_detail="${_dry_detail}, profile ${_dry_profile}"
+          rm -f "$_dry_err"
+        elif _dry_n=$(node "$_dry_cli" "${_dry_args[@]}" 2>"$_dry_err"); then
           echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' resolves to ${_dry_n} skills (closure computed offline; not counted against the release tarball)"
           _dry_detail="${_dry_detail}, profile ${_dry_profile} (${_dry_n})"
+          rm -f "$_dry_err"
+        elif [[ $? -eq 2 ]]; then
+          cat "$_dry_err" >&2
+          echo -e "${YELLOW}[dry-run]${NC} skills-config.yaml names something that does not exist (above) — the real run would install the unfiltered set"
+          _dry_detail="${_dry_detail}, profile ${_dry_profile} (config error)"
+          rm -f "$_dry_err"
         else
-          echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' — resolver unavailable locally, count not computed"
+          echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' — resolver failed, count not computed"
           _dry_detail="${_dry_detail}, profile ${_dry_profile}"
+          rm -f "$_dry_err"
         fi
       fi
       record_step "Skills install" "ok" "$_dry_detail"
@@ -1228,15 +1248,31 @@ install_skills() {
       local _profile; _profile=$(_config_skills_profile)
       local _RESOLVED_SET="" _have_set=false _resolve_rc=0
       if [[ "$_profile" != "full" || -n "$(_config_skills_list exclude)" ]]; then
-        _RESOLVED_SET=$(_resolve_skill_set "$_tracker" "$_tmpdir"); _resolve_rc=$?
+        # CONDITION FORM, not a bare assignment. Under `set -euo pipefail` a bare
+        # `_X=$(cmd)` whose substitution exits non-zero triggers errexit and kills
+        # the wizard outright — here, after the tarball is extracted and
+        # .agents/skills/ created but before a single skill is copied, leaving an
+        # empty install and a leaked temp dir. Cycle 2 introduced exactly that by
+        # rewriting this line as a bare assignment while, in the same commit,
+        # adding a comment above _resolve_skill_set warning against it. Both rc
+        # branches below were dead code as a result.
+        if _RESOLVED_SET=$(_resolve_skill_set "$_tracker" "$_tmpdir"); then
+          _resolve_rc=0
+        else
+          _resolve_rc=$?
+        fi
         if [[ $_resolve_rc -eq 0 ]]; then
           _have_set=true
           # An empty-but-successful resolution is honoured — but never quietly.
           # "You excluded everything" and "something broke" produce the same
           # `0 new, 0 updated` summary otherwise.
           if [[ -z "$_RESOLVED_SET" ]]; then
-            warn "Profile '${_profile}' resolved to ZERO skills — check your skills.exclude list"
-            record_warning "Profile '${_profile}' resolved to zero skills, so nothing was installed. This is what the config asks for (every seed is excluded); if it is not what you meant, fix skills.exclude and re-run --update."
+            # Names BOTH reachable causes. An empty set means every seed was
+            # removed — usually by skills.exclude, but a profile whose seeds are
+            # all inapplicable to this tracker gets here too, and blaming
+            # `exclude` for that would send the reader to the wrong line.
+            warn "Profile '${_profile}' resolved to ZERO skills — check skills.exclude, and whether this profile applies to tracker '${_tracker}'"
+            record_warning "Profile '${_profile}' resolved to zero skills under tracker '${_tracker}', so nothing was installed. Either skills.exclude removes every seed, or none of the profile's seeds apply to this tracker. The resolver printed which above. Fix the config and re-run --update."
           fi
         elif [[ $_resolve_rc -eq 2 ]]; then
           # The CLI has already printed the specific problem to stderr.
