@@ -5,18 +5,20 @@ type: task
 description: "Six times in one task, an assertion claimed a relationship — X routes to Y, X fires at Y, X owns Y — while testing only that both names appear somewhere in the haystack. Each passed on the exact regression it named, on six different surfaces, twice inside the fix for the previous instance. Add a lint that flags the shape so the seventh is caught by CI rather than by a reviewer."
 tags: [evals, test-strength, lint, static-analysis]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: low
 created: 2026-09-04
 updated: 2026-09-04
+completed_date: 2026-09-04
+pr_number: 312
 assignee: Claude
 estimated_effort_hours: 6
 ---
 
 # Technical Task: Lint for prose-matching assertions that claim a relationship but test only co-occurrence
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.89.review.1.relationship-assertion-lint.md` implemented 2026-09-04
 
 ---
@@ -315,6 +317,40 @@ lint, so rollback is a deletion rather than a migration.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.89.gate.2.relationship-assertion-lint.yml` — ✅ **PASS**, 100/100
+**QA Cycles**: 2 (cycle 1 CONCERNS 90 → cycle 2 PASS 100)
+**Step 5c `/review-pr`**: CONCERNS — PC-1 addressed in `fb96c24`, 0 code findings
+**CI**: ✅ SUCCESS on `fb96c24` (the final head) — `test`, `validate`, `link-check`, branch-policy
+
+Every criterion below was verified by **executing** its evidence, not by reading the checkbox above it:
+
+✅ **SC1 — six historical instances flagged**: 6/6 green, each by its assigned rule (A/A/A/D/C/B), fixtures reconstructed with `git show` from the commits that closed them
+✅ **SC2 — two survivors not flagged**: 2/2 green. Load-bearing — rule A's suggested replacement *is* survivor 1's mechanism
+✅ **SC3 — FP rate measured and reported**: **0 unsuppressed** over 2191 call sites / 89 files at `de19e1c`; 4 raw findings, all suppressed with written reasons; every figure commit-anchored
+✅ **SC4 — every rule mutation-proved**: **9 proofs**, exceeding the four required. M13 proves the corpus reachability sweep can fail *at all* — what separates a live guard from one that merely passes
+✅ **SC5 — runs in `npm run ci`, no `package.json` change**: 0 `package.json` changes; picked up by the existing `tests/*.test.js` glob
+✅ **SC6 — `npm run ci` exits 0**: `ci:fast` 2320 / 2319 pass / 0 fail / 1 skipped; CI green on the final head
+
+✅ **Security**: PASS — probed rather than assumed. The analyser is pure (0 `fs`, 0 writes, 0 exec, 0 network); the deliverable is a classifier, so its boundary was *executed* — 7 value-position shapes, 6 regression probes, an 89-file reachability sweep, 0 blind
+⚠️ **Compliance**: NOT_APPLICABLE — repository-internal test tooling; no user data, UI or external interface
+✅ **Documentation**: PASS — `mutation-proving.md` gains this as shape 6 of six, bundled copies regenerated and verified in sync
+
+**Residual, carried knowingly**: 1 LOW (keyword arm does not exclude property access — 0 occurrences, bounded to one line, non-silent because the reachability guard names it); `assert.strictEqual(x.includes(y), true)` unmodelled (0 occurrences, disclosed). The lint models the six shapes that happened; a seventh in an unmodelled shape will pass, and `mutation-proving.md` says so beside the lint it points at.
+
+**Not done, and why**: no tracker issue was closed and no board card moved — none exists. `TRACKER=github` with no `github_issue` in frontmatter, and tracker sync is opt-in with no operator present to consent. Recorded rather than skipped silently.
+
+**Detailed Verification Log**: see [`task.89.dod.1.relationship-assertion-lint.md`](./task.89.dod.1.relationship-assertion-lint.md) for full evidence.
+
+**Task marked as ACCEPTED on:** 2026-09-04
+
+---
+
 ## Dev Agent Record — QA Fix Cycle 1
 
 **Finding closed**: CY1-1 (MEDIUM) — `regexCanStartAfter` rejected `>`, so a regex literal after `=>`
@@ -418,6 +454,7 @@ legitimate division is unaffected.
 | 2026-09-04 | 1.0     | Filed from task 77's retrospective — six instances of one bug class across eleven gates | create-task |
 | 2026-09-04 | 1.1     | Review passed (9/10 post-fix) — added the 9 missing mandatory sections (Motivation, Technical Background, Breaking Changes, Implementation Plan, Files Summary, Testing Strategy, Risk Assessment, Rollback Plan, Progress Tracking); pinned each of the six instances to its gate finding and closing commit, which criterion 1 referenced but §2 did not carry; gave the false-positive criterion a denominator (1742 assertions / 81 files) and a reporting location; added `shared/resources/tests/` to the target globs; named the lint's path and its no-package.json-change CI wiring | review-task |
 | 2026-09-04 |         | Status → ready-for-development                                    | review-task |
+| 2026-09-04 | 1.2     | DoD verified — task accepted (PR #312, gate PASS 100/100, CI green on `fb96c24`) | finalise |
 | 2026-09-04 |         | QA gate PASS (100/100) cycle 2 — CY1-1 verified closed by mutation; 1 LOW recorded, not fixed | qa-task |
 | 2026-09-04 |         | QA findings fixed — CY1-1 closed (scanner value positions + reachability guard), 1 iteration | qa-fix |
 | 2026-09-04 |         | QA gate CONCERNS (90/100) — 1 MEDIUM (CY1-1, silent scanner desync), 1 LOW | qa-task |

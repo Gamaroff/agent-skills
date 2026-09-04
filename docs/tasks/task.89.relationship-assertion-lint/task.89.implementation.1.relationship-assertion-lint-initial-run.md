@@ -35,10 +35,10 @@ only establishing co-occurrence, validated against the six historical instances 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.89.*` exists in git                               | `feature/task.89.relationship-assertion-lint` created from `develop` at `bf3fd5b`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.89.review.{N}.{name}.md` exists (or skip logged)                 | `task.89.review.1.relationship-assertion-lint.md` — 9/10 READY TO IMPLEMENT; 2 Critical + 4 Important found, 6 fixes applied, 2 skipped; `draft → ready-for-development` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. 4-rule lint + analyser + 8 fixtures + FP record. `npm run ci` exit 0 (ci:fast 2311/2310/0/1 skipped; eval:all exit 0). 6 mutation proofs. | — |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.89.qa.{N}.*.md`; `task.89.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.89.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #312: https://github.com/Gamaroff/agent-skills/pull/312 — 2 commits (f94ff95 fixes, fe7f617 lint). Issue comment skipped (none linked). No leak: every committed path in SCOPE_PATHS. | — |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.89.qa.{N}.*.md`; `task.89.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 7. finalise                | ✅ Done    | `task.89.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     |       | —                    |
 
 ---
 
@@ -141,16 +141,66 @@ matched the possessive "its own provenance header". Full record:
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — gate CONCERNS 90/100
+
+- `/qa-task`: every numeric claim re-derived independently (89 files / 2188 call sites counted three
+  ways; six mutation proofs re-run with the mutation confirmed applied first). Suite proved
+  non-vacuous under an always-flagging analyser (14 red), a broken corpus walk, and a deleted fixture.
+- **CY1-1 (MEDIUM)** — `regexCanStartAfter` omitted `>`, so a regex after `=>` was scanned as code and
+  an odd quote count inside it silently blinded the analyser to the rest of the file. 0 of 89 files
+  affected, so no coverage was lost; the *mode* was the defect.
+- `/qa-fix`: closed both halves — value positions (`>`, `<`, 14 keywords) **and** a per-file
+  reachability guard. **Mutation-proving the fix found a defect in the fix's own guard**: the probe's
+  seven shapes shared one file, and the apostrophe in `return /it's/` was closed by a later line,
+  re-syncing the mask and leaving the keyword arm unproven. Shapes are now asserted one at a time.
+
+### Cycle 2 — gate PASS 100/100
+
+- Full refute pass over the whole branch diff. M11 (revert `>`) → 5 red; M12 (revert keyword arm) →
+  3 red; **M13** (revert `>` + inject a real odd-quote line into a live corpus file) → 6 red, naming
+  the file — which is what proves the corpus sweep is a live guard rather than one that merely
+  happens to pass.
+- 6 regression probes confirm `>`/`<` does not consume legitimate division. 1 LOW recorded and
+  deliberately not fixed (property access spelled like a keyword; 0 occurrences, bounded, non-silent).
+- Reliability NFR: CONCERNS → PASS.
+
+### Step 5c — `/review-pr`, verdict CONCERNS
+
+- **PC-1 (medium/high)** — every published number was a snapshot at `fe7f617` that `183a19e` moved,
+  with no commit anchor: 2188→2191 call sites, 22→31 tests, 6→9 proofs, 2311→2320 suite. The README's
+  proof table omitted M11–M13 entirely. An *under*claim, fixed anyway: this is the task that exists to
+  stop assertions claiming more than they establish, and an unanchored number is that failure with the
+  sign flipped.
+- 0 code findings. CONCERNS exits the loop to Step 7.
+
+---
+
+## Completion Summary
+
+Task 89 shipped a four-rule static analyser that turns a bug class costing eleven review cycles into a
+CI failure. Its value showed immediately: **six live instances on the first clean run**, three of them
+residual copies of the very assertions task 77 spent those eleven gates fixing, still standing beside
+their own replacements.
+
+The run's own discipline is the other outcome worth recording. Three defects were caught by attacking
+this work rather than reading it, and all three were disclosed rather than quietly corrected: a false
+mutation proof (shell escaping had swallowed the substitution, so the "mutation" tested nothing); two
+analyser bugs found by measuring rather than reading, one of which had made instance 3 invisible to the
+rule written for it; and — sharpest — **a defect in the fix's own guard, found by mutation-proving that
+guard**, where the probe's quotes paired up and re-synced the mask, leaving the keyword arm vouched for
+by nothing. That last one is instance 2 and instance 6 of this task's own corpus, one level down, inside
+the fix for the finding that named the class.
+
+Nine mutation proofs, 0 unsuppressed findings over 2191 call sites, CI green on the final head.
 
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-04
+**Final Status**: Completed
 **Branch**: `feature/task.89.relationship-assertion-lint`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: [#312](https://github.com/Gamaroff/agent-skills/pull/312)
+**QA Iterations**: 2 (cycle 1 CONCERNS 90/100 → cycle 2 PASS 100/100), plus Step 5c CONCERNS (PC-1 addressed)
+**DoD Summary**: `task.89.dod.1.relationship-assertion-lint.md` — ACCEPTED, CI SUCCESS on `fb96c24`
+**Tracker debt**: none — no tracker issue exists to act on (`TRACKER=github`, no `github_issue`; sync is opt-in and no operator was present to consent). Recorded explicitly rather than skipped silently.
