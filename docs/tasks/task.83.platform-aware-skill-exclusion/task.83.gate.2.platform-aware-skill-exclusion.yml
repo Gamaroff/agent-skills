@@ -16,23 +16,17 @@ top_issues:
     status: open
     bug_ref: "task.83.bug.3.test-env-scrub-incomplete.md"
 
-  # Cycle 1 issues, closed this cycle — retained so the gate carries the history.
-  - id: "CR-001"
-    severity: high
-    file: "scripts/setup-consumer.sh"
-    finding: "Quoted and CRLF `tracker:` values resolved github at install and jira at runtime, pruning all 11 Jira skills from a Jira repo."
-    suggested_action: "Normalise the token before the case; widen the awk pattern past [a-z]."
-    suggested_owner: dev
-    status: closed
-    fixed_date: "2026-09-04"
-  - id: "CR-002"
-    severity: medium
-    file: "scripts/setup-consumer.sh"
-    finding: "The installer probes .env for JIRA_URL; resolve-platform.sh reads only the environment."
-    suggested_action: "Keep the probe, correct the over-claiming comment and CHANGELOG, pin the asymmetry with a test."
-    suggested_owner: dev
-    status: closed
-    fixed_date: "2026-09-04"
+  # NOTE: cycle 1's CR-001 / CR-002 are NOT carried forward here, deliberately.
+  # They were, briefly, "so the gate carries the history" — and that broke the
+  # pipeline's third-strike detector, which reads the `file:` of every HIGH
+  # top_issues entry across the last three gates and deliberately IGNORES
+  # `status: closed` (because a gate updated in place after its own cycle would
+  # otherwise read as empty). That rule assumes one gate per cycle carrying only
+  # that cycle's findings. Copying a closed HIGH forward makes one real finding
+  # look like a file struck twice, and a third would trip "replace, do not patch
+  # again" on a file with nothing wrong with it. The history lives in
+  # `bug_resolution` below, in the Re-Review Context table of qa.2, and in the
+  # bug reports.
 
 waiver:
   active: false
