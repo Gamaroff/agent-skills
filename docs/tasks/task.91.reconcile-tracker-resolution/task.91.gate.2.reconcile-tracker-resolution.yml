@@ -1,0 +1,84 @@
+schema: 1
+task: 'task.91.reconcile-tracker-resolution'
+task_title: 'Reconcile install-time and run-time tracker resolution'
+gate: FAIL
+status_reason: 'Four of five cycle-1 findings are genuinely fixed and re-verified. But the refute pass found a defect IN cycle 1 fix itself: command substitution strips the trailing newline, so the two-line rc/TRACKER payload collapses whenever TRACKER is empty, and the installer resolves the literal string "0" as a tracker. That also makes the TASK-91-005 fix unreachable, so -005 is NOT fixed.'
+reviewer: 'QA Engineer'
+updated: '2026-09-05T07:17:28Z'
+
+top_issues:
+  - id: 'TASK-91-006'
+    severity: high
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The subshell emits `printf "%s\n%s" "$?" "${TRACKER:-}"` and the caller splits on the newline. Command substitution strips TRAILING newlines, so when TRACKER is empty the payload is just "0" — one field, no newline. `_rc=${_out%%<nl>*}` and `_t=${_out#*<nl>}` then BOTH yield "0", the `[[ "$_rc" == "0" && -n "$_t" ]]` success branch fires, and the function returns the literal string "0" as the tracker. Reproduced end to end with a truncated resolver copy: rc=0, tracker=[0]. "0" matches no entry in SKILLS_JIRA_ONLY or SKILLS_GITHUB_ONLY, so the platform filter silently becomes inert — a worse outcome than the TASK-91-005 bug this code replaced, which at least failed loudly.'
+    suggested_action: 'Make the payload unambiguous rather than relying on a newline that $() removes. Put the possibly-empty field FIRST and the status LAST with a tab between (`printf %s\t%s "${TRACKER:-}" "$rc"`), splitting with `${_out%%<tab>*}` and `${_out##*<tab>}`; the separator is then always present. Pin it with a test that points the locator at a resolver which sources cleanly and sets nothing.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-91-007'
+    severity: medium
+    file: 'shared/resources/tests/setup-consumer-skill-exclusion.test.mjs'
+    finding: 'The TASK-91-004 and TASK-91-005 fixes have ZERO test coverage — verified, not merely unnamed: the test file contains no reference to the rc-3 count-skip or to the empty-TRACKER message. TASK-91-003 is only indirectly covered by the pre-existing dry-run test, which asserts the tracker line but nothing about resolver provenance. This is exactly how TASK-91-006 reached the branch undetected: the fix for -005 was never executed by any test, so a shell subtlety that made it unreachable produced a green suite.'
+    suggested_action: 'Add a direct test per fix: a truncated resolver (drives -005 and would have caught -006), and a dry-run assertion that no profile count is printed when the tracker is unresolved. Mutation-prove each.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-91-008'
+    severity: low
+    file: 'shared/resources/resolve-platform.sh'
+    finding: 'The .env probe reports "set" if ANY matching line has a non-empty value. A shell that sources the file takes the LAST assignment, so a .env containing `JIRA_URL=https://x` followed by `JIRA_URL=` resolves jira here and would be unset in a sourcing shell. Verified. Narrow — a duplicated key in .env is pathological — but it is the same install-vs-run asymmetry class this task exists to close.'
+    suggested_action: 'Take the last matching line rather than the first (drop the `exit` and keep overwriting), or document the first-match rule explicitly in the comment.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 2441
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 1
+  fix_date: '2026-09-05'
+  total_iterations: 1
+  verification_method: 'Behavioural re-execution of each finding, plus a refute pass over the fixes'
+  detail: 'TASK-91-001, -002, -003, -004 verified FIXED by execution. TASK-91-005 is NOT fixed — its branch is unreachable (TASK-91-006).'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from cycle 1. The .env file is still parsed, never sourced. The awk probe was checked against a directory, an empty value, mixed quotes, an export-without-=, CRLF throughout, and a different key ending in JIRA_URL — all graded correctly and none error.'
+  performance:
+    status: PASS
+    notes: 'No change. The double-source on the failure path remains, still install-time only.'
+  reliability:
+    status: FAIL
+    notes: 'TASK-91-006. A truncated or partially-written resolver copy — precisely what an interrupted install leaves behind, which is the scenario TASK-91-005 was filed about — now yields a garbage tracker instead of an error, and the filter it feeds silently keeps every skill. The cycle-1 fix moved the failure from loud to silent.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The stale comments from cycle 1 were not re-checked this cycle and are assumed still present. More importantly, three of the five cycle-1 fixes shipped with no test, which is what allowed TASK-91-006 through: a fix that no test executes is a claim, not a guarantee.'
+
+recommendations:
+  immediate:
+    - action: 'Fix the payload collapse — make the separator one that command substitution cannot remove.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Add a direct test for a resolver that sources cleanly and sets nothing; it drives TASK-91-005 and would have caught TASK-91-006.'
+      refs: ['shared/resources/tests/setup-consumer-skill-exclusion.test.mjs']
+    - action: 'Add a dry-run assertion that no profile count is printed when the tracker is unresolved.'
+      refs: ['shared/resources/tests/setup-consumer-skill-exclusion.test.mjs']
+  future:
+    - action: 'Decide first-match vs last-match for a duplicated JIRA_URL in .env, and say which in the comment.'
+      refs: ['shared/resources/resolve-platform.sh']
+    - action: 'The cycle-1 cleanups remain open: stale comments naming deleted code, the double-source, the hand-rolled awk parsers in _config_skills_profile, and the skill lists still mirrored in resolve-skill-set-cli.mjs.'
+      refs: ['scripts/setup-consumer.sh']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-91-006 resolved and pinned by a test that executes the empty-TRACKER path.'

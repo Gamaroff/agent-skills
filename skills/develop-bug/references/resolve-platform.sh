@@ -478,7 +478,12 @@ _rp_dotenv_has_jira() {
       sub(/\r$/, "")
       gsub("^[\"" q "]|[\"" q "]$", "")
       gsub(/^[[:space:]]+|[[:space:]]+$/, "")
-      if (length($0) > 0) { found = 1; exit }
+      # LAST match wins, not first — no `exit` here. A shell that sources this
+      # file takes the last assignment, so a .env carrying `JIRA_URL=https://x`
+      # followed by `JIRA_URL=` is UNSET to that shell. Stopping at the first
+      # non-empty line would report it set, which is the same install-vs-run
+      # asymmetry this rung exists to close, one level down.
+      found = (length($0) > 0)
     }
     END { exit !found }
   ' .env 2>/dev/null

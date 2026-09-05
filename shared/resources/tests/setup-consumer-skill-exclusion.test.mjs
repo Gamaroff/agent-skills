@@ -21,6 +21,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -280,6 +281,13 @@ test("an empty tracker excludes nothing", () => {
 
 // ── 4. resolution order ──────────────────────────────────────────────────────
 
+// NOTE: this no longer pins what its name says. The installer does not read
+// $TRACKER any more (the rung was removed with the local implementation), and
+// resolve-platform.sh unsets TRACKER before doing anything, so the injected
+// value cannot influence the result under any implementation. What it still
+// pins is that an explicit config key resolves to github. Kept, renamed in
+// spirit by this comment rather than deleted, because the config-key half is a
+// real assertion.
 test("skills-config.yaml beats $TRACKER — the --update case", () => {
   // main() calls install_skills on --update and returns before select_platform,
   // so $TRACKER is unset there. A resolver trusting $TRACKER first would be
@@ -526,6 +534,97 @@ test("a non-tracker refusal does not block the install and does not blame `track
   });
 });
 
+/**
+ * Point the installer's resolver locator at a file WE control, by planting it
+ * where `_locate_resolver`'s second candidate looks. This is the only way to
+ * exercise what the installer does with a resolver that is present and readable
+ * but not functional — the state an interrupted install leaves behind, and the
+ * one no test reached until QA cycle 2.
+ */
+function withPlantedResolver(body, dir) {
+  const d = path.join(dir, ".agents", "skills", "x", "references");
+  mkdirSync(d, { recursive: true });
+  writeFileSync(path.join(d, "resolve-platform.sh"), body);
+}
+
+test("a resolver that sources cleanly but sets no TRACKER is refused, not believed", () => {
+  // THE REGRESSION GUARD FOR QA CYCLE 2's HIGH.
+  //
+  // The installer used to carry the resolver's exit status and its TRACKER back
+  // on two lines and split on the newline. COMMAND SUBSTITUTION STRIPS TRAILING
+  // NEWLINES, so an empty TRACKER collapsed the payload to a bare "0": both
+  // halves of the split returned "0", the success test passed, and the function
+  // returned the literal string "0" AS A TRACKER. "0" matches no entry in either
+  // classification list, so `_skill_excluded_for_tracker` excluded nothing — the
+  // filter kept every skill and reported success.
+  //
+  // That is strictly worse than the bug it replaced, which at least failed
+  // loudly. The trigger is a readable file that is not a working resolver, which
+  // is exactly what an interrupted install leaves behind — and `_locate_resolver`
+  // checks only readability.
+  //
+  // Asserting `<refused>` rather than `!== "0"` deliberately: the point is not
+  // that one particular wrong string is absent, it is that no tracker is
+  // produced at all.
+  inTempRepo((dir) => {
+    withPlantedResolver("true\n", dir);
+    assert.equal(
+      resolveTracker(dir),
+      "<refused>",
+      "a resolver that sets no TRACKER must yield no tracker",
+    );
+  });
+});
+
+test("a resolver that returns non-zero without setting TRACKER is also refused", () => {
+  // The sibling case, and the reason the bug above survived review: an rc of 1
+  // collapsed to "1", which is neither "0" nor a legal tracker, so it landed on
+  // the correct branch by luck. Pinning both means a future change cannot fix
+  // one by breaking the other.
+  inTempRepo((dir) => {
+    withPlantedResolver("return 1\n", dir);
+    assert.equal(resolveTracker(dir), "<refused>");
+  });
+});
+
+test("a planted resolver that DOES set TRACKER is believed", () => {
+  // The positive control. Without it, the two tests above would pass against an
+  // implementation that refuses every planted resolver for the wrong reason —
+  // e.g. one that never finds them at all.
+  inTempRepo((dir) => {
+    withPlantedResolver("TRACKER=jira\n", dir);
+    assert.equal(
+      resolveTracker(dir),
+      "jira",
+      "the planted resolver must actually be the one being consulted",
+    );
+  });
+});
+
+test("a refusal that happens BEFORE identity is resolved still stops the install", () => {
+  // The half of the failure surface the discriminator does NOT cover, pinned so
+  // the code and its comment cannot drift apart again.
+  //
+  // `resolve-platform.sh` unsets TRACKER at the top and does not assign it until
+  // the Identity block, so any refusal before that point leaves TRACKER empty —
+  // the "rc≠0 but TRACKER is legal, so proceed" branch cannot fire. An earlier
+  // version of the comment in `_resolve_install_tracker` claimed the
+  // SKILLS_CONFIG_FILE redirect guard was covered by that branch. It is not.
+  //
+  // Stopping is the RIGHT behaviour here — the resolver could not read a config
+  // at all, so every skill would refuse at run time too. What must not happen is
+  // the installer blaming `skills-config.yaml`, since the complaint is about a
+  // different file entirely.
+  inTempRepo((dir) => {
+    writeFileSync(path.join(dir, "skills-config.yaml"), "tracker: github\n");
+    assert.equal(
+      resolveTracker(dir, { SKILLS_CONFIG_FILE: "/nonexistent/nope.yaml" }),
+      "<refused>",
+      "a pre-identity refusal must not be mistaken for a resolved tracker",
+    );
+  });
+});
+
 test("an illegal `tracker:` is still refused even when nothing else is wrong", () => {
   // The other side of the discriminator above: the resolver leaves the OFFENDING
   // value in TRACKER, which is not a legal one, so this must still be rc 2.
@@ -538,8 +637,16 @@ test("an illegal `tracker:` is still refused even when nothing else is wrong", (
 });
 
 // `.env` value spellings. These need a fixture DIRECTORY, so they cannot join
-// PARITY_CASES — but each still asserts the two resolvers AGREE before
-// asserting what they agree on, which is the property that matters.
+// PARITY_CASES.
+//
+// HONEST NOTE ON WHAT THE AGREEMENT ASSERTION PROVES HERE: not much. In a bare
+// temp repo `_locate_resolver` finds this repo's own
+// `shared/resources/resolve-platform.sh` — the very file `runtimeTracker`
+// sources — so the two sides cannot disagree by construction, and
+// `assert.equal(install, runtime)` is close to a tautology for these rows. It is
+// kept because it stops being a tautology the moment the installer stops
+// delegating, which is exactly the regression worth catching. The line that
+// carries information TODAY is `assert.equal(install, expected)`.
 const DOTENV_CASES = [
   ["JIRA_URL=https://x.atlassian.net\n", "jira", "plain assignment"],
   // Was MISSED by the original `^JIRA_URL=.+`. A shell that sourced this .env
@@ -556,6 +663,11 @@ const DOTENV_CASES = [
   ["JIRA_URL=\n", "github", "empty value"],
   ["#JIRA_URL=https://x\n", "github", "commented out"],
   ["MYJIRA_URL=https://x\n", "github", "a different key that ends in JIRA_URL"],
+  // LAST match wins, matching what a shell that sources the file would do. The
+  // first-match rule reported the first pair as set, which is the same
+  // install-vs-run asymmetry this rung exists to close, one level down.
+  ["JIRA_URL=https://x\nJIRA_URL=\n", "github", "set then emptied (last wins)"],
+  ["JIRA_URL=\nJIRA_URL=https://x\n", "jira", "emptied then set (last wins)"],
 ];
 
 for (const [dotenv, expected, label] of DOTENV_CASES) {
@@ -681,6 +793,21 @@ function makeFixtureTarball(dir, names) {
       `---\nname: ${n}\n---\n`,
     );
   }
+  // Ship the REAL resolver (and the config reader it sources) in the fixture, as
+  // the release archive does. Without it every install test resolved the tracker
+  // through `_locate_resolver`'s THIRD candidate — this repo's own checkout — so
+  // the `release` origin and the `_tmpdir` argument were never exercised by
+  // anything, and the real-install comment claiming "$_tmpdir carries a copy of
+  // the resolver" was unverified. If a future archive stopped shipping
+  // shared/resources/, the suite would have stayed green while every consumer
+  // without a checkout got a hard install failure.
+  mkdirSync(path.join(stage, "shared", "resources"), { recursive: true });
+  for (const f of ["resolve-platform.sh", "read-config.sh"]) {
+    copyFileSync(
+      path.join(REPO, "shared", "resources", f),
+      path.join(stage, "shared", "resources", f),
+    );
+  }
   const tarball = path.join(dir, "skills.tar.gz");
   execFileSync("tar", [
     "-czf",
@@ -731,6 +858,28 @@ const installed = (dir) => {
   const p = path.join(dir, ".agents", "skills");
   return existsSync(p) ? readdirSync(p).sort() : [];
 };
+
+test("the tarball's own resolver is what a real install resolves with", () => {
+  // Pins `_locate_resolver`'s first candidate — the copy inside the extracted
+  // archive, which is the version whose skills will actually run after the
+  // install. Nothing exercised it before: the fixture shipped no resolver, so
+  // every install test silently fell through to this repo's checkout.
+  inTempRepo((dir) => {
+    const tarball = makeFixtureTarball(dir, FIXTURE_SKILLS);
+    const stage = path.join(dir, "stage", "agent-skills-fixture");
+    const out = callFn(`_locate_resolver '${stage}'`, { cwd: dir });
+    const [origin, resolverPath] = out.split("\t");
+    assert.equal(
+      origin,
+      "release",
+      "the extracted archive must win over any installed copy",
+    );
+    assert.ok(
+      resolverPath.startsWith(stage),
+      `resolved ${resolverPath}, which is outside the archive`,
+    );
+  });
+});
 
 test("fresh install with tracker github prunes the Jira-only skills", () => {
   inTempRepo((dir) => {

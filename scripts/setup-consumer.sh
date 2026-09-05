@@ -932,24 +932,41 @@ _locate_resolver() {
 }
 
 _resolve_install_tracker() {
-  local _tmp="${1:-}" _found _from _res _out _t _rc
+  local _tmp="${1:-}" _found _res _out _t _rc
 
+  # Only the path is needed here; the origin half is for the dry run, which asks
+  # _locate_resolver for it directly.
   _found=$(_locate_resolver "$_tmp") || return 3
-  _from=${_found%%$'\t'*}
   _res=${_found#*$'\t'}
 
   # Capture the resolver's EXIT STATUS AND ITS TRACKER TOGETHER, and print
   # TRACKER even when the status is non-zero. That is the whole trick, and it
   # replaces a defect: mapping every non-zero return onto "your tracker: key is
-  # wrong" was false, because resolve-platform.sh returns 1 from at least five
-  # places that have nothing to do with `tracker:` — the `access.vcs != full`
-  # guard, validate_access_mode, the `access:`-as-a-scalar guard, an unreadable
-  # SKILLS_CONFIG_FILE redirect, and the fail-closed unparseable branch. A repo
-  # with a perfectly good `tracker: github` and a restricted access key could
-  # not install at all, and was told to fix a key that was already correct.
+  # wrong" was false, because resolve-platform.sh returns 1 from several places
+  # that have nothing to do with `tracker:`.
   #
-  # Identity is resolved BEFORE access in that file, so the discriminator falls
-  # out of the resolver's own semantics rather than out of matching its prose:
+  # THE DISCRIMINATOR ONLY COVERS THE REFUSALS THAT HAPPEN AFTER IDENTITY IS
+  # RESOLVED, and being precise about that matters — an earlier version of this
+  # comment claimed all of them and was wrong about two:
+  #
+  #   COVERED (identity already assigned, TRACKER is trustworthy):
+  #     the `vcs:` enum, the `access:`-as-a-scalar guard, resolve_access /
+  #     validate_access_mode, and the `access.vcs != full` guard.
+  #   NOT COVERED (these return BEFORE `TRACKER=` is assigned, because that file
+  #   `unset`s TRACKER at the top and does not set it until the Identity block):
+  #     an unreadable SKILLS_CONFIG_FILE redirect, the poisoned-value halt, the
+  #     exists-but-unreadable config halt, the fail-closed unparseable+access
+  #     halt, and the tier-2 subset refusal.
+  #
+  # The uncovered ones land on rc 2 and stop the install. That is DEFENSIBLE
+  # rather than a bug — in every one of them the resolver could not read a
+  # config at all, so every skill would refuse at run time too — but the caller
+  # must not then blame `skills-config.yaml`, because the complaint may be about
+  # a different file entirely (a redirected SKILLS_CONFIG_FILE). Hence the rc-2
+  # message says "see the message above" and names no file of its own.
+  #
+  # For the covered half the discriminator falls out of the resolver's own
+  # semantics rather than out of matching its prose:
   #
   #   rc 0                      -> resolved normally
   #   rc != 0, TRACKER legal    -> the refusal was about some OTHER key; the
@@ -959,13 +976,30 @@ _resolve_install_tracker() {
   #
   # No string matching against error messages, which would break the first time
   # anyone rewords one.
+  # THE SEPARATOR IS A TAB, AND THE POSSIBLY-EMPTY FIELD COMES FIRST. Both halves
+  # of that are load-bearing, and getting it wrong shipped a defect:
+  #
+  # This was `printf "%s\n%s" "$?" "${TRACKER:-}"`, split on the newline. But
+  # COMMAND SUBSTITUTION STRIPS TRAILING NEWLINES — so with an empty TRACKER the
+  # payload collapsed to a bare "0", with no newline left to split on. `%%` and
+  # `#` then both returned the WHOLE string, so _rc and _t were both "0", the
+  # success test passed, and this function returned the literal string "0" as a
+  # tracker. "0" matches no entry in either classification list, so the filter
+  # kept every skill and reported success — a silent failure replacing a loud one.
+  #
+  # A tab is never stripped, and putting TRACKER first means the separator is
+  # present even when the value is empty (the payload is "\t0", not "0").
   _out=$(bash -c '
            source "$1" >/dev/null 2>&1
-           printf "%s\n%s" "$?" "${TRACKER:-}"
+           _s=$?
+           printf "%s\t%s" "${TRACKER:-}" "$_s"
          ' _ "$_res" 2>/dev/null) || true
 
-  _rc=${_out%%$'\n'*}
-  _t=${_out#*$'\n'}
+  # `%%` takes everything before the FIRST tab, `##` everything after the LAST —
+  # so a tab inside TRACKER (pathological, but it is raw config data) truncates
+  # the value while leaving the status correct, which is the safe way round.
+  _t=${_out%%$'\t'*}
+  _rc=${_out##*$'\t'}
 
   if [[ "$_rc" == "0" && -n "$_t" ]]; then
     printf '%s' "$_t"
@@ -1243,8 +1277,8 @@ install_skills() {
       local _dry_found _dry_from="none"
       _dry_found=$(_locate_resolver) && _dry_from=${_dry_found%%$'\t'*}
       if [[ $_dry_rc -eq 2 ]]; then
-        err "No usable tracker could be resolved from skills-config.yaml — see the message above."
-        record_step "Skills install" "fail" "no usable tracker in skills-config.yaml"
+        err "No usable tracker could be resolved — see the resolver's message above."
+        record_step "Skills install" "fail" "no usable tracker resolved"
         return 1
       fi
       local _dry_detail="${_version} (dry-run)"
@@ -1379,7 +1413,8 @@ install_skills() {
       _tracker=$(_resolve_install_tracker "$_tmpdir") || _tracker_rc=$?
       if [[ $_tracker_rc -ne 0 ]]; then
         if [[ $_tracker_rc -eq 2 ]]; then
-          err "No usable tracker could be resolved from skills-config.yaml — see the message above."
+          err "No usable tracker could be resolved — see the resolver's message above."
+          err "It may name a file other than skills-config.yaml (e.g. a redirected SKILLS_CONFIG_FILE)."
         else
           err "Could not locate resolve-platform.sh to resolve the tracker — the archive may be incomplete."
         fi

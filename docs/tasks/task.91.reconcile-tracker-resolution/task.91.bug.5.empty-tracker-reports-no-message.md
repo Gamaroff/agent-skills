@@ -58,3 +58,31 @@ replayed. A resolver that succeeded and set nothing gets its own message naming 
 `sourced cleanly but set no TRACKER — the file may be truncated or not a resolver`.
 
 **Files Modified**: `scripts/setup-consumer.sh`
+
+### Iteration 2
+
+#### Re-Investigation (Reopened → In Progress)
+
+**Date**: 2026-09-05
+
+**QA cycle 2 reopening reason**: the iteration-1 message exists in source but its branch was
+**unreachable**. `printf "%s\n%s" "$?" "$TRACKER"` with an empty `TRACKER` emits `"0\n"`, and command
+substitution strips the trailing newline — so the payload collapsed to one field, both halves of the
+split returned `"0"`, the success branch fired, and the function returned the literal string `"0"` as a
+tracker.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Fix Description**: the separator is now a **tab**, and the possibly-empty field comes **first**
+(`printf "%s\t%s" "${TRACKER:-}" "$_s"`), so the separator survives command substitution and is present
+even when the value is empty. Split with `%%` for the value and `##` for the status, so a tab inside
+`TRACKER` truncates the value while leaving the status correct — the safe way round.
+
+**Files Modified**: `scripts/setup-consumer.sh`
+
+**Testing**: `a resolver that sources cleanly but sets no TRACKER is refused, not believed`, plus its
+non-zero sibling and a **positive control** (a planted resolver that does set `TRACKER` must be
+believed) — without the control, both negative tests would pass against an implementation that simply
+never finds a planted resolver.
+
+**Mutation-proven**: yes — reverting to the newline payload turns exactly that test red.

@@ -465,17 +465,28 @@ config that carries an explicit `tracker:` key.
 - [Bug 2: `.env` probe spelling and CRLF](./task.91.bug.2.env-probe-spelling-and-crlf.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
 - [Bug 3: dry run previews with the installed resolver](./task.91.bug.3.dry-run-previews-with-installed-resolver.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
 - [Bug 4: dry run prints an unfiltered profile count](./task.91.bug.4.dry-run-unfiltered-profile-count.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
-- [Bug 5: empty resolution reports no message](./task.91.bug.5.empty-tracker-reports-no-message.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
+- [Bug 5: empty resolution reports no message](./task.91.bug.5.empty-tracker-reports-no-message.md) — ✅ Ready for QA — MEDIUM (iteration 2, fixed 2026-09-05)
+- [Bug 6: pre-identity refusal blamed the wrong file](./task.91.bug.6.pre-identity-refusal-blamed-the-wrong-file.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
 
 ---
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: FAIL (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-05
 **Quality Score**: 70/100
 **Gate Decision**: FAIL
+
+### Cycle 2 (latest)
+
+- **Gate**: [task.91.gate.2.reconcile-tracker-resolution.yml](./task.91.gate.2.reconcile-tracker-resolution.yml) — FAIL, 70/100
+- **Report**: [task.91.qa.2.reconcile-tracker-resolution.md](./task.91.qa.2.reconcile-tracker-resolution.md)
+- Cycle-1 findings: **4 of 5 FIXED** and re-verified by execution. TASK-91-005 is **NOT fixed** — its branch is unreachable.
+- **New HIGH (TASK-91-006)**: command substitution strips the trailing newline, so cycle 1's two-line rc/`TRACKER` payload collapses when `TRACKER` is empty and the installer resolves the literal string `"0"` as a tracker. The filter it feeds then keeps every skill and reports success — a *silent* failure where the bug it replaced was a loud one.
+- The lesson is the coverage one: three of five cycle-1 fixes shipped with no test, and the empty-`TRACKER` path was never executed, so a shell subtlety that made the branch unreachable still produced a green suite.
+
+### Cycle 1
 
 ### QA Report
 
@@ -520,6 +531,10 @@ which reads like plumbing — is where the regression is.
 | 2026-09-05 |         | QA gate FAIL (70/100) — 1 HIGH, 4 MEDIUM, 5 LOW. All 6 functional criteria met; the delegation's error contract conflates every resolver refusal with a bad `tracker:` value, blocking installs on valid configs | qa-task |
 | 2026-09-05 |         | Status → in-progress (QA FAIL, returning to fix) | qa-task |
 | 2026-09-05 |         | QA findings fixed — all 5 addressed in 1 iteration. rc 2 now means only a tracker rejection (a non-tracker refusal proceeds with a warning); the `.env` probe accepts `export` and rejects CRLF/quoted-empty; the dry run names which resolver copy answered and no longer prints an unfiltered count; the empty resolution gets its own message. 12 new tests, 3 mutation proofs, `npm run ci` green at 2441 | qa-fix |
+| 2026-09-05 |         | Status → ready-for-review | qa-fix |
+| 2026-09-05 |         | QA gate 2 FAIL (70/100) — 4 of 5 cycle-1 findings fixed; 1 new HIGH introduced BY the cycle-1 fix (rc/`TRACKER` payload collapses on an empty tracker → literal `"0"` resolved as a tracker), leaving TASK-91-005 unfixed | qa-task |
+| 2026-09-05 |         | Status → in-progress (QA cycle 2 FAIL) | qa-task |
+| 2026-09-05 |         | QA cycle 2 findings fixed — tab separator with the possibly-empty field first (a newline is stripped by command substitution); `.env` now last-match-wins like a sourcing shell; the COVERED/NOT-COVERED refusal split documented honestly and the rc-2 message stops naming the wrong file; the fixture tarball now ships the real resolver so the `release` origin is exercised at all. 4 new tests, 2 mutation proofs, `npm run ci` green at 2448 | qa-fix |
 | 2026-09-05 |         | Status → ready-for-review | qa-fix |
 
 ---
