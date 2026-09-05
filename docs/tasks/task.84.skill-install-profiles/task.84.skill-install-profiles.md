@@ -5,10 +5,12 @@ type: task
 description: "Let a consumer pick an install profile (minimal/pipeline/full) plus per-skill add-ons, resolve the dependency closure so a chosen skill's callees come with it, and persist the choice in skills-config.yaml."
 tags: [setup-consumer, install, configuration, context-budget]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-02
 updated: 2026-09-05
+completed_date: 2026-09-05
+pr_number: 318
 assignee:
 estimated_effort_hours: 8
 github_issue: 317
@@ -16,7 +18,7 @@ github_issue: 317
 
 # Technical Task: Skill install profiles with dependency closure
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#317](https://github.com/Gamaroff/agent-skills/issues/317)
 **Review**: ✅ All review recommendations from `task.84.review.1.skill-install-profiles.md` implemented 2026-09-04
 
@@ -97,10 +99,16 @@ Two constraints this task inherits:
 
 Measured by extracting `/slash-command` references from each `SKILL.md` where a matching `skills/` directory exists. The two edge sets below are the known-good fixture §8 asserts; re-verify them against the tree when implementing, and update both here and in the fixture together:
 
-| Skill | Invokes |
+| Skill | Declares (`invokes:`) |
 |---|---|
-| `develop-story` | `create-branch`, `review-story`, `develop`, `create-pr`, `qa-story`, `qa-fix`, `finalise`, `commit-changes` |
-| `review-story` | `create-branch`, `create-epic`, `create-story`, `create-task`, `develop`, `develop-story`, `develop-task`, `finalise`, `review-task`, `sync-github-story`, `sync-jira-story` |
+| `develop-story` | `create-branch`, `review-story`, `develop`, `create-pr`, `qa-story`, `qa-fix`, `review-pr`, `finalise`, `commit-changes` (9 — the 8 pipeline steps plus Step 5c) |
+| `review-story` | `create-branch`, `ensure-epic-github-issue`, `ensure-epic-jira-issue`, `ensure-story-github-issue`, `ensure-story-jira-issue`, `mermaid-architect` (6) |
+
+> **These are the SHIPPED declarations, regenerated from `skill-dependencies.json`.** An earlier
+> revision of this table listed prose-derived edges (`review-story` → 11, including `create-epic`
+> and `develop-task`) which the declarative graph does not contain and never did. The drift suite
+> asserts `develop-story` and `develop-task`; `review-story`'s set is asserted through the
+> tracker-sibling chain test rather than as a count.
 
 Highest fan-in (count of other `SKILL.md` files naming them): `create-pr` 25, `finalise` 22, `develop-story` 22, `review-story` 20, `develop-task` 20, `create-story` 19, `qa-fix` 16. (Those counts are *prose mentions*, which is precisely why they cannot be used as edges — see the design note above.)
 
@@ -335,7 +343,7 @@ Sizes are estimates to be fixed during Phase 1 once closure is computed; the suc
 - `minimal` → `create-pr` present (fan-in 25), `jira-sprint-retrospective` absent
 - `full` → every skill in the tarball minus task-83 exclusions (assert against a computed count, never a literal)
 - `minimal` + `include: [jira-sprint-manager]` under `tracker: jira` → present
-- **Tracker interaction**: `pipeline` + `tracker: github` → `sync-jira-story` absent *even though `review-story` names it*. This is the case that catches closure defeating task 83.
+- **Tracker interaction**: `pipeline` + `tracker: github` → `sync-jira-story` absent, even though it IS in the closure — reached transitively as `review-story` → `ensure-story-jira-issue` → `sync-jira-story`. This is the case that catches closure defeating task 83, and the indirection is what makes it non-trivial: no seed names the Jira skill.
 - `--update` with `skills.profile: pipeline` in config, no wizard → same set
 - `--update` over a full install → nothing pruned, extras reported as kept
 - `--dry-run` → writes nothing, and reports **the resolved-set count computed offline** from the committed `skill-profiles.json` + `skill-dependencies.json`.
@@ -369,14 +377,16 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 ## 9. Success Criteria
 
-> **Status of this section, stated plainly.** **One** criterion below is unticked: the real
-> `--update` (partial — only a dry run was performed, which by construction cannot exercise the path
-> that deletes files). Every other criterion is met with evidence named in the QA reports. All three
-> QA gates read **CONCERNS**, not PASS.
+> **Status of this section.** All 21 criteria are met, each with evidence named here or in the QA
+> reports. `gate.4` reads **PASS** after a confirmation cycle re-verified all 27 prior findings by
+> execution.
 >
-> shellcheck was previously recorded here as unverifiable. It was not — it ran via the official
-> container and found a new SC2155 warning in this change, now fixed. Recording a check as
-> impossible is a claim that deserves the same scrutiny as recording it as passed.
+> Two of them were recorded as unmeetable earlier in this task and were not. shellcheck was called
+> "not installed, no lane" across three gates — it ran fine in the official container and found a new
+> SC2155 in this very change. The real `--update` was called impractical — it ran against a full
+> 120-skill install and pruned nothing. **Recording a check as impossible is a claim, and it deserves
+> at least the scrutiny of recording it as passed**, because it removes the check rather than
+> reporting on it.
 >
 > An earlier revision of this document had all 21 criteria ticked, including those two. That was a
 > blanket checkbox pass, not an assessment, and it asserted completion the gates and the
@@ -417,7 +427,14 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 - [x] `configuration.md` documents all three keys in "Full schema" and "Key reference"
 - [x] `getting-started.md` documents the profiles, add-ons, and how to change profile later. **Note the step number**: `#### Step 8 — the platform skill filter` is already taken by task 83, so this is Step 9 (or a sibling subsection under Step 8) — do not overwrite the existing Step 8
 - [x] CHANGELOG entry states the measured context saving (bytes and skill counts for `full` vs `pipeline`, with the measurement method named), not an estimate
-- [ ] A real `--update` against a full existing install verified to remove nothing — **PARTIAL.** What was run is `--update --dry-run` against a scratch repo holding **6** skills. A dry run writes nothing by construction, so it cannot exercise the destructive path at all, and 6 skills is not a full install. In-repo the guarantee is asserted only structurally (the grandfather test regex-matches the wizard source for the `continue` and for `keepIdx < rmIdx`; it never runs the loop). This is the weakest evidence in the change, and it sits on the only code path that deletes user files.
+- [x] A real `--update` against a full existing install verified to remove nothing — **MET, by execution.** A tarball was built from this branch, served over `file://`, and a scratch consumer populated with all **120** skills (each carrying a `LOCAL_SENTINEL.txt`). `install_skills` was then run **non-dry** with `profile: pipeline`:
+
+  ```
+  ✓ Skills vTEST installed (0 new, 36 updated, 11 kept, 73 kept outside profile)
+  120 before → 120 after · nothing deleted · 84 sentinels intact
+  ```
+
+  The dispositions are the interesting part: the 11 Jira-only skills were kept via the **tracker** path (`not pruned`), the 73 others via the **profile** path (`outside profile`), and only the 36 in the resolved set were refreshed. That independently confirms fixes C1-005 (tracker test before profile test) and C1-006 (separate counters) end-to-end, which until now were asserted only against the script's source text.
 
 ---
 
@@ -427,11 +444,17 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 **1. Closure is incomplete and a pipeline breaks mid-run**
 
-- **Risk**: A skill invokes another by a form the generator misses — a bare name in prose, a `Skill` tool call, a reference inside `references/`. The install looks fine; `/develop-story` fails at Step 4.
-- **Probability**: Medium — the generator only sees `/slash-command` tokens in `SKILL.md`.
-- **Impact**: Critical — failure is far from the cause, in the consumer's repo, mid-story.
-- **Mitigation**: Scan `references/` as well as `SKILL.md`; assert the known-good edge list for `develop-story` (8) and `review-story` (10) as a fixture, so a generator regression fails CI. **Additionally: the runtime error must name the missing skill and the `--all-skills` remedy** — closure cannot be proven complete, so the failure mode must be legible.
-- **Rollback**: `--all-skills`, or set `skills.profile: full` and `--update`.
+- **Risk**: A skill gains a callee and its `invokes:` key is not updated. The install looks fine; the pipeline fails at that step, in the consumer's repo, hours later.
+- **Probability**: Medium — 20 of 120 skills declare edges, and nothing forces a new orchestrator to.
+- **Impact**: Critical — failure is far from the cause.
+- **Mitigation**: An absent key means **no** outgoing edges, so a profile resolves to exactly its declared seeds — the seeds are deliberately generous for this reason. `npm run skill-deps:candidates` reports prose mentions not declared in `invokes:` (advisory: most are legitimate cross-references, so failing on them would train everyone to ignore it). The drift suite asserts the known-good edge sets for `develop-story` and `develop-task`, and the block form of `invokes:` throws rather than silently yielding an empty list — the failure that would otherwise be invisible to CI.
+- **Rollback**: `--all-skills`, or `skills.profile: full` and `--update`.
+
+> **The risk INVERTED when the design changed** (see §3). Under the prose-scrape it was
+> *over*-collection — a mention read as a call. Under declared edges it is *under*-collection — a
+> call nobody declared. The direction matters: over-collection installs extra skills (harmless),
+> under-collection removes needed ones (a mid-run failure). The mitigations above are written for
+> the second, which is why the safe default is "no edges" rather than "guessed edges".
 
 **2. Closure defeats task 83 and drags the wrong tracker's skills back in**
 
@@ -518,7 +541,7 @@ Closure over ~120 nodes is trivial. The measurable claim is the **context saving
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 2398 (42 new)
+- **Tests Executed**: 2424 (68 new across the two suites)
 - **Phases Verified**: 5/5 implemented, 4 with concerns
 - **Critical Issues**: 0 HIGH, 7 MEDIUM, 3 LOW
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
@@ -533,34 +556,22 @@ Worth recording how they were found, because the three lenses were disjoint: the
 
 ---
 
-## Definition of Done — Gaps Identified
+## Definition of Done — Gaps Closed
 
-**Status:** IN PROGRESS (`ready-for-review`) — **NOT accepted**
+**Superseded by [`task.84.dod.2.skill-install-profiles.md`](./task.84.dod.2.skill-install-profiles.md).**
+The first pass ([`dod.1`](./task.84.dod.1.skill-install-profiles.md)) found five blockers. All five are now closed:
 
-**Full report:** [`task.84.dod.1.skill-install-profiles.md`](./task.84.dod.1.skill-install-profiles.md)
+| Blocker | Resolution |
+|---|---|
+| CI pending | Green — all four checks SUCCESS on the final head |
+| `shellcheck` never run | Run via the official container; found and fixed an SC2155; **0 new** vs baseline |
+| Real `--update` unverified | Run non-dry against a full 120-skill install: 120 → 120, nothing pruned |
+| Three CONCERNS gates | `gate.4` **PASS** (95/100) — confirmation cycle, all 27 findings verified closed |
+| Step 5c REQUEST CHANGES | All ten findings fixed; the six documentation ones closed in this pass |
 
-Blocked five independent ways; any one alone is disqualifying:
-
-1. **CI PENDING** — the `test` job had not finished on the final head
-2. **No approving review** on PR #318
-3. **Three QA gates read CONCERNS**, none PASS
-4. **One success criterion unmet** — the real `--update` (dry-run evidence only, on the path that deletes files). *(shellcheck has since been run and now passes with 0 new warnings.)*
-5. **Step 5c returned REQUEST CHANGES**, six documentation findings still open
-
-### Next Steps
-
-- [ ] Perform a genuine non-dry `--update` against a full install, or extract the per-skill decision into a testable helper
-- [ ] Obtain human review of PR #318 — see below
-- [ ] Wait for CI to finish green
-- [ ] Clear PC-5…PC-9, PC-11 (documentation consistency)
-
-**Estimated effort:** Medium (2–4 hours) plus the review.
-
-**Why human review is a gap rather than a formality:** four independent passes found 27 defects, and
-every pass found the previous pass's fixes defective — same author throughout. The most severe was
-introduced in the same commit as a comment warning against it, and was invisible to its own test
-because that test ran under `set +e`. The implementation is good; self-certification on it has been
-demonstrably unreliable, in a file that can delete a consumer's installed skills.
+**No approving review was recorded.** The merge was authorised by the maintainer's explicit
+instruction rather than by a review on the PR. That is stated rather than ticked — the box means a
+review happened, and one did not.
 
 ---
 
@@ -582,6 +593,9 @@ demonstrably unreliable, in a file that can delete a consumer's installed skills
 | 2026-09-05 |         | review-pr (Step 5c) — REQUEST CHANGES: two success criteria were ticked without evidence, and the implementation report undercounted cycle 3. Corrected | review-pr |
 | 2026-09-05 |         | DoD incomplete — 5 blocking gaps (CI pending, no approving review, 3 CONCERNS gates, 2 criteria unmet, 5c REQUEST CHANGES). Status NOT advanced to accepted | finalise |
 | 2026-09-05 |         | shellcheck run via container after all — found and fixed a new SC2155 (`local` masking a return value). 0 new warnings vs baseline; that criterion now met, 1 gap remains | finalise |
+| 2026-09-05 |         | Real non-dry `--update` against a full 120-skill install: 120 → 120, nothing pruned. Last blocking criterion met | qa-task |
+| 2026-09-05 |         | QA gate 4 **PASS** (95/100) — confirmation cycle, all 27 findings verified closed by execution, no new findings | qa-task |
+| 2026-09-05 | 1.2     | DoD verified — accepted (PR #318). Merge authorised by maintainer instruction; no review recorded on the PR | finalise |
 ---
 
 ## Progress Tracking
@@ -591,8 +605,8 @@ demonstrably unreliable, in a file that can delete a consumer's installed skills
 - [x] Phase 3 — Wizard prompt
 - [x] Phase 4 — Persistence and `--update`
 - [x] Phase 5 — Tests and documentation
-- [ ] QA review complete
-- [ ] Quality gate PASS
+- [x] QA review complete
+- [x] Quality gate PASS
 
 ---
 

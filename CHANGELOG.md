@@ -17,9 +17,9 @@ All notable changes to this project will be documented in this file. Format foll
 
   | Profile    | Skills | Description bytes | ≈ tokens | vs `full` |
   | ---------- | -----: | ----------------: | -------: | --------: |
-  | `full`     |    109 |            35,425 |    8,900 |         — |
-  | `pipeline` |     35 |            13,894 |    3,500 |  **−61%** |
-  | `minimal`  |      5 |             1,893 |      470 |  **−95%** |
+  | `full`     |    109 |            35,425 |    8,856 |         — |
+  | `pipeline` |     36 |            14,281 |    3,570 |  **−60%** |
+  | `minimal`  |      5 |             1,893 |      473 |  **−95%** |
 
   Method matters and is stated because two reasonable ones disagree by ~10%: this sums the
   `description:` frontmatter value of each installed skill. **No test hardcodes these numbers** — the

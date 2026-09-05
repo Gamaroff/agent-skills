@@ -10,8 +10,12 @@ on:
       # this workflow. `skill-profiles.json` is listed so a profile edit re-runs
       # the catalog and bundle checks; the drift step does not read it (its seed
       # validation lives in skill-dependencies-drift.test.mjs, run by test.yml).
-      - 'shared/resources/skill-dependencies.json'
-      - 'shared/resources/skill-profiles.json'
+      # shared/resources/** rather than the three explicit files: the BUNDLE
+      # FRESHNESS check in this same job covers every shared resource that gets
+      # copied into skills' references/, and resolve-skill-set*.mjs are two of
+      # them. Listing only the drift check's own inputs left a resolver edit
+      # triggering no workflow at all.
+      - 'shared/resources/**'
       - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
   push:
@@ -19,8 +23,12 @@ on:
     paths:
       - 'skills/**'
       - 'scripts/generate-skill-dependencies.mjs'
-      - 'shared/resources/skill-dependencies.json'
-      - 'shared/resources/skill-profiles.json'
+      # shared/resources/** rather than the three explicit files: the BUNDLE
+      # FRESHNESS check in this same job covers every shared resource that gets
+      # copied into skills' references/, and resolve-skill-set*.mjs are two of
+      # them. Listing only the drift check's own inputs left a resolver edit
+      # triggering no workflow at all.
+      - 'shared/resources/**'
       - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
 

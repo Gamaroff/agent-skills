@@ -21,7 +21,19 @@ Generate the skill call graph at build time into a committed JSON file; author t
 
 ### Phase 1 — Dependency graph generation
 
-**New file:** `scripts/generate-skill-dependencies.mjs`
+> ## ⚠️ SUPERSEDED — the code block below is the ABANDONED design
+>
+> The generator in this phase scrapes `/slash-command` tokens from `SKILL.md` and `references/`.
+> **That was built, measured, and replaced** — it collapsed `minimal` (5 seeds) and `pipeline`
+> (26 seeds) to the same ~34 of 120 skills, because prose carries no edge direction and is full of
+> reverse references and negations. See the task doc §3 for the measurement table.
+>
+> **The shipped generator reads an `invokes:` frontmatter key instead.** Do not regenerate from the
+> code below — it rebuilds the design this task rejected. It is kept only so the reasoning in §3 has
+> its subject to point at. The authoritative source is
+> [`scripts/generate-skill-dependencies.mjs`](../../../scripts/generate-skill-dependencies.mjs).
+
+**New file (ABANDONED FORM — see banner above):** `scripts/generate-skill-dependencies.mjs`
 
 ```js
 #!/usr/bin/env node

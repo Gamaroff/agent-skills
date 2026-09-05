@@ -118,12 +118,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 
 ### What the wizard does
 
-The full wizard runs all 9 steps. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
+The full wizard runs all 10 steps. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
 
 | Step | Action                                                                                                                             | Skippable?                                           |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | 1    | Checks `node`, `git`, `jq`, `curl` are on PATH — exits if any missing                                                              | No                                                   |
 | 2    | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira, then **tracker access** (`full` / `read-only` / `approve` / `command` / `manual`) | No                                                   |
+| 2b   | Prompts for the **skill install profile** (`full` / `pipeline` / `minimal`) plus optional per-skill add-ons (see below). Appears in the wizard summary as `Skill profile` | Yes (Enter accepts `full`, today's behaviour)        |
 | 3    | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input                                                   | —                                                    |
 | 4    | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore`                                                 | Yes                                                  |
 | 5    | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path                                             | Yes (skips if file exists and you decline overwrite) |
