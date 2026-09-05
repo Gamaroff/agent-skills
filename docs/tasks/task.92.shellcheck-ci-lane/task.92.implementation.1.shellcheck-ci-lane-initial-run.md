@@ -219,7 +219,23 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — CONCERNS 80/100
+2 MEDIUM + 1 LOW, all in code this task introduced. TASK-92-001: the empty-list guard fell through
+(`return` at top level, swallowed). Fixed and mutation-proved.
+
+### QA Cycle 2 — CONCERNS 85/100 (refute pass)
+Cycle-1 findings verified fixed. Two new: TASK-92-003 (fix/annotation split miscounted 11/15; true
+9/17) and TASK-92-004 (`tech-stack.md` said five workflows; there are six). Both fixed.
+**The refute subagent hung and returned nothing; the pass was run in-line.**
+
+### QA Cycle 3 — PASS 96/100
+All four findings verified fixed. No new findings. 5/5 CI jobs green.
+
+**PR Review** (Step 5c, `/review-pr --effort medium --comment`): **CONCERNS** —
+`task.92.pr-review.1.shellcheck-ci-lane.md`. One medium finding (PC-1: the sources-only comment's
+"725 vs 81" figure was stale — 515 vs 55 on this tree), found and fixed during the review. **Both
+review lenses hung and were terminated**, so the review was conducted in-line by the agent that wrote
+the change; the verdict is held at CONCERNS to record that rather than upgraded after the fix.
 
 ---
 

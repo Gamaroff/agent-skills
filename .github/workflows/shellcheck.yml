@@ -56,9 +56,14 @@ jobs:
           # `git ls-files '*.sh'` returns 247 files, but only 56 are sources. The
           # other 191 are bundled copies written by `npm run bundle` from
           # shared/resources/, and each shared script is bundled into four or five
-          # skills. Linting all of them reports every shared finding once per copy:
-          # 725 findings instead of 81, and a red lane whose "fix" is to edit a file
-          # the bundler will overwrite on the next run.
+          # skills. Linting all of them reports every shared finding once per copy —
+          # a ~9x inflation, and a red lane whose "fix" is to edit a file the bundler
+          # will overwrite on the next run.
+          #
+          # Measured at the `style` tier on 2026-09-05, after this change: 515
+          # findings across all 247 files versus 55 across the 56 sources. (The
+          # pre-change baseline in task 92 was 725 versus 81; the ratio is what is
+          # stable, not the absolute counts, which move as findings are resolved.)
           #
           # Bundle drift is already guarded by validate.yml's Bundle freshness check
           # and by evals/shared/tests/ — this lane must not duplicate that job.

@@ -77,7 +77,7 @@ All notable changes to this project will be documented in this file. Format foll
   one you did not know was being watched — now goes red. Run it locally first; both the binary and the
   container form are documented in [`CONTRIBUTING.md`](./CONTRIBUTING.md) under "Before you open a PR".
   The lane lints **sources only** (56 files, not 247): the 191 bundled copies under `skills/*/references/`
-  would otherwise report every shared finding four or five times, 725 findings instead of 81.
+  would otherwise report every shared finding four or five times — a ~9x inflation.
 
 - **⚠️ BEHAVIOUR CHANGE — `resolve-platform.sh` now reads `.env` when resolving `TRACKER`, and
   `setup-consumer.sh` no longer re-implements that resolution.** Install time and run time answered

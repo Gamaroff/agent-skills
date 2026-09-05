@@ -263,7 +263,8 @@ should be announced in the CHANGELOG rather than discovered.
       stale** — it claims a single `validate.yml` that "runs `npm test` on every push to `main`",
       which describes neither workflow that exists. This task invalidates that paragraph further, so
       it fixes the paragraph it touches.
-- [x] Note the sources-only rule and why (**81 findings vs 725**), written where the file list is
+- [x] Note the sources-only rule and why (a **~9x inflation**; 515 vs 55 measured after this change,
+      725 vs 81 before it), written where the file list is
       built, so nobody "fixes" the lane by widening its glob.
 - [x] Do **not** treat `.github/workflows/README.md` as authoritative — it is stale (claims the
       workflows are disabled, documents `sbom.yml`/`codeql.yml`, which do not exist).
@@ -492,6 +493,7 @@ Two MEDIUM findings, both in code this task introduced:
 | 2026-09-05 |         | QA gate 2 CONCERNS (85/100) — refute pass; cycle-1 findings verified fixed, two new documentation-accuracy defects found | qa-task |
 | 2026-09-05 |         | qa-fix cycle 2 — TASK-92-003 (fix/annotation split miscounted 11/15; true split 9/17) and TASK-92-004 (tech-stack said five workflows, there are six) corrected | qa-fix |
 | 2026-09-05 |         | QA gate 3 **PASS** (96/100) — all four findings verified fixed, no new findings, 5/5 CI jobs green | qa-task |
+| 2026-09-05 |         | Step 5c `/review-pr` CONCERNS — PC-1 (stale "725 vs 81" figure, now 515 vs 55) found and fixed; both review lenses hung and the review was not independent | review-pr |
 
 ---
 
@@ -522,7 +524,8 @@ Two MEDIUM findings, both in code this task introduced:
 
 ### Important Reminders
 
-- **Lint sources, not bundles.** 56 files, not 247. The difference is 81 findings versus 725, and the
+- **Lint sources, not bundles.** 56 files, not 247. The difference is a ~9x inflation (725 versus 81
+  at the pre-change baseline; 515 versus 55 measured after this change), and the
   extra 644 are the same findings counted five times.
 - **A gate never seen to fail is not known to be a gate.** Phase 3's deliberate-regression proof is
   the point of Phase 3, not a formality.
