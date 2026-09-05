@@ -263,11 +263,14 @@ select_access() {
   _achoice=${_achoice:-1}
 
   case "$_achoice" in
-    1) ACCESS_TRACKER=full ;;
-    2) ACCESS_TRACKER=read-only ;;
-    3) ACCESS_TRACKER=approve ;;
-    4) ACCESS_TRACKER=command ;;
-    5) ACCESS_TRACKER=manual ;;
+    1) ACCESS_TRACKER="full" ;;
+    2) ACCESS_TRACKER="read-only" ;;
+    3) ACCESS_TRACKER="approve" ;;
+    # Quoted because `command` is a shell builtin, and an unquoted `VAR=command`
+    # reads to shellcheck (SC2209) as a mistyped `VAR=$(command)`. The whole arm
+    # is quoted rather than just this line so the block stays uniform.
+    4) ACCESS_TRACKER="command" ;;
+    5) ACCESS_TRACKER="manual" ;;
     *) err "Invalid choice: $_achoice"; exit 1 ;;
   esac
 

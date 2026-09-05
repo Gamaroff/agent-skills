@@ -50,11 +50,14 @@ REPO_SLUG="Gamaroff/agent-skills"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --major) BUMP=major; shift ;;
-    --minor) BUMP=minor; shift ;;
-    --patch) BUMP=patch; shift ;;
-    --dry-run) DRY_RUN=true; shift ;;
-    --no-sync-develop) SYNC_DEVELOP=false; shift ;;
+    # Quoted: `patch` is an external command on many systems, so an unquoted
+    # `BUMP=patch` reads to shellcheck (SC2209) as a mistyped `BUMP=$(patch)`.
+    # The whole arm set is quoted so the block stays uniform.
+    --major) BUMP="major"; shift ;;
+    --minor) BUMP="minor"; shift ;;
+    --patch) BUMP="patch"; shift ;;
+    --dry-run) DRY_RUN="true"; shift ;;
+    --no-sync-develop) SYNC_DEVELOP="false"; shift ;;
     --retry)
       RETRY=true; shift
       # Optional positional tag argument — consume it only if it looks like a tag

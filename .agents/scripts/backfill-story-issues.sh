@@ -34,7 +34,6 @@ for STORY_FILE in "$@"; do
 
   TITLE=$(fm title "$STORY_FILE")
   PRIORITY=$(fm priority "$STORY_FILE")
-  EPIC=$(fm epic "$STORY_FILE")
   ID=$(fm id "$STORY_FILE")
   # Parse E.S from id (story.E.S.slug)
   STORY_E=$(echo "$ID" | awk -F. '{print $2}')
