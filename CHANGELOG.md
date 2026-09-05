@@ -58,6 +58,27 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **⚠️ CI GATE ADDED — a new `ShellCheck` workflow fails any PR that introduces a warning-tier shell
+  finding.** Shell was the least-gated language in the repo: `npm run ci` runs `prettier --check` over
+  everything and `node --test` over the suite, and nine of those suites *are* shell scripts executed by
+  `bash`, but nothing statically analysed shell. A quoting bug could ship on any path the tests do not
+  take. This had already cost a QA cycle — task 83 carried a `shellcheck scripts/setup-consumer.sh`
+  success criterion through three QA cycles, a gate and a DoD, and no automated step could evaluate it.
+
+  **The gate is `--severity=warning` over the 56 tracked *source* scripts**, pinned to ShellCheck
+  **v0.11.0**. Measured on this tree: 0 errors, 26 warnings, 79 info, 81 style. All 26 warnings are
+  resolved in this change — 11 by a real fix (three genuinely dead variables removed, five string
+  literals quoted, one `ls | grep` replaced by a glob loop, two assertion messages whose backticks were
+  being executed as command substitution) and 15 by a `# shellcheck disable` **with a stated reason**.
+  A bare disable is a suppression; a disable with a reason is documentation, and the lane's own error
+  message says so.
+
+  **What this means for you:** a PR that adds a warning-tier finding — in any tracked `.sh` file, including
+  one you did not know was being watched — now goes red. Run it locally first; both the binary and the
+  container form are documented in [`CONTRIBUTING.md`](./CONTRIBUTING.md) under "Before you open a PR".
+  The lane lints **sources only** (56 files, not 247): the 191 bundled copies under `skills/*/references/`
+  would otherwise report every shared finding four or five times, 725 findings instead of 81.
+
 - **⚠️ BEHAVIOUR CHANGE — `resolve-platform.sh` now reads `.env` when resolving `TRACKER`, and
   `setup-consumer.sh` no longer re-implements that resolution.** Install time and run time answered
   "which platform is this repo?" with two different implementations, and they disagreed on three

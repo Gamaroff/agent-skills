@@ -65,6 +65,26 @@ npm test                              # required — must be green (L1 unit + L2
 npm run format                        # required — CI fails on unformatted JavaScript
 ```
 
+**If you touched a shell script**, run ShellCheck too — the `ShellCheck` workflow gates every PR at
+`--severity=warning` and will reject a new warning-tier finding:
+
+```bash
+# The lane lints SOURCES ONLY — 56 files, not the 247 `git ls-files '*.sh'` returns.
+# The other 191 are bundled copies under skills/*/references/, written by `npm run bundle`;
+# linting them reports every shared finding once per copy (725 findings instead of 81).
+shellcheck --severity=warning $(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
+
+# No `shellcheck` binary? Most contributors will not have one. The container is the reference form:
+docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable \
+  --severity=warning $(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
+```
+
+CI pins **v0.11.0** (see `.github/workflows/shellcheck.yml`), so `koalaman/shellcheck:stable` may drift
+ahead of it and report findings CI does not. If a finding is a genuine false positive, add
+`# shellcheck disable=SCxxxx` **with a one-line reason on the same line** — a bare disable is a
+suppression, and a directive covers only the command immediately after it, so a block of assignments
+needs one each.
+
 `prettier` is already a devDependency, so `npm ci` provides it. Prettier covers **JavaScript only** — Markdown, YAML and JSON are excluded on purpose in `.prettierignore`, because this repo's documents are hand-wrapped.
 
 **Keep reformatting out of your functional commits.** If your editor formats on save, this is the one to watch. A commit that mixes a whole-file reformat with a 40-line change is unreviewable, walls off `git bisect` and `git log -L`, and attributes the churn to a bugfix in `git blame`. It has happened here twice — the second time while [#179](https://github.com/Gamaroff/agent-skills/issues/179), describing the first, was still open. Run `npm run format` as its own `style:` commit and add that commit's full sha to [`.git-blame-ignore-revs`](./.git-blame-ignore-revs).
