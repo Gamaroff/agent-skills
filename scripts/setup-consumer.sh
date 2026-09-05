@@ -193,6 +193,52 @@ select_platform() {
   select_access
 }
 
+# ── 2a. skill install profile ────────────────────────────────────────────────
+#
+# Every installed skill's `description` sits in the agent's context permanently,
+# on every request, before it reads a single instruction. That metadata tier —
+# not disk — is the cost this prompt exists to control.
+#
+# Numbered `read -r`, matching select_platform above. Deliberately NOT a
+# raw-mode arrow-key TUI: the wizard is commonly run as `bash <(curl …)`, where
+# stdin is not a terminal and raw mode is not reliable.
+select_skill_profile() {
+  heading "Skill selection"
+
+  # Counts are resolved, never hardcoded. An earlier draft of this feature
+  # printed "all 119 skills"; the number was already wrong when it was written.
+  echo "  Every installed skill's description stays in the agent's context"
+  echo "  permanently. Install only what this project uses."
+  echo ""
+  echo "  1) full      — every skill. Today's behaviour."
+  echo "  2) pipeline  — story/task/bug lifecycle: create → review → develop → QA → finalise."
+  echo "  3) minimal   — branching, commits, PRs, code review only."
+  echo ""
+  echo "  A profile names seeds only; whatever those skills invoke is added"
+  echo "  automatically, so a profile can never produce a half-installed pipeline."
+  echo ""
+  ask "Profile [1-3] (default: 1):"
+  read -r _pchoice
+  case "${_pchoice:-1}" in
+    1) SKILLS_PROFILE="full" ;;
+    2) SKILLS_PROFILE="pipeline" ;;
+    3) SKILLS_PROFILE="minimal" ;;
+    *) err "Invalid choice: $_pchoice"; exit 1 ;;
+  esac
+
+  SKILLS_INCLUDE=""
+  if [[ "$SKILLS_PROFILE" != "full" ]]; then
+    echo ""
+    echo "  Add individual skills on top? Comma-separated names, or Enter to skip."
+    echo "  Full list: docs/reference/skill-catalog.md"
+    ask "Extra skills:"
+    read -r SKILLS_INCLUDE
+  fi
+
+  ok "Profile: $SKILLS_PROFILE${SKILLS_INCLUDE:+ (+ ${SKILLS_INCLUDE})}"
+  record_step "Skill profile" "ok" "${SKILLS_PROFILE}${SKILLS_INCLUDE:+ +includes}"
+}
+
 # ── 2b. tracker access level ─────────────────────────────────────────────────
 # How much the locally running agent may do to the tracker. Separate from which
 # tracker it is: a restricted run still needs the identity to emit the right
@@ -470,6 +516,18 @@ write_skills_config() {
     access_block=$'\n# How much access the agent has to each system. Absent means `full`.\n# Values: full | read-only | approve | command | manual. An unrecognised value\n# halts the run rather than falling through to a default.\n# Env override AGENT_SKILLS_ACCESS_TRACKER is combined most-restrictive-wins,\n# so it can lock a run down further but never loosen this setting.\naccess:\n  tracker: '"${ACCESS_TRACKER}"$'\n'
   fi
 
+  # Written only when the profile is not `full`, so a config generated before
+  # this prompt existed stays byte-identical. An absent block means `full`,
+  # which is exactly the pre-task-84 behaviour.
+  local skills_block=""
+  if [[ -n "${SKILLS_PROFILE:-}" && "${SKILLS_PROFILE}" != "full" ]]; then
+    local _inc_yaml="[]"
+    if [[ -n "${SKILLS_INCLUDE:-}" ]]; then
+      _inc_yaml="[$(tr -d '[:space:]' <<<"$SKILLS_INCLUDE" | sed 's/,/, /g')]"
+    fi
+    skills_block=$'\n# Which skills to install. An absent block means `profile: full` (every skill).\n# Read by setup-consumer.sh on --update, so the choice survives an update.\n#\n# A profile names SEEDS; whatever those skills invoke is resolved and added\n# automatically, so this can never yield a half-installed pipeline. A skill\n# listed in `exclude` that a chosen skill requires is REPORTED as a conflict\n# and left out — never silently re-added, and never silently dropped.\nskills:\n  profile: '"${SKILLS_PROFILE}"$'  # full | pipeline | minimal\n  include: '"${_inc_yaml}"$'  # extra skills on top of the profile\n  exclude: []  # skills to leave out\n'
+  fi
+
   # Written for BOTH trackers. GitHub used to be the implicit default and was
   # written as nothing at all, which left a GitHub consumer's config unable to
   # state its own platform — install_skills' resolver then had nothing to read
@@ -498,7 +556,7 @@ devLoadAlwaysFiles:
   - ${_cs_path}
   - ${_arch_loc}/concepts/tech-stack.md
   - ${_arch_loc}/concepts/source-tree.md
-${access_block}${tracker_block}"
+${access_block}${skills_block}${tracker_block}"
 
   write_file "skills-config.yaml" "$config"
   ok "skills-config.yaml"
@@ -882,6 +940,166 @@ _skill_excluded_for_tracker() {
   return 1
 }
 
+# ── 8b. install profiles (task 84) ───────────────────────────────────────────
+#
+# A profile is a SEED list; the concrete install set is the seeds' transitive
+# closure over the skill call graph, with the tracker filter above applied AFTER
+# the closure. The graph work happens in Node — resolve-skill-set-cli.mjs, out
+# of the extracted tarball — because it is a cyclic-graph traversal with a
+# conflict report, and neither is something bash should be doing.
+#
+# Config-first, exactly like _resolve_install_tracker and for the same reason:
+# `--update` short-circuits in main() before select_platform ever runs, so on
+# that path the wizard variables do not exist and the config file is the only
+# source. Reading $SKILLS_PROFILE first would make --update silently reinstall
+# everything, which is the failure this whole feature exists to prevent.
+_config_skills_profile() {
+  local _p=""
+  if [[ -f skills-config.yaml ]]; then
+    # The header rule tolerates a trailing comment (`skills:  # which skills`),
+    # and the close rule EXCLUDES the header line itself. Without the `!/^skills:/`
+    # guard the close rule matches the very line that opened the block — so any
+    # trailing content made the whole block invisible, silently, and the installer
+    # fell back to `full` without even reaching the "could not resolve" warning.
+    _p=$(awk '
+      /^skills:[[:space:]]*(#.*)?$/ { inblock=1; next }
+      !/^skills:/ && /^[^[:space:]#]/ { inblock=0 }
+      inblock && /^[[:space:]]+profile:/ {
+        v = $0
+        sub(/^[[:space:]]+profile:[[:space:]]*/, "", v)
+        sub(/[[:space:]]+#.*$/, "", v)
+        sub(/[[:space:]]+$/, "", v)
+        print v; exit
+      }
+    ' skills-config.yaml 2>/dev/null || true)
+  fi
+  # Normalise the way _resolve_install_tracker does: CRLF checkouts leave a
+  # carriage return, and a quoted scalar arrives with its quotes.
+  _p=${_p%$'\r'}
+  case "$_p" in
+    '"'*'"') _p=${_p#'"'}; _p=${_p%'"'} ;;
+    "'"*"'") _p=${_p#\'}; _p=${_p%\'} ;;
+  esac
+  [[ -z "$_p" && -n "${SKILLS_PROFILE:-}" ]] && _p="$SKILLS_PROFILE"
+  printf '%s' "${_p:-full}"
+}
+
+# Read `skills.include` / `skills.exclude`, which are inline YAML flow lists
+# (`include: [a, b]`) — the only form write_skills_config emits. Returns a
+# comma-separated string for the CLI.
+_config_skills_list() {
+  local _key="$1" _v=""
+  if [[ -f skills-config.yaml ]]; then
+    # Same header/close handling as _config_skills_profile — see the note there.
+    # `found` is printed as a sentinel prefix so the caller can tell an explicit
+    # `include: []` from an absent key: they are different instructions, and
+    # treating them alike let a stale env var override an explicit empty list.
+    _v=$(awk -v key="$_key" '
+      /^skills:[[:space:]]*(#.*)?$/ { inblock=1; next }
+      !/^skills:/ && /^[^[:space:]#]/ { inblock=0 }
+      inblock && $0 ~ "^[[:space:]]+" key ":" {
+        v = $0
+        sub("^[[:space:]]+" key ":[[:space:]]*", "", v)
+        # `[[:space:]]*#`, not `+`: this reads a FLOW SEQUENCE, where YAML does
+        # treat an unspaced `#` as a comment — `exclude: [qa-story]# off` is
+        # `['qa-story']`. The scalar parsers above keep `+` deliberately, because
+        # in a plain scalar an unspaced `#` is part of the value.
+        sub(/[[:space:]]*#.*$/, "", v)
+        gsub(/[][]/, "", v)
+        gsub(/[[:space:]]/, "", v)
+        gsub(/["'"'"']/, "", v)
+        print "found:" v; exit
+      }
+    ' skills-config.yaml 2>/dev/null || true)
+  fi
+  _v=${_v%$'\r'}
+  # An explicit key (even an empty list) suppresses the env fallback.
+  if [[ "$_v" == found:* ]]; then
+    printf '%s' "${_v#found:}"
+    return
+  fi
+  if [[ -z "$_v" ]]; then
+    case "$_key" in
+      include) _v="${SKILLS_INCLUDE:-}" ;;
+      exclude) _v="${SKILLS_EXCLUDE:-}" ;;
+    esac
+    # The wizard collects a free-text answer; strip spaces so the CLI sees a
+    # clean comma list.
+    _v=$(tr -d '[:space:]' <<<"$_v")
+  fi
+  printf '%s' "$_v"
+}
+
+# Resolve the concrete skill list. Prints one name per line on stdout; the
+# closure/conflict report goes to stderr and is shown to the user as-is.
+#
+# Exit codes, which the caller MUST distinguish:
+#   0  — authoritative. The printed set is what to install, EVEN IF EMPTY (every
+#        seed excluded is a legitimate answer, not a failure).
+#   2  — user-input error, already named on stderr by the CLI (unknown skill in
+#        `include`, unknown profile). The config is wrong; node is fine.
+#   *  — environment failure (node missing, CLI absent, malformed output).
+#
+# For 2 and anything else the caller installs the UNFILTERED set rather than an
+# empty one — an unfiltered install is recoverable, an empty one leaves the
+# consumer with no skills at all. For 0-with-empty-output the caller honours it
+# but warns first, because "you asked for nothing" and "something went wrong"
+# look identical in a summary line.
+# CALL THIS INSIDE A CONDITION. It returns non-zero on a resolver failure, which
+# is a normal outcome the caller handles by installing the unfiltered set — but
+# under `set -e` a BARE call would abort the whole wizard instead. `install_skills`
+# calls it as `if _RESOLVED_SET=$(_resolve_skill_set …); then`, which suppresses
+# errexit for the call. Verified both ways; keep it that way.
+_resolve_skill_set() {
+  local _tracker="$1" _tmpdir="$2"
+  local _cli="${_tmpdir}/shared/resources/resolve-skill-set-cli.mjs"
+  [[ -f "$_cli" ]] || return 1
+  local _args=(--profile "$(_config_skills_profile)" --tracker "$_tracker"
+               --skills-dir "${_tmpdir}/skills"
+               --profiles "${_tmpdir}/shared/resources/skill-profiles.json"
+               --graph    "${_tmpdir}/shared/resources/skill-dependencies.json")
+  local _inc _exc
+  _inc=$(_config_skills_list include); [[ -n "$_inc" ]] && _args+=(--include "$_inc")
+  _exc=$(_config_skills_list exclude); [[ -n "$_exc" ]] && _args+=(--exclude "$_exc")
+  [[ "${ALL_SKILLS:-false}" == true ]] && _args+=(--all-skills)
+
+  # Discriminate on the EXIT CODE, not on emptiness. The CLI exits 0 for a
+  # legitimately-empty set (every seed excluded, say) and 2 for a data-file or
+  # resolution failure. Treating empty output as failure inverted the user's
+  # intent in the worst possible direction: `--exclude` every seed asked for
+  # almost nothing and installed everything.
+  local _out _rc
+  _out=$(node "$_cli" "${_args[@]}"); _rc=$?
+  # PROPAGATE the CLI's code, do not collapse it. Exit 2 is a user-input error
+  # the CLI has already named on stderr (an unknown skill in `include`, an
+  # unknown profile); anything else is an environment failure. Collapsing both
+  # to 1 made install_skills advise "check that node is on PATH" for a typo in
+  # skills-config.yaml — the very mis-blaming the include validation was added
+  # to stop.
+  [[ $_rc -eq 0 ]] || return $_rc
+
+  # Validate the shape before trusting it. A zero exit is NOT enough: `node` can
+  # be shadowed by a shell function (nvm defines one) that prints help text and
+  # exits 0, in which case this captured ~100 lines of prose and every real
+  # skill then looked "outside profile" — a near-empty install, reported as
+  # success. Observed while testing this very function. Skill names are
+  # lowercase-kebab and nothing else, so a single bad line rejects the batch and
+  # the caller falls back to the unfiltered install.
+  # An empty set is a legitimate answer and is returned as such — the caller
+  # distinguishes it from failure by this function's own exit code.
+  if [[ -z "$_out" ]]; then
+    printf ''
+    return 0
+  fi
+
+  local _line
+  while IFS= read -r _line; do
+    [[ "$_line" =~ ^[a-z0-9][a-z0-9-]*$ ]] || return 1
+  done <<<"$_out"
+
+  printf '%s\n' "$_out"
+}
+
 _resolve_skills_version() {
   # Honour explicit override first
   if [[ -n "${SKILLS_VERSION:-}" ]]; then
@@ -945,6 +1163,76 @@ install_skills() {
         esac
         _dry_detail="${_dry_detail}, tracker ${_dry_tracker}"
       fi
+      # Profile counts ARE computable here, without the network: both data
+      # files are committed and travel in this repo. What is NOT computable is
+      # a count against the tarball's own skill list, because this branch
+      # deliberately never downloads it — so the count below is "what the
+      # profile resolves to", and is labelled as such rather than implying it
+      # counted the release.
+      local _dry_profile _dry_n _dry_inc _dry_exc
+      _dry_profile=$(_config_skills_profile)
+      _dry_inc=$(_config_skills_list include)
+      _dry_exc=$(_config_skills_list exclude)
+      if [[ "$_dry_profile" != "full" || -n "$_dry_exc" ]]; then
+        # Declared and assigned separately (SC2155): `local x="$(cmd)"` makes the
+        # declaration's exit status the one that survives, masking the command's.
+        # The same class this file already guards against in `_resolve_skill_set`
+        # — caught here by shellcheck, which the DoD had recorded as unrunnable.
+        local _dry_cli
+        _dry_cli="$(dirname "${BASH_SOURCE[0]}")/../shared/resources/resolve-skill-set-cli.mjs"
+        # Pass include/exclude too — a dry run that previews a different set than
+        # the real run would install defeats the point of previewing.
+        local _dry_args=(--profile "$_dry_profile" --tracker "$_dry_tracker" --count)
+        [[ -n "$_dry_inc" ]] && _dry_args+=(--include "$_dry_inc")
+        [[ -n "$_dry_exc" ]] && _dry_args+=(--exclude "$_dry_exc")
+        # --all-skills too, or the preview applies a tracker filter the real run
+        # would not: 35 previewed against 41 actually installed.
+        [[ "$ALL_SKILLS" == true ]] && _dry_args+=(--all-skills)
+        # Keep stderr: on rc 2 the CLI has already named the offending entry, and
+        # discarding it reproduced the very mis-attribution fix #3 removed from
+        # the real path — a dry run is where a config typo should be cheapest to
+        # find, not the one place it is hidden.
+        # `|| _dry_err=""` — a BARE `_x=$(mktemp)` aborts under errexit when TMPDIR
+        # is unset or read-only, which is the same class of defect as the bare
+        # resolver assignment this file already carries a warning about. Writing a
+        # temp file at all is also the only filesystem write on a path that
+        # announces "no files will be written", so it degrades to passing stderr
+        # straight through rather than failing.
+        local _dry_err; _dry_err=$(mktemp 2>/dev/null) || _dry_err=""
+        if [[ ! -f "$_dry_cli" ]]; then
+          # Name the real reason. `_dry_cli` is resolved from BASH_SOURCE, which
+          # is `/dev/fd/NN` under the advertised `bash <(curl …)` invocation — so
+          # for most consumers this branch is STRUCTURAL, not a transient
+          # environment problem, and "unavailable" read like something they could
+          # fix. The resolver arrives with the tarball, which a dry run
+          # deliberately does not download.
+          if [[ "${BASH_SOURCE[0]}" == /dev/fd/* || "${BASH_SOURCE[0]}" == /proc/self/fd/* ]]; then
+            echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' — count not previewable when piped from curl (the resolver ships with the tarball). Run from a checkout to preview counts."
+          else
+            echo -e "${YELLOW}[dry-run]${NC} resolver not available locally — count not computed"
+          fi
+          _dry_detail="${_dry_detail}, profile ${_dry_profile}"
+          if [[ -n "$_dry_err" ]]; then rm -f "$_dry_err"; fi
+        elif _dry_n=$(node "$_dry_cli" "${_dry_args[@]}" 2>"${_dry_err:-/dev/stderr}"); then
+          # SHOW the report on success too. It carries the closure additions AND
+          # the `⚠ X is in skills.exclude but required by Y` conflict warnings —
+          # the real install prints them, so a preview that swallows them fails at
+          # its only job. Previously this branch deleted them unread.
+          if [[ -n "$_dry_err" ]]; then cat "$_dry_err" >&2; fi
+          echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' resolves to ${_dry_n} skills (closure computed offline; not counted against the release tarball)"
+          _dry_detail="${_dry_detail}, profile ${_dry_profile} (${_dry_n})"
+          if [[ -n "$_dry_err" ]]; then rm -f "$_dry_err"; fi
+        elif [[ $? -eq 2 ]]; then
+          if [[ -n "$_dry_err" ]]; then cat "$_dry_err" >&2; fi
+          echo -e "${YELLOW}[dry-run]${NC} skills-config.yaml names something that does not exist (above) — the real run would install the unfiltered set"
+          _dry_detail="${_dry_detail}, profile ${_dry_profile} (config error)"
+          if [[ -n "$_dry_err" ]]; then rm -f "$_dry_err"; fi
+        else
+          echo -e "${YELLOW}[dry-run]${NC} profile '${_dry_profile}' — resolver failed, count not computed"
+          _dry_detail="${_dry_detail}, profile ${_dry_profile}"
+          if [[ -n "$_dry_err" ]]; then rm -f "$_dry_err"; fi
+        fi
+      fi
       record_step "Skills install" "ok" "$_dry_detail"
     else
       info "Downloading skills ${_version} ..."
@@ -966,7 +1254,7 @@ install_skills() {
       tar -xzf "$_archive" -C "$_tmpdir" --strip-components=1
       mkdir -p .agents/skills
       local _tracker; _tracker=$(_resolve_install_tracker)
-      local _installed=0 _updated=0 _skipped=0 _kept=0
+      local _installed=0 _updated=0 _skipped=0 _kept=0 _outside=0 _not_in_profile=0
 
       if [[ "$ALL_SKILLS" == true ]]; then
         info "--all-skills: installing every skill, no platform filter"
@@ -974,9 +1262,85 @@ install_skills() {
         info "Filtering skills for tracker: ${_tracker}"
       fi
 
+      # Resolve the profile to a concrete set. The CLI prints names on stdout
+      # and its closure/conflict report on stderr, which goes straight to the
+      # user's terminal — that report is how they see the closure working and
+      # how they learn about an exclude conflict.
+      #
+      # FAILURE MEANS "NO FILTER", NOT "NO SKILLS". An empty _RESOLVED_SET would
+      # make the membership test below reject every skill and produce an empty
+      # install. Falling back to the unfiltered set keeps a broken data file or
+      # a missing node from bricking the install.
+      local _profile; _profile=$(_config_skills_profile)
+      local _RESOLVED_SET="" _have_set=false _resolve_rc=0
+      if [[ "$_profile" != "full" || -n "$(_config_skills_list exclude)" ]]; then
+        # CONDITION FORM, not a bare assignment. Under `set -euo pipefail` a bare
+        # `_X=$(cmd)` whose substitution exits non-zero triggers errexit and kills
+        # the wizard outright — here, after the tarball is extracted and
+        # .agents/skills/ created but before a single skill is copied, leaving an
+        # empty install and a leaked temp dir. Cycle 2 introduced exactly that by
+        # rewriting this line as a bare assignment while, in the same commit,
+        # adding a comment above _resolve_skill_set warning against it. Both rc
+        # branches below were dead code as a result.
+        if _RESOLVED_SET=$(_resolve_skill_set "$_tracker" "$_tmpdir"); then
+          _resolve_rc=0
+        else
+          _resolve_rc=$?
+        fi
+        if [[ $_resolve_rc -eq 0 ]]; then
+          _have_set=true
+          # An empty-but-successful resolution is honoured — but never quietly.
+          # "You excluded everything" and "something broke" produce the same
+          # `0 new, 0 updated` summary otherwise.
+          if [[ -z "$_RESOLVED_SET" ]]; then
+            # Names BOTH reachable causes. An empty set means every seed was
+            # removed — usually by skills.exclude, but a profile whose seeds are
+            # all inapplicable to this tracker gets here too, and blaming
+            # `exclude` for that would send the reader to the wrong line.
+            warn "Profile '${_profile}' resolved to ZERO skills — check skills.exclude, and whether this profile applies to tracker '${_tracker}'"
+            record_warning "Profile '${_profile}' resolved to zero skills under tracker '${_tracker}', so nothing was installed. Either skills.exclude removes every seed, or none of the profile's seeds apply to this tracker. The resolver printed which above. Fix the config and re-run --update."
+          fi
+        elif [[ $_resolve_rc -eq 2 ]]; then
+          # The CLI has already printed the specific problem to stderr.
+          warn "skills-config.yaml names something that does not exist (see above) — installing the unfiltered set"
+          record_warning "Your skills-config.yaml 'skills:' block names a skill or profile that does not exist; the message above says which. Every applicable skill was installed instead. Fix the config and re-run --update — this is a config error, not a node/PATH problem."
+        else
+          warn "Could not resolve skill profile '${_profile}' — installing the unfiltered set"
+          record_warning "Skill profile '${_profile}' could not be resolved; every applicable skill was installed instead. Re-run --update after checking that node is on PATH."
+        fi
+      fi
+
       for _skill_dir in "$_tmpdir"/skills/*/; do
         [[ -f "${_skill_dir}SKILL.md" ]] || continue
         local _name; _name=$(basename "$_skill_dir")
+
+        # ORDER: the tracker test comes FIRST, and it must. The resolver has
+        # already removed tracker-excluded skills from _RESOLVED_SET, so a
+        # profile-first check consumed every one of them — _kept was always 0,
+        # Jira-only skills were reported as "outside profile", and the tracker
+        # grandfather warning (which carries the --all-skills and prune advice)
+        # was unreachable whenever a profile was active.
+        #
+        # PROFILE GRANDFATHER: a skill outside the resolved set that is ALREADY
+        # on disk is KEPT, never deleted — the same guarantee task 83 makes for
+        # the tracker filter, and for the same reason: pruning a working install
+        # breaks the consumer's workflow days later and far from the cause.
+        # The `continue` is what protects it; removing it drops through to the
+        # rm -rf below.
+        if ! _skill_excluded_for_tracker "$_name" "$_tracker" \
+           && [[ "$_have_set" == true ]] \
+           && ! grep -qxF "$_name" <<<"$_RESOLVED_SET"; then
+          if [[ -d ".agents/skills/${_name}" ]]; then
+            info "  kept     ${_name} (already installed; outside profile '${_profile}')"
+            (( _outside++ )) || true
+          else
+            # Counted separately from _skipped: the summary attributes _skipped
+            # to the tracker, and folding profile skips into it reported ~85
+            # skills as "not applicable to github" when ~11 were.
+            (( _not_in_profile++ )) || true
+          fi
+          continue
+        fi
 
         if _skill_excluded_for_tracker "$_name" "$_tracker"; then
           # GRANDFATHER: an excluded skill that is already installed is KEPT.
@@ -1019,9 +1383,18 @@ install_skills() {
       local _detail="${_installed} new, ${_updated} updated"
       (( _skipped > 0 )) && _detail="${_detail}, ${_skipped} skipped (${_tracker})"
       (( _kept > 0 ))    && _detail="${_detail}, ${_kept} kept"
+      (( _outside > 0 )) && _detail="${_detail}, ${_outside} kept outside profile"
+      (( _not_in_profile > 0 )) && _detail="${_detail}, ${_not_in_profile} not in profile '${_profile}'"
       ok "Skills ${_version} installed into .agents/skills/ (${_detail})"
       if (( _kept > 0 )); then
         record_warning "${_kept} skill(s) do not apply to tracker '${_tracker}' but were kept because they are already installed. Delete .agents/skills/ and re-run the wizard to prune, or pass --all-skills to disable the filter entirely."
+      fi
+      # State the divergence plainly. This is the EXPECTED state for every
+      # existing consumer adopting a profile — config says `pipeline`, disk
+      # holds more — so it is reported as normal, with the prune recipe, rather
+      # than flagged as an error.
+      if (( _outside > 0 )); then
+        record_warning "${_outside} skill(s) are outside profile '${_profile}' but were kept because they are already installed. Your skills-config.yaml and .agents/skills/ therefore disagree, which is expected after adopting a profile — nothing is ever pruned on your behalf. To make disk match config: rm -rf .agents/skills && re-run with --update."
       fi
       if [[ "$_unpinned" == true ]]; then
         record_step "Skills install" "warn" "${_version} unpinned (${_detail})"
@@ -1316,6 +1689,7 @@ main() {
   fi
 
   select_platform
+  select_skill_profile
   collect_env_vars
   write_env_files
   write_skills_config

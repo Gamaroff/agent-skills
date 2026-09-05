@@ -1,6 +1,7 @@
 ---
 name: review-epic
 description: "Deep interactive epic review that checks template compliance, detects scope overlap with existing epics, validates against architecture docs, and scans the codebase for already-implemented features. Produces a co-located review report or inline action plan. Use before writing stories to catch structural, duplication, and conflict problems early."
+invokes: [create-branch, mermaid-architect]
 ---
 
 # Review Epic

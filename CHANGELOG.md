@@ -4,6 +4,58 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Skill install profiles with dependency closure.** `setup-consumer.sh` now asks which install
+  profile you want — `full` (every skill, the default and today's behaviour), `pipeline` (the
+  story/task/bug lifecycle) or `minimal` (branching, commits, PRs, code review) — plus optional
+  per-skill add-ons, and writes the answer to `skills-config.yaml` so `--update` reproduces it.
+
+  **The measured saving, not an estimate.** Description bytes are what sit in the agent's context on
+  every request, before it reads an instruction. Measured on this tree (120 skills; the numbers below
+  are for a GitHub consumer, after task 83's tracker filter):
+
+  | Profile    | Skills | Description bytes | ≈ tokens | vs `full` |
+  | ---------- | -----: | ----------------: | -------: | --------: |
+  | `full`     |    109 |            35,425 |    8,856 |         — |
+  | `pipeline` |     36 |            14,281 |    3,570 |  **−60%** |
+  | `minimal`  |      5 |             1,893 |      473 |  **−95%** |
+
+  Method matters and is stated because two reasonable ones disagree by ~10%: this sums the
+  `description:` frontmatter value of each installed skill. **No test hardcodes these numbers** — the
+  assertion measures `full` and `pipeline` in the same run and compares them, so it asserts a
+  property of the resolver rather than a fact about one release.
+
+  **A broken selection is unrepresentable.** A profile names *seeds*; the installer resolves each
+  seed's transitive callees and installs those too, so choosing `develop-story` cannot leave you
+  without the eight skills it invokes as pipeline steps. The wizard prints what the closure added and
+  why before it copies anything. The tracker filter from task 83 runs **after** the closure — the
+  ordering is load-bearing, because `review-story → ensure-story-jira-issue → sync-jira-story` puts a
+  Jira-only skill in a GitHub consumer's closure, and filtering first would silently undo task 83 for
+  every profile user. That ordering is mutation-proven.
+
+  **The call graph is declared, not scraped.** Each SKILL.md carries an optional
+  `invokes: [a, b]` frontmatter key; `npm run generate-skill-deps` compiles those into
+  `shared/resources/skill-dependencies.json`, and CI fails on drift (in `validate.yml`, the PR gate,
+  as well as `release.yml`). Task 84 originally specified extracting `/slash-command` tokens from
+  prose. That was built first and measured, and it does not work: prose is full of *reverse*
+  references — a leaf naming its callers, cross-references, and negations such as
+  `review-code`'s literal "`/develop-story` and `/develop-task` do **not** call `/review-code`",
+  which the scrape turned into two edges. Every scrape variant either exploded the graph (`minimal`
+  and `pipeline` both closed to ~34 of 120 skills — indistinguishable, so the feature would have
+  shipped worthless while reporting success) or lost real pipeline steps. An absent `invokes:` key
+  means no outgoing edges, which is the safe default. The prose scrape survives as an advisory
+  report: `npm run skill-deps:candidates`.
+
+  **Nothing is ever pruned.** A skill outside your profile that is already installed is *kept* and
+  reported, exactly as task 83 does for the tracker filter, and the summary states the resulting
+  config/disk divergence plainly with the prune recipe — that divergence is the expected state for
+  an existing project adopting a profile, not an error. An **absent `skills:` block means `full`**,
+  so every config written before this feature behaves identically.
+
+  A skill in `skills.exclude` that something else requires is reported as a **conflict** — named,
+  with what requires it and what will break — never silently re-added and never silently dropped.
+
 ### Changed
 
 - **`setup-consumer.sh` now installs only the tracker skills a consumer's platform can actually

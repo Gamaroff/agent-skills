@@ -4,12 +4,31 @@ on:
   pull_request:
     paths:
       - 'skills/**'
+      - 'scripts/generate-skill-dependencies.mjs'
+      # `skill-dependencies.json` is the file the drift check regenerates and
+      # diffs — without it here, a hand-edit of the graph would not even trigger
+      # this workflow. `skill-profiles.json` is listed so a profile edit re-runs
+      # the catalog and bundle checks; the drift step does not read it (its seed
+      # validation lives in skill-dependencies-drift.test.mjs, run by test.yml).
+      # shared/resources/** rather than the three explicit files: the BUNDLE
+      # FRESHNESS check in this same job covers every shared resource that gets
+      # copied into skills' references/, and resolve-skill-set*.mjs are two of
+      # them. Listing only the drift check's own inputs left a resolver edit
+      # triggering no workflow at all.
+      - 'shared/resources/**'
       - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
   push:
     branches: [main, develop]
     paths:
       - 'skills/**'
+      - 'scripts/generate-skill-dependencies.mjs'
+      # shared/resources/** rather than the three explicit files: the BUNDLE
+      # FRESHNESS check in this same job covers every shared resource that gets
+      # copied into skills' references/, and resolve-skill-set*.mjs are two of
+      # them. Listing only the drift check's own inputs left a resolver edit
+      # triggering no workflow at all.
+      - 'shared/resources/**'
       - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
 
@@ -30,6 +49,16 @@ jobs:
       - name: Install PyYAML
         run: pip install pyyaml
 
+      # The catalog and bundle checks below are pure Python; the
+      # skill-dependencies generator is Node. `ubuntu-latest` does ship a Node,
+      # so this is not about availability — it pins the same major that
+      # release.yml's drift check runs on, so the two cannot disagree about the
+      # generated file and produce a PR that is green here and red at tag time.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Validate all skills
         run: |
           failed=0
@@ -48,6 +77,19 @@ jobs:
             echo "::error::Skill catalog is out of date."
             echo "Run 'npm run generate-catalog' locally and commit the diff."
             git --no-pager diff docs/reference/skill-catalog.md | head -100
+            exit 1
+          fi
+
+      - name: Skill dependency graph up-to-date check
+        run: |
+          # The graph is generated from each SKILL.md's `invokes:` frontmatter.
+          # A stale graph means install profiles resolve the wrong closure — a
+          # consumer gets a pipeline missing a step, and finds out mid-run.
+          node scripts/generate-skill-dependencies.mjs
+          if ! git diff --quiet shared/resources/skill-dependencies.json; then
+            echo "::error::skill-dependencies.json is out of date."
+            echo "Run 'npm run generate-skill-deps' locally and commit the diff."
+            git --no-pager diff shared/resources/skill-dependencies.json | head -100
             exit 1
           fi
 

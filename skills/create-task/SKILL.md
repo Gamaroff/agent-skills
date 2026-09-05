@@ -1,6 +1,7 @@
 ---
 name: create-task
 description: Create comprehensive technical task documentation for refactoring, infrastructure changes, and technical improvements. Interactive workflow with decision guidance for non-user-facing work.
+invokes: [ensure-task-github-issue, ensure-task-jira-issue, mermaid-architect]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)

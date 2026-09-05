@@ -2,6 +2,7 @@
 name: ensure-story-jira-issue
 description: 'Internal sub-routine called from create-story and review-story. Given a story markdown file path and (optionally) a parent epic Jira key, ensures the story has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-story (which handles parent-epic linkage, board add, ADF rendering, and the Change Log rows for creation and status transition), and writes jira_key + jira_url to the story frontmatter. Sets STORY_JIRA_KEY (e.g. "PROJ-123") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Jira sibling of ensure-story-github-issue. Callers branch on TRACKER (set by references/resolve-platform.sh) to pick the right sub-routine.'
 type: internal
+invokes: [sync-jira-story]
 ---
 
 # Ensure Story Jira Issue — Sub-Routine

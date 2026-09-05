@@ -2,6 +2,7 @@
 name: ensure-epic-jira-issue
 description: 'Internal sub-routine called from review-story. Given an epic markdown file path, ensures the epic has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-epic, and writes jira_key + jira_url to the epic frontmatter. Sets EPIC_JIRA_KEY (e.g. "PROJ-42") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Callers branch on TRACKER (set by references/resolve-platform.sh) to pick the right sub-routine.'
 type: internal
+invokes: [sync-jira-epic]
 ---
 
 # Ensure Epic Jira Issue — Sub-Routine

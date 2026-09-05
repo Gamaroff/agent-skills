@@ -1,0 +1,114 @@
+schema: 1
+task: "task.84.skill-install-profiles"
+task_title: "Skill install profiles with dependency closure"
+gate: CONCERNS
+status_reason: "Cycle 2 ran as a full refute pass over the whole branch diff and found five further defects — TWO OF THEM HIGH, and both introduced BY cycle 1's own fixes. It also identified four of cycle 1's tests as vacuous, including one that passed for precisely the input its comment claimed it guarded. All five are fixed, the vacuous drift guard is replaced with a mutation-proven one, and every fix carries a behavioural regression test. Gate is CONCERNS rather than PASS because the cycle-2 findings were HIGH at discovery; a cycle-3 confirmation pass should close it."
+reviewer: "QA Engineer"
+updated: "2026-09-04T22:50:00Z"
+
+top_issues:
+  - id: "TASK-84-C2-001"
+    severity: high
+    file: "scripts/generate-skill-dependencies.mjs"
+    finding: "The block form of `invokes:` returned `[]` SILENTLY. `/^invokes:[ \\t]*(.*)$/m` captures the empty string for `invokes:` followed by `  - name` lines, so the `if (!raw) return []` early-return fired and the `must use the inline form` throw was unreachable. The file's own header claimed the block form was 'rejected loudly rather than silently returning nothing, because a silently-empty edge list is exactly the under-collection failure this file exists to avoid' — the claim was false, and cycle 1's fix #4 rewrote that very line and left it standing."
+    failure_scenario: "An author writes `invokes:\\n  - create-branch\\n  - develop` in develop-bug/SKILL.md. parseInvokes returns []. The generator writes `\"develop-bug\": []`. The drift test passes (generator and committed JSON agree). The inline-form guard passes (it asserted only doesNotThrow). A consumer on `profile: pipeline` installs develop-bug with none of its steps, and /develop-bug dies at create-branch in their repo hours later — the exact outcome the graph exists to prevent."
+    suggested_action: "Detect the block form explicitly (empty capture followed by an indented `- ` line) and throw. Replace the doesNotThrow guard with one asserting the throw."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-C2-002"
+    severity: high
+    file: "scripts/setup-consumer.sh"
+    finding: "Interaction between cycle 1's fix #1 (CLI exits 2 for an unknown include) and fix #2 (discriminate on exit code). `_resolve_skill_set` collapsed every non-zero rc to `return 1`, so exit 2 — a user-input error the CLI has already named — was indistinguishable from 127 (node missing). The caller took the same branch for both: a full unfiltered install plus 'Re-run --update after checking that node is on PATH'. Fix #1's stated purpose was to stop a typo 'downgrading to a full unfiltered install and blaming node/PATH'. It still downgraded, and it still blamed node/PATH; only the stderr text changed."
+    failure_scenario: "User picks profile `pipeline` and types `Create PR, review-pr` at the extras prompt. write_skills_config persists `include: [CreatePR, review-pr]`. install_skills gets rc 2, converts it to 1, installs ~120 skills instead of ~35, and records a warning telling the user to check node. Every subsequent --update repeats it."
+    suggested_action: "`return $_rc` from _resolve_skill_set and branch on 2 in install_skills with a config-specific message."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-C2-003"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "Cycle 1's fix #2 inverted a stated safety invariant without updating it. The function header still asserted 'On ANY failure this returns non-zero WITHOUT printing names… an empty list would silently produce an empty install, which is far worse than an unfiltered one'. After the fix, rc 0 with empty stdout sets `_have_set=true` with an empty `_RESOLVED_SET`, so `grep -qxF` rejects every skill — precisely the empty install the comment says cannot happen — and the shape guard does not run on empty output."
+    failure_scenario: "A config excluding every seed of its profile resolves legitimately to zero. The loop installs nothing, and print_summary reports `ok Skills v… installed (0 new, 0 updated, 120 not in profile 'pipeline')` — a successful-looking run leaving .agents/skills/ empty."
+    suggested_action: "Honour the empty set but warn loudly before installing zero skills, and correct both comments to state the new contract."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-C2-004"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "Cycle 1's fix #10 forwarded `--include`/`--exclude` to the dry-run count but not `--all-skills`, while passing `--tracker` unconditionally — including on the ALL_SKILLS branch. The preview therefore applies a tracker filter the real run does not. Measured: 35 previewed against 41 installed."
+    failure_scenario: "`--dry-run --all-skills` with `profile: pipeline` prints '--all-skills: no platform filter would be applied' and then, two lines later, 'profile pipeline resolves to 35 skills'. The preview contradicts itself and understates by 6."
+    suggested_action: "Append --all-skills to _dry_args, mirroring _resolve_skill_set."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-C2-005"
+    severity: low
+    file: "shared/resources/resolve-skill-set-cli.mjs"
+    finding: "An `include` naming a real but tracker-excluded skill passed validation, was seeded, then silently removed by the tracker filter — appearing only in the `droppedForTracker` list as an incidental drop. An explicit user request was reported identically to a closure by-product."
+    failure_scenario: "`include: [sync-jira-story]` under `tracker: github`. Exit 0, skill not installed, only trace is `− sync-jira-story (not applicable to tracker: github)` among the other drops. The user believes they installed it."
+    suggested_action: "Intersect includes with droppedForTracker and warn distinctly, naming --all-skills."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+vacuous_tests_replaced:
+  - test: "`invokes:` uses the inline flow form everywhere it appears"
+    why_vacuous: "Asserted only doesNotThrow over the real tree, with a comment claiming it guarded against 'a block list parsing as empty'. The block form returned [] WITHOUT throwing, so it passed for exactly the input it named — and would also have passed with cycle 1's trailing-comment fix reverted, since no SKILL.md in the tree carries one."
+    replacement: "A test asserting the block form THROWS, plus value assertions for every accepted form. Mutation-proven: removing the block-form check turns it red."
+  - test: "005: the tracker test precedes the profile test in the install loop"
+    why_vacuous: "Matches source text, not ordering or outcome. Cannot detect any of the eight {tracker-excluded, in-profile, on-disk} combinations being wrong, and would still pass if the `continue` were deleted — i.e. if a kept skill fell through to the rm -rf."
+    replacement: "Kept as a structural check, PLUS a new behavioural test asserting the resolved set never contains a tracker-excluded skill — the precondition the reorder depends on. Mutation-proven."
+  - test: "the profile grandfather branch keeps an already-installed skill and continues"
+    why_vacuous: "Asserts keepIdx < rmIdx on raw script text. Proves the strings appear in that order, not that a kept skill survives."
+    replacement: "NOT replaced — see the note below. Recorded as an accepted limitation with a named follow-up."
+  - test: "010: the dry-run count applies the config's include and exclude"
+    why_vacuous: "Greps the very lines the --all-skills bug was on and could not see it. The 35-vs-41 divergence its own comment says it prevents was present and green."
+    replacement: "Kept, plus a behavioural assertion that --all-skills actually widens the set (with a message that fails loudly if the flag is ever inert)."
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 66
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. No credentials, no injection surface, arguments passed as a bash array."
+  performance:
+    status: PASS
+    notes: "Unchanged. ~115ms per resolution."
+  reliability:
+    status: CONCERNS
+    notes: "Materially better than cycle 1 — the four silent-full-install paths are closed and exit codes now carry meaning — but this cycle found that two of those fixes had themselves introduced HIGH defects, one of which (the silently-empty block form) is the same under-collection class the graph exists to prevent. That is a pattern, not a coincidence: fixes are the least-reviewed code in a change set. A cycle-3 confirmation pass is warranted before this reads PASS."
+  maintainability:
+    status: CONCERNS
+    notes: "Four of cycle 1's tests were vacuous, and one of them passed for precisely the input its own comment named. Three are now behavioural or mutation-proven. The fourth — the grandfather guarantee — remains structural, and that is an ACCEPTED, DOCUMENTED limitation rather than an oversight: testing it behaviourally means running install_skills, which downloads a tarball, and the alternative (extracting the per-skill decision into a helper) means restructuring the only code in this task that can delete a user's skills. Doing that late in a QA loop, to improve test elegance on code already verified across all eight cases, trades a real risk for a stylistic gain. Filed as follow-up instead."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Extract the install loop's per-skill decision into a `_install_decision` helper so the eight-case truth table becomes an executable test rather than a source-text assertion. Do it as its own change, not inside a QA loop."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Extract one `_config_skills_scalar KEY` helper — the two awk parsers duplicate the header and close rules, and cycle 1's fix #3 had to edit both"
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Run shellcheck once task 92's lane lands; the §9 criterion remains unverified"
+      refs: ["scripts/setup-consumer.sh"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - "A cycle-3 confirmation pass with no new HIGH findings"

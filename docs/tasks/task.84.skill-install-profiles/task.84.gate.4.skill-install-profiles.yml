@@ -1,0 +1,64 @@
+schema: 1
+task: "task.84.skill-install-profiles"
+task_title: "Skill install profiles with dependency closure"
+gate: PASS
+status_reason: "Confirmation cycle. All 27 findings from cycles 1-3 and Step 5c verified still closed by direct execution. The two criteria that blocked the DoD are now genuinely met: a real non-dry --update against a full 120-skill install pruned nothing, and shellcheck runs clean with 0 new warnings. Full merge gate (npm run ci, including the eval:all tier) is green. No new findings."
+reviewer: "QA Engineer"
+updated: "2026-09-05T00:30:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 68
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+verification_performed:
+  - check: "All 27 prior findings still closed"
+    method: "Direct execution of each guarantee — tracker filter under github, unknown include exit 2, all-seeds-excluded resolving 0 at exit 0, $-prefixed profile rejected, no process.exit( in the CLI, block form throwing in both shapes, condition-form call site, flow-list comment strip, minimal ⊆ pipeline, SC2155 absent"
+    result: "11/11 ok"
+  - check: "A real --update against a full existing install prunes nothing (§9 Migration)"
+    method: "Built a tarball from the branch, served it over file://, populated a scratch consumer with all 120 skills each carrying a LOCAL_SENTINEL.txt, ran install_skills NON-DRY with profile: pipeline"
+    result: "120 before, 120 after. 36 updated (in profile), 11 kept via the TRACKER path ('not pruned'), 73 kept via the PROFILE path ('outside profile'). Nothing deleted; the 84 untouched skills kept their sentinels. Independently confirms fix C1-005 (branch ordering) and C1-006 (separate counters) end-to-end."
+  - check: "shellcheck no new warnings (§9 Code Quality)"
+    method: "docker run --rm -v $PWD:/mnt -w /mnt koalaman/shellcheck:stable, baseline origin/develop vs branch"
+    result: "baseline 1 finding (SC2209 line 269, pre-existing); branch 1 finding, 0 new. An SC2155 introduced by this change was found and fixed during this verification."
+  - check: "Full merge gate"
+    method: "npm run ci (ci:fast + eval:all)"
+    result: "2424 tests, 0 failures, 1 skipped; 25 eval scenarios, every assertion passed"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged across four cycles. No credentials. Arguments passed as a bash array — no word-splitting path from config values."
+  performance:
+    status: PASS
+    notes: "~115ms per resolution over 120 nodes against a <1s criterion. Tarball download unchanged — one request, confirmed by the real --update run."
+  reliability:
+    status: PASS
+    notes: "The destructive path is now verified by execution rather than by source inspection: a real --update against a full install pruned nothing, and the kept/updated dispositions were correct for all three categories. The failure directions are right — node absent, node shadowed, config typo, empty resolution and unreadable data files each land on the intended branch."
+  maintainability:
+    status: CONCERNS
+    notes: "Raised from cycle 3 but not to PASS. install_skills still has no behavioural unit coverage — the real --update above is a manual verification, not a test that runs in CI. Three cycles flagged this and the extraction follow-up remains open. Everything else is addressed: the vacuous tests are replaced, the block-form guard enumerates the shape space rather than the shapes that happened to be found, and mutation proofs now assert the mutation applied."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Extract the install loop's per-skill decision into a helper so the eight-case truth table runs in CI rather than being verified by hand. Four cycles have now noted it."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Add a shellcheck lane (task 92) — this task's own SC2155 shows the check earns its place"
+      refs: [".github/workflows/validate.yml"]
+    - action: "Extract one _config_skills_scalar / _config_skills_flow pair; the duplicated awk rules caused C3-003"
+      refs: ["scripts/setup-consumer.sh"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

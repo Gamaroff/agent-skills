@@ -1,6 +1,7 @@
 ---
 name: develop-bug
 description: 'Automates the full end-to-end bug-fix lifecycle: takes an existing bug report and runs it from open to closed — create-branch → review-bug → investigate & fix → create-pr → verify & fix loop (up to 5 cycles) → finalise → commit-changes. Gates on a review-bug fix-readiness check (halts on a duplicate, already-fixed, or under-specified bug), then researches the root cause, reproduces, implements the fix plus a regression test, and writes the fix record (Investigation, Fix Implementation, QA Verification, Resolution Summary) back into the bug report file, closing the bug. Handles all three bug modes (story / task / general) and both branch models — a regular bugfix (off `develop`) or a production hotfix (off `main`). Crash-safe with resume; lite mode for low-severity bugs. Invoke with `/develop-bug [bug-file-path]` or "research and fix this bug end to end".'
+invokes: [create-branch, review-bug, develop, create-pr, qa-fix, finalise, commit-changes]
 ---
 
 # Develop Bug — Automated Bug-Fix Lifecycle Orchestrator

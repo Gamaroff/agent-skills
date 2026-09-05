@@ -75,7 +75,46 @@ Files not intended to be loaded into context, but rather used within the output 
 - **Use cases**: Templates, images, icons, boilerplate code, fonts, sample documents that get copied or modified
 - **Benefits**: Separates output resources from documentation, enables Claude to use files without loading them into context
 
-### Progressive Disclosure Design Principle
+### Declaring what a skill invokes (`invokes:`)
+
+If your skill **invokes other skills** — a pipeline orchestrator, a review skill that delegates to a
+sub-routine — declare them in the frontmatter:
+
+```yaml
+---
+name: develop-task
+description: ...
+invokes: [create-branch, review-task, develop, create-pr, qa-task, qa-fix, finalise, commit-changes]
+---
+```
+
+**Why it matters.** `setup-consumer.sh` offers install profiles (`minimal` / `pipeline` / `full`). A
+profile names *seed* skills and the installer resolves each seed's transitive callees from this
+declaration, so a consumer who picks `pipeline` gets your orchestrator **and** everything it calls.
+Without the key your skill declares no edges, and a profile install can ship it with none of its
+steps — failing mid-run in the consumer's repo, hours after the install, at the step whose skill is
+missing.
+
+Rules:
+
+- **Inline flow form only** — `invokes: [a, b]`. The YAML block form (`invokes:` then `  - a`) is
+  **rejected with an error**, deliberately: it used to parse as an empty list, and a silently-empty
+  edge list is invisible to CI (the generator and the committed manifest agree on it, so the drift
+  check stays green) while breaking a consumer's pipeline.
+- **Every name must be a real directory under `skills/`.** Unknown names fail the generator.
+- **Absent key = no edges**, which is the safe default. Only add it if your skill genuinely calls
+  others.
+- After editing, run `npm run generate-skill-deps` and commit
+  `references/skill-dependencies.json`. CI fails on drift — `validate.yml` on PRs,
+  `release.yml` at tag time.
+- `npm run skill-deps:candidates` lists skills your prose mentions but your `invokes:` does not.
+  It is **advisory**: most mentions are legitimate cross-references, so scan it for a genuine missed
+  call rather than bulk-adding.
+
+**Checklist for a new orchestrator skill**: does it invoke others? If yes, is every one declared? Has
+`npm run generate-skill-deps` been run and the JSON committed?
+
+## Progressive Disclosure Design Principle
 
 Skills use a three-level loading system to manage context efficiently:
 
