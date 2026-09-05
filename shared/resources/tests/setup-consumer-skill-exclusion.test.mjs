@@ -495,6 +495,86 @@ test("an explicit `tracker:` key still beats a stale JIRA_URL in .env", () => {
   });
 });
 
+test("a non-tracker refusal does not block the install and does not blame `tracker:`", () => {
+  // THE REGRESSION GUARD FOR QA CYCLE 1's HIGH FINDING.
+  //
+  // Delegating to resolve-platform.sh imported its ENTIRE failure surface, and
+  // every non-zero return was mapped onto "your tracker: key is wrong".
+  // resolve-platform.sh returns 1 from at least five places that have nothing
+  // to do with `tracker:` — the access.vcs guard, validate_access_mode, the
+  // `access:`-as-a-scalar guard, an unreadable SKILLS_CONFIG_FILE redirect, and
+  // the fail-closed unparseable branch. So a repo with a perfectly good
+  // `tracker: github` and a restricted access key could not install AT ALL, and
+  // was told to fix a key that was already correct. The old implementation
+  // never sourced the resolver, so that repo installed fine — a regression.
+  //
+  // Identity resolves BEFORE access in that file, so the tracker is known even
+  // when the run is refused. The installer must use it.
+  inTempRepo((dir) => {
+    writeFileSync(path.join(dir, "skills-config.yaml"), "tracker: github\n");
+    const got = resolveTracker(dir, { AGENT_SKILLS_ACCESS_VCS: "read-only" });
+    assert.equal(
+      got,
+      "github",
+      "an access.vcs refusal must not stop the installer resolving a tracker that is plainly stated",
+    );
+    assert.notEqual(
+      got,
+      "<refused>",
+      "and must not be reported as a tracker rejection",
+    );
+  });
+});
+
+test("an illegal `tracker:` is still refused even when nothing else is wrong", () => {
+  // The other side of the discriminator above: the resolver leaves the OFFENDING
+  // value in TRACKER, which is not a legal one, so this must still be rc 2.
+  // Without this pair, a fix for the test above could pass by accepting
+  // everything.
+  inTempRepo((dir) => {
+    writeFileSync(path.join(dir, "skills-config.yaml"), "tracker: bitbucket\n");
+    assert.equal(resolveTracker(dir), "<refused>");
+  });
+});
+
+// `.env` value spellings. These need a fixture DIRECTORY, so they cannot join
+// PARITY_CASES — but each still asserts the two resolvers AGREE before
+// asserting what they agree on, which is the property that matters.
+const DOTENV_CASES = [
+  ["JIRA_URL=https://x.atlassian.net\n", "jira", "plain assignment"],
+  // Was MISSED by the original `^JIRA_URL=.+`. A shell that sourced this .env
+  // has JIRA_URL exported and resolves jira; an un-sourced one resolved github
+  // — the exact install-vs-run split this rung exists to close.
+  ["export JIRA_URL=https://x.atlassian.net\n", "jira", "export prefix"],
+  ["  export   JIRA_URL=https://x\n", "jira", "indented export with spaces"],
+  ['JIRA_URL="https://x.atlassian.net"\n', "jira", "double-quoted value"],
+  // Was a FALSE POSITIVE: the carriage return satisfies `.+`, so an emptied key
+  // resolved jira. CRLF is the precise spelling task 83 was written to fix.
+  ["JIRA_URL=\r\n", "github", "empty value, CRLF line ending"],
+  ['JIRA_URL=""\n', "github", "quoted empty value"],
+  ["JIRA_URL=''\n", "github", "single-quoted empty value"],
+  ["JIRA_URL=\n", "github", "empty value"],
+  ["#JIRA_URL=https://x\n", "github", "commented out"],
+  ["MYJIRA_URL=https://x\n", "github", "a different key that ends in JIRA_URL"],
+];
+
+for (const [dotenv, expected, label] of DOTENV_CASES) {
+  test(`install and run time agree on .env \`${label}\``, () => {
+    inTempRepo((dir) => {
+      writeFileSync(path.join(dir, ".env"), dotenv);
+      const install = resolveTracker(dir);
+      const runtime = runtimeTracker(dir);
+      assert.equal(
+        install,
+        runtime,
+        `installer resolved "${install}" but resolve-platform.sh resolved "${runtime}" — ` +
+          `a .env spelling must not install one platform's skills and run as the other`,
+      );
+      assert.equal(install, expected, `${label} should resolve ${expected}`);
+    });
+  });
+}
+
 test("the process environment still beats .env", () => {
   // Ordering within the fallback: env above .env. Both spell `jira` when set, so
   // this pins that an EMPTY `JIRA_URL=` in .env is not "set" on either side —

@@ -451,11 +451,36 @@ validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || retur
 # opt-out is an explicit `tracker: github`, which still wins outright above. Since task 83 the
 # wizard always writes a `tracker:` key, so no wizard-generated config can reach this rung at all.
 #
-# Grep, not `source`: `.env` is data, and sourcing it would execute whatever a checked-in file
-# happens to contain. `^JIRA_URL=.+` is the same pattern the installer has always used, so the two
-# sides cannot disagree about what counts as "set" — an empty `JIRA_URL=` is not set on either.
+# Parsed, not `source`d: `.env` is data, and sourcing it would execute whatever a checked-in file
+# happens to contain.
+#
+# THE PATTERN IS NOT `^JIRA_URL=.+`, AND THE THREE DIFFERENCES ARE EACH A REAL BUG THAT SHIPPED:
+#
+#   `export JIRA_URL=…`   was MISSED. It is a very common .env spelling, and missing it reproduces
+#                         the exact bug this rung exists to close — a shell that sourced such a
+#                         .env has JIRA_URL exported and resolves jira, while an un-sourced shell
+#                         resolved github.
+#   `JIRA_URL=` + CRLF    was a FALSE POSITIVE: the carriage return satisfies `.+`, so an
+#                         explicitly emptied key resolved jira. CRLF is the precise spelling task
+#                         83 was written to fix; `.+` reintroduced it on the other side.
+#   `JIRA_URL=""`         was a FALSE POSITIVE for the same reason, contradicting this comment.
+#
+# So: accept an optional `export` prefix, strip a trailing CR and one surrounding quote pair, trim
+# whitespace, and only then ask whether anything is left. An empty value means NOT SET.
 _rp_dotenv_has_jira() {
-  [ -f .env ] && [ -r .env ] && grep -qE '^JIRA_URL=.+' .env 2>/dev/null
+  [ -f .env ] && [ -r .env ] || return 1
+  # -v q="'" builds the quote class dynamically: a literal single quote cannot appear inside a
+  # single-quoted awk program, and escaping around it is where this kind of parser usually breaks.
+  awk -v q="'" '
+    /^[[:space:]]*(export[[:space:]]+)?JIRA_URL=/ {
+      sub(/^[[:space:]]*(export[[:space:]]+)?JIRA_URL=/, "")
+      sub(/\r$/, "")
+      gsub("^[\"" q "]|[\"" q "]$", "")
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+      if (length($0) > 0) { found = 1; exit }
+    }
+    END { exit !found }
+  ' .env 2>/dev/null
 }
 if [ "$TRACKER" = "auto" ]; then
   if [ -n "${JIRA_URL:-}" ]; then

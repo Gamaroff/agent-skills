@@ -457,6 +457,57 @@ config that carries an explicit `tracker:` key.
 
 ---
 
+## Bug Reports
+
+### In QA Verification
+
+- [Bug 1: rc 2 conflates every resolver refusal](./task.91.bug.1.rc2-conflates-every-resolver-refusal.md) — ✅ Ready for QA — HIGH (fixed 2026-09-05)
+- [Bug 2: `.env` probe spelling and CRLF](./task.91.bug.2.env-probe-spelling-and-crlf.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
+- [Bug 3: dry run previews with the installed resolver](./task.91.bug.3.dry-run-previews-with-installed-resolver.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
+- [Bug 4: dry run prints an unfiltered profile count](./task.91.bug.4.dry-run-unfiltered-profile-count.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
+- [Bug 5: empty resolution reports no message](./task.91.bug.5.empty-tracker-reports-no-message.md) — ✅ Ready for QA — MEDIUM (fixed 2026-09-05)
+
+---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-05
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.91.qa.1.reconcile-tracker-resolution.md](./task.91.qa.1.reconcile-tracker-resolution.md)
+- **Gate File**: [task.91.gate.1.reconcile-tracker-resolution.yml](./task.91.gate.1.reconcile-tracker-resolution.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2429 (`npm run ci` green, exit 0)
+- **Phases Verified**: 4/4 (2 clean, 2 with concerns)
+- **Critical Issues**: 1 HIGH, 4 MEDIUM, 5 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: **FAIL**, Maintainability: CONCERNS
+
+### Key Findings
+
+All six functional success criteria are **met** — 12 config shapes verified to resolve identically at
+install and run time, including the three the task was filed to close.
+
+The gate fails on what the change *acquired*, not what it set out to do. Delegating to
+`resolve-platform.sh` imported that resolver's entire failure surface, and the installer maps all of it
+onto one message: a valid `tracker: github` config with a restricted `access.vcs` now cannot install and
+is told to fix a key that is already correct ([bug.1](./task.91.bug.1.rc2-conflates-every-resolver-refusal.md)).
+The `.env` probe also misses `export JIRA_URL=` and false-positives on a CRLF empty value
+([bug.2](./task.91.bug.2.env-probe-spelling-and-crlf.md)) — the latter being the exact spelling class
+task 83 existed to fix.
+
+Blast radius was named as a first-class concern for this review and did not land where anyone was
+looking: the `.env` behaviour change is correctly bounded, while the delegation's **error contract** —
+which reads like plumbing — is where the regression is.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -466,6 +517,10 @@ config that carries an explicit `tracker:` key.
 | 2026-09-05 |         | Status → ready-for-development | review-task |
 | 2026-09-05 |         | Implemented A+B: `resolve-platform.sh` reads `.env` for `TRACKER` (below env, below config); `_resolve_install_tracker` delegates to it in a subshell and its local `awk` parser is deleted; an unrecognised scalar now halts the install and `--dry-run` reports "unresolved" rather than guessing. All 7 divergence-table rows read OK; 4 mutation proofs; `npm run bundle` re-run | develop |
 | 2026-09-05 |         | Status → ready-for-review | develop |
+| 2026-09-05 |         | QA gate FAIL (70/100) — 1 HIGH, 4 MEDIUM, 5 LOW. All 6 functional criteria met; the delegation's error contract conflates every resolver refusal with a bad `tracker:` value, blocking installs on valid configs | qa-task |
+| 2026-09-05 |         | Status → in-progress (QA FAIL, returning to fix) | qa-task |
+| 2026-09-05 |         | QA findings fixed — all 5 addressed in 1 iteration. rc 2 now means only a tracker rejection (a non-tracker refusal proceeds with a warning); the `.env` probe accepts `export` and rejects CRLF/quoted-empty; the dry run names which resolver copy answered and no longer prints an unfiltered count; the empty resolution gets its own message. 12 new tests, 3 mutation proofs, `npm run ci` green at 2441 | qa-fix |
+| 2026-09-05 |         | Status → ready-for-review | qa-fix |
 
 ---
 

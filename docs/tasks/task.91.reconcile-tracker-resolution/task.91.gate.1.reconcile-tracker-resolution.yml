@@ -1,0 +1,110 @@
+schema: 1
+task: 'task.91.reconcile-tracker-resolution'
+task_title: 'Reconcile install-time and run-time tracker resolution'
+gate: FAIL
+status_reason: 'The stated goal is met — all 12 config shapes now resolve identically at install and run time. But delegating to the resolver imported its ENTIRE failure surface: any non-tracker refusal (e.g. access.vcs) now aborts the install blaming the tracker key, which is an install-blocking regression. The .env probe also misses an `export JIRA_URL=` line and false-positives on a CRLF empty value.'
+reviewer: 'QA Engineer'
+updated: '2026-09-05T06:41:47Z'
+
+top_issues:
+  - id: 'TASK-91-001'
+    severity: high
+    file: 'scripts/setup-consumer.sh'
+    finding: 'rc 2 conflates every non-zero return from resolve-platform.sh with an unrecognised `tracker:` value. A valid `tracker: github` config plus AGENT_SKILLS_ACCESS_VCS=read-only aborts the install with "Fix the tracker: key", which is already correct. Reproduced end to end. Install-blocking regression — the old implementation never sourced the resolver, so such a repo installed fine.'
+    suggested_action: 'Reserve rc 2 for a genuine tracker rejection; report the resolved value and the status separately so a non-tracker refusal is distinguishable. At minimum drop the "Fix the tracker: key" line so the message cannot contradict its own stderr.'
+    suggested_owner: dev
+    bug_ref: 'task.91.bug.1.rc2-conflates-every-resolver-refusal.md'
+    status: open
+  - id: 'TASK-91-002'
+    severity: medium
+    file: 'shared/resources/resolve-platform.sh'
+    finding: 'The .env probe pattern misses an `export JIRA_URL=...` line (resolves github where a sourcing shell resolves jira — the original bug class), and false-positives on a CRLF-terminated empty `JIRA_URL=` and on `JIRA_URL=""` (both resolve jira for an emptied key). CRLF is the exact spelling task 83 existed to fix. All three verified by execution.'
+    suggested_action: 'Normalise before testing — strip trailing CR, optional leading export, and surrounding quotes, then test for a non-empty value. Correct the adjacent comment, which claims an empty JIRA_URL= is not set on either side. Pin each spelling in the parity table.'
+    suggested_owner: dev
+    bug_ref: 'task.91.bug.2.env-probe-spelling-and-crlf.md'
+    status: open
+  - id: 'TASK-91-003'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'On the dry-run path _tmpdir is unset (it is a local of install_skills declared below that branch), so _locate_resolver falls through to the .agents/skills glob — the PREVIOUSLY INSTALLED resolver. Verified: returns .agents/skills/create-epic/references/resolve-platform.sh. Preview and real run can therefore still disagree, which relocates rather than removes the bug class this task closes. It also falsifies the new comment asserting rc 3 is the expected dry-run outcome.'
+    suggested_action: 'Restrict the .agents/skills candidate to the real-install path and let dry-run report rc 3 as its comment claims, or state which copy the preview resolved against.'
+    suggested_owner: dev
+    bug_ref: 'task.91.bug.3.dry-run-previews-with-installed-resolver.md'
+    status: open
+  - id: 'TASK-91-004'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'On rc 3 the dry run announces "tracker NOT RESOLVED" and then passes an empty --tracker to resolve-skill-set-cli, which treats the empty string as falsy and filters nothing — so the very next line reports an UNFILTERED profile count, overstating the install by 11 or 6 skills with no label.'
+    suggested_action: 'Skip the profile count on rc 3, or annotate it as unfiltered.'
+    suggested_owner: dev
+    bug_ref: 'task.91.bug.4.dry-run-unfiltered-profile-count.md'
+    status: open
+  - id: 'TASK-91-005'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The empty-value case is folded into the rc-2 branch, whose error re-run only reprints stderr when the resolver actually failed. A resolver that sources cleanly but sets nothing (a truncated copy left by an interrupted install — _locate_resolver checks only readability) aborts the install with "see the message above" and no message above.'
+    suggested_action: 'Split the conditions; on rc 0 with empty TRACKER name the resolver path that was used.'
+    suggested_owner: dev
+    bug_ref: 'task.91.bug.5.empty-tracker-reports-no-message.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 2429
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No new vulnerabilities. The .env file is GREPPED, never sourced — correct, and explicitly reasoned about in the code comment. The subshell delegation contains the resolver rather than executing it in the installer shell. One low note: with _tmpdir unset the first glob is root-anchored, so a host with such a path would source a file from outside the repo; the readability test on an unmatched glob is a sufficient guard otherwise (no nullglob/failglob is set anywhere in the script — verified).'
+  performance:
+    status: PASS
+    notes: 'The resolver is sourced twice on any failure path (a python3/pyyaml spawn plus a git call each time). Install-time only, once per run — not a regression worth blocking on. Noted as a cleanup.'
+  reliability:
+    status: FAIL
+    notes: 'TASK-91-001 is an install-blocking regression on a config that is valid today: delegating to the resolver imported its whole failure surface, and every refusal is reported as a tracker error. TASK-91-005 compounds it with a failure path that prints no diagnosis at all. Blast radius was named as a first-class concern for this review and this is where it landed — not in the .env behaviour change, which is correctly gated behind config-key-wins and is opt-out-able, but in the error contract.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The change genuinely removes a duplicated decision and the code is unusually well commented. Two comments now describe deleted code: _config_skills_profile still says "Config-first, exactly like _resolve_install_tracker" (which no longer reads the config) and "Normalise the way _resolve_install_tracker does: CRLF checkouts leave a carriage return" (that normalisation is gone). _locate_resolver reads _tmpdir purely by dynamic scope from a caller local — an undeclared coupling, and precisely what makes the dry-run defect invisible.'
+
+recommendations:
+  immediate:
+    - action: 'Stop conflating a non-tracker resolver refusal with a bad tracker value; do not abort the install for an access restriction, and never blame the tracker key for it.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Fix the .env probe spellings: accept an export-prefixed line, reject a CRLF-only and a quoted-empty value.'
+      refs: ['shared/resources/resolve-platform.sh']
+    - action: 'Stop the dry run previewing with a previously-installed resolver, or say that is what it did.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Do not print an unfiltered profile count under a "tracker NOT RESOLVED" banner.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Give the empty-TRACKER case its own message.'
+      refs: ['scripts/setup-consumer.sh']
+  future:
+    - action: 'Pass _tmpdir into _locate_resolver as an argument rather than inheriting it by dynamic scope; guard the first candidate on a non-empty value so the glob is never root-anchored.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Prefer the tarball shared/resources copy — a single deterministic path the archive already ships and the file already reads two other tools from — over a glob across 38 bundled duplicates.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Skip the BASH_SOURCE candidate unless it names an existing regular file; under curl-piped-to-bash BASH_SOURCE[0] is the literal string bash, so dirname yields dot and the candidate becomes the parent of the consumer repo.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Source the resolver once and capture stderr on a separate fd rather than sourcing twice; surface the resolver could-not-be-parsed warning at install time, which the success path currently swallows.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Re-anchor the two comments that describe deleted code.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: '_config_skills_profile and _config_skills_list are still hand-rolled awk YAML parsers with their own quote/CRLF normalisation — the same mirror-the-reader pattern just removed for tracker. Delegate them next.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'SKILLS_JIRA_ONLY and SKILLS_GITHUB_ONLY remain mirrored in resolve-skill-set-cli.mjs. One duplicated decision was removed; this one is still there.'
+      refs: ['scripts/setup-consumer.sh', 'shared/resources/resolve-skill-set-cli.mjs']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-91-001 resolved — a valid config must not be refused, and a non-tracker refusal must not be reported as a tracker error.'
+    - 'TASK-91-002 resolved — the .env probe grades export, CRLF and quoted-empty correctly, with each spelling pinned by a test.'
