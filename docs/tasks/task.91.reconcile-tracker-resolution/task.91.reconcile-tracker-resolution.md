@@ -5,19 +5,21 @@ type: task
 description: "setup-consumer.sh and resolve-platform.sh resolve TRACKER from different sources and grade malformed input differently, so a repo can install one platform's skills and run as the other."
 tags: [setup-consumer, platform-detection, resolver-parity]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 github_issue: 319
 created: 2026-09-04
 updated: 2026-09-05
+completed_date: 2026-09-05
+pr_number: 320
 assignee:
 estimated_effort_hours: 3
 ---
 
 # Technical Task: Reconcile install-time and run-time tracker resolution
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.91.review.1.reconcile-tracker-resolution.md` implemented 2026-09-05
 **GitHub Issue**: [#319](https://github.com/Gamaroff/agent-skills/issues/319)
 
@@ -474,6 +476,37 @@ config that carries an explicit `tracker:` key.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Gates**: `gate.1` FAIL 70 → `gate.2` FAIL 70 → `gate.3` CONCERNS 80 → **`gate.4` PASS 95**
+**Step 5c**: `task.91.pr-review.1.*` — REQUEST CHANGES → remediated → **APPROVE**
+**CI**: ✅ SUCCESS — all 4 jobs green on the final head `e8312feb`
+
+✅ **Functional criteria**: 5 of 6 fully evidenced; F6 met as written, partial in the access suite
+✅ **Code quality**: `npm run ci` 2450 tests / 0 failures; shellcheck 0 new on both changed shell files; `npm run bundle` committed
+✅ **Migration**: CHANGELOG names the affected shape and the one-line opt-out; the `DELIBERATE asymmetry` test replaced in place with its history preserved
+✅ **Security**: `.env` parsed and never sourced; the resolver runs contained in a subshell; the located-file trust boundary validated
+⚠️ **Compliance**: NOT_APPLICABLE — developer tooling, no regulated surface
+
+**Two partials, recorded rather than papered over:**
+
+1. **F6** — `tracker-access.test.sh` asserts `ACCESS_TRACKER` but never that `TRACKER` stays `github`
+   for its own fixtures. The criterion as written is met by the `PARITY_CASES` row; the gap is in the
+   suite that exists for that axis. Pre-existing, outside §4 scope.
+2. **CQ3** — bugs 3, 4 and 6 record no mutation proof. All three are message-, provenance- or
+   comment-only changes with no behaviour to revert; the gap is that this reasoning was never written
+   down until now.
+
+**Detailed Verification Log:** see [`task.91.dod.1.reconcile-tracker-resolution.md`](./task.91.dod.1.reconcile-tracker-resolution.md).
+
+**Task marked as ACCEPTED on:** 2026-09-05
+
+---
+
 ## Bug Reports
 
 ### In QA Verification
@@ -570,6 +603,8 @@ which reads like plumbing — is where the regression is.
 | 2026-09-05 |         | QA cycle 3 findings fixed — the installer now validates the resolver's answer against the legal set (an unvalidated one made the filter inert, keeping every skill), and a silently-failing resolver gets an explanation naming the file instead of "see the message above" | qa-fix |
 | 2026-09-05 |         | QA gate 4 PASS (95/100) — all ten findings from gates 1–3 re-verified fixed by execution, zero new. Convergence on HIGH: 1 → 1 → 0 → 0. Tests grew 40 → 61; `npm run ci` green at 2450 | qa-task |
 | 2026-09-05 |         | Status → ready-for-review (QA PASS, handing to Step 5c) | qa-task |
+| 2026-09-05 |         | Step 5c `/review-pr` — REQUEST CHANGES (the PR did not contain the PASS evidence it was judged on) → all 11 conformance findings remediated → APPROVE | review-pr |
+| 2026-09-05 | 1.2     | DoD verified — accepted (PR #320). CI green on the final head; 2 partials recorded with reasons (F6 access-suite coverage, CQ3 three proofs for changes with no revertible behaviour) | finalise |
 
 ---
 
