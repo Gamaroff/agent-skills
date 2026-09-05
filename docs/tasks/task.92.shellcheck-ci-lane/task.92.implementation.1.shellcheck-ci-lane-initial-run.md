@@ -37,9 +37,9 @@ reasoned `# shellcheck disable` comments, and prove the gate can fail.
 | 2. review-task             | ✅ Done    | `task.92.review.1.shellcheck-ci-lane.md` exists                        | 8/10 READY TO IMPLEMENT; 1 Critical + 4 Important + 3 Optional, all applied. Status `planned` → `ready-for-development`. Issue #321 created + linked | 2 Explore pre-passes (inline) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 26 → 0 warnings (9 real fixes, 17 reasoned disables); lane added + mutation-proved red; 155 files (18 hand, 137 bundled) | none — Step 2 pre-passes reused |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #322 → `develop`. 5 commits, generated output isolated in `d383fa90`. Issue #321 commented (`posted`) | —                    |
-| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 done | `task.92.qa.{N}.*.md`; `task.92.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.92.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.92.qa.{N}.*.md`; `task.92.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 7. finalise                | ✅ Done    | `task.92.dod.1.shellcheck-ci-lane.md`; task `status: accepted`          | 11/11 criteria; CI 5/5 green on `50a2e60c`; issue #321 closed; board Done; 2 partials recorded | DoD agents not used — see P2 |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 8 commits on the branch | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -241,10 +241,37 @@ the change; the verdict is held at CONCERNS to record that rather than upgraded 
 
 ## Completion
 
-**Finished**: _pending_
-**Final Status**: _pending_
+**Finished**: 2026-09-05
+**Final Status**: Completed
 **Branch**: `feature/task.92.shellcheck-ci-lane`
 **PR**: [#322](https://github.com/Gamaroff/agent-skills/pull/322)
-**QA Iterations**: _pending_
-**DoD Summary**: _populated after Step 7_
-**Tracker debt**: _populated after Step 7_
+**QA Iterations**: 3 (CONCERNS 80 → CONCERNS 85 → PASS 96) + Step 5c CONCERNS
+**DoD Summary**: `task.92.dod.1.shellcheck-ci-lane.md` — ACCEPTED
+**Tracker debt**: none — issue #321 commented and closed, board Done, Document link re-pointed to `develop`.
+
+---
+
+## Completion Summary
+
+Task 92 delivered a shellcheck CI lane, resolved all 26 pre-existing warning-tier findings, and was
+accepted at gate PASS 96/100 with 5/5 CI jobs green.
+
+**The two things worth carrying past this task:**
+
+**A green suite was never evidence here.** Five findings across three QA cycles and one PR review, and
+every single one was in code or documentation this task itself introduced — the tree it inherited was
+clean at `error`. The sharpest, TASK-92-001, was a guard that reported a failure and then *continued*,
+into the exact `sed`-reads-STDIN hang its own comment claimed to prevent. It is the `task.90` shape,
+introduced in the task whose entire purpose is catching that shape, while fixing a different finding.
+It was unreachable in practice, so the suite stayed green throughout and would have stayed green
+forever. It was found by mutation-proving the guard, not by running the tests. Two more findings were
+numbers that had been true once and silently were not any more (11/15 vs 9/17; "five workflows" vs six;
+"725 vs 81" vs 515 vs 55) — the same failure in documentation form.
+
+**Independent review never ran.** Three Explore subagents were dispatched — the QA cycle-2 refute pass
+and both Step 5c lenses — and all three hung, produced no usable output, ignored wrap-up requests, and
+were terminated, one after ~40 minutes. A fourth dispatch (finalise's four parallel DoD agents) was
+skipped on that evidence and verified in-line instead. Self-review found four of the five findings, so
+it was not worthless; but the mechanism designed to catch what self-review misses was never exercised
+on this branch. **A human read of the 28-file reviewable surface is the outstanding mitigation** — the
+other 137 files are generated and isolated in commit `d383fa90`.

@@ -5,18 +5,20 @@ type: task
 description: "No workflow runs shellcheck, so a shell-script success criterion cannot be evaluated by any automated gate — task 83's had to be closed by hand with a container."
 tags: [ci, shellcheck, test-harness]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-04
 updated: 2026-09-05
 assignee:
 estimated_effort_hours: 3
 github_issue: 321
+pr_number: 322
+completed_date: 2026-09-05
 ---
 
 # Technical Task: Add a shellcheck CI lane for the repo's shell scripts
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#321](https://github.com/Gamaroff/agent-skills/issues/321)
 **Review**: ✅ All review recommendations from `task.92.review.1.shellcheck-ci-lane.md` implemented 2026-09-05
 
@@ -479,6 +481,43 @@ Two MEDIUM findings, both in code this task introduced:
 - **TASK-92-002** — three pre-existing bare `# shellcheck disable` directives in `jira-sprint-lib.sh`
   leave criterion 6 unmet repo-wide, inside the change that introduces the rule.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.92.gate.3.shellcheck-ci-lane.yml` — ✅ **PASS**, **96/100**, `top_issues: []`
+**Progression**: CONCERNS 80 → CONCERNS 85 → **PASS 96** across three cycles
+**Step 5c `/review-pr`**: CONCERNS (advisory) — one medium finding, found and fixed during the review
+**CI**: ✅ 5/5 jobs SUCCESS on head `50a2e60c` (head parity confirmed — the tested commit is the PR's)
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** 11/11 met, each individually evidenced
+✅ **Tests:** 7 shell suites + full hermetic suite; `npm run ci` green via the CI `test` job (which runs `eval:all`)
+✅ **CI:** `shellcheck`, `test`, `validate`, `link-check` and branch policy all green
+✅ **Documentation:** CHANGELOG, CONTRIBUTING.md, coding-standards.md and tech-stack.md all updated
+✅ **Security:** boundary probed — 3 candidates executed, 0 reproduced; no secrets, no new permissions, pinned HTTPS fetch
+⚠️ **Compliance:** NOT_APPLICABLE — no PII, payment, accessibility or health surface
+
+### Two partials recorded rather than papered over
+
+1. **Every one of the five findings was in code this task itself introduced.** The tree it inherited
+   was clean at `error`. The sharpest — a guard that reported a failure and then continued into the
+   exact hang its own comment claimed to prevent — was found by mutation-proving it, not by the
+   tests, which stayed green throughout and would have stayed green forever. **A green suite was
+   never evidence on this task.**
+2. **Independent review never happened.** Three Explore subagents (the QA cycle-2 refute pass and
+   both Step 5c lenses) hung and were terminated, so those steps were run in-line by the agent that
+   wrote the change. A human read of the 28-file reviewable surface is the outstanding mitigation.
+
+**Detailed Verification Log:** [`task.92.dod.1.shellcheck-ci-lane.md`](./task.92.dod.1.shellcheck-ci-lane.md)
+
+**Task marked as ACCEPTED on:** 2026-09-05
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -494,6 +533,7 @@ Two MEDIUM findings, both in code this task introduced:
 | 2026-09-05 |         | qa-fix cycle 2 — TASK-92-003 (fix/annotation split miscounted 11/15; true split 9/17) and TASK-92-004 (tech-stack said five workflows, there are six) corrected | qa-fix |
 | 2026-09-05 |         | QA gate 3 **PASS** (96/100) — all four findings verified fixed, no new findings, 5/5 CI jobs green | qa-task |
 | 2026-09-05 |         | Step 5c `/review-pr` CONCERNS — PC-1 (stale "725 vs 81" figure, now 515 vs 55) found and fixed; both review lenses hung and the review was not independent | review-pr |
+| 2026-09-05 | 1.2     | DoD verified — accepted (PR #322). 11/11 criteria, gate PASS 96/100, CI 5/5 green. Two partials recorded: all five findings were self-inflicted, and no independent review ran | finalise |
 
 ---
 
