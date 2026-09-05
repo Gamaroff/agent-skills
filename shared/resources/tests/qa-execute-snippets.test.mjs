@@ -1344,7 +1344,10 @@ test("BUG-6: scanning past a keyword does not refuse the constructs around it", 
     classifyBlock('N=1\nif [ -n "$N" ]; then echo x; fi').klass,
     "runnable",
   );
-  assert.equal(classifyBlock('while read -r l; do echo "$l"; done').klass, "runnable");
+  assert.equal(
+    classifyBlock('while read -r l; do echo "$l"; done').klass,
+    "runnable",
+  );
   // `!` negates a command that still RUNS. It is in the command-introducing set
   // for that reason; without it this input would have become runnable.
   assert.equal(classifyBlock("! touch /tmp/x").klass, "mutating");
@@ -1408,7 +1411,10 @@ test("BUG-6: an unterminated quote blanks nothing, so it cannot hide a command",
   // than bash will run, never less.
   assert.equal(classifyBlock("echo don't\ntouch /tmp/x").klass, "mutating");
   assert.equal(classifyBlock('echo "unclosed\ntouch /tmp/x').klass, "mutating");
-  assert.equal(classifyBlock("echo 'unclosed\ngit push origin main").klass, "mutating");
+  assert.equal(
+    classifyBlock("echo 'unclosed\ngit push origin main").klass,
+    "mutating",
+  );
   // A terminated span still blanks, or root cause C is not fixed.
   assert.equal(
     classifyBlock(`echo "it's fine"; touch /tmp/x; echo "don't"`).klass,
@@ -1467,7 +1473,10 @@ test("BUG-6/verify: the -o exemption holds wherever the command actually sits", 
   assert.equal(classifyBlock("echo x | grep -o foo").klass, "runnable");
   assert.equal(classifyBlock("echo x |grep -o foo").klass, "runnable");
   assert.equal(classifyBlock("ls; grep -o foo f").klass, "runnable");
-  assert.equal(classifyBlock("ls && find . -name a -o -name b").klass, "runnable");
+  assert.equal(
+    classifyBlock("ls && find . -name a -o -name b").klass,
+    "runnable",
+  );
   assert.equal(classifyBlock("sudo grep -o foo f").klass, "mutating"); // sudo itself is refused
   // …and a real writer is still caught wherever IT sits.
   assert.equal(classifyBlock("ls; sort -o /tmp/x f").klass, "mutating");
@@ -1477,9 +1486,13 @@ test("BUG-6/verify: the -o exemption holds wherever the command actually sits", 
 test("BUG-6/verify: git's subcommand is read from after THIS git token", () => {
   // The slice was taken from the segment's second token, which was only ever
   // correct while the scan stopped at the segment's first token.
-  assert.equal(classifyBlock("if git status; then echo ok; fi").klass, "runnable");
   assert.equal(
-    classifyBlock("if false; then :; elif git ls-remote origin; then :; fi").klass,
+    classifyBlock("if git status; then echo ok; fi").klass,
+    "runnable",
+  );
+  assert.equal(
+    classifyBlock("if false; then :; elif git ls-remote origin; then :; fi")
+      .klass,
     "runnable",
   );
   assert.equal(classifyBlock("! git diff --quiet").klass, "runnable");

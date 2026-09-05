@@ -297,7 +297,10 @@ function hasOutputFlagWrite(text) {
     ) {
       i += 1;
     }
-    const name = (words[i] || "").replace(/['"\\]/g, "").split("/").pop();
+    const name = (words[i] || "")
+      .replace(/['"\\]/g, "")
+      .split("/")
+      .pop();
     if (O_FLAG_NOT_OUTPUT.has(name)) continue;
     return true; // an unrecognised command with `-o` still fails closed
   }
