@@ -1493,14 +1493,20 @@ if [ -d "$HERE" ]; then
   done
   # Guard the empty case explicitly: `sed` with no file operands reads STDIN and hangs,
   # which the `ls` form was also exposed to and never checked.
+  #
+  # Structured as if/else rather than an early return: section 44 runs inside a TOP-LEVEL
+  # `if [ -d "$HERE" ]` block, not inside a function, so `return` here is illegal — and
+  # `return 1 2>/dev/null || true` (the first attempt) hid both the error and the status,
+  # so control fell straight through into the very sed this guard exists to skip.
   if [ ${#READER_SOURCES[@]} -eq 0 ]; then
     bad "reader-key guard" "no production resolvers found beside $HERE"
-    return 1 2>/dev/null || true
+    READER_CALLS=""
+  else
+    READER_CALLS=$(sed 's/[[:space:]]#.*$//; s/^[[:space:]]*#.*$//' "${READER_SOURCES[@]}" \
+      | grep -oE '(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+[a-zA-Z][a-zA-Z0-9_]*([[:space:]]+[a-zA-Z][a-zA-Z0-9_]*)?' \
+      | sed -E 's/^(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+//' \
+      | tr ' ' '\n' | sort -u)
   fi
-  READER_CALLS=$(sed 's/[[:space:]]#.*$//; s/^[[:space:]]*#.*$//' "${READER_SOURCES[@]}" \
-    | grep -oE '(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+[a-zA-Z][a-zA-Z0-9_]*([[:space:]]+[a-zA-Z][a-zA-Z0-9_]*)?' \
-    | sed -E 's/^(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+//' \
-    | tr ' ' '\n' | sort -u)
   for key in $READER_CALLS; do
     [ -n "$key" ] || continue
     echo "$GUARDED" | tr '|' '\n' | grep -qxF "$key" || MISSING="$MISSING $key"

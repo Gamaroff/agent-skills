@@ -130,7 +130,7 @@ jsm_resolve_access() {
     # Surface the resolver's own refusal line, the way the JS path does. Without
     # this the operator gets `manual` and no reason at all.
     if [ "$cfg_mode" = "manual" ] && [ -n "$cfg_err" ] && [ -s "$cfg_err" ]; then
-      # shellcheck disable=SC2034
+      # shellcheck disable=SC2034  # output contract: set here, read by this lib's callers
       # $'...' (ANSI-C quoting), NOT "\xe2…": grep does not interpret \xNN, so the
       # double-quoted form searched for the literal text `xe2x9dx8c` and matched
       # nothing. The capture was silently inert until a test caught it.
@@ -325,7 +325,8 @@ jsm_paginate_values() {
   local query=${2:-}
   local start=0 is_last page_len grand_total url acc_f page_f new_f
   acc_f=$(mktemp); page_f=$(mktemp); new_f=$(mktemp)
-  # shellcheck disable=SC2064
+  # shellcheck disable=SC2064  # expansion at trap-set time is intended: the path must be
+  # captured now, not resolved when the trap fires and the variable may be gone
   trap "rm -f '$acc_f' '$page_f' '$new_f'" RETURN
   printf '[]' > "$acc_f"
   while :; do
@@ -362,7 +363,8 @@ jsm_paginate_issues() {
   local query=${2:-}
   local start=0 page_len grand_total url acc_f page_f new_f
   acc_f=$(mktemp); page_f=$(mktemp); new_f=$(mktemp)
-  # shellcheck disable=SC2064
+  # shellcheck disable=SC2064  # expansion at trap-set time is intended: the path must be
+  # captured now, not resolved when the trap fires and the variable may be gone
   trap "rm -f '$acc_f' '$page_f' '$new_f'" RETURN
   printf '[]' > "$acc_f"
   while :; do

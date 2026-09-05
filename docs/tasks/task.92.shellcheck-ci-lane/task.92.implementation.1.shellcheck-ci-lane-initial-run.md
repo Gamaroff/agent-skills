@@ -36,8 +36,8 @@ reasoned `# shellcheck disable` comments, and prove the gate can fail.
 | 1. create-branch           | ✅ Done    | Branch `feature/task.92.*` exists in git                               | `feature/task.92.shellcheck-ci-lane` created from `develop` at `4e37cbe9`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.92.review.1.shellcheck-ci-lane.md` exists                        | 8/10 READY TO IMPLEMENT; 1 Critical + 4 Important + 3 Optional, all applied. Status `planned` → `ready-for-development`. Issue #321 created + linked | 2 Explore pre-passes (inline) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 26 → 0 warnings (11 real fixes, 15 reasoned disables); lane added + mutation-proved red; 155 files (18 hand, 137 bundled) | none — Step 2 pre-passes reused |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.92.qa.{N}.*.md`; `task.92.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #322 → `develop`. 5 commits, generated output isolated in `d383fa90`. Issue #321 commented (`posted`) | —                    |
+| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 done | `task.92.qa.{N}.*.md`; `task.92.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.92.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -147,6 +147,37 @@ exists. The sources-only rule (81 vs 725) is written as a comment **at the glob*
 
 **Gate**: `npm run ci:fast` — **exit 0** (`.claude/state/task92-cifast-1.log`). No failures.
 
+### Steps 5–6 — QA cycle 1 + qa-fix — 2026-09-05
+
+**QA cycle 1 → CONCERNS (80/100)**, artifacts `task.92.qa.1.*` / `task.92.gate.1.*`. All 11 success
+criteria met; the central ones verified in **real CI** — 5/5 jobs green on PR #322, including the new
+`shellcheck` job and `test` (which runs `eval:all`, closing criterion 8 that only `ci:fast` had
+covered locally). Three of four mutation proofs held.
+
+The fourth was the finding, and it was **my own code**:
+
+- **TASK-92-001 (MEDIUM)** — the empty-list guard I added at `tracker-access.test.sh:1496` did not
+  guard. Section 44 runs inside a **top-level** `if [ -d "$HERE" ]` block, not a function, so `return`
+  there is illegal; the `2>/dev/null || true` I wrote after it hid both the error message and the
+  status, so control fell through into the very `sed` the guard exists to skip — the STDIN hang its
+  own comment claimed to prevent. Proven with a minimal repro before fixing.
+  **Fix**: if/else instead of an early return, with the reason for the structure written in.
+  **Mutation-proved**: forcing the glob to match nothing makes the suite print
+  `FAIL reader-key guard` and exit 1 in normal time. Before the fix it fell through instead.
+  Worth recording plainly: this is the same shape as `task.90`, in a task whose whole point is
+  catching it, introduced while fixing a different finding. The guard was never exercised because
+  the directory always has sibling `.sh` files — a green suite was not evidence.
+- **TASK-92-002 (MEDIUM)** — three pre-existing bare `# shellcheck disable` directives in
+  `jira-sprint-lib.sh` (:133 SC2034, :328/:365 SC2064) left criterion 6 ("No bare suppressions")
+  unmet repo-wide, inside the change that introduces the rule. **Fix**: all three annotated.
+- **LOW** — 8 new SC2034 directives carried their reason in a block comment above rather than inline,
+  so a `grep '# shellcheck disable'` audit read them as bare. **Fixed too** rather than deferred: an
+  audit that has to be told about an exception is not an audit. There are now **zero** bare disables
+  in any of the 56 source scripts.
+
+Post-fix: shellcheck exit 0 over 56 files, `npm run ci:fast` exit 0, shell suites pass,
+`npm run bundle` re-run (3 further copies).
+
 ### Step 2 — review-task — 2026-09-05
 
 - Output format auto-answered: **Comprehensive report** — required for the pipeline audit trail.
@@ -197,7 +228,7 @@ _Track each QA review/fix cycle._
 **Finished**: _pending_
 **Final Status**: _pending_
 **Branch**: `feature/task.92.shellcheck-ci-lane`
-**PR**: _populated after Step 4_
+**PR**: [#322](https://github.com/Gamaroff/agent-skills/pull/322)
 **QA Iterations**: _pending_
 **DoD Summary**: _populated after Step 7_
 **Tracker debt**: _populated after Step 7_
