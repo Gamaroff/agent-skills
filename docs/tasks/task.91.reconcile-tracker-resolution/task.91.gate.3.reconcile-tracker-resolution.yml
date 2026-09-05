@@ -1,0 +1,73 @@
+schema: 1
+task: 'task.91.reconcile-tracker-resolution'
+task_title: 'Reconcile install-time and run-time tracker resolution'
+gate: CONCERNS
+status_reason: 'Every cycle-2 finding is fixed and re-verified, and the HIGH count reaches zero — the loop is converging. Two residuals remain, both reachable only through a corrupt or partial resolver copy: the installer trusts whatever string a located resolver prints without validating it against the legal set, which makes the filter inert; and a resolver that fails silently produces "see the message above" with nothing above.'
+reviewer: 'QA Engineer'
+updated: '2026-09-05T07:53:25Z'
+
+top_issues:
+  - id: 'TASK-91-009'
+    severity: medium
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The installer accepts whatever string the located resolver prints, without validating it against the legal set. `_locate_resolver` selects a file on READABILITY ALONE — it never establishes that the file is a resolver — so a stale or partially-written copy under `.agents/skills/*/references/` is trusted verbatim. Verified: a planted resolver setting `TRACKER=bitbucket` and returning 0 yields rc=0 tracker=[bitbucket], and `_skill_excluded_for_tracker` then KEEPS both `sync-jira-epic` and `sync-github-epic` — the filter is silently inert. Same failure mode as TASK-91-006, reached through a different door, and the same realistic trigger: a partial write from an interrupted install. The real resolver cannot produce this (validate_enum refuses), so the exposure is entirely in trusting the located file.'
+    suggested_action: 'Validate `_t` against jira|github before returning 0. The installer already knows the legal set — it branches on it in `_skill_excluded_for_tracker`. One `case` closes the door, and it makes the existing "never emits a raw config token as a tracker" property hold end to end rather than only for config input.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-91-010'
+    severity: low
+    file: 'scripts/setup-consumer.sh'
+    finding: 'The rc-not-zero twin of TASK-91-005. When the located resolver returns non-zero WITHOUT writing to stderr, the rc-2 branch replays its (empty) stderr and the caller then prints "No usable tracker could be resolved — see the resolver''s message above", pointing at nothing. Verified with a planted `return 1` resolver: rc=2, no message. TASK-91-005 fixed exactly this shape for the rc=0 case and left the rc-non-zero one.'
+    suggested_action: 'After replaying stderr, if nothing was emitted, print the same style of message the rc=0 branch uses, naming the resolver path.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 2448
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-09-05'
+  total_iterations: 2
+  verification_method: 'Behavioural re-execution of every prior finding, plus targeted probing of the cycle-2 fixes'
+  detail: 'TASK-91-001 through -008 and BUG-6 all verified fixed. The two findings above are new, and neither is a recurrence.'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged. `.env` parsed, never sourced. TASK-91-009 is a trust boundary rather than a vulnerability — the file it trusts is one a previous run of this same installer wrote.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'TASK-91-009 reproduces the inert-filter outcome, but only via a corrupt resolver copy rather than any config a user can write. Materially narrower than the cycle-1 and cycle-2 HIGHs, both of which were reachable from ordinary inputs. Downgraded to CONCERNS on that basis, not waved through.'
+  maintainability:
+    status: PASS
+    notes: 'The coverage gap that let cycles 1 and 2 through is closed: the fixture tarball now ships the real resolver, so the `release` origin and the `_tmpdir` argument are exercised. Two comments that overstated what tests prove were corrected rather than left standing. The false COVERED/NOT-COVERED enumeration is now accurate.'
+
+recommendations:
+  immediate:
+    - action: 'Validate the resolved tracker against the legal set before returning it.'
+      refs: ['scripts/setup-consumer.sh']
+  future:
+    - action: 'Give the silent-non-zero-resolver case a message of its own.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'The cycle-1 cleanups remain open and are all still worth doing: the double-source on the failure path, the stale comments in _config_skills_profile, those hand-rolled awk YAML parsers, and the skill lists still mirrored in resolve-skill-set-cli.mjs.'
+      refs: ['scripts/setup-consumer.sh', 'shared/resources/resolve-skill-set-cli.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-91-009 addressed — it is a one-line validation and closes the last route to a silently inert filter.'

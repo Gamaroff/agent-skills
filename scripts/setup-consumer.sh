@@ -1001,12 +1001,25 @@ _resolve_install_tracker() {
   _t=${_out%%$'\t'*}
   _rc=${_out##*$'\t'}
 
+  # VALIDATE WHAT CAME BACK. `_locate_resolver` picks a file on READABILITY
+  # alone — it never establishes that the file is a resolver — so a stale or
+  # partially-written copy under .agents/skills/ is otherwise trusted verbatim.
+  # A planted `TRACKER=bitbucket` reached this point and was accepted, and
+  # `_skill_excluded_for_tracker` then matched no list and KEPT BOTH skill sets:
+  # the filter silently inert, which is the same outcome as the newline defect
+  # through a different door. The real resolver cannot emit an illegal value
+  # (validate_enum refuses), so the whole exposure is in trusting the file.
+  case "$_t" in
+    jira|github) ;;
+    *) _t="" ;;
+  esac
+
   if [[ "$_rc" == "0" && -n "$_t" ]]; then
     printf '%s' "$_t"
     return 0
   fi
 
-  if [[ "$_t" == "jira" || "$_t" == "github" ]]; then
+  if [[ -n "$_t" ]]; then   # non-empty here means legal — the case above saw to that
     # NOT our problem, and NOT a reason to block the install. The filter needs a
     # tracker and it has one. Warn on stderr — never stdout, which is the
     # function's return channel — and let the operator fix the other key.
@@ -1027,10 +1040,22 @@ _resolve_install_tracker() {
   # would print nothing and leave the operator with "see the message above" and
   # no message above.
   if [[ "$_rc" == "0" ]]; then
-    printf '❌ %s sourced cleanly but set no TRACKER — the file may be truncated or not a resolver.\n' \
+    printf '❌ %s sourced cleanly but set no usable TRACKER — the file may be truncated, or not a resolver.\n' \
            "$_res" >&2
   else
-    bash -c 'source "$1" >/dev/null' _ "$_res" 2>&1 >/dev/null | head -5 >&2 || true
+    # Replay the resolver's own message, which normally names the file and the
+    # offending value. A resolver can fail SILENTLY, though — and then the
+    # caller's "see the resolver's message above" points at nothing, which is
+    # the same unhelpful shape TASK-91-005 fixed for the rc=0 case. Capture the
+    # replay so we can tell whether there was anything to say.
+    local _err
+    _err=$(bash -c 'source "$1" >/dev/null' _ "$_res" 2>&1 >/dev/null | head -5) || true
+    if [[ -n "$_err" ]]; then
+      printf '%s\n' "$_err" >&2
+    else
+      printf '❌ %s failed (status %s) without explanation — the file may be truncated, or not a resolver.\n' \
+             "$_res" "$_rc" >&2
+    fi
   fi
   return 2
 }

@@ -19,7 +19,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   copyFileSync,
   mkdirSync,
@@ -168,6 +168,27 @@ function excluded(name, tracker, prelude = "") {
  * deliberate refusal as a crashed harness. That is the same defect class the
  * wizard's own call sites carry a comment about.
  */
+/** Like `callFn`, but returns the snippet's STDERR — some behaviour is only visible there. */
+function callFnStderr(snippet, { cwd = REPO, env = {} } = {}) {
+  const clean = hermeticEnv();
+  const res = spawnSync(
+    "bash",
+    [
+      "-c",
+      `set -uo pipefail
+       export SETUP_CONSUMER_NO_MAIN=1
+       source '${WIZARD}'
+       ${snippet}`,
+    ],
+    {
+      cwd,
+      env: { ...clean, ...env, SETUP_CONSUMER_NO_MAIN: "1" },
+      encoding: "utf8",
+    },
+  );
+  return res.stderr || "";
+}
+
 function resolveTracker(cwd, env = {}) {
   return callFn(
     `rc=0; v=$(_resolve_install_tracker 2>/dev/null) || rc=$?
@@ -572,6 +593,43 @@ test("a resolver that sources cleanly but sets no TRACKER is refused, not believ
       resolveTracker(dir),
       "<refused>",
       "a resolver that sets no TRACKER must yield no tracker",
+    );
+  });
+});
+
+test("a resolver that emits an ILLEGAL tracker is refused, not trusted", () => {
+  // `_locate_resolver` selects a file on READABILITY alone — it never checks
+  // that the file is a resolver — so a stale or partially-written copy under
+  // .agents/skills/ was trusted verbatim. A planted `TRACKER=bitbucket` was
+  // accepted, and `_skill_excluded_for_tracker` then matched no list and KEPT
+  // BOTH skill sets: the filter silently inert, which is the same outcome as
+  // the newline defect reached through a different door.
+  //
+  // The real resolver cannot produce this (validate_enum refuses), so the whole
+  // exposure was in trusting the located file rather than in any config a user
+  // can write. `bitbucket` is the right probe: it is a legal `vcs` value, so it
+  // is the shape a plausible corruption would take.
+  inTempRepo((dir) => {
+    withPlantedResolver("TRACKER=bitbucket\n", dir);
+    assert.equal(resolveTracker(dir), "<refused>");
+  });
+});
+
+test("a resolver that fails silently still produces an explanation", () => {
+  // The rc-non-zero twin of the empty-TRACKER case. A resolver that returns
+  // non-zero without writing to stderr left the caller printing "see the
+  // resolver's message above" with nothing above it — the same unhelpful shape
+  // that was fixed for rc=0 one cycle earlier and left standing here.
+  //
+  // Asserted through stderr because that is where the defect lived; the return
+  // code was already correct.
+  inTempRepo((dir) => {
+    withPlantedResolver("return 1\n", dir);
+    const err = callFnStderr("_resolve_install_tracker || true", { cwd: dir });
+    assert.match(
+      err,
+      /without explanation/,
+      "a silent failure must still name the file it could not use",
     );
   });
 });
