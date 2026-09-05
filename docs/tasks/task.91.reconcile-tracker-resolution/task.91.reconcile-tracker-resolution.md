@@ -5,17 +5,21 @@ type: task
 description: "setup-consumer.sh and resolve-platform.sh resolve TRACKER from different sources and grade malformed input differently, so a repo can install one platform's skills and run as the other."
 tags: [setup-consumer, platform-detection, resolver-parity]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
+risk_level: medium
+github_issue: 319
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 assignee:
 estimated_effort_hours: 3
 ---
 
 # Technical Task: Reconcile install-time and run-time tracker resolution
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.91.review.1.reconcile-tracker-resolution.md` implemented 2026-09-05
+**GitHub Issue**: [#319](https://github.com/Gamaroff/agent-skills/issues/319)
 
 ---
 
@@ -58,7 +62,7 @@ silent at install and surfaces later, inside a pipeline step, as a skill that is
 
 **2. Malformed config is graded two different ways.**
 
-`docs/reference/configuration.md:148` states that a scalar `tracker:` is validated against
+`docs/reference/configuration.md:153` states that a scalar `tracker:` is validated against
 `jira`/`github`/`auto` and that "anything else halts the run" — `tracker: bitbucket` is explicitly
 named as rejected. `resolve-platform.sh` does halt. The installer falls through to its positive probes
 and silently resolves `github`, then filters on that. A second shape behaves the same way:
@@ -98,7 +102,7 @@ either file, and the parity test only catches the cases someone thought to enume
 
 There is deliberately **no git-remote probe** for `TRACKER` (unlike `VCS`).
 
-`scripts/setup-consumer.sh:820` — `_resolve_install_tracker`. Same order, different reading:
+`scripts/setup-consumer.sh:878` — `_resolve_install_tracker`. Same order, different reading:
 
 1. `skills-config.yaml` `tracker:`, parsed by `awk` plus bash normalisation (strips a trailing `\r`
    and one matched quote pair — added in task 83 QA cycle 1)
@@ -154,6 +158,59 @@ Rejected, and the reasoning is recorded in `task.83.bug.2.env-probe-asymmetry.md
 **once**, often in a plain shell, while the skills run **later** in a shell that has `JIRA_URL`
 because they need it. Dropping the probe trades a rare disagreement for a common one. Do not choose
 this without new evidence that overturns that argument.
+
+### Phase 1 Decision — established empirically 2026-09-05
+
+> Recorded before any code was written, per Phase 1's own instruction. The reachability answers below
+> come from **running** the wizard's code paths and downloading the real release archive, not from
+> reading the script.
+
+**Resolver reachability at the three call sites:**
+
+| Site | Reachable? | Evidence |
+|---|---|---|
+| Real install (`setup-consumer.sh:1256`) | ✅ | The v0.45.0 release tarball carries **38** copies at `skills/*/references/resolve-platform.sh`. `_resolve_install_tracker` is called at line 1256, *after* `tar -xzf` at line 1254, and `$_tmpdir` is a caller local, so it is in dynamic scope. |
+| `--update` | ✅ | `--update` takes the same download path (`UPDATE_ONLY` only skips the wizard's question steps), so `$_tmpdir` exists; `.agents/skills/*/references/resolve-platform.sh` is also present from the prior install. |
+| `--dry-run` (`setup-consumer.sh:1154`) | ❌ | The branch returns before the download. The documented consumer invocation is `bash <(curl -fsSL …)` (`getting-started.md:107`), where `BASH_SOURCE[0]` is `/dev/fd/N` — so the sibling-repo path that the existing `_dry_cli` line already relies on does not resolve either. It *is* reachable when the wizard is run from a repo checkout. |
+
+**The finding that changes the framing: Options A and B are not alternatives.** They fix different rows
+of the divergence table, and neither fixes the other's:
+
+- Rows 6 (`tracker: bitbucket`) and 7 (`tracker:<TAB>jira`) are **config-parsing** divergences. Option A
+  fixes both by construction.
+- Row 5 (`.env`-only `JIRA_URL`) is a **source** divergence. **Option A cannot fix it.** Delegating the
+  whole resolution to `resolve-platform.sh` as it stands would drop the installer's `.env` probe — which
+  is Option C, explicitly rejected in this document and in `task.83.bug.2`.
+
+**Decision: implement A *and* B.**
+
+1. **B first** — `resolve-platform.sh` gains a `.env` probe for `JIRA_URL`, ranked **below** the config
+   key and **below** the process environment. This is the behaviour change, and it is what makes A
+   viable: once the `.env` probe lives in the runtime resolver, delegating to it wholesale *preserves*
+   the probe instead of deleting it, so A stops being C.
+2. **A second** — `_resolve_install_tracker` delegates the entire resolution to a located copy of
+   `resolve-platform.sh` run in a subshell. The local `awk` + quote/CRLF normalisation is **deleted**,
+   not kept as a fallback: parity stops being a thing to maintain.
+
+**On the tab case, and why delegation had to be wholesale.** An earlier design delegated only
+`read_config_key`. That is wrong, and testing caught it: for `tracker:<TAB>jira`, `read_config_key`
+returns `jira` while the resolver's own full resolution returns `github` — because pyyaml rejects the
+tab, the typed bulk read reports the file unparseable, and the resolver falls back to detection rather
+than to its tier-2 grep. Delegating a *part* of the resolution would have reproduced the divergence one
+layer down. Only the final exported `TRACKER` is authoritative.
+
+**`--dry-run` with no locatable resolver reports "unresolved" rather than guessing.** This is the plan's
+stated preference and it is the honest option: a dry run that guesses differently from the real run is
+the exact bug class this task closes. The branch already declines to report per-skill counts for the
+same reason.
+
+**The vestigial `$TRACKER` rung.** Rung 2 (the wizard's in-process answer) is unreachable on both real
+paths: `write_skills_config` always emits a `tracker:` block (`tracker: github`, or `tracker: jira`) and
+runs *before* `install_skills` in `main()`, so the full-wizard path always has an explicit key by the
+time the resolver is called; and `--update` never runs `select_platform`, so `$TRACKER` is unset there.
+It is removed along with the rest of the local implementation rather than preserved as dead code.
+
+---
 
 ### Important Clarifications
 
@@ -215,13 +272,13 @@ over `.env`, and the wizard writes one on both platforms since task 83.
 
 **Files**: none — this is analysis, recorded in the task document.
 
-- [ ] Establish empirically whether a copy of `resolve-platform.sh` is reachable at each of the three
+- [x] Establish empirically whether a copy of `resolve-platform.sh` is reachable at each of the three
       call sites (real install, `--update`, `--dry-run`). Do this by **running the wizard**, not by
       reading it.
-- [ ] If Option A is viable at two of three sites, decide whether a fallback at the third is
+- [x] If Option A is viable at two of three sites, decide whether a fallback at the third is
       acceptable, or whether the dry-run branch should simply report "tracker not resolved" rather
       than guess.
-- [ ] Record the decision and its rationale in §3 before writing code. A later reader must be able to
+- [x] Record the decision and its rationale in §3 before writing code. A later reader must be able to
       see why the other options were rejected — `task.83.bug.2` is the model for this.
 
 **Dependencies**: none.
@@ -230,11 +287,11 @@ over `.env`, and the wizard writes one on both platforms since task 83.
 
 **Files**: `scripts/setup-consumer.sh`, possibly `shared/resources/resolve-platform.sh`
 
-- [ ] Implement the chosen option.
-- [ ] Preserve every behaviour the task-83 parity table pins: the ten spellings, the map form, the
+- [x] Implement the chosen option.
+- [x] Preserve every behaviour the task-83 parity table pins: the ten spellings, the map form, the
       lone-unmatched-quote case, and the deliberate config-beats-`$TRACKER` ordering that keeps the
       filter working on the `--update` path.
-- [ ] If `resolve-platform.sh` changes, re-run `npm run bundle` — every skill carries a bundled copy.
+- [x] If `resolve-platform.sh` changes, re-run `npm run bundle` — every skill carries a bundled copy.
 
 **Dependencies**: Phase 1.
 
@@ -245,12 +302,12 @@ here is not scoped to the installer.
 
 **Files**: `scripts/setup-consumer.sh`
 
-- [ ] An unrecognised `tracker:` scalar (e.g. `tracker: bitbucket`) must not be silently interpreted.
+- [x] An unrecognised `tracker:` scalar (e.g. `tracker: bitbucket`) must not be silently interpreted.
       Match the runtime: refuse, naming the file and the value. Decide explicitly whether the
       installer **halts** or **skips filtering** — halting is consistent with the runtime; skipping is
       more forgiving for a tool whose failure mode is "you get extra skills". State which and why.
-- [ ] A tab separator (`tracker:<TAB>jira`) must resolve the same way at both ends.
-- [ ] Neither change may make a *valid* config harder to read.
+- [x] A tab separator (`tracker:<TAB>jira`) must resolve the same way at both ends.
+- [x] Neither change may make a *valid* config harder to read.
 
 **Dependencies**: Phase 2.
 
@@ -258,13 +315,13 @@ here is not scoped to the installer.
 
 **Files**: `shared/resources/tests/setup-consumer-skill-exclusion.test.mjs`, `docs/reference/configuration.md`
 
-- [ ] Extend the §4b parity table with the `.env`-only case and the malformed-input cases. The
+- [x] Extend the §4b parity table with the `.env`-only case and the malformed-input cases. The
       existing `the .env probe is a DELIBERATE asymmetry` test **must be updated or removed** — it
       currently pins the divergence this task removes, and its failure message says so explicitly.
-- [ ] Keep the parity assertion shape: compare the two resolvers against **each other**, not against
+- [x] Keep the parity assertion shape: compare the two resolvers against **each other**, not against
       hardcoded expectations on both sides, so they cannot drift together and still pass.
-- [ ] Mutation-prove each change per `shared/resources/mutation-proving.md`.
-- [ ] Update `configuration.md` and the resolver header comments if the documented order changes.
+- [x] Mutation-prove each change per `shared/resources/mutation-proving.md`.
+- [x] Update `configuration.md` and the resolver header comments if the documented order changes.
 
 **Dependencies**: Phases 2–3.
 
@@ -325,30 +382,30 @@ here is not scoped to the installer.
 
 ### Functional
 
-- [ ] No config shape resolves differently at install time and run time. Demonstrated by a parity
+- [x] No config shape resolves differently at install time and run time. Demonstrated by a parity
       table that compares the two resolvers against each other.
-- [ ] A repo with no `tracker:` key and `JIRA_URL` in `.env` only installs the skill set that matches
+- [x] A repo with no `tracker:` key and `JIRA_URL` in `.env` only installs the skill set that matches
       what its skills resolve at run time.
-- [ ] An unrecognised `tracker:` scalar is graded the same way at both ends.
-- [ ] `tracker:<TAB>jira` is graded the same way at both ends.
-- [ ] The map form still resolves as `auto` at both ends.
-- [ ] `access.tracker` is still never read as a platform.
+- [x] An unrecognised `tracker:` scalar is graded the same way at both ends.
+- [x] `tracker:<TAB>jira` is graded the same way at both ends.
+- [x] The map form still resolves as `auto` at both ends.
+- [x] `access.tracker` is still never read as a platform.
 
 ### Code Quality
 
-- [ ] `npm run ci` green.
-- [ ] `shellcheck scripts/setup-consumer.sh` — no new warnings against the `origin/develop` baseline.
+- [x] `npm run ci` green.
+- [x] `shellcheck scripts/setup-consumer.sh` — no new warnings against the `origin/develop` baseline.
       (The baseline is **1** warning: a pre-existing `SC2209`. Run via
       `docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable`, since the binary is not
       installed on the dev host and no CI lane runs it.)
-- [ ] Every behaviour change mutation-proven.
-- [ ] If `resolve-platform.sh` changed, `npm run bundle` run and the result committed.
+- [x] Every behaviour change mutation-proven.
+- [x] If `resolve-platform.sh` changed, `npm run bundle` run and the result committed.
 
 ### Migration
 
-- [ ] If the chosen option changes runtime resolution, `CHANGELOG.md` states which repos are affected
+- [x] If the chosen option changes runtime resolution, `CHANGELOG.md` states which repos are affected
       and what to set to opt out.
-- [ ] The `DELIBERATE asymmetry` test and the header comment it points at are updated or removed —
+- [x] The `DELIBERATE asymmetry` test and the header comment it points at are updated or removed —
       leaving a test that pins a divergence this task removed would be actively misleading.
 
 ---
@@ -405,15 +462,19 @@ config that carries an explicit `tracker:` key.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-04 | 1.0     | Initial draft — filed from task 83's `gate.3` `recommendations.future`, covering the two resolver-parity residuals it deliberately left open | create-task |
+| 2026-09-05 | 1.1     | Review passed (9/10) — linked GitHub issue #319, corrected two stale line references (`setup-consumer.sh:820`→`878`, `configuration.md:148`→`153`), added `risk_level: medium` so the pipeline cannot select lite mode for a task carrying a HIGH RISK entry | review-task |
+| 2026-09-05 |         | Status → ready-for-development | review-task |
+| 2026-09-05 |         | Implemented A+B: `resolve-platform.sh` reads `.env` for `TRACKER` (below env, below config); `_resolve_install_tracker` delegates to it in a subshell and its local `awk` parser is deleted; an unrecognised scalar now halts the install and `--dry-run` reports "unresolved" rather than guessing. All 7 divergence-table rows read OK; 4 mutation proofs; `npm run bundle` re-run | develop |
+| 2026-09-05 |         | Status → ready-for-review | develop |
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1 — Decide the approach
-- [ ] Phase 2 — Unify or synchronise the resolution
-- [ ] Phase 3 — Grade malformed input consistently
-- [ ] Phase 4 — Tests and documentation
+- [x] Phase 1 — Decide the approach
+- [x] Phase 2 — Unify or synchronise the resolution
+- [x] Phase 3 — Grade malformed input consistently
+- [x] Phase 4 — Tests and documentation
 - [ ] QA review complete
 - [ ] Quality gate PASS
 
@@ -425,7 +486,7 @@ config that carries an explicit `tracker:` key.
 - [`task.83.bug.2.env-probe-asymmetry.md`](../task.83.platform-aware-skill-exclusion/task.83.bug.2.env-probe-asymmetry.md) — why the `.env` probe was kept, and why Option C is rejected
 - [`task.83.gate.3.platform-aware-skill-exclusion.yml`](../task.83.platform-aware-skill-exclusion/task.83.gate.3.platform-aware-skill-exclusion.yml) — `recommendations.future`, where these residuals were recorded
 - `shared/resources/resolve-platform.sh:424-437` — the runtime identity resolution
-- `scripts/setup-consumer.sh:820` — `_resolve_install_tracker`
+- `scripts/setup-consumer.sh:878` — `_resolve_install_tracker`
 - [`shared/resources/platform-detection.md`](../../../shared/resources/platform-detection.md) — the canonical resolver order
 - [`docs/reference/configuration.md`](../../reference/configuration.md) — the `tracker` key and its validation
 
