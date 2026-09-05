@@ -50,9 +50,11 @@
 # `SKILLS_CONFIG_FILE=skills-config.yaml`, which names the default and so behaves identically to
 # leaving it unset.
 if [ -n "${SKILLS_CONFIG_FILE:-}" ] && [ "$SKILLS_CONFIG_FILE" != "skills-config.yaml" ]; then
-  _CONFIG_FILE_ORIGIN=env
+  # Quoted: `env` is a shell builtin, so an unquoted assignment is read by
+  # ShellCheck (SC2209) as a mistyped `$(env)`. Both arms quoted for symmetry.
+  _CONFIG_FILE_ORIGIN="env"
 else
-  _CONFIG_FILE_ORIGIN=default
+  _CONFIG_FILE_ORIGIN="default"
 fi
 SKILLS_CONFIG_FILE="${SKILLS_CONFIG_FILE:-skills-config.yaml}"
 

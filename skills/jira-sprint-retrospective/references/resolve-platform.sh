@@ -65,6 +65,7 @@ fi
 # entry matches, which lands straight in the capture; an operator with CDPATH
 # exported (common in dotfiles) would otherwise get a garbage path and a silent
 # "writer not found" on every deferral.
+# shellcheck disable=SC1007  # `CDPATH= cmd` is a one-command env prefix, not an empty assignment
 _RP_SELF_DIR=$(CDPATH= cd -P -- "$(dirname -- "$_rp_self")" >/dev/null 2>&1 && pwd -P)
 
 # shellcheck source=read-config.sh
