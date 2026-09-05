@@ -111,6 +111,7 @@ fi
 # branch below then skipped the write — under `full` too, since it runs before the
 # mode is known. Board Estimate writes silently stopped in every one of them
 # (TASK-54-BUG-1). A test now pins the co-location.
+# shellcheck disable=SC1007  # `CDPATH= cmd` is a one-command env prefix, not an empty assignment
 GATE_DIR=$(CDPATH= cd -P -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd -P)
 DEFER_WRITER="${GATE_DIR}/defer-mutation.js"
 

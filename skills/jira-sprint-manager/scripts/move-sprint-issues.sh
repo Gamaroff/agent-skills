@@ -46,9 +46,16 @@ while [ "$moved" -lt "$TOTAL" ]; do
   # `count` is not assigned until after the call, so the size is read from the
   # chunk itself; referencing it early would abort the script under `set -u`.
   CHUNK_LEN=$(jq 'length' <<<"$CHUNK")
+  # JSM_DEFER_* are the access gate's input contract: set here, read by jsm_curl in
+  # jira-sprint-lib.sh (which this script sources), never used locally. A directive
+  # covers only the next command, so each assignment carries its own.
+  # shellcheck disable=SC2034
   JSM_DEFER_KIND="jira.sprint.move-issues"
+  # shellcheck disable=SC2034
   JSM_DEFER_INTENT="Move $CHUNK_LEN issue(s) to: $TARGET"
+  # shellcheck disable=SC2034
   JSM_DEFER_TARGET="{\"url\":\"$ENDPOINT\",\"name\":\"$TARGET\"}"
+  # shellcheck disable=SC2034
   JSM_DEFER_DESIRED=$(jq -nc --argjson keys "$CHUNK" --arg t "$TARGET" '{target: $t, issues: ($keys | join(", "))}')
 
   jsm_curl POST "$ENDPOINT" "$PAYLOAD"

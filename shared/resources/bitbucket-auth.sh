@@ -72,7 +72,10 @@ bitbucket_resolve_auth() {
   # set both to the same value on purpose — do not "tidy" one away.
   local basic_token="${BITBUCKET_API_TOKEN:-${BITBUCKET_APP_PASSWORD:-}}"
   if [ -n "${BITBUCKET_USERNAME:-}" ] && [ -n "$basic_token" ]; then
+    # shellcheck disable=SC2034  # output contract: set here, read by the sourcing caller (see header)
     BB_AUTH_SCHEME="basic"
+    # shellcheck disable=SC2034  # ditto. NOT `export`ed: bash cannot export an array, so `export`
+    # here would silence the warning while doing nothing a child process could observe.
     BB_CURL_AUTH=(--user "${BITBUCKET_USERNAME}:${basic_token}")
     return 0
   fi

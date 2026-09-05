@@ -103,6 +103,7 @@ jsm_resolve_access() {
   if [ -z "$_jsm_self" ]; then
     resolver="/nonexistent/resolve-platform.sh"
   else
+    # shellcheck disable=SC1007  # `CDPATH= cmd` is a one-command env prefix, not an empty assignment
     resolver="$(CDPATH= cd -P -- "$(dirname "$_jsm_self")" >/dev/null 2>&1 && pwd -P || true)/resolve-platform.sh"
   fi
   unset _jsm_self
@@ -121,6 +122,8 @@ jsm_resolve_access() {
     cfg_mode=$(
       unset ACCESS_TRACKER AGENT_SKILLS_ACCESS_TRACKER AGENT_SKILLS_CONFIG_TIER
       cd "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" || exit 1
+      # shellcheck disable=SC1090  # $resolver is computed at runtime from BASH_SOURCE; there is no
+      # constant path a `source=` directive could name.
       source "$resolver" >/dev/null 2>"${cfg_err:-/dev/null}" && printf '%s' "$ACCESS_TRACKER"
     ) || cfg_mode="manual"
     [ -n "$cfg_mode" ] || cfg_mode="manual"
@@ -236,7 +239,9 @@ jsm_curl() {
   local auth tmp attempt=0 max=4 wait=1
 
   # Always set, so a caller under `set -u` can branch on it unconditionally.
+  # shellcheck disable=SC2034  # output contract: read by the sprint scripts that source this lib
   JSM_DEFERRED=0
+  # shellcheck disable=SC2034  # output contract, as above
   JSM_DEFERRED_RECORD=""
 
   # Fail closed, and BEFORE the retry loop — recording inside it would write one
