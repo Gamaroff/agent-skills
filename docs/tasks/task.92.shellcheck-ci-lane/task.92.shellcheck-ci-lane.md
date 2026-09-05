@@ -5,17 +5,22 @@ type: task
 description: "No workflow runs shellcheck, so a shell-script success criterion cannot be evaluated by any automated gate — task 83's had to be closed by hand with a container."
 tags: [ci, shellcheck, test-harness]
 category: testing
-status: planned
+status: accepted
 priority: Medium
 created: 2026-09-04
-updated: 2026-09-04
+updated: 2026-09-05
 assignee:
 estimated_effort_hours: 3
+github_issue: 321
+pr_number: 322
+completed_date: 2026-09-05
 ---
 
 # Technical Task: Add a shellcheck CI lane for the repo's shell scripts
 
-**Status:** Planned
+**Status:** Accepted
+**GitHub Issue**: [#321](https://github.com/Gamaroff/agent-skills/issues/321)
+**Review**: ✅ All review recommendations from `task.92.review.1.shellcheck-ci-lane.md` implemented 2026-09-05
 
 ---
 
@@ -80,6 +85,11 @@ docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable $(cat /tmp/sh-
 
 **Zero errors.** Nothing in the tree is broken; this lane is about keeping it that way.
 
+> **Re-measured 2026-09-05** at implementation time, per §11 Known Issues, against
+> `koalaman/shellcheck:stable` **0.11.0**: `git ls-files '*.sh'` = 247, sources = 56, and the four
+> severity counts reproduce **exactly** — 0 / 26 / 79 / 81, with 14 files affected at `warning`.
+> The snapshot below is therefore current, not historical.
+
 ### The scoping decision that matters most
 
 `git ls-files '*.sh'` returns **247** files. Only **56** are sources — the other **191 are bundled
@@ -101,15 +111,25 @@ This is the triage, done in advance so the implementer does not have to rediscov
 
 | Code | Count | What it is | Real? |
 |---|---|---|---|
-| **SC2034** "appears unused" | **14** | Variables a **sourced** file sets *for its caller* — `BB_CURL_AUTH` and `BB_AUTH_SCHEME` are the documented outputs of `bitbucket-auth.sh`; the `JSM_DEFER_*` family is `jira-sprint-lib.sh`'s output contract. shellcheck cannot see cross-file use. | ❌ |
+| **SC2034** "appears unused" | **15** | Variables a **sourced** file sets *for its caller* — `BB_CURL_AUTH` and `BB_AUTH_SCHEME` are the documented outputs of `bitbucket-auth.sh`; `JSM_DEFERRED`/`JSM_DEFERRED_RECORD` are `jira-sprint-lib.sh`'s output contract. shellcheck cannot see cross-file use. See the attribution note below — the `JSM_DEFER_*` half runs the *other* way. | ❌ |
 | **SC1007** "remove space after `=`" | 4 | `CDPATH= cd -P -- …` — the standard idiom for neutralising `CDPATH` for one command. Misparsed as a malformed assignment. | ❌ |
 | **SC2209** "use `var=$(command)`" | 3 | `ACCESS_TRACKER=command` — assigning the literal access-mode value `command`, which happens to share a name with a shell builtin. | ❌ |
 | **SC2211** "glob used as a command name" | 2 | Backticks used as *markdown emphasis inside an assertion message string* in `tracker-access.test.sh` (`assert_rc "…explicit-key \`? access\` → refused"`). shellcheck parses the prose as command substitution. | ❌ |
 | **SC1090** "can't follow non-constant source" | 1 | A resolver sourcing a path computed at runtime — inherent to the design. | ❌ |
 | **SC2010** "don't use `ls \| grep`" | 1 | Possibly genuine. **Look at this one properly.** | ⚠️ |
 
-So: **one warning worth investigating, 25 needing an annotation.** The `--severity=warning` gate is
+So: **one warning worth investigating, 25 needing an annotation** (15 + 4 + 3 + 2 + 1 = 25, plus
+the single SC2010 = 26). The `--severity=warning` gate is
 achievable in an afternoon, which is why it is the recommended target rather than the aspirational one.
+
+> **Attribution correction (verified 2026-09-05).** An earlier draft of this table said the
+> `JSM_DEFER_*` family is `jira-sprint-lib.sh`'s output contract. It is the reverse:
+> `jira-sprint-lib.sh:195-198` **reads** `JSM_DEFER_KIND`/`INTENT`/`TARGET`/`DESIRED`, and the
+> **writers** are `skills/jira-sprint-manager/scripts/manage-sprint-state.sh:45-48` and
+> `move-sprint-issues.sh:49-52` — which is where SC2034 actually fires (4 findings each). A disable
+> placed in the library would silence nothing. The genuine in-library case is the separate pair
+> `JSM_DEFERRED` / `JSM_DEFERRED_RECORD` (`jira-sprint-lib.sh:224-225,239-240`), written there and
+> read by the two sprint scripts. Annotate at the **writing** site in each case.
 
 The `info` tier adds 53 more, dominated by **SC2016** (24 — "expressions don't expand in single
 quotes", which is exactly what an `awk`/`jq` program string is *for*) and **SC2015** (16 —
@@ -162,17 +182,36 @@ should be announced in the CHANGELOG rather than discovered.
 
 **Files**: none — decision, recorded in this document.
 
-- [ ] **Severity gate.** Recommended: `--severity=warning`, because `error` is 0 today and would very
+- [x] **Severity gate.** Recommended: `--severity=warning`, because `error` is 0 today and would very
       likely stay 0 (syntax errors are already caught by `bash -n` and by the nine shell suites that
       actually execute), making the lane decorative. Decide explicitly and record why.
-- [ ] **Where it runs.** `validate.yml` already does repo-hygiene checks (catalog, bundle) and is the
-      natural home. A separate workflow is justified only if the container pull materially slows that
-      job.
-- [ ] **How shellcheck is obtained in CI.** GitHub's `ubuntu-latest` ships a `shellcheck` binary —
+- [x] **Where it runs.** `validate.yml` looks like the natural home — it already does repo-hygiene
+      checks (catalog, bundle) rather than tests — **but it cannot host this lane as configured**, and
+      that is a decision this phase must make explicitly rather than inherit:
+
+      - **`validate.yml` is path-filtered**, on both `pull_request` and `push`, to `skills/**`,
+        `shared/resources/**`, `scripts/generate-skill-dependencies.mjs`,
+        `docs/reference/skill-catalog.md` and its own file. **Three of the 56 source scripts sit
+        outside every one of those filters** — `scripts/setup-consumer.sh`, `scripts/release.sh` and
+        `.agents/scripts/backfill-story-issues.sh` — and all three carry a warning-tier finding today.
+        `setup-consumer.sh` is *the script whose shellcheck criterion motivated this task*. A lane in
+        `validate.yml` would not have fired for the change that caused it to be written.
+      - **`test.yml` has no path filter** and would give the coverage — but
+        `evals/shared/tests/ci-gate-parity.test.mjs` asserts **set equality in both directions**
+        between the npm scripts run by `test.yml`'s `test` job and the `npm run ci` composite. Adding
+        a step there turns that eval red unless a matching script is also added to `ci`, which
+        contradicts §9's "no change to local gate duration". Do not walk into this.
+
+      **Recommended: a separate one-job `shellcheck.yml`**, triggers mirroring `test.yml`
+      (`on: pull_request` + `push: branches: [main, develop]`, no path filter). It is the only option
+      that satisfies §9's "every push" criterion, covers all 56 files wherever they live, leaves
+      `validate.yml`'s deliberately-reasoned filters alone, and stays outside the parity test's scope.
+      It also matches house style — every workflow in this repo has exactly one job.
+- [x] **How shellcheck is obtained in CI.** GitHub's `ubuntu-latest` ships a `shellcheck` binary —
       prefer it over a container action for speed, but **pin and print the version**, because a
       version bump can introduce new findings and turn a green lane red with no code change. That is
       the main operational risk of this lane.
-- [ ] **File selection.** Must exclude `skills/*/references/`. Derive from `git ls-files` rather than
+- [x] **File selection.** Must exclude `skills/*/references/`. Derive from `git ls-files` rather than
       a shell glob, so untracked scratch scripts are never linted.
 
 **Dependencies**: none.
@@ -181,14 +220,19 @@ should be announced in the CHANGELOG rather than discovered.
 
 **Files**: ~14 shell scripts across `shared/resources/`, `skills/*/scripts/`, `scripts/`
 
-- [ ] Investigate the single **SC2010** properly. If it is real, fix it and add a test; if the fix is
+- [x] Investigate the single **SC2010** properly. If it is real, fix it and add a test; if the fix is
       non-trivial, file it separately rather than expanding this task.
-- [ ] Annotate the 25 false positives with `# shellcheck disable=SCxxxx` **and a one-line reason**.
+- [x] Annotate the 25 false positives with `# shellcheck disable=SCxxxx` **and a one-line reason**.
       A bare disable is a suppression; a disable with a reason is documentation. Prefer a file-level
       disable only where the code recurs throughout the file (e.g. the `JSM_DEFER_*` outputs).
-- [ ] For the SC2034 "unused" family specifically, consider whether the variable should simply be
-      `export`ed — that is a real answer to "is this used elsewhere?" rather than a suppression, and
-      may be more honest for a documented output contract.
+- [x] For the SC2034 "unused" family, **annotate at the writing site**, not at the reader — see the
+      attribution correction in §3. The `JSM_DEFER_*` findings are in `manage-sprint-state.sh` and
+      `move-sprint-issues.sh`; only `JSM_DEFERRED`/`JSM_DEFERRED_RECORD` belong in `jira-sprint-lib.sh`.
+- [x] **Do not reach for `export` on `BB_CURL_AUTH`.** It is a bash **array**, and bash cannot export
+      arrays — `export BB_CURL_AUTH` sets an attribute that no child process ever sees, so it would be
+      a no-op dressed up as a fix. `export` remains a legitimate answer for a scalar that genuinely
+      crosses a process boundary; for a value that crosses only a `source` boundary, a disable with a
+      stated reason is the honest form.
 
 **Dependencies**: Phase 1.
 
@@ -196,12 +240,12 @@ should be announced in the CHANGELOG rather than discovered.
 
 **Files**: `.github/workflows/validate.yml`, `.shellcheckrc` (if used)
 
-- [ ] Add the job. Confirm green on the current tree.
-- [ ] **Prove the gate can fail.** Introduce a deliberate warning-tier finding on a scratch branch and
+- [x] Add the job. Confirm green on the current tree.
+- [x] **Prove the gate can fail.** Introduce a deliberate warning-tier finding on a scratch branch and
       confirm CI goes red, then revert. A gate never observed failing is not known to be a gate — this
       repo has been bitten by exactly that shape (`task.90`, a lock helper that reported success for
       an advance that did not happen).
-- [ ] Confirm the lane does **not** lint bundled copies, by checking the reported file count is 56 and
+- [x] Confirm the lane does **not** lint bundled copies, by checking the reported file count is 56 and
       not 247.
 
 **Dependencies**: Phase 2.
@@ -210,11 +254,22 @@ should be announced in the CHANGELOG rather than discovered.
 
 **Files**: `CHANGELOG.md`, contributing/CI docs
 
-- [ ] CHANGELOG `[Unreleased]` entry naming the gate level and that new warning-tier findings will now
+- [x] CHANGELOG `[Unreleased]` entry naming the gate level and that new warning-tier findings will now
       fail CI.
-- [ ] Document the **local** invocation, including the container form for hosts without the binary:
-      `docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable <files>`.
-- [ ] Note the sources-only rule and why, so nobody "fixes" the lane by widening its glob.
+- [x] Document the **local** invocation, including the container form for hosts without the binary:
+      `docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable <files>`. **Targets are
+      pinned, not "or":** `CONTRIBUTING.md` § "Before you open a PR" (the human-facing list of local
+      gates) **and** `docs/architecture/concepts/coding-standards.md` § "Validation before commit"
+      (the agent-facing second copy of that same list). Both, in the same edit, or they diverge.
+- [x] Update `docs/architecture/concepts/tech-stack.md` § "Infrastructure and CI". It is **already
+      stale** — it claims a single `validate.yml` that "runs `npm test` on every push to `main`",
+      which describes neither workflow that exists. This task invalidates that paragraph further, so
+      it fixes the paragraph it touches.
+- [x] Note the sources-only rule and why (a **~9x inflation**; 515 vs 55 measured after this change,
+      725 vs 81 before it), written where the file list is
+      built, so nobody "fixes" the lane by widening its glob.
+- [x] Do **not** treat `.github/workflows/README.md` as authoritative — it is stale (claims the
+      workflows are disabled, documents `sbom.yml`/`codeql.yml`, which do not exist).
 
 **Dependencies**: Phase 3.
 
@@ -224,21 +279,60 @@ should be announced in the CHANGELOG rather than discovered.
 
 **Core Implementation**
 
-1. `.github/workflows/validate.yml` — the new job
-2. `.shellcheckrc` — optional, only if repo-wide settings beat per-file annotations
+1. `.github/workflows/shellcheck.yml` — **new**, one job, unfiltered triggers, ShellCheck pinned to
+   v0.11.0, `--severity=warning`, sources-only file list with a count assertion
+2. `.shellcheckrc` — **not added.** Every setting it would have carried is expressed more precisely at
+   the call site: severity is a job flag, and `external-sources` would have changed the behaviour of the
+   two pre-existing `# shellcheck source=` directives for no gain. A config file would also have moved
+   the sources-only rule away from the glob it governs.
 
-**Annotated (no behaviour change)**
+**Fixed (9 findings — real fixes, no behaviour change)**
 
-3. ~14 files across `shared/resources/`, `skills/*/scripts/`, `scripts/`, `.agents/scripts/`
+3. `.agents/scripts/backfill-story-issues.sh` — removed dead `EPIC` assignment (SC2034)
+4. `shared/resources/develop-pipeline-on-precompact.sh` — removed dead `TASK_ID` read (SC2034)
+5. `skills/mermaid-architect/scripts/lint.sh` — removed dead `VALID_TYPES_RE`, which had already
+   drifted from the live inline regex it duplicated (SC2034)
+6. `scripts/release.sh`, `scripts/setup-consumer.sh`, `shared/resources/read-config.sh` — quoted five
+   string literals that shadow command names (`patch`, `true`, `command`, `env`) (SC2209)
+7. `shared/resources/tracker-access.test.sh` — two assertion messages whose backticks sat inside a
+   **double-quoted** string and were therefore executed as command substitution, silently dropping the
+   emphasis (SC2211); and `ls | grep` replaced by a glob loop into an array, which also removed a
+   pre-existing SC2086 disable and added the empty-list guard the `ls` form silently lacked (SC2010)
+
+**Annotated (17 findings — reasoned disables)**
+
+8. `shared/resources/bitbucket-auth.sh` (2), `shared/resources/jira-sprint-lib.sh` (2 SC2034 + SC1007 +
+   SC1090), `shared/resources/resolve-platform.sh`, `set-github-project-priority.sh`,
+   `set-github-project-estimate.sh` (SC1007 `CDPATH=`),
+   `skills/jira-sprint-manager/scripts/{manage-sprint-state,move-sprint-issues}.sh` (4 each, SC2034)
 
 **Documentation**
 
-4. `CHANGELOG.md`
-5. Contributing / CI documentation
+9. `CHANGELOG.md` — `### Changed` entry naming the gate level and the migration consequence
+10. `CONTRIBUTING.md` § "Before you open a PR" — local invocation, binary and container forms
+11. `docs/architecture/concepts/coding-standards.md` § "Validation before commit" — the agent-facing
+    second copy of that list, updated in the same change so the two cannot diverge
+12. `docs/architecture/concepts/tech-stack.md` § "Infrastructure and CI" — rewritten; it described a
+    single `validate.yml` running `npm test` on pushes to `main`, which matched neither workflow
+
+**Generated**
+
+13. 137 bundled copies under `skills/*/references/` — regenerated by `npm run bundle`
+
+**Not linted, but regenerated**
+
+- `skills/*/references/*.sh` — bundled copies. They are **excluded from the lane** (linting them
+  reports every shared finding 4–5 times), but they are **not unchanged**: 8 of the 14 files needing
+  an annotation live in `shared/resources/`, and `npm run bundle` fans those edits out to
+  **139 bundled copies** (`read-config.sh` → 44, `bitbucket-auth.sh` → 38, `resolve-platform.sh` → 38,
+  `set-github-project-priority.sh` → 9, `set-github-project-estimate.sh` → 4, `jira-sprint-lib.sh` → 3,
+  `develop-pipeline-on-precompact.sh` → 3, `tracker-access.test.sh` → 0). `validate.yml`'s existing
+  **Bundle freshness check** fails the PR if they are not regenerated and committed, so `npm run bundle`
+  is a required step of Phase 2 and the PR diff will be large and mostly generated. Expect ~150 changed
+  files for ~25 hand-written comment lines.
 
 **Unchanged by design**
 
-- `skills/*/references/*.sh` — bundled copies; linting them reports every shared finding 4–5 times.
 - The nine shell **test** suites' behaviour — they are linted like any other source, not rewritten.
 
 ---
@@ -263,25 +357,27 @@ The deliverable is a CI job, so "testing" is mostly proving the job behaves:
 
 ### Functional
 
-- [ ] A CI job runs shellcheck on every tracked source shell script on every push.
-- [ ] The job lints **56** files, not 247 — bundled copies excluded.
-- [ ] The job is **green** on the tree as it stands at implementation time.
-- [ ] The job has been **observed failing** on a deliberately introduced warning-tier finding, and the
+- [x] A CI job runs shellcheck on every tracked source shell script, on **every pull request and
+      every push to `main`/`develop`** — with **no path filter**, so a change to a script outside
+      `skills/**` and `shared/resources/**` (e.g. `scripts/setup-consumer.sh`) still triggers it.
+- [x] The job lints **56** files, not 247 — bundled copies excluded.
+- [x] The job is **green** on the tree as it stands at implementation time.
+- [x] The job has been **observed failing** on a deliberately introduced warning-tier finding, and the
       evidence is recorded in the implementation report.
-- [ ] The shellcheck version is pinned or printed, so a version bump is diagnosable rather than
+- [x] The shellcheck version is pinned or printed, so a version bump is diagnosable rather than
       mysterious.
 
 ### Code Quality
 
-- [ ] Every `# shellcheck disable` carries a stated reason. No bare suppressions.
-- [ ] The single SC2010 is either fixed or explicitly justified.
-- [ ] `npm run ci` still green; no change to local gate duration.
+- [x] Every `# shellcheck disable` carries a stated reason. No bare suppressions.
+- [x] The single SC2010 is either fixed or explicitly justified.
+- [x] `npm run ci` still green; no change to local gate duration.
 
 ### Migration
 
-- [ ] CHANGELOG entry states the gate level and that new warning-tier findings will fail CI.
-- [ ] The local invocation is documented, including the container form for hosts without the binary.
-- [ ] The sources-only rule is documented **where the glob lives**, so widening it is a deliberate act.
+- [x] CHANGELOG entry states the gate level and that new warning-tier findings will fail CI.
+- [x] The local invocation is documented, including the container form for hosts without the binary.
+- [x] The sources-only rule is documented **where the glob lives**, so widening it is a deliberate act.
 
 ---
 
@@ -300,7 +396,28 @@ The deliverable is a CI job, so "testing" is mostly proving the job behaves:
 - **Mitigation**: pin the version, or at minimum print it in the job output so the cause is one glance
   away. Decide in Phase 1 and state the reasoning.
 
+**2. The lane is hosted where it cannot see the files it is meant to gate**
+
+- **Risk**: `validate.yml` is path-filtered; a lane placed there never fires for
+  `scripts/setup-consumer.sh`, `scripts/release.sh` or `.agents/scripts/backfill-story-issues.sh` —
+  all three of which carry a warning today, and the first of which is the file that motivated the
+  task. The lane looks green because it never ran.
+- **Probability**: High if Phase 1's original recommendation is followed without checking the filter.
+- **Impact**: High — a gate that cannot fail is indistinguishable from no gate, which is exactly the
+  failure mode §8 and `task.90` warn about.
+- **Mitigation**: own workflow, no path filter (Phase 1). The Phase 3 deliberate-regression proof
+  must introduce the finding in a file **outside** `skills/**` and `shared/resources/**`, or it
+  proves nothing about this risk.
+
 ### LOW RISK
+
+**2b. The annotation phase produces a ~150-file PR**
+
+- **Risk**: 8 of the 14 files needing annotations are in `shared/resources/`, which `npm run bundle`
+  fans out to 139 bundled copies. A reviewer sees a 150-file diff for a CI task and either rubber-stamps
+  it or stalls on it.
+- **Mitigation**: run `npm run bundle` as an explicit Phase 2 step, commit the generated copies
+  **separately** from the hand-written annotations, and say so in the PR description. See §7.
 
 **2. Suppressions accumulate into a lane that checks nothing**
 
@@ -329,22 +446,105 @@ there.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-05
+**Quality Score**: 96/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.92.qa.3.shellcheck-ci-lane.md](./task.92.qa.3.shellcheck-ci-lane.md) (cycles [1](./task.92.qa.1.shellcheck-ci-lane.md), [2](./task.92.qa.2.shellcheck-ci-lane.md))
+- **Gate File**: [task.92.gate.3.shellcheck-ci-lane.yml](./task.92.gate.3.shellcheck-ci-lane.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 7 shell suites + full `ci:fast` + 5/5 CI jobs on PR #322
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 — 4 findings across 3 cycles, all fixed and verified
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+All 11 success criteria met, with the central ones verified in **real CI** rather than by proxy — the
+new `shellcheck` job passed on PR #322, as did `test` (which runs `eval:all`, closing criterion 8).
+Three of four mutation proofs hold.
+
+Two MEDIUM findings, both in code this task introduced:
+
+- **TASK-92-001** — the empty-list guard added to `tracker-access.test.sh:1496` does not guard.
+  `return` at top level is illegal, `2>/dev/null || true` swallows it, and execution falls through
+  into the very `sed` hang the guard's comment claims to prevent. Unreachable in practice, but the
+  comment asserts something false — the `task.90` shape.
+- **TASK-92-002** — three pre-existing bare `# shellcheck disable` directives in `jira-sprint-lib.sh`
+  leave criterion 6 unmet repo-wide, inside the change that introduces the rule.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.92.gate.3.shellcheck-ci-lane.yml` — ✅ **PASS**, **96/100**, `top_issues: []`
+**Progression**: CONCERNS 80 → CONCERNS 85 → **PASS 96** across three cycles
+**Step 5c `/review-pr`**: CONCERNS (advisory) — one medium finding, found and fixed during the review
+**CI**: ✅ 5/5 jobs SUCCESS on head `50a2e60c` (head parity confirmed — the tested commit is the PR's)
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** 11/11 met, each individually evidenced
+✅ **Tests:** 7 shell suites + full hermetic suite; `npm run ci` green via the CI `test` job (which runs `eval:all`)
+✅ **CI:** `shellcheck`, `test`, `validate`, `link-check` and branch policy all green
+✅ **Documentation:** CHANGELOG, CONTRIBUTING.md, coding-standards.md and tech-stack.md all updated
+✅ **Security:** boundary probed — 3 candidates executed, 0 reproduced; no secrets, no new permissions, pinned HTTPS fetch
+⚠️ **Compliance:** NOT_APPLICABLE — no PII, payment, accessibility or health surface
+
+### Two partials recorded rather than papered over
+
+1. **Every one of the five findings was in code this task itself introduced.** The tree it inherited
+   was clean at `error`. The sharpest — a guard that reported a failure and then continued into the
+   exact hang its own comment claimed to prevent — was found by mutation-proving it, not by the
+   tests, which stayed green throughout and would have stayed green forever. **A green suite was
+   never evidence on this task.**
+2. **Independent review never happened.** Three Explore subagents (the QA cycle-2 refute pass and
+   both Step 5c lenses) hung and were terminated, so those steps were run in-line by the agent that
+   wrote the change. A human read of the 28-file reviewable surface is the outstanding mitigation.
+
+**Detailed Verification Log:** [`task.92.dod.1.shellcheck-ci-lane.md`](./task.92.dod.1.shellcheck-ci-lane.md)
+
+**Task marked as ACCEPTED on:** 2026-09-05
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-04 | 1.0     | Initial draft — filed from `task.83.gate.3` `recommendations.future`, with the baseline measured rather than estimated (56 sources, 81 findings, 0 errors, 26 warnings of which 25 are identified false positives) | create-task |
+| 2026-09-05 | 1.1 | Review passed (8/10). Baseline re-measured against shellcheck 0.11.0 and reproduces exactly (247/56 files, 0/26/79/81). Five corrections applied: `validate.yml` is path-filtered and cannot see 3 of the 56 sources including the motivating `setup-consumer.sh`, so Phase 1 now recommends a separate unfiltered workflow and records the `ci-gate-parity` constraint that rules out `test.yml`; the `JSM_DEFER_*` SC2034 attribution was inverted (the library reads them, the sprint scripts write them); `export` cannot work on the `BB_CURL_AUTH` array; SC2034 is 15 not 14; and §7's "unchanged by design" understated 139 regenerated bundled copies | review-task |
+| 2026-09-05 |         | Status → ready-for-development | review-task |
+| 2026-09-05 |         | Implemented — 155 files (18 hand-edited, 137 bundled), 0 new tests; all 26 warning-tier findings resolved (9 real fixes, 17 reasoned disables), lane added and mutation-proved red on a finding in `scripts/setup-consumer.sh` | develop |
+| 2026-09-05 |         | Status → ready-for-review | develop |
+| 2026-09-05 |         | QA gate CONCERNS (80/100) — 2 MEDIUM, 1 LOW; all 11 criteria met, 5/5 CI jobs green | qa-task |
+| 2026-09-05 |         | qa-fix cycle 1 — TASK-92-001 (vacuous empty-list guard) fixed and mutation-proved; TASK-92-002 + the LOW closed: zero bare disables remain in any of the 56 sources | qa-fix |
+| 2026-09-05 |         | QA gate 2 CONCERNS (85/100) — refute pass; cycle-1 findings verified fixed, two new documentation-accuracy defects found | qa-task |
+| 2026-09-05 |         | qa-fix cycle 2 — TASK-92-003 (fix/annotation split miscounted 11/15; true split 9/17) and TASK-92-004 (tech-stack said five workflows, there are six) corrected | qa-fix |
+| 2026-09-05 |         | QA gate 3 **PASS** (96/100) — all four findings verified fixed, no new findings, 5/5 CI jobs green | qa-task |
+| 2026-09-05 |         | Step 5c `/review-pr` CONCERNS — PC-1 (stale "725 vs 81" figure, now 515 vs 55) found and fixed; both review lenses hung and the review was not independent | review-pr |
+| 2026-09-05 | 1.2     | DoD verified — accepted (PR #322). 11/11 criteria, gate PASS 96/100, CI 5/5 green. Two partials recorded: all five findings were self-inflicted, and no independent review ran | finalise |
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1 — Choose the gate and the wiring
-- [ ] Phase 2 — Triage and annotate
-- [ ] Phase 3 — Add the lane and prove it fires
-- [ ] Phase 4 — Documentation
-- [ ] QA review complete
-- [ ] Quality gate PASS
+- [x] Phase 1 — Choose the gate and the wiring
+- [x] Phase 2 — Triage and annotate
+- [x] Phase 3 — Add the lane and prove it fires
+- [x] Phase 4 — Documentation
+- [x] QA review complete
+- [x] Quality gate PASS
 
 ---
 
@@ -364,7 +564,8 @@ there.
 
 ### Important Reminders
 
-- **Lint sources, not bundles.** 56 files, not 247. The difference is 81 findings versus 725, and the
+- **Lint sources, not bundles.** 56 files, not 247. The difference is a ~9x inflation (725 versus 81
+  at the pre-change baseline; 515 versus 55 measured after this change), and the
   extra 644 are the same findings counted five times.
 - **A gate never seen to fail is not known to be a gate.** Phase 3's deliberate-regression proof is
   the point of Phase 3, not a formality.

@@ -1,0 +1,85 @@
+schema: 1
+task: 'task.92.shellcheck-ci-lane'
+task_title: "Add a shellcheck CI lane for the repo's shell scripts"
+gate: CONCERNS
+status_reason: 'Cycle-1 findings all verified fixed and mutation-proved. The refute pass found two NEW documentation-accuracy defects, both in shipped docs: the real-fix/annotation split is miscounted 11/15 (true split 9/17) in CHANGELOG.md and two task artifacts, and the tech-stack paragraph rewritten to fix staleness says "five workflows" when there are six, omitting branch-policy.yml.'
+reviewer: 'QA Engineer'
+updated: '2026-09-05T14:05:00Z'
+
+top_issues:
+  - id: 'TASK-92-003'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: >-
+      The split of the 26 findings into real fixes versus annotations is wrong everywhere it is
+      stated. Claimed: "11 by a real fix … and 15 by a `# shellcheck disable`". Actual, counted
+      against the original 26: SC2034 15 → 3 deleted + 12 annotated; SC1007 4 → 4 annotated;
+      SC2209 3 → 3 quoted; SC2211 2 → 2 fixed; SC1090 1 → annotated; SC2010 1 → fixed. That is
+      **9 real fixes and 17 annotations**, and 17 is independently confirmed by counting the
+      directives the branch adds. Root cause: "five string literals quoted" counted ASSIGNMENTS
+      quoted (5 arms in release.sh alone, done for uniformity) rather than FINDINGS resolved (3
+      SC2209). The wrong numbers appear in CHANGELOG.md:70-72, the task document's Files Summary,
+      the implementation report, and the PR body.
+    suggested_action: >-
+      Correct to 9/17 in CHANGELOG.md, task.92.shellcheck-ci-lane.md, the implementation report and
+      the PR body. Keep the distinction explicit — findings resolved, not lines edited.
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-92-004'
+    severity: medium
+    file: 'docs/architecture/concepts/tech-stack.md'
+    finding: >-
+      The § "Infrastructure and CI" paragraph was rewritten by this task specifically because it was
+      stale, and the rewrite is itself inaccurate. It says "five workflows in `.github/workflows/`"
+      and then names five — test, validate, shellcheck, release, docs-link-check — but there are
+      **six**: `branch-policy.yml` (job `base-branch`, on `pull_request`, rejects PRs into `main`
+      from a non-develop/hotfix/release head) is omitted entirely. Five was the count BEFORE this
+      task added shellcheck.yml. Every other claim in the paragraph was verified correct against the
+      workflow files (triggers, path-filtering, and what each runs).
+    suggested_action: >-
+      Say six, and name branch-policy.yml with its one-line purpose. Re-verify the count against
+      `ls .github/workflows/*.yml` rather than against the pre-pass summary that predated this change.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from cycle 1. No security surface touched; pinned tarball over HTTPS; workflow declares no permissions.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. Separate job; local gate duration untouched; ci-gate-parity green.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-1 TASK-92-001 fix mutation-proved: forcing the reader list empty now prints FAIL reader-key guard and exits 1 in normal time, where before it fell through. 5/5 CI jobs green on head f7074d3f.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Both new findings are documentation accuracy in shipped artifacts. TASK-92-004 is the sharper of the two: a paragraph rewritten expressly to correct staleness shipped a new error of the same kind.'
+
+recommendations:
+  immediate:
+    - action: 'Correct the 11/15 split to 9/17 wherever it is stated (TASK-92-003).'
+      refs: ['CHANGELOG.md', 'docs/tasks/task.92.shellcheck-ci-lane/task.92.shellcheck-ci-lane.md']
+    - action: 'Correct the workflow count to six and name branch-policy.yml (TASK-92-004).'
+      refs: ['docs/architecture/concepts/tech-stack.md']
+  future:
+    - action: 'Consider an info-tier lane once the warning lane has been green for a while; §4 scopes it out of this task.'
+      refs: ['.github/workflows/shellcheck.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-92-003 and TASK-92-004 corrected.'

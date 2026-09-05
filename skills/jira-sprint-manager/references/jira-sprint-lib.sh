@@ -104,6 +104,7 @@ jsm_resolve_access() {
   if [ -z "$_jsm_self" ]; then
     resolver="/nonexistent/resolve-platform.sh"
   else
+    # shellcheck disable=SC1007  # `CDPATH= cmd` is a one-command env prefix, not an empty assignment
     resolver="$(CDPATH= cd -P -- "$(dirname "$_jsm_self")" >/dev/null 2>&1 && pwd -P || true)/resolve-platform.sh"
   fi
   unset _jsm_self
@@ -122,13 +123,15 @@ jsm_resolve_access() {
     cfg_mode=$(
       unset ACCESS_TRACKER AGENT_SKILLS_ACCESS_TRACKER AGENT_SKILLS_CONFIG_TIER
       cd "$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")" || exit 1
+      # shellcheck disable=SC1090  # $resolver is computed at runtime from BASH_SOURCE; there is no
+      # constant path a `source=` directive could name.
       source "$resolver" >/dev/null 2>"${cfg_err:-/dev/null}" && printf '%s' "$ACCESS_TRACKER"
     ) || cfg_mode="manual"
     [ -n "$cfg_mode" ] || cfg_mode="manual"
     # Surface the resolver's own refusal line, the way the JS path does. Without
     # this the operator gets `manual` and no reason at all.
     if [ "$cfg_mode" = "manual" ] && [ -n "$cfg_err" ] && [ -s "$cfg_err" ]; then
-      # shellcheck disable=SC2034
+      # shellcheck disable=SC2034  # output contract: set here, read by this lib's callers
       # $'...' (ANSI-C quoting), NOT "\xe2…": grep does not interpret \xNN, so the
       # double-quoted form searched for the literal text `xe2x9dx8c` and matched
       # nothing. The capture was silently inert until a test caught it.
@@ -237,7 +240,9 @@ jsm_curl() {
   local auth tmp attempt=0 max=4 wait=1
 
   # Always set, so a caller under `set -u` can branch on it unconditionally.
+  # shellcheck disable=SC2034  # output contract: read by the sprint scripts that source this lib
   JSM_DEFERRED=0
+  # shellcheck disable=SC2034  # output contract, as above
   JSM_DEFERRED_RECORD=""
 
   # Fail closed, and BEFORE the retry loop — recording inside it would write one
@@ -321,7 +326,8 @@ jsm_paginate_values() {
   local query=${2:-}
   local start=0 is_last page_len grand_total url acc_f page_f new_f
   acc_f=$(mktemp); page_f=$(mktemp); new_f=$(mktemp)
-  # shellcheck disable=SC2064
+  # shellcheck disable=SC2064  # expansion at trap-set time is intended: the path must be
+  # captured now, not resolved when the trap fires and the variable may be gone
   trap "rm -f '$acc_f' '$page_f' '$new_f'" RETURN
   printf '[]' > "$acc_f"
   while :; do
@@ -358,7 +364,8 @@ jsm_paginate_issues() {
   local query=${2:-}
   local start=0 page_len grand_total url acc_f page_f new_f
   acc_f=$(mktemp); page_f=$(mktemp); new_f=$(mktemp)
-  # shellcheck disable=SC2064
+  # shellcheck disable=SC2064  # expansion at trap-set time is intended: the path must be
+  # captured now, not resolved when the trap fires and the variable may be gone
   trap "rm -f '$acc_f' '$page_f' '$new_f'" RETURN
   printf '[]' > "$acc_f"
   while :; do

@@ -1,0 +1,101 @@
+name: ShellCheck
+
+# Deliberately NOT path-filtered, and deliberately not a step inside an existing
+# workflow. Two constraints forced a workflow of its own:
+#
+#   * `validate.yml` is path-filtered to `skills/**`, `shared/resources/**` and a
+#     few named files. Three of the source scripts live outside every one of
+#     those paths — `scripts/setup-consumer.sh`, `scripts/release.sh` and
+#     `.agents/scripts/backfill-story-issues.sh` — and `setup-consumer.sh` is the
+#     script whose unverifiable shellcheck criterion (task 83) is the reason this
+#     lane exists at all. A lane there would never have fired for the change that
+#     motivated it.
+#   * `test.yml` has no path filter, but `evals/shared/tests/ci-gate-parity.test.mjs`
+#     asserts set equality in BOTH directions between the npm scripts run by that
+#     workflow's `test` job and the `npm run ci` composite. A step added there goes
+#     red unless a matching script also joins `npm run ci` — which would put a
+#     Docker pull or an apt install into the local gate.
+#
+# So: same triggers as test.yml, no filter, its own job. The lane is ~15s.
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # PINNED, not the runner image's shellcheck. An unpinned linter is the one
+      # failure mode that turns every PR red for a reason unrelated to the PR:
+      # the runner image updates, a new check fires on untouched code, and the
+      # natural reaction is to widen the excludes, which weakens the lane
+      # permanently. The version is also printed, so when the pin is eventually
+      # bumped the diff in findings is attributable to exactly that.
+      #
+      # Bumping this: change SHELLCHECK_VERSION, run the local invocation from
+      # CONTRIBUTING.md, and fix or annotate whatever the new version adds — in
+      # its own commit, so the bump and the fallout are reviewable together.
+      - name: Install ShellCheck (pinned)
+        env:
+          SHELLCHECK_VERSION: v0.11.0
+        run: |
+          set -euo pipefail
+          url="https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSL "$url" | tar -xJf - --strip-components=1 -C /usr/local/bin "shellcheck-${SHELLCHECK_VERSION}/shellcheck"
+          shellcheck --version
+
+      - name: Lint source shell scripts
+        run: |
+          set -euo pipefail
+
+          # SOURCES ONLY — do not widen this to `**/*.sh` or drop the grep.
+          #
+          # `git ls-files '*.sh'` returns 247 files, but only 56 are sources. The
+          # other 191 are bundled copies written by `npm run bundle` from
+          # shared/resources/, and each shared script is bundled into four or five
+          # skills. Linting all of them reports every shared finding once per copy —
+          # a ~9x inflation, and a red lane whose "fix" is to edit a file the bundler
+          # will overwrite on the next run.
+          #
+          # Measured at the `style` tier on 2026-09-05, after this change: 515
+          # findings across all 247 files versus 55 across the 56 sources. (The
+          # pre-change baseline in task 92 was 725 versus 81; the ratio is what is
+          # stable, not the absolute counts, which move as findings are resolved.)
+          #
+          # Bundle drift is already guarded by validate.yml's Bundle freshness check
+          # and by evals/shared/tests/ — this lane must not duplicate that job.
+          #
+          # `git ls-files` rather than a shell glob so untracked scratch scripts in a
+          # contributor's tree are never linted.
+          mapfile -t FILES < <(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
+
+          echo "linting ${#FILES[@]} source shell scripts"
+
+          # Cheap assertion against the most likely misconfiguration — someone
+          # widening the glob above and silently pulling in the bundled copies.
+          if [ "${#FILES[@]}" -ge 200 ]; then
+            echo "::error::File list includes bundled copies (${#FILES[@]} files, expected ~56)."
+            echo "The grep excluding 'skills/*/references/' has been dropped or widened — see the comment above it."
+            exit 1
+          fi
+
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::No shell scripts matched — the file list is empty, so this lane checked nothing."
+            exit 1
+          fi
+
+          # --severity=warning, not the default (style). error is 0 today and would
+          # very likely stay 0 — syntax errors are already caught by the nine shell
+          # suites that actually execute — which would make the lane decorative.
+          # info/style add 55 findings dominated by SC2016 and SC2015, both of which
+          # are deliberate throughout this repo; gating there would need a blanket
+          # exclude list that makes the lane weaker than gating at warning honestly.
+          if ! shellcheck --severity=warning "${FILES[@]}"; then
+            echo "::error::ShellCheck found warning-tier issues."
+            echo "Run it locally: see CONTRIBUTING.md 'Before you open a PR' (a container form is documented for hosts without the binary)."
+            echo "If the finding is a genuine false positive, add '# shellcheck disable=SCxxxx' WITH a stated reason — a bare disable is a suppression."
+            exit 1
+          fi

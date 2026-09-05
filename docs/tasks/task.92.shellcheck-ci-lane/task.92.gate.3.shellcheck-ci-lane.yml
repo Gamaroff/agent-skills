@@ -1,0 +1,55 @@
+schema: 1
+task: 'task.92.shellcheck-ci-lane'
+task_title: "Add a shellcheck CI lane for the repo's shell scripts"
+gate: PASS
+status_reason: 'All findings from cycles 1 and 2 verified fixed. All 11 success criteria met, with the load-bearing ones verified in real CI rather than by proxy: 5/5 jobs green on head 45951909, including the new shellcheck job. The gate is mutation-proved to fail three ways and proved to pass on the clean tree. No new findings this cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-05T14:40:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No security surface touched. Pinned ShellCheck tarball fetched over HTTPS from the official koalaman release; workflow declares no permissions and needs none.'
+  performance:
+    status: PASS
+    notes: 'Separate ~15s job, so no wall-clock added to test.yml. No npm script joined ci/ci:fast, so local gate duration is unchanged and ci-gate-parity.test.mjs stays green.'
+  reliability:
+    status: PASS
+    notes: 'Gate mutation-proved to fail on a new finding (sited outside validate.yml path filter), on a widened glob at 247 files, and on an empty list; green on the clean tree. Version pinned so a runner-image bump cannot turn the lane red unattended. The cycle-1 guard fix was separately mutation-proved.'
+  maintainability:
+    status: PASS
+    notes: 'Zero bare disables across all 56 sources — every directive carries a stated reason. Sources-only rule documented at the glob; the workflow header records why it is not a step in validate.yml. Both cycle-2 documentation defects corrected.'
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-05'
+  total_iterations: 2
+  verification_method: 'Mutation proof (guard fix), mechanical re-check of every corrected claim, container shellcheck run, and 5/5 real CI jobs'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Consider an info-tier lane once the warning lane has been green for a while — 53 further findings, dominated by deliberate SC2016/SC2015. Task 92 §4 already scopes this out; file it separately.'
+      refs: ['.github/workflows/shellcheck.yml']
+    - action: 'The refute-pass subagent hung and produced nothing, so cycle 2 was reviewed in-line by the agent that wrote the code. Worth a look at why the Explore agent stalled on a 21-file diff.'
+      refs: ['docs/tasks/task.92.shellcheck-ci-lane/task.92.qa.2.shellcheck-ci-lane.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
