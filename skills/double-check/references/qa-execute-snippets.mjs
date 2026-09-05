@@ -257,6 +257,54 @@ const SAFE_GIT_SUBCOMMANDS = new Set([
  * Named dangers. These do not define the boundary — SAFE_COMMANDS does — but
  * they produce a precise reason for the cases worth naming.
  */
+/**
+ * Commands for which `-o` is NOT an output file: `grep` reads it as
+ * `--only-matching` and `find` as the OR operator. Both are read-only.
+ */
+const O_FLAG_NOT_OUTPUT = new Set(["grep", "egrep", "fgrep", "rg", "find"]);
+
+/** Prefixes that precede the real command without being it. */
+const COMMAND_PREFIXES = new Set(["sudo", "env", "command", "nohup", "nice"]);
+
+/**
+ * Does any command in this block write a file via `-o`?
+ *
+ * BUG-6 root cause D — `-o` used to be matched as a bare string with no reference
+ * to the command it belongs to, so `grep -o` and `find … -o` were refused. The
+ * first attempt at scoping it was a regex with a negative lookahead, and it was
+ * wrong twice over, which is why this is a function instead:
+ *
+ *  - `\s*` before a lookahead BACKTRACKS. At `| grep -o …` the engine tried the
+ *    lookahead after the space, failed it, then retried with `\s*` empty — where
+ *    `grep` no longer sits at the cursor, so the negative lookahead trivially
+ *    succeeded and the exemption evaporated. It held only at zero-whitespace
+ *    positions, which meant this repository's OWN documented `| grep -o …`
+ *    snippet stayed refused.
+ *  - A command substitution inherited its enclosing segment's exemption, so
+ *    `find . -newer $(sort -o /tmp/pwned f)` was let through — a FAIL-OPEN newly
+ *    created by the fix for an over-refusal. `$(`, backticks and grouping
+ *    parentheses are therefore segment boundaries here.
+ */
+function hasOutputFlagWrite(text) {
+  const segments = text.split(/\n|;|\|\||&&|\||&|\$\(|`|\(|\)|\{|\}/);
+  for (const seg of segments) {
+    if (!/\s-o(?:\s+|=)\S/.test(seg)) continue;
+    const words = seg.trim().split(/\s+/).filter(Boolean);
+    let i = 0;
+    // Step over assignments and prefix commands to reach the real command name.
+    while (
+      i < words.length &&
+      (COMMAND_PREFIXES.has(words[i]) || /^[A-Za-z_]\w*=/.test(words[i]))
+    ) {
+      i += 1;
+    }
+    const name = (words[i] || "").replace(/['"\\]/g, "").split("/").pop();
+    if (O_FLAG_NOT_OUTPUT.has(name)) continue;
+    return true; // an unrecognised command with `-o` still fails closed
+  }
+  return false;
+}
+
 export const DENY_PATTERNS = [
   [/\bgh\s+pr\s+comment\b/, "gh pr comment"],
   [/\bgh\s+issue\b/, "gh issue"],
@@ -276,16 +324,6 @@ export const DENY_PATTERNS = [
   // Long-form output flags on otherwise read-only commands write files just as a
   // redirection does, and carry no `>` for WRITE_REDIRECT to catch.
   [/\s--output(=|\s)/, "--output flag"],
-  // BUG-6 root cause D — `-o` was matched as a bare string, with no reference to
-  // the command it belongs to. For most commands it names an output file, but for
-  // `grep` it is `--only-matching` and for `find` it is the OR operator, and both
-  // are read-only. A gate that refuses `grep -o` and `find … -o` teaches people to
-  // bypass it. The exception is scoped by naming the few commands where `-o` does
-  // NOT write, so an unrecognised command still fails closed.
-  [
-    /(?:^|[\n;&|])\s*(?!(?:sudo\s+)?(?:grep|egrep|fgrep|rg|find)\b)[^\n;&|]*\s-o\s+\S/,
-    "-o output flag",
-  ],
   // BUG-6 root cause D — sed writes a file through its `w` flag with neither `-i`
   // nor a redirection: `s/a/b/w FILE` as a substitute flag and `w FILE` as a
   // command. DENY_PATTERNS named only the `-i` spellings, so both slipped past.
@@ -322,6 +360,27 @@ export const DENY_PATTERNS = [
  */
 const WRITE_REDIRECT =
   /(?:^|[^<>&])(?:\d*>>?|&>|>\|)\s*(?!&\d|\s*\/dev\/(?:null|stderr|stdout)\b)\S/;
+
+/**
+ * Blank the CONTENTS of `(( … ))` and `[[ … ]]`, preserving length and newlines.
+ *
+ * Inside an arithmetic evaluation or a conditional expression, `>` is a COMPARISON
+ * operator, never a redirection. Widening WRITE_REDIRECT's pre-context to catch
+ * `echo pwned>/tmp/x` (BUG-6 root cause B) also made `if ((a>b)); then …` match,
+ * turning a read-only arithmetic test into a refusal — an over-refusal introduced
+ * by the fix for a fail-open. `[[ 1 > 2 ]]` was already refused for the same
+ * reason before that change; one guard covers both.
+ *
+ * This is applied ONLY on the write-redirection path. `commandWords` still sees
+ * the original text, so a command substitution inside a conditional — `[[ $(touch
+ * /tmp/x) ]]` — is still scanned and still fails closed.
+ */
+function blankConditionalSpans(text) {
+  const blank = (inner) => inner.replace(/[^\n]/g, " ");
+  return text
+    .replace(/\(\(([^)]*)\)\)/g, (_m, inner) => `((${blank(inner)}))`)
+    .replace(/\[\[([^\]]*)\]\]/g, (_m, inner) => `[[${blank(inner)}]]`);
+}
 
 /** Template slots: `{n}`, `{task-id}`, `<path>`, `<PLACEHOLDER>`. */
 const PLACEHOLDER_PATTERNS = [
@@ -465,6 +524,52 @@ function blankQuotedSpans(text) {
   return out;
 }
 
+/**
+ * Like `blankQuotedSpans`, but COLLAPSES each quoted span to its bare quote pair
+ * instead of preserving its length.
+ *
+ * Both exist because they serve different consumers. The heredoc detector needs
+ * offsets that line up with the raw line, so it uses the length-preserving form.
+ * Command detection needs the OLD tokenisation: the two regexes this replaced
+ * turned `"a b"` into `""`, one token. Blanking to spaces instead splits a
+ * multi-line assignment `MSG="first\nsecond"` into a final segment whose only
+ * surviving token is the closing quote — reported as an unreadable command
+ * position and refused. Collapsing keeps the token count while still fixing the
+ * mutual-awareness defect the regex pair had.
+ */
+function collapseQuotedSpans(text) {
+  let out = "";
+  let quote = null;
+  let openedAt = -1;
+  let outAtOpen = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quote === null) {
+      if (ch === "'" || ch === '"') {
+        quote = ch;
+        openedAt = i;
+        outAtOpen = out.length;
+        out += ch;
+      } else if (ch === "\\" && i + 1 < text.length) {
+        out += ch + text[i + 1];
+        i += 1;
+      } else {
+        out += ch;
+      }
+    } else if (quote === '"' && ch === "\\" && i + 1 < text.length) {
+      i += 1; // escaped char inside double quotes is content — dropped
+    } else if (ch === quote) {
+      quote = null;
+      openedAt = -1;
+      out += ch;
+    }
+    // else: content of a quoted span — dropped
+  }
+  // Same fail-closed rule as blankQuotedSpans: an unterminated quote hides nothing.
+  if (quote !== null) return out.slice(0, outAtOpen) + text.slice(openedAt);
+  return out;
+}
+
 function stripProse(code) {
   const out = [];
   const lines = code.split("\n");
@@ -523,7 +628,7 @@ function stripProse(code) {
  * invocation.
  */
 function stripNonCode(code) {
-  return blankQuotedSpans(stripProse(code));
+  return collapseQuotedSpans(stripProse(code));
 }
 
 /**
@@ -650,7 +755,9 @@ export function commandWords(code) {
     // Whether the NEXT token examined sits in command position. A segment starts
     // in command position; a keyword either keeps it there or ends the scan.
     let inCommandPosition = true;
-    for (let tok of trimmed.split(/\s+/)) {
+    const toks = trimmed.split(/\s+/);
+    for (let ti = 0; ti < toks.length; ti += 1) {
+      let tok = toks[ti];
       // Leading `VAR=value` assignments and redirections precede the command.
       if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) continue;
       if (/^[<>]/.test(tok) || /^\d+[<>]/.test(tok)) continue;
@@ -673,6 +780,16 @@ export function commandWords(code) {
       // attacker only has to add one quote to defeat. Verified: all three
       // executed under the previous version.
       let word = tok.replace(/\\(.)/g, "$1").replace(/['"]/g, "");
+
+      // `((expr))` and `[[expr]]` written without spaces arrive as ONE token that
+      // cannot be a command name. Spaced, they tokenise as the `((`/`[[` keywords
+      // and are handled below; glued, fail-closed would refuse a read-only
+      // arithmetic test. A token carrying `$(` or a backtick is NOT exempted —
+      // `((a+$(touch /tmp/x)))` must still reach the fail-closed path.
+      if (/^(?:\(\(|\[\[)/.test(tok) && !/[$`]/.test(tok)) {
+        inCommandPosition = false;
+        continue;
+      }
 
       // Keywords are resolved BEFORE the command-name test, because several of
       // them (`[`, `[[`, `!`, `{`) cannot look like a command name and would
@@ -701,7 +818,13 @@ export function commandWords(code) {
         // Carry THIS invocation's subcommand. Resolving `git` against the first
         // `git …` in the whole block instead fails OPEN: a block opening with
         // `git rev-parse` would license a later `git checkout` in the same block.
-        const rest = gitSubcommand(trimmed.split(/\s+/).slice(1));
+        // Slice from AFTER THIS `git` token. Slicing from the segment's second
+        // token was correct only while the scan always stopped at the segment's
+        // first token; now that it continues past keywords and `case` arms, `git`
+        // is frequently not token 0. `if git status` then resolved to `git:git`
+        // and was refused, and `case log in log) git checkout -- . ;; esac`
+        // resolved to the allow-listed `git:log` and RAN — a fail-open.
+        const rest = gitSubcommand(toks.slice(ti + 1));
         words.push(rest ? `git:${rest}` : "git");
       } else {
         words.push(tok);
@@ -754,8 +877,12 @@ export function classifyBlock(code, bindings = {}) {
       return { klass: "mutating", reason: `deny-list: ${name}` };
   }
 
+  if (hasOutputFlagWrite(prose)) {
+    return { klass: "mutating", reason: "deny-list: -o output flag" };
+  }
+
   // CR-1 — a write redirection makes any command mutating, allow-listed or not.
-  if (WRITE_REDIRECT.test(stripNonCode(code))) {
+  if (WRITE_REDIRECT.test(blankConditionalSpans(stripNonCode(code)))) {
     return { klass: "mutating", reason: "write-redirection" };
   }
 

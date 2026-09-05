@@ -4,7 +4,7 @@ title: "Ten more fail-open routes past the snippet classifier, plus two over-ref
 type: bug
 description: "The qa-execute-snippets classifier still lets ten mutating inputs reach `runnable` after commit 0c4c05f closed bug.3's fourteen, and wrongly refuses two read-only `-o` usages. All twelve reproduce deterministically on current HEAD. Found by the probe mode delivered in task.73 — on its first real run."
 tags: [qa, security, snippet-engine, fail-open, classifier]
-status: ready-for-qa
+status: closed
 severity: Major
 priority: High
 created: 2026-09-02
@@ -18,7 +18,7 @@ component: shared/resources/qa-execute-snippets.mjs
 
 **Bug ID**: bug.6
 **Related**: None — cross-cutting (no single owner)
-**Status:** ✅ Ready for QA
+**Status:** ✅ Closed
 **Severity:** Major
 **Priority:** High
 **Created**: 2026-09-02
@@ -363,6 +363,60 @@ detection; D) command-blind flag semantics.
 
 ---
 
+#### QA Verification — Cycle 1 (Ready for QA → Reopened)
+
+**Date**: 2026-09-05
+**Verifier**: develop-bug (adversarial diff review + deterministic re-probe)
+
+**Verification Result**: ⚠️ Still Failing — **the fix itself carried five defects, one of them a new fail-open.**
+
+| # | Finding | Severity |
+|---|---------|----------|
+| V1 | `find . -name '*.md' -newer $(sort -o /tmp/pwned notes.md)` classified **`runnable`** — it was `mutating` before this branch. The scoped `-o` regex anchored only on `^` and `[\n;&\|]`, so a command substitution **inherited the exemption** of the `grep`/`find` that enclosed it. | **FAIL-OPEN (new)** |
+| V2 | The `-o` exemption held only at zero-whitespace positions: `\s*` before a negative lookahead **backtracks**, so at `\| grep -o …` the lookahead was re-evaluated at a space and trivially succeeded. This repository's **own documented** `\| grep -o …` snippet stayed refused — root cause D's fix was largely non-functional. | Over-refusal |
+| V3 | `gitSubcommand()` was fed the segment's second token, not the tokens after **this** `git` — correct only while the scan stopped at the first token. Gave `if git status` → `git:git` → refused, **and** `case log in log) git checkout -- . ;; esac` → `git:log` → **`runnable`**. | **FAIL-OPEN (new)** + over-refusal |
+| V4 | Blanking a quoted span to spaces preserved its newlines, so a multi-line `MSG="…"` left the closing quote alone on a segment and reported an unreadable command position. | Over-refusal |
+| V5 | A glued `((a>b))` arrives as one token that cannot be a command name, so fail-closed refused a read-only arithmetic test once `if` stopped discarding the segment. | Over-refusal |
+
+**Notes**: V1 and V3 are the significant ones — a fix for a fail-open that opens two more is the worst outcome available to this change. Both were found by adversarial review of the diff, not by the corpus, which is why all five are now pinned by tests of their own.
+
+**Decision**: Reopened → fixed in Iteration 2.
+
+---
+
+### Iteration 2
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-05
+
+**Fix Description**:
+
+- **V1 + V2.** The `-o` rule is no longer a regex. `hasOutputFlagWrite()` splits the block on every boundary that can begin a simple command — **including `$(`, backticks and grouping parentheses** — then per segment steps over assignments and prefix commands (`sudo`, `env`, `command`, `nohup`, `nice`) to reach the real command name and consults `O_FLAG_NOT_OUTPUT`. An unrecognised command with `-o` still fails closed. A function rather than a regex precisely because a lookahead's backtracking made the exemption position-dependent in a way that was invisible on review.
+- **V3.** The token loop is indexed and `gitSubcommand()` receives `toks.slice(ti + 1)` — the tokens after **this** `git`.
+- **V4.** `collapseQuotedSpans()` joins `blankQuotedSpans()`: command detection collapses a quoted span to its bare quote pair (restoring the tokenisation the two original regexes produced), while the heredoc offset test keeps the length-preserving form it needs. Both apply the same unterminated-quote rewind.
+- **V5.** A token matching `^((` or `^[[` that carries no `$(` or backtick is an evaluation, not an invocation. One carrying a command substitution still reaches the fail-closed path.
+
+**Files Modified**: as Iteration 1, plus five new regression tests in `shared/resources/tests/qa-execute-snippets.test.mjs`, one per finding.
+
+**Testing**: 89 tests green (was 84). Each of the five fixes mutation-proven individually — reverting any one turns the suite red. The V1 proof **first reported green because the edit silently failed to apply**; re-run with an assertion that the file actually changed, it went red. A mutation proof that cannot show its mutation landed is not a proof.
+
+#### QA Verification — Cycle 2 (Ready for QA → Closed)
+
+**Date**: 2026-09-05
+
+**Verification Result**: ✅ Fixed
+
+- All 13 reported routes closed; both over-refusals accepted; all 20 probe controls correct.
+- All five verify-cycle findings closed and pinned by tests.
+- 89 unit + replay tests green, 0 failures. Five bundled copies byte-identical to source.
+
+**Decision**: Closed.
+
+**Known remaining gap (recorded, not fixed)**: the new `sed w write` rule requires whitespace after `w`, so a glued GNU-sed form — `sed 's/a/b/wpwned.txt' f` — is still `runnable`. It is outside bug.6's reported set, and every pattern tried for it produced false positives on ordinary text (`sed 's/warning/x/' f`). It belongs with `task.79`'s shared adversarial corpus rather than another regex here.
+
+---
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -371,9 +425,55 @@ detection; D) command-blind flag semantics.
 | 2026-09-05 | New | review-bug | Fix-readiness review. Severity/priority unchanged (Major/High — confirmed correct). Added Expected/Actual, Environment, Frequency/Reproducible, Evidence, Related Files, Scope & Impact, Developer Fix Cycle, Status History and Resolution Summary sections; added `related` frontmatter and the Bug ID header. Corrected the claim that `elif` is not vulnerable (it is) and widened root cause A to the full swallowing-keyword set. Disambiguated the `bug-1`/`bug.3` citations to `task.67.bug.1`/`task.67.bug.3`. Folded the Change Log into this table — bug reports use Status History, not a Change Log. |
 | 2026-09-05 | In Progress | develop-bug | Reproduced all 13 claims by direct execution at HEAD `c9a6be3d`; root causes A–D localised to exact lines; investigation started |
 | 2026-09-05 | Ready for QA | develop-bug | Fix implemented as 4 changes (A–D) + regression corpus (13 fail-open, 2 over-refusal) + 5 counterweight tests. 82 pass / 0 fail. Two self-inflicted regressions caught and fixed before commit |
+| 2026-09-05 | Reopened | develop-bug | Verify cycle 1 FAILED — adversarial review of the fix found 5 defects in it, including 2 NEW fail-opens (`$()` inheriting the `-o` exemption; `gitSubcommand` given the wrong token slice) |
+| 2026-09-05 | Ready for QA | develop-bug | Iteration 2 — all 5 verify findings fixed; `-o` rule rewritten as a segment-walking function; 89 tests green; each fix mutation-proven with an applied-assertion |
+| 2026-09-05 | Closed | develop-bug | Verify cycle 2 PASS — all 13 routes closed, both over-refusals accepted, no new fail-open. Resolution Summary written |
 
 ---
 
 ## Resolution Summary
 
-[To be completed when the bug is closed]
+**Final Status**: ✅ Closed — fixed and verified.
+
+**Total Iterations**: 2 (one reopen, triggered by adversarial review of the fix itself)
+
+**Time to Resolution**: filed 2026-09-02, closed 2026-09-05 — 3 days.
+
+### Final Fix Details
+
+All thirteen reported routes and both over-refusals are closed, addressed as **four root causes**
+rather than thirteen patches, in `shared/resources/qa-execute-snippets.mjs` and its five bundled copies:
+
+| Cause | Change |
+|-------|--------|
+| **A** | `commandWords()` scans every command in a segment instead of stopping at its first token; `COMMAND_INTRODUCING_KEYWORDS` makes the keyword classes explicit; a `case` arm's `)` re-opens command position; keywords resolve before the command-name test; `gitSubcommand()` skips global flags **and the operands they consume**, reading from after *this* `git` token |
+| **B** | `WRITE_REDIRECT`'s pre-operator class narrowed to `[^<>&]`; `2>&1` and `/dev/null` stay exempt via the existing lookaheads; `blankConditionalSpans()` keeps `>` inside `[[ ]]` / `(( ))` a comparison |
+| **C** | One quote-state-aware walker in two forms — `blankQuotedSpans()` (length-preserving, for the heredoc offset test) and `collapseQuotedSpans()` (for command detection) — both rewinding on an unterminated quote so a missing closer hides nothing; heredoc openers matched on the raw line and rejected only when the `<<` itself sat inside quotes |
+| **D** | `hasOutputFlagWrite()` resolves `-o` per command across segment boundaries that include `$(`, backticks and grouping parens; new `sed w write` deny pattern |
+
+**Guarding it**: 13 fail-open + 2 over-refusal inputs in the replay corpus with shrinkage guards and a
+**discriminating pre-fix half** at `0c4c05f`, so the corpus cannot pass vacuously; 11 counterweight and
+verify-finding tests in the unit suite. 89 tests green.
+
+### Lessons Learned
+
+1. **A corpus proves the reported routes are closed. It says nothing about routes the fix opens.**
+   The thirteen inputs were green while the fix carried two brand-new fail-opens. Both were found by
+   adversarially reviewing the diff and asking "what did this change make reachable?", which is a
+   different question from "did the reported bug go away?" On a fail-open bug, that second review is
+   not optional.
+2. **The report's own suggested fix was insufficient, and its own evidence was wrong in one place.**
+   It proposed extending the segment splitter with `if`/`while`/`until` and recorded `elif` as safe.
+   `elif`, `for`, `case`, `esac`, `done`, `fi` and `function` were all vulnerable by the same mechanism.
+   Re-deriving the mechanism beat trusting the enumeration.
+3. **`\s*` before a negative lookahead backtracks.** The first `-o` fix appeared to scope the exemption
+   by command and in fact scoped it by *column*, leaving this repository's own documented `| grep -o`
+   snippet refused. Where a rule needs to know which command a flag belongs to, walk the segments;
+   a regex cannot hold that idea.
+4. **A mutation proof that cannot show its mutation landed is not a proof.** One proof here reported
+   green because a `str.replace()` silently matched nothing. Asserting that the file actually changed
+   turned the same proof red. This is the second time this trap has been recorded in this repository.
+5. **This is the third generation of one defect** (13 → 14 → 13 routes). Each generation was closed by
+   patching the operators that leaked. The recurring lesson, now stated three times, is that
+   command-blind matching of flags and operators is the generator; `task.79`'s shared adversarial
+   corpus and a per-command flag table are the structural answer.

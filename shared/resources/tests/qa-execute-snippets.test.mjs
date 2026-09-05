@@ -1416,3 +1416,97 @@ test("BUG-6: an unterminated quote blanks nothing, so it cannot hide a command",
   );
   assert.equal(classifyBlock('echo "a > b"').klass, "runnable");
 });
+
+test("BUG-6: `>` inside a conditional or arithmetic span is a comparison, not a redirection", () => {
+  // Widening WRITE_REDIRECT's pre-context (root cause B) made these match. Inside
+  // `[[ … ]]` and `(( … ))` a `>` compares; it never writes.
+  assert.equal(classifyBlock("[[ 1 > 2 ]]").klass, "runnable");
+  assert.equal(classifyBlock("[[ -f README.md ]]").klass, "runnable");
+  // The guard must not become a hiding place. A command substitution inside a
+  // conditional is still scanned, because only the write-redirect path is blanked.
+  assert.equal(classifyBlock("[[ $(touch /tmp/x) ]]").klass, "mutating");
+  // A redirection OUTSIDE the brackets is still a redirection.
+  assert.equal(classifyBlock("[[ -f a ]] > /tmp/x").klass, "mutating");
+  assert.equal(classifyBlock("(( a > b )) > /tmp/x").klass, "mutating");
+  // And the route the widening exists to close is still closed.
+  assert.equal(classifyBlock("echo pwned>/tmp/x").klass, "mutating");
+});
+
+/* -------------------------------------------------------------------------- *
+ *  BUG-6 verify-cycle findings.
+ *
+ *  An adversarial review of the first cut of this fix found five defects in the
+ *  fix itself, one of them a NEW fail-open. Each is pinned here, because a fix
+ *  for a fail-open that opens another one is the worst outcome available to this
+ *  change and must not be re-introduced quietly.
+ * -------------------------------------------------------------------------- */
+
+test("BUG-6/verify: a command substitution does not inherit the -o exemption", () => {
+  // THE regression that matters. Scoping `-o` to its command was first written as
+  // a regex anchored to `^` and `[\n;&|]`. `$(` was not an anchor, so a write
+  // nested inside a grep/find-led segment inherited that segment's exemption and
+  // became runnable — a fail-open created by the fix for an over-refusal.
+  assert.equal(
+    classifyBlock("find . -name '*.md' -newer $(sort -o /tmp/pwned notes.md)")
+      .klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("grep -c TODO $(sort -o /tmp/pwned notes.md)").klass,
+    "mutating",
+  );
+  assert.equal(classifyBlock("echo `sort -o /tmp/x f`").klass, "mutating");
+});
+
+test("BUG-6/verify: the -o exemption holds wherever the command actually sits", () => {
+  // The lookahead version worked only at zero-whitespace positions, because `\s*`
+  // backtracked to empty and the negative lookahead then trivially succeeded. It
+  // left this repository's own documented `| grep -o …` snippet refused.
+  assert.equal(classifyBlock("grep -o foo f").klass, "runnable");
+  assert.equal(classifyBlock("  grep -o foo f").klass, "runnable");
+  assert.equal(classifyBlock("echo x | grep -o foo").klass, "runnable");
+  assert.equal(classifyBlock("echo x |grep -o foo").klass, "runnable");
+  assert.equal(classifyBlock("ls; grep -o foo f").klass, "runnable");
+  assert.equal(classifyBlock("ls && find . -name a -o -name b").klass, "runnable");
+  assert.equal(classifyBlock("sudo grep -o foo f").klass, "mutating"); // sudo itself is refused
+  // …and a real writer is still caught wherever IT sits.
+  assert.equal(classifyBlock("ls; sort -o /tmp/x f").klass, "mutating");
+  assert.equal(classifyBlock("  sort -o /tmp/x f").klass, "mutating");
+});
+
+test("BUG-6/verify: git's subcommand is read from after THIS git token", () => {
+  // The slice was taken from the segment's second token, which was only ever
+  // correct while the scan stopped at the segment's first token.
+  assert.equal(classifyBlock("if git status; then echo ok; fi").klass, "runnable");
+  assert.equal(
+    classifyBlock("if false; then :; elif git ls-remote origin; then :; fi").klass,
+    "runnable",
+  );
+  assert.equal(classifyBlock("! git diff --quiet").klass, "runnable");
+  // The fail-open half: `git:log` was resolved from a `case` arm pattern and the
+  // allow-list then licensed a `git checkout` that discards the working tree.
+  assert.equal(
+    classifyBlock("case log in log) git checkout -- . ;; esac").klass,
+    "mutating",
+  );
+});
+
+test("BUG-6/verify: a multi-line quoted string is data, not a command position", () => {
+  // Preserving the newline inside a quoted span made the string's last line its
+  // own segment, whose only surviving token was the closing quote.
+  assert.equal(
+    classifyBlock('MSG="first line\nsecond line"\necho "$MSG"').klass,
+    "runnable",
+  );
+  assert.equal(classifyBlock("X='one\ntwo'\necho ok").klass, "runnable");
+  // A quoted string in COMMAND position is still unreadable, and still refused —
+  // the scanner must not learn to skip empty command words.
+  assert.equal(classifyBlock('"$CMD" --flag').klass, "mutating");
+});
+
+test("BUG-6/verify: a glued arithmetic evaluation is not an invocation", () => {
+  assert.equal(classifyBlock("if ((a>b)); then echo hi; fi").klass, "runnable");
+  assert.equal(classifyBlock("echo $((x>>2))").klass, "runnable");
+  // But one carrying a command substitution still reaches the fail-closed path.
+  assert.equal(classifyBlock("((a+$(touch /tmp/x)))").klass, "mutating");
+});
