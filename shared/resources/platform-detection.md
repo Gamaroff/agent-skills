@@ -55,7 +55,37 @@ rather than being silently ignored.
 
 ### Precedence — and why access differs from identity
 
-**Identity** resolves config → env → git remote → default. First match wins.
+**Identity** resolves config → env → `.env` (TRACKER only) → git remote (VCS only) → default. First
+match wins.
+
+The `.env` rung is read for `TRACKER` alone, and only when the config declared nothing. `setup-consumer.sh`
+probed `.env` from the start while this resolver did not, so a repo with no `tracker:` key and `JIRA_URL`
+only in `.env` **installed one platform's skills and ran as the other** — silently, the failure surfacing
+later inside a pipeline step. Task 91 closed that by teaching this resolver to read `.env` rather than by
+deleting the installer's probe: the installer runs once, often in a plain shell, while skills run later in
+a shell that already has `JIRA_URL`, so dropping it would trade a rare disagreement for a common one
+(`task.83.bug.2.env-probe-asymmetry.md`).
+
+`.env` is **parsed, never sourced** — it is data, and sourcing would execute whatever a checked-in file
+happens to contain.
+
+**There is only one `.env` reader now.** `setup-consumer.sh` used to carry its own
+`grep -qE '^JIRA_URL=.+'`; that probe is gone, because `_resolve_install_tracker` delegates the whole
+resolution to this file. So "both sides agree" is no longer a property to maintain between two greps —
+it is structural.
+
+The parse is deliberately more than a `grep`, and each part of it closed a real defect:
+
+| Spelling | Resolves | Why |
+| --- | --- | --- |
+| `JIRA_URL=https://x` | `jira` | the plain case |
+| `export JIRA_URL=https://x` | `jira` | a very common `.env` spelling; a bare `^JIRA_URL=` anchor missed it, so a shell that *sourced* the file resolved `jira` while this resolver said `github` |
+| `JIRA_URL=` + CRLF | `github` | a trailing `\r` satisfies `.+`; treating it as set resurrected the exact spelling task 83 was written to fix |
+| `JIRA_URL=""` / `JIRA_URL=''` | `github` | an emptied key means *not set*, quotes included |
+| the **last** matching line wins | — | a shell that sources the file takes the last assignment, so first-match-wins disagreed with it |
+
+An explicit `tracker:` key still wins outright, and is the one-line opt-out for a repo carrying a stale
+`JIRA_URL`.
 
 **Access** does not. Config and env (`AGENT_SKILLS_ACCESS_TRACKER`, `AGENT_SKILLS_ACCESS_VCS`) are
 read *independently*, and the **more restrictive** of the two wins, against the permissiveness order
@@ -374,7 +404,16 @@ config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested
 # a config file that does not contain the value.
 [ "$TRACKER" = "__MAP__" ] && TRACKER="auto"   # tracker.workflowFile form ⇒ detect
 validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || return 1
-[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "${JIRA_URL:-}" ] && echo jira || echo github)
+# `.env` is the LAST positive probe for TRACKER, below the process environment. `_rp_dotenv_has_jira`
+# is an awk parse, not a grep — it accepts an optional `export` prefix, strips a trailing CR and one
+# surrounding quote pair, and takes the LAST match. See "Precedence" above for each defect that shape
+# closed. Parsed, never sourced.
+if [ "$TRACKER" = "auto" ]; then
+  if   [ -n "${JIRA_URL:-}" ];                                  then TRACKER=jira
+  elif _rp_dotenv_has_jira;                                     then TRACKER=jira
+  else                                                               TRACKER=github
+  fi
+fi
 
 validate_enum "$SKILLS_CONFIG_FILE" vcs "$VCS" github bitbucket auto || return 1
 [ "$VCS" = "auto" ] && VCS=$(git remote get-url origin 2>/dev/null \
