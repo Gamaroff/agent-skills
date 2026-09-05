@@ -830,98 +830,85 @@ sync-github-task"
 
 # Resolve which tracker this install targets.
 #
-# This MIRRORS shared/resources/resolve-platform.sh — the resolver every skill
-# sources at runtime — deliberately, so install time and run time cannot
-# disagree about what platform this repo is. It does not *source* that script:
-# resolve-platform.sh validates and can `exit 1` on an unrecognised value, which
-# would abort an install over a key the installer only wants a hint from.
+# This DELEGATES to shared/resources/resolve-platform.sh — the resolver every
+# skill sources at run time — rather than mirroring it. That is the whole point:
+# install time and run time cannot disagree about what platform this repo is,
+# because there is only one implementation of the decision.
 #
-# Because it re-implements rather than sources, the VALUE PARSING has to mirror
-# too, not just the order. It did not, once: `print $2` returned the raw token,
-# so `tracker: "jira"`, `tracker: 'jira'` and a CRLF line ending all missed the
-# case arm below and fell through to the github default — while the runtime
-# reader parses them all as `jira`. A Jira repo then installed with none of its
-# eleven Jira skills, silently, and the failure surfaced days later inside a
-# pipeline step. Quoting a YAML scalar is idiomatic and CRLF arrives with any
-# Windows or WSL checkout; neither is exotic. Hence the normalisation below.
+# It used to mirror. Mirroring did not work, twice. `print $2` returned the raw
+# token, so `tracker: "jira"` and a CRLF line ending fell through to the github
+# default while the runtime read them as `jira` — a Jira repo installing with
+# none of its eleven Jira skills, silently, surfacing days later inside a
+# pipeline step. Task 83 fixed those two spellings by hand. Task 91 found three
+# more (a `.env`-only JIRA_URL, `tracker: bitbucket`, `tracker:<TAB>jira`) and
+# stopped fixing spellings.
 #
-# Order matters and is asserted by test:
+# WHY A SUBSHELL. The stated reason for not sourcing the resolver was that it
+# validates and can `return 1` on an unrecognised value, which would abort an
+# install over a key the installer only wants a hint from. The subshell contains
+# that — a refusal arrives here as a non-zero exit status, not as a dead script.
 #
-#   1. skills-config.yaml `tracker:` — FIRST because main() calls install_skills
-#      on the --update path and returns before select_platform ever runs, so on
-#      the path consumers use most $TRACKER is unset. A resolver that trusted
-#      $TRACKER first would be silently inert exactly where it is needed.
-#   2. $TRACKER, when select_platform has run in this process.
-#   3. JIRA_URL (environment or .env) implies jira. LAST of the positive probes
-#      because a stale JIRA_URL outlives the setup that wrote it, and trusting
-#      it over an explicit `tracker: github` would exclude the six GitHub-sync
-#      skills the consumer actually uses.
-#   4. Otherwise `github` — the same default resolve-platform.sh applies.
+# WHY DELEGATION IS NOT A DELETION OF THE `.env` PROBE. resolve-platform.sh now
+# reads `.env` itself (below the process environment, below the config key), so
+# the probe survives delegation. Deleting it outright was considered and
+# rejected — see task.83.bug.2.env-probe-asymmetry.md.
 #
-# ONE DELIBERATE ASYMMETRY, in step 3: this reads `.env` as well as the
-# environment; resolve-platform.sh reads only the environment. That is not an
-# oversight and must not be "corrected" by deleting the probe. The installer
-# runs once, often in a plain shell; the skills run later in a shell that has
-# JIRA_URL because they need it. Dropping the probe would make the installer
-# resolve github for a Jira consumer whose JIRA_URL lives in .env — trading a
-# rare disagreement for a common one. Closing it properly means teaching
-# resolve-platform.sh to read .env, which changes every skill's resolution and
-# belongs in its own task. Pinned by test so the choice stays visible.
+# WHY THE WHOLE RESOLUTION, not just the config read. An earlier attempt
+# delegated `read_config_key` alone. For `tracker:<TAB>jira` that returns `jira`
+# while the resolver's full resolution returns `github`: pyyaml rejects the tab,
+# the typed bulk read reports the file unparseable, and the resolver falls back
+# to detection rather than to its tier-2 grep. Delegating a PART of the
+# resolution reproduces the divergence one layer down. Only the exported
+# TRACKER is authoritative.
 #
-# The github default is load-bearing, not a convenience. write_skills_config
-# writes a `tracker:` key only for Jira consumers, so before this default
-# existed a GitHub consumer running --update missed every probe and resolved to
-# nothing — leaving the filter inert on its own headline path. Defaulting to
-# github cannot disagree with runtime, because runtime defaults to github too:
-# a repo where this guesses github is a repo where every Jira skill already
-# fails when invoked. The grandfather rule and --all-skills remain the net.
+# EXIT STATUS IS THE INTERFACE. Callers must use the condition form
+# (`if ! _t=$(_resolve_install_tracker); then`), never a bare assignment:
+#   0 — resolved; the tracker is on stdout
+#   2 — the resolver REFUSED this config (unrecognised value). The message is
+#       already on stderr. Do NOT fall through to a default: a silent default is
+#       exactly the install-one-platform-run-as-another bug being closed here.
+#   3 — no resolver copy is reachable, so the tracker is UNKNOWN. Only the
+#       --dry-run path can see this (it returns before the download); it reports
+#       "unresolved" rather than guessing, because a dry run that guesses
+#       differently from the real run is the same bug class again.
+#
+# The vestigial `$TRACKER` rung is gone with the rest of the local
+# implementation. It could not fire on either real path: write_skills_config
+# always emits a `tracker:` block and runs before install_skills in main(), and
+# --update never runs select_platform at all.
+
+# Locate a copy of the runtime resolver. Empty output + non-zero when none is
+# reachable. Order is deliberate: the release being installed wins, because it
+# is the version whose skills will actually run in this repo.
+_locate_resolver() {
+  local _c
+  for _c in "${_tmpdir:-}"/skills/*/references/resolve-platform.sh \
+            .agents/skills/*/references/resolve-platform.sh \
+            "$(dirname "${BASH_SOURCE[0]}")/../shared/resources/resolve-platform.sh"; do
+    [[ -r "$_c" ]] && { printf '%s' "$_c"; return 0; }
+  done
+  return 1
+}
+
 _resolve_install_tracker() {
-  local _t=""
+  local _res _t _rc
 
-  # 1. skills-config.yaml scalar `tracker:`. The map form (`tracker:` with a
-  #    nested workflowFile:) carries no platform identity — the pattern requires
-  #    a value on the same line, so the map form correctly does not match.
-  #
-  #    The pattern is `[^[:space:]]`, NOT `[a-z]`: a quoted value starts with a
-  #    quote character, and `[a-z]` refused to match it at all. Take the rest of
-  #    the line rather than $2 so a missing space (`tracker:jira`) and a trailing
-  #    `# comment` are both handled in one place.
-  if [[ -f skills-config.yaml ]]; then
-    _t=$(awk '/^tracker:[[:space:]]*[^[:space:]]/ {
-                v = $0
-                sub(/^tracker:[[:space:]]*/, "", v)
-                sub(/[[:space:]]+#.*$/, "", v)
-                sub(/[[:space:]]+$/, "", v)
-                print v; exit
-              }' skills-config.yaml 2>/dev/null || true)
+  _res=$(_locate_resolver) || return 3
+
+  # `|| true` on the assignment, status captured separately: under `set -e` a
+  # bare `_t=$(...)` that exits non-zero kills the wizard outright — here, on
+  # the real path, after the tarball is extracted but before a skill is copied.
+  _t=$(bash -c '
+         source "$1" >/dev/null 2>&1 || exit 1
+         printf "%s" "${TRACKER:-}"
+       ' _ "$_res" 2>/dev/null) && _rc=0 || _rc=$?
+
+  if [[ $_rc -ne 0 || -z "$_t" ]]; then
+    # Re-run WITHOUT swallowing stderr so the operator sees the resolver's own
+    # message, which already names the file, the value and the legal set.
+    bash -c 'source "$1" >/dev/null' _ "$_res" 2>&1 >/dev/null | head -5 >&2 || true
+    return 2
   fi
-
-  # Normalise the way the runtime YAML reader does: a CRLF checkout leaves a
-  # trailing carriage return, and a quoted scalar arrives with its quotes. Strip
-  # a matched surrounding pair only — a lone quote is a malformed value and
-  # should fall through to the default rather than be silently repaired.
-  _t=${_t%$'\r'}
-  case "$_t" in
-    '"'*'"') _t=${_t#'"'}; _t=${_t%'"'} ;;
-    "'"*"'") _t=${_t#\'}; _t=${_t%\'} ;;
-  esac
-
-  # 2. wizard answer, when select_platform has run in this process
-  [[ -z "$_t" ]] && _t="${TRACKER:-}"
-
-  # 3 + 4. `auto`, unset, or an unrecognised value resolves the way
-  #        resolve-platform.sh does: a JIRA_URL implies jira, otherwise github.
-  case "$_t" in
-    jira|github) : ;;
-    *)
-      if [[ -n "${JIRA_URL:-}" ]] \
-        || { [[ -f .env ]] && grep -qE '^JIRA_URL=.+' .env 2>/dev/null; }; then
-        _t="jira"
-      else
-        _t="github"
-      fi
-      ;;
-  esac
 
   printf '%s' "$_t"
 }
@@ -1151,11 +1138,29 @@ install_skills() {
       # downloads the tarball, so it has no skill list to count — and making it
       # download one would put a network request in a dry run and break the
       # "one request, whole archive" property the real path relies on.
-      local _dry_tracker; _dry_tracker=$(_resolve_install_tracker)
+      # Condition form, not a bare assignment — see the exit-status contract on
+      # _resolve_install_tracker. rc 3 (no resolver reachable) is the EXPECTED
+      # outcome here for the documented `bash <(curl ...)` invocation: this
+      # branch returns before the download, so there is no tarball to read the
+      # resolver out of. Report that honestly instead of guessing; a dry run
+      # that guesses differently from the real run is the bug this task closes.
+      local _dry_tracker _dry_rc=0
+      _dry_tracker=$(_resolve_install_tracker) || _dry_rc=$?
+      if [[ $_dry_rc -eq 2 ]]; then
+        err "skills-config.yaml declares a tracker the resolver refuses — see the message above."
+        record_step "Skills install" "fail" "invalid tracker in skills-config.yaml"
+        return 1
+      fi
       local _dry_detail="${_version} (dry-run)"
       if [[ "$ALL_SKILLS" == true ]]; then
         echo -e "${YELLOW}[dry-run]${NC} --all-skills: no platform filter would be applied"
         _dry_detail="${_dry_detail}, no filter (--all-skills)"
+      elif [[ $_dry_rc -eq 3 ]]; then
+        echo -e "${YELLOW}[dry-run]${NC} tracker NOT RESOLVED — no copy of resolve-platform.sh is reachable"
+        echo -e "${YELLOW}[dry-run]${NC}   The real run reads it out of the release archive, which a dry run never downloads."
+        echo -e "${YELLOW}[dry-run]${NC}   Re-run from a repo checkout, or after any install, to preview the filter."
+        _dry_tracker=""
+        _dry_detail="${_dry_detail}, tracker unresolved"
       else
         case "$_dry_tracker" in
           github) echo -e "${YELLOW}[dry-run]${NC} tracker resolves to 'github' — would skip the $(grep -c . <<<"$SKILLS_JIRA_ONLY") Jira-only skills (kept if already installed)" ;;
@@ -1253,7 +1258,25 @@ install_skills() {
       fi
       tar -xzf "$_archive" -C "$_tmpdir" --strip-components=1
       mkdir -p .agents/skills
-      local _tracker; _tracker=$(_resolve_install_tracker)
+      # Condition form, not a bare assignment — see the exit-status contract on
+      # _resolve_install_tracker. rc 3 cannot happen here: the tarball is
+      # extracted above, so $_tmpdir carries a copy of the resolver. rc 2 means
+      # the config names a tracker the runtime refuses, which is a config the
+      # skills could not run against either — halt rather than install a
+      # silently-defaulted set.
+      local _tracker _tracker_rc=0
+      _tracker=$(_resolve_install_tracker) || _tracker_rc=$?
+      if [[ $_tracker_rc -ne 0 ]]; then
+        if [[ $_tracker_rc -eq 2 ]]; then
+          err "skills-config.yaml declares a tracker the resolver refuses — see the message above."
+          err "Fix the 'tracker:' key (legal values: jira, github, auto) and re-run."
+        else
+          err "Could not locate resolve-platform.sh to resolve the tracker — the archive may be incomplete."
+        fi
+        rm -rf "$_tmpdir"
+        record_step "Skills install" "fail" "tracker not resolved (rc ${_tracker_rc})"
+        return 1
+      fi
       local _installed=0 _updated=0 _skipped=0 _kept=0 _outside=0 _not_in_profile=0
 
       if [[ "$ALL_SKILLS" == true ]]; then

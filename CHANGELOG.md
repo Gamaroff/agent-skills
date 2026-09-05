@@ -58,6 +58,47 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **⚠️ BEHAVIOUR CHANGE — `resolve-platform.sh` now reads `.env` when resolving `TRACKER`, and
+  `setup-consumer.sh` no longer re-implements that resolution.** Install time and run time answered
+  "which platform is this repo?" with two different implementations, and they disagreed on three
+  config shapes.
+
+  **Who is affected, and the one-line opt-out.** A repo with **no `tracker:` key** in
+  `skills-config.yaml` **and** a `JIRA_URL=` line in a repo-root `.env` now resolves `jira` at run
+  time where it previously resolved `github`. If that `JIRA_URL` is stale — left behind by a setup
+  that no longer applies — set an explicit **`tracker: github`** in `skills-config.yaml`. An explicit
+  key wins outright, above both the environment and `.env`. Since task 83 the wizard always writes a
+  `tracker:` key, so **no wizard-generated config can reach this rung at all**; the exposed window is
+  hand-authored and pre-task-83 configs.
+
+  The three shapes that used to diverge, install vs run:
+
+  | `skills-config.yaml` | Before (install → run) | Now |
+  | --- | --- | --- |
+  | no key, `JIRA_URL` in `.env` | `jira` → `github` | **`jira` → `jira`** |
+  | `tracker: bitbucket` | `github` → refused | **refused → refused** |
+  | `tracker:<TAB>jira` | `jira` → `github` | **`github` → `github`** |
+
+  The first shape is the one that bites: the installer pruned the six GitHub-only skills from a repo
+  whose skills then resolved `github` and reached for exactly those skills — a silent install-time
+  decision surfacing days later, inside a pipeline step, as a skill that is not on disk.
+
+  **An unrecognised `tracker:` scalar now halts the install.** `docs/reference/configuration.md` has
+  always documented that it halts the run, and the runtime resolver has always delivered that; the
+  installer fell through to a `github` default and filtered on the guess. Halting is the consistent
+  grade — a config the runtime refuses is one whose skills would not start anyway, so a
+  working-looking install of the wrong half of the skills was strictly worse than a named error.
+
+  **`--dry-run` may now report the tracker as unresolved.** The dry-run branch returns before the
+  release archive is downloaded, and the documented invocation is `bash <(curl …)`, so no copy of
+  `resolve-platform.sh` is reachable there. It says so rather than guessing — a dry run that guesses
+  differently from the real run is the same bug class this change closes. Run the wizard from a repo
+  checkout, or after any install, to preview the filter.
+
+  `_resolve_install_tracker` now delegates to `resolve-platform.sh` in a subshell (the subshell
+  contains the resolver's `return 1`, which was the original reason for not sourcing it) and its local
+  `awk` parser is deleted. Parity is structural rather than maintained by hand.
+
 - **`setup-consumer.sh` now installs only the tracker skills a consumer's platform can actually
   fire.** 17 of the shipped skills are tracker-specific and mutually exclusive — 11 Jira-only, 6
   GitHub-only — and every consumer received all 17 regardless of platform. A GitHub repo got

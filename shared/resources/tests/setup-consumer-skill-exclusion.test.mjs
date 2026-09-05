@@ -155,8 +155,29 @@ function excluded(name, tracker, prelude = "") {
   );
 }
 
+/**
+ * Resolve TRACKER the way the INSTALLER does, mapping its exit-status contract
+ * onto the same vocabulary `runtimeTracker` uses:
+ *
+ *   rc 0 → the tracker string        rc 2 → "<refused>"        rc 3 → "<unresolved>"
+ *
+ * The condition form is not a style choice. `source`ing the wizard brings its
+ * `set -euo pipefail` into this shell, so a BARE `v=$(_resolve_install_tracker)`
+ * is killed by errexit the moment the resolver refuses — which reports a
+ * deliberate refusal as a crashed harness. That is the same defect class the
+ * wizard's own call sites carry a comment about.
+ */
 function resolveTracker(cwd, env = {}) {
-  return callFn("_resolve_install_tracker", { cwd, env });
+  return callFn(
+    `rc=0; v=$(_resolve_install_tracker 2>/dev/null) || rc=$?
+     case $rc in
+       0) printf '%s' "$v" ;;
+       2) printf '<refused>' ;;
+       3) printf '<unresolved>' ;;
+       *) printf '<rc%s>' "$rc" ;;
+     esac`,
+    { cwd, env },
+  );
 }
 
 /**
@@ -180,11 +201,15 @@ function runtimeTracker(cwd, env = {}) {
     { cwd, env: hermeticEnv(env), encoding: "utf8" },
   );
   const [rc, ...rest] = out.split("\n");
-  assert.equal(
-    rc,
-    "0",
-    `resolve-platform.sh exited ${rc} for this config — it refused to resolve, which is a different failure from disagreeing with the installer`,
-  );
+  // A REFUSAL is a legitimate resolution outcome, not a harness failure: the
+  // resolver is contracted to reject an unrecognised `tracker:` scalar. Report
+  // it in the same vocabulary `resolveTracker` uses so the two can be compared
+  // directly — the whole point of the parity assertion.
+  //
+  // This used to `assert.equal(rc, "0")`, which made the refusal case
+  // untestable through this helper: the assertion fired before any comparison
+  // could happen, and the parity gap on `tracker: bitbucket` stayed invisible.
+  if (rc !== "0") return "<refused>";
   return rest.join("\n").trim();
 }
 
@@ -313,10 +338,33 @@ test("the tracker: map form is not read as a platform", () => {
   });
 });
 
-test("the resolver only ever returns jira or github", () => {
+test("the resolver never emits a raw config token as a tracker", () => {
+  // The property being protected is that a garbage `tracker:` value can never
+  // reach the filter AS a tracker — `_skill_excluded_for_tracker "x" "nonsense"`
+  // matches no classification list, so every skill would be kept and the filter
+  // would be silently inert.
+  //
+  // Task 91 changed HOW that is guaranteed. This test used to assert the value
+  // was coerced to `jira` or `github`; the installer got there by falling
+  // through its `case` to the github default. That silent coercion was itself a
+  // divergence — resolve-platform.sh refuses the same config, and
+  // configuration.md has always documented that it halts the run — so a repo
+  // with a typo'd tracker installed a github-filtered set whose skills then
+  // refused to start. Refusing is now the guarantee, and it is the stronger one:
+  // the operator is told which file and which value, rather than getting a
+  // working-looking install of the wrong half of the skills.
   inTempRepo((dir) => {
     writeFileSync(path.join(dir, "skills-config.yaml"), "tracker: nonsense\n");
-    assert.ok(["jira", "github"].includes(resolveTracker(dir)));
+    const got = resolveTracker(dir);
+    assert.equal(
+      got,
+      "<refused>",
+      "an unrecognised scalar is refused, not coerced",
+    );
+    assert.ok(
+      !["nonsense"].includes(got),
+      "and the raw token never escapes as a tracker value",
+    );
   });
 });
 
@@ -344,6 +392,21 @@ const PARITY_CASES = [
   ["tracker: jira    \n", "jira", "trailing whitespace"],
   ["tracker: auto\n", "github", "auto with no JIRA_URL"],
   ["tracker:\n  workflowFile: tracker-workflow.yaml\n", "github", "map form"],
+  // ── added by task 91 ──────────────────────────────────────────────────────
+  // An unrecognised scalar. configuration.md has always promised this halts the
+  // run, and resolve-platform.sh has always delivered that — but the installer
+  // fell through its `case` to the github default and filtered on the guess, so
+  // a repo with a typo'd tracker installed a github set while every skill in it
+  // refused to start. Both sides now refuse.
+  ["tracker: bitbucket\n", "<refused>", "unrecognised scalar"],
+  // A tab separator. `yaml.safe_load` rejects it, so the runtime's typed bulk
+  // read reports the file unparseable and falls back to detection → github. The
+  // installer's `awk` was happy to treat a tab as whitespace and read `jira`.
+  //
+  // This one is why the delegation had to be WHOLESALE: `read_config_key` alone
+  // returns `jira` here, so delegating only the config read would have moved the
+  // divergence down a layer rather than closing it.
+  ["tracker:\tjira\n", "github", "tab separator"],
 ];
 
 for (const [config, expected, label] of PARITY_CASES) {
@@ -372,23 +435,78 @@ test("a lone unmatched quote is not silently repaired", () => {
   });
 });
 
-test("the .env probe is a DELIBERATE asymmetry, not an oversight", () => {
-  // `_resolve_install_tracker` reads .env as well as the environment;
-  // resolve-platform.sh reads only the environment. Do not "fix" this by
-  // deleting the probe: the installer runs once, often in a plain shell, while
-  // the skills run later in a shell that has JIRA_URL because they need it, so
-  // dropping it trades a rare disagreement for a common one. Closing it
-  // properly means teaching resolve-platform.sh to read .env — which changes
-  // every skill's resolution and belongs in its own task. If you do that, this
-  // test is the one that tells you to update both sides together.
+test("install and run time agree on a `.env`-only JIRA_URL", () => {
+  // HISTORY, so the reversal is not mistaken for drift. Until task 91 this test
+  // was called "the .env probe is a DELIBERATE asymmetry, not an oversight" and
+  // asserted the OPPOSITE of what it asserts now: installer `jira`, runtime
+  // `github`. The asymmetry really was deliberate — `_resolve_install_tracker`
+  // read `.env` because the installer runs once, often in a plain shell, while
+  // skills run later in a shell that already has JIRA_URL. Deleting the probe
+  // to reach parity was rejected (task.83.bug.2): it trades a rare disagreement
+  // for a common one.
+  //
+  // Task 91 closed it from the other side — resolve-platform.sh now reads `.env`
+  // too, below the process environment and below the config key. That is a
+  // behaviour change for every skill, and the old test's failure message said
+  // exactly this: "if you changed that, update the installer and this test
+  // together". This is that update.
+  //
+  // Needs a fixture DIRECTORY, not just a config string, so it cannot join
+  // PARITY_CASES — both resolvers read `.env` relative to the working directory.
   inTempRepo((dir) => {
     writeFileSync(path.join(dir, ".env"), "JIRA_URL=https://x.atlassian.net\n");
-    assert.equal(resolveTracker(dir), "jira", "the installer reads .env");
+    const install = resolveTracker(dir);
+    const runtime = runtimeTracker(dir);
+    assert.equal(
+      install,
+      runtime,
+      `installer resolved "${install}" but resolve-platform.sh resolved "${runtime}" — ` +
+        `a JIRA_URL in .env must not install one platform's skills and run as the other`,
+    );
+    assert.equal(
+      install,
+      "jira",
+      "a JIRA_URL in .env implies jira on both sides",
+    );
+  });
+});
+
+test("an explicit `tracker:` key still beats a stale JIRA_URL in .env", () => {
+  // The documented one-line opt-out for the behaviour change above, and the
+  // mitigation the CHANGELOG points at. If this ever goes red, a repo that
+  // pinned `tracker: github` to protect itself from a stale .env has lost that
+  // protection — which is the migration hazard, not a cosmetic ordering detail.
+  inTempRepo((dir) => {
+    writeFileSync(path.join(dir, "skills-config.yaml"), "tracker: github\n");
+    writeFileSync(
+      path.join(dir, ".env"),
+      "JIRA_URL=https://stale.atlassian.net\n",
+    );
     assert.equal(
       runtimeTracker(dir),
       "github",
-      "resolve-platform.sh does not read .env — if you changed that, update the installer and this test together",
+      "config key beats .env at run time",
     );
+    assert.equal(
+      resolveTracker(dir),
+      "github",
+      "config key beats .env at install time",
+    );
+  });
+});
+
+test("the process environment still beats .env", () => {
+  // Ordering within the fallback: env above .env. Both spell `jira` when set, so
+  // this pins that an EMPTY `JIRA_URL=` in .env is not "set" on either side —
+  // the `^JIRA_URL=.+` pattern is shared by both resolvers for that reason.
+  inTempRepo((dir) => {
+    writeFileSync(path.join(dir, ".env"), "JIRA_URL=\n");
+    assert.equal(
+      runtimeTracker(dir),
+      "github",
+      "an empty JIRA_URL= is not set",
+    );
+    assert.equal(resolveTracker(dir), "github", "and the installer agrees");
   });
 });
 
@@ -548,6 +666,51 @@ test("fresh install with tracker github prunes the Jira-only skills", () => {
     assert.ok(got.includes("create-pr"), "create-pr must always install");
     assert.equal(got.length, FIXTURE_SKILLS.length - JIRA_ONLY.length);
     assert.match(out, /skipped \(github\)/);
+  });
+});
+
+test("a `.env`-only JIRA_URL installs the set its skills will actually resolve", () => {
+  // THE INTEGRATION TEST FOR THE HEADLINE BUG. The parity tests above prove the
+  // two resolvers agree; this proves that agreement reaches DISK, which is the
+  // thing a consumer experiences.
+  //
+  // Before task 91 this exact fixture — no `tracker:` key, JIRA_URL only in
+  // `.env` — installed the JIRA set (installer probed `.env`) while every skill
+  // in it resolved `github` at run time (the resolver did not). The six
+  // GitHub-only skills the repo would actually reach for were pruned, silently,
+  // and the failure surfaced days later inside a pipeline step as a skill that
+  // is not on disk.
+  //
+  // Asserting the installed set against `runtimeTracker(dir)` rather than
+  // against a hardcoded "jira" is deliberate: if a future change flips the
+  // resolution, this test follows it and keeps checking the property that
+  // matters — install set matches run-time answer — instead of going red for
+  // the wrong reason.
+  inTempRepo((dir) => {
+    writeFileSync(path.join(dir, ".env"), "JIRA_URL=https://x.atlassian.net\n");
+    const tarball = makeFixtureTarball(dir, FIXTURE_SKILLS);
+    runInstall(dir, tarball);
+    const got = installed(dir);
+
+    const runtime = runtimeTracker(dir);
+    assert.equal(
+      runtime,
+      "jira",
+      "precondition: skills resolve jira in this repo",
+    );
+
+    // The set on disk must be the one a `jira` repo needs.
+    for (const n of GITHUB_ONLY)
+      assert.ok(
+        !got.includes(n),
+        `${n} should be pruned — this repo runs as ${runtime}`,
+      );
+    for (const n of JIRA_ONLY)
+      assert.ok(
+        got.includes(n),
+        `${n} must install — this repo runs as ${runtime}`,
+      );
+    assert.ok(got.includes("create-pr"), "create-pr must always install");
   });
 });
 

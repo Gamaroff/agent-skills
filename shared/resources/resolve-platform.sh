@@ -23,8 +23,9 @@
 # Resolver order for identity (per shared/resources/platform-detection.md):
 #   1. skills-config.yaml keys (tracker:, vcs:)
 #   2. Env vars (JIRA_URL → jira)
-#   3. Git remote (bitbucket.org → bitbucket)
-#   4. Default: github / github
+#   3. .env at the repo root (JIRA_URL=… → jira)  [TRACKER only]
+#   4. Git remote (bitbucket.org → bitbucket)     [VCS only]
+#   5. Default: github / github
 #
 # Resolver order for access — deliberately NOT the same:
 #   Config and env are each read independently, then the MORE RESTRICTIVE of the two wins,
@@ -435,7 +436,37 @@ fi
 # docs/reference/tracker-workflow.md). It is not a platform override and must not be graded as
 # one — it means "no scalar override", i.e. detect.
 validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || return 1
-[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "${JIRA_URL:-}" ] && echo jira || echo github)
+# `.env` is read as the LAST positive probe, below the process environment, and only when the
+# config declared nothing. Rationale, and the reason this is a deliberate behaviour change:
+# `setup-consumer.sh` has always probed `.env` here while this file did not, so a repo with no
+# `tracker:` key and JIRA_URL only in `.env` installed the Jira skill set and then resolved
+# `github` at run time — it installed one platform and ran as the other. Closing that by DELETING
+# the installer's probe was considered and rejected (task.83.bug.2): the installer runs once, often
+# in a plain shell, while skills run later in a shell that has JIRA_URL because they need it, so
+# dropping it trades a rare disagreement for a common one. Teaching this file to read `.env` is the
+# other direction, and it is what lets the installer delegate here instead of re-implementing.
+#
+# The known cost: a repo with no `tracker:` key and a STALE JIRA_URL in `.env` — one that outlived
+# the setup that wrote it — now resolves `jira` where it used to resolve `github`. The one-line
+# opt-out is an explicit `tracker: github`, which still wins outright above. Since task 83 the
+# wizard always writes a `tracker:` key, so no wizard-generated config can reach this rung at all.
+#
+# Grep, not `source`: `.env` is data, and sourcing it would execute whatever a checked-in file
+# happens to contain. `^JIRA_URL=.+` is the same pattern the installer has always used, so the two
+# sides cannot disagree about what counts as "set" — an empty `JIRA_URL=` is not set on either.
+_rp_dotenv_has_jira() {
+  [ -f .env ] && [ -r .env ] && grep -qE '^JIRA_URL=.+' .env 2>/dev/null
+}
+if [ "$TRACKER" = "auto" ]; then
+  if [ -n "${JIRA_URL:-}" ]; then
+    TRACKER=jira
+  elif _rp_dotenv_has_jira; then
+    TRACKER=jira
+  else
+    TRACKER=github
+  fi
+fi
+unset -f _rp_dotenv_has_jira 2>/dev/null || true
 
 if [ -n "$_RP_VCS" ]; then
   VCS="$_RP_VCS"

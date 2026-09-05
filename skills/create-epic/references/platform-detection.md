@@ -56,7 +56,21 @@ rather than being silently ignored.
 
 ### Precedence — and why access differs from identity
 
-**Identity** resolves config → env → git remote → default. First match wins.
+**Identity** resolves config → env → `.env` (TRACKER only) → git remote (VCS only) → default. First
+match wins.
+
+The `.env` rung is read for `TRACKER` alone, and only when the config declared nothing. `setup-consumer.sh`
+probed `.env` from the start while this resolver did not, so a repo with no `tracker:` key and `JIRA_URL`
+only in `.env` **installed one platform's skills and ran as the other** — silently, the failure surfacing
+later inside a pipeline step. Task 91 closed that by teaching this resolver to read `.env` rather than by
+deleting the installer's probe: the installer runs once, often in a plain shell, while skills run later in
+a shell that already has `JIRA_URL`, so dropping it would trade a rare disagreement for a common one
+(`task.83.bug.2.env-probe-asymmetry.md`).
+
+`.env` is **grepped, never sourced** — it is data, and sourcing would execute whatever a checked-in file
+happens to contain. Both resolvers share the `^JIRA_URL=.+` pattern, so an empty `JIRA_URL=` counts as
+unset on both sides. An explicit `tracker:` key still wins outright, and is the one-line opt-out for a
+repo carrying a stale `JIRA_URL`.
 
 **Access** does not. Config and env (`AGENT_SKILLS_ACCESS_TRACKER`, `AGENT_SKILLS_ACCESS_VCS`) are
 read *independently*, and the **more restrictive** of the two wins, against the permissiveness order
@@ -375,7 +389,14 @@ config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested
 # a config file that does not contain the value.
 [ "$TRACKER" = "__MAP__" ] && TRACKER="auto"   # tracker.workflowFile form ⇒ detect
 validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || return 1
-[ "$TRACKER" = "auto" ] && TRACKER=$([ -n "${JIRA_URL:-}" ] && echo jira || echo github)
+# `.env` is the LAST positive probe for TRACKER, below the process environment. Grepped, not
+# sourced. See "Precedence" above for why this rung exists.
+if [ "$TRACKER" = "auto" ]; then
+  if   [ -n "${JIRA_URL:-}" ];                                  then TRACKER=jira
+  elif [ -f .env ] && grep -qE '^JIRA_URL=.+' .env 2>/dev/null;  then TRACKER=jira
+  else                                                               TRACKER=github
+  fi
+fi
 
 validate_enum "$SKILLS_CONFIG_FILE" vcs "$VCS" github bitbucket auto || return 1
 [ "$VCS" = "auto" ] && VCS=$(git remote get-url origin 2>/dev/null \
