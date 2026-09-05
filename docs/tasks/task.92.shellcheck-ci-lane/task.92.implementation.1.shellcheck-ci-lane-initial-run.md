@@ -35,7 +35,7 @@ reasoned `# shellcheck disable` comments, and prove the gate can fail.
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.92.*` exists in git                               | `feature/task.92.shellcheck-ci-lane` created from `develop` at `4e37cbe9`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.92.review.1.shellcheck-ci-lane.md` exists                        | 8/10 READY TO IMPLEMENT; 1 Critical + 4 Important + 3 Optional, all applied. Status `planned` → `ready-for-development`. Issue #321 created + linked | 2 Explore pre-passes (inline) |
-| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 26 → 0 warnings (11 real fixes, 15 reasoned disables); lane added + mutation-proved red; 155 files (18 hand, 137 bundled) | none — Step 2 pre-passes reused |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 26 → 0 warnings (9 real fixes, 17 reasoned disables); lane added + mutation-proved red; 155 files (18 hand, 137 bundled) | none — Step 2 pre-passes reused |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #322 → `develop`. 5 commits, generated output isolated in `d383fa90`. Issue #321 commented (`posted`) | —                    |
 | 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 done | `task.92.qa.{N}.*.md`; `task.92.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.92.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
@@ -104,7 +104,7 @@ reaction (widen the excludes) weakens the lane permanently. No `.shellcheckrc` �
 and `external-sources=true` would have changed the two pre-existing `# shellcheck source=` directives.
 
 **Phase 2 — triage.** All 26 warnings resolved. The task's triage held for the *families* it named but
-was wrong that all 25 non-SC2010 findings were false positives — **11 had a real fix**:
+was wrong that all 25 non-SC2010 findings were false positives — **9 had a real fix**:
 
 | Finding | Disposition |
 | --- | --- |
@@ -112,7 +112,7 @@ was wrong that all 25 non-SC2010 findings were false positives — **11 had a re
 | SC2209 ×5 (`release.sh` `patch`/`true`, `setup-consumer.sh` `command`, `read-config.sh` `env`) | **Quoted the literal** — ShellCheck's own suggested fix, and identical bytes at runtime. Whole `case` arms quoted so the blocks stay uniform. |
 | SC2211 ×2 (`tracker-access.test.sh:1034,1040`) | **A real defect, not a false positive.** The backticks sit inside a **double-quoted** string, so bash was executing `? access` as a command and the emphasis was being silently stripped from the assertion message. Changed the prose to single quotes. |
 | SC2010 ×1 (`tracker-access.test.sh:1486`) | **Fixed** — `ls \| grep` → glob loop into an array. This also removed a pre-existing `# shellcheck disable=SC2086` (the array needs no word-splitting) and added an explicit empty-list guard: with no matches, `sed` takes no file operands and reads STDIN, which the `ls` form was equally exposed to and never checked. |
-| SC2034 ×15, SC1007 ×4, SC1090 ×1 | **Reasoned disables.** Sourced-file output contracts (`BB_*`, `JSM_DEFERRED*`, `JSM_DEFER_*`), the `CDPATH= cmd` one-command env prefix, and a resolver path computed from `BASH_SOURCE`. |
+| SC2034 ×12, SC1007 ×4, SC1090 ×1 | **Reasoned disables** (17 total). Sourced-file output contracts (`BB_*`, `JSM_DEFERRED*`, `JSM_DEFER_*`), the `CDPATH= cmd` one-command env prefix, and a resolver path computed from `BASH_SOURCE`. |
 
 **`export` was rejected for `BB_CURL_AUTH`** per the Step 2 finding — it is a bash array, and bash
 cannot export arrays, so it would have silenced the warning while doing nothing observable.

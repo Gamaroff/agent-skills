@@ -283,7 +283,7 @@ should be announced in the CHANGELOG rather than discovered.
    two pre-existing `# shellcheck source=` directives for no gain. A config file would also have moved
    the sources-only rule away from the glob it governs.
 
-**Fixed (11 findings — real fixes, no behaviour change)**
+**Fixed (9 findings — real fixes, no behaviour change)**
 
 3. `.agents/scripts/backfill-story-issues.sh` — removed dead `EPIC` assignment (SC2034)
 4. `shared/resources/develop-pipeline-on-precompact.sh` — removed dead `TASK_ID` read (SC2034)
@@ -296,7 +296,7 @@ should be announced in the CHANGELOG rather than discovered.
    emphasis (SC2211); and `ls | grep` replaced by a glob loop into an array, which also removed a
    pre-existing SC2086 disable and added the empty-list guard the `ls` form silently lacked (SC2010)
 
-**Annotated (15 findings — reasoned disables)**
+**Annotated (17 findings — reasoned disables)**
 
 8. `shared/resources/bitbucket-auth.sh` (2), `shared/resources/jira-sprint-lib.sh` (2 SC2034 + SC1007 +
    SC1090), `shared/resources/resolve-platform.sh`, `set-github-project-priority.sh`,
@@ -485,10 +485,12 @@ Two MEDIUM findings, both in code this task introduced:
 | 2026-09-04 | 1.0     | Initial draft — filed from `task.83.gate.3` `recommendations.future`, with the baseline measured rather than estimated (56 sources, 81 findings, 0 errors, 26 warnings of which 25 are identified false positives) | create-task |
 | 2026-09-05 | 1.1 | Review passed (8/10). Baseline re-measured against shellcheck 0.11.0 and reproduces exactly (247/56 files, 0/26/79/81). Five corrections applied: `validate.yml` is path-filtered and cannot see 3 of the 56 sources including the motivating `setup-consumer.sh`, so Phase 1 now recommends a separate unfiltered workflow and records the `ci-gate-parity` constraint that rules out `test.yml`; the `JSM_DEFER_*` SC2034 attribution was inverted (the library reads them, the sprint scripts write them); `export` cannot work on the `BB_CURL_AUTH` array; SC2034 is 15 not 14; and §7's "unchanged by design" understated 139 regenerated bundled copies | review-task |
 | 2026-09-05 |         | Status → ready-for-development | review-task |
-| 2026-09-05 |         | Implemented — 155 files (18 hand-edited, 137 bundled), 0 new tests; all 26 warning-tier findings resolved (11 real fixes, 15 reasoned disables), lane added and mutation-proved red on a finding in `scripts/setup-consumer.sh` | develop |
+| 2026-09-05 |         | Implemented — 155 files (18 hand-edited, 137 bundled), 0 new tests; all 26 warning-tier findings resolved (9 real fixes, 17 reasoned disables), lane added and mutation-proved red on a finding in `scripts/setup-consumer.sh` | develop |
 | 2026-09-05 |         | Status → ready-for-review | develop |
 | 2026-09-05 |         | QA gate CONCERNS (80/100) — 2 MEDIUM, 1 LOW; all 11 criteria met, 5/5 CI jobs green | qa-task |
 | 2026-09-05 |         | qa-fix cycle 1 — TASK-92-001 (vacuous empty-list guard) fixed and mutation-proved; TASK-92-002 + the LOW closed: zero bare disables remain in any of the 56 sources | qa-fix |
+| 2026-09-05 |         | QA gate 2 CONCERNS (85/100) — refute pass; cycle-1 findings verified fixed, two new documentation-accuracy defects found | qa-task |
+| 2026-09-05 |         | qa-fix cycle 2 — TASK-92-003 (fix/annotation split miscounted 11/15; true split 9/17) and TASK-92-004 (tech-stack said five workflows, there are six) corrected | qa-fix |
 
 ---
 

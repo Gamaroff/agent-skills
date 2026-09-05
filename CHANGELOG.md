@@ -67,9 +67,9 @@ All notable changes to this project will be documented in this file. Format foll
 
   **The gate is `--severity=warning` over the 56 tracked *source* scripts**, pinned to ShellCheck
   **v0.11.0**. Measured on this tree: 0 errors, 26 warnings, 79 info, 81 style. All 26 warnings are
-  resolved in this change — 11 by a real fix (three genuinely dead variables removed, five string
+  resolved in this change — **9 by a real fix** (three genuinely dead variables removed, three string
   literals quoted, one `ls | grep` replaced by a glob loop, two assertion messages whose backticks were
-  being executed as command substitution) and 15 by a `# shellcheck disable` **with a stated reason**.
+  being executed as command substitution) and **17 by a `# shellcheck disable` with a stated reason**.
   A bare disable is a suppression; a disable with a reason is documentation, and the lane's own error
   message says so.
 
