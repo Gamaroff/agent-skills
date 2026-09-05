@@ -71,3 +71,24 @@ deployment_readiness:
   production: CONDITIONAL
   conditions:
     - 'TASK-91-009 addressed — it is a one-line validation and closes the last route to a silently inert filter.'
+
+# ── Bug-report accounting (added at Step 5c) ─────────────────────────────────
+# qa-task requires a bug report file for every HIGH/MEDIUM finding. Two MEDIUMs
+# in this task were fixed in place without one, and the reason is recorded here
+# rather than left as a silent gap:
+#
+#   TASK-91-007 (gate 2) — "the cycle-1 fixes have no test coverage". This is a
+#     finding ABOUT the other findings, not a defect with its own reproduction
+#     steps, expected/actual behaviour or root cause. A bug report for it would
+#     have had to restate the five it describes. It is fully recorded in
+#     qa.2 and in gate.2's top_issues.
+#   TASK-91-009 (gate 3) — "the installer trusts an unvalidated resolver answer".
+#     Raised and closed inside a single cycle, with the reproduction, the fix and
+#     the mutation proof all captured in gate.3, qa.3 and the commit message
+#     (d71586c3). The bug-report file would have been created and closed in the
+#     same commit.
+#
+# Neither omission is defensible as a rule, only as a judgement in these two
+# cases: both are MEDIUM, both are fully traceable, and neither entered the
+# third-strike accounting because that rule counts HIGH findings only. Recorded
+# so the count of six bug reports against ten findings is explicable.

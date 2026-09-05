@@ -67,10 +67,26 @@ deleting the installer's probe: the installer runs once, often in a plain shell,
 a shell that already has `JIRA_URL`, so dropping it would trade a rare disagreement for a common one
 (`task.83.bug.2.env-probe-asymmetry.md`).
 
-`.env` is **grepped, never sourced** — it is data, and sourcing would execute whatever a checked-in file
-happens to contain. Both resolvers share the `^JIRA_URL=.+` pattern, so an empty `JIRA_URL=` counts as
-unset on both sides. An explicit `tracker:` key still wins outright, and is the one-line opt-out for a
-repo carrying a stale `JIRA_URL`.
+`.env` is **parsed, never sourced** — it is data, and sourcing would execute whatever a checked-in file
+happens to contain.
+
+**There is only one `.env` reader now.** `setup-consumer.sh` used to carry its own
+`grep -qE '^JIRA_URL=.+'`; that probe is gone, because `_resolve_install_tracker` delegates the whole
+resolution to this file. So "both sides agree" is no longer a property to maintain between two greps —
+it is structural.
+
+The parse is deliberately more than a `grep`, and each part of it closed a real defect:
+
+| Spelling | Resolves | Why |
+| --- | --- | --- |
+| `JIRA_URL=https://x` | `jira` | the plain case |
+| `export JIRA_URL=https://x` | `jira` | a very common `.env` spelling; a bare `^JIRA_URL=` anchor missed it, so a shell that *sourced* the file resolved `jira` while this resolver said `github` |
+| `JIRA_URL=` + CRLF | `github` | a trailing `\r` satisfies `.+`; treating it as set resurrected the exact spelling task 83 was written to fix |
+| `JIRA_URL=""` / `JIRA_URL=''` | `github` | an emptied key means *not set*, quotes included |
+| the **last** matching line wins | — | a shell that sources the file takes the last assignment, so first-match-wins disagreed with it |
+
+An explicit `tracker:` key still wins outright, and is the one-line opt-out for a repo carrying a stale
+`JIRA_URL`.
 
 **Access** does not. Config and env (`AGENT_SKILLS_ACCESS_TRACKER`, `AGENT_SKILLS_ACCESS_VCS`) are
 read *independently*, and the **more restrictive** of the two wins, against the permissiveness order
@@ -389,11 +405,13 @@ config_bulk status key:tracker key:vcs shape:access nested:access.tracker nested
 # a config file that does not contain the value.
 [ "$TRACKER" = "__MAP__" ] && TRACKER="auto"   # tracker.workflowFile form ⇒ detect
 validate_enum "$SKILLS_CONFIG_FILE" tracker "$TRACKER" jira github auto || return 1
-# `.env` is the LAST positive probe for TRACKER, below the process environment. Grepped, not
-# sourced. See "Precedence" above for why this rung exists.
+# `.env` is the LAST positive probe for TRACKER, below the process environment. `_rp_dotenv_has_jira`
+# is an awk parse, not a grep — it accepts an optional `export` prefix, strips a trailing CR and one
+# surrounding quote pair, and takes the LAST match. See "Precedence" above for each defect that shape
+# closed. Parsed, never sourced.
 if [ "$TRACKER" = "auto" ]; then
   if   [ -n "${JIRA_URL:-}" ];                                  then TRACKER=jira
-  elif [ -f .env ] && grep -qE '^JIRA_URL=.+' .env 2>/dev/null;  then TRACKER=jira
+  elif _rp_dotenv_has_jira;                                     then TRACKER=jira
   else                                                               TRACKER=github
   fi
 fi

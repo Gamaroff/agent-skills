@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.91.reconcile-tracker-resolution'
+task_title: 'Reconcile install-time and run-time tracker resolution'
+gate: PASS
+status_reason: 'All ten findings across gates 1-3 are fixed and re-verified by execution, including the positive control that proves the negative tests are not passing for the wrong reason. Zero new findings this cycle. The task goal is met and independently confirmed: 17 config shapes resolve identically at install and run time, and the coverage gap that let the first two cycles through is closed.'
+reviewer: 'QA Engineer'
+updated: '2026-09-05T08:07:21Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 2450
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-09-05'
+  total_iterations: 3
+  verification_method: 'Behavioural re-execution of every finding from all three prior gates, with a positive control'
+  detail: 'TASK-91-001..010 and BUG-6 all verified fixed. Convergence on HIGH findings: 1 -> 1 -> 0 -> 0.'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'The .env file is parsed, never sourced. The subshell contains the resolver rather than executing it in the installer shell. The trust boundary flagged in cycle 3 is now closed — a located resolver''s answer is validated against the legal set before it is believed.'
+  performance:
+    status: PASS
+    notes: 'The double-source on the failure path remains, install-time only and once per run. Recorded as a cleanup across every cycle and never escalated, correctly.'
+  reliability:
+    status: PASS
+    notes: 'Every route to a silently inert filter found across three cycles is closed and pinned by a test: the newline payload collapse, an unvalidated resolver answer, an empty resolution, and a silent non-zero failure. Each refusal path now produces an explanation naming the file it could not use.'
+  maintainability:
+    status: PASS
+    notes: 'The change removes a duplicated decision, and its commentary is unusually good — it records why the rejected options were rejected and pre-empts the two retries a future reader would attempt. Three comments that were wrong or overstated were corrected during the loop rather than left standing: the false COVERED enumeration, the DOTENV parity tautology, and the now-vacuous $TRACKER test.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Source the resolver once and capture stderr on a separate fd rather than sourcing twice on the failure path.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Re-anchor the two comments in _config_skills_profile that still describe the deleted local parser.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: '_config_skills_profile and _config_skills_list are still hand-rolled awk YAML parsers with their own quote/CRLF normalisation — the same mirror-the-reader pattern this task removed for tracker:. They are the obvious next task.'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'SKILLS_JIRA_ONLY and SKILLS_GITHUB_ONLY remain mirrored in resolve-skill-set-cli.mjs. One duplicated decision was removed; this one is still there.'
+      refs: ['scripts/setup-consumer.sh', 'shared/resources/resolve-skill-set-cli.mjs']
+    - action: 'Decide whether a whitespace-only JIRA_URL should count as set. The env probe accepts it, the .env probe trims it away — a corner of the same asymmetry, not reachable from any wizard-written config.'
+      refs: ['shared/resources/resolve-platform.sh']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

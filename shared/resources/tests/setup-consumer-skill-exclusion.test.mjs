@@ -408,8 +408,18 @@ test("the resolver never emits a raw config token as a tracker", () => {
 // failure surfacing days later inside a pipeline step.
 //
 // Each case asserts the two resolvers AGREE, and separately what they agree on.
-// The first half is the property that matters; the second half stops a future
-// change from making them agree on the wrong answer.
+//
+// HONEST NOTE ON WHAT THE AGREEMENT HALF PROVES SINCE DELEGATION. In a bare temp
+// repo `_locate_resolver` finds this repo's own shared/resources/resolve-platform.sh
+// — the very file `runtimeTracker` sources — so the two sides cannot disagree by
+// construction, and `assert.equal(install, runtime)` is close to a tautology for
+// every row below. That is the intended end state (one implementation, not two),
+// but it means the line carrying information TODAY is `assert.equal(install, expected)`.
+//
+// The agreement assertion is kept because it stops being a tautology the moment
+// the installer stops delegating — which is exactly the regression worth
+// catching, and the reason the original two-implementation drift went unnoticed
+// for so long. It is a regression detector, not present-tense proof.
 const PARITY_CASES = [
   ["tracker: jira\n", "jira", "bare scalar"],
   ['tracker: "jira"\n', "jira", "double-quoted"],
@@ -745,10 +755,16 @@ for (const [dotenv, expected, label] of DOTENV_CASES) {
   });
 }
 
-test("the process environment still beats .env", () => {
-  // Ordering within the fallback: env above .env. Both spell `jira` when set, so
-  // this pins that an EMPTY `JIRA_URL=` in .env is not "set" on either side —
-  // the `^JIRA_URL=.+` pattern is shared by both resolvers for that reason.
+test("an empty `JIRA_URL=` in .env is not 'set'", () => {
+  // RENAMED. This was called "the process environment still beats .env" and
+  // never set a process-environment JIRA_URL — it wrote an empty one to `.env`
+  // and asserted github twice, which is an empty-value test, not a precedence
+  // test. A test whose name claims a property it does not exercise is worse
+  // than a missing one: it makes the property look covered.
+  //
+  // The precedence it claimed to pin now lives where it can actually be
+  // observed — `resolve-platform.test.sh`, scenario "env JIRA_URL wins over an
+  // emptied .env", which sets both and so can tell them apart.
   inTempRepo((dir) => {
     writeFileSync(path.join(dir, ".env"), "JIRA_URL=\n");
     assert.equal(

@@ -184,6 +184,13 @@ of the divergence table, and neither fixes the other's:
 
 **Decision: implement A *and* B.**
 
+> This **supersedes §10 Risk 1's "prefer Option A"**, and says so rather than leaving a later reader to
+> notice the contradiction. That preference was written on the assumption that A and B are alternatives
+> and that A is the lower-risk one. A is indeed lower-risk — it is also *insufficient*: it cannot close
+> row 5, and closing rows 6 and 7 while leaving row 5 open would not satisfy §9's first criterion. The
+> preference is honoured where it still applies (A does the structural work; B is the minimum addition
+> that makes A viable), and §10's mitigations for B are delivered in full rather than waived.
+
 1. **B first** — `resolve-platform.sh` gains a `.env` probe for `JIRA_URL`, ranked **below** the config
    key and **below** the process environment. This is the behaviour change, and it is what makes A
    viable: once the `.env` probe lives in the runtime resolver, delegating to it wholesale *preserves*
@@ -423,6 +430,16 @@ here is not scoped to the installer.
 - **Impact**: High — wrong-tracker calls fail late and confusingly.
 - **Mitigation**: prefer Option A. If Option B is chosen, the config key must keep winning, and the
   CHANGELOG must name the affected shape and the one-line opt-out.
+- **Outcome (2026-09-05)**: Option B **was** chosen, alongside A — see the Phase 1 Decision in §3. Both
+  mitigations are delivered and pinned: the config key wins in code (the `.env` rung sits inside the
+  `auto` branch, below the process environment) and by test (`explicit tracker: github beats a stale
+  .env`, in both suites), and the CHANGELOG names the shape and the opt-out.
+- **On `risk_level: medium`**: set by `review-task` before this decision existed, and deliberately left
+  at `medium` after it. The HIGH rating above is the *unmitigated* risk of B. With the config key
+  winning, and with the wizard writing a `tracker:` key on both platforms since task 83, the exposed
+  window is hand-authored and pre-task-83 configs only — narrow enough that `medium` is the honest
+  frontmatter value. Recorded here so the gap between §10's HIGH and the frontmatter is a decision
+  rather than an oversight.
 
 ### MEDIUM RISK
 
@@ -472,13 +489,26 @@ config that carries an explicit `tracker:` key.
 
 ## QA Testing Results
 
-**QA Status**: FAIL (cycle 2)
+**QA Status**: ✅ PASS (cycle 4)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-05
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
-### Cycle 2 (latest)
+### Cycle 4 (final)
+
+- **Gate**: [task.91.gate.4.reconcile-tracker-resolution.yml](./task.91.gate.4.reconcile-tracker-resolution.yml) — **PASS, 95/100**
+- **Report**: [task.91.qa.4.reconcile-tracker-resolution.md](./task.91.qa.4.reconcile-tracker-resolution.md)
+- All **ten** findings from gates 1–3 re-verified fixed by execution, plus a positive control. **Zero new findings.**
+- Convergence — HIGH: 1 → 1 → 0 → 0. The gate-2 HIGH was a *new* defect introduced by the gate-1 fix, not gate-1's unresolved. No third strike.
+- `npm run ci` green at 2450 tests; 17 config shapes agree; shellcheck 0 new. Tests grew 40 → 61.
+
+### Cycle 3
+
+- **Gate**: [task.91.gate.3.reconcile-tracker-resolution.yml](./task.91.gate.3.reconcile-tracker-resolution.yml) — CONCERNS, 80/100, 0 HIGH
+- Two residuals, both reachable only through a corrupt resolver copy: an unvalidated tracker made the filter inert; a silent failure produced no explanation. Both fixed.
+
+### Cycle 2
 
 - **Gate**: [task.91.gate.2.reconcile-tracker-resolution.yml](./task.91.gate.2.reconcile-tracker-resolution.yml) — FAIL, 70/100
 - **Report**: [task.91.qa.2.reconcile-tracker-resolution.md](./task.91.qa.2.reconcile-tracker-resolution.md)
@@ -532,11 +562,14 @@ which reads like plumbing — is where the regression is.
 | 2026-09-05 |         | Status → in-progress (QA FAIL, returning to fix) | qa-task |
 | 2026-09-05 |         | QA findings fixed — all 5 addressed in 1 iteration. rc 2 now means only a tracker rejection (a non-tracker refusal proceeds with a warning); the `.env` probe accepts `export` and rejects CRLF/quoted-empty; the dry run names which resolver copy answered and no longer prints an unfiltered count; the empty resolution gets its own message. 12 new tests, 3 mutation proofs, `npm run ci` green at 2441 | qa-fix |
 | 2026-09-05 |         | Status → ready-for-review | qa-fix |
-| 2026-09-05 |         | QA cycle 3 CONCERNS (80/100), 0 HIGH — loop converging. Both residuals fixed: the installer now validates the resolver's answer against the legal set (an unvalidated one made the filter inert), and a silently-failing resolver gets an explanation instead of "see the message above" | qa-fix |
 | 2026-09-05 |         | QA gate 2 FAIL (70/100) — 4 of 5 cycle-1 findings fixed; 1 new HIGH introduced BY the cycle-1 fix (rc/`TRACKER` payload collapses on an empty tracker → literal `"0"` resolved as a tracker), leaving TASK-91-005 unfixed | qa-task |
 | 2026-09-05 |         | Status → in-progress (QA cycle 2 FAIL) | qa-task |
 | 2026-09-05 |         | QA cycle 2 findings fixed — tab separator with the possibly-empty field first (a newline is stripped by command substitution); `.env` now last-match-wins like a sourcing shell; the COVERED/NOT-COVERED refusal split documented honestly and the rc-2 message stops naming the wrong file; the fixture tarball now ships the real resolver so the `release` origin is exercised at all. 4 new tests, 2 mutation proofs, `npm run ci` green at 2448 | qa-fix |
 | 2026-09-05 |         | Status → ready-for-review | qa-fix |
+| 2026-09-05 |         | QA gate 3 CONCERNS (80/100), 0 HIGH — loop converging. Two residuals, both reachable only via a corrupt resolver copy: an unvalidated tracker answer made the filter inert; a silent failure produced no explanation | qa-task |
+| 2026-09-05 |         | QA cycle 3 findings fixed — the installer now validates the resolver's answer against the legal set (an unvalidated one made the filter inert, keeping every skill), and a silently-failing resolver gets an explanation naming the file instead of "see the message above" | qa-fix |
+| 2026-09-05 |         | QA gate 4 PASS (95/100) — all ten findings from gates 1–3 re-verified fixed by execution, zero new. Convergence on HIGH: 1 → 1 → 0 → 0. Tests grew 40 → 61; `npm run ci` green at 2450 | qa-task |
+| 2026-09-05 |         | Status → ready-for-review (QA PASS, handing to Step 5c) | qa-task |
 
 ---
 
@@ -546,8 +579,8 @@ which reads like plumbing — is where the regression is.
 - [x] Phase 2 — Unify or synchronise the resolution
 - [x] Phase 3 — Grade malformed input consistently
 - [x] Phase 4 — Tests and documentation
-- [ ] QA review complete
-- [ ] Quality gate PASS
+- [x] QA review complete — 4 cycles, gate.4 PASS
+- [x] Quality gate PASS — 95/100
 
 ---
 
@@ -556,8 +589,8 @@ which reads like plumbing — is where the regression is.
 - [Task 83](../task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md) — the filter this decides the input for
 - [`task.83.bug.2.env-probe-asymmetry.md`](../task.83.platform-aware-skill-exclusion/task.83.bug.2.env-probe-asymmetry.md) — why the `.env` probe was kept, and why Option C is rejected
 - [`task.83.gate.3.platform-aware-skill-exclusion.yml`](../task.83.platform-aware-skill-exclusion/task.83.gate.3.platform-aware-skill-exclusion.yml) — `recommendations.future`, where these residuals were recorded
-- `shared/resources/resolve-platform.sh:424-437` — the runtime identity resolution
-- `scripts/setup-consumer.sh:878` — `_resolve_install_tracker`
+- `shared/resources/resolve-platform.sh` — the runtime identity resolution (`validate_enum … tracker` at :438, `_rp_dotenv_has_jira` at :470)
+- `scripts/setup-consumer.sh` — `_resolve_install_tracker` (:934) and `_locate_resolver` (:909)
 - [`shared/resources/platform-detection.md`](../../../shared/resources/platform-detection.md) — the canonical resolver order
 - [`docs/reference/configuration.md`](../../reference/configuration.md) — the `tracker` key and its validation
 
@@ -576,7 +609,11 @@ which reads like plumbing — is where the regression is.
 
 ### Known Issues
 
-- The `the .env probe is a DELIBERATE asymmetry, not an oversight` test currently **pins the
-  divergence this task removes**. Its failure message says "if you changed that, update the installer
-  and this test together" — this task is that change. Expect it to go red; that is correct, not a
-  regression.
+- ~~The `the .env probe is a DELIBERATE asymmetry, not an oversight` test currently **pins the
+  divergence this task removes**. Expect it to go red.~~
+  **Resolved — and the prediction was not quite right.** The test never went red, because it was
+  rewritten in the *same commit* as the behaviour change rather than being observed failing first. Its
+  replacement, `install and run time agree on a \`.env\`-only JIRA_URL`, asserts the new agreement and
+  carries a HISTORY comment recording that the asymmetry was deliberate until this task closed it, so
+  a later reader does not mistake the reversal for drift. §9's Migration criterion asked for "updated
+  or removed"; updated-in-place is what happened.
