@@ -1523,3 +1523,82 @@ test("BUG-6/verify: a glued arithmetic evaluation is not an invocation", () => {
   // But one carrying a command substitution still reaches the fail-closed path.
   assert.equal(classifyBlock("((a+$(touch /tmp/x)))").klass, "mutating");
 });
+
+/* -------------------------------------------------------------------------- *
+ *  BUG-10 — sed's `w` write flag, caught by position rather than by shape.
+ *
+ *  bug.6 closed this rule with a regex requiring whitespace after `w`. GNU sed
+ *  does not require it, so seven glued spellings stayed runnable. `w` means
+ *  "write" in flag position and means the letter w inside a pattern, and
+ *  `s/warning/x/` contains `/w` exactly as `s/a/b/wfile` does — which is why no
+ *  regex closed it and the script is walked instead.
+ * -------------------------------------------------------------------------- */
+
+test("BUG-10: a glued sed write filename is still a write", () => {
+  for (const input of [
+    "sed 's/a/b/wpwned.txt' README.md",
+    "sed 's|a|b|wpwned.txt' README.md", // `|` is a legal s/// delimiter
+    "sed 's#a#b#wpwned.txt' README.md",
+    "sed -e 's/a/b/wpwned.txt' README.md",
+    "sed --expression='s/a/b/wpwned.txt' README.md",
+    "sed 'wpwned.txt' README.md", // bare w command
+    "sed 's/a/b/Wpwned.txt' README.md", // W writes too
+    "sed '/re/wpwned.txt' README.md", // address-prefixed
+    "sed '1,3wpwned.txt' README.md", // range-prefixed
+    "sed '2wpwned.txt' README.md", // line-number-prefixed
+  ]) {
+    assert.equal(classifyBlock(input).klass, "mutating", input);
+  }
+  // The spaced forms bug.6 closed must stay closed.
+  assert.equal(
+    classifyBlock("sed -n 's/a/b/w /tmp/x' README.md").klass,
+    "mutating",
+  );
+  assert.equal(classifyBlock("sed 'w /tmp/x' README.md").klass, "mutating");
+});
+
+test("BUG-10: an unreadable sed script fails closed", () => {
+  // `-f` names a script file the classifier cannot read. It cannot say what the
+  // script does, and "cannot say" must never resolve to "safe".
+  assert.equal(classifyBlock("sed -f evil.sed README.md").klass, "mutating");
+  assert.equal(
+    classifyBlock("sed --file=evil.sed README.md").klass,
+    "mutating",
+  );
+});
+
+test("BUG-10: every sed in a segment is examined, not just the first", () => {
+  // Checking only the leading invocation would miss the one that writes.
+  assert.equal(
+    classifyBlock("sed 's/a/b/' f | sed 'w /tmp/x'").klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("sed 's/a/b/' f | sed 'wpwned.txt'").klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("echo hi; sed 's/a/b/wpwned.txt' f").klass,
+    "mutating",
+  );
+});
+
+test("BUG-10: a w inside pattern text is not a write", () => {
+  // These are what defeated every regex attempted for this rule.
+  for (const input of [
+    "sed 's/warning/x/' README.md",
+    "sed 's/w/x/' README.md",
+    "sed 's/x/write/' README.md",
+    "sed 's/a/b/g' README.md",
+    "sed -e 's/a/b/' -e 's/c/d/' README.md",
+    "sed -n 's/a/b/p' README.md",
+    "sed -n '2p' README.md",
+    "sed '/re/d' README.md",
+    "sed 'y/abc/xyz/' README.md",
+    "echo w file | sed 's/a/b/'",
+    "grep w f | sed 's/a/b/'",
+    "echo watershed",
+  ]) {
+    assert.equal(classifyBlock(input).klass, "runnable", input);
+  }
+});

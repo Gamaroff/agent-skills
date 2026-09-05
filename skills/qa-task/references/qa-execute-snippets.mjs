@@ -267,6 +267,118 @@ const O_FLAG_NOT_OUTPUT = new Set(["grep", "egrep", "fgrep", "rg", "find"]);
 const COMMAND_PREFIXES = new Set(["sudo", "env", "command", "nohup", "nice"]);
 
 /**
+ * Does any `sed` invocation in this block write a file?
+ *
+ * BUG-10 — bug.6 closed sed's `w` flag with `/\bsed\b[^\n|;&]*\bw\s+\S/`, which fires
+ * only when a SPACE separates `w` from its filename. GNU sed does not require
+ * one, so `sed 's/a/b/wpwned.txt' f` and six sibling spellings stayed runnable.
+ *
+ * A regex cannot close this, and that is the whole point. `w` means "write" in
+ * FLAG position (after the closing delimiter of `s<D>…<D>…<D>`) and means the
+ * letter w in PATTERN text, and `s/warning/x/` contains `/w` exactly as
+ * `s/a/b/wfile` does. Anchoring on `/w` matches both — every pattern tried during
+ * bug.6 false-positived on ordinary substitutions, which is why that rule was
+ * left demanding a space. Position is the distinction, so the script has to be
+ * walked rather than matched. Same shape as bug.6 root cause D.
+ */
+function sedWritesFile(segment) {
+  const toks = segment.trim().split(/\s+/).filter(Boolean);
+  const isSed = (t) =>
+    t
+      .replace(/['"\\]/g, "")
+      .split("/")
+      .pop() === "sed";
+  // EVERY sed in the segment, not just the first: `sed 's/a/b/' | sed 'w /tmp/x'`
+  // writes, and checking only the leading invocation would miss it.
+  for (let sedAt = 0; sedAt < toks.length; sedAt += 1) {
+    if (!isSed(toks[sedAt])) continue;
+    if (sedInvocationWrites(toks, sedAt)) return true;
+  }
+  return false;
+}
+
+/** Collect the script(s) of ONE sed invocation starting at `sedAt` and test them. */
+function sedInvocationWrites(toks, sedAt) {
+  const scripts = [];
+  for (let i = sedAt + 1; i < toks.length; i += 1) {
+    const tok = toks[i];
+    // `-f script.sed` — the script is a file we cannot read. The classifier
+    // cannot say what it does, and "cannot say" is never "safe".
+    if (tok === "-f" || tok === "--file" || /^--file=/.test(tok)) return true;
+    if (tok === "-e" || tok === "--expression") {
+      if (toks[i + 1] !== undefined) scripts.push(toks[i + 1]);
+      i += 1;
+      continue;
+    }
+    if (/^--expression=/.test(tok)) {
+      scripts.push(tok.slice("--expression=".length));
+      continue;
+    }
+    if (tok.startsWith("-")) continue; // -n, -i handled elsewhere, other flags
+    // First non-flag operand is the script, unless -e already supplied one.
+    if (scripts.length === 0) scripts.push(tok);
+    break;
+  }
+
+  return scripts.some((raw) => scriptWrites(raw.replace(/^['"]|['"]$/g, "")));
+}
+
+/** Walk one sed script; true when it contains a `w`/`W` write in command or flag position. */
+function scriptWrites(script) {
+  let i = 0;
+  const isWrite = (ch) => ch === "w" || ch === "W";
+  while (i < script.length) {
+    const ch = script[i];
+    if (
+      ch === ";" ||
+      ch === "\n" ||
+      ch === " " ||
+      ch === "\t" ||
+      ch === "{" ||
+      ch === "}"
+    ) {
+      i += 1;
+      continue;
+    }
+    // An address may precede the command: /re/, \cREc, $, a line number, or a range.
+    if (ch === "/") {
+      i += 1;
+      while (i < script.length && script[i] !== "/") {
+        if (script[i] === "\\") i += 1;
+        i += 1;
+      }
+      i += 1; // closing delimiter
+      while (i < script.length && /[0-9,$~+\s]/.test(script[i])) i += 1;
+      continue;
+    }
+    if (/[0-9$,~+]/.test(ch)) {
+      i += 1;
+      continue;
+    }
+    if (ch === "s" && i + 1 < script.length) {
+      const delim = script[i + 1];
+      i += 2;
+      let seen = 0;
+      while (i < script.length && seen < 2) {
+        if (script[i] === "\\") i += 1;
+        else if (script[i] === delim) seen += 1;
+        i += 1;
+      }
+      // Flags run to the end of this command.
+      while (i < script.length && !";\n}".includes(script[i])) {
+        if (isWrite(script[i])) return true;
+        i += 1;
+      }
+      continue;
+    }
+    if (isWrite(ch)) return true; // `w file` / `wfile` in command position
+    // Any other command: skip to the end of it.
+    while (i < script.length && !";\n}".includes(script[i])) i += 1;
+  }
+  return false;
+}
+
+/**
  * Does any command in this block write a file via `-o`?
  *
  * BUG-6 root cause D — `-o` used to be matched as a bare string with no reference
@@ -330,7 +442,6 @@ export const DENY_PATTERNS = [
   // BUG-6 root cause D — sed writes a file through its `w` flag with neither `-i`
   // nor a redirection: `s/a/b/w FILE` as a substitute flag and `w FILE` as a
   // command. DENY_PATTERNS named only the `-i` spellings, so both slipped past.
-  [/\bsed\b[^\n|;&]*\bw\s+\S/, "sed w write"],
   // CR-7: `find` is read-only until it is given an action that is not.
   [
     /\bfind\b[^\n]*\s-(delete|exec|execdir|ok|okdir|fls|fprint|fprintf)\b/,
@@ -878,6 +989,14 @@ export function classifyBlock(code, bindings = {}) {
   for (const [re, name] of DENY_PATTERNS) {
     if (re.test(prose))
       return { klass: "mutating", reason: `deny-list: ${name}` };
+  }
+
+  // Deliberately NOT split on a single `|`: sed accepts it as an s/// delimiter,
+  // so splitting there tears `s|a|b|wfile` apart and the write disappears.
+  // `sedWritesFile` locates each `sed` token itself, so pipeline segmentation
+  // buys nothing here anyway.
+  if (prose.split(/\n|;|&&|\$\(|`/).some((seg) => sedWritesFile(seg))) {
+    return { klass: "mutating", reason: "deny-list: sed w write" };
   }
 
   if (hasOutputFlagWrite(prose)) {
