@@ -9,6 +9,11 @@
  * shared lib apply: idempotent create, atomic PUT, status transitions, live
  * priority, issue-type cache, retry on 5xx + network, default-branch URLs,
  * in-place frontmatter, --json/--quiet/--dry-run/--force, pluggable fetch.
+ *
+ * `--no-transition` re-points links / refreshes the description WITHOUT driving
+ * the issue's status, so a caller that has already decided the status (e.g.
+ * finalise's tracker-workflow ladder) is not overruled by this script's own
+ * `loadStatusMap` resolver afterwards. See bug.11.
  */
 
 const fs = require("fs");
@@ -552,6 +557,7 @@ function parseArgs(argv) {
     verbose: false,
     version: false,
     failOnStatusSkip: false,
+    noTransition: false,
     probeWorkflow: false,
     writeRecord: "",
   };
@@ -590,6 +596,9 @@ function parseArgs(argv) {
         break;
       case "--fail-on-status-skip":
         opts.failOnStatusSkip = true;
+        break;
+      case "--no-transition":
+        opts.noTransition = true;
         break;
       case "--probe-workflow":
         opts.probeWorkflow = true;
@@ -674,7 +683,7 @@ async function run({
   if (!args.file) {
     output.err("Error: --file is required");
     output.err(
-      "Usage: sync-jira-epic --file <epic.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version]",
+      "Usage: sync-jira-epic --file <epic.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version] [--no-transition]",
     );
     return { exitCode: 1 };
   }
@@ -929,6 +938,13 @@ async function run({
     // status would silently diverge from the board on exactly the sync that was
     // meant to carry it. `sync-jira-story` and `sync-jira-task` have always
     // transitioned on this path; the epic's early return made it the odd one out.
+    //
+    // ...except under `--no-transition`, where the caller has taken the status
+    // decision itself, so the call below forwards it like every other call site.
+    // Suppressing here too is what makes the flag path-independent: transitioning
+    // only when the body happened to be unchanged would make the flag's effect
+    // depend on whether an unrelated field drifted, which is the least
+    // predictable behaviour on offer.
     if (current && changedFields.length === 0 && !args.force) {
       output.info(
         "\nℹ️  No field changes detected — skipping Jira update. Re-run with --force to push anyway.",
@@ -948,6 +964,7 @@ async function run({
           currentStatus: current?.status || null,
           docKind: "epic",
           output,
+          noTransition: args.noTransition,
         });
       }
 
@@ -1387,6 +1404,7 @@ async function run({
       currentStatus: current?.status || null,
       docKind: "epic",
       output,
+      noTransition: args.noTransition,
     });
   }
 

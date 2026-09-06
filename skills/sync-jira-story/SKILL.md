@@ -27,9 +27,9 @@ One-way sync of a local story markdown file to Jira. Auto-detects create vs upda
 - **Live priority resolution** — fetches `/rest/api/3/priority` and matches user input against the actual Jira instance, falling back to a built-in synonym map (`critical`→`Highest`, etc.).
 - **Issue type cache** — Jira `Story` type id is cached to `<repo>/.cache/jira-issuetypes-<PROJECT>.json` for 24h.
 - **Bullet/ordered lists** — body sections containing `- item` or `1. item` lines render as proper ADF lists, not paragraphs with hard-breaks.
-- **Current-branch Bitbucket URLs** — links use the current branch's remote-tracking branch (e.g. `origin/feature/...`), falling back to the default branch (`origin/HEAD`, e.g. `main`) when there is no upstream or HEAD is detached. Since feature branches are deleted post-merge, `review-story` pins the link to the durable branch (`develop`, when the story file already exists there) whenever it re-syncs, and `finalise` re-points it at acceptance (both via `--doc-branch`); you can also re-sync manually from `develop`/`main` after merge.
+- **Current-branch Bitbucket URLs** — links use the current branch's remote-tracking branch (e.g. `origin/feature/...`), falling back to the default branch (`origin/HEAD`, e.g. `main`) when there is no upstream or HEAD is detached. Since feature branches are deleted post-merge, `review-story` pins the link to the durable branch (`develop`, when the story file already exists there) whenever it re-syncs, and `finalise` re-points it at acceptance (both via `--doc-branch`; finalise adds `--no-transition` so its re-point is link-only and cannot move the card); you can also re-sync manually from `develop`/`main` after merge.
 - **HTTP retry** — automatic retry with exponential backoff on 5xx, network errors, and 429 (Retry-After honoured, capped at 60s). Other 4xx responses fail fast.
-- **Skip-when-no-diff** — on update, if the field diff is empty (`summary`, `description`, `metadata`, `priority`, `labels` all unchanged), the script skips the PUT, the file write-back, and the changelog entry. Status transitions still run.
+- **Skip-when-no-diff** — on update, if the field diff is empty (`summary`, `description`, `metadata`, `priority`, `labels` all unchanged), the script skips the PUT, the file write-back, and the changelog entry. Status transitions still run, unless `--no-transition` is passed.
 - **Conditional `description` on PUT** — `description` is sent only when body or metadata content actually changed, so labels-only edits don't show up as edits in Jira's history.
 - **Backlog placement (Scrum only)** — board type is detected via `/rest/agile/1.0/board/{id}/configuration`. Skipped on Kanban with a warning.
 - **In-place frontmatter updates** — `jira_*` keys are updated where they sit, not stripped and re-appended. Clean diffs.
@@ -155,7 +155,7 @@ Flow:
 5. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
 6. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 7. Diff `summary`, body hash, meta hash, priority, labels.
-8. **If diff empty (update path only):** skip the PUT, the file write-back, and the changelog entry. Status transition still runs. Exit clean.
+8. **If diff empty (update path only):** skip the PUT, the file write-back, and the changelog entry. Status transition still runs, unless `--no-transition` is passed. Exit clean.
 9. Build a Jira ADF description: Summary → Acceptance Criteria (capped) → Metadata → Source links.
 10. Resolve cached `Story` issue type id (or fetch + cache); detect project style (cached 24 h).
 11. **Create** (POST, with parent/Epic Link auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`). On update, `description` is sent only when body or metadata hash changed.
@@ -318,6 +318,7 @@ the authoritative log.
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
 | `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Used by `finalise` (passes the durable integration branch) so a closed issue doesn't link to a deleted feature branch. |
+| `--no-transition` | | Re-point links / refresh the description **without** driving the issue's status. The sync normally resolves frontmatter `status:` through its own `loadStatusMap` and transitions the card; with this flag it issues no status request at all. Passed by `finalise` Step 7's Document-link re-point, so the re-link cannot overrule the terminal status the tracker-workflow ladder just set (bug.11). Composes with `--fail-on-status-skip` — a suppressed transition is a run behaving as configured, and exits 0. |
 | `--check-card` | | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-story` to catch a heading mismatch before it publishes a thin card. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--no-write` | | Run live Jira sync but skip the local file write-back. Useful for first-time adopters who want to inspect what would change in the markdown without committing the change. Differs from `--dry-run` in that the Jira side is updated. |

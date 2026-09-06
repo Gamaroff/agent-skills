@@ -18,6 +18,9 @@
  *   - In-place frontmatter updates (no key reorder churn)
  *   - --json / --quiet / --dry-run / --force
  *   - --check-card: offline preflight of the document against the card spec
+ *   - --no-transition: re-point links / refresh the description WITHOUT
+ *     driving the issue's status, so a caller that has already decided the
+ *     status (finalise's ladder) is not overruled by a second resolver
  *   - Pluggable fetch (`module.exports.run({ fetchImpl })`) for tests
  */
 
@@ -389,6 +392,7 @@ function parseArgs(argv) {
     json: false,
     quiet: false,
     failOnStatusSkip: false,
+    noTransition: false,
     probeWorkflow: false,
     writeRecord: "",
   };
@@ -430,6 +434,9 @@ function parseArgs(argv) {
         break;
       case "--fail-on-status-skip":
         opts.failOnStatusSkip = true;
+        break;
+      case "--no-transition":
+        opts.noTransition = true;
         break;
       case "--probe-workflow":
         opts.probeWorkflow = true;
@@ -489,7 +496,7 @@ async function run({
   if (!args.file) {
     output.err("Error: --file is required");
     output.err(
-      "Usage: sync-jira-task --file <task.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet]",
+      "Usage: sync-jira-task --file <task.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--no-transition]",
     );
     return { exitCode: 1 };
   }
@@ -955,6 +962,7 @@ async function run({
       currentStatus: current?.status || null,
       docKind: "task",
       output,
+      noTransition: args.noTransition,
     });
   }
 

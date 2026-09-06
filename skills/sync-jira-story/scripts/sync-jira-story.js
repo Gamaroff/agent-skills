@@ -9,6 +9,11 @@
  *
  * Uses Jira REST API v3 with ADF. All 20 reliability features from
  * sync-jira-task apply via the shared lib.
+ *
+ * `--no-transition` re-points links / refreshes the description WITHOUT driving
+ * the issue's status, so a caller that has already decided the status (e.g.
+ * finalise's tracker-workflow ladder) is not overruled by this script's own
+ * `loadStatusMap` resolver afterwards. See bug.11.
  */
 
 const fs = require("fs");
@@ -568,6 +573,7 @@ function parseArgs(argv) {
     json: false,
     quiet: false,
     failOnStatusSkip: false,
+    noTransition: false,
     probeWorkflow: false,
     writeRecord: "",
   };
@@ -612,6 +618,9 @@ function parseArgs(argv) {
         break;
       case "--fail-on-status-skip":
         opts.failOnStatusSkip = true;
+        break;
+      case "--no-transition":
+        opts.noTransition = true;
         break;
       case "--probe-workflow":
         opts.probeWorkflow = true;
@@ -671,7 +680,7 @@ async function run({
   if (!args.file) {
     output.err("Error: --file is required");
     output.err(
-      "Usage: sync-jira-story --file <story.md> [--check-card] [--doc-branch <name>] [--dry-run] [--no-write] [--force] [--json] [--quiet]",
+      "Usage: sync-jira-story --file <story.md> [--check-card] [--doc-branch <name>] [--dry-run] [--no-write] [--force] [--json] [--quiet] [--no-transition]",
     );
     return { exitCode: 1 };
   }
@@ -908,7 +917,10 @@ async function run({
     if (skippedNoChanges) {
       changeSummary = "Sync (no field changes detected)";
       output.info(
-        `\nℹ️  No field changes vs Jira — skipping PUT, write-back, and changelog entry. Status transition still runs if frontmatter status differs.`,
+        `\nℹ️  No field changes vs Jira — skipping PUT, write-back, and changelog entry.` +
+          (args.noTransition
+            ? " Status transition suppressed by --no-transition."
+            : " Status transition still runs if frontmatter status differs."),
       );
       result = {
         issueKey: existingJiraKey,
@@ -1157,6 +1169,7 @@ async function run({
       currentStatus: current?.status || postCreateStatus || null,
       docKind: "story",
       output,
+      noTransition: args.noTransition,
     });
   }
 
