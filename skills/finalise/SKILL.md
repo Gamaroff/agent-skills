@@ -1107,9 +1107,27 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    > transition protocol) and the `sync-jira-*` re-link below can drive the status to Done, but they
    > resolve it from **different config sources**: the transition uses the `tracker-workflow.yaml`
    > ladder, the sync uses its own `loadStatusMap`. Running the ladder first makes it the single
-   > resolver — the sync's own transition then finds the issue already in Done and no-ops, while its
-   > real job (re-pointing the Document link at the durable branch) still happens. Do not reverse
-   > these two blocks.
+   > resolver for the *decision*, while the sync's real job (re-pointing the Document link at the
+   > durable branch) still happens. **Do not reverse these two blocks** — sync-first hands the
+   > decision back to `loadStatusMap`, which is what this order exists to prevent.
+   >
+   > ⚠️ **The sync does NOT reliably no-op afterwards, and step 3 below must check.** This block used
+   > to claim it did — *"the sync's own transition then finds the issue already in Done and no-ops"* —
+   > and that is only true when the consumer's `jira.statusMap` maps `accepted` to `Done`. **On a
+   > project that maps it to anything else, the sync moves the card BACKWARDS out of the terminal
+   > status the ladder just set**, and the resolution it was closed with is stranded on a non-terminal
+   > status, where `resolution IS EMPTY` sweeps cannot see it either.
+   >
+   > This is not an exotic configuration — **it is the one this very step recommends**. See the
+   > `stage-disabled` row below: *"a board that wants a card to sit in a merge queue until the PR
+   > actually lands should leave `done` to a human"*. A consumer that took that advice is exactly the
+   > consumer this bites. Observed on RAPP-715 (2026-09-05): closed to `Done` + `resolution: Done`,
+   > then the re-link returned it to `Waiting for Review` still carrying `resolution: Done` — matched
+   > by *name*, because that workflow offers a transition literally called `Waiting for Review` and
+   > that name was in the project's `accepted` candidate list.
+   >
+   > Full analysis and the durable fix (a `--no-transition` flag on the sync, so the re-link cannot
+   > carry a status decision at all): [`bug.11`](../../docs/bugs/bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md).
 
    1. **Transition to Done** — follow `references/jira-transition-protocol.md` exactly, with
       `candidates = ["Done", "Closed", "Resolved", "Complete", "Completed"]` and `terminal = true`.
@@ -1183,6 +1201,25 @@ EOF
      echo "ℹ️ JIRA_* env not set — skipping Document-link refresh; re-sync from develop after merge to pin a durable link"
    fi
    ```
+
+   4. **Re-assert the terminal status — MANDATORY, and read it back rather than assuming.** The sync
+      above drives status from frontmatter through its own resolver, so on a consumer whose
+      `statusMap` maps `accepted` to a non-`Done` column it will have just walked the card backwards
+      out of the status step 1 set (bug.11). Check, and repair if so:
+
+   ```bash
+   POST_SYNC=$(curl -s -u "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" -H "Accept: application/json" \
+     "${JIRA_URL}/rest/api/3/issue/${JIRA_KEY}?fields=status,resolution" \
+     | python3 -c 'import sys,json; f=json.load(sys.stdin)["fields"]; print(f["status"]["name"])')
+   ```
+
+   - Terminal (`Done`/`Closed`/whatever step 1 targeted) → nothing to do.
+   - **Anything else** → step 1's close was undone. Re-run the step-1 transition, supplying the same
+     required fields (a `resolution` is the common one), then **re-read again** to confirm. Log in the
+     running summary: *"re-asserted terminal status after the Document-link re-point (bug.11)"*.
+
+   Never report the close on the strength of step 1 alone once step 3 has run — a `204` from step 1 is
+   a statement about step 1, not about the state the step ends in.
 
    `${WORKITEM}` is `story` or `task` depending on the document being finalised.
 
@@ -1337,6 +1374,9 @@ EOF
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
 - [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API)
 - [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
+- [ ] **Jira only — terminal status RE-READ after the Document-link re-point**, and re-asserted if the
+      sync walked it back (bug.11). A `204` from the close is evidence about the close, not about the
+      state this step ends in
 - [ ] Tracker board updated: Jira — N/A (handled by transition above) **OR** GitHub project board item moved to Done via GraphQL mutation **OR** warning comment posted (if mutation failed after retry)
 - [ ] Running summary records issue close outcome AND board update outcome (success, failure, not-found — with detail)
 - [ ] User notified with success message, artifact paths, PR comment link, and board update status
