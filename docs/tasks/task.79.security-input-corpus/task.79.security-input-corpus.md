@@ -5,18 +5,20 @@ type: task
 description: "Every security check in this repo generates its own candidate inputs from scratch, in prose, at the moment it runs. Ship the adversarial corpus as one source of truth — readable and machine-readable — so a probe tests the inputs that are known to defeat a sink rather than the ones an agent thought of."
 tags: [security, corpus, probe, shared-resources]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: low
 created: 2026-09-02
 updated: 2026-09-07
+completed_date: 2026-09-07
+pr_number: 332
 assignee:
 estimated_effort_hours: 5
 ---
 
 # Technical Task: Write down the inputs that defeat each sink, once
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.79.review.1.security-input-corpus.md` implemented 2026-09-06
 
 ---
@@ -339,6 +341,37 @@ restored table.
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: [`task.79.gate.3.security-input-corpus.yml`](./task.79.gate.3.security-input-corpus.yml) — ✅ **PASS**, 100/100, `top_issues: []`
+**QA Cycles**: 3 (FAIL → CONCERNS → PASS). HIGH findings 1 → 0 → 0; issues found 16 → 11 → 0.
+**PR Conformance Review** (Step 5c): ✅ **APPROVE** — [`task.79.pr-review.1`](./task.79.pr-review.1.security-input-corpus.md)
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** 8/8 met, each verified by execution rather than inspection
+✅ **Tests:** 2537 passing / 0 failing across the hermetic suite; `eval:all` exit 0
+✅ **CI:** all 5 checks green on the **final** head `8ed8737c` — not on an ancestor
+✅ **PR Review:** Step 5c APPROVE; scope verified exact (the 10 files declared in §7 are precisely the 10 changed) and the artifact trail verified honest
+✅ **Documentation:** CHANGELOG entry under `[Unreleased] → Added`; prose peer generated from the module; all four `npm run bundle` outputs committed with no content drift
+✅ **Security:** **boundary: true** — 28 candidates executed across all five axes plus the accept direction, **0 reproduced**. The boundaries held
+⚠️ **Compliance:** NOT_APPLICABLE — no data collection, persistence, payments, UI or PHI
+
+**Carried forward, non-blocking:** three corpus claims are cited rather than executed (no template
+engine or Windows codepage available); `BUNDLED_REFS` lacks an `isFile()` guard (benign today).
+
+**Detailed Verification Log:** see [`task.79.dod.1.security-input-corpus.md`](./task.79.dod.1.security-input-corpus.md)
+for complete evidence, including the probe candidate table and the note that two of the four DoD
+agents hung and their checks were completed in-line.
+
+**Task marked as ACCEPTED on:** 2026-09-07
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -412,6 +445,7 @@ All 10 promoted gate issues addressed, plus 6 advisory cleanups taken while in t
 | 2026-09-07 |         | QA cycle 2 gate CONCERNS (80/100) — refute pass found 11 further issues, all in cycle 1's own fixes or in unexecuted corpus claims; all addressed. HIGH 1 → 0 | qa-task |
 | 2026-09-07 |         | QA findings fixed — 11 cycle-2 issues closed in 1 iteration: guard widened to flag-head fragments with a third fixture, import snippet stops guessing the directory, purity check rebuilt on call shapes, `host-with-slash` correct no longer endorses a non-mitigation, table cells escaped, bundled refs derived from disk | qa-fix |
 | 2026-09-07 |         | QA cycle 3 gate PASS (100/100) — verification re-review: all 21 findings across 3 cycles closed and independently re-checked, 0 new findings, CI green on head | qa-task |
+| 2026-09-07 | 1.2     | DoD verified — accepted (PR #332). 8/8 criteria, 28 security probes executed with 0 reproduced, CI green on the final head | finalise |
 
 ---
 
