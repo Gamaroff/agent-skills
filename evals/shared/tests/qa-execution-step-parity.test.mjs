@@ -105,7 +105,15 @@ test("the rule document exists and covers every part of the contract", () => {
     ["dual-shell execution", /^## 3\. Dual-shell execution/m],
     ["sandbox sentinel", /sandbox sentinel/im],
     ["zsh guard", /command -v zsh/m],
-    ["zero blocks executed", /zero blocks executed is itself a finding/im],
+    // bug.7 — the rule doc must state the SPLIT, not the old single-signal
+    // framing. Pinning the former heading text would have kept passing on a doc
+    // that still told readers to treat a permanently-unfixable state as a finding.
+    [
+      "zero blocks executed is never a pass",
+      /zero blocks executed is never a pass/im,
+    ],
+    ["the informational half of the split", /no-executable-blocks/m],
+    ["the discriminator", /counts\.placeholder|`placeholder > 0`/m],
     ["reporting", /^## 5\. Reporting/m],
   ]) {
     assert.match(rule, re, `the rule document must cover: ${what}`);
@@ -178,14 +186,50 @@ test("both skills carry the zero-blocks-executed rule and forbid suppressing it"
     assert.match(src, /zero-blocks-executed/, `${name} must name the finding`);
     assert.match(
       src,
-      /do not suppress it/i,
-      `${name} must forbid suppressing the zero-executed finding`,
+      /do not suppress (it|either)/i,
+      `${name} must forbid suppressing the zero-executed record`,
     );
     // zsh being absent must never be conflated with "nothing ran".
     assert.match(
       src,
-      /zsh[^.]*absent[^.]*not that case|zsh-unavailable/i,
+      /zsh[^.]*absent[^.]*not (that|either) case|zsh-unavailable/i,
       `${name} must distinguish a missing interpreter from a zero-executed run`,
+    );
+  }
+});
+
+// bug.7 — "nothing ran" is two states. A skill doc that names only the finding
+// tells a reviewer to chase a `no-executable-blocks` record that has no remedy,
+// or (worse) to suppress it. Both halves of the contract must be stated, in both
+// skills, or the engine's split is invisible where it is actually read.
+test("both skills state BOTH halves of the zero-executed split (bug.7)", () => {
+  for (const [name, src] of [
+    ["qa-task", qaTask],
+    ["qa-story", qaStory],
+  ]) {
+    assert.match(
+      src,
+      /no-executable-blocks/,
+      `${name} must name the informational record, not only the finding`,
+    );
+    // The discriminator itself, so the doc says WHEN each fires rather than
+    // merely that both exist.
+    assert.match(
+      src,
+      /placeholder\s*(===|==|>)\s*0|placeholder > 0/,
+      `${name} must state the condition that picks between them (counts.placeholder)`,
+    );
+    // The reason the second half is not actionable. Without this a reader treats
+    // it as a finding with a missing hint — which is the bug.7 report verbatim.
+    // Whitespace-tolerant: these skills wrap prose at 100 columns, so the phrase
+    // this asserts on is routinely split across a line break (and a blockquote
+    // `>` marker). A regex with a literal space silently stops matching the day
+    // someone reflows the paragraph — the assertion would go green-to-red for a
+    // reason that has nothing to do with the contract.
+    assert.match(
+      src,
+      /(ever|never)\s+make\s+them\s+runnable|nothing\s+to\s+act\s+on|deny-listed\s+by[\s>]+design/i,
+      `${name} must say why the refused case has no remedy`,
     );
   }
 });

@@ -170,14 +170,25 @@ defect in the work item under review.
 
 ---
 
-## 4. A run where zero blocks executed is itself a finding
+## 4. A run where zero blocks executed is never a pass — but it is two states
 
-If an in-scope file has fenced `bash` blocks and **none** of them classified `runnable`, that is
-reported as a finding, not as a pass.
+If an in-scope file has fenced `bash` blocks and **none** of them classified `runnable`, that is always
+**recorded**, never reported as a clean pass. This is the rule's own failure mode, so it is stated
+explicitly rather than left to good sense: an over-broad `placeholder` or `mutating` classification
+would make the step quietly do nothing, which is precisely the silent-skip shape the step exists to
+eliminate. A gate that cannot fail is not a gate.
 
-This is the rule's own failure mode, so it is stated explicitly rather than left to good sense: an
-over-broad `placeholder` or `mutating` classification would make the step quietly do nothing, which is
-precisely the silent-skip shape the step exists to eliminate. A gate that cannot fail is not a gate.
+But "nothing ran" covers two situations, and only one of them is anyone's problem. The engine
+discriminates on `counts.placeholder`:
+
+| Condition | Record | Kind | Gate |
+|---|---|---|---|
+| `placeholder > 0` | **finding**, `confidence: medium` | `zero-blocks-executed` | eligible for `top_issues[]` |
+| `placeholder === 0` (every block refused as `mutating`) | **information** | `no-executable-blocks` | never gates; exit `0` |
+
+**`placeholder > 0` — the run was under-configured.** Some block reads a value the run did not supply.
+`--bind` / `--copy` fixes it and the `detail` string says so. This is the case the guard was written
+for, and it stays a finding.
 
 Its `confidence` is **`medium`**, unlike the two findings in §3. It is a statement about *coverage* —
 this gate did nothing here — not a defect in the work item, and `confidence: high` on a `category: bug`
@@ -186,9 +197,26 @@ otherwise block its own pull request for needing bindings the run did not supply
 and `qa-story` both classify **0 runnable** without bindings, so at `high` this step would have blocked
 the very change that introduced it.
 
-The finding still appears in the QA report, which is what "a finding, not a pass" asks for. When it
-fires with a non-zero `placeholder` count, the fix is usually to pass the missing values with `--bind`,
-and the detail says so.
+**`placeholder === 0` — every documented command was correctly refused.** The file documents `gh`,
+`curl`, `rm` and write redirections because that is what the skill *does*, and those are deny-listed by
+design — a QA gate does not make network calls. **No configuration will ever move these into
+`runnable`**, so there is nothing to act on, and a finding here is permanent noise. It is emitted as an
+informational `no-executable-blocks` record instead: still in the JSON, still in the report, so the step
+is never a silent no-op; not a finding, so it does not accumulate.
+
+Measured before the split: six of ten skills surveyed sat permanently in the second state, and three of
+those (`develop-next`, `commit-changes`, `tracker-reconcile`) received a bare finding with **no**
+remediation hint — the hint is appended only when there is a placeholder to bind. A check that fires on
+most of the library with no available fix is one reviewers learn to scroll past, and an ignored check is
+a check that does not exist. See `bug.7`.
+
+The informational record carries a **breakdown of refusal reasons with counts**. A
+`unrecognised-command (fail-closed)` refusal is not the same thing as a deny-listed one: the first may
+be an over-refusal the classifier should learn (see `bug.6`, `bug.10`), and collapsing both into
+"correctly refused" is how that would stop being visible.
+
+> **Do not suppress either record**, and do not convert one into the other to quiet a report. If a file
+> genuinely should have runnable blocks, the fix is bindings or a classifier correction — not silence.
 
 ---
 
@@ -201,6 +229,10 @@ The QA report records, for the file under review:
 - which shells actually ran (and `zsh-unavailable` when applicable)
 - each finding, mapped onto the existing `code_review` finding shape: `category: bug`, with `severity`
   and `confidence` per the table in §3
+- **each informational `notes[]` record** — today that is `no-executable-blocks` (§4) and
+  `zsh-unavailable` (§3.5). These are reported as information, never as findings, and never dropped:
+  dropping them is what would turn a file the step could not execute into one indistinguishable from a
+  file it fully covered
 
 No new report or gate schema. An execution failure is eligible for `top_issues[]` under
 `code_review_blocking` exactly like any other `category: bug` finding.
@@ -216,7 +248,10 @@ execution. It is a library plus a CLI:
 node shared/resources/qa-execute-snippets.mjs --file <path.md> --json
 ```
 
-Exit codes follow the repository convention: `0` clean, `1` findings, `2` hard error.
+Exit codes follow the repository convention: `0` clean, `1` findings, `2` hard error. A file whose every
+block was correctly refused exits **`0`** — it carries a `notes[]` record, not a finding (§4). The JSON
+report carries `findings[]` and `notes[]` side by side; a caller that reads only the exit code sees the
+distinction too, which is why the split reaches the exit code and not just the payload.
 
 Bind caller values with repeated `--bind NAME=VALUE`, seed the temp working directory from a real
 directory with `--copy <dir>`, and set the per-block timeout with `--timeout <ms>`.

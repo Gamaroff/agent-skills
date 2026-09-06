@@ -940,9 +940,19 @@ Record in the QA report:
    execution failure and `medium` for a shell disagreement. They feed `top_issues[]` under
    `code_review_blocking` on the same terms as any other Phase 1.6 finding — no new schema.
 
-> **A run where zero blocks executed is a finding, not a pass.** The engine raises
-> `zero-blocks-executed`; do not suppress it. `zsh` being absent is not that case — it never reduces the
-> runnable count, so record it as information and continue.
+> **A run where zero blocks executed is never a pass — but it is two states, and the engine tells them
+> apart for you.** Report whichever it emits; do not suppress either.
+>
+> - **`zero-blocks-executed`** (finding, `medium`) — `placeholder > 0`: the run was under-configured,
+>   and `--bind` / `--copy` is the fix.
+> - **`no-executable-blocks`** (information, in `notes[]`, exit `0`) — `placeholder === 0` and every
+>   block refused as `mutating`: the file documents side-effecting commands that are deny-listed by
+>   design, so **no configuration will ever make them runnable**. Still recorded, with a per-reason
+>   refusal breakdown, so the step is never a silent no-op; not a finding, so it does not accumulate as
+>   noise on most of the library (`bug.7`).
+>
+> `zsh` being absent is not either case — it never reduces the runnable count, so record it as
+> information and continue.
 
 **Lite mode**: this phase still runs, but only over blocks in the changed file.
 
