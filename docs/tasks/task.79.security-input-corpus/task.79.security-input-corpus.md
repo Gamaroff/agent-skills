@@ -339,6 +339,66 @@ restored table.
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-06
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.79.qa.1.security-input-corpus.md](./task.79.qa.1.security-input-corpus.md)
+- **Gate File**: [task.79.gate.1.security-input-corpus.yml](./task.79.gate.1.security-input-corpus.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2530 (2529 pass, 0 fail, 1 skipped) + `eval:all` exit 0
+- **Phases Verified**: 4/4 completed, 2/4 with issues
+- **Critical Issues**: 1 HIGH, 7 MEDIUM, 2 LOW promoted to the gate; 6 further advisory
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+Every success criterion verifies under execution and CI is green on the head commit. The gate fails
+on one finding: **the non-restatement guard — the single mechanism Phase 4 exists to install — does
+not detect the restatement it is named for.** Run against `origin/develop`'s prompt, the axis table
+this change deletes, it reports zero findings and passes; the restatement that actually existed was
+fragmentary (`g\h`, `-o`, `--output`, `a; b`), and the guard requires whole-input containment.
+Seven medium issues follow: three `url-authority` `why` fields the WHATWG parser falsifies, a
+documented import that throws `ERR_MODULE_NOT_FOUND`, two broken links in the bundled copy, no
+parity test for the three transitively-bundled artefacts, and no assertion for the Safety criterion.
+
+### Fix Cycle 1 — 2026-09-06
+
+**Status**: ✅ Fixes complete — ready for QA re-review
+
+All 10 promoted gate issues addressed, plus 6 advisory cleanups taken while in the same code.
+
+**Files modified**
+
+- `shared/resources/security-input-corpus.mjs` — six `why` fields corrected (CR-2/3/4/5 plus `fragment-delimiter` and `base64-secret-in-userinfo`, found by QA's own fact-check and of the same class); `allCases()` memoised (CR-16); **`renderInput` / `renderRow` / `renderCorpusTables` exported** so the document and its parity test share one renderer (CR-15).
+- `shared/resources/security-input-corpus.md` — case tables **regenerated from `renderCorpusTables()`**, so inputs now render literally (`t\ouch`, `to"u"ch`, `safe.txt␀.png`) instead of JSON-escaped (CR-12); depth-sensitive `../../docs` links removed so the bundled copy has no broken links (CR-7); import example made resolvable with the temp-dir form shown (CR-6); a control-character legend and the regeneration command added.
+- `shared/resources/finalise-dod-security-prompt.md` — import example replaced with an absolute `pathToFileURL(join(repoRoot, …))` form, because step 3 runs the script from a temp directory where no relative or bare specifier resolves (CR-6).
+- `shared/resources/tests/security-input-corpus.test.mjs` — **purity assertions added** (source-level: no import, no side-effecting builtin outside string literals; observable: no exit listener, cwd or argv change on import) closing the unasserted Safety criterion (TASK79-001); parity rewritten against `renderCorpusTables()` and sliced by sink and direction (CR-9/10/12/15); vacuous `allCases` coverage test replaced with a FLOORS-independent assertion plus a memoisation check (CR-13/16); the shell shrink-guard removed as a restatement of FLOORS (CR-14).
+- `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` — **the non-restatement guard rebuilt** (CR-1); bundled-copy marker check replaced with **byte parity across all four transitively-bundled references** (CR-8).
+
+**The load-bearing fix.** The old guard asked whether a whole corpus input appeared in the prompt. Real restatement is fragmentary — the deleted axis table carried `cu'r'l`, `g\h` and `--output`, each a *piece* of an input — so it reported zero on the exact document it was named for. The detector now works on distinctive inline code spans (metacharacter-bearing or flag-shaped, ≥3 chars) that share text with a corpus input, and **the deleted axis table is kept as a fixture the detector must flag**. That second test is what makes the guard's power falsifiable: a future simplification back to uselessness turns it red instead of passing quietly. The `length >= 8` heuristic is gone, replaced by an explicit, reviewable `PROMPT_MAY_MENTION` allow-list (CR-11).
+
+**Mutation proofs (all held)** — each with a pre-mutation `diff` confirming the edit landed:
+
+| Mutation | Target assertion | Result |
+|---|---|---|
+| Revert the detector to whole-input equality (the old, vacuous rule) | `the non-restatement detector can see the restatement it is named for` | **RED** |
+| Add `import { execSync } from "node:child_process"` to the module | `the module imports nothing and has no side-effecting builtin` | **RED** |
+| Move a `legitimate` row into the `hostile` table in the doc | `the prose peer contains the generated tables verbatim` + `every case appears in the document, under its own sink and direction` | **RED** (both) |
+| Edit a source without re-bundling | `every transitively-bundled reference is byte-identical to its source` | **RED** — observed live before the bundle ran |
+
+**Verification**: `npm run ci:fast` exit 0 — 2533 tests, **2532 pass, 0 fail**, 1 skipped. Prettier clean, bundle idempotent.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                                                                    | Author      |
@@ -346,6 +406,8 @@ restored table.
 | 2026-09-02 | 1.0     | Initial draft — filed from the rebirth-wallet security-review handover           | create-task |
 | 2026-09-06 | 1.1     | Review passed (8/10, READY TO IMPLEMENT) — 0 critical, 6 important fixed: `bug.3` requalified as `task.67.bug.3`, bug.6 count corrected to 13 + 2 over-refusals, Phase 4's pre-existing five-axis assertion declared, test renamed to `security-input-corpus.test.mjs`, transitive bundle output named, `CHANGELOG.md` assigned to Phase 4 | review-task |
 | 2026-09-06 |         | Implemented — 3 files added, 3 modified, 6 regenerated; 73 corpus cases across 5 sinks; 19 new tests; 3 mutation proofs held | develop |
+| 2026-09-06 |         | QA gate FAIL (80/100) — 10 findings promoted (1 high, 7 medium, 2 low): non-restatement guard vacuous, three url-authority `why` fields falsified by the reference parser, unresolvable documented import | qa-task |
+| 2026-09-06 |         | QA findings fixed — 10 promoted issues closed in 1 iteration: non-restatement guard rebuilt on fragments with a must-fail fixture, six url-authority `why` fields corrected against the reference parser, import examples made resolvable, bundled-copy links de-pathed, byte-parity added for all 4 transitively-bundled refs, purity assertion added; 6 advisory cleanups also taken | qa-fix |
 
 ---
 

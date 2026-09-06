@@ -85,22 +85,33 @@ between an instruction a model may skip and a guarantee.
 
 ## The cases
 
-Each sink below lists every case in the machine-readable peer, in the same
-order, with the same wording. **The two files are held in step by a test** —
-`tests/security-input-corpus.test.mjs` asserts that every case id in the module
-appears in this document and vice versa. Adding a case to one and not the other
-turns it red. That guard is the whole reason it is safe to write the cases out
-twice; without it this document would become the third stale copy the corpus
-exists to prevent.
+Each sink below lists every case in the machine-readable peer, in the same order,
+with the same wording. **This section is generated** — it is the verbatim output of
+`renderCorpusTables()` in the module, and a test asserts the document contains
+exactly that. Adding a case to one and not the other turns it red, and there is no
+second renderer to keep in step. Regenerate with:
 
-To read a case as an oracle: `input` is what to send, `why` is what goes wrong
-if the sink accepts it (or, for a `legitimate` case, why an over-strict
-implementation wrongly refuses it), and **what a correct implementation does**
-is the expected behaviour a probe compares against.
+```sh
+node -e 'import("./shared/resources/security-input-corpus.mjs")
+  .then((m) => process.stdout.write(m.renderCorpusTables()))'
+```
+
+That guard is the whole reason it is safe to write the cases out twice; without it
+this document would become the third stale copy the corpus exists to prevent.
+
+To read a case as an oracle: `input` is what to send, `why` is what goes wrong if
+the sink accepts it (or, for a `legitimate` case, why an over-strict implementation
+wrongly refuses it), and **what a correct implementation does** is the expected
+behaviour a probe compares against.
+
+**Reading the Input column.** Inputs are rendered literally — the bytes the module
+supplies, not a JSON-escaped rewrite of them. Only `|` is escaped, and control
+characters are shown with a visible glyph: `␊` newline, `␍` carriage return,
+`␉` tab, `␀` NUL. Take the bytes from the module, not from this table.
 
 ### `url-authority`
 
-A URL or DSN parser deciding **where a connection goes**. The through-line: authority delimiters are silent. A misplaced one does not raise — it re-points the connection and drops whatever followed.
+A URL or DSN parser deciding **where a connection goes**. The through-line: authority delimiters are silent. A misplaced one does not raise; it re-points the connection and drops whatever followed. Several cases below behave differently in a spec-compliant parser than in a hand-rolled one, and each says which — that difference is itself the hazard.
 
 **9 hostile, 3 legitimate.**
 
@@ -110,13 +121,13 @@ A URL or DSN parser deciding **where a connection goes**. The through-line: auth
 |---|---|---|
 | `evil.example.com/x` | A `/` ends the authority, so everything after it becomes a path — and a port that followed the host is silently lost. No error is raised: the connection goes to a different host on the default port. | Build the URL by setting fields on a URL object rather than concatenating strings, and reject a host component containing `/`, `?`, `#`, `@` or whitespace before use. |
 | `db?sslmode=disable` | A `?` starts the query string, so what the author intended as a database-name path segment silently becomes a connection parameter — here one that turns TLS off. | Percent-encode the segment with encodeURIComponent so `?` becomes `%3F` and stays part of the name. |
-| `a/b+c=d` | Generated secrets routinely contain the base64 alphabet. Interpolated raw into the password position, the `/` terminates the authority and the remainder becomes a path — so the credential is both wrong and disclosed in a path. | encodeURIComponent the credential before interpolation; never string-concatenate a secret into a DSN. |
-| `p@ss` | `@` separates userinfo from host, so a password containing it re-points the connection at a host named after the password's tail. | Percent-encode to `%40` before interpolation. |
-| `pa:ss` | `:` splits user from password inside userinfo, and host from port outside it. Either way the value is silently truncated at the colon. | Percent-encode to `%3A` before interpolation. |
-| `secret#1` | `#` starts the fragment, which is never sent to the server. The credential is truncated before the request leaves the process, so the failure surfaces as an authentication error far from its cause. | Percent-encode to `%23` before interpolation. |
-| `[::1]` | Brackets are IPv6-literal syntax in the authority. A bracketed value that is not an address either fails to parse or parses as one, and which of the two happens differs by library. | Emit brackets only around an actual IPv6 literal, and validate the address rather than trusting the brackets. |
+| `a/b+c=d` | Generated secrets routinely contain the base64 alphabet. A spec-compliant parser rejects the raw form; a naive splitter lets the `/` terminate the authority so the remainder becomes a path — the credential is then both wrong and disclosed in a path that gets logged. | encodeURIComponent the credential before interpolation; never string-concatenate a secret into a DSN. |
+| `p@ss` | In a hand-rolled DSN parser that splits userinfo at the FIRST `@`, a password containing one re-points the connection at a host named after the password's tail. A spec-compliant parser splits at the LAST `@` instead and percent-encodes the value — `new URL("postgres://u:p@ss@h/db")` gives password `p%40ss` and host `h`. The same input is therefore silently wrong in one parser and silently fine in the other, which is harder to find than either failure alone. | Percent-encode to `%40` before interpolation, so both parsers agree. |
+| `pa:ss` | In the USERNAME position `:` starts the password, and in the HOST position it starts the port — a naive splitter truncates at it in both. In the PASSWORD position it is preserved: `new URL("postgres://u:pa:ss@h/db").password` is `pa%3Ass`. The truncation is position-dependent, which is what makes it easy to test in the wrong slot and conclude the value is safe. | Percent-encode to `%3A`, and test the value in the position it will actually occupy. |
+| `secret#1` | `#` starts the fragment, which is never sent to the server. A spec-compliant parser rejects it in the userinfo position outright; a naive splitter accepts it and truncates the credential at the `#`, so the request goes out with a shortened secret and fails authentication far from its cause. | Percent-encode to `%23` before interpolation. |
+| `[::1]` | `[::1]` is a valid IPv6 loopback literal, so it parses cleanly — and that is the hazard, not a parse failure. A host field carrying it re-points the connection at the machine running the code, reaching services bound to loopback precisely because they are unauthenticated. | Resolve the host and reject loopback, link-local and private ranges whenever the destination is meant to be external; emit brackets only around an actual IPv6 literal. |
 | `exa mple.com` | Whitespace is not valid in an authority, and parsers variously strip, reject, or truncate at it — so the same configuration works in one library and silently addresses something else in another. | Reject the value explicitly. Do not trim silently: a trim turns a malformed input into a plausible one. |
-| _(empty string)_ | Concatenation yields `scheme://:5432/db`, which parses, and which several drivers read as localhost — so a missing configuration value becomes a connection to the developer's own machine. | Reject empty required components explicitly rather than relying on the parser to notice. |
+| _(empty string)_ | Concatenation yields `scheme://:5432/db`. A spec-compliant parser rejects that outright — `new URL("postgres://:5432/db")` throws — but several driver-specific DSN parsers accept it and fall back to a default host. So a missing configuration value becomes a connection to the developer's own machine in exactly the parsers that do not raise. | Reject empty required components explicitly, before the string is built. Do not rely on the parser: its behaviour here differs by library, and the libraries that stay quiet are the dangerous ones. |
 
 #### Legitimate — must still be accepted
 
@@ -140,7 +151,7 @@ A SQL engine deciding **what statement to run**. Almost every hostile case here 
 | `' OR '1'='1` | Closes the literal and appends a predicate that is always true, turning a single-row lookup into a full-table read. | Bind the value as a parameter; the whole string becomes one comparison operand. |
 | `--` | Comments out the rest of the statement, including any trailing `AND tenant_id = ?` that was carrying the authorisation. | Bind the value as a parameter. |
 | `; DROP TABLE users; --` | Ends the statement and starts another. Whether the second one runs depends on whether the driver has multi-statement execution enabled — a setting the calling code usually does not know. | Bind the value as a parameter, and leave multi-statement execution off. |
-| `\\'` | Backslash escaping is engine- and mode-dependent (MySQL's NO_BACKSLASH_ESCAPES changes it outright), so a hand-written escaper correct against one engine is wrong against another — and against the same engine differently configured. | Bind the value as a parameter. Hand-written escaping is the defect, not the fix. |
+| `\'` | Backslash escaping is engine- and mode-dependent (MySQL's NO_BACKSLASH_ESCAPES changes it outright), so a hand-written escaper correct against one engine is wrong against another — and against the same engine differently configured. | Bind the value as a parameter. Hand-written escaping is the defect, not the fix. |
 | `＇` | U+FF07 FULLWIDTH APOSTROPHE is not U+0027, so a deny-list keyed on the ASCII quote does not see it — while some client-to-server charset conversions fold it back to a real apostrophe on the way in. | Bind the value as a parameter. Character deny-lists cannot enumerate Unicode; parameterisation does not need to. |
 | `%` | Parameter binding makes this safe as data and still leaves it a wildcard: inside a LIKE it matches everything, so a filter meant to scope rows to one tenant matches all of them. Bound is not the same as inert. | Escape LIKE metacharacters (`%`, `_`, and the escape character) in the value in addition to binding it, and declare the ESCAPE clause. |
 
@@ -154,7 +165,7 @@ A SQL engine deciding **what statement to run**. Almost every hostile case here 
 
 ### `shell-exec`
 
-A shell deciding **what command to run**. The 27 hostile cases are measured, not invented: 14 from [`task.67.bug.3`](../../docs/tasks/task.67.execute-the-skill-qa-gate/task.67.bug.3.obfuscated-names-and-flag-writes.md) and 13 from [`bug.6`](../../docs/bugs/bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md), replayed verbatim in `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs`. Every one got past a classifier that looked correct on inspection. The common shape: the string a scanner reads is not the command the shell runs.
+A shell deciding **what command to run**. The 27 hostile cases are measured, not invented: 14 from `task.67.bug.3` and 13 from `bug.6`, replayed verbatim in `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs`. Every one got past a classifier that looked correct on inspection. The common shape: the string a scanner reads is not the command the shell runs.
 
 **27 hostile, 4 legitimate.**
 
@@ -163,12 +174,12 @@ A shell deciding **what command to run**. The 27 hostile cases are measured, not
 | Input | Why | What a correct implementation does |
 |---|---|---|
 | `who'am'i` | Quote removal rejoins the word to `whoami`, so a matcher comparing the raw token sees a command name that is on no list at all. | Compare the effective command word — after quote removal — not the literal token. |
-| `to\"u\"ch /tmp/x` | Double quotes split the same way: the effective command is `touch`, which writes. | Apply quote removal before matching. |
-| `t\\ouch /tmp/x` | `\o` is just `o` after escape removal, so the effective command is `touch`. | Apply escape removal before matching. |
+| `to"u"ch /tmp/x` | Double quotes split the same way: the effective command is `touch`, which writes. | Apply quote removal before matching. |
+| `t\ouch /tmp/x` | `\o` is just `o` after escape removal, so the effective command is `touch`. | Apply escape removal before matching. |
 | `/usr/bin/[t]ouch /tmp/x` | Pathname expansion resolves `[t]ouch` to `touch`; the literal never equals the name a list is keyed on. | Treat glob metacharacters in a command word as unresolvable and deny, rather than matching the unexpanded literal. |
 | `/usr/bin/touc? /tmp/x` | `?` matches any single character, so the expansion is `touch`. | Same as the bracket case: an unresolvable command word is a deny. |
 | `~/../../usr/bin/whoami` | Tilde expansion followed by `..` traversal reaches an absolute path that a prefix check on `~/` is satisfied by and never sees. | Expand and normalise to a real path before deciding, then match on the result. |
-| `g\\h pr comment 1 --body x` | Escape removal yields `gh`, so a rule keyed on the tool name `gh` does not fire and an outbound write posts. | Apply escape removal before matching the tool name. |
+| `g\h pr comment 1 --body x` | Escape removal yields `gh`, so a rule keyed on the tool name `gh` does not fire and an outbound write posts. | Apply escape removal before matching the tool name. |
 | `cu'r'l -X POST https://x/` | Quote removal yields `curl`, and the request is a POST — a network write from a command that scanned as unknown. | Apply quote removal before matching. |
 | `cat <<EOF > /tmp/x` | The write is in the redirection, not in the command word. `cat` inspects as read-only and the statement creates a file. | Parse redirections separately from the command word; any `>` or `>>` target is a write regardless of what precedes it. |
 | `cat <<'EOF' >> ~/.zshrc` | The same shape, appending to a shell rc file — a persistent change that runs again in every future shell. | Treat `>>` as a write, and a write to a shell rc path as persistent, regardless of the command word. |
@@ -185,8 +196,8 @@ A shell deciding **what command to run**. The 27 hostile cases are measured, not
 | `echo pwned>/tmp/x` | No space before `>`, so whitespace tokenisation produces the single word `pwned>/tmp/x` and reports no redirection at all. | Tokenise redirection operators independently of whitespace — the shell does. |
 | `cat README.md>/tmp/x` | The same gluing, now attached to a filename, which makes the resulting token look even more like an ordinary operand. | Split redirection operators out of every token before classifying. |
 | `echo pwned>>/tmp/x` | The append form glued the same way; a scan that special-cases a spaced ` > ` misses both. | Handle `>`, `>>`, `>|` and fd-prefixed forms as operators, not as text. |
-| `echo \"it's fine\"; touch /tmp/x; echo \"don't\"` | The apostrophe inside a double-quoted string opens a single-quote span for a scanner that ignores which quote type is already open. The span it then blanks runs across the `touch`, deleting it from the scan. | Track quote state per character, recording the enclosing quote type; an apostrophe inside double quotes is a literal. |
-| `echo \"example: cat <<EOF\"\ntouch /tmp/x` | A heredoc marker inside a quoted string is text, not a heredoc. Treating it as one consumes the following real command as heredoc body and never classifies it. | Recognise heredoc operators only outside quoted spans. |
+| `echo "it's fine"; touch /tmp/x; echo "don't"` | The apostrophe inside a double-quoted string opens a single-quote span for a scanner that ignores which quote type is already open. The span it then blanks runs across the `touch`, deleting it from the scan. | Track quote state per character, recording the enclosing quote type; an apostrophe inside double quotes is a literal. |
+| `echo "example: cat <<EOF"␊touch /tmp/x` | A heredoc marker inside a quoted string is text, not a heredoc. Treating it as one consumes the following real command as heredoc body and never classifies it. | Recognise heredoc operators only outside quoted spans. |
 | `sed -n 's/a/b/w /tmp/x' README.md` | `sed` writes a file through the `w` flag inside the script — with neither `-i` nor a shell redirection to notice. | Parse the sed script itself, not only the tool's flags. |
 | `sed 'w /tmp/x' README.md` | The bare `w` command form, which does not even carry a substitution to draw attention to the script. | Parse the sed script; treat `w` and `W` as writes wherever they appear in it. |
 
@@ -214,7 +225,7 @@ A filesystem API deciding **which file to open**. Note how many of the hostile c
 | `/etc/passwd` | An absolute path discards the root when resolved — `path.join(root, '/etc/passwd')` keeps the root, but `path.resolve(root, '/etc/passwd')` does not, and which one the code used is easy to misread. | Reject absolute inputs explicitly, then resolve and assert containment. |
 | `..%2f..%2fetc%2fpasswd` | The containment check sees no `/` and passes; a later decode — in a router, a client, or the code itself — re-introduces the traversal after the check has already run. | Decode fully before validating, and validate immediately before use. |
 | `uploads/link-to-etc/passwd` | Every component is inside the root lexically, and the filesystem resolves `link-to-etc` somewhere else. A `path.resolve` check is satisfied by a string the kernel does not agree with. | realpath the resolved path — following symlinks — and re-assert containment on the result. |
-| `safe.txt\u0000.png` | An extension check passes on `.png` while syscall layers that truncate at NUL open `safe.txt`. The validated string and the opened file are different strings. | Reject any input containing a NUL before any filesystem call or extension check. |
+| `safe.txt␀.png` | An extension check passes on `.png` while syscall layers that truncate at NUL open `safe.txt`. The validated string and the opened file are different strings. | Reject any input containing a NUL before any filesystem call or extension check. |
 | `../data-evil/x` | With root `/srv/data` this resolves to `/srv/data-evil/x`, which `startsWith('/srv/data')` accepts. The check passes on a sibling directory that merely shares a prefix. | Compare on a separator boundary — `resolved === root || resolved.startsWith(root + path.sep)`. |
 | _(empty string)_ | Resolves to the root itself, so an operation meant for one file targets the whole directory — a delete or a chmod then applies to everything under it. | Reject empty input explicitly; a containment check alone accepts it. |
 
@@ -238,7 +249,7 @@ A renderer deciding **what markup a value becomes**. The escaping is not one fun
 |---|---|---|
 | `<script>alert(1)</script>` | The canonical case, and the one every deny-list is written against — which is exactly why it is a poor test on its own. | HTML-escape at render time so the value renders as text; never insert it as markup. |
 | `<img src=x onerror=alert(1)>` | Executes without the string `script` appearing anywhere, so a deny-list keyed on `<script>` passes it through. | Escape rather than filter. An allow-list of tags, if markup is genuinely wanted, must allow-list attributes too. |
-| `\" autofocus onfocus=alert(1) x=\"` | Escaping chosen for element text does not neutralise a value landing inside an attribute: the quote closes the attribute and the rest becomes new attributes. | Choose the escaping by the position the value lands in — element text, attribute value, URL and script context are four different escapings. |
+| `" autofocus onfocus=alert(1) x="` | Escaping chosen for element text does not neutralise a value landing inside an attribute: the quote closes the attribute and the rest becomes new attributes. | Choose the escaping by the position the value lands in — element text, attribute value, URL and script context are four different escapings. |
 | `javascript:alert(1)` | Escaping does nothing here because there is no markup to escape — the scheme itself is the payload, and the value is a perfectly well-formed href. | Allow-list URL schemes (`http`, `https`, `mailto`) for href and src; reject everything else. |
 | `{{constructor.constructor('return process')()}}` | Server-side template injection: the value is compiled as template source rather than substituted as data, so it runs in the renderer's own scope with the renderer's own privileges. | Never compile user data as template source. Pass it as a value to an already-compiled template. |
 | `${process.env.SECRET}` | The same class in JavaScript template literals and expression languages: a value interpolated into code rather than into output reads whatever the surrounding scope can see. | Never build a template literal or expression from user data; bind it as a parameter. |
@@ -255,12 +266,22 @@ A renderer deciding **what markup a value becomes**. The escaping is not one fun
 
 ## Using the corpus
 
+The `.mjs` sits beside this file in both its source and bundled locations, so a
+**sibling-relative** specifier resolves in both. A bare `shared/resources/...` or
+`references/...` specifier does not — Node throws `ERR_MODULE_NOT_FOUND` — and a
+probe script written in a temp directory needs an absolute path built from the
+repo root:
+
 ```js
 import {
   SINKS,
   corpusFor,
   allCases,
-} from "shared/resources/security-input-corpus.mjs";
+} from "./security-input-corpus.mjs";
+// From a temp working directory, resolve against the repo instead:
+//   const { corpusFor } = await import(
+//     pathToFileURL(join(repoRoot, "shared/resources/security-input-corpus.mjs"))
+//   );
 
 for (const c of corpusFor("shell-exec")) {
   const actual = classify(c.input); // the entry point under test

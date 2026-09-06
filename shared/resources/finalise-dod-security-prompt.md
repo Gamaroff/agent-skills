@@ -113,7 +113,15 @@ machine-readable peer `shared/resources/security-input-corpus.mjs`. Start there 
 re-inventing a candidate set per run:
 
 ```js
-import { corpusFor } from "shared/resources/security-input-corpus.mjs";
+// Step 3 runs this from a TEMP directory, so the specifier must be absolute —
+// a bare "shared/resources/..." (or the bundled "references/...") throws
+// ERR_MODULE_NOT_FOUND. Build it from the repo root:
+import { pathToFileURL } from "node:url";
+import { join } from "node:path";
+
+const { corpusFor } = await import(
+  pathToFileURL(join(repoRoot, "shared/resources/security-input-corpus.mjs"))
+);
 // sinks: url-authority | sql-orm | shell-exec | path | template-render
 const cases = corpusFor("shell-exec");
 ```

@@ -94,7 +94,7 @@ const URL_AUTHORITY = sinkCases("url-authority", [
     id: "base64-secret-in-userinfo",
     direction: "hostile",
     input: "a/b+c=d",
-    why: "Generated secrets routinely contain the base64 alphabet. Interpolated raw into the password position, the `/` terminates the authority and the remainder becomes a path — so the credential is both wrong and disclosed in a path.",
+    why: "Generated secrets routinely contain the base64 alphabet. A spec-compliant parser rejects the raw form; a naive splitter lets the `/` terminate the authority so the remainder becomes a path — the credential is then both wrong and disclosed in a path that gets logged.",
     correct:
       "encodeURIComponent the credential before interpolation; never string-concatenate a secret into a DSN.",
   },
@@ -102,30 +102,32 @@ const URL_AUTHORITY = sinkCases("url-authority", [
     id: "userinfo-delimiter",
     direction: "hostile",
     input: "p@ss",
-    why: "`@` separates userinfo from host, so a password containing it re-points the connection at a host named after the password's tail.",
-    correct: "Percent-encode to `%40` before interpolation.",
+    why: 'In a hand-rolled DSN parser that splits userinfo at the FIRST `@`, a password containing one re-points the connection at a host named after the password\'s tail. A spec-compliant parser splits at the LAST `@` instead and percent-encodes the value — `new URL("postgres://u:p@ss@h/db")` gives password `p%40ss` and host `h`. The same input is therefore silently wrong in one parser and silently fine in the other, which is harder to find than either failure alone.',
+    correct:
+      "Percent-encode to `%40` before interpolation, so both parsers agree.",
   },
   {
     id: "port-delimiter",
     direction: "hostile",
     input: "pa:ss",
-    why: "`:` splits user from password inside userinfo, and host from port outside it. Either way the value is silently truncated at the colon.",
-    correct: "Percent-encode to `%3A` before interpolation.",
+    why: 'In the USERNAME position `:` starts the password, and in the HOST position it starts the port — a naive splitter truncates at it in both. In the PASSWORD position it is preserved: `new URL("postgres://u:pa:ss@h/db").password` is `pa%3Ass`. The truncation is position-dependent, which is what makes it easy to test in the wrong slot and conclude the value is safe.',
+    correct:
+      "Percent-encode to `%3A`, and test the value in the position it will actually occupy.",
   },
   {
     id: "fragment-delimiter",
     direction: "hostile",
     input: "secret#1",
-    why: "`#` starts the fragment, which is never sent to the server. The credential is truncated before the request leaves the process, so the failure surfaces as an authentication error far from its cause.",
+    why: "`#` starts the fragment, which is never sent to the server. A spec-compliant parser rejects it in the userinfo position outright; a naive splitter accepts it and truncates the credential at the `#`, so the request goes out with a shortened secret and fails authentication far from its cause.",
     correct: "Percent-encode to `%23` before interpolation.",
   },
   {
     id: "ipv6-brackets",
     direction: "hostile",
     input: "[::1]",
-    why: "Brackets are IPv6-literal syntax in the authority. A bracketed value that is not an address either fails to parse or parses as one, and which of the two happens differs by library.",
+    why: "`[::1]` is a valid IPv6 loopback literal, so it parses cleanly — and that is the hazard, not a parse failure. A host field carrying it re-points the connection at the machine running the code, reaching services bound to loopback precisely because they are unauthenticated.",
     correct:
-      "Emit brackets only around an actual IPv6 literal, and validate the address rather than trusting the brackets.",
+      "Resolve the host and reject loopback, link-local and private ranges whenever the destination is meant to be external; emit brackets only around an actual IPv6 literal.",
   },
   {
     id: "whitespace",
@@ -139,9 +141,9 @@ const URL_AUTHORITY = sinkCases("url-authority", [
     id: "empty-host",
     direction: "hostile",
     input: "",
-    why: "Concatenation yields `scheme://:5432/db`, which parses, and which several drivers read as localhost — so a missing configuration value becomes a connection to the developer's own machine.",
+    why: 'Concatenation yields `scheme://:5432/db`. A spec-compliant parser rejects that outright — `new URL("postgres://:5432/db")` throws — but several driver-specific DSN parsers accept it and fall back to a default host. So a missing configuration value becomes a connection to the developer\'s own machine in exactly the parsers that do not raise.',
     correct:
-      "Reject empty required components explicitly rather than relying on the parser to notice.",
+      "Reject empty required components explicitly, before the string is built. Do not rely on the parser: its behaviour here differs by library, and the libraries that stay quiet are the dangerous ones.",
   },
   {
     id: "plain-host",
@@ -709,9 +711,97 @@ export function corpusFor(sink) {
   return CORPUS[sink];
 }
 
-/** Every case across every sink, in SINKS order. */
+/** Every case across every sink, in SINKS order. Memoised, so the freeze is shared. */
+let _all;
 export function allCases() {
-  return Object.freeze(SINKS.flatMap((sink) => corpusFor(sink)));
+  return (_all ??= Object.freeze(SINKS.flatMap((sink) => corpusFor(sink))));
+}
+
+// ---------------------------------------------------------------------------
+// Rendering — ONE implementation, used by the prose peer and by its parity test
+// ---------------------------------------------------------------------------
+// security-input-corpus.md's case tables are this function's output, verbatim.
+// The parity test asserts that, so the document cannot drift from the module and
+// there is no second renderer to keep in step. Regenerate the document's
+// "## The cases" body with:
+//
+//   node -e 'import("./shared/resources/security-input-corpus.mjs")
+//     .then((m) => process.stdout.write(m.renderCorpusTables()))'
+
+/** Control characters rendered visibly, because a table cannot carry them. */
+const CONTROL = Object.freeze({
+  "\n": "␊",
+  "\r": "␍",
+  "\t": "␉",
+  "\0": "␀",
+});
+
+/**
+ * Render one case's `input` for a markdown table cell — literally, so a reader
+ * sees the bytes the module supplies rather than a JSON-escaped rewrite of them.
+ * Only `|` is escaped (it would end the cell) and control characters are shown
+ * with a visible glyph, which the document's legend names.
+ */
+export function renderInput(input) {
+  if (input === "") return "_(empty string)_";
+  const shown = [...input]
+    .map((ch) => CONTROL[ch] ?? ch)
+    .join("")
+    .replace(/\|/g, "\\|");
+  const fence = shown.includes("`") ? "``" : "`";
+  const pad = shown.startsWith("`") || shown.endsWith("`") ? " " : "";
+  return `${fence}${pad}${shown}${pad}${fence}`;
+}
+
+/** Render one case as its markdown table row. */
+export function renderRow(c) {
+  return `| ${renderInput(c.input)} | ${c.why} | ${c.correct} |`;
+}
+
+/** Per-sink prose that heads each table group in the document. */
+const SINK_BLURB = Object.freeze({
+  "url-authority":
+    "A URL or DSN parser deciding **where a connection goes**. The through-line: authority delimiters are silent. A misplaced one does not raise; it re-points the connection and drops whatever followed. Several cases below behave differently in a spec-compliant parser than in a hand-rolled one, and each says which — that difference is itself the hazard.",
+  "sql-orm":
+    "A SQL engine deciding **what statement to run**. Almost every hostile case here has the same `correct` handling — bind the value as a parameter — and that is the point: one control answers the whole class, and hand-written escaping is the defect rather than the fix.",
+  "shell-exec":
+    "A shell deciding **what command to run**. The 27 hostile cases are measured, not invented: 14 from `task.67.bug.3` and 13 from `bug.6`, replayed verbatim in `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs`. Every one got past a classifier that looked correct on inspection. The common shape: the string a scanner reads is not the command the shell runs.",
+  path: "A filesystem API deciding **which file to open**. Note how many of the hostile cases defeat a check that is lexically correct — the disagreement is between the string and the kernel.",
+  "template-render":
+    "A renderer deciding **what markup a value becomes**. The escaping is not one function: element text, attribute value, URL and script context are four different ones, and choosing by position is the control.",
+});
+
+/**
+ * The document's "## The cases" body, generated from the corpus.
+ *
+ * Pure — returns a string, writes nothing. The counts in each group's heading
+ * are computed here rather than hand-written, so they cannot go stale when a
+ * case is added.
+ */
+export function renderCorpusTables() {
+  let out = "";
+  for (const sink of SINKS) {
+    const cases = corpusFor(sink);
+    const groups = DIRECTIONS.map((d) => [
+      d,
+      cases.filter((c) => c.direction === d),
+    ]);
+    const [[, hostile], [, legit]] = groups;
+    out += `### \`${sink}\`\n\n${SINK_BLURB[sink]}\n\n`;
+    out += `**${hostile.length} hostile, ${legit.length} legitimate.**\n\n`;
+    for (const [direction, group] of groups) {
+      const heading =
+        direction === "hostile"
+          ? "Hostile — must not be accepted"
+          : "Legitimate — must still be accepted";
+      out += `#### ${heading}\n\n`;
+      out +=
+        "| Input | Why | What a correct implementation does |\n|---|---|---|\n";
+      for (const c of group) out += `${renderRow(c)}\n`;
+      out += "\n";
+    }
+  }
+  return out;
 }
 
 export default corpusFor;

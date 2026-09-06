@@ -33,6 +33,8 @@ import {
   CASE_FIELDS,
   corpusFor,
   allCases,
+  renderCorpusTables,
+  renderRow,
 } from "../security-input-corpus.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -200,20 +202,74 @@ test("per-sink case counts meet their floors", () => {
   }
 });
 
-test("the two replayed shell corpora have not been trimmed", () => {
-  // 14 from task.67.bug.3 + 13 from bug.6. Each cost a measured defect to
-  // learn, and each is replayed verbatim in
-  // evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs.
-  assert.ok(
-    byDirection("shell-exec", "hostile").length >= 27,
-    "shell-exec has fewer than 27 hostile cases — the 14 task.67.bug.3 " +
-      "routes and the 13 bug.6 routes are the reason this corpus exists",
+// ---------------------------------------------------------------------------
+// Purity — the corpus supplies inputs, it does not run them
+// ---------------------------------------------------------------------------
+
+test("the module imports nothing and has no side-effecting builtin", () => {
+  const src = readFileSync(
+    join(here, "..", "security-input-corpus.mjs"),
+    "utf-8",
   );
-  assert.ok(
-    byDirection("shell-exec", "legitimate").length >= 4,
-    "shell-exec has fewer than 4 legitimate cases — bug.6's 2 over-refusals " +
-      "are measured accept-direction data and must not be dropped",
+  // Strip string literals and template literals first: the corpus legitimately
+  // CONTAINS `${process.env.SECRET}` as a template-render case input, and a
+  // naive grep would read that hostile input as a hostile module.
+  const code = src
+    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(/`(?:[^`\\]|\\.)*`/g, "``")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  const imports = code.match(
+    /^\s*import\s|[^.\w]require\s*\(|^\s*export\s+\*/gm,
   );
+  assert.equal(
+    imports,
+    null,
+    "security-input-corpus.mjs has acquired an import — the corpus is inputs " +
+      "only, and a dependency is the first step to one that runs them: " +
+      `${imports?.join(", ")}`,
+  );
+
+  for (const forbidden of [
+    "child_process",
+    "node:fs",
+    "node:net",
+    "node:http",
+    "execSync",
+    "spawnSync",
+    "eval(",
+    "new Function",
+    "process.env",
+    "globalThis",
+  ]) {
+    assert.ok(
+      !code.includes(forbidden),
+      `security-input-corpus.mjs references "${forbidden}" outside a string ` +
+        `literal. Importing this module must be safe in any context, including ` +
+        `a security review of the module itself.`,
+    );
+  }
+});
+
+test("importing the module has no observable side effect", async () => {
+  const before = {
+    exit: process.listenerCount("exit"),
+    cwd: process.cwd(),
+    argv: process.argv.length,
+  };
+  await import("../security-input-corpus.mjs?purity-probe");
+  assert.equal(
+    process.listenerCount("exit"),
+    before.exit,
+    "import added an exit listener",
+  );
+  assert.equal(
+    process.cwd(),
+    before.cwd,
+    "import changed the working directory",
+  );
+  assert.equal(process.argv.length, before.argv, "import mutated argv");
 });
 
 // ---------------------------------------------------------------------------
@@ -244,57 +300,88 @@ test("corpusFor returns a frozen array for every known sink", () => {
   }
 });
 
-test("allCases covers every sink and nothing else", () => {
-  const all = allCases();
-  assert.equal(
-    all.length,
-    SINKS.reduce((n, s) => n + corpusFor(s).length, 0),
-    "allCases() does not equal the sum of the per-sink corpora",
+test("allCases is memoised and at least as large as the declared floors", () => {
+  // Asserting the length against SINKS.flatMap(corpusFor) would restate
+  // allCases()'s own body and could never fail. FLOORS is an independent source
+  // of truth, so it can.
+  const floor = Object.values(FLOORS).reduce(
+    (n, f) => n + f.hostile + f.legitimate,
+    0,
   );
-  assert.deepEqual(
-    [...new Set(all.map((c) => c.sink))].sort(),
-    [...SINKS].sort(),
-    "allCases() covers a different set of sinks than SINKS",
+  assert.ok(
+    allCases().length >= floor,
+    `allCases() returned ${allCases().length} cases, below the ${floor} the ` +
+      `FLOORS table declares`,
+  );
+  assert.equal(
+    allCases(),
+    allCases(),
+    "allCases() is not memoised — it re-freezes a fresh array per call, so the " +
+      "freeze protects nothing shared",
   );
 });
 
 // ---------------------------------------------------------------------------
-// D — the prose peer renders every case
+// D — the prose peer IS the renderer's output
 // ---------------------------------------------------------------------------
+// One assertion replaces three. Comparing against renderCorpusTables() catches
+// every drift the old row-by-row checks caught AND three they could not: a case
+// rendered under the wrong sink heading, a hostile case rendered under
+// "Legitimate", and a stale hand-written count sentence. There is also no second
+// renderer in this file to fall out of step with the one that generated the doc.
 
-/** Render a case exactly as security-input-corpus.md's tables do. */
-const showInput = (s) =>
-  s === ""
-    ? "_(empty string)_"
-    : "`" + JSON.stringify(s).slice(1, -1).replace(/\|/g, "\\|") + "`";
+test("the prose peer contains the generated tables verbatim", () => {
+  const tables = renderCorpusTables();
+  assert.ok(
+    doc().includes(tables),
+    `${DOC} is not in step with renderCorpusTables(). The case tables are ` +
+      `GENERATED — regenerate them rather than editing by hand:\n\n` +
+      `  node -e 'import("./shared/resources/security-input-corpus.mjs")` +
+      `.then((m) => process.stdout.write(m.renderCorpusTables()))'\n\n` +
+      `A case that exists in only one of the two is how this became a third ` +
+      `stale copy in task.74.`,
+  );
+});
 
-const row = (c) => `| ${showInput(c.input)} | ${c.why} | ${c.correct} |`;
-
-test("the prose peer renders every case in the module", () => {
+test("every case appears in the document, under its own sink and direction", () => {
+  // Belt and braces on the block match above: if the block assertion fails, this
+  // names WHICH case moved, which the includes() check cannot.
   const text = doc();
-  for (const c of allCases()) {
-    assert.ok(
-      text.includes(row(c)),
-      `${DOC} does not carry case ${c.id} with the module's wording. The ` +
-        `document is the readable half of one corpus, not a summary of it — ` +
-        `a case that exists in only one of the two is how this became a ` +
-        `third stale copy in task.74.`,
+  for (const sink of SINKS) {
+    const sinkStart = text.indexOf(`### \`${sink}\``);
+    assert.ok(sinkStart >= 0, `${DOC}: no section for sink "${sink}"`);
+    const nextSink = SINKS.map((s2) => text.indexOf(`### \`${s2}\``))
+      .filter((i) => i > sinkStart)
+      .sort((a, b) => a - b)[0];
+    const section = text.slice(
+      sinkStart,
+      nextSink === undefined ? undefined : nextSink,
     );
-  }
-});
 
-test("the prose peer carries no case the module does not have", () => {
-  // Every row in a case table starts with "| `" or "| _(empty string)_".
-  const rows = doc()
-    .split("\n")
-    .filter((l) => /^\| (?:`|_\(empty string\)_)/.test(l));
-  assert.equal(
-    rows.length,
-    allCases().length,
-    `${DOC} has ${rows.length} case rows but the module has ` +
-      `${allCases().length} cases. A row the module does not back is a case ` +
-      `no probe will ever run.`,
-  );
+    for (const direction of DIRECTIONS) {
+      const heading =
+        direction === "hostile"
+          ? "#### Hostile — must not be accepted"
+          : "#### Legitimate — must still be accepted";
+      const start = section.indexOf(heading);
+      assert.ok(start >= 0, `${DOC}: sink "${sink}" has no ${direction} table`);
+      const otherHeading =
+        direction === "hostile"
+          ? "#### Legitimate — must still be accepted"
+          : "#### Hostile — must not be accepted";
+      const otherAt = section.indexOf(otherHeading, start);
+      const slice = section.slice(start, otherAt > start ? otherAt : undefined);
+
+      for (const c of corpusFor(sink).filter(
+        (x) => x.direction === direction,
+      )) {
+        assert.ok(
+          slice.includes(renderRow(c)),
+          `${DOC}: case ${c.id} is not in the "${sink}" ${direction} table`,
+        );
+      }
+    }
+  }
 });
 
 test("the prose peer states the method ordering and both directions", () => {
