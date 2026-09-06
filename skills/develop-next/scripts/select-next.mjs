@@ -132,6 +132,43 @@ export const TASK_ELIGIBLE_STATUSES = new Set([
   "in-progress",
 ]);
 
+// The full LIFECYCLES — every status a document of that kind may legally carry.
+// A strict superset of the floors above, and a different question from them:
+//
+//   floor     : "should this row be nominated for work now?"
+//   lifecycle : "is this string a status at all?"
+//
+// bug.8. Until these existed, the frontier could only answer the first, so its
+// rejection branch gave `closed` (valid, terminal, nothing to do) and `open`
+// (not a status — a filing typo) the identical sentence. On this repo's own
+// corpus that hid a real typo among 8 closed bugs and ~90 accepted tasks, and
+// the two bugs it actually happened to sat unselectable on `develop` for days.
+//
+// Do NOT collapse these into the floors. The gap between them is deliberate and
+// argued at length above; what was missing was the second vocabulary, not a
+// wider first one.
+//
+// Sources of truth these mirror, and which a test in
+// evals/develop-next/unit/select-next.test.mjs parses and compares against:
+//   bug  → docs/standards/bug-documents.md §"Frontmatter schema"
+//   task → shared/resources/document-status-lifecycle.md
+export const BUG_LIFECYCLE_STATUSES = new Set([
+  "new",
+  "in-progress",
+  "ready-for-qa",
+  "closed",
+  "reopened",
+]);
+export const TASK_LIFECYCLE_STATUSES = new Set([
+  "draft",
+  "planned",
+  "ready-for-development",
+  "in-progress",
+  "ready-for-review",
+  "accepted",
+  "cancelled",
+]);
+
 // Ordering vocabularies. Lower rank sorts first. An unrecognised value sorts
 // LAST within its tier rather than throwing — a registry is hand-maintained and
 // a typo in a severity cell must not decide whether work is visible at all.
@@ -706,23 +743,41 @@ export function selectNext(model, opts = {}) {
   // The loader is injected and LAZY: no registry is read unless this line runs.
   if (typeof opts.loadRegistries === "function") {
     const frontier = registryFrontier(opts.loadRegistries());
+    // `warnings` used to be returned only under `--lint`, so the one caller that
+    // most needed them — an unattended `/develop-next` loop reporting
+    // `roadmap-complete` — was the one caller that could not see them (bug.8).
+    const registryFrontierOut = {
+      passedOver: frontier.passedOver,
+      warnings: frontier.warnings,
+    };
     if (frontier.selected) {
       return {
         status: "selected",
         item: frontier.selected,
         rationale: buildRegistryRationale(frontier, skipped),
         skipped,
-        registryFrontier: { passedOver: frontier.passedOver },
+        registryFrontier: registryFrontierOut,
         lint,
       };
     }
+    // `roadmap-complete` is indistinguishable from "there is genuinely nothing
+    // to do" — which is the failure the registry fallback exists to remove. A
+    // row that can never be selected because its status is misspelled must say
+    // so in the one line a human or a loop log actually reads.
+    const offLifecycle = frontier.passedOver.filter((p) => p.offLifecycle);
     return {
       status: "stop",
       stopReason: "roadmap-complete",
       item: null,
-      detail: `no actionable candidate rows in any phase, and no outstanding registry item (${frontier.candidates} registry row(s) considered)`,
+      detail:
+        `no actionable candidate rows in any phase, and no outstanding registry item ` +
+        `(${frontier.candidates} registry row(s) considered)` +
+        (offLifecycle.length
+          ? ` — WARNING: ${offLifecycle.length} row(s) carry a status outside their lifecycle and can never be selected: ` +
+            `${offLifecycle.map((p) => `${p.path} (${p.documentStatus})`).join(", ")}`
+          : ""),
       skipped,
-      registryFrontier: { passedOver: frontier.passedOver },
+      registryFrontier: registryFrontierOut,
       lint,
     };
   }
@@ -1179,6 +1234,10 @@ const ELIGIBLE_FOR = {
   bug: BUG_ELIGIBLE_STATUSES,
   task: TASK_ELIGIBLE_STATUSES,
 };
+const LIFECYCLE_FOR = {
+  bug: BUG_LIFECYCLE_STATUSES,
+  task: TASK_LIFECYCLE_STATUSES,
+};
 const COMMAND_FOR = { bug: "/develop-bug", task: "/develop-task" };
 const SOURCE_FOR = { bug: "bug-registry", task: "task-registry" };
 
@@ -1245,13 +1304,31 @@ export function registryFrontier(registries, opts = {}) {
     }
 
     const docStatus = readStatus(row.path);
-    const entry = { ...row, documentStatus: docStatus };
+    const entry = { ...row, documentStatus: docStatus, offLifecycle: false };
 
     if (docStatus === null) {
       passedOver.push({
         ...entry,
         eligible: false,
         reason: `document missing or unreadable: ${row.path}`,
+      });
+      continue;
+    }
+    // Checked BEFORE the floor, because it names the nearer and more actionable
+    // cause: `open` is not "a status we don't select on", it is not a status.
+    // Answering with the floor sends the reader looking for a policy decision
+    // when what they have is a typo one edit away from being fixed.
+    if (!LIFECYCLE_FOR[row.kind].has(docStatus)) {
+      const detail =
+        `${row.path}: document status ${docStatus} is not a member of the ${row.kind} lifecycle ` +
+        `(${[...LIFECYCLE_FOR[row.kind]].join(", ")}) — the row can never be selected; ` +
+        `this is almost certainly a filing error, not a finished item`;
+      warnings.push(detail);
+      passedOver.push({
+        ...entry,
+        eligible: false,
+        offLifecycle: true,
+        reason: detail,
       });
       continue;
     }
