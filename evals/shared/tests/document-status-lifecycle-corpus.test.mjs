@@ -25,7 +25,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, globSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -64,17 +64,23 @@ function frontmatterType(text) {
     : null;
 }
 
+// `readdirSync(..., { recursive: true })` rather than `fs.globSync`: it is the
+// idiom every sibling test in this directory already uses, and it is stable
+// where `globSync` is still experimental on the Node 22 that CI pins.
 function docsOfType(kind) {
   const found = [];
-  for (const rel of globSync("docs/**/*.md", { cwd: REPO_ROOT })) {
-    const abs = path.join(REPO_ROOT, rel);
+  const docsRoot = path.join(REPO_ROOT, "docs");
+  for (const rel of readdirSync(docsRoot, { recursive: true })) {
+    if (!rel.endsWith(".md")) continue;
+    const abs = path.join(docsRoot, rel);
     let text;
     try {
       text = readFileSync(abs, "utf-8");
     } catch {
       continue;
     }
-    if (frontmatterType(text) === kind) found.push({ rel, text });
+    if (frontmatterType(text) === kind)
+      found.push({ rel: path.join("docs", rel), text });
   }
   return found;
 }

@@ -1316,6 +1316,17 @@ export function registryFrontier(registries, opts = {}) {
     }
     // Checked BEFORE the floor, because it names the nearer and more actionable
     // cause: `open` is not "a status we don't select on", it is not a status.
+    //
+    // Coverage boundary, stated because "it warns" invites the assumption that
+    // it always warns: selection short-circuits at the first eligible row, so a
+    // misfiled row ranked BELOW the winner is never evaluated and never warned
+    // about on this path. That is deliberate — reading every document on every
+    // run is the cost this short-circuit exists to avoid — and it does not weaken
+    // the case this branch was written for, because a run that reports
+    // `roadmap-complete` selected nothing and therefore evaluated everything.
+    // The complete guards are `--lint` (evaluateAll) and, upstream of both,
+    // evals/shared/tests/document-status-lifecycle-corpus.test.mjs, which fails
+    // the build before a bad status can reach the selector at all.
     // Answering with the floor sends the reader looking for a policy decision
     // when what they have is a typo one edit away from being fixed.
     if (!LIFECYCLE_FOR[row.kind].has(docStatus)) {
