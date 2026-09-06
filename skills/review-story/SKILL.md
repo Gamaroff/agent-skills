@@ -2146,7 +2146,7 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
        --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
      ```
 
-     > **This site deliberately omits `--no-transition`, unlike Step 9.6.** Driving the transition *is* the point here — the status has just changed locally and this is what carries it to the card. The two steps ran the same command line until bug.12; they are now different on purpose, so do not "restore consistency" by flagging this one. The `jira-sync-no-transition` parity guard (test G, in the shared test suite) records this step in its deliberate-status-push allowlist — a bare path is deliberately not written here, because the bundler treats any `references/…` mention in shipped prose as a resource to copy into this skill's `references/`.
+     > **This site deliberately omits `--no-transition`, unlike Step 9.6.** Driving the transition *is* the point here — the status has just changed locally and this is what carries it to the card. The two steps ran the same command line until bug.12; they are now different on purpose, so do not "restore consistency" by flagging this one. The `jira-sync-no-transition` parity guard (test G, in the shared test suite) records this step in its deliberate-status-push allowlist — the file is named without its path on purpose: the bundler treats a literal shared-resources path in shipped prose as a resource to copy into this skill, and a test is not a shared resource.
 
      On success → `✅ Status synced to Jira {jira_key} (doc link pinned to ${PIN_BRANCH:-current branch})`.
      On failure → log `⚠️ sync-jira-story failed after status update — Jira may be stale` and continue.

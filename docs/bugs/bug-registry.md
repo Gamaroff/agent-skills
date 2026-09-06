@@ -38,7 +38,7 @@
 | 9 | [The registry frontier ignores the `Depends on` column, so it can nominate work whose prerequisite is unbuilt](bug.9.registry-frontier-ignores-depends-on/bug.9.registry-frontier-ignores-depends-on.md) | closed | Major | High | 2026-09-02 | selection / task registry |
 | 10 | [sed's `w` write flag is only caught when a space follows it, leaving seven glued forms fail-open](bug.10.sed-w-glued-filename/bug.10.sed-w-glued-filename.md) | closed | Major | High | 2026-09-05 | qa-execute-snippets / classifier |
 | 11 | [finalise's Document-link re-point regresses a card out of the terminal status it just set, stranding the resolution](bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md) | closed | Major | High | 2026-09-06 | finalise Step 7 / sync-jira status drive |
-| 12 | [Three review-* body/link-only syncs still re-resolve status after the ladder has moved the card](bug.12.review-syncs-relink-without-no-transition/bug.12.review-syncs-relink-without-no-transition.md) | new | Major | Medium | 2026-09-06 | review-story 9.6 / review-task 8.6 / review-epic |
+| 12 | [Three review-* body/link-only syncs still re-resolve status after the ladder has moved the card](bug.12.review-syncs-relink-without-no-transition/bug.12.review-syncs-relink-without-no-transition.md) | closed | Major | Medium | 2026-09-06 | review-story 9.6 / review-task 8.6 / review-epic |
 
 ---
 

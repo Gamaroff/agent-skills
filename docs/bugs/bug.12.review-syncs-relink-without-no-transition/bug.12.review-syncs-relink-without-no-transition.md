@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'Medium'
 created: '2026-09-06'
@@ -11,7 +11,7 @@ description: "bug.11 gave sync-jira-* a --no-transition flag and wired it into f
 
 **Bug ID**: bug.12
 **Related**: none — cross-cutting (`review-story` 9.6 · `review-task` 8.6 · `review-epic`)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Major
 **Created**: 2026-09-06
@@ -258,6 +258,30 @@ them.
 1. `node --test shared/resources/tests/jira-sync-no-transition.test.mjs` → 23/23.
 2. Change the G-scanner's fence close-condition to ignore marker length → G4 goes red.
 
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-09-06
+**Verified by**: develop-bug
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: Verify Cycle 2. Regression tests `G`/`G2`/`G3`/`G4` pass (23/23 in the guard file), each
+mutation-proved to fail without its corresponding fix. Affected suite + lint green — `npm run ci:fast`
+2505 pass / 0 fail, Prettier clean. CI on PR #330 SUCCESS across all five checks, with the PR head
+SHA `00030655` equal to local HEAD, so the green is on the final commit rather than an ancestor. The
+adversarial diff review of the cycle-1 change returned no findings.
+
+The reported failure no longer reproduces: all three body/link-only syncs pass `--no-transition`, and
+`review-story` Step 10 — the one deliberate status push — is verified as still *not* passing it.
+
+**Caveat recorded rather than smoothed over**: the full-PR adversarial review in Cycle 1 did not
+complete (the subagent was stopped after ~17 minutes). The four specific risks it was asked about
+were verified in-line by the orchestrator, and the completed review covers the cycle-1 diff only.
+That is a thinner independent-review trail than a clean full-PR pass, and it is logged as such in the
+implementation report.
+
+**Decision**: Closed (finalised in Step 7)
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -268,10 +292,59 @@ them.
 | 2026-09-06 | Ready for QA | develop-bug | Fix implemented at all three sites + regression tests G/G2/G3; mutation-proved; ci:fast green |
 | 2026-09-06 | Reopened | develop-bug | Verify Cycle 1 — fence-tracking defect found in the guard itself; latent false-pass path |
 | 2026-09-06 | Ready for QA | develop-bug | Iteration 2 — CommonMark fence semantics + test G4; mutation-proved |
+| 2026-09-06 | Ready for QA | develop-bug | Verify Cycle 2 PASS — 23/23 guard tests, ci:fast 2505/0, CI green on `00030655`, review clean |
+| 2026-09-06 | Closed | develop-bug | Fix verified and accepted — DoD satisfied (bug.12.dod.1) |
 
 ## Resolution Summary
 
-_Not yet resolved._
+**Final Status**: Closed — Fixed
+**Total Iterations**: 2
+**Time to Resolution**: same day (filed and closed 2026-09-06)
+**PR**: [#330](https://github.com/Gamaroff/agent-skills/pull/330)
+**DoD**: [`bug.12.dod.1.review-syncs-relink-without-no-transition.md`](./bug.12.dod.1.review-syncs-relink-without-no-transition.md)
+
+**Final Fix Details**: `bug.11` built `--no-transition` and wired it into the one caller it had
+observed. The three body/link-only syncs — `review-story` Step 9.6, `review-task` Step 8.6,
+`review-epic` Step 11.5 — now pass it too, so each changes the description and the doc link and
+leaves the card's position to the `tracker-workflow.yaml` ladder. `review-story` Step 10, the one
+deliberate status push among these skills, is unchanged and now says at the call site why it is
+different. A parity guard (tests G/G2/G3/G4) asserts the invariant over the whole population of
+shipped invocations rather than over the four sites anyone happened to think of.
+
+**Lessons Learned**:
+
+1. **The defect class was enumeration, and only a population check catches it.** Every individual
+   call was correct in isolation, the flag worked perfectly, and `bug.11`'s own tests were thorough
+   and green. No behavioural test could have found this. When a fix is "apply X at every site that
+   needs X", the deliverable is not the applications — it is the *check that the set is complete*.
+
+2. **A fix scoped to "the caller we observed" leaves a bug, not a smaller bug.** `bug.11` deliberately
+   held its PR scope and filed this as the remainder, which was the right call and is why nothing was
+   lost. The lesson is about the *shape* of the recommendation: "add a flag, passed by finalise" reads
+   as complete while naming one of four callers.
+
+3. **A guard is a deliverable and gets reviewed like one.** Verify Cycle 1 passed every test, the
+   full local gate and all five CI checks — and still found a defect in the guard itself: a naive
+   fence toggle that, on a nested `````` fence, collapsed two sites onto one heading. Allowlisting the
+   deliberate push would then have silently allowlisted the body-only sync beside it, reinstating this
+   exact bug behind a green tick. Ask of any new guard: *how would this pass while the invariant is
+   broken?*
+
+4. **A mutation that does not reproduce the defect is worse than no mutation.** Two attempts here were
+   invalid — one broke the file's syntax so nothing ran, one used an even-count fence the naive toggle
+   recovers from. Both would have been logged as proof. Check that the mutation actually turns the
+   test red *for the stated reason*, not merely that something went red.
+
+5. **The bug report's own Recommendation was wrong in a way that changed the fix.** It asked to protect
+   `review-task` Step 9 as an intentional status push; that step performs no sync at all. Reviewing
+   the *instructions* against the code, not just the *claim*, is what surfaced that Step 8.6 runs
+   before Step 9 and was pushing a pre-promotion status — which turned "will this break the status
+   push?" into "this removes a stale write".
+
+6. **Naming a shared-resources path in shipped prose is an instruction to the bundler.** Doing so tried
+   to copy a test file into a skill's `references/`; the bundler then rewrote the path inside the
+   explanatory sentence about it, leaving the sentence circular. In this repo a path in prose is not
+   inert text.
 
 ## Related
 
