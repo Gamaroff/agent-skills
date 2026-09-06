@@ -206,18 +206,19 @@ test("per-sink case counts meet their floors", () => {
 // Purity — the corpus supplies inputs, it does not run them
 // ---------------------------------------------------------------------------
 
-test("the module imports nothing and has no side-effecting builtin", () => {
+test("the module's top level contains no call that could do anything", () => {
   const src = readFileSync(
     join(here, "..", "security-input-corpus.mjs"),
     "utf-8",
   );
-  // Strip string literals and template literals first: the corpus legitimately
-  // CONTAINS `${process.env.SECRET}` as a template-render case input, and a
-  // naive grep would read that hostile input as a hostile module.
+  // Strip string, template and comment content first: the corpus legitimately
+  // CONTAINS `${process.env.SECRET}` and `<script>` as case inputs, and a naive
+  // grep would read a hostile input as a hostile module.
   const code = src
     .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
     .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
     .replace(/`(?:[^`\\]|\\.)*`/g, "``")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
 
   const imports = code.match(
@@ -231,23 +232,41 @@ test("the module imports nothing and has no side-effecting builtin", () => {
       `${imports?.join(", ")}`,
   );
 
-  for (const forbidden of [
-    "child_process",
-    "node:fs",
-    "node:net",
-    "node:http",
-    "execSync",
-    "spawnSync",
-    "eval(",
-    "new Function",
-    "process.env",
-    "globalThis",
-  ]) {
-    assert.ok(
-      !code.includes(forbidden),
-      `security-input-corpus.mjs references "${forbidden}" outside a string ` +
-        `literal. Importing this module must be safe in any context, including ` +
-        `a security review of the module itself.`,
+  // CALL SHAPES, not a list of module names.
+  //
+  // The first version of this check grepped for `child_process`, `node:fs`,
+  // `eval(` and friends. Measured against a hostile body, all of
+  //   const fs = await import(p.join(""));  fs.writeFileSync(…);
+  //   Object.getPrototypeOf(async function(){}).constructor("…")();
+  //   fetch("…");
+  // survived the stripping with zero hits: a dynamic import needs no literal
+  // module name, `.constructor()` reaches Function without naming it, and
+  // `fetch` was simply not on the list. A name list can only forbid the
+  // spellings someone thought of; a shape list forbids the mechanism.
+  const FORBIDDEN_SHAPES = [
+    [/\bimport\s*\(/, "a dynamic import()"],
+    [/\brequire\s*\(/, "require()"],
+    [/\bfetch\s*\(/, "fetch()"],
+    [/\.constructor\s*\(/, "a .constructor() call (reaches Function)"],
+    [/\bFunction\s*\(/, "the Function constructor"],
+    [/\beval\s*\(/, "eval()"],
+    [/\bprocess\s*\./, "the process object"],
+    [/\bglobalThis\b/, "globalThis"],
+    [/\b(?:exec|execSync|spawn|spawnSync)\s*\(/, "process spawning"],
+    [
+      /\b(?:readFile|writeFile|appendFile|unlink|mkdir)\w*\s*\(/,
+      "filesystem IO",
+    ],
+    [/\bsetTimeout\s*\(|\bsetInterval\s*\(/, "a timer"],
+  ];
+  for (const [shape, description] of FORBIDDEN_SHAPES) {
+    const m = code.match(shape);
+    assert.equal(
+      m,
+      null,
+      `security-input-corpus.mjs contains ${description} (${m?.[0]}). ` +
+        `Importing this module must be safe in any context — including a ` +
+        `security review of the module itself.`,
     );
   }
 });
@@ -329,6 +348,34 @@ test("allCases is memoised and at least as large as the declared floors", () => 
 // rendered under the wrong sink heading, a hostile case rendered under
 // "Legitimate", and a stale hand-written count sentence. There is also no second
 // renderer in this file to fall out of step with the one that generated the doc.
+
+/**
+ * A STRUCTURAL check on the renderer, not a comparison against it.
+ *
+ * The parity test below compares the document with `renderCorpusTables()`. That
+ * cannot see a bug in the renderer itself: both sides are equally wrong and
+ * compare equal. Two rows shipped as malformed tables that way — `why`/`correct`
+ * are prose about shell and path syntax, so they quote `|` (`>|`, `||`)
+ * routinely, and only the input column was being escaped.
+ *
+ * Every row must have exactly four unescaped pipes and live on one line.
+ */
+test("every rendered row is a well-formed four-column table row", () => {
+  for (const c of allCases()) {
+    const row = renderRow(c);
+    const pipes = (row.match(/(?<!\\)\|/g) || []).length;
+    assert.equal(
+      pipes,
+      4,
+      `case ${c.id} renders with ${pipes} unescaped pipes, not 4 — the row ` +
+        `breaks the table. An unescaped "|" in why/correct ends the cell.`,
+    );
+    assert.ok(
+      !/[\n\r]/.test(row),
+      `case ${c.id} renders with a newline in its row, which splits the table`,
+    );
+  }
+});
 
 test("the prose peer contains the generated tables verbatim", () => {
   const tables = renderCorpusTables();

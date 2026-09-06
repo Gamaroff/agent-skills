@@ -115,18 +115,20 @@ re-inventing a candidate set per run:
 
 ```js
 // Step 3 runs this from a TEMP directory, so the specifier must be ABSOLUTE —
-// a bare or relative one throws ERR_MODULE_NOT_FOUND from there. The module
-// lives beside this prompt, in a directory whose name depends on whether you
-// are in the repository or in an installed skill, so try both:
+// a bare or relative one throws ERR_MODULE_NOT_FOUND from there.
+//
+// Do not guess the directory. The corpus module ships BESIDE this prompt file,
+// and you already know that path: it is the file you are reading. Substitute it
+// for PROMPT_DIR below. (In this repository that is `shared/resources`; in an
+// installed skill it is the skill's own `references` directory, which is not
+// under the repo root — which is why guessing a fixed pair of names fails.)
 import { pathToFileURL } from "node:url";
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-const CORPUS = "security-input-corpus.mjs";
-const corpusPath = ["shared/resources", "references"]
-  .map((dir) => join(repoRoot, dir, CORPUS))
-  .find(existsSync);
-const { corpusFor } = await import(pathToFileURL(corpusPath));
+const PROMPT_DIR = "<the directory you read this prompt from>";
+const { corpusFor } = await import(
+  pathToFileURL(join(PROMPT_DIR, "security-input-corpus.mjs"))
+);
 // sinks: url-authority | sql-orm | shell-exec | path | template-render
 const cases = corpusFor("shell-exec");
 ```
@@ -197,7 +199,7 @@ security_review:
   probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
     # the legitimate inputs of step 5 and every candidate that behaved correctly.
   probes: # only candidates that REPRODUCED a defect; [] is correct and good when none did
-    - input: "gh pr comment --body x" # the candidate, verbatim and re-runnable
+    - input: "svc deploy --target prod" # the candidate, verbatim and re-runnable
       expected: "denied"
       actual: "runnable"
       reproduced: true # entries are reproduced by construction; the field is kept explicit

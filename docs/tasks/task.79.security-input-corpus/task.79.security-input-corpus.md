@@ -9,7 +9,7 @@ status: ready-for-review
 priority: High
 risk_level: low
 created: 2026-09-02
-updated: 2026-09-06
+updated: 2026-09-07
 assignee:
 estimated_effort_hours: 5
 ---
@@ -341,16 +341,16 @@ restored table.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-06
 **Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.79.qa.1.security-input-corpus.md](./task.79.qa.1.security-input-corpus.md)
-- **Gate File**: [task.79.gate.1.security-input-corpus.yml](./task.79.gate.1.security-input-corpus.yml)
+- **Cycle 2 (latest)**: [task.79.qa.2.security-input-corpus.md](./task.79.qa.2.security-input-corpus.md) · [gate.2](./task.79.gate.2.security-input-corpus.yml) — **CONCERNS**
+- **Cycle 1**: [task.79.qa.1.security-input-corpus.md](./task.79.qa.1.security-input-corpus.md) · [gate.1](./task.79.gate.1.security-input-corpus.yml) — FAIL
 
 ### Test Coverage Summary
 
@@ -408,6 +408,8 @@ All 10 promoted gate issues addressed, plus 6 advisory cleanups taken while in t
 | 2026-09-06 |         | Implemented — 3 files added, 3 modified, 6 regenerated; 73 corpus cases across 5 sinks; 19 new tests; 3 mutation proofs held | develop |
 | 2026-09-06 |         | QA gate FAIL (80/100) — 10 findings promoted (1 high, 7 medium, 2 low): non-restatement guard vacuous, three url-authority `why` fields falsified by the reference parser, unresolvable documented import | qa-task |
 | 2026-09-06 |         | QA findings fixed — 10 promoted issues closed in 1 iteration: non-restatement guard rebuilt on fragments with a must-fail fixture, six url-authority `why` fields corrected against the reference parser, import examples made resolvable, bundled-copy links de-pathed, byte-parity added for all 4 transitively-bundled refs, purity assertion added; 6 advisory cleanups also taken | qa-fix |
+| 2026-09-07 |         | QA cycle 2 gate CONCERNS (80/100) — refute pass found 11 further issues, all in cycle 1's own fixes or in unexecuted corpus claims; all addressed. HIGH 1 → 0 | qa-task |
+| 2026-09-07 |         | QA findings fixed — 11 cycle-2 issues closed in 1 iteration: guard widened to flag-head fragments with a third fixture, import snippet stops guessing the directory, purity check rebuilt on call shapes, `host-with-slash` correct no longer endorses a non-mitigation, table cells escaped, bundled refs derived from disk | qa-fix |
 
 ---
 

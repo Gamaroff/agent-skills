@@ -16,7 +16,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -199,14 +199,66 @@ const distinctive = (span) =>
   span.length >= 3 && (META.test(span) || FLAG.test(span));
 
 /**
- * Spans the prompt is allowed to use even though they collide with a corpus input.
+ * Text the prompt is allowed to use even though it collides with a corpus input.
  *
  * This replaces a `length >= 8` heuristic, which exempted 14 cases nobody had
  * chosen to exempt (`p@ss`, `[::1]`, `a/b+c=d`, `O'Brien`, …) while admitting
  * generic strings a future example would trip on. An explicit list is reviewed;
- * a character count is not. Empty today — add a span here only with a reason.
+ * a character count is not. Add an entry here only with a reason.
  */
-const PROMPT_MAY_MENTION = Object.freeze([]);
+const PROMPT_MAY_MENTION = Object.freeze([
+  // Empty, and worth keeping that way. It briefly held "--body", because the
+  // prompt's YAML output example used `gh pr comment --body x` — which is a
+  // de-escaped copy of the shell-exec case `g\h pr comment 1 --body x`. So the
+  // one suppression was covering the one genuine paraphrase in the file: the
+  // exemption list papering over exactly what it warns about. The example was
+  // changed instead, and the exemption removed.
+]);
+
+/**
+ * Distinctive TOKENS of the corpus inputs — whitespace-split, >=3 chars, and
+ * either metacharacter-bearing or flag-shaped.
+ *
+ * The span scan below only sees INLINE CODE SPANS, which is how the deleted axis
+ * table happened to quote its inputs. It is not the only way: bold, plain prose
+ * and fenced blocks all restate without an inline span, and the span scan misses
+ * every one of them — measured, not assumed. This token scan runs over the whole
+ * text and catches those. The two are kept together because they are
+ * complementary: the span scan catches `--output` (a substring of
+ * `sort --output=/tmp/x file.txt`, which is not a whole token), and this one
+ * catches `g\h` in a bold cell.
+ */
+function corpusFragments() {
+  const set = new Set();
+  const add = (t) => {
+    if (t.length >= 3 && (META.test(t) || FLAG.test(t))) set.add(t);
+    // Flag heads down to two characters — `-o`, `-i`. Safe only because
+    // restatedFragments matches on a word boundary.
+    if (t.length >= 2 && FLAG.test(t)) set.add(t);
+  };
+  for (const c of allCases()) {
+    for (const token of c.input.split(/\s+/)) {
+      const t = token.replace(/^[`*_]+|[`*_,.;:]+$/g, "");
+      add(t);
+      // A flag carrying its operand HIDES the flag: the token `--output=/tmp/x`
+      // contains `--output`, which is what a restatement quotes. Without this
+      // split, the axis table's Flag-forms row (`-o` and `--output`) was missed
+      // by BOTH scans — and DELETED_AXIS_TABLE did not notice, because its
+      // other rows carried code spans the span scan caught instead.
+      if (t.includes("=")) add(t.slice(0, t.indexOf("=")));
+    }
+  }
+  return [...set].filter((f) => !PROMPT_MAY_MENTION.includes(f));
+}
+
+const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Corpus fragments appearing anywhere in `text`, code span or not. */
+function restatedFragments(text) {
+  return corpusFragments().filter((f) =>
+    new RegExp(`(?<![\\w-])${escapeRe(f)}(?![\\w-])`).test(text),
+  );
+}
 
 /** Corpus inputs a span could be quoting. Short ones are punctuation, not quotation. */
 const quotableInputs = () =>
@@ -244,13 +296,58 @@ const DELETED_AXIS_TABLE = [
 ].join("\n");
 
 test("the non-restatement detector can see the restatement it is named for", () => {
-  const hits = restatedSpans(DELETED_AXIS_TABLE);
+  const hits = [
+    ...restatedSpans(DELETED_AXIS_TABLE),
+    ...restatedFragments(DELETED_AXIS_TABLE),
+  ];
   assert.ok(
     hits.length > 0,
     "the detector reports NOTHING on the deleted axis table — the exact text " +
       "the guard below exists to forbid. A guard that cannot fail on its own " +
       "worked example is not a guard, and this is precisely how the first " +
       "version of it shipped: green, and blind to the defect it named.",
+  );
+});
+
+test("the detector sees a restatement that uses no inline code spans", () => {
+  // The deleted table happened to quote its inputs in code spans. Nothing makes
+  // that the only shape: bold, plain prose and fenced blocks all restate without
+  // one, and the span scan misses every one of them. Measured, so this fixture
+  // is a second worked example rather than a restatement of the first.
+  const noSpans =
+    "Vary the quoting, e.g. cu'r'l and g\\h, and the flag form -o / --output.";
+  assert.equal(
+    restatedSpans(noSpans).length,
+    0,
+    "precondition: this fixture deliberately contains no inline code spans",
+  );
+  assert.ok(
+    restatedFragments(noSpans).length > 0,
+    "the detector cannot see a restatement written without code spans — the " +
+      "span scan alone was blind to bold, prose and fenced-block restatement",
+  );
+});
+
+test("the detector sees a flag-forms restatement, which hides inside its operand", () => {
+  // The narrowest real shape, and the one every earlier version of this guard
+  // missed. The axis table's Flag-forms row quotes `-o` and `--output` —
+  // neither is a whole token of any corpus input (the token is
+  // `--output=/tmp/x`), and `-o` is under the three-character floor. Rewritten
+  // in bold it escapes the span scan too. DELETED_AXIS_TABLE did not catch this
+  // on its own, because its OTHER rows carry code spans the span scan sees: a
+  // fixture can pass for the wrong reason, so this row is asserted alone.
+  const flagRow =
+    "| **Flag forms** | the long **and** short form of every flag the code " +
+    "names by hand (**-o** and **--output**) |";
+  assert.equal(
+    restatedSpans(flagRow).length,
+    0,
+    "precondition: this fixture deliberately contains no inline code spans",
+  );
+  assert.ok(
+    restatedFragments(flagRow).length > 0,
+    "the detector misses a flag-forms restatement — `--output` hides inside " +
+      "the corpus token `--output=/tmp/x`, and `-o` is two characters",
   );
 });
 
@@ -263,6 +360,17 @@ test("probe mode does not restate the corpus's inputs", () => {
       `Reference the corpus; do not copy pieces of it. If one of these is a ` +
       `genuine coincidence, add it to PROMPT_MAY_MENTION with a reason rather ` +
       `than weakening the detector.`,
+  );
+});
+
+test("probe mode does not carry a corpus fragment outside a code span", () => {
+  const hits = restatedFragments(source());
+  assert.deepEqual(
+    hits,
+    [],
+    `${PROMPT} carries corpus fragments: ${hits.map((h) => JSON.stringify(h)).join(", ")}. ` +
+      `If one is a genuine coincidence, add it to PROMPT_MAY_MENTION with a ` +
+      `reason rather than weakening the scan.`,
   );
 });
 
@@ -659,12 +767,10 @@ function normaliseBundled(text) {
  * prompt is how a stale corpus reaches the agent — the exact drift the corpus
  * exists to prevent, reintroduced one directory over.
  */
-const BUNDLED_REFS = Object.freeze([
-  PROMPT,
-  "security-input-corpus.md",
-  "security-input-corpus.mjs",
-  "mutation-proving.md",
-]);
+const bundledDir = join(repoRoot, "skills", "finalise", "references");
+const BUNDLED_REFS = readdirSync(bundledDir).filter((f) =>
+  existsSync(join(repoRoot, "shared", "resources", f)),
+);
 
 /**
  * The rewrite can CORRUPT a path as easily as it can fix one, and byte-parity

@@ -81,7 +81,7 @@ const URL_AUTHORITY = sinkCases("url-authority", [
     input: "evil.example.com/x",
     why: "A `/` ends the authority, so everything after it becomes a path — and a port that followed the host is silently lost. No error is raised: the connection goes to a different host on the default port.",
     correct:
-      "Build the URL by setting fields on a URL object rather than concatenating strings, and reject a host component containing `/`, `?`, `#`, `@` or whitespace before use.",
+      'REJECT a host component containing `/`, `?`, `#`, `@` or whitespace, before the URL is built. Setting fields on a URL object is not sufficient here and must not be graded as a pass: `u.host = "evil.example.com/x"` on a URL with port 5432 silently yields host `evil.example.com`, port `5432` — the setter truncates at the `/` and raises nothing, which is the same re-pointing as concatenation with a cleaner-looking diff.',
   },
   {
     id: "query-in-path-segment",
@@ -217,7 +217,7 @@ const SQL_ORM = sinkCases("sql-orm", [
     id: "homoglyph-quote",
     direction: "hostile",
     input: "＇",
-    why: "U+FF07 FULLWIDTH APOSTROPHE is not U+0027, so a deny-list keyed on the ASCII quote does not see it — while some client-to-server charset conversions fold it back to a real apostrophe on the way in.",
+    why: "U+FF07 FULLWIDTH APOSTROPHE is not U+0027, so a deny-list keyed on the ASCII quote does not see it. Whether it then BECOMES an apostrophe depends on the conversion: Windows best-fit codepage mapping folds it to U+0027, while Node's latin1 conversion yields 0x07 and MySQL's utf8mb4→latin1 substitutes `?`. The deny-list is defeated in every case; the escalation to injection needs best-fit mapping specifically.",
     correct:
       "Bind the value as a parameter. Character deny-lists cannot enumerate Unicode; parameterisation does not need to.",
   },
@@ -549,9 +549,9 @@ const PATH = sinkCases("path", [
     id: "symlink-escape",
     direction: "hostile",
     input: "uploads/link-to-etc/passwd",
-    why: "Every component is inside the root lexically, and the filesystem resolves `link-to-etc` somewhere else. A `path.resolve` check is satisfied by a string the kernel does not agree with.",
+    why: "Every component is inside the root lexically, and the filesystem resolves `link-to-etc` somewhere else. A `path.resolve` check is satisfied by a string the kernel does not agree with. **This case needs filesystem setup to discriminate**: without the symlink present, a realpath-checking implementation and one that skips realpath return the same verdict, so the input alone proves nothing.",
     correct:
-      "realpath the resolved path — following symlinks — and re-assert containment on the result.",
+      "realpath the resolved path — following symlinks — and re-assert containment on the result. To probe it, first create the fixture: a directory `<root>/uploads` containing a symlink `link-to-etc` → `/etc`. Then a correct implementation rejects; one that only resolves lexically accepts.",
   },
   {
     id: "null-byte",
@@ -627,7 +627,7 @@ const TEMPLATE_RENDER = sinkCases("template-render", [
     id: "attribute-breakout",
     direction: "hostile",
     input: '" autofocus onfocus=alert(1) x="',
-    why: "Escaping chosen for element text does not neutralise a value landing inside an attribute: the quote closes the attribute and the rest becomes new attributes.",
+    why: 'Escaping chosen for element text does not always neutralise a value landing inside an attribute: the quote closes the attribute and the rest becomes new attributes. The qualifier matters — a full escaper that also encodes `"` to `&quot;` (lodash `_.escape`, `he`, Handlebars) neutralises this inside a QUOTED attribute. It breaks out against an UNQUOTED attribute, or an escaper that handles only `<`, `>` and `&`.',
     correct:
       "Choose the escaping by the position the value lands in — element text, attribute value, URL and script context are four different escapings.",
   },
@@ -643,7 +643,7 @@ const TEMPLATE_RENDER = sinkCases("template-render", [
     id: "mustache-interpolation",
     direction: "hostile",
     input: "{{constructor.constructor('return process')()}}",
-    why: "Server-side template injection: the value is compiled as template source rather than substituted as data, so it runs in the renderer's own scope with the renderer's own privileges.",
+    why: "Server-side template injection: the value is compiled as template source rather than substituted as data. In an EXPRESSION-EVALUATING renderer (Angular, Vue, Jinja-style) it runs in the renderer's own scope with the renderer's own privileges; logic-less Mustache and Handlebars resolve `{{a.b}}` as a lookup path and render empty. That the same string is inert in one renderer and remote code execution in another is the reason to test it rather than reason about it.",
     correct:
       "Never compile user data as template source. Pass it as a value to an already-compiled template.",
   },
@@ -755,9 +755,19 @@ export function renderInput(input) {
   return `${fence}${pad}${shown}${pad}${fence}`;
 }
 
+/**
+ * Escape a prose cell for a markdown table.
+ *
+ * `why` and `correct` are prose ABOUT shell and path syntax, so they quote `|`
+ * routinely — `>|`, `||`. An unescaped one ends the cell and the row renders
+ * with the wrong number of columns. Two rows shipped that way before a
+ * structural check caught it: renderRow escaped the input column and not these.
+ */
+const escapeCell = (text) => text.replace(/\|/g, "\\|");
+
 /** Render one case as its markdown table row. */
 export function renderRow(c) {
-  return `| ${renderInput(c.input)} | ${c.why} | ${c.correct} |`;
+  return `| ${renderInput(c.input)} | ${escapeCell(c.why)} | ${escapeCell(c.correct)} |`;
 }
 
 /** Per-sink prose that heads each table group in the document. */
