@@ -1,0 +1,111 @@
+schema: 1
+task: "task.79.security-input-corpus"
+task_title: "Write down the inputs that defeat each sink, once"
+gate: PASS
+status_reason: >-
+  Verification re-review of cycle 2's fixes. Every one holds under independent
+  re-check, CI is green on the exact head commit, and no new finding was raised.
+  The three claims cycle 2 could not execute are qualified in the corpus text and
+  carried forward as a named future action rather than an open issue — they are
+  correctly stated as cited, and a corpus that says which of its claims are
+  measured and which are cited is doing its job.
+reviewer: "QA Engineer"
+updated: "2026-09-07T00:30:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 60
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 21
+  bugs_remaining: 0
+  fix_date: "2026-09-07"
+  total_iterations: 2
+  verification_method: >-
+    Independent re-check of each cycle-2 fix (not a re-read of the fix
+    descriptions), plus CI on a clean checkout of the tracked tree at head
+    73f6a45f — all five checks green. Nine mutation proofs across the two fix
+    cycles, each with a pre-mutation diff confirming the edit landed.
+
+cycle_3_verification:
+  - fix: "C2-1 guard widened to flag-head fragments"
+    check: "All three restatement fixtures pass — deleted axis table, no-code-span prose, and the Flag-forms row asserted alone"
+    result: PASS
+  - fix: "C2-2 import snippet stops guessing the directory"
+    check: "Zero `repoRoot` occurrences remain in either the source or the bundled prompt"
+    result: PASS
+  - fix: "C2-3 purity check rebuilt on call shapes"
+    check: "Mutation with the exact body that defeated the name-list version turns the named assertion red"
+    result: PASS
+  - fix: "C2-4 host-with-slash correct leads with rejection"
+    check: "correct starts with REJECT; the URL-object advice is demoted and its truncation named"
+    result: PASS
+  - fix: "C2-7 table cells escaped + structural row assertion"
+    check: "All 73 rows well-formed; doc matches the renderer; every case under its own sink and direction"
+    result: PASS
+  - fix: "C2-8 exemption list emptied"
+    check: "PROMPT_MAY_MENTION has 0 entries and the prompt's example no longer paraphrases a corpus case"
+    result: PASS
+  - fix: "C2-9 BUNDLED_REFS derived from disk"
+    check: >-
+      Now covers 27 bundled references rather than the 4 that were hand-listed —
+      every shared resource the finalise skill ships is byte-parity-checked, a
+      materially wider guarantee than the fix was asked for
+    result: PASS
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      Upgraded from CONCERNS. Every url-authority claim that was falsified is
+      corrected and re-executed; `host-with-slash` no longer endorses a
+      mitigation that does not mitigate it. The module is inert on import and
+      that is now defeat-proved against dynamic import, fetch and
+      `.constructor()` rather than against a list of module names. The three
+      cited-not-executed claims are stated with their conditions, which is the
+      honest form — a reader can see which parts of the corpus are measured.
+  performance:
+    status: PASS
+    notes: "Pure data. 2ms import, 73 frozen cases, allCases() memoised."
+  reliability:
+    status: PASS
+    notes: >-
+      Rollback verified green. corpusFor throws on every unknown key including
+      the five prototype probes. Bundler runs with no warnings.
+  maintainability:
+    status: PASS
+    notes: >-
+      The guard fails on three distinct restatement shapes, each its own fixture.
+      Bundled parity is byte-level, derived from disk, and now covers 27 refs.
+      Document and parity test share one renderer, with a structural assertion
+      that catches renderer bugs the self-comparison cannot.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Execute the three cited-but-unreproduced claims against a real template
+        engine and a Windows codepage, and either confirm or drop them. The
+        corpus's own method ordering ranks execution above citation, and it
+        should hold itself to that.
+      refs: ["shared/resources/security-input-corpus.mjs"]
+    - action: >-
+        Give the corpus a `fixture` field for cases needing filesystem setup
+        (path.symlink-escape), rather than describing it in prose. task.80 will
+        need it to score that case.
+      refs: ["shared/resources/security-input-corpus.mjs"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -341,15 +341,16 @@ restored table.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-06
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Cycle 2 (latest)**: [task.79.qa.2.security-input-corpus.md](./task.79.qa.2.security-input-corpus.md) · [gate.2](./task.79.gate.2.security-input-corpus.yml) — **CONCERNS**
+- **Cycle 3 (latest)**: [task.79.qa.3.security-input-corpus.md](./task.79.qa.3.security-input-corpus.md) · [gate.3](./task.79.gate.3.security-input-corpus.yml) — **PASS**
+- **Cycle 2**: [task.79.qa.2.security-input-corpus.md](./task.79.qa.2.security-input-corpus.md) · [gate.2](./task.79.gate.2.security-input-corpus.yml) — CONCERNS
 - **Cycle 1**: [task.79.qa.1.security-input-corpus.md](./task.79.qa.1.security-input-corpus.md) · [gate.1](./task.79.gate.1.security-input-corpus.yml) — FAIL
 
 ### Test Coverage Summary
@@ -410,6 +411,7 @@ All 10 promoted gate issues addressed, plus 6 advisory cleanups taken while in t
 | 2026-09-06 |         | QA findings fixed — 10 promoted issues closed in 1 iteration: non-restatement guard rebuilt on fragments with a must-fail fixture, six url-authority `why` fields corrected against the reference parser, import examples made resolvable, bundled-copy links de-pathed, byte-parity added for all 4 transitively-bundled refs, purity assertion added; 6 advisory cleanups also taken | qa-fix |
 | 2026-09-07 |         | QA cycle 2 gate CONCERNS (80/100) — refute pass found 11 further issues, all in cycle 1's own fixes or in unexecuted corpus claims; all addressed. HIGH 1 → 0 | qa-task |
 | 2026-09-07 |         | QA findings fixed — 11 cycle-2 issues closed in 1 iteration: guard widened to flag-head fragments with a third fixture, import snippet stops guessing the directory, purity check rebuilt on call shapes, `host-with-slash` correct no longer endorses a non-mitigation, table cells escaped, bundled refs derived from disk | qa-fix |
+| 2026-09-07 |         | QA cycle 3 gate PASS (100/100) — verification re-review: all 21 findings across 3 cycles closed and independently re-checked, 0 new findings, CI green on head | qa-task |
 
 ---
 
