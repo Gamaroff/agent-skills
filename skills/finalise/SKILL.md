@@ -1103,13 +1103,16 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    Use the Atlassian MCP tools. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
 
-   > **Order matters — the transition runs first, the re-link second.** Both `jira-stage.js` (via the
-   > transition protocol) and the `sync-jira-*` re-link below can drive the status to Done, but they
-   > resolve it from **different config sources**: the transition uses the `tracker-workflow.yaml`
-   > ladder, the sync uses its own `loadStatusMap`. Running the ladder first makes it the single
-   > resolver for the *decision*, while the sync's real job (re-pointing the Document link at the
-   > durable branch) still happens. **Do not reverse these two blocks** — sync-first hands the
-   > decision back to `loadStatusMap`, which is what this order exists to prevent.
+   > **Order matters — the transition runs first, the re-link second.** Historically both
+   > `jira-stage.js` (via the transition protocol) and the `sync-jira-*` re-link below could drive the
+   > status, resolving it from **different config sources**: the transition uses the
+   > `tracker-workflow.yaml` ladder, the sync its own `loadStatusMap`. The re-link now runs with
+   > `--no-transition` (step 3), so it carries no status decision at all and the ladder is the single
+   > resolver by construction rather than by sequencing.
+   >
+   > **Keep the order anyway.** It is now belt-and-braces rather than the guarantee — it is what still
+   > protects a consumer pinned to a `sync-jira-*` predating the flag, for whom sync-first would hand
+   > the decision back to `loadStatusMap`. Do not reverse these two blocks.
    >
    > ⚠️ **The sync does not no-op — it is made status-neutral, and that is why step 3 passes
    > `--no-transition`.** This block used to claim the sync no-ops on its own — *"the sync's own

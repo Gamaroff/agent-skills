@@ -323,6 +323,7 @@ guidance, not information for a card reader.
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
 | `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Lets a post-merge re-sync point links at the durable integration branch instead of a deleted feature branch. |
+| `--no-transition` | | Re-point links / refresh the description **without** driving the issue's status. The sync normally resolves frontmatter `status:` through its own `loadStatusMap` and transitions the card; with this flag it issues no status request at all. Passed by `finalise` Step 7's Document-link re-point, so the re-link cannot overrule the terminal status the tracker-workflow ladder just set (bug.11). Composes with `--fail-on-status-skip` — a suppressed transition is a run behaving as configured, and exits 0. |
 | `--check-card` | | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-epic` to catch a heading mismatch before it publishes a thin card. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--force` | | Override the concurrent-edit guard AND the no-change fast path |

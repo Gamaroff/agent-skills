@@ -938,6 +938,13 @@ async function run({
     // status would silently diverge from the board on exactly the sync that was
     // meant to carry it. `sync-jira-story` and `sync-jira-task` have always
     // transitioned on this path; the epic's early return made it the odd one out.
+    //
+    // ...except under `--no-transition`, where the caller has taken the status
+    // decision itself, so the call below forwards it like every other call site.
+    // Suppressing here too is what makes the flag path-independent: transitioning
+    // only when the body happened to be unchanged would make the flag's effect
+    // depend on whether an unrelated field drifted, which is the least
+    // predictable behaviour on offer.
     if (current && changedFields.length === 0 && !args.force) {
       output.info(
         "\nℹ️  No field changes detected — skipping Jira update. Re-run with --force to push anyway.",

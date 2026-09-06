@@ -235,6 +235,85 @@ Document-link re-point carried a second, independent status resolver.
    `jira-sync.js` and observe B2 go red; restore.
 6. `npm run ci:fast` → green.
 
+### Iteration 2
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-06
+
+**Trigger**: Verify Cycle 1 signal 3 — `/review-code` on the PR #329 diff returned 6 findings.
+Signals 1 (regression test) and 2 (suite + format) were green. Four of the findings are defects the
+fix itself introduced, so the cycle is treated as FAIL rather than waved through on the
+"only high-confidence *correctness* findings block" letter:
+
+- **CR-2** (medium/high) — `--no-transition` absent from all three `sync-jira-*` SKILL.md
+  `Script Options` tables and from the prose describing finalise's re-point. The flag is now
+  *required* by finalise Step 7, and SKILL.md is where a consumer reads; `--doc-branch`, its
+  companion in the same command, was documented while its partner was not.
+- **CR-3** (low/high) — finalise's "Order matters" paragraph was left untouched and now contradicts
+  the paragraph five lines below it, giving two mutually exclusive accounts of the same command.
+- **CR-4** (low/high) — the epic skip-path comment states "the status transition still runs here,
+  and must" as an absolute that the line 12 below it now falsifies.
+- **CR-5** (low/high) — **test C was tautological.** `buildChangeLogEntries` branches only on
+  `created` and `transitioned`; it never reads `reason`. Fed a hand-written outcome, C passed for any
+  reason string and would have passed with no gate in the codebase at all. It was cited as evidence
+  in the Iteration 1 record, so this is a correction to that record as much as to the test.
+- **CR-6** (low/high) — four soft spots in the E/E2 structural check, whose entire justification is
+  catching what behavioural tests cannot: a literal-string needle invisible to reformatting, an
+  unbalanced slice silently returning the rest of the file (a later call site could satisfy an
+  earlier one's assertion — a false pass in exactly the miss E exists to catch), and a
+  presence-only match that `noTransition: false` would satisfy.
+
+**CR-1** (bug, medium/medium) is **not** fixed here: `review-story` 9.6, `review-task` 8.6 and
+`review-epic` run body/link-only syncs that still re-resolve status, which is bug.11's shape at three
+more call sites. bug.11 scoped its Recommendation item 2 to the flag *"passed by finalise's re-link"*,
+so widening this PR would be scope creep. Filed as
+[`bug.12`](../bug.12.review-syncs-relink-without-no-transition/bug.12.review-syncs-relink-without-no-transition.md)
+with the registry row and counter bumped, so it is carried rather than dropped.
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-06
+
+**Fix Description**:
+
+- **CR-2** — `--no-transition` row added to the `Script Options` table in all three `sync-jira-*`
+  SKILL.md files, and named alongside `--doc-branch` in the current-branch-URLs prose for task and
+  story.
+- **CR-3** — finalise's "Order matters" paragraph rewritten: the ladder is now the single resolver
+  *by construction* rather than by sequencing, and the ordering is kept explicitly as belt-and-braces
+  for a consumer pinned to a pre-flag sync.
+- **CR-4** — the epic skip-path comment now carries the `--no-transition` exception and says why
+  suppressing on that path is what makes the flag path-independent.
+- **CR-5** — test C is now driven **end-to-end**: it calls `syncDocumentStatus({noTransition:true})`
+  and feeds the real return into `buildChangeLogEntries`, so a regression in the gate's return shape
+  fails it. Added C2, the end-to-end twin of B.
+- **CR-6** — the extractor matches by regex (`/syncDocumentStatus\(\s*\{/`) so reformatting cannot
+  hide a call site; it records whether the slice actually **balanced** and E fails loudly if not; and
+  E now asserts the forwarded **value** (`noTransition: args.noTransition`), not merely the key.
+
+**Files Modified**:
+
+- `skills/sync-jira-{task,story,epic}/SKILL.md` — flag documented
+- `skills/finalise/SKILL.md` — ordering paragraph corrected
+- `skills/sync-jira-epic/scripts/sync-jira-epic.js` — skip-path comment
+- `shared/resources/tests/jira-sync-no-transition.test.mjs` — C rewritten, C2 added, extractor hardened
+- `docs/bugs/bug.12.…` + `docs/bugs/bug-registry.md` — CR-1 filed
+
+**Testing**:
+
+- 17 tests pass (was 16; C2 added).
+- **Both hardened tests mutation-proven against mutations their previous versions would have passed**:
+  - gate returns `transitioned: true` → **C fails** (old C could not see this)
+  - a call site hardcoded to `noTransition: false` → **E fails** (old E matched the key only)
+
+**Verification Steps for QA**:
+
+1. `command node --test shared/resources/tests/jira-sync-no-transition.test.mjs` → 17/17.
+2. Hardcode `noTransition: false` at any call site → E goes red; restore.
+3. `grep -n -- "--no-transition" skills/sync-jira-*/SKILL.md` → one Script Options row each.
+4. Read `skills/finalise/SKILL.md` Step 7 blocks 3–4 and confirm no two paragraphs disagree.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -243,6 +322,8 @@ Document-link re-point carried a second, independent status resolver.
 | 2026-09-06 | New | review-bug | Fix-readiness validate pass. Added the template sections the report was missing (Evidence, Reproduction Steps environment/frequency/reproducible, Developer Fix Cycle, Status History, Resolution Summary); renamed `Steps to Reproduce` → `Reproduction Steps` and `Impact` → `Scope & Impact` to the canonical headings. No severity/priority change — Major/High confirmed correct. |
 | 2026-09-06 | In Progress | develop-bug | Reproduced via a failing regression test; root cause localised to the unconditional `syncDocumentStatus` and its four call sites. |
 | 2026-09-06 | Ready for QA | develop-bug | `--no-transition` implemented on all three syncs, gated inside `syncDocumentStatus`; finalise Step 7 passes it. 16 regression tests, five mutation proofs, `ci:fast` green. |
+| 2026-09-06 | Reopened | develop-bug | Verify Cycle 1 FAIL — 5 review-code findings, 4 of them introduced by the fix. |
+| 2026-09-06 | Ready for QA | develop-bug | Cycle 1 fixes applied: flag documented, contradictory prose corrected, tautological test C rewritten end-to-end, structural check hardened. CR-1 filed as bug.12. |
 
 ## Resolution Summary
 

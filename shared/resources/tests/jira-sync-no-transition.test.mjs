@@ -20,6 +20,8 @@
 //                          Without this, `--no-transition --fail-on-status-skip`
 //                          would fail every run that used both.
 //   C — no Change Log row. Nothing moved, so nothing is an event worth a row.
+//                          Driven end-to-end off the gate's real return value, not a
+//                          hand-written outcome, which would pin nothing.
 //   D — the flag reaches   All three CLIs must parse `--no-transition`; a flag
 //       every CLI.         wired into two of three is the failure mode that made
 //                          this bug reachable from finalise in the first place.
@@ -168,16 +170,49 @@ test("B2: a genuine `no-transition` skip still fails under --fail-on-status-skip
 // C — nothing moved, so nothing is logged
 // ---------------------------------------------------------------------------
 
-test("C: a transition-suppressed outcome writes no Change Log status row", () => {
+test("C: a suppressed sync's REAL outcome writes no Change Log status row", async () => {
+  // Driven end-to-end on purpose. `buildChangeLogEntries` branches on
+  // `statusOutcome.transitioned` and never reads `reason`, so handing it a
+  // hand-written `{transitioned:false, reason:"transition-suppressed"}` asserts
+  // a generic pre-existing invariant and would pass identically with no gate in
+  // the codebase at all. Feeding it the object `syncDocumentStatus` actually
+  // returns is what ties this test to the gate: if the early return ever grew a
+  // truthy `transitioned`, this fails.
+  const { http } = recordingHttp();
+  const outcome = await lib.syncDocumentStatus({
+    ...BASE,
+    http,
+    localStatus: "accepted",
+    currentStatus: "Done",
+    noTransition: true,
+  });
+
   const entries = lib.buildChangeLogEntries({
     created: false,
     issueKey: "PROJ-715",
-    statusOutcome: { transitioned: false, reason: "transition-suppressed" },
+    statusOutcome: outcome,
     author: "sync-jira-task",
     docNoun: "task",
     date: "2026-09-06",
   });
   assert.deepEqual(entries, []);
+});
+
+test("C2: the same real outcome is also exit-0 under --fail-on-status-skip", async () => {
+  // The end-to-end twin of B. B pins the reason string; this pins that the
+  // object the gate actually produces satisfies it.
+  const { http } = recordingHttp();
+  const outcome = await lib.syncDocumentStatus({
+    ...BASE,
+    http,
+    localStatus: "accepted",
+    currentStatus: "Done",
+    noTransition: true,
+  });
+  assert.equal(
+    lib.summariseStatusOutcome(outcome, { failOnSkip: true, repoRoot: REPO }),
+    0,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -231,22 +266,39 @@ for (const [kind, rel] of CLIS) {
 
 function callSiteArgObjects(src) {
   // Extract the `{...}` argument of each `syncDocumentStatus(` call by brace
-  // balancing, so nested objects and template literals don't truncate it.
+  // balancing.
+  //
+  // Three deliberate hardenings, each closing a way this check could pass while
+  // the invariant it guards is broken:
+  //   - the call is matched by REGEX allowing whitespace, so reformatting the
+  //     call to `syncDocumentStatus(\n  {` does not make a site invisible;
+  //   - an UNBALANCED slice is reported rather than silently returning the rest
+  //     of the file, which would let a *later* call site's `noTransition:`
+  //     satisfy an earlier one's assertion — a false pass in exactly the miss
+  //     this test exists to catch;
+  //   - the brace counter is naive about braces inside strings and comments.
+  //     That is accepted: these are four known call sites in reviewed code, and
+  //     the `balanced` flag turns a mis-slice into a failure rather than a
+  //     false pass.
   const objs = [];
-  const needle = "syncDocumentStatus({";
-  let i = src.indexOf(needle);
-  while (i !== -1) {
+  const re = /syncDocumentStatus\(\s*\{/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
     let depth = 0;
-    let j = i + needle.length - 1; // at the opening brace
+    let j = m.index + m[0].length - 1; // at the opening brace
+    let balanced = false;
     for (; j < src.length; j++) {
       if (src[j] === "{") depth++;
       else if (src[j] === "}") {
         depth--;
-        if (depth === 0) break;
+        if (depth === 0) {
+          balanced = true;
+          break;
+        }
       }
     }
-    objs.push({ offset: i, text: src.slice(i, j + 1) });
-    i = src.indexOf(needle, j);
+    objs.push({ offset: m.index, text: src.slice(m.index, j + 1), balanced });
+    re.lastIndex = j;
   }
   return objs;
 }
@@ -264,12 +316,20 @@ for (const [kind, rel] of CLIS) {
     );
 
     for (const site of sites) {
+      assert.ok(
+        site.balanced,
+        `${rel}: could not find the closing brace of the syncDocumentStatus ` +
+          `call at offset ${site.offset}; the extractor mis-sliced, so a pass ` +
+          `here would be meaningless`,
+      );
+      // The VALUE, not just the key. `noTransition: false` hardcoded would
+      // satisfy a presence-only check while ignoring the flag entirely.
       assert.match(
         site.text,
-        /\bnoTransition:/,
+        /\bnoTransition:\s*args\.noTransition\b/,
         `${rel}: the syncDocumentStatus call at offset ${site.offset} does not ` +
-          `forward noTransition, so --no-transition is silently ignored on ` +
-          `that path`,
+          `forward args.noTransition, so --no-transition is silently ignored ` +
+          `on that path`,
       );
     }
   });
