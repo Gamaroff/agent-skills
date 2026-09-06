@@ -2058,8 +2058,11 @@ fi
 
 ```bash
 node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
-  --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
+  --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"} \
+  --no-transition
 ```
+
+> **`--no-transition` is required here, not tidiness.** This step's job is the description and the doc link. Without the flag the sync also resolves the document's frontmatter `status:` through its own `loadStatusMap` and transitions the card — a second resolver running after the `tracker-workflow.yaml` ladder has already placed it. In the `develop-story` pipeline this step runs at Step 2, *after* Step 1 signalled `work-started`, while the frontmatter still reads `ready-for-development`; un-flagged, it walks the card back out of In Progress (bug.12; same shape as bug.11). Step 10 below is the deliberate status push — it is the one that must *not* carry the flag.
 
 > **Path note**: the script is bundled at `.agents/skills/sync-jira-story/scripts/sync-jira-story.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist and never did. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
 
@@ -2142,6 +2145,8 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
      node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
        --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
      ```
+
+     > **This site deliberately omits `--no-transition`, unlike Step 9.6.** Driving the transition *is* the point here — the status has just changed locally and this is what carries it to the card. The two steps ran the same command line until bug.12; they are now different on purpose, so do not "restore consistency" by flagging this one. The `jira-sync-no-transition` parity guard (test G, in the shared test suite) records this step in its deliberate-status-push allowlist — the file is named without its path on purpose: the bundler treats a literal shared-resources path in shipped prose as a resource to copy into this skill, and a test is not a shared resource.
 
      On success → `✅ Status synced to Jira {jira_key} (doc link pinned to ${PIN_BRANCH:-current branch})`.
      On failure → log `⚠️ sync-jira-story failed after status update — Jira may be stale` and continue.
