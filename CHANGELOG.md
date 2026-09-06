@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`finalise` no longer reports a close it may have just undone (bug.11).** Step 7 transitions the
+  card to a terminal status and then re-runs `sync-jira-*` to re-point the Document link at the
+  durable branch. Task 40 set that order deliberately and justified it on the premise that the sync
+  would then *"find the issue already in Done and no-op"*.
+
+  **That premise only holds when the consumer maps `accepted → Done`** — and this same step
+  recommends the opposite, telling boards that want a card to wait for the merge to leave `done` to
+  a human. On such a project the sync resolves `accepted` through its own `loadStatusMap`, finds a
+  non-terminal candidate and walks the card **backwards out of the status the ladder just set**,
+  leaving the resolution stranded where neither a `resolution IS EMPTY` sweep nor a status-is-done
+  filter will find it. Observed on a consumer 2026-09-05: closed to `Done` + `resolution: Done`,
+  returned by the re-link to `Waiting for Review` still carrying `resolution: Done`, matched by name
+  because that workflow offers a transition literally called `Waiting for Review`.
+
+  The order is **unchanged** — reversing it hands the decision back to `loadStatusMap`, which is what
+  task 40 removed. What changed is that the block no longer asserts the sync no-ops, names the
+  configuration under which it does not, and Step 7 now **requires the terminal status to be re-read
+  after the re-link and re-asserted if it moved**, with a matching checklist item. Verification is by
+  reading the issue back, never by trusting the transition call's `204`.
+
+  The durable fix — a `--no-transition` flag so the re-link cannot carry a status decision at all —
+  is specified in [`bug.11`](docs/bugs/bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md)
+  and deliberately not bundled here, to keep this one change.
+
 ### Added
 
 - **Skill install profiles with dependency closure.** `setup-consumer.sh` now asks which install
