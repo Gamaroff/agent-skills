@@ -38,6 +38,8 @@ const {
   parseDepCell,
   TASK_ELIGIBLE_STATUSES,
   BUG_ELIGIBLE_STATUSES,
+  TASK_LIFECYCLE_STATUSES,
+  BUG_LIFECYCLE_STATUSES,
 } = await import(pathToFileURL(SCRIPT).href);
 
 function fixture(name) {
@@ -2674,5 +2676,180 @@ test("deps: a headerless registry falls back to the documented column position",
   assert.match(
     f.passedOver.find((p) => p.n === 84).reason,
     /blocked on unaccepted dependency: task\.83 \(planned\)/,
+  );
+});
+
+// ── B8: a status outside the LIFECYCLE is distinguishable from a terminal one ─
+//
+// bug.8. `registryFrontier` knew exactly one status vocabulary — the eligibility
+// FLOOR — so its single `!ELIGIBLE_FOR[kind].has(docStatus)` branch gave
+// `closed` (a valid terminal status: nothing to do) and `open` (not a status at
+// all: a filing typo) the same sentence. On the live corpus that put a real typo
+// among 8 closed bugs and ~90 accepted tasks wearing identical prose.
+//
+// The floor is NOT widened — `{new, reopened}` stays, and §16/H1 above pins why
+// the floor and the lifecycle are deliberately different sets. What is added is
+// a SECOND vocabulary: membership of the lifecycle, which separates "outside the
+// floor" from "not a status".
+
+test("B8: an off-lifecycle bug status gets its own reason, not the terminal one", () => {
+  const { opts } = registryOpts({
+    bugs: bugRegistry([bugRow(7, "typo", "open")]),
+    docs: { "docs/bugs/bug.7.typo/bug.7.typo.md": "open" },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(
+    f.selected,
+    null,
+    "an unrecognised status is still not selected",
+  );
+
+  const row = f.passedOver.find((p) => p.n === 7);
+  assert.match(
+    row.reason,
+    /not a member of the bug lifecycle/i,
+    `an unrecognised status must not reuse the eligibility-floor sentence.\n  got: ${row.reason}`,
+  );
+  assert.match(
+    row.reason,
+    /new, in-progress, ready-for-qa, closed, reopened/,
+    "the reason must name the lifecycle so the typo is fixable from the message alone",
+  );
+  assert.equal(row.offLifecycle, true);
+});
+
+test("B8: an off-lifecycle status raises a warning; a terminal one does not", () => {
+  const off = registryOpts({
+    bugs: bugRegistry([bugRow(7, "typo", "open")]),
+    docs: { "docs/bugs/bug.7.typo/bug.7.typo.md": "open" },
+  });
+  const offWarnings = registryFrontier(off.opts.registries, {
+    evaluateAll: true,
+  }).warnings;
+  assert.equal(
+    offWarnings.filter((w) => /not a member of the bug lifecycle/i.test(w))
+      .length,
+    1,
+    `expected exactly one lifecycle warning, got: ${JSON.stringify(offWarnings)}`,
+  );
+  assert.match(offWarnings[0], /docs\/bugs\/bug\.7\.typo\/bug\.7\.typo\.md/);
+
+  // Anti-vacuity: the warning must fire on the typo and NOT on every rejection.
+  // Without this half, `warnings.push` on the shared branch would pass above.
+  const terminal = registryOpts({
+    bugs: bugRegistry([bugRow(7, "done", "closed")]),
+    docs: { "docs/bugs/bug.7.done/bug.7.done.md": "closed" },
+  });
+  const termFrontier = registryFrontier(terminal.opts.registries, {
+    evaluateAll: true,
+  });
+  assert.deepEqual(
+    termFrontier.warnings.filter((w) => /lifecycle/i.test(w)),
+    [],
+    "a correctly-closed bug is not a filing error and must stay quiet",
+  );
+  assert.match(
+    termFrontier.passedOver.find((p) => p.n === 7).reason,
+    /outside the bug eligibility floor/,
+    "terminal rows keep the floor sentence — this change adds a case, it does not rewrite the old one",
+  );
+  assert.equal(
+    termFrontier.passedOver.find((p) => p.n === 7).offLifecycle,
+    false,
+  );
+});
+
+test("B8: the task axis gets the same treatment", () => {
+  const { opts } = registryOpts({
+    tasks: taskRegistry([taskRow(9, "typo", "open")]),
+    docs: { "docs/tasks/task.9.typo/task.9.typo.md": "open" },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  const row = f.passedOver.find((p) => p.n === 9);
+  assert.match(row.reason, /not a member of the task lifecycle/i);
+  assert.match(
+    row.reason,
+    /draft, planned, ready-for-development, in-progress, ready-for-review, accepted, cancelled/,
+  );
+  assert.equal(f.warnings.filter((w) => /lifecycle/i.test(w)).length, 1);
+});
+
+test("B8: selectNext surfaces frontier warnings on the stop path", () => {
+  // The warning existed nowhere an operator would see it: `--lint` returned
+  // `frontier.warnings`, but the normal selection path returned
+  // `registryFrontier: { passedOver }` and dropped them. `/develop-next` runs the
+  // normal path, so the loop that reports `roadmap-complete` was exactly the
+  // caller that could not see why.
+  const { r } = fallback({
+    bugs: [bugRow(7, "typo", "open")],
+    docs: { "docs/bugs/bug.7.typo/bug.7.typo.md": "open" },
+  });
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.ok(
+    Array.isArray(r.registryFrontier.warnings),
+    "warnings must be present on the normal path, not only under --lint",
+  );
+  assert.equal(
+    r.registryFrontier.warnings.filter((w) =>
+      /not a member of the bug lifecycle/i.test(w),
+    ).length,
+    1,
+  );
+  assert.match(
+    r.detail,
+    /1 row\(s\) carry a status outside their lifecycle/,
+    "the one-line stop detail must say it — passedOver[] is not read by a human scanning a loop log",
+  );
+});
+
+test("B8: a clean stop says nothing about lifecycles", () => {
+  // Anti-vacuity for the `detail` assertion above.
+  const { r } = fallback({
+    bugs: [bugRow(7, "done", "closed")],
+    docs: { "docs/bugs/bug.7.done/bug.7.done.md": "closed" },
+  });
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.doesNotMatch(r.detail, /lifecycle/);
+  assert.deepEqual(r.registryFrontier.warnings, []);
+});
+
+test("B8: the lifecycles are supersets of the floors, and are exported", () => {
+  // The floor must remain a subset of the lifecycle — a status can be
+  // ineligible-but-valid, never eligible-but-invalid. If this fails, one of the
+  // two sets was edited without the other.
+  for (const [name, floor, lifecycle] of [
+    ["bug", BUG_ELIGIBLE_STATUSES, BUG_LIFECYCLE_STATUSES],
+    ["task", TASK_ELIGIBLE_STATUSES, TASK_LIFECYCLE_STATUSES],
+  ]) {
+    const stray = [...floor].filter((s) => !lifecycle.has(s));
+    assert.deepEqual(
+      stray,
+      [],
+      `${name}: the eligibility floor admits ${stray.join(", ")}, which the lifecycle does not define`,
+    );
+  }
+});
+
+test("B8: the code lifecycles match docs/standards/bug-documents.md", () => {
+  // The lifecycle now exists in code AND in prose. Two copies drift, so the
+  // prose is parsed and compared rather than trusted — the same technique
+  // §16/H1 uses on develop-bug's proceed table.
+  const doc = readFileSync(
+    path.join(REPO_ROOT, "docs", "standards", "bug-documents.md"),
+    "utf-8",
+  );
+  const row = doc.split("\n").find((l) => /^\|\s*`status`\s*\|/.test(l));
+  assert.ok(row, "bug-documents.md no longer has a `status` frontmatter row");
+  const parsed = [...row.matchAll(/`([a-z-]+)`/g)]
+    .map((m) => m[1])
+    .filter((v) => v !== "status");
+  assert.deepEqual(
+    parsed.sort(),
+    [...BUG_LIFECYCLE_STATUSES].sort(),
+    `the documented bug lifecycle and BUG_LIFECYCLE_STATUSES disagree.\n` +
+      `  doc:  ${parsed.sort().join(", ")}\n` +
+      `  code: ${[...BUG_LIFECYCLE_STATUSES].sort().join(", ")}`,
   );
 });
