@@ -725,7 +725,8 @@ export function allCases() {
 // there is no second renderer to keep in step. Regenerate the document's
 // "## The cases" body with:
 //
-//   node -e 'import("./shared/resources/security-input-corpus.mjs")
+//   cd shared/resources
+//   node -e 'import("./security-input-corpus.mjs")
 //     .then((m) => process.stdout.write(m.renderCorpusTables()))'
 
 /** Control characters rendered visibly, because a table cannot carry them. */

@@ -336,7 +336,7 @@ test("the prose peer contains the generated tables verbatim", () => {
     doc().includes(tables),
     `${DOC} is not in step with renderCorpusTables(). The case tables are ` +
       `GENERATED — regenerate them rather than editing by hand:\n\n` +
-      `  node -e 'import("./shared/resources/security-input-corpus.mjs")` +
+      `  cd shared/resources && node -e 'import("./security-input-corpus.mjs")` +
       `.then((m) => process.stdout.write(m.renderCorpusTables()))'\n\n` +
       `A case that exists in only one of the two is how this became a third ` +
       `stale copy in task.74.`,

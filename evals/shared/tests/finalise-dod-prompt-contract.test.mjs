@@ -666,6 +666,38 @@ const BUNDLED_REFS = Object.freeze([
   "mutation-proving.md",
 ]);
 
+/**
+ * The rewrite can CORRUPT a path as easily as it can fix one, and byte-parity
+ * cannot see it: `normaliseBundled` deliberately undoes the rewrite, so a source
+ * and a bundled copy that differ only by a broken rewrite compare equal.
+ *
+ * Found the hard way during task.79's own qa-fix cycle. A fix for an
+ * unresolvable import wrote `join(repoRoot, "shared/resources/…")` into the
+ * prompt; the bundler rewrote it to `join(repoRoot, "references/…")`, which
+ * resolves to nothing — so the "fix" shipped a *different* broken import to the
+ * only copy an agent reads. `repoRoot` + `references/` is never a real path,
+ * which makes the corruption exactly detectable.
+ */
+test("no bundled reference builds a repo-root path out of the rewritten directory", () => {
+  for (const ref of BUNDLED_REFS) {
+    const bun = join(repoRoot, "skills", "finalise", "references", ref);
+    if (!existsSync(bun)) continue;
+    const text = readFileSync(bun, "utf-8");
+    const bad = [...text.matchAll(/repoRoot[^\n]{0,40}["'`]references\//g)].map(
+      (m) => m[0],
+    );
+    assert.deepEqual(
+      bad,
+      [],
+      `skills/finalise/references/${ref} builds a path from repoRoot + ` +
+        `"references/", which does not exist. The source almost certainly says ` +
+        `"shared/resources/..." inside a code example, and the bundler rewrote ` +
+        `it. Write the example so it does not carry a rewritable path — e.g. ` +
+        `try both directory names at runtime.`,
+    );
+  }
+});
+
 test("every transitively-bundled reference is byte-identical to its source", () => {
   // Byte parity, not marker presence. The previous version of this test checked
   // that five strings survived into the bundled copy, which a stale copy passes

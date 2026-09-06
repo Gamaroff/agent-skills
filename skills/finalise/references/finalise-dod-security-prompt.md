@@ -114,15 +114,19 @@ machine-readable peer `references/security-input-corpus.mjs`. Start there rather
 re-inventing a candidate set per run:
 
 ```js
-// Step 3 runs this from a TEMP directory, so the specifier must be absolute —
-// a bare "references/..." (or the bundled "references/...") throws
-// ERR_MODULE_NOT_FOUND. Build it from the repo root:
+// Step 3 runs this from a TEMP directory, so the specifier must be ABSOLUTE —
+// a bare or relative one throws ERR_MODULE_NOT_FOUND from there. The module
+// lives beside this prompt, in a directory whose name depends on whether you
+// are in the repository or in an installed skill, so try both:
 import { pathToFileURL } from "node:url";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-const { corpusFor } = await import(
-  pathToFileURL(join(repoRoot, "references/security-input-corpus.mjs"))
-);
+const CORPUS = "security-input-corpus.mjs";
+const corpusPath = ["shared/resources", "references"]
+  .map((dir) => join(repoRoot, dir, CORPUS))
+  .find(existsSync);
+const { corpusFor } = await import(pathToFileURL(corpusPath));
 // sinks: url-authority | sql-orm | shell-exec | path | template-render
 const cases = corpusFor("shell-exec");
 ```

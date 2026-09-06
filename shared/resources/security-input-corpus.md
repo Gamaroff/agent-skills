@@ -92,7 +92,8 @@ exactly that. Adding a case to one and not the other turns it red, and there is 
 second renderer to keep in step. Regenerate with:
 
 ```sh
-node -e 'import("./shared/resources/security-input-corpus.mjs")
+cd shared/resources
+node -e 'import("./security-input-corpus.mjs")
   .then((m) => process.stdout.write(m.renderCorpusTables()))'
 ```
 
@@ -278,10 +279,12 @@ import {
   corpusFor,
   allCases,
 } from "./security-input-corpus.mjs";
-// From a temp working directory, resolve against the repo instead:
-//   const { corpusFor } = await import(
-//     pathToFileURL(join(repoRoot, "shared/resources/security-input-corpus.mjs"))
-//   );
+// From a temp working directory a relative specifier cannot resolve — build an
+// absolute one, trying both directory names this file ships under:
+//   const dir = ["shared/resources", "references"]
+//     .map((d) => join(repoRoot, d, "security-input-corpus.mjs"))
+//     .find(existsSync);
+//   const { corpusFor } = await import(pathToFileURL(dir));
 
 for (const c of corpusFor("shell-exec")) {
   const actual = classify(c.input); // the entry point under test
