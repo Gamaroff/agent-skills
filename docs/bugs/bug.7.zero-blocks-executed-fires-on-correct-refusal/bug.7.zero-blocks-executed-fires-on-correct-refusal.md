@@ -4,7 +4,7 @@ title: "`zero-blocks-executed` fires on skills whose every documented command is
 type: bug
 description: "The Step 4b anti-vacuity guard reports a finding whenever no block ran, conflating an under-configured run (fixable with --bind/--copy) with a skill whose documented commands are all genuinely mutating and can never execute. Six of ten skills surveyed trip it permanently, and for two of them the finding carries no remediation at all."
 tags: [qa, qa-task, snippet-engine, false-positive, anti-vacuity]
-status: ready-for-qa
+status: closed
 severity: Minor
 priority: Medium
 related: 'none — cross-cutting (no single owner)'
@@ -16,7 +16,7 @@ component: shared/resources/qa-execute-snippets.mjs
 
 **Bug ID**: bug.7
 **Related**: None — cross-cutting (no single owner)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-09-02
@@ -272,6 +272,29 @@ deny-listed by design, which nothing can fix — as the same finding.
 5. Confirm the 5 bundled engine copies and 5 rule-doc copies carry the change (`npm run bundle` is
    idempotent; re-running must produce no diff).
 
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-09-06
+**Verified by**: develop-bug (verify cycle 1, lite mode)
+
+**Verification Result**: ✅ Fixed
+
+**Notes**:
+
+- **Regression test**: pass. All four `bug.7: …` tests green on the committed tree; the fails-without
+  property was established in Step 3 by reverting the discrimination (3 of 4 go red).
+- **Suite + lint**: pass. `npm run ci:fast` exit 0 — Prettier clean, 2510 pass / 0 fail / 1 skipped
+  across 2511 tests.
+- **Remote CI**: all five PR #331 checks green (`test`, `validate`, `link-check`, `shellcheck`, branch
+  policy) — **waited for, not assumed**. PR head `2d9e1418` matches local `HEAD`, so the green is on
+  the final commit and not on an ancestor.
+- **Code review**: not run — lite mode (Minor/Medium) runs signals 1 and 2 only, per the Step 5a
+  standard-vs-lite rule. Recorded rather than implied.
+- **The reported failure no longer reproduces**: the exact command in Reproduction Steps now returns
+  `findings: []` with one `no-executable-blocks` note and exit `0`.
+
+**Decision**: Closed (finalised in Step 7)
+
 ---
 
 ## Status History
@@ -282,15 +305,53 @@ deny-listed by design, which nothing can fix — as the same finding.
 | 2026-09-06 | New    | review-bug   | Fix-readiness review: reproduction verified in-line; report restructured to the bug template (Expected/Actual, Scope & Impact, Developer Fix Cycle, Status History, Resolution Summary added); `related` frontmatter added; `## Change Log` migrated into this table per the bug-report exclusion. Severity/priority unchanged (Minor/Medium). |
 | 2026-09-06 | In Progress | develop-bug | Reproduced on `develop`; root cause localised to the single-signal guard in `executeFile()` |
 | 2026-09-06 | Ready for QA | develop-bug | Signal split on `counts.placeholder`; 4 regression tests added and mutation-proven; prose + parity eval updated; bundled copies regenerated |
+| 2026-09-06 | Closed | develop-bug | Fix verified and accepted — DoD satisfied (`bug.7.dod.1`), PR #331 green on final commit |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1 (verify cycle 1 passed; no reopen)
+**Time to Resolution**: 4 days (filed 2026-09-02, closed 2026-09-06)
 
-**Final Status**: —
-**Total Iterations**: —
-**Time to Resolution**: —
-**Final Fix Details**: —
-**Lessons Learned**: —
+**Final Fix Details**: The Step 4b anti-vacuity guard used one condition — `blocks.length > 0 &&
+counts.runnable === 0` — to report two states as the same finding. It now discriminates on
+`counts.placeholder`: a run with unbound placeholders keeps the `zero-blocks-executed` finding (and
+now always carries the `--bind` remedy, since in that branch it always applies), while a file whose
+every block was refused as `mutating` emits an informational `no-executable-blocks` record into a new
+`notes[]` array. Nothing is suppressed — the second state is still recorded, still in the JSON, still
+printed — it is simply no longer a finding, and no longer exits `1`. Shipped in PR
+[#331](https://github.com/Gamaroff/agent-skills/pull/331) with four mutation-proved regression tests,
+the rule doc and both QA skill docs rewritten, and a parity test that now requires both skills to
+state both halves.
+
+**Lessons Learned**:
+
+1. **One signal for two states is a defect shape, not a one-off.** This is the third instance in the
+   same neighbourhood: `task.73`'s `probes: []` stood for not-a-boundary, probed-and-held and
+   probed-nothing at once, and `bug.8`'s bug status did something similar for selection. The remedy
+   is always the same — split the signal so each state can be reported as itself. Worth recognising
+   by shape rather than rediscovering: *when a reader has to infer which of two situations a single
+   value means, the value is wrong.*
+2. **Noise is a correctness problem with a delay.** The guard was never wrong about the facts — six
+   of ten skills genuinely had zero runnable blocks. It was wrong about what to *do* with that, and
+   the cost lands later, on the day a real vacuous run scrolls past with the permanent ones. "An
+   ignored check is a check that does not exist" was already written down in this repo; the guard
+   still had to be measured against ten real files before the argument landed.
+3. **Fix the exit code too, or the fix only reaches half the callers.** Splitting `findings[]` from
+   `notes[]` would have left every `&&`-chain and CI job still seeing red on a correctly-refused
+   file. A reporting split that stops at the payload is not a split.
+4. **Keep the over-correction guard in the test set, and expect it to stay green.** Test 3 passes
+   under both the fix and the mutation, which looks at first like a weak test. It is the opposite:
+   without it, "delete the guard entirely" satisfies every other test. A test set where *every* test
+   goes red under *every* mutation cannot distinguish the right fix from an over-broad one.
+5. **Don't summarise away the distinction you were asked to preserve.** The note's per-reason
+   breakdown was not in the bug's suggested fix. Without it, "all correctly refused as mutating"
+   would have hidden the fail-closed refusals that `bug.6` and `bug.10` existed to surface — the
+   reproducing file turned out to be *entirely* fail-closed. Splitting one signal into two is only
+   an improvement if the second is not itself a lossy summary.
+6. **A security criterion can pass on a mis-specified grep.** The DoD's "no new execution surface"
+   check first used a `…|exec|…` alternation and returned 7 hits — every one the substring `exec`
+   inside the word *executed*. The finding was benign; the method was not. Recorded in
+   `bug.7.dod.1` rather than quietly tightened.
