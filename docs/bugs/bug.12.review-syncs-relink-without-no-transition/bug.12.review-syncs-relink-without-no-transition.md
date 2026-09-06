@@ -202,6 +202,62 @@ cannot be added silently.
    deliberate status push) and that test G2 passes, proving it is allowlisted rather than overlooked.
 4. `npm run ci:fast` → green.
 
+### Iteration 2
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-06
+
+**Trigger**: Verify Cycle 1. The regression tests, the full fast gate and all five CI checks were
+green, but adversarial scrutiny of **the guard itself** found a defect in it. The scanner tracked
+fenced code blocks with a naive open/close toggle. This repo nests ```` fences around ``` blocks, so
+the toggle inverts on the inner fence — and in three shipped files (`create-epics-from-shards`,
+`create-parallel-stories`, `qa-story`) it never recovers, leaving an odd fence count.
+
+**Why it mattered**: after a desync, every heading in the file is either read inside a fence or
+skipped outside one. Demonstrated on `review-story` with a nested fence injected above Step 9.6:
+under the old toggle **both** the Step 9.6 and Step 10 invocations were attributed to a bash comment
+(`# … sync uses its normal current-branch resolution …`). Because the two then share one heading,
+allowlisting the deliberate push at Step 10 would have **silently allowlisted the body-only sync at
+Step 9.6** — reinstating exactly the defect bug.12 exists to prevent, behind a green tick.
+
+None of the three desynced files is allowlisted today, so no site was actually mis-attributed on
+`develop`; this was a latent hole, closed before it opened.
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-06
+
+**Root Cause**: the fence walk modelled fences as a boolean toggle rather than as CommonMark defines
+them.
+
+**Fix Description**:
+- The walk now records the **opening** fence's character and length. A closing fence must use the
+  same character, be at least as long, and carry no info string; anything else (the ```bash inside a
+  ````markdown wrapper) is content. All 596 shipped `.md` files now parse with balanced fences.
+- Extracted the per-file walk as `scanLines(lines)` so the property can be tested against a fixture
+  instead of only against the repo's current contents.
+- Added **G4**, which feeds `scanLines` a nested-fence fixture and asserts the two invocations keep
+  **distinct, correct** headings and that a bash comment never becomes one.
+
+**Files Modified**:
+- `shared/resources/tests/jira-sync-no-transition.test.mjs` — CommonMark fence semantics,
+  `scanLines` extraction, new test G4.
+
+**Testing**:
+- G4 **mutation-proved**: removing the length/info-string discrimination (so any same-char fence
+  closes) turns G4 red with "the first invocation was mis-attributed"; restoring returns 23/23.
+- The first mutation attempt was **discarded as invalid** — it broke the file's syntax (0 tests ran),
+  which proves nothing. A second attempt was also invalid: the injected fence had an *even* line
+  count, so the naive toggle recovered before the invocation and old and new logic agreed. Only the
+  third — an odd-count nested fence, the shape `qa-story` actually has — reproduced the defect.
+- Full mutation battery re-run against the changed guard: reverting the flag at each of the three
+  sites is red; a new un-flagged site is red; a stale allowlist entry is red.
+
+**Verification Steps for QA**:
+1. `node --test shared/resources/tests/jira-sync-no-transition.test.mjs` → 23/23.
+2. Change the G-scanner's fence close-condition to ignore marker length → G4 goes red.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -210,6 +266,8 @@ cannot be added silently.
 | 2026-09-06 | New | review-bug | Fix-readiness 9/10 — READY TO FIX. Corrected Recommendation item 2 (`review-task` Step 9 is not a status push; `review-story` Step 10 is the only site to protect), fixed the `review-task` evidence line ref, recorded that the defect is Jira-only. Severity/priority unchanged. |
 | 2026-09-06 | In Progress | develop-bug | Reproduced via a new parity test (red on all three sites); investigation started |
 | 2026-09-06 | Ready for QA | develop-bug | Fix implemented at all three sites + regression tests G/G2/G3; mutation-proved; ci:fast green |
+| 2026-09-06 | Reopened | develop-bug | Verify Cycle 1 — fence-tracking defect found in the guard itself; latent false-pass path |
+| 2026-09-06 | Ready for QA | develop-bug | Iteration 2 — CommonMark fence semantics + test G4; mutation-proved |
 
 ## Resolution Summary
 

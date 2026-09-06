@@ -550,19 +550,61 @@ async function shippedInvocations() {
   for (const full of files) {
     const rel = full.slice(REPO.length + 1);
     const lines = readFileSync(full, "utf8").split("\n");
+    for (const site of scanLines(lines)) sites.push({ file: rel, ...site });
+  }
+  return sites;
+}
+
+/**
+ * The per-file walk, split out so it can be fed a fixture directly (test G4).
+ * Returns `{ line, heading, command }` for each `node …sync-jira-*.js…`
+ * invocation, with the heading it sits under.
+ */
+export function scanLines(lines) {
+  const sites = [];
+  {
     let heading = "(no heading)";
-    let inFence = false;
+    // Fence state as CommonMark defines it, not as a naive toggle. Track the
+    // OPENING fence's character and length: a closing fence must use the same
+    // character, be at least as long, and carry no info string.
+    //
+    // Track fenced blocks BEFORE reading headings, because a bash comment
+    // (`# only pin if …`) is indistinguishable from an h1 by shape. The first
+    // run of this test mis-attributed review-story's Step 9.6 site to one —
+    // which would let an allowlist prefix match a site it was never meant to
+    // cover, i.e. a false pass in the exact check this performs.
+    //
+    // A plain toggle is not enough either: this repo nests ```` fences around
+    // ``` blocks, so a toggle inverts partway through such a file and, in three
+    // files, never recovers — after which EVERY heading is either read inside a
+    // fence or skipped outside one. None of those three files is allowlisted
+    // today, so no site is currently mis-attributed; this closes the hole before
+    // one is, since the symptom is silent.
+    let fenceChar = null;
+    let fenceLen = 0;
     for (let i = 0; i < lines.length; i++) {
-      // Track fenced blocks BEFORE reading headings. A bash comment
-      // (`# only pin if …`) is indistinguishable from an h1 by shape, and the
-      // very first run of this test mis-attributed review-story's Step 9.6 site
-      // to one — which would let an allowlist prefix match a site it was never
-      // meant to cover, i.e. a false pass in the exact check this performs.
-      if (/^\s*(```|~~~)/.test(lines[i])) {
-        inFence = !inFence;
+      const f = /^\s{0,3}(`{3,}|~{3,})(.*)$/.exec(lines[i]);
+      if (f) {
+        const [, marker, info] = f;
+        if (fenceChar === null) {
+          // An opening fence may carry an info string (```bash, ````markdown).
+          fenceChar = marker[0];
+          fenceLen = marker.length;
+          continue;
+        }
+        if (
+          marker[0] === fenceChar &&
+          marker.length >= fenceLen &&
+          info.trim() === ""
+        ) {
+          fenceChar = null;
+          fenceLen = 0;
+        }
+        // Same char but shorter, or carrying an info string, is CONTENT of the
+        // open block (the ```bash inside a ````markdown wrapper) — not a close.
         continue;
       }
-      if (!inFence) {
+      if (fenceChar === null) {
         const h = /^#{1,6}\s+(.*)/.exec(lines[i]);
         if (h) heading = h[1].trim();
       }
@@ -582,7 +624,7 @@ async function shippedInvocations() {
       // only an actual `node` command line is an invocation.
       if (!/\bnode\b/.test(command)) continue;
 
-      sites.push({ file: rel, line: start + 1, heading, command });
+      sites.push({ line: start + 1, heading, command });
       i = end;
     }
   }
@@ -673,4 +715,60 @@ test("G3: the three bug.12 call sites are covered by name", async () => {
         `ladder has moved the card (bug.12).`,
     );
   }
+});
+
+// G4 — the scanner's heading attribution survives nested fences.
+//
+// G/G2/G3 all rest on one assumption: that an invocation is attributed to the
+// heading it actually sits under. Break that and the guard does not fail — it
+// quietly allowlists the wrong thing, which is the failure mode it exists to
+// prevent, wearing a green tick.
+//
+// The concrete hazard is real in this repo: markdown nests ```` fences around
+// ``` blocks, and a naive open/close toggle inverts on the inner fence. Three
+// shipped files carry an odd fence count for exactly this reason. Under a
+// toggle, the fixture below attributes BOTH invocations to the bash comment
+// `# not a heading` — so the two sites collapse onto one heading, and
+// allowlisting the deliberate push would silently allowlist the body-only sync
+// beside it.
+test("G4: nested ```` fences do not corrupt heading attribution", () => {
+  const fixture = [
+    "## Step 1: Body Only",
+    "",
+    "````markdown", // opens a level-4 fence
+    "```bash", // CONTENT of it — shorter and carries an info string
+    "# not a heading",
+    "````", // closes the level-4 fence
+    "",
+    "```bash",
+    'node .agents/skills/sync-jira-task/scripts/sync-jira-task.js --file "$F" --no-transition',
+    "```",
+    "",
+    "## Step 2: Deliberate Push",
+    "",
+    "```bash",
+    'node .agents/skills/sync-jira-task/scripts/sync-jira-task.js --file "$F"',
+    "```",
+  ];
+
+  const sites = scanLines(fixture);
+  assert.equal(sites.length, 2, "both invocations should be found");
+  assert.equal(
+    sites[0].heading,
+    "Step 1: Body Only",
+    "the first invocation was mis-attributed — the nested ```` fence desynced " +
+      "the walk, so a heading-keyed allowlist would match the wrong site",
+  );
+  assert.equal(
+    sites[1].heading,
+    "Step 2: Deliberate Push",
+    "the second invocation was mis-attributed",
+  );
+  // The distinctness is the point: a toggle collapses both onto one heading.
+  assert.notEqual(sites[0].heading, sites[1].heading);
+  // And the bash comment inside the fence must never become a heading.
+  assert.ok(
+    !sites.some((s) => s.heading.includes("not a heading")),
+    "a bash comment inside a fence was read as a markdown heading",
+  );
 });
