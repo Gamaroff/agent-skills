@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-06'
@@ -11,7 +11,7 @@ description: "finalise Step 7 transitions the card to Done and then re-runs sync
 
 **Bug ID**: bug.11
 **Related**: none — cross-cutting (finalise Step 7 · `sync-jira-*` status drive)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-06
@@ -443,6 +443,36 @@ The remaining findings are all in the **prose written by the previous two cycles
 3. Read `skills/finalise/SKILL.md` Step 7 blocks 3–4 end to end: no two statements about the same
    scenario may disagree, and no protective effect may be claimed for the block ordering.
 
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-09-06
+**Verified by**: develop-bug (Verify Cycle 4)
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: All three signals green.
+
+1. **Regression test** — 19/19 pass. Every behaviour mutation-proven across the run: deleting the
+   gate fails A/C/C2 (reproduced independently by the round-3 reviewer via an in-memory module
+   mutation); dropping `transition-suppressed` from the zero-exit list fails B; reusing the colliding
+   `no-transition` name fails A/B/B2; unwiring any one call site fails E; hardcoding
+   `noTransition: false` fails E; un-qualifying a doc absolute fails F.
+2. **Suite + format** — `npm run ci:fast` exit 0, 2502 tests, zero failures, `prettier --check` clean.
+3. **Code review** — three rounds. Rounds 1–3 returned 6, 3 and 4 findings respectively; all are
+   fixed or, in CR-1's case, filed as [`bug.12`](../bug.12.review-syncs-relink-without-no-transition/bug.12.review-syncs-relink-without-no-transition.md).
+   Round 3 confirmed the gate and its tests settled. Cycle 4's remaining check was a direct read of
+   the two prose blocks cycle 3 rewrote: `finalise` Step 7 blocks 3 and 4 now name the same two
+   reachable causes, both exclude the pre-flag sync, and both identify block 4 as the safeguard — no
+   contradiction remains.
+
+Final state verified: four call sites forward the flag (two of them in `sync-jira-epic`), `finalise`
+passes it, all three `SKILL.md` files document it, and the bundled `references/` copies carry the gate.
+
+The reported failure no longer reproduces: a re-link run with `--no-transition` issues no status
+request at all, so it cannot move the card off the status the ladder set.
+
+**Decision**: Closed (finalised in Step 7)
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -457,10 +487,56 @@ The remaining findings are all in the **prose written by the previous two cycles
 | 2026-09-06 | Ready for QA | develop-bug | Cycle 2 fixes: gate-sensitive fixture + C0 control, reachable ordering rationale, three doc absolutes qualified. Gate deletion now fails A/C/C2. |
 | 2026-09-06 | Reopened | develop-bug | Verify Cycle 3 FAIL — NEW-1 confirmed fixed; 4 findings remained, all in the prose the prior cycles wrote (one rationale outright backwards). |
 | 2026-09-06 | Ready for QA | develop-bug | Cycle 3 fixes: protective claim dropped rather than re-worded, block-4 intro reconciled, runtime string branched, doc-invariant test F added and mutation-proven. |
+| 2026-09-06 | Ready for QA | develop-bug | Verify Cycle 4 PASS — all three signals green; bug scenario gone. |
+| 2026-09-06 | Closed | develop-bug | Fix verified and accepted. DoD satisfied, CI green on the final commit (PR #329). |
 
 ## Resolution Summary
 
-_Not yet resolved._
+**Final Status**: Closed — Fixed
+**Total Iterations**: 4
+**Time to Resolution**: same day (filed and closed 2026-09-06)
+**PR**: [#329](https://github.com/Gamaroff/agent-skills/pull/329) → `develop`
+**DoD**: [`bug.11.dod.1.finalise-relink-regresses-terminal-status.md`](./bug.11.dod.1.finalise-relink-regresses-terminal-status.md) — satisfied
+
+**Final Fix Details**: `sync-jira-*` had no way to be status-neutral — `syncDocumentStatus` drove the
+issue's status whenever frontmatter carried a `status:` — so finalise's Document-link re-point was
+unavoidably a *second* status resolver running after the `tracker-workflow.yaml` ladder had already
+decided. On a consumer mapping `accepted` to a non-terminal column, it walked the card back out of the
+terminal status and stranded its resolution. A `noTransition` opt-out now sits **inside**
+`syncDocumentStatus`, returning before any HTTP with `reason: "transition-suppressed"`; it is exposed
+as `--no-transition` on all three sync CLIs, forwarded at all four call sites, and passed by finalise
+Step 7. PR #326 had already shipped the documentation half of the recommendation; this is the durable
+half, and it removes the second resolver from the path rather than correcting after the fact.
+
+**Lessons Learned**:
+
+1. **Put the gate where the guarantee is, not where the callers are.** Four call sites across three
+   scripts meant a per-caller check would only ever be as strong as the least-updated one — and that
+   was not hypothetical: `sync-jira-epic`'s no-field-changes path was missed on the first pass while
+   every behavioural test still passed. Gating inside the shared function made the invariant hold for
+   every caller *and* made it assertable as "no HTTP request was issued".
+2. **Check whether a `reason` string is already taken before adding one.** `no-transition` already
+   meant the *opposite* thing in the same module — the board offers no matching transition, a genuine
+   skip. Reusing it and adding it to `summariseStatusOutcome`'s zero-exit list would have silently
+   stopped every real skip from failing under `--fail-on-status-skip`. Caught before commit; test B2
+   now pins the two apart.
+3. **A test's fixture is as load-bearing as its plumbing.** Test C was rewritten to run end-to-end and
+   still could not detect the gate being deleted, because its fixture (`currentStatus: "Done"` against
+   `localStatus: "accepted"`) made the un-gated path short-circuit on `already`. Two review rounds were
+   needed to see it. The fix was a **control test** (C0) asserting the same call un-gated *does*
+   transition — without a control, "nothing happened" is the default outcome and proves nothing.
+4. **Verify a mutation proves what you claim it proves.** The iteration-2 record said the tautology was
+   corrected, on the strength of a mutation that only changed the gate's *return shape*. Gate
+   *deletion* — the mutation that matters — still passed. A mutation proof is only as good as the
+   mutation chosen.
+5. **A doc sweep for an absolute must include runtime strings.** "The status transition still runs" was
+   stated as an unconditional in five places; the first sweep missed one, the second missed the one
+   that prints to a user. Test **F** now enforces that every such claim carries its qualification,
+   because this class is invisible to every behavioural test.
+6. **Prose written to correct prose needs the same review.** Cycles 1–3 each found defects introduced
+   by the previous cycle's corrections, including one rationale that was outright backwards. The
+   ordering block ended up asserting *nothing* protective, which was the accurate answer all along.
+
 
 ## Related
 
