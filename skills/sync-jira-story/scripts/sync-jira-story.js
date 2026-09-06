@@ -917,7 +917,10 @@ async function run({
     if (skippedNoChanges) {
       changeSummary = "Sync (no field changes detected)";
       output.info(
-        `\nℹ️  No field changes vs Jira — skipping PUT, write-back, and changelog entry. Status transition still runs if frontmatter status differs.`,
+        `\nℹ️  No field changes vs Jira — skipping PUT, write-back, and changelog entry.` +
+          (args.noTransition
+            ? " Status transition suppressed by --no-transition."
+            : " Status transition still runs if frontmatter status differs."),
       );
       result = {
         issueKey: existingJiraKey,

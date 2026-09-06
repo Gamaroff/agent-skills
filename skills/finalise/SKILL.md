@@ -1110,15 +1110,21 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    > `--no-transition` (step 3), so it carries no status decision at all and the ladder is the single
    > resolver by construction rather than by sequencing.
    >
-   > **Keep the order anyway.** It is now belt-and-braces rather than the guarantee. The case it still
-   > protects is a consumer running a **finalise copy older than this one** — whose step 3 therefore
-   > omits `--no-transition` — against a current `sync-jira-*`. There the sync does resolve status,
-   > and ladder-first is what keeps the ladder's decision the one that stands.
+   > **Keep the order anyway — but as convention, not as a safeguard.** Nothing about ladder-first
+   > *protects* anything once step 3 is status-neutral, and it is worth being exact about why, because
+   > two plausible-sounding justifications are both wrong:
    >
-   > It is *not* protecting the reverse pairing, a consumer pinned to a pre-flag `sync-jira-*`: that
-   > sync rejects `--no-transition` with `Unknown option` and exits before resolving anything, so its
-   > re-link never runs in either order (see the note at the end of block 4). Do not reverse these
-   > two blocks.
+   > - *"It protects a consumer on a pre-flag `sync-jira-*`."* No: that sync rejects
+   >   `--no-transition` with `Unknown option` and exits before resolving anything, so its re-link
+   >   never runs, in either order.
+   > - *"It protects a consumer on an older **finalise** whose step 3 omits the flag."* Also no — and
+   >   this one is backwards. In that pairing the sync runs **second** with status resolution live, so
+   >   it writes **last** and can walk the card straight off the ladder's target. That is the RAPP-715
+   >   sequence recorded above, not a case ordering prevents.
+   >
+   > **What actually protects the close is block 4** — reading the status back and re-asserting it.
+   > Keep the order because reversing it buys nothing and would need re-arguing; rely on block 4.
+   > Do not reverse these two blocks.
    >
    > ⚠️ **The sync does not no-op — it is made status-neutral, and that is why step 3 passes
    > `--no-transition`.** This block used to claim the sync no-ops on its own — *"the sync's own
@@ -1219,9 +1225,11 @@ EOF
 
    4. **Confirm the terminal status — still MANDATORY, and read it back rather than assuming.** With
       `--no-transition` in step 3 the re-link no longer moves the card, so this is now a confirmation
-      rather than a repair of expected damage. Keep it: it is one cheap read, it still catches a
-      consumer pinned to an older `sync-jira-*` that predates the flag, and step 1's own `204` is a
-      statement about step 1, not about the state the step ends in. Check, and repair if needed:
+      rather than a repair of expected damage. **Keep it — this block is what actually protects the
+      close.** It is one cheap read; it catches an older *finalise* copy whose step 3 omits the flag
+      (the sync then runs second and can undo step 1), and anything outside this step that moved the
+      card; and step 1's own `204` is a statement about step 1, not about the state the step ends in.
+      Check, and repair if needed:
 
    ```bash
    POST_SYNC=$(curl -s -u "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" -H "Accept: application/json" \

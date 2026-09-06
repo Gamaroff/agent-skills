@@ -379,6 +379,70 @@ the cycle-1 *corrections*, which makes this the more important iteration of the 
 4. Read `skills/finalise/SKILL.md` Step 7 blocks 3–4: the ordering rationale and the block-4 causes
    must name the same reachable case and agree about `Unknown option`.
 
+### Iteration 4
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-06
+
+**Trigger**: Verify Cycle 3. The round-3 reviewer independently confirmed NEW-1 fixed by an
+**in-memory gate-deletion experiment** — loading `jira-sync.js` into a fresh module, string-deleting
+the `if (noTransition) …` block, and re-executing the test bodies against it: A, C and C2 all fail,
+while C0 (the control) passes under both, which is exactly what a control should do. The gate and its
+tests are settled from here.
+
+The remaining findings are all in the **prose written by the previous two cycles**:
+
+- **R3-2 (the substantive one)** — the replacement rationale from Iteration 3 is **backwards**. It
+  claimed that for an older-*finalise*-against-current-sync pairing, "ladder-first is what keeps the
+  ladder's decision the one that stands". In that pairing the sync runs **second** with status
+  resolution live, so it writes **last** and can walk the card straight off the ladder's target —
+  which is the RAPP-715 sequence recorded 15 lines above in the same block. NEW-2 replaced an
+  unreachable rationale with an incorrect one.
+- **R3-1** — block 4's *intro* still cited the unreachable pre-flag-sync case, contradicting the
+  bullet rewritten in the same commit 14 lines below it.
+- **R3-3** — the sweep for the "status transition still runs" absolute was **docs-only**; it missed
+  the one occurrence that reaches a user at runtime, `sync-jira-story.js:920`, which printed the
+  claim unconditionally including on a `--no-transition` run.
+- **R3-4** — the older-finalise scenario's reachability was asserted rather than established
+  (`setup-consumer.sh` installs the skill set as one tarball, so skew needs a hand-copied install).
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-06
+
+**Fix Description**:
+
+- **R3-2 + R3-4** — the protective claim is **dropped**, not re-worded. The ordering block now says
+  plainly that ladder-first protects nothing once step 3 is status-neutral, and names *both*
+  plausible-sounding justifications as wrong, with the reason for each — the pre-flag sync never runs
+  (`Unknown option`), and the older-finalise pairing is backwards because the sync writes last. It
+  states what actually protects the close: **block 4's read-back**. The order is kept as convention.
+- **R3-1** — block 4's intro rewritten to name the same causes its own bullet names.
+- **R3-3** — the runtime message now branches on `args.noTransition` and says
+  "Status transition suppressed by `--no-transition`" on a suppressed run. Confirmed `args` is in
+  scope (declared `sync-jira-story.js:647`, inside `run` at `:642`) and the other two CLIs carry no
+  equivalent string.
+- **Added test F** — a documentation invariant asserting every "status transition still runs" claim
+  in the three sync skills' prose *and* runtime strings is qualified. This class of miss has now
+  recurred twice (NEW-3, then R3-3), and it is invisible to every behavioural test, so it gets a
+  guard rather than a third sweep. **The test caught two hits on its first run** — both false
+  positives from a forward-only 3-line window, since a ternary names the flag on the line *above* its
+  else-arm; the window now looks both ways.
+
+**Testing**:
+
+- 19 tests pass (was 18; F added).
+- **Mutation-proven**: un-qualifying one doc absolute → **F fails**.
+- Gate deletion → A, C, C2 fail (independently reproduced by the reviewer).
+
+**Verification Steps for QA**:
+
+1. `command node --test shared/resources/tests/jira-sync-no-transition.test.mjs` → 19/19.
+2. Remove "unless `--no-transition` is passed" from any of the three SKILL.md files → **F goes red**.
+3. Read `skills/finalise/SKILL.md` Step 7 blocks 3–4 end to end: no two statements about the same
+   scenario may disagree, and no protective effect may be claimed for the block ordering.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -391,6 +455,8 @@ the cycle-1 *corrections*, which makes this the more important iteration of the 
 | 2026-09-06 | Ready for QA | develop-bug | Cycle 1 fixes applied: flag documented, contradictory prose corrected, tautological test C rewritten end-to-end, structural check hardened. CR-1 filed as bug.12. |
 | 2026-09-06 | Reopened | develop-bug | Verify Cycle 2 FAIL — CR-5 only partially fixed (overclaimed) plus 2 new findings, all in the cycle-1 corrections. |
 | 2026-09-06 | Ready for QA | develop-bug | Cycle 2 fixes: gate-sensitive fixture + C0 control, reachable ordering rationale, three doc absolutes qualified. Gate deletion now fails A/C/C2. |
+| 2026-09-06 | Reopened | develop-bug | Verify Cycle 3 FAIL — NEW-1 confirmed fixed; 4 findings remained, all in the prose the prior cycles wrote (one rationale outright backwards). |
+| 2026-09-06 | Ready for QA | develop-bug | Cycle 3 fixes: protective claim dropped rather than re-worded, block-4 intro reconciled, runtime string branched, doc-invariant test F added and mutation-proven. |
 
 ## Resolution Summary
 

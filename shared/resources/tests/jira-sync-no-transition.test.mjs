@@ -414,3 +414,55 @@ test("E2: sync-jira-epic has both of its call sites covered", () => {
       "sites (the normal path and the no-field-changes skip path)",
   );
 });
+
+// ---------------------------------------------------------------------------
+// F — no shipped text still claims the transition ALWAYS runs
+// ---------------------------------------------------------------------------
+//
+// A documentation invariant, and the right tool for a documentation defect.
+// "The status transition still runs" was true, and stated as an unconditional,
+// in five places across the sync skills' prose, step lists and runtime output.
+// `--no-transition` falsified all five at once. The sweep for them missed one on
+// the first pass and a different one on the second — a doc-level absolute is
+// exactly the kind of claim that is cheap to write, invisible to every
+// behavioural test, and wrong the moment an opt-out exists.
+//
+// This asserts the qualification travels with the claim, wherever the claim is.
+
+test("F: every 'status transition still runs' claim is qualified", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { globSync } = await import("node:fs");
+
+  const files = [
+    "skills/sync-jira-task/SKILL.md",
+    "skills/sync-jira-story/SKILL.md",
+    "skills/sync-jira-epic/SKILL.md",
+    "skills/sync-jira-task/scripts/sync-jira-task.js",
+    "skills/sync-jira-story/scripts/sync-jira-story.js",
+    "skills/sync-jira-epic/scripts/sync-jira-epic.js",
+  ];
+
+  const unqualified = [];
+  for (const rel of files) {
+    const lines = readFileSync(join(REPO, rel), "utf8").split("\n");
+    lines.forEach((line, i) => {
+      if (!/status transitions?\s+(still\s+)?runs?/i.test(line)) return;
+      // Qualified if the exemption is named anywhere in the surrounding few
+      // lines. The window looks BOTH ways and is deliberately generous: a
+      // ternary names the flag on the branch line above its else-arm, and a
+      // prose comment can carry the caveat a paragraph below the claim. A
+      // forward-only 3-line window flagged both as violations on first run.
+      const window = lines.slice(Math.max(0, i - 6), i + 8).join(" ");
+      if (/--no-transition|noTransition/.test(window)) return;
+      unqualified.push(`${rel}:${i + 1}: ${line.trim()}`);
+    });
+  }
+
+  assert.deepEqual(
+    unqualified,
+    [],
+    "these still assert the transition always runs, which --no-transition " +
+      "falsifies:\n  " +
+      unqualified.join("\n  "),
+  );
+});
