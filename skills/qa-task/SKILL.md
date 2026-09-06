@@ -497,11 +497,24 @@ an empty tree. Execution always happens in that temp copy — never the live tre
 An execution failure is eligible for gate `top_issues[]` under `code_review_blocking` exactly like any
 other `category: bug` finding. No new report or gate schema.
 
-> **A run where zero blocks executed is a finding, not a pass.** The engine raises
-> `zero-blocks-executed` for you; do not suppress it. An over-broad classification that skips everything
-> is the silent-skip shape this step was built to eliminate, and it would be easy to reintroduce here.
+> **A run where zero blocks executed is never a pass — but it is two states, and the engine tells them
+> apart for you.** Report whichever it emits; do not suppress either, and do not convert one into the
+> other to quiet the report.
 >
-> `zsh` being absent is **not** that case — it never reduces the runnable count. Record it as
+> - **`zero-blocks-executed`** (finding, `medium`) — fired when `placeholder > 0`. The run was
+>   under-configured; `--bind` / `--copy` is the fix and the detail says so.
+> - **`no-executable-blocks`** (information, in `notes[]`, exit `0`) — fired when `placeholder === 0`
+>   and every block was refused as `mutating`. This file documents `gh` / `curl` / `rm` / write
+>   redirections because that is what the skill *does*, and those are deny-listed by design. **No
+>   configuration will ever make them runnable**, so there is nothing to act on. Record it and continue.
+>
+> An over-broad classification that skips everything is the silent-skip shape this step was built to
+> eliminate, and it would be easy to reintroduce here — which is why the second case is still
+> **recorded**, with a per-reason refusal breakdown, rather than dropped. Equally, reporting it as a
+> finding is how the check became noise on six of ten skills surveyed: an ignored check is a check that
+> does not exist (`bug.7`).
+>
+> `zsh` being absent is **not** either case — it never reduces the runnable count. Record it as
 > information and continue.
 
 **Lite mode**: the step still runs, but only over blocks in the changed file.

@@ -1260,6 +1260,10 @@ export function executeFile(filePath, opts = {}) {
 
   const results = [];
   const findings = [];
+  // Informational records: things the reader must be told but cannot act on.
+  // Kept separate from `findings` so they never gate and never accumulate as
+  // noise, and separate from silence so the step is never a no-op nobody sees.
+  const notes = [];
 
   try {
     mkdirSync(tmp, { recursive: true });
@@ -1293,27 +1297,67 @@ export function executeFile(filePath, opts = {}) {
   const counts = { runnable: 0, placeholder: 0, mutating: 0 };
   for (const r of results) counts[r.klass]++;
 
-  // A run where zero blocks executed is itself a finding — this is the rule's
-  // own failure mode, and it is exactly the silent skip the step exists to stop.
-  // zsh being absent never reduces the runnable count, so the guard cannot trip it.
+  // A run where zero blocks executed must never look like a pass — this is the
+  // rule's own failure mode, and it is exactly the silent skip the step exists to
+  // stop. zsh being absent never reduces the runnable count, so neither branch
+  // below can be tripped by a missing interpreter.
+  //
+  // But "nothing ran" is TWO states, and reporting them as one is what made this
+  // guard noise (bug.7). Discriminate on `counts.placeholder`:
+  //
+  //   placeholder > 0  → the run was UNDER-CONFIGURED. `--bind` / `--copy` fixes
+  //                      it. Actionable, so it stays a finding.
+  //   placeholder == 0 → every block was refused as `mutating`. The file documents
+  //                      side-effecting commands (`gh`, `curl`, `rm`, write
+  //                      redirections) that are deny-listed BY DESIGN — a QA gate
+  //                      does not make network calls. No configuration will ever
+  //                      move them into `runnable`, so there is nothing to act on.
+  //                      Recorded as information, not as a finding.
+  //
+  // Six of ten skills surveyed sat permanently in the second state, three of them
+  // receiving a finding whose remediation hint was suppressed precisely because it
+  // did not apply. A finding that fires on most of the library with no available
+  // fix is one reviewers learn to scroll past — an ignored check is a check that
+  // does not exist.
   if (blocks.length > 0 && counts.runnable === 0) {
-    // `medium`, deliberately. This is a statement about COVERAGE — the gate did
-    // nothing here — not a defect in the work item, and `high` + `category: bug`
-    // is what makes a finding gate-blocking. A skill whose snippets all read
-    // caller variables would otherwise block its own PR for needing bindings the
-    // run did not supply, which is the "noise trains reviewers to ignore it"
-    // failure the rule warns about. It is still reported, which is what "a
-    // finding, not a pass" requires.
-    findings.push({
-      kind: "zero-blocks-executed",
-      confidence: "medium",
-      detail:
-        `${blocks.length} bash block(s) found, none classified runnable ` +
-        `(${counts.placeholder} placeholder, ${counts.mutating} mutating)` +
-        (counts.placeholder > 0
-          ? " — supply the missing values with --bind to execute the placeholder blocks"
-          : ""),
-    });
+    if (counts.placeholder > 0) {
+      // `medium`, deliberately. This is a statement about COVERAGE — the gate did
+      // nothing here — not a defect in the work item, and `high` + `category: bug`
+      // is what makes a finding gate-blocking. A skill whose snippets all read
+      // caller variables would otherwise block its own PR for needing bindings the
+      // run did not supply, which is the "noise trains reviewers to ignore it"
+      // failure the rule warns about. It is still reported, which is what "a
+      // finding, not a pass" requires.
+      findings.push({
+        kind: "zero-blocks-executed",
+        confidence: "medium",
+        detail:
+          `${blocks.length} bash block(s) found, none classified runnable ` +
+          `(${counts.placeholder} placeholder, ${counts.mutating} mutating)` +
+          " — supply the missing values with --bind to execute the placeholder blocks",
+      });
+    } else {
+      // The refusal reasons are carried verbatim rather than summarised away. An
+      // `unrecognised-command (fail-closed)` refusal is not the same thing as a
+      // deny-listed one: the first may be an over-refusal the classifier should
+      // learn (bug.6, bug.10), and collapsing both into "correctly refused" is how
+      // that would stop being visible.
+      const byReason = new Map();
+      for (const r of results) {
+        byReason.set(r.reason, (byReason.get(r.reason) ?? 0) + 1);
+      }
+      const breakdown = [...byReason]
+        .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+        .map(([reason, n]) => `${reason} \u00d7${n}`)
+        .join(", ");
+      notes.push({
+        kind: "no-executable-blocks",
+        detail:
+          `${blocks.length} bash block(s), all correctly refused as mutating ` +
+          `(0 placeholder) — this file documents side-effecting commands and the ` +
+          `snippet step cannot execute it. Refusals: ${breakdown}`,
+      });
+    }
   }
 
   return {
@@ -1326,6 +1370,7 @@ export function executeFile(filePath, opts = {}) {
     counts,
     results,
     findings,
+    notes,
   };
 }
 
@@ -1414,6 +1459,13 @@ function render(report) {
   lines.push("");
   for (const r of report.results.filter((x) => x.skipped)) {
     lines.push(`  SKIP  line ${r.line}  ${r.klass} — ${r.reason}`);
+  }
+  // Notes print BEFORE the findings verdict. "No findings." is true and must stay
+  // sayable, but a reader who sees only that line cannot tell a file the step
+  // fully covered from one it could not execute at all — which is the whole point
+  // of splitting the signal.
+  for (const n of report.notes ?? []) {
+    lines.push("", `  INFO  ${n.kind}  ${n.detail}`);
   }
   if (report.findings.length === 0) {
     lines.push("", "  No findings.");

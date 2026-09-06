@@ -1074,6 +1074,130 @@ test("zero runnable blocks in a file that HAS blocks is itself a finding", () =>
   rmSync(dir, { recursive: true, force: true });
 });
 
+// ── bug.7: "nothing ran" is two states, and only one of them is actionable ────
+//
+// The guard above used to fire on BOTH, so six of ten skills surveyed carried a
+// permanent finding they could never clear — three of them without even the
+// `--bind` hint, because the hint is suppressed when there is no placeholder to
+// bind. These four tests pin the split. Revert the discrimination in
+// `executeFile` and the first, third and fourth go red.
+
+test("bug.7: all-mutating with zero placeholders is information, not a finding", () => {
+  const dir = tmp();
+  const file = join(dir, "SKILL.md");
+  // Every block is refused, and NONE is a placeholder — the case-B shape. No
+  // --bind, --copy or any other configuration can move these into `runnable`,
+  // so there is nothing for a reader to act on.
+  writeFileSync(
+    file,
+    md(bash("gh pr comment 1 --body x"), bash("rm -rf /tmp/whatever")),
+  );
+
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(report.counts.runnable, 0);
+  assert.equal(report.counts.placeholder, 0);
+  assert.equal(report.counts.mutating, 2);
+
+  assert.equal(
+    report.findings.find((x) => x.kind === "zero-blocks-executed"),
+    undefined,
+    "a file whose every block is correctly refused must not carry a finding it " +
+      "can never clear — that is the noise bug.7 reported",
+  );
+
+  const note = report.notes.find((x) => x.kind === "no-executable-blocks");
+  assert.ok(
+    note,
+    "it must still be RECORDED — silence here would be the silent no-op the " +
+      "step exists to prevent, which is the opposite over-correction",
+  );
+  assert.match(note.detail, /2 bash block\(s\)/);
+  assert.match(note.detail, /refused as mutating/);
+});
+
+test("bug.7: the informational record names each refusal reason and its count", () => {
+  const dir = tmp();
+  const file = join(dir, "SKILL.md");
+  // Two refusals of the SAME reason plus one of another. An `unrecognised-command
+  // (fail-closed)` refusal is not the same thing as a deny-listed one — the first
+  // may be an over-refusal the classifier should learn (bug.6, bug.10). Summing
+  // them into "all correctly refused" is how that would stop being visible.
+  writeFileSync(
+    file,
+    md(bash("gh pr view 1"), bash("gh pr view 2"), bash("gh issue list")),
+  );
+
+  const report = executeFile(file, { allowZsh: false });
+  const note = report.notes.find((x) => x.kind === "no-executable-blocks");
+  assert.ok(note);
+  assert.match(
+    note.detail,
+    /Refusals:/,
+    "the breakdown is what lets a reader tell a deny-list refusal from a " +
+      "fail-closed one",
+  );
+  assert.match(
+    note.detail,
+    /fail-closed\) \u00d72/,
+    "the repeated reason must carry its count",
+  );
+  // Both refusal kinds are present and stay distinguishable: `gh pr view` is
+  // unrecognised (fail-closed), `gh issue` is on the deny-list. Collapsing them
+  // is the thing this breakdown exists to prevent.
+  assert.match(note.detail, /deny-list/);
+  assert.match(note.detail, /fail-closed/);
+});
+
+test("bug.7: a placeholder present keeps it a finding, with the --bind remedy", () => {
+  const dir = tmp();
+  const file = join(dir, "SKILL.md");
+  // The case-A shape: one refused block AND one unbound placeholder. This run WAS
+  // under-configured, `--bind` is the fix, and it must stay a finding. Without
+  // this the fix could be "delete the guard", which passes the test above.
+  writeFileSync(file, md(bash("rm -rf /tmp/whatever"), bash("echo {id}")));
+
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(report.counts.runnable, 0);
+  assert.ok(report.counts.placeholder > 0);
+
+  const f = report.findings.find((x) => x.kind === "zero-blocks-executed");
+  assert.ok(f, "an under-configured run is still a finding");
+  assert.equal(f.confidence, "medium");
+  assert.match(
+    f.detail,
+    /--bind/,
+    "the remedy must be stated — this is the branch where one exists",
+  );
+
+  assert.equal(
+    report.notes.find((x) => x.kind === "no-executable-blocks"),
+    undefined,
+    "the two records are alternatives, never both",
+  );
+});
+
+test("bug.7: the split reaches the exit code — refused-only is clean, unbound is not", () => {
+  const dir = tmp();
+  const refusedOnly = join(dir, "refused.md");
+  const underConfigured = join(dir, "unbound.md");
+  writeFileSync(refusedOnly, bash("gh pr comment 1 --body x"));
+  writeFileSync(underConfigured, bash("echo {id}"));
+
+  // Exit status is what a CI job and a shell `&&` chain actually read. Splitting
+  // the report but leaving both at exit 1 would leave the noise exactly where it
+  // was for every non-JSON caller.
+  assert.equal(
+    main(["--file", refusedOnly, "--no-zsh"]).exitCode,
+    0,
+    "a file the step correctly cannot execute is not a failure",
+  );
+  assert.equal(
+    main(["--file", underConfigured, "--no-zsh"]).exitCode,
+    1,
+    "an under-configured run still exits non-zero",
+  );
+});
+
 test("a file with no bash blocks raises nothing — the step is cheap where it does not apply", () => {
   const dir = tmp();
   const file = join(dir, "SKILL.md");
