@@ -20,6 +20,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { allCases } from "../../../shared/resources/security-input-corpus.mjs";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
 
@@ -137,6 +139,46 @@ test("probe mode names every candidate axis that defeats boundaries in practice"
       `${PROMPT}: candidate axis "${axis}" is gone — each one corresponds to a real task-67 escape`,
     );
   }
+});
+
+test("probe mode sources its candidates from the shared corpus", () => {
+  assert.ok(
+    has(source(), "security-input-corpus.md"),
+    `${PROMPT}: the prompt no longer points at shared/resources/security-input-corpus.md — ` +
+      `without it the agent re-derives a candidate set from prose on every run, which is what ` +
+      `made two runs of the same probe reach different verdicts`,
+  );
+  assert.ok(
+    has(source(), "security-input-corpus.mjs"),
+    `${PROMPT}: the machine-readable peer is no longer named, so there is nothing to import`,
+  );
+  assert.ok(
+    has(source(), "corpusFor("),
+    `${PROMPT}: the corpus accessor is gone — naming the file without naming the call leaves ` +
+      `the agent to guess how to read it`,
+  );
+});
+
+/**
+ * The non-restatement guard — the same shape qa-re-review-scope-parity.test.mjs applies to the
+ * scoping rule, and the reason Phase 4 of task.79 was not optional.
+ *
+ * It reads the corpus rather than a hand-written list of literals, so a case added to the corpus is
+ * covered the moment it lands. Short inputs (`'`, `--`, `%`) are excluded: they are ordinary
+ * punctuation and would fire on prose that is not restating anything.
+ */
+test("probe mode does not restate the corpus's inputs", () => {
+  const flatSource = flat(source());
+  const restated = allCases()
+    .filter((c) => c.input.length >= 8)
+    .filter((c) => flatSource.includes(flat(c.input)));
+  assert.deepEqual(
+    restated.map((c) => c.id),
+    [],
+    `${PROMPT} restates corpus inputs verbatim: ${restated.map((c) => c.id).join(", ")}. ` +
+      `Two copies drift, and the copy an agent reads is the one in front of it — task.74 found a ` +
+      `third stale copy of a scoping rule at its own DoD gate. Reference the corpus; do not quote it.`,
+  );
 });
 
 test("probe mode asserts the accept direction too, so an over-strict fix is caught", () => {
