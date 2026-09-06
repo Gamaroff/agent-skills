@@ -29,7 +29,7 @@ One-way sync of a local story markdown file to Jira. Auto-detects create vs upda
 - **Bullet/ordered lists** — body sections containing `- item` or `1. item` lines render as proper ADF lists, not paragraphs with hard-breaks.
 - **Current-branch Bitbucket URLs** — links use the current branch's remote-tracking branch (e.g. `origin/feature/...`), falling back to the default branch (`origin/HEAD`, e.g. `main`) when there is no upstream or HEAD is detached. Since feature branches are deleted post-merge, `review-story` pins the link to the durable branch (`develop`, when the story file already exists there) whenever it re-syncs, and `finalise` re-points it at acceptance (both via `--doc-branch`; finalise adds `--no-transition` so its re-point is link-only and cannot move the card); you can also re-sync manually from `develop`/`main` after merge.
 - **HTTP retry** — automatic retry with exponential backoff on 5xx, network errors, and 429 (Retry-After honoured, capped at 60s). Other 4xx responses fail fast.
-- **Skip-when-no-diff** — on update, if the field diff is empty (`summary`, `description`, `metadata`, `priority`, `labels` all unchanged), the script skips the PUT, the file write-back, and the changelog entry. Status transitions still run.
+- **Skip-when-no-diff** — on update, if the field diff is empty (`summary`, `description`, `metadata`, `priority`, `labels` all unchanged), the script skips the PUT, the file write-back, and the changelog entry. Status transitions still run, unless `--no-transition` is passed.
 - **Conditional `description` on PUT** — `description` is sent only when body or metadata content actually changed, so labels-only edits don't show up as edits in Jira's history.
 - **Backlog placement (Scrum only)** — board type is detected via `/rest/agile/1.0/board/{id}/configuration`. Skipped on Kanban with a warning.
 - **In-place frontmatter updates** — `jira_*` keys are updated where they sit, not stripped and re-appended. Clean diffs.
@@ -155,7 +155,7 @@ Flow:
 5. If `jira_key` absent: search for an issue carrying the file's `synced-from-*` label. If found, switch to update.
 6. Detect create vs update; on update fetch current state and run concurrent-edit guard.
 7. Diff `summary`, body hash, meta hash, priority, labels.
-8. **If diff empty (update path only):** skip the PUT, the file write-back, and the changelog entry. Status transition still runs. Exit clean.
+8. **If diff empty (update path only):** skip the PUT, the file write-back, and the changelog entry. Status transition still runs, unless `--no-transition` is passed. Exit clean.
 9. Build a Jira ADF description: Summary → Acceptance Criteria (capped) → Metadata → Source links.
 10. Resolve cached `Story` issue type id (or fetch + cache); detect project style (cached 24 h).
 11. **Create** (POST, with parent/Epic Link auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`). On update, `description` is sent only when body or metadata hash changed.

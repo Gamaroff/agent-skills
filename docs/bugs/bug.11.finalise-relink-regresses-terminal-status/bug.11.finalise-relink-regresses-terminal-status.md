@@ -314,6 +314,71 @@ with the registry row and counter bumped, so it is carried rather than dropped.
 3. `grep -n -- "--no-transition" skills/sync-jira-*/SKILL.md` → one Script Options row each.
 4. Read `skills/finalise/SKILL.md` Step 7 blocks 3–4 and confirm no two paragraphs disagree.
 
+### Iteration 3
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-06
+
+**Trigger**: Verify Cycle 2 — a re-review of the cycle-1 delta confirmed CR-2, CR-3, CR-4 and CR-6
+fixed, but returned **CR-5 as only partially fixed** plus two new findings. All three are defects in
+the cycle-1 *corrections*, which makes this the more important iteration of the two:
+
+- **NEW-1 (the significant one)** — the CR-5 fix was **overclaimed**. Making test C drive
+  `syncDocumentStatus` end-to-end removed the hand-written outcome, and the mutation run for it
+  (`transitioned: true`) did go red — but that mutation only changes the gate's *return shape*. With
+  the fixture `localStatus: "accepted"`, `currentStatus: "Done"`, an **un-gated** call short-circuits
+  at `reason: "already"` with zero HTTP, because `Done` is itself in the `accepted` candidate list. So
+  C and C2 still passed with the gate **deleted** — verbatim the flaw CR-5 raised. The plumbing was
+  fixed and the fixture was not, and the Iteration 2 record asserted more than the test supported.
+- **NEW-2** — the CR-3 rewrite's replacement rationale is unreachable. It justified keeping the block
+  order as protecting "a consumer pinned to a `sync-jira-*` predating the flag", but such a sync
+  rejects `--no-transition` with `Unknown option` and exits before resolving status — a fact stated
+  20 lines later in the same step. Ordering protects nobody there.
+- **NEW-3** — the CR-4 fix qualified the absolute in the epic *script* comment but left three
+  identical absolutes standing in the SKILL.md docs (`sync-jira-epic` §10, `sync-jira-story` line 32
+  and step 8), one of them two lines below a bullet the same pass had edited.
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-06
+
+**Fix Description**:
+
+- **NEW-1** — the fixture is now load-bearing and says so. `currentStatus` is `"In Review"` (not an
+  `accepted` candidate) and a new `transitioningHttp` double **offers a real `Done` transition**, so
+  the un-gated path genuinely transitions and earns a Change Log row. Added **C0**, an explicit
+  *control*: it runs the identical call with `noTransition: false` and asserts `transitioned === true`
+  and exactly one Change Log entry. Without a control, "no Change Log row" is the default for almost
+  any outcome and C proves nothing; C0 fails the moment the fixture drifts back toward vacuity.
+- **NEW-2** — the ordering rationale now names the **reachable** pairing: a *finalise copy* older than
+  this one (whose step 3 omits the flag) against a current sync. The unreachable pairing is called out
+  explicitly as not being what the ordering protects, so the next reader does not re-derive it.
+- **NEW-3** — all three doc absolutes qualified with "unless `--no-transition` is passed"; swept the
+  three SKILL.md files for the phrase to confirm none remain.
+
+**Files Modified**:
+
+- `shared/resources/tests/jira-sync-no-transition.test.mjs` — `transitioningHttp` double, shared
+  `SUPPRESSED` fixture, C rewritten, **C0 control added**, C2 re-pointed
+- `skills/finalise/SKILL.md` — ordering rationale and block-4 causes corrected
+- `skills/sync-jira-{epic,story}/SKILL.md` — three absolutes qualified
+
+**Testing**:
+
+- 18 tests pass (was 17; C0 added).
+- **The decisive mutation now lands.** Deleting the `noTransition` gate **entirely** — the mutation
+  the Iteration 2 tests could not detect — fails **A, C and C2**. That is the proof the previous
+  record claimed and did not have.
+
+**Verification Steps for QA**:
+
+1. `command node --test shared/resources/tests/jira-sync-no-transition.test.mjs` → 18/18.
+2. Delete the `if (noTransition) return {...}` block from `syncDocumentStatus` → **A, C, C2 go red**; restore.
+3. `grep -niE "status transitions? (still )?run" skills/sync-jira-*/SKILL.md` → every hit qualified.
+4. Read `skills/finalise/SKILL.md` Step 7 blocks 3–4: the ordering rationale and the block-4 causes
+   must name the same reachable case and agree about `Unknown option`.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -324,6 +389,8 @@ with the registry row and counter bumped, so it is carried rather than dropped.
 | 2026-09-06 | Ready for QA | develop-bug | `--no-transition` implemented on all three syncs, gated inside `syncDocumentStatus`; finalise Step 7 passes it. 16 regression tests, five mutation proofs, `ci:fast` green. |
 | 2026-09-06 | Reopened | develop-bug | Verify Cycle 1 FAIL — 5 review-code findings, 4 of them introduced by the fix. |
 | 2026-09-06 | Ready for QA | develop-bug | Cycle 1 fixes applied: flag documented, contradictory prose corrected, tautological test C rewritten end-to-end, structural check hardened. CR-1 filed as bug.12. |
+| 2026-09-06 | Reopened | develop-bug | Verify Cycle 2 FAIL — CR-5 only partially fixed (overclaimed) plus 2 new findings, all in the cycle-1 corrections. |
+| 2026-09-06 | Ready for QA | develop-bug | Cycle 2 fixes: gate-sensitive fixture + C0 control, reachable ordering rationale, three doc absolutes qualified. Gate deletion now fails A/C/C2. |
 
 ## Resolution Summary
 

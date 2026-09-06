@@ -55,6 +55,36 @@ function recordingHttp() {
   return { calls, http: lib.makeHttp({ fetchImpl: handler }) };
 }
 
+// A double that OFFERS a matching transition, so the un-gated path really does
+// move the card. `recordingHttp` answers `{transitions: []}`, under which an
+// un-gated call cannot reach `transitioned: true` at all — which is why tests
+// built on it cannot detect the gate being REMOVED, only its return shape being
+// changed. C and C2 use this one instead.
+function transitioningHttp() {
+  const calls = [];
+  const handler = async (url, opts) => {
+    const method = (opts && opts.method) || "GET";
+    calls.push({ url, method });
+    if (method === "GET")
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          transitions: [
+            { id: "31", name: "Done", to: { name: "Done", id: "3" } },
+          ],
+        }),
+      };
+    return {
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+      text: async () => "",
+    };
+  };
+  return { calls, http: lib.makeHttp({ fetchImpl: handler }) };
+}
+
 const BASE = {
   baseUrl: "https://example.atlassian.net",
   email: "e@example.com",
@@ -170,23 +200,29 @@ test("B2: a genuine `no-transition` skip still fails under --fail-on-status-skip
 // C — nothing moved, so nothing is logged
 // ---------------------------------------------------------------------------
 
-test("C: a suppressed sync's REAL outcome writes no Change Log status row", async () => {
-  // Driven end-to-end on purpose. `buildChangeLogEntries` branches on
-  // `statusOutcome.transitioned` and never reads `reason`, so handing it a
-  // hand-written `{transitioned:false, reason:"transition-suppressed"}` asserts
-  // a generic pre-existing invariant and would pass identically with no gate in
-  // the codebase at all. Feeding it the object `syncDocumentStatus` actually
-  // returns is what ties this test to the gate: if the early return ever grew a
-  // truthy `transitioned`, this fails.
-  const { http } = recordingHttp();
+// The fixture for C/C2 is chosen so the UN-GATED path would visibly do
+// something. `currentStatus: "Done"` — the obvious choice — is useless here:
+// "Done" is already in the `accepted` candidate list, so an un-gated call
+// short-circuits with `reason: "already"` and no HTTP, and C would pass with the
+// gate deleted. That is the tautology this test was rewritten to escape, so the
+// fixture, not just the plumbing, is load-bearing. "In Review" is not a
+// candidate, and `transitioningHttp` offers a real "Done" transition, so without
+// the gate this call transitions and earns a Change Log row.
+const SUPPRESSED = {
+  localStatus: "accepted",
+  currentStatus: "In Review",
+  noTransition: true,
+};
+
+test("C: a suppressed sync writes no Change Log row — and would without the gate", async () => {
+  const { calls, http } = transitioningHttp();
   const outcome = await lib.syncDocumentStatus({
     ...BASE,
     http,
-    localStatus: "accepted",
-    currentStatus: "Done",
-    noTransition: true,
+    ...SUPPRESSED,
   });
 
+  assert.equal(calls.length, 0, "the suppressed call must issue no request");
   const entries = lib.buildChangeLogEntries({
     created: false,
     issueKey: "PROJ-715",
@@ -198,17 +234,45 @@ test("C: a suppressed sync's REAL outcome writes no Change Log status row", asyn
   assert.deepEqual(entries, []);
 });
 
-test("C2: the same real outcome is also exit-0 under --fail-on-status-skip", async () => {
-  // The end-to-end twin of B. B pins the reason string; this pins that the
-  // object the gate actually produces satisfies it.
-  const { http } = recordingHttp();
+test("C0: the fixture is sound — un-gated, this same call DOES earn a row", async () => {
+  // The control for C. Without it C proves nothing: "no Change Log row" is the
+  // default for almost any outcome, so C is only meaningful if the identical
+  // call, un-gated, produces one. If this ever goes red the fixture has drifted
+  // and C has quietly become tautological again.
+  const { http } = transitioningHttp();
   const outcome = await lib.syncDocumentStatus({
     ...BASE,
     http,
-    localStatus: "accepted",
-    currentStatus: "Done",
-    noTransition: true,
+    ...SUPPRESSED,
+    noTransition: false,
   });
+
+  assert.equal(
+    outcome.transitioned,
+    true,
+    `expected a real transition, got ${JSON.stringify(outcome)}`,
+  );
+  const entries = lib.buildChangeLogEntries({
+    created: false,
+    issueKey: "PROJ-715",
+    statusOutcome: outcome,
+    author: "sync-jira-task",
+    docNoun: "task",
+    date: "2026-09-06",
+  });
+  assert.equal(entries.length, 1);
+});
+
+test("C2: the same real outcome is also exit-0 under --fail-on-status-skip", async () => {
+  // The end-to-end twin of B. B pins a hand-written reason string; this pins
+  // that the object the gate actually produces satisfies it.
+  const { http } = transitioningHttp();
+  const outcome = await lib.syncDocumentStatus({
+    ...BASE,
+    http,
+    ...SUPPRESSED,
+  });
+  assert.equal(outcome.reason, "transition-suppressed");
   assert.equal(
     lib.summariseStatusOutcome(outcome, { failOnSkip: true, repoRoot: REPO }),
     0,

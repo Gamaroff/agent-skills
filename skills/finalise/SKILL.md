@@ -1110,9 +1110,15 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    > `--no-transition` (step 3), so it carries no status decision at all and the ladder is the single
    > resolver by construction rather than by sequencing.
    >
-   > **Keep the order anyway.** It is now belt-and-braces rather than the guarantee — it is what still
-   > protects a consumer pinned to a `sync-jira-*` predating the flag, for whom sync-first would hand
-   > the decision back to `loadStatusMap`. Do not reverse these two blocks.
+   > **Keep the order anyway.** It is now belt-and-braces rather than the guarantee. The case it still
+   > protects is a consumer running a **finalise copy older than this one** — whose step 3 therefore
+   > omits `--no-transition` — against a current `sync-jira-*`. There the sync does resolve status,
+   > and ladder-first is what keeps the ladder's decision the one that stands.
+   >
+   > It is *not* protecting the reverse pairing, a consumer pinned to a pre-flag `sync-jira-*`: that
+   > sync rejects `--no-transition` with `Unknown option` and exits before resolving anything, so its
+   > re-link never runs in either order (see the note at the end of block 4). Do not reverse these
+   > two blocks.
    >
    > ⚠️ **The sync does not no-op — it is made status-neutral, and that is why step 3 passes
    > `--no-transition`.** This block used to claim the sync no-ops on its own — *"the sync's own
@@ -1224,12 +1230,14 @@ EOF
    ```
 
    - Terminal (`Done`/`Closed`/whatever step 1 targeted) → nothing to do.
-   - **Anything else** → step 1's close was undone. This should no longer be reachable through step 3;
-     if it happens, check that the sync being invoked actually supports `--no-transition` (it would
-     have exited non-zero with `Unknown option` if not). Re-run the step-1 transition, supplying the
-     same required fields (a `resolution` is the common one), then **re-read again** to confirm. Log
-     in the running summary: *"re-asserted terminal status after the Document-link re-point
-     (bug.11)"*.
+   - **Anything else** → step 1's close was undone. This should no longer be reachable through step 3
+     as written above. The reachable causes are a **finalise copy older than this one** (whose step 3
+     omits the flag, so the sync still resolves status), or something outside this step moving the
+     card. Note that a `sync-jira-*` too old to know the flag does *not* cause this — it rejects
+     `--no-transition` with `Unknown option` and exits without touching the status. Re-run the step-1
+     transition, supplying the same required fields (a `resolution` is the common one), then
+     **re-read again** to confirm. Log in the running summary: *"re-asserted terminal status after
+     the Document-link re-point (bug.11)"*.
 
    Never report the close on the strength of step 1 alone once step 3 has run — a `204` from step 1 is
    a statement about step 1, not about the state the step ends in.
