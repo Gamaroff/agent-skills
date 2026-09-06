@@ -20,6 +20,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { allCases } from "../../../shared/resources/security-input-corpus.mjs";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
 
@@ -137,6 +139,143 @@ test("probe mode names every candidate axis that defeats boundaries in practice"
       `${PROMPT}: candidate axis "${axis}" is gone — each one corresponds to a real task-67 escape`,
     );
   }
+});
+
+test("probe mode sources its candidates from the shared corpus", () => {
+  assert.ok(
+    has(source(), "security-input-corpus.md"),
+    `${PROMPT}: the prompt no longer points at shared/resources/security-input-corpus.md — ` +
+      `without it the agent re-derives a candidate set from prose on every run, which is what ` +
+      `made two runs of the same probe reach different verdicts`,
+  );
+  assert.ok(
+    has(source(), "security-input-corpus.mjs"),
+    `${PROMPT}: the machine-readable peer is no longer named, so there is nothing to import`,
+  );
+  assert.ok(
+    has(source(), "corpusFor("),
+    `${PROMPT}: the corpus accessor is gone — naming the file without naming the call leaves ` +
+      `the agent to guess how to read it`,
+  );
+});
+
+/**
+ * ─────────────────────────── The non-restatement guard ───────────────────────────
+ *
+ * The rule: the prompt must REFERENCE the corpus, not quote it. Two copies drift,
+ * and the copy an agent reads is the one in front of it — task.74 found a third
+ * stale copy of a scoping rule at its own DoD gate.
+ *
+ * ⚠️ The first version of this guard was VACUOUS, and the way it was vacuous is
+ * worth keeping written down. It asked whether any WHOLE corpus input appeared in
+ * the prompt. Run against the pre-change prompt — the axis table task.79 deleted,
+ * the exact artefact this guard is named for — it reported ZERO findings and
+ * passed. Real restatement is FRAGMENTARY: that table carried `cu'r'l`, `g\h` and
+ * `--output`, each a *piece* of a corpus input, and whole-input containment
+ * matched none of them. Its mutation proof passed only because the mutation
+ * re-added two inputs in full, which is not the shape restatement takes.
+ *
+ * So the guard now works on fragments, and — more importantly — the test below
+ * proves it can still see the real thing. DELETED_AXIS_TABLE is the deleted text,
+ * kept as a fixture the detector MUST flag. Without that, a future simplification
+ * could quietly return the guard to uselessness and every test would stay green.
+ */
+
+/** Inline code spans, which is how a prompt quotes an input. */
+const codeSpans = (text) => [...text.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]);
+
+/**
+ * A span distinctive enough that sharing text with a corpus input means quotation
+ * rather than coincidence: it carries a shell/URL metacharacter, or is flag-shaped.
+ *
+ * Without this, ordinary words that happen to sit inside a corpus input — `data`,
+ * `note`, `secret`, `https`, `ssl`, `process.env` — all match, and the guard cries
+ * wolf on prose that quotes nothing. Verified: the filter drops exactly those six
+ * and keeps the three real ones.
+ */
+const META = /[\\'"`;|&<>$(){}[\]*?~!#%^]/;
+const FLAG = /^--?[A-Za-z]/;
+const distinctive = (span) =>
+  span.length >= 3 && (META.test(span) || FLAG.test(span));
+
+/**
+ * Spans the prompt is allowed to use even though they collide with a corpus input.
+ *
+ * This replaces a `length >= 8` heuristic, which exempted 14 cases nobody had
+ * chosen to exempt (`p@ss`, `[::1]`, `a/b+c=d`, `O'Brien`, …) while admitting
+ * generic strings a future example would trip on. An explicit list is reviewed;
+ * a character count is not. Empty today — add a span here only with a reason.
+ */
+const PROMPT_MAY_MENTION = Object.freeze([]);
+
+/** Corpus inputs a span could be quoting. Short ones are punctuation, not quotation. */
+const quotableInputs = () =>
+  allCases()
+    .map((c) => c.input)
+    .filter((input) => input.length >= 3);
+
+/** Every distinctive code span in `text` that shares text with a corpus input. */
+function restatedSpans(text) {
+  const inputs = quotableInputs();
+  return [
+    ...new Set(
+      codeSpans(text)
+        .filter(distinctive)
+        .filter((span) => !PROMPT_MAY_MENTION.includes(span))
+        .filter((span) =>
+          inputs.some((input) => input.includes(span) || span.includes(input)),
+        ),
+    ),
+  ];
+}
+
+/**
+ * The axis table task.79 removed, verbatim. This is the fixture the detector must
+ * flag — it is what "restatement" actually looked like in this file.
+ */
+const DELETED_AXIS_TABLE = [
+  "| Axis | What to vary |",
+  "|---|---|",
+  "| **Alternative spellings** | quoting (`g\"h\"`, `cu'r'l`), escaping (`g\\h`), globbing, case, unicode look-alikes, added whitespace |",
+  "| **Position** | a flag in trailing rather than leading position; the payload as the last argument rather than the first |",
+  "| **Composition** | chaining (`a; b`, `a && b`), nesting, command substitution, piping into an interpreter |",
+  "| **The unparseable case** | input the checker cannot read at all — malformed quoting, a truncated token, an empty string, a very long token |",
+  "| **Flag forms** | the long **and** short form of every flag the code names by hand (`-o` and `--output`) |",
+].join("\n");
+
+test("the non-restatement detector can see the restatement it is named for", () => {
+  const hits = restatedSpans(DELETED_AXIS_TABLE);
+  assert.ok(
+    hits.length > 0,
+    "the detector reports NOTHING on the deleted axis table — the exact text " +
+      "the guard below exists to forbid. A guard that cannot fail on its own " +
+      "worked example is not a guard, and this is precisely how the first " +
+      "version of it shipped: green, and blind to the defect it named.",
+  );
+});
+
+test("probe mode does not restate the corpus's inputs", () => {
+  const spans = restatedSpans(source());
+  assert.deepEqual(
+    spans,
+    [],
+    `${PROMPT} quotes corpus inputs: ${spans.map((s2) => JSON.stringify(s2)).join(", ")}. ` +
+      `Reference the corpus; do not copy pieces of it. If one of these is a ` +
+      `genuine coincidence, add it to PROMPT_MAY_MENTION with a reason rather ` +
+      `than weakening the detector.`,
+  );
+});
+
+test("probe mode does not restate a whole corpus input either", () => {
+  const flatSource = flat(source());
+  const restated = allCases()
+    .filter((c) => c.input.length >= 3)
+    .filter((c) => flatSource.includes(flat(c.input)));
+  assert.deepEqual(
+    restated.map((c) => c.id),
+    [],
+    `${PROMPT} carries corpus inputs verbatim: ${restated.map((c) => c.id).join(", ")}`,
+  );
 });
 
 test("probe mode asserts the accept direction too, so an over-strict fix is caught", () => {
@@ -497,17 +636,90 @@ test("finalise bundles the security prompt under references/", () => {
   );
 });
 
-test("the bundled copy is in step with the source", () => {
-  for (const marker of [
-    "Step 1b: Is the deliverable a boundary?",
-    "Step 4: Probe mode — only when Step 1b fired",
-    "Do not reason abstractly",
-    "Zero executed candidates on a boundary deliverable is a finding, not a pass",
-    "probes_executed:",
-  ]) {
+/**
+ * Normalise a bundled copy back to its source form: drop the AUTO-GENERATED
+ * banner and undo the `shared/resources/` → `references/` path rewrite. Same
+ * helper shape as transition-protocol-parity.test.mjs, for the same reason.
+ */
+function normaliseBundled(text) {
+  return text
+    .split("\n")
+    .filter((l) => !l.includes("AUTO-GENERATED — DO NOT EDIT"))
+    .join("\n")
+    .split("references/")
+    .join("shared/resources/");
+}
+
+/**
+ * Every shared resource the prompt drags into skills/finalise/references/.
+ *
+ * `bundle_skill.py` walks shared refs TRANSITIVELY, so this is not just the
+ * prompt: the prompt references the corpus doc, the corpus doc references its
+ * `.mjs` peer and `mutation-proving.md`, and all four ship. Listing only the
+ * prompt is how a stale corpus reaches the agent — the exact drift the corpus
+ * exists to prevent, reintroduced one directory over.
+ */
+const BUNDLED_REFS = Object.freeze([
+  PROMPT,
+  "security-input-corpus.md",
+  "security-input-corpus.mjs",
+  "mutation-proving.md",
+]);
+
+/**
+ * The rewrite can CORRUPT a path as easily as it can fix one, and byte-parity
+ * cannot see it: `normaliseBundled` deliberately undoes the rewrite, so a source
+ * and a bundled copy that differ only by a broken rewrite compare equal.
+ *
+ * Found the hard way during task.79's own qa-fix cycle. A fix for an
+ * unresolvable import wrote `join(repoRoot, "shared/resources/…")` into the
+ * prompt; the bundler rewrote it to `join(repoRoot, "references/…")`, which
+ * resolves to nothing — so the "fix" shipped a *different* broken import to the
+ * only copy an agent reads. `repoRoot` + `references/` is never a real path,
+ * which makes the corruption exactly detectable.
+ */
+test("no bundled reference builds a repo-root path out of the rewritten directory", () => {
+  for (const ref of BUNDLED_REFS) {
+    const bun = join(repoRoot, "skills", "finalise", "references", ref);
+    if (!existsSync(bun)) continue;
+    const text = readFileSync(bun, "utf-8");
+    const bad = [...text.matchAll(/repoRoot[^\n]{0,40}["'`]references\//g)].map(
+      (m) => m[0],
+    );
+    assert.deepEqual(
+      bad,
+      [],
+      `skills/finalise/references/${ref} builds a path from repoRoot + ` +
+        `"references/", which does not exist. The source almost certainly says ` +
+        `"shared/resources/..." inside a code example, and the bundler rewrote ` +
+        `it. Write the example so it does not carry a rewritable path — e.g. ` +
+        `try both directory names at runtime.`,
+    );
+  }
+});
+
+test("every transitively-bundled reference is byte-identical to its source", () => {
+  // Byte parity, not marker presence. The previous version of this test checked
+  // that five strings survived into the bundled copy, which a stale copy passes
+  // trivially — it passed on an edited-but-unbundled prompt during task.79's own
+  // development. `npm run ci:fast` never runs the bundler, so nothing else here
+  // would have caught it either.
+  for (const ref of BUNDLED_REFS) {
+    const src = join(repoRoot, "shared", "resources", ref);
+    const bun = join(repoRoot, "skills", "finalise", "references", ref);
+    assert.ok(existsSync(src), `missing source shared/resources/${ref}`);
     assert.ok(
-      has(bundled(), marker),
-      `skills/finalise/references/${PROMPT} is stale — run \`npm run bundle\` and commit it (missing: ${marker})`,
+      existsSync(bun),
+      `skills/finalise/references/${ref} is missing — the prompt pulls it in ` +
+        `transitively. Run \`npm run bundle\` and commit the result.`,
+    );
+    assert.equal(
+      normaliseBundled(readFileSync(bun, "utf-8")),
+      normaliseBundled(readFileSync(src, "utf-8")),
+      `skills/finalise/references/${ref} is STALE — it differs from ` +
+        `shared/resources/${ref}. Run \`npm run bundle\` and commit it. An ` +
+        `agent reads the bundled copy, so a stale one is a wrong answer ` +
+        `delivered confidently.`,
     );
   }
 });

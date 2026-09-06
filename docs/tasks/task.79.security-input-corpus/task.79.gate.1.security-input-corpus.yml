@@ -1,0 +1,246 @@
+schema: 1
+task: "task.79.security-input-corpus"
+task_title: "Write down the inputs that defeat each sink, once"
+gate: FAIL
+status_reason: >-
+  Every success criterion verifies and CI is green on the head commit, but the
+  non-restatement guard — the one mechanism Phase 4 exists to install — is
+  vacuous against the exact restatement it names: run against the pre-change
+  prompt it reports zero findings. Six further medium issues are factual errors
+  in the corpus's own `why` fields, a documented import that cannot resolve, and
+  two missing parity/purity assertions.
+reviewer: "QA Engineer"
+updated: "2026-09-06T21:20:00Z"
+
+top_issues:
+  - id: "CR-1"
+    severity: high
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: >-
+      The non-restatement guard requires verbatim containment of a WHOLE corpus
+      input, but real restatement is fragmentary. VERIFIED by QA: run against
+      `origin/develop`'s prompt — the axis table this change deletes, which is
+      the defect the guard is named for — it reports 0 restatements and passes.
+      The fragments actually present there (`g\h`, `g"h"`, `-o`, `--output`,
+      `a; b`, `a && b`) are all substrings of corpus inputs and none match. The
+      develop-run mutation proof passed only because it re-added two inputs in
+      full, which is not the shape restatement takes.
+    suggested_action: >-
+      Assert on distinctive input fragments or a token-overlap threshold rather
+      than full-string containment, and seed the guard with the deleted
+      axis-table text as a fixture that MUST fail. Mutation-prove it against
+      that fixture, not against a full-input re-insertion.
+    suggested_owner: dev
+    status: open
+
+  - id: "CR-2"
+    severity: medium
+    file: "shared/resources/security-input-corpus.mjs"
+    finding: >-
+      `url-authority.userinfo-delimiter`'s `why` is wrong for the reference
+      parser. VERIFIED: `new URL("postgres://u:p@ss@h/db")` yields password
+      `p%40ss` and host `h` — WHATWG splits at the LAST `@`, so the connection
+      is not re-pointed.
+    suggested_action: >-
+      Qualify the claim to naive first-`@`-splitting DSN parsers rather than
+      stating re-pointing as unconditional.
+    suggested_owner: dev
+    status: open
+
+  - id: "CR-3"
+    severity: medium
+    file: "shared/resources/security-input-corpus.mjs"
+    finding: >-
+      `url-authority.port-delimiter`'s `why` says the value is truncated at the
+      colon "either way". VERIFIED: in the password position it is preserved —
+      `new URL("postgres://u:pa:ss@h/db").password === "pa%3Ass"`.
+    suggested_action: >-
+      Name the position the truncation applies to and drop the "either way"
+      generalisation.
+    suggested_owner: dev
+    status: open
+
+  - id: "CR-4"
+    severity: medium
+    file: "shared/resources/security-input-corpus.mjs"
+    finding: >-
+      `url-authority.empty-host`'s `why` asserts `scheme://:5432/db` "parses".
+      VERIFIED: `new URL("postgres://:5432/db")` throws ERR_INVALID_URL.
+    suggested_action: >-
+      Name the specific DSN parsers that accept it and default to localhost,
+      instead of claiming the URL grammar accepts it.
+    suggested_owner: dev
+    status: open
+
+  - id: "CR-6"
+    severity: medium
+    file: "shared/resources/finalise-dod-security-prompt.md"
+    finding: >-
+      The new fenced example imports from the bare specifier
+      `"shared/resources/security-input-corpus.mjs"`. VERIFIED: that throws
+      ERR_MODULE_NOT_FOUND, and so does the bundler's rewrite to
+      `"references/…"`. The prompt's own step 3 tells the agent to run the
+      script from a temporary directory, where it cannot resolve either. The
+      same broken specifier appears in `security-input-corpus.md:258`. A corpus
+      whose method ordering puts execution first ships an example that does not
+      execute.
+    suggested_action: >-
+      Use a specifier that resolves from both locations. VERIFIED that a
+      sibling-relative `./security-input-corpus.mjs` resolves against both
+      `shared/resources/` and `skills/finalise/references/`, and survives the
+      bundler rewrite untouched. For the temp-dir case, show an absolute path
+      built from the repo root.
+    suggested_owner: dev
+    status: open
+
+  - id: "CR-7"
+    severity: medium
+    file: "shared/resources/security-input-corpus.md"
+    finding: >-
+      The bundled copy keeps the source's `../../docs/...` provenance links,
+      which from `skills/finalise/references/` resolve to `skills/docs/...`.
+      VERIFIED: both targets are absent — the shipped artefact has two broken
+      links, and CI's link-check did not catch them.
+    suggested_action: >-
+      Make the two provenance references path-free in the source (name the
+      documents rather than linking them, as the file already does for
+      `evals/shared/tests/...`), so no depth-sensitive link survives bundling.
+    suggested_owner: dev
+    status: open
+
+  - id: "CR-8"
+    severity: medium
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: >-
+      Only `finalise-dod-security-prompt.md` has a bundled-copy-in-step test.
+      VERIFIED: the three new bundled artefacts —
+      `skills/finalise/references/security-input-corpus.{md,mjs}` and
+      `mutation-proving.md` — have none, and `npm run ci:fast` never runs the
+      bundler. A source edit that is not re-bundled ships a stale corpus to the
+      agent, which is the failure the corpus exists to prevent.
+    suggested_action: >-
+      Extend the existing bundled-parity test to cover every reference the
+      prompt pulls in transitively, not just the prompt itself.
+    suggested_owner: dev
+    status: open
+
+  - id: "TASK79-001"
+    severity: medium
+    file: "shared/resources/tests/security-input-corpus.test.mjs"
+    finding: >-
+      Success criterion "the corpus contains inputs only — no execution, no side
+      effects on import" has no assertion. VERIFIED that purity holds today
+      (zero import/require statements; the only `process.` is inside a case's
+      input string), but it is enforced only incidentally by two successful
+      imports. An edit adding `node:child_process` or a top-level side effect
+      would pass every existing test.
+    suggested_action: >-
+      Assert the module's own source carries no import/require statement and no
+      reference to a side-effecting builtin outside string literals.
+    suggested_owner: dev
+    status: open
+
+  - id: "CR-10"
+    severity: low
+    file: "shared/resources/tests/security-input-corpus.test.mjs"
+    finding: >-
+      The row-count regex matches any doc line beginning with a code span, so a
+      future non-case table in the same document inflates the count and fails
+      with a message blaming the corpus for a row it does not own.
+    suggested_action: >-
+      Count rows only inside the `#### Hostile` / `#### Legitimate` slices.
+    suggested_owner: dev
+    status: open
+
+  - id: "CR-11"
+    severity: low
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: >-
+      The `length >= 8` filter exempts 14 cases, not only the ordinary
+      punctuation the comment names — `p@ss`, `pa:ss`, `[::1]`, `a/b+c=d`,
+      `O'Brien`, `50% off` are all exempt — while admitting generic strings
+      (`cat README.md`, `.gitkeep`, `Tom & Jerry`) that an incidental future
+      prompt example would trip as a false failure.
+    suggested_action: >-
+      Replace the length heuristic with an explicit per-case opt-out on the
+      corpus, so exemptions are named and reviewed rather than inferred.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3, 4]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      The deliverable IS a security artefact, so the accuracy of its `why`
+      fields is a security property: four url-authority cases describe failure
+      modes the reference parser does not exhibit (CR-2/3/4, plus advisory
+      CR-5). A probe comparing "expected silent truncation" against "actual
+      throw" reports a false finding. The module itself is inert on import
+      (verified empirically) and contains no executable payload.
+  performance:
+    status: PASS
+    notes: >-
+      Pure data, 2ms import, 73 frozen cases. `allCases()` rebuilds its array
+      per call (CR-16, advisory) — immaterial at this size.
+  reliability:
+    status: PASS
+    notes: >-
+      Rollback verified: the §11 command
+      (`node --test evals/shared/tests/finalise-dod-prompt-contract.test.mjs`)
+      is green, and the two new files are inert until task.80 consumes them.
+      `corpusFor` throws on every unknown key including `__proto__`,
+      `constructor`, `toString`, `hasOwnProperty` and `""`.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The guard installed to stop drift does not detect the drift it names
+      (CR-1); three transitively-bundled artefacts have no parity test (CR-8);
+      the doc's tables were produced by an uncommitted generator whose renderer
+      is duplicated in the test (CR-15, advisory); two tests are vacuous or
+      subsumed (CR-13/14, advisory).
+
+recommendations:
+  immediate:
+    - action: "Rewrite the non-restatement guard to detect fragmentary restatement, and mutation-prove it against the deleted axis table"
+      refs: ["evals/shared/tests/finalise-dod-prompt-contract.test.mjs"]
+    - action: "Correct the four url-authority `why` fields falsified by the reference parser"
+      refs: ["shared/resources/security-input-corpus.mjs"]
+    - action: "Make the documented import specifier resolvable from both the source and bundled locations"
+      refs:
+        - "shared/resources/finalise-dod-security-prompt.md"
+        - "shared/resources/security-input-corpus.md"
+    - action: "Remove the depth-sensitive ../../docs links that break in the bundled copy"
+      refs: ["shared/resources/security-input-corpus.md"]
+    - action: "Add bundled-parity coverage for the transitively-bundled artefacts, and a purity assertion for the corpus module"
+      refs:
+        - "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+        - "shared/resources/tests/security-input-corpus.test.mjs"
+  future:
+    - action: "Bind doc-parity rows to their sink and direction sections (CR-9), and derive the doc's count sentences from the module rather than hand-writing them"
+      refs: ["shared/resources/tests/security-input-corpus.test.mjs"]
+    - action: "Memoise allCases(); drop or replace the two vacuous/subsumed count tests"
+      refs:
+        - "shared/resources/security-input-corpus.mjs"
+        - "shared/resources/tests/security-input-corpus.test.mjs"
+    - action: "Export the row renderer (or commit the generator) so the doc and its parity test share one implementation"
+      refs: ["shared/resources/security-input-corpus.mjs"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions:
+    - "CR-1 fixed and mutation-proved against the deleted axis table"
+    - "CR-2/3/4 corrected — the corpus must not misstate how a sink fails"
+    - "CR-6 fixed — the documented import must actually resolve"
