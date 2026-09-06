@@ -765,8 +765,11 @@ options:
 
 ```bash
 node .agents/skills/sync-jira-epic/scripts/sync-jira-epic.js \
-  --file "$EPIC_FILE_PATH"
+  --file "$EPIC_FILE_PATH" \
+  --no-transition
 ```
+
+> **`--no-transition` is required here, not tidiness.** This step pushes body/description changes only. Without the flag the sync also resolves the epic's frontmatter `status:` through its own `loadStatusMap` and transitions the card — a second resolver running after the `tracker-workflow.yaml` ladder has already placed it, undoing the ladder's move on a sync that was meant to carry a description (bug.12; same shape as bug.11). `review-epic` has no deliberate status-push invocation: Step 11.6 delegates unlinked epics to `ensure-epic-jira-issue`, which is where a create-and-push belongs.
 
 > **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-epic/scripts/sync-jira-epic.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
 

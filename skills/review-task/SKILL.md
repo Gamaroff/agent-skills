@@ -1480,8 +1480,11 @@ options:
 
 ```bash
 node .agents/skills/sync-jira-task/scripts/sync-jira-task.js \
-  --file "$TASK_FILE_PATH"
+  --file "$TASK_FILE_PATH" \
+  --no-transition
 ```
+
+> **`--no-transition` is required here, not tidiness.** This step pushes body changes only. Without the flag the sync also resolves the document's frontmatter `status:` through its own `loadStatusMap` and transitions the card, running as a second resolver after the `tracker-workflow.yaml` ladder has already placed it — in the `develop-task` pipeline this step runs at Step 2, after Step 1 signalled `work-started`, so un-flagged it walks the card back out of In Progress (bug.12). Note this step runs *before* Step 9 promotes the document, so the status it would push is the pre-promotion one — suppressing it removes a stale write, not a needed one. The ladder remains the single authority on the card's position.
 
 > **Path note**: the script is bundled with the skill at `.agents/skills/sync-jira-task/scripts/sync-jira-task.js` (installed by `setup-consumer.sh`). Do **NOT** look for `.scripts/jira-sync*.js` in the consumer repo root — that path does not exist. Do **NOT** hand-craft a REST PUT, and do **NOT** leave `jira_last_body_hash` stale.
 

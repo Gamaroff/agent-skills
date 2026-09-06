@@ -466,3 +466,211 @@ test("F: every 'status transition still runs' claim is qualified", async () => {
       unqualified.join("\n  "),
   );
 });
+
+// ---------------------------------------------------------------------------
+// G — every WRITING sync-jira-* invocation in shipped prose is a conscious
+//     status decision
+// ---------------------------------------------------------------------------
+//
+// Guards bug.12, which is bug.11's defect at the three call sites bug.11 did not
+// reach. bug.11 built `--no-transition` and wired it into finalise's re-link —
+// the one caller it had observed. `review-story` 9.6, `review-task` 8.6 and
+// `review-epic` 11.5 all describe themselves as body/link-only syncs and all
+// still let `loadStatusMap` re-resolve the card's status afterwards, walking it
+// back out of the position the tracker-workflow ladder had just set.
+//
+// The failure mode is ENUMERATION, not logic: the flag worked perfectly, and
+// whoever wired it simply listed one caller instead of four. A behavioural test
+// cannot catch that — every individual call is correct in isolation. Only a
+// check over the whole population can, which is why this asserts on shipped
+// prose. That is not a proxy for behaviour here: a SKILL.md bash block IS the
+// program, executed by an agent, exactly as tests E and F already treat it.
+//
+// The rule: an invocation that WRITES must either carry `--no-transition`, or
+// be named below as a deliberate status push. Read-only invocations classify
+// themselves out via `--check-card`, `--probe-workflow` or `--dry-run`.
+
+// Deliberate status pushes: syncs whose PURPOSE is to move the card. Keyed by
+// file plus a heading prefix, because `review-story/SKILL.md` holds one of each
+// kind — Step 9.6 (body-only, must carry the flag) and Step 10 (the push) — and
+// a file-level allowlist would silently re-admit the very defect this guards.
+// Every entry must still match a real site (asserted in G2), so the list cannot
+// rot into a set of permanent excuses for sites that no longer exist.
+const DELIBERATE_STATUS_PUSHES = [
+  ["skills/review-story/SKILL.md", "Step 10: Update Document Status"],
+  ["skills/ensure-story-jira-issue/SKILL.md", "Step SJ4:"],
+  ["skills/ensure-task-jira-issue/SKILL.md", "Step TJ4:"],
+  ["skills/ensure-epic-jira-issue/SKILL.md", "Step EJ4:"],
+  // The sync skills documenting their own end-to-end behaviour. A full sync is
+  // what these skills ARE; suppressing the transition in their own worked
+  // example would document the opposite of what they do.
+  ["skills/sync-jira-story/SKILL.md", "4. Sync the Story"],
+  ["skills/sync-jira-task/SKILL.md", "4. Sync the Task"],
+  ["skills/sync-jira-epic/SKILL.md", "3. Sync the Epic"],
+];
+
+// `sync-jira-${WORKITEM}.js` is a real, shipped form — finalise builds the
+// script path from a variable. A literal-only pattern would make that site
+// invisible to this check, which is the same "invisible to grep" trap the
+// repo has been bitten by before.
+const INVOCATION =
+  /sync-jira-(?:story|task|epic|\$\{[A-Za-z_][A-Za-z0-9_]*\})\.js\b/;
+const READ_ONLY = /--check-card\b|--probe-workflow\b|--dry-run\b/;
+
+/**
+ * Every `node …sync-jira-*.js…` invocation in shipped prose, with the whole
+ * logical command (line continuations joined) and the heading it sits under.
+ *
+ * Only `skills/` and `shared/resources/` are scanned: those are the files an
+ * agent executes. `docs/` describes the defect — including quoting the broken
+ * command lines verbatim, as bug.12's own report does — and scanning it would
+ * make the guard fail on its own bug report.
+ */
+async function shippedInvocations() {
+  const { readFileSync, readdirSync, statSync, existsSync } =
+    await import("node:fs");
+
+  const files = [];
+  const walk = (dir) => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        if (entry === "node_modules" || entry === "tests") continue;
+        walk(full);
+      } else if (entry.endsWith(".md")) {
+        files.push(full);
+      }
+    }
+  };
+  walk(join(REPO, "skills"));
+  walk(join(REPO, "shared", "resources"));
+
+  const sites = [];
+  for (const full of files) {
+    const rel = full.slice(REPO.length + 1);
+    const lines = readFileSync(full, "utf8").split("\n");
+    let heading = "(no heading)";
+    let inFence = false;
+    for (let i = 0; i < lines.length; i++) {
+      // Track fenced blocks BEFORE reading headings. A bash comment
+      // (`# only pin if …`) is indistinguishable from an h1 by shape, and the
+      // very first run of this test mis-attributed review-story's Step 9.6 site
+      // to one — which would let an allowlist prefix match a site it was never
+      // meant to cover, i.e. a false pass in the exact check this performs.
+      if (/^\s*(```|~~~)/.test(lines[i])) {
+        inFence = !inFence;
+        continue;
+      }
+      if (!inFence) {
+        const h = /^#{1,6}\s+(.*)/.exec(lines[i]);
+        if (h) heading = h[1].trim();
+      }
+      if (!INVOCATION.test(lines[i])) continue;
+
+      // Walk back to the first line of the command, then forward to its end,
+      // so a flag on any continuation line counts. Looking only forward would
+      // miss a command whose script path sits on a continuation line.
+      let start = i;
+      while (start > 0 && lines[start - 1].trimEnd().endsWith("\\")) start--;
+      let end = i;
+      while (end + 1 < lines.length && lines[end].trimEnd().endsWith("\\"))
+        end++;
+      const command = lines.slice(start, end + 1).join(" ");
+
+      // Prose mentions the scripts constantly ("run sync-jira-story.js");
+      // only an actual `node` command line is an invocation.
+      if (!/\bnode\b/.test(command)) continue;
+
+      sites.push({ file: rel, line: start + 1, heading, command });
+      i = end;
+    }
+  }
+  return sites;
+}
+
+const isDeliberate = (site) =>
+  DELIBERATE_STATUS_PUSHES.some(
+    ([file, prefix]) => site.file === file && site.heading.startsWith(prefix),
+  );
+
+test("G: every writing sync-jira-* invocation is flagged or allowlisted", async () => {
+  const sites = await shippedInvocations();
+
+  // Guard the guard. If the scan silently matched nothing — a renamed script, a
+  // reorganised tree, a regex that stopped working — every assertion below
+  // would pass vacuously, which is the one outcome worse than a red test.
+  assert.ok(
+    sites.length >= 10,
+    `only ${sites.length} sync-jira-* invocations found in shipped prose; the ` +
+      `scanner has probably stopped matching. Fix the scan rather than lowering ` +
+      `this floor.`,
+  );
+
+  const offenders = sites
+    .filter((s) => !READ_ONLY.test(s.command))
+    .filter((s) => !/--no-transition\b/.test(s.command))
+    .filter((s) => !isDeliberate(s))
+    .map((s) => `${s.file}:${s.line} (under "${s.heading}")`);
+
+  assert.deepEqual(
+    offenders,
+    [],
+    "these sync-jira-* invocations write to Jira but neither pass " +
+      "--no-transition nor appear in DELIBERATE_STATUS_PUSHES, so each " +
+      "silently re-resolves the card's status through loadStatusMap after the " +
+      "tracker-workflow ladder has already set it (bug.11, bug.12):\n  " +
+      offenders.join("\n  "),
+  );
+});
+
+test("G2: no stale entries in the deliberate-status-push allowlist", async () => {
+  const sites = await shippedInvocations();
+  const unmatched = DELIBERATE_STATUS_PUSHES.filter(
+    ([file, prefix]) =>
+      !sites.some((s) => s.file === file && s.heading.startsWith(prefix)),
+  ).map(([file, prefix]) => `${file} — "${prefix}"`);
+
+  assert.deepEqual(
+    unmatched,
+    [],
+    "these allowlist entries match no invocation any more. An allowlist that " +
+      "is never re-checked stops being a set of decisions and becomes a set of " +
+      "excuses — delete the entry, or fix the heading it no longer matches:\n  " +
+      unmatched.join("\n  "),
+  );
+});
+
+test("G3: the three bug.12 call sites are covered by name", async () => {
+  // G is a population check, so it would still pass if these three sites were
+  // deleted outright. bug.12 is about these specific steps; pin them, so that
+  // removing one is a decision someone has to make rather than a silent pass.
+  const sites = await shippedInvocations();
+  const required = [
+    ["skills/review-story/SKILL.md", "Step 9.6"],
+    ["skills/review-task/SKILL.md", "Step 8.6"],
+    ["skills/review-epic/SKILL.md", "Step 11.5"],
+  ];
+
+  for (const [file, step] of required) {
+    const match = sites.find(
+      (s) =>
+        s.file === file &&
+        s.heading.includes(step) &&
+        !READ_ONLY.test(s.command),
+    );
+    assert.ok(
+      match,
+      `${file}: found no writing sync-jira-* invocation under ${step}. If the ` +
+        `step moved or was renamed, update this list; if the sync was removed, ` +
+        `say so here rather than deleting the assertion.`,
+    );
+    assert.match(
+      match.command,
+      /--no-transition\b/,
+      `${file}:${match.line} (${step}) is documented as a body/link-only sync ` +
+        `but does not pass --no-transition, so it re-resolves status after the ` +
+        `ladder has moved the card (bug.12).`,
+    );
+  }
+});
