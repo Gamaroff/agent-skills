@@ -5,18 +5,19 @@ type: task
 description: "Every security check in this repo generates its own candidate inputs from scratch, in prose, at the moment it runs. Ship the adversarial corpus as one source of truth — readable and machine-readable — so a probe tests the inputs that are known to defeat a sink rather than the ones an agent thought of."
 tags: [security, corpus, probe, shared-resources]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: low
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-06
 assignee:
 estimated_effort_hours: 5
 ---
 
 # Technical Task: Write down the inputs that defeat each sink, once
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.79.review.1.security-input-corpus.md` implemented 2026-09-06
 
 ---
 
@@ -42,8 +43,9 @@ hand-rolled axes table into a reference to it. No executor, no skill, no QA wiri
 1. **The candidate set is regenerated from prose every run.** Two runs of the same probe against the same
    boundary can test different inputs and reach different verdicts, and nothing records which inputs were
    tried. `probes_executed: 12` does not say *which* twelve.
-2. **Knowledge found the hard way is not retained.** `bug.3` documented 14 fail-open inputs; `bug.6`
-   documented 12 more. They live in `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs` as
+2. **Knowledge found the hard way is not retained.** [`task.67.bug.3`](../task.67.execute-the-skill-qa-gate/task.67.bug.3.obfuscated-names-and-flag-writes.md)
+   documented 14 fail-open inputs; [`bug.6`](../../bugs/bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md)
+   documented 13 more, plus 2 over-refusals. They live in `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs` as
    a replay corpus for **one** classifier — correct for that test, but unavailable to any other probe.
 3. **The negative direction is easy to forget.** A boundary that refuses everything passes any
    hostile-input-only corpus. `finalise-dod-security-prompt.md:135-137` already requires probing the
@@ -103,7 +105,7 @@ document that argues and defines, and a module that the engine can import.
 ✅ **`shared/resources/security-input-corpus.md`** — what a sink is; per-sink entries; the method ordering
 ✅ **`shared/resources/security-input-corpus.mjs`** — `SINKS`, `corpusFor(sink)`, a frozen case shape
 ✅ **Both directions per sink** — `hostile` and `legitimate`, the latter required
-✅ **`shared/resources/tests/security-corpus.test.mjs`** — schema, coverage floors, both-directions
+✅ **`shared/resources/tests/security-input-corpus.test.mjs`** — schema, coverage floors, both-directions
 ✅ **Folding `finalise-dod-security-prompt.md`'s axes table into a reference**
 
 ### Out of Scope
@@ -132,13 +134,13 @@ content. The DoD security agent's returned YAML shape is unchanged.
 **Files**: `shared/resources/security-input-corpus.md` (new)
 
 **Changes**:
-- [ ] Define **sink**: a place where a value constructed from parts the code does not control is handed to
+- [x] Define **sink**: a place where a value constructed from parts the code does not control is handed to
       a parser or interpreter that assigns it meaning — a URL parser, a SQL engine, a shell, a filesystem
       API, a template renderer
-- [ ] State the **method ordering** once, strongest first: execute the property against a hostile input >
+- [x] State the **method ordering** once, strongest first: execute the property against a hostile input >
       read the dependency's own source for the condition that activates the control > mutate the control
       and re-run the tests > grep. Grep establishes presence, which is the thing that misleads
-- [ ] Per sink, for each case: the input, **why it is dangerous**, and **what a correct implementation does
+- [x] Per sink, for each case: the input, **why it is dangerous**, and **what a correct implementation does
       to it**. The third is what makes the corpus usable as an oracle rather than a list
 
 **Dependencies**: none
@@ -152,21 +154,29 @@ content. The DoD security agent's returned YAML shape is unchanged.
 **Files**: `shared/resources/security-input-corpus.mjs` (new)
 
 **Changes**:
-- [ ] Export `SINKS` — `url-authority`, `sql-orm`, `shell-exec`, `path`, `template-render`
-- [ ] Export `corpusFor(sink)` returning frozen cases; unknown sink throws rather than returning `[]`, so a
+- [x] Export `SINKS` — `url-authority`, `sql-orm`, `shell-exec`, `path`, `template-render`
+- [x] Export `corpusFor(sink)` returning frozen cases; unknown sink throws rather than returning `[]`, so a
       typo cannot silently produce a zero-case probe
-- [ ] Case shape: `{ id, sink, input, why, correct, direction }` where `direction` is `'hostile' |
+- [x] Case shape: `{ id, sink, input, why, correct, direction }` where `direction` is `'hostile' |
       'legitimate'`
-- [ ] Seed from evidence already in this repo and from the two measured defects:
+- [x] Seed from evidence already in this repo and from the two measured defects:
       - `url-authority` — `evil.example.com/x` (host containing `/`; the port is **silently lost**),
         `db?sslmode=disable` (a query appended to what the author thought was a path segment), a
         base64-alphabet secret `a/b+c=d` (generated secrets routinely contain `/` and `+`), plus `@ : # [ ]`,
         a space, and the empty string
-      - `shell-exec` — draw from `bug.3` and `bug.6`: `who'am'i`, `to"u"ch`, `g\h`, `echo pwned>/tmp/x`,
-        `if touch /tmp/x; then`, `$( )`, backtick, `;`, newline
+      - `shell-exec` — draw from `task.67.bug.3` (14 routes, verbatim at
+        `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs:52-65`) and `bug.6` (13 routes):
+        `who'am'i`, `to"u"ch`, `g\h`, `echo pwned>/tmp/x`, `if touch /tmp/x; then`, `$( )`, backtick,
+        `;`, newline. **`bug.6`'s 2 over-refusals seed the `legitimate` direction** — measured accept
+        cases rather than invented ones
       - `path` — `../`, an absolute path, a symlink, a null byte
       - `sql-orm` — quote, comment introducer, `;`, a unicode homoglyph
       - `template-render` — `<script>`, `{{ }}`, `${ }`
+
+- [x] **Prettier covers this file.** `.prettierignore` excludes `*.md`, `*.yml`, `*.json` and
+      `skills/*/references/`, but **not** `shared/resources/*.mjs`, and `npm run ci:fast` runs
+      `prettier --check .` before the tests. Satisfy `printWidth: 80`, `singleQuote: false`,
+      `semi: true`, `trailingComma: "all"`
 
 **Dependencies**: Phase 1
 
@@ -176,16 +186,16 @@ content. The DoD security agent's returned YAML shape is unchanged.
 
 **Risk Level**: Low
 
-**Files**: `shared/resources/tests/security-corpus.test.mjs` (new)
+**Files**: `shared/resources/tests/security-input-corpus.test.mjs` (new)
 
 **Changes**:
-- [ ] Every case satisfies the frozen shape; `why` and `correct` are non-empty strings
-- [ ] **Every sink has at least one `legitimate` case** — the assertion that stops the corpus becoming a
+- [x] Every case satisfies the frozen shape; `why` and `correct` are non-empty strings
+- [x] **Every sink has at least one `legitimate` case** — the assertion that stops the corpus becoming a
       hostile-only list an over-strict implementation would pass
-- [ ] Per-sink minimum case counts, so a sink cannot be added as an empty stub
-- [ ] `corpusFor` on an unknown sink throws
-- [ ] Ids are unique across the whole corpus
-- [ ] **No `package.json` edit needed** — `shared/resources/tests/*.test.mjs` is already in the `test` glob.
+- [x] Per-sink minimum case counts, so a sink cannot be added as an empty stub
+- [x] `corpusFor` on an unknown sink throws
+- [x] Ids are unique across the whole corpus
+- [x] **No `package.json` edit needed** — `shared/resources/tests/*.test.mjs` is already in the `test` glob.
       Confirm it actually ran in the gate log, which in this repo is distinct from being registered
 
 **Dependencies**: Phase 2
@@ -199,15 +209,24 @@ content. The DoD security agent's returned YAML shape is unchanged.
 **Files**: `shared/resources/finalise-dod-security-prompt.md`
 
 **Changes**:
-- [ ] Replace the restated axes table at `:110-118` with a reference to
+- [x] Replace the restated axes table at `:110-118` with a reference to
       `shared/resources/security-input-corpus.md`, keeping the axes as a short summary and moving the
       inputs themselves to the corpus
-- [ ] Preserve the accept-direction requirement at `:135-137` — it now names the corpus's `legitimate`
+- [x] **All five axis names must survive the edit.**
+      `evals/shared/tests/finalise-dod-prompt-contract.test.mjs:126-140` already asserts each of
+      `Alternative spellings`, `Position`, `Composition`, `The unparseable case` and `Flag forms` is
+      present in the prompt source. The summary that replaces the table keeps them; dropping them turns
+      an existing guard red for a reason this task never asked for
+- [x] Preserve the accept-direction requirement at `:135-137` — it now names the corpus's `legitimate`
       cases rather than describing them
-- [ ] Extend `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` to assert the prompt references the
+- [x] Extend `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` to assert the prompt references the
       corpus and **does not restate** its inputs — the same non-restatement guard
       `qa-re-review-scope-parity.test.mjs` applies to the scoping rule
-- [ ] `npm run bundle`
+- [x] `npm run bundle` — the bundler walks shared references **transitively**
+      (`skills/create-skill/scripts/bundle_skill.py:135`), so linking the corpus from the prompt copies
+      `security-input-corpus.md` into `skills/finalise/references/`. Commit the regenerated files;
+      `validate.yml` gates bundle freshness
+- [x] `CHANGELOG.md` — add the entry for this change
 
 **Dependencies**: Phase 3
 
@@ -219,7 +238,7 @@ content. The DoD security agent's returned YAML shape is unchanged.
 
 1. `shared/resources/security-input-corpus.md`
 2. `shared/resources/security-input-corpus.mjs`
-3. `shared/resources/tests/security-corpus.test.mjs`
+3. `shared/resources/tests/security-input-corpus.test.mjs`
 
 ### Files to Modify
 
@@ -229,7 +248,14 @@ content. The DoD security agent's returned YAML shape is unchanged.
 
 ### Files Regenerated
 
-7. `skills/finalise/references/*` — `npm run bundle` output
+7. `skills/finalise/references/finalise-dod-security-prompt.md` — `npm run bundle` output
+8. `skills/finalise/references/security-input-corpus.md` — pulled in transitively once the prompt
+   references it (`bundle_skill.py` walks shared refs recursively). `skills/finalise` is the **only**
+   skill referencing the prompt, so no other skill directory changes
+9. `skills/finalise/references/security-input-corpus.mjs` — the corpus doc links its machine-readable
+   peer, so the bundler copies that too
+10. `skills/finalise/references/mutation-proving.md` — a second transitive hop: the corpus doc links
+    it from the method-ordering section. Confirmed by running the bundler, not predicted
 
 ---
 
@@ -237,18 +263,18 @@ content. The DoD security agent's returned YAML shape is unchanged.
 
 ### Contract Tests
 
-- [ ] Case shape frozen; `why` and `correct` present and non-empty
-- [ ] Every sink carries at least one `legitimate` case
-- [ ] Unknown sink throws
-- [ ] The DoD prompt references the corpus and does not restate its inputs
+- [x] Case shape frozen; `why` and `correct` present and non-empty
+- [x] Every sink carries at least one `legitimate` case
+- [x] Unknown sink throws
+- [x] The DoD prompt references the corpus and does not restate its inputs
 
-**Command**: `node --test shared/resources/tests/security-corpus.test.mjs`
+**Command**: `node --test shared/resources/tests/security-input-corpus.test.mjs`
 
 ### Mutation Proving
 
-- [ ] Delete every `legitimate` case from one sink → the both-directions test goes red
-- [ ] Make `corpusFor` return `[]` for an unknown sink instead of throwing → that test goes red
-- [ ] Re-add an input literal to the DoD prompt → the non-restatement guard goes red
+- [x] Delete every `legitimate` case from one sink → the both-directions test goes red
+- [x] Make `corpusFor` return `[]` for an unknown sink instead of throwing → that test goes red
+- [x] Re-add an input literal to the DoD prompt → the non-restatement guard goes red
 
 Procedure: [`shared/resources/mutation-proving.md`](../../../shared/resources/mutation-proving.md).
 
@@ -258,20 +284,20 @@ Procedure: [`shared/resources/mutation-proving.md`](../../../shared/resources/mu
 
 ### Functional
 
-- [ ] Five sinks defined, each with `hostile` **and** `legitimate` cases
-- [ ] Every case states why it is dangerous and what a correct implementation does to it
-- [ ] The corpus is importable and frozen; a typo'd sink throws rather than yielding zero cases
-- [ ] The DoD security prompt references the corpus rather than restating candidate inputs
+- [x] Five sinks defined, each with `hostile` **and** `legitimate` cases
+- [x] Every case states why it is dangerous and what a correct implementation does to it
+- [x] The corpus is importable and frozen; a typo'd sink throws rather than yielding zero cases
+- [x] The DoD security prompt references the corpus rather than restating candidate inputs
 
 ### Regression
 
-- [ ] `finalise`'s returned `security_review` YAML shape is unchanged
-- [ ] `npm run ci` green; the new suite confirmed to have **run**, not merely been registered
+- [x] `finalise`'s returned `security_review` YAML shape is unchanged
+- [x] `npm run ci` green; the new suite confirmed to have **run**, not merely been registered
 
 ### Safety
 
-- [ ] The corpus contains inputs only — no execution, no side effects on import
-- [ ] Every hostile case names the sink it targets, so nothing is tested against the wrong parser
+- [x] The corpus contains inputs only — no execution, no side effects on import
+- [x] Every hostile case names the sink it targets, so nothing is tested against the wrong parser
 
 ---
 
@@ -318,27 +344,30 @@ restored table.
 | Date       | Version | Description                                                                    | Author      |
 | ---------- | ------- | ------------------------------------------------------------------------------ | ----------- |
 | 2026-09-02 | 1.0     | Initial draft — filed from the rebirth-wallet security-review handover           | create-task |
+| 2026-09-06 | 1.1     | Review passed (8/10, READY TO IMPLEMENT) — 0 critical, 6 important fixed: `bug.3` requalified as `task.67.bug.3`, bug.6 count corrected to 13 + 2 over-refusals, Phase 4's pre-existing five-axis assertion declared, test renamed to `security-input-corpus.test.mjs`, transitive bundle output named, `CHANGELOG.md` assigned to Phase 4 | review-task |
+| 2026-09-06 |         | Implemented — 3 files added, 3 modified, 6 regenerated; 73 corpus cases across 5 sinks; 19 new tests; 3 mutation proofs held | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Sink definition and prose
-- [ ] Sink defined; method ordering stated once
-- [ ] Per-sink entries with why + correct handling
+- [x] Sink defined; method ordering stated once
+- [x] Per-sink entries with why + correct handling
 
 ### Phase 2: Machine-readable module
-- [ ] `SINKS`, `corpusFor`, frozen case shape
-- [ ] Seeded from bug.3, bug.6 and the two measured defects
+- [x] `SINKS`, `corpusFor`, frozen case shape
+- [x] Seeded from bug.3, bug.6 and the two measured defects
 
 ### Phase 3: Tests
-- [ ] Schema, coverage floors, both directions
-- [ ] Confirmed to have run in the gate log
+- [x] Schema, coverage floors, both directions
+- [x] Confirmed to have run in the gate log
 
 ### Phase 4: Fold the prompt's table
-- [ ] Reference replaces restatement
-- [ ] Non-restatement guard added
-- [ ] `npm run bundle`
+- [x] Reference replaces restatement; all five axis names kept
+- [x] Non-restatement guard added
+- [x] `npm run bundle` + regenerated `skills/finalise/references/` committed
+- [x] `CHANGELOG.md` entry added
 
 ---
 
