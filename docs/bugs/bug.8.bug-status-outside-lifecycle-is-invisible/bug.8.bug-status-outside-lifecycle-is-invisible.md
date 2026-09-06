@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-02'
@@ -10,7 +10,7 @@ description: 'A bug filed with a status outside the general-bug lifecycle is sil
 
 **Bug ID**: bug.8
 **Related**: none — cross-cutting (selection · bug authoring · validation)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-02
@@ -306,14 +306,38 @@ floor is deliberately **not** widened:
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-09-06
+**Verified by**: develop-bug
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ✅ Fixed
 
-**Notes**: [Testing notes]
+**Notes**: Verify cycle 1 passed all three signals on the first pass.
 
-**Decision**: Closed | Reopened
+1. **Regression test** — 148/148 green across `select-next.test.mjs` and the new corpus guard,
+   including all 7 `B8:` tests and all 6 corpus tests. The fails-without property was established in
+   Step 3 and re-proved here: setting this very bug document to `status: open` turns the corpus guard
+   red (1 fail), and reverting turns it green (0 fail). The bug's own reported scenario is the test.
+2. **Suite + lint** — `npm run ci:fast` exit 0: `prettier --check` clean across the repo, and
+   **2482 pass / 0 fail / 1 skipped** over the full suite. No regression anywhere.
+3. **Diff code review** — 3 findings, 2 applied in commit `ca4992ff`, 0 blocking left:
+   - *CR-1 (bug, low)* — the corpus guard used `fs.globSync`, experimental on the Node 22 CI pins and
+     used by no sibling test in `evals/shared/tests/`. Switched to the established
+     `readdirSync(dir, { recursive: true })`, then **re-mutation-proved**, so the swap could not have
+     silently turned the guard into a scan that matches nothing and passes by never looking.
+   - *CR-2 (cleanup, low)* — "it warns" invited the assumption that it always warns. Selection
+     short-circuits at the first eligible row, so a misfiled row ranked below the winner is not
+     evaluated on that path. Harmless for this bug's case (a `roadmap-complete` run selected nothing
+     and therefore evaluated everything), but now stated in-code, pointing at `--lint` and the corpus
+     test as the complete guards.
+   - *CR-3 (cleanup, low)* — deliberately **not** applied: adding an off-lifecycle count to
+     `buildRegistryRationale` would be misleading rather than merely absent, precisely because of
+     CR-2's partial evaluation on that path.
+
+The reported failure no longer reproduces: an off-lifecycle status now yields its own reason, its own
+warning on both output paths, and a named mention in the `roadmap-complete` line — and, upstream of
+all three, the build goes red before such a status can reach the selector at all.
+
+**Decision**: Closed (finalised in Step 7)
 
 ---
 
@@ -325,9 +349,43 @@ floor is deliberately **not** widened:
 | 2026-09-06 | New    | review-bug | Fix-readiness review: READY TO FIX (9/10). Corrected the Reproduction Steps + Suggested Fix evidence — the passed-over row *is* recorded in `registryFrontier.passedOver[]` with a reason; the defect is that the reason is indistinguishable from a terminal status. Severity/priority unchanged. |
 | 2026-09-06 | In Progress | develop-bug | Reproduced against `registryFrontier()`; root cause localised to the single floor-only rejection branch |
 | 2026-09-06 | Ready for QA | develop-bug | Fix implemented + 13 regression tests (7 selector, 6 corpus), mutation-proved 6 ways; eligibility floor unchanged |
+| 2026-09-06 | Ready for QA | develop-bug | Verify cycle 1 PASS — regression green, `ci:fast` exit 0 (2482/0), 2 review findings applied (`ca4992ff`); bug scenario gone |
+| 2026-09-06 | Closed | develop-bug | Fix verified and accepted — DoD passed, CI green on `ca4992ff`, PR #327 |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1 (no reopen; verify cycle 1 passed on the first pass)
+**Time to Resolution**: 4 days (filed 2026-09-02 → closed 2026-09-06)
+
+**Final Fix Details**: `registryFrontier()` in `select-next.mjs` knew exactly one status vocabulary —
+the eligibility floor — so its single rejection branch answered *"is this selectable?"* for a question
+that was really *"is this a status at all?"*, giving `closed` and `open` the same sentence. The
+lifecycles now exist in code (`BUG_LIFECYCLE_STATUSES` / `TASK_LIFECYCLE_STATUSES`, pinned against the
+prose in `docs/standards/bug-documents.md`), the frontier tests membership **before** the floor and
+emits a distinct reason plus a `warnings[]` entry, those warnings are returned on the normal selection
+path rather than only under `--lint`, and off-lifecycle rows are named in the `roadmap-complete` line.
+Upstream of all of it, `evals/shared/tests/document-status-lifecycle-corpus.test.mjs` fails the build
+before a bad status can reach the selector at all. The eligibility floor is unchanged.
+
+**Lessons Learned**:
+
+1. **A guard placed downstream of the gate it protects can only fire on inputs that did not need it.**
+   `review-bug` checked this exact rule and was never reached, because the selector it sits behind had
+   already skipped the bug. When a check exists and the defect still ships, ask where in the pipeline
+   it runs before asking whether it is correct — the check was right, its position was not.
+2. **"Recorded" is not "visible".** The passed-over row *was* recorded, with a reason, from the day
+   the frontier shipped. What made it invisible was that the reason was indistinguishable from the one
+   ~98 legitimately-terminal rows carry. The original report said the row was "not mentioned"; the
+   truer statement — found during review — is that it was mentioned identically to everything else.
+   That distinction changed the fix: the work was distinguishability, not recording.
+3. **An enum that lives only in prose cannot be enforced.** The lifecycle was documented in
+   `bug-documents.md` and consumed by `BUG_ELIGIBLE_STATUSES` without ever being represented as the
+   full set, so no filing-time check was even expressible. Giving it a home in code — with a
+   parse-and-compare test against the prose — is what made the corpus guard possible.
+4. **A warning only helps the caller that can see it.** `frontier.warnings` had existed all along, but
+   only on the `--lint` path. The unattended loop reporting `roadmap-complete` — the caller the whole
+   registry fallback exists to serve — was the one caller that could not read it. Worth checking, for
+   any diagnostic, which callers actually receive it.
