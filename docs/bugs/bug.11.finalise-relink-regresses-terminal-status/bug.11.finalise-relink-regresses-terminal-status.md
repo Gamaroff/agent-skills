@@ -1,16 +1,17 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-06'
+updated: '2026-09-06'
 related: 'none — cross-cutting (finalise Step 7 · sync-jira-* status drive)'
 description: "finalise Step 7 transitions the card to Done and then re-runs sync-jira-* to re-point the Document link. Task 40 justified that order on the premise that the sync would then find the issue already in Done and no-op. On any project whose statusMap deliberately maps accepted to something other than Done — which the pipeline's own guidance recommends — the sync instead moves the card BACKWARDS out of the terminal status, and the resolution it was closed with is left stranded on a non-terminal status."
 ---
 
 **Bug ID**: bug.11
 **Related**: none — cross-cutting (finalise Step 7 · `sync-jira-*` status drive)
-**Status**: 🆕 New
+**Status**: ✅ Ready for QA
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-06
@@ -43,7 +44,13 @@ carries no resolution change — the `resolution` set when it was closed is **le
 non-terminal status**. Such a card is invisible to `resolution IS EMPTY` backlog-hygiene queries
 while also not appearing as done, so it is missing from both halves of the usual sweep.
 
-## Steps to Reproduce
+## Reproduction Steps
+
+**Environment**: Jira Cloud (team-managed project), `sync-jira-{story,task}` via `shared/resources/jira-sync.js`;
+observed on the `rebirth-wallet` consumer repo, issue RAPP-715, 2026-09-05.
+**Frequency**: Always — deterministic given the `statusMap` below and a workflow that offers a
+non-terminal transition whose name appears in the `accepted` candidate list.
+**Reproducible**: Yes
 
 On a consumer whose `skills-config.yaml` contains a non-`Done` mapping for `accepted` — e.g.
 
@@ -67,7 +74,24 @@ no self-transition, and offers one literally *named* `Waiting for Review`, which
 that project's `accepted` list. It matched by name, on the first rule, without ever reaching the
 statusCategory fallback.
 
-## Impact
+## Evidence
+
+- **RAPP-715 (rebirth-wallet, 2026-09-05).** After Step 7 block 1 the issue read status `Done`,
+  `resolution: Done`. After block 3 (`sync-jira-task --file <doc> --doc-branch develop`) it read
+  status `Waiting for Review`, still carrying `resolution: Done`.
+- **Mechanism confirmed from the Jira transitions API**, not inferred: from `Done` that workflow
+  offers no self-transition, and offers one literally named `Waiting for Review`, which is a
+  candidate in the project's `accepted` list. It matched by name, on the first rule, without ever
+  reaching the `statusCategory` fallback.
+- **The unconditional call site** — `syncDocumentStatus` is invoked whenever frontmatter carries a
+  `status:`, with no way for a caller to opt out. Four call sites:
+  `skills/sync-jira-story/scripts/sync-jira-story.js:1149`,
+  `skills/sync-jira-task/scripts/sync-jira-task.js:947`,
+  `skills/sync-jira-epic/scripts/sync-jira-epic.js:940` and `:1379`.
+- **The flag does not exist.** `grep -rn -- '--no-transition' skills/ shared/` returns exactly one
+  hit — `skills/finalise/SKILL.md:1129`, which *describes* the durable fix. No implementation.
+
+## Scope & Impact
 
 - **Silent regression of a terminal status.** The pipeline's last act un-does its own close.
 - **Stranded resolution.** Neither `resolution IS EMPTY` nor a status-is-Done filter finds the card.
@@ -114,6 +138,115 @@ Two changes, the first cheap and shipped with this bug, the second the durable f
 
 **Not the fix: reversing the order back to sync-first.** That re-opens what task 40 closed, and the
 QA record for that task should be read before anyone proposes it again.
+
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-09-06
+
+**Reproduction**: The live failure is consumer-configuration dependent (it needs a Jira project whose
+`statusMap` maps `accepted` to a non-terminal column), so the deterministic signal used here is a
+**failing automated test** encoding the defect rather than a live API call. Pre-fix,
+`shared/resources/tests/jira-sync-no-transition.test.mjs` case A fails: `syncDocumentStatus` has no
+way to be asked not to transition, so a caller wanting only the Document-link re-point still issues
+transition requests to Jira. Confirmed the defect is present and not already fixed:
+`grep -rn -- '--no-transition' skills/ shared/ evals/` returned a single hit —
+`skills/finalise/SKILL.md:1129`, prose *describing* the fix — and no implementation.
+
+**Root Cause Analysis**: `shared/resources/jira-sync.js` — `syncDocumentStatus` unconditionally
+resolves and drives status; there is no opt-out on the function or on any of the three CLIs. Four
+call sites consume it: `sync-jira-task.js:951`, `sync-jira-story.js:1153`, and **two** in
+`sync-jira-epic.js` (`:944`, the no-field-changes skip path, and `:1384`, the normal path). So
+finalise's link-only re-point was unavoidably also a status decision, resolved by a second resolver
+(`loadStatusMap`) after the `tracker-workflow.yaml` ladder had already made the call.
+
+**Proposed Fix**: add a `noTransition` opt-out gated **inside** `syncDocumentStatus` (before any
+HTTP), expose it as `--no-transition` on all three CLIs, and pass it from finalise's Step 7 re-link.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-09-06
+
+**Root Cause**: `syncDocumentStatus` could not be asked to skip the status decision, so the
+Document-link re-point carried a second, independent status resolver.
+
+**Fix Description**:
+
+- `syncDocumentStatus` accepts `noTransition` and returns early — **before any HTTP request** —
+  with `{ transitioned: false, reason: "transition-suppressed" }`.
+- The gate lives **in the shared function, not at the four call sites**. Placing it at the callers
+  makes the guarantee only as strong as the least-updated one; that is not hypothetical — the epic's
+  no-field-changes path was missed on the first pass of this very fix while every behavioural test
+  still passed.
+- `--no-transition` added to `sync-jira-{task,story,epic}` (parse, usage string, header docs), and
+  forwarded at all four call sites.
+- `summariseStatusOutcome` treats `transition-suppressed` as exit 0, so `--no-transition` composes
+  with `--fail-on-status-skip` instead of failing every run that uses both.
+- **The reason is `transition-suppressed`, not `no-transition`.** The latter name was already in use
+  in this module for the *opposite* condition — the board offers no matching transition from here,
+  a genuine skip that must keep failing. The first version of this fix reused it and added it to
+  `summariseStatusOutcome`'s zero-exit list, which would have silently stopped every real
+  unreachable-transition skip from failing under `--fail-on-status-skip`. Caught before commit; test
+  B2 now pins the two meanings apart.
+- `finalise` Step 7 block 3 passes `--no-transition`; the prose that asserted the sync no-ops is
+  corrected, and block 4's status re-read is reframed from a repair of expected damage to a cheap
+  confirmation (kept — it still catches a consumer pinned to a pre-flag sync).
+
+**Files Modified**:
+
+- `shared/resources/jira-sync.js` — `noTransition` gate in `syncDocumentStatus`;
+  `transition-suppressed` added to `summariseStatusOutcome`'s zero-exit reasons.
+- `skills/sync-jira-task/scripts/sync-jira-task.js` — flag parsed, usage, header, call site.
+- `skills/sync-jira-story/scripts/sync-jira-story.js` — same.
+- `skills/sync-jira-epic/scripts/sync-jira-epic.js` — same, **both** call sites.
+- `skills/finalise/SKILL.md` — Step 7 passes the flag; ordering note and block 4 corrected.
+- `shared/resources/develop-pipeline-step-7-finalise.md` — re-point note names the flag.
+- `shared/resources/tests/jira-sync-no-transition.test.mjs` — **added**, 16 regression tests.
+- `CHANGELOG.md` — Unreleased entry.
+- Bundled `references/` copies refreshed via `npm run bundle`.
+
+**Testing**:
+
+- 16 regression tests in `shared/resources/tests/jira-sync-no-transition.test.mjs`, covering the
+  gate (zero HTTP issued), its negative half (the un-flagged call *does* reach Jira, so "no request"
+  is caused by the flag and not by a broken function), the default, exit semantics both ways,
+  Change Log silence, per-CLI parsing, and per-call-site forwarding.
+- **Every one mutation-proven** — five separate reverts, each turning the intended test red and only
+  that test:
+  1. gate removed → A fails
+  2. `transition-suppressed` dropped from the zero-exit list → B fails
+  3. flag case removed from one CLI → that CLI's D fails
+  4. epic skip-path call site unwired → E fails (the real defect hit during this fix)
+  5. reason renamed back to the colliding `no-transition` → A, B and B2 fail
+- `npm run ci:fast` (format:check + full suite): **2498 pass, 0 fail**, exit 0. The new file is
+  matched by the existing `shared/resources/tests/*.test.mjs` glob and confirmed present in that run.
+
+**Verification Steps for QA**:
+
+1. `command node --test shared/resources/tests/jira-sync-no-transition.test.mjs` → 16/16 pass.
+2. Confirm the gate is central, not per-caller: `grep -n "if (noTransition)" shared/resources/jira-sync.js`.
+3. Confirm all four call sites forward it:
+   `grep -n -A 14 "syncDocumentStatus({" skills/sync-jira-*/scripts/*.js | grep -E "syncDocumentStatus|noTransition"` → four pairs.
+4. Confirm finalise passes it: `grep -n -- "--no-transition" skills/finalise/SKILL.md`.
+5. Confirm the naming collision is guarded: revert `transition-suppressed` → `no-transition` in
+   `jira-sync.js` and observe B2 go red; restore.
+6. `npm run ci:fast` → green.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+|------|--------|------------|-------|
+| 2026-09-06 | New | create-bug-report | Bug filed alongside the Step 7 documentation fix (PR #326). |
+| 2026-09-06 | New | review-bug | Fix-readiness validate pass. Added the template sections the report was missing (Evidence, Reproduction Steps environment/frequency/reproducible, Developer Fix Cycle, Status History, Resolution Summary); renamed `Steps to Reproduce` → `Reproduction Steps` and `Impact` → `Scope & Impact` to the canonical headings. No severity/priority change — Major/High confirmed correct. |
+| 2026-09-06 | In Progress | develop-bug | Reproduced via a failing regression test; root cause localised to the unconditional `syncDocumentStatus` and its four call sites. |
+| 2026-09-06 | Ready for QA | develop-bug | `--no-transition` implemented on all three syncs, gated inside `syncDocumentStatus`; finalise Step 7 passes it. 16 regression tests, five mutation proofs, `ci:fast` green. |
+
+## Resolution Summary
+
+_Not yet resolved._
 
 ## Related
 

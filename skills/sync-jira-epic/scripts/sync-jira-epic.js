@@ -9,6 +9,11 @@
  * shared lib apply: idempotent create, atomic PUT, status transitions, live
  * priority, issue-type cache, retry on 5xx + network, default-branch URLs,
  * in-place frontmatter, --json/--quiet/--dry-run/--force, pluggable fetch.
+ *
+ * `--no-transition` re-points links / refreshes the description WITHOUT driving
+ * the issue's status, so a caller that has already decided the status (e.g.
+ * finalise's tracker-workflow ladder) is not overruled by this script's own
+ * `loadStatusMap` resolver afterwards. See bug.11.
  */
 
 const fs = require("fs");
@@ -552,6 +557,7 @@ function parseArgs(argv) {
     verbose: false,
     version: false,
     failOnStatusSkip: false,
+    noTransition: false,
     probeWorkflow: false,
     writeRecord: "",
   };
@@ -590,6 +596,9 @@ function parseArgs(argv) {
         break;
       case "--fail-on-status-skip":
         opts.failOnStatusSkip = true;
+        break;
+      case "--no-transition":
+        opts.noTransition = true;
         break;
       case "--probe-workflow":
         opts.probeWorkflow = true;
@@ -674,7 +683,7 @@ async function run({
   if (!args.file) {
     output.err("Error: --file is required");
     output.err(
-      "Usage: sync-jira-epic --file <epic.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version]",
+      "Usage: sync-jira-epic --file <epic.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--verbose] [--version] [--no-transition]",
     );
     return { exitCode: 1 };
   }
@@ -948,6 +957,7 @@ async function run({
           currentStatus: current?.status || null,
           docKind: "epic",
           output,
+          noTransition: args.noTransition,
         });
       }
 
@@ -1387,6 +1397,7 @@ async function run({
       currentStatus: current?.status || null,
       docKind: "epic",
       output,
+      noTransition: args.noTransition,
     });
   }
 

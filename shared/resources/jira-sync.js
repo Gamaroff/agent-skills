@@ -4170,7 +4170,35 @@ async function syncDocumentStatus({
   // Named on a deferred transition record, so a refused status move is
   // attributed to the calling skill rather than to this library.
   skill = undefined,
+  // Opt out of driving status at all, for a caller that wants only the other
+  // half of a sync (re-pointing the Document link, refreshing the description).
+  //
+  // This exists because `sync-jira-*` previously had no way to be status-neutral
+  // — `syncDocumentStatus` ran whenever frontmatter carried a `status:` — so
+  // finalise's Document-link re-point was unavoidably also a status decision,
+  // resolved by a SECOND resolver (`loadStatusMap`) after the ladder had already
+  // made the call. On a consumer mapping `accepted` to a non-terminal column,
+  // that second resolver walked the card back OUT of the status the ladder had
+  // just set, stranding its resolution (bug.11).
+  //
+  // The gate lives here rather than at the four call sites so it holds for every
+  // caller and can be asserted without a live Jira: with `noTransition`, not one
+  // HTTP request is issued.
+  noTransition = false,
 }) {
+  // NB the reason is `transition-suppressed`, NOT `no-transition`. That name is
+  // already taken, by the opposite condition: `no-transition` means the workflow
+  // offers no matching transition from here — a genuine skip that must still
+  // fail under --fail-on-status-skip. Reusing it would have made every real skip
+  // start exiting 0 the moment the suppressed case was added to the pass list.
+  if (noTransition)
+    return {
+      transitioned: false,
+      reason: "transition-suppressed",
+      issueKey,
+      localStatus,
+    };
+
   const root =
     repoRoot ||
     (() => {
@@ -4216,7 +4244,20 @@ function summariseStatusOutcome(
 ) {
   if (!outcome) return 0;
   const { transitioned, reason } = outcome;
-  if (transitioned || reason === "already" || reason === "no-target") return 0;
+  // `transition-suppressed` is the caller having ASKED for no status move, so it
+  // is a run behaving exactly as configured — never a skip to warn about, and
+  // never a reason to fail under --fail-on-status-skip. Omitting it here would
+  // make `--no-transition --fail-on-status-skip` fail every run that used both.
+  //
+  // `no-transition` is deliberately NOT in this list: it is the board offering
+  // no matching transition, which is a real skip and must keep failing.
+  if (
+    transitioned ||
+    reason === "already" ||
+    reason === "no-target" ||
+    reason === "transition-suppressed"
+  )
+    return 0;
 
   // CR-1 — a deferral is not a skip. The move was refused by policy and WRITTEN
   // DOWN, so there is a record to act on; treating it as a skip would both

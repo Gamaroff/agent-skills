@@ -1111,12 +1111,14 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    > durable branch) still happens. **Do not reverse these two blocks** — sync-first hands the
    > decision back to `loadStatusMap`, which is what this order exists to prevent.
    >
-   > ⚠️ **The sync does NOT reliably no-op afterwards, and step 3 below must check.** This block used
-   > to claim it did — *"the sync's own transition then finds the issue already in Done and no-ops"* —
-   > and that is only true when the consumer's `jira.statusMap` maps `accepted` to `Done`. **On a
-   > project that maps it to anything else, the sync moves the card BACKWARDS out of the terminal
-   > status the ladder just set**, and the resolution it was closed with is stranded on a non-terminal
-   > status, where `resolution IS EMPTY` sweeps cannot see it either.
+   > ⚠️ **The sync does not no-op — it is made status-neutral, and that is why step 3 passes
+   > `--no-transition`.** This block used to claim the sync no-ops on its own — *"the sync's own
+   > transition then finds the issue already in Done and no-ops"* — and that is only true when the
+   > consumer's `jira.statusMap` maps `accepted` to `Done`. **On a project that maps it to anything
+   > else, the sync moved the card BACKWARDS out of the terminal status the ladder just set**, and the
+   > resolution it was closed with was stranded on a non-terminal status, where `resolution IS EMPTY`
+   > sweeps cannot see it either. `--no-transition` removes the second resolver from the path
+   > entirely, rather than correcting after the fact.
    >
    > This is not an exotic configuration — **it is the one this very step recommends**. See the
    > `stage-disabled` row below: *"a board that wants a card to sit in a merge queue until the PR
@@ -1126,8 +1128,9 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    > by *name*, because that workflow offers a transition literally called `Waiting for Review` and
    > that name was in the project's `accepted` candidate list.
    >
-   > Full analysis and the durable fix (a `--no-transition` flag on the sync, so the re-link cannot
-   > carry a status decision at all): [`bug.11`](../../docs/bugs/bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md).
+   > Full analysis: [`bug.11`](../../docs/bugs/bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md).
+   > The flag is implemented on `sync-jira-{story,task,epic}` and gated inside `syncDocumentStatus`,
+   > so it holds for every caller of the sync, not just this one.
 
    1. **Transition to Done** — follow `references/jira-transition-protocol.md` exactly, with
       `candidates = ["Done", "Closed", "Resolved", "Complete", "Completed"]` and `terminal = true`.
@@ -1187,14 +1190,17 @@ EOF
 
    Log outcome in running summary: "Jira issue {jira_key} transitioned to Done ✅" or the warning detail.
 
-   3. **Re-point the Jira Document link** — the description is ADF (can't be patched in place), so re-run the sync with the durable branch pinned. This is best-effort and additive. It also drives the status transition from frontmatter (`accepted` → Done), but because step 1 has already run, that transition resolves to a no-op and the ladder remains the single resolver:
+   3. **Re-point the Jira Document link** — the description is ADF (can't be patched in place), so re-run the sync with the durable branch pinned. This is best-effort and additive. It is run with **`--no-transition`**, which makes it link-only: the sync issues no status request at all, so the ladder in step 1 stays the single resolver and the re-link cannot overrule it (bug.11):
 
    ```bash
    WORKITEM=story   # set to "task" when finalising a task
    if [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ]; then
      # sync-jira-{story|task} (same script the create/sync flow uses)
+     # --no-transition is REQUIRED here, not optional tidiness. Without it the
+     # sync resolves `accepted` through its own loadStatusMap and can walk the
+     # card back out of the terminal status step 1 just set (bug.11).
      node .agents/skills/sync-jira-${WORKITEM}/scripts/sync-jira-${WORKITEM}.js \
-       -f "$DOC_PATH" --doc-branch "$DURABLE_BRANCH" --quiet \
+       -f "$DOC_PATH" --doc-branch "$DURABLE_BRANCH" --no-transition --quiet \
        && echo "✅ Jira Document link re-pointed to ${DURABLE_BRANCH}" \
        || echo "⚠️ sync-jira re-link failed — the transition in step 1 already ran; re-sync from develop after merge"
    else
@@ -1202,10 +1208,11 @@ EOF
    fi
    ```
 
-   4. **Re-assert the terminal status — MANDATORY, and read it back rather than assuming.** The sync
-      above drives status from frontmatter through its own resolver, so on a consumer whose
-      `statusMap` maps `accepted` to a non-`Done` column it will have just walked the card backwards
-      out of the status step 1 set (bug.11). Check, and repair if so:
+   4. **Confirm the terminal status — still MANDATORY, and read it back rather than assuming.** With
+      `--no-transition` in step 3 the re-link no longer moves the card, so this is now a confirmation
+      rather than a repair of expected damage. Keep it: it is one cheap read, it still catches a
+      consumer pinned to an older `sync-jira-*` that predates the flag, and step 1's own `204` is a
+      statement about step 1, not about the state the step ends in. Check, and repair if needed:
 
    ```bash
    POST_SYNC=$(curl -s -u "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" -H "Accept: application/json" \
@@ -1214,9 +1221,12 @@ EOF
    ```
 
    - Terminal (`Done`/`Closed`/whatever step 1 targeted) → nothing to do.
-   - **Anything else** → step 1's close was undone. Re-run the step-1 transition, supplying the same
-     required fields (a `resolution` is the common one), then **re-read again** to confirm. Log in the
-     running summary: *"re-asserted terminal status after the Document-link re-point (bug.11)"*.
+   - **Anything else** → step 1's close was undone. This should no longer be reachable through step 3;
+     if it happens, check that the sync being invoked actually supports `--no-transition` (it would
+     have exited non-zero with `Unknown option` if not). Re-run the step-1 transition, supplying the
+     same required fields (a `resolution` is the common one), then **re-read again** to confirm. Log
+     in the running summary: *"re-asserted terminal status after the Document-link re-point
+     (bug.11)"*.
 
    Never report the close on the strength of step 1 alone once step 3 has run — a `204` from step 1 is
    a statement about step 1, not about the state the step ends in.

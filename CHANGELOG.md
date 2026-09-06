@@ -28,7 +28,31 @@ All notable changes to this project will be documented in this file. Format foll
 
   The durable fix — a `--no-transition` flag so the re-link cannot carry a status decision at all —
   is specified in [`bug.11`](docs/bugs/bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md)
-  and deliberately not bundled here, to keep this one change.
+  and deliberately not bundled here, to keep this one change. **It has since landed — see below.**
+
+- **`sync-jira-{story,task,epic}` can now be status-neutral: `--no-transition` (bug.11, durable fix).**
+  The sync previously had no way to re-point a Document link *without* also deciding the issue's
+  status: `syncDocumentStatus` ran whenever frontmatter carried a `status:`. So finalise's link-only
+  re-point was unavoidably a second status resolver running after the `tracker-workflow.yaml` ladder
+  had already made the call — the mechanism behind the regression above. `finalise` Step 7 now passes
+  the flag, and its post-re-link status re-read drops from a repair of expected damage to a cheap
+  confirmation (kept, because it still catches a consumer pinned to an older sync).
+
+  **The gate lives inside `syncDocumentStatus`, not at its callers.** There are four call sites across
+  the three scripts, and putting the check at the callers means the guarantee is only as good as the
+  least-updated one — during this fix, `sync-jira-epic`'s no-field-changes path was in fact missed on
+  the first pass while every behavioural test still passed. Gated centrally, `--no-transition` issues
+  **no HTTP request at all**, which is what the regression test asserts.
+
+  **The outcome reason is `transition-suppressed`, not `no-transition`.** The latter was already taken
+  by the opposite condition — *the board offers no matching transition from here* — which is a real
+  skip that must keep failing under `--fail-on-status-skip`. Reusing the name (briefly done, and
+  caught) would have silently stopped every genuine unreachable-transition skip from failing. A
+  regression test now pins both meanings apart.
+
+  `--no-transition` composes with `--fail-on-status-skip` (a suppressed transition is a run behaving
+  as configured, so it exits 0) and writes no Change Log row, because nothing moved. `review-story`'s
+  `--doc-branch` sync is unaffected and still drives status — there, the transition is the point.
 
 ### Added
 
