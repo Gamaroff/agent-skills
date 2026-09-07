@@ -1,178 +1,233 @@
-# Session Handoff — 2026-08-13
+# Session Handoff — 2026-09-07
 
-Read this first if you are picking up work in `agent-skills`. It records where things stand, the
-one open decision, and the traps that cost time in the previous session.
+Read this first if you are picking up work in `agent-skills`. It records where things stand, what to
+pick up, the one standing decision, and the traps that cost time. Every figure below was measured in
+the session that wrote this file, not carried forward from the previous handoff.
 
-**State at handoff:** branch `develop` @ `9b01ef5` · working tree clean · `npm test` **1193/1193** ·
-both eval suites green · `npm run bundle` idempotent · **zero open PRs**.
+**State at handoff:** branch `develop` @ `0de616b0` · working tree clean · **zero open PRs** · **zero
+open issues**.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Hermetic suite | `npm test` | **exit 0** — 505 bash assertions + 2,538 node tests, **0 failures**, 1 skipped |
+| Replay evals | `npm run eval:all` | **exit 0** — 25 scenarios, all assertions passed |
+| Bundle idempotency | `npm run bundle` | clean no-op — 0 files changed |
+| Formatting | `npx prettier --check .` | clean |
+| Roadmap lint | `select-next.mjs --lint` | **0 errors, 0 warnings** |
 
 ---
 
-## 1. Nothing is blocking
+## 1. What to pick up — T80
 
-The roadmap is complete and archived. `select-next.mjs` reports `roadmap-complete`, which is the
-correct terminal state, not an error. There is no frontier to pick up.
+The frontier is **not** empty. `select-next.mjs` returns:
 
-If you ran `/develop-next` right now it would stop cleanly and do nothing. That is expected.
+```
+selected  T80  →  /develop-task
+docs/tasks/task.80.security-probe-engine/task.80.security-probe-engine.md
+ready-for-development · High · risk_level: medium · est. 6h · depends_on: task.79 (merged)
+```
+
+*Make a security probe runnable without widening the snippet allow-list.* task.73's probe mode is
+prose — it tells the agent to hand-write a script, run it, and then trusts the `probes_executed`
+count the agent types. T80 builds the engine that runs the probe and computes the verdict, without
+putting an interpreter on the snippet allow-list (which would make that boundary fail open).
+
+`/develop-next` will dispatch this. There is no run-state file, so it starts clean rather than
+resuming.
+
+**Note how it was selected.** Phase 5 of the roadmap is fully ticked, so no phase held an actionable
+row and selection **fell through to the task-registry fallback**. That is the designed terminal
+behaviour of a closed phase, not a fault.
 
 ---
 
-## 2. The one open decision — a release
+## 2. The standing decision — when to cut v0.46.0
 
-This is the only outstanding action, and it needs a human call.
+The previous handoff's "is this the moment for 1.0?" question was answered by practice: **eight tags
+shipped since**, all `0.x` minors.
 
 | Fact | Value |
 | --- | --- |
-| `develop` ahead of `main` | **67 commits** |
-| Last tag | `v0.37.4` |
-| `## [Unreleased]` in `CHANGELOG.md` | **~1,153 lines** |
+| Last tag | **v0.45.0**, cut 2026-09-02, on `main` @ `0d09860f` |
+| `develop` ahead of `v0.45.0` / `main` | **177 commits** |
+| `## [Unreleased]` in `CHANGELOG.md` | **399 lines** |
 | Release trigger | push a `v*.*.*` tag, or `workflow_dispatch` (`.github/workflows/release.yml`) |
 
-**The version choice is not yours to make.** Both roadmap phases shipped breaking changes — task.45
-alone documents three (marker-pair unification, sync stops writing body-update rows, task.42 wrappers
-deleted), plus `transitionToStatus` now returns `to: null` where it previously returned a transition
-name. On `0.x` that is a minor bump at minimum; whether it is the moment for `1.0` is a product
-decision. **Ask before tagging.**
+So the release machinery works and the cadence is established — roughly a tag every few days through
+mid-August, then a 5-day gap since v0.45.0 while 177 commits accumulated. **The timing is still a
+human call. Ask before tagging.**
 
-**Watch the diff's shape, not just its content.** Open issue
-[#179](https://github.com/Gamaroff/agent-skills/issues/179) is a complaint that *"v0.29.5 shipped a
-whole-file reformat alongside a 40-line fix, unannounced"*. This release carries 67 commits including
-several full-file rewrites produced by the bundler — the same shape that generated that complaint.
-Separate mechanical churn from behavioural change in the release notes.
-
-**Caveat:** the previous session reviewed only the commits it authored. Roughly 55 of the 67 are
-unreviewed by any agent in that session.
+One piece of advice from the previous handoff still applies: **separate mechanical churn from
+behavioural change in the release notes.** A large fraction of any diff this size is full-file
+rewrites produced by `npm run bundle`, not behaviour. Issue #179 (now closed) was a complaint about
+exactly that shape shipping unannounced.
 
 ---
 
-## 3. Carried follow-ups — real, not blocking
+## 3. Carried follow-ups — status re-verified this session
 
-None of these has a task document yet. Each would need `/create-task` (read
-`docs/standards/task-registry.md` first — task numbers are globally unique and the registry is the
-source of truth).
+The previous handoff listed four. Here is where each actually stands, checked rather than assumed.
 
-### 3a. Two pre-existing defects in `shared/resources/change-log.js`
+### 3a. `shared/resources/change-log.js` — one defect fixed, one still open
 
-Both found by an adversarial diff review during task.45 QA, both **deliberately not fixed** to avoid
-expanding a PR into engine surgery mid-QA-cycle. Documented in
-`docs/tasks/task.45.change-log-pipeline-and-sync/task.45.bug.3.row-loss-on-unparsed-rows.md`.
+**(1) Content loss on the hand-written-heading path — STILL OPEN (MEDIUM).** Confirmed by running the
+engine, not by reading it. On the `hasMarkers: false` path — which is what **every not-yet-migrated
+document takes on its first write** — a probe document with prose and a nested `###` under
+`## Change Log` came back:
 
-1. **Content loss on the hand-written-heading path (MEDIUM).** When `findChangeLog` returns
-   `hasMarkers: false`, the whole span to the next heading is replaced by the regenerated block —
-   destroying prose, authoring comments and any nested `###` subsection under that heading. This is
-   the path every not-yet-migrated document takes on its first write. **This is the more serious of
-   the two** and is the natural next task.
-2. **`collapseOtherLegacyBlocks` skips the chosen block's own pair (LOW).** A document holding *two*
-   blocks of the same legacy pair keeps both for one write, self-healing on the next. The guard
-   contradicts the loop directly below it (`shared/resources/change-log.js`, 3 references).
+```
+hasMarkers: false
+LOST   AUTHORING NOTE prose
+LOST   ### Nested Subsection  (heading and body)
+KEPT   existing table rows
+KEPT   the following ## section and its body
+```
 
-### 3b. Live Jira verification (task.45, unticked by design)
+Rows survive; **everything else under the heading does not.** Note the source comment near
+`findChangeLog` describes a fix for a *related* case (an H3 log ending at the next `###` or `##`) —
+that fix is real but does not cover this one, where the log is H2 and the nested H3 falls inside its
+span. Do not read that comment as closing this.
 
-Four-step check against a real Jira issue, in
-`docs/tasks/task.45.change-log-pipeline-and-sync/task.45.plan.change-log-pipeline-and-sync.md`:
-two no-op syncs leave the file byte-identical → a body edit writes **no** row → a status change writes
-**exactly one** → `--check-card` still clean.
+**(2) `collapseOtherLegacyBlocks` skipping the chosen block's pair — FIXED.** The previous handoff
+called the guard a contradiction of the loop below it. It is now correct and documented as
+deliberate: the function is called on the text *either side* of the chosen block, so that block is
+never a removal candidate, and the inner `for (;;)` does handle several blocks of one pair. **Drop
+this item.**
 
-Cannot run here: `JIRA_URL` is unset and this repo is GitHub-tracked. It was carried openly through
-review, both QA cycles, the gate and the DoD rather than quietly ticked. Gate 2 assessed it as
-**staging APPROVED, production CONDITIONAL**. Run it before relying on the sync narrowing in a
-Jira-tracked consumer.
+### 3b. Live Jira verification (task.45) — still unrunnable here
 
-### 3c. Missing `run()`-level tests
+`JIRA_URL` is **unset** and this repo is GitHub-tracked. The four-step check lives in
+`docs/tasks/task.45.change-log-pipeline-and-sync/task.45.plan.change-log-pipeline-and-sync.md`. It
+was carried openly through review, both QA cycles, the gate and the DoD rather than quietly ticked —
+keep it that way. Gate 2: **staging APPROVED, production CONDITIONAL.** Run it before relying on the
+sync narrowing in a Jira-tracked consumer.
 
-Two behaviours task.45 changed but tested only at unit level, with a stubbed `fetchImpl`:
-- `sync-jira-story`'s write gate on the **skipped-but-transitioned** path (the case that matters —
-  body unchanged, status moved, must still write)
-- `sync-jira-epic`'s fast-path transition
+### 3c. Missing `run()`-level tests — still open
 
-### 3d. Deferred / human-gated roadmap rows
+`sync-jira-story`'s write gate on the **skipped-but-transitioned** path (body unchanged, status
+moved, must still write) and `sync-jira-epic`'s fast-path transition. The suites are large — 88 and
+72 tests — but they target helpers (`guardConcurrentEdit`, `makeHttp`, `findRelatedDocs`,
+`findChildStories`). No test names either path.
 
-`T41-fixtures` and `T38-fixtures` — both need credentials or a scratch Projects v2 board this repo
-does not hold. They live under `## Deferred / human-gated` and are invisible to selection by design.
+### 3d. Deferred / human-gated roadmap rows — unchanged
+
+`T41-fixtures` and `T38-fixtures` still sit under `## Deferred / human-gated`, invisible to selection
+by design. Both need credentials or a scratch Projects v2 board this repo does not hold.
 
 ---
 
-## 4. Traps that cost time — read before touching anything
+## 4. Two kinds of bookkeeping drift — known, tolerated, recurring
 
-These are environment and codebase specific. Each one bit the previous session.
+Neither blocks anything. Both will mislead you if you trust the wrong file.
 
-### `node` is shadowed by an nvm shell function
+**The task-registry status column goes stale; the document is the authority.** 16 of 103 evaluated
+rows disagree with their document's own frontmatter — 9 `ready-for-development`→`accepted`, 5
+`planned`→`accepted`, 2 `draft`→`accepted`. Every one is stale in the harmless direction, and
+`select-next` rejects on the **document** status, so selection is correct regardless. `--lint`
+reports 0 warnings for these; do not read that as agreement between the two.
 
-`type node` resolves to a shell function that prints nvm's help and swallows your arguments. **Use
-`/usr/local/bin/node` explicitly** for every script invocation. `npm` is fine.
+**Accepted items keep not getting a Phase 5 roadmap row.** B7, B11, B12 and T79 are all accepted with
+**no row at all**. This is the third recurrence — `bcf183b4` fixed it for B6/B9, PR #328 for B8/B10,
+and it has already returned. Nothing enforces the convention: a fix's own commit has no reason to
+touch the roadmap, and by merge time the pipeline is done with it. A *missing* row is harmless
+(selection reads the registries directly); an **unticked** row for an accepted item is what stalls
+the loop, and that is what `## Housekeeping` warns about. Different failure, don't conflate them.
+
+---
+
+## 5. Traps — read before touching anything
+
+### `node`, `npm` and `npx` are all shell functions — prefix every one with `command`
+
+All three resolve to shell functions from the Claude shell snapshot
+(`~/.claude/shell-snapshots/snapshot-zsh-*.sh`), and each injects **101 lines of nvm help** into the
+output stream. Measured this session: the banner appears in the captured output of `npm test`,
+`npm run eval:all`, `npm run bundle` and `npx prettier --write` alike; `command npx prettier --write`
+emits none.
+
+Exit codes and human-readable output survive it — that is why this goes unnoticed — but **any
+captured JSON is corrupted**, which is exactly how `select-next.mjs` output gets mangled. **Use
+`command node`, `command npm`, `command npx`.** (`/usr/local/bin/node` also works but is less
+portable.)
+
+The previous handoff said "`npm` is fine". It is not; it was never checked.
+
+### `.agents/skills` is a symlink to `../skills`
+
+Not just one file — **the whole directory**. `.agents/skills/foo/…` and `skills/foo/…` are the same
+file on disk; editing either edits both. Only the `skills/` path is git-tracked.
 
 ### Never edit `skills/*/references/` — it is generated
 
-`shared/resources/` is the single source of truth. A pre-commit hook (`.git/hooks/pre-commit`) runs
-`npm run bundle` whenever `shared/resources/` or any `SKILL.md` is staged, and **re-stages the
-result** — so a fix applied only to a bundled copy is silently reverted. Edit the source, then
-bundle. A second `npm run bundle` must be a clean no-op.
+`shared/resources/` is the single source of truth. `.git/hooks/pre-commit` runs `npm run bundle`
+whenever `shared/resources/` or any `SKILL.md` is staged and **re-stages the result** — so a fix
+applied only to a bundled copy is silently reverted. Edit the source, then bundle. A second
+`npm run bundle` must be a clean no-op (it is, as of this handoff).
 
-**Exception:** `skills/develop-next/scripts/select-next.mjs` and
-`.agents/skills/develop-next/scripts/select-next.mjs` are the *same file* (linked). Editing one edits
-both. Only the `skills/` path is git-tracked.
+### CI check counts differ per PR — legitimately
+
+Two of the five workflows are `paths:`-filtered:
+
+| Workflow | Filter |
+| --- | --- |
+| `docs-link-check.yml` | `docs/**/*.md`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md` |
+| `validate.yml` | `skills/**`, `shared/resources/**`, `scripts/generate-skill-dependencies.mjs`, … |
+| `test.yml`, `shellcheck.yml`, `branch-policy.yml` | unfiltered |
+
+A docs-only PR shows 4 checks; a skills PR shows 5. **A skipped check and a check that failed to
+start look identical in `gh pr checks`** — confirm via the rollup. Note `docs-link-check` does *not*
+fire on `skills/**/*.md` or `shared/resources/**/*.md`.
+
+### `gh pr view --json mergeable` lies twice, in different ways
+
+`UNKNOWN` means GitHub has not computed it yet — not a conflict. Re-query, or use
+`git merge-tree --write-tree` for a definitive local answer. Worse: **immediately after a force-push
+this session returned `MERGEABLE CLEAN` with an empty `statusCheckRollup`** — CLEAN only because no
+check had registered yet. Twenty seconds later it was `UNSTABLE` with four checks `IN_PROGRESS`.
+**Poll until the rollup is non-empty *and* every check has a conclusion.**
+
+### `npm test`'s suite list is hand-maintained
+
+The `test` script is 10 `&&`-joined segments — nine explicit `bash …` invocations plus one
+`node --test` call with an explicit list of per-skill globs. **A new `skills/*/tests/` directory runs
+nowhere until someone adds its glob.** This has already silently orphaned 232 tests once.
+
+### The `.gitignore` negation block must stay at the END of the file
+
+The last three lines re-include `evals/**/replay/`. Those fixtures deliberately contain paths matched
+by earlier rules (`*.log`, `.claude/`). A gitignore negation only overrides rules that appear
+**before** it, and the directory negations must precede the file negation so git descends into
+otherwise-ignored fixture dirs. Move that block and CI fails on a fresh clone while local passes.
 
 ### Do not use a next-heading lookahead to replace a markdown section
 
-This caused two separate defects in one session. A regex like:
+A regex like `/## Section\n[\s\S]*?(?=\n## )/` matches its terminating lookahead against a `##`
+heading **inside a fenced code sample**, stops early, and leaves the tail of the old section behind —
+including an unbalanced fence that makes the rest of the file render as code. It also fires on a
+prose *mention* of a heading name. The Change Log engine guards this (`fencedRanges` /
+`insideProtected`); one-off edit scripts do not. **Locate both boundaries, assert both, cut by
+explicit line range**, then verify fence parity: `$(grep -c '^```' "$f") % 2` must be `0`.
 
-```js
-/## Section Name\n[\s\S]*?(?=\n## )/
-```
+### Two tests to distrust differently
 
-matches its terminating lookahead against a `##` heading **inside a fenced code sample**, stops early,
-and leaves the tail of the old section behind — including an unbalanced ` ``` ` fence that makes the
-rest of the file render as code. It also fires on a *prose mention* of a heading name.
-
-The Change Log engine guards against exactly this (`fencedRanges` / `insideProtected`); one-off edit
-scripts do not. **Locate the boundaries, assert both, and cut by explicit line range.** Verify after
-with fence parity: `$(grep -c '^```' "$f") % 2` must be `0`.
-
-### CI: `link-check` is `paths:`-filtered
-
-`.github/workflows/docs-link-check.yml` only runs on `.md` changes. A PR touching no markdown shows
-**two** checks, not three. That is a legitimate skip, not a missing check — but a skipped check and a
-check that failed to start look identical in `gh pr checks`. Confirm via the rollup.
-
-### `gh pr view --json mergeable` returns `UNKNOWN` before GitHub computes it
-
-Not a conflict. Re-query, or use `git merge-tree --write-tree` for a definitive local answer.
-
----
-
-## 5. What shipped in the previous session
-
-For context when reading recent history.
-
-| PR | What |
-| --- | --- |
-| [#213](https://github.com/Gamaroff/agent-skills/pull/213) | **task.45** — pipeline, QA, finalise and tracker sync write the Change Log. Completes the T42–T45 series and Phase 2. Gate PASS 95/100 after 1 fix cycle, 3 bugs closed |
-| [#214](https://github.com/Gamaroff/agent-skills/pull/214) | `jira-sync` reports the landed **status**, never the transition **name** — a verb was being written into permanent history |
-| [#212](https://github.com/Gamaroff/agent-skills/pull/212) | `qa-fix` Step 3.5 (adversarial pass over the fixes themselves) + `finalise` test-execution rule. Authored elsewhere; merged after verifying it did not collide with task.45 |
-| — | Roadmap Phases 1 and 2 archived to `docs/development/roadmap-history.md`, plus the selector fix that archiving made necessary |
-
-### The one worth knowing about
-
-During task.45's QA, a diff review found that `upsertChangeLog` **silently deleted every Change Log
-row it could not parse** — any log ordered `| Version | Date | ... |` lost its entire history on first
-write, and this repo's own roadmap template shipped with that column order. Pre-existing in task.42.
-Fixed in #213 along with the template.
-
-The lesson worth carrying: the task's own risk register claimed *"`upsertChangeLog` never drops a row
-it parsed"* — true, and hollow, because the rows it drops are the ones it **fails** to parse. A
-mitigation that is technically true can still be worthless.
+- `qa-execute-snippets` is **load-flaky** — it asserts on multi-second timings and fails under
+  parallel load. Re-run that file alone before believing a failure.
+- The **stdout-drain premise test is not flaky any more** (fixed 2026-09-04; the payload is now sized
+  from the pipe buffer). A failure there is real. Do not re-run it away.
 
 ---
 
 ## 6. Where the artifacts are
 
 ```
-docs/development/project-completion-roadmap.md   live roadmap (no frontier; deferred rows only)
-docs/development/roadmap-history.md              archived Phases 1 & 2 — resolve any `deps:` here
-docs/tasks/task.45.change-log-pipeline-and-sync/ review, QA ×2, gates ×2, 3 bug reports, DoD,
-                                                 implementation report, sprint-review summary
+docs/development/project-completion-roadmap.md   live roadmap — Phase 5 closed, deferred rows only
+docs/development/roadmap-history.md              archived Phases 1–4
+docs/tasks/task-registry.md                      task numbering — next available: 93
+docs/bugs/bug-registry.md                        general-bug numbering — next available: 13
+docs/tasks/task.80.security-probe-engine/        the next item
+shared/resources/change-log.js                   3a(1)'s defect lives here
 shared/resources/document-change-log.md          canonical Change Log spec
-shared/resources/change-log.js                   the engine (3a's defects live here)
 ```
 
-Pipeline conventions: `AGENTS.md`. Anti-patterns: `docs/reference/anti-patterns.md`.
+Pipeline conventions: `AGENTS.md`. Anti-patterns: `docs/reference/anti-patterns.md`. Design
+rationale: `docs/reference/faq.md`.
