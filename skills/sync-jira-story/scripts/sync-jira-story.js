@@ -163,11 +163,23 @@ function hashBody({
 }
 
 function hashMeta(frontmatter) {
+  // `assignee`, `due_date`, `components` and `fix_versions` are here because
+  // the PAYLOAD carries them (`collectIssueFields`) while `diffFields` does
+  // not compare them — it compares summary, description hash, priority, labels
+  // and this meta hash, and nothing else. Before the label-diff fix the skip
+  // gate was unreachable, so the PUT always fired and these fields always
+  // reached Jira; making the gate reachable turned an edit to any of them into
+  // a silent no-op that still reported success. Any field the payload sends
+  // and the diff does not compare belongs in this hash.
   return lib.hashStable({
     story_type: frontmatter.story_type || "",
     estimated_effort_hours: frontmatter.estimated_effort_hours || "",
     jira_epic: frontmatter.jira_epic || "",
     status: frontmatter.status || "",
+    assignee: frontmatter.assignee || "",
+    due_date: frontmatter.due_date || "",
+    components: JSON.stringify(frontmatter.components || ""),
+    fix_versions: JSON.stringify(frontmatter.fix_versions || ""),
   });
 }
 
@@ -978,12 +990,19 @@ async function run({
       // Second pass of the two-pass build: send `description` only when body or
       // metadata actually changed, to avoid pointless edits in Jira's history.
       //
-      // `args.force` overrides that. A forced sync of an unchanged document
-      // otherwise PUTs exactly the three fields the diff just proved identical
-      // to Jira — a write that repairs nothing, which makes the documented
-      // repair path (a card blanked or corrupted in the Jira UI) inoperable.
-      // Forcing is the one case where re-publishing an unchanged description
-      // is the entire point.
+      // `args.force` overrides that, and this is NEW behaviour rather than a
+      // restoration — worth stating plainly, because an earlier revision of
+      // this comment claimed otherwise. On `develop` a forced unchanged sync
+      // also computed `includeDescription === false` (`changedFields` was
+      // always exactly `["labels"]`, which contains neither "description" nor
+      // "metadata"), so `--force` never re-published the description there
+      // either. Verified against a develop worktree: the forced payload was
+      // `summary, labels, priority`.
+      //
+      // It is added deliberately: without it a forced sync PUTs exactly the
+      // fields the diff just proved identical to Jira, which makes `--force`
+      // useless for the thing operators reach for it for — repairing a card
+      // edited or blanked in the Jira UI. Epic behaves the same way.
       const includeDescription =
         args.force ||
         changedFields.includes("description") ||

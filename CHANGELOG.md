@@ -146,6 +146,18 @@ All notable changes to this project will be documented in this file. Format foll
   epic issue no PUT. Nothing in this repo scraped that string, and a caller depending on it was
   depending on a defect.
 
+  **`sync-jira-story --force` gains behaviour**, and it is new rather than restored. It now bypasses
+  the no-change fast path and re-publishes the description, matching `sync-jira-epic`. Neither half
+  worked before: story's gate never carried epic's `!args.force` term, and a forced unchanged sync
+  computed `includeDescription === false` in any case, so the forced write carried only the fields
+  the diff had already proved identical. Both were unreachable while the label defect kept the gate
+  shut. `--force` is now what an operator repairing a card edited in the Jira UI expects it to be.
+
+  One more consequence of making that gate reachable, caught at PR review: the gate compares only
+  what `diffFields` compares, so `assignee`, `due_date`, `components` and `fix_versions` — carried by
+  the payload, compared by nothing — were being silently dropped on story and epic. They are folded
+  into the meta hash, with a regression test on each script.
+
   The regression coverage is the point as much as the fix. Both defects survived a full unit suite,
   because those tests asserted `diffFields` and `collectIssueFields` each behaved correctly *in
   isolation* and nothing asserted the two agreed with each other. The new end-to-end suites

@@ -9,7 +9,7 @@
  * Epic is the careful one, and not for the reason a grep suggests. It already
  * has a post-transition re-read of `updated` — but only inside the skip branch,
  * which is gated on `current && changedFields.length === 0 && !args.force`
- * (`sync-jira-epic.js:948`). Defect 1 guarantees `changedFields` always
+ * (the no-change fast path in `sync-jira-epic.js`). Defect 1 guarantees `changedFields` always
  * contains `labels`, so that gate never opens and the correct code behind it is
  * dead. Epic is not half-fixed in practice; it is equally broken, with a fix
  * that cannot run.
@@ -149,9 +149,10 @@ test("an unchanged epic ENTERS the skip path, reaching the re-read behind its ga
   const second = await runSync(root, epic, fetchImpl, ["--quiet"]);
 
   // THE ASSERTION THAT MATTERS. `skipped` is set only inside the
-  // `changedFields.length === 0` branch at :948. While defect 1 stands,
+  // `changedFields.length === 0` fast-path branch. While defect 1 stands,
   // `changedFields` always contains "labels", the gate never opens, and the
-  // post-transition re-read at :990 is unreachable. Asserting merely that no
+  // post-transition re-read behind it (`skipSyncedAt`) is unreachable.
+  // Asserting merely that no
   // abort occurred would pass for the wrong reason.
   assert.equal(
     second.skipped,
@@ -166,6 +167,37 @@ test("an unchanged epic ENTERS the skip path, reaching the re-read behind its ga
     putCount(state, key),
     0,
     "an update-path PUT was issued on a run that reported itself as skipped",
+  );
+});
+
+test("a payload-only frontmatter edit is not swallowed by the skip gate", async () => {
+  const { root, epic } = repoWithEpic();
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, epic, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+
+  // Same defect as story's: `due_date` is sent by the payload and compared by
+  // neither `diffFields` nor — before this fix — `hashMeta`, so the newly
+  // reachable fast path returned early and the edit never reached Jira.
+  fs.writeFileSync(
+    epic,
+    fs
+      .readFileSync(epic, "utf-8")
+      .replace("priority: High", "priority: High\ndue_date: 2026-12-01"),
+  );
+
+  const second = await runSync(root, epic, fetchImpl, ["--quiet"]);
+
+  assert.notEqual(
+    second.skipped,
+    true,
+    "a due_date edit took the skip path — the gate swallowed a real change",
+  );
+  assert.equal(
+    state.issues[key].fields.duedate,
+    "2026-12-01",
+    "the due date never reached Jira",
   );
 });
 
@@ -211,7 +243,8 @@ test("the UPDATE path also refreshes the timestamp after a transition", async ()
   // The STATUS edit is what makes the update run actually transition. Without
   // it, run 1 has already moved the card to In Progress and frontmatter still
   // says `in-progress`, so `syncDocumentStatus` returns
-  // `transitioned: false, reason: "already"` — and the re-read at `:1428`, the
+  // `transitioned: false, reason: "already"` — and the update path's own
+  // `lastSyncedAt: result.updated` write, the
   // one site §2.4 identifies as never fixed, is skipped. The test would still
   // go red if the block were deleted, but only because run 1 (the CREATE path)
   // needs the same block: it would be passing for the wrong reason.
@@ -240,7 +273,7 @@ test("the UPDATE path also refreshes the timestamp after a transition", async ()
   assert.equal(
     second.statusOutcome?.transitioned,
     true,
-    "the update run did not transition — the post-transition re-read at :1428 " +
+    "the update run did not transition — the update path's post-transition re-read " +
       "was never reached, so this test proves nothing about it",
   );
 
@@ -251,6 +284,64 @@ test("the UPDATE path also refreshes the timestamp after a transition", async ()
     third.skipped,
     true,
     "the run after an update-path transition did not converge",
+  );
+});
+
+test("the skip path's --json timestamp matches the one written to the file", async () => {
+  const { root, epic } = repoWithEpic();
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, epic, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+
+  // The transition must fire ON THE SKIP PATH for this test to mean anything.
+  // The document cannot supply it — `status` is in the meta hash, so editing it
+  // makes `changedFields` non-empty and the run takes the update path instead.
+  // So move the CARD backwards, as someone dragging it on the board would: the
+  // document is unchanged (skip path entered) and the card still needs to move
+  // (transition fires).
+  //
+  // Without this the second run transitions nothing, `skipSyncedAt` and
+  // `current.updated` are trivially equal, and the assertion below holds for
+  // every possible implementation — a vacuous test, which is the defect class
+  // this whole task is about. Confirmed by mutation: with the card left alone,
+  // reverting the fix leaves this test green.
+  state.issues[key].status = "To Do";
+
+  // The skip path re-reads `updated` after a transition and writes THAT to the
+  // file. It used to emit the pre-transition value to `--json`, so the document
+  // and the machine-readable output disagreed on exactly the run that moved the
+  // card — and a consumer trusting the JSON would store a stale timestamp and
+  // trip the concurrent-edit guard on its next run.
+  // `output.emit` writes the payload to stdout rather than returning it, so
+  // capture stdout for the duration of the run.
+  const chunks = [];
+  const realWrite = process.stdout.write.bind(process.stdout);
+  process.stdout.write = (c, ...rest) => {
+    chunks.push(typeof c === "string" ? c : c.toString());
+    return realWrite(c, ...rest);
+  };
+  let out;
+  try {
+    out = await runSync(root, epic, fetchImpl, ["--json"]);
+  } finally {
+    process.stdout.write = realWrite;
+  }
+  assert.equal(out.skipped, true, "expected the skip path");
+
+  const file = fs.readFileSync(epic, "utf-8");
+  const inFile = /^jira_last_synced_at: "(.+)"$/m.exec(file);
+  assert.ok(inFile, "no timestamp was written to the file");
+
+  const payload = JSON.parse(
+    chunks.join("").trim().split("\n{").length > 1
+      ? "{" + chunks.join("").trim().split("\n{").pop()
+      : chunks.join("").trim(),
+  );
+  assert.equal(
+    payload.jira_last_synced_at,
+    inFile[1],
+    "the --json timestamp disagrees with the one written to the file",
   );
 });
 

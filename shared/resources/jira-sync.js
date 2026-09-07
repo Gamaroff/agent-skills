@@ -2109,7 +2109,10 @@ function diffFields({
  * `fields` is the cut that leaves no parameter behind.
  *
  * @param {object}      args
- * @param {object|null} args.current       what Jira holds (null ⇒ creating)
+ * @param {object|null} args.current       what Jira holds. Null when creating,
+ *   and also on a `--dry-run` update — every caller fetches `current` only
+ *   under `if (!args.dryRun)`, so the dry-run update is the null state a reader
+ *   is most likely to hit.
  * @param {object}      args.fields        the payload about to be sent
  * @param {object}      args.frontmatter   for the stored hashes
  * @param {string}      args.newBodyHash

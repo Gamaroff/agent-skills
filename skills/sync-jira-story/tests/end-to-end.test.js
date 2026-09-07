@@ -7,7 +7,7 @@
  * `skills/sync-jira-task/tests/end-to-end.test.js` for the full account.
  *
  * Story differs from its siblings in one way that matters here: it *does* have
- * a skip-when-no-diff gate (`skippedNoChanges` at `:915`), so the PUT count is
+ * a skip-when-no-diff gate (`skippedNoChanges`), so the PUT count is
  * assertable. Two consecutive syncs of an unchanged document should issue one
  * PUT, not two. That assertion is the one the change summary cannot make on its
  * own — suppressing the message without fixing the diff would leave the summary
@@ -185,6 +185,51 @@ test("--force still pushes a PUT on an unchanged document", async () => {
   assert.ok(
     JSON.stringify(descriptionOf(state, key)).length > 100,
     "the card's description was not restored",
+  );
+
+  // And the summary must not read the bare "Updated: " that an unconditional
+  // template produces when `changedFields` is empty — which `--force` is the
+  // only way to reach. Task and epic have always used a ternary here.
+  const forced = await runSync(root, story, fetchImpl, ["--quiet", "--force"]);
+  assert.equal(
+    forced.changeSummary,
+    "Sync (no field changes detected — forced)",
+    "a forced sync with no field changes produced a malformed summary",
+  );
+});
+
+test("a payload-only frontmatter edit is not swallowed by the skip gate", async () => {
+  const { root, story } = repoWithStory();
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, story, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+
+  // `due_date` is carried by the PAYLOAD but compared by neither `diffFields`
+  // nor — before this fix — `hashMeta`. Making the skip gate reachable turned
+  // an edit to it into a silent no-op that still reported success: the run said
+  // "no field changes detected", issued no PUT, and the date never reached the
+  // card. Every field the payload sends and the diff does not compare must move
+  // the meta hash, or the gate swallows it.
+  fs.writeFileSync(
+    story,
+    fs
+      .readFileSync(story, "utf-8")
+      .replace("priority: High", "priority: High\ndue_date: 2026-12-01"),
+  );
+
+  const second = await runSync(root, story, fetchImpl, ["--quiet"]);
+
+  assert.notEqual(
+    second.changeSummary,
+    "Sync (no field changes detected)",
+    "a due_date edit was reported as no change — the skip gate swallowed it",
+  );
+  assert.ok(putCount(state, key) > 0, "no PUT was issued for a real edit");
+  assert.equal(
+    state.issues[key].fields.duedate,
+    "2026-12-01",
+    "the due date never reached Jira",
   );
 });
 

@@ -95,7 +95,17 @@ function fakeJira(opts = {}) {
     requests: [],
     backlog: [],
     nextKey,
+    // A monotonic clock, deliberately NOT the wall clock. Both the transition
+    // handler and the PUT handler stamp `updated`, and a PUT immediately
+    // followed by a transition produced two identical millisecond strings — so
+    // a regression that dropped the post-transition re-read on the
+    // update-then-transition path would still have passed. Every write must be
+    // distinguishable from the one before it, or the timestamp assertions are
+    // testing the clock's resolution rather than the skill.
+    clock: 0,
   };
+  const tick = () =>
+    new Date(Date.UTC(2026, 0, 1) + ++state.clock * 1000).toISOString();
 
   const ok = (body) => ({
     ok: true,
@@ -194,7 +204,7 @@ function fakeJira(opts = {}) {
           // assertion would be testing the stub rather than the skill.
           const chosen = transitions.find((t) => t.id === body.transition.id);
           if (chosen) issue.status = chosen.to.name;
-          issue.updated = new Date(Date.now() + 1000).toISOString();
+          issue.updated = tick();
           return empty(204);
         }
         return ok({ transitions });
@@ -202,7 +212,7 @@ function fakeJira(opts = {}) {
 
       if (method === "PUT") {
         Object.assign(issue.fields, body.fields);
-        issue.updated = new Date(Date.now() + 1000).toISOString();
+        issue.updated = tick();
         return ok({ fields: { ...issue.fields, updated: issue.updated } });
       }
 
@@ -232,7 +242,7 @@ function fakeJira(opts = {}) {
       const key = `${projectKey}-${state.nextKey++}`;
       state.issues[key] = {
         fields: { ...body.fields },
-        updated: new Date().toISOString(),
+        updated: tick(),
         status: "To Do",
       };
       for (const l of body.fields.labels || []) state.labels[l] = key;

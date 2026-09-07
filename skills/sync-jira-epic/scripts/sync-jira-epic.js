@@ -275,11 +275,23 @@ function hashBody({
 }
 
 function hashMeta(frontmatter) {
+  // `assignee`, `due_date`, `components` and `fix_versions` are here because
+  // the PAYLOAD carries them (`collectIssueFields`) while `diffFields` does
+  // not compare them — it compares summary, description hash, priority, labels
+  // and this meta hash, and nothing else. Before the label-diff fix the skip
+  // gate was unreachable, so the PUT always fired and these fields always
+  // reached Jira; making the gate reachable turned an edit to any of them into
+  // a silent no-op that still reported success. Any field the payload sends
+  // and the diff does not compare belongs in this hash.
   return lib.hashStable({
     epic_type: frontmatter.epic_type || "",
     prd_source: frontmatter.prd_source || "",
     estimated_sprints: frontmatter.estimated_sprints || "",
     status: frontmatter.status || "",
+    assignee: frontmatter.assignee || "",
+    due_date: frontmatter.due_date || "",
+    components: JSON.stringify(frontmatter.components || ""),
+    fix_versions: JSON.stringify(frontmatter.fix_versions || ""),
   });
 }
 
