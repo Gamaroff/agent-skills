@@ -114,6 +114,19 @@ if (statusOutcome?.transitioned && result?.issueKey && !deferred) {
 
 **Extraction decision, to be made from evidence during Phase 1, not assumed now.** If the corrected diff block is genuinely identical across all four, it belongs in `jira-sync.js` as a helper the four call. If the scripts differ enough that a shared helper needs three parameters to paper over the differences, keep the fix local and record the family entry instead. A wrong extraction is harder to unpick than a fourth duplication.
 
+### The two defects interact — this decides the fix order
+
+Traced on `develop` at `3522a934`, after the task was first written.
+
+`sync-jira-epic`'s working post-transition re-read (`:990`) sits inside a block gated on `current && changedFields.length === 0 && !args.force` (`:948`). **Defect 1 guarantees `changedFields` always contains `labels`.** That gate is therefore never satisfied, and the correct code at `:990` never executes.
+
+Two consequences, both of which change how this task should be run:
+
+1. **Epic is not "less broken" than story and task in practice — it is equally broken.** Its fix is dormant. The earlier framing of a half-fix was about *discoverability* (a grep for `fetchUpdatedTimestampStrict` hits all four scripts and reads as "handled"), not about severity. Nothing about epic warrants being fixed ahead of the other two.
+2. **Fixing defect 1 alone would make epic worse to diagnose.** It would satisfy the gate, activating the dormant skip-path re-read while the update path (`:1460`) stays stale. Epic would then be correct on syncs with no field changes and wrong on syncs that change something — an intermittent failure, which is materially harder to diagnose than the consistent one it has today.
+
+**So the two fixes must land together per script.** Phase 2 and Phase 3 may be separate commits, but neither epic's label fix nor its timestamp fix may merge alone. The Phase 1 test that drives epic's skip path will pass for the wrong reason until defect 1 is fixed — it never reaches the code it is meant to exercise — so assert that the skip path is actually *entered*, not merely that it produced no abort.
+
 ### Important Clarifications
 
 - **This is a convergence defect, not a data-loss defect.** Nothing is corrupted; the cards are correct. What fails is idempotency, and its symptoms — a PUT on every run, then a hard refusal — look like flakiness rather than a bug, which is why it survived this long.
@@ -163,7 +176,8 @@ The **behaviour** change is the point and should be stated plainly for the chang
 
 **Changes**:
 - [ ] Write the failing test first, per script: sync twice against the fake Jira, assert the second run reports no field changes and issues no PUT. Confirm all three go **red** before any fix
-- [ ] Write the failing transition test: transition a card, sync again, assert no concurrent-edit abort. Confirm story and task go red, and that epic goes red on the update path and green on the skip path — the half-fix must be visible in the test output, not just in the prose
+- [ ] Write the failing transition test: transition a card, sync again, assert no concurrent-edit abort. Confirm story and task go red
+- [ ] For epic, assert the skip path is **entered**, not merely that no abort occurred. Its re-read is unreachable while defect 1 stands, so a test that only checks for an abort passes for the wrong reason and will keep passing after a regression
 - [ ] Diff the four corrected blocks and decide extraction on the evidence: shared helper, or local fix plus a family entry
 
 **Dependencies**: none — PR #338 is merged
@@ -371,12 +385,20 @@ Assert the count, not the wall-clock. A timing assertion here would be load-flak
 - **Impact**: Minor if recognised, Major if it causes the fix to be reverted.
 - **Mitigation**: Phase 2 explicitly checks for this. A red test here is evidence the fix worked; update the assertion and note it.
 
-**3. The epic half-fix misleads the implementer**
+**3. Epic's label fix is merged without its timestamp fix**
+
+- **Risk**: the two fixes are naturally separate commits (Phases 2 and 3). Landing epic's label fix alone activates its dormant skip-path re-read while the update path stays stale, converting a consistent failure into an intermittent one.
+- **Probability**: Medium — the phases invite it, and the label fix alone will make the convergence test go green, which looks like progress.
+- **Impact**: Major. An intermittent stale-timestamp bug that depends on whether an unrelated field drifted is far harder to diagnose than the current always-fails behaviour.
+- **Mitigation**: neither epic fix merges alone — stated in §3. The epic skip-path test must assert the path is **entered**, not just that no abort occurred, or it passes for the wrong reason.
+- **Rollback**: land the second fix, or revert the first.
+
+**4. The epic half-fix misleads the implementer**
 
 - **Risk**: grepping for `fetchUpdatedTimestampStrict` returns a hit in every script, which reads as "already handled". The hits are on different paths and only one is post-transition.
 - **Probability**: Medium — the grep is the obvious first move.
 - **Impact**: Major: epic's update path stays broken and the task closes claiming otherwise.
-- **Mitigation**: the call-site table in §3 lists line numbers and which path each covers, and Phase 1 requires the epic test to be red on update and green on skip *before* any fix.
+- **Mitigation**: the call-site table in §3 lists line numbers and which path each covers. Note the correction above: the epic skip-path test cannot be "green before the fix" in the way originally written, because defect 1 stops that path being reached at all — Phase 1 must assert path entry, not just absence of an abort.
 
 ### Low Risk Areas
 
@@ -439,6 +461,7 @@ Assert the count, not the wall-clock. A timing assertion here would be load-flak
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-07 | 1.0     | Initial draft | create-task |
+| 2026-09-07 | 1.1     | Traced the defect interaction: epic's skip-path re-read is unreachable while the label diff never converges, so epic is equally broken, not less, and the two fixes must land together per script | create-task |
 
 ---
 
@@ -447,7 +470,7 @@ Assert the count, not the wall-clock. A timing assertion here would be load-flak
 ### Phase 1: Reproduce, then decide on extraction
 - [ ] Convergence test red in all three
 - [ ] Transition test red in story and task
-- [ ] Epic test red on update path, green on skip path
+- [ ] Epic skip-path test asserts path ENTRY, not just absence of an abort
 - [ ] Extraction decision recorded
 
 ### Phase 2: The label diff
