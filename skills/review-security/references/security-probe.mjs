@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/security-probe.mjs. Regenerate via `npm run bundle`.
 /**
  * security-probe — run a security probe against a named export and compute the
  * verdict from what actually happened.

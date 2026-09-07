@@ -6,6 +6,48 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`/review-security` — a review skill that establishes whether a security control *engages*, by
+  running it.** Nothing in the repository took application code as its subject and executed
+  adversarial input against it. Three instruments came close and each missed for its own reason: the
+  `finalise` DoD security agent gates probe mode on the deliverable *being* an accept/reject
+  predicate, so a connection-options object and a URL composer — neither of which is a decider —
+  skip it entirely; `qa-story` / `qa-task` reduce the security axis to one line of judgement; and
+  `review-code` gives security a single bullet with no security lens.
+
+  The gap all three share is that a control can be **present and inert**, and every one of them
+  passes it. The motivating defect: `...(isTls ? { tls: {} } : {})` satisfies a grep for `tls`,
+  produces a citation, and passes the presence checklist — while the connection it configures is
+  plaintext, and the accompanying unit test asserts `toBeDefined()` on it and stays green.
+
+  Four verdicts — `engages`, `present-but-inert`, `absent`, `unverifiable` — with
+  **`present-but-inert` rated high**, above `absent`. That ordering is deliberate: an absent
+  control is a gap someone will notice, while an inert one has already been read, reviewed and
+  believed, carrying the credibility of a control while providing none of the protection.
+
+  **The agent cannot write the verdict.** It produces a probe *specification* (`{sink, entry}`);
+  `security-probe.mjs` runs it against the corpus in a sandboxed child process and computes the
+  outcome. An agent that executed nothing has no field to forge — which is why this skill does not
+  become a second, more confident copy of the vacuum it replaces. There is no PASS token in the
+  schema, so a bare pass is unrepresentable rather than merely discouraged, and zero executed probes
+  render `unverifiable`.
+
+  Its own PASS is falsifiable in CI: four fixtures model both measured defects in engaged and inert
+  variants, and the suite asserts `engaged → engages` and `inert → present-but-inert` from the
+  **engine's** computed verdict, with no agent in the loop. Each inert variant deliberately contains
+  the literal tokens a grep reviewer accepts — `tls`, `rejectUnauthorized`, `sslmode=require` —
+  so that tidying it into an `absent` case any grep would catch fails the suite instead of quietly
+  proving nothing.
+
+  Modes are `diff` (default) and `full`, the latter reviewing a work item's security surface
+  regardless of what changed — every other security instrument here is anchored to a diff, so a
+  control that shipped last month is reviewed by nothing. Advisory in v1: it writes a co-located
+  `*.security.{N}.{name}.md` report, owns no gate and edits no code.
+
+  **Note the name.** Claude Code ships a built-in `/security-review`; this skill is
+  `review-security`. The dispatch strings do not collide but the natural language does — "do a
+  security review" matches both, and the built-in wins. Prefer the built-in for a broad read of a
+  pending diff; prefer `/review-security` when you need proof that a named control fires.
+
 - **Bug reports can now be published to a tracker: `sync-jira-bug` + `ensure-bug-jira-issue`, and
   `sync-github-bug` + `ensure-bug-github-issue`.** `sync-{jira,github}-{story,epic,task}` all
   existed; there was no bug equivalent for either tracker, so bug cards were created through the

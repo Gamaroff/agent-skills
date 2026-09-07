@@ -1,0 +1,71 @@
+schema: 1
+task: 'task.81.review-security-skill'
+task_title: 'Ship /review-security: prove a control engages, not that it is present'
+gate: CONCERNS
+status_reason: 'Both cycle-1 findings independently verified fixed. The mandatory cycle-2 refute pass found one new medium defect: the engaged fixture''s loopback guard accepts every non-dotted-quad encoding of 127.0.0.1 while its comment claims to refuse loopback — a miniature present-but-inert inside the instrument built to name it.'
+reviewer: 'QA Engineer'
+updated: '2026-09-07T18:55:00Z'
+
+top_issues:
+  - id: 'TASK81-003'
+    severity: medium
+    file: 'skills/review-security/tests/fixtures/redis-tls/engaged.mjs'
+    finding: 'The loopback/private-range guard only recognises dotted-quad IPv4, so 127.1, 0177.0.0.1 and 2130706433 — all standard encodings of loopback — are accepted, while the comment above states that an external destination must not resolve to the local machine. The fixture is the artifact that models a correct control, so the false claim is the defect.'
+    suggested_action: 'Fail closed on digits-and-dots hosts that are not a clean four-octet dotted quad, then narrow the comment to what the code guarantees. Verify 127.1 / 0177.0.0.1 / 2130706433 / 1.2.3.4.5 are refused and db.internal.example.com / 8.8.8.8 are not.'
+    suggested_owner: dev
+    bug_ref: 'task.81.bug.3.loopback-guard-overclaims.md'
+    status: open
+  - id: 'TASK81-004'
+    severity: low
+    file: 'skills/review-security/SKILL.md'
+    finding: 'The frontmatter description is 149 words, against the ~100-word guidance in docs/architecture/concepts/coding-standards.md and longer than the longest sibling (review-pr, 130). It is the auto-activation signal and sits in every agent context window.'
+    suggested_action: 'Trim to roughly 100 words, keeping the engages/executes discriminator first and the built-in disambiguation.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 27
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-09-07'
+  total_iterations: 1
+  verification_method: 'Independent re-derivation of fence block boundaries; mutation of a probe spec export name (3 tests red)'
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: 'No credentials, no network, no new dependencies; sandbox containment unchanged. Downgraded from PASS only because TASK81-003 is a security-shaped inaccuracy in a security-teaching artifact. Nothing in the product path is affected.'
+  performance:
+    status: PASS
+    notes: 'Two guard tests added; suite 25 to 27, full gate 2726 to 2728. No material runtime change.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-1 fixes both mutation-proven and independently re-verified this cycle. The drift guard was itself strengthened after it was found to assert on resolveEntry().ok, which validates shape and containment rather than existence.'
+  maintainability:
+    status: PASS
+    notes: 'Upgraded from CONCERNS: the duplicate source of truth for entry paths is gone and the prompt contract renders correctly. One deliberate deviation recorded (suite reads the shared source, not the bundled copy).'
+
+recommendations:
+  immediate:
+    - action: 'Fail closed on non-dotted-quad IP-literal hosts and narrow the guard comment'
+      refs: ['skills/review-security/tests/fixtures/redis-tls/engaged.mjs']
+  future:
+    - action: 'Trim the SKILL.md description to ~100 words'
+      refs: ['skills/review-security/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'Fix TASK81-003 — a fixture that teaches what a correct control looks like must not overclaim'

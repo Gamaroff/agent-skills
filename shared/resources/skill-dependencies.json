@@ -169,6 +169,7 @@
   "review-prd": [
     "mermaid-architect"
   ],
+  "review-security": [],
   "review-story": [
     "create-branch",
     "ensure-epic-github-issue",

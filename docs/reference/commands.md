@@ -56,6 +56,8 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/review-code --comment` / `--fix` | Post findings as inline PR comments, or apply them to the working tree | [`review-code`](../../skills/review-code/SKILL.md) |
 | `/review-pr [PR\|branch]` | Review a PR against its work item and pipeline artifacts — conformance + code, advisory. Also runs automatically as **Step 5c**, the exit gate of the develop pipelines' QA loop | [`review-pr`](../../skills/review-pr/SKILL.md) |
 | `/review-pr --comment` / `--no-code` / `--no-docs` | Post one summary PR comment, or run a single lens | [`review-pr`](../../skills/review-pr/SKILL.md) |
+| `/review-security [work-item]` | Establish whether each security control **engages**, by executing it against adversarial input — per-control `engages` / `present-but-inert` / `absent` / `unverifiable`. Advisory; owns no gate | [`review-security`](../../skills/review-security/SKILL.md) |
+| `/review-security --mode full` | Review the work item's whole security surface regardless of what changed | [`review-security`](../../skills/review-security/SKILL.md) |
 | `/double-check [target]` | Adversarial audit of the work just produced — disk state, negative constraints, clean-room re-derivation, requirement coverage | [`double-check`](../../skills/double-check/SKILL.md) |
 | `/double-check --report-only` / `--fresh-eyes` | Report defects without correcting, or run the non-empirical gates in a subagent with no reasoning trace | [`double-check`](../../skills/double-check/SKILL.md) |
 
