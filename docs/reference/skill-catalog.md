@@ -66,7 +66,7 @@ Full categorised index below.
 | `qa-task` | Comprehensive quality assurance review for technical tasks. Focuses on success criteria validation, implementation phase verification, and non-functional requirements assessment for infrastructure and refactoring work. |
 | `review-epic` | Deep interactive epic review that checks template compliance, detects scope overlap with existing epics, validates against architecture docs, and scans the codebase for already-implemented features.… |
 | `review-prd` | Deep interactive PRD review that verifies claims against the actual codebase, checks requirements traceability to epics/stories, detects staleness, and asks clarifying questions. Produces a co-located… |
-| `review-security` | Establishes whether a security control ENGAGES — by executing it against adversarial input — rather than whether it is present in the source. Reports a… |
+| `review-security` | Establishes whether a security control ENGAGES — by executing it against adversarial input — not whether it is merely present in the source. Reports a… |
 | `review-story` | Story review with two modes. Interactive mode (default): asks clarifying questions to resolve ambiguities, conflicts, and missing information — use when story has unclear requirements… |
 | `review-task` | Interactive task document review that asks clarifying questions instead of making assumptions. Identifies inaccuracies, gaps, inconsistencies, and implementability issues. Provides user-aligned recommendations based on collaborative… |
 

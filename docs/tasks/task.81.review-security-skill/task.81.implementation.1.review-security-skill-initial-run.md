@@ -164,6 +164,21 @@ Notes on how this cycle was run, since two things deviate from the documented de
 - **Step 4b found the first defect by accident.** The snippet engine reported **0 blocks** for a prompt that visibly contains a ```bash block. That anomaly is the symptom: the block is nested inside a ```markdown fence, so the engine never saw it. The check earned its place here by failing to find something.
 - Task status left at `ready-for-review` rather than the skill's "Completed" — the repo's canonical lifecycle has no such state, and Step 7 `/finalise` owns the move to `accepted`.
 
+### QA Cycle 2 — 2026-09-07
+**Gate Result**: CONCERNS
+**Issues Found**: 1 MEDIUM (TASK81-003 — the engaged fixture's loopback guard recognises only dotted-quad IPv4, so `127.1`, `0177.0.0.1` and `2130706433` are accepted while its comment claims loopback is refused) + 1 LOW (TASK81-004 — description 149 words vs the ~100 guidance).
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Running qa-fix (cycle 2 of 5) — **complete**
+
+Cycle 2 was the mandatory **refute pass**: the whole branch diff re-read to find a claim that is false rather than to confirm the change works. It earned its cost. The finding is the most interesting of the run — a miniature `present-but-inert` inside the instrument built to name `present-but-inert`, in the one artifact a reader consults to see what a correct control looks like. The steady-state suite could not have found it: every corpus case still passed.
+
+Both cycle-1 findings were verified fixed **independently** rather than from the fix record — fence boundaries re-derived from source and bundle, and the spec import re-proven by renaming an export (3 red, green before the fix). Bugs 1 and 2 closed.
+
+**qa-fix cycle 2 outcome**: both findings fixed. The guard now treats any digits-and-dots host as an IP-literal attempt and fails closed unless it is a clean four-octet quad; all 15 expectations verified, and mutation-proven twice. The description was trimmed 149 → 98 words.
+
+**One gate failure worth recording.** The first `ci:fast` after the description edit came back **red** on `generated catalog is in sync with SKILL.md frontmatter` — changing a `description:` stales `docs/reference/skill-catalog.md`, and `npm run generate-catalog` had only been run when the skill was *added*. Same freshness class as the `generate-skill-deps` gap recorded at Step 3, and the same lesson: a generated artifact goes stale on **edit**, not only on **create**. Regenerated; re-run green.
+
 ---
 
 ## Completion

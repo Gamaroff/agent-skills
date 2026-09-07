@@ -4,7 +4,7 @@
 **Bug ID**: TASK-81-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer (cycle 2 refute pass)
 **Date Found**: 2026-09-07
 
@@ -67,8 +67,50 @@ consists only of digits and dots, require exactly four decimal octets ≤ 255 �
 
 Then narrow the comment so it states what the code actually guarantees.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Investigation (New → In Progress)
+
+**Date**: 2026-09-07
+
+Confirmed by direct call. The guard tested `octets.length === 4`, so a host that is *not* a
+four-part dotted quad fell through to the accept path entirely — including three standard spellings
+of loopback. The previous prefix-based version had the same gap in a different form (it also accepted
+`127.1`), so this was not introduced by the cycle-1 fix; that fix corrected one inaccuracy and left
+this one visible.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-09-07
+
+**Fix Description**: treat anything made only of digits and dots as an IP-literal **attempt** and
+judge it as one — require a clean four-octet dotted quad, and **fail closed** on anything else. A
+hostname is unaffected.
+
+**Files Modified**:
+- `skills/review-security/tests/fixtures/redis-tls/engaged.mjs` — fail-closed IP-literal branch; the
+  overclaiming comment narrowed to state that DNS is not resolved, so a hostname *pointing* at
+  127.0.0.1 still passes
+- `skills/review-security/tests/review-security.test.js` — regression test locking all 15 cases
+
+**Testing** — all 15 expectations met:
+
+| Refused | Accepted |
+| --- | --- |
+| `127.0.0.1`, `127.000.000.001`, `127.1`, `0177.0.0.1`, `2130706433`, `1.2.3.4.5`, `10.0.0.5`, `192.168.1.1`, `172.20.0.1`, `localhost` | `8.8.8.8`, `172.32.0.1`, `db.internal.example.com`, `10.example.com`, `172.20.example.com` |
+
+**Mutation-proven** — two ways, each reding the new regression test and nothing else:
+- flip the fail-closed branch to `return true` → 1 red
+- disable the digits-and-dots gate entirely → 1 red
+
+**Verification Steps for QA**: call `buildRedisOptions('2130706433')` and confirm `false`.
+
 ## Status History
 
 | Date | Status | Note | Author |
 | ---- | ------ | ---- | ------ |
 | 2026-09-07 | New | Found during QA cycle 2 (mandatory refute pass) | qa-task |
+| 2026-09-07 | In Progress | Confirmed: length-4 check let three loopback spellings through | qa-fix |
+| 2026-09-07 | Ready for QA | Fail-closed IP-literal branch + regression test; mutation-proven twice | qa-fix |

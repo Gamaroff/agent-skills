@@ -211,6 +211,53 @@ for (const name of ["redis-tls/inert", "db-url/inert"]) {
 }
 
 // ---------------------------------------------------------------------------
+// The engaged fixture is what a reader consults to see what a correct control
+// looks like, so its guard must not claim more than it does. Loopback has
+// several standard spellings and a length-4 check alone accepts three of them.
+// ---------------------------------------------------------------------------
+
+test("the engaged redis fixture refuses loopback in every digits-and-dots form", async () => {
+  const { buildRedisOptions } = await import(
+    require("node:url").pathToFileURL(
+      path.join(SKILL_ROOT, "tests/fixtures/redis-tls/engaged.mjs"),
+    ).href
+  );
+  // Each of these resolves to the local machine.
+  for (const host of [
+    "127.0.0.1",
+    "127.000.000.001",
+    "127.1", // valid loopback shorthand
+    "0177.0.0.1", // octal
+    "2130706433", // the same address as a bare integer
+  ]) {
+    assert.equal(
+      buildRedisOptions(host),
+      false,
+      `${host} resolves to loopback and must be refused`,
+    );
+  }
+  // Fail closed on an IP-shaped host that does not parse as a clean quad.
+  assert.equal(buildRedisOptions("1.2.3.4.5"), false);
+  // RFC1918, and a hostname that merely begins with those digits.
+  for (const host of ["10.0.0.5", "192.168.1.1", "172.20.0.1", "localhost"]) {
+    assert.equal(buildRedisOptions(host), false, `${host} must be refused`);
+  }
+  for (const host of [
+    "8.8.8.8",
+    "172.32.0.1",
+    "db.internal.example.com",
+    "10.example.com",
+    "172.20.example.com",
+  ]) {
+    assert.notEqual(
+      buildRedisOptions(host),
+      false,
+      `${host} is legitimate and must be accepted`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // The grep decoy.
 //
 // Without this, someone tidies an inert fixture into an `absent` case that any

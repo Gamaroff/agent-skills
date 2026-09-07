@@ -433,6 +433,21 @@ source-vs-bundle drift rather than reveal it. Recorded as a deliberate deviation
 Tests: 25 → **27**.
 
 ---
+## QA Fix Cycle 2 — 2026-09-07
+
+| Finding | Fix | Mutation-proven |
+| --- | --- | --- |
+| TASK81-003 — loopback guard overclaims | Treat digits-and-dots hosts as IP-literal attempts; require a clean four-octet quad and **fail closed** otherwise. Comment narrowed to state that DNS is not resolved | Yes, twice — flipping the fail-closed branch, and disabling the gate, each red the new regression test and nothing else |
+| TASK81-004 — description over the word guidance | Trimmed 149 → **98** words, keeping the engages/executes discriminator first and the built-in disambiguation | n/a (a standards fix, verified by count) |
+
+The trim dropped the trailing `Triggers:` phrase list. That is a real trade — trigger phrases help
+auto-activation — but `coding-standards.md` is explicit about the ~100-word ceiling for the line that
+sits in every agent's context window, and the activation phrases are documented in
+`docs/reference/activation-phrases.md`. Recorded as a choice, not an omission.
+
+Tests: 27 → **28**.
+
+---
 ## QA Testing Results
 
 **QA Status**: CONCERNS (cycle 2)
@@ -473,6 +488,7 @@ and the six `probe.mjs` specs are imported by nothing ([bug 2](./task.81.bug.2.p
 | 2026-09-07 |         | QA gate CONCERNS (90/100) — 2 medium findings: prompt §4 nested fences, unreferenced probe specs | qa-task |
 | 2026-09-07 |         | QA findings fixed — 2 medium + 1 low closed, 1 iteration; tests 25 → 27 | qa-fix |
 | 2026-09-07 |         | QA gate CONCERNS (90/100) cycle 2 — both prior findings verified fixed; refute pass found 1 new medium (loopback guard overclaims) | qa-task |
+| 2026-09-07 |         | QA findings fixed — loopback guard fails closed on IP literals; description trimmed to 98 words; tests 27 → 28 | qa-fix |
 
 ---
 
