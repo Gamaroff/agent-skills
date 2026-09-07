@@ -591,7 +591,7 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * @param {string}  o.issueKey        e.g. "PROJ-42"
  * @param {object}  [o.statusOutcome] result of `syncDocumentStatus`
  * @param {string}  o.author          the calling skill, e.g. "sync-jira-task"
- * @param {string}  o.docNoun         "story" | "task" | "epic" — for the prose
+ * @param {string}  o.docNoun         "story" | "task" | "epic" | "bug" — for the prose
  * @param {string}  [o.date]          ISO date; defaults to today
  * @returns {Array<{date, description, author}>} zero, one or two entries
  */
@@ -2193,6 +2193,230 @@ async function getIssueTypeId({
 }
 
 // ---------------------------------------------------------------------------
+// Issue links
+// ---------------------------------------------------------------------------
+// A bug card is a SIBLING of the work item it was found in, never a child of it.
+// Jira has no way to make a Bug a child of a Story without switching it to a
+// sub-task type, which differs per board and costs the bug its own backlog
+// placement, sprint membership and independent transitions. So the relationship
+// travels as an issue link, which every project type supports and which JQL and
+// the board's link panel can both see.
+//
+// Link type names are per-board configuration, exactly like status names, so they
+// are resolved by introspection against a candidate list rather than hardcoded.
+// A board with none of them is a real outcome, reported as `no-link-type`, and
+// the caller degrades to description links alone.
+const LINK_TYPE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const LINK_TYPE_CANDIDATES = Object.freeze([
+  "Relates",
+  "Relates To",
+  "Related",
+  "Problem/Incident",
+  "Blocks",
+]);
+
+function linkTypeCachePath(repoRoot) {
+  return path.join(repoRoot, ".cache", "jira-linktypes.json");
+}
+
+function readLinkTypeCache(repoRoot) {
+  const p = linkTypeCachePath(repoRoot);
+  if (!fs.existsSync(p)) return null;
+  try {
+    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+    if (!data.ts || Date.now() - data.ts > LINK_TYPE_TTL_MS) return null;
+    return data.types || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeLinkTypeCache(repoRoot, types) {
+  const p = linkTypeCachePath(repoRoot);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify({ ts: Date.now(), types }, null, 2));
+}
+
+/** Every link type the project offers: `[{id, name, inward, outward}]`. */
+async function getIssueLinkTypes({ http, baseUrl, email, token, repoRoot }) {
+  const cache = repoRoot ? readLinkTypeCache(repoRoot) : null;
+  if (cache) return cache;
+  try {
+    const resp = await http(`${baseUrl}/rest/api/3/issueLinkType`, {
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const types = (data.issueLinkTypes || []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      inward: t.inward,
+      outward: t.outward,
+    }));
+    if (repoRoot && types.length) writeLinkTypeCache(repoRoot, types);
+    return types;
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * Pick a usable link type. Pure, so it is unit-testable without a board —
+ * the same split `resolveTransition` uses, and for the same reason.
+ *
+ * First candidate present wins; matching is case-insensitive on the type NAME,
+ * not on its inward/outward phrases, because those vary independently
+ * ("relates to" / "is related to") while the name is what the API accepts.
+ */
+function resolveLinkType(available, candidates = LINK_TYPE_CANDIDATES) {
+  const list = Array.isArray(available) ? available : [];
+  for (const want of candidates) {
+    const hit = list.find(
+      (t) => t.name && t.name.toLowerCase() === String(want).toLowerCase(),
+    );
+    if (hit) return { match: hit, rule: `name="${want}"` };
+  }
+  return { match: null, reason: "no-link-type" };
+}
+
+/**
+ * Link two issues, idempotently.
+ *
+ * The existing-link check is not an optimisation — it is what makes a second
+ * sync a no-op. Jira's issueLink endpoint happily creates a DUPLICATE link of
+ * the same type between the same pair, so a sync that posted unconditionally
+ * would add one more identical row to the card's link panel on every run.
+ *
+ * Returns one of:
+ *   { linked: true,  type }                        — created
+ *   { linked: false, reason: "already" }           — a link of this type exists
+ *   { linked: false, reason: "no-link-type" }      — board offers none of them
+ *   { linked: false, reason: "deferred", record }  — access.tracker refused it
+ *   { linked: false, reason: "http-<status>" | <message> }
+ *
+ * Never throws: a bug card that exists but is unlinked is a degraded success,
+ * not a failed sync.
+ */
+async function linkIssues({
+  http,
+  baseUrl,
+  email,
+  token,
+  fromKey,
+  toKey,
+  repoRoot,
+  candidates = LINK_TYPE_CANDIDATES,
+  output,
+  skill = undefined,
+}) {
+  if (!fromKey || !toKey) return { linked: false, reason: "no-target" };
+  if (fromKey === toKey) return { linked: false, reason: "self" };
+
+  const types = await getIssueLinkTypes({
+    http,
+    baseUrl,
+    email,
+    token,
+    repoRoot,
+  });
+  const chosen = resolveLinkType(types, candidates);
+  if (!chosen.match) {
+    if (output)
+      output.warn(
+        `⚠️  No usable issue link type on this project (tried: ${candidates.join(", ")}) — the card keeps its description links only.`,
+      );
+    return { linked: false, reason: "no-link-type" };
+  }
+  const typeName = chosen.match.name;
+
+  // Already linked? Read the FROM issue's own link list rather than searching:
+  // one GET, and it is the authoritative view of what the panel will show.
+  try {
+    const resp = await http(
+      `${baseUrl}/rest/api/3/issue/${fromKey}?fields=issuelinks`,
+      {
+        headers: {
+          Authorization: authHeader(email, token),
+          Accept: "application/json",
+        },
+      },
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      const links = data.fields?.issuelinks || [];
+      const exists = links.some((l) => {
+        const other = l.outwardIssue?.key || l.inwardIssue?.key;
+        return (
+          other === toKey &&
+          l.type?.name &&
+          l.type.name.toLowerCase() === typeName.toLowerCase()
+        );
+      });
+      if (exists) {
+        if (output)
+          output.info(`   🔗 Already linked: ${fromKey} ${typeName} ${toKey}`);
+        return { linked: false, reason: "already", type: typeName };
+      }
+    }
+  } catch (_) {
+    // An unreadable link list is not a reason to refuse the write — at worst
+    // the POST below is a no-op that Jira itself rejects.
+  }
+
+  try {
+    const resp = await http(`${baseUrl}/rest/api/3/issueLink`, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(email, token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        type: { name: typeName },
+        inwardIssue: { key: fromKey },
+        outwardIssue: { key: toKey },
+      }),
+      // Layer 2 — what the gate records if this run may not write.
+      defer: {
+        kind: "jira.issue.link",
+        intent: `Link ${fromKey} to ${toKey} as "${typeName}"`,
+        target: {
+          issue: fromKey,
+          url: `${baseUrl}/rest/api/3/issue/${fromKey}`,
+          ui_url: `${baseUrl}/browse/${fromKey}`,
+        },
+        desired: { link: `${typeName} ${toKey}` },
+        skill,
+      },
+    });
+    if (resp.deferred) {
+      if (output)
+        output.info(
+          `   ⏸️  Issue link deferred (${fromKey} → ${toKey}) — recorded as ${resp.deferredRecord}`,
+        );
+      return { linked: false, reason: "deferred", record: resp.deferredRecord };
+    }
+    if (resp.ok || resp.status === 201 || resp.status === 204) {
+      if (output) output.info(`   🔗 Linked: ${fromKey} ${typeName} ${toKey}`);
+      return { linked: true, type: typeName };
+    }
+    const msg = await parseJiraError(resp);
+    if (output)
+      output.warn(
+        `⚠️  Issue link failed (non-fatal): HTTP ${resp.status}: ${msg}`,
+      );
+    return { linked: false, reason: `http-${resp.status}`, message: msg };
+  } catch (e) {
+    if (output) output.warn(`⚠️  Issue link failed (non-fatal): ${e.message}`);
+    return { linked: false, reason: e.message };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Live priority resolution
 // ---------------------------------------------------------------------------
 async function resolveLivePriorities({ http, baseUrl, email, token }) {
@@ -2416,6 +2640,22 @@ const QA_CANDIDATES = Object.freeze([
   "QA",
   "In QA",
 ]);
+// Bug-lifecycle stages. The bug enum (new -> in-progress -> ready-for-qa ->
+// closed | reopened) is deliberately distinct from the document lifecycle that
+// stories, tasks and epics use, and four of its five words had no entry in
+// DEFAULT_STATUS_MAP at all — so they fell through mapStatusCandidates' verbatim
+// pass-through and were offered to the board as a single literal candidate.
+//
+// "Closed" leads CLOSED_CANDIDATES because that is what a bug workflow calls the
+// terminal column; DONE_CANDIDATES follows for boards that do not have one.
+const CLOSED_CANDIDATES = Object.freeze([
+  ...new Set(["Closed", ...DONE_CANDIDATES]),
+]);
+// A reopened bug goes back to the TOP of the board, not into progress: reopening
+// says the fix did not hold, not that anyone has picked it up again.
+const REOPENED_CANDIDATES = Object.freeze([
+  ...new Set(["Reopened", "Reopen", ...NEW_CANDIDATES]),
+]);
 const MERGE_CANDIDATES = Object.freeze([
   "Waiting for merge",
   "Ready to Merge",
@@ -2579,6 +2819,13 @@ const DEFAULT_STATUS_MAP = {
   "wont do": WONT_DO_CANDIDATES,
   "won't fix": WONT_DO_CANDIDATES,
   wontfix: WONT_DO_CANDIDATES,
+  // bug lifecycle — see docs/standards/bug-documents.md. `in-progress` is
+  // already mapped above and is shared with the document lifecycle.
+  new: NEW_CANDIDATES,
+  "ready-for-qa": QA_CANDIDATES,
+  "ready for qa": QA_CANDIDATES,
+  closed: CLOSED_CANDIDATES,
+  reopened: REOPENED_CANDIDATES,
 };
 
 // Local statuses meaning "this work is finished". Only these may fall back to
@@ -2586,6 +2833,10 @@ const DEFAULT_STATUS_MAP = {
 // for why the fallback is unsafe for every other stage.
 const TERMINAL_LOCAL_STATUSES = new Set([
   "accepted",
+  // A bug's terminal word. Without it, a closing bug could not use
+  // resolveTransition's statusCategory=done fallback on a board whose done
+  // column is named something none of the candidate lists guess.
+  "closed",
   "cancelled",
   "canceled",
   "done",
@@ -4154,7 +4405,7 @@ async function walkLadder({
 
 // Drive an issue's Jira status from a local document's frontmatter status.
 // Shared by all three sync skills so they resolve, configure, and report
-// identically. `docKind` ("story" | "task" | "epic") selects the optional
+// identically. `docKind` ("story" | "task" | "epic" | "bug") selects the optional
 // per-issue-type layer of jira.statusMap.
 async function syncDocumentStatus({
   http,
@@ -5140,6 +5391,11 @@ module.exports = {
   fetchUpdatedTimestampStrict,
   fetchUpdatedTimestamp,
   getIssueTypeId,
+  // issue links (the bug card's sibling relationship)
+  LINK_TYPE_CANDIDATES,
+  getIssueLinkTypes,
+  resolveLinkType,
+  linkIssues,
   getBoardType,
   moveToBacklog,
   putIssueAtomic,
@@ -5153,6 +5409,8 @@ module.exports = {
   CANONICAL_LOCAL_STATUSES,
   getTransitions,
   resolveTransition,
+  CLOSED_CANDIDATES,
+  REOPENED_CANDIDATES,
   buildTransitionFields,
   buildTransitionUpdate,
   buildWorkflowRecord,

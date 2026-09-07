@@ -52,7 +52,15 @@ const PAGES = {
 };
 
 /**
- * Undocumented in BOTH pages when this guard landed (2026-09-02).
+ * Undocumented in BOTH pages when this guard landed (2026-09-02), plus the
+ * later additions listed with a reason below.
+ *
+ * `ensure-bug-github-issue` / `ensure-bug-jira-issue` (2026-09-07): internal
+ * sub-routines with `type: internal`, invoked by NAME from develop-bug and
+ * review-bug rather than by slash command — exactly like the six
+ * `ensure-{epic,story,task}-*-issue` siblings already on this list. Their
+ * user-facing entry points, `/sync-jira-bug` and `/sync-github-bug`, ARE
+ * documented in both pages.
  */
 const UNDOCUMENTED_AT_ADOPTION = new Set([
   "agent-md-refactor",
@@ -83,6 +91,8 @@ const UNDOCUMENTED_AT_ADOPTION = new Set([
   "ensure-story-jira-issue",
   "ensure-task-github-issue",
   "ensure-task-jira-issue",
+  "ensure-bug-github-issue",
+  "ensure-bug-jira-issue",
   "epic-registry-manager",
   "error-handling-enforcer",
   "explain-simply",

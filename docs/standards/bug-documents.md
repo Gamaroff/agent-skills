@@ -61,11 +61,29 @@ description: 'One-line summary of the bug'
 | `related`     | string  | Yes         | For general bugs: `none — cross-cutting (no single owner)`. Story/task bugs name their parent    |
 | `description` | string  | Recommended | One-sentence summary (OKF `description`) — what consumers and agents index on                    |
 | `tags`        | list    | Optional    | Short strings for cross-cutting categorization (OKF `tags`)                                       |
+| `jira_key`    | string  | Optional    | Written by [`sync-jira-bug`](../../skills/sync-jira-bug/SKILL.md). Never hand-authored           |
+| `jira_url`    | string  | Optional    | `{JIRA_URL}/browse/{jira_key}` (OKF `resource`). Written by the same sync                        |
+| `github_issue`| integer | Optional    | Written by [`sync-github-bug`](../../skills/sync-github-bug/SKILL.md). Never hand-authored       |
 
 > **Bug status ≠ document status.** The bug lifecycle (`new → … → closed | reopened`) is deliberately
 > distinct from the document status lifecycle (`draft → … → accepted`) used by stories/tasks/epics.
 > Do not map one onto the other. OKF only mandates a non-empty `type`; full mapping:
 > [`open-knowledge-format.md`](../../shared/resources/open-knowledge-format.md).
+
+> **Frontmatter is not guaranteed, and the sync skills do not assume it.** Bug documents predating
+> this template open with the bold-line header block (below) and no YAML at all. `sync-jira-bug` and
+> `ensure-bug-github-issue` read either shape, merging them per key with frontmatter winning, and
+> **prepend a minimal block** to a file that has none before writing `jira_key` / `github_issue` —
+> the body is left verbatim. Without that the tracker key has nowhere to live: an in-place
+> frontmatter write on such a file is a silent no-op, so the card is created and its key never
+> persisted, and the next sync creates a duplicate. The rules live in one place,
+> [`shared/resources/bug-doc.js`](../../shared/resources/bug-doc.js), so the Jira and GitHub paths
+> cannot disagree about which story a bug belongs to.
+>
+> **Parentage is carried by the path, not by a frontmatter key.** There is no `story_id` / `task_id`
+> in this schema — those are `create-bug-report` *inputs*. `related:` is free text and is read only
+> as corroboration: when it disagrees with the filename, the sync warns and the **path wins**,
+> because a wrong parent link is worse than a missing one.
 
 ## Body sections
 
