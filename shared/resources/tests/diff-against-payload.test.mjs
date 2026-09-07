@@ -23,6 +23,10 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const lib = require("../jira-sync.js");
+// The real builder, so the counter-example pins the defect rather than diffFields.
+const taskSync = require("../../../skills/sync-jira-task/scripts/sync-jira-task.js");
+
+const SILENT = { info() {}, warn() {}, err() {}, emit() {} };
 
 const SYNC_LABEL = "synced-from-task-42";
 
@@ -59,30 +63,61 @@ test("diffing the payload reports no label change when Jira already carries the 
   assert.deepEqual(changed, [], `expected no changes, got: ${changed}`);
 });
 
-test("THE COUNTER-EXAMPLE: the frontmatter rebuild reports a spurious label change", () => {
-  // This is the defect, asserted directly and permanently rather than proven by
-  // a mutation that is reverted a moment later. `sanitiseLabels(frontmatter.labels)`
-  // is what all four scripts fed the diff before task.96; it omits the sync
-  // label that `collectIssueFields` appends, so the sets can never converge.
-  const changed = lib.diffFields({
-    prev: current,
-    next: {
-      summary: fields.summary,
-      priority: "High",
-      labels: lib.sanitiseLabels(frontmatter.labels) || [],
-    },
+test("THE COUNTER-EXAMPLE: the real builder's labels differ from the frontmatter rebuild", () => {
+  // The defect, asserted permanently rather than proven by a mutation that is
+  // reverted a moment later.
+  //
+  // This drives the REAL builder — `sync-jira-task`'s `collectIssueFields` —
+  // rather than a hand-built object, because the defect was never in
+  // `diffFields`: it was in the disagreement between what the builder SENDS and
+  // what the old code DIFFED. A test that hand-builds both sides pins
+  // `diffFields` and would stay green if a caller reverted to the frontmatter
+  // rebuild, which is precisely the vacuity this task exists to eliminate.
+  const built = taskSync.collectIssueFields({
+    summary: "Cache lib simplification",
+    args: {},
+    frontmatter: { labels: ["backend"], priority: "High" },
+    descAdf: { type: "doc", version: 1, content: [] },
+    taskTypeId: null,
+    projectKey: null,
+    livePriorities: null,
+    output: SILENT,
+    syncLabel: SYNC_LABEL,
+  });
+
+  const rebuilt = lib.sanitiseLabels(["backend"]) || [];
+
+  assert.ok(
+    built.labels.includes(SYNC_LABEL),
+    "the builder no longer appends the sync label — the defect's precondition " +
+      "is gone and this counter-example no longer means anything",
+  );
+  assert.ok(
+    !rebuilt.includes(SYNC_LABEL),
+    "the frontmatter rebuild now contains the sync label — the two sets no " +
+      "longer diverge, so the defect cannot be demonstrated",
+  );
+
+  // Feeding the rebuild to the diff reports the spurious change. Feeding the
+  // built payload does not. That gap IS the bug.
+  const withRebuild = lib.diffFields({
+    prev: { ...current, labels: built.labels },
+    next: { summary: built.summary, priority: "High", labels: rebuilt },
     prevBodyHash: "b1",
     newBodyHash: "b1",
     prevMetaHash: "m1",
     newMetaHash: "m1",
   });
-  assert.deepEqual(
-    changed,
-    ["labels"],
-    "the frontmatter rebuild no longer reports the spurious change — if this " +
-      "fails, the defect this task fixed can no longer be demonstrated, and " +
-      "the fix's counter-example is gone",
-  );
+  assert.deepEqual(withRebuild, ["labels"], "the defect no longer reproduces");
+
+  const withPayload = lib.diffAgainstPayload({
+    current: { ...current, labels: built.labels },
+    fields: built,
+    frontmatter,
+    newBodyHash: "b1",
+    newMetaHash: "m1",
+  });
+  assert.deepEqual(withPayload, [], "the fix no longer converges");
 });
 
 test("a real summary change is still reported", () => {

@@ -168,6 +168,14 @@ Two consequences, both of which change how this task should be run:
 
 **No interface changes shape** — no CLI flag added or removed, no frontmatter key, no JSON output field.
 
+**One-off migration cost, disclosed.** Extending `hashMeta` to cover `assignee`, `due_date`,
+`components` and `fix_versions` changes the hash for **every already-synced story and epic**, even
+one where none of those fields is set. So the next sync of each such document reports
+`Updated: metadata` and issues one PUT. The payload it sends is correct, nothing is corrupted, the
+new hash is stored, and convergence resumes from the run after. This is the same self-healing shape
+§4 already accepts for `jira_last_synced_at`, and it is the price of closing a silent data-loss
+path — an edit to any of those four fields was being dropped while the run reported success.
+
 **One flag gains behaviour, deliberately.** `sync-jira-story --force` now also bypasses the
 no-change fast path *and* re-publishes the description. Both halves are new: story's skip gate
 never carried epic's `!args.force` term, and on `develop` a forced unchanged sync computed
@@ -306,14 +314,16 @@ Production code and shared library:
   skip term, forced-description term and summary ternary; story and epic `hashMeta` extended to
   cover the payload-only fields the diff does not compare
 
-Tests (**28 in total across the four suites plus the new unit file**):
+Tests (**35 new, 40 touched** — verified by counting `^test(` in each file: 17 new end-to-end across the three sibling suites, 9 `diffAgainstPayload` unit tests, 8 family contract tests, 1 deferred-run test; plus the bug suite's 5 pre-existing tests re-pointed at the shared harness and otherwise unchanged):
 
 - `skills/sync-jira-story/tests/end-to-end.test.js` — **new**, 5 tests
 - `skills/sync-jira-task/tests/end-to-end.test.js` — **new**, 5 tests
 - `skills/sync-jira-epic/tests/end-to-end.test.js` — **new**, 7 tests
 - `skills/sync-jira-task/tests/deferred-no-network.test.js` — **new**, 1 test
 - `shared/resources/tests/diff-against-payload.test.mjs` — **new**, 9 unit tests including the
-  standing counter-example
+  standing counter-example, which drives the real builder rather than a hand-built object
+- `tests/sync-jira-family-contract.test.js` — **new**, 8 contract tests pinning the four scripts'
+  agreement by reading their sources
 - `skills/sync-jira-bug/tests/end-to-end.test.js` — re-pointed at the shared harness; its 5
   assertions unchanged
 
@@ -343,7 +353,8 @@ None.
 **Actions**:
 - [x] `diffFields` fed the payload's label set returns no `labels` change when Jira already carries `synced-from-*`
 - [x] The same call fed the frontmatter rebuild **does** report a change — the defect, asserted directly, so the fix has a named counter-example
-- [x] The re-read fires only when `transitioned && issueKey && !deferred`; each of the three conditions gets its own negative case
+- [x] The re-read fires only when `transitioned && issueKey && !deferred` — the guard shape is asserted over all four scripts by the contract test
+- [ ] ~~each of the three conditions gets its own negative case~~ — **not delivered, stated plainly rather than ticked**. Only `!deferred` has a dedicated case (`deferred-no-network.test.js`); `transitioned` and `issueKey` are exercised incidentally by the end-to-end suites, which is not a negative case. `!deferred` is in any case redundant today — a deferred transition reports `transitioned: false` — so the missing cases guard less than the bullet implies
 
 **Command**: `npm test`
 
@@ -366,8 +377,8 @@ None.
 **Scope**: the four siblings agreeing.
 
 **Actions**:
-- [x] No `sync-jira-*` script builds a diff label set from frontmatter — asserted over the four scripts, so a fifth sibling inherits the check
-- [x] Every script with a transition path has a post-transition re-read
+- [x] No `sync-jira-*` script builds a diff label set from frontmatter — asserted over the four scripts in `tests/sync-jira-family-contract.test.js`, so a fifth sibling inherits the check
+- [x] Every script with a transition path has a post-transition re-read — same file; also asserts it is best-effort (try/catch + warn) and `!deferred`-guarded in all four, and that any script with a skip gate hashes the payload-only fields
 
 ---
 
@@ -544,14 +555,14 @@ Assert the count, not the wall-clock. A timing assertion here would be load-flak
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 2676 (2675 pass, 0 failures, 1 pre-existing skip)
+- **Tests Executed**: 2696 (2695 pass, 0 failures, 1 pre-existing skip) — measured after cycle 4
 - **Phases Verified**: 4/4
-- **QA Cycles**: 2 — cycle 1 found 8 issues, cycle 2's refute pass found 8 more; all 16 closed
+- **QA Cycles**: 3 + a `/review-pr` exit gate that ran twice — see the reconciled finding count below
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Both named defects are fixed and mutation-proven, and the concurrent-edit guard is provably still armed. Two QA cycles found and closed 16 issues between them — **five of which the change itself introduced**, each invisible to a green suite:
+Both named defects are fixed and mutation-proven, and the concurrent-edit guard is provably still armed. Three QA-fix cycles and two `/review-pr` passes found and closed every issue between them — **five of which the change itself introduced**, each invisible to a green suite:
 
 **Cycle 1 (FAIL, 50/100)** — the new e2e suites could not run in a consumer install (masked locally by the `.agents/skills` symlink); `--force` became a silent no-op on an unchanged story once the label fix made that gate reachable; and two tests passed for the wrong reason.
 
@@ -577,7 +588,15 @@ Three, none blocking, each needing its own evidence:
 2. The re-read opens a read-after-write window: an edit landing between the transition POST and the
    re-read GET is absorbed into `jira_last_synced_at`. Inherent to refreshing at all.
 3. `sync-jira-task` and `sync-jira-bug` have no skip-when-no-diff gate while story and epic do.
-   That asymmetry is itself family drift.
+   That asymmetry is itself family drift. The contract test now pins it: if either gains a gate, the
+   test fails and names the hashMeta work that must come with it.
+4. Epic's skip path calls `updateEpicFile` unconditionally where story gates the write on
+   `(!skippedNoChanges || changeLogEntries.length > 0)`. Measured: a pure no-op sync rewrites nothing
+   beyond `jira_last_synced_at`, so the divergence is in shape rather than in observable behaviour.
+   Left alone at cycle 4 rather than restructuring a path this task only just made live.
+5. The epic `--json` test recovers the payload by monkey-patching `process.stdout.write` and
+   splitting on `\n{`. It works, but couples the assertion to output framing; an injectable sink on
+   `makeOutput` would be the durable fix.
 
 ### Success-criteria caveats
 
@@ -606,6 +625,7 @@ reader:
 | 2026-09-07 |         | QA gate FAIL (50/100) — 2 HIGH, 1 MEDIUM, 5 LOW: consumer-install require failure, `--force` regression, and two tests that pass for the wrong reason | qa-task |
 | 2026-09-07 |         | QA findings fixed — all 4 gate issues plus 4 cleanups and 1 found by the adversarial pass, 1 iteration | qa-fix |
 | 2026-09-07 |         | QA gate PASS (95/100) — cycle 2 refute pass found 8 further issues, 3 of them caused by cycle 1's own fixes; all closed | qa-task |
+| 2026-09-07 |         | `/review-pr` REQUEST CHANGES ×2 — 32 further findings across two passes, incl. HIGH silent loss of `assignee`/`due_date`/`components`/`fix_versions` behind the newly reachable skip gate, and the `--force` framing shown false against a develop worktree; all closed, gate 3 PASS (93/100) | qa-fix |
 
 ---
 

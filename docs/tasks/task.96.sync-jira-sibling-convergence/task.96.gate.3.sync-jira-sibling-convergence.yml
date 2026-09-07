@@ -1,0 +1,61 @@
+schema: 1
+task: "task.96.sync-jira-sibling-convergence"
+task_title: "sync-jira-story/task/epic never converge — label diff and post-transition timestamp"
+gate: PASS
+status_reason: "Covers QA-fix cycles 3 and 4, which were driven by /review-pr rather than by qa-task. Supersedes gate 2, whose --force framing was shown to be wrong and whose counts predate these cycles. Two HIGH findings (silent loss of assignee/due_date/components/fix_versions behind the newly reachable skip gate) are fixed and mutation-proven; 21 further findings across two review-pr passes are closed."
+reviewer: "QA Engineer"
+updated: "2026-09-07T18:40:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 93
+
+evidence:
+  tests_reviewed: 2696
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "The concurrent-edit guard is provably still armed — three counterweight tests, now clock-independent (they derive the remote edit from the fake's own timestamp rather than the wall clock, which the monotonic-clock change had made fragile). `countRequests` escapes its interpolated key."
+  performance:
+    status: PASS
+    notes: "Story and epic issue one PUT instead of two for two unchanged syncs, asserted as a literal count. One-off cost disclosed: extending hashMeta invalidates every already-synced document's stored hash, so each gets a single `Updated: metadata` PUT on its next sync, then converges."
+  reliability:
+    status: PASS
+    notes: "The HIGH pair is closed: assignee, due_date, components and fix_versions are hashed, so the skip gate can no longer swallow an edit while reporting success. List fields are normalised (sorted, coerced to array) so a cosmetic frontmatter reorder does not fire a spurious PUT, and assignee is hashed from the RESOLVED value the payload carries rather than the raw frontmatter input."
+  maintainability:
+    status: PASS
+    notes: "A family contract test now pins the four scripts' agreement by reading their sources, including the rule that any script with a skip gate must hash its payload-only fields. Every test added this cycle was mutation-proven; two were found vacuous by that proof and fixed — one of them inside the contract test written to prevent vacuity."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "A failed post-transition re-read warns, but `--json` suppresses warns. Needs a new JSON field, which §5 declines to add."
+      refs: ["shared/resources/jira-sync.js"]
+    - action: "The re-read opens a read-after-write window — inherent to refreshing at all."
+      refs: ["shared/resources/jira-sync.js"]
+    - action: "task and bug have no skip gate while story and epic do. The contract test now pins this so a future gate cannot be added without the hashMeta work."
+      refs: ["skills/sync-jira-task/scripts/sync-jira-task.js"]
+    - action: "Epic's skip path writes the file unconditionally where story gates it. Measured as no observable difference beyond the timestamp; left alone rather than restructuring a newly-live path."
+      refs: ["skills/sync-jira-epic/scripts/sync-jira-epic.js"]
+    - action: "The epic --json test monkey-patches process.stdout.write. An injectable sink on makeOutput would be the durable fix."
+      refs: ["shared/resources/jira-sync.js"]
+
+bug_resolution:
+  bugs_fixed: 23
+  bugs_remaining: 0
+  fix_date: "2026-09-07"
+  total_iterations: 2
+  verification_method: "Mutation proof per behavioural fix and per new test; a simulated consumer install for the packaging defect; a develop worktree for the --force framing claim"
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

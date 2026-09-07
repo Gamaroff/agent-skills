@@ -158,6 +158,12 @@ All notable changes to this project will be documented in this file. Format foll
   the payload, compared by nothing — were being silently dropped on story and epic. They are folded
   into the meta hash, with a regression test on each script.
 
+  **That fold has a one-off cost, and it is deliberate.** Adding keys to the meta hash changes it for
+  every already-synced story and epic, so the next sync of each reports `Updated: metadata` and
+  issues one PUT — even where none of the four fields is set. The payload is correct, nothing is
+  corrupted, and convergence resumes on the run after. One redundant write per document, once, is
+  the price of closing a path that dropped real edits while reporting success.
+
   The regression coverage is the point as much as the fix. Both defects survived a full unit suite,
   because those tests asserted `diffFields` and `collectIssueFields` each behaved correctly *in
   isolation* and nothing asserted the two agreed with each other. The new end-to-end suites

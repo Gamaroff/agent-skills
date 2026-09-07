@@ -298,7 +298,13 @@ test("a genuine remote edit still trips the concurrent-edit guard", async () => 
   const key = first.result.issueKey;
 
   // Someone else edits the card in the Jira UI.
-  state.issues[key].updated = new Date(Date.now() + 60_000).toISOString();
+  // Derived from the fake's OWN timestamp, not the wall clock: the fake now
+  // stamps `updated` from a monotonic clock seeded in 2026, so a
+  // `Date.now()`-based edit only looks "later" while the host clock happens
+  // to be past that seed. Deriving it keeps the assertion clock-independent.
+  state.issues[key].updated = new Date(
+    Date.parse(state.issues[key].updated) + 60_000,
+  ).toISOString();
 
   // Every other test in this file rewards the guard staying quiet. This is the
   // one that stops the fix becoming a worse bug than the defect: the cheapest

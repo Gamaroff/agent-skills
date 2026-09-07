@@ -291,22 +291,34 @@ test("the skip path's --json timestamp matches the one written to the file", asy
   const { root, epic } = repoWithEpic();
   const { state, fetchImpl } = fakeJira();
 
-  const first = await runSync(root, epic, fetchImpl, ["--quiet"]);
+  const first = await runSync(root, epic, fetchImpl, [
+    "--quiet",
+    "--no-transition",
+  ]);
   const key = first.result.issueKey;
+  assert.equal(
+    state.issues[key].status,
+    "To Do",
+    "--no-transition did not hold the card back — the precondition is gone",
+  );
 
-  // The transition must fire ON THE SKIP PATH for this test to mean anything.
-  // The document cannot supply it — `status` is in the meta hash, so editing it
-  // makes `changedFields` non-empty and the run takes the update path instead.
-  // So move the CARD backwards, as someone dragging it on the board would: the
-  // document is unchanged (skip path entered) and the card still needs to move
-  // (transition fires).
+  // The transition must fire ON THE SKIP PATH for this test to mean anything,
+  // and the precondition is reached through the PRODUCT rather than by writing
+  // an impossible state into the fake.
   //
-  // Without this the second run transitions nothing, `skipSyncedAt` and
-  // `current.updated` are trivially equal, and the assertion below holds for
-  // every possible implementation — a vacuous test, which is the defect class
-  // this whole task is about. Confirmed by mutation: with the card left alone,
-  // reverting the fix leaves this test green.
-  state.issues[key].status = "To Do";
+  // Run 1 above used `--no-transition`, so the card was created and left in
+  // "To Do" while the document says `in-progress`. The document is therefore
+  // unchanged (skip path entered) and the card still needs to move (transition
+  // fires) — a state a real Jira genuinely holds.
+  //
+  // An earlier version set `state.issues[key].status` directly. That is a state
+  // the API cannot produce: every real transition bumps `updated`, so a card
+  // whose status moved without its timestamp moving does not exist, and the
+  // comment claiming it modelled "someone dragging it on the board" was false.
+  //
+  // Without a real transition here the second run moves nothing, `skipSyncedAt`
+  // and `current.updated` are trivially equal, and the assertion below holds for
+  // every possible implementation — the vacuous shape this whole task is about.
 
   // The skip path re-reads `updated` after a transition and writes THAT to the
   // file. It used to emit the pre-transition value to `--json`, so the document
@@ -356,7 +368,13 @@ test("a genuine remote edit still trips the concurrent-edit guard", async () => 
   const first = await runSync(root, epic, fetchImpl, ["--quiet"]);
   const key = first.result.issueKey;
 
-  state.issues[key].updated = new Date(Date.now() + 60_000).toISOString();
+  // Derived from the fake's OWN timestamp, not the wall clock: the fake now
+  // stamps `updated` from a monotonic clock seeded in 2026, so a
+  // `Date.now()`-based edit only looks "later" while the host clock happens
+  // to be past that seed. Deriving it keeps the assertion clock-independent.
+  state.issues[key].updated = new Date(
+    Date.parse(state.issues[key].updated) + 60_000,
+  ).toISOString();
 
   await assert.rejects(
     () => runSync(root, epic, fetchImpl, ["--quiet"]),

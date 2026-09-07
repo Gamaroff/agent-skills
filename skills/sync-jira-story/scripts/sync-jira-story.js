@@ -162,6 +162,18 @@ function hashBody({
   });
 }
 
+// Normalise a value the payload treats as a list before hashing it. The payload
+// maps `api`, `[api]` and `["web","api"]` onto the same `components` array, so a
+// hash that distinguishes them fires a spurious `Updated: metadata` — and that
+// PUT also republishes the whole description — on a cosmetic frontmatter
+// reorder. `diffFields` already sorts labels for exactly this reason.
+function normaliseListForHash(v) {
+  if (v === undefined || v === null || v === "") return "";
+  return JSON.stringify(
+    (Array.isArray(v) ? v : [v]).map((x) => String(x).trim()).sort(),
+  );
+}
+
 function hashMeta(frontmatter) {
   // `assignee`, `due_date`, `components` and `fix_versions` are here because
   // the PAYLOAD carries them (`collectIssueFields`) while `diffFields` does
@@ -176,10 +188,15 @@ function hashMeta(frontmatter) {
     estimated_effort_hours: frontmatter.estimated_effort_hours || "",
     jira_epic: frontmatter.jira_epic || "",
     status: frontmatter.status || "",
-    assignee: frontmatter.assignee || "",
+    // The RESOLVED value, not the raw frontmatter one: the payload sends
+    // `resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE)`, so hashing the
+    // input means a changed default alters the payload without moving the hash
+    // — the newly reachable skip gate would then swallow it, which is this
+    // fix's own defect one level down.
+    assignee: lib.resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE) || "",
     due_date: frontmatter.due_date || "",
-    components: JSON.stringify(frontmatter.components || ""),
-    fix_versions: JSON.stringify(frontmatter.fix_versions || ""),
+    components: normaliseListForHash(frontmatter.components),
+    fix_versions: normaliseListForHash(frontmatter.fix_versions),
   });
 }
 
@@ -961,8 +978,13 @@ async function run({
     // `!args.force` is load-bearing, not defensive. Until the label diff was
     // fixed this gate was unreachable (`labels` always differed), so its
     // absence was inert; making the gate reachable turned `--force` into a
-    // silent no-op on an unchanged document, removing the documented repair
-    // path for a card blanked in the Jira UI. Epic has always carried the term.
+    // silent no-op on an unchanged document — it issued no PUT at all and still
+    // reported success. Epic has always carried the term.
+    //
+    // Note this restores the WRITE, not a repair: on `develop` a forced
+    // unchanged sync also sent no description, so `--force` never repaired a
+    // blanked card. The `args.force` term further down is what makes it one,
+    // and that is new behaviour — see the comment there and §5 of task.96.
     skippedNoChanges = changedFields.length === 0 && !args.force;
 
     if (skippedNoChanges) {

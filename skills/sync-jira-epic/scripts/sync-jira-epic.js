@@ -274,6 +274,18 @@ function hashBody({
   });
 }
 
+// Normalise a value the payload treats as a list before hashing it. The payload
+// maps `api`, `[api]` and `["web","api"]` onto the same `components` array, so a
+// hash that distinguishes them fires a spurious `Updated: metadata` — and that
+// PUT also republishes the whole description — on a cosmetic frontmatter
+// reorder. `diffFields` already sorts labels for exactly this reason.
+function normaliseListForHash(v) {
+  if (v === undefined || v === null || v === "") return "";
+  return JSON.stringify(
+    (Array.isArray(v) ? v : [v]).map((x) => String(x).trim()).sort(),
+  );
+}
+
 function hashMeta(frontmatter) {
   // `assignee`, `due_date`, `components` and `fix_versions` are here because
   // the PAYLOAD carries them (`collectIssueFields`) while `diffFields` does
@@ -288,10 +300,15 @@ function hashMeta(frontmatter) {
     prd_source: frontmatter.prd_source || "",
     estimated_sprints: frontmatter.estimated_sprints || "",
     status: frontmatter.status || "",
-    assignee: frontmatter.assignee || "",
+    // The RESOLVED value, not the raw frontmatter one: the payload sends
+    // `resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE)`, so hashing the
+    // input means a changed default alters the payload without moving the hash
+    // — the newly reachable skip gate would then swallow it, which is this
+    // fix's own defect one level down.
+    assignee: lib.resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE) || "",
     due_date: frontmatter.due_date || "",
-    components: JSON.stringify(frontmatter.components || ""),
-    fix_versions: JSON.stringify(frontmatter.fix_versions || ""),
+    components: normaliseListForHash(frontmatter.components),
+    fix_versions: normaliseListForHash(frontmatter.fix_versions),
   });
 }
 
