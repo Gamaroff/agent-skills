@@ -394,6 +394,32 @@ configuration), and widen once real runs show the verdicts hold.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-07
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.81.qa.1.review-security-skill.md](./task.81.qa.1.review-security-skill.md)
+- **Gate File**: [task.81.gate.1.review-security-skill.yml](./task.81.gate.1.review-security-skill.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 57 (25 new + 32 regression)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Behaviour is correct and its falsifiability holds — verdicts are engine-computed and all four mutation
+proofs red only their own assertion. Two medium defects in the shipped artifacts: the reviewer prompt's
+§4 Output Contract is broken by nested code fences ([bug 1](./task.81.bug.1.malformed-nested-fences-in-prompt.md)),
+and the six `probe.mjs` specs are imported by nothing ([bug 2](./task.81.bug.2.probe-specs-referenced-nowhere.md)).
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -405,6 +431,7 @@ configuration), and widen once real runs show the verdicts hold.
 | 2026-09-02 | 1.0     | Initial draft — filed from the rebirth-wallet security-review handover           | create-task |
 | 2026-09-07 | 1.1     | Review passed (9/10) — corrected the fixture entry-point contract to the engine's single-argument, authority-component call shape; stated the `engages` / `present-but-inert` verdict boundaries and the sandbox env allowlist in Phase 2; asserted both in Phase 3; fixed a `qa-task` line citation | review-task |
 | 2026-09-07 |         | Implemented — 9 files created, 8 modified, 25 tests; all four mutation proofs held | develop |
+| 2026-09-07 |         | QA gate CONCERNS (90/100) — 2 medium findings: prompt §4 nested fences, unreferenced probe specs | qa-task |
 
 ---
 

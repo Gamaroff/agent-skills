@@ -34,7 +34,7 @@ Ship the `review-security` skill — its prompt, output contract, falsifiability
 | 1. create-branch           | ✅ Done    | Branch `feature/task.81.*` exists in git                               | `feature/task.81.review-security-skill` created from `develop` at `5a9fb362`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.81.review.{N}.{name}.md` exists (or skip logged)                 | `task.81.review.1.review-security-skill.md` — 2 Critical, 5 Important, 2 Optional; all critical+important applied; 6/10 → 9/10, READY TO IMPLEMENT | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases; 9 files created, 8 modified; 25 new tests; 4/4 mutation proofs held; `npm run ci:fast` green (2726 pass, 0 fail) | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #347: https://github.com/Gamaroff/agent-skills/pull/347 — OPEN, base `develop`. 2 commits, 27 files. No issue comment (no linked issue) | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.81.qa.{N}.*.md`; `task.81.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.81.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -122,6 +122,16 @@ The number is itself the evidence the task asked for. The same command with the 
 
 One formatting fix was needed along the way: `prettier --write` on `review-security.test.js`. Caught locally by the fast gate, which is the whole reason formatting sits in the develop loop rather than at the merge gate.
 
+### Step 4 — create-pr — 2026-09-07
+
+- **PR created: https://github.com/Gamaroff/agent-skills/pull/347** — base `develop`, head `feature/task.81.review-security-skill`, state OPEN.
+- `SCOPE_PATHS`: `docs/tasks/task.81.review-security-skill`, `docs/reference`, `shared/resources`, `skills/review-security`, `skills/create-skill/scripts`, `CHANGELOG.md`, `package.json`. Pre-flight guard held **0** files — every changed path was in scope.
+- Leak check after commit: **OK**, no out-of-scope file in either commit.
+- `--issue` deliberately omitted: `TRACKER=github` but the task has no `github_issue`, so Step 6b (issue comment) and the GitHub board `in-review` move both skip — there is no issue or board item to address. Not a failure; there is nothing to signal.
+- The implementation report **is** committed here, per the Step 4 rule: a reviewer can read the audit trail while the PR is open, and any document linking to it resolves in a CI checkout of the tracked tree rather than only in a dirty working tree.
+- **Two commits rather than one.** The second is a comment-only fix to `shared/resources/security-probe.mjs`: its own JSDoc wrote a path as `shared/resources/…`, which the bundler's `SHARED_REF_RE` read as a filename and reported missing on every `npm run bundle`. Latent since task.80 — the engine had never been bundled because no skill referenced it, and shipping review-security is what surfaced it. Kept separate from the feature commit because it fixes a different task's file. Verified fixed by re-running the bundler, and `security-probe.test.mjs` + the new suite pass together (47 tests).
+- PR body was written directly rather than by the documented Explore subagent — same session constraint recorded at Steps 2 and 3. The diff is this run's own work, so there was nothing to summarise that was not already in hand.
+
 ---
 
 ## Issues Log
@@ -136,6 +146,20 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-07
+**Gate Result**: CONCERNS
+**Issues Found**: 2 MEDIUM — (1) `security-review-prompt.md` §4 nested three-backtick fences close the outer ```markdown block early, corrupting the Output Contract as rendered; (2) the six `probe.mjs` spec files are imported by nothing, so a declared Phase 2 deliverable ships unexercised while the test redeclares the same entry paths. Plus 2 LOW (prefix-matched private-range guard over-blocks `10.example.com`; suite reads the shared source rather than the bundled copy).
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Action**: Running qa-fix (cycle 1 of 5)
+
+Notes on how this cycle was run, since two things deviate from the documented default:
+
+- **Direct tools, not parallel agents.** The Adaptive Review Strategy permits it (4 phases, not >5), and subagent dispatch is barred in this session regardless. Step 3b still ran — in the main context, against the whole branch diff. Recorded in the QA report rather than silently skipped.
+- **The reviewer wrote the code.** Stated in the QA report as a real limit on the gate. Both promoted findings are mechanically demonstrable — a fence scan and a `grep` for importers — rather than matters of judgement, which is the only thing that makes the gate worth anything under that constraint.
+- **Step 4b found the first defect by accident.** The snippet engine reported **0 blocks** for a prompt that visibly contains a ```bash block. That anomaly is the symptom: the block is nested inside a ```markdown fence, so the engine never saw it. The check earned its place here by failing to find something.
+- Task status left at `ready-for-review` rather than the skill's "Completed" — the repo's canonical lifecycle has no such state, and Step 7 `/finalise` owns the move to `accepted`.
+
 ---
 
 ## Completion
@@ -143,7 +167,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.81.review-security-skill`
-**PR**: {populated after Step 4}
+**PR**: [#347](https://github.com/Gamaroff/agent-skills/pull/347)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
