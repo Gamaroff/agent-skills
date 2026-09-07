@@ -677,27 +677,13 @@ async function run({
       });
     }
 
-    const changedFields = current
-      ? lib.diffFields({
-          prev: current,
-          next: {
-            summary,
-            priority: lib.normalisePriority(
-              args.priority || frontmatter.priority,
-              livePriorities,
-            ),
-            labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || [],
-          },
-          prevBodyHash: frontmatter.jira_last_body_hash,
-          newBodyHash,
-          prevMetaHash: frontmatter.jira_last_meta_hash,
-          newMetaHash,
-        })
-      : ["summary", "description", "priority", "labels"];
-    changeSummary = changedFields.length
-      ? `Updated: ${changedFields.join(", ")}`
-      : "Sync (no field changes detected)";
-
+    // Build the payload FIRST, then diff against the set actually being sent.
+    //
+    // The diff used to rebuild `labels` from frontmatter here, which can never
+    // match: `collectIssueFields` appends the `synced-from-*` idempotency label
+    // to the set it sends, so the comparison was always a set-without-the-label
+    // against a Jira issue that has it. `labels` was reported changed on every
+    // run.
     const descAdf = buildDescriptionAdf({
       body,
       frontmatter,
@@ -717,6 +703,17 @@ async function run({
       output,
       syncLabel,
     });
+
+    const changedFields = lib.diffAgainstPayload({
+      current,
+      fields,
+      frontmatter,
+      newBodyHash,
+      newMetaHash,
+    });
+    changeSummary = changedFields.length
+      ? `Updated: ${changedFields.join(", ")}`
+      : "Sync (no field changes detected)";
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would UPDATE ${existingJiraKey} ===`);
@@ -964,6 +961,34 @@ async function run({
       output,
       noTransition: args.noTransition,
     });
+  }
+
+  // A transition is a write: Jira bumps the issue's own `updated`. Persisting
+  // the pre-transition value would tell the NEXT run that Jira has moved since
+  // this sync — which is exactly what `guardConcurrentEdit` aborts on — so the
+  // card would refuse every subsequent sync over a change this tool made itself
+  // moments earlier.
+  //
+  // Refreshing is best-effort: a failed re-read leaves the earlier value, which
+  // is no worse than not refreshing at all.
+  //
+  // All three guards are load-bearing: `transitioned` (nothing moved, nothing
+  // to re-read), `issueKey` (nothing to query), `!deferred` (a restricted run
+  // performed no transition and must make no network call).
+  if (statusOutcome?.transitioned && result?.issueKey && !deferred) {
+    try {
+      result.updated = await lib.fetchUpdatedTimestampStrict({
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey: result.issueKey,
+      });
+    } catch (e) {
+      output.warn(
+        `⚠️  Could not re-read the issue timestamp after the transition (${e.message}). The next sync may report a concurrent edit; re-run with --force if so.`,
+      );
+    }
   }
 
   // Write-back. A deferred update changed nothing in Jira, so recording a

@@ -908,23 +908,46 @@ async function run({
       });
     }
 
-    const changedFields = current
-      ? lib.diffFields({
-          prev: current,
-          next: {
-            summary,
-            priority: lib.normalisePriority(
-              args.priority || frontmatter.priority,
-              livePriorities,
-            ),
-            labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || [],
-          },
-          prevBodyHash: frontmatter.jira_last_body_hash,
-          newBodyHash,
-          prevMetaHash: frontmatter.jira_last_meta_hash,
-          newMetaHash,
-        })
-      : ["summary", "description", "priority", "labels"];
+    // Build the payload FIRST, then diff against the set actually being sent.
+    //
+    // The diff used to rebuild `labels` from frontmatter here, which can never
+    // match: `collectCommonFields` appends the `synced-from-*` idempotency
+    // label to the set it sends, so the comparison was always a
+    // set-without-the-label against a Jira issue that has it. `labels` was
+    // reported changed on every run — which meant the no-change fast path at
+    // the gate below was NEVER entered, and the post-transition re-read behind
+    // that gate was dead code. Fixing the diff is what makes that path
+    // reachable at all.
+    //
+    // The build has moved above the gate, so it now runs on the skip path too.
+    // It is pure — an ADF render and an object build, no network — so the only
+    // cost is a few microseconds on a run that writes nothing.
+    const descAdf = buildDescriptionAdf({
+      body,
+      frontmatter,
+      prdBbUrl,
+      epicBbUrl,
+      relatedDocLinks,
+      linkResolver,
+      output,
+    });
+    const fields = collectUpdateFields({
+      args,
+      frontmatter,
+      descAdf,
+      livePriorities,
+      output,
+      syncLabel,
+      summary,
+    });
+
+    const changedFields = lib.diffAgainstPayload({
+      current,
+      fields,
+      frontmatter,
+      newBodyHash,
+      newMetaHash,
+    });
     changeSummary = changedFields.length
       ? `Updated: ${changedFields.join(", ")}`
       : "Sync (no field changes detected)";
@@ -1051,24 +1074,6 @@ async function run({
       };
     }
 
-    const descAdf = buildDescriptionAdf({
-      body,
-      frontmatter,
-      prdBbUrl,
-      epicBbUrl,
-      relatedDocLinks,
-      linkResolver,
-      output,
-    });
-    const fields = collectUpdateFields({
-      args,
-      frontmatter,
-      descAdf,
-      livePriorities,
-      output,
-      syncLabel,
-      summary,
-    });
     dump("PUT fields", fields);
     dump("PUT description (ADF)", descAdf);
 
@@ -1406,6 +1411,37 @@ async function run({
       output,
       noTransition: args.noTransition,
     });
+  }
+
+  // A transition is a write: Jira bumps the issue's own `updated`. Persisting
+  // the pre-transition value would tell the NEXT run that Jira has moved since
+  // this sync — which is exactly what `guardConcurrentEdit` aborts on.
+  //
+  // The SKIP path above already does this (`skipSyncedAt`). This is the UPDATE
+  // path, which did not — and the asymmetry was invisible, because a grep for
+  // `fetchUpdatedTimestampStrict` hit the skip path and read as "handled".
+  // Worse, the skip path was unreachable: its gate needs
+  // `changedFields.length === 0`, which the label-diff defect made impossible.
+  // The two fixes therefore land together; the label fix alone would activate
+  // the skip re-read while leaving this one stale, turning a consistent failure
+  // into an intermittent one.
+  //
+  // Refreshing is best-effort: a failed re-read leaves the earlier value, which
+  // is no worse than not refreshing at all.
+  if (statusOutcome?.transitioned && result?.issueKey && !deferred) {
+    try {
+      result.updated = await lib.fetchUpdatedTimestampStrict({
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey: result.issueKey,
+      });
+    } catch (e) {
+      output.warn(
+        `⚠️  Could not re-read the issue timestamp after the transition (${e.message}). The next sync may report a concurrent edit; re-run with --force if so.`,
+      );
+    }
   }
 
   // Write-back. A deferred update changed nothing in Jira, so recording a
