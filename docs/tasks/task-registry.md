@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-07
-**Next Available Task Number:** **96**
+**Next Available Task Number:** **97**
 
 ## How to use
 
@@ -135,6 +135,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 93 | [Observation-log engine, workspace resolver and contract](task.93.observation-log-engine/task.93.observation-log-engine.md) | planned | infrastructure | High | 2026-09-07 | [#339](https://github.com/Gamaroff/agent-skills/issues/339) | — |
 | 94 | [Add the observe-work meta-skill](task.94.observe-work-skill/task.94.observe-work-skill.md) | planned | infrastructure | High | 2026-09-07 | [#340](https://github.com/Gamaroff/agent-skills/issues/340) | task.93 |
 | 95 | [observe-work: config schema, skill boundaries and the meta-skill family](task.95.observe-work-docs-boundaries/task.95.observe-work-docs-boundaries.md) | planned | documentation | High | 2026-09-07 | [#341](https://github.com/Gamaroff/agent-skills/issues/341) | task.93, task.94 |
+| 96 | [sync-jira-story/task/epic never converge: label diff and post-transition timestamp](task.96.sync-jira-sibling-convergence/task.96.sync-jira-sibling-convergence.md) | planned | infrastructure | High | 2026-09-07 | [#343](https://github.com/Gamaroff/agent-skills/issues/343) | — |
 
 - **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 
@@ -152,5 +153,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - Tasks 62-64 are the **`loop-supervisor`** sequence — one shippable unit each. Design: [`.agents/plans/loop-supervisor.md`](../../.agents/plans/loop-supervisor.md). Task 62 is the only one that has to exist; it delivers a usable runner with log files alone. 63 (terminal views, notifications) and 64 (dashboard push, runbook) both depend on 62 and are independent of each other, so they can land in either order. None has a tracker issue yet.
 - **Rows 56-58 and 62-64 were stale and were corrected 2026-08-29** as part of task 65. All six documents read `accepted`; the rows read `planned` (56, 57), `ready-for-review` (58) and `draft` (62-64). Task 65's Phase 6 named only 62-64 — the other three were found by the same check and corrected in the same edit, because leaving a row known to be wrong is worse than the drift task 65 was written about. The correction is **not** what makes the registry safe to select from: the selector reads each document's own frontmatter and treats the row as a nomination only, so all six were already excluded from the frontier by the drift guard rather than by the row being right (SC5).
 - **Tasks 93-95 are the `observe-work` meta-skill sequence** — one shippable unit each, in dependency order. Design: [`task.93.plan.observation-log-engine.md`](task.93.observation-log-engine/task.93.plan.observation-log-engine.md). 93 ships the engine, resolver and contract under `shared/resources/` and is usable before any skill calls it; 94 authors the skill and does the eleven CI-enforced registration steps; 95 documents the `observations:` config block, adds reciprocal boundary notes to `autoskill` / `remember-insight` / `double-check`, and seeds the skill-family registry. The methodology is adapted from [task-observer](https://github.com/rebelytics/one-skill-to-rule-them-all) by Eoghan Henn (CC BY 4.0) — attribution is a licence obligation, not a courtesy; the mechanism is a rewrite.
+
+- **Task 96 was filed from PR [#338](https://github.com/Gamaroff/agent-skills/pull/338)'s own findings.** Its end-to-end test against a fake Jira found two convergence defects on the bug path; both were verified present in `sync-jira-story`, `sync-jira-task` and `sync-jira-epic` at specific line numbers before the task was written, rather than carried over as an assumption. `sync-jira-epic` is half-fixed — its skip path re-reads the post-transition timestamp, its update path does not — which is why a grep for `fetchUpdatedTimestampStrict` misleads.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
