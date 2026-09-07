@@ -21,6 +21,7 @@ One-way sync of a local story markdown file to Jira. Auto-detects create vs upda
 - **Idempotent create** — pre-flight JQL search by `synced-from-<story-dir>` label prevents duplicates if a previous POST left no `jira_key` in the file.
 - **Atomic PUT** — uses `?returnIssue=true` so the fresh `updated` timestamp comes back in one round-trip.
 - **Parent linkage detection + retry** — detects team-managed (`parent`) vs classic (`customfield_10014` Epic Link) project style on create. If the first attempt is rejected with a 400 mentioning `parent`/`epic_link`/`customfield_10014`, retries with the opposite field.
+- **No-change fast path** — if no fields changed, the Jira PUT is skipped entirely. Pass `--force` to push the update anyway; a forced sync re-publishes the description, which is what makes it a repair for a card someone edited in the Jira UI.
 - **Concurrent-edit guard** — stores Jira `fields.updated` in frontmatter as `jira_last_synced_at`. Aborts on next sync if Jira advanced (use `--force` to override).
 - **Field-level diff** — Change Log entries say `Updated: summary, description, metadata` etc. Body and metadata hashes are stored separately (`jira_last_body_hash`, `jira_last_meta_hash`) so frontmatter changes (status/effort/story_type) don't masquerade as description changes.
 - **Status transitions** — frontmatter `status` is mapped (emoji-stripped, lowercased) to Jira's transition list and POSTed to `/transitions` after sync.
@@ -179,7 +180,7 @@ Flow:
 |---|---|
 | Jira `updated` ≤ stored | Sync proceeds normally |
 | Jira `updated` > stored | **Aborts**; pass `--force` to override |
-| `--force` | Warning, sync proceeds, overwrites Jira |
+| `--force` | Warning, sync proceeds, overwrites Jira — also bypasses the no-change fast path |
 | First sync (no stored timestamp) | Guard skipped |
 
 ## Status Transitions
@@ -322,7 +323,7 @@ the authoritative log.
 | `--check-card` | | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-story` to catch a heading mismatch before it publishes a thin card. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--no-write` | | Run live Jira sync but skip the local file write-back. Useful for first-time adopters who want to inspect what would change in the markdown without committing the change. Differs from `--dry-run` in that the Jira side is updated. |
-| `--force` | | Override the concurrent-edit guard |
+| `--force` | | Override the concurrent-edit guard **and** the no-change fast path — the forced PUT re-publishes the description, so it repairs a card edited or blanked in the Jira UI |
 | `--json` | | Suppress human output; emit a single JSON object on completion |
 | `--quiet` | | Suppress info logs (warnings still printed) |
 

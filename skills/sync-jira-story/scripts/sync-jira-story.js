@@ -163,11 +163,28 @@ function hashBody({
 }
 
 function hashMeta(frontmatter) {
+  // `assignee`, `due_date`, `components` and `fix_versions` are here because
+  // the PAYLOAD carries them (`collectIssueFields`) while `diffFields` does
+  // not compare them — it compares summary, description hash, priority, labels
+  // and this meta hash, and nothing else. Before the label-diff fix the skip
+  // gate was unreachable, so the PUT always fired and these fields always
+  // reached Jira; making the gate reachable turned an edit to any of them into
+  // a silent no-op that still reported success. Any field the payload sends
+  // and the diff does not compare belongs in this hash.
   return lib.hashStable({
     story_type: frontmatter.story_type || "",
     estimated_effort_hours: frontmatter.estimated_effort_hours || "",
     jira_epic: frontmatter.jira_epic || "",
     status: frontmatter.status || "",
+    // The RESOLVED value, not the raw frontmatter one: the payload sends
+    // `resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE)`, so hashing the
+    // input means a changed default alters the payload without moving the hash
+    // — the newly reachable skip gate would then swallow it, which is this
+    // fix's own defect one level down.
+    assignee: lib.resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE) || "",
+    due_date: frontmatter.due_date || "",
+    components: lib.normaliseListForHash(frontmatter.components),
+    fix_versions: lib.normaliseListForHash(frontmatter.fix_versions),
   });
 }
 
@@ -894,25 +911,69 @@ async function run({
       });
     }
 
-    const changedFields = current
-      ? lib.diffFields({
-          prev: current,
-          next: {
-            summary,
-            priority: lib.normalisePriority(
-              args.priority || frontmatter.priority,
-              livePriorities,
-            ),
-            labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || [],
-          },
-          prevBodyHash: frontmatter.jira_last_body_hash,
-          newBodyHash,
-          prevMetaHash: frontmatter.jira_last_meta_hash,
-          newMetaHash,
-        })
-      : ["summary", "description", "priority", "labels"];
+    // Build the payload FIRST, then diff against the set actually being sent.
+    //
+    // The diff used to rebuild `labels` from frontmatter here, which can never
+    // match: `collectIssueFields` appends the `synced-from-*` idempotency label
+    // to the set it sends, so the comparison was always a set-without-the-label
+    // against a Jira issue that has it. `labels` was reported changed on every
+    // run, which defeated the skip gate below and fired a PUT every time.
+    //
+    // Story is the one sibling where this is not a straight reorder:
+    // `includeDescription` is derived FROM `changedFields`, so the payload is
+    // built provisionally with the description included and the field is
+    // dropped below once the diff is known.
+    //
+    // As in epic, the build now runs on the skip path too. No network and no
+    // mutation, but not silent: `buildDescriptionAdf` warns on a missing card
+    // section and `collectIssueFields` warns through `normalisePriority` /
+    // `resolveAssignee`, so a no-op sync can emit advisory warnings it did not
+    // before.
+    const descAdf = buildDescriptionAdf({
+      body,
+      frontmatter,
+      epicBbUrl,
+      storyBbUrl,
+      relatedDocLinks,
+      linkResolver,
+      output,
+    });
+    // Do not change parent linkage on update — Jira rejects parent edits on
+    // team-managed tracking issues.
+    const fields = collectIssueFields({
+      args,
+      frontmatter,
+      summary,
+      descAdf,
+      includeDescription: true,
+      storyTypeId: null,
+      projectKey: null,
+      livePriorities,
+      output,
+      syncLabel,
+      epicKey: null,
+      useEpicLink: false,
+    });
 
-    skippedNoChanges = changedFields.length === 0;
+    const changedFields = lib.diffAgainstPayload({
+      current,
+      fields,
+      frontmatter,
+      newBodyHash,
+      newMetaHash,
+    });
+
+    // `!args.force` is load-bearing, not defensive. Until the label diff was
+    // fixed this gate was unreachable (`labels` always differed), so its
+    // absence was inert; making the gate reachable turned `--force` into a
+    // silent no-op on an unchanged document — it issued no PUT at all and still
+    // reported success. Epic has always carried the term.
+    //
+    // Note this restores the WRITE, not a repair: on `develop` a forced
+    // unchanged sync also sent no description, so `--force` never repaired a
+    // blanked card. The `args.force` term further down is what makes it one,
+    // and that is new behaviour — see the comment there and §5 of task.96.
+    skippedNoChanges = changedFields.length === 0 && !args.force;
 
     if (skippedNoChanges) {
       changeSummary = "Sync (no field changes detected)";
@@ -928,37 +989,35 @@ async function run({
         updated: current?.updated || frontmatter.jira_last_synced_at || null,
       };
     } else {
-      changeSummary = `Updated: ${changedFields.join(", ")}`;
+      // The ternary matters now that `--force` can reach this branch with an
+      // empty `changedFields`: an unconditional template produced the bare
+      // string "Updated: " with nothing after it. Task and epic have always
+      // built the summary this way.
+      changeSummary = changedFields.length
+        ? `Updated: ${changedFields.join(", ")}`
+        : "Sync (no field changes detected — forced)";
 
-      const descAdf = buildDescriptionAdf({
-        body,
-        frontmatter,
-        epicBbUrl,
-        storyBbUrl,
-        relatedDocLinks,
-        linkResolver,
-        output,
-      });
-      // Send `description` only when body or metadata actually changed, to avoid
-      // pointless edits in Jira's history.
+      // Second pass of the two-pass build: send `description` only when body or
+      // metadata actually changed, to avoid pointless edits in Jira's history.
+      //
+      // `args.force` overrides that, and this is NEW behaviour rather than a
+      // restoration — worth stating plainly, because an earlier revision of
+      // this comment claimed otherwise. On `develop` a forced unchanged sync
+      // also computed `includeDescription === false` (`changedFields` was
+      // always exactly `["labels"]`, which contains neither "description" nor
+      // "metadata"), so `--force` never re-published the description there
+      // either. Verified against a develop worktree: the forced payload was
+      // `summary, labels, priority`.
+      //
+      // It is added deliberately: without it a forced sync PUTs exactly the
+      // fields the diff just proved identical to Jira, which makes `--force`
+      // useless for the thing operators reach for it for — repairing a card
+      // edited or blanked in the Jira UI. Epic behaves the same way.
       const includeDescription =
+        args.force ||
         changedFields.includes("description") ||
         changedFields.includes("metadata");
-      // Do not change parent linkage on update — Jira rejects parent edits on team-managed tracking issues.
-      const fields = collectIssueFields({
-        args,
-        frontmatter,
-        summary,
-        descAdf,
-        includeDescription,
-        storyTypeId: null,
-        projectKey: null,
-        livePriorities,
-        output,
-        syncLabel,
-        epicKey: null,
-        useEpicLink: false,
-      });
+      if (!includeDescription) delete fields.description;
 
       if (args.dryRun) {
         output.info(`\n=== DRY RUN — Would UPDATE ${existingJiraKey} ===`);
@@ -1171,6 +1230,34 @@ async function run({
       output,
       noTransition: args.noTransition,
     });
+  }
+
+  // A transition is a write: Jira bumps the issue's own `updated`. Persisting
+  // the pre-transition value would tell the NEXT run that Jira has moved since
+  // this sync — which is exactly what `guardConcurrentEdit` aborts on — so the
+  // card would refuse every subsequent sync over a change this tool made itself
+  // moments earlier.
+  //
+  // Refreshing is best-effort: a failed re-read leaves the earlier value, which
+  // is no worse than not refreshing at all.
+  //
+  // All three guards are load-bearing: `transitioned` (nothing moved, nothing
+  // to re-read), `issueKey` (nothing to query), `!deferred` (a restricted run
+  // performed no transition and must make no network call).
+  if (statusOutcome?.transitioned && result?.issueKey && !deferred) {
+    try {
+      result.updated = await lib.fetchUpdatedTimestampStrict({
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey: result.issueKey,
+      });
+    } catch (e) {
+      output.warn(
+        `⚠️  Could not re-read the issue timestamp after the transition (${e.message}). The next sync may report a concurrent edit; re-run with --force if so.`,
+      );
+    }
   }
 
   // Write-back

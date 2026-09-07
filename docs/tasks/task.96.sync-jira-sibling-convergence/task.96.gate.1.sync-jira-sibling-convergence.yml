@@ -1,0 +1,85 @@
+schema: 1
+task: "task.96.sync-jira-sibling-convergence"
+task_title: "sync-jira-story/task/epic never converge — label diff and post-transition timestamp"
+gate: FAIL
+status_reason: "The two named defects are fixed and mutation-proven, but the change introduces two HIGH regressions of its own: the new shared test helper does not survive a consumer install, and making story's skip gate reachable silently disabled --force on an unchanged document. A third finding shows the epic UPDATE-path test does not exercise the path it is named for."
+reviewer: "QA Engineer"
+updated: "2026-09-07T15:05:00Z"
+
+top_issues:
+  - id: "TASK96-001"
+    severity: high
+    file: "skills/sync-jira-task/tests/end-to-end.test.js"
+    finding: "All four end-to-end suites require `../../../tests/lib/fake-jira.js`. `bundle_skill.py` vendors only `shared/resources/*`, so in a real consumer install (a plain directory copy) the require resolves to a non-existent `.agents/tests/lib/fake-jira.js` and the suite dies with MODULE_NOT_FOUND — while `sync-jira-task/SKILL.md:415` tells users to run exactly that command. Masked in this repo because `.agents/skills` is a symlink to `../skills`, so Node resolves the real path."
+    suggested_action: "Move the helper to `shared/resources/fake-jira.js` so the bundler vendors it into each skill's `references/` and rewrites the path. This is the existing precedent — `relative-doc-links.test.js` already requires `../references/jira-sync.js`."
+    suggested_owner: dev
+    status: open
+  - id: "TASK96-002"
+    severity: high
+    file: "skills/sync-jira-story/scripts/sync-jira-story.js"
+    finding: "Story's skip gate is `changedFields.length === 0` with no `!args.force` term, unlike epic's `current && changedFields.length === 0 && !args.force`. The label fix made that gate reachable for the first time, so `--force` on an unchanged story now issues no PUT at all. Verified behaviourally: PUT count 0 before and 0 after a `--force` run. This contradicts `SKILL.md`'s documented `--force` behaviour and removes the repair path for a card blanked in the Jira UI — a regression introduced by this change, in a task whose §5 promises no interface change."
+    suggested_action: "Add `&& !args.force` to story's skip condition, matching epic. Add a test asserting `--force` pushes a PUT on an unchanged document."
+    suggested_owner: dev
+    status: open
+  - id: "TASK96-003"
+    severity: medium
+    file: "skills/sync-jira-epic/tests/end-to-end.test.js"
+    finding: "'the UPDATE path also refreshes the timestamp after a transition' never transitions on the update run: run 1 already moved the card to In Progress and the fixture edit does not change frontmatter status, so `syncDocumentStatus` returns `transitioned: false, reason: 'already'`. The test does go red when the re-read block is disabled, but only because run 1 (the CREATE path) needs the same block — so it does not cover the epic update-path site (`:1428`) that §2.4 names as the never-fixed one."
+    suggested_action: "Make the fixture edit also advance frontmatter status so the update run genuinely transitions, and assert `statusOutcome.transitioned === true` on that run so the test cannot silently stop exercising the path."
+    suggested_owner: dev
+    status: open
+  - id: "TASK96-004"
+    severity: low
+    file: "skills/sync-jira-task/tests/end-to-end.test.js"
+    finding: "'the diff is fed the label set that is actually sent, not a frontmatter rebuild' compares the create payload's labels with the update payload's labels — both produced by the same builder over identical inputs. It asserts builder determinism, not the diff. Verified: it stays GREEN with the label-diff defect restored, so it cannot see the bug it is named for."
+    suggested_action: "Compare the PUT payload's labels against the labels the fake Jira actually holds after the update — the comparison `diffFields` really makes."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50 # 100 - (20 × 2 high) - (10 × 1 medium)
+
+evidence:
+  tests_reviewed: 2675
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No credential handling changed. The concurrent-edit guard is provably still armed — three counterweight tests assert a genuine remote edit aborts, and the guard call sites are byte-identical."
+  performance:
+    status: PASS
+    notes: "The stated goal is met where it applies: story and epic issue one PUT instead of two for two unchanged syncs, asserted as a count. Task is correctly excluded (no skip gate)."
+  reliability:
+    status: CONCERNS
+    notes: "TASK96-002 — `--force` is a documented repair path and it is now a silent no-op on an unchanged story. Silent is the operative word: the run reports success."
+  maintainability:
+    status: CONCERNS
+    notes: "TASK96-001 ships a suite that cannot run where it is installed. TASK96-003 and TASK96-004 are tests that report coverage they do not provide, which is worse than absent tests."
+
+recommendations:
+  immediate:
+    - action: "Move the fake-Jira helper into shared/resources/ so it bundles"
+      refs: ["tests/lib/fake-jira.js", "skills/sync-jira-*/tests/end-to-end.test.js"]
+    - action: "Restore --force on story's skip gate"
+      refs: ["skills/sync-jira-story/scripts/sync-jira-story.js"]
+    - action: "Make the epic UPDATE-path test actually transition"
+      refs: ["skills/sync-jira-epic/tests/end-to-end.test.js"]
+    - action: "Make the task label test assert against what Jira holds"
+      refs: ["skills/sync-jira-task/tests/end-to-end.test.js"]
+  future:
+    - action: "A failed post-transition re-read warns, but `--json` suppresses warns — the pipeline's own mode. Surfacing it would add a JSON field, which §5 promises not to do; worth its own task."
+      refs: ["shared/resources/jira-sync.js"]
+    - action: "The re-read introduces a read-after-write window: a human edit landing between the transition POST and the re-read GET is absorbed into jira_last_synced_at. Inherent to refreshing at all; narrow it by reading `updated` off the transition response if Jira returns it."
+      refs: ["shared/resources/jira-sync.js"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "TASK96-001 and TASK96-002 resolved"

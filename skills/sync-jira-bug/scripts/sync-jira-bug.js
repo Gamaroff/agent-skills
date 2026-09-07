@@ -830,20 +830,13 @@ async function run({
       modeLabels,
     });
 
-    const changedFields = current
-      ? lib.diffFields({
-          prev: current,
-          next: {
-            summary: fields.summary,
-            priority: fields.priority ? fields.priority.name : null,
-            labels: fields.labels,
-          },
-          prevBodyHash: frontmatter.jira_last_body_hash,
-          newBodyHash,
-          prevMetaHash: frontmatter.jira_last_meta_hash,
-          newMetaHash,
-        })
-      : ["summary", "description", "priority", "labels"];
+    const changedFields = lib.diffAgainstPayload({
+      current,
+      fields,
+      frontmatter,
+      newBodyHash,
+      newMetaHash,
+    });
     changeSummary = changedFields.length
       ? `Updated: ${changedFields.join(", ")}`
       : "Sync (no field changes detected)";

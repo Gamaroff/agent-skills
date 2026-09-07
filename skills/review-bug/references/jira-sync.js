@@ -1,8 +1,8 @@
 // AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/jira-sync.js. Regenerate via `npm run bundle`.
 "use strict";
 /**
- * Shared library for Jira sync skills (sync-jira-task at present;
- * sync-jira-epic / sync-jira-story can adopt next).
+ * Shared library for the Jira sync skills — sync-jira-task, sync-jira-epic,
+ * sync-jira-story and sync-jira-bug all use it.
  *
  * Pure functions where possible. I/O paths accept an injected `fetch`
  * for testing. No top-level side effects beyond `loadDotEnv()` if called.
@@ -2087,6 +2087,88 @@ function diffFields({
   const nl = [...(next.labels || [])].sort().join(",");
   if (pl !== nl) changed.push("labels");
   return changed;
+}
+
+/**
+ * Diff the payload that is ACTUALLY being sent against what Jira holds.
+ *
+ * This exists because all four `sync-jira-*` scripts got the same thing wrong
+ * in the same place: they rebuilt `labels` from frontmatter to feed the diff,
+ * while the payload they sent had the `synced-from-*` idempotency label
+ * appended by `collectIssueFields`. The two sets could never match, so `labels`
+ * was reported changed on every run — a PUT every time on the scripts that gate
+ * on the diff, and a permanently wrong change summary on the ones that do not.
+ *
+ * The rule this encodes is the one the duplication kept losing: **diff the
+ * outgoing payload, never a separately-rebuilt field set.** Callers must
+ * therefore build `fields` FIRST and pass it here, not reconstruct its inputs.
+ *
+ * Deliberately takes the already-built `fields` rather than building it. The
+ * four builders genuinely differ — different parameter lists, and story derives
+ * `includeDescription` from this function's own result — so a helper that also
+ * built the payload would need discriminating parameters for each. Taking
+ * `fields` is the cut that leaves no parameter behind.
+ *
+ * @param {object}      args
+ * @param {object|null} args.current       what Jira holds. Null when creating,
+ *   and also on a `--dry-run` update — every caller fetches `current` only
+ *   under `if (!args.dryRun)`, so the dry-run update is the null state a reader
+ *   is most likely to hit.
+ * @param {object}      args.fields        the payload about to be sent
+ * @param {object}      args.frontmatter   for the stored hashes
+ * @param {string}      args.newBodyHash
+ * @param {string}      args.newMetaHash
+ * @returns {string[]}  changed field names
+ */
+/**
+ * Normalise a value the payload treats as a list, for hashing.
+ *
+ * The payload maps `api`, `[api]` and `["web","api"]` onto the same
+ * `components` array, so a hash that distinguishes them fires a spurious
+ * `Updated: metadata` — and that PUT republishes the whole description — on a
+ * cosmetic frontmatter reorder. `diffFields` already sorts labels for the same
+ * reason.
+ *
+ * Elements are keyed with `String(x)` — the SAME coercion the payload builders
+ * apply (`comps.map((name) => ({ name: String(name) }))`). Mirroring matters
+ * more than cleverness here, and in one direction only: if the hash
+ * distinguishes values the payload collapses, the cost is a spurious PUT; if it
+ * collapses values the payload distinguishes, an edit is silently lost. An
+ * earlier revision trimmed the key while the payload did not, which is exactly
+ * the losing direction — a whitespace-only edit changed what was sent and left
+ * the hash still. The rule is: key it the way the payload keys it.
+ *
+ * Lives here rather than in each script because four scripts sharing one
+ * methodology is exactly what this task is about — a copy per script is the
+ * drift it was written to stop.
+ */
+function normaliseListForHash(v) {
+  if (v === undefined || v === null || v === "") return "";
+  return JSON.stringify(
+    (Array.isArray(v) ? v : [v]).filter(Boolean).map(String).sort(),
+  );
+}
+
+function diffAgainstPayload({
+  current,
+  fields,
+  frontmatter,
+  newBodyHash,
+  newMetaHash,
+}) {
+  if (!current) return ["summary", "description", "priority", "labels"];
+  return diffFields({
+    prev: current,
+    next: {
+      summary: fields.summary,
+      priority: fields.priority ? fields.priority.name : null,
+      labels: fields.labels,
+    },
+    prevBodyHash: frontmatter.jira_last_body_hash,
+    newBodyHash,
+    prevMetaHash: frontmatter.jira_last_meta_hash,
+    newMetaHash,
+  });
 }
 
 function guardConcurrentEdit({ jiraUpdated, lastSyncedAt, force, output }) {
@@ -5374,6 +5456,8 @@ module.exports = {
   describeAuthFail,
   // diff / guard / hash
   diffFields,
+  diffAgainstPayload,
+  normaliseListForHash,
   guardConcurrentEdit,
   hashStable,
   // comments
