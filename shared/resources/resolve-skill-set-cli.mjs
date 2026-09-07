@@ -50,9 +50,11 @@ export const SKILLS_JIRA_ONLY = [
   "ensure-epic-jira-issue",
   "ensure-story-jira-issue",
   "ensure-task-jira-issue",
+  "ensure-bug-jira-issue",
   "sync-jira-epic",
   "sync-jira-story",
   "sync-jira-task",
+  "sync-jira-bug",
   "jira-epic-creator",
   "jira-sprint-manager",
   "jira-sprint-retrospective",
@@ -64,9 +66,11 @@ export const SKILLS_GITHUB_ONLY = [
   "ensure-epic-github-issue",
   "ensure-story-github-issue",
   "ensure-task-github-issue",
+  "ensure-bug-github-issue",
   "sync-github-epic",
   "sync-github-story",
   "sync-github-task",
+  "sync-github-bug",
 ];
 
 export function trackerPredicate(tracker, allSkills = false) {

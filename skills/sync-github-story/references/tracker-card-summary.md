@@ -77,6 +77,23 @@ reaching the summary.
 | Metadata | frontmatter — type, PRD, estimated sprints, status |
 | Document | link to the epic file, then the parent PRD, then child stories |
 
+### Bug
+
+| Block | Source |
+|---|---|
+| Summary | `## Bug Description`, first 4 sentences |
+| Reproduction | `## Reproduction Steps`, capped at 5 |
+| Impact | `## Scope & Impact` / `## Acceptance Criteria Violation` / `## Success Criteria Violation` — one spec, three aliases, capped at 5, **omitted entirely when absent** |
+| Metadata | severity, priority, bug status, created, related |
+| Source Documents | the bug report, then its parent document, then that parent's card, then (story mode) the epic, then the bug's own durable siblings |
+
+`## Evidence` is deliberately **excluded**. It is the largest section of a bug report and the
+fastest to go stale — screenshots, log dumps, stack traces — and it is precisely the material a
+pointer exists to avoid copying.
+
+The three violation headings are mode-dependent (story / task / general), which is why they are one
+spec with an alias array rather than three specs: it keeps bug mode out of the card builder.
+
 ## What a card never carries
 
 - **The document's Change Log.** Jira and GitHub both keep their own issue

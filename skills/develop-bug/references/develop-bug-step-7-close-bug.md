@@ -76,7 +76,19 @@ Update the row for this bug in `docs/bugs/bug-registry.md` — set the `Status` 
 
 ### B4. Tracker close (only if linked)
 
-If the bug has `github_issue`/`jira_key` (`TRACKER_ISSUE` non-empty): post a completion comment and close/transition the issue, following the GitHub close / Jira Done-transition mechanics in [`references/develop-pipeline-step-7-finalise.md`](references/develop-pipeline-step-7-finalise.md) (Tracker Issue Update), substituting bug terminology. Skip silently when `TRACKER_ISSUE` is empty — most bugs have no dedicated tracker issue.
+If the bug has `github_issue`/`jira_key` (`TRACKER_ISSUE` non-empty): post a completion comment and close/transition the issue, following the GitHub close / Jira Done-transition mechanics in [`references/develop-pipeline-step-7-finalise.md`](references/develop-pipeline-step-7-finalise.md) (Tracker Issue Update), substituting bug terminology.
+
+Step 1 ensures the issue via `ensure-bug-{jira,github}-issue`, so a bug normally **has** one — an empty `TRACKER_ISSUE` here means that create failed or was deferred, not that bugs go untracked. Skip the close when it is empty, and say so in the report rather than silently: a deferred create leaves the card uncreated *and* unclosed, and the handover checklist is what carries both actions.
+
+Then re-sync the bug document so the card's `Source Documents` links point at the durable integration branch rather than the feature branch that is about to be deleted:
+
+```bash
+# TRACKER=jira
+node .agents/skills/sync-jira-bug/scripts/sync-jira-bug.js \
+  --file "$BUG_FILE" --doc-branch "$BASE_BRANCH" --no-transition
+```
+
+**`--no-transition` is mandatory here.** The close above has already decided the card's status; without the flag the sync resolves the bug's `status: closed` through its own status map and can walk the card back out of the terminal status it was just put into, stranding its resolution. That is bug.11, and the same flag is the fix on the story and task paths.
 
 ---
 

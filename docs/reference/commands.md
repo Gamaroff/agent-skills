@@ -94,9 +94,11 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/sync-jira-epic <path>` | Create/update Jira epic from local file | [Jira Publish](../runbooks/jira-publish.md) |
 | `/sync-jira-story <path>` | Create/update Jira story, link to epic | [Jira Publish](../runbooks/jira-publish.md) |
 | `/sync-jira-task <path>` | Create/update standalone Jira task | [Jira Publish](../runbooks/jira-publish.md) |
+| `/sync-jira-bug <path>` | Create/update a Jira bug, issue-linked to its parent's card | [`sync-jira-bug`](../../skills/sync-jira-bug/SKILL.md) |
 | `/sync-github-epic <path>` | Create/update GitHub epic issue, add to board, mirror priority | [`sync-github-epic`](../../skills/sync-github-epic/SKILL.md) |
 | `/sync-github-story <path>` | Create/update GitHub story issue, link as sub-issue of the epic | [`sync-github-story`](../../skills/sync-github-story/SKILL.md) |
 | `/sync-github-task <path>` | Create/update standalone GitHub task issue | [`sync-github-task`](../../skills/sync-github-task/SKILL.md) |
+| `/sync-github-bug <path>` | Create/update a GitHub bug issue, sub-issue of its parent | [`sync-github-bug`](../../skills/sync-github-bug/SKILL.md) |
 | `/jira-epic-creator` | Bulk Jira epic creation from PRD | [`jira-epic-creator`](../../skills/jira-epic-creator/SKILL.md) |
 
 Which family fires is resolved per-run, not chosen by hand — see [platform detection](../../shared/resources/platform-detection.md) and [tracker workflow](./tracker-workflow.md).

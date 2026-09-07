@@ -63,9 +63,11 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Sync this epic to Jira" / "Publish epic to Jira" | `sync-jira-epic` |
 | "Sync this story to Jira" | `sync-jira-story` |
 | "Sync this task to Jira" | `sync-jira-task` |
+| "Sync this bug to Jira" | `sync-jira-bug` |
 | "Sync this epic to GitHub" / "Publish epic to GitHub" | `sync-github-epic` |
 | "Sync this story to GitHub" | `sync-github-story` |
 | "Sync this task to GitHub" | `sync-github-task` |
+| "Sync this bug to GitHub" | `sync-github-bug` |
 | "File an issue for this" / "Create a ticket" | `create-issue` (platform auto-detected) |
 | "Reconcile the tracker handover" / "Work the deferred checklist" / "Did anyone do the handover actions?" | `tracker-reconcile` |
 

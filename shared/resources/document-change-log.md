@@ -177,6 +177,12 @@ automatic.
 already the bug-type equivalent, and it is richer — it carries a `Status` column, which is the
 thing a bug's history is actually about. Do not add a second table to bug reports.
 
+That table has its own engine — [`status-history.js`](status-history.js), the peer of
+`change-log.js` — so a writer that needs to record a moment on a bug has somewhere correct to go.
+Reaching for `upsertChangeLog(content, entry, { docType: "bug" })` instead does **not** fail: there
+is no `bug` anchor, so it falls through to the end-of-file path and appends the one table this
+exclusion forbids, silently. Use the engine, not the `docType`.
+
 **Tracker cards never carry the Change Log.**
 [`tracker-card-summary.md`](tracker-card-summary.md) is explicit about why: *"Jira and GitHub
 both keep their own issue history, and the local file holds the authoritative log. A third copy

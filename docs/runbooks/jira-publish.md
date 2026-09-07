@@ -26,6 +26,8 @@ flowchart TD
     B --> C[Status changes in frontmatter]
     C --> D[Re-run sync to drive transitions]
     A --> E[sync-jira-task<br/>standalone — no epic link]
+    B -.issue link.-> F[sync-jira-bug<br/>sibling card, linked to its parent]
+    E -.issue link.-> F
 ```
 
 ## Phase 1 — Sync the parent epic
@@ -68,6 +70,24 @@ The parent epic **must already exist in Jira** with `jira_key` set — Phase 1 f
 - **Not linked** to any Jira epic — tasks are standalone.
 - Idempotent create via `synced-from-*` label search.
 - Adds the task to the project backlog (Scrum boards only).
+
+## Phase 4 — Sync bugs
+
+```bash
+/sync-jira-bug <bug-path>
+```
+
+- Creates the Jira bug if `jira_key` is absent; updates it otherwise.
+- Infers the **mode** — story bug / task bug / general bug — from the file's own path.
+- The card is a **sibling** of its parent's card, never a child: Jira cannot nest a Bug under a
+  Story without switching it to a sub-task type, which differs per board and costs the bug its own
+  backlog placement and transitions. The relationship travels as a Jira **issue link** (type
+  resolved by runtime introspection) plus link-marked entries in a `Source Documents` section.
+- Sync the **parent first**. A parent with no `jira_key` yet gets its document linked but not its
+  card; re-run the bug sync afterwards and the card link lands — `linkIssues` is idempotent.
+- Idempotent create via a `synced-from-{bug stem}` label — derived from the bug's own filename, not
+  its directory, because a bug shares its directory with its parent and every sibling bug.
+- Writes `## Status History` rows, never a Change Log. Bug reports are barred from carrying one.
 - Embeds Bitbucket links rendered via ADF.
 
 ## What lands on a card
@@ -98,6 +118,8 @@ All three sync skills drive the Jira issue's status from the local frontmatter `
 - [`sync-jira-epic` SKILL.md](../../skills/sync-jira-epic/SKILL.md)
 - [`sync-jira-story` SKILL.md](../../skills/sync-jira-story/SKILL.md)
 - [`sync-jira-task` SKILL.md](../../skills/sync-jira-task/SKILL.md)
+- [`sync-jira-bug` SKILL.md](../../skills/sync-jira-bug/SKILL.md)
+- [`ensure-bug-jira-issue` SKILL.md](../../skills/ensure-bug-jira-issue/SKILL.md) — called by `develop-bug`
 - [`jira-epic-creator` SKILL.md](../../skills/jira-epic-creator/SKILL.md)
 - [`ensure-epic-jira-issue` SKILL.md](../../skills/ensure-epic-jira-issue/SKILL.md) — called by `finalise`
 - [Platform detection](../../shared/resources/platform-detection.md)

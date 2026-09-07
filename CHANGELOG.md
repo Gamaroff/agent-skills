@@ -6,6 +6,71 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Bug reports can now be published to a tracker: `sync-jira-bug` + `ensure-bug-jira-issue`, and
+  `sync-github-bug` + `ensure-bug-github-issue`.** `sync-{jira,github}-{story,epic,task}` all
+  existed; there was no bug equivalent for either tracker, so bug cards were created through the
+  generic `/create-issue` path with a hand-authored description. Measured on a live Jira board, bug
+  card RAPP-713 and its three siblings each had a description whose ADF contained **zero** `link`
+  marks — the bug report was a bare plain-text path — with `parent: null` and an empty `remotelink`
+  list. The card linked to nothing: not the bug file, not the story doc, not the epic, not the
+  story's own card. The bug *file* linked out correctly, so the both-ways relationship held in one
+  direction only. `develop-bug` already described the gap, in a comment saying *"most general/story/
+  task bugs will not [have a tracker issue] — skip silently when empty"*; that branch now ensures one.
+
+  Three modes — story bug, task bug, general bug — inferred from the file's own **path**, never
+  asked for. The brief for this work named `story_id` / `task_id` frontmatter keys; those do not
+  exist. They are `create-bug-report` *inputs*, and the documented schema carries parentage only in
+  the free-text `related:` string. So the path decides, `related:` is read as corroboration, and a
+  disagreement is **warned about but not obeyed** — a wrong parent link is worse than a missing one.
+
+- **The bug card is a Jira sibling with a real issue link, not a child.** Jira cannot nest a Bug
+  under a Story without switching it to a sub-task type, and that is not a neutral change: sub-task
+  type names differ per board, a sub-task has no independent backlog placement and usually no sprint
+  of its own, and sub-task workflows are frequently shorter than the project's standard one. In a
+  company-managed project `parent` on a standard issue *is* the Epic Link, so pointing it at a story
+  key is simply invalid. The relationship therefore travels as `POST /rest/api/3/issueLink`, with the
+  link type resolved by introspecting `/rest/api/3/issueLinkType` against a candidate list
+  (`Relates → Relates To → Related → Problem/Incident → Blocks`) — never a hardcoded name — plus
+  link-marked entries in a `Source Documents` section. A board offering none of them reports
+  `no-link-type` and keeps its description links: a degraded success, not a failure.
+
+  GitHub takes the stronger relationship its API actually supports and nests the bug as a
+  **sub-issue**. Same intent, different mechanism, because the platforms differ.
+
+  `linkIssues` reads `fields=issuelinks` before posting. That is not an optimisation: Jira happily
+  creates a *duplicate* link of the same type between the same pair, so an unconditional POST would
+  add one more identical row to the link panel on every sync.
+
+- **`shared/resources/status-history.js` — the bug-type Change Log.** Bug reports are barred from
+  carrying a `## Change Log`; `## Status History` is the equivalent and is richer, because it has a
+  `Status` column. Until now nothing wrote that table in code — only prose. The trap this closes:
+  `change-log.js` has no `bug` anchor, so `upsertChangeLog(content, e, {docType: "bug"})` does not
+  fail — it falls through to the end-of-file path and silently appends the one table the standard
+  forbids, added by the code meant to respect it.
+
+- **`shared/resources/bug-doc.js` — bug-document semantics in one place.** Mode inference,
+  header-block parsing, parent and sibling resolution, and frontmatter adoption, shared by the Jira
+  script and the GitHub prose skills via a `--json` CLI. Two implementations would disagree the first
+  time a filename surprised one of them, and the disagreement would be invisible: each tracker would
+  simply link the card to a different parent. It requires nothing but node builtins, deliberately —
+  bundling follows `require()` edges, and a Jira dependency here would vendor a Jira client into the
+  GitHub-only skills.
+
+- **A bug file with no frontmatter now gets one.** About half the bug documents in a mature repo
+  predate the template and open with a `**Bug ID**:` header block. On those, `upsertFrontmatterKeys`
+  returns its input **unchanged, and silently** — so the card was created, the link line written, and
+  `jira_key` never persisted, and the next run created a duplicate unless the `synced-from-*` label
+  search happened to rescue it. A minimal block is now prepended, seeded from the header block, with
+  the body concatenated verbatim. `review-bug` already flags a bold-line header with no YAML block as
+  Critical, so adoption clears a finding rather than creating one.
+
+- **`DEFAULT_STATUS_MAP` gains the four bug-lifecycle words it lacked** — `new`, `ready-for-qa`,
+  `closed`, `reopened` (`in-progress` was already there). All four were previously *unmapped* and
+  fell through `mapStatusCandidates`' verbatim single-candidate pass-through, so a board was offered
+  the literal word. `closed` also joins `TERMINAL_LOCAL_STATUSES`, which is what makes
+  `resolveTransition`'s `statusCategory=done` fallback available to a closing bug. Adding keys that
+  were absent cannot move any existing status, and a test asserts the document lifecycle is unchanged.
+
 - **A security probe now runs, and the engine computes the verdict (task.80).** `task.73` gave the DoD
   security check a probe mode, but the mode was prose: it told the agent to hand-write a script and run
   it, then trusted the `probes_executed` count the agent typed. The guard *"`boundary: true` and
@@ -44,6 +109,30 @@ All notable changes to this project will be documented in this file. Format foll
   `COMMAND_RUNNERS`.
 
 ### Fixed
+
+- **The idempotency label is derived from the bug's own filename stem, not its directory.**
+  `sync-jira-task` labels by parent-directory basename, which is unique because a task owns its
+  directory. A bug does not: a story bug shares a directory with its story, that story's QA reports
+  and every sibling bug. Carrying that rule over would have given every bug in a story the same
+  `synced-from-*` label, and the pre-flight "have I already created this?" search would then adopt
+  the first card it found — so bug 2 would silently update bug 1's card. This label is the sole
+  guarantor of idempotent create when the write-back fails, so it must be unique per bug.
+
+- **`sync-jira-bug` diffs against the payload it is about to send, not a separately-computed one.**
+  The update path builds `fields` first and diffs `fields.labels`. Diffing a list rebuilt from
+  frontmatter compares a set that is missing the `synced-from-*` and mode labels against a Jira issue
+  that has them; the two never converge, `labels` is reported changed on **every** run, and the
+  skip-when-no-diff path never fires. Caught by the end-to-end test asserting the second sync changes
+  nothing. _The three sibling sync scripts appear to share this shape and have not been changed here._
+
+- **`jira_last_synced_at` is re-read after a transition that fired.** The timestamp captured on
+  create is from _before_ the status transition, and a transition is a write. Storing the earlier
+  value tells the next run that Jira has moved since this sync — which is precisely what the
+  concurrent-edit guard aborts on. The symptom is a card that syncs once and then refuses every
+  subsequent run with _"Jira issue updated since last local sync"_, pointing at a change the tool
+  made itself seconds earlier. Also caught by the end-to-end test. _The sibling scripts appear to
+  share this ordering too._
+
 
 - **`finalise` no longer reports a close it may have just undone (bug.11).** Step 7 transitions the
   card to a terminal status and then re-runs `sync-jira-*` to re-point the Document link at the
