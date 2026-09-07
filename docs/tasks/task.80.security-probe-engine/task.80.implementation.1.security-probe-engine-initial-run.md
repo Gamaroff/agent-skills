@@ -118,6 +118,34 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 
 ## QA Iteration History
 
+### QA Cycle 3 — 2026-09-07
+
+| Field | Value |
+| --- | --- |
+| **QA skill** | `/qa-task` (standard, narrowed — `REFUTE_PASS=false`, cycle 2 already ran the unscoped refute) |
+| **Gate** | ✅ **PASS** — 100/100 |
+| **HIGH findings** | 0 |
+| **Findings** | **None new**; both cycle-2 findings verified fixed |
+| **Gate file** | `task.80.gate.3.security-probe-engine.yml` |
+| **QA report** | `task.80.qa.3.security-probe-engine.md` |
+| **PR comment** | [posted](https://github.com/Gamaroff/agent-skills/pull/337#issuecomment-5567536657) |
+| **Tests** | 276/276 targeted; full `ci:fast` 2570/0 |
+| **PR Review** | _(Step 5c — pending)_ |
+
+Both cycle-2 fixes verified, and **both halves of each** — the half that could have been faked as
+easily as fixed. Nine bad `timeoutMs` values handled without a crash, *and* `timeoutMs: 1` still
+bites (`executed 0, declined 1`), so the fallback is not swallowing every input. The module move
+left no stale reference in code, no markdown link a checker would follow, and nothing in any bundled
+`references/` copy; `npm run bundle` reports 0 files bundled.
+
+Both fixes mutation-proved independently by faithful reversion.
+
+**Convergence check: skipped** — the rule explicitly exempts a gate that hands to 5c. Worth recording
+that it would otherwise have tripped: `HIGH_N` was 0 at all three gates, so `0 >= 0 >= 0` satisfies
+the not-converging condition. The guard measures HIGH counts, and a run that is genuinely converging
+on MEDIUMs (4 → 2 → 0) reads as flat to it. Not acted on and not a defect in this run — noted because
+a run that ends cycle 3 on CONCERNS with no HIGH findings would escalate for the wrong reason.
+
 ### QA Cycle 2 — 2026-09-07 (refute pass)
 
 | Field | Value |

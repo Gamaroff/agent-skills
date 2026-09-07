@@ -368,6 +368,7 @@ run clean for a cycle.
 | 2026-09-07 |         | QA findings fixed — 4 MEDIUM closed + 1 new latent bug (exit-after-write truncation), 1 iteration | qa-fix |
 | 2026-09-07 |         | QA gate CONCERNS (80/100) cycle 2 — all 4 prior findings verified fixed; 2 new MEDIUM found by the refute pass | qa-task |
 | 2026-09-07 |         | QA findings fixed — 2 MEDIUM closed; spawn-budget moved out of tests/, bundler nested-dep fix, 2 iterations | qa-fix |
+| 2026-09-07 |         | QA gate PASS (100/100) cycle 3 — both prior findings verified fixed, no new findings | qa-task |
 
 ---
 
@@ -409,21 +410,35 @@ run clean for a cycle.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (cycle 2)
+**QA Status**: PASS (cycle 3)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-07
-**Quality Score**: 80/100 (cycle 1: 60/100)
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100 (60 → 80 → 100)
+**Gate Decision**: PASS
 
 ### QA Reports
-- **Cycle 2 (current)**: [task.80.qa.2.security-probe-engine.md](./task.80.qa.2.security-probe-engine.md) · [gate.2](./task.80.gate.2.security-probe-engine.yml)
+- **Cycle 3 (current)**: [task.80.qa.3.security-probe-engine.md](./task.80.qa.3.security-probe-engine.md) · [gate.3](./task.80.gate.3.security-probe-engine.yml)
+- **Cycle 2**: [task.80.qa.2.security-probe-engine.md](./task.80.qa.2.security-probe-engine.md) · [gate.2](./task.80.gate.2.security-probe-engine.yml)
 - **Cycle 1**: [task.80.qa.1.security-probe-engine.md](./task.80.qa.1.security-probe-engine.md) · [gate.1](./task.80.gate.1.security-probe-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 153 targeted (2568 on the full `ci:fast` run), 0 failures
+- **Tests Executed**: 276 targeted (2570 on the full `ci:fast` run), 0 failures
 - **Phases Verified**: 4/4
-- **Critical Issues**: cycle 1 — 0 HIGH, 4 MEDIUM, 1 LOW (all fixed). Cycle 2 — 0 HIGH, 2 MEDIUM, 1 LOW (new).
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: **0 open**. Six findings raised across three cycles (0 HIGH throughout), all closed and independently verified — none carried, none waived.
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: **PASS** (was CONCERNS), Maintainability: PASS
+
+### Key Findings — cycle 3 (final)
+
+**Gate PASS, 100/100, no open findings.** Both cycle-2 findings closed, and **both halves of each
+verified** — the half that could have been faked as easily as fixed:
+
+- The timeout fallback handles nine bad programmatic values without crashing, **and** `timeoutMs: 1`
+  still bites (`executed 0, declined 1`), so it is not swallowing every input.
+- The module move left **no stale reference anywhere** — not in code, not as a markdown link a
+  checker would follow, not in any bundled `references/` copy. `npm run bundle` reports 0 files
+  bundled.
+
+No new findings from a scope aimed at the one thing cycle 3 owed: the blast radius of a move.
 
 ### Key Findings — cycle 2
 
