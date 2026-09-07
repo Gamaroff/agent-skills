@@ -119,7 +119,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 77 | [Run the PR conformance review before a work item is finalised](task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md) | accepted | infrastructure | High | 2026-09-01 | — | task.66 |
 | 78 | [Give develop-bug's fix cycle the same fast gate as the other pipelines](task.78.develop-bug-fast-gate/task.78.develop-bug-fast-gate.md) | ready-for-development | infrastructure | Medium | 2026-09-01 | — | task.75 |
 | 79 | [Write down the inputs that defeat each sink, once](task.79.security-input-corpus/task.79.security-input-corpus.md) | accepted | infrastructure | High | 2026-09-02 | — | — |
-| 80 | [Make a security probe runnable without widening the snippet allow-list](task.80.security-probe-engine/task.80.security-probe-engine.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | task.79 |
+| 80 | [Make a security probe runnable without widening the snippet allow-list](task.80.security-probe-engine/task.80.security-probe-engine.md) | accepted | infrastructure | High | 2026-09-02 | — | task.79 |
 | 81 | [Ship /review-security: prove a control engages, not that it is present](task.81.review-security-skill/task.81.review-security-skill.md) | ready-for-development | infrastructure | High | 2026-09-02 | — | task.79, task.80 |
 | 82 | [Feed the measured security verdict into the QA gate](task.82.security-gate-evidence-field/task.82.security-gate-evidence-field.md) | ready-for-development | infrastructure | Medium | 2026-09-02 | — | task.81 |
 | 83 | [Platform-aware skill exclusion in setup-consumer.sh](task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md) | planned | infrastructure | Medium | 2026-09-02 | — | — |
