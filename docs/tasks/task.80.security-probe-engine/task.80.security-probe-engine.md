@@ -366,6 +366,8 @@ run clean for a cycle.
 | 2026-09-07 |         | Implemented — 8 files (3 created, 3 modified, 6 fixtures), 26 tests added (18 new + 8 parity), 4 mutation proofs | develop |
 | 2026-09-07 |         | QA gate CONCERNS (60/100) — 4 MEDIUM findings, all peripheral; all 7 safety criteria verified | qa-task |
 | 2026-09-07 |         | QA findings fixed — 4 MEDIUM closed + 1 new latent bug (exit-after-write truncation), 1 iteration | qa-fix |
+| 2026-09-07 |         | QA gate CONCERNS (80/100) cycle 2 — all 4 prior findings verified fixed; 2 new MEDIUM found by the refute pass | qa-task |
+| 2026-09-07 |         | QA findings fixed — 2 MEDIUM closed; spawn-budget moved out of tests/, bundler nested-dep fix, 2 iterations | qa-fix |
 
 ---
 
@@ -407,23 +409,37 @@ run clean for a cycle.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-07
-**Quality Score**: 60/100
+**Quality Score**: 80/100 (cycle 1: 60/100)
 **Gate Decision**: CONCERNS
 
-### QA Report
-- **Full Report**: [task.80.qa.1.security-probe-engine.md](./task.80.qa.1.security-probe-engine.md)
-- **Gate File**: [task.80.gate.1.security-probe-engine.yml](./task.80.gate.1.security-probe-engine.yml)
+### QA Reports
+- **Cycle 2 (current)**: [task.80.qa.2.security-probe-engine.md](./task.80.qa.2.security-probe-engine.md) · [gate.2](./task.80.gate.2.security-probe-engine.yml)
+- **Cycle 1**: [task.80.qa.1.security-probe-engine.md](./task.80.qa.1.security-probe-engine.md) · [gate.1](./task.80.gate.1.security-probe-engine.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 139 targeted (2564 on the full `ci:fast` run), 0 failures
+- **Tests Executed**: 153 targeted (2568 on the full `ci:fast` run), 0 failures
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 4 MEDIUM, 1 LOW
+- **Critical Issues**: cycle 1 — 0 HIGH, 4 MEDIUM, 1 LOW (all fixed). Cycle 2 — 0 HIGH, 2 MEDIUM, 1 LOW (new).
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
-### Key Findings
+### Key Findings — cycle 2
+
+All four gate-1 findings **verified fixed and mutation-proved**. The refute pass found two new MEDIUM
+issues, both latent and both aimed at the declared consumer (`task.81`), sharing one shape: *a fix that
+satisfies the finding as written while leaving the mechanism reachable by the route the consumer
+actually takes.*
+
+- **TASK80-005** — the `--timeout` fix was CLI-only; `runProbeSpec({timeoutMs: NaN})` still throws the
+  same uncaught `RangeError`, and `timeoutMs: 0` still disables containment. `task.81` calls the API,
+  not the CLI.
+- **TASK80-006** — `import … from "./tests/spawn-budget.mjs"` will crash `npm run bundle`: the bundler
+  captures the nested sibling then writes to `references/tests/` without creating it. It does not fire
+  today only because no skill references this module yet — `task.81` is the change that triggers it.
+
+### Key Findings — cycle 1 (all fixed)
 
 All seven §9 safety criteria hold under **independent** probing — each was tested against running code, not read in the source. The out-of-root rejection was proved to precede `import()` using a fixture whose module top level writes a sentinel (never created), and the no-shell property was proved with a shell-injection input (clean rejection, no artifact). The Phase 1 extraction is behaviour-preserving against 105 tests including the `bug.3` replay eval.
 
@@ -433,6 +449,36 @@ Four MEDIUM findings, all in the engine's **periphery** rather than its verdict 
 - **TASK80-002** — `escapes` is `undefined` on four of five result paths; the declared consumer (`task.81`) would throw.
 - **TASK80-003** — a sandbox escape is invisible in default CLI output.
 - **TASK80-004** — the parity block's comment claims broader coverage than it pins: adding only `rm` to `SAFE_COMMANDS` is a genuine fail-open that leaves 105/105 tests green.
+
+---
+
+## QA Fix Cycle 2 — 2026-09-07
+
+Both cycle-2 findings fixed and mutation-proved. Status stays `Ready for Review`.
+
+| Finding | Fix | Mutation-proven |
+| --- | --- | --- |
+| **TASK80-005** timeout validated at the CLI only | `readInt(timeoutMs, 1)` moved to where `perCaseTimeout` resolves, so validation sits at the boundary the caller actually crosses. An unparseable value **falls back to the budget** rather than throwing — the function's contract is that it returns a verdict, and making it throw for a bad argument would make an out-of-range timeout louder than an unimportable entry point, which is backwards. The CLI keeps its `return 2` so a bad *flag* still reports as an argument error. | **yes** — reverting to `timeoutMs ?? budget.timeoutMs` reds the new test with the original `RangeError` |
+| **TASK80-006** production module importing from `tests/` | `shared/resources/tests/spawn-budget.mjs` **moved** to `shared/resources/spawn-budget.mjs`; all 7 import sites updated (4 sibling test suites, 1 eval, 3 references in `test-harness-concurrency.test.js`, and the probe engine). **No shim** — a re-exporting shim would leave two paths for one module, which is the same smell in a different place. | **yes** (bundler half) |
+| **TASK80-006, class fix** | `dst.parent.mkdir(parents=True, exist_ok=True)` in `bundle_skill.py`, plus a regression test in `tests/bundle-mjs.test.js` (which *is* in the `npm test` glob). | **yes** — removing the mkdir reds the new test |
+
+### Why the move rather than a shim
+
+The QA finding offered either. A shim keeps every existing import working with no edits, but it also
+keeps `shared/resources/tests/spawn-budget.mjs` in existence — so anything importing through that
+path would still hand the bundler a nested dep, and the inverted dependency would still be one
+`import` away. Seven call sites is a small enough cost to remove the path entirely.
+
+### The advisory, decided rather than deferred
+
+`escapes` accumulates one entry per (case, path) and is **not** de-duplicated. The question a reader
+asks of an escape is *"which inputs caused a write outside the sandbox?"* — a probe that escapes on
+one hostile input and one that escapes on all twelve are different findings, and collapsing to a path
+set renders them identically. A consumer wanting the path set can take
+`new Set(escapes.map((e) => e.path))`; that direction is lossless, the other is not. Recorded in a
+comment at the accumulation site.
+
+**Fast gate**: `npm run ci:fast` green — **2570 tests, 0 failures**. `npm run bundle`: clean no-op.
 
 ---
 

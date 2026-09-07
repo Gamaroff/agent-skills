@@ -118,6 +118,48 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 
 ## QA Iteration History
 
+### QA Cycle 2 — 2026-09-07 (refute pass)
+
+| Field | Value |
+| --- | --- |
+| **QA skill** | `/qa-task` (standard, **`REFUTE_PASS=true`** — whole branch diff re-read to refute) |
+| **Gate** | **CONCERNS** — 80/100 (up from 60) |
+| **HIGH findings** | 0 |
+| **Findings** | 0 HIGH, 2 MEDIUM (new), 1 LOW |
+| **Gate file** | `task.80.gate.2.security-probe-engine.yml` |
+| **QA report** | `task.80.qa.2.security-probe-engine.md` |
+| **PR comment** | [posted](https://github.com/Gamaroff/agent-skills/pull/337#issuecomment-5567225783) |
+| **Tests** | 153/153 targeted; full `ci:fast` 2568/0 |
+| **PR Review** | _(Step 5c — not reached; gate did not read PASS)_ |
+
+**All four gate-1 findings verified fixed and mutation-proved.** Each was re-executed independently
+rather than accepted from the fix summary, and each was proved by reverting it and confirming exactly
+the guarding test goes red.
+
+Two new MEDIUM findings, both **latent** and both aimed at the declared consumer (`task.81`). They
+share one shape worth naming: *a fix that satisfies the finding as written while leaving the mechanism
+reachable by the route the consumer actually takes.*
+
+- **TASK80-005** — the `--timeout` fix was CLI-only. `runProbeSpec({timeoutMs: NaN})` still throws the
+  same uncaught `RangeError`; `timeoutMs: 0` still reaches `spawnSync` as "no timeout". `task.81` calls
+  the API, not the CLI.
+- **TASK80-006** — `import … from "./tests/spawn-budget.mjs"` will crash `npm run bundle`. The bundler
+  captures the nested sibling as a transitive dep, then writes `references/tests/spawn-budget.mjs`
+  while only `references/` is created — reproduced deterministically as `FileNotFoundError`. It does
+  not fire today only because no skill references this module yet.
+
+Gate-1's TASK80-001 is graded **PARTIAL, not FIXED**, deliberately: `:460` is fixed, but the finding's
+impact statement is still reachable through the API. Grading the wording rather than the mechanism is
+how a loop closes findings while the defect stays.
+
+One methodological note. The exit-after-write mutation initially appeared **not** to red — the guard is
+proximity-based (`LOOKBACK_CHARS = 1200`) and the first reversion put the exit outside its window. A
+faithful reversion reds it at `security-probe.mjs:L100`. Reporting the first attempt as "not proven"
+would have been wrong; so would reporting a green suite as proof.
+
+**Convergence check**: not applicable — it needs three readings and there are two. Both are
+`HIGH_N = 0`. Proceeding to 5b.
+
 ### QA Cycle 1 — 2026-09-07
 
 | Field | Value |
@@ -129,6 +171,7 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 | **QA report** | `task.80.qa.1.security-probe-engine.md` |
 | **PR comment** | [posted](https://github.com/Gamaroff/agent-skills/pull/337#issuecomment-5566557812) |
 | **Tests** | 139/139 targeted, 0 fail |
+| **HIGH findings** | 0 |
 | **PR Review** | _(Step 5c — not reached; gate did not read PASS)_ |
 
 All seven §9 safety criteria verified **by execution rather than inspection**, and all four hold. The two that matter most were tested with purpose-built adversarial fixtures: a module whose *top level* writes a sentinel proved the out-of-root rejection precedes `import()`, and a shell-injection input proved values never reach a shell.

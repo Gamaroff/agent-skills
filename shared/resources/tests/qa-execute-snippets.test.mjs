@@ -27,7 +27,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { neverRan, spawnBudget } from "./spawn-budget.mjs";
+import { neverRan, spawnBudget } from "../spawn-budget.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

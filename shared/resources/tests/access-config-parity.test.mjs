@@ -23,7 +23,7 @@
 import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { spawnBudget } from "./spawn-budget.mjs";
+import { spawnBudget } from "../spawn-budget.mjs";
 import {
   mkdtempSync,
   mkdirSync,

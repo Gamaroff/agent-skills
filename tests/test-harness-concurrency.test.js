@@ -175,7 +175,7 @@ test("the bound is overridable from the environment without editing package.json
 const BUDGET_MODULE = path.join(
   __dirname,
   "..",
-  "shared/resources/tests/spawn-budget.mjs",
+  "shared/resources/spawn-budget.mjs",
 );
 
 /**
@@ -563,8 +563,7 @@ test("comment stripping never deletes executable source", () => {
 });
 
 test("the spawn budget honours 0 retries and the full precedence ladder", async () => {
-  const { spawnBudget } =
-    await import("../shared/resources/tests/spawn-budget.mjs");
+  const { spawnBudget } = await import("../shared/resources/spawn-budget.mjs");
   const withEnv = (env, fn) => {
     const saved = {};
     for (const [k, v] of Object.entries(env)) {
@@ -653,8 +652,7 @@ test("runnerScripts itself recognises every runner form", () => {
 });
 
 test("the spawn budget rejects values that are not integers", async () => {
-  const { spawnBudget } =
-    await import("../shared/resources/tests/spawn-budget.mjs");
+  const { spawnBudget } = await import("../shared/resources/spawn-budget.mjs");
   const timeoutFor = (v) => {
     const saved = process.env.Q_SPAWN_TIMEOUT_MS;
     process.env.Q_SPAWN_TIMEOUT_MS = v;

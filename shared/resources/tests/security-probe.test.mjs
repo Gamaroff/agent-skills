@@ -490,3 +490,36 @@ test("a sandbox escape forces a non-zero exit even on an otherwise-clean verdict
     "an escaping probe must never exit 0, even on `engages`",
   );
 });
+
+test("runProbeSpec validates timeoutMs itself — the API, not only the CLI", () => {
+  // Cycle 1 validated the flag and left the parameter open, so the reported
+  // symptom was fixed while the mechanism it named stayed reachable by the
+  // route that mattered: `task.81` calls this function, never the CLI.
+  //
+  // Both values below previously reached spawnSync — NaN as an uncaught
+  // RangeError, 0 as "no timeout". Now both fall back to the budget, so the
+  // probe still runs and still returns a verdict.
+  for (const bad of [NaN, 0, -1, 1.5, "abc", null, undefined, {}]) {
+    const r = runProbeSpec({
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+      timeoutMs: bad,
+    });
+    assert.equal(
+      r.verdict,
+      "engages",
+      `timeoutMs ${JSON.stringify(bad)} must fall back to the budget, not throw`,
+    );
+    assert.equal(r.executed, CASES.length);
+  }
+
+  // A GOOD value is still honoured — the fallback must not swallow every input.
+  const good = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("engaging-control"),
+    cases: CASES,
+    timeoutMs: 30000,
+  });
+  assert.equal(good.verdict, "engages");
+});

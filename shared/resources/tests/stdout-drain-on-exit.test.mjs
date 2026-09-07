@@ -57,7 +57,7 @@ import {
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
-import { spawnBudget } from "./spawn-budget.mjs";
+import { spawnBudget } from "../spawn-budget.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, "..", "..", "..");

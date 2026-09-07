@@ -40,7 +40,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { execFileSync, spawnSync } from "node:child_process";
-import { spawnBudget } from "./spawn-budget.mjs";
+import { spawnBudget } from "../spawn-budget.mjs";
 
 const require = createRequire(import.meta.url);
 

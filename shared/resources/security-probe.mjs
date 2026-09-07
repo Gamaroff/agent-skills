@@ -43,7 +43,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
 import { corpusFor } from "./security-input-corpus.mjs";
-import { spawnBudget, neverRan, readInt } from "./tests/spawn-budget.mjs";
+import { spawnBudget, neverRan, readInt } from "./spawn-budget.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -311,7 +311,20 @@ export function runProbeSpec({
   repoRoot = defaultRepoRoot(),
 } = {}) {
   const budget = spawnBudget("PROBE");
-  const perCaseTimeout = timeoutMs ?? budget.timeoutMs;
+  // Validated HERE, not only in `main()`, because this is the boundary a caller
+  // actually crosses: `task.81` calls this function, never the CLI. Cycle 1
+  // validated the flag and left the parameter open, so `timeoutMs: NaN` still
+  // reached spawnSync and threw an uncaught RangeError, and `timeoutMs: 0` still
+  // meant "no timeout" — the reported symptom was fixed while the mechanism it
+  // named stayed reachable by the route that mattered.
+  //
+  // An unparseable value FALLS BACK to the budget rather than throwing. The
+  // function's contract is that it returns a verdict; making it throw for a bad
+  // argument would hand callers a second failure mode to handle and would make
+  // an out-of-range timeout louder than an unimportable entry point, which is
+  // backwards. The CLI keeps its `return 2` on top, so a bad *flag* is still
+  // reported as an argument error rather than as a probe result.
+  const perCaseTimeout = readInt(timeoutMs, 1) ?? budget.timeoutMs;
 
   // Every field the success path returns, so EVERY return path carries the same
   // shape. `escapes` in particular: it was previously added only on the success
@@ -397,6 +410,14 @@ export function runProbeSpec({
 
       const after = snapshotTree(sandboxRoot, workDirName);
       for (const [path, stamp] of after) {
+        // One entry per (case, path). NOT de-duplicated by path, deliberately:
+        // the question a reader asks of an escape is "which inputs caused a write
+        // outside the sandbox?", and collapsing to a path set answers a different
+        // one. A probe that escapes on exactly one hostile input and a probe that
+        // escapes on all twelve are different findings; de-duplicating would
+        // render them identically. A consumer wanting the path set can take
+        // `new Set(escapes.map((e) => e.path))` — that direction is lossless,
+        // the other is not.
         if (before.get(path) !== stamp) escapes.push({ id: c.id, path });
       }
 

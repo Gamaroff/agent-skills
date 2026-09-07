@@ -61,7 +61,11 @@ function bundleFixture({ skillFiles, sharedFiles }) {
     fs.writeFileSync(dest, content);
   }
   for (const [name, content] of Object.entries(sharedFiles)) {
-    fs.writeFileSync(path.join(root, "shared", "resources", name), content);
+    // `name` may be a NESTED path (`nested/dep.mjs`) — both sibling regexes allow
+    // `/`, so a shared module can legitimately depend on one in a subdirectory.
+    const dest = path.join(root, "shared", "resources", name);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, content);
   }
 
   const stdout = execFileSync("python3", [BUNDLER, skillDir], {
@@ -324,5 +328,38 @@ test("mjs: the bundled parser matches its shared source (drift guard)", () => {
     strip(fs.readFileSync(shared, "utf-8")),
     "skills/develop-batch/references/yaml-subset.js has drifted from " +
       "shared/resources/yaml-subset.js — run `npm run bundle` and commit the result",
+  );
+});
+
+test("mjs: a NESTED sibling import is followed and its parent directory is created", () => {
+  // The bundler captures a nested transitive dep — `JS_ESM_SIBLING_RE` allows `/`
+  // in the captured name — and then writes it to `refs_dir / name`, i.e.
+  // `references/nested/dep.mjs`. Only `references/` was ever created, so the write
+  // raised FileNotFoundError and bundling failed for EVERY skill that referenced
+  // the importing file.
+  //
+  // It surfaced on task.80: `security-probe.mjs` imported `./tests/spawn-budget.mjs`,
+  // and nothing failed until a skill first referenced that module — which would have
+  // been its consumer's integration, not its own tests. The import was straightened
+  // out separately (a production module should not depend on a test helper), but the
+  // bundler defect it exposed is the general one and is fixed here.
+  const fx = bundleFixture({
+    skillFiles: {
+      "SKILL.md": SKILL_MD,
+      "scripts/run.mjs":
+        'import "../../../shared/resources/nested-engine.mjs";\n',
+    },
+    sharedFiles: {
+      "nested-engine.mjs":
+        'import { d } from "./nested/dep.mjs";\nexport { d };\n',
+      "nested/dep.mjs": "export const d = 1;\n",
+    },
+  });
+
+  assert.ok(fx.exists("references/nested-engine.mjs"));
+  assert.ok(
+    fx.exists("references/nested/dep.mjs"),
+    "a nested sibling dep must be copied into references/ with its parent directory " +
+      "created — otherwise the bundler throws FileNotFoundError and the skill cannot ship",
   );
 });

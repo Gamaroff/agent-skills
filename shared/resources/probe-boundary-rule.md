@@ -157,7 +157,7 @@ Declining conditions, each reported with its reason:
 - Watches a **sentinel directory** beside the working copy with `snapshotTree()`
   and reports any write that escapes, whatever the probe claimed to do.
 - Takes its per-case timeout from the **shared spawn budget**
-  (`tests/spawn-budget.mjs`), never a literal.
+  (`spawn-budget.mjs`), never a literal.
 
 **What it does not do, stated honestly:**
 
