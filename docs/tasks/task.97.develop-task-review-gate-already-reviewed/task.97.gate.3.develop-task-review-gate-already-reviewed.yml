@@ -1,0 +1,50 @@
+schema: 1
+task: 'task.97.develop-task-review-gate-already-reviewed'
+task_title: '/develop-task Step 2 has no recovery path when review-task Step 9 does not promote'
+gate: PASS
+status_reason: 'Verification cycle. The full attack corpus accumulated over cycles 1–2 — 20 inputs, every route that previously produced a wrong `fresh` — now yields zero unsafe results, and the opposite direction is clean too: 68/68 real task review reports still date, 161/161 real documents still parse. No new findings.'
+reviewer: 'QA Engineer'
+updated: '2026-09-08T00:35:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 2788
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Zero `require` calls; no filesystem, network or process API. Asserted by test, not by inspection, so a later `stat` cannot be added without a test going red.'
+  performance:
+    status: PASS
+    notes: 'No catastrophic backtracking (3ms on a 200k-space adversarial line, 58ms on a 1M-line document). The fence-first restructure removes work rather than adding it.'
+  reliability:
+    status: PASS
+    notes: '20 adversarial inputs, 0 unsafe verdicts. Every ambiguity resolves to `stale` as designed. The seven routes found across cycles 1–2 are each pinned by a test, and every fix was mutation-proved.'
+  maintainability:
+    status: PASS
+    notes: 'Tests 27 → 59, covering all six defect classes plus the documented boundaries. Two guards are redundant by design (recorded explicitly, with the behaviour proved by removing both). One unreachable line was found by a mutation that would not go red, and deleted.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'A CI check that each bundled `references/*.js` byte-matches its `shared/resources/` source would close the drift class this task ran into by hand.'
+      refs: ['.github/workflows/validate.yml']
+    - action: '`develop-bug` still carries a presence-only Step 2 gate in its own step-2 document. Porting the freshness rule there is a separate card.'
+      refs: ['skills/develop-bug/references/develop-bug-step-2-review.md']
+    - action: 'Step 4 of the develop pipelines silently excludes every repo-root file from staging scope (dirname `.`), while /develop requires a CHANGELOG update for behaviour changes. Worked around by hand here; the fix belongs upstream.'
+      refs: ['shared/resources/develop-pipeline-step-4-create-pr.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

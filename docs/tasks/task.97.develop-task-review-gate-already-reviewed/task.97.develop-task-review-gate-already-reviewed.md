@@ -397,15 +397,16 @@ the smaller rollback if only the table behaviour needs undoing.
 
 ## QA Testing Results
 
-**QA Status**: FAIL (cycle 2 at review) — all findings closed
+**QA Status**: PASS (cycle 3)
 **Testing Date**: 2026-09-08
 **Quality Score**: 70/100
-**Gate Decision**: cycle 1 FAIL → cycle 2 FAIL → all 18 findings closed
+**Gate Decision**: cycle 1 FAIL → cycle 2 FAIL → **cycle 3 PASS (95/100)**; all 18 findings closed
 
 ### QA Reports
 
 - **Cycle 1**: [qa.1](./task.97.qa.1.develop-task-review-gate-already-reviewed.md) · [gate.1](./task.97.gate.1.develop-task-review-gate-already-reviewed.yml)
 - **Cycle 2 (refute)**: [qa.2](./task.97.qa.2.develop-task-review-gate-already-reviewed.md) · [gate.2](./task.97.gate.2.develop-task-review-gate-already-reviewed.yml)
+- **Cycle 3 (verification)**: [qa.3](./task.97.qa.3.develop-task-review-gate-already-reviewed.md) · [gate.3](./task.97.gate.3.develop-task-review-gate-already-reviewed.yml) — **PASS**
 
 ### Test Coverage Summary
 
@@ -514,6 +515,7 @@ which §5 of this card promises not to make — **filed as a follow-up**, not ac
 | 2026-09-07 |  | QA findings fixed — all 10 closed, 9 mutations proved red, 1 cycle | qa-fix |
 | 2026-09-08 |  | QA cycle 2 refute pass — gate FAIL (70/100), 8 findings; two of cycle 1's fixes cancelled out and the module was still defeatable | qa-task |
 | 2026-09-08 |  | Cycle-2 findings fixed — all 8 closed, 12 mutations proved red, tests 27 → 59 | qa-fix |
+| 2026-09-08 |  | QA gate PASS (95/100) cycle 3 — 20-input attack corpus, 0 unsafe; 68/68 reports and 161/161 docs still parse | qa-task |
 
 ---
 
