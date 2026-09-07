@@ -5,7 +5,7 @@ type: task
 description: "A consumer repository predicted a deterministic HALT at /develop-task Step 2 on an already-reviewed task and steered the pipeline around it by hand; the halt itself was never reached. The consumer diagnosed it as two contradictory tables in develop-pipeline-step-2-review.md; measurement against the installed skills contradicts that diagnosis, so the first job here is to establish the real cause. What survives either way is a robustness defect: the skip table keys on status rather than on evidence of review, so whenever Step 9's promotion does not happen the only remedy an operator will reach for — re-running the review — cannot clear the halt."
 tags: [develop-task, pipeline, review-gate, status-lifecycle, consumer-report]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-09-07
 updated: 2026-09-07
@@ -16,7 +16,8 @@ github_issue: 348
 
 # Technical Task: /develop-task Step 2 has no recovery path when review-task Step 9 does not promote
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.97.review.1.develop-task-review-gate-already-reviewed.md` implemented 2026-09-07
 **GitHub Issue**: [#348](https://github.com/Gamaroff/agent-skills/issues/348)
 
 ---
@@ -115,9 +116,16 @@ Post-review status table (line 133):
 | --- | --- |
 | `Planned` (unchanged) | **HALT** |
 
-**Target state.** `planned` + a *current* review report skips, exactly as `in-progress` + a report
-already does. Unchanged `planned` after a review is a HALT only when no report was produced and none
-already existed — and the halt message names which precondition failed.
+**Target state.** `planned` + a *current* review report skips, as `in-progress` + a report already
+does — but strictly stricter than it. Unchanged `planned` after a review is a HALT only when no report
+was produced and none already existed, and the halt message names which precondition failed.
+
+> **The freshness test applies to the `planned` row only, and that is a decision, not an oversight.**
+> The `in-progress` and `ready-for-development` rows skip on report *existence alone*, with no age
+> comparison — so "exactly as `in-progress` does" would actually be a *weakening*. They are left alone
+> because reaching either status required passing this gate already, which is evidence the `planned`
+> row by definition does not have. If that reasoning is ever falsified, extending freshness to those
+> two rows is the fix — not relaxing this one.
 
 **Do not make this symmetrical with `/develop-story`.** The story-side post-review table (line 124)
 halts on unchanged `Draft`, and that is correct: `/review-story` genuinely promotes, so an unchanged
@@ -129,11 +137,22 @@ right today; only the *recovery path* differs.
 ## 4. Scope
 
 **In scope**: the `develop-task` Step 2 skip/run and post-review tables; a freshness definition for
-"current review report"; the halt message's diagnostics; a reasoning note in the resource; and the
-`develop-task/SKILL.md` autonomous-defaults rows that reference Step 9 promotion.
+"current review report", **and a small executable helper that implements it**; the halt message's
+diagnostics; a reasoning note in the resource; the `develop-task/SKILL.md` autonomous-defaults rows
+that reference Step 9 promotion; and the tests for all of it.
+
+> **The helper is in scope because §8 cannot be satisfied without it.** §8 requires asserting freshness
+> "in a clone where every mtime is the checkout time" and asserting on the halt *message text*. Neither
+> is possible against prose. The alternative — deleting those requirements — was rejected: §10 ranks a
+> wrong skip above a needless halt, and a rule enforced only by prose has no mechanism to fail loudly.
+> Measurement settles that this is new ground rather than an extension: **no existing test asserts a row
+> of either table, the status, the HALT or its message.** The one Step 2 protocol test asserts that the
+> substrings `review` and `skip` appear somewhere in the file, and would pass with both tables deleted.
 
 **Out of scope**: `/develop-story`'s tables (correct as they stand); `/review-task`'s Step 9
-behaviour, unless Phase 1 finds it is the actual fault; the status lifecycle itself.
+behaviour, unless Phase 1 finds it is the actual fault; the status lifecycle itself; and the
+**mtime-based freshness rule in `develop-pipeline-resume-contract.md:95–110`**, which Phase 2's
+reasoning arguably condemns but which is a separate card (see Phase 2).
 
 ---
 
@@ -149,52 +168,107 @@ recoverable.
 
 **Phase 1 — Establish the actual cause before changing a table (Low risk).**
 
-- [ ] **Establish whether the post-review HALT is reachable at all** through the pipeline path. It has
-      never been observed — the consumer predicted it and steered around it — so this is not the
-      reproduction of a known event. Drive a `planned` task with a current review report through Step 2
-      and record what actually happens.
-- [ ] **If it is unreachable, narrow this card to the skip table alone** and leave the post-review
-      table untouched. A fix to a branch nothing can enter is churn that reads as progress.
-- [ ] Determine why Step 9 did not promote in the reported incident. Candidates, in order of
-      likelihood: the review ran standalone rather than through the pipeline and the promotion
-      question was answered "no"; the outcome was `NEEDS REVISION`, making the halt correct; the
-      promotion was written and later reverted by a sync (compare `bug.12`, where an unflagged sync
-      walked a card back).
-- [ ] **If Phase 1 finds Step 9 genuinely broken, stop and re-scope.** The tables would then be
-      innocent and this card is the wrong fix. Record the finding either way — the consumer reached a
-      confident wrong diagnosis from the same files, and the record is what stops the next reader
-      repeating it.
+> **Phase 1 was answered during review (2026-09-07) and this phase is now confirmation, not open
+> enquiry.** The original phase asked a binary question — *is the HALT reachable at all?* — and offered
+> two branches. **Measurement returns neither.** The HALT is **conditionally reachable**: reachable
+> through the pipeline under non-default configuration, unreachable under stock defaults. The
+> "if unreachable, narrow the card" branch is therefore falsified and has been removed; the post-review
+> table is live for any consumer running blocking enforcement and must not be left untouched.
+
+- [x] **Confirm the two mechanisms that reach the HALT**, both of which run a full review, write a
+      report, apply fixes and auto-answer Step 9 "Yes, fixes complete" — and still return `planned`:
+      1. **The sign-off gate** — `review-task/SKILL.md` Step 9 §1a: when `sign-off.enabled: true` and
+         `sign-off.enforcement: blocking`, an unsigned required row means do **not** promote
+         "regardless of the review outcome, **and including the pipeline auto-answer path**". The file
+         states the consequence outright: "`develop-task` will HALT at Step 2 until then."
+      2. **The change-log gate** — `review-task/SKILL.md` check 4b: under
+         `change-log.enforcement: blocking`, a missing or stale log is Critical → NO-GO → do not
+         promote out of `planned`.
+- [x] **Confirm the two paths that do *not* reach it**, so the fix does not chase them:
+      `NEEDS REVISION` / `REQUIRES REWORK` halts *inside* `/review-task` Step 9, short-circuiting ahead
+      of the post-review table; and "a review that produced no report" does not halt at all — Step 2
+      logs a warning and proceeds.
+- [x] **Record that this is why the halt has never been observed here.** Under this repo's defaults
+      (sign-off absent, change-log advisory) with a READY outcome, Step 9 promotes and the table is
+      never entered. The consumer *predicted* the halt correctly and simply never met its precondition.
+      The re-run remedy is genuinely a no-op: both gates re-fire identically on a second pass.
+- [x] **On the reported incident specifically**: it occurred in `rebirth-wallet`, which is not
+      available from this repository, so the specific cause cannot be evidenced here. Record the
+      narrowed candidate list — the two gates above, plus a standalone `/review-task` where Step 9 was
+      answered "Partially complete" / "Not yet" — **and record explicitly what could not be
+      determined**. The consumer reached a confident wrong diagnosis from these same files; a record
+      that distinguishes established fact from inference is what stops the next reader repeating it.
+- [x] **Note, do not fix, the documentation asymmetry Phase 1 exposes**: the sign-off gate is written
+      as a numbered gate *inside* Step 9, while the change-log gate's identical "do not promote"
+      instruction lives only in check 4b's severity table and is never restated in Step 9. An agent
+      executing Step 9 linearly may honour one and miss the other. This is a `/review-task` change and
+      §5 promises no behaviour change there — file it as a follow-up card.
 
 **Phase 2 — Define "current review report" (Low risk).**
 
-- [ ] A report matching `task.{id}.review.*.md` exists, **and** it is not older than the task
+- [x] A report matching `task.{id}.review.*.md` exists, **and** it is not older than the task
       document's last content change. A report from before a rewrite is not evidence about what the
       card now says.
-- [ ] Derive freshness from frontmatter `updated:`, **never** filesystem mtime — mtime does not
-      survive a fresh clone, which is exactly the environment CI and `/develop-batch` worktrees run
-      in. A gate whose input is `stat` output behaves differently on a developer's machine and in the
-      pipeline, and that difference is invisible until it matters.
-- [ ] Where the two disagree, treat the report as **stale** and run the review. The failure this task
-      removes is a needless halt; the failure a wrong skip would introduce is developing against an
-      unreviewed card, which is worse.
+- [x] **Both sides of that comparison must be named, and only one of them was.** The task document's
+      side is frontmatter `updated:`. The report's side **does not exist in frontmatter** — measured
+      across all 49 tracked `task.{id}.review.*.md` files in this repo:
+
+      | Property of the review report | Count |
+      | --- | --- |
+      | Carries any YAML frontmatter block | **7 / 49** |
+      | Carries frontmatter `updated:` | **6 / 49** |
+      | Carries no frontmatter date field at all | **42 / 49** |
+      | Carries a body `**Reviewed:** YYYY-MM-DD` line | **49 / 49** |
+      | Carries a body `- **Review Date:** YYYY-MM-DD` line | **49 / 49** |
+
+      Nor is there a filename fallback: the canonical name (`task.{n}.review.{N}.{name}.md`)
+      deliberately dropped the date that older reports carried.
+- [x] **Read the report's date from its body**: `**Reviewed:**` first, falling back to
+      `- **Review Date:**`. Both are present in 49/49 reports, and both are file *content*, so they are
+      clone-stable in exactly the way this phase requires.
+- [x] **Define the unparseable case as `stale`.** If neither line yields a date, run the review. The
+      failure this task removes is a needless halt; the failure a wrong skip introduces is developing
+      against an unreviewed card, which is worse — so every ambiguity resolves toward running it.
+- [x] Derive freshness from document content, **never** filesystem mtime — mtime does not survive a
+      fresh clone, which is exactly the environment CI and `/develop-batch` worktrees run in. A gate
+      whose input is `stat` output behaves differently on a developer's machine and in the pipeline,
+      and that difference is invisible until it matters.
+- [x] **Name the rule this diverges from.** `develop-pipeline-resume-contract.md:95–110` performs the
+      structurally identical check — is this artifact at least as fresh as the task file? — using
+      `_mtime()`, and `pipeline-resume-detector-prompt.md:50,133–148` does likewise. By the argument
+      above those are defective in a fresh clone. Fixing them is **out of scope** (see §4), but the
+      divergence must be stated in the resource, or the pipeline is left holding two contradictory
+      freshness conventions with nothing to tell a reader which governs.
+- [x] Where the two disagree, treat the report as **stale** and run the review.
 
 **Phase 3 — Fix the tables and the message (Low risk).**
 
-- [ ] Skip table: `Planned` + a **current** report → **Skip**, logged, exactly as `In Progress` +
+- [x] Skip table: `Planned` + a **current** report → **Skip**, logged, exactly as `In Progress` +
       report already does. `Planned` with no report, or a stale one, still runs the review.
-- [ ] Post-review table: unchanged `Planned` is a HALT only when **no** report was produced and none
+- [x] Post-review table: unchanged `Planned` is a HALT only when **no** report was produced and none
       already existed. A review that ran, wrote its report and left the status alone is a completed
       review, not a failed one.
-- [ ] Keep the HALT for the genuine case — a review that produced nothing at all.
-- [ ] The halt message states which precondition failed: report present or absent, its age against
+- [x] Keep the HALT for the genuine case — a review that produced nothing at all.
+- [x] The halt message states which precondition failed: report present or absent, its age against
       `updated:`, and the review outcome if one was recorded. The current message names only the
       symptom, and that is how a consumer with every relevant file installed still misdiagnosed it.
+- [x] **The third edit site in the same file**: the Handling Findings bullet at
+      `develop-pipeline-step-2-review.md:152` independently restates the rule as "**Blocking issues**
+      (… or status still `Planned` after review)". Left alone it contradicts the new table. Three
+      sites, one behaviour — change them together.
 
 **Phase 4 — Align the surrounding prose (Low risk).**
 
-- [ ] `develop-task/SKILL.md:247–249` — confirm the Step 8.5 / Step 9 rows still read correctly beside
-      the new tables, and that no row implies promotion is the *only* route past Step 2.
-- [ ] Record the reasoning in the resource, in the shape of the 2026-08-19 `Draft` note.
+- [x] **`develop-task/SKILL.md:248` is an edit, not a check.** It reads "pipeline needs
+      `Ready for Development` before Step 3" — an unconditional claim the new skip path falsifies. It
+      is also silent about the sign-off and change-log gates, which withhold promotion *on a READY TO
+      IMPLEMENT outcome* — the exact case the row presents as safe. Rewrite it to name the report-based
+      route past Step 2, and to acknowledge that a READY outcome does not guarantee promotion.
+- [x] Re-read rows 247 and 249 beside the new tables; they are expected to stand, but confirm.
+- [x] Record the reasoning in the resource, in the shape of the 2026-08-19 `Draft` note in
+      `develop-pipeline-step-0-resolve-and-prepare.md` — bold opening sentence naming the change, its
+      date and the failure it closes; then the mechanism; then which of the disagreeing parties was
+      wrong, with the concrete incident that surfaced it.
 
 ---
 
@@ -202,47 +276,100 @@ recoverable.
 
 | File | Change |
 | --- | --- |
-| `shared/resources/develop-pipeline-step-2-review.md` | **Modify** — both `develop-task` tables, the halt message, plus the reasoning note |
-| `skills/develop-task/SKILL.md` | **Verify / modify** — autonomous-defaults rows 247–249 |
-| `skills/*/references/*` | **Regenerated** — `npm run bundle`, never hand-edited |
+| `shared/resources/develop-pipeline-step-2-review.md` | **Modify** — both `develop-task` tables, the Handling Findings bullet at `:152`, the halt message, plus the reasoning note |
+| `shared/resources/review-report-freshness.js` | **Add** — the freshness helper: given a task file and its newest review report, return `fresh` / `stale` / `absent` plus the reason the halt message needs. Pure, no network, no `stat` |
+| `shared/resources/tests/review-report-freshness.test.mjs` | **Add** — the regression net for §8, including the fresh-clone case |
+| `skills/develop-task/SKILL.md` | **Modified** — autonomous-defaults row 248 rewritten; rows 247 and 249 re-read beside the new tables and left unchanged |
+| `evals/develop-task/step-isolation/02-review-task/scenario.json` | **Modified** — description rewritten to the new semantics; assertions 1 → 4 |
+| `evals/.../02-review-task/replay/.../task.42.example.md` | **Added** — the scenario had no task file at all, so it could not express the status its own description named |
+| `evals/.../02-review-task/replay/.../task.42.review.2026-05-11.md` | **Modified** — carried `**Date:**`, a form the rule does not read; now `**Reviewed:**` + `**Review Date:**`, matching the real corpus |
+| `CHANGELOG.md` | **Modified** — Unreleased → Changed entry; this alters pipeline behaviour, so it is not an internal refactor |
+| `skills/*/references/*` | **Regenerated** — `npm run bundle`, never hand-edited. Two copies of the step-2 resource exist (`develop-story`, `develop-task`) |
 
-**Added / deleted:** none.
+**Added:** 3 (helper, its test, the eval fixture task file). **Deleted:** none.
+
+> **The eval scenario is improved but still not a discriminating test, and that is inherent.** It runs
+> under `EVAL_MODE: replay`, where nothing executes the skill — assertions verify the seeded sandbox.
+> Strengthening them further would be theatre. The real net for this behaviour is the unit test; the
+> scenario's job here is to stop *misdescribing* the semantics and to carry a fixture that matches the
+> corpus. Recorded rather than glossed, because a scenario that looks like a behavioural test and is
+> not is exactly the shape §8 warns about.
+
+> `package.json`'s `test` script lists per-skill globs by hand. `shared/resources/tests/*.test.mjs` is
+> **already** in that list, so the new test file runs without a `package.json` edit — verify this rather
+> than assuming it, because a suite that runs nowhere is the failure mode this repo has already paid for.
 
 ---
 
 ## 8. Testing Strategy
 
+> **There is no existing net to extend — §8 is the whole net.** Measured across the repository, no test
+> asserts a row of either table, the `planned` status, the HALT, its message, or report freshness. The
+> Step 2 protocol test (`evals/develop-task/protocol/step-contract.test.mjs:38`) asserts only that the
+> substrings `review` and `skip` occur somewhere in the file — **it would pass with both tables
+> deleted**. The step-isolation scenario's single `fileExists` assertion cannot distinguish a skip from
+> a run. Treat a green suite as no evidence at all on this task, and mutation-prove every case below by
+> reverting the behaviour and confirming the test goes red.
+
 1. **Falsify the current behaviour first.** Reproduce the halt before changing anything. A fix for a
    defect nobody has reproduced is a guess — and this task exists because a confident diagnosis was
    already reached without one.
+   **The reproduction needs a config, not just a task**: under stock defaults the HALT is unreachable
+   (Phase 1). Set `sign-off.enabled: true` + `sign-off.enforcement: blocking` with an unsigned required
+   row — or `change-log.enforcement: blocking` with a missing log — then drive a `planned` task through
+   Step 2. Without that, "reproduce the halt" is not merely hard, it is impossible, and reporting it as
+   unreachable would be an artifact of the fixture rather than a finding.
 2. **Both directions.** `planned` + current report → skips Step 2, reaches Step 3. `planned` + no
-   report → still runs the review. `planned` + report older than `updated:` → still runs the review.
+   report → still runs the review. `planned` + report older than the task's `updated:` → still runs the
+   review. `planned` + report whose date cannot be parsed → still runs the review.
 3. **The genuine halt must survive.** A review that produces no report at all must still HALT. The fix
    must not buy liveness by removing the gate.
 4. **Freshness in a fresh clone.** Assert the freshness rule in a clone where every mtime is the
-   checkout time. A test that passes only because mtimes happen to be ordered is not evidence.
+   checkout time. A test that passes only because mtimes happen to be ordered is not evidence — and,
+   conversely, the helper must be shown to consult **no** `stat` output at all, so that a test cannot
+   pass for the wrong reason either.
 5. **The message.** Assert on the halt text naming the failed precondition, not merely on the halt
-   firing.
+   firing. Assert each precondition separately: report absent, report stale (with both dates in the
+   message), report date unparseable.
+6. **Both bundled copies.** After `npm run bundle`, assert the `develop-task` copy carries the new
+   tables and the `develop-story` copy is byte-identical to before apart from its banner and link
+   rewrites. §9 promises the story tables are unchanged; assert it rather than trusting the bundler.
 
 ---
 
 ## 9. Success Criteria
 
-- [ ] Phase 1 records, with evidence, why Step 9 did not promote in the reported incident.
-- [ ] A `planned` task with a current review report reaches Step 3 without an operator ruling.
-- [ ] A `planned` task with no review report still runs `/review-task`.
-- [ ] A `planned` task with a review report older than the document's `updated:` still runs it.
-- [ ] A review that produces no report still HALTs.
-- [ ] The halt message names which precondition failed.
-- [ ] Report freshness derives from frontmatter, not filesystem mtime — verified in a fresh clone.
-- [ ] `/develop-story`'s tables are unchanged.
-- [ ] The resource carries a note explaining the defect, in the shape of the 2026-08-19 `Draft` note.
+- [x] Phase 1 records the reachability result with evidence — the two gates that reach the HALT, the
+      two paths that do not — **and records explicitly what could not be determined about the reported
+      incident and why** (it occurred in `rebirth-wallet`, unavailable from here, so the specific cause
+      is not evidenceable from this repository; the candidate list is).
+- [x] A `planned` task with a current review report reaches Step 3 without an operator ruling.
+- [x] A `planned` task with no review report still runs `/review-task`.
+- [x] A `planned` task with a review report older than the document's `updated:` still runs it.
+- [x] A `planned` task whose review report has no parseable date still runs it.
+- [x] A review that produces no report still HALTs.
+- [x] The halt message names which precondition failed, and is asserted per-precondition.
+- [x] Report freshness derives from document content — the task's frontmatter `updated:` and the
+      report's body `**Reviewed:**` / `- **Review Date:**` line — and from no filesystem mtime;
+      verified in a clone where every mtime is the checkout time.
+- [x] The resource states how and why this diverges from the mtime rule in
+      `develop-pipeline-resume-contract.md:95–110`.
+- [x] `/develop-story`'s tables are unchanged — asserted, not assumed.
+- [x] The new test file is actually executed by `npm test` (confirm its glob is matched).
+- [x] The resource carries a note explaining the defect, in the shape of the 2026-08-19 `Draft` note.
+- [x] Every new test is mutation-proved: reverting the behaviour turns it red.
 
 ---
 
 ## 10. Risk Assessment
 
-**Low.** Table rows, a freshness rule and a message, in a documentation resource with no runtime.
+**Low.** Table rows, a freshness rule, a message, and one small pure helper with its tests.
+
+> The earlier framing — "a documentation resource with no runtime" — was wrong twice over. The resource
+> already embeds shell the orchestrator executes (the gate-check `ls` that finds the review report), and
+> §4 now adds a helper deliberately. The risk level is unchanged; the characterisation was understating
+> what is being touched, which matters because it is the sentence a reviewer uses to decide how hard to
+> look.
 
 The risk worth naming is **over-correction**: a skip rule that is too permissive develops against an
 unreviewed card, which is a worse failure than the halt. That is why staleness is its own phase
@@ -259,8 +386,59 @@ deviation individually, nobody records it, and the gate quietly stops meaning an
 
 ## 11. Rollback Plan
 
-Revert the resource, `npm run bundle`, re-release. Nothing depends on the new behaviour; the halt
-returns, along with the manual override.
+Revert the resource, delete the helper and its test, `npm run bundle`, re-release. Nothing depends on
+the new behaviour; the halt returns, along with the manual override.
+
+The helper is a pure function with no callers outside the step-2 resource, so removing it cannot strand
+anything. Reverting the resource alone — leaving the helper in place, unreferenced — is also safe and is
+the smaller rollback if only the table behaviour needs undoing.
+
+---
+
+## Phase 1 Record — why the promotion did not happen
+
+> This section is Phase 1's deliverable. The card exists partly because a confident diagnosis was
+> reached without one, so the distinction between *established*, *inferred* and *not determinable*
+> is kept explicit throughout.
+
+**Established, with evidence.** The post-review HALT is **conditionally reachable** — not
+unconditional as the consumer believed, and not unreachable as this card's original Phase 1 allowed
+for. Two supported configurations run a full review, write a report, auto-answer Step 9
+"Yes, fixes complete", and still leave the status at `planned`:
+
+| Mechanism | Where | Precondition |
+| --- | --- | --- |
+| Sign-off gate | `review-task` Step 9 §1a — "do **not** promote the status — regardless of the review outcome, **and including the pipeline auto-answer path**"; "`develop-task` will HALT at Step 2 until then" | `sign-off.enabled: true` **and** `sign-off.enforcement: blocking`, with a required row unsigned |
+| Change-log gate | `review-task` check 4b severity table — Critical → NO-GO → "do **not** promote the task out of `planned`" | `change-log.enforcement: blocking`, with a missing or stale log |
+
+Both defaults are `advisory`, and `sign-off` is skipped entirely when `sign-off.enabled` is absent.
+**That is why the halt has never been observed in this repository**: under stock defaults with a
+READY outcome, Step 9 promotes and the post-review table is never entered. The consumer predicted
+the halt correctly and simply never met its precondition.
+
+**Two paths that look like this one and are not:**
+
+- `NEEDS REVISION` / `REQUIRES REWORK` halts *inside* `/review-task` Step 9, short-circuiting ahead
+  of the post-review table. The halt is real but it is a different halt, with a correct message.
+- A review that produces no report does **not** halt at the locate step — that logs a warning and
+  continues. Whether it halts is decided by the post-review table, and only when the status is also
+  unchanged.
+
+**Inferred, not established.** For the reported incident specifically, the candidate causes are the
+two gates above plus a standalone `/review-task` whose Step 9 was answered "Partially complete" or
+"Not yet" (`review-task` Step 9 step 3 keeps `planned` for both).
+
+**Not determinable from here, and deliberately not guessed.** Which of those applied in the
+`rebirth-wallet` incident cannot be evidenced from this repository — that repo is not available to
+this one. The incident record cited by the card shows the operator ruling "Skip — already reviewed"
+at Phase 0d, so `/review-task` never re-ran there and no post-review evaluation happened at all. No
+further conclusion about that specific run is supportable, and none is drawn.
+
+**A defect surfaced but deliberately not fixed here.** The sign-off gate is written as a numbered
+gate *inside* `review-task` Step 9; the change-log gate's identical "do not promote" instruction
+lives only in check 4b's severity table and is never restated in Step 9. An agent executing Step 9
+linearly may honour the first and miss the second. Fixing that is a `/review-task` behaviour change,
+which §5 of this card promises not to make — **filed as a follow-up**, not actioned.
 
 ---
 
@@ -270,6 +448,9 @@ returns, along with the manual override.
 | ---- | ------- | ----------- | ------ |
 | 2026-09-07 | 1.0 | Created from a consumer report (`rebirth-wallet` task.113 / RAPP-728), whose `/develop-task` run halted at Step 2 on a card reviewed hours earlier. **The consumer's diagnosis was checked and does not hold** — `/review-task` does promote `planned → ready-for-development` (`review-task/SKILL.md:1569`) and `document-status-lifecycle.md:59` names `review-task` as a setter of that status for tasks. Re-scoped from "two contradictory tables" to "the halt has no recovery path", with Phase 1 required to establish the real cause before any table changes | manual |
 | 2026-09-07 | 1.1 | Framing corrected before any work started: the halt was **never observed**. The consumer's own incident record shows the operator ruling "Skip — already reviewed" at Phase 0d, so Step 2 was skipped and the post-review table was never reached — it was predicted from reading the tables. Phase 1 amended from *reproduce the halt* to *establish whether the HALT is reachable at all*, with an explicit branch to narrow the card if it is not. Roadmap row switched to the bare-path form its neighbours use; the markdown-link form failed the repo's link check, which resolves hrefs relative to the file | manual |
+| 2026-09-07 | 1.2 | Review (7/10 → 9/10, READY TO IMPLEMENT). **Phase 1 answered by measurement and its branch structure falsified**: the post-review HALT is *conditionally* reachable — through `sign-off.enforcement: blocking` and `change-log.enforcement: blocking`, both of which return `planned` after a full review — and unreachable under stock defaults, which is why it has never been observed here. The "if unreachable, narrow the card" branch was removed as unusable. **Phase 2's freshness rule was unimplementable as written**: it named the task's frontmatter `updated:` but left the report's timestamp undefined, and only 7 of 49 tracked review reports carry frontmatter at all (6 carry `updated:`) — the report's date now comes from its body `**Reviewed:**` / `- **Review Date:**` line, present in 49/49, with unparseable defined as stale. **§8 contradicted §4/§7/§10**: it demanded fresh-clone and message assertions against a scope of two markdown files, and no existing test asserts either table (the Step 2 protocol test would pass with both deleted), so scope widened to a pure helper plus its test rather than deleting the requirement. Also: divergence from the mtime rule in `develop-pipeline-resume-contract.md:95–110` must now be stated rather than left silent; two omitted edit sites added (`:152` prose, the step-isolation scenario); Phase 4 restated as an edit to `SKILL.md:248`; §9's first criterion reframed to what this repo can evidence, since the incident is in another repository | review-task |
+| 2026-09-07 |  | Status → ready-for-development | review-task |
+| 2026-09-07 |  | Implemented — 8 source files (+4 regenerated bundles), 27 tests | develop |
 
 ---
 
@@ -277,10 +458,10 @@ returns, along with the manual override.
 
 | Phase | Status | Notes |
 | --- | --- | --- |
-| Phase 1 — Establish the actual cause | ⏳ Not started | Gates the rest; may re-scope the card |
-| Phase 2 — Define "current review report" | ⏳ Not started | Freshness from frontmatter, not mtime |
-| Phase 3 — Fix the tables and the message | ⏳ Not started | |
-| Phase 4 — Align the surrounding prose | ⏳ Not started | |
+| Phase 1 — Establish the actual cause | ✅ Complete | Conditionally reachable via the sign-off and change-log **blocking** gates; unreachable under stock defaults. "Narrow the card" branch falsified and removed. Written up in **Phase 1 Record** below, including what could not be determined |
+| Phase 2 — Define "current review report" | ✅ Complete | `review-report-freshness.js` + 27 tests, all 8 mutations proved red. Task side = frontmatter `updated:`; report side = body `**Reviewed:**` → `**Review Date:**`. No filesystem access at all — asserted, not merely intended |
+| Phase 3 — Fix the tables and the message | ✅ Complete | Four sites in the resource: skip table (+ freshness definition), post-review table (now two `Planned` rows), Handling Findings bullet (+ the three-fact halt message), report-locating paragraph (+ the `sort \| tail -1` caveat). Two ⚠️ reasoning notes added |
+| Phase 4 — Align the surrounding prose | ✅ Complete | `develop-task/SKILL.md:248` rewritten; eval scenario + fixtures corrected; `npm run bundle` re-run |
 
 ---
 
