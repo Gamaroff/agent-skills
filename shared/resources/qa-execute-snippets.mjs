@@ -1078,7 +1078,7 @@ export function zshAvailable() {
  * The containment check below compares two of these. It is deliberately cheap and
  * deliberately NOT a substitute for classification — see `runBlock`.
  */
-function snapshotTree(dir, skipDir = null) {
+export function snapshotTree(dir, skipDir = null) {
   const out = new Map();
   const walk = (d, prefix) => {
     let entries;
@@ -1110,15 +1110,34 @@ function snapshotTree(dir, skipDir = null) {
   return out;
 }
 
-export function runBlock(
-  code,
-  { shells, cwd, timeout = 10_000, bindings = {}, sandboxRoot = null } = {},
-) {
-  // CR-12 — a minimal environment, not the parent's. Spreading `process.env`
-  // handed every snippet GITHUB_TOKEN and tracker credentials, contradicting this
-  // file's own claim that the execution environment carries none. Inherited PWD
-  // also disagreed with `cwd`, which can manufacture disagreement noise by itself.
-  const env = {
+/**
+ * CR-12 — a minimal environment for a child process, not the parent's.
+ *
+ * Spreading `process.env` handed every snippet GITHUB_TOKEN and tracker
+ * credentials, contradicting this file's own claim that the execution
+ * environment carries none. Inherited PWD also disagreed with `cwd`, which can
+ * manufacture disagreement noise by itself.
+ *
+ * This is an ALLOW-LIST, and it must stay one. Six names cross; everything else
+ * — every token, every credential, every CI variable — is absent because it was
+ * never copied, not because it was deleted. A future maintainer who needs one
+ * more variable adds one more key here, where the diff is visible; the failure
+ * mode being designed out is `...process.env` re-appearing as a convenience.
+ *
+ * `bindings` are caller-supplied values, applied last so a caller can override a
+ * base key deliberately. They are values the CALLER chose, not values inherited
+ * from the ambient environment, which is why they are allowed to win.
+ *
+ * Extracted from `runBlock` for task.80 so the probe engine
+ * (`security-probe.mjs`) contains its children exactly as the snippet path does,
+ * rather than re-improvising containment per caller. Behaviour is byte-identical
+ * to the inlined version it replaced.
+ *
+ * @param {{cwd?: string, bindings?: Record<string,string>}} opts
+ * @returns {Record<string,string>} the child environment
+ */
+export function sandboxEnv({ cwd, bindings = {} } = {}) {
+  return {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
     LANG: process.env.LANG ?? "C",
@@ -1127,6 +1146,13 @@ export function runBlock(
     PWD: cwd ?? process.cwd(),
     ...bindings,
   };
+}
+
+export function runBlock(
+  code,
+  { shells, cwd, timeout = 10_000, bindings = {}, sandboxRoot = null } = {},
+) {
+  const env = sandboxEnv({ cwd, bindings });
   const runs = {};
 
   // Defence in depth. Classification is the first line and it has been wrong

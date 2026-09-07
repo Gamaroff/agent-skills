@@ -27,7 +27,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { neverRan, spawnBudget } from "./spawn-budget.mjs";
+import { neverRan, spawnBudget } from "../spawn-budget.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,6 +37,7 @@ const MODULE = join(__dirname, "..", "qa-execute-snippets.mjs");
 
 const {
   COMMAND_RUNNERS,
+  DENY_PATTERNS,
   main,
   SAFE_COMMANDS,
   classifyBlock,
@@ -44,6 +45,8 @@ const {
   executeFile,
   extractBlocks,
   runBlock,
+  sandboxEnv,
+  snapshotTree,
   unboundVariables,
   zshAvailable,
 } = await import(MODULE);
@@ -1725,4 +1728,233 @@ test("BUG-10: a w inside pattern text is not a write", () => {
   ]) {
     assert.equal(classifyBlock(input).klass, "runnable", input);
   }
+});
+
+// ── task.80 Phase 1: extraction parity ───────────────────────────────────────
+//
+// `sandboxEnv()` and `snapshotTree()` were lifted out of `runBlock` so the probe
+// engine (`security-probe.mjs`) can contain its children with the SAME mechanism
+// rather than re-improvising one. The extraction is only safe if it changed
+// nothing observable in the snippet path, and "nothing changed" is a claim that
+// needs a test rather than a code review — this block is that test.
+//
+// The classifier assertions below are the load-bearing half. `runBlock` is the
+// containment for a boundary with 26 documented fail-open routes behind it
+// (bug.3 + bug.6); an extraction that quietly altered classification would
+// reopen them, and would do so in a diff that looks like pure motion.
+
+test("task.80 parity: the classifier surface is exported and unchanged in shape", () => {
+  // Pins the four classifier primitives as EXPORTS. The extraction touched the
+  // module's export list, so the cheapest way this could have gone wrong is a
+  // name disappearing from it — after which every consumer silently gets
+  // `undefined` and every `SAFE_COMMANDS.has(...)` throws rather than denying.
+  assert.ok(SAFE_COMMANDS instanceof Set, "SAFE_COMMANDS is a Set");
+  assert.ok(COMMAND_RUNNERS instanceof Set, "COMMAND_RUNNERS is a Set");
+  assert.ok(Array.isArray(DENY_PATTERNS), "DENY_PATTERNS is an Array");
+  assert.equal(typeof classifyBlock, "function");
+});
+
+test("task.80 parity: no interpreter is on the snippet allow-list", () => {
+  // THE central safety property of this task, asserted rather than asserted-in-prose.
+  //
+  // Adding `node` here is the obvious shortcut for making a probe runnable, and
+  // it is the one thing task.80 exists to refuse: SAFE_COMMANDS gates untrusted
+  // text extracted from markdown fences, so an interpreter on it lets ANY fenced
+  // bash block in ANY document run arbitrary code through the QA path. The
+  // allow-list would stop being an allow-list.
+  //
+  // The probe engine needs no entry here — it constructs its own runner and
+  // never routes through `classifyBlock`. See `probe-boundary-rule.md`.
+  for (const interpreter of [
+    "node",
+    "nodejs",
+    "python",
+    "python3",
+    "ruby",
+    "perl",
+    "php",
+    "deno",
+    "bun",
+    "osascript",
+  ]) {
+    assert.ok(
+      !SAFE_COMMANDS.has(interpreter),
+      `${interpreter} must never be on SAFE_COMMANDS — see probe-boundary-rule.md`,
+    );
+    // COMMAND_RUNNERS is NOT a second allow-list, and the distinction matters
+    // enough to state here: it names commands whose ARGUMENT is another command,
+    // so the classifier recurses into it. Membership makes classification
+    // STRICTER, not laxer — which is why `eval` and `exec` are legitimately on
+    // it, and why `eval "rm -rf /"` classifies mutating.
+    //
+    // The assertion stays, but for a different reason than the one above: an
+    // interpreter here would make the classifier read JS or Python source as a
+    // shell command line, which is noise rather than safety. The SAFE_COMMANDS
+    // half is the security property; this half is a correctness one.
+    assert.ok(
+      !COMMAND_RUNNERS.has(interpreter),
+      `${interpreter} on COMMAND_RUNNERS would make the classifier read source as a command line`,
+    );
+  }
+});
+
+test("task.80 parity: QA-1…QA-17 classify exactly as they did before the extraction", () => {
+  // One assertion per documented fail-open route, pinned by expected class. If
+  // the extraction perturbed the classification OF THESE CASES, this reds with
+  // the case id that moved — which is the information a bisect actually needs.
+  //
+  // Scope, stated precisely because the earlier wording overreached: this pins
+  // seventeen enumerated inputs, not the allow-list's membership. A destructive
+  // command ADDED to SAFE_COMMANDS is a different mutation and slips past every
+  // case here — see the test immediately below, which exists because of it.
+  //
+  // The set runs to QA-17, not QA-14: three routes (QA-15 glob-in-command-
+  // position, QA-16 heredoc-line redirection, QA-17 write-flags-anywhere) were
+  // added after task.80 was authored. Pinning only 1–14 would have left the
+  // three newest fail-open routes unpinned by the very test that exists to pin
+  // them.
+  const cases = [
+    ["QA-1", "ls -la", "runnable"],
+    ["QA-2", "rm -rf /tmp/x", "mutating"],
+    ["QA-3", "frobnicate --all", "mutating"],
+    ["QA-4", "gh pr list", "mutating"],
+    ["QA-5", "curl https://example.com", "mutating"],
+    ["QA-6", "git status", "runnable"],
+    ["QA-7", "git push origin main", "mutating"],
+    ["QA-8", "echo $(rm -rf /tmp/x)", "mutating"],
+    ["QA-9", "echo $((1 + 2))", "runnable"],
+    ["QA-10", "sed 's/watershed/x/' README.md", "runnable"],
+    ["QA-11", "sed 's/a/b/w pwned.txt' f", "mutating"],
+    ["QA-12", "cat <<EOF\nrm -rf /\nEOF", "runnable"],
+    ["QA-13", "ls \\\n  -la", "runnable"],
+    ["QA-14", "echo hi; rm -rf /tmp/x", "mutating"],
+    ["QA-15", "./*.sh", "mutating"],
+    ["QA-16", "cat <<EOF > out.txt\nbody\nEOF", "mutating"],
+    ["QA-17", "tee -a out.txt < in.txt", "mutating"],
+  ];
+  for (const [id, code, expected] of cases) {
+    assert.equal(classifyBlock(code).klass, expected, `${id}: ${code}`);
+  }
+});
+
+test("task.80 parity: a destructive command must fail closed via the ALLOW-LIST, not only the deny-list", () => {
+  // The gap the QA cycle found, and the reason the comment above was narrowed.
+  //
+  // Adding a single destructive command to SAFE_COMMANDS is the cheapest
+  // possible fail-open — `rm README.md` becomes `runnable`, and a QA gate that
+  // executes documented snippets would delete the file. Before this test, that
+  // one-word mutation left 105/105 tests green across BOTH this suite and the
+  // bug.3 fail-open replay eval. Nothing caught it.
+  //
+  // The reason nothing caught it is worth keeping: every `rm` case in the suite
+  // uses `rm -rf`, which DENY_PATTERNS rejects first. The deny-list masks the
+  // allow-list breach, so the suite tested the second mechanism while believing
+  // it was testing the first. These inputs are chosen to have NO deny-pattern,
+  // which is what makes SAFE_COMMANDS membership the only thing standing
+  // between them and `runnable`.
+  //
+  // Mutation-proof: add "rm" to SAFE_COMMANDS and this test reds. It is the
+  // only one that does.
+  for (const code of [
+    "rm README.md",
+    "mv README.md OTHER.md",
+    "cp -r src dest",
+    "truncate -s 0 README.md",
+    "install -m 777 a b",
+  ]) {
+    assert.equal(
+      classifyBlock(code).klass,
+      "mutating",
+      `${code} must fail closed — it has no deny-pattern, so only SAFE_COMMANDS membership decides it`,
+    );
+  }
+});
+
+test("task.80 parity: sandboxEnv is an allow-list — no parent token reaches a child", () => {
+  // The mutation proof for the extraction. Revert `sandboxEnv` to spread
+  // `process.env` and this test reds on the first assertion: the secret it
+  // plants in the parent appears in the child env.
+  //
+  // Planting the secret here rather than reading whatever the real environment
+  // happens to hold is what makes the test deterministic — it fails on a
+  // developer laptop with no GITHUB_TOKEN set exactly as it fails in CI.
+  const CANARY = "QA_SNIPPETS_CANARY_TOKEN";
+  const previous = process.env[CANARY];
+  process.env[CANARY] = "ghp_this_must_not_cross_the_boundary";
+  try {
+    const env = sandboxEnv({ cwd: "/tmp/example" });
+
+    assert.equal(
+      env[CANARY],
+      undefined,
+      "a parent env var leaked into the sandbox environment",
+    );
+    assert.deepEqual(
+      Object.keys(env).sort(),
+      ["HOME", "LANG", "PATH", "PWD", "TERM", "TMPDIR"],
+      "sandboxEnv must carry exactly six keys — an allow-list, not a filter",
+    );
+    assert.equal(env.TERM, "dumb");
+    assert.equal(env.PWD, "/tmp/example", "PWD tracks cwd, never the parent's");
+  } finally {
+    if (previous === undefined) delete process.env[CANARY];
+    else process.env[CANARY] = previous;
+  }
+});
+
+test("task.80 parity: sandboxEnv applies caller bindings last", () => {
+  // Bindings are values the CALLER chose, not values inherited from the ambient
+  // environment, so they are allowed to override a base key. This pins the
+  // precedence the inlined version had, which is the part a re-implementation
+  // would most plausibly get backwards.
+  const env = sandboxEnv({
+    cwd: "/tmp/a",
+    bindings: { TERM: "xterm", X: "1" },
+  });
+  assert.equal(env.TERM, "xterm", "an explicit binding wins over the base");
+  assert.equal(env.X, "1");
+  assert.equal(env.PATH, process.env.PATH ?? "");
+});
+
+test("task.80 parity: sandboxEnv defaults PWD to process.cwd() when no cwd is given", () => {
+  const env = sandboxEnv();
+  assert.equal(env.PWD, process.cwd());
+});
+
+test("task.80 parity: snapshotTree is exported and still sees a write", () => {
+  // `snapshotTree` was module-private before this task, so the export itself is
+  // the change. This asserts it is reachable AND that it still detects the write
+  // the escape sentinel depends on.
+  const dir = tmp();
+  writeFileSync(join(dir, "a.txt"), "one");
+  const before = snapshotTree(dir);
+  assert.ok(before.has("a.txt"));
+
+  writeFileSync(join(dir, "b.txt"), "two");
+  const after_ = snapshotTree(dir);
+  assert.ok(
+    after_.has("b.txt"),
+    "a new file must appear in the second snapshot",
+  );
+  assert.equal(after_.size, before.size + 1);
+});
+
+test("task.80 parity: snapshotTree still honours skipDir", () => {
+  // The skipDir argument is what stops the sentinel walking a large `--copy`
+  // twice per block. Losing it in the extraction would turn a safety net into
+  // the run's dominant cost — the exact regression the comment above it records.
+  const dir = tmp();
+  mkdirSync(join(dir, "work"));
+  writeFileSync(join(dir, "work", "inside.txt"), "x");
+  writeFileSync(join(dir, "outside.txt"), "y");
+
+  const all = snapshotTree(dir);
+  assert.ok(all.has("work/inside.txt"));
+
+  const skipped = snapshotTree(dir, "work");
+  assert.ok(skipped.has("outside.txt"));
+  assert.ok(
+    !skipped.has("work/inside.txt"),
+    "skipDir must prune the whole subtree, not just its direct entries",
+  );
 });

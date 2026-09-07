@@ -38,7 +38,7 @@ import { fileURLToPath } from "node:url";
 // chosen against an idle machine is roughly 1.2× the loaded worst case, which
 // is what bug.2 was about, and `tests/test-harness-concurrency.test.js` fails
 // the build on any `timeout: <number>` literal in a test file.
-import { spawnBudget } from "../../../shared/resources/tests/spawn-budget.mjs";
+import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");

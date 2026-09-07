@@ -200,6 +200,11 @@ def bundle_skill(skill_path):
             new_bytes = expected.encode('utf-8')
         except UnicodeDecodeError:
             new_bytes = src.read_bytes()
+        # A transitive sibling dep can be a NESTED path (`tests/foo.mjs`) — both
+        # JS_SIBLING_RE and JS_ESM_SIBLING_RE allow `/` in the captured name. Only
+        # `references/` itself was created, so such a dep raised FileNotFoundError
+        # and broke the bundle for every skill that referenced the importing file.
+        dst.parent.mkdir(parents=True, exist_ok=True)
         if dst.exists() and dst.read_bytes() == new_bytes:
             # Content unchanged — still re-sync mode for .sh in case the bit was lost.
             if Path(name).suffix == '.sh':
