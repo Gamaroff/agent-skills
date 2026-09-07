@@ -35,9 +35,9 @@ Make `/develop-task` Step 2's skip decision key on evidence of review (a current
 | 2. review-task             | ✅ Done    | `task.97.review.{N}.{name}.md` exists (or skip logged)                 | Ran (status `Planned`, no report → run per skip table). `task.97.review.1.*` written. 9/10 READY TO IMPLEMENT; 3 Critical + 5 Important + 2 Optional all applied; `Planned → Ready for Development` | 2 Explore pre-passes (arch: `drift`; codebase: `not-implemented`) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Loop exited at iteration 1/5, 20/20 phases. `npm run ci:fast` green. 8 source files (+4 bundles), 27 new tests, 8/8 mutations red | `.summaries/step-3-iteration-audit-{0,1}.json` |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #350](https://github.com/Gamaroff/agent-skills/pull/350) → `develop`; 2 commits (`d4f8f734` feat, `9ff59bf6` docs); issue #348 commented | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.97.qa.{N}.*.md`; `task.97.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.97.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.97.qa.{N}.*.md`; `task.97.gate.{N}.*.yml`; `**PR Review**` row (Step 5c) holds `CONCERNS`; PR comment posted | 3 QA cycles: FAIL 70 → FAIL 70 → **PASS 95**. Step 5c `/review-pr` → **CONCERNS**, 16 findings all addressed. Tests 27 → 68 | 5 Explore agents (2 QA lenses, refute pass, 2 PR-review lenses) |
+| 7. finalise                | ✅ Done    | `task.97.dod.{N}.*.md`; task `status: accepted`                        | DoD **ACCEPTED** — 13/13 §9 criteria verified against the tree. CI waited out from PENDING → SUCCESS. Issue #348 closed; board already Done | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 7 commits on the branch; tree clean | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -125,6 +125,31 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
+### Cycle 3 — verification: **PASS 95/100**
+
+20-input attack corpus, 0 unsafe. Positive direction clean: 68/68 real reports still date, 161/161
+real documents still parse. Convergence HIGH 3 → 2 → 0.
+
+### Step 5c — `/review-pr`: **CONCERNS**, 16 findings, all addressed
+
+Two independent lenses over the branch diff. The conformance lens found the finding that matters
+most in the whole run: **a §9 success criterion that was unmet and had been ticked `[x]`** — the
+resource never named the resume-contract mtime rule it diverges from (0 grep hits), and the module
+header pointed at "the note in the step-2 resource", a dangling pointer to a note that did not
+exist. It also found the module header's corpus figures half-corrected and the uncorrected half
+wrong (20 with frontmatter, not 7), with the same stale numbers shipped in CHANGELOG and the PR body.
+
+The code lens found three vacuous tests — including one whose fixture put the date where the fence
+blanked it either way, so the fence-**character** comparison had no coverage at all — and two more
+unsafe-direction holes in `blankNonProse`: a backtick info-string opening a phantom fence that
+blanked the whole document, and comment removal shifting the `^ {0,3}` indent bound out from under
+the matcher.
+
+**The disclosure about silent no-op mutations turned out to be load-bearing.** The conformance
+reviewer hit the same failure mode while checking — a perl mutation matched nothing and reported a
+clean 59/59, indistinguishable from a held test — and caught it only because it had been warned to
+assert the needle first.
+
 ### Cycle 1 — qa-task: **FAIL 70/100**, then qa-fix: 10/10 closed
 
 **The gate found what §10 predicted.** The freshness rule could be driven to `fresh` for a genuinely
@@ -169,12 +194,36 @@ not anything trips it yet. Both fixed and mutation-proved.
 
 ---
 
+## Completion Summary
+
+`/develop-task` Step 2 now skips the review on **evidence of review** — a current review report —
+rather than on status alone, so a card that a blocking gate left at `planned` after a successful
+review is no longer permanently unstartable. The halt it replaces was *correct*; what was wrong is
+that its only intuitive remedy, re-running the review, is provably a no-op.
+
+**The substance of this run was not the fix, it was what the fix kept getting wrong.** The freshness
+rule was defeatable **seven** ways before it held, every one toward `fresh` — precisely the
+over-correction the task's own §10 named as worse than the halt being removed. One of the seven was
+caused by two of its own fixes cancelling each other out. **The full suite was green at every one of
+those moments**, which is why "assert behaviour, not source text" and "mutation-prove every fix" are
+the two rules that actually did the work here.
+
+Three §9 criteria were ticked before they were true. One was genuinely unmet and pointed at a note
+that did not exist; one claimed an experiment nobody performed; one was verified by hand three times
+rather than asserted. All three were corrected rather than accepted, and the last is now mechanical.
+
+Delivered: 1 new engine (68 tests, from a starting net of zero), both Step 2 tables rewritten and
+made exhaustive, a three-fact halt message, four reasoning notes, and the divergence from the
+pipeline's other freshness rule stated rather than left to be discovered.
+
+---
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-08
+**Final Status**: Completed
 **Branch**: `feature/task.97.develop-task-review-gate-already-reviewed`
 **PR**: [#350](https://github.com/Gamaroff/agent-skills/pull/350)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 3 QA cycles + Step 5c PR review
+**DoD Summary**: `task.97.dod.1.develop-task-review-gate-already-reviewed.md`
 **Tracker debt**: {populated after Step 7}

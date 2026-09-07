@@ -412,7 +412,7 @@ All notable changes to this project will be documented in this file. Format foll
   `/develop-story`'s tables are unchanged and asserted byte-identical — `/review-story` genuinely
   promotes, so an unchanged `Draft` there really is a failed promotion. The asymmetry is deliberate.
 
-  Guarded by **67 tests, every fix mutation-proved**. There was **no prior test net**: the only test
+  Guarded by **68 tests, every fix mutation-proved**. There was **no prior test net**: the only test
   touching this file asserted that the substrings `review` and `skip` appear somewhere in it, and
   would have passed with both decision tables deleted. Three QA cycles plus a PR review found the
   rule defeatable **seven** ways toward `fresh` — once because two of the first round's own fixes

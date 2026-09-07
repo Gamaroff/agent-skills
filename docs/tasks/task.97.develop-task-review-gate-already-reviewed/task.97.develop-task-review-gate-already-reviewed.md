@@ -5,10 +5,12 @@ type: task
 description: "A consumer repository predicted a deterministic HALT at /develop-task Step 2 on an already-reviewed task and steered the pipeline around it by hand; the halt itself was never reached. The consumer diagnosed it as two contradictory tables in develop-pipeline-step-2-review.md; measurement against the installed skills contradicts that diagnosis, so the first job here is to establish the real cause. What survives either way is a robustness defect: the skip table keys on status rather than on evidence of review, so whenever Step 9's promotion does not happen the only remedy an operator will reach for — re-running the review — cannot clear the halt."
 tags: [develop-task, pipeline, review-gate, status-lifecycle, consumer-report]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-09-07
 updated: 2026-09-08
+completed_date: 2026-09-08
+pr_number: 350
 assignee:
 estimated_effort_hours: 4
 github_issue: 348
@@ -16,7 +18,7 @@ github_issue: 348
 
 # Technical Task: /develop-task Step 2 has no recovery path when review-task Step 9 does not promote
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.97.review.1.develop-task-review-gate-already-reviewed.md` implemented 2026-09-07
 **GitHub Issue**: [#348](https://github.com/Gamaroff/agent-skills/issues/348)
 
@@ -460,6 +462,41 @@ Tests: 27 → **44**.
 
 ---
 
+## Definition of Done - PASSED
+
+**Status:** ACCEPTED
+
+**QA gate:** `task.97.gate.3.*` — ✅ **PASS**, 95/100, zero open issues
+**PR:** [#350](https://github.com/Gamaroff/agent-skills/pull/350) · **CI:** ✅ SUCCESS (5/5) on head `c54ee972`
+**Step 5c `/review-pr`:** ⚠️ CONCERNS — 16 findings, all addressed
+
+All 13 §9 success criteria verified **against the tree**, not against the reports:
+
+- ✅ **Acceptance criteria:** 13/13. The four behavioural ones were confirmed by *executing* the
+  module, not by reading it — including "a report older than `updated:` still runs the review",
+  which was falsified four separate ways during QA before it held.
+- ✅ **Tests:** 68 on the new module (from 0 — there was no prior net); full suite 2797, 0 failures.
+  21 mutations proved red across three QA cycles and the PR review.
+- ✅ **Security:** probe mode — 20 candidates executed, **0 reproduced**. The boundary held. The
+  module reaches no filesystem, network or process API, asserted by test rather than by inspection.
+- ✅ **Documentation:** CHANGELOG entry (behaviour change, not an internal refactor); four ⚠️
+  reasoning notes in the resource, in the shape of the 2026-08-19 `Draft` note.
+- ⚠️ **Compliance:** N/A — internal pipeline tooling, no user data or runtime surface.
+
+**Three criteria were ticked before they were true, and were corrected rather than accepted** —
+recorded here because it is the most useful thing this DoD has to say. §9's resume-contract
+divergence criterion was genuinely **unmet** (zero grep hits, and the module pointed at a note that
+did not exist); the fresh-clone criterion claimed an experiment nobody performed; and the
+develop-story guarantee was verified by hand three times rather than asserted. All three now hold,
+the last mechanically.
+
+**Detailed Verification Log:** see
+[`task.97.dod.1.develop-task-review-gate-already-reviewed.md`](./task.97.dod.1.develop-task-review-gate-already-reviewed.md).
+
+**Task marked as ACCEPTED on:** 2026-09-08
+
+---
+
 ## Phase 1 Record — why the promotion did not happen
 
 > This section is Phase 1's deliverable. The card exists partly because a confident diagnosis was
@@ -521,6 +558,7 @@ which §5 of this card promises not to make — **filed as a follow-up**, not ac
 | 2026-09-08 |  | QA cycle 2 refute pass — gate FAIL (70/100), 8 findings; two of cycle 1's fixes cancelled out and the module was still defeatable | qa-task |
 | 2026-09-08 |  | Cycle-2 findings fixed — all 8 closed, 12 mutations proved red, tests 27 → 59 | qa-fix |
 | 2026-09-08 |  | QA gate PASS (95/100) cycle 3 — 20-input attack corpus, 0 unsafe; 68/68 reports and 161/161 docs still parse | qa-task |
+| 2026-09-08 | 1.3 | DoD verified — accepted (PR #350, CI green, gate PASS 95/100). Three §9 criteria were ticked before they were true and were corrected rather than accepted | finalise |
 | 2026-09-08 |  | Step 5c `/review-pr` — CONCERNS, 16 findings all addressed: an unmet §9 criterion that had been ticked, wrong corpus figures in the module header and CHANGELOG, three vacuous tests, and two unsafe-direction holes (phantom fence from an inline code span; comment removal shifting the indent bound) | review-pr |
 
 ---
