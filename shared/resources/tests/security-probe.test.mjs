@@ -26,6 +26,7 @@ import {
   VERDICTS,
   computeVerdict,
   defaultRepoRoot,
+  main,
   resolveEntry,
   runProbeSpec,
 } from "../security-probe.mjs";
@@ -357,4 +358,135 @@ test("computeVerdict only ever returns a known verdict", () => {
     assert.ok(VERDICTS.includes(verdict), `${verdict} is not a known verdict`);
   }
   assert.deepEqual([...OUTCOMES], ["rejected", "accepted", "errored"]);
+});
+
+// ── Result shape (QA cycle 1: TASK80-002) ────────────────────────────────────
+
+test("every result path returns the same key set", () => {
+  // The defect this guards is a MISSING KEY, which no per-path assertion about
+  // values can see. `escapes` was present only on the success path, so all four
+  // early returns handed back an object where `result.escapes` was undefined —
+  // and a consumer doing `result.escapes.length` throws a TypeError on exactly
+  // the paths a probe most often takes, since a declined or unverifiable target
+  // is the common case in v1 by this engine's own admission.
+  //
+  // Comparing key SETS rather than individual keys is deliberate: it also
+  // catches the reverse mistake, a path that grows a field the others lack.
+  const F = "shared/resources/tests/fixtures/security-probe";
+  const paths = {
+    success: {
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: CASES,
+    },
+    "decline: out-of-root": {
+      sink: "url-authority",
+      entry: "/etc/passwd#x",
+      cases: CASES,
+    },
+    "decline: unknown sink": {
+      sink: "not-a-real-sink",
+      entry: entry("engaging-control"),
+    },
+    "zero cases": {
+      sink: "url-authority",
+      entry: entry("engaging-control"),
+      cases: [],
+    },
+    "entry not probeable": {
+      sink: "url-authority",
+      entry: `${F}/does-not-exist.mjs#validateHost`,
+      cases: CASES,
+    },
+  };
+
+  const expected = Object.keys(runProbeSpec(paths.success)).sort();
+  assert.ok(
+    expected.includes("escapes"),
+    "the success path must carry escapes",
+  );
+
+  for (const [name, spec] of Object.entries(paths)) {
+    const r = runProbeSpec(spec);
+    assert.deepEqual(
+      Object.keys(r).sort(),
+      expected,
+      `${name} returns a different key set`,
+    );
+    assert.ok(
+      Array.isArray(r.escapes),
+      `${name}: escapes must be an array, not undefined`,
+    );
+  }
+});
+
+// ── CLI argument validation (QA cycle 1: TASK80-001, TASK80-003) ─────────────
+
+test("--timeout is validated: a bad value exits 2 rather than crashing", () => {
+  // Before this, `Number(argv[++i])` yielded NaN for a missing or non-numeric
+  // value; NaN survived the `??` default and reached spawnSync, which threw an
+  // uncaught RangeError [ERR_OUT_OF_RANGE] — a stack trace instead of the exit 2
+  // this file's header documents for a bad argument.
+  //
+  // `0` is in this list and is the dangerous one: it is a plausible typo, it
+  // parses as a number, and `timeout: 0` means NO timeout to spawnSync — so it
+  // silently removed the per-case containment rather than failing loudly.
+  const good = entry("engaging-control");
+  for (const bad of ["abc", "0", "-1", "1.5", "1e3", "0x10", "+5", ""]) {
+    assert.equal(
+      main(["--sink", "url-authority", "--entry", good, "--timeout", bad]),
+      2,
+      `--timeout ${JSON.stringify(bad)} must exit 2`,
+    );
+  }
+  // Surrounding whitespace is TOLERATED, not rejected — `readInt` trims before
+  // testing, so " 5" means 5ms. Pinned so a future tightening of the regex is a
+  // deliberate decision rather than an accident.
+  assert.notEqual(
+    main(["--sink", "url-authority", "--entry", good, "--timeout", " 5000"]),
+    2,
+    "a whitespace-padded integer must parse — any exit but 2 means it was not a parse failure",
+  );
+
+  // The flag given last, with no value at all.
+  assert.equal(
+    main(["--sink", "url-authority", "--entry", good, "--timeout"]),
+    2,
+    "--timeout with no value must exit 2",
+  );
+});
+
+test("a sandbox escape forces a non-zero exit even on an otherwise-clean verdict", () => {
+  // The verdict describes the control under probe; the escape describes the
+  // probe itself. A caller reading only `$?` must not be told the second was
+  // fine because the first was.
+  // The fixture must EARN a clean verdict, or this test is vacuous. Built on
+  // `escaping-probe` it was: that fixture rejects everything, so it scores
+  // `unverifiable` and exits 1 whether or not the guard exists — removing the
+  // guard left the suite green. `engaging-but-escaping` scores `engages`, so the
+  // escape is the only thing that can make the exit non-zero.
+  const r = runProbeSpec({
+    sink: "url-authority",
+    entry: entry("engaging-but-escaping"),
+    cases: CASES,
+  });
+  assert.equal(
+    r.verdict,
+    "engages",
+    "precondition: the verdict alone would exit 0",
+  );
+  assert.ok(r.escapes.length > 0, "precondition: the sentinel fired");
+
+  const code = main([
+    "--sink",
+    "url-authority",
+    "--entry",
+    entry("engaging-but-escaping"),
+    "--json",
+  ]);
+  assert.notEqual(
+    code,
+    0,
+    "an escaping probe must never exit 0, even on `engages`",
+  );
 });

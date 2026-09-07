@@ -1781,17 +1781,32 @@ test("task.80 parity: no interpreter is on the snippet allow-list", () => {
       !SAFE_COMMANDS.has(interpreter),
       `${interpreter} must never be on SAFE_COMMANDS — see probe-boundary-rule.md`,
     );
+    // COMMAND_RUNNERS is NOT a second allow-list, and the distinction matters
+    // enough to state here: it names commands whose ARGUMENT is another command,
+    // so the classifier recurses into it. Membership makes classification
+    // STRICTER, not laxer — which is why `eval` and `exec` are legitimately on
+    // it, and why `eval "rm -rf /"` classifies mutating.
+    //
+    // The assertion stays, but for a different reason than the one above: an
+    // interpreter here would make the classifier read JS or Python source as a
+    // shell command line, which is noise rather than safety. The SAFE_COMMANDS
+    // half is the security property; this half is a correctness one.
     assert.ok(
       !COMMAND_RUNNERS.has(interpreter),
-      `${interpreter} must never be on COMMAND_RUNNERS`,
+      `${interpreter} on COMMAND_RUNNERS would make the classifier read source as a command line`,
     );
   }
 });
 
 test("task.80 parity: QA-1…QA-17 classify exactly as they did before the extraction", () => {
   // One assertion per documented fail-open route, pinned by expected class. If
-  // the extraction perturbed classification, this reds with the case id that
-  // moved — which is the information a bisect actually needs.
+  // the extraction perturbed the classification OF THESE CASES, this reds with
+  // the case id that moved — which is the information a bisect actually needs.
+  //
+  // Scope, stated precisely because the earlier wording overreached: this pins
+  // seventeen enumerated inputs, not the allow-list's membership. A destructive
+  // command ADDED to SAFE_COMMANDS is a different mutation and slips past every
+  // case here — see the test immediately below, which exists because of it.
   //
   // The set runs to QA-17, not QA-14: three routes (QA-15 glob-in-command-
   // position, QA-16 heredoc-line redirection, QA-17 write-flags-anywhere) were
@@ -1819,6 +1834,39 @@ test("task.80 parity: QA-1…QA-17 classify exactly as they did before the extra
   ];
   for (const [id, code, expected] of cases) {
     assert.equal(classifyBlock(code).klass, expected, `${id}: ${code}`);
+  }
+});
+
+test("task.80 parity: a destructive command must fail closed via the ALLOW-LIST, not only the deny-list", () => {
+  // The gap the QA cycle found, and the reason the comment above was narrowed.
+  //
+  // Adding a single destructive command to SAFE_COMMANDS is the cheapest
+  // possible fail-open — `rm README.md` becomes `runnable`, and a QA gate that
+  // executes documented snippets would delete the file. Before this test, that
+  // one-word mutation left 105/105 tests green across BOTH this suite and the
+  // bug.3 fail-open replay eval. Nothing caught it.
+  //
+  // The reason nothing caught it is worth keeping: every `rm` case in the suite
+  // uses `rm -rf`, which DENY_PATTERNS rejects first. The deny-list masks the
+  // allow-list breach, so the suite tested the second mechanism while believing
+  // it was testing the first. These inputs are chosen to have NO deny-pattern,
+  // which is what makes SAFE_COMMANDS membership the only thing standing
+  // between them and `runnable`.
+  //
+  // Mutation-proof: add "rm" to SAFE_COMMANDS and this test reds. It is the
+  // only one that does.
+  for (const code of [
+    "rm README.md",
+    "mv README.md OTHER.md",
+    "cp -r src dest",
+    "truncate -s 0 README.md",
+    "install -m 777 a b",
+  ]) {
+    assert.equal(
+      classifyBlock(code).klass,
+      "mutating",
+      `${code} must fail closed — it has no deny-pattern, so only SAFE_COMMANDS membership decides it`,
+    );
   }
 });
 

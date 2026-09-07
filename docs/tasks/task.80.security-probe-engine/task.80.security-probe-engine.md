@@ -364,6 +364,8 @@ run clean for a cycle.
 | 2026-09-02 | 1.0     | Initial draft — filed from the rebirth-wallet security-review handover           | create-task |
 | 2026-09-07 | 1.1     | Review passed (8/10) — corrected 5 stale source anchors that drifted when task.79 landed; `snapshotTree` is module-private, not exported, so Phase 1 gains a real export step; QA case range widened to QA-17 | review-task |
 | 2026-09-07 |         | Implemented — 8 files (3 created, 3 modified, 6 fixtures), 26 tests added (18 new + 8 parity), 4 mutation proofs | develop |
+| 2026-09-07 |         | QA gate CONCERNS (60/100) — 4 MEDIUM findings, all peripheral; all 7 safety criteria verified | qa-task |
+| 2026-09-07 |         | QA findings fixed — 4 MEDIUM closed + 1 new latent bug (exit-after-write truncation), 1 iteration | qa-fix |
 
 ---
 
@@ -400,6 +402,79 @@ run clean for a cycle.
 - **Collapsed-state precedent**: `task.73`'s tri-state conflation, and `bug.7` one layer up
 - **The corpus this consumes**: `task.79`
 - **Consumer**: `task.81`
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-07
+**Quality Score**: 60/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.80.qa.1.security-probe-engine.md](./task.80.qa.1.security-probe-engine.md)
+- **Gate File**: [task.80.gate.1.security-probe-engine.yml](./task.80.gate.1.security-probe-engine.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 139 targeted (2564 on the full `ci:fast` run), 0 failures
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 4 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+All seven §9 safety criteria hold under **independent** probing — each was tested against running code, not read in the source. The out-of-root rejection was proved to precede `import()` using a fixture whose module top level writes a sentinel (never created), and the no-shell property was proved with a shell-injection input (clean rejection, no artifact). The Phase 1 extraction is behaviour-preserving against 105 tests including the `bug.3` replay eval.
+
+Four MEDIUM findings, all in the engine's **periphery** rather than its verdict logic:
+
+- **TASK80-001** — `--timeout` unvalidated: `NaN` reaches `spawnSync` and throws an uncaught `RangeError`; `--timeout 0` silently disables the per-case timeout.
+- **TASK80-002** — `escapes` is `undefined` on four of five result paths; the declared consumer (`task.81`) would throw.
+- **TASK80-003** — a sandbox escape is invisible in default CLI output.
+- **TASK80-004** — the parity block's comment claims broader coverage than it pins: adding only `rm` to `SAFE_COMMANDS` is a genuine fail-open that leaves 105/105 tests green.
+
+---
+
+## QA Fix Cycle 1 — 2026-09-07
+
+All four MEDIUM findings from gate 1 fixed; both advisory cleanups taken. Status stays
+`Ready for Review` — `qa-fix` hands work back to QA.
+
+| Finding | Fix | Mutation-proven |
+| --- | --- | --- |
+| **TASK80-001** `--timeout` unvalidated | `main()` now validates with `readInt(value, 1)`, **imported from `spawn-budget.mjs`** rather than restated — that module's own comment already documents the `timeout: 0` hazard. Returns exit 2 on a non-integer or `< 1`. | **yes** — reverting to bare `Number()` reds the new test |
+| **TASK80-002** `escapes` undefined on 4/5 paths | `escapes: []` added to the `base` object; a new test compares **key sets** across all five result paths, which is what catches a missing key. | **yes** — removing it from `base` reds |
+| **TASK80-003** escape invisible in default output | Summary line appends `ESCAPED n`; **an escape now forces a non-zero exit even on `engages`**, and `probe-boundary-rule.md` §6 records the rule with its reason. | **yes** — but only after the test was rebuilt; see below |
+| **TASK80-004** parity claim overreached | Comment narrowed to what it actually pins, plus a new test asserting five destructive commands with **no deny-pattern** fail closed via the allow-list. | **yes** — adding `"rm"` to `SAFE_COMMANDS` reds it, and only it |
+
+### Two things worth recording, because both were found by mutation rather than by review
+
+**The first version of the TASK80-003 test was vacuous.** It used the existing `escaping-probe`
+fixture, which rejects every input and therefore scores `unverifiable` — exiting 1 whether or not
+the escape guard exists. Removing the guard left the suite green. A new fixture
+(`engaging-but-escaping.mjs`) earns `engages` *and* escapes, so the escape is the only thing that
+can make the exit non-zero. This is exactly the failure mutation-proving exists to catch, and it
+was in a test written to close a QA finding.
+
+**A repository guard caught a latent bug the QA cycle had not found.** `stdout-drain-on-exit.test.mjs`
+flagged the child runner: it called `process.exit(0)` immediately after writing its JSON payload,
+which truncates the write at ~64KB when the caller pipes the process — and this caller *always*
+pipes, since `spawnSync` captures stdout. A truncated payload would have surfaced as "no result
+payload from child", i.e. **a large probe result would have silently become a declined one**. The
+runner now returns from every arm and sets `process.exitCode`. Recorded as a new finding of this
+cycle rather than fixed silently.
+
+### Advisory cleanups taken
+
+- The `COMMAND_RUNNERS` assertion is kept but re-justified: that set makes the classifier **recurse
+  into** a command's argument, so membership is *stricter*, not laxer — which is why `eval` and
+  `exec` are legitimately on it. The assertion now states the correctness reason rather than
+  implying a second allow-list.
+- `OUTCOMES` stays exported, documented as deliberate public vocabulary alongside `VERDICTS`: a
+  consumer branching on an outcome should import the strings rather than retype them.
+
+**Fast gate after fixes**: `npm run ci:fast` green — **2568 tests, 0 failures**.
 
 ---
 

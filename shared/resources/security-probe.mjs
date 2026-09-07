@@ -43,7 +43,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { sandboxEnv, snapshotTree } from "./qa-execute-snippets.mjs";
 import { corpusFor } from "./security-input-corpus.mjs";
-import { spawnBudget, neverRan } from "./tests/spawn-budget.mjs";
+import { spawnBudget, neverRan, readInt } from "./tests/spawn-budget.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -55,7 +55,14 @@ export const VERDICTS = Object.freeze([
   "unverifiable",
 ]);
 
-/** Per-case outcomes. `errored` means the HARNESS failed, not the control. */
+/**
+ * Per-case outcomes. `errored` means the HARNESS failed, not the control.
+ *
+ * Exported alongside `VERDICTS` as deliberate public vocabulary, not as test
+ * scaffolding: a consumer that branches on an outcome should import the strings
+ * rather than retype them, for the same reason `VERDICTS` exists — a typo in a
+ * retyped `"rejected"` fails silently as a branch that never matches.
+ */
 export const OUTCOMES = Object.freeze(["rejected", "accepted", "errored"]);
 
 // ── The child runner ─────────────────────────────────────────────────────────
@@ -77,40 +84,53 @@ import { pathToFileURL } from "node:url";
 const MARK = "__PROBE_RESULT__";
 const emit = (o) => process.stdout.write("\\n" + MARK + JSON.stringify(o) + MARK + "\\n");
 
-let spec;
-try {
-  spec = JSON.parse(readFileSync(0, "utf8"));
-} catch (e) {
-  emit({ stage: "spec", error: String(e && e.message) });
-  process.exit(0);
+// Every arm RETURNS rather than calling process.exit(). An exit immediately
+// after an async stdout write truncates that write at ~64KB when the caller
+// pipes the process — which this caller always does, since spawnSync captures
+// stdout. That is bug.3, and stdout-drain-on-exit.test.mjs guards the whole
+// repository against re-adopting it. A truncated payload would surface here as
+// "no result payload from child", i.e. as a DECLINED case: a large probe result
+// would silently become an unverifiable one.
+async function run() {
+  let spec;
+  try {
+    spec = JSON.parse(readFileSync(0, "utf8"));
+  } catch (e) {
+    return { stage: "spec", error: String(e && e.message) };
+  }
+
+  let mod;
+  try {
+    mod = await import(pathToFileURL(spec.entryPath).href);
+  } catch (e) {
+    return { stage: "import", error: String(e && e.message) };
+  }
+
+  const fn =
+    spec.exportName === "default" ? (mod.default ?? mod) : mod[spec.exportName];
+  if (typeof fn !== "function") {
+    return {
+      stage: "export",
+      error: "export " + spec.exportName + " is not a function",
+    };
+  }
+
+  try {
+    const returned = await fn(spec.input);
+    // A control "rejects" by throwing, or by answering with a value that means
+    // "no". Returning null/undefined/false is the non-throwing rejection shape a
+    // validator commonly uses; treating it as acceptance would score a working
+    // control as absent.
+    const rejected =
+      returned === null || returned === undefined || returned === false;
+    return { stage: "call", outcome: rejected ? "rejected" : "accepted" };
+  } catch (e) {
+    return { stage: "call", outcome: "rejected", threw: String(e && e.message) };
+  }
 }
 
-let mod;
-try {
-  mod = await import(pathToFileURL(spec.entryPath).href);
-} catch (e) {
-  emit({ stage: "import", error: String(e && e.message) });
-  process.exit(0);
-}
-
-const fn = spec.exportName === "default" ? (mod.default ?? mod) : mod[spec.exportName];
-if (typeof fn !== "function") {
-  emit({ stage: "export", error: "export " + spec.exportName + " is not a function" });
-  process.exit(0);
-}
-
-try {
-  const returned = await fn(spec.input);
-  // A control "rejects" by throwing, or by answering with a value that means
-  // "no". Returning null/undefined/false is the non-throwing rejection shape a
-  // validator commonly uses; treating it as acceptance would score a working
-  // control as absent.
-  const rejected = returned === null || returned === undefined || returned === false;
-  emit({ stage: "call", outcome: rejected ? "rejected" : "accepted" });
-} catch (e) {
-  emit({ stage: "call", outcome: "rejected", threw: String(e && e.message) });
-}
-process.exit(0);
+emit(await run());
+process.exitCode = 0;
 `;
 
 const MARK = "__PROBE_RESULT__";
@@ -293,6 +313,14 @@ export function runProbeSpec({
   const budget = spawnBudget("PROBE");
   const perCaseTimeout = timeoutMs ?? budget.timeoutMs;
 
+  // Every field the success path returns, so EVERY return path carries the same
+  // shape. `escapes` in particular: it was previously added only on the success
+  // path, which left it `undefined` on all four early returns — and a consumer
+  // reading `result.escapes.length` then throws on exactly the paths a probe
+  // most often takes, since a declined or unverifiable target is the common
+  // case in v1 by this engine's own admission. A missing KEY is invisible to
+  // any per-path assertion about values, which is why the test added alongside
+  // this compares key sets rather than contents.
   const base = {
     sink: sink ?? null,
     entry: entry ?? null,
@@ -301,6 +329,7 @@ export function runProbeSpec({
     reproduced: [],
     overblocked: [],
     declined: [],
+    escapes: [],
     cases: [],
   };
 
@@ -457,8 +486,24 @@ export function main(argv = process.argv.slice(2)) {
     else if (a === "--sink") opts.sink = argv[++i];
     else if (a === "--entry") opts.entry = argv[++i];
     else if (a === "--cases-file") opts.casesFile = argv[++i];
-    else if (a === "--timeout") opts.timeoutMs = Number(argv[++i]);
-    else {
+    else if (a === "--timeout") {
+      // Validated with the SAME rule the spawn budget applies to its env vars,
+      // imported rather than restated. `Number()` alone was the defect: it
+      // yields NaN for a missing or non-numeric value, NaN is neither null nor
+      // undefined so it survives the `??` default below, and `spawnSync` then
+      // throws an uncaught RangeError instead of the exit 2 this file documents
+      // for a bad argument. `0` was worse — it survives too, and `timeout: 0`
+      // means NO timeout to spawnSync, silently removing per-case containment.
+      // Hence a floor of 1, which is what `readInt`'s own `min` argument is for.
+      const parsed = readInt(argv[++i], 1);
+      if (parsed === undefined) {
+        process.stderr.write(
+          "--timeout must be a positive integer (milliseconds)\n",
+        );
+        return 2;
+      }
+      opts.timeoutMs = parsed;
+    } else {
       process.stderr.write(`unknown argument: ${a}\n`);
       return 2;
     }
@@ -489,17 +534,33 @@ export function main(argv = process.argv.slice(2)) {
     timeoutMs: opts.timeoutMs,
   });
 
+  const escaped = result.escapes?.length ?? 0;
+
   if (opts.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } else {
+    // `escaped` is appended rather than folded into the counts, and it is never
+    // omitted when non-zero. The escape sentinel is the last line of
+    // containment, and it was the one result this line dropped: an escaping
+    // probe printed a clean-looking summary while the sentinel had fired, and
+    // only `--json` revealed it.
     process.stdout.write(
       `${result.verdict} (${result.reason}) — executed ${result.executed}, ` +
         `passed ${result.passed}, reproduced ${result.reproduced.length}, ` +
-        `declined ${result.declined.length}\n`,
+        `declined ${result.declined.length}` +
+        (escaped > 0 ? `, ESCAPED ${escaped}` : "") +
+        `\n`,
     );
   }
 
   // `unverifiable` exits 1, not 0. See the exit-code note at the top of the file.
+  //
+  // An ESCAPE also exits 1, even on an `engages` verdict. A probe that wrote
+  // outside its sandbox is not a clean run whatever verdict it earned: the
+  // verdict describes the control under probe, the escape describes the probe
+  // itself, and a caller reading only `$?` must not be told the second was fine
+  // because the first was.
+  if (escaped > 0) return 1;
   return result.verdict === "engages" ? 0 : 1;
 }
 

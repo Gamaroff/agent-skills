@@ -1,0 +1,86 @@
+schema: 1
+task: "task.80.security-probe-engine"
+task_title: "Make a security probe runnable without widening the snippet allow-list"
+gate: CONCERNS
+status_reason: "All seven §9 safety criteria hold under independent probing and the Phase 1 extraction is genuinely behaviour-preserving. Four MEDIUM code-review findings, all in the new engine's periphery rather than its verdict logic: an unvalidated --timeout that crashes or silently disables containment, an inconsistent result shape, a sandbox escape invisible in default CLI output, and a parity-test comment claiming broader coverage than the block delivers."
+reviewer: "QA Engineer"
+updated: "2026-09-07T09:20:00Z"
+
+top_issues:
+  - id: "TASK80-001"
+    severity: medium
+    file: "shared/resources/security-probe.mjs"
+    finding: "`--timeout` is unvalidated (:460 `Number(argv[++i])`). A non-numeric value, or the flag given last with no value, yields NaN, which reaches spawnSync and throws an uncaught RangeError [ERR_OUT_OF_RANGE] — a stack trace instead of the file's own documented exit 2 for a bad argument. Separately `--timeout 0` passes the `??` guard at :294 and silently disables the per-case timeout entirely, removing the containment §9 criterion 6 requires."
+    suggested_action: "Validate in main(): reject a non-integer or <1 value with a message and `return 2`, matching every other bad-argument path in the same function. `spawn-budget.mjs` already ships `readInt`-style parsing with a `min` floor — reuse that rule rather than restating it."
+    suggested_owner: dev
+    status: open
+  - id: "TASK80-002"
+    severity: medium
+    file: "shared/resources/security-probe.mjs"
+    finding: "The result shape is inconsistent: `escapes` is present only on the success path. The `base` object (:296) omits it, so all four early returns — out-of-root decline, unknown-sink decline, zero-cases, entry-not-probeable — return an object with `escapes: undefined`. A consumer reading `result.escapes.length` throws a TypeError on exactly the paths a probe most often takes. task.81 is the declared consumer."
+    suggested_action: "Add `escapes: []` to the `base` object so every return path carries the full shape. Add a test asserting the key set is identical across all five result paths."
+    suggested_owner: dev
+    status: open
+  - id: "TASK80-003"
+    severity: medium
+    file: "shared/resources/security-probe.mjs"
+    finding: "A sandbox escape is invisible in default CLI output. The human-readable line (:496) reports verdict, executed, passed, reproduced and declined — but never `escapes`. Running the escaping-probe fixture through the CLI prints a clean-looking line while the sentinel has fired. The escape sentinel is the last line of containment; a caller must pass --json to learn it triggered."
+    suggested_action: "Append `escaped N` to the summary line whenever `result.escapes.length > 0`, and consider making an escape affect the exit code — a probe that wrote outside its sandbox is not a clean run whatever its verdict."
+    suggested_owner: dev
+    status: open
+  - id: "TASK80-004"
+    severity: medium
+    file: "shared/resources/tests/qa-execute-snippets.test.mjs"
+    finding: "The parity block's comment (:1793) claims 'if the extraction perturbed classification, this reds with the case id that moved', but none of the 17 enumerated cases exercises SAFE_COMMANDS membership for a destructive command. Demonstrated: adding only `rm` to SAFE_COMMANDS makes `rm README.md` classify `runnable` — a genuine fail-open — and all 105 tests across the snippet suite and the bug.3 replay eval stay green. `chmod`/`dd` are caught, but by a PRE-EXISTING test, not by anything task.80 added."
+    suggested_action: "Add a case asserting a destructive command absent from SAFE_COMMANDS classifies `mutating` via the allow-list rather than only via DENY_PATTERNS (`rm README.md` has no deny pattern and is the demonstrated hole), or narrow the comment to what the block actually pins. The interpreter assertion — the task's real §9 criterion 1 — is sound and mutation-proved; only the broader claim overreaches."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 139
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "All seven §9 safety criteria independently verified, not taken on trust. (1) No interpreter on SAFE_COMMANDS — confirmed against 15 names; `eval`/`exec` appear in COMMAND_RUNNERS, which makes the classifier recurse into an argument and is stricter, not laxer. (2) Out-of-root entry rejected before import — proved with a fixture whose module top level writes a sentinel file: the file was never created. (3) Inputs never reach a shell — a case whose input is a shell-injection string produced a clean rejection and no artifact. (4) unverifiable exits 1, confirmed on two distinct unverifiable paths. (5) declined is populated and executed stays 0 on all four decline paths. (6) Timeout from spawnBudget('PROBE'), no literal; the concurrency guard's hardcoded-timeout scan is green — but see TASK80-001 for the operator-supplied path. (7) Extraction behaviour-preserving: 105 tests green including the bug.3 replay."
+  performance:
+    status: PASS
+    notes: "One child process per case is the design and is what makes a hang attributable to one case. Measured ~35-90ms per case; the full 12-case url-authority corpus runs in ~1.0s. The probe suite adds 4.5s to a 2564-test run. No regression in the snippet path."
+  reliability:
+    status: CONCERNS
+    notes: "Verdict logic is sound and all four branches are mutation-proved. Reliability is downgraded on the periphery: an unvalidated --timeout crashes the process (TASK80-001) and an inconsistent result shape will throw in the declared consumer (TASK80-002). Both are outside the verdict computation, which is why this is CONCERNS rather than FAIL. Rollback plan is specific, time-bounded and names its verification commands."
+  maintainability:
+    status: PASS
+    notes: "probe-boundary-rule.md (208 lines) states the trust-class argument, the verdict derivation from `direction`, the honest v1 limits, and the SAFE_COMMANDS refusal with its reason. Both non-obvious verdict branches are documented where a maintainer will look. Prettier clean. The one accuracy defect is TASK80-004, a comment claiming broader coverage than delivered."
+
+recommendations:
+  immediate:
+    - action: "Validate --timeout: reject non-integer or <1 with exit 2"
+      refs: ["shared/resources/security-probe.mjs:460"]
+    - action: "Add escapes: [] to the base result object"
+      refs: ["shared/resources/security-probe.mjs:296"]
+    - action: "Report escapes in the default CLI summary line"
+      refs: ["shared/resources/security-probe.mjs:496"]
+    - action: "Close the parity-test gap, or narrow the comment to what it pins"
+      refs: ["shared/resources/tests/qa-execute-snippets.test.mjs:1793"]
+  future:
+    - action: "Link task.80 to a tracker issue — carried from the Step 2 review, consent-gated so not actioned by the autonomous run"
+      refs: ["docs/tasks/task.80.security-probe-engine/task.80.security-probe-engine.md"]
+    - action: "A cases-file that parses but is not an array reports reason `unknown-sink`, which describes the wrong problem"
+      refs: ["shared/resources/security-probe.mjs"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "TASK80-001 fixed — an uncaught RangeError from a security tool is the shape most likely to be misread"
+    - "TASK80-002 fixed before task.81 consumes the module"

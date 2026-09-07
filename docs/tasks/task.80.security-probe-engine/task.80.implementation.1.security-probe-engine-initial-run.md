@@ -34,7 +34,7 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 | 1. create-branch           | ✅ Done    | Branch `feature/task.80.*` exists in git                             | `feature/task.80.security-probe-engine` from `develop` at `a2227017`; pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.80.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT, 8/10. 0 Critical, 6 Important (5 fixed in place, 1 skipped), 2 Optional. Report: `task.80.review.1.security-probe-engine.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                    | 1 iteration, no stall. 4/4 phases. 8 files. 26 tests added. 4 mutation proofs. Fast gate green: 2564 tests, 0 fail | — (inline)           |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #337: https://github.com/Gamaroff/agent-skills/pull/337 — state OPEN, base `develop`. 3 commits, 20 files, +2131/-124. Issue comment N/A (no tracker issue) | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.80.qa.{N}.*.md`; `task.80.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.80.dod.{N}.*.md`; task `status: accepted`                    |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -56,6 +56,18 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 - Pipeline mode: **standard**. Computed from `risk_ok = (risk_level ∈ {low, absent})` → **false** (`risk_level: medium`); `phase_count = 4` → not < 3; `single_module` → false (touches `shared/resources/` and regenerates `skills/*/references/`). All three fail, so lite mode is not available.
 - Always-load files resolved: 3 files from `skills-config.yaml` `devLoadAlwaysFiles` — all three verified present on disk.
 - Task status at entry: `ready-for-development` — proceed normally.
+
+### Step 4 — create-pr — 2026-09-07
+
+- PR **#337** → https://github.com/Gamaroff/agent-skills/pull/337, base `develop` (Q2 pre-supplied, interactive prompt skipped). State verified `OPEN` after creation.
+- `--issue` **omitted** — no linked tracker issue. Step 6b issue comment and the GitHub board `in-review` move both skipped for the same reason.
+- Staging scope: 8 `--scope` paths. Pre-flight guard held **0 files** — every untracked path already fell inside the scope set. Leak check across all three commits: clean, no out-of-scope path committed.
+- Committed as **3 logical commits** rather than one, along the natural seam:
+  - `5cb3364f refactor(task.80)` — the Phase 1 containment extraction, its 8 parity tests, and the 5 bundled `references/` copies that are its `npm run bundle` output
+  - `e961337a feat(task.80)` — the engine, the rule doc, 18 tests, 6 fixtures
+  - `a152f7df docs(task.80)` — task record, review report, implementation report, CHANGELOG
+- A repo pre-commit hook re-runs `npm run bundle` on every commit; it reported every skill in sync, independently confirming the bundle step in Step 3.
+- The implementation report is committed **here, at Step 4**, not deferred to Step 8 — so a reviewer can read the audit trail during the QA loop, and so the task document's link to it is not a dangling relative link in the tracked tree (which fails in CI while passing locally).
 
 ### Step 3 — develop — 2026-09-07
 
@@ -106,7 +118,31 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-07
+
+| Field | Value |
+| --- | --- |
+| **QA skill** | `/qa-task` (standard mode, direct tools, first review) |
+| **Gate** | **CONCERNS** — 60/100 |
+| **Findings** | 0 HIGH, 4 MEDIUM, 1 LOW |
+| **Gate file** | `task.80.gate.1.security-probe-engine.yml` |
+| **QA report** | `task.80.qa.1.security-probe-engine.md` |
+| **PR comment** | [posted](https://github.com/Gamaroff/agent-skills/pull/337#issuecomment-5566557812) |
+| **Tests** | 139/139 targeted, 0 fail |
+| **PR Review** | _(Step 5c — not reached; gate did not read PASS)_ |
+
+All seven §9 safety criteria verified **by execution rather than inspection**, and all four hold. The two that matter most were tested with purpose-built adversarial fixtures: a module whose *top level* writes a sentinel proved the out-of-root rejection precedes `import()`, and a shell-injection input proved values never reach a shell.
+
+Findings promoted to the gate (`code_review_blocking=true`):
+
+- **TASK80-001** `security-probe.mjs:460` — `--timeout` unvalidated: `NaN` → uncaught `RangeError`; `0` → containment silently disabled
+- **TASK80-002** `security-probe.mjs:296` — `escapes` undefined on 4 of 5 result paths
+- **TASK80-003** `security-probe.mjs:496` — sandbox escape invisible in default CLI output
+- **TASK80-004** `qa-execute-snippets.test.mjs:1793` — parity block's scope claim exceeds what it pins
+
+QA's independent mutation spot-check reproduced all four claimed proofs **and found a fifth mutation nobody had tried**: adding only `"rm"` to `SAFE_COMMANDS` is a genuine fail-open that leaves 105/105 tests green. That is TASK80-004, and it is the clearest argument for running the spot-check against mutations the implementer did not choose.
+
+Convergence check: **not applicable at cycle 1** (starts at cycle 3). Proceeding to 5b `/qa-fix`.
 
 ---
 
@@ -115,7 +151,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.80.security-probe-engine`
-**PR**: {populated after Step 4}
+**PR**: [#337](https://github.com/Gamaroff/agent-skills/pull/337)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

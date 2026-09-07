@@ -188,13 +188,27 @@ tell "the control holds" from "we could not tell" — and making those two
 indistinguishable at the exit code is the same defect this engine exists to
 close, one layer further out.
 
-| Verdict | Exit |
+| Outcome | Exit |
 | --- | --- |
 | `engages` | 0 |
 | `present-but-inert` | 1 |
 | `absent` | 1 |
 | `unverifiable` | 1 |
-| bad argument, unreadable `--cases-file` | 2 |
+| **any verdict, with `escapes` non-empty** | **1** |
+| bad argument, unreadable `--cases-file`, invalid `--timeout` | 2 |
+
+**An escape overrides the verdict.** A probe that wrote outside its sandbox exits
+non-zero even when the control it was probing scored `engages`. The verdict
+describes the *control under probe*; the escape describes the *probe itself*, and
+a caller reading only `$?` must not be told the second was fine because the first
+was. The default (non-`--json`) summary line appends `ESCAPED n` for the same
+reason — the sentinel is the last line of containment, and it was previously the
+one result that line dropped.
+
+`--timeout` is validated with the same rule the spawn budget applies to its env
+vars: a plain decimal integer, minimum 1. `0` is rejected specifically because it
+parses cleanly and means **no timeout** to `spawnSync` — it reads as "be quick"
+and would silently remove per-case containment.
 
 ---
 
