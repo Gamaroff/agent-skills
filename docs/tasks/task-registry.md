@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-09-03
-**Next Available Task Number:** **93**
+**Last Updated:** 2026-09-07
+**Next Available Task Number:** **96**
 
 ## How to use
 
@@ -132,6 +132,9 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 90 | [advance-pipeline-lock.sh reports success for an advance that did not happen](task.90.pipeline-lock-silent-success/task.90.pipeline-lock-silent-success.md) | draft | infrastructure | High | 2026-09-04 | — | task.77 |
 | 91 | [Reconcile install-time and run-time tracker resolution](task.91.reconcile-tracker-resolution/task.91.reconcile-tracker-resolution.md) | planned | infrastructure | Medium | 2026-09-04 | — | task.83 |
 | 92 | [Add a shellcheck CI lane for the repo's shell scripts](task.92.shellcheck-ci-lane/task.92.shellcheck-ci-lane.md) | planned | testing | Medium | 2026-09-04 | — | — |
+| 93 | [Observation-log engine, workspace resolver and contract](task.93.observation-log-engine/task.93.observation-log-engine.md) | planned | infrastructure | High | 2026-09-07 | [#339](https://github.com/Gamaroff/agent-skills/issues/339) | — |
+| 94 | [Add the observe-work meta-skill](task.94.observe-work-skill/task.94.observe-work-skill.md) | planned | infrastructure | High | 2026-09-07 | [#340](https://github.com/Gamaroff/agent-skills/issues/340) | task.93 |
+| 95 | [observe-work: config schema, skill boundaries and the meta-skill family](task.95.observe-work-docs-boundaries/task.95.observe-work-docs-boundaries.md) | planned | documentation | High | 2026-09-07 | [#341](https://github.com/Gamaroff/agent-skills/issues/341) | task.93, task.94 |
 
 - **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 
@@ -148,4 +151,6 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - Tasks 32-34 are the **Evals Infrastructure** milestone ([#1](https://github.com/Gamaroff/agent-skills/milestone/1)).
 - Tasks 62-64 are the **`loop-supervisor`** sequence — one shippable unit each. Design: [`.agents/plans/loop-supervisor.md`](../../.agents/plans/loop-supervisor.md). Task 62 is the only one that has to exist; it delivers a usable runner with log files alone. 63 (terminal views, notifications) and 64 (dashboard push, runbook) both depend on 62 and are independent of each other, so they can land in either order. None has a tracker issue yet.
 - **Rows 56-58 and 62-64 were stale and were corrected 2026-08-29** as part of task 65. All six documents read `accepted`; the rows read `planned` (56, 57), `ready-for-review` (58) and `draft` (62-64). Task 65's Phase 6 named only 62-64 — the other three were found by the same check and corrected in the same edit, because leaving a row known to be wrong is worse than the drift task 65 was written about. The correction is **not** what makes the registry safe to select from: the selector reads each document's own frontmatter and treats the row as a nomination only, so all six were already excluded from the frontier by the drift guard rather than by the row being right (SC5).
+- **Tasks 93-95 are the `observe-work` meta-skill sequence** — one shippable unit each, in dependency order. Design: [`task.93.plan.observation-log-engine.md`](task.93.observation-log-engine/task.93.plan.observation-log-engine.md). 93 ships the engine, resolver and contract under `shared/resources/` and is usable before any skill calls it; 94 authors the skill and does the eleven CI-enforced registration steps; 95 documents the `observations:` config block, adds reciprocal boundary notes to `autoskill` / `remember-insight` / `double-check`, and seeds the skill-family registry. The methodology is adapted from [task-observer](https://github.com/rebelytics/one-skill-to-rule-them-all) by Eoghan Henn (CC BY 4.0) — attribution is a licence obligation, not a courtesy; the mechanism is a rewrite.
+
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
