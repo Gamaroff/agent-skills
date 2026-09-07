@@ -35,8 +35,8 @@ Ship the `review-security` skill — its prompt, output contract, falsifiability
 | 2. review-task             | ✅ Done    | `task.81.review.{N}.{name}.md` exists (or skip logged)                 | `task.81.review.1.review-security-skill.md` — 2 Critical, 5 Important, 2 Optional; all critical+important applied; 6/10 → 9/10, READY TO IMPLEMENT | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases; 9 files created, 8 modified; 25 new tests; 4/4 mutation proofs held; `npm run ci:fast` green (2726 pass, 0 fail) | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #347: https://github.com/Gamaroff/agent-skills/pull/347 — OPEN, base `develop`. 2 commits, 27 files. No issue comment (no linked issue) | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.81.qa.{N}.*.md`; `task.81.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.81.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.81.qa.{N}.*.md`; `task.81.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 QA cycles; gate 3 **PASS** (100/100); 2 qa-fix cycles; 4 findings all fixed and mutation-proven; Step 5c `/review-pr` → **CONCERNS** (exits loop) | —                    |
+| 7. finalise                | ⏳ Pending | `task.81.dod.{N}.*.md`; task `status: accepted`                        | 5c returned CONCERNS — PC-1 (no independent review) must be carried into the DoD verbatim | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -183,8 +183,15 @@ Both cycle-1 findings were verified fixed **independently** rather than from the
 **Gate Result**: PASS (100/100)
 **Issues Found**: none
 **HIGH findings**: 0
-**PR Review**: pending — 5c not yet run
-**Action**: Proceeding to 5c (PR conformance review)
+**PR Review**: CONCERNS
+**Action**: Proceeding to 5c (PR conformance review) → **5c returned CONCERNS**, which records findings without blocking and exits the loop to Step 7
+
+**Step 5c — `/review-pr` (QA loop exit gate), 2026-09-07.** Report: `task.81.pr-review.1.review-security-skill.md`. Work item resolved via rung 1 (branch stem). 30 files reviewed, 7 auto-generated `references/` excluded. CI 5/5 green. Both lenses ran directly in the main context rather than as Explore subagents, stated in the report rather than silently dropped.
+
+- **Code lens: 0 findings.** One candidate was investigated and **discarded** — `encodeURIComponent` before `url.username` looked like double-encoding, but measurement showed the composition is idempotent (`p%40ss` either way). Recorded in the report because a plausible-sounding finding that survives into a report is the exact failure this task exists to name.
+- **Conformance lens: 1 medium, 2 low.** The medium (PC-1) is that **no independent review of this change exists** — `reviewDecision` empty, author and reviewer the same agent across all three QA cycles, and subagent dispatch unavailable, so even the pipeline's own independent-lens mechanism did not run. The two lows are the disclosed scope delta (`security-probe.mjs`, a task.80 file) and an asymmetry between the two engaged fixtures.
+
+**Why CONCERNS and not REQUEST CHANGES.** PC-1 is about the *provenance* of the assurance, not a defect in the change. Sending the run back to `/qa-fix` would produce another self-review, which is the one thing that cannot address it. The finding's correct destination is the DoD, and Step 7 must carry it verbatim rather than let a PASS gate and green CI imply an independent read that did not happen.
 
 Scope: since gate 2 (default narrowing — `PRIOR_GATES=2`, `SAFETY_REPROBE=false`, since gate 2's security axis was CONCERNS rather than FAIL). Four files re-read as a diff. Third-strike check: no HIGH finding appeared in any of the three gates, so no file is under a strike.
 
