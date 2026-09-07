@@ -107,7 +107,7 @@ reading.
 Every control gets a row. Every row carries the command that produced it — a verdict a reader cannot
 re-run is an assertion, not evidence.
 
-```markdown
+````markdown
 ### {control name}
 
 - **Verdict**: `present-but-inert` (high)
@@ -124,7 +124,7 @@ re-run is an assertion, not evidence.
   the connection is re-pointed and the port silently dropped.
 - **What it did reject**: `exa mple.com`, `""` — which is why this is `present-but-inert` rather
   than `absent`: the control demonstrably runs.
-```
+````
 
 And the machine block, once per report, which is what a gate consumes:
 

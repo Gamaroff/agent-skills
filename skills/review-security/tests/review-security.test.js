@@ -47,40 +47,110 @@ const engine = () => {
   return enginePromise;
 };
 
-const FIXTURES = {
-  "redis-tls/engaged": {
-    sink: "url-authority",
-    entry:
-      "skills/review-security/tests/fixtures/redis-tls/engaged.mjs#buildRedisOptions",
-  },
-  "redis-tls/inert": {
-    sink: "url-authority",
-    entry:
-      "skills/review-security/tests/fixtures/redis-tls/inert.mjs#buildRedisOptions",
-  },
-  "db-url/engaged": {
-    sink: "url-authority",
-    entry:
-      "skills/review-security/tests/fixtures/db-url/engaged.mjs#composeDbUrl",
-  },
-  "db-url/inert": {
-    sink: "url-authority",
-    entry:
-      "skills/review-security/tests/fixtures/db-url/inert.mjs#composeDbUrl",
-  },
+// The probe specs are IMPORTED, never redeclared. Each fixture family ships a
+// `probe.mjs` exporting its `engaged` and `inert` specs, and those files are the
+// single source of truth for what gets probed. Writing the {sink, entry} objects
+// out again here would give the entry paths two homes and execute only one of
+// them — a spec could then drift to a nonexistent entry while this suite stayed
+// green: the declared artifact present, and provably doing nothing. That is the
+// shape this skill exists to catch, and not one to ship inside it.
+const SPEC_FILES = {
+  "redis-tls": "tests/fixtures/redis-tls/probe.mjs",
+  "db-url": "tests/fixtures/db-url/probe.mjs",
+};
+
+const FIXTURE_NAMES = [
+  "redis-tls/engaged",
+  "redis-tls/inert",
+  "db-url/engaged",
+  "db-url/inert",
+];
+
+let specsPromise;
+const specs = () => {
+  specsPromise ??= (async () => {
+    const out = {};
+    for (const [family, rel] of Object.entries(SPEC_FILES)) {
+      const mod = await import(
+        require("node:url").pathToFileURL(path.join(SKILL_ROOT, rel)).href
+      );
+      out[`${family}/engaged`] = mod.engaged;
+      out[`${family}/inert`] = mod.inert;
+    }
+    return out;
+  })();
+  return specsPromise;
 };
 
 const results = new Map();
 async function probe(name) {
   if (!results.has(name)) {
     const { runProbeSpec } = await engine();
-    results.set(name, runProbeSpec(FIXTURES[name]));
+    const spec = (await specs())[name];
+    assert.ok(spec, `no probe spec exported for ${name}`);
+    results.set(name, runProbeSpec(spec));
   }
   return results.get(name);
 }
 
 const hostile = (r) => r.cases.filter((c) => c.direction === "hostile");
 const legitimate = (r) => r.cases.filter((c) => c.direction === "legitimate");
+
+// ---------------------------------------------------------------------------
+// The probe specs are the artifact. Assert they are wired, well-formed, and
+// point at entries that actually resolve — otherwise "the spec file exists" and
+// "the spec file works" are the same observation, which is the confusion this
+// whole skill is about.
+// ---------------------------------------------------------------------------
+
+test("every fixture name resolves to an imported probe spec", async () => {
+  const loaded = await specs();
+  for (const name of FIXTURE_NAMES) {
+    assert.ok(loaded[name], `${name} has no exported spec`);
+    assert.equal(typeof loaded[name].sink, "string");
+    assert.equal(typeof loaded[name].entry, "string");
+  }
+  assert.deepEqual(Object.keys(loaded).sort(), [...FIXTURE_NAMES].sort());
+});
+
+test("every spec names a sink the corpus knows and an entry that resolves", async () => {
+  const { SINKS } = await import(
+    require("node:url").pathToFileURL(
+      path.join(REPO_ROOT, "shared/resources/security-input-corpus.mjs"),
+    ).href
+  );
+  const { resolveEntry } = await engine();
+  for (const [name, spec] of Object.entries(await specs())) {
+    assert.ok(
+      SINKS.includes(spec.sink),
+      `${name}: sink "${spec.sink}" is not one of ${SINKS.join(", ")}`,
+    );
+    // The drift guard. Note what `resolveEntry` does and does not do: it
+    // validates SHAPE and CONTAINMENT only, and says so in its own comment —
+    // "a path that may not exist yet". So it returns ok:true for any
+    // well-formed in-repo path, present or absent. Asserting only on it would
+    // read as an existence check while being nothing of the kind, which is the
+    // precise defect class this suite is about. Check the file and the export
+    // too.
+    const resolved = resolveEntry(spec.entry, REPO_ROOT);
+    assert.ok(
+      resolved.ok,
+      `${name}: entry "${spec.entry}" is malformed or escapes the repo (${resolved.reason})`,
+    );
+    assert.ok(
+      fs.existsSync(resolved.entryPath),
+      `${name}: entry file does not exist — ${resolved.entryPath}`,
+    );
+    const mod = await import(
+      require("node:url").pathToFileURL(resolved.entryPath).href
+    );
+    assert.equal(
+      typeof mod[resolved.exportName],
+      "function",
+      `${name}: "${resolved.exportName}" is not an exported function of ${spec.entry}`,
+    );
+  }
+});
 
 // ---------------------------------------------------------------------------
 // The central falsifiability assertion: the engine computes these, not us.
@@ -172,7 +242,10 @@ for (const [file, tokens] of Object.entries(DECOYS)) {
 
 test("zero cases → unverifiable, never engages", async () => {
   const { runProbeSpec } = await engine();
-  const r = runProbeSpec({ ...FIXTURES["redis-tls/engaged"], cases: [] });
+  const r = runProbeSpec({
+    ...(await specs())["redis-tls/engaged"],
+    cases: [],
+  });
   assert.equal(r.verdict, "unverifiable");
   assert.notEqual(r.verdict, "engages");
   assert.equal(r.executed, 0);

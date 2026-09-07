@@ -151,7 +151,11 @@ _Track each QA review/fix cycle._
 **Issues Found**: 2 MEDIUM — (1) `security-review-prompt.md` §4 nested three-backtick fences close the outer ```markdown block early, corrupting the Output Contract as rendered; (2) the six `probe.mjs` spec files are imported by nothing, so a declared Phase 2 deliverable ships unexercised while the test redeclares the same entry paths. Plus 2 LOW (prefix-matched private-range guard over-blocks `10.example.com`; suite reads the shared source rather than the bundled copy).
 **HIGH findings**: 0
 **PR Review**: not reached — gate did not exit the loop
-**Action**: Running qa-fix (cycle 1 of 5)
+**Action**: Running qa-fix (cycle 1 of 5) — **complete**; both medium findings and one low fixed, `ci:fast` green (2728 pass / 0 fail), returning to 5a for re-review
+
+**qa-fix cycle 1 outcome**: TASK81-001 and TASK81-002 both fixed and mutation-proven; LOW private-range over-block also fixed; the LOW about reading the shared source rather than the bundled copy deliberately left, with the reason recorded. Tests 25 → 27; full gate 2726 → 2728.
+
+**A second defect surfaced during the fix and is worth carrying forward.** The new drift guard first asserted only on `resolveEntry(...).ok` — which validates shape and containment, *not* existence, as its own comment states. The assertion read as an existence check while being nothing of the kind. Strengthened to check `fs.existsSync` and the named export before it shipped. Fixing a vacuity finding with a vacuous test would have been the most ironic possible defect in this particular task, and it was one edit away.
 
 Notes on how this cycle was run, since two things deviate from the documented default:
 

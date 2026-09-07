@@ -394,6 +394,45 @@ configuration), and widen once real runs show the verdicts hold.
 
 ---
 
+## Bug Reports
+
+### In QA Verification
+
+- [Bug 1: Nested code fences break the reviewer prompt's Output Contract](./task.81.bug.1.malformed-nested-fences-in-prompt.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-09-07)
+- [Bug 2: The six probe.mjs specs are referenced nowhere](./task.81.bug.2.probe-specs-referenced-nowhere.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-09-07)
+
+### Closed Bugs
+
+_None yet — QA to verify._
+
+---
+
+## QA Fix Cycle 1 — 2026-09-07
+
+Both promoted gate findings fixed, plus one of the two LOW findings.
+
+| Finding | Fix | Mutation-proven |
+| --- | --- | --- |
+| TASK81-001 — nested fences corrupt prompt §4 | Four-backtick outer fence; source edited, bundle regenerated | Block boundaries re-derived in source **and** bundled copy: example block now 110–127 (was 110–122), the explanatory bullets are inside it, and the `security_review:` YAML is its own block again |
+| TASK81-002 — probe specs imported by nothing | Suite imports the specs and builds its fixture map from them; +2 guard tests | Yes — pointing a spec's `entry` at a nonexistent file, and renaming its export, each red **3** tests including the drift guard. Both were green before the fix |
+| LOW — private-range guard over-blocks DNS names | Match on parsed IPv4 octets rather than string prefix | Verified directly: `10.example.com` and `172.20.example.com` now accepted; `127.0.0.1`, `10.0.0.5`, `192.168.1.1`, `172.20.0.1`, `localhost` still rejected; `172.32.0.1` correctly accepted |
+
+**A second defect was found while fixing the first.** Guard 2 initially asserted only on
+`resolveEntry(...).ok`. That function validates **shape and containment, not existence** — its own
+comment says so — so the assertion read as an existence check while being nothing of the kind, and
+would have passed for any well-formed in-repo path whether or not the file was there. It now also
+checks `fs.existsSync` and that the named export is a function. Worth stating plainly: fixing a
+vacuity finding with a vacuous test is the exact failure this task exists to prevent, and it was one
+edit away from shipping.
+
+**LOW finding not fixed, deliberately**: the suite reads `shared/resources/security-review-prompt.md`
+rather than the bundled `references/` copy, unlike the `review-pr` sibling. Left as-is — switching
+would change which file the assertions validate, and asserting against the bundled copy could mask
+source-vs-bundle drift rather than reveal it. Recorded as a deliberate deviation, not an oversight.
+
+Tests: 25 → **27**.
+
+---
 ## QA Testing Results
 
 **QA Status**: CONCERNS
@@ -432,6 +471,7 @@ and the six `probe.mjs` specs are imported by nothing ([bug 2](./task.81.bug.2.p
 | 2026-09-07 | 1.1     | Review passed (9/10) — corrected the fixture entry-point contract to the engine's single-argument, authority-component call shape; stated the `engages` / `present-but-inert` verdict boundaries and the sandbox env allowlist in Phase 2; asserted both in Phase 3; fixed a `qa-task` line citation | review-task |
 | 2026-09-07 |         | Implemented — 9 files created, 8 modified, 25 tests; all four mutation proofs held | develop |
 | 2026-09-07 |         | QA gate CONCERNS (90/100) — 2 medium findings: prompt §4 nested fences, unreferenced probe specs | qa-task |
+| 2026-09-07 |         | QA findings fixed — 2 medium + 1 low closed, 1 iteration; tests 25 → 27 | qa-fix |
 
 ---
 

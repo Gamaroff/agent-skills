@@ -27,11 +27,28 @@ export function buildRedisOptions(authority) {
   // An external destination must not resolve to the machine running the code:
   // loopback and private ranges reach services that are unauthenticated
   // precisely because they were assumed unreachable.
-  if (
-    /^(localhost|127\.|10\.|192\.168\.|169\.254\.)/i.test(host) ||
-    /^172\.(1[6-9]|2[0-9]|3[01])\./.test(host)
-  ) {
-    return false;
+  //
+  // Match on the ADDRESS, not on a string prefix. A prefix test rejects
+  // `10.example.com` and `172.20.example.com` — ordinary DNS names that merely
+  // begin with digits — so the control would refuse legitimate traffic while
+  // reading, to anyone skimming it, exactly as it does now. A fixture that
+  // models a correct control should not itself contain a quiet inaccuracy.
+  if (/^localhost$/i.test(host)) return false;
+  const octets = host.split(".");
+  const isIPv4 =
+    octets.length === 4 &&
+    octets.every((o) => /^[0-9]{1,3}$/.test(o) && Number(o) <= 255);
+  if (isIPv4) {
+    const [a, b] = octets.map(Number);
+    if (
+      a === 127 ||
+      a === 10 ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31)
+    ) {
+      return false;
+    }
   }
 
   return {
