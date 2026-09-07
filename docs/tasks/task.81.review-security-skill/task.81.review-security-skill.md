@@ -398,12 +398,12 @@ configuration), and widen once real runs show the verdicts hold.
 
 ### In QA Verification
 
-- [Bug 1: Nested code fences break the reviewer prompt's Output Contract](./task.81.bug.1.malformed-nested-fences-in-prompt.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-09-07)
-- [Bug 2: The six probe.mjs specs are referenced nowhere](./task.81.bug.2.probe-specs-referenced-nowhere.md) — ✅ Ready for QA — Severity: MEDIUM (fixed 2026-09-07)
+- [Bug 3: The engaged fixture's loopback guard claims more than it does](./task.81.bug.3.loopback-guard-overclaims.md) — 🐛 New — Severity: MEDIUM (found cycle 2)
 
 ### Closed Bugs
 
-_None yet — QA to verify._
+- [Bug 1: Nested code fences break the reviewer prompt's Output Contract](./task.81.bug.1.malformed-nested-fences-in-prompt.md) — ✅ Closed 2026-09-07 (verified by re-derived block boundaries)
+- [Bug 2: The six probe.mjs specs are referenced nowhere](./task.81.bug.2.probe-specs-referenced-nowhere.md) — ✅ Closed 2026-09-07 (verified by export-rename mutation)
 
 ---
 
@@ -435,21 +435,21 @@ Tests: 25 → **27**.
 ---
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-07
 **Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.81.qa.1.review-security-skill.md](./task.81.qa.1.review-security-skill.md)
-- **Gate File**: [task.81.gate.1.review-security-skill.yml](./task.81.gate.1.review-security-skill.yml)
+- **Full Report**: [task.81.qa.2.review-security-skill.md](./task.81.qa.2.review-security-skill.md) (cycle 1: [qa.1](./task.81.qa.1.review-security-skill.md))
+- **Gate File**: [task.81.gate.2.review-security-skill.yml](./task.81.gate.2.review-security-skill.yml) (cycle 1: [gate.1](./task.81.gate.1.review-security-skill.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 57 (25 new + 32 regression)
+- **Tests Executed**: 27 in this skill; full gate 2728
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 Behaviour is correct and its falsifiability holds — verdicts are engine-computed and all four mutation
@@ -472,6 +472,7 @@ and the six `probe.mjs` specs are imported by nothing ([bug 2](./task.81.bug.2.p
 | 2026-09-07 |         | Implemented — 9 files created, 8 modified, 25 tests; all four mutation proofs held | develop |
 | 2026-09-07 |         | QA gate CONCERNS (90/100) — 2 medium findings: prompt §4 nested fences, unreferenced probe specs | qa-task |
 | 2026-09-07 |         | QA findings fixed — 2 medium + 1 low closed, 1 iteration; tests 25 → 27 | qa-fix |
+| 2026-09-07 |         | QA gate CONCERNS (90/100) cycle 2 — both prior findings verified fixed; refute pass found 1 new medium (loopback guard overclaims) | qa-task |
 
 ---
 

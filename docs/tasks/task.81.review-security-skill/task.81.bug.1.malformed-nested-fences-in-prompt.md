@@ -4,7 +4,7 @@
 **Bug ID**: TASK-81-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-07
 
@@ -105,3 +105,4 @@ against a three-backtick opener.
 | 2026-09-07 | New | Found during QA cycle 1 (Step 4b fence scan) | qa-task |
 | 2026-09-07 | In Progress | Root cause confirmed — same fence width inside and outside | qa-fix |
 | 2026-09-07 | Ready for QA | Four-backtick outer fence; boundaries verified in source and bundle | qa-fix |
+| 2026-09-07 | Closed | Verified fixed — block boundaries re-derived in source and bundle; three balanced top-level blocks | qa-task |

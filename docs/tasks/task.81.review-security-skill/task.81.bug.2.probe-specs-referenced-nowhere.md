@@ -4,7 +4,7 @@
 **Bug ID**: TASK-81-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-07
 
@@ -106,3 +106,4 @@ confirm the suite reds; restore.
 | 2026-09-07 | New | Found during QA cycle 1 (Step 3b diff code review) | qa-task |
 | 2026-09-07 | In Progress | Confirmed by grep — specs imported by nothing | qa-fix |
 | 2026-09-07 | Ready for QA | Specs imported; 2 guard tests added, both mutation-proven | qa-fix |
+| 2026-09-07 | Closed | Verified fixed — renaming a spec export now reds 3 tests including the drift guard; was green before | qa-task |
