@@ -26,226 +26,19 @@ const { execFileSync } = require("child_process");
 
 const bugSync = require("../scripts/sync-jira-bug.js");
 
-const BB = "https://bitbucket.org/ws/repo";
-const BASE = "https://example.atlassian.net";
+// The fake Jira, the ADF readers and the repo/runner helpers are shared with
+// the story, task and epic end-to-end suites. See tests/lib/fake-jira.js.
+const {
+  BB,
+  BASE,
+  fakeJira,
+  hrefsIn,
+  descriptionOf,
+  gitRepo,
+  makeRunner,
+} = require("../../../tests/lib/fake-jira.js");
 
-const ENV = {
-  JIRA_URL: BASE,
-  JIRA_API_TOKEN: "t",
-  JIRA_USER_EMAIL: "e@example.com",
-  JIRA_PROJECT_KEY: "PROJ",
-  BITBUCKET_REPO_URL: BB,
-  JIRA_DOC_BRANCH: "develop",
-};
-
-// ---------------------------------------------------------------------------
-// A fake Jira: enough of the API for one create and one update.
-// ---------------------------------------------------------------------------
-function fakeJira() {
-  const state = {
-    issues: {},
-    links: [],
-    labels: {},
-    requests: [],
-    nextKey: 901,
-  };
-  const ok = (body) => ({
-    ok: true,
-    status: 200,
-    json: async () => body,
-    text: async () => JSON.stringify(body),
-  });
-
-  const fetchImpl = async (url, opts = {}) => {
-    const method = opts.method || "GET";
-    const body = opts.body ? JSON.parse(opts.body) : null;
-    state.requests.push({ url, method, body });
-
-    if (url.includes("/rest/api/3/priority"))
-      return ok([{ name: "Highest" }, { name: "High" }, { name: "Medium" }]);
-
-    if (url.includes("/rest/api/3/search/jql")) {
-      const m = /labels = "([^"]+)"/.exec(body.jql || "");
-      const key = m && state.labels[m[1]];
-      return ok({ issues: key ? [{ key, fields: {} }] : [] });
-    }
-
-    if (url.includes("/issuetypes") || url.includes("createmeta"))
-      return ok({ issueTypes: [{ id: "10004", name: "Bug" }] });
-
-    if (url.includes("/rest/api/3/issueLinkType"))
-      return ok({
-        issueLinkTypes: [
-          {
-            id: "10",
-            name: "Blocks",
-            inward: "is blocked by",
-            outward: "blocks",
-          },
-          {
-            id: "20",
-            name: "Relates",
-            inward: "relates to",
-            outward: "relates to",
-          },
-        ],
-      });
-
-    if (url.includes("/rest/api/3/issueLink") && method === "POST") {
-      state.links.push(body);
-      return {
-        ok: true,
-        status: 201,
-        json: async () => ({}),
-        text: async () => "",
-      };
-    }
-
-    // Board config — report Kanban so backlog placement is skipped cleanly.
-    if (url.includes("/board/") && url.includes("/configuration"))
-      return ok({ type: "kanban" });
-
-    const issueMatch = /\/rest\/api\/3\/issue\/([A-Z]+-\d+)/.exec(url);
-    if (issueMatch) {
-      const key = issueMatch[1];
-      const issue = state.issues[key];
-      if (!issue)
-        return {
-          ok: false,
-          status: 404,
-          json: async () => ({}),
-          text: async () => "",
-        };
-
-      if (url.includes("/transitions")) {
-        const available = [
-          { id: "21", name: "Start", to: { name: "In Progress" } },
-          {
-            id: "41",
-            name: "Close",
-            to: { name: "Done", statusCategory: { key: "done" } },
-          },
-        ];
-        if (method === "POST") {
-          // Apply it. A stub whose status never moves would make every run look
-          // like a fresh transition, and the "second run changes nothing"
-          // assertion below would be testing the stub rather than the skill.
-          const chosen = available.find((t) => t.id === body.transition.id);
-          if (chosen) issue.status = chosen.to.name;
-          issue.updated = new Date(Date.now() + 1000).toISOString();
-          return {
-            ok: true,
-            status: 204,
-            json: async () => ({}),
-            text: async () => "",
-          };
-        }
-        return ok({ transitions: available });
-      }
-
-      if (method === "PUT") {
-        Object.assign(issue.fields, body.fields);
-        issue.updated = new Date(Date.now() + 1000).toISOString();
-        return ok({ fields: { ...issue.fields, updated: issue.updated } });
-      }
-
-      if (url.includes("fields=issuelinks"))
-        return ok({
-          fields: {
-            issuelinks: state.links
-              .filter((l) => l.inwardIssue.key === key)
-              .map((l) => ({
-                type: { name: l.type.name },
-                outwardIssue: { key: l.outwardIssue.key },
-              })),
-          },
-        });
-
-      return ok({
-        key,
-        fields: {
-          ...issue.fields,
-          updated: issue.updated,
-          status: { name: issue.status },
-        },
-      });
-    }
-
-    if (url.endsWith("/rest/api/3/issue") && method === "POST") {
-      const key = `PROJ-${state.nextKey++}`;
-      state.issues[key] = {
-        fields: { ...body.fields },
-        updated: new Date().toISOString(),
-        status: "To Do",
-      };
-      for (const l of body.fields.labels || []) state.labels[l] = key;
-      return {
-        ok: true,
-        status: 201,
-        json: async () => ({ key }),
-        text: async () => "",
-      };
-    }
-
-    return {
-      ok: false,
-      status: 404,
-      json: async () => ({}),
-      text: async () => "",
-    };
-  };
-
-  return { state, fetchImpl };
-}
-
-// Walk an ADF doc and return every link mark's href, in document order.
-function hrefsIn(node, acc = []) {
-  if (Array.isArray(node)) {
-    for (const n of node) hrefsIn(n, acc);
-    return acc;
-  }
-  if (!node || typeof node !== "object") return acc;
-  for (const mark of node.marks || [])
-    if (mark.type === "link" && mark.attrs?.href) acc.push(mark.attrs.href);
-  if (node.content) hrefsIn(node.content, acc);
-  return acc;
-}
-
-// The description the fake Jira is holding — the same bytes
-// `GET /issue/{key}?fields=description` would hand back.
-function descriptionOf(state, key) {
-  return state.issues[key].fields.description;
-}
-
-// ---------------------------------------------------------------------------
-// A repo on disk, because the script resolves paths and links from a real tree.
-// ---------------------------------------------------------------------------
-function repoWithStoryBug() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bug-e2e-"));
-  const real = fs.realpathSync(dir);
-  execFileSync("git", ["init", "-q"], { cwd: real });
-
-  const docs = path.join(real, "docs", "prd", "epic-7");
-  fs.mkdirSync(docs, { recursive: true });
-  fs.mkdirSync(path.join(real, "docs", "prd"), { recursive: true });
-
-  fs.writeFileSync(
-    path.join(real, "docs", "prd", "epic.7.checkout.md"),
-    "---\ntype: epic\n---\n\n# Epic 7\n",
-  );
-  fs.writeFileSync(
-    path.join(docs, "story.7.4.tap-targets.md"),
-    "---\ntype: story\njira_key: PROJ-123\nepic_source: ../epic.7.checkout.md\n---\n\n# Story 7.4\n",
-  );
-  fs.writeFileSync(
-    path.join(docs, "story.7.4.bug.4.review.1.tap-target.md"),
-    "# Bug review\n",
-  );
-
-  const bug = path.join(docs, "story.7.4.bug.4.tap-target.md");
-  fs.writeFileSync(
-    bug,
-    `---
+const BUG_MD = `---
 type: bug
 status: in-progress
 severity: 'Major'
@@ -280,32 +73,29 @@ The primary control renders at 24px, below the 44px minimum. It violates
 ## Resolution Summary
 
 [Will be completed when bug is closed]
-`,
-  );
-  return { root: real, bug };
+`;
+
+// ---------------------------------------------------------------------------
+// A repo on disk, because the script resolves paths and links from a real tree.
+// ---------------------------------------------------------------------------
+function repoWithStoryBug() {
+  const root = gitRepo("bug-e2e-", {
+    "docs/prd/epic.7.checkout.md": "---\ntype: epic\n---\n\n# Epic 7\n",
+    "docs/prd/epic-7/story.7.4.tap-targets.md":
+      "---\ntype: story\njira_key: PROJ-123\nepic_source: ../epic.7.checkout.md\n---\n\n# Story 7.4\n",
+    "docs/prd/epic-7/story.7.4.bug.4.review.1.tap-target.md": "# Bug review\n",
+    "docs/prd/epic-7/story.7.4.bug.4.tap-target.md": BUG_MD,
+  });
+  return {
+    root,
+    bug: path.join(root, "docs/prd/epic-7/story.7.4.bug.4.tap-target.md"),
+  };
 }
 
-async function runSync(root, bug, fetchImpl, extraArgs = []) {
-  const cwd = process.cwd();
-  const saved = {};
-  for (const [k, v] of Object.entries(ENV)) {
-    saved[k] = process.env[k];
-    process.env[k] = v;
-  }
-  process.chdir(root);
-  try {
-    return await bugSync.run({
-      argv: ["node", "sync-jira-bug", "--file", bug, ...extraArgs],
-      fetchImpl,
-    });
-  } finally {
-    process.chdir(cwd);
-    for (const [k, v] of Object.entries(saved)) {
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
-    }
-  }
-}
+const runSync = makeRunner({
+  module: bugSync,
+  cliName: "sync-jira-bug",
+});
 
 // ===========================================================================
 // The acceptance criterion
