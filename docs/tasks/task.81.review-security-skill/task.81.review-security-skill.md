@@ -398,9 +398,11 @@ configuration), and widen once real runs show the verdicts hold.
 
 ### In QA Verification
 
-- [Bug 3: The engaged fixture's loopback guard claims more than it does](./task.81.bug.3.loopback-guard-overclaims.md) — 🐛 New — Severity: MEDIUM (found cycle 2)
+_None — all bugs closed._
 
 ### Closed Bugs
+
+- [Bug 3: The engaged fixture's loopback guard claims more than it does](./task.81.bug.3.loopback-guard-overclaims.md) — ✅ Closed 2026-09-07 (verified by direct call, 15 cases)
 
 - [Bug 1: Nested code fences break the reviewer prompt's Output Contract](./task.81.bug.1.malformed-nested-fences-in-prompt.md) — ✅ Closed 2026-09-07 (verified by re-derived block boundaries)
 - [Bug 2: The six probe.mjs specs are referenced nowhere](./task.81.bug.2.probe-specs-referenced-nowhere.md) — ✅ Closed 2026-09-07 (verified by export-rename mutation)
@@ -450,27 +452,30 @@ Tests: 27 → **28**.
 ---
 ## QA Testing Results
 
-**QA Status**: CONCERNS (cycle 2)
+**QA Status**: PASS (cycle 3)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-07
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.81.qa.2.review-security-skill.md](./task.81.qa.2.review-security-skill.md) (cycle 1: [qa.1](./task.81.qa.1.review-security-skill.md))
-- **Gate File**: [task.81.gate.2.review-security-skill.yml](./task.81.gate.2.review-security-skill.yml) (cycle 1: [gate.1](./task.81.gate.1.review-security-skill.yml))
+- **Full Report**: [task.81.qa.3.review-security-skill.md](./task.81.qa.3.review-security-skill.md) (earlier: [qa.1](./task.81.qa.1.review-security-skill.md), [qa.2](./task.81.qa.2.review-security-skill.md))
+- **Gate File**: [task.81.gate.3.review-security-skill.yml](./task.81.gate.3.review-security-skill.yml) (earlier: [gate.1](./task.81.gate.1.review-security-skill.yml), [gate.2](./task.81.gate.2.review-security-skill.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 27 in this skill; full gate 2728
+- **Tests Executed**: 28 in this skill; full gate 2729
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Behaviour is correct and its falsifiability holds — verdicts are engine-computed and all four mutation
-proofs red only their own assertion. Two medium defects in the shipped artifacts: the reviewer prompt's
-§4 Output Contract is broken by nested code fences ([bug 1](./task.81.bug.1.malformed-nested-fences-in-prompt.md)),
-and the six `probe.mjs` specs are imported by nothing ([bug 2](./task.81.bug.2.probe-specs-referenced-nowhere.md)).
+
+Four findings across three QA cycles, all fixed, all verified independently and mutation-proven where
+a behaviour was involved. The most instructive was cycle 2's: the *engaged* fixture — the artifact a
+reader consults to see what a correct control looks like — carried a loopback guard that accepted
+`127.1`, `0177.0.0.1` and `2130706433` while its comment claimed to refuse loopback. A miniature
+`present-but-inert` inside the instrument built to name it, invisible to the steady-state suite and
+found only by the mandatory refute pass.
 
 ---
 
@@ -489,6 +494,7 @@ and the six `probe.mjs` specs are imported by nothing ([bug 2](./task.81.bug.2.p
 | 2026-09-07 |         | QA findings fixed — 2 medium + 1 low closed, 1 iteration; tests 25 → 27 | qa-fix |
 | 2026-09-07 |         | QA gate CONCERNS (90/100) cycle 2 — both prior findings verified fixed; refute pass found 1 new medium (loopback guard overclaims) | qa-task |
 | 2026-09-07 |         | QA findings fixed — loopback guard fails closed on IP literals; description trimmed to 98 words; tests 27 → 28 | qa-fix |
+| 2026-09-07 |         | QA gate PASS (100/100) cycle 3 — all four findings verified fixed, no new findings | qa-task |
 
 ---
 

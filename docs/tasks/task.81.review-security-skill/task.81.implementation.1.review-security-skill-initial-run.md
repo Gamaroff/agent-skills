@@ -179,6 +179,17 @@ Both cycle-1 findings were verified fixed **independently** rather than from the
 
 **One gate failure worth recording.** The first `ci:fast` after the description edit came back **red** on `generated catalog is in sync with SKILL.md frontmatter` — changing a `description:` stales `docs/reference/skill-catalog.md`, and `npm run generate-catalog` had only been run when the skill was *added*. Same freshness class as the `generate-skill-deps` gap recorded at Step 3, and the same lesson: a generated artifact goes stale on **edit**, not only on **create**. Regenerated; re-run green.
 
+### QA Cycle 3 — 2026-09-07
+**Gate Result**: PASS (100/100)
+**Issues Found**: none
+**HIGH findings**: 0
+**PR Review**: pending — 5c not yet run
+**Action**: Proceeding to 5c (PR conformance review)
+
+Scope: since gate 2 (default narrowing — `PRIOR_GATES=2`, `SAFETY_REPROBE=false`, since gate 2's security axis was CONCERNS rather than FAIL). Four files re-read as a diff. Third-strike check: no HIGH finding appeared in any of the three gates, so no file is under a strike.
+
+All four findings across the three cycles verified fixed by measurement rather than from the fix record. Four residual items are named in `recommendations.future` and repeated in the report's own "Residual" section — a PASS that quietly carries residue is the reporting failure this task is about, so they are listed rather than folded into the score.
+
 ---
 
 ## Completion

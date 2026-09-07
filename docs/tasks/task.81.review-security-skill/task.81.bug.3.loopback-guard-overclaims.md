@@ -4,7 +4,7 @@
 **Bug ID**: TASK-81-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 2 refute pass)
 **Date Found**: 2026-09-07
 
@@ -114,3 +114,4 @@ hostname is unaffected.
 | 2026-09-07 | New | Found during QA cycle 2 (mandatory refute pass) | qa-task |
 | 2026-09-07 | In Progress | Confirmed: length-4 check let three loopback spellings through | qa-fix |
 | 2026-09-07 | Ready for QA | Fail-closed IP-literal branch + regression test; mutation-proven twice | qa-fix |
+| 2026-09-07 | Closed | Verified by direct call across 15 cases — all loopback spellings refused, all legitimate hosts accepted | qa-task |
