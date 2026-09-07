@@ -107,12 +107,17 @@ test("module never reads mtime, stat, or any filesystem API", () => {
   }
 });
 
-test("verdict is identical for two calls — no ambient state, no clock", () => {
+test("verdict is identical for two calls, and echoes its inputs — no clock", () => {
   const input = {
     taskContent: task("2026-05-10"),
     reportContent: report("**Reviewed:** 2026-05-11"),
   };
-  assert.deepEqual(classifyReviewReport(input), classifyReviewReport(input));
+  const a = classifyReviewReport(input);
+  assert.deepEqual(a, classifyReviewReport(input));
+  // Echoing the inputs is what distinguishes determinism from a hardcoded
+  // constant, which the previous version of this test would also have accepted.
+  assert.equal(a.taskDate, "2026-05-10");
+  assert.equal(a.reportDate, "2026-05-11");
 });
 
 // ── 2. the report-side date ────────────────────────────────────────────────
@@ -209,7 +214,6 @@ test("no report at all is absent, and absent is not fresh", () => {
     });
     assert.equal(r.verdict, VERDICTS.ABSENT);
     assert.equal(r.reason, "no-report");
-    assert.notEqual(r.verdict, VERDICTS.FRESH);
   }
 });
 
@@ -393,4 +397,171 @@ test("tilde fences are handled like backtick fences", () => {
 - **Review Date:** 2026-05-11
 `;
   assert.equal(reportReviewedDate(doc), "2026-05-11");
+});
+
+// ── 7. the six classes QA found — each was a route to a WRONG `fresh` ──────
+//
+// Every case below returned `fresh` for a genuinely stale report before the fix.
+// They are grouped together deliberately: they share one failure mode (a picture
+// of the header read as a value) and one direction (unsafe), and a future edit
+// that reopens any of them should fail as a set.
+
+const STALE_TASK = task("2026-06-01"); // newer than every report date below
+
+test("a `**Reviewed:**` line inside an HTML comment is not the report's date", () => {
+  const r = classifyReviewReport({
+    taskContent: STALE_TASK,
+    reportContent:
+      "# R\n<!--\n**Reviewed:** 2030-01-01\n-->\n\n**Reviewed:** 2026-01-01\n",
+  });
+  assert.equal(r.verdict, VERDICTS.STALE);
+  assert.equal(
+    r.reportDate,
+    "2026-01-01",
+    "must read the real line, not the commented one",
+  );
+});
+
+test("a single-line HTML comment is stripped too", () => {
+  assert.equal(
+    reportReviewedDate(
+      "# R\n\n<!-- **Reviewed:** 2030-01-01 -->\n\n**Reviewed:** 2026-01-01\n",
+    ),
+    "2026-01-01",
+  );
+});
+
+test("a 4-space indented code block is not the report's date (CommonMark)", () => {
+  const r = classifyReviewReport({
+    taskContent: STALE_TASK,
+    reportContent: "# R\n\nFormat example:\n\n    **Reviewed:** 2030-01-01\n",
+  });
+  assert.equal(r.verdict, VERDICTS.STALE);
+  assert.equal(r.reason, "report-date-unparseable");
+});
+
+test("up to 3 spaces of indent is still a paragraph, and still counts", () => {
+  assert.equal(
+    reportReviewedDate("# R\n\n   **Reviewed:** 2026-05-11\n"),
+    "2026-05-11",
+  );
+});
+
+test("the date must be on the label's line — `\\s*` must not span newlines", () => {
+  const r = classifyReviewReport({
+    taskContent: STALE_TASK,
+    reportContent:
+      "# R\n\n**Reviewed:**\n2030-01-01 was the previous revision\n",
+  });
+  assert.equal(r.verdict, VERDICTS.STALE);
+  assert.equal(r.reason, "report-date-unparseable");
+});
+
+test("a shorter fence does not close a longer one (nested ``` inside ````)", () => {
+  const r = classifyReviewReport({
+    taskContent: STALE_TASK,
+    reportContent: "# R\n\n````\n```\n**Reviewed:** 2030-01-01\n````\n",
+  });
+  assert.equal(r.verdict, VERDICTS.STALE);
+  assert.equal(r.reason, "report-date-unparseable");
+});
+
+test("an equal-length fence still closes normally", () => {
+  assert.equal(
+    reportReviewedDate(
+      "# R\n\n```\nnot a date\n```\n\n**Reviewed:** 2026-05-11\n",
+    ),
+    "2026-05-11",
+  );
+});
+
+test("a document opening with a thematic break is not frontmatter", () => {
+  assert.equal(
+    taskUpdatedDate(
+      "---\n\nProse, not frontmatter.\n\nupdated: 1999-01-01\n\n---\n\nbody\n",
+    ),
+    null,
+    "column-0 prose inside the delimiters means this is a horizontal rule",
+  );
+});
+
+test("frontmatter with indented continuations still parses", () => {
+  const withList =
+    "---\nid: t\ntags:\n  - a\n  - b\nupdated: 2026-06-01\n---\n\n# T\n";
+  assert.equal(taskUpdatedDate(withList), "2026-06-01");
+});
+
+test("duplicate `updated:` is first-wins, not last-wins", () => {
+  assert.equal(
+    taskUpdatedDate(
+      "---\nupdated: 2026-06-01\nfoo: bar\nupdated: 1999-01-01\n---\n",
+    ),
+    "2026-06-01",
+  );
+});
+
+test("an impossible calendar date is rejected, not ranked", () => {
+  for (const bad of [
+    "2026-99-99",
+    "2026-13-01",
+    "2026-02-30",
+    "2026-00-10",
+    "2026-04-31",
+  ]) {
+    const r = classifyReviewReport({
+      taskContent: STALE_TASK,
+      reportContent: report(`**Reviewed:** ${bad}`),
+    });
+    assert.equal(r.verdict, VERDICTS.STALE, `${bad} must not be usable`);
+  }
+});
+
+test("a real leap day is accepted", () => {
+  assert.equal(
+    reportReviewedDate(report("**Reviewed:** 2024-02-29")),
+    "2024-02-29",
+  );
+  assert.equal(reportReviewedDate(report("**Reviewed:** 2026-02-29")), null);
+});
+
+test("a CRLF task document still yields its `updated:` date", () => {
+  assert.equal(
+    taskUpdatedDate(
+      "---\r\nid: t\r\nupdated: 2026-06-01\r\n---\r\n\r\n# T\r\n",
+    ),
+    "2026-06-01",
+    "CRLF must not silently disable the whole escape hatch",
+  );
+});
+
+test("a CRLF review report still yields its reviewed date", () => {
+  assert.equal(
+    reportReviewedDate("# R\r\n\r\n**Reviewed:** 2026-05-11\r\n"),
+    "2026-05-11",
+  );
+});
+
+test("all three corpus spellings of the colon are accepted", () => {
+  assert.equal(reportReviewedDate("**Reviewed:** 2026-05-11\n"), "2026-05-11");
+  assert.equal(reportReviewedDate("**Reviewed**: 2026-05-11\n"), "2026-05-11");
+  assert.equal(reportReviewedDate("**Reviewed** 2026-05-11\n"), "2026-05-11");
+});
+
+test("a throwing getter yields a verdict rather than crashing the caller", () => {
+  const r = classifyReviewReport({
+    get taskContent() {
+      throw new Error("boom");
+    },
+  });
+  assert.equal(r.verdict, VERDICTS.STALE);
+  assert.equal(r.reason, "input-unreadable");
+  assert.match(describeVerdict(r), /could not be read/);
+});
+
+test("`__proto__` in frontmatter does not reach the prototype", () => {
+  const r = taskUpdatedDate(
+    "---\n__proto__: polluted\nupdated: 2026-06-01\n---\n",
+  );
+  assert.equal(r, "2026-06-01");
+  assert.equal({}.polluted, undefined, "prototype must not be polluted");
 });

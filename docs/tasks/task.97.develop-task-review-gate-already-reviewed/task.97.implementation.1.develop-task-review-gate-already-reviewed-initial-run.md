@@ -34,7 +34,7 @@ Make `/develop-task` Step 2's skip decision key on evidence of review (a current
 | 1. create-branch           | ✅ Done    | Branch `feature/task.97.*` exists in git                               | `feature/task.97.develop-task-review-gate-already-reviewed` created from `develop` at `7bfffe06`, pushed with tracking |  —                   |
 | 2. review-task             | ✅ Done    | `task.97.review.{N}.{name}.md` exists (or skip logged)                 | Ran (status `Planned`, no report → run per skip table). `task.97.review.1.*` written. 9/10 READY TO IMPLEMENT; 3 Critical + 5 Important + 2 Optional all applied; `Planned → Ready for Development` | 2 Explore pre-passes (arch: `drift`; codebase: `not-implemented`) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Loop exited at iteration 1/5, 20/20 phases. `npm run ci:fast` green. 8 source files (+4 bundles), 27 new tests, 8/8 mutations red | `.summaries/step-3-iteration-audit-{0,1}.json` |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #350](https://github.com/Gamaroff/agent-skills/pull/350) → `develop`; 2 commits (`d4f8f734` feat, `9ff59bf6` docs); issue #348 commented | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.97.qa.{N}.*.md`; `task.97.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.97.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -55,6 +55,15 @@ Make `/develop-task` Step 2's skip decision key on evidence of review (a current
 - Phase 0c: `TRACKER=github`, `TRACKER_ISSUE=348`; task status `planned` → proceed per the develop-task status table (Step 2 `/review-task` validates and promotes)
 - Pipeline mode: **standard** — the lite-mode rule requires fewer than 3 implementation phases; this task has 4 (Phases 1–4), so the AND fails regardless of `risk_level` being absent
 - Always-load files resolved: 3 files from `skills-config.yaml` `devLoadAlwaysFiles` — all verified present on disk
+
+### Step 4 — create-pr — 2026-09-07
+
+- Base `develop` (Phase 0d Q2), issue `#348` — both pre-supplied, no prompt.
+- `SCOPE_PATHS` built from the work-item dir plus the dirname of every changed file, **plus `CHANGELOG.md` added by hand** — see the Issues Log entry on the repo-root scope gap.
+- Split into two commits: `d4f8f734` (the behaviour change, 12 files) and `9ff59bf6` (the paper trail, 3 files). Verified nothing outside the scope allowlist was staged.
+- One false alarm worth recording: the leak check `grep -c "docs/tasks"` reported 2 hits on commit 1, which were the eval **replay fixtures** under `evals/.../replay/docs/tasks/task.42.example/` — legitimately part of that commit. Re-checked against `^docs/tasks/task\.97` and the staged set was clean. Same lesson as the mutation false negative: verify the premise before believing the finding.
+- A pre-commit hook re-ran `npm run bundle` and reported every skill in sync.
+- PR #350 opened; `in-review` comment posted to #348.
 
 ### Step 3 — develop — 2026-09-07
 
@@ -125,7 +134,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.97.develop-task-review-gate-already-reviewed`
-**PR**: {populated after Step 4}
+**PR**: [#350](https://github.com/Gamaroff/agent-skills/pull/350)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

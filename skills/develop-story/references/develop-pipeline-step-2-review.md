@@ -56,7 +56,7 @@ document's last content change. Compute it with the engine — never eyeball the
 node -e '
   const fs = require("fs");
   const { classifyReviewReport, describeVerdict } =
-    require("./.agents/skills/develop-task/references/review-report-freshness.js");
+    require("./.agents/skills/{develop-story|develop-task|develop-bug}/references/review-report-freshness.js");
   const r = classifyReviewReport({
     taskContent:   fs.readFileSync(process.argv[1], "utf8"),
     reportContent: process.argv[2] ? fs.readFileSync(process.argv[2], "utf8") : null,
@@ -196,13 +196,23 @@ Re-read the document file and check the `Status:` field. Apply these autonomous 
 
 #### develop-task post-review status table
 
-| Post-review status      | A report now exists?                                   | Action                                        |
-| ----------------------- | ------------------------------------------------------ | --------------------------------------------- |
-| `Ready for Development` | —                                                      | Proceed — clean pass or Planned promoted      |
-| `In Progress`           | —                                                      | Proceed — acceptable intermediate state       |
-| `Planned` (unchanged)   | Yes — written this run, or already present and current | Proceed — log as an issue, do **not** HALT    |
-| `Planned` (unchanged)   | No — none written, none already present                | **HALT** — log as an issue and report to user |
-| Downgraded / unclear    | —                                                      | HALT — report to user                         |
+| Post-review status      | A report now exists?                                        | Action                                        |
+| ----------------------- | ----------------------------------------------------------- | --------------------------------------------- |
+| `Ready for Development` | —                                                           | Proceed — clean pass or Planned promoted      |
+| `In Progress`           | —                                                           | Proceed — acceptable intermediate state       |
+| `Planned` (unchanged)   | Yes — written this run, or already present and **current**  | Proceed — log as an issue, do **not** HALT    |
+| `Planned` (unchanged)   | Yes, but **stale**, and none written this run               | **HALT** — log as an issue and report to user |
+| `Planned` (unchanged)   | No — none written, none already present                     | **HALT** — log as an issue and report to user |
+| Downgraded / unclear    | —                                                           | HALT — report to user                         |
+
+**The three `Planned` rows are exhaustive on purpose.** A report is `fresh`, `stale`, or `absent` —
+the freshness engine returns exactly those three — so every state has a row. An earlier draft of this
+table had only the first and third, which left a *pre-existing stale* report matching neither: the
+skip table correctly ran the review, the review wrote no new report and did not promote, and the run
+fell through to "a report exists → proceed" and developed against a report that reviewed an earlier
+version of the card. **That is the same over-permissive skip the freshness rule exists to prevent,
+reintroduced in prose after the code had refused it.** A decision table in a runnable-prose
+deliverable is executed by a reader; a gap in it is a branch, not an omission.
 
 > ⚠️ **The unconditional `Planned` → HALT was narrowed 2026-09-07: a review that ran, wrote its
 > report and left the status alone is a completed review, not a failed one.** Two supported
@@ -239,8 +249,10 @@ Re-read the document file and check the `Status:` field. Apply these autonomous 
 - **Planned → Ready for Development**: Log "Planned promoted to Ready for Development by review-task" in Decisions Log. Proceed autonomously.
 - **Non-blocking suggestions**: Log as "Proceeding despite minor review suggestions: {list}" and continue.
 - **Clean pass**: Log "Task review passed" and continue.
-- **Planned unchanged, but a report exists**: Log in Issues Log — "review-task left the status at `Planned` but {wrote / found} a current report at `{path}`; proceeding on the report. Two supported configs withhold promotion after a successful review — `sign-off.enforcement: blocking` and `change-log.enforcement: blocking` — so check those before treating this as a defect." Then **proceed**. This is not a blocking issue.
-- **Blocking issues** (missing success criteria, conflicting specs, or status still `Planned` after review **with no report written and none already present**): Log each in Issues Log, invoke `/commit-changes` (message: `docs(task.{id}): implementation report — review-task blocking halt`), then HALT.
+- **Planned unchanged, but a CURRENT report exists**: Log in Issues Log — "review-task left the status at `Planned` but {wrote / found} a current report at `{path}` ({reportDate} ≥ updated {taskDate}); proceeding on the report. Two supported configs withhold promotion after a successful review — `sign-off.enforcement: blocking` and `change-log.enforcement: blocking` — so check those before treating this as a defect." Then **proceed**. This is not a blocking issue.
+
+  **`current` is the load-bearing word.** Run the freshness engine; do not infer it from the report merely being present. A stale report reaching this bullet is the HALT row above, not this one.
+- **Blocking issues** (missing success criteria, conflicting specs, or status still `Planned` after review with **no current report** — none written this run, and none already present that is current): Log each in Issues Log, invoke `/commit-changes` (message: `docs(task.{id}): implementation report — review-task blocking halt`), then HALT.
 
   **The HALT message must name which precondition failed, not just the symptom.** `describeVerdict()`
   from the freshness engine produces that sentence; do not compose one by hand. Emit:
