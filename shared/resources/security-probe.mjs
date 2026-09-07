@@ -154,8 +154,8 @@ function extractResult(stdout) {
 
 /**
  * The repository root — the directory two levels above this file
- * (`shared/resources/…` → repo root). Overridable so tests can point the
- * containment check at a fixture tree.
+ * (it lives in `shared/resources/`, so two levels up is the repo root).
+ * Overridable so tests can point the containment check at a fixture tree.
  */
 export function defaultRepoRoot() {
   return resolve(__dirname, "..", "..");
