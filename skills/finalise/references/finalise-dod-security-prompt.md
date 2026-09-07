@@ -108,15 +108,40 @@ and complete-looking while still being permeable to an input nobody thought to w
 **1. Locate the entry point.** Find the exported function that makes the accept/reject decision — not
 its caller, and not the code that acts on the verdict.
 
-**2. Generate candidates** across these axes. They are the ones that defeat boundaries in practice:
+**2. Take the candidates from the corpus.** The inputs already known to defeat each sink are written
+down once, in [`references/security-input-corpus.md`](security-input-corpus.md) and its
+machine-readable peer `references/security-input-corpus.mjs`. Start there rather than
+re-inventing a candidate set per run:
 
-| Axis | What to vary |
-|---|---|
-| **Alternative spellings** | quoting (`g"h"`, `cu'r'l`), escaping (`g\h`), globbing, case, unicode look-alikes, added whitespace |
-| **Position** | a flag in trailing rather than leading position; the payload as the last argument rather than the first |
-| **Composition** | chaining (`a; b`, `a && b`), nesting, command substitution, piping into an interpreter |
-| **The unparseable case** | input the checker cannot read at all — malformed quoting, a truncated token, an empty string, a very long token |
-| **Flag forms** | the long **and** short form of every flag the code names by hand (`-o` and `--output`) |
+```js
+// Step 3 runs this from a TEMP directory, so the specifier must be ABSOLUTE —
+// a bare or relative one throws ERR_MODULE_NOT_FOUND from there.
+//
+// Do not guess the directory. The corpus module ships BESIDE this prompt file,
+// and you already know that path: it is the file you are reading. Substitute it
+// for PROMPT_DIR below. (In this repository that is `shared/resources`; in an
+// installed skill it is the skill's own `references` directory, which is not
+// under the repo root — which is why guessing a fixed pair of names fails.)
+import { pathToFileURL } from "node:url";
+import { join } from "node:path";
+
+const PROMPT_DIR = "<the directory you read this prompt from>";
+const { corpusFor } = await import(
+  pathToFileURL(join(PROMPT_DIR, "security-input-corpus.mjs"))
+);
+// sinks: url-authority | sql-orm | shell-exec | path | template-render
+const cases = corpusFor("shell-exec");
+```
+
+Each case carries the input, **why** it is dangerous, and **what a correct implementation does to
+it** — so the corpus says what a pass looks like, not merely what to try. Between them the cases
+span the axes that defeat boundaries in practice: **Alternative spellings**, **Position**,
+**Composition**, **The unparseable case**, and **Flag forms**.
+
+**The inputs themselves live in the corpus and are deliberately not restated here.** Two runs that
+each re-derive a candidate set from prose test different things and reach different verdicts. A run
+that imports the corpus tests what is known to get past the control. If you find an input the corpus
+does not have, add it there — every later probe then gets it for free.
 
 **3. Execute them.** Write a short script in a temporary directory that imports the entry point and
 calls it on each candidate, and **run it**. Do not reason abstractly about what the code would return —
@@ -133,9 +158,11 @@ step 5 and every candidate that behaved correctly. An empty `probes[]` with a hi
 the *good* result; an empty `probes[]` with `probes_executed: 0` is the failure in the guard below. The
 two are indistinguishable without this count, which is why it is required rather than optional.
 
-**5. Probe the other direction too.** Include a set of **legitimate inputs that must still be accepted**,
-and assert that they are. A fix that closes a hole by refusing everything is also a defect, and without
-this direction an over-strict boundary looks identical to a correct one.
+**5. Probe the other direction too.** The corpus's `legitimate` cases *are* the set of **legitimate
+inputs that must still be accepted** — filter for `direction === "legitimate"` and assert that they
+are. Every sink carries at least one, held by the corpus's own schema test rather than by this
+sentence. A fix that closes a hole by refusing everything is also a defect, and without this
+direction an over-strict boundary looks identical to a correct one.
 
 **Zero executed candidates on a boundary deliverable is a finding, not a pass.** If `boundary: true` and
 `probes_executed: 0`, emit a check with `status: FAIL` named `probe mode executed no candidates`. A step
@@ -172,7 +199,7 @@ security_review:
   probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
     # the legitimate inputs of step 5 and every candidate that behaved correctly.
   probes: # only candidates that REPRODUCED a defect; [] is correct and good when none did
-    - input: "gh pr comment --body x" # the candidate, verbatim and re-runnable
+    - input: "svc deploy --target prod" # the candidate, verbatim and re-runnable
       expected: "denied"
       actual: "runnable"
       reproduced: true # entries are reproduced by construction; the field is kept explicit

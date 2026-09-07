@@ -56,6 +56,33 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The security input corpus: the inputs that defeat each sink, written down once (task.79).**
+  `shared/resources/security-input-corpus.md` and its machine-readable peer
+  `security-input-corpus.mjs` ship 73 cases across five sinks — `url-authority`, `sql-orm`,
+  `shell-exec`, `path`, `template-render` — exporting `SINKS`, `corpusFor(sink)` and `allCases()`.
+
+  The DoD security prompt's Step 4 previously asked the agent to *generate* candidates along five
+  named axes, from prose, on every run. Two runs of the same probe against the same boundary could
+  therefore test different inputs and reach different verdicts, and nothing recorded which inputs
+  were tried — `probes_executed: 12` does not say *which* twelve. The prompt now points at the
+  corpus and deliberately does not restate its inputs; a contract test reads the corpus and fails if
+  any case literal reappears in the prompt, so the two cannot drift into a second copy.
+
+  Two properties make the corpus an oracle rather than a list. Every case carries **`why`** it is
+  dangerous and **`correct`** — what a right implementation does to it — so an engine can compute a
+  verdict instead of asking an agent to judge one. And every sink carries **`legitimate`** cases as
+  well as hostile ones, enforced by the schema test: an implementation that closes a hole by refusing
+  everything passes a hostile-only corpus perfectly, and is also a defect.
+
+  The 27 `shell-exec` hostile cases are measured rather than invented — 14 from `task.67.bug.3` and
+  13 from `bug.6` — and bug.6's 2 over-refusals seed the accept direction. `corpusFor` **throws** on
+  an unknown sink rather than returning `[]`: a typo yielding an empty array would produce a probe
+  that executes zero candidates and reports no findings, which is indistinguishable from a boundary
+  that held.
+
+  No behaviour change to `finalise`'s returned `security_review` YAML shape. The engine that consumes
+  the corpus is `task.80`; the `/review-security` skill is `task.81`.
+
 - **Skill install profiles with dependency closure.** `setup-consumer.sh` now asks which install
   profile you want — `full` (every skill, the default and today's behaviour), `pipeline` (the
   story/task/bug lifecycle) or `minimal` (branching, commits, PRs, code review) — plus optional

@@ -1,0 +1,247 @@
+schema: 1
+task: "task.79.security-input-corpus"
+task_title: "Write down the inputs that defeat each sink, once"
+gate: CONCERNS
+status_reason: >-
+  The cycle-1 HIGH is closed and mutation-proved. Cycle 2 was a refute pass and
+  it found eleven further issues — every one of them in cycle 1's own fixes or in
+  corpus claims nobody had executed. All eleven are addressed in this cycle. None
+  is HIGH: the guard now fails on three distinct restatement shapes, the purity
+  check is defeat-proved against the body that beat its predecessor, and the
+  import snippet no longer guesses a directory. CONCERNS rather than PASS because
+  three of the corrections rest on claims this environment cannot execute
+  (template-engine and charset-conversion behaviour), and those are recorded as
+  qualified rather than verified.
+reviewer: "QA Engineer"
+updated: "2026-09-07T00:10:00Z"
+
+top_issues:
+  - id: "C2-1"
+    severity: medium
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: >-
+      The cycle-1 detector still missed the axis table's Flag-forms row.
+      VERIFIED: `--output` is not a whole token of any corpus input (the token is
+      `--output=/tmp/x`), and `-o` fell under the 3-character floor, so a bold
+      rewrite of that row scored 0 on both scans. DELETED_AXIS_TABLE did not
+      notice, because its OTHER rows carry code spans the span scan catches — a
+      fixture passing for the wrong reason.
+    suggested_action: >-
+      Derive flag heads by splitting tokens at `=`, admit 2-character flags, and
+      assert the Flag-forms row ALONE as its own fixture.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-2"
+    severity: medium
+    file: "shared/resources/finalise-dod-security-prompt.md"
+    finding: >-
+      The cycle-1 import fix still did not resolve. VERIFIED: `repoRoot` is
+      undefined in the snippet, and an installed skill puts the corpus at
+      `<repoRoot>/.claude/skills/finalise/references/`, which neither candidate
+      path covers — so `corpusPath` is `undefined` and `pathToFileURL(undefined)`
+      throws. Third iteration on the same defect.
+    suggested_action: >-
+      Stop guessing the directory. The agent already knows where it read the
+      prompt from; resolve the module against that path.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-3"
+    severity: medium
+    file: "shared/resources/tests/security-input-corpus.test.mjs"
+    finding: >-
+      The purity check was a list of module NAMES. VERIFIED: a body containing
+      `await import(p.join(""))`, `fs.writeFileSync(…)`,
+      `Object.getPrototypeOf(async function(){}).constructor(…)()` and `fetch(…)`
+      survived the literal-stripping with zero hits — a dynamic import needs no
+      literal module name, `.constructor()` reaches Function without naming it,
+      and `fetch` was simply not on the list.
+    suggested_action: >-
+      Match on call SHAPES rather than names. A name list forbids only the
+      spellings someone thought of.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-4"
+    severity: medium
+    file: "shared/resources/security-input-corpus.mjs"
+    finding: >-
+      `url-authority.host-with-slash`'s `correct` led with a mitigation that does
+      not mitigate its own input. VERIFIED: `u.host = "evil.example.com/x"` on a
+      URL with port 5432 yields host `evil.example.com`, port `5432` — the setter
+      truncates at the `/` and raises nothing. An engine grading "build with a
+      URL object" as a pass would pass a still-exploitable boundary.
+    suggested_action: >-
+      Lead with the rejection rule; demote the URL-object advice and state that
+      the setter truncates.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-5"
+    severity: medium
+    file: "shared/resources/security-input-corpus.mjs"
+    finding: >-
+      Three corpus claims were stated more broadly than the evidence supports:
+      `template-render.mustache-interpolation` pairs a Mustache-named case with
+      an expression-language payload that logic-less Mustache/Handlebars render
+      empty; `sql-orm.homoglyph-quote` asserted charset folding to U+0027 without
+      naming the mechanism (Node latin1 gives 0x07, MySQL substitutes `?`);
+      `template-render.attribute-breakout` is neutralised inside a quoted
+      attribute by any escaper that encodes `"`.
+    suggested_action: >-
+      Qualify each to the configuration where it holds. Not independently
+      executable here — the template-engine and codepage behaviours are cited,
+      not reproduced.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-6"
+    severity: medium
+    file: "shared/resources/security-input-corpus.mjs"
+    finding: >-
+      `path.symlink-escape` cannot serve as an oracle. VERIFIED: the input
+      resolves lexically inside the root, so with no symlink on disk a
+      realpath-checking implementation and one that skips realpath return the
+      same verdict. The engine task.80 will build cannot score it.
+    suggested_action: >-
+      State the fixture the case needs (the symlink to create) in `correct`.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-7"
+    severity: medium
+    file: "shared/resources/security-input-corpus.mjs"
+    finding: >-
+      Two rows shipped as MALFORMED markdown tables. VERIFIED: `renderRow`
+      escaped `|` in the input column but not in `why`/`correct`, which are prose
+      about shell and path syntax and quote `|` routinely (`>|`, `||`). The
+      parity test is structurally blind to this — it compares the document
+      against the renderer, so both sides are equally wrong and compare equal.
+    suggested_action: >-
+      Escape the prose cells too, and add a STRUCTURAL row assertion that does
+      not compare against the renderer.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-8"
+    severity: low
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: >-
+      The single `PROMPT_MAY_MENTION` exemption (`--body`) was covering the one
+      genuine paraphrase of a corpus case in the prompt — its YAML example used
+      `gh pr comment --body x`, a de-escaped copy of `shell-exec.escaped-tool-name`.
+      The exemption list was papering over exactly what its own comment warns about.
+    suggested_action: >-
+      Change the prompt's example instead, and empty the exemption list.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-9"
+    severity: low
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: >-
+      `BUNDLED_REFS` was hand-maintained while the bundler walks refs
+      transitively — the same staleness class the list was added to close, one
+      entry over. A new transitive reference would never be parity-checked.
+    suggested_action: >-
+      Derive it by listing the bundled directory and intersecting with the source
+      directory.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+  - id: "C2-10"
+    severity: low
+    file: "evals/shared/tests/finalise-dod-prompt-contract.test.mjs"
+    finding: >-
+      The fragment scan matched by substring over 45 generic tokens, so ordinary
+      future prose would fail claiming the corpus was restated — pushing
+      maintainers toward more exemptions, which is how a guard becomes noise and
+      then becomes ignored.
+    suggested_action: >-
+      Match on a word boundary. (Required anyway once 2-character flags were
+      admitted: substring `-i` fires on "re-invent".)
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-07"
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 57
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 20
+  bugs_remaining: 0
+  fix_date: "2026-09-07"
+  total_iterations: 2
+  verification_method: >-
+    Execution, not inspection. Every promoted finding across both cycles was
+    reproduced by QA before being written down, and every fix carries a mutation
+    proof with a pre-mutation diff confirming the edit landed. Nine proofs across
+    the two cycles; all held.
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    notes: >-
+      Materially improved. The four url-authority claims falsified in cycle 1 are
+      corrected and the `host-with-slash` `correct` no longer endorses a
+      mitigation that does not mitigate it (C2-4, measured). Residual: three
+      claims (C2-5) are qualified on cited rather than reproduced behaviour —
+      template-engine evaluation and Windows best-fit codepage mapping are not
+      executable in this environment. They are now stated with their conditions
+      instead of unconditionally, which is the honest form, but it is not
+      verification. The module remains inert on import, now defeat-proved.
+  performance:
+    status: PASS
+    notes: "Pure data. 2ms import, 73 frozen cases, allCases() memoised."
+  reliability:
+    status: PASS
+    notes: >-
+      Rollback verified green. `corpusFor` throws on every unknown key including
+      the five prototype probes. The bundler now runs with no warnings — cycle 1
+      had introduced one.
+  maintainability:
+    status: PASS
+    notes: >-
+      Upgraded from CONCERNS. The guard now fails on three distinct restatement
+      shapes, each its own fixture; bundled parity is byte-level and derived from
+      disk rather than hand-listed; the document and its parity test share one
+      renderer; a structural row assertion catches renderer bugs the
+      self-comparison cannot.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Execute the three cited-but-unreproduced claims (C2-5) against a real
+        template engine and a Windows codepage, and either confirm or drop them.
+        The corpus's own method ordering ranks execution above citation.
+      refs: ["shared/resources/security-input-corpus.mjs"]
+    - action: >-
+        Give the corpus a `fixture` field for cases that need filesystem setup,
+        rather than describing it in prose (C2-6). task.80 will need it.
+      refs: ["shared/resources/security-input-corpus.mjs"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - "The three qualified-not-verified claims (C2-5) are accepted as cited, or executed before task.80 consumes them as an oracle"
