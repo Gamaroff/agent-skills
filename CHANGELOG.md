@@ -110,6 +110,51 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`sync-jira-story`, `sync-jira-task` and `sync-jira-epic` now converge: syncing an unchanged
+  document twice reports no field changes on the second run, and a card that transitions can be
+  synced again without `--force`.** Two defects, both fixed on the bug path in the work above and
+  deliberately left in the three siblings, are now fixed there too.
+
+  The first is a label diff that could never match. Each script built its diff input as
+  `labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || []` — rebuilt from frontmatter —
+  while the payload `collectIssueFields` actually sends appends the `synced-from-*` idempotency
+  label. The comparison was therefore always a set-without-the-label against a Jira issue that has
+  it, so `labels` was reported changed on **every run**. For `sync-jira-story` and `sync-jira-epic`,
+  which gate their PUT on `changedFields.length === 0`, that defeated the gate and fired a write
+  every time. `sync-jira-task` has no such gate and PUTs regardless, so there the damage was
+  confined to a permanently wrong change summary. The fix is to build the payload first and diff
+  against it, now shared as `diffAgainstPayload` in `jira-sync.js` and called by all four scripts —
+  the rule the duplication kept losing is *diff the outgoing payload, never a rebuilt field set*.
+
+  The second is a stale timestamp. A transition is a write and bumps Jira's own `updated`;
+  persisting the pre-transition value told the next run that Jira had moved since the last sync,
+  which is exactly what `guardConcurrentEdit` aborts on. A card synced once and then refused every
+  subsequent run — over a change the tool had made moments earlier — recoverable only with
+  `--force`, which is the one habit that makes the guard useless when a *real* concurrent edit
+  happens. All three now re-read `updated` after any successful transition, best-effort: a failed
+  re-read warns and keeps the earlier value, which is no worse than not refreshing.
+
+  `sync-jira-epic` looked half-fixed and was not. It already re-read after a transition, but only
+  inside its skip branch — and that branch is gated on `changedFields.length === 0`, which the first
+  defect made impossible. The correct code was unreachable. This is why the two fixes had to land
+  together: the label fix alone would have activated the skip-path re-read while the update path
+  stayed stale, converting a consistent failure into an intermittent one that depends on whether an
+  unrelated field happened to drift.
+
+  Behaviour worth stating for anyone parsing output: story, task and epic syncs used to report
+  `Updated: labels` on every run. An unchanged document now reports no field changes, and story and
+  epic issue no PUT. Nothing in this repo scraped that string, and a caller depending on it was
+  depending on a defect.
+
+  The regression coverage is the point as much as the fix. Both defects survived a full unit suite,
+  because those tests asserted `diffFields` and `collectIssueFields` each behaved correctly *in
+  isolation* and nothing asserted the two agreed with each other. The new end-to-end suites
+  (`skills/sync-jira-{story,task,epic}/tests/end-to-end.test.js`) read the payload back from a fake
+  Jira, now shared at `tests/lib/fake-jira.js` after being lifted out of the bug suite, where it was
+  a private function with bug-specific stubs and no fake for the backlog or project endpoints the
+  siblings call. Each script also carries a counterweight test asserting a **genuine** remote edit
+  still aborts — without it, the cheapest way to pass everything else would be to disable the guard.
+
 - **The idempotency label is derived from the bug's own filename stem, not its directory.**
   `sync-jira-task` labels by parent-directory basename, which is unique because a task owns its
   directory. A bug does not: a story bug shares a directory with its story, that story's QA reports

@@ -415,7 +415,7 @@ The script is a thin wrapper over `references/jira-sync.js`, which holds the sha
 node --test .agents/skills/sync-jira-task/tests/*.test.js
 ```
 
-55 tests covering frontmatter parsing, in-place frontmatter update, changelog upsert / strict entry-row regex / hand-written-heading rescue, body-vs-meta hash split, priority synonyms + live resolution, label sanitisation, concurrent-edit guard, ADF builders + bullet/ordered list detection, Jira error parser, HTTP retry on 5xx, status transitions, board-type detection, atomic PUT response parsing, fail-loud timestamp fetch, idempotent create via label search, and issue-type cache.
+Unit and end-to-end tests covering frontmatter parsing, in-place frontmatter update, changelog upsert / strict entry-row regex / hand-written-heading rescue, body-vs-meta hash split, priority synonyms + live resolution, label sanitisation, concurrent-edit guard, ADF builders + bullet/ordered list detection, Jira error parser, HTTP retry on 5xx, status transitions, board-type detection, atomic PUT response parsing, fail-loud timestamp fetch, idempotent create via label search, and issue-type cache. The end-to-end suite (`tests/end-to-end.test.js`, driving the shared fake Jira in `tests/lib/fake-jira.js`) additionally asserts the convergence property the unit tests structurally cannot see: sync twice, and the second run reports no field changes and does not trip the concurrent-edit guard on the tool's own transition.
 
 ## Notes
 
