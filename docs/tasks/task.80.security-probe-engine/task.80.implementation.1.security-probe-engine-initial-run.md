@@ -35,7 +35,7 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 | 2. review-task             | ✅ Done    | `task.80.review.{N}.{name}.md` exists (or skip logged)               | READY TO IMPLEMENT, 8/10. 0 Critical, 6 Important (5 fixed in place, 1 skipped), 2 Optional. Report: `task.80.review.1.security-probe-engine.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                    | 1 iteration, no stall. 4/4 phases. 8 files. 26 tests added. 4 mutation proofs. Fast gate green: 2564 tests, 0 fail | — (inline)           |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #337: https://github.com/Gamaroff/agent-skills/pull/337 — state OPEN, base `develop`. 3 commits, 20 files, +2131/-124. Issue comment N/A (no tracker issue) | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.80.qa.{N}.*.md`; `task.80.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.80.qa.{N}.*.md`; `task.80.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles. Gates: CONCERNS 60 → CONCERNS 80 → **PASS 100**. 6 findings raised, 6 closed, 0 HIGH throughout. Step 5c: **CONCERNS** (2 doc-currency findings, both fixed before proceeding) | —                    |
 | 7. finalise                | ⏳ Pending | `task.80.dod.{N}.*.md`; task `status: accepted`                    |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -130,7 +130,39 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 | **QA report** | `task.80.qa.3.security-probe-engine.md` |
 | **PR comment** | [posted](https://github.com/Gamaroff/agent-skills/pull/337#issuecomment-5567536657) |
 | **Tests** | 276/276 targeted; full `ci:fast` 2570/0 |
-| **PR Review** | _(Step 5c — pending)_ |
+| **PR Review** | ⚠️ **CONCERNS** — exits the loop, does not block ([report](./task.80.pr-review.1.security-probe-engine.md), [comment](https://github.com/Gamaroff/agent-skills/pull/337#issuecomment-5567628319)) |
+
+#### Step 5c — PR conformance review (the loop's exit gate)
+
+`/review-pr --effort medium --comment`. Verdict **⚠️ CONCERNS**: 0 code findings, 3 conformance
+findings, **none a correctness defect**. Per the 5c verdict table CONCERNS records the findings and
+exits the loop to Step 7 without blocking.
+
+Its conformance lens — the one with no counterpart elsewhere in the pipeline — earned its place. It
+found two currency defects that three QA cycles had no reason to look for, because QA reviews the
+code and the gate, not the artifacts a human reads to *understand* the merge:
+
+- **PC-1 (medium)** — the PR description was written at Step 4 and never updated, so it had **zero**
+  mentions of the two largest post-Step-4 changes (the `spawn-budget` move and the bundler fix). A
+  reviewer reading it then opening a 3445-line diff would meet a file move and 44 lines of packaging
+  tooling unannounced.
+- **PC-2 (medium)** — the task's "Files Actually Landed" table recorded the develop-time state while
+  its heading claimed to describe what shipped. Eight files omitted; every count stale (593 not 430
+  lines, 22 not 18 tests, 7 not 6 fixtures, 98 not 97).
+- **PC-3 (low)** — scope drift on the bundler fix; the review agreed it belongs here rather than in a
+  follow-up, and asked only that it be named.
+
+**Both medium findings were fixed before proceeding**, rather than carried into the merge: the PR
+description now names both changes, and the Files table is refreshed. CONCERNS said not to block, not
+to ignore — and merging documentation already known to be wrong is the cheaper mistake to avoid.
+
+The review also independently re-checked the two trail claims it was invited to be sceptical of, and
+both held: the deliberate PARTIAL grade in cycle 2, and cycle 3's note that the convergence check
+would have tripped (HIGH counts verified `0, 0, 0`). It softened exactly one claim — "inputs never
+reach a shell" is a property of the engine's construction on the tested paths rather than a proof over
+all inputs — which the rule doc already states as a limit.
+
+`ready-for-merge` stage: **skipped** — `TRACKER_ISSUE` is empty.
 
 Both cycle-2 fixes verified, and **both halves of each** — the half that could have been faked as
 easily as fixed. Nine bad `timeoutMs` values handled without a crash, *and* `timeoutMs: 1` still

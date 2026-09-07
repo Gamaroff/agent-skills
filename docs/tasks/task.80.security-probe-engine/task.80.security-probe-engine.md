@@ -246,8 +246,45 @@ tests are what establish that rather than assert it.
 
 ### Files Actually Landed
 
-| File | Status | Note |
-| --- | --- | --- |
+> Refreshed after QA cycle 3 in response to PR-review finding **PC-2** — the first version of this
+> table recorded the develop-time state and was never updated by the two QA fix cycles, while its
+> heading claimed to describe what shipped.
+
+**Created**
+
+| File | Note |
+| --- | --- |
+| `shared/resources/security-probe.mjs` | 593 lines — engine, verdict computation, CLI |
+| `shared/resources/probe-boundary-rule.md` | 222 lines — the argument, the refusal, the v1 limits |
+| `shared/resources/tests/security-probe.test.mjs` | 22 tests |
+| `shared/resources/tests/fixtures/security-probe/*.mjs` | 7 fixtures — one per verdict, plus escape, engaging-but-escaping, and not-a-function |
+
+**Modified**
+
+| File | Note |
+| --- | --- |
+| `shared/resources/qa-execute-snippets.mjs` | `sandboxEnv()` extracted + exported; `export` added to `snapshotTree()`. Classifier untouched. |
+| `shared/resources/tests/qa-execute-snippets.test.mjs` | +9 parity tests (98 total, was 89) |
+| `skills/create-skill/scripts/bundle_skill.py` | QA cycle 2 — create nested parents before writing a transitive dep |
+| `tests/bundle-mjs.test.js` | QA cycle 2 — nested-sibling regression; helper creates nested `sharedFiles` parents |
+| `CHANGELOG.md` | Added section |
+
+**Moved** *(QA cycle 2, TASK80-006 — a production module must not import from `tests/`)*
+
+| From | To |
+| --- | --- |
+| `shared/resources/tests/spawn-budget.mjs` | `shared/resources/spawn-budget.mjs` |
+
+**Import sites updated for the move** — `shared/resources/tests/access-config-parity.test.mjs`,
+`shared/resources/tests/jira-interception.test.mjs`,
+`shared/resources/tests/qa-execute-snippets.test.mjs`,
+`shared/resources/tests/stdout-drain-on-exit.test.mjs`,
+`evals/shared/tests/qa-re-review-scope-parity.test.mjs`,
+`tests/test-harness-concurrency.test.js` (3 references), and `shared/resources/security-probe.mjs`.
+
+**Regenerated** — `skills/*/references/qa-execute-snippets.mjs` (5 copies, `npm run bundle` output).
+
+--- | --- | --- |
 | `shared/resources/security-probe.mjs` | created | 430 lines — engine, verdict computation, CLI |
 | `shared/resources/probe-boundary-rule.md` | created | 208 lines — the argument, the refusal, the limits |
 | `shared/resources/tests/security-probe.test.mjs` | created | 18 tests |
