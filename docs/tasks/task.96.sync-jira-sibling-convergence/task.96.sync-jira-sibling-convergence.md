@@ -5,10 +5,11 @@ type: task
 description: "The two convergence defects fixed on the bug path in PR #338 are present in the three sibling Jira sync scripts: every run re-PUTs because the label diff can never match, and a card that transitions then refuses every subsequent sync on a change the tool made itself."
 tags: [sync-jira, convergence, jira, defect, skill-family]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-07
 updated: 2026-09-07
+completed_date: 2026-09-07
 assignee:
 estimated_effort_hours: 8
 github_issue: 343
@@ -17,7 +18,7 @@ pr_number: 346
 
 # Technical Task: sync-jira-story/task/epic never converge — label diff and post-transition timestamp
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#343](https://github.com/Gamaroff/agent-skills/issues/343)
 **Review**: ✅ All review recommendations from `task.96.review.1.sync-jira-sibling-convergence.md` implemented 2026-09-07
 
@@ -617,6 +618,32 @@ reader:
 - **SC15 (doc sweep)** — the two files that were actually *wrong* are fixed and verified; the rest of
   the §7 list was read and is accurate, but that re-verification leaves no artifact beyond this note.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**Gate:** [gate.3](./task.96.gate.3.sync-jira-sibling-convergence.yml) — PASS, 93/100
+**PR:** [#346](https://github.com/Gamaroff/agent-skills/pull/346) — CI **SUCCESS** on all five checks
+**Detailed verification log:** [`task.96.dod.1.sync-jira-sibling-convergence.md`](./task.96.dod.1.sync-jira-sibling-convergence.md)
+
+- ✅ **Success criteria:** 17/17, three carrying the qualifications stated in §9
+- ✅ **Tests:** 2700 pass / 0 fail / 1 pre-existing skip; 40 new tests
+- ✅ **CI:** `test`, `validate`, `link-check`, `shellcheck`, branch-policy all green
+- ✅ **Security:** the task's own named High risk — that the fix might silently disable
+  `guardConcurrentEdit` — did **not** materialise. Call sites byte-identical; three counterweight
+  tests assert a genuine remote edit still aborts
+- ⚠️ **Compliance:** N/A — internal tooling, no PII, no UI, no external data flow
+- ✅ **Docs:** CHANGELOG, two SKILL.md files, the stale library header, and the one-off meta-hash
+  migration cost disclosed in §5
+
+**Limits, stated rather than omitted:** no human code review (`reviewDecision` is empty — this was
+accepted on automated evidence and self-review); the fake Jira proves what the scripts *send*, not
+that a live tenant accepts it.
+
+**Accepted on:** 2026-09-07
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -630,6 +657,7 @@ reader:
 | 2026-09-07 |         | QA findings fixed — all 4 gate issues plus 4 cleanups and 1 found by the adversarial pass, 1 iteration | qa-fix |
 | 2026-09-07 |         | QA gate PASS (95/100) — cycle 2 refute pass found 8 further issues, 3 of them caused by cycle 1's own fixes; all closed | qa-task |
 | 2026-09-07 |         | `/review-pr` REQUEST CHANGES ×2 — 32 further findings across two passes, incl. HIGH silent loss of `assignee`/`due_date`/`components`/`fix_versions` behind the newly reachable skip gate, and the `--force` framing shown false against a develop worktree; all closed, gate 3 PASS (93/100) | qa-fix |
+| 2026-09-07 | 1.3     | DoD passed — accepted (PR #346), gate 3 PASS 93/100, CI green | finalise |
 
 ---
 
@@ -737,7 +765,7 @@ A helper taking the *already-built* `fields` plus `current` is a ~6-line wrapper
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the implementation plan
