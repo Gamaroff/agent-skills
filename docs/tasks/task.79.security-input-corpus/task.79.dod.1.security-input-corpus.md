@@ -193,9 +193,11 @@ Neither affects acceptance; both are recorded so they are not lost.
 2. **`BUNDLED_REFS` lacks an `isFile()` guard** (PR review CR-1). Verified benign today — 0
    subdirectories — but a nested directory would surface as an opaque `EISDIR`.
 
-Also noted during the run, outside this task's scope: `review-pr` SKILL.md Step 2's branch-stem
-`sed` snippet uses `|` as both delimiter and alternation, so it errors on BSD sed and silently drops
-rung 1 of its resolution cascade on macOS. Worth its own bug report.
+**Retracted.** An earlier revision of this record claimed that `review-pr` SKILL.md ships a broken
+branch-stem `sed` snippet. It does not — rung 1 is described in prose in a markdown table, and the
+broken `sed` was a command the orchestrator wrote while executing that prose. Verified by `git grep`
+across every shipped `.md`, `.sh`, `.js` and `.mjs`: no such alternation exists in the repository. No
+bug report is warranted.
 
 ---
 

@@ -93,22 +93,28 @@ neutralising all three hostile-looking strings (`process.env.SECRET`, `<script>`
 
 ---
 
-## Aside — a defect in the review tooling, not in this PR
+## Correction — a claimed tooling defect that does not exist
 
-`review-pr` SKILL.md Step 2's branch-stem snippet is
-`sed -E 's|^(feature|bugfix|hotfix)/||'`, which uses `|` as **both** the `s` delimiter and the
-alternation operator. It fails on BSD sed with `RE error: parentheses not balanced`, leaving `STEM`
-empty and silently dropping rung 1 of the resolution cascade on macOS — the default platform. Worked
-around here with a `#` delimiter. Out of scope for this PR; worth its own bug report.
+An earlier revision of this report asserted that `review-pr` SKILL.md Step 2 shipped a broken
+branch-stem snippet — `sed -E 's|^(feature|bugfix|hotfix)/||'`, using `|` as both the `s` delimiter
+and the alternation operator, failing on BSD sed.
 
----
+**That was wrong, and the mistake was mine.** The skill ships no such command: rung 1 of its
+resolution cascade is described in prose — *"strip `feature/` \| `bugfix/` \| `hotfix/`"* — in a
+markdown table, where the `\|` are escaped cell separators. The broken `sed` was a one-liner **I**
+wrote while executing that prose, and the delimiter collision was in my command, not in the skill.
+
+Verified: `git grep` over every shipped `.md`, `.sh`, `.js` and `.mjs` finds no occurrence of that
+alternation anywhere in the repository.
+
+No bug report is warranted. Recorded here rather than deleted, because this report was merged and a
+reader who saw the original claim deserves to find its retraction in the same place.
 
 ## Recommended Actions
 
 1. **None blocking.** Proceed to Step 7 (`/finalise`).
 2. Add the `isFile()` guard to `BUNDLED_REFS` (CR-1) — one line, no urgency.
 3. Before `task.80` consumes the corpus as an oracle, execute the three cited claims (PC-1).
-4. File a bug for the `review-pr` sed delimiter defect noted above.
 
 ---
 

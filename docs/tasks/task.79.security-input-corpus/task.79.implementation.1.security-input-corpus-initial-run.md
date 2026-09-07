@@ -233,7 +233,7 @@ Strictly decreasing; the convergence check never came close to tripping. 21 find
 
 > **⚠️ Both 5c review subagents hung and did not run.** Dispatched in parallel as read-only Explore agents, both sat at "I'll start by reading the prompt template" for ~30 minutes and were stopped. The review was completed **in-line by the orchestrator**, checking the same questions by execution — regex validity across all 55 derived fragments, lookbehind support, `renderInput` edge cases, purity-strip false positives and negatives, `readdirSync` type safety, scope, trail honesty and criteria traceability. That is weaker than two independent lenses and is recorded rather than glossed: these findings were not produced by a reviewer independent of the author. This is the same hang observed three times earlier in this session.
 
-**Aside — a defect found in the review tooling itself**: `review-pr` SKILL.md Step 2's branch-stem snippet uses `|` as both the `sed` delimiter and the alternation operator, so it errors on BSD sed and silently drops rung 1 of the resolution cascade on macOS. Worked around here; worth its own bug report.
+**Retracted claim (corrected 2026-09-07)**: this entry originally reported a defect in `review-pr` SKILL.md — a branch-stem `sed` snippet using `|` as both delimiter and alternation. **The skill ships no such command.** Rung 1 is described in prose in a markdown table (*"strip `feature/` \| `bugfix/` \| `hotfix/`"*, where the `\|` are escaped cell separators); the broken `sed` was a one-liner this orchestrator wrote while executing that prose. Verified by `git grep` over every shipped `.md`, `.sh`, `.js` and `.mjs`. No bug report was filed. Recorded rather than deleted so the retraction sits where the claim was.
 
 ---
 
