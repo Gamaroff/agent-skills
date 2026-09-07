@@ -2,7 +2,7 @@
 id: task.97
 title: '/develop-task Step 2 has no recovery path when review-task Step 9 does not promote'
 type: task
-description: "A consumer repository hit a deterministic HALT at /develop-task Step 2 on an already-reviewed task and had to override it by hand. The consumer diagnosed it as two contradictory tables in develop-pipeline-step-2-review.md; measurement against the installed skills contradicts that diagnosis, so the first job here is to establish the real cause. What survives either way is a robustness defect: the skip table keys on status rather than on evidence of review, so whenever Step 9's promotion does not happen the only remedy an operator will reach for — re-running the review — cannot clear the halt."
+description: "A consumer repository predicted a deterministic HALT at /develop-task Step 2 on an already-reviewed task and steered the pipeline around it by hand; the halt itself was never reached. The consumer diagnosed it as two contradictory tables in develop-pipeline-step-2-review.md; measurement against the installed skills contradicts that diagnosis, so the first job here is to establish the real cause. What survives either way is a robustness defect: the skip table keys on status rather than on evidence of review, so whenever Step 9's promotion does not happen the only remedy an operator will reach for — re-running the review — cannot clear the halt."
 tags: [develop-task, pipeline, review-gate, status-lifecycle, consumer-report]
 category: infrastructure
 status: planned
@@ -24,9 +24,11 @@ github_issue: 348
 ## 1. Overview
 
 `/develop-task` Step 2 decides whether to run `/review-task`, then judges the result. A consumer
-repository (`rebirth-wallet`, card `task.113` / RAPP-728) hit a **deterministic HALT** there on
-2026-09-07, on a task that had been reviewed hours earlier, and the operator had to rule on the
-deviation before the pipeline could start.
+repository (`rebirth-wallet`, card `task.113` / RAPP-728) stopped there on 2026-09-07 on a task
+reviewed hours earlier, and an operator had to rule on the deviation before the pipeline could start.
+**The HALT itself was never reached** — the operator ruled _"Skip — already reviewed"_ at Phase 0d, so
+`/review-task` never re-ran and the post-review table was never evaluated. The halt was predicted from
+reading the tables, not observed.
 
 **Scope**: establish why the halt was unrecoverable, then make Step 2's skip decision key on
 evidence of review rather than on status alone — without weakening the gate that stops development
@@ -54,13 +56,16 @@ vendored copy:
 | "`/review-task` does not promote out of `planned`" | `.agents/skills/review-task/SKILL.md:1569` — `Planned` → `Ready for Development` (after successful review and fixes) |
 | "`ready-for-development` is the *story* enum" | `shared/resources/document-status-lifecycle.md:59` — set by **`review-story`, `review-task`**; not story-only |
 | "the spec is not available to the consumer" | `document-status-lifecycle.md` is vendored **17 times** into that repo |
+| "the halt fired" | **Never observed** — `task.111`'s implementation report records the operator answering _"Skip — already reviewed"_ at Phase 0d; Step 2 was skipped entirely |
 
 So the two tables are consistent as written, and the halt is the *correct* response to Step 9 having
 failed to promote. **The bug is not the one that was reported.**
 
 ### What is nevertheless defective
 
-The halt is right; its **irrecoverability** is not.
+The halt is right, and on the evidence available it has never fired. What is defective is narrower:
+the pipeline **stopped to ask a human a question it could have answered itself**, and if the halt were
+ever reached it would be **irrecoverable** by the obvious remedy.
 
 1. **The skip decision keys on the wrong fact.** Lines 45 and 47 skip on *status* (`Ready for
    Development` / `In Progress`) plus a report. Status is a downstream consequence; the **report** is
@@ -72,7 +77,8 @@ The halt is right; its **irrecoverability** is not.
    point at which an operator is most likely to resolve it by re-running the review rather than by
    questioning the gate. A re-review costs a full pass and, if whatever suppressed the promotion is
    still in play, the second table halts again. **A gate whose intuitive fix is a no-op is close to
-   the worst property a gate can have** — and it is what actually consumed the operator's time here.
+   the worst property a gate can have.** In the reported incident that cost was paid in advance: the
+   operator reasoned their way to the same conclusion and skipped the step rather than testing it.
 3. **Nothing reports which of the three voices disagreed.** `develop-task/SKILL.md:248` expects
    promotion, the post-review table demands it, `review-task` Step 9 performs it. When the halt
    fires, the message names only the symptom (*"review-task left it Planned"*). It does not say
@@ -143,8 +149,12 @@ recoverable.
 
 **Phase 1 — Establish the actual cause before changing a table (Low risk).**
 
-- [ ] Reproduce the consumer's halt: a `planned` task with a current review report, run through
-      `/develop-task` Step 2. Confirm the halt fires.
+- [ ] **Establish whether the post-review HALT is reachable at all** through the pipeline path. It has
+      never been observed — the consumer predicted it and steered around it — so this is not the
+      reproduction of a known event. Drive a `planned` task with a current review report through Step 2
+      and record what actually happens.
+- [ ] **If it is unreachable, narrow this card to the skip table alone** and leave the post-review
+      table untouched. A fix to a branch nothing can enter is churn that reads as progress.
 - [ ] Determine why Step 9 did not promote in the reported incident. Candidates, in order of
       likelihood: the review ran standalone rather than through the pipeline and the promotion
       question was answered "no"; the outcome was `NEEDS REVISION`, making the halt correct; the
@@ -259,6 +269,7 @@ returns, along with the manual override.
 | Date | Version | Description | Author |
 | ---- | ------- | ----------- | ------ |
 | 2026-09-07 | 1.0 | Created from a consumer report (`rebirth-wallet` task.113 / RAPP-728), whose `/develop-task` run halted at Step 2 on a card reviewed hours earlier. **The consumer's diagnosis was checked and does not hold** — `/review-task` does promote `planned → ready-for-development` (`review-task/SKILL.md:1569`) and `document-status-lifecycle.md:59` names `review-task` as a setter of that status for tasks. Re-scoped from "two contradictory tables" to "the halt has no recovery path", with Phase 1 required to establish the real cause before any table changes | manual |
+| 2026-09-07 | 1.1 | Framing corrected before any work started: the halt was **never observed**. The consumer's own incident record shows the operator ruling "Skip — already reviewed" at Phase 0d, so Step 2 was skipped and the post-review table was never reached — it was predicted from reading the tables. Phase 1 amended from *reproduce the halt* to *establish whether the HALT is reachable at all*, with an explicit branch to narrow the card if it is not. Roadmap row switched to the bare-path form its neighbours use; the markdown-link form failed the repo's link check, which resolves hrefs relative to the file | manual |
 
 ---
 
