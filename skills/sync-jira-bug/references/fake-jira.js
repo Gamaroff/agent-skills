@@ -296,12 +296,17 @@ function descriptionOf(state, key) {
 function countRequests(state, filter = {}) {
   const { method, issueKey } = filter;
   // Anchor the key: a bare `includes` makes PROJ-901 a prefix match for
-  // PROJ-9012, and would also match sub-resources like /transitions. The key
-  // must be followed by `?`, `/` or end-of-string, and `/transitions` is
-  // excluded so a POST filter counts writes to the issue rather than its
-  // transition endpoint.
+  // PROJ-9012. The key must be followed by `?` or end-of-string — which also
+  // excludes every sub-resource path (`/transitions`, `/comment`), since those
+  // put a `/` where the anchor requires `?` or nothing.
+  // Escape the key before interpolating: a caller is free to pass an arbitrary
+  // string, and an unescaped one would be read as a pattern rather than a
+  // literal. Real Jira keys carry no metacharacters, so this changes no
+  // behaviour today — it stops a future caller turning a filter into a bug.
   const keyRe = issueKey
-    ? new RegExp(`/rest/api/3/issue/${issueKey}(?:[?]|$)`)
+    ? new RegExp(
+        `/rest/api/3/issue/${issueKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[?]|$)`,
+      )
     : null;
   return state.requests.filter((r) => {
     if (method && r.method !== method) return false;

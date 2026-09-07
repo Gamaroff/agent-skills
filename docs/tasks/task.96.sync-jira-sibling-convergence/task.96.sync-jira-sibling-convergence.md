@@ -5,7 +5,7 @@ type: task
 description: "The two convergence defects fixed on the bug path in PR #338 are present in the three sibling Jira sync scripts: every run re-PUTs because the label diff can never match, and a card that transitions then refuses every subsequent sync on a change the tool made itself."
 tags: [sync-jira, convergence, jira, defect, skill-family]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: High
 created: 2026-09-07
 updated: 2026-09-07
@@ -16,7 +16,7 @@ github_issue: 343
 
 # Technical Task: sync-jira-story/task/epic never converge — label diff and post-transition timestamp
 
-**Status:** In Progress
+**Status:** Ready for Review
 **GitHub Issue**: [#343](https://github.com/Gamaroff/agent-skills/issues/343)
 **Review**: ✅ All review recommendations from `task.96.review.1.sync-jira-sibling-convergence.md` implemented 2026-09-07
 
@@ -180,11 +180,11 @@ The **behaviour** change is the point and should be stated plainly for the chang
 **Risk Level**: Low
 
 **Files**:
-- `tests/lib/fake-jira.js` (new — generalised harness)
+- `shared/resources/fake-jira.js` (new — generalised harness, vendored into each consuming skill)
 - `skills/sync-jira-{story,task,epic}/tests/`
 
 **Changes**:
-- [x] **Generalise the fake Jira first.** Lift `fakeJira()`, `hrefsIn()` and `descriptionOf()` out of `skills/sync-jira-bug/tests/end-to-end.test.js` (where they are module-local and unexported) into `tests/lib/fake-jira.js`, parameterised by `{ runner, argv }` so any sibling script can drive it. Place it **outside `shared/resources/`** so `npm run bundle` does not fan it into 23 skills. Extend it to fake `/rest/agile/1.0/backlog/issue`, `/rest/api/3/project/{key}` and `/rest/api/3/project/{key}/statuses` — endpoints story/task/epic call and the bug path never did
+- [x] **Generalise the fake Jira first.** Lift `fakeJira()`, `hrefsIn()` and `descriptionOf()` out of `skills/sync-jira-bug/tests/end-to-end.test.js` (where they are module-local and unexported) into `shared/resources/fake-jira.js`, parameterised by `{ runner, argv }` so any sibling script can drive it. It **must** live under `shared/resources/` — that is the only tree the bundler vendors, and a skill is installed by copying its directory, so a require reaching outside the skill resolves to nothing in a consumer install. (An earlier revision placed it at `tests/lib/`; QA gate 1 caught that.) Extend it to fake `/rest/agile/1.0/backlog/issue`, `/rest/api/3/project/{key}` and `/rest/api/3/project/{key}/statuses` — endpoints story/task/epic call and the bug path never did
 - [x] Re-point `sync-jira-bug`'s existing e2e suite at the extracted helper and confirm **its tests pass unchanged** — it is the reference implementation, and a generalisation that requires editing its assertions has changed its behaviour
 - [x] Add PUT-count assertion machinery: `state.requests` is already recorded, but nothing counts it. Filter by `method === "PUT"` — this is new code, not a copy
 - [x] Write the failing test first, per script: sync twice against the fake Jira, assert the second run reports no field changes. Confirm all three go **red** before any fix
@@ -290,7 +290,7 @@ The **behaviour** change is the point and should be stated plainly for the chang
 
 - `shared/resources/jira-sync.js` — added `diffAgainstPayload` + export; un-staled the header (it still claimed only `sync-jira-task` used the library)
 - `skills/sync-jira-{story,task,epic,bug}/scripts/*.js` — payload-before-diff, migrated to the helper; post-transition re-read added to story, task and epic's **update** path
-- `tests/lib/fake-jira.js` — **new**, the generalised harness
+- `shared/resources/fake-jira.js` — **new**, the generalised harness (+ 4 vendored `references/` copies)
 - `skills/sync-jira-bug/tests/end-to-end.test.js` — re-pointed at the harness, assertions unchanged
 - `skills/sync-jira-{story,task,epic}/tests/end-to-end.test.js` — **new**, 12 tests
 - `skills/sync-jira-task/SKILL.md` — the literal test count replaced with a description
@@ -502,32 +502,33 @@ Assert the count, not the wall-clock. A timing assertion here would be load-flak
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-07
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS (cycle 2 — cycle 1 was FAIL, 50/100)
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.96.qa.1.sync-jira-sibling-convergence.md](./task.96.qa.1.sync-jira-sibling-convergence.md)
-- **Gate File**: [task.96.gate.1.sync-jira-sibling-convergence.yml](./task.96.gate.1.sync-jira-sibling-convergence.yml)
+- **Cycle 2 (current)**: [task.96.qa.2.sync-jira-sibling-convergence.md](./task.96.qa.2.sync-jira-sibling-convergence.md) · [gate.2](./task.96.gate.2.sync-jira-sibling-convergence.yml)
+- **Cycle 1**: [task.96.qa.1.sync-jira-sibling-convergence.md](./task.96.qa.1.sync-jira-sibling-convergence.md) · [gate.1](./task.96.gate.1.sync-jira-sibling-convergence.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 2675 (0 failures, 1 pre-existing skip)
+- **Tests Executed**: 2676 (2675 pass, 0 failures, 1 pre-existing skip)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 2 HIGH, 1 MEDIUM, 5 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **QA Cycles**: 2 — cycle 1 found 8 issues, cycle 2's refute pass found 8 more; all 16 closed
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-The two named defects are fixed and all six fixes mutation-proven. The gate fails on two regressions the change introduced, both invisible to the green suite:
+Both named defects are fixed and mutation-proven, and the concurrent-edit guard is provably still armed. Two QA cycles found and closed 16 issues between them — **five of which the change itself introduced**, each invisible to a green suite:
 
-- **TASK96-001 (HIGH)** — the new end-to-end suites require a helper outside the skill, so they die with `MODULE_NOT_FOUND` in a consumer install. Masked locally because `.agents/skills` is a symlink.
-- **TASK96-002 (HIGH)** — story's skip gate lacks `!args.force`, and the label fix made that gate reachable for the first time. `--force` on an unchanged story now issues no PUT, contradicting §5's "no interface change".
-- **TASK96-003 (MEDIUM)** — the epic UPDATE-path test does not actually transition, so it does not cover the site §2.4 names.
-- **TASK96-004 (LOW)** — the task label test asserts builder determinism; it stays green with the defect restored.
+**Cycle 1 (FAIL, 50/100)** — the new e2e suites could not run in a consumer install (masked locally by the `.agents/skills` symlink); `--force` became a silent no-op on an unchanged story once the label fix made that gate reachable; and two tests passed for the wrong reason.
+
+**Cycle 2 (PASS, 95/100)** — the mandatory refute pass, unscoped over the whole diff. It found that cycle 1's `--force` fix restored the *write* but not the *repair* (the two-pass build stripped `description`, so the forced PUT carried only the fields the diff had proved identical); that epic's skip path wrote a refreshed timestamp to the file but a stale one to `--json`; and that the deferred-run guard test stayed green with the guard deleted. All closed.
+
+Three residuals are recorded as future work rather than fixed — a `--json`-suppressed warning, an inherent read-after-write window, and the task/bug scripts' missing skip gate. None blocks this change.
 
 ## Change Log
 
@@ -540,13 +541,14 @@ The two named defects are fixed and all six fixes mutation-proven. The gate fail
 | 2026-09-07 |         | Implemented — 30 files (5 scripts/lib, 5 test files, 2 docs, 22 bundled copies), 17 end-to-end tests, all 6 fixes mutation-proven | develop |
 | 2026-09-07 |         | QA gate FAIL (50/100) — 2 HIGH, 1 MEDIUM, 5 LOW: consumer-install require failure, `--force` regression, and two tests that pass for the wrong reason | qa-task |
 | 2026-09-07 |         | QA findings fixed — all 4 gate issues plus 4 cleanups and 1 found by the adversarial pass, 1 iteration | qa-fix |
+| 2026-09-07 |         | QA gate PASS (95/100) — cycle 2 refute pass found 8 further issues, 3 of them caused by cycle 1's own fixes; all closed | qa-task |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Reproduce, then decide on extraction
-- [x] Fake Jira generalised into `tests/lib/fake-jira.js` (backlog + project endpoints added)
+- [x] Fake Jira generalised into `shared/resources/fake-jira.js` (backlog + project endpoints added)
 - [x] `sync-jira-bug` e2e re-pointed at it, assertions unchanged
 - [x] PUT-count assertion machinery added (filter `state.requests` by method)
 - [x] Convergence test red in all three

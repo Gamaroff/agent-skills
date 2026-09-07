@@ -27,6 +27,7 @@ const {
   gitRepo,
   makeRunner,
   putCount,
+  descriptionOf,
 } = require("../references/fake-jira.js");
 
 const runSync = makeRunner({ module: storySync, cliName: "sync-jira-story" });
@@ -111,7 +112,6 @@ test("a story synced twice reports no field changes and issues no second PUT", a
       "without it there is no divergence to test",
   );
 
-  const putsAfterCreate = putCount(state, key);
   const before = fs.readFileSync(story, "utf-8");
 
   const second = await runSync(root, story, fetchImpl, ["--quiet"]);
@@ -135,9 +135,11 @@ test("a story synced twice reports no field changes and issues no second PUT", a
   // And the counter-assertion: the skip gate must actually skip the write.
   // Asserting the count, never the wall-clock — a timing assertion here would
   // be load-flaky.
+  // The literal, not a delta against the create: creating is a POST, so the
+  // expected count is exactly 0 and saying so is stronger than `0 === 0`.
   assert.equal(
     putCount(state, key),
-    putsAfterCreate,
+    0,
     "the second run issued a PUT for a document that had not changed",
   );
 
@@ -154,15 +156,35 @@ test("--force still pushes a PUT on an unchanged document", async () => {
   const key = first.result.issueKey;
   const before = putCount(state, key);
 
-  // Nothing has changed, so the skip gate above would fire — but `--force` is
-  // the documented override, and it is the repair path for a card someone
-  // blanked in the Jira UI. Making the gate reachable must not silently
-  // disable it.
+  // Someone blanks the card in the Jira UI. Nothing about the DOCUMENT has
+  // changed, so the skip gate would fire — `--force` is the documented
+  // override and this is the repair path it exists for.
+  state.issues[key].fields.description = {
+    type: "doc",
+    version: 1,
+    content: [],
+  };
+
   await runSync(root, story, fetchImpl, ["--quiet", "--force"]);
 
   assert.ok(
     putCount(state, key) > before,
     "--force issued no PUT — the skip gate swallowed the override",
+  );
+
+  // A PUT is necessary but not sufficient. The two-pass build strips
+  // `description` whenever the diff reports no change — which is always true on
+  // a forced unchanged sync — so without the `args.force` term the forced write
+  // carries only the three fields the diff just proved identical, and repairs
+  // nothing. Assert the repair, not just the write.
+  const put = state.requests.filter((r) => r.method === "PUT").pop();
+  assert.ok(
+    "description" in put.body.fields,
+    "the forced PUT carried no description — it cannot repair a blanked card",
+  );
+  assert.ok(
+    JSON.stringify(descriptionOf(state, key)).length > 100,
+    "the card's description was not restored",
   );
 });
 

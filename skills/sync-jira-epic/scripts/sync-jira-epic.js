@@ -1050,7 +1050,12 @@ async function run({
           jira_key: existingJiraKey,
           jira_url: issueUrl,
           change_summary: changeSummary,
-          jira_last_synced_at: current.updated,
+          // `skipSyncedAt`, not `current.updated`: the skip path re-reads the
+          // timestamp after a transition and writes THAT to the file, so
+          // emitting the pre-transition value here would make the JSON and the
+          // document disagree on exactly the run that moved the card. This path
+          // only became reachable when the label diff was fixed.
+          jira_last_synced_at: skipSyncedAt,
           jira_last_body_hash: newBodyHash,
           jira_last_meta_hash: newMetaHash,
           // The skip path has its own emit, and a deferred status transition is

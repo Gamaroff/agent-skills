@@ -150,7 +150,8 @@ All notable changes to this project will be documented in this file. Format foll
   because those tests asserted `diffFields` and `collectIssueFields` each behaved correctly *in
   isolation* and nothing asserted the two agreed with each other. The new end-to-end suites
   (`skills/sync-jira-{story,task,epic}/tests/end-to-end.test.js`) read the payload back from a fake
-  Jira, now shared at `tests/lib/fake-jira.js` after being lifted out of the bug suite, where it was
+  Jira, now shared at `shared/resources/fake-jira.js` (vendored into each consuming skill's
+  `references/` by the bundler) after being lifted out of the bug suite, where it was
   a private function with bug-specific stubs and no fake for the backlog or project endpoints the
   siblings call. Each script also carries a counterweight test asserting a **genuine** remote edit
   still aborts — without it, the cheapest way to pass everything else would be to disable the guard.

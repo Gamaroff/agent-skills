@@ -17,7 +17,7 @@ Reproduce both defects as failing tests first, port the two fixes from `sync-jir
 
 ### Phase 1: Reproduce, then decide on extraction
 
-**Prerequisite: generalise the fake Jira first.** `fakeJira()` is a module-local, unexported function inside `skills/sync-jira-bug/tests/end-to-end.test.js:44`, not a reusable harness — and it does not fake `/rest/agile/1.0/backlog/issue` or `/rest/api/3/project/{key}`, which story, task and epic all call. Lift it (with `hrefsIn`, `descriptionOf`) into `tests/lib/fake-jira.js`, parameterised by `{ runner, argv }`, outside `shared/resources/` so `npm run bundle` does not fan it into 23 skills. Re-point the bug suite at it and confirm **its assertions are unchanged**. Add PUT-counting while you are there: `state.requests` is recorded but nothing filters it by method.
+**Prerequisite: generalise the fake Jira first.** `fakeJira()` is a module-local, unexported function inside `skills/sync-jira-bug/tests/end-to-end.test.js:44`, not a reusable harness — and it does not fake `/rest/agile/1.0/backlog/issue` or `/rest/api/3/project/{key}`, which story, task and epic all call. Lift it (with `hrefsIn`, `descriptionOf`) into `shared/resources/fake-jira.js`, parameterised by `{ runner, argv }`. It must live there rather than in a repo-root `tests/` tree: the bundler vendors only `shared/resources/`, and a skill is installed by copying its directory, so a require reaching outside the skill breaks in every consumer install. Re-point the bug suite at it and confirm **its assertions are unchanged**. Add PUT-counting while you are there: `state.requests` is recorded but nothing filters it by method.
 
 **Then write these red before touching any script.**
 
@@ -161,13 +161,13 @@ Then `npm run bundle` — `jira-sync.js` has **23 bundled `references/` copies**
 | Corrected transition re-read | `skills/sync-jira-bug/scripts/sync-jira-bug.js:1100-1115` |
 | The already-correct epic skip path | `skills/sync-jira-epic/scripts/sync-jira-epic.js:984-1003` |
 | Fake-Jira end-to-end suite (source to generalise, **not** reusable as-is) | `skills/sync-jira-bug/tests/end-to-end.test.js` — `fakeJira()` at `:44`, convergence assertion at `:369-406` |
-| Generalised harness (new, Phase 1) | `tests/lib/fake-jira.js` |
+| Generalised harness (new, Phase 1) | `shared/resources/fake-jira.js` → vendored as `references/fake-jira.js` |
 | Shared helpers | `shared/resources/jira-sync.js` |
 
 ## Testing Approach
 
 - **Location**: each script's own `tests/` directory. All four are already in the `package.json` glob (`skills/sync-jira-{epic,story,task,bug}/tests/*.test.js`), so no `package.json` edit is needed — verify that rather than assuming it.
-- **Harness**: the fake Jira from `sync-jira-bug`'s end-to-end suite is the only thing that caught either defect, because it reads the payload back rather than trusting the caller's model of it. It is **not reusable as-is** — generalise it into `tests/lib/fake-jira.js` first (Phase 1), extend it with the backlog and project endpoints the siblings call, and re-point the bug suite at it with its assertions unchanged.
+- **Harness**: the fake Jira from `sync-jira-bug`'s end-to-end suite is the only thing that caught either defect, because it reads the payload back rather than trusting the caller's model of it. It is **not reusable as-is** — generalise it into `shared/resources/fake-jira.js` first (Phase 1), extend it with the backlog and project endpoints the siblings call, and re-point the bug suite at it with its assertions unchanged.
 - **Order**: red first, always. Confirm each new test fails against unmodified code and record that it did.
 - **Mutation proof**: for each fix, revert it, confirm the named test goes red, restore. A fix without a recorded proof is not done.
 - **The counterweight test**: a genuine remote edit must still abort. Every other test here rewards the guard staying quiet, so this is the one that stops the fix becoming a silent regression.

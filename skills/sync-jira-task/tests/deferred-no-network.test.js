@@ -122,8 +122,20 @@ test("a deferred run makes no PUT and no post-transition timestamp re-read", asy
     "a deferred run issued a PUT — the access mode did not hold",
   );
 
-  // The post-transition re-read is a GET of the issue. Under deferral no
-  // transition happened, so no such read may be issued on the strength of one.
+  // THE ASSERTION THIS TEST EXISTS FOR: the post-transition re-read is a GET
+  // for `fields=updated`. A deferred run moved nothing, so it must not ask for
+  // a refreshed timestamp — that read is the network call the access mode
+  // exists to prevent, and it is the call the guard governs. An earlier version
+  // asserted only on transition POSTs, which is not that call.
+  const timestampReads = state.requests.filter(
+    (r) => r.method === "GET" && r.url.includes("fields=updated"),
+  );
+  assert.equal(
+    timestampReads.length,
+    0,
+    "a deferred run issued a post-transition timestamp read",
+  );
+
   const transitionPosts = state.requests.filter(
     (r) => r.method === "POST" && r.url.includes("/transitions"),
   );

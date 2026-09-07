@@ -906,6 +906,12 @@ async function run({
     // `includeDescription` is derived FROM `changedFields`, so the payload is
     // built provisionally with the description included and the field is
     // dropped below once the diff is known.
+    //
+    // As in epic, the build now runs on the skip path too. No network and no
+    // mutation, but not silent: `buildDescriptionAdf` warns on a missing card
+    // section and `collectIssueFields` warns through `normalisePriority` /
+    // `resolveAssignee`, so a no-op sync can emit advisory warnings it did not
+    // before.
     const descAdf = buildDescriptionAdf({
       body,
       frontmatter,
@@ -971,7 +977,15 @@ async function run({
 
       // Second pass of the two-pass build: send `description` only when body or
       // metadata actually changed, to avoid pointless edits in Jira's history.
+      //
+      // `args.force` overrides that. A forced sync of an unchanged document
+      // otherwise PUTs exactly the three fields the diff just proved identical
+      // to Jira — a write that repairs nothing, which makes the documented
+      // repair path (a card blanked or corrupted in the Jira UI) inoperable.
+      // Forcing is the one case where re-publishing an unchanged description
+      // is the entire point.
       const includeDescription =
+        args.force ||
         changedFields.includes("description") ||
         changedFields.includes("metadata");
       if (!includeDescription) delete fields.description;
