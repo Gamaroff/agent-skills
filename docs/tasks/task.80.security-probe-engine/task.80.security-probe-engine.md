@@ -5,11 +5,11 @@ type: task
 description: "task.73's probe mode is prose: it tells the agent to hand-write a script and run it, and then trusts the probes_executed count the agent types. Build the engine that runs the probe and computes the verdict — without putting an interpreter on the snippet allow-list, which would make that boundary fail open."
 tags: [security, probe, sandbox, engine, shared-resources]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-07
 assignee:
 estimated_effort_hours: 6
 depends_on: task.79
@@ -17,14 +17,15 @@ depends_on: task.79
 
 # Technical Task: Make a security probe runnable without widening the snippet allow-list
 
-**Status:** Ready for Development
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.80.review.1.security-probe-engine.md` implemented 2026-09-07 (1 skipped — tracker linkage needs consent)
 
 ---
 
 ## 1. Overview
 
 `task.73` gave the DoD security check a probe mode. Read what it actually instructs
-(`shared/resources/finalise-dod-security-prompt.md:120-122`):
+(`shared/resources/finalise-dod-security-prompt.md:145-146`, under §"Step 4: Probe mode"):
 
 > **3. Execute them.** Write a short script in a temporary directory that imports the entry point and
 > calls it on each candidate, and **run it**.
@@ -70,10 +71,11 @@ admit an interpreter.
 
 ### Current architecture
 
-`shared/resources/qa-execute-snippets.mjs` (1032 lines) is the only hardened executor in the repo. Its
+`shared/resources/qa-execute-snippets.mjs` (1517 lines) is the only hardened executor in the repo. Its
 safety model is an **allow-list that fails closed** (`:117` `SAFE_COMMANDS`, `:165` `COMMAND_RUNNERS`,
-`:259` `DENY_PATTERNS`, `:561` `classifyBlock`), plus containment: `runBlock` (`:680`) runs in a temp
-working copy with a minimal env, and `snapshotTree` (`:648`) reports any write that escapes it.
+`:422` `DENY_PATTERNS`, `:982` `classifyBlock`), plus containment: `runBlock` (`:1113`) runs in a temp
+working copy with a minimal env (`:1121-1127`), and `snapshotTree` (`:1081`) reports any write that
+escapes it.
 
 The subject it was built for is **untrusted text extracted from documentation**. That is why `node`, `gh`
 and `curl` are absent from the allow-list in every form.
@@ -142,13 +144,15 @@ tests are what establish that rather than assert it.
 **Files**: `shared/resources/qa-execute-snippets.mjs`, `shared/resources/tests/qa-execute-snippets.test.mjs`
 
 **Changes**:
-- [ ] Export `sandboxEnv()` — the CR-12 minimal env (`PATH`, `HOME`, `LANG`, `TERM`, `TMPDIR`, `PWD` plus
-      bindings), so no parent token reaches a child
-- [ ] Export `snapshotTree()` unchanged — it is already exported at `:648`; confirm and pin
-- [ ] `runBlock()` calls both rather than inlining them
-- [ ] **Assert the classifier is untouched**: `SAFE_COMMANDS`, `COMMAND_RUNNERS`, `DENY_PATTERNS` and
-      `classifyBlock()` byte-identical in behaviour, pinned by a test over the existing QA-1…QA-14 cases
-- [ ] Mutation-prove the extraction: change `sandboxEnv` to spread `process.env` and confirm the
+- [x] Export `sandboxEnv()` — the CR-12 minimal env (`PATH`, `HOME`, `LANG`, `TERM`, `TMPDIR`, `PWD` plus
+      bindings), currently inlined in `runBlock` at `:1121-1127`, so no parent token reaches a child
+- [x] **Export `snapshotTree()`** — it is defined at `:1081` as a module-private `function snapshotTree(`,
+      **not** exported. Adding the `export` keyword is the change; there is nothing to "confirm". Its body
+      stays byte-identical
+- [x] `runBlock()` calls both rather than inlining them
+- [x] **Assert the classifier is untouched**: `SAFE_COMMANDS`, `COMMAND_RUNNERS`, `DENY_PATTERNS` and
+      `classifyBlock()` byte-identical in behaviour, pinned by a test over the existing QA-1…QA-17 cases
+- [x] Mutation-prove the extraction: change `sandboxEnv` to spread `process.env` and confirm the
       no-parent-tokens test goes red
 
 **Dependencies**: none
@@ -162,15 +166,15 @@ tests are what establish that rather than assert it.
 **Files**: `shared/resources/security-probe.mjs` (new)
 
 **Changes**:
-- [ ] `runProbeSpec({ sink, entry, cases })` where `entry` is `path#exportName` and `cases` come from
+- [x] `runProbeSpec({ sink, entry, cases })` where `entry` is `path#exportName` and `cases` come from
       `corpusFor(sink)` (task.79) or are caller-supplied in the same shape
-- [ ] **Resolve `entry` and assert it is under the repo root** before importing; reject otherwise
-- [ ] Run each case in its own child process, so a hang, throw or `process.exit` is contained and
+- [x] **Resolve `entry` and assert it is under the repo root** before importing; reject otherwise
+- [x] Run each case in its own child process, so a hang, throw or `process.exit` is contained and
       attributable to one case rather than killing the run
-- [ ] Inputs cross as JSON — never interpolated into a shell string
-- [ ] Per-case timeout from the shared spawn budget (`shared/resources/tests/spawn-budget.mjs`), **not a
+- [x] Inputs cross as JSON — never interpolated into a shell string
+- [x] Per-case timeout from the shared spawn budget (`shared/resources/tests/spawn-budget.mjs`), **not a
       literal** — `tests/test-harness-concurrency.test.js` fails the build on a hardcoded `timeout: <n>`
-- [ ] Report `{ executed, passed, reproduced[], declined[] }`; exit 0 / 1 / 2 per the convention at the top
+- [x] Report `{ executed, passed, reproduced[], declined[] }`; exit 0 / 1 / 2 per the convention at the top
       of `qa-execute-snippets.mjs`; `--json`
 
 **Dependencies**: Phase 1, task.79
@@ -184,17 +188,17 @@ tests are what establish that rather than assert it.
 **Files**: `shared/resources/security-probe.mjs`, `shared/resources/probe-boundary-rule.md` (new)
 
 **Changes**:
-- [ ] Compute the verdict from the run, never from a caller-supplied field:
+- [x] Compute the verdict from the run, never from a caller-supplied field:
       - **`engages`** — hostile cases handled as `correct` says, and at least one `legitimate` case passes
       - **`present-but-inert`** — the control is reachable in source but a hostile case is handled as if it
         were absent. **High severity**: worse than absent, because it has already been reviewed and believed
       - **`absent`** — no control found at the entry point
       - **`unverifiable`** — could not run: zero cases, an entry point that is not importable, a declined
         target, a timeout
-- [ ] **Zero cases yields `unverifiable`, never `engages`** and never a pass
-- [ ] **`declined` is its own state**, never folded into `executed: 0` — collapsing states is the defect
+- [x] **Zero cases yields `unverifiable`, never `engages`** and never a pass
+- [x] **`declined` is its own state**, never folded into `executed: 0` — collapsing states is the defect
       `task.73` chased through four QA cycles and `bug.7` documents one layer up
-- [ ] `probe-boundary-rule.md`: the trust-class argument, the v1 limits (importable entry points only; the
+- [x] `probe-boundary-rule.md`: the trust-class argument, the v1 limits (importable entry points only; the
       harness contains the harness, not arbitrary repo code), and **the refusal to add `node` to
       `SAFE_COMMANDS`, with the reason** — someone will propose it as the easy path
 
@@ -209,12 +213,12 @@ tests are what establish that rather than assert it.
 **Files**: `shared/resources/tests/security-probe.test.mjs` (new)
 
 **Changes**:
-- [ ] A fixture whose control engages → `engages`; one that is present-but-inert → `present-but-inert`
-- [ ] `cases: []` → `unverifiable`
-- [ ] A non-importable entry → `declined`, not `executed: 0`
-- [ ] An entry path outside the repo root → rejected
-- [ ] The sentinel fires when a probe writes outside its temp dir
-- [ ] **Mutation proofs**: remove the `present-but-inert` branch → the inert fixture test goes red; make
+- [x] A fixture whose control engages → `engages`; one that is present-but-inert → `present-but-inert`
+- [x] `cases: []` → `unverifiable`
+- [x] A non-importable entry → `declined`, not `executed: 0`
+- [x] An entry path outside the repo root → rejected
+- [x] The sentinel fires when a probe writes outside its temp dir
+- [x] **Mutation proofs**: remove the `present-but-inert` branch → the inert fixture test goes red; make
       zero cases return `engages` → that test goes red; restore both
 
 **Dependencies**: Phase 3
@@ -231,7 +235,8 @@ tests are what establish that rather than assert it.
 
 ### Files to Modify
 
-4. `shared/resources/qa-execute-snippets.mjs` — export the primitives; classifier untouched
+4. `shared/resources/qa-execute-snippets.mjs` — extract + export `sandboxEnv()`, add `export` to the
+   existing `snapshotTree()`; classifier untouched
 5. `shared/resources/tests/qa-execute-snippets.test.mjs` — parity assertions
 6. `CHANGELOG.md`
 
@@ -239,25 +244,38 @@ tests are what establish that rather than assert it.
 
 7. `skills/*/references/*` — `npm run bundle` output
 
+### Files Actually Landed
+
+| File | Status | Note |
+| --- | --- | --- |
+| `shared/resources/security-probe.mjs` | created | 430 lines — engine, verdict computation, CLI |
+| `shared/resources/probe-boundary-rule.md` | created | 208 lines — the argument, the refusal, the limits |
+| `shared/resources/tests/security-probe.test.mjs` | created | 18 tests |
+| `shared/resources/tests/fixtures/security-probe/*.mjs` | created | 6 fixtures — one per verdict, plus escape and not-a-function |
+| `shared/resources/qa-execute-snippets.mjs` | modified | `sandboxEnv()` extracted + exported; `export` added to `snapshotTree()`. Classifier untouched. |
+| `shared/resources/tests/qa-execute-snippets.test.mjs` | modified | +8 parity tests (97 total, was 89) |
+| `CHANGELOG.md` | modified | Added section |
+| `skills/*/references/*` | regenerated | `npm run bundle` |
+
 ---
 
 ## 8. Testing Strategy
 
 ### Contract Tests
 
-- [ ] The four verdicts, each produced by a fixture
-- [ ] Zero cases → `unverifiable`; declined ≠ executed-zero
-- [ ] Entry-path containment
-- [ ] Snippet classifier behaviour unchanged across QA-1…QA-14
+- [x] The four verdicts, each produced by a fixture
+- [x] Zero cases → `unverifiable`; declined ≠ executed-zero
+- [x] Entry-path containment
+- [x] Snippet classifier behaviour unchanged across QA-1…QA-17
 
 **Command**: `node --test shared/resources/tests/security-probe.test.mjs shared/resources/tests/qa-execute-snippets.test.mjs`
 
 ### Mutation Proving
 
-- [ ] `sandboxEnv` spreads `process.env` → the token-leak test reds
-- [ ] The `present-but-inert` branch removed → the inert fixture reds
-- [ ] Zero cases returns `engages` → that test reds
-- [ ] `declined` folded into `executed: 0` → the state-separation test reds
+- [x] `sandboxEnv` spreads `process.env` → the token-leak test reds
+- [x] The `present-but-inert` branch removed → the inert fixture reds
+- [x] Zero cases returns `engages` → that test reds
+- [x] `declined` folded into `executed: 0` → the state-separation test reds
 
 Procedure: [`shared/resources/mutation-proving.md`](../../../shared/resources/mutation-proving.md).
 
@@ -267,23 +285,23 @@ Procedure: [`shared/resources/mutation-proving.md`](../../../shared/resources/mu
 
 ### Functional
 
-- [ ] `runProbeSpec` returns a verdict the engine computed, not one a caller supplied
-- [ ] Zero executed cases yields `unverifiable`; a declined target is distinguishable from a zero count
-- [ ] Probes run contained: minimal env, temp cwd, escape sentinel, budgeted timeout
-- [ ] `probe-boundary-rule.md` records the `SAFE_COMMANDS` refusal and the v1 limits
+- [x] `runProbeSpec` returns a verdict the engine computed, not one a caller supplied
+- [x] Zero executed cases yields `unverifiable`; a declined target is distinguishable from a zero count
+- [x] Probes run contained: minimal env, temp cwd, escape sentinel, budgeted timeout
+- [x] `probe-boundary-rule.md` records the `SAFE_COMMANDS` refusal and the v1 limits
 
 ### Regression
 
-- [ ] `SAFE_COMMANDS`, `COMMAND_RUNNERS`, `DENY_PATTERNS`, `classifyBlock` behaviourally unchanged
-- [ ] `bug.3`'s 14 replay routes still classify as they did — `snippet-classifier-fail-open-replay.test.mjs` green
-- [ ] `npm run ci` green
+- [x] `SAFE_COMMANDS`, `COMMAND_RUNNERS`, `DENY_PATTERNS`, `classifyBlock` behaviourally unchanged
+- [x] `bug.3`'s 14 replay routes still classify as they did — `snippet-classifier-fail-open-replay.test.mjs` green
+- [x] `npm run ci` green
 
 ### Safety
 
-- [ ] No interpreter added to `SAFE_COMMANDS`
-- [ ] An entry path outside the repo root is rejected before import
-- [ ] No probe opens a network connection
-- [ ] Inputs never reach a shell as text
+- [x] No interpreter added to `SAFE_COMMANDS`
+- [x] An entry path outside the repo root is rejected before import
+- [x] No probe opens a network connection
+- [x] Inputs never reach a shell as text
 
 ---
 
@@ -344,42 +362,126 @@ run clean for a cycle.
 | Date       | Version | Description                                                                    | Author      |
 | ---------- | ------- | ------------------------------------------------------------------------------ | ----------- |
 | 2026-09-02 | 1.0     | Initial draft — filed from the rebirth-wallet security-review handover           | create-task |
+| 2026-09-07 | 1.1     | Review passed (8/10) — corrected 5 stale source anchors that drifted when task.79 landed; `snapshotTree` is module-private, not exported, so Phase 1 gains a real export step; QA case range widened to QA-17 | review-task |
+| 2026-09-07 |         | Implemented — 8 files (3 created, 3 modified, 6 fixtures), 26 tests added (18 new + 8 parity), 4 mutation proofs | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Extract containment
-- [ ] `sandboxEnv()` / `snapshotTree()` exported, `runBlock` calls them
-- [ ] Classifier proven unchanged
-- [ ] Extraction mutation-proved
+- [x] `sandboxEnv()` / `snapshotTree()` exported, `runBlock` calls them
+- [x] Classifier proven unchanged
+- [x] Extraction mutation-proved
 
 ### Phase 2: Probe runner
-- [ ] `runProbeSpec` with per-case child processes
-- [ ] Entry-path containment
-- [ ] Timeout from the spawn budget, not a literal
+- [x] `runProbeSpec` with per-case child processes
+- [x] Entry-path containment
+- [x] Timeout from the spawn budget, not a literal
 
 ### Phase 3: Verdicts
-- [ ] Four verdicts computed by the engine
-- [ ] Zero cases → unverifiable; declined is its own state
-- [ ] `SAFE_COMMANDS` refusal recorded with its reason
+- [x] Four verdicts computed by the engine
+- [x] Zero cases → unverifiable; declined is its own state
+- [x] `SAFE_COMMANDS` refusal recorded with its reason
 
 ### Phase 4: Tests
-- [ ] Four verdicts covered by fixtures
-- [ ] Sentinel and containment cases
-- [ ] Mutation proofs
+- [x] Four verdicts covered by fixtures
+- [x] Sentinel and containment cases
+- [x] Mutation proofs
 
 ---
 
 ## References
 
-- **The prose this replaces**: `shared/resources/finalise-dod-security-prompt.md:120-122` (task.73)
-- **The containment being extracted**: `shared/resources/qa-execute-snippets.mjs:648,680,688-698` (task.67)
+- **The prose this replaces**: `shared/resources/finalise-dod-security-prompt.md:145-146` (task.73)
+- **The containment being extracted**: `shared/resources/qa-execute-snippets.mjs:1081,1113,1121-1127` (task.67)
 - **Why the allow-list must not widen**: [`bug.6`](../../bugs/bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md),
   and `bug.3` before it — 26 documented routes past that boundary
 - **Collapsed-state precedent**: `task.73`'s tri-state conflation, and `bug.7` one layer up
 - **The corpus this consumes**: `task.79`
 - **Consumer**: `task.81`
+
+---
+
+## Implementation Record
+
+**Started / Completed**: 2026-09-07 (single develop pass, no iterations)
+**Implemented by**: `/develop` via `/develop-task` Step 3/8
+
+### Approach, phase by phase
+
+**Phase 1 — extract the containment, prove nothing moved.** `sandboxEnv()` lifted out of `runBlock`
+(it was inlined at `:1121-1127`) and exported; `export` added to `snapshotTree()`, which was
+module-private at `:1081` despite the task's original claim that it was already exported. `runBlock`
+now calls both. The classifier — `SAFE_COMMANDS`, `COMMAND_RUNNERS`, `DENY_PATTERNS`,
+`classifyBlock` — was not touched.
+
+Eight parity tests pin the extraction: the export shape, `QA-1…QA-17` classification (all 17, not
+the 14 the task originally named — three routes were added after it was authored), the six-key
+environment allow-list, binding precedence, `PWD` defaulting, and `snapshotTree`'s `skipDir`
+pruning. **Mutation proof**: reverting `sandboxEnv` to spread `process.env` turned two tests red —
+the new allow-list test and the pre-existing `QA-12: snippets do not inherit the parent environment`,
+which is the stronger signal, since it confirms the extraction is pinned by a test that predates it.
+
+**Phase 2 — the probe runner.** `runProbeSpec({sink, entry, cases, timeoutMs, repoRoot})`. Each case
+runs in its own child process (`node --input-type=module -e RUNNER`), so a hang, throw or
+`process.exit` is contained and attributable to one case. `RUNNER` is a fixed string with nothing
+interpolated into it; the entry path, export name and input all arrive as **JSON on stdin**. That is
+the property that makes an interpreter on `SAFE_COMMANDS` unnecessary, and it is tested directly —
+a case whose input is `"; touch /tmp/probe-pwned-$$; echo "` produces a clean rejection and no file.
+
+The child's answer is bracketed with a sentinel and the parent extracts the **last** complete
+payload, because a module under probe that logs to stdout is ordinary and must not be misread as a
+harness failure. Per-case timeout comes from `spawnBudget("PROBE")`, never a literal —
+`tests/test-harness-concurrency.test.js:403` fails the build on a hardcoded one.
+
+**Phase 3 — verdicts.** The design decision the task states in prose but does not mechanise: the
+corpus `correct` field is human-readable prose, so "handled as `correct` says" is derived from
+`direction` instead. hostile → should reject; legitimate → should accept. A control rejects by
+throwing *or* by returning `null`/`undefined`/`false`, the non-throwing rejection shape a validator
+commonly uses.
+
+Two branches that are not obvious and are documented in `probe-boundary-rule.md` §3:
+
+- `present-but-inert` = a hostile case reproduced **while others were rejected**. A control
+  demonstrably exists and demonstrably let one through — worse than `absent` because it has already
+  been reviewed and believed.
+- **`engages` additionally requires ≥1 legitimate case to pass.** Without that clause, a stub that
+  throws unconditionally rejects every hostile case and scores a clean probe — the same failure as a
+  self-reported `probes_executed: 0` in different clothes. It scores `unverifiable` /
+  `rejects-every-input` instead.
+
+**Phase 4 — tests and mutation proofs.** 18 tests, 6 fixtures (one per verdict, plus an escaping
+probe and a non-callable export). All four required mutation proofs run and each reds exactly the
+test that guards it:
+
+| Mutation | Tests red | Restored |
+| --- | --- | --- |
+| `sandboxEnv` spreads `process.env` | 2 (incl. pre-existing QA-12) | ✅ |
+| `present-but-inert` branch removed | 1 | ✅ |
+| zero cases returns `engages` | 1 | ✅ |
+| `declined` list emptied | 4 | ✅ |
+
+### Testing results
+
+- `shared/resources/tests/security-probe.test.mjs` — **18/18 pass**
+- `shared/resources/tests/qa-execute-snippets.test.mjs` — **97/97 pass** (was 89; +8 parity)
+- CLI smoke against the live 12-case `url-authority` corpus: `engages` → exit 0, `absent` → exit 1
+  (9 reproduced), `present-but-inert` → exit 1 (6 reproduced), missing `--sink` → exit 2
+- No `/tmp/probe-pwned-*` artifacts — inputs never reached a shell
+
+### Deferred work
+
+None deferred from this task's scope. Out-of-scope items remain with their owners: the skill that
+calls this engine is `task.81`, the gate-schema change is `task.82`.
+
+### Notes for the reviewer
+
+`engaging-control.mjs` scores `passed 11` of 12 against the real corpus, not 12 — one legitimate
+corpus case is over-blocked by the fixture's deliberately strict regex. The verdict is still
+`engages`, which is correct: over-blocking is reported in `overblocked[]` and does not by itself
+negate a control that rejects every hostile input and accepts some legitimate ones. The fixture is a
+test double, not a reference implementation.
 
 ---
 

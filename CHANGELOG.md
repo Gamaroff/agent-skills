@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **A security probe now runs, and the engine computes the verdict (task.80).** `task.73` gave the DoD
+  security check a probe mode, but the mode was prose: it told the agent to hand-write a script and run
+  it, then trusted the `probes_executed` count the agent typed. The guard *"`boundary: true` and
+  `probes_executed: 0` → FAIL"* was a self-guard whose input was self-reported — an agent that executed
+  nothing could write `probes_executed: 12`.
+
+  New `shared/resources/security-probe.mjs` runs each corpus case in its own child process and computes
+  one of four verdicts from what actually happened: **`engages`**, **`present-but-inert`**, **`absent`**,
+  **`unverifiable`**. Two properties are the point of it. Zero executed cases yields `unverifiable`,
+  never a pass — and `unverifiable` exits **1**, not 0, so a CI check reading `$?` cannot mistake "could
+  not tell" for "the control holds". And `declined` is its own state, never folded into `executed: 0`:
+  both render as "nothing ran", but one says the engine could not reach the target and the other says it
+  reached it and found nothing to run. Collapsing them is the defect `task.73` chased through four QA
+  cycles.
+
+  `present-but-inert` is the high-severity verdict, and the ordering is deliberate — worse than
+  `absent`, because an inert control has already been reviewed and believed. `engages` additionally
+  requires at least one *legitimate* case to pass, so a stub that throws on every input scores
+  `unverifiable` rather than a clean probe.
+
+- **`sandboxEnv()` and `snapshotTree()` extracted from `qa-execute-snippets.mjs` (task.80).** The
+  hardened containment the snippet path has used since task.67 — a six-key allow-list environment so no
+  parent token reaches a child, plus the escape sentinel — is now reusable rather than re-improvised per
+  caller. Behaviour-preserving: the extraction landed with parity tests pinning `QA-1…QA-17` and was
+  mutation-proved (reverting `sandboxEnv` to spread `process.env` turns the token-leak tests red).
+
+- **`shared/resources/probe-boundary-rule.md` — the written refusal to widen the snippet allow-list
+  (task.80).** Making probes runnable through the snippet path would need an interpreter on
+  `SAFE_COMMANDS`. It is one line and it looks small. It would let **any fenced bash block in any
+  document** run arbitrary code through the QA path, because the classifier cannot tell a probe's `node`
+  from a document's `node`. The rule doc records the refusal with its reason, the trust-class argument
+  that makes it unnecessary (the engine constructs its own runner; inputs cross as JSON on stdin, never
+  as shell text), the honest v1 limits (importable entry points only; no OS-level sandbox), and the
+  derivation of the verdict from the corpus `direction` field. The refusal is also asserted in code —
+  `qa-execute-snippets.test.mjs` enumerates ten interpreters against both `SAFE_COMMANDS` and
+  `COMMAND_RUNNERS`.
+
 ### Fixed
 
 - **`finalise` no longer reports a close it may have just undone (bug.11).** Step 7 transitions the
