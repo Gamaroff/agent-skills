@@ -54,7 +54,7 @@ First review; no prior gate, so the whole `origin/develop...HEAD` diff was revie
 
 ## Success Criteria Verification
 
-Traceability matrix: [`.summaries/qa-traceability-matrix.md`](./.summaries/qa-traceability-matrix.md) — 17 criteria, 14 full / 3 partial / 0 uncovered.
+Traceability matrix: `.summaries/qa-traceability-matrix.md` — 17 criteria, 14 full / 3 partial / 0 uncovered. **Deliberately not a link**: `.summaries/` is gitignored (`.gitignore:25`), so the target exists in a working tree and not in a CI checkout — a link here goes dead on the tracked tree only, which is the asymmetric failure this repo has been bitten by before. The three partials are restated inline in the task document's §9 caveats so a PR reader does not need it.
 
 Two criteria were **uncovered** when the matrix was first built (SC8 "no new network call on a deferred run", SC17 "no frontmatter backfill needed — confirmed, not assumed") and were closed with real tests before this review ran. SC17 is worth noting: its own wording forbids the form of evidence it had, which was a ticked box.
 
