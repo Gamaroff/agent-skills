@@ -5,11 +5,13 @@ type: task
 description: "Nothing in the repo takes application code as its subject and executes adversarial input against it. Ship a review skill that does — reporting engages / present-but-inert / absent / unverifiable per control, with the verdict computed by the engine and its own PASS falsifiable in CI."
 tags: [security, review, skill, probe]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-02
 updated: 2026-09-07
+completed_date: 2026-09-07
+pr_number: 347
 assignee:
 estimated_effort_hours: 6
 depends_on: task.79, task.80
@@ -17,7 +19,7 @@ depends_on: task.79, task.80
 
 # Technical Task: Ship `/review-security` — prove a control engages, not that it is present
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.81.review.1.review-security-skill.md` implemented 2026-09-07
 
 ---
@@ -479,6 +481,39 @@ found only by the mandatory refute pass.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate**: [`task.81.gate.3.review-security-skill.yml`](./task.81.gate.3.review-security-skill.yml) — ✅ **PASS**, 100/100, `top_issues: []`
+**QA cycles**: 3 · **Fix cycles**: 2 · **Findings**: 4, all fixed and closed
+**PR review (Step 5c)**: [`task.81.pr-review.1.review-security-skill.md`](./task.81.pr-review.1.review-security-skill.md) — ⚠️ CONCERNS (non-blocking)
+**CI**: ✅ 5/5 green on head `b7a5090c`, sha-matched against local HEAD
+
+All Definition of Done criteria verified — each re-checked **live** at DoD time by running the code,
+not by inheriting the QA reports' conclusions:
+
+✅ **Success criteria**: 10/10. Both inert fixtures report `present-but-inert` (12 executed, 7 reproduced); both engaged report `engages` (12 executed, 0 reproduced); zero cases → `unverifiable`; `VERDICTS` frozen with no PASS token.
+✅ **Tests**: 28 in this skill; 2729 in the full gate, 0 failures. Every fix mutation-proven.
+✅ **Documentation**: CHANGELOG, catalog (table row **and** the `**Review:**` line), commands, activation-phrases, pipeline-artifacts. Bundle and validation clean.
+✅ **Security**: no credentials, no network, no new dependencies; execution contained in the engine sandbox; the skill's own `node` block correctly *refused* by the snippet executor.
+⚠️ **Compliance**: NOT_APPLICABLE — no personal, payment, health or accessibility surface in a developer-tooling library.
+
+### Limits — stated, not implied away
+
+1. **No independent review exists.** `reviewDecision` is empty; the same agent authored the code, ran all three QA cycles, wrote the PR review and this DoD; and subagent dispatch was barred throughout, so the pipeline's own independent-lens mechanisms never ran. Every assurance here is self-assurance. What partially compensates is that every finding was mechanically demonstrable and reproducible in one command — and that two further defects were caught *while fixing others* and disclosed rather than quietly corrected.
+2. **`evidence: measured ⇒ probes_executed > 0`** is enforced against the prompt's documented example, not an emitted report — v1 ships no emitter. Weaker than the risk section's wording implies. Wiring is `task.82`.
+3. **The loopback guard does not resolve DNS** — a hostname pointing at 127.0.0.1 still passes.
+4. **Three advisory cleanups** remain, listed in `gate.3` `recommendations.future`.
+
+**Detailed Verification Log:** see [`task.81.dod.1.review-security-skill.md`](./task.81.dod.1.review-security-skill.md) for complete evidence, including the catalog gap this DoD run caught and fixed.
+
+**Task marked as ACCEPTED on:** 2026-09-07
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -495,6 +530,7 @@ found only by the mandatory refute pass.
 | 2026-09-07 |         | QA gate CONCERNS (90/100) cycle 2 — both prior findings verified fixed; refute pass found 1 new medium (loopback guard overclaims) | qa-task |
 | 2026-09-07 |         | QA findings fixed — loopback guard fails closed on IP literals; description trimmed to 98 words; tests 27 → 28 | qa-fix |
 | 2026-09-07 |         | QA gate PASS (100/100) cycle 3 — all four findings verified fixed, no new findings | qa-task |
+| 2026-09-07 | 1.2     | DoD verified — accepted (PR #347). Catalog Review line fixed at its generator during verification | finalise |
 
 ---
 

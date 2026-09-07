@@ -3,7 +3,7 @@
 **Task**: `task.81.review-security-skill.md`
 **Run Number**: 1
 **Started**: 2026-09-07 18:42
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -36,8 +36,8 @@ Ship the `review-security` skill — its prompt, output contract, falsifiability
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases; 9 files created, 8 modified; 25 new tests; 4/4 mutation proofs held; `npm run ci:fast` green (2726 pass, 0 fail) | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #347: https://github.com/Gamaroff/agent-skills/pull/347 — OPEN, base `develop`. 2 commits, 27 files. No issue comment (no linked issue) | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.81.qa.{N}.*.md`; `task.81.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 QA cycles; gate 3 **PASS** (100/100); 2 qa-fix cycles; 4 findings all fixed and mutation-proven; Step 5c `/review-pr` → **CONCERNS** (exits loop) | —                    |
-| 7. finalise                | ⏳ Pending | `task.81.dod.{N}.*.md`; task `status: accepted`                        | 5c returned CONCERNS — PC-1 (no independent review) must be carried into the DoD verbatim | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.81.dod.{N}.*.md`; task `status: accepted`                        | DoD PASSED; `status: accepted`; CI 5/5 green on `b7a5090c` (sha-matched); PC-1 carried verbatim; one gap found and fixed during verification | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 9 commits on `feature/task.81.review-security-skill`, all pushed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -132,6 +132,16 @@ One formatting fix was needed along the way: `prettier --write` on `review-secur
 - **Two commits rather than one.** The second is a comment-only fix to `shared/resources/security-probe.mjs`: its own JSDoc wrote a path as `shared/resources/…`, which the bundler's `SHARED_REF_RE` read as a filename and reported missing on every `npm run bundle`. Latent since task.80 — the engine had never been bundled because no skill referenced it, and shipping review-security is what surfaced it. Kept separate from the feature commit because it fixes a different task's file. Verified fixed by re-running the bundler, and `security-probe.test.mjs` + the new suite pass together (47 tests).
 - PR body was written directly rather than by the documented Explore subagent — same session constraint recorded at Steps 2 and 3. The diff is this run's own work, so there was nothing to summarise that was not already in hand.
 
+### Step 7 — finalise — 2026-09-07
+
+- **DoD: PASSED. Task `status: accepted`.** Summary: `task.81.dod.1.review-security-skill.md` (238 lines). Sprint review: `sprint-review-summary.md`. Canonical PR comment posted.
+- **The four parallel DoD subagents were not dispatched** — barred in this session. Every domain was verified directly against evidence on disk and by re-running the code, and the DoD says so in its own Method section rather than implying an agent ran.
+- **Success criteria re-verified live, not inherited.** All four fixtures were re-run through the engine at DoD time — and that run went *through the `probe.mjs` specs*, which is the end-to-end confirmation of TASK81-002's fix: had the specs still been unreferenced, the check would have had nothing to import.
+- **The CI gate did its job.** The rollup read `PENDING` on first sample (the 5c commit had started a new run) and `SUCCESS` on an earlier *ancestor*; neither was used. The gate waited, then matched the rollup's head sha against local `HEAD` (`b7a5090c`) before accepting.
+- **One real gap found at DoD time and fixed.** `skill-catalog.md`'s `**Review:**` line did not contain `review-security`, despite the Phase 4 checkbox being ticked and the edit genuinely made at Step 3. That line is **generated**, not hand-written — `generate_catalog.py:178` — so `npm run generate-catalog` silently reverted it, while the generated *table row* stayed present and made everything look correct. Fixed at the source and proven idempotent across two regenerations. This is the third instance in one task of the same family: edit a generated artifact, and the generator quietly undoes it.
+- **PC-1 carried verbatim.** The DoD states that no independent review exists — empty `reviewDecision`, author and reviewer the same agent, subagent dispatch unavailable — and that a PASS gate plus green CI must not be read as implying otherwise. It also records what partially compensates (every finding mechanically reproducible; two defects caught while fixing others and disclosed; one candidate finding measured and discarded) and what does not (a self-review cannot find the defect whose blind spot it shares).
+- Tracker steps skipped: no `github_issue`, no `jira_key` — nothing to close, no card to move. Recorded as N/A rather than as a failure.
+
 ---
 
 ## Issues Log
@@ -199,12 +209,47 @@ All four findings across the three cycles verified fixed by measurement rather t
 
 ---
 
+## Completion Summary
+
+Task 81 shipped `/review-security` and ran the full eight-step pipeline to acceptance. Gate 3 **PASS
+(100/100)**, CI 5/5 green, task `status: accepted`, PR [#347](https://github.com/Gamaroff/agent-skills/pull/347) open and ready to merge.
+
+**What was built**: a review skill that establishes whether a security control *engages* by executing
+it, with the verdict computed by `task.80`'s engine rather than written by the agent — plus a shared
+reviewer prompt, four falsifiability fixtures with their probe specs, a 28-test contract suite, and
+the registration sweep.
+
+**Six defects were found and fixed across the run**, four by QA and two while fixing others:
+
+| # | Defect | Found by |
+| --- | --- | --- |
+| 1 | Fixture entry points took 2 args and a full URL; the engine passes 1 arg and an authority component | **Step 2 review**, before any code was written |
+| 2 | Nested fences corrupted the prompt's Output Contract | QA cycle 1, via a Step 4b anomaly (0 blocks reported for a file that visibly had one) |
+| 3 | The six `probe.mjs` specs were imported by nothing | QA cycle 1 |
+| 4 | The loopback guard accepted `127.1`, `0177.0.0.1`, `2130706433` while claiming otherwise | QA cycle 2's **refute pass** |
+| 5 | The new drift guard asserted on `resolveEntry(...).ok` — shape, not existence | caught while fixing #3 |
+| 6 | The catalog's `**Review:**` line was reverted by its own generator | caught at **DoD verification** |
+
+Defect 1 is the one worth keeping. Had it shipped, both inert fixtures would have scored
+`unverifiable`, Phase 3's central assertion would have failed, and the cheap repair under pressure is
+to relax the assertion — producing exactly the vacuous instrument the task exists to replace. It was
+caught by reading the dependency's source at review time rather than by trusting the task's prose.
+
+**A recurring shape, three times in one task**: edit a generated artifact and the generator quietly
+undoes it. Bundled `references/`, `skill-dependencies.json`, and the catalog's curated line. Each was
+fixed at its source.
+
+**The honest limit**: no independent review exists. The same agent wrote the code, all three QA
+cycles, the PR review and the DoD, and subagent dispatch was barred throughout, so the pipeline's own
+independent-lens mechanisms never ran. This is stated in the DoD, the PR review, the sprint review
+and the canonical PR comment rather than left for a reader to infer.
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-07 20:25
+**Final Status**: Completed
 **Branch**: `feature/task.81.review-security-skill`
 **PR**: [#347](https://github.com/Gamaroff/agent-skills/pull/347)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
+**QA Iterations**: 3 QA cycles + 2 qa-fix cycles (of a 5-cycle budget); exited via Step 5c `/review-pr` → CONCERNS
+**DoD Summary**: `task.81.dod.1.review-security-skill.md`
 **Tracker debt**: {populated after Step 7}
