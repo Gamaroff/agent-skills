@@ -111,19 +111,33 @@ function splitFrontmatter(content) {
   // A block delimited by `---` is not yet frontmatter: a document that OPENS with
   // a thematic break and carries another `---` further down has exactly the same
   // delimiters. Delimiters cannot tell those apart — only the content can. So
-  // require every line in the block to look like YAML: blank, a `key:` at column
-  // 0, or an indented continuation (list items, folded scalars). One line of
-  // column-0 prose means this is a thematic break and the "frontmatter" is body
-  // text.
+  // every line in the block must be something YAML permits at the top level.
   //
   // Without this, prose containing `updated: 1999-01-01` is read as the task's
   // own date — and an artificially OLD task date makes every report look current,
   // which is the unsafe direction.
+  //
+  // The four allowances below are all legal YAML, and the last two were initially
+  // omitted — a `#` comment line or a column-0 block sequence made this reject the
+  // whole block and return no date. That direction is safe (no date -> stale ->
+  // run the review), and no tracked document currently uses either shape, so it
+  // was latent rather than live; it is fixed because rejecting valid frontmatter
+  // is a defect whether or not anything trips it yet.
+  //
+  // WHERE THIS DELIBERATELY STOPS: a line like `Note: something` is accepted,
+  // because YAML itself would parse it as the key `Note`. There is no syntactic
+  // difference between `Note: prose` and `description: prose`, so a document that
+  // opens with `---` and whose every line is `Word: …` genuinely *is* frontmatter
+  // by YAML's rules, and reading it as such is correct rather than a hole. The
+  // case this guard catches is the one that is not YAML at all: a bare prose
+  // sentence at column 0.
   for (let i = 1; i < close; i++) {
     const line = lines[i];
     if (line.trim() === "") continue;
-    if (/^\s/.test(line)) continue; // continuation
-    if (/^[A-Za-z0-9_-]+:/.test(line)) continue; // key
+    if (/^\s/.test(line)) continue; // indented continuation / nested block
+    if (/^#/.test(line)) continue; // YAML comment
+    if (/^-(\s|$)/.test(line)) continue; // column-0 block sequence entry
+    if (/^(?:["'][^"']+["']|[A-Za-z0-9_.-]+)[ \t]*:/.test(line)) continue; // key
     return { frontmatter: Object.create(null), body: content };
   }
 
@@ -133,14 +147,21 @@ function splitFrontmatter(content) {
   // prototype setter instead of creating an own key.
   const frontmatter = Object.create(null);
   for (let i = 1; i < close; i++) {
-    const m = lines[i].match(/^([A-Za-z0-9_-]+):[ \t]*(.*)$/);
+    const m = lines[i].match(
+      /^(?:["']([^"']+)["']|([A-Za-z0-9_.-]+))[ \t]*:[ \t]*(.*)$/,
+    );
     if (!m) continue;
+    // A quoted key (`"updated": …`) is the same key as a bare one. Dots are
+    // legal in a YAML key too (`jira.key:`); neither shape voided the block
+    // before, but both were dropped silently by the old `[A-Za-z0-9_-]+` class,
+    // so a document using them lost every key after the first such line.
+    const key = m[1] !== undefined ? m[1] : m[2];
     // FIRST wins. Last-wins lets a stray later occurrence override the real key,
     // and "later" is the half an author is least likely to be looking at.
-    if (Object.prototype.hasOwnProperty.call(frontmatter, m[1])) continue;
-    let v = m[2].trim();
+    if (Object.prototype.hasOwnProperty.call(frontmatter, key)) continue;
+    let v = m[3].trim();
     if (v === "" || v === "null" || v === "~") {
-      frontmatter[m[1]] = null;
+      frontmatter[key] = null;
       continue;
     }
     v = v.replace(/\s+#.*$/, "").trim();
@@ -149,7 +170,7 @@ function splitFrontmatter(content) {
       (v.startsWith("'") && v.endsWith("'"))
     )
       v = v.slice(1, -1).replace(/''/g, "'");
-    frontmatter[m[1]] = v;
+    frontmatter[key] = v;
   }
   return { frontmatter, body: lines.slice(close + 1).join("\n") };
 }
@@ -168,6 +189,8 @@ function splitFrontmatter(content) {
 // an indented code block — which is simpler and stricter than tracking block
 // state. List continuations make that state ambiguous, and an ambiguity here
 // resolves the wrong way.
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+
 function blankNonProse(body) {
   const lines = splitLines(body);
   let fence = null; // { char, len }
@@ -175,9 +198,48 @@ function blankNonProse(body) {
 
   return lines
     .map((raw) => {
-      let line = raw;
+      // ORDER IS LOAD-BEARING: fences are resolved from the RAW line, before any
+      // comment handling, and comment handling never runs inside a fence.
+      //
+      // The reverse order — strip comments first, then test what is left as a
+      // delimiter — makes the comment pass and the fence pass cancel each other
+      // out. A line inside a fenced example reading `<!-- template -->` followed
+      // by a backtick run becomes a bare backtick run once the comment is
+      // removed, closes the block, and releases the rest of the example as live
+      // prose. That defeats the run-length check as thoroughly as the run-length
+      // check defeats a bare character comparison, and it fails toward `fresh`.
+      //
+      // No markdown processor parses HTML comments inside a fenced block, so
+      // "fence first, comments only outside" is also simply what the format says.
+      if (fence !== null) {
+        const c = raw.match(FENCE_RE);
+        if (
+          c &&
+          c[1][0] === fence.char &&
+          c[1].length >= fence.len &&
+          c[2].trim() === ""
+        ) {
+          // CommonMark: a closer matches the opener's character, is at least as
+          // long, and carries no info string.
+          fence = null;
+        }
+        return "";
+      }
 
-      // --- HTML comments ---------------------------------------------------
+      const o = raw.match(FENCE_RE);
+      if (o) {
+        fence = { char: o[1][0], len: o[1].length };
+        // Comment state is deliberately NOT reset here. Under fence-first
+        // ordering a `<!--` inside a fence is never seen at all, so the only
+        // state that can survive is a comment opened in real prose before the
+        // fence — and an unterminated comment there should keep blanking, which
+        // is the safe direction. (An earlier draft reset it. That line was
+        // unreachable by any test, which is what surfaced it.)
+        return "";
+      }
+
+      // --- HTML comments, outside fences only --------------------------------
+      let line = raw;
       if (inComment) {
         const end = line.indexOf("-->");
         if (end === -1) return "";
@@ -190,32 +252,7 @@ function blankNonProse(body) {
         line = line.slice(0, open);
         inComment = true;
       }
-
-      // --- fenced code -----------------------------------------------------
-      // A fence may be indented up to 3 spaces; 4+ is an indented code block,
-      // which the matchers reject anyway.
-      const m = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
-      if (m) {
-        const char = m[1][0];
-        const len = m[1].length;
-        if (fence === null) {
-          fence = { char, len };
-        } else if (
-          char === fence.char &&
-          len >= fence.len &&
-          m[2].trim() === ""
-        ) {
-          // CommonMark: a closing fence uses the same character, is AT LEAST as
-          // long as the opener, and carries no info string. Tracking only the
-          // character let a ``` inside a ```` block close it, so the rest of the
-          // example leaked out as live text — which is exactly how this repo
-          // writes markdown-about-markdown.
-          fence = null;
-        }
-        return "";
-      }
-
-      return fence === null ? line : "";
+      return line;
     })
     .join("\n");
 }
@@ -262,6 +299,10 @@ const ISO_ONLY_RE = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/;
 // makes the "string order is date order" property claimed in the header actually
 // safe rather than merely usually true.
 function isRealDate(y, mo, d) {
+  // Year 0 is representable in the ISO shape and orders below every real date, so
+  // it would make a report look older than anything rather than newer — the safe
+  // direction, but it is not a date and should not be treated as one.
+  if (y < 1000) return false;
   if (mo < 1 || mo > 12 || d < 1) return false;
   const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
   const dim = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];

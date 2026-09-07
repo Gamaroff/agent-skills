@@ -56,7 +56,7 @@ document's last content change. Compute it with the engine — never eyeball the
 node -e '
   const fs = require("fs");
   const { classifyReviewReport, describeVerdict } =
-    require("./.agents/skills/{develop-story|develop-task|develop-bug}/references/review-report-freshness.js");
+    require("./.agents/skills/{develop-story|develop-task}/references/review-report-freshness.js");
   const r = classifyReviewReport({
     taskContent:   fs.readFileSync(process.argv[1], "utf8"),
     reportContent: process.argv[2] ? fs.readFileSync(process.argv[2], "utf8") : null,
@@ -65,14 +65,32 @@ node -e '
 ' "{task-file}" "{resolved-report-file-or-empty}"
 ```
 
+> Two things about that snippet. **`argv[1]` is the first *argument* only because this is `node -e`** —
+> there is no script path in `argv` under `-e`. Lift the body into a `.js` file and `argv[1]` becomes
+> the script path, and it silently reads the wrong file. And the engine is bundled into
+> **`develop-story` and `develop-task` only**; `develop-bug` keeps its own step-2 document and has no
+> copy of this module, so do not widen the placeholder to it without bundling it there first.
+
 Engine source: `references/review-report-freshness.js` (bundled into each skill as
 `references/review-report-freshness.js`). It is a **library, not a CLI** — deliberately, because its
 only caller is this gate and a CLI would be a second interface to keep honest. It returns
 `{verdict, reason, taskDate, reportDate}` with `verdict ∈ {fresh, stale, absent}`.
 
-**Only `fresh` skips.** `stale` and `absent` both run the review, and so does every malformed input —
-the module resolves each ambiguity toward running, because a needless review costs one pass while a
-wrong skip develops against an unreviewed card.
+**Only `fresh` skips — on the `Planned` row.** `stale` and `absent` both run the review, and so does
+every malformed input: the module resolves each ambiguity toward running, because a needless review
+costs one pass while a wrong skip develops against an unreviewed card.
+
+> ⚠️ **This paragraph governs the `Planned` row and nothing else. Read it against the tables, not
+> over them.** The `Ready for Development` and `In Progress` rows — in **both** the develop-story and
+> develop-task tables — still skip on the *presence* of a report, with no freshness computation, and
+> that is deliberate: reaching either status required passing this gate, so the status is itself an
+> assertion that a review completed. `Planned` carries no such assertion, which is exactly why it
+> needed the report to be current before it could authorise a skip.
+>
+> Stated because an earlier draft put the unqualified sentence "Only `fresh` skips" between the two
+> tables, where it read as governing all six rows and contradicted four of them — in a document a
+> reader executes, 26 lines apart. If the reasoning above is ever falsified, the fix is to extend the
+> freshness column to those rows, not to relax this one.
 
 The task's date is its frontmatter `updated:`. The report's date is its body `**Reviewed:**` line,
 falling back to `**Review Date:**` — **not** frontmatter, which review reports mostly do not carry,

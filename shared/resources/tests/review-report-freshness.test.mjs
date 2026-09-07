@@ -565,3 +565,165 @@ test("`__proto__` in frontmatter does not reach the prototype", () => {
   assert.equal(r, "2026-06-01");
   assert.equal({}.polluted, undefined, "prototype must not be polluted");
 });
+
+// ── 8. shapes the cycle-1 frontmatter guard initially rejected ─────────────
+//
+// The "looks like YAML" discriminator that closed the thematic-break hole was at
+// first too strict: it rejected two legal top-level YAML constructs, so a
+// document using either lost its date. Safe direction, latent (no tracked doc
+// uses them) — but rejecting valid frontmatter is a defect regardless.
+
+test("a YAML comment line in frontmatter does not void the block", () => {
+  assert.equal(
+    taskUpdatedDate("---\n# a yaml comment\nid: t\nupdated: 2026-06-01\n---\n"),
+    "2026-06-01",
+  );
+});
+
+test("a column-0 block sequence in frontmatter does not void the block", () => {
+  assert.equal(
+    taskUpdatedDate("---\ntags:\n- a\n- b\nupdated: 2026-06-01\n---\n"),
+    "2026-06-01",
+  );
+});
+
+test("bare column-0 prose still voids the block (the thematic-break case)", () => {
+  assert.equal(
+    taskUpdatedDate(
+      "---\n\nProse, not frontmatter.\n\nupdated: 1999-01-01\n\n---\n",
+    ),
+    null,
+  );
+});
+
+test("a year below 1000 is not a date", () => {
+  assert.equal(reportReviewedDate("**Reviewed:** 0000-01-01\n"), null);
+  assert.equal(reportReviewedDate("**Reviewed:** 0999-12-31\n"), null);
+  assert.equal(reportReviewedDate("**Reviewed:** 1000-01-01\n"), "1000-01-01");
+});
+
+test("a tab-indented date line is not read (a tab is 4 spaces in CommonMark)", () => {
+  assert.equal(reportReviewedDate("# R\n\n\t**Reviewed:** 2030-01-01\n"), null);
+});
+
+test("a fence opener carrying an info string still opens a block", () => {
+  assert.equal(
+    reportReviewedDate("# R\n\n```markdown\n**Reviewed:** 2030-01-01\n```\n"),
+    null,
+  );
+});
+
+test("a `~~~` block is not closed by a ``` line", () => {
+  assert.equal(
+    reportReviewedDate("# R\n\n~~~\n**Reviewed:** 2030-01-01\n```\n"),
+    null,
+  );
+});
+
+test("a CRLF report with a fenced block still yields its real date", () => {
+  assert.equal(
+    reportReviewedDate(
+      "# R\r\n\r\n```\r\nx\r\n```\r\n\r\n**Reviewed:** 2026-05-11\r\n",
+    ),
+    "2026-05-11",
+    "no stray \\r may leak into the captured date",
+  );
+});
+
+// ── 9. documented boundaries — accepted on purpose, pinned so they stay visible
+
+test("frontmatter keys may be quoted or dotted", () => {
+  assert.equal(
+    taskUpdatedDate('---\n"updated": 2026-09-01\n---\n'),
+    "2026-09-01",
+  );
+  assert.equal(
+    taskUpdatedDate("---\njira.key: PROJ-1\nupdated: 2026-09-01\n---\n"),
+    "2026-09-01",
+  );
+});
+
+test("`Word: prose` inside `---` delimiters IS frontmatter — a documented limit", () => {
+  // Not a hole: YAML itself parses `Status: planned` as the key `Status`, and
+  // there is no syntactic difference between that and `description: prose`. A
+  // document opening with `---` whose every line is `Word: value` genuinely is
+  // frontmatter. The guard catches the case that is not YAML at all — a bare
+  // sentence at column 0 — and this test pins where it stops so the boundary is
+  // documented rather than merely implied by the one case that fails.
+  assert.equal(
+    taskUpdatedDate(
+      "---\nStatus: planned\nOwner: someone\nupdated: 1999-01-01\n---\n",
+    ),
+    "1999-01-01",
+  );
+});
+
+test("a comment inside a fence cannot close it (fix 1 must not undo fix 3)", () => {
+  // The refute pass's defeating input, reduced. Stripping comments before
+  // resolving fences turned `<!-- template -->` + a backtick run into a bare
+  // closer, releasing the fenced example as live prose and reading its date as
+  // the report's own — fresh, from a template.
+  assert.equal(
+    reportReviewedDate("```\n<!-- c -->```\n**Reviewed:** 2030-12-31\n"),
+    null,
+  );
+  assert.equal(
+    reportReviewedDate("````\n```\n<!-- c -->````\n**Reviewed:** 2030-12-31\n"),
+    null,
+  );
+});
+
+test("an unterminated comment inside a fence does not blank the rest of the file", () => {
+  // Comment state must not survive a fence. It used to, so one stray `<!--` in
+  // an example blanked everything after it — including the report's real date.
+  assert.equal(
+    reportReviewedDate("```\n<!-- TODO\n```\n\n**Reviewed:** 2026-09-05\n"),
+    "2026-09-05",
+  );
+});
+
+test("the full refute-pass input classifies stale, on the report's real date", () => {
+  const r = classifyReviewReport({
+    taskContent: "---\nupdated: 2026-09-01\n---\n# task\n",
+    reportContent:
+      "# Task Review Report\n\n## Review Metadata\n\n- **Reviewer:** QA\n" +
+      "- **Review Date:** 2020-01-01\n\n## Appendix — report header template\n\n" +
+      "```markdown\n<!-- template -->```\n**Reviewed:** 2030-12-31\n```\n",
+  });
+  assert.equal(r.verdict, VERDICTS.STALE);
+  assert.equal(r.reportDate, "2020-01-01");
+});
+
+// ── 10. the load-bearing halves of two otherwise-vacuous guards ────────────
+//
+// Both tests below exist because their siblings pass with the fix reverted:
+// the CRLF *report* test passes because the matcher carries `m` and stops at the
+// captured date, and the `__proto__` test passes because assigning a STRING
+// through the prototype setter is a silent no-op. Neither sibling holds the
+// behaviour it names. These do.
+
+test("CRLF is stripped by the splitter, not merely tolerated by the matcher", () => {
+  // Revert `splitLines` to split("\n") and every fence delimiter keeps a
+  // trailing \r, so FENCE_RE stops matching and the fenced example leaks out.
+  assert.equal(
+    reportReviewedDate("# R\r\n\r\n```\r\n**Reviewed:** 2030-01-01\r\n```\r\n"),
+    null,
+    "a CRLF fenced example must not leak its date",
+  );
+});
+
+test("a task with no `updated:` cannot inherit one from the prototype", () => {
+  const before = Object.prototype.updated;
+  try {
+    // eslint-disable-next-line no-extend-native
+    Object.prototype.updated = "1999-01-01";
+    assert.equal(
+      taskUpdatedDate("---\nid: t\n---\n"),
+      null,
+      "a missing `updated:` must read as absent, never inherited",
+    );
+  } finally {
+    if (before === undefined) delete Object.prototype.updated;
+    else Object.prototype.updated = before;
+  }
+});

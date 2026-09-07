@@ -397,36 +397,32 @@ the smaller rollback if only the table behaviour needs undoing.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
-**QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-07
+**QA Status**: FAIL (cycle 2 at review) — all findings closed
+**Testing Date**: 2026-09-08
 **Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Gate Decision**: cycle 1 FAIL → cycle 2 FAIL → all 18 findings closed
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.97.qa.1.develop-task-review-gate-already-reviewed.md](./task.97.qa.1.develop-task-review-gate-already-reviewed.md)
-- **Gate File**: [task.97.gate.1.develop-task-review-gate-already-reviewed.yml](./task.97.gate.1.develop-task-review-gate-already-reviewed.yml)
+- **Cycle 1**: [qa.1](./task.97.qa.1.develop-task-review-gate-already-reviewed.md) · [gate.1](./task.97.gate.1.develop-task-review-gate-already-reviewed.yml)
+- **Cycle 2 (refute)**: [qa.2](./task.97.qa.2.develop-task-review-gate-already-reviewed.md) · [gate.2](./task.97.gate.2.develop-task-review-gate-already-reviewed.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 2756 (2755 pass, 0 fail)
-- **Phases Verified**: 4/4 (2 with defects)
-- **Critical Issues**: 3 HIGH, 5 MEDIUM, 2 LOW
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: CONCERNS
+- **Tests Executed**: 2788 (2787 pass, 0 fail)
+- **Phases Verified**: 4/4
+- **Findings**: cycle 1 — 3 HIGH / 5 MED / 2 LOW; cycle 2 — 2 HIGH / 4 MED / 2 LOW. All closed.
+- **NFR Status**: Security PASS, Performance PASS, Reliability FAIL→fixed, Maintainability CONCERNS→fixed
 
 ### Key Findings
 
-The freshness rule that authorises the new skip can be driven to `fresh` for a genuinely stale
-report by four independent ordinary markdown constructs — an HTML comment, a 4-space indented code
-block, a nested fence whose run length is not tracked, and a date on the line *after* the
-`**Reviewed:**` label. That is the over-correction §10 names as worse than the halt this task
-removes, and it falsifies the §9 criterion that a stale report still runs the review. A fifth route
-parses body prose as frontmatter; a sixth silently disables the feature on CRLF checkouts. The prose
-adds a seventh: the post-review table is non-exhaustive and lets a *pre-existing stale* report
-authorise a skip the code would refuse.
+The freshness rule was defeatable in **seven** distinct ways across two cycles, every one toward
+`fresh` — the over-correction §10 names as worse than the halt this task removes. Cycle 2's sharpest
+finding is that **two of cycle 1's own fixes cancelled each other out**: comment-stripping ran inside
+fenced blocks and its output was re-tested as a delimiter, so a fenced example could close its own
+block and leak an illustrative date as the report's. A fix is new code, not the closure of a finding.
 
-All seven reproduced by execution, not inferred. `/develop-story` verified byte-identical.
+Unit tests 27 → 59, every fix mutation-proved. `/develop-story` byte-identical throughout.
 
 ---
 
@@ -516,6 +512,8 @@ which §5 of this card promises not to make — **filed as a follow-up**, not ac
 | 2026-09-07 |  | Implemented — 8 source files (+4 regenerated bundles), 27 tests | develop |
 | 2026-09-07 |  | QA gate FAIL (70/100) — 10 findings; the freshness rule is defeatable 4 ways toward `fresh` | qa-task |
 | 2026-09-07 |  | QA findings fixed — all 10 closed, 9 mutations proved red, 1 cycle | qa-fix |
+| 2026-09-08 |  | QA cycle 2 refute pass — gate FAIL (70/100), 8 findings; two of cycle 1's fixes cancelled out and the module was still defeatable | qa-task |
+| 2026-09-08 |  | Cycle-2 findings fixed — all 8 closed, 12 mutations proved red, tests 27 → 59 | qa-fix |
 
 ---
 

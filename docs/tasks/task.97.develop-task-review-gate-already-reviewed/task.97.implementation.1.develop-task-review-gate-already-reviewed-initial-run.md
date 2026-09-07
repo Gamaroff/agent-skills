@@ -125,7 +125,47 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — qa-task: **FAIL 70/100**, then qa-fix: 10/10 closed
+
+**The gate found what §10 predicted.** The freshness rule could be driven to `fresh` for a genuinely
+stale report by four ordinary markdown constructs — an HTML comment, a 4-space indented block, a
+nested fence whose run length was not tracked, and a date on the line *after* the label. Three more
+routes: body prose parsed as frontmatter (artificially old task date), `2026-99-99` outranking every
+real date forever, and CRLF silently disabling the feature. Plus a prose gap: the post-review table
+was non-exhaustive and let a *pre-existing stale* report authorise the skip the code refused.
+
+All reproduced by execution before fixing, all mutation-proved after. **12 mutations applied, 12 went
+red.** Tests 27 → 52. Suite 2756 → 2773 → green.
+
+**What made this catchable.** The task document wrote down the failure mode it was most at risk of
+(§10: "a skip rule that is too permissive develops against an unreviewed card, which is a worse
+failure than the halt") and §9 stated the criterion precisely enough to falsify ("a report older than
+the document's `updated:` still runs it"). QA had something to attack rather than something to admire.
+
+**What did NOT catch it.** The full suite was green at 2755/2756 the whole time, and the 27 existing
+tests were genuinely mutation-proved. Mutation-proving establishes that the tests you wrote are not
+vacuous; it says nothing about the tests you did not write. The tests and the defects simply did not
+intersect — which is the sharpest lesson of this cycle and is now recorded in the QA report.
+
+**Three false alarms, each caught by checking the premise rather than the conclusion** — a pattern
+worth naming because it recurred:
+
+1. A mutation reported "STILL GREEN" (an unheld test). The perl pattern had not matched; the mutation
+   was a no-op. Re-applied with a needle assertion, the test went red.
+2. A leak check reported 2 task-doc files staged in the wrong commit. They were the eval **replay
+   fixtures** under `evals/.../replay/docs/tasks/…`; the grep pattern was too broad.
+3. A regression check reported 4 documents mis-parsing after a fix. None of the four has frontmatter
+   at all — the check script had matched a fenced *example* of frontmatter inside them.
+
+In all three the tool output was accurate and the conclusion drawn from it was wrong. `git check-ignore`
+supplied a fourth: it reports negation rules too, so it named `!evals/**/replay/**` for a file that is
+**not** ignored.
+
+**Cycle 1's own fixes then introduced two latent regressions**, found by probing the fixes rather than
+re-reading them: the new frontmatter discriminator rejected two legal YAML constructs (a `#` comment
+line, a column-0 block sequence). No tracked document uses either, so nothing went red — the direction
+was safe (no date → stale → run the review) — but rejecting valid frontmatter is a defect whether or
+not anything trips it yet. Both fixed and mutation-proved.
 
 ---
 
