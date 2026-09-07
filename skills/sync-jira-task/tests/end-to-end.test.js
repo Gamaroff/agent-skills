@@ -32,11 +32,7 @@ const fs = require("fs");
 const path = require("path");
 
 const taskSync = require("../scripts/sync-jira-task.js");
-const {
-  fakeJira,
-  gitRepo,
-  makeRunner,
-} = require("../../../tests/lib/fake-jira.js");
+const { fakeJira, gitRepo, makeRunner } = require("../references/fake-jira.js");
 
 const runSync = makeRunner({ module: taskSync, cliName: "sync-jira-task" });
 
@@ -173,24 +169,42 @@ test("the diff is fed the label set that is actually sent, not a frontmatter reb
 
   const first = await runSync(root, task, fetchImpl, ["--quiet"]);
   const key = first.result.issueKey;
-  const sent = state.issues[key].fields.labels.slice().sort();
 
   await runSync(root, task, fetchImpl, ["--quiet"]);
 
-  // The PUT on the second run must carry the same label set the card already
-  // holds. If the diff were right but the payload wrong, the summary assertion
-  // above would pass while the card drifted.
+  // Compare the PUT payload against what JIRA ACTUALLY HOLDS — which is the
+  // comparison `diffFields` makes, and the one the defect got wrong.
+  //
+  // The earlier version of this test compared the create payload's labels with
+  // the update payload's labels. Both come from the same builder over identical
+  // inputs, so it asserted builder determinism and stayed green with the defect
+  // restored: it could not see the bug it is named for.
+  const held = (state.issues[key].fields.labels || []).slice().sort();
   const puts = state.requests.filter(
     (r) => r.method === "PUT" && r.url.includes(`/issue/${key}`),
   );
   assert.ok(puts.length >= 1, "expected at least one PUT");
-  const lastLabels = (puts[puts.length - 1].body.fields.labels || [])
+  const sentLabels = (puts[puts.length - 1].body.fields.labels || [])
     .slice()
     .sort();
+
+  assert.ok(
+    held.some((l) => l.startsWith("synced-from-")),
+    "the card carries no synced-from-* label — there is no divergence to test",
+  );
   assert.deepEqual(
-    lastLabels,
-    sent,
-    "the payload's label set drifted between runs",
+    sentLabels,
+    held,
+    "the payload's label set differs from what Jira holds — this is the set " +
+      "the diff compares, so they must agree for the sync to converge",
+  );
+
+  // And the diff, fed that payload, must report no label change.
+  const secondSummary = (await runSync(root, task, fetchImpl, ["--quiet"]))
+    .changeSummary;
+  assert.ok(
+    !/labels/.test(secondSummary),
+    `the diff still reports a label change: ${secondSummary}`,
   );
 });
 
@@ -223,6 +237,52 @@ test("a task whose card transitioned can be synced again without --force", async
     second.changeSummary,
     "Sync (no field changes detected)",
     "the second run thought something had changed",
+  );
+});
+
+// ===========================================================================
+// Migration — no frontmatter backfill is needed
+// ===========================================================================
+
+test("a document with no jira_last_synced_at self-heals — no backfill needed", async () => {
+  const { root, task } = repoWithTask();
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, task, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+
+  // Simulate a document synced before `jira_last_synced_at` was written — the
+  // shape any already-synced document in the wild has. The task claims no
+  // backfill is needed because the next successful sync self-heals it; this
+  // asserts that rather than assuming it.
+  const stripped = fs
+    .readFileSync(task, "utf-8")
+    .replace(/^jira_last_synced_at:.*\n/m, "");
+  assert.ok(
+    !/jira_last_synced_at/.test(stripped),
+    "the fixture edit did not remove the field",
+  );
+  fs.writeFileSync(task, stripped);
+
+  // `guardConcurrentEdit` returns early when there is no stored timestamp, so
+  // the absence must not abort — it must simply write a fresh one.
+  const second = await runSync(root, task, fetchImpl, ["--quiet"]);
+  assert.equal(second.result.issueKey, key);
+
+  const healed = fs.readFileSync(task, "utf-8");
+  assert.match(
+    healed,
+    /^jira_last_synced_at: ".+"$/m,
+    "the field was not restored — a backfill WOULD be required",
+  );
+
+  // And the run after the self-heal converges, so the restored value is the
+  // post-transition one rather than a stale read.
+  const third = await runSync(root, task, fetchImpl, ["--quiet"]);
+  assert.equal(
+    third.changeSummary,
+    "Sync (no field changes detected)",
+    "the self-healed timestamp did not converge on the next run",
   );
 });
 

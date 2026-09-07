@@ -5,7 +5,7 @@ type: task
 description: "The two convergence defects fixed on the bug path in PR #338 are present in the three sibling Jira sync scripts: every run re-PUTs because the label diff can never match, and a card that transitions then refuses every subsequent sync on a change the tool made itself."
 tags: [sync-jira, convergence, jira, defect, skill-family]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: High
 created: 2026-09-07
 updated: 2026-09-07
@@ -16,7 +16,7 @@ github_issue: 343
 
 # Technical Task: sync-jira-story/task/epic never converge — label diff and post-transition timestamp
 
-**Status:** Ready for Review
+**Status:** In Progress
 **GitHub Issue**: [#343](https://github.com/Gamaroff/agent-skills/issues/343)
 **Review**: ✅ All review recommendations from `task.96.review.1.sync-jira-sibling-convergence.md` implemented 2026-09-07
 
@@ -270,7 +270,9 @@ The **behaviour** change is the point and should be stated plainly for the chang
 
 ### Files to Add (Test Infrastructure)
 
-5. ✅ `tests/lib/fake-jira.js` — the generalised harness lifted from `skills/sync-jira-bug/tests/end-to-end.test.js`, parameterised by `{ runner, argv }`, extended with the backlog and project endpoints. `tests/lib/` is the repo's established home for shared test helpers (`tests/lib/relationship-assertion-lint.js`); deliberately **not** `shared/resources/`, which would bundle test-only code into every consumer's skill install
+5. ✅ `shared/resources/fake-jira.js` — the generalised harness lifted from `skills/sync-jira-bug/tests/end-to-end.test.js`, parameterised by `{ runner, argv }`, extended with the backlog and project endpoints, and bundled into the four consuming skills' `references/`.
+
+   > It was first placed at `tests/lib/` — the repo's home for shared test helpers — which QA found breaks every consumer install: a skill is installed by copying its directory, so a require reaching outside the skill resolves to nothing. The failure is invisible here because `.agents/skills` is a symlink to `../skills`. `shared/resources/` is the only location the bundler vendors, and vendoring is what makes the require resolve.
 
 ### Files to Modify (Tests)
 
@@ -498,6 +500,35 @@ Assert the count, not the wall-clock. A timing assertion here would be load-flak
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-07
+**Quality Score**: 50/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.96.qa.1.sync-jira-sibling-convergence.md](./task.96.qa.1.sync-jira-sibling-convergence.md)
+- **Gate File**: [task.96.gate.1.sync-jira-sibling-convergence.yml](./task.96.gate.1.sync-jira-sibling-convergence.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2675 (0 failures, 1 pre-existing skip)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 2 HIGH, 1 MEDIUM, 5 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+The two named defects are fixed and all six fixes mutation-proven. The gate fails on two regressions the change introduced, both invisible to the green suite:
+
+- **TASK96-001 (HIGH)** — the new end-to-end suites require a helper outside the skill, so they die with `MODULE_NOT_FOUND` in a consumer install. Masked locally because `.agents/skills` is a symlink.
+- **TASK96-002 (HIGH)** — story's skip gate lacks `!args.force`, and the label fix made that gate reachable for the first time. `--force` on an unchanged story now issues no PUT, contradicting §5's "no interface change".
+- **TASK96-003 (MEDIUM)** — the epic UPDATE-path test does not actually transition, so it does not cover the site §2.4 names.
+- **TASK96-004 (LOW)** — the task label test asserts builder determinism; it stays green with the defect restored.
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -507,6 +538,8 @@ Assert the count, not the wall-clock. A timing assertion here would be load-flak
 | 2026-09-07 | 1.2     | Review passed (8/10) — every defect claim verified against HEAD with no line drift. Corrected four inaccuracies and closed two unbudgeted gaps: the PUT-count criterion is scoped to story and epic (task has no skip gate); epic's stale-timestamp site is `:1428`, not `:1460`; story's Phase 2 needs a two-pass build because `includeDescription` derives from the diff; the family registry is deferred to task.93 (no such file exists) with the entry parked in Notes; the fake Jira is budgeted for generalisation in Phase 1 (it is a private function, not a harness); Risk 2 downgraded — no existing test asserts the defect | review-task |
 | 2026-09-07 |         | Status → ready-for-development | review-task |
 | 2026-09-07 |         | Implemented — 30 files (5 scripts/lib, 5 test files, 2 docs, 22 bundled copies), 17 end-to-end tests, all 6 fixes mutation-proven | develop |
+| 2026-09-07 |         | QA gate FAIL (50/100) — 2 HIGH, 1 MEDIUM, 5 LOW: consumer-install require failure, `--force` regression, and two tests that pass for the wrong reason | qa-task |
+| 2026-09-07 |         | QA findings fixed — all 4 gate issues plus 4 cleanups and 1 found by the adversarial pass, 1 iteration | qa-fix |
 
 ---
 

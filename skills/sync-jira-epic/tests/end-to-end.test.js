@@ -34,7 +34,7 @@ const {
   gitRepo,
   makeRunner,
   putCount,
-} = require("../../../tests/lib/fake-jira.js");
+} = require("../references/fake-jira.js");
 
 const runSync = makeRunner({ module: epicSync, cliName: "sync-jira-epic" });
 
@@ -159,10 +159,13 @@ test("an unchanged epic ENTERS the skip path, reaching the re-read behind its ga
     "the skip path was not entered — the no-change fast path is unreachable, " +
       "so the re-read behind its gate is dead code",
   );
+  // And the skip is a real skip: entering the fast path must also mean no PUT.
+  // (The previous assertion here compared putCount to itself and was therefore
+  // always true — it asserted nothing.)
   assert.equal(
     putCount(state, key),
-    putCount(state, key),
-    "sanity: PUT counting is wired",
+    0,
+    "an update-path PUT was issued on a run that reported itself as skipped",
   );
 });
 
@@ -197,19 +200,31 @@ test("the UPDATE path also refreshes the timestamp after a transition", async ()
   const { root, epic } = repoWithEpic();
   const { state, fetchImpl } = fakeJira();
 
-  const first = await runSync(root, epic, fetchImpl, ["--quiet"]);
-  const key = first.result.issueKey;
+  await runSync(root, epic, fetchImpl, ["--quiet"]);
 
-  // Force a real field change so this run takes the UPDATE path, not the skip
-  // path — `:1428` on the update path is the site that was never fixed, and the
-  // skip path's own re-read at `:990` would mask it. The edit must land inside
-  // a card section (`Epic Goal`) or the body hash does not move.
+  // Two edits, and BOTH are needed for this test to reach the site it names.
+  //
+  // The body edit forces the UPDATE path (the body hash moves, so the skip gate
+  // does not fire). It must land inside a card section — `Epic Goal` — or the
+  // hash does not change at all.
+  //
+  // The STATUS edit is what makes the update run actually transition. Without
+  // it, run 1 has already moved the card to In Progress and frontmatter still
+  // says `in-progress`, so `syncDocumentStatus` returns
+  // `transitioned: false, reason: "already"` — and the re-read at `:1428`, the
+  // one site §2.4 identifies as never fixed, is skipped. The test would still
+  // go red if the block were deleted, but only because run 1 (the CREATE path)
+  // needs the same block: it would be passing for the wrong reason.
   const body = fs.readFileSync(epic, "utf-8");
-  const edited = body.replace(
-    "Make the checkout flow survive a mis-tap, a slow network and a back button.",
-    "Make checkout survive a mis-tap, a slow network, a back button and a retry.",
-  );
+  const edited = body
+    .replace(
+      "Make the checkout flow survive a mis-tap, a slow network and a back button.",
+      "Make checkout survive a mis-tap, a slow network, a back button and a retry.",
+    )
+    .replace("status: in-progress", "status: done")
+    .replace("**Status:** In Progress", "**Status:** Done");
   assert.notEqual(edited, body, "the fixture edit did not apply");
+  assert.match(edited, /^status: done$/m, "the status edit did not apply");
   fs.writeFileSync(epic, edited);
 
   const second = await runSync(root, epic, fetchImpl, ["--quiet"]);
@@ -220,6 +235,15 @@ test("the UPDATE path also refreshes the timestamp after a transition", async ()
       "if the run skipped",
   );
 
+  // The assertion that stops this test silently ceasing to exercise the update
+  // path: the run must have genuinely transitioned, not reported "already".
+  assert.equal(
+    second.statusOutcome?.transitioned,
+    true,
+    "the update run did not transition — the post-transition re-read at :1428 " +
+      "was never reached, so this test proves nothing about it",
+  );
+
   // The card may have transitioned during that run. The timestamp written back
   // must be the post-transition one, or this next run aborts on our own write.
   const third = await runSync(root, epic, fetchImpl, ["--quiet"]);
@@ -228,7 +252,6 @@ test("the UPDATE path also refreshes the timestamp after a transition", async ()
     true,
     "the run after an update-path transition did not converge",
   );
-  assert.ok(key, "sanity: a card was created");
 });
 
 // ===========================================================================

@@ -940,7 +940,12 @@ async function run({
       newMetaHash,
     });
 
-    skippedNoChanges = changedFields.length === 0;
+    // `!args.force` is load-bearing, not defensive. Until the label diff was
+    // fixed this gate was unreachable (`labels` always differed), so its
+    // absence was inert; making the gate reachable turned `--force` into a
+    // silent no-op on an unchanged document, removing the documented repair
+    // path for a card blanked in the Jira UI. Epic has always carried the term.
+    skippedNoChanges = changedFields.length === 0 && !args.force;
 
     if (skippedNoChanges) {
       changeSummary = "Sync (no field changes detected)";
@@ -956,7 +961,13 @@ async function run({
         updated: current?.updated || frontmatter.jira_last_synced_at || null,
       };
     } else {
-      changeSummary = `Updated: ${changedFields.join(", ")}`;
+      // The ternary matters now that `--force` can reach this branch with an
+      // empty `changedFields`: an unconditional template produced the bare
+      // string "Updated: " with nothing after it. Task and epic have always
+      // built the summary this way.
+      changeSummary = changedFields.length
+        ? `Updated: ${changedFields.join(", ")}`
+        : "Sync (no field changes detected — forced)";
 
       // Second pass of the two-pass build: send `description` only when body or
       // metadata actually changed, to avoid pointless edits in Jira's history.

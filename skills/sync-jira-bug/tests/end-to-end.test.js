@@ -20,9 +20,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
-const { execFileSync } = require("child_process");
 
 const bugSync = require("../scripts/sync-jira-bug.js");
 
@@ -36,7 +34,7 @@ const {
   descriptionOf,
   gitRepo,
   makeRunner,
-} = require("../../../tests/lib/fake-jira.js");
+} = require("../references/fake-jira.js");
 
 const BUG_MD = `---
 type: bug
@@ -219,17 +217,11 @@ test("deleting jira_key adopts the existing card instead of creating a second", 
 });
 
 test("a general bug's card links the bug report and the registry, and takes no issue link", async () => {
-  const dir = fs.realpathSync(
-    fs.mkdtempSync(path.join(os.tmpdir(), "bug-e2e-gen-")),
-  );
-  execFileSync("git", ["init", "-q"], { cwd: dir });
-  const bugsDir = path.join(dir, "docs", "bugs", "bug.12.a-thing");
-  fs.mkdirSync(bugsDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, "docs", "bugs", "bug-registry.md"),
-    "# Bug Registry\n",
-  );
-  const bug = path.join(bugsDir, "bug.12.a-thing.md");
+  const dir = gitRepo("bug-e2e-gen-", {
+    "docs/bugs/bug-registry.md": "# Bug Registry\n",
+  });
+  const bug = path.join(dir, "docs/bugs/bug.12.a-thing/bug.12.a-thing.md");
+  fs.mkdirSync(path.dirname(bug), { recursive: true });
   fs.writeFileSync(
     bug,
     `---
@@ -271,20 +263,10 @@ It is broken everywhere.
 });
 
 test("a bug with NO frontmatter is created, keyed, and converges on the second run", async () => {
-  const dir = fs.realpathSync(
-    fs.mkdtempSync(path.join(os.tmpdir(), "bug-e2e-nf-")),
-  );
-  execFileSync("git", ["init", "-q"], { cwd: dir });
-  const tasks = path.join(dir, "docs", "tasks", "task.67.qa-gate");
-  fs.mkdirSync(tasks, { recursive: true });
-  fs.writeFileSync(
-    path.join(tasks, "task.67.qa-gate.md"),
-    "---\ntype: task\njira_key: PROJ-500\n---\n\n# Task 67\n",
-  );
-  const bug = path.join(tasks, "task.67.bug.3.names.md");
-  fs.writeFileSync(
-    bug,
-    `# Bug: Obfuscated names
+  const dir = gitRepo("bug-e2e-nf-", {
+    "docs/tasks/task.67.qa-gate/task.67.qa-gate.md":
+      "---\ntype: task\njira_key: PROJ-500\n---\n\n# Task 67\n",
+    "docs/tasks/task.67.qa-gate/task.67.bug.3.names.md": `# Bug: Obfuscated names
 
 **Bug ID**: task.67.bug.3
 **Related**: task 67
@@ -305,6 +287,10 @@ Names are obfuscated.
 
 - SC-2 is not met.
 `,
+  });
+  const bug = path.join(
+    dir,
+    "docs/tasks/task.67.qa-gate/task.67.bug.3.names.md",
   );
   const originalBody = fs.readFileSync(bug, "utf-8");
 

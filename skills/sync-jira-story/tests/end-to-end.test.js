@@ -27,7 +27,7 @@ const {
   gitRepo,
   makeRunner,
   putCount,
-} = require("../../../tests/lib/fake-jira.js");
+} = require("../references/fake-jira.js");
 
 const runSync = makeRunner({ module: storySync, cliName: "sync-jira-story" });
 
@@ -144,6 +144,26 @@ test("a story synced twice reports no field changes and issues no second PUT", a
   const after = fs.readFileSync(story, "utf-8");
   const strip = (t) => t.replace(/^jira_last_synced_at:.*$/m, "");
   assert.equal(strip(after), strip(before), "the second run rewrote the file");
+});
+
+test("--force still pushes a PUT on an unchanged document", async () => {
+  const { root, story } = repoWithStory();
+  const { state, fetchImpl } = fakeJira();
+
+  const first = await runSync(root, story, fetchImpl, ["--quiet"]);
+  const key = first.result.issueKey;
+  const before = putCount(state, key);
+
+  // Nothing has changed, so the skip gate above would fire — but `--force` is
+  // the documented override, and it is the repair path for a card someone
+  // blanked in the Jira UI. Making the gate reachable must not silently
+  // disable it.
+  await runSync(root, story, fetchImpl, ["--quiet", "--force"]);
+
+  assert.ok(
+    putCount(state, key) > before,
+    "--force issued no PUT — the skip gate swallowed the override",
+  );
 });
 
 // ===========================================================================

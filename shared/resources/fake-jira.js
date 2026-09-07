@@ -16,6 +16,13 @@
  * not a Jira emulator and must not become one. A fake Jira cannot prove a real
  * tenant accepts a payload; it proves the half that was broken.
  *
+ * It lives in `shared/resources/` rather than the repo-root `tests/lib/` because a skill is
+ * installed by copying its directory verbatim into a consumer's `.agents/skills/`. A test that
+ * requires a path outside the skill resolves to nothing there — and the failure is invisible in
+ * this repo, where `.agents/skills` is a symlink to `../skills` and Node resolves the real path.
+ * The bundler vendors this file into each consuming skill's `references/` and rewrites the
+ * require, which is the same mechanism `jira-sync.js` already uses.
+ *
  * Run: node --test 'skills/sync-jira-*\/tests/*.test.js'
  */
 
@@ -287,13 +294,17 @@ function descriptionOf(state, key) {
  */
 function countRequests(state, filter = {}) {
   const { method, issueKey } = filter;
+  // Anchor the key: a bare `includes` makes PROJ-901 a prefix match for
+  // PROJ-9012, and would also match sub-resources like /transitions. The key
+  // must be followed by `?`, `/` or end-of-string, and `/transitions` is
+  // excluded so a POST filter counts writes to the issue rather than its
+  // transition endpoint.
+  const keyRe = issueKey
+    ? new RegExp(`/rest/api/3/issue/${issueKey}(?:[?]|$)`)
+    : null;
   return state.requests.filter((r) => {
     if (method && r.method !== method) return false;
-    if (issueKey && !r.url.includes(`/rest/api/3/issue/${issueKey}`))
-      return false;
-    // A transition is a POST, never a PUT, so no exclusion is needed for the
-    // PUT count — but an explicit issueKey filter would otherwise also match
-    // the transition sub-resource on a POST query.
+    if (keyRe && !keyRe.test(r.url)) return false;
     return true;
   }).length;
 }

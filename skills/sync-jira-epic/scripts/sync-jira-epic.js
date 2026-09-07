@@ -920,8 +920,12 @@ async function run({
     // reachable at all.
     //
     // The build has moved above the gate, so it now runs on the skip path too.
-    // It is pure — an ADF render and an object build, no network — so the only
-    // cost is a few microseconds on a run that writes nothing.
+    // No network and no mutation — an ADF render and an object build — but not
+    // silent: `buildDescriptionAdf` warns on a missing card section and
+    // `collectCommonFields` warns through `normalisePriority` / `resolveAssignee`.
+    // So a no-op skip sync can now emit advisory warnings it did not before.
+    // That is a cosmetic change to a diagnostic path, accepted over the
+    // alternative of building twice.
     const descAdf = buildDescriptionAdf({
       body,
       frontmatter,
