@@ -41,16 +41,34 @@ test("no member builds its diff label set from frontmatter", () => {
   // THE DEFECT, asserted over the family. Each script used to feed the diff
   // `lib.sanitiseLabels(args.labels || frontmatter.labels)` while the payload
   // appended the `synced-from-*` label, so the two could never converge.
+  //
+  // Scan BOTH diff entry points. An earlier version matched only `diffFields({`
+  // — which no script contains any more, since all four now route through
+  // `diffAgainstPayload` — so the loop body never executed and the test passed
+  // without evaluating its assertion. It would have fired only on a literal
+  // revert to the pre-task call shape, never on the live regression path of
+  // feeding a rebuilt label set into the new helper.
   const offenders = [];
+  let scanned = 0;
   for (const m of MEMBERS) {
     const src = sourceOf(m);
-    // Look only at what is passed to the diff, not at the payload builder —
-    // `collectIssueFields` legitimately calls `sanitiseLabels`.
-    const diffCall = /diffFields\(\{[\s\S]{0,600}?\}\)/g;
-    for (const [block] of [...src.matchAll(diffCall)].map((x) => [x[0]])) {
+    const blocks = [
+      ...src.matchAll(/diffFields\(\{[\s\S]{0,600}?\n\s*\}\)/g),
+      ...src.matchAll(/diffAgainstPayload\(\{[\s\S]{0,600}?\n\s*\}\)/g),
+    ].map((x) => x[0]);
+    assert.ok(
+      blocks.length > 0,
+      `no diff call found in sync-jira-${m} — this test would scan nothing ` +
+        `and pass vacuously. Has the call shape changed?`,
+    );
+    scanned += blocks.length;
+    for (const block of blocks) {
+      // `collectIssueFields` legitimately calls `sanitiseLabels`; what must
+      // never appear is a rebuilt label set INSIDE the diff call.
       if (/labels:\s*lib\.sanitiseLabels\(/.test(block)) offenders.push(m);
     }
   }
+  assert.ok(scanned >= MEMBERS.length, "expected at least one diff call each");
   assert.deepEqual(
     offenders,
     [],

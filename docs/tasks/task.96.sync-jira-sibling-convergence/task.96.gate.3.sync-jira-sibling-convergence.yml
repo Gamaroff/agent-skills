@@ -2,7 +2,7 @@ schema: 1
 task: "task.96.sync-jira-sibling-convergence"
 task_title: "sync-jira-story/task/epic never converge — label diff and post-transition timestamp"
 gate: PASS
-status_reason: "Covers QA-fix cycles 3 and 4, which were driven by /review-pr rather than by qa-task. Supersedes gate 2, whose --force framing was shown to be wrong and whose counts predate these cycles. Two HIGH findings (silent loss of assignee/due_date/components/fix_versions behind the newly reachable skip gate) are fixed and mutation-proven; 21 further findings across two review-pr passes are closed."
+status_reason: "Covers QA-fix cycles 3-5, all driven by /review-pr rather than by qa-task. Supersedes gate 2, whose --force framing was disproved and whose counts predate these cycles. Two HIGH findings (silent loss of assignee/due_date/components/fix_versions behind the newly reachable skip gate) are fixed and mutation-proven; 38 further findings across three review-pr passes are closed. The final pass found zero HIGH code defects."
 reviewer: "QA Engineer"
 updated: "2026-09-07T18:40:00Z"
 
@@ -14,7 +14,7 @@ waiver:
 quality_score: 93
 
 evidence:
-  tests_reviewed: 2696
+  tests_reviewed: 2701
   phases_verified: "4/4"
   trace:
     phases_covered: [1, 2, 3, 4]
@@ -49,10 +49,10 @@ recommendations:
       refs: ["shared/resources/jira-sync.js"]
 
 bug_resolution:
-  bugs_fixed: 23
+  bugs_fixed: 40
   bugs_remaining: 0
   fix_date: "2026-09-07"
-  total_iterations: 2
+  total_iterations: 3
   verification_method: "Mutation proof per behavioural fix and per new test; a simulated consumer install for the packaging defect; a develop worktree for the --force framing claim"
 
 deployment_readiness:

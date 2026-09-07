@@ -199,3 +199,59 @@ test("a payload with no priority compares as null rather than throwing", () => {
   });
   assert.deepEqual(changed, []);
 });
+
+// ---------------------------------------------------------------------------
+// normaliseListForHash — the hash input for payload-only list fields
+// ---------------------------------------------------------------------------
+
+test("list order does not change the hash input", () => {
+  assert.equal(
+    lib.normaliseListForHash(["api", "web"]),
+    lib.normaliseListForHash(["web", "api"]),
+    "a cosmetic frontmatter reorder would fire a spurious `Updated: metadata` " +
+      "PUT, which also republishes the whole description",
+  );
+});
+
+test("a scalar and a one-element list hash identically", () => {
+  // The payload maps `components: api` and `components: [api]` to the same
+  // array, so the hash must not distinguish them.
+  assert.equal(
+    lib.normaliseListForHash("api"),
+    lib.normaliseListForHash(["api"]),
+  );
+});
+
+test("the hash key MIRRORS the payload's coercion, including whitespace", () => {
+  // The invariant is mirroring, not cleverness, and it is asymmetric: a hash
+  // that distinguishes what the payload collapses costs a spurious PUT, while
+  // one that collapses what the payload distinguishes loses an edit silently.
+  // The payload does `String(name)` with no trim, so the hash must too — an
+  // earlier revision trimmed, which is the losing direction.
+  assert.notEqual(
+    lib.normaliseListForHash([" api"]),
+    lib.normaliseListForHash(["api"]),
+    "a whitespace-only edit changes what is sent to Jira but not the hash — " +
+      "the skip gate would swallow it",
+  );
+  // And objects collapse in the hash exactly as they collapse in the payload,
+  // which is correct: there is no payload difference for the gate to lose.
+  assert.equal(
+    lib.normaliseListForHash([{ a: 1 }]),
+    lib.normaliseListForHash([{ b: 2 }]),
+  );
+});
+
+test("empty, null and undefined all normalise to the same empty key", () => {
+  assert.equal(lib.normaliseListForHash(undefined), "");
+  assert.equal(lib.normaliseListForHash(null), "");
+  assert.equal(lib.normaliseListForHash(""), "");
+});
+
+test("a real membership change still moves the hash input", () => {
+  assert.notEqual(
+    lib.normaliseListForHash(["api"]),
+    lib.normaliseListForHash(["api", "web"]),
+    "adding a component no longer registers — the skip gate would swallow it",
+  );
+});

@@ -314,13 +314,13 @@ Production code and shared library:
   skip term, forced-description term and summary ternary; story and epic `hashMeta` extended to
   cover the payload-only fields the diff does not compare
 
-Tests (**35 new, 40 touched** — verified by counting `^test(` in each file: 17 new end-to-end across the three sibling suites, 9 `diffAgainstPayload` unit tests, 8 family contract tests, 1 deferred-run test; plus the bug suite's 5 pre-existing tests re-pointed at the shared harness and otherwise unchanged):
+Tests (**40 new, 45 touched** — verified by counting `^test(` in each file: 17 new end-to-end across the three sibling suites, 14 unit tests for `diffAgainstPayload` and `normaliseListForHash`, 8 family contract tests, 1 deferred-run test; plus the bug suite's 5 pre-existing tests re-pointed at the shared harness and otherwise unchanged):
 
 - `skills/sync-jira-story/tests/end-to-end.test.js` — **new**, 5 tests
 - `skills/sync-jira-task/tests/end-to-end.test.js` — **new**, 5 tests
 - `skills/sync-jira-epic/tests/end-to-end.test.js` — **new**, 7 tests
 - `skills/sync-jira-task/tests/deferred-no-network.test.js` — **new**, 1 test
-- `shared/resources/tests/diff-against-payload.test.mjs` — **new**, 9 unit tests including the
+- `shared/resources/tests/diff-against-payload.test.mjs` — **new**, 14 unit tests including the
   standing counter-example, which drives the real builder rather than a hand-built object
 - `tests/sync-jira-family-contract.test.js` — **new**, 8 contract tests pinning the four scripts'
   agreement by reading their sources
@@ -545,24 +545,26 @@ Assert the count, not the wall-clock. A timing assertion here would be load-flak
 **QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-07
-**Quality Score**: 95/100
-**Gate Decision**: PASS (cycle 2 — cycle 1 was FAIL, 50/100)
+**Quality Score**: 93/100 (gate 3 — the governing gate)
+**Gate Decision**: PASS. Gate 1 FAIL (50) → gate 2 PASS (95) → gate 3 PASS (93, covering the `/review-pr`-driven cycles 3–5)
 
 ### QA Reports
 
-- **Cycle 2 (current)**: [task.96.qa.2.sync-jira-sibling-convergence.md](./task.96.qa.2.sync-jira-sibling-convergence.md) · [gate.2](./task.96.gate.2.sync-jira-sibling-convergence.yml)
+- **Gate 3 (current, governing)**: [gate.3](./task.96.gate.3.sync-jira-sibling-convergence.yml) — covers cycles 3–5, driven by `/review-pr`
+- **Cycle 2**: [task.96.qa.2.sync-jira-sibling-convergence.md](./task.96.qa.2.sync-jira-sibling-convergence.md) · [gate.2](./task.96.gate.2.sync-jira-sibling-convergence.yml) (superseded)
+- **PR review**: [task.96.pr-review.1.sync-jira-sibling-convergence.md](./task.96.pr-review.1.sync-jira-sibling-convergence.md)
 - **Cycle 1**: [task.96.qa.1.sync-jira-sibling-convergence.md](./task.96.qa.1.sync-jira-sibling-convergence.md) · [gate.1](./task.96.gate.1.sync-jira-sibling-convergence.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 2696 (2695 pass, 0 failures, 1 pre-existing skip) — measured after cycle 4
+- **Tests Executed**: 2701 (2700 pass, 0 failures, 1 pre-existing skip) — measured after cycle 5
 - **Phases Verified**: 4/4
 - **QA Cycles**: 3 + a `/review-pr` exit gate that ran twice — see the reconciled finding count below
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Both named defects are fixed and mutation-proven, and the concurrent-edit guard is provably still armed. Three QA-fix cycles and two `/review-pr` passes found and closed every issue between them — **five of which the change itself introduced**, each invisible to a green suite:
+Both named defects are fixed and mutation-proven, and the concurrent-edit guard is provably still armed. Five QA-fix cycles and three `/review-pr` passes found and closed every issue between them — **five of which the change itself introduced**, each invisible to a green suite:
 
 **Cycle 1 (FAIL, 50/100)** — the new e2e suites could not run in a consumer install (masked locally by the `.agents/skills` symlink); `--force` became a silent no-op on an unchanged story once the label fix made that gate reachable; and two tests passed for the wrong reason.
 
@@ -575,13 +577,15 @@ epic, with the run reporting success. Also corrected: `--force`'s framing (it is
 not a restoration — on `develop` it re-published no description either), two overclaimed coverage
 ticks, and a test of my own that was vacuous until a mutation proved it so.
 
-**Finding count**: 8 (cycle 1) + 9 (cycle 2, including one from the adversarial pass) + 14
-(cycle 3, from `/review-pr`'s two lenses) = **31 findings, all closed**. Earlier revisions of this
-section quoted 12 and 16; both counted subsets and are superseded by this line.
+**Finding count**: 8 (cycle 1) + 9 (cycle 2, incl. one from the adversarial pass) + 14 (cycle 3,
+`/review-pr` pass 1) + 18 (cycle 4, `/review-pr` pass 2) + 8 (cycle 5, `/review-pr` pass 3) =
+**57 findings raised, 57 closed**. Earlier revisions of this section quoted 12, 16, 31 and 32; every
+one counted a subset, and this line supersedes all of them. The implementation report's QA Iteration
+History carries the same split.
 
 ### Residuals — recorded, not fixed
 
-Three, none blocking, each needing its own evidence:
+Five, none blocking, each needing its own evidence:
 
 1. A failed post-transition re-read warns, but `--json` suppresses warns — the pipeline's own mode.
    Surfacing it needs a new JSON field, which §5 declines to add.

@@ -340,6 +340,14 @@ test("the skip path's --json timestamp matches the one written to the file", asy
     process.stdout.write = realWrite;
   }
   assert.equal(out.skipped, true, "expected the skip path");
+  // Without this the test silently reverts to the vacuous form the moment the
+  // fixture stops transitioning: `skipSyncedAt` and `current.updated` become
+  // trivially equal and the comparison below holds for every implementation.
+  assert.equal(
+    out.statusOutcome?.transitioned,
+    true,
+    "the skip run did not transition — this test then proves nothing",
+  );
 
   const file = fs.readFileSync(epic, "utf-8");
   const inFile = /^jira_last_synced_at: "(.+)"$/m.exec(file);

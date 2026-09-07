@@ -29,7 +29,7 @@ nfr_validation:
     notes: "Story and epic issue one PUT instead of two across two unchanged syncs, asserted as a literal count. Task correctly excluded and documented."
   reliability:
     status: PASS
-    notes: "`--force` restored AND made effective — it now re-publishes the description. The epic skip path's file and --json timestamps now agree. NOTE: this gate records cycle 2 only. Its `--force` framing was shown to be wrong at PR review (the capability is new, not restored) and its counts predate cycles 3-4 — see gate 3, which supersedes it. Left as written rather than silently amended: a signed gate is a record of what was believed at the time."
+    notes: "`--force` restored AND made effective — it now re-publishes the description. The epic skip path's file and --json timestamps now agree. NOTE: this gate records cycle 2 only and is superseded by gate 3. Its original wording continued 'so it genuinely repairs a card blanked in the Jira UI rather than PUTting the three fields the diff just proved identical' — that clause was DISPROVED at PR review (on develop a forced sync also sent no description, so nothing was being restored) and is removed rather than left standing as a false claim. Its counts also predate cycles 3-5. Saying so here, rather than editing silently, is the point: the removal is the amendment, and it is disclosed."
   maintainability:
     status: PASS
     notes: "The harness lives where the bundler vendors it, verified against a simulated consumer install. Every test that previously passed for the wrong reason now fails when its defect is restored."

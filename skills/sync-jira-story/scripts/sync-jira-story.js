@@ -162,18 +162,6 @@ function hashBody({
   });
 }
 
-// Normalise a value the payload treats as a list before hashing it. The payload
-// maps `api`, `[api]` and `["web","api"]` onto the same `components` array, so a
-// hash that distinguishes them fires a spurious `Updated: metadata` — and that
-// PUT also republishes the whole description — on a cosmetic frontmatter
-// reorder. `diffFields` already sorts labels for exactly this reason.
-function normaliseListForHash(v) {
-  if (v === undefined || v === null || v === "") return "";
-  return JSON.stringify(
-    (Array.isArray(v) ? v : [v]).map((x) => String(x).trim()).sort(),
-  );
-}
-
 function hashMeta(frontmatter) {
   // `assignee`, `due_date`, `components` and `fix_versions` are here because
   // the PAYLOAD carries them (`collectIssueFields`) while `diffFields` does
@@ -195,8 +183,8 @@ function hashMeta(frontmatter) {
     // fix's own defect one level down.
     assignee: lib.resolveAssignee(frontmatter.assignee, DEFAULT_ASSIGNEE) || "",
     due_date: frontmatter.due_date || "",
-    components: normaliseListForHash(frontmatter.components),
-    fix_versions: normaliseListForHash(frontmatter.fix_versions),
+    components: lib.normaliseListForHash(frontmatter.components),
+    fix_versions: lib.normaliseListForHash(frontmatter.fix_versions),
   });
 }
 

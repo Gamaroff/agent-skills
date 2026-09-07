@@ -2120,6 +2120,35 @@ function diffFields({
  * @param {string}      args.newMetaHash
  * @returns {string[]}  changed field names
  */
+/**
+ * Normalise a value the payload treats as a list, for hashing.
+ *
+ * The payload maps `api`, `[api]` and `["web","api"]` onto the same
+ * `components` array, so a hash that distinguishes them fires a spurious
+ * `Updated: metadata` — and that PUT republishes the whole description — on a
+ * cosmetic frontmatter reorder. `diffFields` already sorts labels for the same
+ * reason.
+ *
+ * Elements are keyed with `String(x)` — the SAME coercion the payload builders
+ * apply (`comps.map((name) => ({ name: String(name) }))`). Mirroring matters
+ * more than cleverness here, and in one direction only: if the hash
+ * distinguishes values the payload collapses, the cost is a spurious PUT; if it
+ * collapses values the payload distinguishes, an edit is silently lost. An
+ * earlier revision trimmed the key while the payload did not, which is exactly
+ * the losing direction — a whitespace-only edit changed what was sent and left
+ * the hash still. The rule is: key it the way the payload keys it.
+ *
+ * Lives here rather than in each script because four scripts sharing one
+ * methodology is exactly what this task is about — a copy per script is the
+ * drift it was written to stop.
+ */
+function normaliseListForHash(v) {
+  if (v === undefined || v === null || v === "") return "";
+  return JSON.stringify(
+    (Array.isArray(v) ? v : [v]).filter(Boolean).map(String).sort(),
+  );
+}
+
 function diffAgainstPayload({
   current,
   fields,
@@ -5428,6 +5457,7 @@ module.exports = {
   // diff / guard / hash
   diffFields,
   diffAgainstPayload,
+  normaliseListForHash,
   guardConcurrentEdit,
   hashStable,
   // comments
