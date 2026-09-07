@@ -2,7 +2,7 @@
 name: task.79.plan.follow-ups
 description: Handover for the two non-blocking follow-ups left by task.79 — executing the three corpus claims that are currently cited rather than measured, and adding an isFile() guard to the derived BUNDLED_REFS list. Written to be actioned from a cold start.
 type: plan
-status: ready-for-development
+status: accepted
 created: 2026-09-07
 updated: 2026-09-07
 parent: task.79.security-input-corpus
@@ -16,6 +16,22 @@ the task.79 QA reports unless you want the history.
 **Baseline**: `develop` at `679c50d3` or later. Both follow-ups are non-blocking — task.79 is
 `accepted` and merged (PR #332). Nothing is broken. These are two known-imperfect edges, recorded
 deliberately rather than papered over.
+
+---
+
+## Outcome (both follow-ups landed)
+
+Actioned on branch `bugfix/task.79-follow-ups`. Follow-up 1: all three claims were
+**measured**, none had to be dropped — and the measurement found the
+`mustache-interpolation` claim was wrong about Handlebars (it does not render empty, it
+refuses to compile). Follow-up 2: guard added and mutation-proved.
+
+**Correction to the mutation recipe below.** `mkdir skills/finalise/references/change-log.js.d`
+does **not** reproduce the failure — `BUNDLED_REFS` keeps an entry only if a file of that name
+exists under `shared/resources/`, and `change-log.js.d` does not. The mutation that actually
+goes red is `mkdir skills/finalise/references/tests`, because `shared/resources/tests/` is a real
+directory, so `existsSync` passes and `readFileSync` then throws `EISDIR`. That is also the
+realistic drift shape, which is why it is the one named in the guard's comment.
 
 ---
 

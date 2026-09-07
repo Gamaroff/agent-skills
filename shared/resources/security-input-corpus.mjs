@@ -216,7 +216,7 @@ const SQL_ORM = sinkCases("sql-orm", [
     id: "homoglyph-quote",
     direction: "hostile",
     input: "＇",
-    why: "U+FF07 FULLWIDTH APOSTROPHE is not U+0027, so a deny-list keyed on the ASCII quote does not see it. Whether it then BECOMES an apostrophe depends on the conversion: Windows best-fit codepage mapping folds it to U+0027, while Node's latin1 conversion yields 0x07 and MySQL's utf8mb4→latin1 substitutes `?`. The deny-list is defeated in every case; the escalation to injection needs best-fit mapping specifically.",
+    why: "U+FF07 FULLWIDTH APOSTROPHE is not U+0027, so a deny-list keyed on the ASCII quote does not see it. Whether it then BECOMES an apostrophe depends on the conversion, and the conversions disagree — measured: `iconv -f UTF-8 -t CP1252` folds it to the byte 0x27 and NFKC normalisation yields U+0027, while Node's latin1 conversion yields 0x07 and MySQL's utf8mb4→latin1 substitutes `?`. The deny-list is defeated in every case; the escalation to injection needs a folding conversion specifically.",
     correct:
       "Bind the value as a parameter. Character deny-lists cannot enumerate Unicode; parameterisation does not need to.",
   },
@@ -626,7 +626,7 @@ const TEMPLATE_RENDER = sinkCases("template-render", [
     id: "attribute-breakout",
     direction: "hostile",
     input: '" autofocus onfocus=alert(1) x="',
-    why: 'Escaping chosen for element text does not always neutralise a value landing inside an attribute: the quote closes the attribute and the rest becomes new attributes. The qualifier matters — a full escaper that also encodes `"` to `&quot;` (lodash `_.escape`, `he`, Handlebars) neutralises this inside a QUOTED attribute. It breaks out against an UNQUOTED attribute, or an escaper that handles only `<`, `>` and `&`.',
+    why: 'Escaping chosen for element text does not always neutralise a value landing inside an attribute: the quote closes the attribute and the rest becomes new attributes. The qualifier matters, and it is measured rather than assumed — reading back the attributes an HTML parser actually assigns: a full escaper that also encodes `"` to `&quot;` (`he`, lodash `_.escape`, Handlebars) CONTAINS this inside a QUOTED attribute, leaving `value` the only attribute set. Those same escapers break out of an UNQUOTED attribute, where `autofocus` and `onfocus` land as new attributes — and so does an escaper handling only `<`, `>` and `&` inside a quoted one.',
     correct:
       "Choose the escaping by the position the value lands in — element text, attribute value, URL and script context are four different escapings.",
   },
@@ -642,7 +642,7 @@ const TEMPLATE_RENDER = sinkCases("template-render", [
     id: "mustache-interpolation",
     direction: "hostile",
     input: "{{constructor.constructor('return process')()}}",
-    why: "Server-side template injection: the value is compiled as template source rather than substituted as data. In an EXPRESSION-EVALUATING renderer (Angular, Vue, Jinja-style) it runs in the renderer's own scope with the renderer's own privileges; logic-less Mustache and Handlebars resolve `{{a.b}}` as a lookup path and render empty. That the same string is inert in one renderer and remote code execution in another is the reason to test it rather than reason about it.",
+    why: "Server-side template injection: the value is compiled as template source rather than substituted as data. In an EXPRESSION-EVALUATING renderer (Angular, Vue, Jinja-style) it runs in the renderer's own scope with the renderer's own privileges — measured, the equivalent in a JavaScript template literal returns `process.version`. Logic-less renderers read `{{a.b}}` as a lookup path rather than an expression, and the disagreement between them is measured too: Mustache renders empty, while Handlebars refuses to compile it at all (`Parse error ... Expecting 'ID', got 'INVALID'`). That the same string is remote code execution in one renderer, empty output in a second and a parse error in a third is the reason to test it rather than reason about it.",
     correct:
       "Never compile user data as template source. Pass it as a value to an already-compiled template.",
   },

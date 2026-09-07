@@ -16,7 +16,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -768,8 +768,14 @@ function normaliseBundled(text) {
  * exists to prevent, reintroduced one directory over.
  */
 const bundledDir = join(repoRoot, "skills", "finalise", "references");
-const BUNDLED_REFS = readdirSync(bundledDir).filter((f) =>
-  existsSync(join(repoRoot, "shared", "resources", f)),
+const BUNDLED_REFS = readdirSync(bundledDir).filter(
+  (f) =>
+    // Files only. Both consumers below `readFileSync` every entry, so a
+    // directory here throws EISDIR and the parity test reports staleness for
+    // something that is not stale. `shared/resources/tests/` is a directory the
+    // bundler could plausibly emit a peer for one day.
+    statSync(join(bundledDir, f)).isFile() &&
+    existsSync(join(repoRoot, "shared", "resources", f)),
 );
 
 /**
