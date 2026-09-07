@@ -369,6 +369,56 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`/develop-task` Step 2 now skips the review on *evidence of review* rather than on status alone,
+  giving a correct-but-unrecoverable gate a recovery path.** The skip table keyed on `Ready for
+  Development` / `In Progress`; a task at `planned` always re-ran `/review-task`, and if the status
+  was still `planned` afterwards the post-review table halted unconditionally.
+
+  Both tables were internally consistent — the halt was the *correct* response to a promotion that
+  did not happen. What was wrong is that **the only remedy an operator reaches for is provably a
+  no-op**: the halt lands before any work exists, which is exactly when re-running the review looks
+  like the fix, and whatever withheld the promotion fires again identically on the second pass.
+
+  Two supported configurations do withhold it after a full, successful review —
+  `sign-off.enforcement: blocking` with an unsigned row, and `change-log.enforcement: blocking` with
+  a missing log. Both are documented in `review-task` Step 9 as declining to promote *"regardless of
+  the review outcome, and including the pipeline auto-answer path"*. Under stock defaults neither
+  applies, which is why the halt had **never been observed** — it was reported by a consumer who
+  predicted it from reading the tables and steered around it by hand, and whose diagnosis (that the
+  two tables contradict each other) does not survive measurement.
+
+  Now: `planned` + a **current** review report skips; `planned` with no report, or a stale one, still
+  runs the review; and unchanged `planned` halts only when no report was written and none already
+  existed. The genuine gate — a review that produced nothing at all — is kept, because buying
+  liveness by removing it would trade a needless halt for developing against an unreviewed card.
+
+  **Freshness is defined, not judged, and deliberately does not use mtime.** New pure helper
+  `shared/resources/review-report-freshness.js` compares the task's frontmatter `updated:` against
+  the report's body `**Reviewed:**` (falling back to `**Review Date:**`). mtime is the checkout time
+  in a fresh clone — which is what CI and `/develop-batch` worktrees are — so an mtime rule decides
+  differently in the pipeline than on a developer's machine, and that difference is invisible until
+  it matters. This **diverges from the mtime-based plan-freshness rule** in
+  `develop-pipeline-resume-contract.md`, which is left unchanged; the divergence is now stated in
+  the resource rather than left for a reader to trip over. Report frontmatter is not consulted even
+  when present: of the 68 tracked task review reports, 20 carry a frontmatter block and only 7 an
+  `updated:` field, while every one carries the body form. Every ambiguity — unparseable date, missing
+  date, missing report — resolves to *run the review*.
+
+  **The halt message now names which precondition failed.** It carries the status, the report's
+  presence and age, and the review's own outcome, plus a pointer at the two enforcement settings.
+  The old message said only *"review-task left it Planned"*, and that is how a consumer with every
+  relevant file installed still reached a confident wrong diagnosis.
+
+  `/develop-story`'s tables are unchanged and asserted byte-identical — `/review-story` genuinely
+  promotes, so an unchanged `Draft` there really is a failed promotion. The asymmetry is deliberate.
+
+  Guarded by **68 tests, every fix mutation-proved**. There was **no prior test net**: the only test
+  touching this file asserted that the substrings `review` and `skip` appear somewhere in it, and
+  would have passed with both decision tables deleted. Three QA cycles plus a PR review found the
+  rule defeatable **seven** ways toward `fresh` — once because two of the first round's own fixes
+  cancelled each other out — so the count above is the size of the net that closed them, not a
+  measure of how clean the first cut was.
+
 - **⚠️ CI GATE ADDED — a new `ShellCheck` workflow fails any PR that introduces a warning-tier shell
   finding.** Shell was the least-gated language in the repo: `npm run ci` runs `prettier --check` over
   everything and `node --test` over the suite, and nine of those suites *are* shell scripts executed by

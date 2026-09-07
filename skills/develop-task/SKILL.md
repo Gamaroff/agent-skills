@@ -245,7 +245,7 @@ See `references/develop-pipeline-autonomous-defaults.md` for the full shared aut
 | Situation | Default |
 |-----------|---------|
 | review-task Step 8.5 (implement fixes?) | Auto-answer "Yes, apply all critical + important fixes" — pipeline needs the task fully corrected before Step 3 runs `/develop` |
-| review-task Step 9 (update status?) when outcome is READY TO IMPLEMENT | Auto-answer "Yes, fixes complete" — pipeline needs `Ready for Development` before Step 3 |
+| review-task Step 9 (update status?) when outcome is READY TO IMPLEMENT | Auto-answer "Yes, fixes complete" — the pipeline wants `Ready for Development` before Step 3. **But promotion is not the only route past Step 2**: a task left at `Planned` with a *current* review report proceeds on the report, per the Step 2 tables. Two supported configs withhold promotion even on a READY outcome — `sign-off.enforcement: blocking` and `change-log.enforcement: blocking` — so a `Planned` status here is not by itself a failed review |
 | review-task Step 9 (update status?) when outcome is NEEDS REVISION or REQUIRES REWORK | HALT — task is not ready; surface review findings to user before proceeding |
 
 If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
