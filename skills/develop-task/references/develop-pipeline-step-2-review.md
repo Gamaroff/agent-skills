@@ -97,6 +97,20 @@ falling back to `**Review Date:**` — **not** frontmatter, which review reports
 and **not** filesystem mtime, which is the checkout time in a fresh clone and would make the gate
 decide differently in CI than on a developer's machine.
 
+> ⚠️ **This deliberately diverges from the pipeline's other freshness rule, and the divergence is
+> stated here rather than left for a reader to trip over.** `develop-pipeline-resume-contract.md`
+> §"Plan Freshness" answers the structurally identical question — *is this artifact at least as fresh
+> as the task file?* — using `_mtime()` and `stat`, and `pipeline-resume-detector-prompt.md` diffs
+> artifact mtimes the same way. By the argument above those are wrong in a fresh clone, where every
+> mtime is the checkout time.
+>
+> **Neither is changed here.** Step 2 diverges because its verdict *authorises skipping a review*,
+> so a rule that decides differently in CI than on a developer's desk would be believed in both
+> places and be wrong in one. The resume rules select a cached plan, where the cost of being wrong is
+> a redundant re-discovery. Same shape, different stakes — and if that reasoning is ever falsified,
+> the fix is to move those rules onto content, not to move this one onto mtime. Two conventions, one
+> of them argued for; silence about the other was the thing worth avoiding.
+
 > ⚠️ **`Planned` + a current report was added 2026-09-07, closing a gate whose only intuitive remedy
 > was a no-op.** This row previously read `Planned` + *either* → run the review, so the skip decision
 > keyed on **status** while the fact that answers "has this been reviewed?" is the **report**. Any

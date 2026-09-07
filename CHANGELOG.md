@@ -400,8 +400,8 @@ All notable changes to this project will be documented in this file. Format foll
   it matters. This **diverges from the mtime-based plan-freshness rule** in
   `develop-pipeline-resume-contract.md`, which is left unchanged; the divergence is now stated in
   the resource rather than left for a reader to trip over. Report frontmatter is not consulted even
-  when present: of the 49 tracked task review reports, 7 carry a frontmatter block and 6 an
-  `updated:` field, while all 49 carry the body form. Every ambiguity — unparseable date, missing
+  when present: of the 68 tracked task review reports, 20 carry a frontmatter block and only 7 an
+  `updated:` field, while every one carries the body form. Every ambiguity — unparseable date, missing
   date, missing report — resolves to *run the review*.
 
   **The halt message now names which precondition failed.** It carries the status, the report's
@@ -412,9 +412,12 @@ All notable changes to this project will be documented in this file. Format foll
   `/develop-story`'s tables are unchanged and asserted byte-identical — `/review-story` genuinely
   promotes, so an unchanged `Draft` there really is a failed promotion. The asymmetry is deliberate.
 
-  Guarded by 27 new tests, all 8 mutations proved red. There was **no prior test net**: the only test
+  Guarded by **67 tests, every fix mutation-proved**. There was **no prior test net**: the only test
   touching this file asserted that the substrings `review` and `skip` appear somewhere in it, and
-  would have passed with both decision tables deleted.
+  would have passed with both decision tables deleted. Three QA cycles plus a PR review found the
+  rule defeatable **seven** ways toward `fresh` — once because two of the first round's own fixes
+  cancelled each other out — so the count above is the size of the net that closed them, not a
+  measure of how clean the first cut was.
 
 - **⚠️ CI GATE ADDED — a new `ShellCheck` workflow fails any PR that introduces a warning-tier shell
   finding.** Shell was the least-gated language in the repo: `npm run ci` runs `prettier --check` over

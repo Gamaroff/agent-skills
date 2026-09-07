@@ -2,6 +2,7 @@ schema: 1
 task: 'task.97.develop-task-review-gate-already-reviewed'
 task_title: '/develop-task Step 2 has no recovery path when review-task Step 9 does not promote'
 gate: FAIL
+superseded_by: 'task.97.gate.3.develop-task-review-gate-already-reviewed.yml'
 status_reason: 'The freshness rule can be driven to `fresh` for a genuinely stale report by four ordinary markdown constructs (HTML comment, 4-space indented block, nested fence, date on the following line) — the exact over-correction §10 names as worse than the halt this task removes. Three further routes falsify §9 criteria. All seven reproduced by execution.'
 reviewer: 'QA Engineer'
 updated: '2026-09-07T21:35:00Z'
@@ -13,70 +14,80 @@ top_issues:
     finding: '`blankFences()` neutralises fenced code only. An HTML comment or a 4-space-indented code block containing a `**Reviewed:**` line is left as live scannable text, and `REVIEWED_RE`s `^\s*` matches the indented form. A report genuinely written months before the task is classified `fresh` and the review is skipped.'
     suggested_action: 'Blank `<!-- ... -->` spans and 4+-space / tab-indented lines (line-count-preserving, as the fence pass already does) before matching. Both are ordinary ways to show a picture of the header — the case the fence-blanking comment says it exists to prevent.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-002'
     severity: high
     file: 'shared/resources/review-report-freshness.js'
     finding: 'The separator before the date is `\s*` in both regexes, and JS `\s` includes newline — so the date need not be on the `**Reviewed:**` line at all. A bare label silently adopts the next date-shaped token anywhere below it, and fence-blanking makes it worse by collapsing intervening fenced content to blank lines.'
     suggested_action: 'Use `[ \t]*` for the separators so the `m` flag genuinely restricts each match to one line.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-003'
     severity: high
     file: 'shared/resources/review-report-freshness.js'
     finding: '`blankFences()` records the fence character but not its run length, so a shorter delimiter closes a longer opener — the opposite of CommonMark. A ```` block wrapping a ``` example (how this repo writes markdown-about-markdown) leaks its illustrative date as the real one.'
     suggested_action: 'Track the opening run char AND length; close only on the same char with length >= the opener.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-004'
     severity: medium
     file: 'shared/resources/review-report-freshness.js'
     finding: '`splitFrontmatter()` treats any leading `---` as a frontmatter opener and closes on the first `\n---`, so a document opening with a thematic break has its body prose parsed as frontmatter. Verified: a body `updated: 1999-01-01` is returned as the task date — an artificially old task date makes every report look current. Duplicate `updated:` keys are also last-wins.'
     suggested_action: 'Require the opener to be exactly `---\n` and the closer to be a line that is exactly `---` (or `...`); make `updated:` first-wins.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-005'
     severity: medium
     file: 'shared/resources/review-report-freshness.js'
     finding: 'Dates are shape-validated, never range-validated. `**Reviewed:** 2026-99-99` parses and lexically outranks every real task date, so such a report is `fresh` permanently. This is the one check that makes the documented "string order is date order" claim safe.'
     suggested_action: 'Range-check month 01–12 and day 01–31 after the shape match; return null on failure so it falls to the `stale` tie-break.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-006'
     severity: medium
     file: 'shared/resources/review-report-freshness.js'
     finding: 'The frontmatter line regex has no `m` flag and `.` does not match `\r`, so on a CRLF task document every frontmatter line fails and `taskUpdatedDate()` returns null. The tie-break sends that to `stale`, which is safe — but it means the entire `Planned` + current-report escape hatch is silently dead on any CRLF checkout, and nothing reports why. That is the "permanently unstartable card" this task exists to unblock.'
     suggested_action: 'Split on `/\r?\n/` (or strip `\r` from the frontmatter text first) and add a CRLF fixture.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-007'
     severity: medium
     file: 'shared/resources/develop-pipeline-step-2-review.md'
     finding: 'The post-review `Planned` rows are non-exhaustive — they cover "a report exists and is current" and "no report at all", but not a **pre-existing stale** report where the re-run review writes none. The Handling Findings bullet then says "Planned unchanged, but a report exists → proceed" with no freshness qualifier, so that case proceeds on a stale report. The prose reintroduces the permissive skip the code was written to prevent, and a decision table in a prose deliverable must not be non-exhaustive.'
     suggested_action: 'Add a third `Planned` row — "Yes, but stale (none written this run)" → HALT — and qualify both the bullet and the blocking condition with "current".'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-008'
     severity: medium
     file: 'evals/develop-task/step-isolation/02-review-task/scenario.json'
     finding: 'All four assertions are satisfied by the untouched replay fixtures — two `fileExists` on files the fixture provides and two `fileMatches` on strings it contains. Nothing distinguishes "Step 2 skipped on the current report" from "Step 2 ran the review". The scenario passes vacuously and does not guard the behaviour its own description names.'
     suggested_action: 'Assert the behaviour: require no second `task.42.review.*.md` via the `fileDoesNotMatch`/absence assertion, and assert the mandated skip log line carrying both dates.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-009'
     severity: low
     file: 'shared/resources/review-report-freshness.js'
     finding: 'The header asserts "IT NEVER THROWS", but `classifyReviewReport()` reads `input.taskContent` / `input.reportContent` unguarded, so a throwing getter propagates. Low real-world likelihood, but the Step 2 gate relies on the stated contract.'
     suggested_action: 'Guard the two property reads, or soften the claim to "never throws for string/absent input".'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
   - id: 'TASK97-010'
     severity: low
     file: 'shared/resources/review-report-freshness.js'
     finding: '`frontmatter` is a plain object and the key pattern matches `__proto__` / `constructor`, so `frontmatter.updated` can resolve through `Object.prototype` and `frontmatter["__proto__"] = v` hits the prototype setter rather than creating an own key.'
     suggested_action: '`Object.create(null)` plus a `hasOwnProperty` read.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-08'
 
 waiver:
   active: false

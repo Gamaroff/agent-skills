@@ -8,7 +8,7 @@ category: infrastructure
 status: ready-for-review
 priority: Medium
 created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-08
 assignee:
 estimated_effort_hours: 4
 github_issue: 348
@@ -284,7 +284,7 @@ recoverable.
 | `evals/.../02-review-task/replay/.../task.42.example.md` | **Added** — the scenario had no task file at all, so it could not express the status its own description named |
 | `evals/.../02-review-task/replay/.../task.42.review.2026-05-11.md` | **Modified** — carried `**Date:**`, a form the rule does not read; now `**Reviewed:**` + `**Review Date:**`, matching the real corpus |
 | `CHANGELOG.md` | **Modified** — Unreleased → Changed entry; this alters pipeline behaviour, so it is not an internal refactor |
-| `skills/*/references/*` | **Regenerated** — `npm run bundle`, never hand-edited. Two copies of the step-2 resource exist (`develop-story`, `develop-task`) |
+| `skills/*/references/*` | **Regenerated** — `npm run bundle`, never hand-edited. **Four files**: the step-2 resource into `develop-story` and `develop-task`, plus `review-report-freshness.js` into both. develop-story receives the engine as a **bundling consequence only** — its own tables never call it, and the bundler copies whatever the shared resource references into every skill that carries it |
 
 **Added:** 3 (helper, its test, the eval fixture task file). **Deleted:** none.
 
@@ -350,8 +350,13 @@ recoverable.
 - [x] A review that produces no report still HALTs.
 - [x] The halt message names which precondition failed, and is asserted per-precondition.
 - [x] Report freshness derives from document content — the task's frontmatter `updated:` and the
-      report's body `**Reviewed:**` / `- **Review Date:**` line — and from no filesystem mtime;
-      verified in a clone where every mtime is the checkout time.
+      report's body `**Reviewed:**` / `- **Review Date:**` line — and from no filesystem mtime.
+      **Verified by forbidding the input rather than by cloning**: two tests assert the module
+      contains zero `require(...)` calls and none of `statSync`/`stat(`/`mtime`/`readFile`/
+      `existsSync`/`openSync` in comment-stripped source. A module that cannot reach the filesystem
+      cannot vary with mtime, which subsumes the fresh-clone case and holds for every future clone
+      rather than for one. *(Original wording claimed a clone was made; none was. The substituted
+      evidence is stronger, but the criterion had to say what was actually done.)*
 - [x] The resource states how and why this diverges from the mtime rule in
       `develop-pipeline-resume-contract.md:95–110`.
 - [x] `/develop-story`'s tables are unchanged — asserted, not assumed.
@@ -516,6 +521,7 @@ which §5 of this card promises not to make — **filed as a follow-up**, not ac
 | 2026-09-08 |  | QA cycle 2 refute pass — gate FAIL (70/100), 8 findings; two of cycle 1's fixes cancelled out and the module was still defeatable | qa-task |
 | 2026-09-08 |  | Cycle-2 findings fixed — all 8 closed, 12 mutations proved red, tests 27 → 59 | qa-fix |
 | 2026-09-08 |  | QA gate PASS (95/100) cycle 3 — 20-input attack corpus, 0 unsafe; 68/68 reports and 161/161 docs still parse | qa-task |
+| 2026-09-08 |  | Step 5c `/review-pr` — CONCERNS, 16 findings all addressed: an unmet §9 criterion that had been ticked, wrong corpus figures in the module header and CHANGELOG, three vacuous tests, and two unsafe-direction holes (phantom fence from an inline code span; comment removal shifting the indent bound) | review-pr |
 
 ---
 

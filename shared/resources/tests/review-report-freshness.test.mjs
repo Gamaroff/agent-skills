@@ -29,6 +29,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
@@ -223,7 +224,7 @@ test("report with no date line is stale, never fresh", () => {
     reportContent: "# Report\n\nNo date anywhere.\n",
   });
   assert.equal(r.verdict, VERDICTS.STALE);
-  assert.equal(r.reason, "report-date-unparseable");
+  assert.equal(r.reason, "report-date-missing");
 });
 
 test("task with no `updated:` is stale, never fresh", () => {
@@ -437,7 +438,7 @@ test("a 4-space indented code block is not the report's date (CommonMark)", () =
     reportContent: "# R\n\nFormat example:\n\n    **Reviewed:** 2030-01-01\n",
   });
   assert.equal(r.verdict, VERDICTS.STALE);
-  assert.equal(r.reason, "report-date-unparseable");
+  assert.equal(r.reason, "report-date-missing");
 });
 
 test("up to 3 spaces of indent is still a paragraph, and still counts", () => {
@@ -454,7 +455,7 @@ test("the date must be on the label's line — `\\s*` must not span newlines", (
       "# R\n\n**Reviewed:**\n2030-01-01 was the previous revision\n",
   });
   assert.equal(r.verdict, VERDICTS.STALE);
-  assert.equal(r.reason, "report-date-unparseable");
+  assert.equal(r.reason, "report-date-missing");
 });
 
 test("a shorter fence does not close a longer one (nested ``` inside ````)", () => {
@@ -463,7 +464,7 @@ test("a shorter fence does not close a longer one (nested ``` inside ````)", () 
     reportContent: "# R\n\n````\n```\n**Reviewed:** 2030-01-01\n````\n",
   });
   assert.equal(r.verdict, VERDICTS.STALE);
-  assert.equal(r.reason, "report-date-unparseable");
+  assert.equal(r.reason, "report-date-missing");
 });
 
 test("an equal-length fence still closes normally", () => {
@@ -726,4 +727,155 @@ test("a task with no `updated:` cannot inherit one from the prototype", () => {
     if (before === undefined) delete Object.prototype.updated;
     else Object.prototype.updated = before;
   }
+});
+
+// ── 11. guards that had no coverage until the PR review found them ─────────
+//
+// Each of these pins a decision that was already implemented but that NO test
+// exercised — verified by reverting the guard and watching the suite stay green.
+// A guard with no coverage is one refactor away from silently disappearing.
+
+test("a `~~~` fence is not closed by a ``` line (fence CHARACTER is checked)", () => {
+  // The pre-existing test for this put the date BEFORE the mismatched delimiter,
+  // where the `~~~` fence blanks it either way — so the character comparison had
+  // no coverage at all. The date must sit AFTER the wrong-character line and
+  // still inside the block.
+  assert.equal(
+    reportReviewedDate("# R\n\n~~~\nx\n```\n**Reviewed:** 2030-01-01\n~~~\n"),
+    null,
+  );
+});
+
+test("a ``` fence is not closed by a ~~~ line (the mirror case)", () => {
+  assert.equal(
+    reportReviewedDate("# R\n\n```\nx\n~~~\n**Reviewed:** 2030-01-01\n```\n"),
+    null,
+  );
+});
+
+test("a comment opened in prose survives a fenced block", () => {
+  // The fence-open branch deliberately does NOT reset comment state. Nothing
+  // exercised that: every other comment/fence test has the comment INSIDE the
+  // fence, where it is never parsed. Reinstating the reset makes a commented-out
+  // date read as the report's own — the unsafe direction.
+  assert.equal(
+    reportReviewedDate(
+      "# R\n\n<!-- reviewer scratchpad\n```\nx\n```\n**Reviewed:** 2030-01-01\n",
+    ),
+    null,
+  );
+});
+
+test("...and stops surviving once that comment closes", () => {
+  assert.equal(
+    reportReviewedDate(
+      "# R\n\n<!-- open\n```\nx\n```\nstill comment\nend -->\n\n**Reviewed:** 2026-05-11\n",
+    ),
+    "2026-05-11",
+  );
+});
+
+test("an inline code span at column 0 does not open a phantom fence", () => {
+  // CommonMark forbids backticks in a backtick fence's info string precisely so
+  // this line is not a fence. Without the rule it opened a block that never
+  // closed and blanked the rest of the document, taking the real date with it.
+  assert.equal(
+    reportReviewedDate(
+      "# R\n\n```code``` is inline\n\n**Reviewed:** 2026-05-11\n",
+    ),
+    "2026-05-11",
+  );
+  // A tilde fence is unaffected by that rule and must still open.
+  assert.equal(
+    reportReviewedDate("# R\n\n~~~code~~~\n**Reviewed:** 2030-01-01\n~~~\n"),
+    null,
+  );
+});
+
+test("removing a comment span preserves column positions", () => {
+  // Slicing a comment out shortened the line and moved what followed left, until
+  // a 4-space-indented date slipped under the `^ {0,3}` bound. Unsafe direction.
+  assert.equal(
+    reportReviewedDate("<!-- x\n    -->**Reviewed:** 2030-01-01\n"),
+    null,
+  );
+  assert.equal(
+    reportReviewedDate("# R\n\n<!--c-->  **Reviewed:** 2030-01-01\n"),
+    null,
+  );
+});
+
+test("the halt message separates a missing date line from an invalid one", () => {
+  const T = "---\nupdated: 2026-06-01\n---\n";
+  const missing = classifyReviewReport({
+    taskContent: T,
+    reportContent: "# R\n\nno date here\n",
+  });
+  const invalid = classifyReviewReport({
+    taskContent: T,
+    reportContent: "# R\n\n**Reviewed:** 2026-02-30\n",
+  });
+  assert.equal(missing.reason, "report-date-missing");
+  assert.equal(invalid.reason, "report-date-invalid");
+  assert.match(describeVerdict(missing), /states no review date/);
+  assert.match(describeVerdict(invalid), /not a real calendar date/);
+  // A label inside a fenced example is not "carrying a date line".
+  assert.equal(
+    classifyReviewReport({
+      taskContent: T,
+      reportContent: "# R\n\n```\n**Reviewed:** 2026-05-11\n```\n",
+    }).reason,
+    "report-date-missing",
+  );
+});
+
+test("the no-report message makes no claim about a review having run", () => {
+  // describeVerdict is called at the PRE-review gate check too, where asserting
+  // "and the review produced none" would be false.
+  const r = classifyReviewReport({
+    taskContent: "---\nupdated: 2026-06-01\n---\n",
+  });
+  assert.equal(r.reason, "no-report");
+  assert.doesNotMatch(describeVerdict(r), /review produced none/);
+});
+
+// ── 12. §9's scope guarantee, asserted mechanically ────────────────────────
+
+test("the develop-story halves of the step-2 resource are untouched by this change", () => {
+  // §9 requires "/develop-story's tables are unchanged — asserted, not assumed".
+  // It was verified by hand three times during the run, which is exactly the kind
+  // of guarantee that regresses silently. This pins it: a future edit or bundler
+  // change that alters a develop-story section fails here.
+  const extract = (text) => {
+    const out = [];
+    let on = false;
+    for (const line of text.split("\n")) {
+      if (line.startsWith("#### develop-story")) on = true;
+      else if (line.startsWith("#### develop-task")) on = false;
+      if (on) out.push(line);
+    }
+    return out.join("\n");
+  };
+  const resource = readFileSync(
+    join(__dirname, "..", "develop-pipeline-step-2-review.md"),
+    "utf8",
+  );
+  let base;
+  try {
+    base = execFileSync(
+      "git",
+      [
+        "show",
+        "origin/develop:shared/resources/develop-pipeline-step-2-review.md",
+      ],
+      { cwd: join(__dirname, "..", ".."), encoding: "utf8" },
+    );
+  } catch {
+    return; // no origin/develop here (shallow clone, fork) — nothing to compare against
+  }
+  assert.equal(
+    extract(resource),
+    extract(base),
+    "a `#### develop-story` section changed; §9 requires them byte-identical",
+  );
 });

@@ -27,16 +27,17 @@
 //                                This diverges deliberately from the plan-freshness
 //                                rule in develop-pipeline-resume-contract.md, which
 //                                compares mtimes for the same shape of question.
-//                                That rule is not changed here — see the note in
-//                                the step-2 resource. Two conventions, one of them
+//                                That rule is not changed here — the step-2
+//                                resource states the divergence beside its
+//                                "not filesystem mtime" paragraph. Two conventions, one of them
 //                                argued for; silence about the other one was the
 //                                thing worth avoiding.
 //
 //   2. THE REPORT'S DATE COMES FROM ITS BODY. Review reports have no reliable
 //                                frontmatter: of the 68 task review reports tracked
-//                                when this was written, 7 carried a frontmatter
-//                                block at all and 6 an `updated:` field — while
-//                                every one carries a body `Reviewed` or
+//                                when this was written, 20 carried a frontmatter
+//                                block at all and only 7 an `updated:` field —
+//                                while every one carries a body `Reviewed` or
 //                                `Review Date` line. Frontmatter is deliberately
 //                                NOT consulted even when present: two sources for
 //                                one value is two code paths, and the body form
@@ -50,7 +51,12 @@
 //                                `**Reviewed:**`" — true of that subset, and wrong
 //                                about the corpus. Three reports using the second
 //                                spelling read as undated until the matcher was
-//                                widened.
+//                                widened. The frontmatter half of that count was
+//                                mis-labelled the same way and corrected later
+//                                still: 7/6 are the numbered subset's figures, not
+//                                the corpus's. Re-measuring one half of a claim and
+//                                re-labelling the other is how a corrected comment
+//                                stays wrong.
 //
 //   3. EVERY AMBIGUITY RESOLVES TO `stale`. Unparseable date, missing date,
 //                                missing report — all run the review. The failure
@@ -228,7 +234,12 @@ function blankNonProse(body) {
       }
 
       const o = raw.match(FENCE_RE);
-      if (o) {
+      if (o && !(o[1][0] === "`" && o[2].includes("`"))) {
+        // CommonMark forbids backticks in a backtick fence's info string, and the
+        // reason is exactly this: without the rule, a line beginning with an
+        // inline code span (`` ```code``` is inline ``) opens a fence that never
+        // closes and blanks the rest of the document — taking the report's real
+        // date with it. Tilde fences are unaffected.
         fence = { char: o[1][0], len: o[1].length };
         // Comment state is deliberately NOT reset here. Under fence-first
         // ordering a `<!--` inside a fence is never seen at all, so the only
@@ -244,10 +255,18 @@ function blankNonProse(body) {
       if (inComment) {
         const end = line.indexOf("-->");
         if (end === -1) return "";
-        line = line.slice(end + 3);
+        // The remainder of the line that CLOSES an HTML comment is still part of
+        // that HTML block in CommonMark, never markdown — so it is blanked, not
+        // returned. Slicing it off instead also discarded its leading spaces,
+        // which shifted a 4-space-indented date left until the `^ {0,3}` bound
+        // accepted it. That failed toward `fresh`.
         inComment = false;
+        return "";
       }
-      line = line.replace(/<!--[\s\S]*?-->/g, "");
+      // Equal-length spaces, not "": removing a span shortens the line and moves
+      // everything after it left, which is the same column-shift defect in its
+      // inline form.
+      line = line.replace(/<!--[\s\S]*?-->/g, (m) => " ".repeat(m.length));
       const open = line.indexOf("<!--");
       if (open !== -1) {
         line = line.slice(0, open);
@@ -292,6 +311,18 @@ const REVIEW_DATE_RE = new RegExp(
   "m",
 );
 
+// The same two labels with a RELAXED value — any non-space token. Used only to
+// distinguish "no date line" from "a date line whose value is not a date"; the
+// strict ISO forms above remain what actually yields a date.
+const REVIEWED_LOOSE_RE = new RegExp(
+  LABEL + String.raw`Reviewed:?\*\*:?[ \t]*(\S+)`,
+  "m",
+);
+const REVIEW_DATE_LOOSE_RE = new RegExp(
+  LABEL + String.raw`Review Date:?\*\*:?[ \t]*(\S+)`,
+  "m",
+);
+
 const ISO_ONLY_RE = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/;
 
 // Shape is not validity. `2026-99-99` matches the ISO pattern and, compared as a
@@ -321,11 +352,26 @@ function validIso(s) {
  * Returns an ISO `YYYY-MM-DD` string, or null when neither form is present.
  */
 function reportReviewedDate(reportContent) {
+  const t = reportDateToken(reportContent);
+  return t === null ? null : validIso(t);
+}
+
+// The raw token a review-date line carries, before validation — `null` when no
+// such line exists in scannable prose at all.
+//
+// Split out from `reportReviewedDate` so the caller can tell "this report states
+// no review date" from "this report states one and it is not a real date". Both
+// resolve to `stale`, but they send a human to different places, and the halt
+// message is only useful if it distinguishes them. The relaxed token pattern is
+// matched against the SAME blanked content as the strict one, so a label inside a
+// fenced example does not count as the report carrying a date line.
+function reportDateToken(reportContent) {
   if (typeof reportContent !== "string" || reportContent === "") return null;
   const { body } = splitFrontmatter(reportContent);
   const scannable = blankNonProse(body);
-  const m = scannable.match(REVIEWED_RE) || scannable.match(REVIEW_DATE_RE);
-  return m ? validIso(m[1]) : null;
+  const m =
+    scannable.match(REVIEWED_LOOSE_RE) || scannable.match(REVIEW_DATE_LOOSE_RE);
+  return m ? m[1] : null;
 }
 
 /**
@@ -339,7 +385,8 @@ function taskUpdatedDate(taskContent) {
     return null;
   const raw = frontmatter.updated;
   if (typeof raw !== "string") return null;
-  return validIso(raw.trim());
+  // No .trim() — splitFrontmatter stores the trimmed value already.
+  return validIso(raw);
 }
 
 // ── the verdict ────────────────────────────────────────────────────────────
@@ -394,9 +441,13 @@ function classifyReviewReport(input) {
   const reportDate = reportReviewedDate(reportContent);
 
   if (reportDate === null) {
+    // Two distinct causes, and the halt message has to tell them apart: a reader
+    // sent looking for a missing line will not find a typo'd date. `hasDateLine`
+    // is what separates them.
+    const hasDateLine = reportDateToken(reportContent) !== null;
     return {
       verdict: VERDICTS.STALE,
-      reason: "report-date-unparseable",
+      reason: hasDateLine ? "report-date-invalid" : "report-date-missing",
       taskDate,
       reportDate: null,
     };
@@ -441,9 +492,14 @@ function describeVerdict(result, opts) {
   const reportPath = (opts && opts.reportPath) || "the review report";
   switch (result && result.reason) {
     case "no-report":
-      return "no review report exists beside this task, and the review produced none";
-    case "report-date-unparseable":
+      // No "and the review produced none" — this function is called at the
+      // PRE-review gate check too, where no review has run and that clause would
+      // be false. The post-review table adds the stronger wording itself.
+      return "no review report exists beside this task";
+    case "report-date-missing":
       return `${reportPath} states no review date (no \`**Reviewed:**\` or \`**Review Date:**\` line), so its age cannot be established`;
+    case "report-date-invalid":
+      return `${reportPath} carries a review-date line, but its value is not a real calendar date, so its age cannot be established`;
     case "task-date-unparseable":
       return `the task document has no parseable frontmatter \`updated:\` date, so ${reportPath} cannot be dated against it`;
     case "report-older-than-task":
@@ -460,6 +516,7 @@ function describeVerdict(result, opts) {
 module.exports = {
   // read
   reportReviewedDate,
+  reportDateToken,
   taskUpdatedDate,
   // classify
   classifyReviewReport,
