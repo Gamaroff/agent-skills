@@ -70,7 +70,7 @@ cycles and `pr-review.{n}` counts 5c invocations, and since 5c runs only on a cl
 diverge on any run whose first gate was not clean. Whether 5c cleared is recorded in the
 implementation report's `**PR Review**` row, not derived from filenames.
 
-## The eight documents, in plain terms
+## The nine documents, in plain terms
 
 | Document | What it is | Who may edit it |
 | --- | --- | --- |
@@ -78,6 +78,7 @@ implementation report's `**PR Review**` row, not derived from filenames.
 | **Plan** | How the work will be done. Written *before* the pipeline runs; the pipeline reads it and checks its mtime against the work item (Plan Freshness) but never rewrites it. | You |
 | **Review report** | The pre-flight check — what was ambiguous, what got fixed, GO/NO-GO with a 1–10 readiness score. | `review-*` skills |
 | **PR review report** | The post-flight check — does the PR deliver what the work item promised, and is the trail behind it complete? Advisory verdict, never a gate; the orchestrator is what acts on it. Written at **Step 5c**, the QA loop's exit gate, and also produced by a standalone `/review-pr` run. | `review-pr` |
+| **Security review report** | Per-control proof that a security control **engages** — a verdict of `engages` / `present-but-inert` / `absent` / `unverifiable` per control, each carrying the command that produced it. **Not a pipeline step**: written only by a standalone `/review-security` run, so it is absent from most work items. Advisory, and deliberately owns no gate. | `review-security` |
 | **Implementation report** | The pipeline's running log: Pipeline Progress table, Decisions Log, Issues Log, QA Iteration History. **This is the file to read when a run goes wrong** — it records every prompt answer and every fork taken. | The orchestrator, at every step |
 | **QA report** | The full quality review for one cycle: NFR assessment, requirements traceability, findings. | `qa-*` skills |
 | **Gate file** (`.yml`) | The machine-readable verdict for that cycle — `PASS` / `CONCERNS` / `FAIL` / `WAIVED`. Small on purpose: it is what tooling greps. | **`qa-*` skills only.** Dev skills must never write a gate file — see [Anti-patterns](./anti-patterns.md) |
