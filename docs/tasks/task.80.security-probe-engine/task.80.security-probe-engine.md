@@ -5,11 +5,13 @@ type: task
 description: "task.73's probe mode is prose: it tells the agent to hand-write a script and run it, and then trusts the probes_executed count the agent types. Build the engine that runs the probe and computes the verdict — without putting an interpreter on the snippet allow-list, which would make that boundary fail open."
 tags: [security, probe, sandbox, engine, shared-resources]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-02
 updated: 2026-09-07
+completed_date: 2026-09-07
+pr_number: 337
 assignee:
 estimated_effort_hours: 6
 depends_on: task.79
@@ -17,7 +19,7 @@ depends_on: task.79
 
 # Technical Task: Make a security probe runnable without widening the snippet allow-list
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.80.review.1.security-probe-engine.md` implemented 2026-09-07 (1 skipped — tracker linkage needs consent)
 
 ---
@@ -406,6 +408,8 @@ run clean for a cycle.
 | 2026-09-07 |         | QA gate CONCERNS (80/100) cycle 2 — all 4 prior findings verified fixed; 2 new MEDIUM found by the refute pass | qa-task |
 | 2026-09-07 |         | QA findings fixed — 2 MEDIUM closed; spawn-budget moved out of tests/, bundler nested-dep fix, 2 iterations | qa-fix |
 | 2026-09-07 |         | QA gate PASS (100/100) cycle 3 — both prior findings verified fixed, no new findings | qa-task |
+| 2026-09-07 |         | PR conformance review CONCERNS — 2 doc-currency findings, both fixed | review-pr |
+| 2026-09-07 | 1.2     | DoD verified — accepted (PR #337), CI green on the accepted head | finalise |
 
 ---
 
@@ -442,6 +446,37 @@ run clean for a cycle.
 - **Collapsed-state precedent**: `task.73`'s tri-state conflation, and `bug.7` one layer up
 - **The corpus this consumes**: `task.79`
 - **Consumer**: `task.81`
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate:** [`task.80.gate.3.security-probe-engine.yml`](./task.80.gate.3.security-probe-engine.yml) — ✅ **PASS**, 100/100
+**QA cycles:** 3 (CONCERNS 60 → CONCERNS 80 → **PASS 100**) · six findings raised, six closed, 0 HIGH throughout
+**PR conformance review:** [`task.80.pr-review.1.security-probe-engine.md`](./task.80.pr-review.1.security-probe-engine.md) — ⚠️ CONCERNS (advisory); both medium findings fixed before acceptance
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 11/11 met, each traced to a named test
+✅ **Tests:** `npm run ci:fast` — 2570 tests, 0 failures. Targeted: 276/276 across the eight suites this change touches
+✅ **CI:** **SUCCESS** on head `9ab45cba` — the commit being accepted, not an ancestor. The first sample read `PENDING` and finalise **waited** rather than assuming
+✅ **Documentation:** `probe-boundary-rule.md` (222 lines, the task's own §4 deliverable); CHANGELOG three Added entries; task doc and PR description both refreshed at Step 5c
+✅ **Security:** all seven §9 safety criteria hold, each verified by execution. **Probe mode fired** (this is a boundary deliverable): **39 candidates executed, 1 reproduced** — analysed as a LOW misclassification, not a containment escape; `/etc/passwd` was never read. See the DoD summary for the full analysis
+⚠️ **Compliance:** NOT APPLICABLE — no personal data, payment path, UI or health data
+
+**Outstanding follow-ups (non-blocking, recorded not papered over):**
+
+1. **No linked tracker issue** — flagged Important at Step 2 and carried through all three cycles because creating one is consent-gated and this run is autonomous. No DoD criterion requires it. Run `/sync-github-task`.
+2. `file://` entry specifiers are silently reinterpreted as relative paths and reported as `entry-not-probeable` rather than `bad-entry` (LOW; cannot leak).
+3. `runProbeSpec` falls back to the budget on an unparseable `timeoutMs` rather than reporting it — deliberate and documented.
+
+**Detailed Verification Log:** see [`task.80.dod.1.security-probe-engine.md`](./task.80.dod.1.security-probe-engine.md) for complete evidence, the CI rollup per job, and the probe analysis.
+
+**Task marked as ACCEPTED on:** 2026-09-07
 
 ---
 

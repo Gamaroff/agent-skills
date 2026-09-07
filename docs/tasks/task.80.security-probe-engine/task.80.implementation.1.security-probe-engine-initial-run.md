@@ -37,7 +37,7 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #337: https://github.com/Gamaroff/agent-skills/pull/337 — state OPEN, base `develop`. 3 commits, 20 files, +2131/-124. Issue comment N/A (no tracker issue) | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.80.qa.{N}.*.md`; `task.80.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles. Gates: CONCERNS 60 → CONCERNS 80 → **PASS 100**. 6 findings raised, 6 closed, 0 HIGH throughout. Step 5c: **CONCERNS** (2 doc-currency findings, both fixed before proceeding) | —                    |
 | 7. finalise                | ⏳ Pending | `task.80.dod.{N}.*.md`; task `status: accepted`                    |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final commit; lock removed                                                                        | —                    |
 
 ---
 
@@ -56,6 +56,15 @@ Build `shared/resources/security-probe.mjs` — an engine that runs security pro
 - Pipeline mode: **standard**. Computed from `risk_ok = (risk_level ∈ {low, absent})` → **false** (`risk_level: medium`); `phase_count = 4` → not < 3; `single_module` → false (touches `shared/resources/` and regenerates `skills/*/references/`). All three fail, so lite mode is not available.
 - Always-load files resolved: 3 files from `skills-config.yaml` `devLoadAlwaysFiles` — all three verified present on disk.
 - Task status at entry: `ready-for-development` — proceed normally.
+
+### Step 7 — finalise — 2026-09-07
+
+- **Decision: ✅ ACCEPTED.** DoD summary at `task.80.dod.1.security-probe-engine.md`; sprint review summary written; canonical PR comment [posted](https://github.com/Gamaroff/agent-skills/pull/337#issuecomment-5567705941).
+- **CI is a DoD gate and was checked, not assumed.** The first rollup sample read **PENDING** (`test` was `IN_PROGRESS`). Per the gate's own rule that `PENDING` is non-acceptance and waiting is the correct action, finalise **waited** and re-polled to completion: **SUCCESS** on head `9ab45cba9457`, which matches local HEAD exactly — a green on the accepted commit, not an ancestor. All five jobs green.
+- **Probe mode fired**, because this task ships a boundary. **39 candidates executed, 1 reproduced** — and the reproduction was analysed rather than reported raw: `file:///etc/passwd#x` is accepted by the entry check because `isAbsolute()` is false for it, so it resolves *relative to the repo root* into a path that **is** inside the root. Verified end-to-end that the path does not exist, the import fails, and `/etc/passwd` was never read. **LOW severity, not a containment escape**; §9 criterion 2 holds. Recorded as a follow-up.
+  - Worth recording: probe mode found this by enumerating the boundary's input space, after three QA cycles had not. That is the argument for task.80, made against task.80's own deliverable — and it is exactly the class of evidence the task exists to make machine-produced rather than self-reported.
+- Tracker issue close and board `done` move: **skipped, recorded, not failures** — there is no linked issue, so there is no card to move.
+- Compliance: NOT_APPLICABLE (no personal data, payment path, UI or health data).
 
 ### Step 4 — create-pr — 2026-09-07
 
@@ -251,10 +260,10 @@ Convergence check: **not applicable at cycle 1** (starts at cycle 3). Proceeding
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-07
+**Final Status**: Completed
 **Branch**: `feature/task.80.security-probe-engine`
 **PR**: [#337](https://github.com/Gamaroff/agent-skills/pull/337)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 3 (gates CONCERNS 60 → CONCERNS 80 → PASS 100)
+**DoD Summary**: [`task.80.dod.1.security-probe-engine.md`](./task.80.dod.1.security-probe-engine.md) — ACCEPTED
+**Tracker debt**: none deferred — but the task has **no linked tracker issue at all**, so no tracker action ever fired in this run. Flagged Important at Step 2, consent-gated, carried unactioned by design. Run `/sync-github-task` to link it.
