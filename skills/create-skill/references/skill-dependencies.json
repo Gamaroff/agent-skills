@@ -61,15 +61,7 @@
     "develop-story",
     "develop-task"
   ],
-  "develop-bug": [
-    "commit-changes",
-    "create-branch",
-    "create-pr",
-    "develop",
-    "finalise",
-    "qa-fix",
-    "review-bug"
-  ],
+  "develop-bug": [],
   "develop-next": [
     "develop-bug",
     "develop-story",
@@ -104,6 +96,10 @@
   "edit-epic": [],
   "edit-story": [],
   "enforce-standards": [],
+  "ensure-bug-github-issue": [],
+  "ensure-bug-jira-issue": [
+    "sync-jira-bug"
+  ],
   "ensure-epic-github-issue": [],
   "ensure-epic-jira-issue": [
     "sync-jira-epic"
@@ -173,6 +169,7 @@
   "review-prd": [
     "mermaid-architect"
   ],
+  "review-security": [],
   "review-story": [
     "create-branch",
     "ensure-epic-github-issue",
@@ -192,9 +189,11 @@
   "server-admin": [],
   "shard-doc": [],
   "shard-prd": [],
+  "sync-github-bug": [],
   "sync-github-epic": [],
   "sync-github-story": [],
   "sync-github-task": [],
+  "sync-jira-bug": [],
   "sync-jira-epic": [],
   "sync-jira-story": [],
   "sync-jira-task": [],

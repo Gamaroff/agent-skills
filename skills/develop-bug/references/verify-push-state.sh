@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/verify-push-state.sh. Regenerate via `npm run bundle`.
 # verify-push-state.sh — assert that reported work actually exists on the remote.
 #
 # WHY THIS EXISTS
