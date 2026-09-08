@@ -449,6 +449,52 @@ own fixes**, which is the cycle's real result.
 
 ---
 
+### QA Cycle 5 — 2026-09-08 (loop limit; convergence check TRIPPED)
+
+Gate **CONCERNS** (72/100). Two HIGH findings, both defects introduced by cycle 4.
+
+| ID | Fix |
+| --- | --- |
+| C5-003 (HIGH) | Cycle 4's pass-3 **fence exemption was a functional regression**, reverted. Skill docs use fences for the commands the agent *runs*: 75 lines across 24 SKILL.md files invoke `source references/…` inside ```bash blocks, holding that form **because pass 3 rewrote them**. The exemption meant the next author writing `shared/resources/…` in a fence ships a path that exists in no install — with `--check` green. The URL exemption stays; it covers the 404 case there was actual evidence for |
+| C5-004 (HIGH) | Cycle 4's C4-006 guard went on the **wrong read**, and its comment claimed the guarded one was "the only unguarded read in the file". Pass 3's read is the one that crashes; because the check-side was already guarded, `--check` reported green for a skill where `npm run bundle` died |
+| C5-001 | A 0444 source self-locks its own copy. **Attribution corrected by the reviewer**: pre-existing, not a cycle-4 regression — the unconditional `chmod` is present verbatim at `e14bccae` |
+
+**Three of my own claims were wrong and are corrected here**: I told the reviewer the tree was clean
+(it carried an uncommitted fix), I attributed the read-only lock to cycle 4 (it predates it), and I
+reported 52 tests (it is 43 tests / 81 assertions in that file).
+
+The first cycle-5 gate run failed on `qa-execute-snippets` — the **load-flake this repo's own memory
+documents**. Run alone: 98/98, exit 0. Not this task's code.
+
+---
+
+## ⚠️ QA Loop Escalation — Not Converging
+
+**The convergence check has tripped.** HIGH findings per gate: **1, 2, 1, 2, 2**. At cycle 5,
+`HIGH_5 ≥ HIGH_4` (2≥2) **and** `HIGH_4 ≥ HIGH_3` (2≥1) — the guard's stop condition. The 5-cycle
+budget is also exhausted. Both say the same thing, so the loop stops here rather than declaring a pass.
+
+**Cycles 2, 4 and 5 each found defects introduced by the previous cycle's fix.** That is the fact that
+matters, and no amount of green CI displaces it.
+
+### What the five cycles actually established
+
+`source_backed_on_disk` — **the actual task.86 fix** — was written in the first commit (`41a88d73`)
+and has not changed in substance since. It is covered, mutation-proven, and has never been the subject
+of a finding. Every one of the ~45 findings across five cycles landed in the **`--check` CI assertion
+added beyond the task's stated scope**, or in the class taxonomy that grew around it.
+
+The deliverable converged immediately. The elaboration never did.
+
+### Handover
+
+All findings are closed and every behavioural fix is mutation-proven; CI is green; the tree is
+byte-identical apart from the intended changes. Six residuals are recorded in
+`task.86.gate.5.*.yml`, all latent with no live instance. A reviewer should weigh the deliverable and
+the elaboration **separately** — they have very different evidence behind them.
+
+---
+
 ### Key Findings
 
 All eight §9 success criteria hold when checked against the tree. The gate fails on code review:
@@ -465,6 +511,8 @@ diff` check it replaced did catch.
 | 2026-09-03 | 1.0     | Filed from task 77 QA cycle 3 (TASK77-025) | develop-task |
 | 2026-09-08 | 1.1     | Review (4/10 → 9/10). Root cause corrected — discovery was always transitive; the real cause is three reachability edges leaving 26 source-backed orphans, 8 stale today. Scope self-contradiction resolved (refresh source-backed orphans; leave 83 source-less ones). CI item re-framed: a freshness step already exists and is structurally blind. `package_skill.py` scoped out with a reason. Seven missing mandatory sections added. | review-task |
 | 2026-09-08 |         | Status → ready-for-development            | review-task |
+| 2026-09-08 |         | QA gate 5 CONCERNS (72/100) — 2 HIGH, both cycle-4 regressions; convergence check TRIPPED (1,2,1,2,2) | qa-task |
+| 2026-09-08 |         | qa-fix cycle 5 — 3 fixed, 44 tests, 3 mutation proofs | qa-fix |
 | 2026-09-08 |         | QA gate 4 FAIL (62/100) — 7 findings, 2 of them defects in cycle 3's fixes | qa-task |
 | 2026-09-08 |         | qa-fix cycle 4 — 7 fixed, 52 tests, 7 mutation proofs | qa-fix |
 | 2026-09-08 |         | QA gate 3 CONCERNS (78/100) — 13 findings incl. 2 test gaps; 45 tests, 6 mutation proofs | qa-task |
