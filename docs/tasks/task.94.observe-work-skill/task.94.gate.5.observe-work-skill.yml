@@ -1,0 +1,87 @@
+schema: 1
+task: 'task.94.observe-work-skill'
+task_title: 'Add the observe-work meta-skill'
+gate: PASS
+status_reason: >-
+  TASK-94-007 is closed and the rewritten reference was verified by executing its claims rather than
+  reading them — including two degradation branches the prose asserts that no prior cycle had run,
+  plus a third invented for this pass. Nothing above LOW outstanding. All seven findings across five
+  cycles are closed.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T15:55:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2885
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: '2026-09-08'
+  total_iterations: 4
+  verification_method: >-
+    Each cycle's fixes were verified against the case that produced them, never against the suite
+    alone. The final cycle executed the reference's own claims: the four degradation branches it
+    promises (no engine, no node, unparseable payload, valid JSON without the expected keys) were
+    each run, plus a fourth invented here — a non-zero exit carrying a plausible payload — and all
+    five emit nothing. The hook agrees with the engine on twelve inputs spanning every case raised
+    across cycles 1-4.
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No credentials, no network, no untrusted input. The hook reads two paths and writes only to
+      stdout; its one JSON interpolation escapes backslash and quote. shellcheck --severity=warning
+      clean across all tracked sources. The engine's ephemeral-anchor refusal was observed firing
+      three separate times during this loop — engaged, not merely present.
+  performance:
+    status: PASS
+    notes: >-
+      Body 283 lines against a 500 ceiling; authored footprint 49.1 KB against upstream's ~214 KB.
+      The hook spawns node once per session start, which is the deliberate cost of the count being
+      correct.
+  reliability:
+    status: PASS
+    notes: >-
+      The queue rule lives in exactly one place. Every degradation path is silence rather than a
+      guess — five of them now executed, not assumed. The date-comparison fallback ladder fails
+      toward nagging rather than toward silence, which is the correct direction for the one branch
+      where a wrong answer is recoverable.
+  maintainability:
+    status: PASS
+    notes: >-
+      Raised from CONCERNS. The reference now describes the shipped mechanism and carries the three
+      failed attempts and why each failed, so the next editor is warned off the exact path that
+      produced them. Both HIGHs found in this loop carry mutation-proved regression assertions.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Encode the hook/engine agreement as a test. It is exercised in QA across twelve inputs but
+        not asserted anywhere, because the natural guard ("the hook contains no grep") is a
+        source-text assertion this repo rejects. A fixture-driven behavioural test would close it.
+      refs: ['shared/resources/observe-work-session-start.sh']
+    - action: >-
+        qa-execute-snippets refuses `command node` as `unrecognised-command: command (fail-closed)`,
+        so Step 4b can never execute a block from any skill following this repo's own `command node`
+        rule. Observed on this task; deserves its own.
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'docs-link-check is path-filtered to docs/**; everything under skills/** ships unchecked'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

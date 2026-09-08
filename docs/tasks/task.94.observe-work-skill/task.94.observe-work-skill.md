@@ -586,14 +586,15 @@ Two changes are worth naming because they are not confined to the new directory:
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (cycle 4)
+**QA Status**: PASS (cycle 5)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-08
-**Quality Score**: 90/100 (cycle 2: 70, cycle 1: 60)
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100 (cycles 1-4: 60, 70, 90, 90)
+**Gate Decision**: PASS
 
 ### QA Report
-- **Cycle 4 (current)**: [task.94.qa.4.observe-work-skill.md](./task.94.qa.4.observe-work-skill.md) · [gate.4](./task.94.gate.4.observe-work-skill.yml)
+- **Cycle 5 (current)**: [task.94.qa.5.observe-work-skill.md](./task.94.qa.5.observe-work-skill.md) · [gate.5](./task.94.gate.5.observe-work-skill.yml)
+- **Cycle 4**: [task.94.qa.4.observe-work-skill.md](./task.94.qa.4.observe-work-skill.md) · [gate.4](./task.94.gate.4.observe-work-skill.yml)
 - **Cycle 3**: [task.94.qa.3.observe-work-skill.md](./task.94.qa.3.observe-work-skill.md) · [gate.3](./task.94.gate.3.observe-work-skill.yml)
 - **Cycle 2**: [task.94.qa.2.observe-work-skill.md](./task.94.qa.2.observe-work-skill.md) · [gate.2](./task.94.gate.2.observe-work-skill.yml)
 - **Cycle 1**: [task.94.qa.1.observe-work-skill.md](./task.94.qa.1.observe-work-skill.md) · [gate.1](./task.94.gate.1.observe-work-skill.yml)
@@ -601,7 +602,7 @@ Two changes are worth naming because they are not confined to the new directory:
 ### Test Coverage Summary
 - **Tests Executed**: 2884 (2883 pass, 0 fail, 1 skipped)
 - **Phases Verified**: 6/6
-- **Critical Issues**: 1 HIGH, 2 MEDIUM, 1 LOW
+- **QA Cycles**: 5 · **Findings**: 7 raised, 7 closed (2 HIGH, 5 MEDIUM) + 2 LOW advisory
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
@@ -626,7 +627,7 @@ Every document-anchored check passes — that is why the decisive finding needed
 - [bug.4 — The cycle-1 fix blocks capture in every fresh install](./task.94.bug.4.healthy-false-blocks-fresh-install.md) — HIGH — ✅ Ready for QA (fixed 2026-09-08, mutation-proved)
 - [bug.5 — Hook counts a body line as a status, overcounting](./task.94.bug.5.hook-grep-not-frontmatter-scoped.md) — MEDIUM — ✅ Ready for QA (fixed 2026-09-08)
 
-**Fixed in cycles 3–4**
+**Fixed in cycles 3–4** (all closed and verified in cycle 5)
 
 - [bug.6 — Third counting divergence; replace the mechanism](./task.94.bug.6.hook-third-instance-replace-mechanism.md) — MEDIUM — ✅ Ready for QA (mechanism replaced 2026-09-08)
 - [bug.7 — environments.md documents the mechanism cycle 3 removed](./task.94.bug.7.environments-documents-removed-mechanism.md) — MEDIUM — ✅ Ready for QA (rewritten 2026-09-08)
@@ -650,6 +651,7 @@ Every document-anchored check passes — that is why the decisive finding needed
 | 2026-09-08 |         | QA findings fixed — hook count replaced with an engine call, 3 iterations | qa-fix |
 | 2026-09-08 |         | QA gate CONCERNS (90/100) — replacement verified on 12 cases; reliability → PASS; 1 doc MEDIUM | qa-task |
 | 2026-09-08 |         | QA findings fixed — hook reference rewritten against the shipped mechanism, 4 iterations | qa-fix |
+| 2026-09-08 |         | QA gate PASS (100/100) — all 7 findings closed across 5 cycles | qa-task |
 
 ---
 
