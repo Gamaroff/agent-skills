@@ -1,78 +1,336 @@
 ---
 id: task.86
-title: "[Task 86] bundle_skill.py never refreshes transitively-bundled references"
+title: "[Task 86] bundle_skill.py prints `in sync` for bundled references it never examines"
 type: task
-description: "A shared resource that lands in skills/*/references/ via a transitive reference is never refreshed again — the bundler discovers references only from a skill's own files, so the copy goes stale forever while the bundler reports 'in sync'. Two skills shipped a pipeline contract describing a step that no longer matched the source."
+description: "Twenty-six files sit in skills/*/references/ that bundle_skill.py never opens, because three discovery-edge cases leave them unreachable from a skill's own files. Eight of them are stale on develop right now, including two that ship a pipeline contract contradicting an invariant the source explicitly warns about. The bundler prints `in sync` for every one of them."
 tags: [bundler, build, tooling, silent-failure]
 category: infrastructure
-status: draft
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-08
 assignee:
-estimated_effort_hours: 4
+estimated_effort_hours: 7
+github_issue: 351
 ---
 
-# Technical Task: `bundle_skill.py` never refreshes transitively-bundled references
+# Technical Task: `bundle_skill.py` prints `in sync` for bundled references it never examines
 
-**Status:** Draft
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.86.review.1.bundle-transitive-refresh.md` implemented 2026-09-08
+**GitHub Issue**: [#351](https://github.com/Gamaroff/agent-skills/issues/351)
 
 ---
 
 ## 1. Overview
 
-`bundle_skill.py` builds its `needed` set by scanning a skill's **own** files for
-`shared/resources/X` references. Its copy loop is content-based and correct. But a file that reached
-`skills/{skill}/references/` because *another bundled file* referenced it is never rediscovered — so
-once the source changes, the copy is **stale forever**, and the bundler prints `✅ in sync`.
+`bundle_skill.py` copies `shared/resources/*` into each skill's `references/` directory so that a skill
+installs self-contained. It discovers what to copy by walking the skill's own files and then following
+references **transitively** to a fixed point.
 
-Found during task 77. `skills/qa-story/` and `skills/qa-task/` were shipping
-`develop-pipeline-resume-contract.md`, `develop-pipeline-autonomous-defaults.md`,
-`develop-pipeline-step-0-resolve-and-prepare.md` and `pipeline-resume-detector-prompt.md` that still
-described a pipeline **without Step 5c**, four cycles after the source changed. Both were reported
-in sync on every run.
+Twenty-six files currently sit in `skills/*/references/` that this walk never reaches. The bundler does
+not open them, does not compare them, and does not refresh them — and then prints `✅ {skill}: in sync`.
+Eight are stale on `develop` today. Two of those ship a pipeline contract whose central value contradicts
+the invariant its own source file exists to state.
 
-## 2. Why this is High priority
+> **The original filing misdiagnosed this, and the correction is the point of the task.**
+> Task 86 was filed on 2026-09-03 asserting that discovery *"is never rediscovered"* because the bundler
+> scans only a skill's own files. That is not so: the fixed-point loop at `bundle_skill.py:157-183` has
+> been present since `b887381d`, the commit that created the file (`git log -S` on its comment returns
+> that commit and no other). The loop works. What fails is **reachability into it** — three specific
+> edge cases below. An implementer who trusted the original text would rewrite a working loop and fix
+> none of the 26 files.
 
-The failure is silent and the report is actively misleading — `in sync` is printed for a file the
-bundler is no longer even looking at. Nothing in the test suite catches it, because every assertion
-in the repo reads `shared/resources/`, never the bundled copies. A consumer installing a skill from
-its zip gets the stale contract with no signal at all.
+---
 
-## 3. Scope
+## 2. Motivation
+
+### Current problems
+
+**The report is actively misleading.** `in sync` is printed for files the bundler is not looking at. There
+is no warning, no count of skipped files, and no exit code — the operator's only signal says everything is
+fine.
+
+**Nothing in the repository can see it.** Every assertion in the test suite reads `shared/resources/`,
+never the bundled copies. The `validate.yml` "Bundle freshness check" re-runs the bundler and diffs the
+working tree — which is structurally blind here, because the bundler never *writes* an unreachable file,
+so `git diff` stays clean. That lane is green on `develop` right now with eight stale files on disk.
+
+**The harm is real and shipping.** `skills/qa-{story,task}/references/develop-pipeline-step-1-create-branch.md`
+contains `"current_step": 1`. The shared source says `2`, and carries a ⚠️ block explaining that `1` is
+wrong and that the mistake made the `Stop` hook skip a step — *"observed four times on one story before it
+was found."* That block is absent from both shipped copies. A consumer installing `qa-story` gets the
+contradicted invariant with no signal.
+
+### Benefits
+
+- A stale bundled copy becomes impossible to land, rather than merely unlikely.
+- The success message stops asserting something the bundler did not check.
+- The eight currently-stale files are corrected.
+
+---
+
+## 3. Technical Background
+
+### Current architecture
+
+Discovery runs in two stages (`bundle_skill.py:135-183`):
+
+1. **Seed** — walk the skill's own files (`*.md`, `*.js`, `*.mjs`, `*.sh`, excluding `references/`).
+   `collect_shared_refs` harvests `shared/resources/X` into `pending`; `REFS_REF_RE` harvests
+   `references/X` into `pending_quiet` (`:151-155`).
+2. **Fixed point** — pop from either worklist, resolve against `shared/resources/`, record in `needed`,
+   then re-scan **that source's text** and extend `pending` (`:157-183`).
+
+Pass 2 (`:190-220`) then iterates `needed.items()` — **it never enumerates what is on disk**. Anything in
+`references/` that is not in `needed` is invisible to every subsequent step, including the status line.
+
+### The three reachability failures
+
+| # | Edge | Evidence | Files affected |
+| --- | --- | --- | --- |
+| 1 | **A copy no rule can reach.** Something placed it (an earlier bundle, a hand-sync) and nothing the walk sees points at it any more. Discovery cannot be widened to reach these — see the rejected fix below — so they are handled by reconciling against disk. | `qa-story`/`qa-task` hold 7–8 such files each | 20 of the 26 |
+| 2 | **`.json` is absent from `REFS_REF_RE`'s suffix alternation** `(?:md\|sh\|js\|mjs\|py)`. | `skills/create-skill/SKILL.md` names `references/skill-dependencies.json`; `create-skill` computes `\|needed\| == 0`, takes the early return at `:185-188` and prints `✓ create-skill: no shared refs` | `skill-dependencies.json` |
+| 3 | **Bare backticked filenames in shared prose match neither regex.** | `shared/resources/platform-detection.md` names `` `set-github-project-priority.sh` `` with no path prefix | `set-github-project-priority.sh` × 2 |
+
+> **Rejected during implementation: following `references/X` out of shared text.**
+> This is the obvious-looking fix for edge 1 and it is wrong. `shared/resources/tracker-card-summary.md`
+> names `references/jira-sync.js` in prose while stating outright that it avoids the
+> `shared/resources/` form *"because naming a shared resource in prose makes the bundler vendor it, and
+> the GitHub-only skills that follow this spec have no use for a Jira client."* Implementing the edge
+> vendored **38 unwanted files** across the repo, including a Jira client into GitHub-only skills — a
+> documented design constraint, broken. A prose mention is not a dependency. The reconciliation pass
+> below fixes every real case without it, because those copies are already on disk. Pinned by a
+> regression test.
+
+### Target architecture
+
+Discovery gains edge 1 and edge 2. Pass 2 additionally **reconciles against disk**: every file present in
+`references/` that has a `shared/resources/` counterpart is refreshed whether or not discovery reached it,
+and the status line reports files it did not examine instead of calling them `in sync`.
+
+---
+
+## 4. Scope
 
 ### In Scope
 
-- Make reference discovery **transitive**: after bundling a file, scan it for further
-  `shared/resources/X` / `references/X` references and bundle those too, to a fixed point.
-- Add a **bundle-freshness assertion** to CI: every `skills/*/references/<name>` must equal
-  `shared/resources/<name>` after path rewriting and header injection. A partial bundle should fail
-  CI rather than wait for a reviewer.
-- Correct the `in sync` status so it cannot be printed for a file that was not examined.
+- Close discovery edges 1 and 2 (apply `REFS_REF_RE` inside the fixed-point loop; add `json` to its suffix
+  alternation).
+- **Reconcile `references/` against `shared/resources/` by disk enumeration**, so a copy is refreshed on
+  the strength of *having a source*, not on the strength of being reachable.
+- Correct the status output: `in sync` must not be printed when files were skipped; report the count.
+- Re-bundle the 8 currently-stale files as part of the change.
+- Replace the `validate.yml` regenerate-and-diff freshness step with a **per-file equality assertion**.
+- A regression test proving a source change propagates to a previously-unreachable copy.
 
 ### Out of Scope
 
+- **Deleting source-less orphans.** Of the 109 files the bundler does not regenerate, **83 have no
+  `shared/resources/` counterpart** — they are skill-native files that legitimately live in `references/`
+  (e.g. `building-components/*.mdx`). Deleting those is a separate cleanup with its own risk. This task
+  touches only the **26 with a source**, which are stale copies rather than orphans in the risky sense.
+
+  > This supersedes the original filing, which placed *all* orphan handling out of scope while listing
+  > in-scope items that only make sense for orphans. The 109-vs-26 split is the line, and it is
+  > measurable rather than a judgement call.
+
+- **`package_skill.py`.** It walks `skill_path.rglob('*')`, which **includes the on-disk `references/`
+  directory** (`:116-138`), so the zip carries whatever `bundle_skill.py` produced. Fixing the in-tree
+  bundler therefore fixes the zip path — which is the harm §2 names — without touching this script. Its
+  own duplicated single-pass discovery (`:84-102`) and verbatim `zipf.write` of shared sources
+  (`:142-145`, no rewrite, no header) are real divergences from the parity `AGENTS.md:146-151` claims, but
+  they are a separate task.
 - Changing the rewrite or header format.
-- Removing genuinely orphaned references (files no longer referenced by anything) — that is a
-  separate cleanup with its own risk.
 
-## 4. Success Criteria
+---
 
-- [ ] Changing a shared resource referenced only transitively refreshes every consumer
-- [ ] A deliberately-staled bundled copy fails CI (mutation-proved)
-- [ ] `npm run bundle` is still idempotent — a second run is a no-op
-- [ ] No skill gains or loses a bundled file as a side effect of this change
-- [ ] Full `npm run ci` green
+## 5. Breaking Changes
 
-## 5. References
+None to any interface. The bundler will write files it previously left alone, so the first run produces a
+larger-than-usual diff in `skills/*/references/`. That is the correction, not a regression, and
+`source-tree.md:87` already sanctions it — provided the diff is bundler-produced and never hand-edited.
 
-- Origin: `docs/tasks/task.77.review-pr-in-pipeline/task.77.gate.3.review-pr-in-pipeline.yml` — TASK77-025
-- Discovery: `skills/create-skill/scripts/bundle_skill.py` pass 1 vs pass 2
-- Related prior art: the repo memory note on bundle drift reverting fixes applied to `references/`
+---
+
+## 6. Implementation Plan
+
+**Phase 1 — Lock the current behaviour down with a failing test (Low risk).**
+
+- [x] Add a case to `tests/bundle-mjs.test.js` (or a sibling `tests/bundle-transitive.test.js`) building a
+      temp fixture repo whose skill reaches a shared file **only** via a `references/X` mention inside
+      another shared file.
+- [x] Assert the copy is refreshed after the source changes. **This must fail before any fix** — record
+      the failure output in the implementation report.
+- [x] Follow the `tests/bundle-mjs.test.js` idiom exactly: temp repo via `mkdtempSync`, real script via
+      `execFileSync`, `node:test` + `node:assert/strict`. The bundler rewrites sources in place, so the
+      fixture must never be inside this repo.
+
+**Phase 2 — Close the discovery edges (Medium risk).**
+
+- [x] ~~Apply `REFS_REF_RE` to `text` inside the fixed-point loop~~ — **implemented, measured, then reverted**: it vendored 38 unwanted files and broke a documented constraint. Replaced by the Phase 3 disk reconciliation, which fixes every real case. Guarded by a regression test.
+- [x] Add `json` to `REFS_REF_RE`'s suffix alternation.
+- [x] Confirm idempotence: a second `--all` run must be a no-op. `AGENTS.md:55-62` and the module docstring
+      both make this a load-bearing contract, and `validate.yml` depends on it.
+
+**Phase 3 — Reconcile against disk, and fix the status line (Medium risk).**
+
+- [x] In pass 2, after processing `needed`, enumerate `references/` on disk. For each file with a
+      `shared/resources/` counterpart not in `needed`: refresh it and count it.
+- [x] Remove the unconditional early return at `:185-188` — `no shared refs` must not skip reconciliation.
+- [x] Change `:232` so `in sync` is printed only when nothing was skipped; otherwise report
+      `{n} reconciled` / `{n} unexamined`.
+
+**Phase 4 — Make CI able to see it (Low risk).**
+
+- [x] Replace the `validate.yml` "Bundle freshness check" body with a per-file equality assertion:
+      for every `skills/*/references/<name>` with a `shared/resources/<name>`, recompute
+      `inject_header(rewrite_text(src))` and compare bytes.
+- [x] Reuse `bundle_skill.py`'s **own** `rewrite_text` / `inject_header` — do not re-implement them. A
+      raw checksum can never match, because a bundled copy is the source *plus* a banner *plus* the path
+      rewrite. Re-implementing this comparison is what produced a retracted false finding on T90.
+- [x] Honour the `.sh` executable bit and the `UnicodeDecodeError` binary path.
+- [x] Do **not** add an `npm run …` term to `test.yml` without adding it to the `ci` composite —
+      `evals/shared/tests/ci-gate-parity.test.mjs` asserts set equality in both directions. Adding a test
+      *file* under an existing glob is free.
+
+**Phase 5 — Land the correction (Low risk).**
+
+- [x] Run `npm run bundle`; commit the resulting diff, including the 8 stale files. Bundler-produced only.
+
+---
+
+## 7. Files Summary
+
+### Modify
+
+- `skills/create-skill/scripts/bundle_skill.py` — `.json` suffix; `rewrite_text`/`expected_bytes` hoisted to module level; discovery extracted to `discover_needed()`; new `source_backed_on_disk()` + pass 2b; honest status line; `--check` mode
+- `.github/workflows/validate.yml` — freshness step replaced with `bundle_skill.py --check --all`
+- 8 bundler-produced refreshes:
+  - `skills/create-skill/references/skill-dependencies.json`
+  - `skills/create-story/references/set-github-project-priority.sh`
+  - `skills/create-task/references/set-github-project-priority.sh`
+  - `skills/develop-bug/references/verify-push-state.sh`
+  - `skills/develop-story/references/verify-push-state.sh`
+  - `skills/develop-task/references/verify-push-state.sh`
+  - `skills/qa-story/references/develop-pipeline-step-1-create-branch.md`
+  - `skills/qa-task/references/develop-pipeline-step-1-create-branch.md`
+
+### Add
+
+- `tests/bundle-transitive.test.js` — 9 regression tests
+
+### Delete
+
+None.
+
+---
+
+## 8. Testing Strategy
+
+| Level | Coverage |
+| --- | --- |
+| Unit | Fixture repo where a shared file is reachable only via `references/X` inside another shared file → refreshed after a source change |
+| Unit | Fixture where the only reference is `references/x.json` → discovered, not silently skipped |
+| Unit | A `references/` file **with** a source but unreachable → reconciled from disk |
+| Unit | A `references/` file **without** a source → left untouched (guards the Out-of-Scope boundary) |
+| Idempotence | Two consecutive `--all` runs; second reports no changes |
+| Status | A skill with skipped files must not print `in sync` |
+| CI | The freshness assertion fails on a staled **orphan** — the case that currently passes green |
+
+**Mutation proof is required, not optional.** For each fix, revert the behaviour and confirm a test goes
+red. Success criterion 2 below is unfalsifiable unless the staled file is an **orphan**: hand-staling a
+*discovered* file produces a git diff that the existing check already catches, so that mutation proves
+nothing about this defect.
+
+---
+
+## 9. Success Criteria
+
+- [x] A copy that **no discovery rule can reach** is refreshed when its source changes (mutation-proved:
+      red before the fix). Restated from the original wording — widening discovery to reach it was the
+      approach that had to be rejected; reconciliation against disk is what delivers it
+- [x] A deliberately-staled **orphan** fails CI (mutation-proved in a pristine `git worktree` at HEAD:
+      after a developer does exactly what the old check instructs — `npm run bundle` + commit — the old
+      check reports **GREEN with 8 stale copies**; `--check` reports all 8 and exits 1)
+- [x] All 26 source-backed copies are examined; the 8 stale ones are corrected
+- [x] `in sync` is never printed for a skill with unexamined source-backed files — pinned by a test
+      asserting the run reports `reconciled` and *not* `in sync`
+- [x] `npm run bundle` is still idempotent — second run touched 0 files
+- [x] No skill gains or loses a bundled file — 9 files changed, **0 added, 0 removed** (an earlier attempt added 38; that approach was rejected and is now guarded by a test)
+- [x] The 83 source-less copies are untouched — pinned by the out-of-scope boundary test
+- [ ] `npm run ci` green **and** the `validate.yml` job reproduced locally — `npm run ci` alone runs
+      neither `validate:all` nor the freshness step, so it cannot evidence this change
+
+---
+
+## 10. Risk Assessment
+
+| Risk | Level | Mitigation |
+| --- | --- | --- |
+| Disk reconciliation refreshes a file a skill deliberately overrode | Medium | Only files with a `shared/resources/` counterpart are touched; overriding a bundled copy is already forbidden (`source-tree.md:79`) |
+| New freshness assertion lands red on the 8 stale files | Expected | Phase 5 re-bundles them in the same change |
+| Re-implementing the transform in CI yields a false positive | Medium | Import the bundler's own `rewrite_text`/`inject_header`; this exact mistake caused a retracted finding on T90 |
+| Fixed-point change breaks idempotence | Medium | Explicit two-run test; `validate.yml` would go flaky-red otherwise |
+| `.githooks/pre-commit` auto-stages a larger delta | Low | It already runs `npm run bundle` and warns on pre-existing unstaged changes; note the behaviour change in the report |
+
+---
+
+## 11. Rollback Plan
+
+**Trigger:** bundler non-idempotent, `validate.yml` red on unrelated PRs, or an unintended `references/`
+deletion.
+
+**Procedure:** revert the single commit — `bundle_skill.py`, `validate.yml`, the test, and the bundled
+diff all land together, so one revert restores prior behaviour exactly. The bundled files return to their
+committed (stale) state, which is the pre-task status quo.
+
+**Verification:** `npm run bundle` twice → clean second run; `git status` clean; `npm test` green.
+
+---
 
 ## Change Log
 
 | Date       | Version | Description                               | Author       |
 | ---------- | ------- | ----------------------------------------- | ------------ |
 | 2026-09-03 | 1.0     | Filed from task 77 QA cycle 3 (TASK77-025) | develop-task |
+| 2026-09-08 | 1.1     | Review (4/10 → 9/10). Root cause corrected — discovery was always transitive; the real cause is three reachability edges leaving 26 source-backed orphans, 8 stale today. Scope self-contradiction resolved (refresh source-backed orphans; leave 83 source-less ones). CI item re-framed: a freshness step already exists and is structurally blind. `package_skill.py` scoped out with a reason. Seven missing mandatory sections added. | review-task |
+| 2026-09-08 |         | Status → ready-for-development            | review-task |
+| 2026-09-08 |         | Implemented — 12 files, 9 tests. Disk reconciliation + `.json` discovery + `--check`; 8 stale copies corrected, 0 files added. Following `references/X` out of shared text was implemented, measured to vendor 38 unwanted files, and reverted. | develop |
+
+---
+
+## Progress Tracking
+
+| Phase | Status | Notes |
+| --- | --- | --- |
+| Phase 1 — Failing test first | ✅ Complete | 9 tests in `tests/bundle-transitive.test.js`; **6 of 8 red before the fix**, the 2 green ones being the deliberate guards (out-of-scope boundary, idempotence) |
+| Phase 2 — Close discovery edges | ✅ Complete | `.json` added to `REFS_REF_RE`. The `references/X`-in-shared-text edge was implemented, measured to vendor **38 unwanted files**, and **reverted** — a prose mention is not a dependency |
+| Phase 3 — Disk reconciliation + status line | ✅ Complete | `source_backed_on_disk()` + pass 2b; early return now fires only when nothing on disk is source-backed; status reports `N reconciled` and never claims `in sync` over a refresh |
+| Phase 4 — CI equality assertion | ✅ Complete | `--check` reuses the bundler's own `rewrite_text`/`inject_header` (hoisted to module level for exactly this). `validate.yml` is now a one-liner |
+| Phase 5 — Land the correction | ✅ Complete | 8 stale files refreshed, **0 added, 0 removed**; second run is a clean no-op |
+
+---
+
+## References
+
+- Origin: `docs/tasks/task.77.review-pr-in-pipeline/task.77.gate.3.review-pr-in-pipeline.yml` — TASK77-025
+- Review: `task.86.review.1.bundle-transitive-refresh.md` — measurements M1–M5
+- `skills/create-skill/scripts/bundle_skill.py:135-234` — discovery, copy loop, status line
+- `skills/create-skill/scripts/package_skill.py:84-145` — the sibling consumer, scoped out
+- `.github/workflows/validate.yml` — the existing "Bundle freshness check"
+- `tests/bundle-mjs.test.js` — the temp-repo test idiom to follow
+- `da1d9f1a` — the manual sync that repaired four of these files without fixing the cause
+- `AGENTS.md:55-62`, `146-151` — idempotence and the two-consumer parity claim
+- `docs/architecture/concepts/source-tree.md:79,87` — bundled copies are generated; the bundler is the safe path
+
+---
+
+## Notes
+
+The four files named in the original filing (`develop-pipeline-resume-contract.md`,
+`develop-pipeline-autonomous-defaults.md`, `develop-pipeline-step-0-resolve-and-prepare.md`,
+`pipeline-resume-detector-prompt.md`) are **currently in sync** — repaired by hand in `da1d9f1a`, not
+structurally. All eight copies remain orphans, so nothing prevents them re-staling. A reproduction must
+not assert present drift in them; use `develop-pipeline-step-1-create-branch.md`, which is stale now.
