@@ -421,6 +421,34 @@ two independent guards, so neither is individually provable.
 
 ---
 
+### QA Cycle 4 — 2026-09-08
+
+Gate **FAIL** (62/100), seven findings, all fixed and mutation-proven. **Two were defects in cycle 3's
+own fixes**, which is the cycle's real result.
+
+| ID | Fix |
+| --- | --- |
+| C4-001 (HIGH) | `UNREWRITTEN` was **non-convergent** — pass 3 runs after the early return, so a reference to a missing source left CI permanently red behind a remedy that provably does nothing. The exact failure TASK86-013 exists to prevent, reintroduced by the fix for F-001 |
+| C4-002 (HIGH) | Pass 3 is the one **ungated** write, and `UNREWRITTEN` newly compelled it. It turns a `blob/main/shared/resources/…` URL into a 404 and a fenced `cp lib.sh shared/resources/x.md` into a wrong instruction. Pass 3 now skips fences and URLs — while `rewrite_text` deliberately does not, because a bundled copy's fenced snippet must be rewritten to run |
+| C4-003/004 | **Two cycle-3 fixes never landed and a third corrupted line 1** of the test file, destroying its `"use strict"` — while the commit message claimed all three were applied |
+| C4-005 | Three behaviours pinned by **nothing**, each mutation-verified as unpinned |
+| C4-006 | The one unguarded read: a non-UTF-8 file aborted the whole `--all` run with a raw traceback |
+| C4-007 | **Path traversal** — `shared/resources/../../OUTSIDE.md` created a file outside the skill. Raised only as a residual; reproduced and fixed rather than handed over |
+
+**Three errors made while fixing, all caught by verification rather than review:**
+
+- The first pass-3 fix applied the fence exemption to `rewrite_text`, which **pass 2 also uses** — rewriting **77 real files**. Caught by running it against the tree.
+- `git checkout -- skills/` silently reverted the bundler itself (it lives under `skills/`), so three edits believed applied were not; only a call-site rename survived, pointing at a function that no longer existed.
+- The `C4-006` test was **vacuous** — its fixture produced a `MISSING` problem that kept the regenerable bucket non-empty regardless. Caught by MUT-29 and rewritten.
+
+> **What the four cycles actually say.** The original defect — transitive refresh and disk
+> reconciliation — has been **stable since cycle 2**. Every finding since has been in the `--check` CI
+> assertion added beyond the task's stated scope, and its growing class taxonomy. The HIGH sequence is
+> **1, 2, 1, 2**: not converging, but churning in the elaboration rather than the deliverable. Three
+> latent residuals remain, recorded in gate 4 for a human to triage.
+
+---
+
 ### Key Findings
 
 All eight §9 success criteria hold when checked against the tree. The gate fails on code review:
@@ -437,6 +465,8 @@ diff` check it replaced did catch.
 | 2026-09-03 | 1.0     | Filed from task 77 QA cycle 3 (TASK77-025) | develop-task |
 | 2026-09-08 | 1.1     | Review (4/10 → 9/10). Root cause corrected — discovery was always transitive; the real cause is three reachability edges leaving 26 source-backed orphans, 8 stale today. Scope self-contradiction resolved (refresh source-backed orphans; leave 83 source-less ones). CI item re-framed: a freshness step already exists and is structurally blind. `package_skill.py` scoped out with a reason. Seven missing mandatory sections added. | review-task |
 | 2026-09-08 |         | Status → ready-for-development            | review-task |
+| 2026-09-08 |         | QA gate 4 FAIL (62/100) — 7 findings, 2 of them defects in cycle 3's fixes | qa-task |
+| 2026-09-08 |         | qa-fix cycle 4 — 7 fixed, 52 tests, 7 mutation proofs | qa-fix |
 | 2026-09-08 |         | QA gate 3 CONCERNS (78/100) — 13 findings incl. 2 test gaps; 45 tests, 6 mutation proofs | qa-task |
 | 2026-09-08 |         | QA gate 2 FAIL (80/100) — cycle-1 fixes verified; TASK86-004's repair had a hole | qa-task |
 | 2026-09-08 |         | qa-fix cycle 2 — 9 findings incl. 2 HIGH from the refute pass; 38 tests, 12 mutation proofs | qa-fix |
