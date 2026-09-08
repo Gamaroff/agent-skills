@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-09-07
-**Next Available Task Number:** **99**
+**Last Updated:** 2026-09-08
+**Next Available Task Number:** **102**
 
 ## How to use
 
@@ -137,6 +137,11 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 95 | [observe-work: config schema, skill boundaries and the meta-skill family](task.95.observe-work-docs-boundaries/task.95.observe-work-docs-boundaries.md) | planned | documentation | High | 2026-09-07 | [#341](https://github.com/Gamaroff/agent-skills/issues/341) | task.93, task.94 |
 | 96 | [sync-jira-story/task/epic never converge: label diff and post-transition timestamp](task.96.sync-jira-sibling-convergence/task.96.sync-jira-sibling-convergence.md) | planned | infrastructure | High | 2026-09-07 | [#343](https://github.com/Gamaroff/agent-skills/issues/343) | — |
 | 98 | [A per-file bundle-freshness assertion the regenerate-and-diff check cannot provide](task.98.bundle-freshness-check-mode/task.98.bundle-freshness-check-mode.md) | draft | infrastructure | Medium | 2026-09-08 | — | task.86 — split out when its QA loop stopped converging |
+| 99 | [The QA loop has no exit for "nothing is blocked, and every finding is now about the pins"](task.99.qa-loop-diminishing-returns-exit/task.99.qa-loop-diminishing-returns-exit.md) | draft | infrastructure | High | 2026-09-08 | — | — |
+| 100 | [mutation-proving covers the false GREEN but not the false RED](task.100.mutation-proving-false-red/task.100.mutation-proving-false-red.md) | draft | documentation | Medium | 2026-09-08 | — | — |
+| 101 | [develop.fastGateCommand defaults to a script consumers need not have](task.101.fast-gate-command-existence-check/task.101.fast-gate-command-existence-check.md) | draft | infrastructure | Medium | 2026-09-08 | — | — |
+
+- **Tasks 99-101 were filed from a consumer pipeline run** — tinker-city task.103 (PR #829, 2026-09-08), a 245-minute run of which 117 minutes was CI. Four QA cycles produced 21 findings and **not one was in the three fixes the task existed to make**; every finding was in the machinery built to pin them, and four were false claims in prose rather than defects in code. 99 is the substantive one (the loop has no exit for that state); 100 and 101 are the two smaller gaps the same run exposed.
 
 - **Tasks 67-70 were filed from task 66's dogfood run** — running `/review-pr` against its own PR ([#283](https://github.com/Gamaroff/agent-skills/pull/283)) returned REQUEST CHANGES and surfaced them. **67 is the one that matters**: it closes the structural hole the run exposed — QA reads a prose skill's text and never executes it, so task 66 shipped `accepted` with a glob that collected 0 files on the default macOS shell. 68 and 69 are the two halves of one dead cross-reference (`/review-code` telling implementers to mirror a `/qa-story` step that is itself GitHub-only). 70 builds the inline-comment primitive `/review-code` has documented but never had. None has a tracker issue yet.
 
