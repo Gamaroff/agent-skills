@@ -226,22 +226,90 @@ def source_backed_on_disk(refs_dir, shared_dir, needed):
     if not refs_dir.is_dir():
         return out
     for dst in sorted(refs_dir.rglob('*')):
-        if not dst.is_file() or dst.name in EXCLUDE_DIRS:
+        # `is_file()` follows symlinks and `write_bytes` writes THROUGH one, so a
+        # symlinked reference would have the banner injected into the shared
+        # source itself — after which the source contains the marker,
+        # `inject_header` short-circuits, and `--check` reports STALE forever.
+        if dst.is_symlink() or not dst.is_file():
             continue
-        if any(p in EXCLUDE_DIRS for p in dst.parts):
+        rel_parts = dst.relative_to(refs_dir).parts
+        if any(p in EXCLUDE_DIRS for p in rel_parts):
             continue
         rel = dst.relative_to(refs_dir).as_posix()
         if rel in needed:
             continue
         src = shared_dir / rel
-        if src.is_file():
-            out[rel] = src
+        if not src.is_file():
+            continue        # no source ⇒ skill-native ⇒ never ours to touch
+        if not _looks_bundled(dst, src, rel):
+            # Same-named but not bundler-produced. Sharing a filename with a
+            # shared resource is not evidence that a hand-authored file is a
+            # stale copy of it, and overwriting one would destroy work the
+            # bundler never created. Reported by --check, never rewritten.
+            continue
+        out[rel] = src
     return out
+
+
+def _banner_head(text):
+    """The region a provenance banner can legitimately occupy.
+
+    Line-based, not byte-based. For a `.md` the banner is injected AFTER the YAML
+    frontmatter, and a long `description:` pushes it well past any small byte
+    window — measured at char 499 in one real file, so a 512-byte slice cut the
+    marker in half and silently misclassified a correctly-bundled copy as
+    hand-authored. Bounded to keep an incidental mention deep in a document from
+    counting as provenance.
+    """
+    return '\n'.join(text.split('\n')[:40])
+
+
+def _looks_bundled(dst, src, name):
+    """True when `dst` is demonstrably bundler output rather than authored content.
+
+    Sharing a filename with a shared resource is NOT evidence: a hand-authored
+    `references/read-config.sh` would be silently overwritten and stamped
+    AUTO-GENERATED. Two things do count as evidence:
+
+    1. It carries the provenance banner.
+    2. It is byte-identical to the rewritten source *without* the banner — the
+       shape every copy bundled before header injection existed still has.
+
+    Case 2 is not hypothetical and is why the banner alone is too strict: three
+    of the eight stale copies this change corrected (`verify-push-state.sh`)
+    were exactly that, and a banner-only gate would have refused to fix them.
+
+    Anything else is genuinely ambiguous. `check_skill` reports it; the bundler
+    leaves it alone.
+
+    Suffixes that never get a header (`.json`, and anything else `autogen_header`
+    returns "" for) are accepted on the name match alone and return early — they
+    cannot supply evidence 1, and requiring evidence 2 would make a legitimately
+    edited-then-regenerated JSON permanently unreconcilable. That is the
+    pre-existing behaviour for those suffixes, kept deliberately.
+    """
+    suffix = Path(name).suffix
+    if not autogen_header(name, suffix):
+        return True
+    try:
+        text = dst.read_text()
+    except (UnicodeDecodeError, OSError):
+        return True          # binary — historical behaviour reconciled it
+    if AUTOGEN_MARKER in _banner_head(text):
+        return True
+    try:
+        return text == rewrite_text(src.read_text(), suffix)
+    except (UnicodeDecodeError, OSError):
+        return False
 
 
 def write_if_changed(dst, src, name, new_bytes):
     """Write a bundled copy when its bytes differ. Returns True if it wrote."""
     dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.is_symlink():
+        # Never write through a link — that edits the link's target, which for a
+        # reference pointing back at shared/resources/ is the source itself.
+        dst.unlink()
     if dst.exists() and dst.read_bytes() == new_bytes:
         # Content unchanged — still re-sync mode for .sh in case the bit was lost.
         if Path(name).suffix == '.sh':
@@ -358,21 +426,87 @@ def check_skill(skill_path):
             continue
         if dst.read_bytes() != expected_bytes(src, name):
             problems.append(f"{skill_path.name}: references/{name} is STALE")
+            continue
+        # Mode is part of being in sync — `write_if_changed` re-chmods a `.sh`
+        # copy whose bits drifted even when the bytes match. Comparing bytes
+        # alone would let a lost executable bit pass here while `npm run bundle`
+        # silently repaired it, which is the green-CI-but-dirty-tree split this
+        # check exists to close. The `git diff` form this replaced caught it
+        # because git tracks the bit.
+        if Path(name).suffix == '.sh':
+            if (dst.stat().st_mode & 0o777) != (src.stat().st_mode & 0o777):
+                problems.append(
+                    f"{skill_path.name}: references/{name} has WRONG MODE "
+                    f"({dst.stat().st_mode & 0o777:o}, expected {src.stat().st_mode & 0o777:o})"
+                )
+
+    # A copy the bundler produced whose source has since been deleted is
+    # invisible to everything above — it is in neither `needed` nor
+    # `source_backed_on_disk`, both of which require the source to exist. It
+    # keeps a banner naming a file that is gone, and stays green forever. The
+    # banner is the discriminator the bundler already writes; this reads it back.
+    if refs_dir.is_dir():
+        for dst in sorted(refs_dir.rglob('*')):
+            if dst.is_symlink() or not dst.is_file():
+                continue
+            rel_parts = dst.relative_to(refs_dir).parts
+            if any(p in EXCLUDE_DIRS for p in rel_parts):
+                continue
+            rel = dst.relative_to(refs_dir).as_posix()
+            if rel in expected:
+                continue
+            src = shared_dir / rel
+            if src.is_file():
+                # Same-named source, but `source_backed_on_disk` declined to
+                # reconcile it — so it is neither banner-carrying nor identical
+                # to the rewritten source. Never rewritten silently; surfaced
+                # here so a human decides which it is.
+                problems.append(
+                    f"{skill_path.name}: references/{rel} is AMBIGUOUS "
+                    f"(shares a name with shared/resources/{rel} but is not bundler "
+                    f"output — not rewritten; delete it or add the banner)"
+                )
+                continue
+            try:
+                head = _banner_head(dst.read_text())
+            except (UnicodeDecodeError, OSError):
+                continue
+            if AUTOGEN_MARKER in head:
+                problems.append(
+                    f"{skill_path.name}: references/{rel} is ORPHANED "
+                    f"(banner names shared/resources/{rel}, which no longer exists)"
+                )
     return problems
 
 
 def main():
     args = sys.argv[1:]
-    check_mode = False
-    if args and args[0] == '--check':
-        check_mode = True
-        args = args[1:]
 
-    if not args:
-        print("Usage: bundle_skill.py [--check] <skill-path> | --all")
+    # `--check` is honoured ANYWHERE in argv, not only at position 0.
+    #
+    # It used to be recognised only as args[0], which made `--all --check`
+    # silently perform a full MUTATING bundle and exit 0 — a read-only flag
+    # rewriting the repository because the arguments were the other way round.
+    # Unknown `--flags` are now rejected outright for the same reason: a typo
+    # (`--chekc`) must not fall through to a write.
+    check_mode = '--check' in args
+    all_mode = '--all' in args
+    args = [a for a in args if a not in ('--check', '--all')]
+
+    unknown = [a for a in args if a.startswith('--')]
+    if unknown:
+        print(f"❌ Unknown option(s): {' '.join(unknown)}")
+        print("Usage: bundle_skill.py [--check] <skill-path>... | [--check] --all")
+        sys.exit(2)
+
+    if not all_mode and not args:
+        print("Usage: bundle_skill.py [--check] <skill-path>... | [--check] --all")
         sys.exit(1)
 
-    if args[0] == '--all':
+    if all_mode:
+        if args:
+            print(f"❌ --all takes no skill paths (got: {' '.join(args)})")
+            sys.exit(2)
         repo_root = Path(__file__).resolve().parents[3]
         skills_dir = repo_root / 'skills'
         targets = sorted(d for d in skills_dir.iterdir() if (d / 'SKILL.md').exists())
@@ -384,9 +518,14 @@ def main():
         for t in targets:
             problems.extend(check_skill(t))
         if problems:
+            # `::error::` is a GitHub Actions workflow command — it surfaces the
+            # failure as an annotation in the PR checks UI, which the two sibling
+            # hygiene steps in validate.yml also do. Harmless noise outside CI.
+            print("::error::Bundled references/ are out of date. "
+                  "Run 'npm run bundle' locally and commit the regenerated files.")
             print("❌ Bundled references are out of date:")
-            for p in problems:
-                print(f"   {p}")
+            for problem in problems:
+                print(f"   {problem}")
             print("\nRun 'npm run bundle' and commit the regenerated files.")
             sys.exit(1)
         print(f"✅ Bundle freshness: {len(targets)} skill(s) verified")

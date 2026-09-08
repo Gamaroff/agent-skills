@@ -65,6 +65,11 @@ description: Fixture skill used by the bundler reachability regression test.
 # Fixture Skill
 `;
 
+/** The provenance banner the bundler injects — what marks a file as its output. */
+const BANNER = (name) =>
+  `<!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/${name}. ` +
+  `Regenerate via \`npm run bundle\`. -->\n`;
+
 /**
  * Build a disposable repo with one skill plus a shared/resources tree.
  *
@@ -75,7 +80,7 @@ description: Fixture skill used by the bundler reachability regression test.
  * A real temp repo keeps the test from mutating tracked files: the bundler
  * rewrites sources in place by design.
  */
-function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }) {
+function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "bundle-transitive-"));
   // find_repo_root() walks up looking for these markers.
   fs.mkdirSync(path.join(root, "skills"), { recursive: true });
@@ -101,10 +106,52 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }) {
   const bundle = () =>
     execFileSync("python3", [BUNDLER, skillDir], { encoding: "utf-8" });
 
+  // Each fixture is a full mini-repo; without this they accumulate in $TMPDIR
+  // for the life of the machine. `t` is optional so the helper still works if a
+  // future test forgets to thread it through.
+  if (t && typeof t.after === "function") {
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  }
+
+  // Run the bundler with arbitrary argv. Returns {status, stdout} rather than
+  // throwing — a non-zero exit is the expected result in several tests below.
+  const run = (argv) => {
+    try {
+      return {
+        status: 0,
+        stdout: execFileSync("python3", [BUNDLER, ...argv], {
+          encoding: "utf-8",
+        }),
+      };
+    } catch (e) {
+      // A signal kill gives status null; a missing python3 gives ENOENT with
+      // status undefined. Neither is a bundler verdict — surface it as itself
+      // rather than letting it masquerade as a staleness assertion failure.
+      if (e.status == null) throw e;
+      return { status: e.status, stdout: (e.stdout || "") + (e.stderr || "") };
+    }
+  };
+
   return {
     root,
     skillDir,
     bundle,
+    run,
+    // `--check` AFTER the target — the argument order that used to be ignored.
+    // (`--all` cannot be used in a fixture: it resolves the skills dir from the
+    // bundler's own __file__, which points at the real repository.)
+    checkArgsReversed: () => run([skillDir, "--check"]),
+    readShared: (name) =>
+      fs.readFileSync(path.join(root, "shared", "resources", name), "utf-8"),
+    chmodShared: (name, mode) =>
+      fs.chmodSync(path.join(root, "shared", "resources", name), mode),
+    chmodRef: (name, mode) =>
+      fs.chmodSync(path.join(skillDir, "references", name), mode),
+    symlinkRef: (name, target) => {
+      const refs = path.join(skillDir, "references");
+      fs.mkdirSync(refs, { recursive: true });
+      fs.symlinkSync(target, path.join(refs, name));
+    },
     writeShared: (name, content) =>
       fs.writeFileSync(path.join(root, "shared", "resources", name), content),
     readRef: (name) =>
@@ -130,19 +177,22 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }) {
   };
 }
 
-test("a copy reachable by no discovery rule is REFRESHED when its source changes", () => {
+test("a copy reachable by no discovery rule is REFRESHED when its source changes", (t) => {
   // The real shape of the defect. All 26 affected files in this repo were already
   // sitting in references/ — put there by an earlier bundle or a hand-sync — and
   // nothing the walk can see points at them any more. Discovery cannot be widened
   // to reach them (see the over-vendoring guard below), so reconciliation keys on
   // the copy existing and having a source.
-  const fx = makeFixture({
-    skillFiles: {
-      "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: { "contract.md": "# Contract\n\nORIGINAL body.\n" },
+      refsFiles: { "contract.md": "# Contract\n\nORIGINAL body.\n" },
     },
-    sharedFiles: { "contract.md": "# Contract\n\nORIGINAL body.\n" },
-    refsFiles: { "contract.md": "# Contract\n\nORIGINAL body.\n" },
-  });
+    t,
+  );
 
   fx.bundle();
   fx.writeShared("contract.md", "# Contract\n\nCORRECTED body.\n");
@@ -157,14 +207,21 @@ test("a copy reachable by no discovery rule is REFRESHED when its source changes
   );
 });
 
-test("`in sync` is not printed when a source-backed copy was actually refreshed", () => {
-  const fx = makeFixture({
-    skillFiles: {
-      "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+test("`in sync` is not printed when a source-backed copy was actually refreshed", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: { "contract.md": "# Contract\n\nCURRENT body.\n" },
+      // A real bundled copy carries the provenance banner — that is what marks it
+      // as bundler output rather than hand-authored content.
+      refsFiles: {
+        "contract.md": `${BANNER("contract.md")}# Contract\n\nSTALE body.\n`,
+      },
     },
-    sharedFiles: { "contract.md": "# Contract\n\nCURRENT body.\n" },
-    refsFiles: { "contract.md": "# Contract\n\nSTALE body.\n" },
-  });
+    t,
+  );
 
   const stdout = fx.bundle();
 
@@ -180,7 +237,7 @@ test("`in sync` is not printed when a source-backed copy was actually refreshed"
   );
 });
 
-test("a `references/X` mention inside shared PROSE does not vendor the file", () => {
+test("a `references/X` mention inside shared PROSE does not vendor the file", (t) => {
   // Regression guard for an over-correction found while implementing this task.
   // Following `references/X` out of shared text looks like the obvious fix for
   // unreachable copies, and it is wrong: `shared/resources/tracker-card-summary.md`
@@ -189,18 +246,21 @@ test("a `references/X` mention inside shared PROSE does not vendor the file", ()
   // GitHub-only skills. Making prose a dependency edge added 38 unwanted files
   // across this repo. Only files a skill actually reaches, or already holds, belong
   // in its references/.
-  const fx = makeFixture({
-    skillFiles: {
-      "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/spec.md.\n`,
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/spec.md.\n`,
+      },
+      sharedFiles: {
+        "spec.md":
+          "# Spec\n\nHelpers live in the shared library (vendored as " +
+          "`references/heavy-client.js` in skills that need it). Its path is " +
+          "deliberately not spelled out.\n",
+        "heavy-client.js": "module.exports = {};\n",
+      },
     },
-    sharedFiles: {
-      "spec.md":
-        "# Spec\n\nHelpers live in the shared library (vendored as " +
-        "`references/heavy-client.js` in skills that need it). Its path is " +
-        "deliberately not spelled out.\n",
-      "heavy-client.js": "module.exports = {};\n",
-    },
-  });
+    t,
+  );
 
   fx.bundle();
 
@@ -212,15 +272,18 @@ test("a `references/X` mention inside shared PROSE does not vendor the file", ()
   );
 });
 
-test("`references/x.json` is discovered — .json must be in the suffix alternation", () => {
-  const fx = makeFixture({
-    skillFiles: {
-      "SKILL.md": `${SKILL_MD_HEAD}\nThe graph lives in \`references/graph.json\`.\n`,
+test("`references/x.json` is discovered — .json must be in the suffix alternation", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nThe graph lives in \`references/graph.json\`.\n`,
+      },
+      sharedFiles: {
+        "graph.json": '{\n  "fixture-skill": []\n}\n',
+      },
     },
-    sharedFiles: {
-      "graph.json": '{\n  "fixture-skill": []\n}\n',
-    },
-  });
+    t,
+  );
 
   const stdout = fx.bundle();
 
@@ -233,19 +296,22 @@ test("`references/x.json` is discovered — .json must be in the suffix alternat
   );
 });
 
-test("a stale copy WITH a shared source is reconciled even when discovery cannot reach it", () => {
-  const fx = makeFixture({
-    skillFiles: {
-      // SKILL.md references nothing at all — orphan.md is unreachable by any rule.
-      "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+test("a stale copy WITH a shared source is reconciled even when discovery cannot reach it", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        // SKILL.md references nothing at all — orphan.md is unreachable by any rule.
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: {
+        "orphan.md": "# Orphan\n\nCURRENT source body.\n",
+      },
+      refsFiles: {
+        "orphan.md": `${BANNER("orphan.md")}# Orphan\n\nANCIENT stale body.\n`,
+      },
     },
-    sharedFiles: {
-      "orphan.md": "# Orphan\n\nCURRENT source body.\n",
-    },
-    refsFiles: {
-      "orphan.md": "# Orphan\n\nANCIENT stale body.\n",
-    },
-  });
+    t,
+  );
 
   const stdout = fx.bundle();
 
@@ -258,14 +324,17 @@ test("a stale copy WITH a shared source is reconciled even when discovery cannot
   );
 });
 
-test("a copy WITHOUT a shared source is left untouched — the out-of-scope boundary", () => {
+test("a copy WITHOUT a shared source is left untouched — the out-of-scope boundary", (t) => {
   const NATIVE =
     "# Skill-native\n\nThis file has no shared/resources source.\n";
-  const fx = makeFixture({
-    skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing shared.\n` },
-    sharedFiles: {},
-    refsFiles: { "skill-native.md": NATIVE },
-  });
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing shared.\n` },
+      sharedFiles: {},
+      refsFiles: { "skill-native.md": NATIVE },
+    },
+    t,
+  );
 
   fx.bundle();
 
@@ -278,16 +347,19 @@ test("a copy WITHOUT a shared source is left untouched — the out-of-scope boun
   );
 });
 
-test("the bundler stays idempotent — a second run reports no changes", () => {
-  const fx = makeFixture({
-    skillFiles: {
-      "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/outer.md.\n`,
+test("the bundler stays idempotent — a second run reports no changes", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/outer.md.\n`,
+      },
+      sharedFiles: {
+        "outer.md": "# Outer\n\nRun `references/inner.md`.\n",
+        "inner.md": "# Inner\n\nBody.\n",
+      },
     },
-    sharedFiles: {
-      "outer.md": "# Outer\n\nRun `references/inner.md`.\n",
-      "inner.md": "# Inner\n\nBody.\n",
-    },
-  });
+    t,
+  );
 
   fx.bundle();
   const second = fx.bundle();
@@ -301,12 +373,17 @@ test("the bundler stays idempotent — a second run reports no changes", () => {
   );
 });
 
-test("--check fails on a staled copy that discovery cannot reach", () => {
-  const fx = makeFixture({
-    skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing shared.\n` },
-    sharedFiles: { "orphan.md": "# Orphan\n\nCURRENT source body.\n" },
-    refsFiles: { "orphan.md": "# Orphan\n\nANCIENT stale body.\n" },
-  });
+test("--check fails on a staled copy that discovery cannot reach", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing shared.\n` },
+      sharedFiles: { "orphan.md": "# Orphan\n\nCURRENT source body.\n" },
+      refsFiles: {
+        "orphan.md": `${BANNER("orphan.md")}# Orphan\n\nANCIENT stale body.\n`,
+      },
+    },
+    t,
+  );
 
   const res = fx.check();
 
@@ -325,13 +402,16 @@ test("--check fails on a staled copy that discovery cannot reach", () => {
   );
 });
 
-test("--check passes on a correctly bundled tree, and writes nothing", () => {
-  const fx = makeFixture({
-    skillFiles: {
-      "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/outer.md.\n`,
+test("--check passes on a correctly bundled tree, and writes nothing", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/outer.md.\n`,
+      },
+      sharedFiles: { "outer.md": "# Outer\n\nBody.\n" },
     },
-    sharedFiles: { "outer.md": "# Outer\n\nBody.\n" },
-  });
+    t,
+  );
 
   fx.bundle();
   const before = fx.readRef("outer.md");
@@ -346,5 +426,217 @@ test("--check passes on a correctly bundled tree, and writes nothing", () => {
     fx.readRef("outer.md"),
     before,
     "--check must be read-only — CI runs it to detect drift, not to repair it.",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 1 findings (TASK86-001 … 005). Each fix gets a test; a fix without
+// one is not held. Every test below was confirmed red against the code as it
+// stood when the finding was raised.
+// ---------------------------------------------------------------------------
+
+test("TASK86-001: --check is honoured after the target, and does not write", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: { "contract.md": "# Contract\n\nCURRENT body.\n" },
+      refsFiles: {
+        "contract.md": `${BANNER("contract.md")}# Contract\n\nSTALE body.\n`,
+      },
+    },
+    t,
+  );
+
+  // Argument order reversed (`<path> --check`). This used to set check_mode=false,
+  // fall through to the mutating path, and rewrite the repo while exiting 0 — a
+  // read-only flag performing writes because it was not in position 0. The same
+  // parse bug made `--all --check` bundle every skill in the repository.
+  const before = fx.readRef("contract.md");
+  const res = fx.checkArgsReversed();
+
+  assert.equal(
+    res.status,
+    1,
+    `<path> --check must still be a CHECK and must fail on stale input. Output:\n${res.stdout}`,
+  );
+  assert.equal(
+    fx.readRef("contract.md"),
+    before,
+    "…and it must not have written anything. A read-only flag that rewrites the " +
+      "repository when the arguments are the other way round is the worst shape " +
+      "this bug can take: silent, order-dependent, and exit 0.",
+  );
+});
+
+test("TASK86-001: an unknown --flag is rejected instead of falling through to a write", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/a.md.\n`,
+      },
+      sharedFiles: { "a.md": "# A\n\nBody.\n" },
+    },
+    t,
+  );
+
+  const res = fx.run(["--chekc", fx.skillDir]); // typo for --check
+  assert.equal(
+    res.status,
+    2,
+    `A misspelt flag must be refused, not silently ignored — ignoring it runs a ` +
+      `mutating bundle when the caller asked for a check. Output:\n${res.stdout}`,
+  );
+  assert.equal(
+    fx.refExists("a.md"),
+    false,
+    "…and nothing may be written on the rejected path.",
+  );
+});
+
+test("TASK86-002: --check catches a lost .sh executable bit", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/tool.sh.\n`,
+      },
+      sharedFiles: { "tool.sh": "#!/usr/bin/env bash\necho hi\n" },
+    },
+    t,
+  );
+  fx.chmodShared("tool.sh", 0o755);
+  fx.bundle();
+
+  // Bytes still match; only the mode drifted. bundle_skill() treats mode as part
+  // of being in sync, so a check that ignores it disagrees with the bundler —
+  // and the `git diff` form this replaced DID catch it, because git tracks the bit.
+  fx.chmodRef("tool.sh", 0o644);
+  const res = fx.check();
+
+  assert.equal(
+    res.status,
+    1,
+    `A bundled .sh whose executable bit was lost must fail the check. Otherwise CI ` +
+      `is green while 'npm run bundle' would repair it locally — the green-CI-but-` +
+      `stale split this whole task exists to close. Output:\n${res.stdout}`,
+  );
+  assert.match(
+    res.stdout,
+    /WRONG MODE/,
+    "the failure must name the mode problem",
+  );
+});
+
+test("TASK86-003: an orphaned copy whose source was deleted is reported", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: {},
+      refsFiles: {
+        "gone.md": `${BANNER("gone.md")}# Gone\n\nSource deleted.\n`,
+      },
+    },
+    t,
+  );
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    1,
+    `A copy carrying a banner that names a source which no longer exists must be ` +
+      `reported. It is in neither discovery nor reconciliation — both need the ` +
+      `source — so it would stay green forever. Output:\n${res.stdout}`,
+  );
+  assert.match(
+    res.stdout,
+    /ORPHANED/,
+    "the failure must say the source is gone",
+  );
+});
+
+test("TASK86-004: a same-named hand-authored file is reported, never overwritten", (t) => {
+  const AUTHORED = "# Hand-authored\n\nThis is NOT bundler output.\n";
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: { "read-config.sh": "#!/usr/bin/env bash\n: shared\n" },
+      refsFiles: { "read-config.sh": AUTHORED },
+    },
+    t,
+  );
+
+  fx.bundle();
+
+  assert.equal(
+    fx.readRef("read-config.sh"),
+    AUTHORED,
+    "Sharing a filename with a shared resource is not evidence of being a stale " +
+      "copy of it. Overwriting an authored file and stamping it AUTO-GENERATED " +
+      "destroys work the bundler never created.",
+  );
+
+  const res = fx.check();
+  assert.equal(res.status, 1, "…but it must not be silent about it either.");
+  assert.match(
+    res.stdout,
+    /AMBIGUOUS/,
+    "the collision must be surfaced for a human",
+  );
+});
+
+test("TASK86-004: a pre-header-injection copy IS still reconciled", (t) => {
+  // The banner alone is too strict a discriminator, and this is why: copies
+  // bundled before header injection existed carry no banner. Three of the eight
+  // files this task corrected were exactly that shape, so a banner-only gate
+  // would have refused to fix the very files it was written for.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: { "legacy.md": "# Legacy\n\nOriginal body.\n" },
+      refsFiles: { "legacy.md": "# Legacy\n\nOriginal body.\n" }, // no banner
+    },
+    t,
+  );
+
+  fx.bundle(); // identical-to-source ⇒ recognised as bundler output ⇒ gets the banner
+  fx.writeShared("legacy.md", "# Legacy\n\nUPDATED body.\n");
+  const stdout = fx.bundle();
+
+  assert.match(
+    fx.readRef("legacy.md"),
+    /UPDATED body/,
+    `A banner-less copy that is byte-identical to the rewritten source is ` +
+      `demonstrably bundler output and must keep being refreshed. Bundler said:\n${stdout}`,
+  );
+});
+
+test("TASK86-005: a symlinked reference is never written through", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: { "linked.md": "# Linked\n\nSource body.\n" },
+    },
+    t,
+  );
+  const sourceBefore = fx.readShared("linked.md");
+  fx.symlinkRef("linked.md", "../../../shared/resources/linked.md");
+
+  fx.bundle();
+
+  assert.equal(
+    fx.readShared("linked.md"),
+    sourceBefore,
+    "write_bytes writes THROUGH a symlink, so a reference linked back at its own " +
+      "source would get the AUTO-GENERATED banner injected into shared/resources/ " +
+      "itself — permanently, and --check would then report STALE forever.",
   );
 });
