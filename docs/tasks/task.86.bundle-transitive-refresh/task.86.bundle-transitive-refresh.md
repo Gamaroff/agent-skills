@@ -5,11 +5,13 @@ type: task
 description: "Twenty-six files sit in skills/*/references/ that bundle_skill.py never opens, because three discovery-edge cases leave them unreachable from a skill's own files. Eight of them are stale on develop right now, including two that ship a pipeline contract contradicting an invariant the source explicitly warns about. The bundler prints `in sync` for every one of them."
 tags: [bundler, build, tooling, silent-failure]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-03
 updated: 2026-09-08
+completed_date: 2026-09-08
+pr_number: 352
 assignee:
 estimated_effort_hours: 7
 github_issue: 351
@@ -17,7 +19,7 @@ github_issue: 351
 
 # Technical Task: `bundle_skill.py` prints `in sync` for bundled references it never examines
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.86.review.1.bundle-transitive-refresh.md` implemented 2026-09-08
 **GitHub Issue**: [#351](https://github.com/Gamaroff/agent-skills/issues/351)
 
@@ -539,6 +541,7 @@ diff` check it replaced did catch.
 | 2026-09-03 | 1.0     | Filed from task 77 QA cycle 3 (TASK77-025) | develop-task |
 | 2026-09-08 | 1.1     | Review (4/10 → 9/10). Root cause corrected — discovery was always transitive; the real cause is three reachability edges leaving 26 source-backed orphans, 8 stale today. Scope self-contradiction resolved (refresh source-backed orphans; leave 83 source-less ones). CI item re-framed: a freshness step already exists and is structurally blind. `package_skill.py` scoped out with a reason. Seven missing mandatory sections added. | review-task |
 | 2026-09-08 |         | Status → ready-for-development            | review-task |
+| 2026-09-08 | 1.2     | Accepted — PR #352 merged to develop. Step 7 `/finalise` did NOT run: the pipeline escalated at the QA loop, and the merge was authorised directly by the operator. There is therefore no `task.86.dod.*.md` artifact; the acceptance evidence is the five gate files, three QA reports and the merge-gate run recorded below. | develop-task |
 | 2026-09-08 |         | Split: CI assertion moved to task.98; this task keeps the reconciliation fix | develop-task |
 | 2026-09-08 |         | QA gate 5 CONCERNS (72/100) — 2 HIGH, both cycle-4 regressions; convergence check TRIPPED (1,2,1,2,2) | qa-task |
 | 2026-09-08 |         | qa-fix cycle 5 — 3 fixed, 44 tests, 3 mutation proofs | qa-fix |
