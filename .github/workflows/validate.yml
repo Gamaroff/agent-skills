@@ -97,12 +97,15 @@ jobs:
       # references/ copies are stale — or, worse, that reference a file which is
       # not in their bundle at all. Until now only scripts/release.sh caught this,
       # long after review. bundle_skill.py is pure Python, like the catalog check.
+      # Per-file equality assertion, NOT regenerate-and-diff.
+      #
+      # The previous form ran the bundler and asked git what moved. That inherits
+      # the bundler's own blind spots by construction: a bundled copy the bundler
+      # does not write produces no diff, so a stale file passed. This lane was
+      # green while 8 files were provably stale on develop.
+      #
+      # `--check` compares each source-backed copy against the exact bytes its
+      # source implies — reusing the bundler's own rewrite and header injection, so
+      # the comparison cannot drift from the thing it checks. It writes nothing.
       - name: Bundle freshness check
-        run: |
-          python3 skills/create-skill/scripts/bundle_skill.py --all >/dev/null
-          if ! git diff --quiet -- 'skills/*/references/*'; then
-            echo "::error::Bundled references/ are out of date."
-            echo "Run 'npm run bundle' locally and commit the regenerated files."
-            git --no-pager diff --stat -- 'skills/*/references/*'
-            exit 1
-          fi
+        run: python3 skills/create-skill/scripts/bundle_skill.py --check --all
