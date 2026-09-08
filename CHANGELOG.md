@@ -4,6 +4,52 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Fixed
+
+- **`bundle_skill.py` now follows shell dependencies sourced as `"${var}/dep.sh"`, and asserts the
+  dependency graph it produced instead of assuming it.** `SH_SIBLING_RE`'s prefix alternation
+  covered `$(dirname …)/` and `./` but not the `${var}/` spelling — which is exactly what
+  `shared/resources/resolve-observation-workspace.sh` uses — so `read-config.sh` was never bundled
+  into `skills/observe-work/references/`. The three spellings are interchangeable to bash and
+  distinct to the regex, so the one nobody wrote a case for stayed invisible.
+
+  It stayed invisible after runtime too, because the consumer degraded **softly**: the resolver
+  printed a warning, left `read_nested_config_key` undefined, still exported a workspace and still
+  exited 0 — so the documented guard `source … || exit 1` never tripped, and a missing config tier
+  was indistinguishable from an absent one.
+
+  Widening the alternation is exact rather than speculative: across every `shared/resources/*.sh` in
+  the tree it adds **one** match and **no** false positives. Alongside it,
+  `assert_sourced_siblings_landed()` re-reads every bundled `.sh` and fails the bundle when a sourced
+  sibling with a shared source did not land. Two properties make it worth having — it uses a matcher
+  **independent** of the one under test (the first version reused `SH_SIBLING_RE`, inherited its
+  blind spot and passed vacuously on the exact defect it was written for), and it carries a
+  **non-vacuity floor**, so a `.sh` that visibly sources something but yields no matches reports a
+  broken scan rather than a clean graph. Mutation-proven: reverting the regex while keeping the
+  assertion makes the assertion fire and exit 1.
+
+### Added
+
+- **Two named defect classes in [`docs/reference/anti-patterns.md`](docs/reference/anti-patterns.md),
+  and a Signal Design Principle section in `create-skill`.** *Never let one signal report two states*
+  — for each falsy, empty or zero value a check emits, name the situations that produce it; where
+  more than one does and the right response differs, they need separate values. This repository had
+  independently diagnosed that shape at least four times and named it only in the postmortem of each
+  occurrence, which is the one artefact the next occurrence does not read. *Never fix N call sites
+  without a population check* — when a fix is the same edit at more than one site, the deliverable is
+  the check that finds site N+1, carrying a non-vacuity floor and allowlist-staleness failure.
+
+  Both are also review-time findings now: `shared/resources/code-review-prompt.md` gains categories
+  **C (ambiguous signals)** and **D (enumeration risk)**, so they reach `review-code`, `review-pr`,
+  `qa-story`, `qa-task`, `develop-story` and `develop-task` through the one shared lens.
+
+- **`AGENTS.md` links `.agents/handoff.md`.** The handoff opens with "Read this first if you are
+  picking up work in `agent-skills`" and was referenced by nothing — no skill named it, no doc linked
+  it, no script read it, and the always-loaded instruction file did not contain the word "handoff".
+  The pointer carries a re-measure caution rather than a bare link: every state figure in that
+  document records the command that produced it, and state decays within days while the traps section
+  stays true much longer.
+
 ### Added
 
 - **The `observe-work` meta-skill** (`skills/observe-work/`) — the first consumer of the
