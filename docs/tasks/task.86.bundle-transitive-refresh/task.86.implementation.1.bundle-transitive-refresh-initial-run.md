@@ -35,7 +35,7 @@ Make `bundle_skill.py` reference discovery transitive to a fixed point, add a CI
 | 2. review-task             | ✅ Done    | `task.86.review.1.bundle-transitive-refresh.md` exists                   | READY TO IMPLEMENT. 4 Critical + 5 Important fixed. Status draft → ready-for-development | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                       | 5 phases complete. 12 files, 9 new tests. `ci:fast` green (2806 tests, 0 fail); all 4 validate.yml steps reproduced locally | — |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                            | PR #352 → develop. 4 conventional commits. Issue #351 commented (`reason: posted`) | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.86.qa.{N}.*.md`; `task.86.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | 🔄 Cycle 3 | `task.86.qa.{N}.*.md`; `task.86.gate.{N}.*.yml`; Step 5c `**PR Review**` row | C1 FAIL 60 (1H/4M/4L) → fixed. C2 FAIL 55 (2H/7M/1L, incl. refute pass) → fixed. 39 tests, 13 mutation proofs | — |
 | 7. finalise                | ⏳ Pending | `task.86.dod.{N}.*.md`; task `status: accepted`                          |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                      |       | —                    |
 
@@ -90,7 +90,26 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-08
+Gate FAIL 60/100. 1 HIGH (`--check` parsed only at argv[0] → `--all --check` ran a mutating bundle,
+6 files written), 4 MEDIUM, 4 LOW. All 8 §9 criteria verified against the tree; 5 mutation proofs
+held. Fixed, each with a test, each mutation-proven. Two of the five proofs initially proved nothing
+and were redone — one hit a duplicate `.sh` block in the wrong function, one was masked by a second
+guard.
+
+### QA Cycle 2 (refute pass) — 2026-09-08
+Gate FAIL 55/100. 2 HIGH, 7 MEDIUM, 1 LOW.
+
+- **The ambiguity gate had one call site.** It guarded reconciliation — the path a file reaches when
+  nothing names it — while pass 2 wrote `needed` ungated. Authored files were overwritten in both
+  ordinary cases, and the cycle-1 test used the one fixture seed of three that routed to the working
+  branch.
+- **The symlink test was vacuous**: its fixture wrote nothing, so its assertion was trivially true.
+- **A live instance of this task's own defect was in the tree throughout**: `pr-inline-comment.js`
+  0755 at source, 0644 in two copies, `--check` reporting clean, because the mode rule was `.sh`-only.
+- One finding (TASK86-014) came from verifying the fixes, not from either review.
+
+All 10 closed. 39 tests (was 19), 13 mutation proofs. `ci:fast` exit 0 — 2826 tests, 0 fail.
 
 ---
 

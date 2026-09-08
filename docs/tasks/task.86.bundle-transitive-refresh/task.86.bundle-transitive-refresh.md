@@ -393,6 +393,34 @@ repairs the mode too.
 
 ---
 
+### QA Cycle 3 — 2026-09-08
+
+Gate **CONCERNS** (78/100). All ten cycle-2 findings verified fixed by execution. Thirteen more found
+and fixed; the six behavioural ones mutation-proven.
+
+| ID | Fix |
+| --- | --- |
+| F-001 (HIGH) | `--check` never asserted **pass 3** — a skill source still naming `shared/resources/` passed while `npm run bundle` would rewrite it. This task's own subject, surviving in the one dimension the new check had dropped. Now `UNREWRITTEN` |
+| F-002 | Mode drift was one-directional: a 0644 source with a 0755 copy passed both check and bundler, and git ships the bit to consumers |
+| F-003 | `.json` bypassed the evidence check, so an authored `.json` was silently overwritten — and `--check` classed it *regenerable*, telling the operator to run the bundler that would destroy it |
+| F-004 | A **dangling** symlink (no source) was invisible — the more dangerous half of TASK86-014, which had fixed only the source-backed half |
+| F-005 | **Test gap**: the "a mode repair IS a change" decision was held by nothing; reverting it red no test |
+| F-006 | **Test gap**: the 40-line banner window was load-bearing but unexercised — no fixture had long enough frontmatter, so the suite stayed green with the byte-bounded regression restored |
+| F-007–F-013 | Seven cleanups: a skip message that misstated its reason, `AMBIGUOUS` swallowing `MISDECLARED` then advising "add the banner" to a file that has one, a bad path exiting 1 instead of 2, duplicated output, a test helper missing its twin's signal-kill guard, an assertion narrower than its siblings, and a helper that could not create a nested link |
+
+**Three residuals are recorded as limitations rather than closed**, because they are properties of the
+approach rather than defects in it: evidence 2 cannot distinguish a pre-header copy from an authored
+file byte-identical to the rewritten source; a header-less file whose source was deleted cannot be
+reported `ORPHANED` (no banner to read); and the symlink write-through outcome is reachable through
+two independent guards, so neither is individually provable.
+
+> **The gate is CONCERNS, not PASS, and deliberately so.** Every criterion holds and CI is green, but
+> findings arrived in all three cycles and two of this cycle's were behaviours *nothing asserted*. The
+> module has grown from 258 to ~700 lines carrying seven problem classes. Recording that is more
+> useful than a PASS implying the file has been exhausted.
+
+---
+
 ### Key Findings
 
 All eight §9 success criteria hold when checked against the tree. The gate fails on code review:
@@ -409,6 +437,7 @@ diff` check it replaced did catch.
 | 2026-09-03 | 1.0     | Filed from task 77 QA cycle 3 (TASK77-025) | develop-task |
 | 2026-09-08 | 1.1     | Review (4/10 → 9/10). Root cause corrected — discovery was always transitive; the real cause is three reachability edges leaving 26 source-backed orphans, 8 stale today. Scope self-contradiction resolved (refresh source-backed orphans; leave 83 source-less ones). CI item re-framed: a freshness step already exists and is structurally blind. `package_skill.py` scoped out with a reason. Seven missing mandatory sections added. | review-task |
 | 2026-09-08 |         | Status → ready-for-development            | review-task |
+| 2026-09-08 |         | QA gate 3 CONCERNS (78/100) — 13 findings incl. 2 test gaps; 45 tests, 6 mutation proofs | qa-task |
 | 2026-09-08 |         | QA gate 2 FAIL (80/100) — cycle-1 fixes verified; TASK86-004's repair had a hole | qa-task |
 | 2026-09-08 |         | qa-fix cycle 2 — 9 findings incl. 2 HIGH from the refute pass; 38 tests, 12 mutation proofs | qa-fix |
 | 2026-09-08 |         | qa-fix cycle 1 — 5 findings fixed, 7 tests added, all mutation-proven | qa-fix |
