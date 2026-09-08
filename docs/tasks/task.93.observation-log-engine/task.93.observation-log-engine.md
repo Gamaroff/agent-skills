@@ -502,6 +502,67 @@ None. Every file is new, nothing consumes them yet, and the blast radius of a de
 
 ## Dev Agent Record
 
+### QA Fix Cycle 2 — 2026-09-08
+
+Three findings fixed. Two came from the cycle-2 refute pass; the third came from the **operator
+stopping an unsafe verification script**, which is worth recording as the way it was found.
+
+**Completion notes**
+
+- **TASK-93-004 (HIGH)** — the cycle-1 fork fix swept *every* directory under `~/.claude/projects`,
+  which holds one entry per project on the machine. Any other project's legitimate workspace read as
+  a fork of this one, so the moment a second project adopted the log `doctor` would fail in both,
+  permanently. Narrowed to **this repository's own worktree encodings**, derived by a new
+  `repoWorktrees()` that reads `.git` directly — pure `fs`, no shell-out, keeping the engine's
+  no-subprocess property intact. That candidate set is exactly the fork TASK-93-001 used to create.
+- **TASK-93-005 (MEDIUM)** — `sweepResolved()` archived with `fs.renameSync`, which silently
+  clobbers an existing destination. Now checks first and reports
+  `skipped: [{ file, why: "collision" }]`, leaving both files in place. `write` already used `wx` so
+  a create could never truncate; the one operation that *moves* files did not hold the same line.
+- **TASK-93-006 (HIGH)** — the cycle-1 test suite wrote into, and read from, the developer's real
+  `~/.claude`. Every `doctor` invocation now runs against a **temp `HOME`**, using this repo's
+  existing env allow-list shape with the temp home substituted. No production-code change was
+  needed: `cli(args, opts)` already spread `opts` into `spawnSync`.
+
+**How TASK-93-006 was found.** The operator rejected a verification script this pipeline had
+written, which contained `rm -rf "$PJ/$ENC"` where `$ENC` came from a command substitution — had
+that call failed, it would have deleted every session transcript and the memory directory under
+`~/.claude/projects`. Asking why that script needed to touch the real home at all is what exposed
+that the **already-committed tests did too**. The narrow lesson is to guard variables in `rm -rf`;
+the useful one is that a test suite reaching into `$HOME` is a defect even when it cleans up after
+itself, because it is also *reading* state it does not control.
+
+**Isolation is by redirection, not by careful paths.** A temp home is discarded wholesale, so there
+is no cleanup step to get wrong and no `rm -rf` whose argument could be empty. The verification
+routine now brackets the suite with a `find ~/.claude` diff, which is cheap and would have caught
+this on the day cycle 1 was written.
+
+**Mutation proofs — 4/4**
+
+| Fix | Mutation | Result |
+|---|---|---|
+| TASK-93-004 | restore the unrestricted `readdirSync(projects)` sweep | RED |
+| TASK-93-005 | drop the `fs.existsSync(dest)` check | RED |
+| TASK-93-006 | remove `env: isolatedEnv(home)` from the fork test | RED |
+| TASK-93-002 | remove the project-path sweep (re-proved against the rewritten test) | RED |
+
+The TASK-93-006 mutation is safe to run: the planted directory still goes to the temp home, so only
+the CLI's *view* reverts to the real one. It goes red without writing anything outside the temp tree.
+
+**A note on the fork tests.** They assert **both** directions — this project's own duplicate
+encoding *is* a fork, another project's workspace is *not* — because either alone passes against a
+broken implementation. Return everything and the first passes while the second fails; return nothing
+and the reverse. That symmetry is why cycle 1's single-direction test let TASK-93-004 through.
+
+**File list**
+
+- `shared/resources/observation-log.js` — modified (`repoWorktrees`, `encodeProjectPath`, narrowed
+  `forkCandidates`, archive collision guard)
+- `shared/resources/tests/observation-log.test.mjs` — temp-`HOME` isolation across 5 `doctor` tests,
+  planted-fork test rewritten, 3 tests added (44 → 47), stale `OBS_TEST_ALLOW_TMP` comment removed
+
+---
+
 ### QA Fix Cycle 1 — 2026-09-08
 
 All three gate findings fixed, each verified by reproducing the defect first and confirming the
@@ -596,6 +657,10 @@ All three findings sit in one seam — **the boundary between the process and th
 | 2026-09-08 |         | QA gate FAIL (70/100) — 3 findings: worktree-dependent workspace (HIGH), doctor blind to project-path forks, UTF-8 chunk-boundary corruption | qa-task |
 | 2026-09-08 |         | Status → in-progress (QA FAIL) | qa-task |
 | 2026-09-08 |         | QA findings fixed — 3 findings (1 HIGH, 2 MEDIUM), 1 iteration; all mutation-proven | qa-fix |
+| 2026-09-08 |         | Status → ready-for-review | qa-fix |
+| 2026-09-08 |         | QA cycle 2 (refute pass) FAIL (70/100) — all 3 cycle-1 findings verified fixed; 3 new: fork sweep false-positives across projects (HIGH), test suite writes into the real ~/.claude (HIGH), archive overwrites via renameSync | qa-task |
+| 2026-09-08 |         | Status → in-progress (QA FAIL) | qa-task |
+| 2026-09-08 |         | QA cycle 2 findings fixed — narrowed fork sweep, archive collision guard, temp-HOME test isolation; 4 mutation proofs | qa-fix |
 | 2026-09-08 |         | Status → ready-for-review | qa-fix |
 
 ---

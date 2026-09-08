@@ -359,7 +359,21 @@ function sweepResolved(logDir, opts) {
       continue;
     }
     fs.mkdirSync(archiveDir, { recursive: true });
-    fs.renameSync(src, path.join(archiveDir, name));
+    const dest = path.join(archiveDir, name);
+    // Refuse rather than overwrite. `fs.renameSync` clobbers an existing
+    // destination silently, which would destroy the archived observation and
+    // still report `ok` — the exact shape of loss `write`'s `wx` create exists
+    // to prevent, in the one operation that moves files. The two must hold the
+    // same line, or the engine's stated posture is only true where it is cheap.
+    //
+    // Reachable whenever an active and an archived file share a name: an
+    // observation restored from the archive to be reopened, a `git checkout` of
+    // a deleted active file, or a corrupted `.id-floor` permitting id reuse.
+    if (fs.existsSync(dest)) {
+      skipped.push({ file: name, why: "collision" });
+      continue;
+    }
+    fs.renameSync(src, dest);
     moved.push(name);
   }
   return { moved, skipped };
@@ -997,14 +1011,93 @@ function cmdCheckpoint(P, args) {
   return { reason: "ok", line: line.trim(), exitCode: 0 };
 }
 
+/** Encode an absolute path the way the project-identity default does. */
+function encodeProjectPath(p) {
+  return p.split(path.sep).join("-");
+}
+
 /**
- * Other places a workspace plausibly gets anchored — where a fork would hide.
+ * Every worktree of the repository containing `cwd` — the main one, plus any
+ * linked ones. Empty outside a repository.
  *
- * The `~/.claude/projects/*` sweep is the load-bearing one, and it was missing
- * from the first implementation. That directory is where the project-identity
- * default actually writes, so it is where a fork actually lands — and without
- * this sweep `doctor` reported `no-fork` on a workspace that had one. The other
- * three entries cover hand-configured anchors, which are the less likely case.
+ * Pure `fs`; deliberately no shell-out. The engine makes no subprocess and no
+ * network call, and a `git` invocation here would be the first exception to
+ * that, for a question the filesystem already answers:
+ *
+ *   - `<root>/.git` is a DIRECTORY in the main worktree.
+ *   - `<root>/.git` is a FILE in a linked worktree, holding
+ *     `gitdir: <main>/.git/worktrees/<name>`.
+ *   - `<main>/.git/worktrees/<name>/gitdir` holds `<worktree>/.git`.
+ */
+function repoWorktrees(cwd) {
+  let dir = path.resolve(cwd);
+  let gitPath = null;
+  for (;;) {
+    const candidate = path.join(dir, ".git");
+    if (fs.existsSync(candidate)) {
+      gitPath = candidate;
+      break;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) return [];
+    dir = parent;
+  }
+
+  let mainRoot;
+  try {
+    if (fs.statSync(gitPath).isDirectory()) {
+      mainRoot = dir;
+    } else {
+      // A linked worktree: follow its pointer back to the main .git.
+      const m = /gitdir:\s*(.+)/.exec(fs.readFileSync(gitPath, "utf8"));
+      if (!m) return [dir];
+      const wtAdmin = m[1].trim(); // <main>/.git/worktrees/<name>
+      const idx = wtAdmin.lastIndexOf(path.sep + "worktrees" + path.sep);
+      if (idx === -1) return [dir];
+      mainRoot = path.dirname(wtAdmin.slice(0, idx)); // strip the trailing /.git
+    }
+  } catch {
+    return [dir];
+  }
+
+  const roots = new Set([mainRoot, dir]);
+  const admin = path.join(mainRoot, ".git", "worktrees");
+  let names = [];
+  try {
+    names = fs.readdirSync(admin, { withFileTypes: true });
+  } catch {
+    names = [];
+  }
+  for (const n of names) {
+    if (!n.isDirectory()) continue;
+    try {
+      const g = fs
+        .readFileSync(path.join(admin, n.name, "gitdir"), "utf8")
+        .trim();
+      if (g) roots.add(path.dirname(g)); // <worktree>/.git -> <worktree>
+    } catch {
+      /* a stale worktree admin entry is not a fork */
+    }
+  }
+  return [...roots];
+}
+
+/**
+ * Other places a workspace for THIS project plausibly got anchored — where a
+ * fork would hide.
+ *
+ * **"For this project" is the whole of the rule, and getting it wrong is a
+ * defect in either direction.** The first implementation omitted
+ * `~/.claude/projects` entirely, so `doctor` answered `no-fork` on a workspace
+ * that had one. The fix for that swept EVERY directory under
+ * `~/.claude/projects` — which holds one entry per project on the machine — so
+ * the moment a second project adopted the log, doctor failed in both, forever,
+ * naming a path that was not a fault. An alarm that always fires is the same
+ * failure as one that never fires: nobody reads either.
+ *
+ * So the sweep is restricted to the encodings of THIS repository's own
+ * worktrees. That set is exactly the fork the `--show-toplevel` bug used to
+ * create, which is the case worth catching, and it cannot name another project.
  */
 function forkCandidates(workspace, cwd) {
   const out = new Set();
@@ -1013,15 +1106,8 @@ function forkCandidates(workspace, cwd) {
   out.add(path.join(os.homedir(), ".claude", "skill-observations"));
 
   const projects = path.join(os.homedir(), ".claude", "projects");
-  let entries = [];
-  try {
-    entries = fs.readdirSync(projects, { withFileTypes: true });
-  } catch {
-    entries = [];
-  }
-  for (const e of entries) {
-    if (e.isDirectory())
-      out.add(path.join(projects, e.name, "skill-observations"));
+  for (const root of repoWorktrees(cwd)) {
+    out.add(path.join(projects, encodeProjectPath(root), "skill-observations"));
   }
 
   const ours = path.join(workspace, "skill-observations");
@@ -1372,6 +1458,9 @@ module.exports = {
   today,
   parseFamilies,
   rewriteLifecycle,
+  repoWorktrees,
+  encodeProjectPath,
+  forkCandidates,
   ephemeralReason,
   RESOLVED_SET,
   STATUS_VALUES,

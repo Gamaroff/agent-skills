@@ -27,7 +27,7 @@ import {
   mkdirSync,
   statSync,
 } from "node:fs";
-import { tmpdir, homedir } from "node:os";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
@@ -47,8 +47,7 @@ const engine = require(CLI);
 // NOTE the tension this creates with the engine's own ephemeral-anchor refusal —
 // /tmp IS an ephemeral anchor, and refusing it is a guard tested below. The
 // tests therefore call the exported functions directly, or pass an explicit
-// --workspace, rather than routing through the resolver. Where a test needs the
-// CLI against a temp workspace it uses OBS_TEST_ALLOW_TMP (see below).
+// --workspace, rather than routing through the resolver.
 function ws(label) {
   const dir = mkdtempSync(join(tmpdir(), `observation-log-${label}-`));
   return dir;
@@ -56,6 +55,41 @@ function ws(label) {
 
 function cleanup(dir) {
   rmSync(dir, { recursive: true, force: true });
+}
+
+// ── $HOME isolation ──────────────────────────────────────────────────────────
+//
+// `forkCandidates()` probes `~/skill-observations`, `~/.claude/skill-observations`
+// and `~/.claude/projects/<encoded>/skill-observations`. So EVERY `doctor` test
+// reads the real home directory unless it is told otherwise, and one of them
+// used to WRITE there — planting a directory under the developer's actual
+// `~/.claude/projects` on every `npm test`, with a `recursive: true` mkdir that
+// would create `~/.claude` itself if absent and leave it behind.
+//
+// That is unacceptable twice over: a test suite must not touch the user's data,
+// and a test whose result depends on what happens to be in someone's home
+// directory is not a test. Both directions were live — a developer with a stray
+// `~/skill-observations` would have seen spurious failures.
+//
+// So every `doctor` invocation below runs against a TEMP home. The env shape is
+// this repo's existing allow-list convention (see access-config-parity.test.mjs
+// and setup-consumer-skill-profiles.test.mjs, which pass
+// `{ PATH: process.env.PATH, HOME: process.env.HOME }`) with the temp home
+// substituted for the real one. `os.homedir()` prefers `$HOME` on macOS and
+// Linux, so the override reaches the engine with no production-code change.
+//
+// Isolation is by REDIRECTION, never by careful paths under the real home: a
+// temp home is discarded wholesale, so there is no cleanup step to get wrong and
+// no `rm -rf` whose argument could be empty.
+function tempHome(label) {
+  const home = mkdtempSync(join(tmpdir(), `observation-log-home-${label}-`));
+  mkdirSync(join(home, ".claude", "projects"), { recursive: true });
+  return home;
+}
+
+/** The env an isolated CLI invocation runs with. */
+function isolatedEnv(home) {
+  return { PATH: process.env.PATH, HOME: home };
 }
 
 /** Run the CLI. Returns { code, json, stdout, stderr }. */
@@ -740,16 +774,13 @@ test("doctor reports fork-detected when a second skill-observations/ exists", ()
   // returns a short, clean, believable list.
   const { dir } = initWs("fork");
   const other = ws("fork-other");
+  const home = tempHome("fork");
   try {
     mkdirSync(join(other, "skill-observations"), { recursive: true });
-    const r = cli([
-      "doctor",
-      "--workspace",
-      dir,
-      "--audit-root",
-      other,
-      "--json",
-    ]);
+    const r = cli(
+      ["doctor", "--workspace", dir, "--audit-root", other, "--json"],
+      { env: isolatedEnv(home) },
+    );
     assert.equal(r.json.reason, "fork-detected");
     assert.equal(r.code, 1);
     const check = r.json.checks.find((c) => c.check === "no-fork");
@@ -757,24 +788,30 @@ test("doctor reports fork-detected when a second skill-observations/ exists", ()
   } finally {
     cleanup(dir);
     cleanup(other);
+    cleanup(home);
   }
 });
 
 test("doctor reports ephemeral-workspace for an anchor under /tmp", () => {
   const other = ws("doctor-clean");
+  const home = tempHome("ephemeral");
   try {
-    const r = cli([
-      "doctor",
-      "--workspace",
-      "/tmp/some-ephemeral-anchor",
-      "--audit-root",
-      other,
-      "--json",
-    ]);
+    const r = cli(
+      [
+        "doctor",
+        "--workspace",
+        "/tmp/some-ephemeral-anchor",
+        "--audit-root",
+        other,
+        "--json",
+      ],
+      { env: isolatedEnv(home) },
+    );
     assert.equal(r.json.reason, "ephemeral-workspace");
     assert.equal(r.code, 1);
   } finally {
     cleanup(other);
+    cleanup(home);
   }
 });
 
@@ -784,20 +821,18 @@ test("doctor flags a workspace with no activation instruction", () => {
   // indistinguishable from a project with nothing worth recording.
   const { dir } = initWs("activation");
   const other = ws("no-agents-md");
+  const home = tempHome("activation");
   try {
-    const r = cli([
-      "doctor",
-      "--workspace",
-      dir,
-      "--audit-root",
-      other,
-      "--json",
-    ]);
+    const r = cli(
+      ["doctor", "--workspace", dir, "--audit-root", other, "--json"],
+      { env: isolatedEnv(home) },
+    );
     const check = r.json.checks.find(
       (c) => c.check === "activation-configured",
     );
     assert.equal(check.ok, false);
   } finally {
+    cleanup(home);
     cleanup(dir);
     cleanup(other);
   }
@@ -857,6 +892,7 @@ test("an unknown subcommand is a usage error", () => {
 
 test("--json always emits a reason field", () => {
   const { dir, P } = initWs("reason-field");
+  const home = tempHome("reason-field");
   try {
     obs(P, "0001-x.md", { id: 1, status: "open" });
     for (const argv of [
@@ -867,14 +903,10 @@ test("--json always emits a reason field", () => {
       ["families"],
       ["doctor"],
     ]) {
-      const r = cli([
-        ...argv,
-        "--workspace",
-        dir,
-        "--audit-root",
-        dir,
-        "--json",
-      ]);
+      const r = cli(
+        [...argv, "--workspace", dir, "--audit-root", dir, "--json"],
+        { env: isolatedEnv(home) },
+      );
       assert.ok(r.json, `${argv[0]} produced unparseable JSON`);
       assert.ok(
         typeof r.json.reason === "string" && r.json.reason.length > 0,
@@ -883,6 +915,7 @@ test("--json always emits a reason field", () => {
     }
   } finally {
     cleanup(dir);
+    cleanup(home);
   }
 });
 
@@ -1308,35 +1341,161 @@ test("the project-identity default is the same from a linked worktree as from th
   }
 });
 
-test("doctor detects a second workspace under ~/.claude/projects", () => {
-  // MUTATION: remove the `~/.claude/projects/*` sweep from forkCandidates().
+test("doctor detects a second workspace at this project's own encoding", () => {
+  // MUTATION: remove the `~/.claude/projects` sweep from forkCandidates().
   //
   // TASK-93-002. The other three candidates cover hand-configured anchors; this
   // one covers the directory the project-identity DEFAULT writes to, which is
   // where a fork actually lands. Without it `doctor` answered `no-fork` on a
   // workspace that had one — the check reporting the reassuring half of the two
   // states it exists to tell apart.
+  //
+  // The planted path is this repository's OWN encoding. That is not incidental:
+  // TASK-93-004 narrowed the sweep to this project's worktrees, so an arbitrary
+  // sibling directory is deliberately no longer a candidate. See the pair of
+  // tests below, which assert both directions of that narrowing.
   const { dir } = initWs("fork-projects");
-  const projects = join(homedir(), ".claude", "projects");
-  const planted = join(projects, ".observation-log-test-sibling");
+  const home = tempHome("fork-projects");
+  const repoRoot = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    cwd: SHARED,
+  }).stdout.trim();
   try {
-    mkdirSync(join(planted, "skill-observations"), { recursive: true });
-    const r = cli([
-      "doctor",
-      "--workspace",
-      dir,
-      "--audit-root",
-      dir,
-      "--json",
-    ]);
+    const planted = join(
+      home,
+      ".claude",
+      "projects",
+      engine.encodeProjectPath(repoRoot),
+      "skill-observations",
+    );
+    mkdirSync(planted, { recursive: true });
+    const r = cli(
+      ["doctor", "--workspace", dir, "--audit-root", repoRoot, "--json"],
+      { env: isolatedEnv(home) },
+    );
     assert.equal(r.json.reason, "fork-detected");
     assert.equal(r.code, 1);
     const check = r.json.checks.find((c) => c.check === "no-fork");
     assert.equal(check.ok, false);
-    assert.match(check.detail, /observation-log-test-sibling/);
+    assert.match(check.detail, /skill-observations/);
   } finally {
-    rmSync(planted, { recursive: true, force: true });
+    cleanup(home);
     cleanup(dir);
+  }
+});
+
+test("doctor does NOT flag another project's workspace as a fork", () => {
+  // MUTATION: restore the unrestricted `readdirSync(projects)` sweep in
+  // forkCandidates().
+  //
+  // TASK-93-004, and the direction that matters. `~/.claude/projects` holds one
+  // entry PER PROJECT on the machine — twelve on the machine this was found on.
+  // Sweeping all of them meant that as soon as a second project adopted the
+  // observation log, `doctor` failed in BOTH, permanently, naming a path that
+  // was not a fault.
+  //
+  // That is not a milder bug than the blindness it replaced, it is the same bug
+  // inverted: an alarm that always fires is read exactly as often as one that
+  // never fires, which this repo already has written down (`bug.7` — an ignored
+  // check is a check that does not exist).
+  //
+  // Both directions are asserted, here and in the test above, because either one
+  // alone passes against a broken implementation: return everything and this
+  // test fails while that one passes; return nothing and the reverse.
+  const { dir } = initWs("fork-unrelated");
+  const home = tempHome("fork-unrelated");
+  const repoRoot = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    cwd: SHARED,
+  }).stdout.trim();
+  try {
+    const unrelated = join(
+      home,
+      ".claude",
+      "projects",
+      engine.encodeProjectPath("/Users/someone/Development/an-unrelated-repo"),
+      "skill-observations",
+    );
+    mkdirSync(unrelated, { recursive: true });
+    const r = cli(
+      ["doctor", "--workspace", dir, "--audit-root", repoRoot, "--json"],
+      { env: isolatedEnv(home) },
+    );
+    const check = r.json.checks.find((c) => c.check === "no-fork");
+    assert.equal(
+      check.ok,
+      true,
+      `another project's workspace was reported as a fork: ${check.detail}`,
+    );
+    assert.notEqual(r.json.reason, "fork-detected");
+  } finally {
+    cleanup(home);
+    cleanup(dir);
+  }
+});
+
+test("archive refuses to overwrite an existing archived file", () => {
+  // MUTATION: drop the `fs.existsSync(dest)` check in sweepResolved().
+  //
+  // TASK-93-005. `fs.renameSync` clobbers an existing destination silently, so
+  // the archived observation was destroyed and the sweep still reported `ok`
+  // with the file listed as archived. `write` uses `wx` specifically so a create
+  // can never truncate; the one operation that MOVES files did not hold the same
+  // line, which made the task's own Rollback Plan ("nothing is destroyed, only
+  // misfiled") false.
+  //
+  // Reachable whenever an active and an archived file share a name: an
+  // observation restored from the archive to be reopened, a `git checkout` of a
+  // deleted active file, or a corrupted `.id-floor` permitting id reuse.
+  const { dir, P } = initWs("archive-collision");
+  try {
+    obs(P, "0001-dup.md", {
+      id: 1,
+      status: "actioned",
+      resolved: "2020-01-01",
+    });
+    const archived = join(P.archiveDir, "0001-dup.md");
+    writeFileSync(archived, "ARCHIVED VERSION — MUST NOT BE LOST\n");
+
+    const r = cli([
+      "archive",
+      "--workspace",
+      dir,
+      "--now",
+      "2026-09-08",
+      "--json",
+    ]);
+    assert.deepEqual(
+      r.json.archived,
+      [],
+      "nothing may be moved onto a collision",
+    );
+    assert.deepEqual(r.json.skipped, [
+      { file: "0001-dup.md", why: "collision" },
+    ]);
+    assert.equal(
+      readFileSync(archived, "utf8"),
+      "ARCHIVED VERSION — MUST NOT BE LOST\n",
+      "the archived file was overwritten",
+    );
+    assert.ok(
+      existsSync(join(P.logDir, "0001-dup.md")),
+      "the active file must stay put rather than vanishing",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("repoWorktrees returns an empty list outside a repository", () => {
+  // The fork sweep is built from this list, so an empty one must mean "no
+  // project-path candidates", not a crash and not a candidate list built from a
+  // partially-resolved path.
+  const outside = ws("no-repo");
+  try {
+    assert.deepEqual(engine.repoWorktrees(outside), []);
+  } finally {
+    cleanup(outside);
   }
 });
 

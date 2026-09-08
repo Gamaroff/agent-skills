@@ -1,0 +1,159 @@
+schema: 1
+task: "task.93.observation-log-engine"
+task_title: "Observation-log engine, workspace resolver and contract"
+gate: FAIL
+status_reason: >-
+  All three cycle-1 findings verified FIXED and mutation-proven. Cycle 2 was a refute pass over the
+  whole branch diff and found two more: the cycle-1 fork-detection fix false-positives on every
+  other project's legitimate workspace, and `archive` silently overwrites an existing archived file.
+  One of the two was introduced by a cycle-1 fix — which is the case the refute pass exists for.
+reviewer: "QA Engineer"
+updated: "2026-09-08T10:05:00Z"
+
+top_issues:
+  - id: "TASK-93-004"
+    severity: high
+    file: "shared/resources/observation-log.js"
+    finding: >-
+      The cycle-1 fix for TASK-93-002 sweeps every directory under `~/.claude/projects/`, so ANY
+      other project's legitimate workspace reads as a fork of this one. Demonstrated on this machine,
+      which has 12 project directories: planting a `skill-observations/` under an unrelated project's
+      directory makes `doctor` report `fork-detected`, exit 1, naming that unrelated path. The moment
+      a second project adopts the observation log, doctor fails in BOTH projects, permanently, on
+      every run. That is worse than the blindness it replaced: an alarm that always fires is one
+      nobody reads, which is this repo's own recorded lesson (`bug.7` — an ignored check is a check
+      that does not exist). Introduced by a fix that was correct in isolation.
+    suggested_action: >-
+      A fork is a second workspace for THIS project, not any workspace anywhere. Restrict the sweep
+      to the plausible encodings of this project only: the main worktree plus every linked worktree
+      from `git worktree list --porcelain` (path separators replaced by hyphens), excluding the
+      resolved workspace's own path. That set is exactly the fork TASK-93-001 used to create, so it
+      catches the real case with no false positives. Cover it with a test that plants a workspace
+      under an UNRELATED project directory and asserts `no-fork` stays true, alongside the existing
+      test that plants a same-project one.
+    suggested_owner: dev
+    status: open
+
+  - id: "TASK-93-006"
+    severity: high
+    file: "shared/resources/tests/observation-log.test.mjs"
+    finding: >-
+      The cycle-1 regression test for TASK-93-002 plants a directory in the developer's REAL
+      `~/.claude/projects` on every `npm test` run, and its `mkdirSync(..., { recursive: true })`
+      creates `~/.claude` and `~/.claude/projects` themselves if absent and leaves them behind; the
+      `finally` removes only the planted leaf. Four further tests — every `doctor` invocation — READ
+      the real home, because `forkCandidates()` probes `~/skill-observations` and
+      `~/.claude/skill-observations` and no test passes an `env`. So the suite both mutates the
+      user's data directory and returns results that depend on what happens to be in it: a developer
+      with a stray `~/skill-observations` gets spurious failures. Found when a verification script
+      for TASK-93-004 was stopped by the operator for containing an unguarded `rm -rf "$PJ/$ENC"`
+      that would have deleted every session transcript and the memory directory had the preceding
+      command substitution failed.
+    suggested_action: >-
+      Redirect `HOME` to a temp directory for every `doctor` invocation, using the repo's existing
+      env allow-list shape (`{ PATH: process.env.PATH, HOME: <temp> }`) with the temp home
+      substituted. `cli(args, opts)` already spreads `opts` into `spawnSync`, so no helper and no
+      production-code change is needed. Isolate by redirection rather than by careful paths under
+      the real home — a temp home is discarded wholesale, so there is no cleanup step to get wrong.
+      Add a before/after `find ~/.claude` diff to the verification routine.
+    suggested_owner: dev
+    status: open
+
+  - id: "TASK-93-005"
+    severity: medium
+    file: "shared/resources/observation-log.js"
+    finding: >-
+      `sweepResolved()` archives with `fs.renameSync`, which silently overwrites an existing file of
+      the same name in `archive/`. Demonstrated: an archived `0001-dup.md` was destroyed by an active
+      file of the same name being swept, with `reason: "ok"` and the file listed as archived. This
+      directly contradicts the engine's own posture elsewhere — `write` uses `wx` precisely so a
+      create can never truncate — and the task's Rollback Plan claims "nothing is destroyed, only
+      misfiled". Reachable whenever an active and an archived file share a name: an observation
+      restored from the archive to be reopened, a `git checkout` of a deleted active file, or a
+      corrupted `.id-floor` allowing id reuse.
+    suggested_action: >-
+      Refuse rather than overwrite. Check `fs.existsSync(dest)` before the rename (or use
+      `fs.linkSync` + `unlinkSync`, which fails on an existing destination) and, on collision, leave
+      the file in place and report it in the sweep's `skipped[]` with a reason of `collision` — the
+      vocabulary already has that value. Cover it with a test asserting the archived file's contents
+      survive.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: "2026-09-08"
+  total_iterations: 1
+  verification_method: "Reproduced each defect, applied the fix, re-reproduced, then mutation-proved"
+  resolved:
+    - id: "TASK-93-001"
+      status: FIXED
+      verification: >-
+        A real linked worktree and the main checkout now resolve the same workspace. Mutation-proven:
+        reverting `--git-common-dir` to `--show-toplevel` turns the named test red.
+    - id: "TASK-93-002"
+      status: FIXED
+      verification: >-
+        `doctor` now detects a planted second workspace under `~/.claude/projects`. Mutation-proven.
+        NOTE: the fix over-reaches — see TASK-93-004.
+    - id: "TASK-93-003"
+      status: FIXED
+      verification: >-
+        All eight byte alignments decode cleanly with no U+FFFD. Mutation-proven: reverting to
+        `buf.toString("utf8", …)` turns the named test red.
+
+evidence:
+  tests_reviewed: 44
+  phases_verified: "5/5"
+  code_review_subagent: "not dispatched this cycle — the cycle-1 dispatch hung and was stopped; the refute pass was performed by the reviewer directly, by execution"
+  refute_pass: true
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1 — no shell-out, no eval, no network; only local requires."
+  performance:
+    status: PASS
+    notes: >-
+      Unchanged. The StringDecoder fix adds no per-file reads; `bytesRead` is still one chunk for a
+      5 MB body. The `~/.claude/projects` sweep runs only in `doctor`.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      Improved — the workspace is now deterministic across worktrees. Still CONCERNS: TASK-93-005 is
+      silent data loss, and TASK-93-004 makes the health check unreliable in the opposite direction
+      from cycle 1.
+  maintainability:
+    status: PASS
+    notes: >-
+      The cycle-1 fixes each carry the reason they exist and the failure they prevent, and both
+      non-obvious test designs (a real worktree; an eight-alignment sweep) explain why the cheap
+      version of the test would prove nothing.
+
+recommendations:
+  immediate:
+    - action: "Restrict the fork sweep to this project's own worktree encodings"
+      refs: ["shared/resources/observation-log.js"]
+    - action: "Refuse to overwrite an existing archived file; report collision in skipped[]"
+      refs: ["shared/resources/observation-log.js"]
+  future:
+    - action: >-
+        A non-Latin title slugifies to the literal `observation`, so such filenames carry no
+        information beyond the id. Harmless (ids keep them unique) and not worth fixing now.
+      refs: ["shared/resources/observation-log.js"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "TASK-93-004 fixed, with a test that an unrelated project's workspace is not a fork"
+    - "TASK-93-005 fixed, with a test that the archived file's contents survive"
