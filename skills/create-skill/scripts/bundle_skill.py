@@ -14,9 +14,8 @@ skill.
 Usage:
     python bundle_skill.py <path/to/skill-folder>
     python bundle_skill.py --all                  # bundle every skill under skills/
-    python bundle_skill.py --check <path> | --all # read-only freshness assertion
 
-Exit codes: 0 success / in sync; 1 drift found (--check); 2 usage error.
+Exit codes: 0 success; 1 a skill failed to bundle; 2 usage error.
 """
 
 import re
@@ -65,10 +64,9 @@ EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
 # Suffixes that legitimately carry no provenance banner. Kept for documentation:
 # absence of a banner is not evidence about these. It is NOT a licence to write —
 # an early `return True` here made an authored `.json` silently destroyable, and
-# `--check` then classed it STALE and told the operator to run the bundler that
-# would destroy it. Evidence 2 (byte-equality with the rewritten source) is
-# available for these suffixes precisely because no header is injected, so every
-# genuine copy still passes.
+# Evidence 2 (byte-equality with the rewritten source) is available for these
+# suffixes precisely because no header is injected, so every genuine copy still
+# passes.
 HEADERLESS_SUFFIXES = {'.json'}
 AUTOGEN_MARKER = "AUTO-GENERATED — DO NOT EDIT"
 
@@ -109,56 +107,13 @@ def inject_header(content, filename, suffix):
     return header + content
 
 
-def _md_reference_sub(m):
-    """Rewrite one `shared/resources/X` match, unless it sits inside a URL."""
-    text = m.string
-    token_start = max(text.rfind(' ', 0, m.start()),
-                      text.rfind('(', 0, m.start())) + 1
-    if '://' in text[token_start:m.end()]:
-        return m.group(0)          # part of a URL — rewriting it yields a 404
-    return f"references/{m.group(1)}"
-
-
-def rewrite_source_text(content, suffix):
-    """Pass-3 rewrite of a skill's OWN files. NOT interchangeable with `rewrite_text`.
-
-    `rewrite_text` builds the *content of a bundled copy*, where a fenced snippet
-    like `source ../references/resolve-platform.sh` MUST be rewritten or the
-    installed skill cannot run. Exempting fences there rewrote 77 real files on
-    the first attempt at this fix — caught by running it against the tree.
-
-    Pass 3 edits a skill's own prose, and exempts URLs only: rewriting a
-    `https://…/blob/main/shared/resources/x.md` link turns it into a 404.
-
-    **Fenced blocks are deliberately NOT exempt, and a previous version of this
-    function got that wrong.** Skill docs use fences for the commands the agent
-    actually runs, not for illustration: 75 lines across 24 SKILL.md files invoke
-    `source references/resolve-platform.sh`, `node references/tracker-issue.js`
-    and the like inside ```bash blocks, and they hold the `references/` form
-    precisely because pass 3 rewrote them. Exempting fences meant the next author
-    writing the `shared/resources/` form inside one would ship a path that does
-    not exist in any install — with `--check` reporting green. That is a worse
-    failure than the `cp lib.sh shared/resources/x.md` example the exemption was
-    meant to protect, and it is the failure this whole task is about.
-
-    **Inline code spans are still rewritten**, deliberately: `` `shared/resources/x.md` ``
-    is the ordinary way a skill names a shared resource, and exempting it would
-    defeat the bundler.
-    """
-    if suffix != '.md':
-        return rewrite_text(content, suffix)
-    return SHARED_REF_RE.sub(_md_reference_sub, content)
-
-
 def rewrite_text(content, suffix):
     """Rewrite `shared/resources/X` references to their bundled `references/X` form.
 
     Module-level rather than nested inside `bundle_skill()` because the freshness
-    check (`--check`) must reproduce this transform *exactly* to compare a bundled
-    copy against its source. A re-implementation cannot be trusted to stay in step:
-    a bundled copy is the source PLUS a banner PLUS this rewrite, so a naive
-    checksum can never match, and an inexact reproduction reports drift that is not
-    there. One definition, two callers.
+    write path and the ambiguity gate must agree on it exactly: a bundled copy is
+    the source PLUS a banner PLUS this rewrite, so a naive checksum can never
+    match. One definition, two callers.
     """
     if suffix == '.md':
         return SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
@@ -303,10 +258,9 @@ def source_backed_on_disk(refs_dir, shared_dir, needed):
         # A symlink IS included here — membership means "our concern", and a
         # symlinked reference is very much our concern: a consumer copying the
         # directory verbatim gets a dangling link. `writable_copy` refuses to
-        # write it and `check_skill` reports it. Excluding it here was the same
-        # membership-vs-writability conflation fixed above for AMBIGUOUS, left
-        # in the one place it still bit: a symlink no rule discovers entered
-        # neither set and nothing said anything about it.
+        # write it. Excluding it here was the same membership-vs-writability
+        # conflation: a symlink no rule discovers entered neither set, so the
+        # bundler silently accepted whatever it pointed at.
         if not dst.is_symlink() and not dst.is_file():
             continue
         rel_parts = dst.relative_to(refs_dir).parts
@@ -319,10 +273,9 @@ def source_backed_on_disk(refs_dir, shared_dir, needed):
         if not src.is_file():
             continue        # no source ⇒ skill-native ⇒ never ours to touch
         # Membership here means "this file is our concern", NOT "we may write it".
-        # The write decision is `writable_copy`, applied at both write sites and
-        # in check_skill. Conflating the two hid the ambiguous case from the
-        # report entirely: it entered neither the expected set nor the orphan
-        # scan, so nothing said anything about it.
+        # The write decision is `writable_copy`, applied at both write sites.
+        # Conflating the two meant an authored file that merely shared a name with
+        # a shared resource was silently overwritten.
         out[rel] = src
     return out
 
@@ -383,8 +336,8 @@ def _looks_bundled(dst, src, name):
     of the eight stale copies this change corrected (`verify-push-state.sh`)
     were exactly that, and a banner-only gate would have refused to fix them.
 
-    Anything else is genuinely ambiguous. `check_skill` reports it; the bundler
-    leaves it alone.
+    Anything else is genuinely ambiguous, and the bundler leaves it alone rather
+    than overwriting work it did not create.
 
     **Evidence 2 cannot distinguish** a pre-header bundled copy from an authored
     file that merely happens to be byte-identical to the rewritten source — an
@@ -451,8 +404,8 @@ def write_if_changed(dst, src, name, new_bytes):
         # Content unchanged — still re-sync the mode, in EITHER direction.
         if (dst.stat().st_mode & 0o777) != src_mode:
             dst.chmod(src_mode)
-            return True        # a mode repair IS a change; reporting False here
-                               # is what let `--check` and the bundler disagree
+            return True        # a mode repair IS a change, and must be counted
+                               # as one or the status line understates the run
         return False
     # Mirroring the mode unconditionally (cycle 4) made a read-only source
     # self-locking: a 0444 source produced a 0444 copy, and the NEXT run died with
@@ -549,14 +502,11 @@ def bundle_skill(skill_path):
         try:
             original = f.read_text()
         except (UnicodeDecodeError, OSError):
-            # THIS is the read that crashes, and the guard added for C4-006 went
-            # on the wrong one. Its comment claimed `discover_needed`'s was "the
-            # only unguarded read in the file"; it was not. With the check-side
-            # equivalent already guarded, `--check` reported green for a skill on
-            # which `npm run bundle` died — green-CI-but-broken-bundler, which is
-            # the failure this task exists to close.
+            # A non-UTF-8 file here crashed the whole run with a raw traceback,
+            # aborting before later skills were bundled. Guarded like its sibling
+            # in `discover_needed`.
             continue
-        updated = rewrite_source_text(original, f.suffix)
+        updated = rewrite_text(original, f.suffix)
         if updated != original:
             f.write_text(updated)
             rewritten += 1
@@ -578,185 +528,16 @@ def bundle_skill(skill_path):
     return True
 
 
-def check_skill(skill_path):
-    """Read-only freshness check. Returns a list of human-readable problems.
-
-    Compares each source-backed bundled copy against `expected_bytes`, rather than
-    regenerating and asking git what moved. The regenerate-and-diff idiom inherits
-    the bundler's own blind spots by construction: a copy the bundler does not
-    write produces no diff, so a stale file passes. Comparing per file is what
-    makes the check independent of discovery.
-    """
-    resolved = resolve_paths(skill_path)
-    if resolved is None:
-        # Signalled distinctly: a path that is not a skill is a USAGE error, and
-        # bucketing it with drift made CI read "bundled references are out of
-        # date" for a typo'd argument.
-        raise UsageError(f"{skill_path}: not a bundleable skill")
-    skill_path, shared_dir, refs_dir = resolved
-
-    needed, skill_files = discover_needed(skill_path, shared_dir, refs_dir)
-    expected = dict(needed)
-    expected.update(source_backed_on_disk(refs_dir, shared_dir, needed))
-
-    problems = []
-    for name, src in sorted(expected.items()):
-        dst = refs_dir / name
-        if dst.is_symlink():
-            # Made safe (never written through) but previously also invisible:
-            # a consumer copying the directory verbatim gets a dangling link.
-            problems.append(f"{skill_path.name}: references/{name} is a SYMLINK")
-            continue
-        if not dst.is_file():
-            problems.append(f"{skill_path.name}: references/{name} is MISSING")
-            continue
-        if not writable_copy(dst, src, name):
-            # MISDECLARED first: a file that DOES carry a banner, naming another
-            # path, is not "missing a banner". Reporting it as AMBIGUOUS and
-            # advising "add the banner" contradicts the file in front of you.
-            misdeclared = None
-            try:
-                m = BANNER_SOURCE_RE.search(_banner_head(dst.read_text()))
-                misdeclared = m.group(1) if m else None
-            except (UnicodeDecodeError, OSError):
-                pass
-            if misdeclared:
-                problems.append(
-                    f"{skill_path.name}: references/{name} is MISDECLARED "
-                    f"(banner names shared/resources/{misdeclared}, not its own path)"
-                )
-            else:
-                problems.append(
-                    f"{skill_path.name}: references/{name} is AMBIGUOUS "
-                    f"(shares a name with shared/resources/{name} but is not bundler "
-                    f"output — not rewritten; delete it or add the banner)"
-                )
-            continue
-        if dst.read_bytes() != expected_bytes(src, name):
-            problems.append(f"{skill_path.name}: references/{name} is STALE")
-            continue
-        # Mode is part of being in sync — `write_if_changed` re-chmods a `.sh`
-        # copy whose bits drifted even when the bytes match. Comparing bytes
-        # alone would let a lost executable bit pass here while `npm run bundle`
-        # silently repaired it, which is the green-CI-but-dirty-tree split this
-        # check exists to close. The `git diff` form this replaced caught it
-        # because git tracks the bit.
-        # Keyed on the source actually being executable, NOT on the `.sh` suffix.
-        # `shared/resources/pr-inline-comment.js` is 0755 while two bundled copies
-        # were 0644 — a live instance of the exact green-CI-but-wrong-mode split
-        # this check exists to close, invisible to a suffix-scoped test.
-        # Compared UNCONDITIONALLY and in both directions. Gating on "is the
-        # source executable" caught a copy that lost its +x but not one that
-        # gained one: a 0644 source with a 0755 copy passed the check AND the
-        # bundler, and git ships the bit to consumers.
-        if (dst.stat().st_mode & 0o777) != (src.stat().st_mode & 0o777):
-            problems.append(
-                f"{skill_path.name}: references/{name} has WRONG MODE "
-                f"({dst.stat().st_mode & 0o777:o}, expected {src.stat().st_mode & 0o777:o})"
-            )
-
-    # Pass 3 is part of "in sync" too, and the check used to look only inside
-    # references/. A skill source still carrying `shared/resources/X` therefore
-    # passed while `npm run bundle` would rewrite it — the same green-CI-but-dirty
-    # -tree split this check exists to close, in the one dimension it had dropped.
-    # (Not a regression: the `git diff -- 'skills/*/references/*'` form it replaced
-    # was equally blind, because pass 3 edits files outside that pathspec.)
-    #
-    # Reported ONLY when the bundler would actually perform the rewrite. Pass 3
-    # runs after `bundle_skill`'s early return, so a skill whose only
-    # `shared/resources/X` mention names a file that does not exist takes that
-    # return and rewrites nothing. Reporting UNREWRITTEN there left CI permanently
-    # red behind "Run `npm run bundle`" — a remedy that provably does nothing,
-    # which is exactly the failure TASK86-013 exists to prevent, reintroduced by
-    # the fix for F-001. The missing source already emits its own
-    # `⚠️ shared/resources/X not found`; that is the actionable signal.
-    if needed or source_backed_on_disk(refs_dir, shared_dir, needed):
-        for f in skill_files:
-            try:
-                original = f.read_text()
-            except (UnicodeDecodeError, OSError):
-                continue
-            if rewrite_source_text(original, f.suffix) != original:
-                problems.append(
-                    f"{skill_path.name}: {f.relative_to(skill_path)} is UNREWRITTEN "
-                    f"(still references shared/resources/ — `npm run bundle` rewrites it)"
-                )
-
-    # A copy the bundler produced whose source has since been deleted is
-    # invisible to everything above — it is in neither `needed` nor
-    # `source_backed_on_disk`, both of which require the source to exist. It
-    # keeps a banner naming a file that is gone, and stays green forever. The
-    # banner is the discriminator the bundler already writes; this reads it back.
-    if refs_dir.is_dir():
-        for dst in sorted(refs_dir.rglob('*')):
-            rel_parts = dst.relative_to(refs_dir).parts
-            if any(p in EXCLUDE_DIRS for p in rel_parts):
-                continue
-            if dst.is_symlink():
-                # A link with no same-named source reaches neither the expected
-                # set nor `source_backed_on_disk`. It is the MORE dangerous half
-                # of TASK86-014, not the safer one: this link is already dangling
-                # for anyone who copies the directory verbatim.
-                rel = dst.relative_to(refs_dir).as_posix()
-                if rel not in expected:
-                    problems.append(f"{skill_path.name}: references/{rel} is a SYMLINK")
-                continue
-            if not dst.is_file():
-                continue
-            rel_parts = dst.relative_to(refs_dir).parts
-            if any(p in EXCLUDE_DIRS for p in rel_parts):
-                continue
-            rel = dst.relative_to(refs_dir).as_posix()
-            if rel in expected:
-                continue
-            if (shared_dir / rel).is_file():
-                continue        # reported by the expected-set loop above
-            try:
-                text = dst.read_text()
-            except (UnicodeDecodeError, OSError):
-                continue
-            # The path comes from the banner the file actually carries, so the
-            # message cannot assert something it never read.
-            declared = declared_source(text, rel)
-            if declared is not None:
-                problems.append(
-                    f"{skill_path.name}: references/{rel} is ORPHANED "
-                    f"(banner names shared/resources/{declared}, which no longer exists)"
-                )
-                continue
-            # A real banner that names a DIFFERENT path — a moved or renamed copy.
-            # Requiring declared == rel is right for the prose false-positive it
-            # fixes, but on its own it silently drops this case, which the
-            # phrase-matching version did report.
-            other = BANNER_SOURCE_RE.search(_banner_head(text))
-            if other:
-                problems.append(
-                    f"{skill_path.name}: references/{rel} is MISDECLARED "
-                    f"(banner names shared/resources/{other.group(1)}, not its own path)"
-                )
-    return problems
-
-
-class UsageError(Exception):
-    """A bad invocation, distinct from drift. Exits 2, never 1."""
-
-
-USAGE = "Usage: bundle_skill.py [--check] <skill-path>... | [--check] --all"
+USAGE = "Usage: bundle_skill.py <skill-path>... | --all"
 
 
 def main():
     args = sys.argv[1:]
 
-    # `--check` is honoured ANYWHERE in argv, not only at position 0.
-    #
-    # It used to be recognised only as args[0], which made `--all --check`
-    # silently perform a full MUTATING bundle and exit 0 — a read-only flag
-    # rewriting the repository because the arguments were the other way round.
-    # Unknown `--flags` are now rejected outright for the same reason: a typo
-    # (`--chekc`) must not fall through to a write.
-    check_mode = '--check' in args
+    # Unknown flags are rejected outright rather than treated as skill paths: a
+    # typo (`--al`, `-all`) must not fall through to a write.
     all_mode = '--all' in args
-    args = [a for a in args if a not in ('--check', '--all')]
+    args = [a for a in args if a != '--all']
 
     # ANY leading dash, not just `--`. `-check` was treated as a skill path, so a
     # single-dash typo on a read-only request ran the MUTATING bundle and exited 0.
@@ -780,43 +561,6 @@ def main():
         targets = sorted(d for d in skills_dir.iterdir() if (d / 'SKILL.md').exists())
     else:
         targets = [Path(a) for a in args]
-
-    if check_mode:
-        problems = []
-        try:
-            for t in targets:
-                problems.extend(check_skill(t))
-        except UsageError as e:
-            print(f"❌ {e}")
-            print(USAGE)
-            sys.exit(2)
-        if problems:
-            # `::error::` is a GitHub Actions workflow command — it surfaces the
-            # failure as an annotation in the PR checks UI, which the two sibling
-            # hygiene steps in validate.yml also do. Harmless noise outside CI.
-            # `npm run bundle` fixes STALE / MISSING / WRONG MODE. It cannot fix
-            # ORPHANED, AMBIGUOUS, MISDECLARED or SYMLINK — those need a human
-            # decision. Printing the blanket remedy for them left CI permanently
-            # red with an instruction that provably does nothing.
-            regenerable = [x for x in problems
-                           if ' is STALE' in x or ' is MISSING' in x
-                           or 'WRONG MODE' in x or ' is UNREWRITTEN' in x]
-            manual = [x for x in problems if x not in regenerable]
-            print("::error::Bundled references/ need attention "
-                  f"({len(regenerable)} regenerable, {len(manual)} needing a decision).")
-            print("❌ Bundled references are out of date:")
-            for problem in problems:
-                print(f"   {problem}")
-            if regenerable:
-                print("\nRun 'npm run bundle' and commit the regenerated files.")
-            if manual:
-                print(f"\n{len(manual)} of the above need a human decision — "
-                      "`npm run bundle` will NOT clear them. They are the "
-                      "AMBIGUOUS / ORPHANED / MISDECLARED / SYMLINK lines; act on "
-                      "each one's own advice.")
-            sys.exit(1)
-        print(f"✅ Bundle freshness: {len(targets)} skill(s) verified")
-        sys.exit(0)
 
     failed = 0
     for t in targets:
