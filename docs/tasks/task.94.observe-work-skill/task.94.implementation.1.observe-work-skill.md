@@ -38,7 +38,7 @@ Author `skills/observe-work/` — a meta-skill that observes the session for ski
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 6/6 phases. 14 files created/modified. `npm run ci:fast` exit 0 — 2883 pass / 0 fail. New suite 20/20, glob mutation-proved RED→GREEN. | — (inline; no subagent) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #354: https://github.com/Gamaroff/agent-skills/pull/354 — 23 files, no out-of-scope leak. Issue #340 commented (`in-review`). | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.94.qa.{N}.*.md`; `task.94.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.94.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 7. finalise                | ✅ Done    | `task.94.dod.{N}.*.md`; task `status: accepted`                        | `task.94.dod.1.observe-work-skill.md`; status → accepted; sprint-review summary written; canonical PR comment posted; issue #340 closed + verified; board `done` → `already` | — (inline; no subagent) |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -53,6 +53,8 @@ Author `skills/observe-work/` — a meta-skill that observes the session for ski
 - qa-planning gate: skipped (auto — no prompt).
 - Phase 0 resolution run inline rather than via Explore subagents — the session's operating instructions bar subagent dispatch unless requested, and the task path was already resolved by the selector. No information was lost: 0b, 0c and the lite-mode inputs were all read directly.
 - Pipeline mode: standard — task declares 6 implementation phases (≥ 3), so the lite-mode conjunction fails at the phase-count clause regardless of the absent `risk_level`.
+- Step 7 finalise: the four DoD checks are normally four parallel Explore subagents; all four ran **inline**, since this session's instructions bar subagent dispatch. The security check's probe mode still executed 4 candidates against the resolver rather than reasoning about the boundary — 0 reproduced.
+- CI was verified on the **exact head** (`df882735`, local == PR head), all 5 jobs `COMPLETED`/`SUCCESS`. No entry resolved through the empty-string path that would round a running job up to green.
 - GitHub board: work-started → transitioned (Todo → In Progress, verified). Pipeline-start comment posted to #340 (reason: `posted`).
 - review-task output format auto-answered: "Comprehensive report" — required for the pipeline audit trail.
 - review-task Step 8.5 auto-answered: "Yes, apply all critical + important fixes" — pipeline proceeds autonomously.
@@ -127,10 +129,10 @@ Writing that suite surfaced behaviour nothing had tested: a log holding **only**
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-08
+**Final Status**: Completed
 **Branch**: `feature/task.94.observe-work-skill`
 **PR**: [#354](https://github.com/Gamaroff/agent-skills/pull/354)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 5 cycles (4 qa-fix rounds) — 7 findings raised, 7 closed
+**DoD Summary**: [`task.94.dod.1.observe-work-skill.md`](./task.94.dod.1.observe-work-skill.md) — ACCEPTED
+**Tracker debt**: none — issue #340 closed and verified, board `done` reported `already`, no deferred mutations

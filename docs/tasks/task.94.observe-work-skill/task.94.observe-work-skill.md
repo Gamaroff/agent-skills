@@ -5,10 +5,12 @@ type: task
 description: "Author the observe-work skill — a meta-skill that observes the session for skill-improvement signals, writes them to a durable observation log, and runs a periodic review that stages skill updates — and register it through every gate this repo's CI enforces."
 tags: [observe-work, meta-skill, skills, progressive-disclosure]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-07
 updated: 2026-09-08
+completed_date: 2026-09-08
+pr_number: 354
 assignee:
 estimated_effort_hours: 16
 github_issue: 340
@@ -16,7 +18,7 @@ github_issue: 340
 
 # Technical Task: Add the observe-work meta-skill
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.94.review.1.observe-work-skill.md` implemented 2026-09-08
 **GitHub Issue**: [#340](https://github.com/Gamaroff/agent-skills/issues/340)
 
@@ -636,6 +638,35 @@ Every document-anchored check passes — that is why the decisive finding needed
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate**: [`task.94.gate.5.observe-work-skill.yml`](./task.94.gate.5.observe-work-skill.yml) — ✅ **PASS**, 100/100, `top_issues: []`
+**QA cycles**: 5 · **Findings**: 7 raised, 7 closed (2 HIGH, 5 MEDIUM) + 2 LOW advisory
+**PR review (Step 5c)**: [`task.94.pr-review.1.observe-work-skill.md`](./task.94.pr-review.1.observe-work-skill.md) — CONCERNS, both findings closed before acceptance
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria** — 21 of 21 met, 0 unticked. Per-criterion traceability in the PR review report.
+✅ **CI** — SUCCESS on the exact head `df882735`, all 5 jobs COMPLETED. Local `npm run ci:fast` exit 0, 2891 pass / 0 fail.
+✅ **Tests** — 28 assertions across two suites. The `package.json` glob and both HIGH regressions are **mutation-proved**; the hook suite is mutation-proved twice.
+✅ **Security** — no credentials, no network, no untrusted input; shellcheck clean. Boundary probe mode fired: 4 candidates executed, 0 reproduced. The engine's ephemeral-anchor refusal was observed firing three times during the loop.
+✅ **Compliance** — CC BY 4.0 attribution complete on all four required elements, and asserted by the suite so it cannot be silently dropped.
+✅ **Documentation** — CHANGELOG, both doc pages, catalog, `AGENTS.md`, and five authored references each carrying a load trigger.
+
+**Deployment readiness:** staging ✅ APPROVED · production ✅ APPROVED
+
+**The install is `activation unverified`**, by construction rather than by omission — the installing session cannot prove activation, because a skill being callable right after install only shows it was invoked by hand. The next-session check is handed to the user in `environments.md`, the CHANGELOG and the PR body.
+
+**Detailed Verification Log:** see [`task.94.dod.1.observe-work-skill.md`](./task.94.dod.1.observe-work-skill.md) for complete evidence, the probe results and the acceptance decision matrix.
+
+**Task marked as ACCEPTED on:** 2026-09-08
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -654,6 +685,8 @@ Every document-anchored check passes — that is why the decisive finding needed
 | 2026-09-08 |         | QA gate CONCERNS (90/100) — replacement verified on 12 cases; reliability → PASS; 1 doc MEDIUM | qa-task |
 | 2026-09-08 |         | QA findings fixed — hook reference rewritten against the shipped mechanism, 4 iterations | qa-fix |
 | 2026-09-08 |         | QA gate PASS (100/100) — all 7 findings closed across 5 cycles | qa-task |
+| 2026-09-08 |         | Step 5c PR review CONCERNS — both findings closed (hook test suite added, Files Summary corrected) | review-pr |
+| 2026-09-08 | 1.3     | DoD verified — accepted (PR #354) | finalise |
 
 ---
 
@@ -747,7 +780,7 @@ Every document-anchored check passes — that is why the decisive finding needed
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the implementation plan
