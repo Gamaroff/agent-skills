@@ -1,4 +1,4 @@
-check: (() => run(["--check", skillDir]), "use strict");
+"use strict";
 /**
  * Bundler regression — reachability, disk reconciliation, and honest status.
  *
@@ -160,23 +160,7 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
     readRef: (name) =>
       fs.readFileSync(path.join(skillDir, "references", name), "utf-8"),
     refExists: (name) => fs.existsSync(path.join(skillDir, "references", name)),
-    check: () => {
-      // `--check` must not write. Returns {status, stdout} rather than throwing,
-      // because a non-zero exit is the expected result in half these tests.
-      try {
-        return {
-          status: 0,
-          stdout: execFileSync("python3", [BUNDLER, "--check", skillDir], {
-            encoding: "utf-8",
-          }),
-        };
-      } catch (e) {
-        return {
-          status: e.status,
-          stdout: (e.stdout || "") + (e.stderr || ""),
-        };
-      }
-    },
+    check: () => run(["--check", skillDir]),
   };
 }
 
@@ -881,6 +865,14 @@ test("TASK86-011: a header-less suffix is not auto-accepted as bundler output", 
       `were auto-accepted on a bare name match. This tree already holds 15 ` +
       `skill-native .mdx files and one .ts.`,
   );
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    1,
+    "…and the collision must be reported, as its siblings do",
+  );
+  assert.match(res.stdout, /AMBIGUOUS/);
 });
 
 test("TASK86-012: a banner naming a different path is reported MISDECLARED", (t) => {
@@ -1122,4 +1114,223 @@ test("F-006: the banner window survives long YAML frontmatter", (t) => {
     "the banner lands after ~740 bytes of frontmatter; a byte-bounded window cuts " +
       "the marker in half and misclassifies a correctly-bundled copy",
   );
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 4. Three of these pin behaviours the cycle-4 review proved were held
+// by NOTHING — each was mutation-verified as unpinned before being written.
+// ---------------------------------------------------------------------------
+
+test("C4-001: UNREWRITTEN converges — it is not raised for work the bundler will not do", (t) => {
+  // Pass 3 runs after bundle_skill's early return, so a skill whose only
+  // shared/resources mention names a MISSING file rewrites nothing. Reporting
+  // UNREWRITTEN there left CI permanently red behind "Run npm run bundle" — a
+  // remedy that provably does nothing, which is the exact failure TASK86-013
+  // exists to prevent, reintroduced by the fix for F-001.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/missing.md.\n`,
+      },
+      sharedFiles: {},
+    },
+    t,
+  );
+
+  fx.bundle();
+  assert.equal(
+    fx.check().status,
+    0,
+    "a check that cannot be cleared by its own printed remedy is worse than no check",
+  );
+  fx.bundle();
+  assert.equal(fx.check().status, 0, "and it must stay converged");
+});
+
+test("C4-002: pass 3 does not corrupt URLs or fenced blocks, but still rewrites prose", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": [
+          SKILL_MD_HEAD,
+          "",
+          "Docs: https://github.com/acme/x/blob/main/shared/resources/real.md",
+          "",
+          "```bash",
+          "cp mylib.sh shared/resources/real.md",
+          "```",
+          "",
+          "An ordinary reference `shared/resources/real.md` must still be rewritten.",
+          "",
+        ].join("\n"),
+      },
+      sharedFiles: { "real.md": "# Real\n" },
+    },
+    t,
+  );
+
+  fx.bundle();
+  const after = fs.readFileSync(path.join(fx.skillDir, "SKILL.md"), "utf-8");
+
+  assert.match(
+    after,
+    /blob\/main\/shared\/resources\/real\.md/,
+    "rewriting a URL turns a working link into a 404",
+  );
+  assert.match(
+    after,
+    /cp mylib\.sh shared\/resources\/real\.md/,
+    "rewriting inside a fenced block turns an instruction into a wrong one",
+  );
+  assert.match(
+    after,
+    /`references\/real\.md` must still be rewritten/,
+    "but an inline span is the ordinary way to name a shared resource — exempting " +
+      "it would defeat the bundler",
+  );
+});
+
+test("C4-003: pass 2 still rewrites inside fenced blocks (the opposite rule)", (t) => {
+  // rewrite_text and rewrite_source_text are NOT interchangeable. A bundled copy
+  // must have its fenced `source ../references/x.sh` snippets rewritten or the
+  // installed skill cannot run. Applying pass 3's exemption to pass 2 rewrote 77
+  // real files on the first attempt at this fix.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/doc.md.\n`,
+      },
+      sharedFiles: {
+        "doc.md": "# Doc\n\n```bash\ncat shared/resources/other.md\n```\n",
+        "other.md": "# Other\n",
+      },
+    },
+    t,
+  );
+
+  fx.bundle();
+  assert.match(
+    fx.readRef("doc.md"),
+    /cat references\/other\.md/,
+    "a bundled copy's fenced snippet must be rewritten to resolve in an install",
+  );
+});
+
+test("C4-004: MISDECLARED beats AMBIGUOUS when the file has a live same-named source", (t) => {
+  // The expected-set MISDECLARED branch was pinned by nothing: TASK86-012's
+  // fixture has no same-named source, so it exercises the ORPHAN-scan branch,
+  // a different one. Mutating `if misdeclared:` to `if False:` left 35 green.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: { "x.md": "# X\n" },
+      refsFiles: { "x.md": `${BANNER("y.md")}# X copy\n` },
+    },
+    t,
+  );
+
+  const res = fx.check();
+  assert.equal(res.status, 1);
+  assert.match(
+    res.stdout,
+    /MISDECLARED/,
+    "the file HAS a banner — it names the wrong path",
+  );
+  // Scoped to the file's own line: the summary block LISTS the class names
+  // ("the AMBIGUOUS / ORPHANED / MISDECLARED / SYMLINK lines"), so a bare
+  // doesNotMatch over stdout fails on the explainer rather than on the verdict.
+  const line = res.stdout
+    .split("\n")
+    .find((l) => l.includes("references/x.md is"));
+  assert.match(line, /MISDECLARED/);
+  assert.doesNotMatch(
+    line,
+    /AMBIGUOUS/,
+    "'add the banner' is unactionable advice for a file that already has one",
+  );
+});
+
+test("C4-005: a non-skill path is a usage error (exit 2), not drift", (t) => {
+  // UsageError, its raise and its catch were pinned by nothing: replacing the
+  // raise with `return []` left 35 green, so cycle 3's F-009 could have been
+  // reverted in silence.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: {},
+    },
+    t,
+  );
+  const res = fx.run(["--check", path.join(fx.root, "no-such-skill")]);
+  assert.equal(
+    res.status,
+    2,
+    `A bad path reported as exit 1 reads to CI as bundle drift. Output:\n${res.stdout}`,
+  );
+});
+
+test("C4-006: UNREWRITTEN is bucketed as regenerable", (t) => {
+  // The bucket was named in the cycle-3 commit message and pinned by nothing.
+  // The fixture must bundle FIRST: otherwise references/ is empty, MISSING lands
+  // in the regenerable bucket too, and the assertion passes for the wrong reason.
+  // (That is exactly how the first version of this test was vacuous — MUT-29
+  // removed UNREWRITTEN from the bucket and nothing went red.)
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee \`shared/resources/r.md\`.\n`,
+      },
+      sharedFiles: { "r.md": "# R\n" },
+    },
+    t,
+  );
+  fx.bundle(); // references/ now complete and rewritten — no MISSING, no STALE
+  assert.equal(
+    fx.check().status,
+    0,
+    "precondition: the only later problem is pass 3",
+  );
+
+  // Re-introduce an un-rewritten skill source. UNREWRITTEN is now the ONLY problem.
+  fs.writeFileSync(
+    path.join(fx.skillDir, "guide.md"),
+    "# Guide\n\nSee `shared/resources/r.md`.\n",
+  );
+
+  const res = fx.check();
+  assert.equal(res.status, 1);
+  assert.match(res.stdout, /UNREWRITTEN/);
+  assert.match(
+    res.stdout,
+    /Run 'npm run bundle'/,
+    "UNREWRITTEN IS fixable by the bundler, so it belongs in the regenerable bucket",
+  );
+});
+
+test("C4-007: an out-of-tree reference is refused, not written outside references/", (t) => {
+  // `name` is an unsanitised regex capture permitting `.` and `/`, so
+  // `shared/resources/../../OUTSIDE.md` escaped both refs_dir and the skill:
+  // the bundler printed "bundled references/../../OUTSIDE.md" and created
+  // <root>/skills/OUTSIDE.md. Overwriting an existing file was already blocked
+  // by the write gate; CREATING one was not.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/../../OUTSIDE.md.\n`,
+      },
+      sharedFiles: {},
+    },
+    t,
+  );
+  // Place the file where the traversal actually resolves.
+  fs.writeFileSync(path.join(fx.root, "OUTSIDE.md"), "# outside\n");
+
+  const stdout = fx.bundle();
+
+  assert.equal(
+    fs.existsSync(path.join(fx.root, "skills", "OUTSIDE.md")),
+    false,
+    `The bundler must never create a file outside the skill's references/. Said:\n${stdout}`,
+  );
+  assert.match(stdout, /refusing out-of-tree reference/);
 });

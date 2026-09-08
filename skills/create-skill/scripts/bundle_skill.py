@@ -20,7 +20,6 @@ Exit codes: 0 success / in sync; 1 drift found (--check); 2 usage error.
 """
 
 import re
-import shutil
 import sys
 from pathlib import Path
 
@@ -110,6 +109,50 @@ def inject_header(content, filename, suffix):
     return header + content
 
 
+FENCE_RE = re.compile(r'^\s*(?:```|~~~)')
+
+
+def _md_reference_sub(m):
+    """Rewrite one `shared/resources/X` match, unless it sits inside a URL."""
+    text = m.string
+    token_start = max(text.rfind(' ', 0, m.start()),
+                      text.rfind('(', 0, m.start())) + 1
+    if '://' in text[token_start:m.end()]:
+        return m.group(0)          # part of a URL — rewriting it yields a 404
+    return f"references/{m.group(1)}"
+
+
+def rewrite_source_text(content, suffix):
+    """Pass-3 rewrite of a skill's OWN files. NOT interchangeable with `rewrite_text`.
+
+    `rewrite_text` builds the *content of a bundled copy*, where a fenced snippet
+    like `source ../references/resolve-platform.sh` MUST be rewritten or the
+    installed skill cannot run. Exempting fences there rewrote 77 real files on
+    the first attempt at this fix — caught by running it against the tree.
+
+    Pass 3 is the opposite case: it edits a skill's own prose, where a fenced
+    block is an example and a URL is an address. Rewriting either corrupts it —
+    a `https://…/blob/main/shared/resources/x.md` link becomes a 404, and a
+    `cp lib.sh shared/resources/x.md` instruction becomes wrong. Both were
+    harmless while nothing compelled the rewrite; the `UNREWRITTEN` check compels
+    it, so the hazard had to close alongside it.
+
+    **Inline code spans are still rewritten**, deliberately: `` `shared/resources/x.md` ``
+    is the ordinary way a skill names a shared resource, and exempting it would
+    defeat the bundler.
+    """
+    if suffix != '.md':
+        return rewrite_text(content, suffix)
+    out, in_fence = [], False
+    for line in content.split('\n'):
+        if FENCE_RE.match(line):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        out.append(line if in_fence else SHARED_REF_RE.sub(_md_reference_sub, line))
+    return '\n'.join(out)
+
+
 def rewrite_text(content, suffix):
     """Rewrite `shared/resources/X` references to their bundled `references/X` form.
 
@@ -154,7 +197,15 @@ def expected_bytes(src, name):
         return src.read_bytes()
 
 
-def discover_needed(skill_path, shared_dir):
+def _within(root, candidate):
+    """True when `candidate` stays inside `root` once `..` segments are resolved."""
+    try:
+        return candidate.resolve().is_relative_to(root.resolve())
+    except (OSError, ValueError):
+        return False
+
+
+def discover_needed(skill_path, shared_dir, refs_dir):
     """Resolve the transitive set of shared resources a skill reaches.
 
     Returns (needed, skill_files). `needed` maps bundled name -> source Path.
@@ -188,7 +239,14 @@ def discover_needed(skill_path, shared_dir):
     pending = []          # candidates from shared/resources/X — warn if missing
     pending_quiet = []    # candidates from references/X — many are skill-native, silent
     for f in skill_files:
-        text = f.read_text()
+        try:
+            text = f.read_text()
+        except (UnicodeDecodeError, OSError):
+            # The only unguarded read in the file: a non-UTF-8 source anywhere in
+            # a skill aborted the whole 125-skill `--all` run with a raw traceback
+            # and exit 1 — indistinguishable from drift. Every sibling read is
+            # guarded; this one was not.
+            continue
         pending.extend(collect_shared_refs(text))
         for m in REFS_REF_RE.finditer(text):
             pending_quiet.append(m.group(1))
@@ -204,6 +262,14 @@ def discover_needed(skill_path, shared_dir):
         if name in seen:
             continue
         seen.add(name)
+        # `name` is an unsanitised regex capture whose class permits `.` and `/`,
+        # so `shared/resources/../../OUTSIDE.md` escaped both refs_dir and the
+        # skill: the bundler printed `bundled references/../../OUTSIDE.md` and
+        # created `skills/OUTSIDE.md`. Overwriting an existing file was already
+        # blocked by the write gate; CREATING one was not.
+        if not _within(refs_dir, refs_dir / name) or not _within(shared_dir, shared_dir / name):
+            print(f"⚠️  refusing out-of-tree reference: {name}")
+            continue
         src = shared_dir / name
         if not src.exists():
             if not quiet:
@@ -420,7 +486,7 @@ def bundle_skill(skill_path):
     skill_path, shared_dir, refs_dir = resolved
 
     # Pass 1: walk skill files (excluding references/) and shared files transitively.
-    needed, skill_files = discover_needed(skill_path, shared_dir)
+    needed, skill_files = discover_needed(skill_path, shared_dir, refs_dir)
 
     # Pass 1b: add on-disk copies discovery could not reach but which have a source.
     reconcilable = source_backed_on_disk(refs_dir, shared_dir, needed)
@@ -476,7 +542,7 @@ def bundle_skill(skill_path):
     rewritten = 0
     for f in skill_files:
         original = f.read_text()
-        updated = rewrite_text(original, f.suffix)
+        updated = rewrite_source_text(original, f.suffix)
         if updated != original:
             f.write_text(updated)
             rewritten += 1
@@ -515,7 +581,7 @@ def check_skill(skill_path):
         raise UsageError(f"{skill_path}: not a bundleable skill")
     skill_path, shared_dir, refs_dir = resolved
 
-    needed, skill_files = discover_needed(skill_path, shared_dir)
+    needed, skill_files = discover_needed(skill_path, shared_dir, refs_dir)
     expected = dict(needed)
     expected.update(source_backed_on_disk(refs_dir, shared_dir, needed))
 
@@ -569,12 +635,11 @@ def check_skill(skill_path):
         # source executable" caught a copy that lost its +x but not one that
         # gained one: a 0644 source with a 0755 copy passed the check AND the
         # bundler, and git ships the bit to consumers.
-        if True:
-            if (dst.stat().st_mode & 0o777) != (src.stat().st_mode & 0o777):
-                problems.append(
-                    f"{skill_path.name}: references/{name} has WRONG MODE "
-                    f"({dst.stat().st_mode & 0o777:o}, expected {src.stat().st_mode & 0o777:o})"
-                )
+        if (dst.stat().st_mode & 0o777) != (src.stat().st_mode & 0o777):
+            problems.append(
+                f"{skill_path.name}: references/{name} has WRONG MODE "
+                f"({dst.stat().st_mode & 0o777:o}, expected {src.stat().st_mode & 0o777:o})"
+            )
 
     # Pass 3 is part of "in sync" too, and the check used to look only inside
     # references/. A skill source still carrying `shared/resources/X` therefore
@@ -582,16 +647,26 @@ def check_skill(skill_path):
     # -tree split this check exists to close, in the one dimension it had dropped.
     # (Not a regression: the `git diff -- 'skills/*/references/*'` form it replaced
     # was equally blind, because pass 3 edits files outside that pathspec.)
-    for f in skill_files:
-        try:
-            original = f.read_text()
-        except (UnicodeDecodeError, OSError):
-            continue
-        if rewrite_text(original, f.suffix) != original:
-            problems.append(
-                f"{skill_path.name}: {f.relative_to(skill_path)} is UNREWRITTEN "
-                f"(still references shared/resources/ — `npm run bundle` rewrites it)"
-            )
+    #
+    # Reported ONLY when the bundler would actually perform the rewrite. Pass 3
+    # runs after `bundle_skill`'s early return, so a skill whose only
+    # `shared/resources/X` mention names a file that does not exist takes that
+    # return and rewrites nothing. Reporting UNREWRITTEN there left CI permanently
+    # red behind "Run `npm run bundle`" — a remedy that provably does nothing,
+    # which is exactly the failure TASK86-013 exists to prevent, reintroduced by
+    # the fix for F-001. The missing source already emits its own
+    # `⚠️ shared/resources/X not found`; that is the actionable signal.
+    if needed or source_backed_on_disk(refs_dir, shared_dir, needed):
+        for f in skill_files:
+            try:
+                original = f.read_text()
+            except (UnicodeDecodeError, OSError):
+                continue
+            if rewrite_source_text(original, f.suffix) != original:
+                problems.append(
+                    f"{skill_path.name}: {f.relative_to(skill_path)} is UNREWRITTEN "
+                    f"(still references shared/resources/ — `npm run bundle` rewrites it)"
+                )
 
     # A copy the bundler produced whose source has since been deleted is
     # invisible to everything above — it is in neither `needed` nor
