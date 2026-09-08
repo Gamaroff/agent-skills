@@ -122,7 +122,6 @@ and the status line reports files it did not examine instead of calling them `in
   the strength of *having a source*, not on the strength of being reachable.
 - Correct the status output: `in sync` must not be printed when files were skipped; report the count.
 - Re-bundle the 8 currently-stale files as part of the change.
-- Replace the `validate.yml` regenerate-and-diff freshness step with a **per-file equality assertion**.
 - A regression test proving a source change propagates to a previously-unreachable copy.
 
 ### Out of Scope
@@ -135,6 +134,14 @@ and the status line reports files it did not examine instead of calling them `in
   > This supersedes the original filing, which placed *all* orphan handling out of scope while listing
   > in-scope items that only make sense for orphans. The 109-vs-26 split is the line, and it is
   > measurable rather than a judgement call.
+
+- **The CI freshness assertion.** Split into **task.98** after this task's QA loop stopped converging
+  on it — five cycles, ~45 findings, with cycles 2, 4 and 5 each finding defects introduced by the
+  previous cycle's fix. The reconciliation fix below makes the *existing* `validate.yml`
+  regenerate-and-diff step effective again, which is what closes this task's own defect: measured after
+  the fix, changing one shared source turns that step red on all four consumers, including the three
+  orphans it was previously blind to. A per-file assertion covers four further classes the diff cannot
+  see; those are task.98's subject, with the six residuals as its starting backlog.
 
 - **`package_skill.py`.** It walks `skill_path.rglob('*')`, which **includes the on-disk `references/`
   directory** (`:116-138`), so the zip carries whatever `bundle_skill.py` produced. Fixing the in-tree
@@ -260,9 +267,8 @@ nothing about this defect.
 - [x] `npm run bundle` is still idempotent — second run touched 0 files
 - [x] No skill gains or loses a bundled file — 9 files changed, **0 added, 0 removed** (an earlier attempt added 38; that approach was rejected and is now guarded by a test)
 - [x] The 83 source-less copies are untouched — pinned by the out-of-scope boundary test
-- [x] `npm run ci` green (exit 0; 2806 tests, 0 fail) **and** the `validate.yml` job reproduced
-      locally (skills 125/125, catalog current, dep graph current, `--check --all` green). Confirmed
-      independently by GitHub CI on PR #352: all 5 checks SUCCESS, including `validate`
+- [x] `npm run ci:fast` green and the `validate.yml` job reproduced locally (skills 125/125, catalog
+      current, dep graph current, bundle a no-op). Confirmed independently by GitHub CI on PR #352
 
 ---
 
@@ -468,6 +474,28 @@ documents**. Run alone: 98/98, exit 0. Not this task's code.
 
 ---
 
+## Split — what this task now delivers
+
+The QA loop's convergence guard tripped at cycle 5 (HIGH per gate: 1, 2, 1, 2, 2), and the escalation
+below records why. The response was to **split**, on the evidence the five cycles produced:
+
+- **`source_backed_on_disk` — the reconciliation fix — was written in the first commit and never
+  changed in substance.** It is mutation-proven, and was never the subject of a single finding.
+- **Every one of the ~45 findings landed in the `--check` CI assertion** added beyond the original
+  scope, or in the class taxonomy that grew around it. That surface is now **task.98**, carrying the
+  six residuals as its starting backlog.
+
+The split is clean because the reconciliation fix **makes the existing CI check work**: the bundler now
+writes the copies it used to skip, so `git diff` sees them. Verified in a pristine worktree — changing
+one shared source turns `validate.yml` red on all four consumers, where before only the one discovered
+consumer appeared. This task therefore still closes its own defect end to end.
+
+What ships here: the 26 source-backed copies are examined, the 8 stale ones corrected, `in sync` can no
+longer be printed over a refresh, and the write path is gated so reconciliation cannot overwrite
+authored content.
+
+---
+
 ## ⚠️ QA Loop Escalation — Not Converging
 
 **The convergence check has tripped.** HIGH findings per gate: **1, 2, 1, 2, 2**. At cycle 5,
@@ -511,6 +539,7 @@ diff` check it replaced did catch.
 | 2026-09-03 | 1.0     | Filed from task 77 QA cycle 3 (TASK77-025) | develop-task |
 | 2026-09-08 | 1.1     | Review (4/10 → 9/10). Root cause corrected — discovery was always transitive; the real cause is three reachability edges leaving 26 source-backed orphans, 8 stale today. Scope self-contradiction resolved (refresh source-backed orphans; leave 83 source-less ones). CI item re-framed: a freshness step already exists and is structurally blind. `package_skill.py` scoped out with a reason. Seven missing mandatory sections added. | review-task |
 | 2026-09-08 |         | Status → ready-for-development            | review-task |
+| 2026-09-08 |         | Split: CI assertion moved to task.98; this task keeps the reconciliation fix | develop-task |
 | 2026-09-08 |         | QA gate 5 CONCERNS (72/100) — 2 HIGH, both cycle-4 regressions; convergence check TRIPPED (1,2,1,2,2) | qa-task |
 | 2026-09-08 |         | qa-fix cycle 5 — 3 fixed, 44 tests, 3 mutation proofs | qa-fix |
 | 2026-09-08 |         | QA gate 4 FAIL (62/100) — 7 findings, 2 of them defects in cycle 3's fixes | qa-task |
