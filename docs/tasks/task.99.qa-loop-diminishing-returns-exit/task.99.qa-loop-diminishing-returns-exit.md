@@ -157,7 +157,29 @@ a unit test of a paragraph:
 - **Anti-vacuity**: a fixture where every condition holds except the glob match must NOT exit — if
   it does, condition 2 is not being read.
 
-## 10. Risk Assessment
+## 10. Success Criteria
+
+1. [ ] The *Diminishing-returns exit* section sits after *Convergence check* and before
+       `### 5b. Run QA Fix (shared)`, and states all three conditions plus the cycle ≥ 3 floor.
+2. [ ] The exit fires on a replay of tinker-city task.103's four committed gates, **at the end of
+       cycle 2** — the first point at which both conditions hold.
+3. [ ] The exit does **not** fire on the `7, 7, 7, 7, 4` sequence the Convergence check owns, at any
+       cycle. The two guards never both claim the same run.
+4. [ ] A gate carrying one HIGH does not fire it; a MEDIUM finding on a **production** path does not
+       fire it.
+5. [ ] **Anti-vacuity:** a fixture where every condition holds *except* the glob match does not
+       exit. If it does, condition 2 is not being read and the rule is passing on absence.
+6. [ ] A `top_issues[]` entry with no `file:`, or one the globs do not match, **fails** the
+       condition — the exit is opt-in on positive evidence, never on missing data.
+7. [ ] `qa.testArtifactGlobs` is in the schema and in `docs/reference/configuration.md`, with the
+       fail-safe direction stated: a consumer matching nothing keeps today's behaviour exactly.
+8. [ ] The Loop Escalation table and the preamble's exit count distinguish this clean exit from a
+       stall, so a reader six months later can tell which one a run took.
+9. [ ] The Convergence check's arithmetic, its `HIGH_N` awk and its escalation text are
+       **byte-unchanged** — verified by diff, not by assertion.
+10. [ ] `npm run bundle` has been run and the regenerated `references/` copies are committed.
+
+## 11. Risk Assessment
 
 **Medium**, and the risk is one-directional: this exit ends a loop early, so a wrong rule ships work
 that a later cycle would have caught.
@@ -169,7 +191,7 @@ that a later cycle would have caught.
 | Consumers with unusual test layouts match nothing and never exit | Fail-safe direction — they keep today's behaviour exactly. A missed exit costs time; a wrong exit costs a defect |
 | The exit is mistaken for a stall in the record | Phase 3's escalation-table row exists solely to keep the two distinguishable |
 
-## 11. Rollback Plan
+## 12. Rollback Plan
 
 Delete the section and the config key; re-run `npm run bundle`. Nothing else reads either, and the
 Convergence check is untouched, so rollback restores today's behaviour exactly.
