@@ -345,6 +345,54 @@ A mutation that fails to turn a test red is a statement about the mutation as of
 
 ---
 
+### QA Fix Cycle 2 — 2026-09-08
+
+Cycle 2 was a refute pass aimed at cycle 1's own fixes, and it found one: **the TASK86-004 repair had
+a hole**. `_looks_bundled` accepted the marker *phrase* as provenance, so a hand-authored document
+that merely quotes the banner was classified as bundler output and **silently overwritten** — the
+exact destruction that fix was written to prevent, in its likeliest case, since a document *about* the
+bundler is precisely what quotes its banner. The same root cause made `check_skill` report such a file
+as `ORPHANED`, in a message that named a source path it had never read.
+
+Both fixed by one change: match the banner's **structure** — `Source: shared/resources/<the file's own
+path>` — not the phrase. Validated against the tree before writing it: **774 bundled files match their
+own path, 0 mismatches.**
+
+| ID | Fix |
+| --- | --- |
+| TASK86-007 | `_looks_bundled` requires a banner declaring this file's own path; a prose quote no longer authorises an overwrite |
+| TASK86-006 | The ORPHANED branch uses the same parsed banner, and reports the path it actually read |
+
+**Then the refute agent returned, and found the fix protected the wrong path.**
+
+| ID | Fix |
+| --- | --- |
+| TASK86-008 (HIGH) | `_looks_bundled` had **one** call site — reconciliation — so pass 2 overwrote authored files whenever discovery reached the name, which is the ordinary case. The gate now guards every write site, and membership (`has a source`) is separated from writability (`writable_copy`) |
+| TASK86-005-TEST (HIGH) | The symlink test was **vacuous** — its fixture wrote nothing, so "source unchanged" was trivially true and it passed with either guard removed. Split into two tests, one forcing the write path |
+| TASK86-009 | `-check` (single dash) still ran the mutating bundle; any leading `-` is now refused |
+| TASK86-010 | The mode rule was `.sh`-scoped, and a **live** 0755-vs-0644 mismatch on `pr-inline-comment.js` was sitting in the tree, invisible. Now keyed on the source's executable bit — and the bundler repaired both copies |
+| TASK86-011 | Every header-less suffix was auto-accepted, not just `.json`; 15 skill-native `.mdx` and one `.ts` were exposed |
+| TASK86-012 | Orphan detection never fired for header-less suffixes, and `declared == rel` silently dropped renamed copies — now a `MISDECLARED` class |
+| TASK86-014 | `source_backed_on_disk` skipped symlinks, so an *undiscovered* symlink was reported by nothing — the same membership-vs-writability conflation, left in one place. Found while verifying the other fixes, by neither review |
+| TASK86-013 | `npm run bundle` cannot clear ORPHANED/AMBIGUOUS/MISDECLARED/SYMLINK, so the blanket remedy would leave CI permanently red under a useless instruction. Also: unhandled `OSError` aborted `--all`; symlinks were invisible |
+
+> **The most useful finding is about the test, not the code.** The cycle-1 test asserting "a
+> hand-authored file is never overwritten" used the one fixture seed out of three that routed to the
+> branch where the guarantee held. It was not written to pass — but it did, for a reason unrelated to
+> the property it named. `MUT-8` now reds exactly the two discovery-path variants and leaves the
+> reconciliation one green, which is what pins the difference.
+
+Cycle 2 also re-verified all five cycle-1 findings **by execution** and ran nine transition probes
+(bulk teardown, in-flight, error path, reconnect/convergence). One interaction was found and judged
+benign: a file that is both STALE and WRONG MODE reports only STALE, because the remedy for STALE
+repairs the mode too.
+
+> **The refute agent returned late — after the cycle-2 report was first drafted — and found two HIGH
+> issues the in-line pass had missed.** An earlier draft recorded that it had not returned; that was
+> wrong, and the correction is kept visible rather than overwritten.
+
+---
+
 ### Key Findings
 
 All eight §9 success criteria hold when checked against the tree. The gate fails on code review:
@@ -361,6 +409,8 @@ diff` check it replaced did catch.
 | 2026-09-03 | 1.0     | Filed from task 77 QA cycle 3 (TASK77-025) | develop-task |
 | 2026-09-08 | 1.1     | Review (4/10 → 9/10). Root cause corrected — discovery was always transitive; the real cause is three reachability edges leaving 26 source-backed orphans, 8 stale today. Scope self-contradiction resolved (refresh source-backed orphans; leave 83 source-less ones). CI item re-framed: a freshness step already exists and is structurally blind. `package_skill.py` scoped out with a reason. Seven missing mandatory sections added. | review-task |
 | 2026-09-08 |         | Status → ready-for-development            | review-task |
+| 2026-09-08 |         | QA gate 2 FAIL (80/100) — cycle-1 fixes verified; TASK86-004's repair had a hole | qa-task |
+| 2026-09-08 |         | qa-fix cycle 2 — 9 findings incl. 2 HIGH from the refute pass; 38 tests, 12 mutation proofs | qa-fix |
 | 2026-09-08 |         | qa-fix cycle 1 — 5 findings fixed, 7 tests added, all mutation-proven | qa-fix |
 | 2026-09-08 |         | QA gate FAIL (60/100) — 1 HIGH, 4 MEDIUM, 4 LOW; all 8 success criteria verified against the tree | qa-task |
 | 2026-09-08 |         | Implemented — 12 files, 9 tests. Disk reconciliation + `.json` discovery + `--check`; 8 stale copies corrected, 0 files added. Following `references/X` out of shared text was implemented, measured to vendor 38 unwanted files, and reverted. | develop |

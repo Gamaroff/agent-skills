@@ -1,0 +1,232 @@
+schema: 1
+task: 'task.86.bundle-transitive-refresh'
+task_title: '`bundle_skill.py` prints `in sync` for bundled references it never examines'
+gate: FAIL
+status_reason: >-
+  All five cycle-1 findings are verified fixed by execution, and nine independent cycle-2 probes hold.
+  But the cycle-1 fix for TASK86-004 has a hole of its own: `_looks_bundled` treats any occurrence of
+  the marker PHRASE in the first 40 lines as provenance, so a hand-authored document that merely quotes
+  it is classified as bundler output and SILENTLY OVERWRITTEN — the exact destruction TASK86-004 was
+  written to prevent. The same root cause makes `check_skill` report such a file as ORPHANED when no
+  same-named source exists. The refute agent, returning late, found worse: the ambiguity gate had ONE
+  call site — reconciliation — so pass 2 overwrote authored files in the two ORDINARY cases, and the
+  test asserting otherwise used the single fixture seed that routed to the working branch. It also
+  found TASK86-005's test vacuous, a single-dash typo still running the mutating bundle, and a LIVE
+  0755-vs-0644 mismatch on `pr-inline-comment.js` that the `.sh`-scoped mode rule could not see.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T08:10:00Z'
+
+top_issues:
+  - id: 'TASK86-007'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `_looks_bundled()` accepts any occurrence of the marker phrase `AUTO-GENERATED — DO NOT EDIT`
+      within the first 40 lines as evidence the file is bundler output. A hand-authored
+      `references/guide.md` that merely DOCUMENTS the banner ("bundled files carry AUTO-GENERATED —
+      DO NOT EDIT at the top") is therefore reconciled and overwritten wholesale. Verified by
+      execution: an authored file was replaced by the shared source plus a banner. This defeats the
+      purpose of the cycle-1 fix in the single most plausible case — a document about the bundler is
+      exactly the kind of file that quotes the marker. Latent: no live instance in this repo.
+    suggested_action: >-
+      Match the banner's STRUCTURE, not the phrase: require `Source: shared/resources/<rel>` where
+      <rel> is the file's own path relative to references/. Validated against the tree — 774 bundled
+      files satisfy this with 0 mismatches.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-006'
+    severity: low
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Same root cause, opposite direction. `check_skill`'s ORPHANED detection also keys on the marker
+      phrase, so a skill-native file quoting it — with no same-named source — is reported as
+      `ORPHANED (banner names shared/resources/X, which no longer exists)`. The message asserts
+      something it never read: the path is inferred from the file's own location, not parsed from the
+      banner. Verified by execution. A prose mention BEYOND the 40-line window is correctly ignored,
+      so the false positive is window-bounded. Latent: 0 live instances.
+    suggested_action: >-
+      Same structured-banner fix; and derive the reported source path from the parsed banner so the
+      message cannot claim something unread.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-008'
+    severity: high
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `_looks_bundled` had exactly one call site — `source_backed_on_disk` — so the ambiguity
+      guarantee held only on the RECONCILIATION path, the one a file reaches when nothing mentions it.
+      Pass 2 wrote every entry in `needed` ungated, so in both ordinary cases (a skill's own files
+      naming the file as `references/X` or as `shared/resources/X`) a hand-authored file was
+      overwritten and stamped AUTO-GENERATED. Reproduced: preserved=False, False, True across the
+      three seeds. The test asserting the guarantee used the third.
+    suggested_action: >-
+      Apply the gate at every write site. Separate "is this our concern" (has a source) from "may we
+      write it" (`writable_copy`), and cover all three seeds in the test.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-005-TEST'
+    severity: high
+    file: 'tests/bundle-transitive.test.js'
+    finding: >-
+      The symlink test was vacuous: its fixture referenced nothing, so the bundler took the early
+      return and wrote nothing at all — "source unchanged" was trivially true, and it passed with
+      either guard removed. The file's own header claimed every test had been confirmed red.
+    suggested_action: >-
+      Split it: one test forces the discovery write path, one pins the reporting. Record that the
+      write-through outcome is provable only by removing both guards, and mark the now-unreachable
+      unlink as defence-in-depth rather than claiming coverage for it.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-009'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      The typo guard matched only `--`, so `-check` / `-c` / `-all` were treated as skill paths. A
+      single-dash typo on a read-only request therefore still ran the MUTATING bundle. Reproduced
+      against the real repo.
+    suggested_action: 'Reject any argument starting with `-`.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-010'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      The mode rule was scoped to the `.sh` suffix, and a LIVE mismatch was already in the tree:
+      `shared/resources/pr-inline-comment.js` is 0755 while its `review-code` and `review-pr` copies
+      were 0644, with `--check` reporting the tree clean. The exact green-CI-but-wrong-mode split the
+      cycle-1 fix claimed to close, still open. `write_if_changed` could not repair it either.
+    suggested_action: 'Key both the check and the propagation on the source executable bit.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-011'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `_looks_bundled` returned True for EVERY suffix `autogen_header` declines, not just `.json` —
+      `.mdx`, `.ts`, `.txt` were all auto-accepted on a bare name match. The tree holds 15
+      skill-native `.mdx` and one `.ts` under skills/*/references/.
+    suggested_action: 'Whitelist header-less suffixes explicitly.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-012'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Two gaps found together. Orphan detection never fired for header-less suffixes, so an orphaned
+      `.json`/`.mdx` stayed green forever; and requiring `declared == rel` silently dropped the
+      moved/renamed case the phrase-matching version had reported.
+    suggested_action: 'Report a MISDECLARED class when a real banner names a different path.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-013'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      The printed remedy is wrong for every class this task introduced. `npm run bundle` cannot clear
+      ORPHANED, AMBIGUOUS, MISDECLARED or SYMLINK — measured check→bundle→check, unchanged — so CI
+      would sit permanently red under an instruction that provably does nothing. Also: unhandled
+      OSError aborted `--all` mid-run (a directory named like a file, a chmod 000 source, a race),
+      and symlinked references became invisible to both the check and the bundler.
+    suggested_action: >-
+      Branch the summary on problem class; use is_file() not exists(); widen expected_bytes to catch
+      OSError; report SYMLINK as its own class.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-014'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Found while verifying the cycle-2 fixes, not by either review. `source_backed_on_disk` skipped
+      symlinks entirely, so a symlinked reference that discovery does not reach entered neither the
+      expected set nor the orphan scan — nothing reported it. This is the SAME membership-vs-
+      writability conflation fixed for AMBIGUOUS in this cycle, left in the one place it still bit.
+    suggested_action: >-
+      Include symlinks in membership (they are our concern); let `writable_copy` refuse the write and
+      `check_skill` report the SYMLINK class.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+waiver:
+  active: false
+
+quality_score: 55
+
+evidence:
+  tests_reviewed: 26
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No auth, network, secrets or user data. TASK86-007 is a file-integrity risk (an authored file
+      can be overwritten) rather than a security one, and is latent.
+  performance:
+    status: PASS
+    notes: >-
+      3× `--all` performs 0 file operations; 3× `--check --all` exits 0. `_looks_bundled` reads only
+      files that are both source-backed and not already in the discovered set.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      TASK86-007 can destroy authored content without warning. Everything else probed clean:
+      convergence is stable across runs, the symlink path converts a link to a real copy leaving the
+      source untouched, and a partially-classified file reports STALE (masking WRONG MODE) which is
+      benign because re-bundling fixes both.
+  maintainability:
+    status: PASS
+    notes: >-
+      One definition of "in sync" (`expected_bytes`) with three call sites. The rejected
+      over-vendoring approach and the two cycle-1 self-corrections are recorded in code, task doc and
+      CHANGELOG rather than left for a future reader to re-derive.
+
+recommendations:
+  immediate:
+    - action: 'Match the banner structure (Source path == own relative path), not the phrase'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+  future:
+    - action: 'Emit ::error:: is done; consider refreshing the stale comment above the validate.yml step'
+      refs: ['.github/workflows/validate.yml']
+    - action: 'Delete the dead `dst.name in EXCLUDE_DIRS` clause'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK86-007 fixed and covered by a test'
+
+bug_resolution:
+  bugs_fixed: 10
+  bugs_remaining: 0
+  fix_date: '2026-09-08'
+  total_iterations: 2
+  verification_method: >-
+    39 tests (was 19). Thirteen mutation proofs run in this cycle; every fix reds exactly its own
+    test(s). MUT-8 (removing the gate from the discovery path) reds precisely the two discovery-path
+    variants and leaves the reconciliation one green, which pins the original test's blind spot. The
+    one exception is stated rather than claimed: the symlink write-through outcome is reachable
+    through two independent guards, so neither is individually provable — only removing both reds it,
+    and `write_if_changed`'s unlink is now documented as unreachable defence-in-depth.
