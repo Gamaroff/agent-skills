@@ -57,8 +57,27 @@ JS_ESM_SIBLING_RE = re.compile(
 #   source "$(dirname "$0")/foo.sh"   |   exec "$(dirname "$0")/foo.sh" "$@"
 #   source ./foo.sh                   |   . ./foo.sh
 #   source foo.sh
+#   source "${_dir}/foo.sh"           |   source "$_dir/foo.sh"
+#
+# The `${var}/` spelling was missing for a long time. The three forms are
+# interchangeable to bash and distinct to this regex, so the one nobody wrote a
+# case for was invisible until a consumer ran the script: the sourced sibling was
+# never bundled, the resolver warned and carried on, and the tier it provided
+# silently did not exist. Widening this is exact, not speculative — across every
+# shared shell source in the tree it adds one match and no false positives.
 SH_SIBLING_RE = re.compile(
-    r'(?:source|exec|\.)\s+["\']?(?:\$\(dirname[^)]*\)/|\./)?([A-Za-z0-9._-]+\.sh)["\']?'
+    r'(?:source|exec|\.)\s+["\']?'
+    r'(?:\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/|\$\(dirname[^)]*\)/|\./)?'
+    r'([A-Za-z0-9._-]+\.sh)["\']?'
+)
+# Deliberately INDEPENDENT of SH_SIBLING_RE, and broader: it accepts ANY prefix
+# before the filename. `assert_sourced_siblings_landed` must not reuse the matcher
+# it exists to check — when the defect IS the matcher's blind spot, a check built
+# on the same regex inherits the blind spot and passes vacuously, which is the
+# failure mode that lets a missing dependency ship. Verified: reverting
+# SH_SIBLING_RE with this check in place makes the check fire.
+SH_ANY_SOURCE_RE = re.compile(
+    r'(?:^|[\s;&(])(?:source|exec|\.)\s+["\']?(?:[^"\'\s;&|)]*/)?([A-Za-z0-9._-]+\.sh)'
 )
 EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
 # Suffixes that legitimately carry no provenance banner. Kept for documentation:
@@ -437,6 +456,64 @@ def resolve_paths(skill_path):
     return skill_path, repo_root / 'shared' / 'resources', skill_path / 'references'
 
 
+def assert_sourced_siblings_landed(refs_dir, shared_dir):
+    """Assert the dependency graph the bundler produced, rather than assuming it.
+
+    Every bundled `.sh` in `references/` is re-read with `SH_ANY_SOURCE_RE` — a
+    matcher independent of the one discovery uses — and every sibling `.sh` it
+    sources must be present beside it. A sibling that exists in the shared
+    directory but not in `references/` is a discovery miss: the discovery regex
+    did not match the spelling used, so the file was never copied.
+
+    This turns a soft runtime failure into a build failure. The miss it was written
+    for degraded quietly: the consumer's resolver printed a warning, left a
+    function undefined and still exited 0, so a `source X || exit 1` guard never
+    tripped and a missing config tier was indistinguishable from an absent one.
+
+    Two properties make it worth having, and it is useless without either:
+
+    - **Independence.** It must not reuse `SH_SIBLING_RE`. A check sharing the
+      matcher under test cannot contradict it.
+    - **Non-vacuity.** A scan that matches nothing passes. So the sourced-sibling
+      count is checked against the presence of `source`/`exec` lines at all: a
+      shell file that plainly sources something, from which the scan extracted no
+      names, means the scan is broken — not that the graph is clean.
+
+    Returns (missing, scan_broken). `missing` is a list of
+    (bundled_sh, missing_sibling); `scan_broken` is a list of filenames whose
+    source lines the scan could not read.
+    """
+    missing = []
+    scan_broken = []
+    for sh in sorted(refs_dir.glob('*.sh')):
+        try:
+            text = sh.read_text()
+        except (UnicodeDecodeError, OSError):
+            continue
+        names = [m.group(1) for m in SH_ANY_SOURCE_RE.finditer(text)]
+
+        # Non-vacuity floor: this file visibly sources something, yet the scan
+        # extracted nothing. "Found no problems" and "could not look" are the same
+        # value otherwise, and the reassuring reading is the one that gets kept.
+        sources_something = re.search(r'(?:^|[\s;&(])(?:source|exec|\.)\s+\S*\.sh', text)
+        if sources_something and not names:
+            scan_broken.append(sh.name)
+            continue
+
+        for name in names:
+            if name == sh.name:
+                continue
+            if (refs_dir / name).exists():
+                continue
+            # Only a sibling that HAS a shared source is a bundler miss. A script
+            # sourcing something skill-native or system-wide is not this bug.
+            if not _within(shared_dir, shared_dir / name):
+                continue
+            if (shared_dir / name).exists():
+                missing.append((sh.name, name))
+    return missing, scan_broken
+
+
 def bundle_skill(skill_path):
     resolved = resolve_paths(skill_path)
     if resolved is None:
@@ -512,6 +589,20 @@ def bundle_skill(skill_path):
             rewritten += 1
             print(f"  rewrote {f.relative_to(skill_path)}")
 
+    # Assert the graph, do not assume it. Runs after every write path, so it sees
+    # what actually landed rather than what discovery intended.
+    unlanded, scan_broken = assert_sourced_siblings_landed(refs_dir, shared_dir)
+    for sh_name, missing_name in unlanded:
+        print(
+            f"  ❌ references/{sh_name} sources {missing_name}, which has a source "
+            f"at shared/resources/{missing_name} but was not bundled"
+        )
+    for sh_name in scan_broken:
+        print(
+            f"  ❌ references/{sh_name} sources a .sh the sibling scan could not "
+            f"read — the scan is broken, not the graph clean"
+        )
+
     parts = []
     if bundled:
         parts.append(f"{bundled} bundled")
@@ -524,6 +615,14 @@ def bundle_skill(skill_path):
     # `in sync` is now an assertion about every source-backed copy on disk, not
     # only about the ones discovery happened to reach.
     status = ", ".join(parts) if parts else "in sync"
+    if unlanded or scan_broken:
+        detail = []
+        if unlanded:
+            detail.append(f"{len(unlanded)} sourced sibling(s) not bundled")
+        if scan_broken:
+            detail.append(f"{len(scan_broken)} file(s) the sibling scan could not read")
+        print(f"❌ {skill_path.name}: {status}, " + ", ".join(detail))
+        return False
     print(f"✅ {skill_path.name}: {status}")
     return True
 

@@ -124,6 +124,31 @@ Skills use a three-level loading system to manage context efficiently:
 
 \*Unlimited because scripts can be executed without reading into context window.
 
+## Signal Design Principle
+
+A skill that emits a check, status, count or verdict is designing a **signal**, and a signal is read
+by someone deciding what to do next. Two rules, both learned the expensive way:
+
+**Name the states behind every empty value.** For each falsy, empty or zero value a check can emit,
+list the distinct situations that produce it. If two situations produce the same value and the right
+response differs between them, they need different values — a `state` field beside the boolean, or a
+verdict vocabulary instead of a boolean. "Found nothing" and "could not look" are identical from the
+caller's side, and the caller will take the reassuring reading.
+
+**Anchor a check to the thing it makes a claim about.** A check that reads `process.cwd()`, or the
+first file it happens to find, is making a claim about the caller's location while being worded as a
+claim about the project. Where a skill establishes an anchor precisely because some ambient value is
+untrustworthy, every check downstream inherits that rule.
+
+Corollary for the guidance you write around a check: **if the correct response to a signal is always
+"note it and continue", the signal is broken.** Documenting the workaround makes the check unable to
+report a true positive either, and a signal that is always ignored carries no information. Fix the
+check.
+
+Full rationale and the review-time form of both rules:
+[`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § *Never let one signal
+report two states*.
+
 ## Skill Creation Process
 
 Copy this checklist and track your progress when creating a skill:
