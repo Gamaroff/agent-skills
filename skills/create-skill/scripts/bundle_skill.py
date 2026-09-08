@@ -109,9 +109,6 @@ def inject_header(content, filename, suffix):
     return header + content
 
 
-FENCE_RE = re.compile(r'^\s*(?:```|~~~)')
-
-
 def _md_reference_sub(m):
     """Rewrite one `shared/resources/X` match, unless it sits inside a URL."""
     text = m.string
@@ -130,12 +127,19 @@ def rewrite_source_text(content, suffix):
     installed skill cannot run. Exempting fences there rewrote 77 real files on
     the first attempt at this fix — caught by running it against the tree.
 
-    Pass 3 is the opposite case: it edits a skill's own prose, where a fenced
-    block is an example and a URL is an address. Rewriting either corrupts it —
-    a `https://…/blob/main/shared/resources/x.md` link becomes a 404, and a
-    `cp lib.sh shared/resources/x.md` instruction becomes wrong. Both were
-    harmless while nothing compelled the rewrite; the `UNREWRITTEN` check compels
-    it, so the hazard had to close alongside it.
+    Pass 3 edits a skill's own prose, and exempts URLs only: rewriting a
+    `https://…/blob/main/shared/resources/x.md` link turns it into a 404.
+
+    **Fenced blocks are deliberately NOT exempt, and a previous version of this
+    function got that wrong.** Skill docs use fences for the commands the agent
+    actually runs, not for illustration: 75 lines across 24 SKILL.md files invoke
+    `source references/resolve-platform.sh`, `node references/tracker-issue.js`
+    and the like inside ```bash blocks, and they hold the `references/` form
+    precisely because pass 3 rewrote them. Exempting fences meant the next author
+    writing the `shared/resources/` form inside one would ship a path that does
+    not exist in any install — with `--check` reporting green. That is a worse
+    failure than the `cp lib.sh shared/resources/x.md` example the exemption was
+    meant to protect, and it is the failure this whole task is about.
 
     **Inline code spans are still rewritten**, deliberately: `` `shared/resources/x.md` ``
     is the ordinary way a skill names a shared resource, and exempting it would
@@ -143,14 +147,7 @@ def rewrite_source_text(content, suffix):
     """
     if suffix != '.md':
         return rewrite_text(content, suffix)
-    out, in_fence = [], False
-    for line in content.split('\n'):
-        if FENCE_RE.match(line):
-            in_fence = not in_fence
-            out.append(line)
-            continue
-        out.append(line if in_fence else SHARED_REF_RE.sub(_md_reference_sub, line))
-    return '\n'.join(out)
+    return SHARED_REF_RE.sub(_md_reference_sub, content)
 
 
 def rewrite_text(content, suffix):
@@ -242,10 +239,10 @@ def discover_needed(skill_path, shared_dir, refs_dir):
         try:
             text = f.read_text()
         except (UnicodeDecodeError, OSError):
-            # The only unguarded read in the file: a non-UTF-8 source anywhere in
-            # a skill aborted the whole 125-skill `--all` run with a raw traceback
-            # and exit 1 — indistinguishable from drift. Every sibling read is
-            # guarded; this one was not.
+            # A non-UTF-8 source anywhere in a skill aborted the whole 125-skill
+            # `--all` run with a raw traceback and exit 1. Guarded here AND in
+            # pass 3 below — an earlier version guarded only this one while
+            # claiming it was the only unguarded read, which left the crash live.
             continue
         pending.extend(collect_shared_refs(text))
         for m in REFS_REF_RE.finditer(text):
@@ -457,6 +454,14 @@ def write_if_changed(dst, src, name, new_bytes):
             return True        # a mode repair IS a change; reporting False here
                                # is what let `--check` and the bundler disagree
         return False
+    # Mirroring the mode unconditionally (cycle 4) made a read-only source
+    # self-locking: a 0444 source produced a 0444 copy, and the NEXT run died with
+    # PermissionError before it could update it. Restore write permission first —
+    # the destination is ours to rewrite, whatever mode we last stamped on it.
+    if dst.exists():
+        current = dst.stat().st_mode & 0o777
+        if not current & 0o200:
+            dst.chmod(current | 0o200)
     dst.write_bytes(new_bytes)
     # Mirror the source's mode whatever it is — not only `.sh`, and not only when
     # the source is executable. A 0755 `.js` source with 0644 copies was live in
@@ -541,7 +546,16 @@ def bundle_skill(skill_path):
     # Pass 3: rewrite skill source files in place.
     rewritten = 0
     for f in skill_files:
-        original = f.read_text()
+        try:
+            original = f.read_text()
+        except (UnicodeDecodeError, OSError):
+            # THIS is the read that crashes, and the guard added for C4-006 went
+            # on the wrong one. Its comment claimed `discover_needed`'s was "the
+            # only unguarded read in the file"; it was not. With the check-side
+            # equivalent already guarded, `--check` reported green for a skill on
+            # which `npm run bundle` died — green-CI-but-broken-bundler, which is
+            # the failure this task exists to close.
+            continue
         updated = rewrite_source_text(original, f.suffix)
         if updated != original:
             f.write_text(updated)

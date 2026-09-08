@@ -1147,7 +1147,15 @@ test("C4-001: UNREWRITTEN converges — it is not raised for work the bundler wi
   assert.equal(fx.check().status, 0, "and it must stay converged");
 });
 
-test("C4-002: pass 3 does not corrupt URLs or fenced blocks, but still rewrites prose", (t) => {
+test("C4-002: pass 3 exempts URLs, and deliberately does NOT exempt fenced blocks", (t) => {
+  // The URL exemption is real: rewriting a link produces a 404.
+  //
+  // A fence exemption was tried and REVERTED. Skill docs use fences for the
+  // commands the agent runs, not for illustration — 75 lines across 24 SKILL.md
+  // files invoke `source references/resolve-platform.sh` and the like inside
+  // ```bash blocks, and they hold that form precisely because pass 3 rewrote
+  // them. Exempting fences meant the next author writing `shared/resources/`
+  // inside one would ship a path that exists in no install, with --check green.
   const fx = makeFixture(
     {
       skillFiles: {
@@ -1157,10 +1165,10 @@ test("C4-002: pass 3 does not corrupt URLs or fenced blocks, but still rewrites 
           "Docs: https://github.com/acme/x/blob/main/shared/resources/real.md",
           "",
           "```bash",
-          "cp mylib.sh shared/resources/real.md",
+          "source shared/resources/real.md",
           "```",
           "",
-          "An ordinary reference `shared/resources/real.md` must still be rewritten.",
+          "An ordinary reference `shared/resources/real.md` is rewritten too.",
           "",
         ].join("\n"),
       },
@@ -1179,14 +1187,14 @@ test("C4-002: pass 3 does not corrupt URLs or fenced blocks, but still rewrites 
   );
   assert.match(
     after,
-    /cp mylib\.sh shared\/resources\/real\.md/,
-    "rewriting inside a fenced block turns an instruction into a wrong one",
+    /source references\/real\.md/,
+    "a fenced command is OPERATIVE — it must be rewritten, or it names a path " +
+      "that exists in no install",
   );
   assert.match(
     after,
-    /`references\/real\.md` must still be rewritten/,
-    "but an inline span is the ordinary way to name a shared resource — exempting " +
-      "it would defeat the bundler",
+    /`references\/real\.md` is rewritten too/,
+    "and an inline span is the ordinary way to name a shared resource",
   );
 });
 
@@ -1333,4 +1341,72 @@ test("C4-007: an out-of-tree reference is refused, not written outside reference
     `The bundler must never create a file outside the skill's references/. Said:\n${stdout}`,
   );
   assert.match(stdout, /refusing out-of-tree reference/);
+});
+
+test("C5-001: a read-only source does not lock its own bundled copy", (t) => {
+  // Cycle 4 made mode mirroring unconditional, which was right — but it also made
+  // a 0444 source SELF-LOCKING: the copy became 0444, and the next run died with
+  // PermissionError before it could update it. Before cycle 4 the chmod only ran
+  // for executable sources, so this path worked; the fix regressed it.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee \`shared/resources/ro.md\`.\n`,
+      },
+      sharedFiles: { "ro.md": "# RO v1\n" },
+    },
+    t,
+  );
+  fx.chmodShared("ro.md", 0o444);
+  fx.bundle();
+
+  fx.chmodShared("ro.md", 0o644);
+  fx.writeShared("ro.md", "# RO v2 CHANGED\n");
+  fx.chmodShared("ro.md", 0o444);
+
+  const stdout = fx.bundle();
+
+  assert.match(
+    fx.readRef("ro.md"),
+    /v2 CHANGED/,
+    `The destination is ours to rewrite whatever mode we last stamped on it. ` +
+      `Said:\n${stdout}`,
+  );
+  assert.equal(fx.check().status, 0, "and it must converge");
+});
+
+test("C5-002: a non-UTF-8 skill file crashes neither bundle nor check", (t) => {
+  // The C4-006 guard went on the wrong read. Its comment claimed
+  // `discover_needed`'s was "the only unguarded read in the file"; pass 3's was
+  // the one that actually crashed. With the check-side already guarded, --check
+  // reported green for a skill on which `npm run bundle` died — the
+  // green-CI-but-broken-bundler split this task exists to close.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee \`shared/resources/ok.md\`.\n`,
+      },
+      sharedFiles: { "ok.md": "# OK\n" },
+    },
+    t,
+  );
+  // Latin-1 bytes that are not valid UTF-8.
+  fs.writeFileSync(
+    path.join(fx.skillDir, "legacy.md"),
+    Buffer.from([0x23, 0x20, 0xe9, 0xe8, 0x0a]),
+  );
+
+  const res = fx.run([fx.skillDir]);
+  assert.equal(
+    res.status,
+    0,
+    `bundle must not die on it. Output:\n${res.stdout}`,
+  );
+  assert.doesNotMatch(res.stdout, /Traceback/);
+
+  assert.equal(
+    fx.check().status,
+    0,
+    "and check must agree with the bundler rather than reporting green over a crash",
+  );
 });
