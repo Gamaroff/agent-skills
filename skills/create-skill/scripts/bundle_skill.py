@@ -13,7 +13,10 @@ skill.
 
 Usage:
     python bundle_skill.py <path/to/skill-folder>
-    python bundle_skill.py --all                 # bundle every skill under skills/
+    python bundle_skill.py --all                  # bundle every skill under skills/
+    python bundle_skill.py --check <path> | --all # read-only freshness assertion
+
+Exit codes: 0 success / in sync; 1 drift found (--check); 2 usage error.
 """
 
 import re
@@ -60,6 +63,12 @@ SH_SIBLING_RE = re.compile(
     r'(?:source|exec|\.)\s+["\']?(?:\$\(dirname[^)]*\)/|\./)?([A-Za-z0-9._-]+\.sh)["\']?'
 )
 EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
+# Suffixes that legitimately carry no provenance banner, so absence of one is not
+# evidence about them. Deliberately a WHITELIST: `autogen_header` returns "" for
+# every suffix it does not know, so keying on that accepted `.mdx`, `.ts`, `.txt`
+# and anything else as bundler output on a bare name match. This tree already
+# holds 15 skill-native `.mdx` and one `.ts` under skills/*/references/.
+HEADERLESS_SUFFIXES = {'.json'}
 AUTOGEN_MARKER = "AUTO-GENERATED — DO NOT EDIT"
 
 
@@ -226,11 +235,14 @@ def source_backed_on_disk(refs_dir, shared_dir, needed):
     if not refs_dir.is_dir():
         return out
     for dst in sorted(refs_dir.rglob('*')):
-        # `is_file()` follows symlinks and `write_bytes` writes THROUGH one, so a
-        # symlinked reference would have the banner injected into the shared
-        # source itself — after which the source contains the marker,
-        # `inject_header` short-circuits, and `--check` reports STALE forever.
-        if dst.is_symlink() or not dst.is_file():
+        # A symlink IS included here — membership means "our concern", and a
+        # symlinked reference is very much our concern: a consumer copying the
+        # directory verbatim gets a dangling link. `writable_copy` refuses to
+        # write it and `check_skill` reports it. Excluding it here was the same
+        # membership-vs-writability conflation fixed above for AMBIGUOUS, left
+        # in the one place it still bit: a symlink no rule discovers entered
+        # neither set and nothing said anything about it.
+        if not dst.is_symlink() and not dst.is_file():
             continue
         rel_parts = dst.relative_to(refs_dir).parts
         if any(p in EXCLUDE_DIRS for p in rel_parts):
@@ -241,14 +253,22 @@ def source_backed_on_disk(refs_dir, shared_dir, needed):
         src = shared_dir / rel
         if not src.is_file():
             continue        # no source ⇒ skill-native ⇒ never ours to touch
-        if not _looks_bundled(dst, src, rel):
-            # Same-named but not bundler-produced. Sharing a filename with a
-            # shared resource is not evidence that a hand-authored file is a
-            # stale copy of it, and overwriting one would destroy work the
-            # bundler never created. Reported by --check, never rewritten.
-            continue
+        # Membership here means "this file is our concern", NOT "we may write it".
+        # The write decision is `writable_copy`, applied at both write sites and
+        # in check_skill. Conflating the two hid the ambiguous case from the
+        # report entirely: it entered neither the expected set nor the orphan
+        # scan, so nothing said anything about it.
         out[rel] = src
     return out
+
+
+# The banner's own declared source, e.g.
+#   AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/foo.md. Regenerate via …
+# Matching the STRUCTURE rather than the phrase is what distinguishes a real
+# banner from a document that merely quotes one.
+BANNER_SOURCE_RE = re.compile(
+    re.escape(AUTOGEN_MARKER) + r'\.\s*Source:\s*shared/resources/(\S+?)\.\s'
+)
 
 
 def _banner_head(text):
@@ -258,10 +278,29 @@ def _banner_head(text):
     frontmatter, and a long `description:` pushes it well past any small byte
     window — measured at char 499 in one real file, so a 512-byte slice cut the
     marker in half and silently misclassified a correctly-bundled copy as
-    hand-authored. Bounded to keep an incidental mention deep in a document from
-    counting as provenance.
+    hand-authored. Bounded so an incidental mention deep in a document cannot
+    count as provenance.
     """
     return '\n'.join(text.split('\n')[:40])
+
+
+def declared_source(text, rel):
+    """The path a file's own banner claims to come from, or None.
+
+    Returns the declared path ONLY when it matches `rel`, the file's own location
+    under references/. Requiring the match is what stops a document that merely
+    quotes the banner from being mistaken for one: prose says the phrase, but it
+    does not say `Source: shared/resources/<this file's own path>.`
+
+    Keying on the phrase alone overwrote a hand-authored file in testing — the
+    very destruction the check exists to prevent, and in the likeliest case,
+    since a document about the bundler is exactly what quotes its banner.
+    Validated against the tree: 774 bundled files match their own path, 0 do not.
+    """
+    m = BANNER_SOURCE_RE.search(_banner_head(text))
+    if m and m.group(1) == rel:
+        return m.group(1)
+    return None
 
 
 def _looks_bundled(dst, src, name):
@@ -289,13 +328,20 @@ def _looks_bundled(dst, src, name):
     pre-existing behaviour for those suffixes, kept deliberately.
     """
     suffix = Path(name).suffix
-    if not autogen_header(name, suffix):
+    if suffix in HEADERLESS_SUFFIXES:
         return True
+    if not autogen_header(name, suffix):
+        # An unknown suffix cannot carry a banner, so evidence 1 is unavailable —
+        # but that is a gap in our knowledge, not a licence to overwrite. Fall
+        # through to evidence 2 (identical to the rewritten source).
+        pass
     try:
         text = dst.read_text()
-    except (UnicodeDecodeError, OSError):
+    except UnicodeDecodeError:
         return True          # binary — historical behaviour reconciled it
-    if AUTOGEN_MARKER in _banner_head(text):
+    except OSError:
+        return False         # unreadable — never write over what we cannot inspect
+    if declared_source(text, name) is not None:
         return True
     try:
         return text == rewrite_text(src.read_text(), suffix)
@@ -303,24 +349,47 @@ def _looks_bundled(dst, src, name):
         return False
 
 
+def writable_copy(dst, src, name):
+    """May the bundler write `dst`? True when it does not yet exist, or is
+    demonstrably its own output.
+
+    A symlink is never writable through: `write_if_changed` unlinks it, but the
+    decision to replace a link the operator placed belongs here, visibly.
+    """
+    if dst.is_symlink():
+        return False
+    if not dst.exists():
+        return True
+    return _looks_bundled(dst, src, name)
+
+
 def write_if_changed(dst, src, name, new_bytes):
     """Write a bundled copy when its bytes differ. Returns True if it wrote."""
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.is_symlink():
-        # Never write through a link — that edits the link's target, which for a
-        # reference pointing back at shared/resources/ is the source itself.
+        # Defence in depth, and UNREACHABLE via today's call sites: both gate on
+        # `writable_copy`, which refuses a symlink first. Kept because writing
+        # through a link edits its target — for a reference pointing back at
+        # shared/resources/ that is the source itself — and a future caller that
+        # forgets the gate should still be safe. Deliberately NOT claimed as
+        # test-covered: either guard alone produces the correct outcome, so
+        # neither is individually provable; only removing both reds the test.
         dst.unlink()
+    src_mode = src.stat().st_mode & 0o777
+    executable = bool(src_mode & 0o111)
     if dst.exists() and dst.read_bytes() == new_bytes:
-        # Content unchanged — still re-sync mode for .sh in case the bit was lost.
-        if Path(name).suffix == '.sh':
-            src_mode = src.stat().st_mode & 0o777
-            if (dst.stat().st_mode & 0o777) != src_mode:
-                dst.chmod(src_mode)
+        # Content unchanged — still re-sync the mode in case the bit was lost.
+        if executable and (dst.stat().st_mode & 0o777) != src_mode:
+            dst.chmod(src_mode)
+            return True        # a mode repair IS a change; reporting False here
+                               # is what let `--check` and the bundler disagree
         return False
     dst.write_bytes(new_bytes)
-    # Preserve executable bit for shell scripts (matches source file mode).
-    if Path(name).suffix == '.sh':
-        dst.chmod(src.stat().st_mode & 0o777)
+    # Preserve the executable bit whenever the SOURCE has one — not only for
+    # `.sh`. A 0755 `.js` source with 0644 copies was live in this tree, and a
+    # suffix-scoped rule could neither see nor repair it.
+    if executable:
+        dst.chmod(src_mode)
     return True
 
 
@@ -358,8 +427,21 @@ def bundle_skill(skill_path):
     # Pass 2: copy shared files into references/, with rewritten content. Idempotent.
     refs_dir.mkdir(exist_ok=True)
     bundled = 0
+    protected = 0
     for name, src in needed.items():
-        if write_if_changed(refs_dir / name, src, name, expected_bytes(src, name)):
+        dst = refs_dir / name
+        # The ambiguity gate belongs on BOTH write paths. It used to guard only
+        # reconciliation, which is the path a file reaches when NOTHING mentions
+        # it — so the guarantee held precisely where the danger was smallest. In
+        # the ordinary case (a skill's own files name the file, either as
+        # `references/X` or `shared/resources/X`) discovery reaches it and pass 2
+        # wrote straight over an authored file. The test that claimed otherwise
+        # used the one fixture seed that routed to the branch that worked.
+        if not writable_copy(dst, src, name):
+            protected += 1
+            print(f"  SKIPPED references/{name} — not bundler output, left alone")
+            continue
+        if write_if_changed(dst, src, name, expected_bytes(src, name)):
             bundled += 1
             print(f"  bundled references/{name}")
 
@@ -372,7 +454,12 @@ def bundle_skill(skill_path):
     # is refreshed on the strength of having a source, not of being reachable.
     reconciled = 0
     for name, src in reconcilable.items():
-        if write_if_changed(refs_dir / name, src, name, expected_bytes(src, name)):
+        dst = refs_dir / name
+        if not writable_copy(dst, src, name):
+            protected += 1
+            print(f"  SKIPPED references/{name} — not bundler output, left alone")
+            continue
+        if write_if_changed(dst, src, name, expected_bytes(src, name)):
             reconciled += 1
             print(f"  reconciled references/{name} (not reached by discovery)")
 
@@ -391,6 +478,8 @@ def bundle_skill(skill_path):
         parts.append(f"{bundled} bundled")
     if reconciled:
         parts.append(f"{reconciled} reconciled")
+    if protected:
+        parts.append(f"{protected} left alone")
     if rewritten:
         parts.append(f"{rewritten} rewritten")
     # `in sync` is now an assertion about every source-backed copy on disk, not
@@ -421,8 +510,20 @@ def check_skill(skill_path):
     problems = []
     for name, src in sorted(expected.items()):
         dst = refs_dir / name
-        if not dst.exists():
+        if dst.is_symlink():
+            # Made safe (never written through) but previously also invisible:
+            # a consumer copying the directory verbatim gets a dangling link.
+            problems.append(f"{skill_path.name}: references/{name} is a SYMLINK")
+            continue
+        if not dst.is_file():
             problems.append(f"{skill_path.name}: references/{name} is MISSING")
+            continue
+        if not writable_copy(dst, src, name):
+            problems.append(
+                f"{skill_path.name}: references/{name} is AMBIGUOUS "
+                f"(shares a name with shared/resources/{name} but is not bundler "
+                f"output — not rewritten; delete it or add the banner)"
+            )
             continue
         if dst.read_bytes() != expected_bytes(src, name):
             problems.append(f"{skill_path.name}: references/{name} is STALE")
@@ -433,7 +534,11 @@ def check_skill(skill_path):
         # silently repaired it, which is the green-CI-but-dirty-tree split this
         # check exists to close. The `git diff` form this replaced caught it
         # because git tracks the bit.
-        if Path(name).suffix == '.sh':
+        # Keyed on the source actually being executable, NOT on the `.sh` suffix.
+        # `shared/resources/pr-inline-comment.js` is 0755 while two bundled copies
+        # were 0644 — a live instance of the exact green-CI-but-wrong-mode split
+        # this check exists to close, invisible to a suffix-scoped test.
+        if src.stat().st_mode & 0o111:
             if (dst.stat().st_mode & 0o777) != (src.stat().st_mode & 0o777):
                 problems.append(
                     f"{skill_path.name}: references/{name} has WRONG MODE "
@@ -455,28 +560,35 @@ def check_skill(skill_path):
             rel = dst.relative_to(refs_dir).as_posix()
             if rel in expected:
                 continue
-            src = shared_dir / rel
-            if src.is_file():
-                # Same-named source, but `source_backed_on_disk` declined to
-                # reconcile it — so it is neither banner-carrying nor identical
-                # to the rewritten source. Never rewritten silently; surfaced
-                # here so a human decides which it is.
-                problems.append(
-                    f"{skill_path.name}: references/{rel} is AMBIGUOUS "
-                    f"(shares a name with shared/resources/{rel} but is not bundler "
-                    f"output — not rewritten; delete it or add the banner)"
-                )
-                continue
+            if (shared_dir / rel).is_file():
+                continue        # reported by the expected-set loop above
             try:
-                head = _banner_head(dst.read_text())
+                text = dst.read_text()
             except (UnicodeDecodeError, OSError):
                 continue
-            if AUTOGEN_MARKER in head:
+            # The path comes from the banner the file actually carries, so the
+            # message cannot assert something it never read.
+            declared = declared_source(text, rel)
+            if declared is not None:
                 problems.append(
                     f"{skill_path.name}: references/{rel} is ORPHANED "
-                    f"(banner names shared/resources/{rel}, which no longer exists)"
+                    f"(banner names shared/resources/{declared}, which no longer exists)"
+                )
+                continue
+            # A real banner that names a DIFFERENT path — a moved or renamed copy.
+            # Requiring declared == rel is right for the prose false-positive it
+            # fixes, but on its own it silently drops this case, which the
+            # phrase-matching version did report.
+            other = BANNER_SOURCE_RE.search(_banner_head(text))
+            if other:
+                problems.append(
+                    f"{skill_path.name}: references/{rel} is MISDECLARED "
+                    f"(banner names shared/resources/{other.group(1)}, not its own path)"
                 )
     return problems
+
+
+USAGE = "Usage: bundle_skill.py [--check] <skill-path>... | [--check] --all"
 
 
 def main():
@@ -493,19 +605,22 @@ def main():
     all_mode = '--all' in args
     args = [a for a in args if a not in ('--check', '--all')]
 
-    unknown = [a for a in args if a.startswith('--')]
+    # ANY leading dash, not just `--`. `-check` was treated as a skill path, so a
+    # single-dash typo on a read-only request ran the MUTATING bundle and exited 0.
+    unknown = [a for a in args if a.startswith('-')]
     if unknown:
         print(f"❌ Unknown option(s): {' '.join(unknown)}")
-        print("Usage: bundle_skill.py [--check] <skill-path>... | [--check] --all")
+        print(USAGE)
         sys.exit(2)
 
     if not all_mode and not args:
-        print("Usage: bundle_skill.py [--check] <skill-path>... | [--check] --all")
-        sys.exit(1)
+        print(USAGE)
+        sys.exit(2)
 
     if all_mode:
         if args:
             print(f"❌ --all takes no skill paths (got: {' '.join(args)})")
+            print(USAGE)
             sys.exit(2)
         repo_root = Path(__file__).resolve().parents[3]
         skills_dir = repo_root / 'skills'
@@ -521,12 +636,25 @@ def main():
             # `::error::` is a GitHub Actions workflow command — it surfaces the
             # failure as an annotation in the PR checks UI, which the two sibling
             # hygiene steps in validate.yml also do. Harmless noise outside CI.
-            print("::error::Bundled references/ are out of date. "
-                  "Run 'npm run bundle' locally and commit the regenerated files.")
+            # `npm run bundle` fixes STALE / MISSING / WRONG MODE. It cannot fix
+            # ORPHANED, AMBIGUOUS, MISDECLARED or SYMLINK — those need a human
+            # decision. Printing the blanket remedy for them left CI permanently
+            # red with an instruction that provably does nothing.
+            regenerable = [x for x in problems
+                           if ' is STALE' in x or ' is MISSING' in x or 'WRONG MODE' in x]
+            manual = [x for x in problems if x not in regenerable]
+            print("::error::Bundled references/ need attention "
+                  f"({len(regenerable)} regenerable, {len(manual)} needing a decision).")
             print("❌ Bundled references are out of date:")
             for problem in problems:
                 print(f"   {problem}")
-            print("\nRun 'npm run bundle' and commit the regenerated files.")
+            if regenerable:
+                print("\nRun 'npm run bundle' and commit the regenerated files.")
+            if manual:
+                print("\nThe following need a human decision — `npm run bundle` will "
+                      "NOT clear them; act on each line above:")
+                for m in manual:
+                    print(f"   {m}")
             sys.exit(1)
         print(f"✅ Bundle freshness: {len(targets)} skill(s) verified")
         sys.exit(0)

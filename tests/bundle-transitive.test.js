@@ -81,7 +81,17 @@ const BANNER = (name) =>
  * rewrites sources in place by design.
  */
 function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
+  // `t` is required, and cleanup is registered IMMEDIATELY after mkdtemp — before
+  // any file is written. Registering it at the end leaked the temp repo whenever
+  // fixture construction threw, and an optional `t` let a future test leak
+  // silently instead of failing.
+  if (!t || typeof t.after !== "function") {
+    throw new Error(
+      "makeFixture requires the test context `t` for temp-dir cleanup",
+    );
+  }
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "bundle-transitive-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   // find_repo_root() walks up looking for these markers.
   fs.mkdirSync(path.join(root, "skills"), { recursive: true });
   fs.mkdirSync(path.join(root, "shared", "resources"), { recursive: true });
@@ -105,13 +115,6 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
 
   const bundle = () =>
     execFileSync("python3", [BUNDLER, skillDir], { encoding: "utf-8" });
-
-  // Each fixture is a full mini-repo; without this they accumulate in $TMPDIR
-  // for the life of the machine. `t` is optional so the helper still works if a
-  // future test forgets to thread it through.
-  if (t && typeof t.after === "function") {
-    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  }
 
   // Run the bundler with arbitrary argv. Returns {status, stdout} rather than
   // throwing — a non-zero exit is the expected result in several tests below.
@@ -617,11 +620,15 @@ test("TASK86-004: a pre-header-injection copy IS still reconciled", (t) => {
   );
 });
 
-test("TASK86-005: a symlinked reference is never written through", (t) => {
+test("TASK86-005: a symlinked reference on the DISCOVERY path is not written through", (t) => {
+  // The original version of this test had SKILL.md reference nothing, so the
+  // bundler took the early return and wrote nothing at all — "the source is
+  // unchanged" was trivially true and the test passed with either guard removed.
+  // Naming the file puts it in `needed`, which forces the write path.
   const fx = makeFixture(
     {
       skillFiles: {
-        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/linked.md.\n`,
       },
       sharedFiles: { "linked.md": "# Linked\n\nSource body.\n" },
     },
@@ -637,6 +644,318 @@ test("TASK86-005: a symlinked reference is never written through", (t) => {
     sourceBefore,
     "write_bytes writes THROUGH a symlink, so a reference linked back at its own " +
       "source would get the AUTO-GENERATED banner injected into shared/resources/ " +
-      "itself — permanently, and --check would then report STALE forever.",
+      "itself — permanently, after which --check reports STALE forever.",
+  );
+});
+
+test("TASK86-005: a symlinked reference is reported, not silently accepted", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/linked.md.\n`,
+      },
+      sharedFiles: { "linked.md": "# Linked\n\nSource body.\n" },
+    },
+    t,
+  );
+  fx.symlinkRef("linked.md", "../../../shared/resources/linked.md");
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    1,
+    `Making symlinks safe also made them invisible: neither reported nor repaired, ` +
+      `while a consumer copying the directory verbatim gets a dangling link. ` +
+      `Output:\n${res.stdout}`,
+  );
+  assert.match(
+    res.stdout,
+    /SYMLINK/,
+    "the link must be named as its own problem class",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 2 findings (TASK86-006/007). One root cause: the marker PHRASE was
+// treated as provenance, so a document that merely quotes the banner was taken
+// for one. Fixed by matching the banner's structure — `Source:
+// shared/resources/<the file's own path>` — validated against the tree at 774
+// matches, 0 mismatches.
+// ---------------------------------------------------------------------------
+
+test("TASK86-007: a file that merely QUOTES the banner is not overwritten", (t) => {
+  const AUTHORED =
+    "# Authored guide\n\nBundled files carry AUTO-GENERATED — DO NOT EDIT at the top.\n";
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: { "guide.md": "# Shared guide\n\nShared content.\n" },
+      refsFiles: { "guide.md": AUTHORED },
+    },
+    t,
+  );
+
+  fx.bundle();
+
+  assert.equal(
+    fx.readRef("guide.md"),
+    AUTHORED,
+    "Quoting the banner is not carrying one. Treating the phrase as provenance " +
+      "overwrote this file wholesale — the exact destruction the ambiguity check " +
+      "exists to prevent, in its likeliest case: a document ABOUT the bundler is " +
+      "precisely what quotes its banner.",
+  );
+
+  const res = fx.check();
+  assert.equal(res.status, 1, "…and the collision must still be surfaced.");
+  assert.match(
+    res.stdout,
+    /AMBIGUOUS/,
+    "reported as ambiguous, not silently kept",
+  );
+});
+
+test("TASK86-006: a source-less file quoting the banner is not called ORPHANED", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: {},
+      refsFiles: {
+        // No same-named source, and no real banner — just prose mentioning it.
+        "notes.md":
+          "# Notes\n\nWe stamp copies with AUTO-GENERATED — DO NOT EDIT.\n",
+      },
+    },
+    t,
+  );
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    0,
+    `A skill-native document that mentions the banner has no provenance to be ` +
+      `orphaned FROM. Reporting it turns a green lane red over prose. Output:\n${res.stdout}`,
+  );
+});
+
+test("TASK86-006: a genuine orphan is still reported, and names its own declared source", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nNo shared references here.\n`,
+      },
+      sharedFiles: {},
+      refsFiles: { "gone.md": `${BANNER("gone.md")}# Gone\n` },
+    },
+    t,
+  );
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    1,
+    "a real banner whose source vanished is still an orphan",
+  );
+  assert.match(
+    res.stdout,
+    /ORPHANED \(banner names shared\/resources\/gone\.md/,
+    "the reported path must come from the banner the file carries, not be inferred " +
+      "from its location — otherwise the message asserts something it never read",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 2, refute-pass findings. The headline one: the ambiguity gate had
+// exactly one call site — reconciliation — so the guarantee held precisely
+// where the danger was smallest, and the test asserting it used the one fixture
+// seed that routed to the branch that worked.
+// ---------------------------------------------------------------------------
+
+for (const [label, skillBody] of [
+  ["names it as references/X", "Use `references/guard.md`.\n"],
+  ["names it as shared/resources/X", "See shared/resources/guard.md.\n"],
+  ["names nothing (reconciliation path)", "Nothing.\n"],
+]) {
+  test(`TASK86-008: an authored file survives when SKILL.md ${label}`, (t) => {
+    const AUTHORED = "# Authored\n\nHand-written, not bundler output.\n";
+    const fx = makeFixture(
+      {
+        skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\n${skillBody}` },
+        sharedFiles: { "guard.md": "# Shared\n\nShared body.\n" },
+        refsFiles: { "guard.md": AUTHORED },
+      },
+      t,
+    );
+
+    fx.bundle();
+
+    assert.equal(
+      fx.readRef("guard.md"),
+      AUTHORED,
+      `The gate must hold on EVERY path into a write, not just the one a ` +
+        `convenient fixture exercises. Discovery reaching the name is the ` +
+        `ORDINARY case; reconciliation is the rare one.`,
+    );
+
+    const res = fx.check();
+    assert.equal(res.status, 1, "…and it must be reported, not silently kept.");
+    assert.match(res.stdout, /AMBIGUOUS/);
+  });
+}
+
+test("TASK86-009: a single-dash typo is refused and writes nothing", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/a.md.\n`,
+      },
+      sharedFiles: { "a.md": "# A\n" },
+    },
+    t,
+  );
+
+  const res = fx.run(["-check", fx.skillDir]);
+  assert.equal(
+    res.status,
+    2,
+    `'-check' was treated as a skill path, so a single-dash typo on a READ-ONLY ` +
+      `request ran the mutating bundle and exited 0. Output:\n${res.stdout}`,
+  );
+  assert.equal(fx.refExists("a.md"), false, "…and nothing may be written.");
+});
+
+test("TASK86-010: a 0755 non-.sh source keeps its bit, and drift is caught", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/tool.js.\n`,
+      },
+      sharedFiles: { "tool.js": "#!/usr/bin/env node\nconsole.log(1);\n" },
+    },
+    t,
+  );
+  fx.chmodShared("tool.js", 0o755);
+  fx.bundle();
+
+  fx.chmodRef("tool.js", 0o644);
+  const res = fx.check();
+
+  assert.equal(
+    res.status,
+    1,
+    `Keying the mode rule on the '.sh' suffix left a real 0755 '.js' source with ` +
+      `0644 copies in this very repo — invisible to check AND unrepairable by ` +
+      `bundle. Output:\n${res.stdout}`,
+  );
+  assert.match(res.stdout, /WRONG MODE/);
+
+  fx.bundle(); // the bundler must also be able to REPAIR it
+  assert.equal(
+    fx.check().status,
+    0,
+    "npm run bundle must clear a mode-only drift",
+  );
+});
+
+test("TASK86-011: a header-less suffix is not auto-accepted as bundler output", (t) => {
+  const AUTHORED = "export const x = 1;\n";
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: { "thing.ts": "export const y = 2;\n" },
+      refsFiles: { "thing.ts": AUTHORED },
+    },
+    t,
+  );
+
+  fx.bundle();
+
+  assert.equal(
+    fx.readRef("thing.ts"),
+    AUTHORED,
+    `Accepting every suffix autogen_header declines meant '.mdx', '.ts' and '.txt' ` +
+      `were auto-accepted on a bare name match. This tree already holds 15 ` +
+      `skill-native .mdx files and one .ts.`,
+  );
+});
+
+test("TASK86-012: a banner naming a different path is reported MISDECLARED", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: {},
+      refsFiles: { "renamed.md": `${BANNER("original.md")}# Renamed\n` },
+    },
+    t,
+  );
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    1,
+    "a moved/renamed copy must not vanish from the report",
+  );
+  assert.match(
+    res.stdout,
+    /MISDECLARED/,
+    "requiring declared == own path fixes the prose false positive but silently " +
+      "drops the renamed case unless it gets a class of its own",
+  );
+});
+
+test("TASK86-013: the remedy matches the problem class", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: {},
+      refsFiles: { "gone.md": `${BANNER("gone.md")}# Gone\n` },
+    },
+    t,
+  );
+
+  const res = fx.check();
+  assert.equal(res.status, 1);
+  assert.match(
+    res.stdout,
+    /NOT clear them/,
+    "`npm run bundle` cannot clear ORPHANED — printing it as the remedy leaves CI " +
+      "permanently red with an instruction that provably does nothing",
+  );
+});
+
+test("TASK86-014: a symlink no rule discovers is still reported", (t) => {
+  // Found while verifying the cycle-2 fixes: `source_backed_on_disk` skipped
+  // symlinks, so one that discovery does not reach entered neither the expected
+  // set nor the orphan scan and nothing said anything about it. The same
+  // membership-vs-writability conflation fixed for AMBIGUOUS, left in one place.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: { "link.md": "# Link\n\nSource body.\n" },
+    },
+    t,
+  );
+  const before = fx.readShared("link.md");
+  fx.symlinkRef("link.md", "../../../shared/resources/link.md");
+
+  fx.bundle();
+  const res = fx.check();
+
+  assert.equal(
+    res.status,
+    1,
+    `A symlinked reference is our concern whether or not discovery reaches it — ` +
+      `a consumer copying the directory verbatim gets a dangling link. ` +
+      `Output:\n${res.stdout}`,
+  );
+  assert.match(res.stdout, /SYMLINK/);
+  assert.equal(
+    fx.readShared("link.md"),
+    before,
+    "and the source stays untouched",
   );
 });
