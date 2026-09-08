@@ -1,0 +1,88 @@
+schema: 1
+task: 'task.94.observe-work-skill'
+task_title: 'Add the observe-work meta-skill'
+gate: CONCERNS
+status_reason: >-
+  Both cycle-2 findings are closed and verified, including the HIGH against the gate's stated
+  condition. One MEDIUM remains, and it is the third instance of a single root cause — the hook
+  reimplements the engine's queue rule. Gate 2 recorded that a third instance replaces the
+  mechanism rather than correcting it again.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T14:45:00Z'
+
+top_issues:
+  - id: 'TASK-94-006'
+    severity: medium
+    file: 'shared/resources/observe-work-session-start.sh'
+    finding: >-
+      Two remaining divergences from the engine, in opposite directions: a quoted `status: "open"`
+      is read as not-open (engine says open), and a file with no frontmatter is read as open (engine
+      excludes it from the log). They cancelled in the first fixture tried — hook and engine both
+      reported 2 open — and were caught only because `total` disagreed, 3 against 2. Third counting
+      defect in three cycles from one root cause.
+    suggested_action: >-
+      Replace the mechanism, do not correct it a third time. Call `observation-log.js queue --json`
+      and fall back to SILENCE when node or the engine is unavailable — a hook whose entire purpose
+      is an accurate count should say nothing rather than a wrong number. This also deletes
+      frontmatter_status(), the whitespace handling and the statusless rule.
+    suggested_owner: dev
+    bug_ref: 'task.94.bug.6.hook-third-instance-replace-mechanism.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2885
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [6]
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 1
+  fix_date: '2026-09-08'
+  total_iterations: 2
+  verification_method: >-
+    TASK-94-004 verified against the gate's stated condition — a project carrying no activation
+    instruction — and confirmed exact: all four engine check names appear in step 1 and each is
+    given the correct treatment. Its regression assertion was mutation-proved. TASK-94-005 verified
+    on the seven-case fixture plus three new adversarial cases, which is what surfaced TASK-94-006.
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged. shellcheck --severity=warning clean after the rewrite.'
+  performance:
+    status: PASS
+    notes: 'Body 277 lines against a 500 ceiling. Authored footprint materially unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: >-
+      The startup path is now correct and verified against the condition that mattered. The residual
+      is confined to the opt-in hook, and is a duplication problem rather than a logic problem —
+      which is why the remedy is replacement, not another correction.
+  maintainability:
+    status: PASS
+    notes: >-
+      Both HIGHs found in this loop now carry mutation-proved regression assertions, so neither can
+      return silently. 22 structural assertions.
+
+recommendations:
+  immediate:
+    - action: 'Replace the hook count with an engine call; fall back to silence, never to a hand-rolled count'
+      refs: ['shared/resources/observe-work-session-start.sh']
+  future:
+    - action: 'qa-execute-snippets cannot execute `command node`, so Step 4b is inert for compliant skills'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'docs-link-check is path-filtered to docs/**; skills/** ships unchecked markdown'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-94-006 addressed by replacing the mechanism, not by a third correction'

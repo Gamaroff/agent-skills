@@ -1,4 +1,5 @@
 #!/bin/sh
+# AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/observe-work-session-start.sh. Regenerate via `npm run bundle`.
 # observe-work-session-start.sh — SessionStart hook for the observe-work skill.
 #
 # Emits the observation backlog's state as `hookSpecificOutput.additionalContext`

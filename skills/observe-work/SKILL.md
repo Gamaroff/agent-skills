@@ -118,6 +118,12 @@ review in one line and proceed with the user's task unless they opt in. Never ga
 **4. Activation.** Once per session, if the project's agent-instruction file carries no activation
 instruction, suggest adding one. Load [`references/environments.md`](references/environments.md).
 
+An opt-in `SessionStart` hook ships alongside this skill at
+`references/observe-work-session-start.sh` — shipping it is not installing it, and
+installation stays the user's decision. It takes its open count from
+`references/observation-log.js` and is **silent** when it cannot reach the engine, because a
+hook whose whole justification is an accurate count should say nothing rather than a wrong number.
+
 **5. Staged work.** If `$OBS_STAGING_DIR/PENDING.md` lists staged updates, reconcile before
 announcing anything: `diff -rq` each staged copy against live and classify three ways —
 

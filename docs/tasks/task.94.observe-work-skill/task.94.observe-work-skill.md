@@ -586,14 +586,15 @@ Two changes are worth naming because they are not confined to the new directory:
 
 ## QA Testing Results
 
-**QA Status**: FAIL (cycle 2)
+**QA Status**: CONCERNS (cycle 3)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-08
-**Quality Score**: 70/100 (cycle 1: 60/100)
-**Gate Decision**: FAIL
+**Quality Score**: 90/100 (cycle 2: 70, cycle 1: 60)
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Cycle 2 (current)**: [task.94.qa.2.observe-work-skill.md](./task.94.qa.2.observe-work-skill.md) · [gate.2](./task.94.gate.2.observe-work-skill.yml)
+- **Cycle 3 (current)**: [task.94.qa.3.observe-work-skill.md](./task.94.qa.3.observe-work-skill.md) · [gate.3](./task.94.gate.3.observe-work-skill.yml)
+- **Cycle 2**: [task.94.qa.2.observe-work-skill.md](./task.94.qa.2.observe-work-skill.md) · [gate.2](./task.94.gate.2.observe-work-skill.yml)
 - **Cycle 1**: [task.94.qa.1.observe-work-skill.md](./task.94.qa.1.observe-work-skill.md) · [gate.1](./task.94.gate.1.observe-work-skill.yml)
 
 ### Test Coverage Summary
@@ -624,6 +625,10 @@ Every document-anchored check passes — that is why the decisive finding needed
 - [bug.4 — The cycle-1 fix blocks capture in every fresh install](./task.94.bug.4.healthy-false-blocks-fresh-install.md) — HIGH — ✅ Ready for QA (fixed 2026-09-08, mutation-proved)
 - [bug.5 — Hook counts a body line as a status, overcounting](./task.94.bug.5.hook-grep-not-frontmatter-scoped.md) — MEDIUM — ✅ Ready for QA (fixed 2026-09-08)
 
+**Fixed in cycle 3**
+
+- [bug.6 — Third counting divergence; replace the mechanism](./task.94.bug.6.hook-third-instance-replace-mechanism.md) — MEDIUM — ✅ Ready for QA (mechanism replaced 2026-09-08)
+
 ---
 
 ## Change Log
@@ -639,6 +644,8 @@ Every document-anchored check passes — that is why the decisive finding needed
 | 2026-09-08 |         | QA findings fixed — 3 of 4 addressed (1 LOW advisory), 1 iteration | qa-fix |
 | 2026-09-08 |         | QA gate FAIL (70/100) — cycle 1 closed; 2 new findings introduced by the fixes | qa-task |
 | 2026-09-08 |         | QA findings fixed — 2 of 2 addressed, 2 iterations | qa-fix |
+| 2026-09-08 |         | QA gate CONCERNS (90/100) — cycle 2 closed; 1 MEDIUM, third instance of one root cause | qa-task |
+| 2026-09-08 |         | QA findings fixed — hook count replaced with an engine call, 3 iterations | qa-fix |
 
 ---
 
