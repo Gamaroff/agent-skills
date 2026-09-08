@@ -2,6 +2,8 @@
 
 This file provides guidance to AI agents working with code in this repository.
 
+> **Picking up work here? Read [`.agents/handoff.md`](./.agents/handoff.md) first** — where things stand, what to pick up, the standing decisions, and the traps that cost time. Its state figures each carry the command that produced them: **re-run those commands rather than trusting the date at the top**. State decays within days (branch tip, what is in flight, next available task number); the traps section stays true much longer.
+
 ## Repository Purpose
 
 This is a library of agent skills — modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling. Skills are loaded into agents via `.agents/skills/` in target projects.
