@@ -36,7 +36,7 @@ Author `skills/observe-work/` — a meta-skill that observes the session for ski
 | 1. create-branch           | ✅ Done    | Branch `feature/task.94.*` exists in git                               | `feature/task.94.observe-work-skill` created from `develop` at `5ae6cb50`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.94.review.{N}.{name}.md` exists (or skip logged)                 | `task.94.review.1.observe-work-skill.md` — READY TO IMPLEMENT, 9/10, 0 critical / 2 important / 1 optional, all fixed; status promoted planned → ready-for-development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 6/6 phases. 14 files created/modified. `npm run ci:fast` exit 0 — 2883 pass / 0 fail. New suite 20/20, glob mutation-proved RED→GREEN. | — (inline; no subagent) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #354: https://github.com/Gamaroff/agent-skills/pull/354 — 23 files, no out-of-scope leak. Issue #340 commented (`in-review`). | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.94.qa.{N}.*.md`; `task.94.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.94.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -58,6 +58,8 @@ Author `skills/observe-work/` — a meta-skill that observes the session for ski
 - review-task Step 8.5 auto-answered: "Yes, apply all critical + important fixes" — pipeline proceeds autonomously.
 - review-task Step 9 auto-answered: "Yes, fixes complete" — outcome was READY TO IMPLEMENT, so the task was promoted planned → ready-for-development.
 - review-task Phase 1.5 pre-pass agents (B: architecture alignment, C: codebase already-implemented) were **not dispatched** — session instructions bar subagent dispatch unless requested. Both axes were covered inline instead: 25 technical claims verified directly against the working tree, and `skills/observe-work/` confirmed absent (no partial implementation to reconcile).
+- Step 4 staging scope: `docs/tasks/task.94.observe-work-skill`, `skills/observe-work`, `shared/resources`, `docs/reference`, `skills/create-skill/scripts`, `package.json`, `AGENTS.md`, `CHANGELOG.md`. No out-of-scope untracked files, so the pre-flight hold was not needed. Leak check clean over all 23 committed paths.
+- The implementation report is committed here (Step 4), by design — a reviewer can read the audit trail during QA, and a tracked document linking to an untracked file is a dangling link that fails only in CI.
 - Pre-develop surface map (20 files) and plan-file read done **inline** rather than via Explore subagents — session instructions bar subagent dispatch unless requested. Nothing was lost: the engine's subcommand set, flag set and reason vocabulary were read from source, and every registration target was located before Phase 1.
 - Alignment analysis: 🆕 No Implementation — `skills/observe-work/` absent, so greenfield; no alignment gate reached.
 - Draft/Planned gate: auto-answered "Yes, ready to implement" (review-task validated in Step 2).
@@ -102,7 +104,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.94.observe-work-skill`
-**PR**: {populated after Step 4}
+**PR**: [#354](https://github.com/Gamaroff/agent-skills/pull/354)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

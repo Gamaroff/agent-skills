@@ -50,14 +50,32 @@ file and stopping has activated nothing.
 command node references/observation-log.js doctor --json
 ```
 
-Act on `reason`:
+**Read `healthy` first, then `reason`. They answer different questions and only one of them
+reports a missing log.**
 
-| `reason` | Do this |
+```
+{ "reason": "ok",  "healthy": false,  "exitCode": 0,
+  "checks": [ { "check": "workspace-exists", "ok": false,
+                "detail": "…/skill-observations does not exist — run `init`" }, … ] }
+```
+
+So:
+
+| Signal | Do this |
 |---|---|
-| `ok` | Nothing |
-| `ephemeral-workspace` | Re-anchor before writing anything. A log written here dies with the checkout |
-| `fork-detected` | Surface it and consolidate deliberately. **Never create a second log beside a populated one** |
-| workspace missing | `command node references/observation-log.js init --json` |
+| `healthy: false` **and** `checks[]` has `workspace-exists` with `ok: false` | `command node references/observation-log.js init --json`, then re-run `doctor` |
+| `healthy: false` for any other failing check | Surface the check's `detail`; do not write until it is resolved |
+| `reason` is `ephemeral-workspace` | Re-anchor before writing anything. A log written here dies with the checkout |
+| `reason` is `fork-detected` | Surface it and consolidate deliberately. **Never create a second log beside a populated one** |
+| `healthy: true` and `reason` is `ok` | Nothing |
+
+> **`reason` is `"ok"` on a workspace that does not exist yet, and `exitCode` is `0`.** A missing log
+> is not an error — it is the normal state of a project that has never run this skill — so the engine
+> reports it as a failing **check**, not as a failing call. Branching on `reason` alone therefore
+> matches the "Nothing" row and silently skips `init`; step 2's `scan` then answers `empty` for a
+> directory that is not there, which is the one reassuring answer nobody questions. The distinction
+> `empty` vs `scan-broken` exists precisely so a broken reader cannot masquerade as an empty log —
+> reading only `reason` here reintroduces at the caller the confusion the engine removed internally.
 
 **2. Scan.**
 

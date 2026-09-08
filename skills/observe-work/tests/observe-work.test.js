@@ -349,6 +349,54 @@ test("every reason the body branches on is in the engine's vocabulary", () => {
   }
 });
 
+test("the missing-workspace branch keys on `healthy`, not on `reason`", () => {
+  // TASK-94-001. `doctor` on an uninitialised workspace returns reason "ok",
+  // healthy false, exitCode 0, and a checks[] entry `workspace-exists` with
+  // ok:false. A protocol that branches on `reason` alone matches the "Nothing"
+  // row and never runs `init`; the next step's `scan` then answers `empty` for
+  // a directory that does not exist. Two silent failures compounding into a
+  // reassuring one, in the skill's first action of every session.
+  const step1 = BODY.split(/\*\*1\. Storage\.\*\*/)[1];
+  assert.ok(step1, "Session Start step 1 must exist");
+  const scoped = step1.split(/\*\*2\. Scan\.\*\*/)[0];
+
+  assert.match(
+    scoped,
+    /`healthy`/,
+    "step 1 must tell the reader to read `healthy` — a missing workspace is a " +
+      "failing CHECK, not a failing call",
+  );
+  assert.match(
+    scoped,
+    /workspace-exists/,
+    "step 1 must name the `workspace-exists` check that carries the signal",
+  );
+
+  // The init row must be keyed on healthy/checks, never on a `reason` value.
+  const initRow = scoped
+    .split("\n")
+    .find((l) => /\binit\b/.test(l) && l.startsWith("|"));
+  assert.ok(initRow, "step 1 must carry a row whose action is `init`");
+  assert.match(
+    initRow,
+    /healthy|workspace-exists/,
+    `the init row must key on healthy/checks, not on a reason value: ${initRow}`,
+  );
+
+  // These two ARE real reason values and must stay keyed on reason.
+  for (const r of ["ephemeral-workspace", "fork-detected"]) {
+    const row = scoped
+      .split("\n")
+      .find((l) => l.startsWith("|") && l.includes(r));
+    assert.ok(row, `step 1 must still carry a row for the ${r} reason`);
+    assert.match(
+      row,
+      /`reason`/,
+      `${r} IS a real reason value and its row must stay keyed on reason: ${row}`,
+    );
+  }
+});
+
 test("the body never invokes bare `node`", () => {
   // On a machine where `node` is an nvm shell function, the bare form prints
   // nvm's help to stdout and corrupts every --json payload the caller captures.

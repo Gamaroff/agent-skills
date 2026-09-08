@@ -584,6 +584,43 @@ Two changes are worth naming because they are not confined to the new directory:
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-08
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.94.qa.1.observe-work-skill.md](./task.94.qa.1.observe-work-skill.md)
+- **Gate File**: [task.94.gate.1.observe-work-skill.yml](./task.94.gate.1.observe-work-skill.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 2884 (2883 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 6/6
+- **Critical Issues**: 1 HIGH, 2 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+Every document-anchored check passes — that is why the decisive finding needed **executing** the documented protocol rather than reading it. Session Start step 1 branches on a `doctor` reason the engine never emits, so `init` never runs and the following `scan` reports the non-existent log as cleanly `empty` — two silent failures compounding, in the skill's first action of every session.
+
+- [task.94.bug.1.doctor-reason-branch.md](./task.94.bug.1.doctor-reason-branch.md) — HIGH
+- [task.94.bug.2.hook-status-whitespace.md](./task.94.bug.2.hook-status-whitespace.md) — MEDIUM
+- [task.94.bug.3.bundled-contract-dangling-links.md](./task.94.bug.3.bundled-contract-dangling-links.md) — MEDIUM
+
+
+### Bug Reports
+
+**In QA Verification**
+
+- [bug.1 — Session Start step 1 branches on a `doctor` reason the engine never emits](./task.94.bug.1.doctor-reason-branch.md) — HIGH — ✅ Ready for QA (fixed 2026-09-08, regression test mutation-proved)
+- [bug.2 — SessionStart hook disagrees with the engine on the open count](./task.94.bug.2.hook-status-whitespace.md) — MEDIUM — ✅ Ready for QA (fixed 2026-09-08)
+- [bug.3 — Bundled contract ships six links that resolve nowhere](./task.94.bug.3.bundled-contract-dangling-links.md) — MEDIUM — ✅ Ready for QA (fixed 2026-09-08)
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -593,6 +630,8 @@ Two changes are worth naming because they are not confined to the new directory:
 | 2026-09-08 | 1.2     | Review passed (9/10) — corrected the dependency-drift test path (`evals/shared/tests/` → `shared/resources/tests/`), the skill count, and a stale duplicate `**Status:**` line in the footer; all other technical claims verified against the repo | review-task |
 | 2026-09-08 |         | Status → ready-for-development | review-task |
 | 2026-09-08 |         | Implemented — 14 files, 20 tests | develop |
+| 2026-09-08 |         | QA gate FAIL (60/100) — 4 findings (1 HIGH, 2 MEDIUM, 1 LOW) | qa-task |
+| 2026-09-08 |         | QA findings fixed — 3 of 4 addressed (1 LOW advisory), 1 iteration | qa-fix |
 
 ---
 

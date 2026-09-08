@@ -41,8 +41,15 @@ LOG_DIR="${OBS_DIR}/observation-log"
 #
 # A missing `status:` is read as open (the contract's rule), so the second grep
 # counts headers that carry no status line at all.
+# Tolerate surrounding whitespace. `grep -l '^status: open$'` matched neither
+# `status: open ` (one trailing space) nor the statusless fallback below, so
+# such a file counted as neither and the hook UNDER-reported the backlog —
+# reporting 1 open where the engine reported 2. Undercounting is the worse
+# direction: an overstated backlog gets noticed and corrected, an understated
+# one is indistinguishable from a clean log, which is the silent failure this
+# whole file exists to prevent.
 open_explicit=$(
-  grep -l '^status: open$' "$LOG_DIR"/*.md 2>/dev/null | wc -l | tr -d ' '
+  grep -lE '^status:[[:space:]]*open[[:space:]]*$' "$LOG_DIR"/*.md 2>/dev/null | wc -l | tr -d ' '
 )
 total=$(ls -1 "$LOG_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
 statusless=$(
@@ -50,7 +57,7 @@ statusless=$(
   # deliberately ignored here; the printed value is the one that matters.
   for f in "$LOG_DIR"/*.md; do
     [ -f "$f" ] || continue
-    grep -q '^status:' "$f" 2>/dev/null || echo "$f"
+    grep -qE '^status:[[:space:]]*[^[:space:]]' "$f" 2>/dev/null || echo "$f"
   done | wc -l | tr -d ' '
 )
 open=$((open_explicit + statusless))

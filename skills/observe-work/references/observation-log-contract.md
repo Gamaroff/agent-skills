@@ -27,8 +27,8 @@ later. The log is the durable, cross-session record of those moments.
 > the file format is hard to parse — it is deliberately trivial — but because the
 > rules *around* the format are the part that is easy to get wrong, and prose
 > asking an agent to remember them is the thing this file exists to replace. The
-> engine is a peer of [`tracker-comment.js`](./tracker-comment.js) and
-> [`change-log.js`](./change-log.js): same exit codes, same `--json` `reason`
+> engine is a peer of `tracker-comment.js` and
+> `change-log.js`: same exit codes, same `--json` `reason`
 > contract, same posture that an agent who has read one has read all of them.
 
 ---
@@ -280,6 +280,21 @@ archive is a pointer a reviewer will not follow.
 
 ---
 
+## A note on the sibling references
+
+`tracker-comment.js`, `change-log.js`, `resolve-platform.sh` and this file are peers in the
+repository's shared-resources directory; `observation-log.js` sits beside them too.
+
+**They are named here rather than linked, deliberately.** A relative link resolves in situ and
+breaks the moment the bundler copies this file into a skill's `references/` directory — which it
+does, without bringing unrelated siblings along, because it keys on the literal
+`references/<name>` form and never sees a `./`-prefixed link. Writing them in that linkable
+form instead would drag three unrelated engines into every consumer of a skill that bundles this
+contract, to satisfy six cross-references. Nothing under `skills/` is link-checked in CI, so the
+broken form would have shipped green.
+
+---
+
 ## Version-control hazards
 
 **A just-written observation is untracked, and `git clean -fd` exists to delete
@@ -318,7 +333,7 @@ source references/resolve-observation-workspace.sh || exit 1
 
 **The `|| exit 1` is not decoration.** A bare `source` prints the resolver's
 error and then carries on with unset variables — the same silent-permissive
-failure [`resolve-platform.sh`](./resolve-platform.sh) documents for itself.
+failure `resolve-platform.sh` documents for itself.
 
 Resolver order:
 
@@ -341,7 +356,7 @@ down with it. This is `reason: ephemeral-workspace`, not a warning.
 
 ## Exit codes and `reason`
 
-Transcribed from [`tracker-comment.js`](./tracker-comment.js) so the
+Transcribed from `tracker-comment.js` so the
 `|| echo "⚠️ …"` subshell idiom keeps working unchanged:
 
 | Code | Meaning |
@@ -398,5 +413,5 @@ body file for comments.
 
 - [`observation-log.js`](./observation-log.js) — the engine
 - [`resolve-observation-workspace.sh`](./resolve-observation-workspace.sh) — the resolver
-- [`tracker-comment.js`](./tracker-comment.js) — the exit-code and `reason` idiom this transcribes
-- [`resolve-platform.sh`](./resolve-platform.sh) — the guarded-source resolver idiom
+- `tracker-comment.js` — the exit-code and `reason` idiom this transcribes
+- `resolve-platform.sh` — the guarded-source resolver idiom

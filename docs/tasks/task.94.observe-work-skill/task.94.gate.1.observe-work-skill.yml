@@ -1,0 +1,120 @@
+schema: 1
+task: 'task.94.observe-work-skill'
+task_title: 'Add the observe-work meta-skill'
+gate: FAIL
+status_reason: >-
+  One HIGH: the Session Start Protocol branches on a `doctor` reason the engine never emits, so the
+  log is never initialised and the next step reports it as cleanly empty. Two MEDIUM: the hook
+  undercounts open observations against the engine, and the bundled contract ships six dangling links.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T13:20:00Z'
+
+top_issues:
+  - id: 'TASK-94-001'
+    severity: high
+    file: 'skills/observe-work/SKILL.md'
+    finding: >-
+      Session Start step 1 tells the agent to branch on `doctor`'s `reason` and lists a
+      "workspace missing" row, but the engine reports that condition through `healthy: false`
+      plus a `checks[]` entry and returns `reason: "ok"`. `init` therefore never runs, and step 2's
+      `scan` then returns `empty` against a workspace that does not exist.
+    suggested_action: >-
+      Branch on `healthy` and `checks[].workspace-exists.ok`, not on `reason`, for the missing-workspace
+      case. Keep the `ephemeral-workspace` and `fork-detected` rows — those ARE reason values.
+    suggested_owner: dev
+    bug_ref: 'task.94.bug.1.doctor-reason-branch.md'
+    status: open
+
+  - id: 'TASK-94-002'
+    severity: medium
+    file: 'shared/resources/observe-work-session-start.sh'
+    finding: >-
+      `grep -l '^status: open$'` matches neither `status: open ` (trailing space) nor the statusless
+      fallback, so such a file is counted as neither. The hook reported 1 open where the engine
+      reported 2. It undercounts, and can fall fully silent on a log with outstanding work.
+    suggested_action: >-
+      Use `grep -lE '^status:[[:space:]]*open[[:space:]]*$'`, or count through the engine and keep the
+      grep only as a fallback.
+    suggested_owner: dev
+    bug_ref: 'task.94.bug.2.hook-status-whitespace.md'
+    status: open
+
+  - id: 'TASK-94-003'
+    severity: medium
+    file: 'shared/resources/observation-log-contract.md'
+    finding: >-
+      Six relative links (`./tracker-comment.js`, `./change-log.js`, `./resolve-platform.sh`) resolve in
+      shared/resources but not in the bundled copy this task is the first to ship. Invisible to CI —
+      docs-link-check is path-filtered to docs/**, so nothing under skills/** is checked.
+    suggested_action: >-
+      Fix the source, not the bundled copy. Demote the six to plain backticked names rather than
+      rewriting them to `shared/resources/<name>`, which would drag three unrelated engines into every
+      consumer of observe-work.
+    suggested_owner: dev
+    bug_ref: 'task.94.bug.3.bundled-contract-dangling-links.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 2884
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 6]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No credential handling, no network calls, no untrusted input. The hook reads two paths and writes
+      only to stdout; its one interpolation into JSON is escaped for backslash and quote. shellcheck
+      clean at --severity=warning. The engine's ephemeral-anchor refusal was observed firing during this
+      review when a probe was attempted under /private/tmp.
+  performance:
+    status: PASS
+    notes: >-
+      The measured concern is context cost, and it is the criterion the task set for itself. Body 256
+      lines against a 500 ceiling; authored total 49.1 KB against upstream's ~214 KB. The hook is two
+      greps and a sort over one directory.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      The startup path does not do what it documents (TASK-94-001), and it fails silently rather than
+      loudly — the worst available failure mode for this feature. The hook's count also diverges from
+      the engine's on a reachable input (TASK-94-002). The date-fallback ladder is sound and its
+      pathological branch (cutoff 9999-12-31) fails toward nagging rather than toward silence, which is
+      the correct direction.
+  maintainability:
+    status: PASS
+    notes: >-
+      Prose is dense but every rule states why it exists. 20 structural assertions, and the pointer
+      assertion was strengthened mid-implementation after the repo's own relationship-assertion lint
+      rejected a substring form. Authoring guidance is cross-referenced rather than restated, which is
+      the rule that keeps it from drifting against create-skill.
+
+recommendations:
+  immediate:
+    - action: 'Branch Session Start step 1 on `healthy` + `checks[]`, not `reason`'
+      refs: ['skills/observe-work/SKILL.md']
+    - action: 'Tolerate surrounding whitespace when counting `status: open`'
+      refs: ['shared/resources/observe-work-session-start.sh']
+    - action: 'Remove the six dangling relative links from the contract source'
+      refs: ['shared/resources/observation-log-contract.md']
+  future:
+    - action: >-
+        qa-execute-snippets refuses `command node` as `unrecognised-command: command (fail-closed)`,
+        so Step 4b can never execute a block from any skill that follows this repo's own
+        `command node` rule. Out of scope for task 94; worth its own task.
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Extend docs-link-check to skills/**, which currently ships unchecked markdown'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-94-001 fixed and the corrected branch verified against a genuinely uninitialised workspace'
