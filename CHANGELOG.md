@@ -6,6 +6,52 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The observation-log engine, workspace resolver and contract** (`shared/resources/observation-log.js`,
+  `resolve-observation-workspace.sh`, `observation-log-contract.md`). The mechanism a forthcoming
+  `observe-work` meta-skill stands on: a durable, cross-session record of moments where an agent's
+  behaviour could have been better, written at the time rather than reconstructed later.
+
+  Adapted from [rebelytics/one-skill-to-rule-them-all](https://github.com/rebelytics/one-skill-to-rule-them-all)
+  (CC BY 4.0, Eoghan Henn / rebelytics.com) — **changes were made**: the methodology is kept, the
+  mechanism is a rewrite. Upstream carries its correctness guards as 20–40-line POSIX shell snippets
+  embedded in prose that the agent must retype correctly before **every** write, and a skipped snippet
+  is silent — the log still looks healthy. Here the guards are inside the call path, so there is no way
+  to call `write` without them.
+
+  Four things the rewrite buys, each of which was a live defect or a live hazard:
+
+  - **The octal bug becomes structurally impossible.** Upstream feeds zero-padded filename prefixes into
+    shell arithmetic, where `$(( 0105 + 1 ))` evaluates as octal and yields 70, and a prefix containing
+    an 8 or 9 (`0108`) is an invalid octal constant that errors the whole derivation. Its mitigation is
+    a `sed` that strips leading zeros — which works exactly as often as it is retyped. `parseInt(s, 10)`
+    has no octal reading of a leading zero, so the defect class does not exist rather than being managed.
+  - **"An empty result is a claim about the instrument" becomes an exit code.** A scan returning nothing
+    means either there is nothing to find or the reader is broken; those are byte-identical from the
+    caller's side. `empty` and `scan-broken` are now separate `reason` values, and both `scan` and
+    `next-id` carry an independent count check — two counts derived by different means — that trips
+    rather than returning a clean, believable zero.
+  - **Archival cannot be skipped.** The stale sweep is folded *inside* `next-id`, so no write path can
+    reach an id without having swept. Upstream couples the two by prose preamble and records that the
+    preamble under-fires.
+  - **The `[ABSOLUTE PATH]` placeholder disappears.** One resolver, three sources (config → env →
+    project identity), one answer — and an ephemeral anchor (`/tmp`, `.claude/worktrees/`, a linked git
+    worktree) is refused with a non-zero exit rather than accepted, because a snippet run against a
+    torn-down checkout reports an empty, clean backlog, which upstream itself names as "the one answer
+    that never gets questioned".
+
+  `parked` is deliberately **not** a resolved state: it means decided-but-blocked, requires
+  `parked_until:`, leaves the work queue, and never archives. There is deliberately **no `--id` flag** on
+  `write` — a batch that pre-computes a base and hardcodes sequential numbers collapses N independent
+  max-checks into one stale read, and the absent flag is the enforcement rather than a prose request.
+
+  40 tests, and **every guard is mutation-proven** — the guard reverted, a named test confirmed red, the
+  guard restored. That pass found two tests that did not test what they claimed (the parked-archival
+  exemption was held up by the date half of the gate rather than by set membership; the resolver's
+  `export` was read back in the sourcing shell, where a plain assignment is visible too) and one live
+  defect in the engine (`write --id 7` was silently accepted and ignored, so a caller saw exit 0 and
+  believed the id had taken effect). Nothing consumes these files yet, so the `reason` vocabulary and
+  exit codes are a contract from this commit forward.
+
 - **`/review-security` — a review skill that establishes whether a security control *engages*, by
   running it.** Nothing in the repository took application code as its subject and executed
   adversarial input against it. Three instruments came close and each missed for its own reason: the

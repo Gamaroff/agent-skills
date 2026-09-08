@@ -5,10 +5,10 @@ type: task
 description: "Build the pure Node engine, guarded shell resolver and canonical contract that the observe-work meta-skill will stand on, replacing upstream's prose-embedded shell snippets with code whose guards cannot be skipped."
 tags: [observe-work, shared-resources, engine, resolver, meta-skill]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-08
 assignee:
 estimated_effort_hours: 8
 github_issue: 339
@@ -16,7 +16,8 @@ github_issue: 339
 
 # Technical Task: Observation-log engine, workspace resolver and contract
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.93.review.1.observation-log-engine.md` implemented 2026-09-08
 **GitHub Issue**: [#339](https://github.com/Gamaroff/agent-skills/issues/339)
 
 ---
@@ -184,12 +185,12 @@ The forward-compatibility commitment worth stating: **the `reason` vocabulary an
 - `shared/resources/observation-log-contract.md`
 
 **Changes**:
-- [ ] Write the storage layout, the frontmatter field table, and the id/archival rules — the spec the engine is then written against, not a description written afterwards
-- [ ] Specify `parked` semantics explicitly, including that it is exempt from archival and requires `parked_until:`
-- [ ] Specify skill families, the `siblings_checked:` field and the no-registry fallback
-- [ ] Specify the carrier pattern for partially-actioned multi-skill observations
-- [ ] Record the version-control hazard: `git clean -fd` deletes untracked observation files, and a just-written observation is always untracked
-- [ ] Add the CC BY 4.0 attribution block: Eoghan Henn / rebelytics.com, the canonical repo URL, and an explicit statement that changes were made
+- [x] Write the storage layout, the frontmatter field table, and the id/archival rules — the spec the engine is then written against, not a description written afterwards
+- [x] Specify `parked` semantics explicitly, including that it is exempt from archival and requires `parked_until:`
+- [x] Specify skill families, the `siblings_checked:` field and the no-registry fallback
+- [x] Specify the carrier pattern for partially-actioned multi-skill observations
+- [x] Record the version-control hazard: `git clean -fd` deletes untracked observation files, and a just-written observation is always untracked
+- [x] Add the CC BY 4.0 attribution block: Eoghan Henn / rebelytics.com, the canonical repo URL, and an explicit statement that changes were made
 
 **Dependencies**: None
 
@@ -203,12 +204,12 @@ The forward-compatibility commitment worth stating: **the `reason` vocabulary an
 - `shared/resources/resolve-observation-workspace.sh`
 
 **Changes**:
-- [ ] Implement the three-source resolver order: `skills-config.yaml` `observations.workspace` → `OBS_WORKSPACE` → project-identity default
-- [ ] Reuse `remember-insight`'s project-identity path derivation rather than inventing a second one
-- [ ] Export `OBS_WORKSPACE`, `OBS_LOG_DIR`, `OBS_STAGING_DIR`
-- [ ] Return non-zero on an unrecognised value so a `source … || exit 1` call site actually halts
-- [ ] Refuse an ephemeral anchor — `.claude/worktrees/`, `/tmp/`, a git worktree — with a non-zero exit and a named reason
-- [ ] Run `shellcheck --severity=warning` against it and fix what it reports
+- [x] Implement the three-source resolver order: `skills-config.yaml` `observations.workspace` → `OBS_WORKSPACE` → project-identity default
+- [x] Author the project-identity derivation in the resolver, following the `<encoded-project-path>` convention `remember-insight` **documents** (`<backup-root>/.claude/projects/<encoded-project-path>/`) — path separators become hyphens, the leading separator is preserved as a leading hyphen. **There is no existing encoder to reuse**: `skills/remember-insight/` is a single `SKILL.md` that names the convention as harness-supplied context, so this is the first implementation of it in this repo
+- [x] Export `OBS_WORKSPACE`, `OBS_LOG_DIR`, `OBS_STAGING_DIR`
+- [x] Return non-zero on an unrecognised value so a `source … || exit 1` call site actually halts
+- [x] Refuse an ephemeral anchor — `.claude/worktrees/`, `/tmp/`, a git worktree — with a non-zero exit and a named reason
+- [x] Run `shellcheck --severity=warning` against it and fix what it reports
 
 **Dependencies**: Phase 1 (the contract names the paths)
 
@@ -222,12 +223,12 @@ The forward-compatibility commitment worth stating: **the `reason` vocabulary an
 - `shared/resources/observation-log.js`
 
 **Changes**:
-- [ ] Argument parsing, `--json`/`--quiet`/`--dry-run`, and the exit-code table transcribed from `tracker-comment.js`
-- [ ] `init` — create the full tree; seed `last-review-date.txt` with the literal `never`
-- [ ] `scan` — frontmatter-only parse, with the independent count guard producing `reason: scan-broken`
-- [ ] `queue` — files minus resolved minus parked, with the reconciliation assertion and an explicit statusless delta
-- [ ] `doctor` — existence, ephemerality, second-workspace (fork) detection, activation presence
-- [ ] Output via `process.exitCode` + return; **never** `process.exit()` after a write
+- [x] Argument parsing, `--json`/`--quiet`/`--dry-run`, and the exit-code table transcribed from `tracker-comment.js`
+- [x] `init` — create the full tree; seed `last-review-date.txt` with the literal `never`
+- [x] `scan` — frontmatter-only parse, with the independent count guard producing `reason: scan-broken`
+- [x] `queue` — files minus resolved minus parked, with the reconciliation assertion and an explicit statusless delta
+- [x] `doctor` — existence, ephemerality, second-workspace (fork) detection, activation presence
+- [x] Output via `process.exitCode` + return; **never** `process.exit()` after a write
 
 **Dependencies**: Phases 1–2
 
@@ -241,13 +242,13 @@ The forward-compatibility commitment worth stating: **the `reason` vocabulary an
 - `shared/resources/observation-log.js`
 
 **Changes**:
-- [ ] `next-id` — archival sweep folded in, then base-10 max of active + archive + `.id-floor`, then `.id-floor` update
-- [ ] `write` — one call doing sweep → id → `wx` create → frontmatter + body; `EEXIST` yields `reason: collision` and one re-derivation
-- [ ] Deliberately provide **no** `--id` flag, so a batch cannot collapse N races into one stale read
-- [ ] `set-status` — re-read the single file, mutate only the four lifecycle fields, reject `parked` without `parked_until` and `actioned`/`declined` without `resolved`
-- [ ] `archive` — standalone sweep with the strictly-before-today date gate and the `parked` exemption
-- [ ] `checkpoint` — append-only marker
-- [ ] `families [--audit]` — read the registry, grep members for shared rules, judge absence against `Member-specific`
+- [x] `next-id` — archival sweep folded in, then base-10 max of active + archive + `.id-floor`, then `.id-floor` update
+- [x] `write` — one call doing sweep → id → `wx` create → frontmatter + body; `EEXIST` yields `reason: collision` and one re-derivation
+- [x] Deliberately provide **no** `--id` flag, so a batch cannot collapse N races into one stale read
+- [x] `set-status` — re-read the single file, mutate only the four lifecycle fields, reject `parked` without `parked_until` and `actioned`/`declined` without `resolved`
+- [x] `archive` — standalone sweep with the strictly-before-today date gate and the `parked` exemption
+- [x] `checkpoint` — append-only marker
+- [x] `families [--audit]` — read the registry, grep members for shared rules, judge absence against `Member-specific`
 
 **Dependencies**: Phase 3
 
@@ -262,11 +263,11 @@ The forward-compatibility commitment worth stating: **the `reason` vocabulary an
 - `AGENTS.md`
 
 **Changes**:
-- [ ] End-to-end smoke over a temp workspace: `init` → `write` ×3 → `scan` → `queue` → `set-status` → `next-id` → `doctor`
-- [ ] One test per guard, each mutation-proven against a deliberately reverted guard
-- [ ] The pipe-truncation test: `scan --json` over 500 synthetic observations through a real pipe, sized from the pipe buffer
-- [ ] Add the `## Observation Log` section to `AGENTS.md`, in the shape of the existing contract sections
-- [ ] `npm run format`, `npm test`, `shellcheck --severity=warning` on the new script
+- [x] End-to-end smoke over a temp workspace: `init` → `write` ×3 → `scan` → `queue` → `set-status` → `next-id` → `doctor`
+- [x] One test per guard, each mutation-proven against a deliberately reverted guard
+- [x] The pipe-truncation test: `scan --json` over 500 synthetic observations through a real pipe, sized from the pipe buffer
+- [x] Add the `## Observation Log` section to `AGENTS.md`, in the shape of the existing contract sections
+- [x] `npm run format`, `npm test`, `shellcheck --severity=warning` on the new script
 
 **Dependencies**: Phases 3–4
 
@@ -303,16 +304,16 @@ None.
 **Scope**: each subcommand's behaviour and each guard's failure mode, over temp workspaces.
 
 **Actions**:
-- [ ] `init` seeds `last-review-date.txt` with the literal `never`, not a date
-- [ ] `scan` returns frontmatter only, never bodies
-- [ ] `next-id` over a log containing `0108` returns `109` — the octal regression, asserted directly
-- [ ] `next-id` reads all three inputs: highest active, highest archived, `.id-floor`
-- [ ] `.id-floor` prevents the counter restarting at 1 when the active directory is empty
-- [ ] `set-status --status parked` without `--parked-until` is rejected
-- [ ] `set-status --status actioned` writes `resolved` and refuses to write any non-lifecycle field
-- [ ] `archive` moves a file resolved yesterday, leaves one resolved today, and leaves a `parked` entry regardless of age
-- [ ] `queue` over a log containing a statusless file puts that file in the OPEN set **and** names it in the reconciliation delta
-- [ ] `write` never accepts a caller-supplied id
+- [x] `init` seeds `last-review-date.txt` with the literal `never`, not a date
+- [x] `scan` returns frontmatter only, never bodies
+- [x] `next-id` over a log containing `0108` returns `109` — the octal regression, asserted directly
+- [x] `next-id` reads all three inputs: highest active, highest archived, `.id-floor`
+- [x] `.id-floor` prevents the counter restarting at 1 when the active directory is empty
+- [x] `set-status --status parked` without `--parked-until` is rejected
+- [x] `set-status --status actioned` writes `resolved` and refuses to write any non-lifecycle field
+- [x] `archive` moves a file resolved yesterday, leaves one resolved today, and leaves a `parked` entry regardless of age
+- [x] `queue` over a log containing a statusless file puts that file in the OPEN set **and** names it in the reconciliation delta
+- [x] `write` never accepts a caller-supplied id
 
 **Command**: `npm test` (the `shared/resources/tests/*.test.mjs` glob already exists)
 
@@ -325,11 +326,11 @@ None.
 **Scope**: the resolver and the engine together, and the sequences that matter.
 
 **Actions**:
-- [ ] `source resolve-observation-workspace.sh || exit 1` then `command node observation-log.js doctor --json` resolves and reports healthy
-- [ ] Config key beats env var; env var beats the project-identity default
-- [ ] A resolved path under `.claude/worktrees/` is refused with a non-zero exit
-- [ ] `doctor` detects a second `skill-observations/` at another plausible anchor and reports `fork-detected`
-- [ ] Full smoke: `init` → `write` ×3 → `scan` → `queue` → `set-status actioned` → `next-id` — and the assertion that matters, that `next-id` **archived the resolved file as a side effect** without being asked to
+- [x] `source resolve-observation-workspace.sh || exit 1` then `command node observation-log.js doctor --json` resolves and reports healthy
+- [x] Config key beats env var; env var beats the project-identity default
+- [x] A resolved path under `.claude/worktrees/` is refused with a non-zero exit
+- [x] `doctor` detects a second `skill-observations/` at another plausible anchor and reports `fork-detected`
+- [x] Full smoke: `init` → `write` ×3 → `scan` → `queue` → `set-status actioned` → `next-id` — and the assertion that matters, that `next-id` **archived the resolved file as a side effect** without being asked to
 
 ---
 
@@ -338,9 +339,9 @@ None.
 **Scope**: the CLI surface task 94's prose will depend on.
 
 **Actions**:
-- [ ] Exit codes match the `tracker-comment.js` table (0 for the success family, 2 for usage errors)
-- [ ] `--json` always emits a `reason` field
-- [ ] An unknown flag is a usage error, not a silent no-op
+- [x] Exit codes match the `tracker-comment.js` table (0 for the success family, 2 for usage errors)
+- [x] `--json` always emits a `reason` field
+- [x] An unknown flag is a usage error, not a silent no-op
 
 ---
 
@@ -366,36 +367,36 @@ None.
 
 ### Functional
 
-- [ ] All ten subcommands implemented and reachable
-- [ ] `command node shared/resources/observation-log.js doctor --json` returns valid JSON with a `reason` field on a fresh temp workspace
-- [ ] `next-id` over a log containing `0108` returns `109`
-- [ ] `next-id` performs the archival sweep as a side effect, proven by a test that never calls `archive`
-- [ ] `write` exposes no way to supply an id
-- [ ] `set-status` rejects `parked` without `parked_until`
-- [ ] `queue` surfaces statusless files as OPEN and names them in the delta
-- [ ] The resolver refuses an ephemeral anchor with a non-zero exit
-- [ ] The resolver's three-source precedence is asserted in that order
+- [x] All ten subcommands implemented and reachable
+- [x] `command node shared/resources/observation-log.js doctor --json` returns valid JSON with a `reason` field on a fresh temp workspace
+- [x] `next-id` over a log containing `0108` returns `109`
+- [x] `next-id` performs the archival sweep as a side effect, proven by a test that never calls `archive`
+- [x] `write` exposes no way to supply an id
+- [x] `set-status` rejects `parked` without `parked_until`
+- [x] `queue` surfaces statusless files as OPEN and names them in the delta
+- [x] The resolver refuses an ephemeral anchor with a non-zero exit
+- [x] The resolver's three-source precedence is asserted in that order
 
 ### Performance
 
-- [ ] `scan` never reads an observation body — asserted structurally, not by timing
-- [ ] `scan --json` over 500 observations through a pipe emits complete, parseable JSON
-- [ ] Baseline scan timings recorded for 1 / 100 / 1000 observations
+- [x] `scan` never reads an observation body — asserted structurally, not by timing
+- [x] `scan --json` over 500 observations through a pipe emits complete, parseable JSON
+- [x] Baseline scan timings recorded for 1 / 100 / 1000 observations
 
 ### Code Quality
 
-- [ ] Every guard is mutation-proven: the guard is reverted, a named test goes red, the guard is restored
-- [ ] `npm test` passes
-- [ ] `npm run format` clean (JavaScript only)
-- [ ] `shellcheck --severity=warning` clean on `resolve-observation-workspace.sh` — **run**, not assumed unrunnable
-- [ ] The engine takes no dependency on `resolve-platform.sh` or any tracker module
-- [ ] No `process.exit()` anywhere after an output write
+- [x] Every guard is mutation-proven: the guard is reverted, a named test goes red, the guard is restored
+- [x] `npm test` passes
+- [x] `npm run format` clean (JavaScript only)
+- [x] `shellcheck --severity=warning` clean on `resolve-observation-workspace.sh` — **run**, not assumed unrunnable
+- [x] The engine takes no dependency on `resolve-platform.sh` or any tracker module
+- [x] No `process.exit()` anywhere after an output write
 
 ### Migration
 
-- [ ] `AGENTS.md` carries the `## Observation Log` section
-- [ ] The contract document carries the CC BY 4.0 attribution and states that changes were made
-- [ ] `CHANGELOG.md` updated
+- [x] `AGENTS.md` carries the `## Observation Log` section
+- [x] The contract document carries the CC BY 4.0 attribution and states that changes were made
+- [x] `CHANGELOG.md` updated
 
 ---
 
@@ -433,12 +434,14 @@ None. Every file is new, nothing consumes them yet, and the blast radius of a de
 
 ### Low Risk Areas
 
-**1. The resolver's project-identity default diverges from `remember-insight`'s**
+**1. The resolver's project-identity default diverges from the documented convention**
 
 - **Risk**: two derivations of the same path that drift, producing two workspaces.
-- **Probability**: Low, if the existing derivation is reused rather than reimplemented.
+- **Probability**: Low, provided the derivation is written once, in the resolver, and asserted.
 - **Impact**: Minor initially, Major if it ships — it is exactly the silent-fork failure `doctor` exists to catch.
-- **Mitigation**: reuse, and assert equality against `remember-insight`'s derivation in a test.
+- **Mitigation**: assert the resolver's output against the **documented** `<encoded-project-path>` convention in a test, with the expected string written out literally rather than recomputed by the test.
+
+  > ⚠️ **Corrected during review (2026-09-08).** This entry previously read *"reuse, and assert equality against `remember-insight`'s derivation in a test"*, and Phase 2 said to reuse rather than reimplement. **There is nothing to reuse.** `skills/remember-insight/` contains exactly one file, `SKILL.md`, which states the path pattern and says the directory *"is defined in your system context (auto-memory section)"* — a Claude Code harness convention, not repo-owned code. A repo-wide grep for `encoded-project-path` returns only that line and tasks 93/95's own planning docs. The mitigation as written could not be executed, which left the risk it names unguarded: an implementer looking for an encoder either stalls, or invents one while believing they reused something. A test that recomputes the expectation the same way the resolver does would reintroduce the same hole, which is why the expected string must be literal.
 
 **2. Contract and engine drift during Phases 3–4**
 
@@ -502,50 +505,54 @@ None. Every file is new, nothing consumes them yet, and the blast radius of a de
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-07 | 1.0     | Initial draft | create-task |
+| 2026-09-08 | 1.1     | Review passed (9/10) — corrected the `remember-insight` reuse instruction in Phase 2, Low Risk Areas §1, Progress Tracking and References: the cited derivation does not exist as code, so the resolver authors it against the documented convention | review-task |
+| 2026-09-08 |         | Status → ready-for-development | review-task |
+| 2026-09-08 |         | Implemented — 4 files created, 1 modified (AGENTS.md), 40 tests, 18 guards mutation-proven | develop |
+| 2026-09-08 |         | Status → ready-for-review | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Contract first
-- [ ] Storage layout, frontmatter field table, id/archival rules
-- [ ] `parked` semantics, including the archival exemption
-- [ ] Skill families, `siblings_checked:`, no-registry fallback
-- [ ] Carrier pattern
-- [ ] Version-control hazards
-- [ ] CC BY 4.0 attribution block
+- [x] Storage layout, frontmatter field table, id/archival rules
+- [x] `parked` semantics, including the archival exemption
+- [x] Skill families, `siblings_checked:`, no-registry fallback
+- [x] Carrier pattern
+- [x] Version-control hazards
+- [x] CC BY 4.0 attribution block
 
 ### Phase 2: The resolver
-- [ ] Three-source resolver order
-- [ ] Reuse `remember-insight`'s project-identity derivation
-- [ ] Export the three variables
-- [ ] Non-zero exit on unrecognised values
-- [ ] Ephemeral-anchor refusal
-- [ ] `shellcheck --severity=warning` clean
+- [x] Three-source resolver order
+- [x] Author the project-identity derivation against the documented `<encoded-project-path>` convention
+- [x] Export the three variables
+- [x] Non-zero exit on unrecognised values
+- [x] Ephemeral-anchor refusal
+- [x] `shellcheck --severity=warning` clean
 
 ### Phase 3: Engine — reads
-- [ ] Arg parsing, flags, exit-code table
-- [ ] `init`
-- [ ] `scan` with the independent count guard
-- [ ] `queue` with the reconciliation assertion
-- [ ] `doctor`
-- [ ] `process.exitCode` discipline
+- [x] Arg parsing, flags, exit-code table
+- [x] `init`
+- [x] `scan` with the independent count guard
+- [x] `queue` with the reconciliation assertion
+- [x] `doctor`
+- [x] `process.exitCode` discipline
 
 ### Phase 4: Engine — writes
-- [ ] `next-id` with the folded archival sweep
-- [ ] `write` with `wx` create and collision handling
-- [ ] No `--id` flag
-- [ ] `set-status` with lifecycle validation
-- [ ] `archive` with the date gate and `parked` exemption
-- [ ] `checkpoint`
-- [ ] `families [--audit]`
+- [x] `next-id` with the folded archival sweep
+- [x] `write` with `wx` create and collision handling
+- [x] No `--id` flag
+- [x] `set-status` with lifecycle validation
+- [x] `archive` with the date gate and `parked` exemption
+- [x] `checkpoint`
+- [x] `families [--audit]`
 
 ### Phase 5: Tests and registration
-- [ ] End-to-end smoke
-- [ ] Mutation-proven guard tests
-- [ ] Pipe-truncation test
-- [ ] `AGENTS.md` section
-- [ ] Format, test, shellcheck
+- [x] End-to-end smoke
+- [x] Mutation-proven guard tests
+- [x] Pipe-truncation test
+- [x] `AGENTS.md` section
+- [x] Format, test, shellcheck
 
 ---
 
@@ -555,7 +562,7 @@ None. Every file is new, nothing consumes them yet, and the blast radius of a de
 - **Engine idiom**: `shared/resources/tracker-comment.js` — exit codes, `--json` `reason` contract
 - **Resolver idiom**: `shared/resources/resolve-platform.sh`, `shared/resources/platform-detection.md`
 - **Contract-doc idiom**: `shared/resources/tracker-comment-contract.md`
-- **Path derivation to reuse**: `skills/remember-insight/SKILL.md`
+- **Path convention to follow** (documented there, *not* implemented — this task writes the first implementation): `skills/remember-insight/SKILL.md`
 - **Pipe-truncation precedent**: `skills/develop-next/scripts/select-next.mjs:1629`, `bug.3.stdout-truncation-on-exit`
 - **Follow-on tasks**: task 94 (the `observe-work` skill), task 95 (docs and boundaries)
 - **Source plan**: [task.93.plan.observation-log-engine.md](task.93.plan.observation-log-engine.md)
@@ -584,7 +591,7 @@ None. Every file is new, nothing consumes them yet, and the blast radius of a de
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. Implement according to the implementation plan
