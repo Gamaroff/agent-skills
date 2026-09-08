@@ -41,17 +41,44 @@ const engine = require(CLI);
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-// Workspaces are built under the OS temp dir, one per test, and torn down after.
-// They are never the developer's real workspace: a test that writes into the
-// live log would be indistinguishable from the tool working.
+// ── scratch space ────────────────────────────────────────────────────────────
 //
-// NOTE the tension this creates with the engine's own ephemeral-anchor refusal —
-// /tmp IS an ephemeral anchor, and refusing it is a guard tested below. The
-// tests therefore call the exported functions directly, or pass an explicit
-// --workspace, rather than routing through the resolver.
+// Test workspaces must be (a) disposable and (b) NOT under a path the engine
+// classifies as ephemeral. Those two requirements conflict on Linux, and the
+// conflict is why this suite once passed on macOS and failed 30 tests in CI:
+//
+//   macOS   os.tmpdir() -> /var/folders/…/T   — not matched, accepted
+//   Linux   os.tmpdir() -> /tmp               — matched, REFUSED
+//
+// So every workspace built under `tmpdir()` is refused by the engine's own
+// ephemeral guard on Linux, and the suite is green on the maintainer's machine
+// and red in CI. An earlier comment here claimed the tests sidestepped this "by
+// passing an explicit --workspace" — they do not, and it does not help: `run()`
+// checks `ephemeralReason()` on the RESOLVED workspace however it was supplied.
+// The guard is right; the scratch location was wrong.
+//
+// Fix: build scratch under a repo-local directory, which is durable by
+// construction on every platform. `SCRATCH_OK` below asserts that in-process,
+// using the engine's own predicate, so this can never silently become
+// platform-dependent again — it fails loudly on any host where the base would
+// be refused, instead of 30 tests failing for a reason none of them names.
+const SCRATCH_ROOT = join(SHARED, "..", "..", ".observation-log-test-tmp");
+mkdirSync(SCRATCH_ROOT, { recursive: true });
+
+const SCRATCH_REFUSAL = engine.ephemeralReason(realpathSync(SCRATCH_ROOT));
+if (SCRATCH_REFUSAL) {
+  throw new Error(
+    `scratch base ${SCRATCH_ROOT} is classified ephemeral (${SCRATCH_REFUSAL}) — ` +
+      "every workspace test would fail with `ephemeral-workspace` for a reason " +
+      "unrelated to what it asserts. Move the scratch base.",
+  );
+}
+
+// Workspaces are one per test and torn down after. They are never the
+// developer's real workspace: a test that writes into the live log would be
+// indistinguishable from the tool working.
 function ws(label) {
-  const dir = mkdtempSync(join(tmpdir(), `observation-log-${label}-`));
-  return dir;
+  return mkdtempSync(join(SCRATCH_ROOT, `observation-log-${label}-`));
 }
 
 function cleanup(dir) {
@@ -83,7 +110,12 @@ function cleanup(dir) {
 // temp home is discarded wholesale, so there is no cleanup step to get wrong and
 // no `rm -rf` whose argument could be empty.
 function tempHome(label) {
-  const home = mkdtempSync(join(tmpdir(), `observation-log-home-${label}-`));
+  // Under SCRATCH_ROOT, not tmpdir(): the resolver derives the workspace from
+  // $HOME, so an ephemeral home produces an ephemeral workspace and the
+  // precedence and encoder-parity tests fail with `ephemeral-workspace`.
+  const home = mkdtempSync(
+    join(SCRATCH_ROOT, `observation-log-home-${label}-`),
+  );
   mkdirSync(join(home, ".claude", "projects"), { recursive: true });
   return home;
 }
@@ -1569,7 +1601,12 @@ test("repoWorktrees returns an empty list outside a repository", () => {
   // The fork sweep is built from this list, so an empty one must mean "no
   // project-path candidates", not a crash and not a candidate list built from a
   // partially-resolved path.
-  const outside = ws("no-repo");
+  // Deliberately NOT under SCRATCH_ROOT: that base lives inside this repository,
+  // so `repoWorktrees` would walk up, find the repo's own `.git`, and return it —
+  // the test would assert its premise away. `tmpdir()` is correct here precisely
+  // because it is outside the repo, and the ephemeral rule does not apply: this
+  // calls `repoWorktrees` directly and never resolves a workspace.
+  const outside = mkdtempSync(join(tmpdir(), "observation-log-no-repo-"));
   try {
     assert.deepEqual(engine.repoWorktrees(outside), []);
   } finally {

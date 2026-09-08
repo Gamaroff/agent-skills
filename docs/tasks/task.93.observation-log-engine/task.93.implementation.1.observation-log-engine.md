@@ -36,7 +36,7 @@ Build `shared/resources/observation-log.js` (ten-subcommand engine), `shared/res
 | 2. review-task             | ✅ Done    | `task.93.review.1.observation-log-engine.md` exists                    | 9/10 READY TO IMPLEMENT; 0 Critical / 1 Important / 2 Optional; status promoted `Planned → Ready for Development` | Pre-pass B + C (in-line, below) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 files created, 2 modified; 41 tests; **19 guards mutation-proven**; shellcheck + prettier clean | Pre-develop surface map (in-line, below) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #353](https://github.com/Gamaroff/agent-skills/pull/353); commit `b542db10`; issue #339 commented; board `in-review` → `stage-disabled` (correct, non-blocking) | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.93.qa.{N}.*.md`; `task.93.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.93.qa.1–4.*.md`; `task.93.gate.1–4.*.yml`; Step 5c `CONCERNS`; PR comments posted | 4 cycles. Gates FAIL(70) → FAIL(70) → CONCERNS(90) → **PASS(96)**. HIGH by cycle 1,2,0,0 — converging. 7 findings raised, 7 closed. Step 5c `/review-pr`: **CONCERNS**, 4 findings, all applied | Both 5c lenses hung and were stopped; run in-line |
 | 7. finalise                | ⏳ Pending | `task.93.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -203,7 +203,30 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-08
+**Gate Result**: FAIL (70/100)
+**Issues Found**: 3 — worktree-dependent workspace (HIGH), doctor blind to project-path forks, UTF-8 chunk-boundary corruption
+**HIGH findings**: 1
+**Fixes**: all 3, mutation-proven
+
+### QA Cycle 2 — 2026-09-08 (refute pass)
+**Gate Result**: FAIL (70/100)
+**Issues Found**: 3 — fork sweep false-positives across projects (HIGH), test suite writes into the real `~/.claude` (HIGH), archive overwrites via `renameSync`
+**HIGH findings**: 2
+**Fixes**: all 3, mutation-proven. Two of the three were introduced by cycle-1 work, which is the case a refute pass exists for; the third was found when the operator stopped an unsafe verification script.
+
+### QA Cycle 3 — 2026-09-08
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: 1 — two path encoders with no cross-check
+**HIGH findings**: 0
+**Convergence**: sequence 1, 2, 0 — the guard did not trip. It was one cycle from firing: `HIGH_2 >= HIGH_1` already held, so two or more HIGH here would have escalated to a human.
+**Fixes**: 1, mutation-proven on both shipped encoders. The first draft of that fix passed while exercising neither — replaced with an end-to-end assertion.
+
+### QA Cycle 4 — 2026-09-08
+**Gate Result**: **PASS (96/100)**, `top_issues: []`
+**Issues Found**: none
+**HIGH findings**: 0
+**PR Review** (Step 5c): ⚠️ **CONCERNS** — 4 findings (1 medium, 3 low), none blocking, all applied before Step 7. Report: `task.93.pr-review.1.observation-log-engine.md`
 
 ---
 
