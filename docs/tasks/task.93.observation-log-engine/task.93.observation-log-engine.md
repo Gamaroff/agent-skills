@@ -5,10 +5,12 @@ type: task
 description: "Build the pure Node engine, guarded shell resolver and canonical contract that the observe-work meta-skill will stand on, replacing upstream's prose-embedded shell snippets with code whose guards cannot be skipped."
 tags: [observe-work, shared-resources, engine, resolver, meta-skill]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-07
 updated: 2026-09-08
+completed_date: 2026-09-08
+pr_number: 353
 assignee:
 estimated_effort_hours: 8
 github_issue: 339
@@ -16,7 +18,7 @@ github_issue: 339
 
 # Technical Task: Observation-log engine, workspace resolver and contract
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.93.review.1.observation-log-engine.md` implemented 2026-09-08
 **GitHub Issue**: [#339](https://github.com/Gamaroff/agent-skills/issues/339)
 
@@ -660,6 +662,43 @@ defect passed by luck.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.93.gate.4.observation-log-engine.yml` — ✅ **PASS**, 96/100, `top_issues: []`
+**QA Cycles**: 4 · **Findings**: 7 raised, 7 closed · **HIGH by cycle**: 1, 2, 0, 0 (converging)
+**PR Review (Step 5c)**: ⚠️ CONCERNS — 4 findings, all applied before acceptance
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria** — 21/21 traced to evidence in the shipped files, each citing a named test or a live-executed result
+✅ **Tests** — 48 in this suite; `npm run ci:fast` green (2863/2864, 1 skipped) and 448 shell assertions
+✅ **CI** — ✅ SUCCESS on head `40101977`: `test`, `validate`, `shellcheck`, `link-check`, branch policy
+✅ **PR** — [#353](https://github.com/Gamaroff/agent-skills/pull/353), reviewed at Step 5c, findings applied
+✅ **Documentation** — `AGENTS.md` section, `CHANGELOG.md` entry, 401-line contract; all relative links resolve in the **tracked** tree
+✅ **Security** — no shell-out, no `eval`, no network; sole local require asserted by a test. **Probe mode fired**: the resolver is an allow/deny predicate, 11 candidates executed, **0 reproduced** — including near-miss negatives (`/tmpfoo`, `worktreesX`) a naive prefix match would wrongly refuse
+✅ **Compliance** — CC BY 4.0 attribution complete: author, licence link, canonical source, and an explicit statement that changes were made
+✅ **Mutation discipline** — 23 proofs across 4 cycles; every guard reverted, its named test confirmed red, then restored
+
+### What the CI gate caught
+
+The first rollup sample was **FAILURE**: 30 tests red in CI on a suite passing 48/48 locally, at a
+point where every prior step had green local evidence. Cause: `os.tmpdir()` is `/tmp` on Linux and
+`/var/folders/…` on macOS, so every test workspace was refused by the engine's **own** ephemeral
+guard on Linux only. Fixed by moving scratch to a repo-local durable base, with an import-time
+assertion using the engine's own predicate so it can never silently become platform-dependent again.
+`eval:all` runs only in CI and at the merge gate, so this was genuinely the first place it could
+surface.
+
+**Detailed Verification Log:** see [`task.93.dod.1.observation-log-engine.md`](./task.93.dod.1.observation-log-engine.md).
+
+**Task marked as ACCEPTED on:** 2026-09-08
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -720,6 +759,9 @@ encoder — the finding reproduced inside its own fix.
 | 2026-09-08 |         | QA cycle 3 CONCERNS (90/100) — 3 cycle-2 findings verified fixed, 0 HIGH (converging 1,2,0); 1 new: two path encoders with no cross-check | qa-task |
 | 2026-09-08 |         | QA cycle 3 finding fixed — end-to-end encoder-parity test, both shipped encoders mutation-proven | qa-fix |
 | 2026-09-08 |         | QA cycle 4 gate PASS (96/100) — all 7 findings closed, 0 remaining | qa-task |
+| 2026-09-08 |         | PR review (5c) CONCERNS — 4 findings, all applied | review-pr |
+| 2026-09-08 |         | CI red on Linux — test scratch sat under an ephemeral anchor; scratch base moved, import-time guard added | qa-fix |
+| 2026-09-08 | 1.2     | DoD passed — accepted (PR #353) | finalise |
 
 ---
 
@@ -802,7 +844,7 @@ encoder — the finding reproduced inside its own fix.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the implementation plan

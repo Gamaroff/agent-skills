@@ -37,8 +37,8 @@ Build `shared/resources/observation-log.js` (ten-subcommand engine), `shared/res
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 files created, 2 modified; 41 tests; **19 guards mutation-proven**; shellcheck + prettier clean | Pre-develop surface map (in-line, below) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #353](https://github.com/Gamaroff/agent-skills/pull/353); commit `b542db10`; issue #339 commented; board `in-review` → `stage-disabled` (correct, non-blocking) | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.93.qa.1–4.*.md`; `task.93.gate.1–4.*.yml`; Step 5c `CONCERNS`; PR comments posted | 4 cycles. Gates FAIL(70) → FAIL(70) → CONCERNS(90) → **PASS(96)**. HIGH by cycle 1,2,0,0 — converging. 7 findings raised, 7 closed. Step 5c `/review-pr`: **CONCERNS**, 4 findings, all applied | Both 5c lenses hung and were stopped; run in-line |
-| 7. finalise                | ⏳ Pending | `task.93.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.93.dod.1.*.md`; task `status: accepted`                          | ACCEPTED. **CI gate caught a real defect**: 30 tests red on Linux vs 48/48 local. Issue #339 closed, board `already` Done | DoD checks run in-line (4 subagent dispatches had hung earlier) |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | final commit + push to `feature/task.93.observation-log-engine` | —                    |
 
 ---
 
@@ -230,12 +230,101 @@ _Problems encountered and how they were resolved or escalated._
 
 ---
 
+## Step 7 — finalise — 2026-09-08
+
+**Accepted.** DoD verified across all six columns; the full record is in
+`task.93.dod.1.observation-log-engine.md`.
+
+**The CI gate is the reason this step matters, and it earned its place on this run.** The first
+rollup sample was `FAILURE` — **30 tests red in CI on a suite passing 48/48 locally**, at a point
+where every prior step had green local evidence and the task was otherwise ready to accept.
+
+`os.tmpdir()` is `/tmp` on Linux and `/var/folders/…` on macOS, so every test workspace the suite
+built was refused by the engine's **own** ephemeral guard — on Linux only. The guard was right; the
+scratch location was wrong. The test file's header comment actively obscured it, claiming the tests
+sidestepped the tension "by passing an explicit `--workspace`" — they do not, and it would not help,
+because `run()` checks `ephemeralReason()` on the resolved workspace however it is supplied. A
+comment asserting a safety property the code does not have is worse than no comment.
+
+Fixed by moving scratch to a repo-local, gitignored durable base — including `tempHome()`, which is
+not optional, since the resolver derives the workspace **from** `$HOME`. An import-time assertion now
+runs the engine's own `ephemeralReason()` against the scratch base and throws if it would be refused,
+so this fails loudly on any host rather than as 30 tests failing for a reason none of them names.
+Reproduced locally under `TMPDIR=/tmp` before pushing; CI green on the new head across all five jobs.
+
+**`eval:all` had never run at any earlier step** — the fast gate is `ci:fast`, and the full tier runs
+only in CI and at develop-next's merge gate. CI was genuinely the first place this could surface.
+
+**Security probe mode fired.** The resolver is an allow/deny predicate over workspace anchors, so the
+DoD security check generated candidates and executed them: **11 executed, 0 reproduced**, including
+near-miss negatives (`/tmpfoo`, `/var/tmpfoo`, `worktreesX`) that a naive prefix match would wrongly
+refuse. The boundary held.
+
+**Subagents:** the four prescribed DoD Explore agents were **not** dispatched. Four earlier dispatches
+in this task — QA cycle 1's code review and both Step 5c lenses — each ran 5–6 minutes producing
+nothing and were stopped. Re-dispatching four more would have spent the same budget on the same risk.
+The checks were run directly and that is recorded in the DoD summary, because a check that never ran
+and a check that found nothing are indistinguishable from outside.
+
+---
+
+## Completion Summary
+
+Task 93 shipped the observation-log engine, its guarded workspace resolver, the canonical contract,
+and a 48-test suite in which **every guard is mutation-proven** — 23 proofs across four QA cycles.
+
+**Findings: 8 raised, 8 closed.** Seven through the QA loop, one at the Step 7 CI gate.
+
+| # | Finding | Sev | Found by |
+|---|---|---|---|
+| 001 | Worktree-dependent workspace derivation | HIGH | QA cycle 1 |
+| 002 | `doctor` blind to project-path forks | MED | QA cycle 1 |
+| 003 | UTF-8 corruption on the chunk boundary | MED | QA cycle 1 |
+| 004 | Fork sweep false-positives across projects | HIGH | QA cycle 2 (refute pass) |
+| 005 | `archive` silently overwrites | MED | QA cycle 2 (refute pass) |
+| 006 | Test suite writes into the real `~/.claude` | HIGH | **the operator**, stopping an unsafe script |
+| 007 | Two path encoders, no cross-check | MED | QA cycle 3 |
+| — | Test scratch under an ephemeral anchor (30 red in CI) | — | **the Step 7 CI gate** |
+
+**Four of the eight were introduced by fixes to earlier findings.** That is not a failure of the
+loop; it is what the refute pass and the CI gate exist to catch, and both caught theirs.
+
+### The one lesson
+
+> **The cheap version of a check reports success.**
+
+It held six times, and each was caught only by constructing the input that could actually fail:
+
+1. A single-offset UTF-8 probe passed — the defect reproduced at **all eight** alignments.
+2. A `cd`-based worktree test would have passed — only a **real** linked worktree reproduces it.
+3. A one-directional fork test *did* pass, and let a HIGH through — both directions are needed,
+   because either alone passes against a broken implementation.
+4. A test that cleaned up after itself still **wrote into the user's home directory**.
+5. The first encoder-parity test passed while exercising **neither** shipped encoder — the finding
+   reproduced inside its own fix.
+6. The suite passed **48/48 on macOS** and failed **30 tests on Linux**.
+
+Two came from outside the automated loop entirely — the operator stopping an unsafe script, and the
+CI gate. Both are the process working, not going wrong.
+
+### A note on the subagents
+
+Six subagent dispatches in this run produced useful results (Phase 0 ×2, review pre-pass ×2,
+pre-develop map, plus the tracker poller). **Five hung and were stopped** after 5–6 minutes each: QA
+cycle 1's code review, both Step 5c lenses, and the four DoD checks were not attempted after that
+pattern. Every finding in this task was ultimately produced by direct execution. That is recorded at
+each site rather than left implicit, because a lens that never reported and a lens that found nothing
+are the same sentence from outside — which is precisely the confusion the component built here
+exists to remove.
+
+---
+
 ## Completion
 
-**Finished**: _pending_
-**Final Status**: _pending_
+**Finished**: 2026-09-08
+**Final Status**: Completed
 **Branch**: `feature/task.93.observation-log-engine`
 **PR**: [#353](https://github.com/Gamaroff/agent-skills/pull/353)
-**QA Iterations**: _pending_
-**DoD Summary**: _pending — populated after Step 7_
-**Tracker debt**: _pending — populated after Step 7_
+**QA Iterations**: 4 (gates FAIL 70 → FAIL 70 → CONCERNS 90 → PASS 96); 7 findings raised, 7 closed
+**DoD Summary**: `task.93.dod.1.observation-log-engine.md` — ACCEPTED
+**Tracker debt**: none — `access.tracker` is `full`; issue #339 closed and verified, board reached Done, nothing deferred
