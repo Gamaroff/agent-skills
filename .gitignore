@@ -62,3 +62,7 @@ secrets.yml
 !evals/**/replay/
 !evals/**/replay/**/
 !evals/**/replay/**
+
+# Scratch space for shared/resources/tests/observation-log.test.mjs.
+# Must NOT be under a path the engine classifies as ephemeral (see that file).
+.observation-log-test-tmp/

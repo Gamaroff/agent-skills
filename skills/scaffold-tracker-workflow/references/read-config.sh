@@ -460,12 +460,13 @@ _CONFIG_SUBSET_VERDICT=""
 #
 #   read_config_key                 tracker | vcs
 #   read_nested_config_key          prd.prdShardedLocation | architecture.architectureShardedLocation
+#                                   observations.workspace
 #   read_nested_config_key_strict   access.tracker | access.vcs
 #   config_child_shape              access
 #
 # Widening the surface without widening this list would re-open the hole for the new key, quietly.
 # tracker-access.test.sh pins the list against the live call sites so that cannot pass unnoticed.
-_CONFIG_GUARDED_KEYS='access|tracker|vcs|prd|architecture|prdShardedLocation|architectureShardedLocation'
+_CONFIG_GUARDED_KEYS='access|tracker|vcs|prd|architecture|prdShardedLocation|architectureShardedLocation|observations|workspace'
 
 # _config_subset_scan — populate $_CONFIG_SUBSET_VERDICT. Echoes nothing.
 #

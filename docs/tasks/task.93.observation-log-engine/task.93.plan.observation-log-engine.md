@@ -79,7 +79,9 @@ Write the contract first, then the resolver, then the engine reads, then the eng
 #    the derivation skills/remember-insight already uses
 ```
 
-**Reuse, do not reimplement, the project-identity derivation.** Read `skills/remember-insight/SKILL.md` for how it encodes the project path, and factor the shared part rather than writing a second encoder — two derivations of the same path that drift is the silent-fork failure `doctor` exists to catch.
+**Author the project-identity derivation here — there is nothing to reuse.** `skills/remember-insight/SKILL.md` *documents* the pattern `<backup-root>/.claude/projects/<encoded-project-path>/memory/` and says the directory "is defined in your system context (auto-memory section)". That skill directory holds one file and no code; nothing in this repo computes `<encoded-project-path>`. So this resolver is the **first** implementation of the convention in this repo, not the second: encode by replacing path separators with hyphens and preserving the leading separator as a leading hyphen (`/Users/x/Projects/agent-skills` → `-Users-x-Projects-agent-skills`).
+
+Write it once, in this file, and assert it in Phase 5 against a **literal** expected string. A test that recomputes the expectation the way the resolver does proves nothing — it is two derivations that drift, which is the silent-fork failure `doctor` exists to catch, wearing a test's clothes.
 
 **Exports:**
 
@@ -301,7 +303,7 @@ sourced as `source … || exit 1` — never derived from the cwd.
 | Correct exit discipline | `skills/develop-next/scripts/select-next.mjs:1629` |
 | Resolver order and guard idiom | `shared/resources/resolve-platform.sh`, `shared/resources/platform-detection.md` |
 | Contract-doc register | `shared/resources/tracker-comment-contract.md` |
-| Project-identity path derivation | `skills/remember-insight/SKILL.md` |
+| Project-identity path **convention** (documented, not implemented — author it here) | `skills/remember-insight/SKILL.md` |
 | Node test-runner conventions | `shared/resources/tests/*.test.mjs` |
 
 ## Testing Approach

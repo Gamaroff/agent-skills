@@ -1,0 +1,110 @@
+schema: 1
+task: "task.93.observation-log-engine"
+task_title: "Observation-log engine, workspace resolver and contract"
+gate: PASS
+status_reason: >-
+  TASK-93-007 verified fixed and mutation-proven on both shipped encoders. No new findings. Full
+  ten-subcommand smoke sequence clean, `npm run ci:fast` green, `shellcheck` and `prettier` clean,
+  and the suite leaves the developer's home directory byte-identical. All seven findings across four
+  cycles are closed; HIGH counts 1, 2, 0, 0.
+reviewer: "QA Engineer"
+updated: "2026-09-08T11:40:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: "2026-09-08"
+  total_iterations: 3
+  verification_method: "Each defect re-reproduced against the fixed code, then mutation-proven"
+  resolved:
+    - id: "TASK-93-001"
+      status: FIXED
+      verification: "Main checkout and a real linked worktree resolve the same workspace."
+    - id: "TASK-93-002"
+      status: FIXED
+      verification: "doctor detects a second workspace at this project's own encoding."
+    - id: "TASK-93-003"
+      status: FIXED
+      verification: "All eight UTF-8 chunk-boundary alignments decode without U+FFFD."
+    - id: "TASK-93-004"
+      status: FIXED
+      verification: "Another project's workspace is not a fork; this project's own encoding is."
+    - id: "TASK-93-005"
+      status: FIXED
+      verification: "An existing archived file survives byte-for-byte; sweep reports collision."
+    - id: "TASK-93-006"
+      status: FIXED
+      verification: "`find ~/.claude` byte-identical before and after the full suite."
+    - id: "TASK-93-007"
+      status: FIXED
+      verification: >-
+        End-to-end: the real resolver run in a real temp git repository exports the workspace the JS
+        encoder predicts. Mutation-proven on BOTH sides — mutating either the JS or the shell encoder
+        turns the test red.
+
+evidence:
+  tests_reviewed: 48
+  phases_verified: "5/5"
+  code_review_subagent: "not dispatched; the cycle-1 dispatch hung and was stopped. Every finding across all four cycles was produced by the reviewer directly, by execution."
+  smoke: "init -> write x3 -> scan -> queue -> set-status -> next-id -> doctor -> archive -> families -> checkpoint, all clean; next-id archived the resolved file as a side effect without archive being called"
+  convergence:
+    high_by_cycle: [1, 2, 0, 0]
+    converging: true
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No shell-out, no eval, no network anywhere in the engine; the only local require is
+      yaml-subset.js, asserted by a test. `repoWorktrees()` was deliberately written against the
+      filesystem rather than invoking git, preserving that property. The resolver refuses ephemeral
+      anchors. No secrets in the change set.
+  performance:
+    status: PASS
+    notes: >-
+      `scan` reads only to the closing `---`: a 5,000,029-byte file costs 8,192 bytes, asserted in
+      bytes rather than seconds. Baselines 90.3 / 108.0 / 152.7 ms for 1 / 100 / 1000 observations.
+  reliability:
+    status: PASS
+    notes: >-
+      The workspace is deterministic across worktrees, archival cannot destroy data, the health
+      check reports accurately in both directions, and the two path encoders are now pinned to each
+      other end to end.
+  maintainability:
+    status: PASS
+    notes: >-
+      Every non-obvious rule carries the failure it prevents, at the site where a reader would
+      otherwise simplify it. The test file names the mutation that catches each guard, and where a
+      cheap test would prove nothing it says so — the real-worktree requirement, the eight-alignment
+      sweep, the both-directions fork pair, and the no-reimplementation encoder check.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        A non-Latin title slugifies to the literal `observation`, so such filenames carry no
+        information beyond the id. Harmless; ids keep them unique.
+      refs: ["shared/resources/observation-log.js"]
+    - action: >-
+        `repoWorktrees()` on a `.git` file pointing at a nonexistent admin directory derives a bogus
+        main root. Filtered by `existsSync` before use; not worth code to prevent.
+      refs: ["shared/resources/observation-log.js"]
+    - action: >-
+        The `observations:` schema is documented in task 95, not here. Nothing consumes the resolver
+        until task 94, so the gap is bounded.
+      refs: ["shared/resources/observation-log-contract.md"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
