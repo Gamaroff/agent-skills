@@ -37,7 +37,7 @@ Author `skills/observe-work/` — a meta-skill that observes the session for ski
 | 2. review-task             | ✅ Done    | `task.94.review.{N}.{name}.md` exists (or skip logged)                 | `task.94.review.1.observe-work-skill.md` — READY TO IMPLEMENT, 9/10, 0 critical / 2 important / 1 optional, all fixed; status promoted planned → ready-for-development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 6/6 phases. 14 files created/modified. `npm run ci:fast` exit 0 — 2883 pass / 0 fail. New suite 20/20, glob mutation-proved RED→GREEN. | — (inline; no subagent) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #354: https://github.com/Gamaroff/agent-skills/pull/354 — 23 files, no out-of-scope leak. Issue #340 commented (`in-review`). | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.94.qa.{N}.*.md`; `task.94.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.94.qa.{N}.*.md`; `task.94.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.94.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -95,7 +95,33 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 5 (final)
+
+| Item | Value |
+|---|---|
+| Gate | **PASS** — `task.94.gate.5.observe-work-skill.yml`, 100/100 |
+| **PR Review** | **CONCERNS** — `task.94.pr-review.1.observe-work-skill.md` (Step 5c); both findings closed before Step 7 |
+| Findings across the loop | 7 raised, 7 closed (2 HIGH, 5 MEDIUM) + 2 LOW advisory |
+| Cycles used | 5 of 5 |
+
+### Cycle-by-cycle
+
+| Cycle | Gate | Score | HIGH | What it found |
+|---|---|---|---|---|
+| 1 | FAIL | 60 | 1 | Session Start branched on a `doctor` reason the engine never emits; hook undercount; bundled contract's dangling links |
+| 2 (refute) | FAIL | 70 | 1 | **Both new findings were introduced by cycle 1's fixes** — a catch-all that disabled capture on every fresh install, and an overcount left by the undercount fix |
+| 3 | CONCERNS | 90 | 0 | Third counting divergence, in opposite directions, **cancelling** — caught only because `total` disagreed. Mechanism replaced per gate 2's pre-committed rule |
+| 4 | CONCERNS | 90 | 0 | The reference still documented the mechanism cycle 3 removed |
+| 5 | **PASS** | **100** | 0 | Nothing above LOW. Two never-executed degradation branches run for the first time; both hold |
+
+### Step 5c — PR review
+
+Verdict **CONCERNS**: one `medium` code finding (the suite asserted nothing about the hook — the file behind 4 of 7 findings), one `low` conformance finding (§7 omitted a file the PR edits). Both closed rather than carried:
+
+- `observe-work-hook.test.js` added — 6 tests, mutation-proved twice (reinstating the cycle-3 off-by-one turns 3 red; making a degradation path guess instead of staying silent turns 1 red).
+- §7 records the contract file and the new test.
+
+Writing that suite surfaced behaviour nothing had tested: a log holding **only** a frontmatter-less file trips the engine's own `scan-broken` guard, and the hook goes silent rather than reporting a partial count.
 
 ---
 

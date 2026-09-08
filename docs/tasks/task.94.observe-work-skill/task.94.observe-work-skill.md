@@ -331,10 +331,12 @@ Two changes are worth naming because they are not confined to the new directory:
 ### Files to Create (Tests)
 
 7. ✅ `skills/observe-work/tests/observe-work.test.js` — structural invariants of the prose
+7a. ✅ `skills/observe-work/tests/observe-work-hook.test.js` — behavioural tests for the SessionStart hook: hook/engine agreement across every input the QA loop raised, the review-nag branches, and silence on each degradation path. Added at PR review (CR-1); covered by the existing `skills/observe-work/tests/*.test.js` glob, so no further `package.json` change
 
 ### Files to Modify (Dependencies)
 
 8. ✅ `package.json` — add the per-skill test glob
+8a. ✅ `shared/resources/observation-log-contract.md` — six relative sibling links demoted to plain names, plus a section recording why. Pulled in by QA finding TASK-94-003: task 94 is the first skill to bundle this task-93 file, so it is where its dangling links first ship. Fixed at the source, never the bundled copy.
 
 ### Files to Modify (Generated — regenerate, never hand-edit)
 
