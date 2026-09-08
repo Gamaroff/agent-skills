@@ -34,7 +34,7 @@ Make `bundle_skill.py` reference discovery transitive to a fixed point, add a CI
 | 1. create-branch           | ✅ Done    | Branch `feature/task.86.*` exists in git                                | Branch created at `1df795e2`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.86.review.1.bundle-transitive-refresh.md` exists                   | READY TO IMPLEMENT. 4 Critical + 5 Important fixed. Status draft → ready-for-development | — |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                       | 5 phases complete. 12 files, 9 new tests. `ci:fast` green (2806 tests, 0 fail); all 4 validate.yml steps reproduced locally | — |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                            |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                            | PR #352 → develop. 4 conventional commits. Issue #351 commented (`reason: posted`) | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.86.qa.{N}.*.md`; `task.86.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.86.dod.{N}.*.md`; task `status: accepted`                          |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                      |       | —                    |
@@ -99,7 +99,7 @@ _Track each QA review/fix cycle._
 **Finished**: _pending_
 **Final Status**: _pending_
 **Branch**: `feature/task.86.bundle-transitive-refresh`
-**PR**: _pending_
+**PR**: https://github.com/Gamaroff/agent-skills/pull/352
 **QA Iterations**: _pending_
 **DoD Summary**: _pending_
 **Tracker debt**: _pending_

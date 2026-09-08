@@ -260,8 +260,9 @@ nothing about this defect.
 - [x] `npm run bundle` is still idempotent — second run touched 0 files
 - [x] No skill gains or loses a bundled file — 9 files changed, **0 added, 0 removed** (an earlier attempt added 38; that approach was rejected and is now guarded by a test)
 - [x] The 83 source-less copies are untouched — pinned by the out-of-scope boundary test
-- [ ] `npm run ci` green **and** the `validate.yml` job reproduced locally — `npm run ci` alone runs
-      neither `validate:all` nor the freshness step, so it cannot evidence this change
+- [x] `npm run ci` green (exit 0; 2806 tests, 0 fail) **and** the `validate.yml` job reproduced
+      locally (skills 125/125, catalog current, dep graph current, `--check --all` green). Confirmed
+      independently by GitHub CI on PR #352: all 5 checks SUCCESS, including `validate`
 
 ---
 
@@ -290,6 +291,69 @@ committed (stale) state, which is the pre-task status quo.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-08
+**Quality Score**: 60/100
+**Gate Decision**: FAIL
+
+### QA Reports
+
+- Cycle 1: [task.86.qa.1.bundle-transitive-refresh.md](./task.86.qa.1.bundle-transitive-refresh.md) — gate [task.86.gate.1.bundle-transitive-refresh.yml](./task.86.gate.1.bundle-transitive-refresh.yml)
+
+### Test Coverage Summary
+
+- **Tests executed**: 2806 (full `npm run ci`, 0 fail) + 19 bundler-specific
+- **Phases verified**: 5/5 (3 PASS, 1 CONCERNS, 1 FAIL)
+- **Mutation proofs**: 5 executed, 5 held
+- **Critical issues**: 1 HIGH, 4 MEDIUM, 4 LOW
+- **NFR**: Security PASS, Performance PASS, Reliability CONCERNS, Maintainability PASS
+
+### QA Fix Cycle 1 — 2026-09-08
+
+All five correctness findings fixed, each with a test, each mutation-proven.
+
+| ID | Fix |
+| --- | --- |
+| TASK86-001 | `--check` is honoured anywhere in argv, not only at `argv[0]`; unknown `--flags` are rejected (exit 2) rather than falling through to a mutating run; `--all` refuses stray paths |
+| TASK86-002 | `check_skill()` compares the `.sh` mode against the source and reports `WRONG MODE` — restoring coverage the replaced `git diff` check had |
+| TASK86-003 | A banner-carrying copy whose source was deleted is reported as `ORPHANED` |
+| TASK86-004 | Reconciliation now requires evidence a file is bundler output; a same-named authored file is reported `AMBIGUOUS`, never overwritten |
+| TASK86-005 | Symlinked references are skipped, and `write_if_changed` unlinks before writing, so the banner can never be injected into the shared source |
+
+**Two things the fix pass got wrong first, kept in the record rather than tidied away:**
+
+- **The banner-only discriminator for TASK86-004 was too strict and would have refused to fix three
+  of the eight files this task exists to correct.** The `verify-push-state.sh` copies were bundled
+  *before* header injection existed, so they carry no banner. The discriminator now accepts a copy
+  that is byte-identical to the rewritten source as well — the provable pre-header shape — and only
+  a file matching neither is reported `AMBIGUOUS`.
+- **The banner-detection window was a 512-byte slice, and the banner sits after YAML frontmatter.**
+  In one real file the marker starts at char 499 and runs past 512, so a correctly-bundled copy was
+  misclassified as hand-authored and `--check` failed on the live tree. Now a 40-line window.
+
+**Two of the five mutation proofs initially proved nothing, and were redone:**
+
+- The mode-check mutation hit `write_if_changed`'s identical `.sh` block instead of `check_skill`'s —
+  `str.replace(..., 1)` takes the first occurrence, and there are two.
+- The symlink mutation removed one of two independent guards, so the other still held. Only removing
+  both makes the test red.
+
+A mutation that fails to turn a test red is a statement about the mutation as often as about the test.
+
+---
+
+### Key Findings
+
+All eight §9 success criteria hold when checked against the tree. The gate fails on code review:
+`--check` is recognised only at `argv[0]`, so `--all --check` silently performs a mutating bundle
+(verified: 6 files written), and `--check` does not verify the `.sh` executable bit that the `git
+diff` check it replaced did catch.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                               | Author       |
@@ -297,6 +361,8 @@ committed (stale) state, which is the pre-task status quo.
 | 2026-09-03 | 1.0     | Filed from task 77 QA cycle 3 (TASK77-025) | develop-task |
 | 2026-09-08 | 1.1     | Review (4/10 → 9/10). Root cause corrected — discovery was always transitive; the real cause is three reachability edges leaving 26 source-backed orphans, 8 stale today. Scope self-contradiction resolved (refresh source-backed orphans; leave 83 source-less ones). CI item re-framed: a freshness step already exists and is structurally blind. `package_skill.py` scoped out with a reason. Seven missing mandatory sections added. | review-task |
 | 2026-09-08 |         | Status → ready-for-development            | review-task |
+| 2026-09-08 |         | qa-fix cycle 1 — 5 findings fixed, 7 tests added, all mutation-proven | qa-fix |
+| 2026-09-08 |         | QA gate FAIL (60/100) — 1 HIGH, 4 MEDIUM, 4 LOW; all 8 success criteria verified against the tree | qa-task |
 | 2026-09-08 |         | Implemented — 12 files, 9 tests. Disk reconciliation + `.json` discovery + `--check`; 8 stale copies corrected, 0 files added. Following `references/X` out of shared text was implemented, measured to vendor 38 unwanted files, and reverted. | develop |
 
 ---
