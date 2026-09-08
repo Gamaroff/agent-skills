@@ -25,6 +25,7 @@ import {
   existsSync,
   rmSync,
   mkdirSync,
+  realpathSync,
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1484,6 +1485,71 @@ test("archive refuses to overwrite an existing archived file", () => {
     );
   } finally {
     cleanup(dir);
+  }
+});
+
+test("the workspace the resolver produces is the one the JS encoder predicts", () => {
+  // MUTATION: change either encoder — e.g. make the JS `encodeProjectPath` strip
+  // a trailing separator, or the shell `_ow_encode_project_path` use `_`.
+  //
+  // TASK-93-007. Two implementations answer the same question for different
+  // consumers: the SHELL one decides where the workspace IS, the JS one decides
+  // where `doctor` LOOKS for forks. If they diverge, doctor silently stops
+  // recognising the resolver's own workspace and the fork check goes quiet — a
+  // guard failing silently, which is what this component exists to eliminate.
+  //
+  // This asserts them END TO END, through their real consumers, rather than
+  // calling the shell function directly. Two reasons, and the second is the
+  // important one:
+  //
+  //   1. The resolver `unset -f`s its helpers on the way out — a deliberate,
+  //      separately-tested property — so the function does not survive a source
+  //      and cannot be called from outside.
+  //   2. A test that re-implemented the shell expansion in order to compare
+  //      would be a THIRD encoder. Three encoders agreeing with each other prove
+  //      nothing about the two that ship. An earlier draft of this test did
+  //      exactly that and passed while exercising neither shipped path.
+  //
+  // So: run the real resolver in a real repository and check the path it
+  // exports against the path the JS encoder predicts for that same repository.
+  const home = tempHome("encoder-parity");
+  const repo = ws("encoder-parity-repo");
+  try {
+    const init = spawnSync("git", ["init", "-q", repo], { encoding: "utf8" });
+    assert.equal(init.status, 0, `git init failed: ${init.stderr}`);
+
+    const r = spawnSync(
+      "/bin/bash",
+      [
+        "-c",
+        `unset OBS_WORKSPACE; source "$1" || exit 1; printf '%s' "$OBS_WORKSPACE"`,
+        "bash",
+        RESOLVER,
+      ],
+      { encoding: "utf8", env: isolatedEnv(home), cwd: repo },
+    );
+    assert.equal(r.status, 0, `resolver failed: ${r.stderr}`);
+
+    // `ws()` builds under the OS temp dir, which on macOS is a /var symlink to
+    // /private/var. git reports the resolved path, so resolve ours too before
+    // predicting — otherwise this compares a path to its own symlink and fails
+    // for a reason that has nothing to do with the encoders.
+    const realRepo = realpathSync(repo);
+    const predicted = join(
+      home,
+      ".claude",
+      "projects",
+      engine.encodeProjectPath(realRepo),
+    );
+
+    assert.equal(
+      r.stdout,
+      predicted,
+      "the shell resolver and the JS encoder disagree about this project's path",
+    );
+  } finally {
+    cleanup(repo);
+    cleanup(home);
   }
 });
 

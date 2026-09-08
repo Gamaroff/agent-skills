@@ -502,6 +502,47 @@ None. Every file is new, nothing consumes them yet, and the blast radius of a de
 
 ## Dev Agent Record
 
+### QA Fix Cycle 3 — 2026-09-08
+
+One finding, and the first draft of its fix was itself wrong in the way the finding warned about.
+
+**TASK-93-007 (MEDIUM)** — the cycle-2 fix created `encodeProjectPath()` in JavaScript alongside the
+existing `_ow_encode_project_path` in the shell resolver. Two implementations of the same encoding,
+answering for different consumers: the shell one decides where the workspace **is**, the JS one
+decides where `doctor` **looks** for forks. They agreed, but nothing kept them in step — and the
+task's own Low Risk Areas §1 had predicted exactly this and prescribed a test.
+
+**The first attempt at that test proved nothing, and the reason is worth keeping.** It tried to
+`source` the resolver and call `_ow_encode_project_path` directly. The resolver `unset -f`s its
+helpers on the way out — a deliberate, separately-tested property — so the function never survived
+the source, and the test silently fell through to a bash one-liner **written for the test**. That is
+a *third* encoder. It passed while exercising neither shipped path, which is precisely the failure
+the finding was about, reproduced inside its own fix.
+
+Replaced with an **end-to-end** assertion: run the real resolver in a real temp git repository under
+an isolated `HOME`, and check the workspace it exports equals what the JS encoder predicts for that
+repository. Both shipped implementations, through their real consumers, no reimplementation.
+
+One incidental detail the end-to-end form forced: `ws()` builds under the OS temp dir, which on macOS
+is `/var` → `/private/var`. Git reports the resolved path, so the prediction resolves too —
+otherwise the test compares a path to its own symlink and fails for a reason unrelated to encoders.
+
+**Mutation proofs — 2/2, one per shipped encoder**
+
+| Mutation | Result |
+|---|---|
+| JS `encodeProjectPath` joins with `_` instead of `-` | RED |
+| Shell `_ow_encode_project_path` substitutes `_` instead of `-` | RED |
+
+Both directions matter: a test that only caught a JS change would leave the shell side unguarded,
+and it is the shell side that decides where data is actually written.
+
+**File list**
+
+- `shared/resources/tests/observation-log.test.mjs` — encoder-parity test added (47 → 48)
+
+---
+
 ### QA Fix Cycle 2 — 2026-09-08
 
 Three findings fixed. Two came from the cycle-2 refute pass; the third came from the **operator
@@ -662,6 +703,8 @@ All three findings sit in one seam — **the boundary between the process and th
 | 2026-09-08 |         | Status → in-progress (QA FAIL) | qa-task |
 | 2026-09-08 |         | QA cycle 2 findings fixed — narrowed fork sweep, archive collision guard, temp-HOME test isolation; 4 mutation proofs | qa-fix |
 | 2026-09-08 |         | Status → ready-for-review | qa-fix |
+| 2026-09-08 |         | QA cycle 3 CONCERNS (90/100) — 3 cycle-2 findings verified fixed, 0 HIGH (converging 1,2,0); 1 new: two path encoders with no cross-check | qa-task |
+| 2026-09-08 |         | QA cycle 3 finding fixed — end-to-end encoder-parity test, both shipped encoders mutation-proven | qa-fix |
 
 ---
 

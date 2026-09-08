@@ -1,0 +1,125 @@
+schema: 1
+task: "task.93.observation-log-engine"
+task_title: "Observation-log engine, workspace resolver and contract"
+gate: CONCERNS
+status_reason: >-
+  All three cycle-2 findings verified fixed, each re-reproduced against the fixed code and
+  mutation-proven. No HIGH findings this cycle — the loop is converging (HIGH counts 1, 2, 0). One
+  MEDIUM remains: the cycle-2 fix introduced a SECOND path encoder (JS, beside the existing bash
+  one), and nothing asserts the two agree. They do agree today, verified across six cases including
+  a trailing slash and non-ASCII — but that is the exact "two derivations of the same path that
+  drift" hazard this task's own risk register names, now with no guard.
+reviewer: "QA Engineer"
+updated: "2026-09-08T11:10:00Z"
+
+top_issues:
+  - id: "TASK-93-007"
+    severity: medium
+    file: "shared/resources/tests/observation-log.test.mjs"
+    finding: >-
+      There are now TWO implementations of the project-path encoding — `_ow_encode_project_path` in
+      `resolve-observation-workspace.sh` (which decides where the workspace IS) and
+      `encodeProjectPath` in `observation-log.js` (which decides where `doctor` LOOKS for forks) —
+      and no test asserts they agree. Verified by hand this cycle that they do, across six inputs
+      including `/`, a trailing slash, embedded spaces and non-ASCII. But if they ever diverge,
+      `doctor` silently stops recognising the resolver's own workspace and the fork check goes quiet
+      — a guard failing silently, which is the failure mode this entire component exists to
+      eliminate. The task's own Low Risk Areas §1 predicted precisely this and prescribed a test;
+      the cycle-2 fix created the second encoder without adding one.
+    suggested_action: >-
+      Add a test that runs both encoders over the same input set (at minimum: a normal absolute path,
+      `/`, a trailing slash, embedded spaces, non-ASCII) and asserts equality — invoking the shell
+      one through `spawnSync` on the real script rather than reimplementing it, since a
+      reimplementation would be a third encoder and would prove nothing. Mutation-prove by changing
+      one encoder and confirming the test goes red.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 1
+  fix_date: "2026-09-08"
+  total_iterations: 2
+  verification_method: "Each defect re-reproduced against the fixed code, then mutation-proven"
+  resolved:
+    - id: "TASK-93-004"
+      status: FIXED
+      verification: >-
+        Both directions confirmed against a temp HOME: an unrelated project's workspace yields
+        `no-fork: true`; this project's own encoding yields `fork-detected`. `repoWorktrees()`
+        returns the correct pair from the repo root, a subdirectory, and inside a linked worktree.
+        Mutation-proven.
+    - id: "TASK-93-005"
+      status: FIXED
+      verification: >-
+        A same-named file already in `archive/` survives byte-for-byte, the active file stays put,
+        and the sweep reports `skipped: [{file, why: "collision"}]`. Mutation-proven.
+    - id: "TASK-93-006"
+      status: FIXED
+      verification: >-
+        `find ~/.claude` is byte-identical before and after the full `npm run ci:fast`, and the
+        project count is unchanged at 12. Mutation-proven by removing the isolated env from the fork
+        test — which goes red without writing anything outside the temp tree.
+
+evidence:
+  tests_reviewed: 47
+  phases_verified: "5/5"
+  code_review_subagent: "not dispatched; the cycle-1 dispatch hung and was stopped. All findings across all three cycles were produced by the reviewer directly, by execution."
+  refute_pass: false
+  convergence:
+    high_by_cycle: [1, 2, 0]
+    converging: true
+    note: >-
+      Cycle 3 raised 0 HIGH against cycle 2's 2, so the guard does not trip. Recorded because the
+      count ROSE from cycle 1 to cycle 2 — had cycle 3 raised 2 or more, the loop would have
+      escalated rather than continued, and that would have been the correct outcome.
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      Still no shell-out, no eval, no network. `repoWorktrees()` was deliberately written against
+      the filesystem rather than invoking `git`, preserving the engine's no-subprocess property.
+  performance:
+    status: PASS
+    notes: >-
+      `repoWorktrees()` adds one upward directory walk plus one small readdir, on `doctor` only.
+      Scan baselines unchanged.
+  reliability:
+    status: PASS
+    notes: >-
+      Upgraded from CONCERNS. The workspace is deterministic across worktrees, archival can no
+      longer destroy data, and the health check now reports accurately in both directions. The
+      remaining MEDIUM is a missing guard against future drift, not a current defect.
+  maintainability:
+    status: PASS
+    notes: >-
+      `repoWorktrees()` documents why it reads `.git` directly instead of shelling out, and the fork
+      tests explain why both directions must be asserted.
+
+recommendations:
+  immediate:
+    - action: "Assert the shell and JS path encoders agree, over a shared input set"
+      refs:
+        - "shared/resources/tests/observation-log.test.mjs"
+        - "shared/resources/resolve-observation-workspace.sh"
+  future:
+    - action: >-
+        `repoWorktrees()` on a `.git` file whose gitdir points at a nonexistent admin directory
+        derives a bogus main root (e.g. `/nope`). Harmless — the candidate is filtered by
+        `existsSync` before use — and not worth code to prevent.
+      refs: ["shared/resources/observation-log.js"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "TASK-93-007: a test asserting the two path encoders agree"
