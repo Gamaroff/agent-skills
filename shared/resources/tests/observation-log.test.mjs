@@ -270,10 +270,22 @@ test("next-id over a log containing 0108 returns 109 — the octal regression", 
   // zero-stripping step in imitation of upstream's `sed` mitigation.
   const { dir, P } = initWs("octal");
   try {
+    // Two prefixes, because they fail differently under shell arithmetic and
+    // only one of them fails LOUDLY. `0105` is a valid octal constant, so it
+    // silently reads as 69 and yields 70 — the assertion below is live only
+    // because this file is planted. `0108` is not valid octal at all and errors
+    // the whole derivation. An earlier version of this test planted only `0108`,
+    // which made the `70` assertion unfalsifiable: 70 is an artefact of an input
+    // the test did not use, so it read as coverage while proving nothing.
+    obs(P, "0105-octal-silent.md", { id: 105, status: "open" });
     obs(P, "0108-octal-hazard.md", { id: 108, status: "open" });
     const r = cli(["next-id", "--workspace", dir, "--json"]);
-    assert.equal(r.json.id, 109, "0108 must parse as one hundred and eight");
-    assert.notEqual(r.json.id, 70, "the octal reading of 0105 is 69");
+    assert.equal(r.json.id, 109, "max prefix is 108, so the next id is 109");
+    assert.notEqual(
+      r.json.id,
+      70,
+      "70 is 0105 read as octal (69) plus one — the silent half of the defect",
+    );
   } finally {
     cleanup(dir);
   }

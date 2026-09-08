@@ -44,7 +44,7 @@ All notable changes to this project will be documented in this file. Format foll
   `write` — a batch that pre-computes a base and hardcodes sequential numbers collapses N independent
   max-checks into one stale read, and the absent flag is the enforcement rather than a prose request.
 
-  40 tests, and **every guard is mutation-proven** — the guard reverted, a named test confirmed red, the
+  48 tests, and **every guard is mutation-proven** — the guard reverted, a named test confirmed red, the
   guard restored. That pass found two tests that did not test what they claimed (the parked-archival
   exemption was held up by the date half of the gate rather than by set membership; the resolver's
   `export` was read back in the sourcing shell, where a plain assignment is visible too) and one live

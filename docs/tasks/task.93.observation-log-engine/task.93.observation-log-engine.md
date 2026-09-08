@@ -288,12 +288,16 @@ The forward-compatibility commitment worth stating: **the `reason` vocabulary an
 ### Files to Modify (Documentation)
 
 5. ✅ `AGENTS.md` — new `## Observation Log` section pointing at the contract
+6. ✅ `CHANGELOG.md` — `[Unreleased] → Added` entry
+7. ✅ `shared/resources/read-config.sh` — registers `observations.workspace` in `_CONFIG_GUARDED_KEYS`. **Not foreseen when this task was written**, and required rather than incidental: the resolver's new call site widens the reader surface, and without the registration the key resolves silently empty on a python-less host, inverting the documented precedence. An existing repo guard (`tracker-access.test.sh` §44) fails until it is made.
 
 ### Files to Delete
 
 None.
 
-**Note on bundling**: no skill references these paths yet, so `npm run bundle` produces no `references/` copies in this task. Task 94 is what pulls them into `skills/observe-work/references/`.
+**Note on bundling**: no skill references the three **new** paths yet, so `npm run bundle` produces no `references/` copies *of them* in this task. Task 94 is what pulls them into `skills/observe-work/references/`.
+
+> The PR nevertheless carries **48 changed `skills/*/references/read-config.sh` files**. Those follow from file 7 above: `read-config.sh` is an existing shared resource that ~48 skills already reference, so editing it requires `npm run bundle` and the refreshed copies ship with it. Stated explicitly because the sentence above, read as a check against the PR's file list, otherwise gives the wrong answer about 48 files.
 
 ---
 
