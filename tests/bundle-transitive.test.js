@@ -1,4 +1,4 @@
-"use strict";
+check: (() => run(["--check", skillDir]), "use strict");
 /**
  * Bundler regression — reachability, disk reconciliation, and honest status.
  *
@@ -151,9 +151,9 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
     chmodRef: (name, mode) =>
       fs.chmodSync(path.join(skillDir, "references", name), mode),
     symlinkRef: (name, target) => {
-      const refs = path.join(skillDir, "references");
-      fs.mkdirSync(refs, { recursive: true });
-      fs.symlinkSync(target, path.join(refs, name));
+      const dest = path.join(skillDir, "references", name);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.symlinkSync(target, dest);
     },
     writeShared: (name, content) =>
       fs.writeFileSync(path.join(root, "shared", "resources", name), content),
@@ -957,5 +957,169 @@ test("TASK86-014: a symlink no rule discovers is still reported", (t) => {
     fx.readShared("link.md"),
     before,
     "and the source stays untouched",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 3. Two of these close TEST gaps rather than code defects: a
+// behaviour that no assertion pinned is a behaviour the next change can delete
+// silently.
+// ---------------------------------------------------------------------------
+
+test("F-001: --check asserts pass 3, not only references/", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/g.md.\n`,
+      },
+      sharedFiles: { "g.md": "# G\n" },
+    },
+    t,
+  );
+  fx.bundle(); // rewrites SKILL.md, bundles g.md
+
+  // A skill source that still names shared/resources/ — references/ is fresh.
+  fs.writeFileSync(
+    path.join(fx.skillDir, "guide.md"),
+    "# Guide\n\nSee shared/resources/g.md.\n",
+  );
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    1,
+    `The check looked only inside references/, so a skill source awaiting a pass-3 ` +
+      `rewrite passed while 'npm run bundle' would change it — the same ` +
+      `green-CI-but-dirty-tree split, in the dimension the check had dropped. ` +
+      `Output:\n${res.stdout}`,
+  );
+  assert.match(res.stdout, /UNREWRITTEN/);
+});
+
+test("F-002: mode drift is caught in BOTH directions", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/t.sh.\n`,
+      },
+      sharedFiles: { "t.sh": "#!/usr/bin/env bash\necho hi\n" }, // 0644 source
+    },
+    t,
+  );
+  fx.bundle();
+  fx.chmodRef("t.sh", 0o755); // copy GAINS a bit the source never had
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    1,
+    `Gating on "is the source executable" caught a copy that LOST its +x but not ` +
+      `one that gained one — and git ships the bit to consumers. Output:\n${res.stdout}`,
+  );
+  assert.match(res.stdout, /WRONG MODE/);
+
+  fx.bundle();
+  assert.equal(fx.check().status, 0, "and the bundler must repair it");
+});
+
+test("F-003: an authored .json is not destroyed, and is not called regenerable", (t) => {
+  const AUTHORED = '{\n  "authored": true\n}\n';
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: { "cfg.json": '{\n  "shared": true\n}\n' },
+      refsFiles: { "cfg.json": AUTHORED },
+    },
+    t,
+  );
+
+  fx.bundle();
+
+  assert.equal(
+    fx.readRef("cfg.json"),
+    AUTHORED,
+    `A '.json' early return skipped the evidence check entirely, so an authored ` +
+      `.json was silently overwritten — and --check then called it STALE and told ` +
+      `the operator to run the bundler that would destroy it.`,
+  );
+  const res = fx.check();
+  assert.match(
+    res.stdout,
+    /AMBIGUOUS/,
+    "it must be reported as needing a decision",
+  );
+});
+
+test("F-004: a DANGLING symlink (no source) is still reported", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: {},
+    },
+    t,
+  );
+  fx.symlinkRef("nope.md", "../../../shared/resources/nope.md");
+
+  const res = fx.check();
+  assert.equal(
+    res.status,
+    1,
+    `This is the MORE dangerous half — the link is already dangling for anyone ` +
+      `copying the directory verbatim — and it reached neither the expected set ` +
+      `nor source_backed_on_disk. Output:\n${res.stdout}`,
+  );
+  assert.match(res.stdout, /SYMLINK/);
+});
+
+test("F-005: a mode-only repair is REPORTED, not silently counted as in sync", (t) => {
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/t.sh.\n`,
+      },
+      sharedFiles: { "t.sh": "#!/usr/bin/env bash\necho hi\n" },
+    },
+    t,
+  );
+  fx.chmodShared("t.sh", 0o755);
+  fx.bundle();
+  fx.chmodRef("t.sh", 0o644);
+
+  const stdout = fx.bundle();
+  assert.doesNotMatch(
+    stdout,
+    /in sync/,
+    `The bundler mutated the tree (it chmod'd the file) — saying 'in sync' is the ` +
+      `same class of untruth this whole task is about. Said:\n${stdout}`,
+  );
+});
+
+test("F-006: the banner window survives long YAML frontmatter", (t) => {
+  // Every other fixture has 1–3 line frontmatter, so the line-based window was
+  // load-bearing but unexercised: the suite would stay green with the old
+  // 512-byte window restored, which misclassified a real file in this repo.
+  const longDescription = "x".repeat(700);
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": `${SKILL_MD_HEAD}\nNothing.\n` },
+      sharedFiles: {
+        "long.md": `---\nname: long\ndescription: ${longDescription}\n---\n\n# Long\n`,
+      },
+      refsFiles: {},
+    },
+    t,
+  );
+  // Bundle it in by naming it, then confirm the round-trip is clean.
+  fs.writeFileSync(
+    path.join(fx.skillDir, "SKILL.md"),
+    `${SKILL_MD_HEAD}\nSee shared/resources/long.md.\n`,
+  );
+  fx.bundle();
+
+  assert.equal(
+    fx.check().status,
+    0,
+    "the banner lands after ~740 bytes of frontmatter; a byte-bounded window cuts " +
+      "the marker in half and misclassifies a correctly-bundled copy",
   );
 });
