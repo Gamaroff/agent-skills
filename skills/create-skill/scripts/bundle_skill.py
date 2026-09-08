@@ -13,11 +13,12 @@ skill.
 
 Usage:
     python bundle_skill.py <path/to/skill-folder>
-    python bundle_skill.py --all                 # bundle every skill under skills/
+    python bundle_skill.py --all                  # bundle every skill under skills/
+
+Exit codes: 0 success; 1 a skill failed to bundle; 2 usage error.
 """
 
 import re
-import shutil
 import sys
 from pathlib import Path
 
@@ -42,7 +43,7 @@ JS_ESM_SHARED_RE = re.compile(
 # bundled location, one level up from scripts/).
 SH_SHARED_RE = re.compile(r'(?:\.\./)+shared/resources/([A-Za-z0-9._-]+)')
 # Matches already-rewritten in-tree references (so re-runs and partial states work).
-REFS_REF_RE = re.compile(r'(?:^|[\s(\[`\'"/])references/([A-Za-z0-9._-]+\.(?:md|sh|js|mjs|py))')
+REFS_REF_RE = re.compile(r'(?:^|[\s(\[`\'"/])references/([A-Za-z0-9._-]+\.(?:json|md|sh|js|mjs|py))')
 # Sibling require/import in JS — `require("./foo.js")` — used to follow transitive
 # deps inside bundled shared .js files.
 JS_SIBLING_RE = re.compile(r'require\(["\']\./([A-Za-z0-9._/-]+\.js)["\']\)')
@@ -60,6 +61,13 @@ SH_SIBLING_RE = re.compile(
     r'(?:source|exec|\.)\s+["\']?(?:\$\(dirname[^)]*\)/|\./)?([A-Za-z0-9._-]+\.sh)["\']?'
 )
 EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
+# Suffixes that legitimately carry no provenance banner. Kept for documentation:
+# absence of a banner is not evidence about these. It is NOT a licence to write —
+# an early `return True` here made an authored `.json` silently destroyable, and
+# Evidence 2 (byte-equality with the rewritten source) is available for these
+# suffixes precisely because no header is injected, so every genuine copy still
+# passes.
+HEADERLESS_SUFFIXES = {'.json'}
 AUTOGEN_MARKER = "AUTO-GENERATED — DO NOT EDIT"
 
 
@@ -99,40 +107,74 @@ def inject_header(content, filename, suffix):
     return header + content
 
 
-def bundle_skill(skill_path):
-    skill_path = Path(skill_path).resolve()
-    if not (skill_path / 'SKILL.md').exists():
-        print(f"❌ SKILL.md not found in {skill_path}")
+def rewrite_text(content, suffix):
+    """Rewrite `shared/resources/X` references to their bundled `references/X` form.
+
+    Module-level rather than nested inside `bundle_skill()` because the freshness
+    write path and the ambiguity gate must agree on it exactly: a bundled copy is
+    the source PLUS a banner PLUS this rewrite, so a naive checksum can never
+    match. One definition, two callers.
+    """
+    if suffix == '.md':
+        return SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
+    if suffix in ('.js', '.mjs'):
+        # Both forms are applied to both suffixes: a `.js` file may be ESM in a
+        # consumer whose package.json says so, and a `.mjs` file may still use
+        # createRequire(). Each regex is a no-op when its syntax is absent.
+        content = JS_SHARED_RE.sub(
+            lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)})',
+            content,
+        )
+        return JS_ESM_SHARED_RE.sub(
+            lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)}',
+            content,
+        )
+    if suffix == '.sh':
+        return SH_SHARED_RE.sub(lambda m: f"../references/{m.group(1)}", content)
+    return content
+
+
+def expected_bytes(src, name):
+    """The exact bytes `<skill>/references/<name>` must hold for source `src`.
+
+    This is the single definition of "in sync". Undecodable sources bypass both
+    transforms and are copied verbatim, matching the historical behaviour.
+    """
+    suffix = Path(name).suffix
+    try:
+        return inject_header(
+            rewrite_text(src.read_text(), suffix), name, suffix
+        ).encode('utf-8')
+    except UnicodeDecodeError:
+        return src.read_bytes()
+
+
+def _within(root, candidate):
+    """True when `candidate` stays inside `root` once `..` segments are resolved."""
+    try:
+        return candidate.resolve().is_relative_to(root.resolve())
+    except (OSError, ValueError):
         return False
 
-    repo_root = find_repo_root(skill_path)
-    if not repo_root:
-        print(f"❌ Cannot locate repo root from {skill_path}")
-        return False
 
-    shared_dir = repo_root / 'shared' / 'resources'
-    refs_dir = skill_path / 'references'
+def discover_needed(skill_path, shared_dir, refs_dir):
+    """Resolve the transitive set of shared resources a skill reaches.
 
-    def rewrite_text(content, suffix):
-        if suffix == '.md':
-            return SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
-        if suffix in ('.js', '.mjs'):
-            # Both forms are applied to both suffixes: a `.js` file may be ESM in a
-            # consumer whose package.json says so, and a `.mjs` file may still use
-            # createRequire(). Each regex is a no-op when its syntax is absent.
-            content = JS_SHARED_RE.sub(
-                lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)})',
-                content,
-            )
-            return JS_ESM_SHARED_RE.sub(
-                lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)}',
-                content,
-            )
-        if suffix == '.sh':
-            return SH_SHARED_RE.sub(lambda m: f"../references/{m.group(1)}", content)
-        return content
+    Returns (needed, skill_files). `needed` maps bundled name -> source Path.
 
-    # Pass 1: walk skill files (excluding references/) and shared files transitively.
+    Discovery seeds from the skill's own files — following both `shared/resources/X`
+    and `references/X` there — and then follows only the `shared/resources/X` form
+    (plus JS/shell sibling imports) out of each shared source, to a fixed point.
+
+    `references/X` is deliberately NOT followed out of shared text. It reads as a
+    dependency but is usually prose: `tracker-card-summary.md` names
+    `references/jira-sync.js` while explicitly stating that it avoids the
+    `shared/resources/` form so the bundler will *not* vendor a Jira client into
+    GitHub-only skills. Following it there vendored 38 unwanted files across the
+    repo. Copies that no discovery rule reaches are handled after the fact by
+    `source_backed_on_disk()` instead, which keys on a file already existing rather
+    than on a sentence mentioning it.
+    """
     skill_files = (
         list(skill_path.rglob('*.md'))
         + list(skill_path.rglob('*.js'))
@@ -145,11 +187,18 @@ def bundle_skill(skill_path):
         and 'references' not in f.relative_to(skill_path).parts
     ]
 
-    needed = {}  # filename -> source Path
+    needed = {}           # filename -> source Path
     pending = []          # candidates from shared/resources/X — warn if missing
     pending_quiet = []    # candidates from references/X — many are skill-native, silent
     for f in skill_files:
-        text = f.read_text()
+        try:
+            text = f.read_text()
+        except (UnicodeDecodeError, OSError):
+            # A non-UTF-8 source anywhere in a skill aborted the whole 125-skill
+            # `--all` run with a raw traceback and exit 1. Guarded here AND in
+            # pass 3 below — an earlier version guarded only this one while
+            # claiming it was the only unguarded read, which left the crash live.
+            continue
         pending.extend(collect_shared_refs(text))
         for m in REFS_REF_RE.finditer(text):
             pending_quiet.append(m.group(1))
@@ -165,6 +214,14 @@ def bundle_skill(skill_path):
         if name in seen:
             continue
         seen.add(name)
+        # `name` is an unsanitised regex capture whose class permits `.` and `/`,
+        # so `shared/resources/../../OUTSIDE.md` escaped both refs_dir and the
+        # skill: the bundler printed `bundled references/../../OUTSIDE.md` and
+        # created `skills/OUTSIDE.md`. Overwriting an existing file was already
+        # blocked by the write gate; CREATING one was not.
+        if not _within(refs_dir, refs_dir / name) or not _within(shared_dir, shared_dir / name):
+            print(f"⚠️  refusing out-of-tree reference: {name}")
+            continue
         src = shared_dir / name
         if not src.exists():
             if not quiet:
@@ -182,65 +239,323 @@ def bundle_skill(skill_path):
         if src.suffix == '.sh':
             pending.extend(m.group(1) for m in SH_SIBLING_RE.finditer(text))
 
-    if not needed:
-        # Skill may have stale references/ dir but no shared refs anymore — leave it.
+    return needed, skill_files
+
+
+def source_backed_on_disk(refs_dir, shared_dir, needed):
+    """Bundled copies present on disk that discovery did not reach, but which have
+    a `shared/resources/` counterpart.
+
+    These are stale copies, not orphans in the risky sense: something put them
+    there, and the file they mirror still exists. A copy with NO source is
+    skill-native and is deliberately excluded — it legitimately lives in
+    references/ and must never be rewritten or removed here.
+    """
+    out = {}
+    if not refs_dir.is_dir():
+        return out
+    for dst in sorted(refs_dir.rglob('*')):
+        # A symlink IS included here — membership means "our concern", and a
+        # symlinked reference is very much our concern: a consumer copying the
+        # directory verbatim gets a dangling link. `writable_copy` refuses to
+        # write it. Excluding it here was the same membership-vs-writability
+        # conflation: a symlink no rule discovers entered neither set, so the
+        # bundler silently accepted whatever it pointed at.
+        if not dst.is_symlink() and not dst.is_file():
+            continue
+        rel_parts = dst.relative_to(refs_dir).parts
+        if any(p in EXCLUDE_DIRS for p in rel_parts):
+            continue
+        rel = dst.relative_to(refs_dir).as_posix()
+        if rel in needed:
+            continue
+        src = shared_dir / rel
+        if not src.is_file():
+            continue        # no source ⇒ skill-native ⇒ never ours to touch
+        # Membership here means "this file is our concern", NOT "we may write it".
+        # The write decision is `writable_copy`, applied at both write sites.
+        # Conflating the two meant an authored file that merely shared a name with
+        # a shared resource was silently overwritten.
+        out[rel] = src
+    return out
+
+
+# The banner's own declared source, e.g.
+#   AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/foo.md. Regenerate via …
+# Matching the STRUCTURE rather than the phrase is what distinguishes a real
+# banner from a document that merely quotes one.
+BANNER_SOURCE_RE = re.compile(
+    re.escape(AUTOGEN_MARKER) + r'\.\s*Source:\s*shared/resources/(\S+?)\.\s'
+)
+
+
+def _banner_head(text):
+    """The region a provenance banner can legitimately occupy.
+
+    Line-based, not byte-based. For a `.md` the banner is injected AFTER the YAML
+    frontmatter, and a long `description:` pushes it well past any small byte
+    window — measured at char 499 in one real file, so a 512-byte slice cut the
+    marker in half and silently misclassified a correctly-bundled copy as
+    hand-authored. Bounded so an incidental mention deep in a document cannot
+    count as provenance.
+    """
+    return '\n'.join(text.split('\n')[:40])
+
+
+def declared_source(text, rel):
+    """The path a file's own banner claims to come from, or None.
+
+    Returns the declared path ONLY when it matches `rel`, the file's own location
+    under references/. Requiring the match is what stops a document that merely
+    quotes the banner from being mistaken for one: prose says the phrase, but it
+    does not say `Source: shared/resources/<this file's own path>.`
+
+    Keying on the phrase alone overwrote a hand-authored file in testing — the
+    very destruction the check exists to prevent, and in the likeliest case,
+    since a document about the bundler is exactly what quotes its banner.
+    Validated against the tree: 774 bundled files match their own path, 0 do not.
+    """
+    m = BANNER_SOURCE_RE.search(_banner_head(text))
+    if m and m.group(1) == rel:
+        return m.group(1)
+    return None
+
+
+def _looks_bundled(dst, src, name):
+    """True when `dst` is demonstrably bundler output rather than authored content.
+
+    Sharing a filename with a shared resource is NOT evidence: a hand-authored
+    `references/read-config.sh` would be silently overwritten and stamped
+    AUTO-GENERATED. Two things do count as evidence:
+
+    1. It carries the provenance banner.
+    2. It is byte-identical to the rewritten source *without* the banner — the
+       shape every copy bundled before header injection existed still has.
+
+    Case 2 is not hypothetical and is why the banner alone is too strict: three
+    of the eight stale copies this change corrected (`verify-push-state.sh`)
+    were exactly that, and a banner-only gate would have refused to fix them.
+
+    Anything else is genuinely ambiguous, and the bundler leaves it alone rather
+    than overwriting work it did not create.
+
+    **Evidence 2 cannot distinguish** a pre-header bundled copy from an authored
+    file that merely happens to be byte-identical to the rewritten source — an
+    empty file, or a one-line note matching the source exactly. They are the same
+    bytes; nothing in the file says which it is. The consequence is bounded rather
+    than absent: such a file is adopted, gains the banner, and thereafter tracks
+    the source. No authored content is lost, because the content was already
+    identical to what the bundler would have written.
+
+    Suffixes that never get a header (`.json`, and anything else `autogen_header`
+    returns "" for) are accepted on the name match alone and return early — they
+    cannot supply evidence 1, and requiring evidence 2 would make a legitimately
+    edited-then-regenerated JSON permanently unreconcilable. That is the
+    pre-existing behaviour for those suffixes, kept deliberately.
+    """
+    suffix = Path(name).suffix
+    if not autogen_header(name, suffix):
+        # An unknown suffix cannot carry a banner, so evidence 1 is unavailable —
+        # but that is a gap in our knowledge, not a licence to overwrite. Fall
+        # through to evidence 2 (identical to the rewritten source).
+        pass
+    try:
+        text = dst.read_text()
+    except UnicodeDecodeError:
+        return True          # binary — historical behaviour reconciled it
+    except OSError:
+        return False         # unreadable — never write over what we cannot inspect
+    if declared_source(text, name) is not None:
+        return True
+    try:
+        return text == rewrite_text(src.read_text(), suffix)
+    except (UnicodeDecodeError, OSError):
+        return False
+
+
+def writable_copy(dst, src, name):
+    """May the bundler write `dst`? True when it does not yet exist, or is
+    demonstrably its own output.
+
+    A symlink is never writable through: `write_if_changed` unlinks it, but the
+    decision to replace a link the operator placed belongs here, visibly.
+    """
+    if dst.is_symlink():
+        return False
+    if not dst.exists():
+        return True
+    return _looks_bundled(dst, src, name)
+
+
+def write_if_changed(dst, src, name, new_bytes):
+    """Write a bundled copy when its bytes differ. Returns True if it wrote."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.is_symlink():
+        # Defence in depth, and UNREACHABLE via today's call sites: both gate on
+        # `writable_copy`, which refuses a symlink first. Kept because writing
+        # through a link edits its target — for a reference pointing back at
+        # shared/resources/ that is the source itself — and a future caller that
+        # forgets the gate should still be safe. Deliberately NOT claimed as
+        # test-covered: either guard alone produces the correct outcome, so
+        # neither is individually provable; only removing both reds the test.
+        dst.unlink()
+    src_mode = src.stat().st_mode & 0o777
+    if dst.exists() and dst.read_bytes() == new_bytes:
+        # Content unchanged — still re-sync the mode, in EITHER direction.
+        if (dst.stat().st_mode & 0o777) != src_mode:
+            dst.chmod(src_mode)
+            return True        # a mode repair IS a change, and must be counted
+                               # as one or the status line understates the run
+        return False
+    # Mirroring the mode unconditionally (cycle 4) made a read-only source
+    # self-locking: a 0444 source produced a 0444 copy, and the NEXT run died with
+    # PermissionError before it could update it. Restore write permission first —
+    # the destination is ours to rewrite, whatever mode we last stamped on it.
+    if dst.exists():
+        current = dst.stat().st_mode & 0o777
+        if not current & 0o200:
+            dst.chmod(current | 0o200)
+    dst.write_bytes(new_bytes)
+    # Mirror the source's mode whatever it is — not only `.sh`, and not only when
+    # the source is executable. A 0755 `.js` source with 0644 copies was live in
+    # this tree; the reverse (0644 source, 0755 copy) ships an executable bit to
+    # consumers that the source never had.
+    dst.chmod(src_mode)
+    return True
+
+
+def resolve_paths(skill_path):
+    """(skill_path, shared_dir, refs_dir) or None when this is not a bundleable skill."""
+    skill_path = Path(skill_path).resolve()
+    if not (skill_path / 'SKILL.md').exists():
+        print(f"❌ SKILL.md not found in {skill_path}")
+        return None
+    repo_root = find_repo_root(skill_path)
+    if not repo_root:
+        print(f"❌ Cannot locate repo root from {skill_path}")
+        return None
+    return skill_path, repo_root / 'shared' / 'resources', skill_path / 'references'
+
+
+def bundle_skill(skill_path):
+    resolved = resolve_paths(skill_path)
+    if resolved is None:
+        return False
+    skill_path, shared_dir, refs_dir = resolved
+
+    # Pass 1: walk skill files (excluding references/) and shared files transitively.
+    needed, skill_files = discover_needed(skill_path, shared_dir, refs_dir)
+
+    # Pass 1b: add on-disk copies discovery could not reach but which have a source.
+    reconcilable = source_backed_on_disk(refs_dir, shared_dir, needed)
+
+    if not needed and not reconcilable:
+        # Nothing shared reaches this skill and nothing on disk mirrors a shared
+        # file. Any references/ content here is skill-native — leave it alone.
         print(f"✓ {skill_path.name}: no shared refs")
         return True
 
     # Pass 2: copy shared files into references/, with rewritten content. Idempotent.
     refs_dir.mkdir(exist_ok=True)
     bundled = 0
+    protected = 0
     for name, src in needed.items():
         dst = refs_dir / name
-        try:
-            text = src.read_text()
-            suffix = Path(name).suffix
-            expected = rewrite_text(text, suffix)
-            expected = inject_header(expected, name, suffix)
-            new_bytes = expected.encode('utf-8')
-        except UnicodeDecodeError:
-            new_bytes = src.read_bytes()
-        # A transitive sibling dep can be a NESTED path (`tests/foo.mjs`) — both
-        # JS_SIBLING_RE and JS_ESM_SIBLING_RE allow `/` in the captured name. Only
-        # `references/` itself was created, so such a dep raised FileNotFoundError
-        # and broke the bundle for every skill that referenced the importing file.
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        if dst.exists() and dst.read_bytes() == new_bytes:
-            # Content unchanged — still re-sync mode for .sh in case the bit was lost.
-            if Path(name).suffix == '.sh':
-                src_mode = src.stat().st_mode & 0o777
-                if (dst.stat().st_mode & 0o777) != src_mode:
-                    dst.chmod(src_mode)
+        # The ambiguity gate belongs on BOTH write paths. It used to guard only
+        # reconciliation, which is the path a file reaches when NOTHING mentions
+        # it — so the guarantee held precisely where the danger was smallest. In
+        # the ordinary case (a skill's own files name the file, either as
+        # `references/X` or `shared/resources/X`) discovery reaches it and pass 2
+        # wrote straight over an authored file. The test that claimed otherwise
+        # used the one fixture seed that routed to the branch that worked.
+        if not writable_copy(dst, src, name):
+            protected += 1
+            why = "symlink" if (refs_dir / name).is_symlink() else "not bundler output"
+            print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
-        dst.write_bytes(new_bytes)
-        # Preserve executable bit for shell scripts (matches source file mode).
-        if Path(name).suffix == '.sh':
-            dst.chmod(src.stat().st_mode & 0o777)
-        bundled += 1
-        print(f"  bundled references/{name}")
+        if write_if_changed(dst, src, name, expected_bytes(src, name)):
+            bundled += 1
+            print(f"  bundled references/{name}")
+
+    # Pass 2b: reconcile the copies discovery did not reach.
+    #
+    # Discovery answers "what should this skill have?"; disk answers "what does it
+    # already have?". A file in the second set but not the first was previously
+    # invisible to every later step INCLUDING the status line, so the bundler
+    # reported `in sync` for files it had not opened. Reconciling here means a copy
+    # is refreshed on the strength of having a source, not of being reachable.
+    reconciled = 0
+    for name, src in reconcilable.items():
+        dst = refs_dir / name
+        if not writable_copy(dst, src, name):
+            protected += 1
+            why = "symlink" if (refs_dir / name).is_symlink() else "not bundler output"
+            print(f"  SKIPPED references/{name} — {why}, left alone")
+            continue
+        if write_if_changed(dst, src, name, expected_bytes(src, name)):
+            reconciled += 1
+            print(f"  reconciled references/{name} (not reached by discovery)")
 
     # Pass 3: rewrite skill source files in place.
     rewritten = 0
     for f in skill_files:
-        original = f.read_text()
+        try:
+            original = f.read_text()
+        except (UnicodeDecodeError, OSError):
+            # A non-UTF-8 file here crashed the whole run with a raw traceback,
+            # aborting before later skills were bundled. Guarded like its sibling
+            # in `discover_needed`.
+            continue
         updated = rewrite_text(original, f.suffix)
         if updated != original:
             f.write_text(updated)
             rewritten += 1
             print(f"  rewrote {f.relative_to(skill_path)}")
 
-    status = f"{bundled} bundled, {rewritten} rewritten" if (bundled or rewritten) else "in sync"
+    parts = []
+    if bundled:
+        parts.append(f"{bundled} bundled")
+    if reconciled:
+        parts.append(f"{reconciled} reconciled")
+    if protected:
+        parts.append(f"{protected} left alone")
+    if rewritten:
+        parts.append(f"{rewritten} rewritten")
+    # `in sync` is now an assertion about every source-backed copy on disk, not
+    # only about the ones discovery happened to reach.
+    status = ", ".join(parts) if parts else "in sync"
     print(f"✅ {skill_path.name}: {status}")
     return True
 
 
+USAGE = "Usage: bundle_skill.py <skill-path>... | --all"
+
+
 def main():
     args = sys.argv[1:]
-    if not args:
-        print("Usage: bundle_skill.py <skill-path> | --all")
-        sys.exit(1)
 
-    if args[0] == '--all':
+    # Unknown flags are rejected outright rather than treated as skill paths: a
+    # typo (`--al`, `-all`) must not fall through to a write.
+    all_mode = '--all' in args
+    args = [a for a in args if a != '--all']
+
+    # ANY leading dash, not just `--`. `-check` was treated as a skill path, so a
+    # single-dash typo on a read-only request ran the MUTATING bundle and exited 0.
+    unknown = [a for a in args if a.startswith('-')]
+    if unknown:
+        print(f"❌ Unknown option(s): {' '.join(unknown)}")
+        print(USAGE)
+        sys.exit(2)
+
+    if not all_mode and not args:
+        print(USAGE)
+        sys.exit(2)
+
+    if all_mode:
+        if args:
+            print(f"❌ --all takes no skill paths (got: {' '.join(args)})")
+            print(USAGE)
+            sys.exit(2)
         repo_root = Path(__file__).resolve().parents[3]
         skills_dir = repo_root / 'skills'
         targets = sorted(d for d in skills_dir.iterdir() if (d / 'SKILL.md').exists())

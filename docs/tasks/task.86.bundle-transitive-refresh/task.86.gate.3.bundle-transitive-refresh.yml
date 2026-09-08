@@ -1,0 +1,184 @@
+schema: 1
+task: 'task.86.bundle-transitive-refresh'
+task_title: '`bundle_skill.py` prints `in sync` for bundled references it never examines'
+gate: CONCERNS
+status_reason: >-
+  All ten cycle-2 findings verified fixed by execution. Cycle 3 found thirteen further issues — one
+  HIGH scope gap (`--check` never asserted pass 3, so a skill source awaiting a rewrite passed while
+  `npm run bundle` would change it), one MEDIUM correctness bug in each of mode direction, `.json`
+  bypass and dangling symlinks, two MEDIUM TEST gaps where a real behaviour was pinned by nothing,
+  and seven LOW cleanups. All thirteen are fixed and the six behavioural ones are mutation-proven.
+  CONCERNS rather than PASS because the findings are still arriving in each cycle, and the honest
+  reading is that this file rewards more scrutiny than one more pass can give it — the residuals
+  below are recorded rather than closed.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T10:30:00Z'
+
+top_issues:
+  - id: 'F-001'
+    severity: high
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `--check` asserted only the contents of `references/`, never pass 3. A skill source still
+      carrying `shared/resources/X` passed the check while `npm run bundle` rewrote it — the same
+      green-CI-but-dirty-tree split this task exists to close, in the one dimension the new check had
+      dropped. Not a regression (the `git diff -- 'skills/*/references/*'` form it replaced was
+      equally blind, since pass 3 edits files outside that pathspec), but `validate.yml` is now the
+      SOLE bundle gate and its comment claimed per-file equality reusing the bundler's own rewrite.
+      Reproduced: check exit 0, then `bundle` printed `rewrote guide.md`.
+    suggested_action: 'Assert pass 3 in check_skill; report UNREWRITTEN in the regenerable bucket.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'F-002'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Mode was compared and repaired in one direction only — both writer and checker were gated on
+      "is the SOURCE executable". A 0644 source with a 0755 copy passed the check AND the bundler,
+      and git ships the bit to consumers. Reproduced.
+    suggested_action: 'Compare and mirror the full mode unconditionally.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'F-003'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      The `.json` early return in `_looks_bundled` skipped the evidence check entirely, so an
+      authored `.json` was silently overwritten — and `--check` then classed it STALE, putting it in
+      the regenerable bucket and instructing the operator to run the bundler that would destroy it.
+      Every other suffix was protected by TASK86-004/007/008/011; `.json` was a hole in the headline
+      guarantee with no test over it. Latent — the tree holds exactly one `.json`, correctly bundled.
+    suggested_action: >-
+      Drop the early return; evidence 2 (byte-equality with the rewritten source) is available for
+      header-less suffixes precisely because no header is injected, so genuine copies still pass.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'F-004'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      A symlink with NO same-named source was invisible to everything: `source_backed_on_disk` drops
+      it for lacking a source, and the orphan loop skipped all symlinks. TASK86-014 fixed this
+      membership conflation for the source-backed half only — and this is the more dangerous half,
+      since the link is already dangling for anyone copying the directory verbatim.
+    suggested_action: 'Report any symlink under refs_dir, source or not.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'F-005'
+    severity: medium
+    file: 'tests/bundle-transitive.test.js'
+    finding: >-
+      TEST GAP. The cycle-2 decision that "a mode repair IS a change" (returning True so the bundler
+      and `--check` cannot disagree) was held by no assertion: reverting it to `return False` reds
+      nothing, because the chmod happens either way and no test read the bundler's stdout after a
+      mode-only drift. The file's own header claims every fix has a test.
+    suggested_action: 'Assert the repair run does not report `in sync`.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'F-006'
+    severity: medium
+    file: 'tests/bundle-transitive.test.js'
+    finding: >-
+      TEST GAP. The line-based 40-line banner window is load-bearing — a byte-bounded window
+      misclassified a real file in this repo (marker at char 499, cut by a 512-byte slice) — but no
+      fixture had frontmatter long enough to exercise it. The suite stayed green with the regression
+      restored.
+    suggested_action: 'Add a fixture with a ~700-char description.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'F-007..F-013'
+    severity: low
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Seven cleanups, all fixed. The skip message said "not bundler output" for a file refused merely
+      for being a symlink; AMBIGUOUS swallowed MISDECLARED and then advised "add the banner" to a file
+      that has one; a bad path exited 1 (drift) rather than 2 (usage), contradicting the docstring;
+      the manual-decision list reprinted every line verbatim; `check()` in the test helper lacked the
+      signal-kill guard its twin `run()` carries, so a missing `python3` would surface as a staleness
+      failure; TASK86-011 asserted survival but not reporting, unlike its siblings; and `symlinkRef`
+      could not create a nested link.
+    suggested_action: 'As described per item.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+waiver:
+  active: false
+
+quality_score: 78
+
+evidence:
+  tests_reviewed: 45
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No auth, network, secrets or user data. The file-integrity risks (overwriting authored content)
+      are the subject of the fixes and are now gated at every write site.
+  performance:
+    status: PASS
+    notes: '`--check --all` over 125 skills ~2s; bundle idempotent (0 ops across repeated runs).'
+  reliability:
+    status: PASS
+    notes: >-
+      Convergence verified across three runs on a mixed fixture holding every class; nothing
+      oscillates or flips class. OSError paths (a directory named like a reference, an unreadable
+      source, a mid-run deletion) no longer abort `--all` with a traceback.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The module has grown from 258 to ~700 lines, much of it reasoning comments that this repo
+      values — but it now carries seven problem classes, two kinds of evidence and three passes, and
+      each review cycle has found real defects in it. That is a signal about the file's complexity,
+      not only about the reviews.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Residual, recorded rather than closed: an authored file byte-identical to the rewritten
+        source is indistinguishable from a pre-header bundled copy and will be adopted. Bounded (no
+        content is lost) and documented in `_looks_bundled`.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        Residual: a header-less file (`.json`) whose source was deleted cannot be reported ORPHANED,
+        because it carries no banner to read. Inherent to the discriminator.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        Residual: the symlink write-through outcome is reachable through two independent guards, so
+        neither is individually provable; only removing both reds the test. `write_if_changed`'s
+        unlink is unreachable via current call sites and is kept as documented defence-in-depth.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'The three residuals above are understood and accepted as documented limitations, not defects.'
+
+bug_resolution:
+  bugs_fixed: 13
+  bugs_remaining: 0
+  fix_date: '2026-09-08'
+  total_iterations: 3
+  verification_method: >-
+    45 tests (was 19 at cycle 1). Six mutation proofs this cycle, each reddening exactly its own
+    test — including MUT-22 and MUT-23, which close the two gaps where a real behaviour had been
+    pinned by nothing at all. All ten cycle-2 fixes re-verified by execution before this cycle began.

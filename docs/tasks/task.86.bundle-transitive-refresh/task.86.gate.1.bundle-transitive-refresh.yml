@@ -1,0 +1,175 @@
+schema: 1
+task: 'task.86.bundle-transitive-refresh'
+task_title: '`bundle_skill.py` prints `in sync` for bundled references it never examines'
+gate: FAIL
+status_reason: >-
+  The change does what it claims — all 8 §9 criteria verified against the tree, 5 mutation proofs held,
+  full CI green. But an independent review found a HIGH correctness bug in the new `--check` flag: it is
+  only recognised at argv[0], so `--check --all` written the other way round silently performs a
+  repo-wide mutating bundle. Confirmed by execution: 6 files written. A second confirmed finding is a
+  coverage regression — `--check` no longer verifies the `.sh` executable bit that the `git diff` check
+  it replaced did catch.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T06:55:00Z'
+
+top_issues:
+  - id: 'TASK86-001'
+    severity: high
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `--check` is only detected at argv[0] (`if args and args[0] == '--check'`). `bundle_skill.py
+      --all --check` sets check_mode=False, matches `--all`, and performs a FULL MUTATING BUNDLE of
+      every skill, exiting 0. Verified by execution: with one shared source modified, the invocation
+      wrote 6 files. `bundle_skill.py <path> --check` is worse — it bundles <path> (writes), then
+      fails resolving a skill at `./--check`. A flag whose entire purpose is to be read-only silently
+      performs repo-wide writes when the argument order is reversed.
+    suggested_action: >-
+      Scan all of argv for `--check` and strip it, rather than inspecting position 0 only. Reject any
+      unrecognised leading `--` token so a typo cannot fall through to a mutating run.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-002'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `check_skill()` compares `dst.read_bytes()` only, so it does not verify the `.sh` executable
+      bit — but `bundle_skill()` treats mode as part of being in sync (`write_if_changed` re-chmods a
+      `.sh` copy whose bits drifted even when bytes match). The `git diff` check this replaced DID
+      catch mode, because git tracks the exec bit. Verified: `chmod 644` on a bundled `.sh`, then
+      `--check --all` exits 0 while `git status` shows the file modified. That is precisely the
+      "green CI, dirty tree" split this task exists to eliminate, reintroduced by its own fix. 205
+      `.sh` files sit under `skills/*/references/`.
+    suggested_action: >-
+      In `check_skill`, for `.sh`, compare `dst.stat().st_mode & 0o777` against the source's and
+      report a MODE problem.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-003'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `check_skill()` builds its expectation set from `needed` ∪ `source_backed_on_disk`, both of
+      which require the source to exist. Delete a `shared/resources/` file and every bundled copy
+      becomes invisible: it keeps an `AUTO-GENERATED … Source: shared/resources/foo.md` banner
+      pointing at nothing, CI stays green, and `npm run bundle` never touches it. The banner is a
+      discriminator the code already writes but never reads back.
+    suggested_action: >-
+      Report a `references/` file that carries AUTOGEN_MARKER but whose source is absent as
+      `ORPHANED (source deleted)`.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-004'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `source_backed_on_disk()` decides "this is a stale bundled copy" purely from the source path
+      existing. A hand-authored skill-native `references/read-config.sh` that merely shares a name
+      with a shared resource is now overwritten wholesale and given an AUTO-GENERATED banner, with no
+      opt-out. Under `origin/develop` it was untouched because discovery never reached it. The
+      function's own docstring asserts the inverse ("a copy with NO source is skill-native") but
+      never establishes the forward direction. No such collision exists today — latent, not live.
+    suggested_action: >-
+      Require corroborating evidence before reconciling: the copy should already carry AUTOGEN_MARKER
+      (exempting `.json`/binary, which get no header). Report a same-named copy without one rather
+      than silently rewriting it.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'TASK86-005'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `dst.is_file()` follows symlinked files, and `write_bytes` writes THROUGH a symlink. A
+      `references/x.md -> ../../shared/resources/x.md` link would get the AUTO-GENERATED banner
+      injected into the shared source itself, permanently, after which `--check` reports STALE
+      forever (the banner in the source makes `inject_header` short-circuit). Pre-existing for
+      discovered files; this diff extends the exposure to reconciled ones. Zero symlinks under
+      `skills/*/references/` today — latent.
+    suggested_action: >-
+      Skip `dst.is_symlink()` in `source_backed_on_disk`, and `dst.unlink(missing_ok=True)` before
+      `write_bytes` in `write_if_changed`.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No auth, network, secrets or user data in the change set. The bundler reads and writes only
+      inside the repo. TASK86-005 (symlink write-through) is a file-integrity risk rather than a
+      security one, and is latent — no symlinks exist under skills/*/references/.
+  performance:
+    status: PASS
+    notes: >-
+      `--all` over 125 skills completes in ~2s; `--check --all` similar. The new disk-reconciliation
+      pass adds one rglob per skill. No regression measured.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      TASK86-001 makes a read-only invocation mutate the repo depending on argument order.
+      TASK86-002 removes mode coverage the replaced check had. TASK86-003/004/005 are latent
+      correctness traps. Idempotence itself is solid — three consecutive `--all` runs performed 0
+      file operations.
+  maintainability:
+    status: PASS
+    notes: >-
+      `rewrite_text`/`expected_bytes` hoisted to module level gives one definition of "in sync" with
+      three call sites and no re-implementation — verified by grep. Discovery extracted to
+      `discover_needed()`. Comments state the rejected alternative and why, which is the part a
+      future reader would otherwise re-derive. One dead guard (`dst.name in EXCLUDE_DIRS`).
+
+recommendations:
+  immediate:
+    - action: 'Parse --check anywhere in argv; reject unknown leading -- tokens'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'Compare .sh mode in check_skill and report MODE drift'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'Detect banner-carrying copies whose source was deleted (ORPHANED)'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'Gate reconciliation on AUTOGEN_MARKER; skip symlinks; unlink before write'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+  future:
+    - action: 'Emit ::error:: from the check so the annotation appears in the PR checks UI'
+      refs: ['.github/workflows/validate.yml']
+    - action: 'Register t.after() cleanup for fixture temp dirs (house-wide; bundle-mjs leaks too)'
+      refs: ['tests/bundle-transitive.test.js', 'tests/bundle-mjs.test.js']
+    - action: 'Delete the dead `dst.name in EXCLUDE_DIRS` clause; scope parts check to relative path'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK86-001 fixed and covered by a test'
+    - 'TASK86-002 fixed and covered by a test'
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 0
+  fix_date: '2026-09-08'
+  total_iterations: 1
+  verification_method: >-
+    One test per finding (7 added, 26 total), each mutation-proven by reverting the behaviour and
+    confirming the matching test goes red. Two mutations initially proved nothing and were redone:
+    the mode mutation had hit a duplicate `.sh` block in write_if_changed rather than check_skill,
+    and the symlink mutation removed only one of two independent guards.
