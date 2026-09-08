@@ -73,8 +73,8 @@ decisions past the review gate, where approval locks them in.
 
 ## The SessionStart hook
 
-Shipped at `shared/resources/observe-work-session-start.sh`. **Shipping the file is not installing
-it** — installation stays the user's decision.
+Shipped at `references/observe-work-session-start.sh`, beside the engine it calls. **Shipping the
+file is not installing it** — installation stays the user's decision.
 
 Capture is hard-enforced by checkpoints hooked onto tool calls that were happening anyway. The
 **review trigger** is not: it is a soft step (read a file, compare a date) and gets skipped the same
@@ -85,21 +85,47 @@ the hook computes the state and injects it, rather than asking the agent to go a
 To install it, register the script as a `SessionStart` hook in the harness's settings. It emits
 `hookSpecificOutput.additionalContext` and writes nothing.
 
-Four details decide whether it works, each from a recorded failure:
+### The count comes from the engine, and there is no shell fallback
 
-- **Count `status: open` files, never the directory.** Resolved entries stay in `observation-log/`
-  until the day after they were resolved, and parked entries are decided and out of the queue. A raw
-  file count overstates the backlog by every entry the last review just closed — for a day, in every
-  session.
+```sh
+queue_json=$(command node "$ENGINE" queue --workspace "$WORKSPACE" --json) || exit 0
+```
+
+The hook **transcribes** `total` and the length of `open`. It re-derives nothing.
+
+That is not a stylistic preference — it is the outcome of three QA cycles that each produced a
+counting defect while the hook implemented the queue rule itself:
+
+| Attempt | Defect |
+|---|---|
+| exact-match `grep` | **undercount** — missed `status: open ` (trailing space) *and* the statusless fallback, so such a file counted as neither |
+| unscoped `grep` | **overcount** — a *resolved* observation quoting `status: open` in its body counted as open |
+| frontmatter `awk` | **both, and they cancelled** — a quoted `status: "open"` read as not-open while a frontmatter-less file read as open. Hook and engine both said "2 open" and appeared to agree; only `total` disagreed, 3 against 2 |
+
+The queue rule is not hard, but it has enough edges — optional field, absent means open, `parked`
+excluded, resolved excluded, quoted scalars, non-observation files — that a second implementation is
+a second thing to keep true. It was not kept true three times running.
+
+> **Do not reintroduce a shell count, not even as a fallback.** When the engine cannot be reached —
+> no `node`, no engine file, an unparseable payload, or an anchor the engine refuses — the hook is
+> **silent**. The entire justification for this file is an accurate number, and a wrong one is worse
+> than none, because a wrong one gets acted on.
+
+### Two details that still decide whether it works
+
+Both survive from the original mechanism, because neither is about counting:
+
 - **Compare dates without `<` inside `[ ]`.** ISO dates sort lexically, so
   `[ "$(printf '%s\n%s\n' "$last" "$cutoff" | sort | head -1)" = "$last" ]` is true when `$last` is
   not later than `$cutoff`, in every POSIX shell. `\<` is a bash/ksh extension that zsh rejects and
   `sh` does not know.
-- **`grep -c` exits 1 on zero matches while still printing `0`**, so `$(grep -c … || echo 0)` yields
-  two values. Capture the output and ignore the exit code.
 - **Prove the branches fire.** Run it against fixtures at `never`, 30 days stale and 2 days stale,
   and confirm the third **stays silent**. A nag that never fires and a nag that is correctly silent
   look identical from a passing run.
+
+  Fixtures must sit on a **durable anchor**. Under `/tmp` the engine correctly refuses the workspace
+  and the hook falls silent — which looks exactly like a broken hook, and was briefly mistaken for
+  one during review.
 
 ---
 
