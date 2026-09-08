@@ -397,6 +397,45 @@ test("the missing-workspace branch keys on `healthy`, not on `reason`", () => {
   }
 });
 
+test("`healthy: false` alone never blocks a write", () => {
+  // TASK-94-004, introduced by the fix for TASK-94-001. `healthy` is
+  // `failed.length === 0` over FOUR checks, one of which is
+  // `activation-configured` — false in every project that has not yet added the
+  // activation instruction, i.e. every project on first install. A blanket
+  // "healthy: false → do not write" therefore refuses to capture in exactly the
+  // projects the skill most needs to work in, and it does so BEFORE step 4,
+  // which is the step that resolves it.
+  const step1 = BODY.split(/\*\*1\. Storage\.\*\*/)[1];
+  const scoped = step1.split(/\*\*2\. Scan\.\*\*/)[0];
+
+  // The activation check must be named, and its row must not stop a write.
+  const activationRow = scoped
+    .split("\n")
+    .find((l) => l.startsWith("|") && l.includes("activation-configured"));
+  assert.ok(
+    activationRow,
+    "step 1 must name `activation-configured` explicitly — it is the one check " +
+      "that fails on a healthy log, and the one a catch-all gets wrong",
+  );
+  assert.match(
+    activationRow,
+    /continue/i,
+    `the activation-configured row must continue, not block: ${activationRow}`,
+  );
+
+  // No row may make a bare `healthy: false` a stop condition.
+  const blanket = scoped
+    .split("\n")
+    .filter((l) => l.startsWith("|") && /healthy[^|]*false/i.test(l))
+    .filter((l) => /do not write|stop|halt/i.test(l));
+  assert.deepEqual(
+    blanket,
+    [],
+    "no row may treat a bare `healthy: false` as a stop condition — it folds in " +
+      "activation-configured, which is false on every fresh install",
+  );
+});
+
 test("the body never invokes bare `node`", () => {
   // On a machine where `node` is an nvm shell function, the bare form prints
   // nvm's help to stdout and corrupts every --json payload the caller captures.

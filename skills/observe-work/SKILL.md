@@ -61,13 +61,30 @@ reports a missing log.**
 
 So:
 
-| Signal | Do this |
+`healthy` is `false` when **any** of four checks fails, and they do not all mean the same thing.
+Act on the check, never on `healthy` alone:
+
+| Failing check | Do this |
 |---|---|
-| `healthy: false` **and** `checks[]` has `workspace-exists` with `ok: false` | `command node references/observation-log.js init --json`, then re-run `doctor` |
-| `healthy: false` for any other failing check | Surface the check's `detail`; do not write until it is resolved |
-| `reason` is `ephemeral-workspace` | Re-anchor before writing anything. A log written here dies with the checkout |
-| `reason` is `fork-detected` | Surface it and consolidate deliberately. **Never create a second log beside a populated one** |
-| `healthy: true` and `reason` is `ok` | Nothing |
+| `workspace-exists` | `command node references/observation-log.js init --json`, then re-run `doctor` |
+| `activation-configured` | **Note it and continue.** Step 4 owns this. It must never stop a write |
+| `anchor-durable` | Also reported as `reason` `ephemeral-workspace` — see below |
+| `no-fork` | Also reported as `reason` `fork-detected` — see below |
+
+Then act on `reason`:
+
+| `reason` | Do this |
+|---|---|
+| `ephemeral-workspace` | Re-anchor before writing anything. A log written here dies with the checkout |
+| `fork-detected` | Surface it and consolidate deliberately. **Never create a second log beside a populated one** |
+| `ok` | Nothing further |
+
+> **`healthy: false` is not by itself a reason to stop writing.** It folds in
+> `activation-configured`, which fails in every project that has not yet added the activation
+> instruction — that is, every project on first install, and precisely the situation step 4 exists
+> to fix. Treating `healthy: false` as a blanket stop would refuse to capture in exactly the
+> projects this skill most needs to work in, and it would do so **before** reaching the step that
+> resolves it. Only `workspace-exists` demands an action here; only `reason` demands a halt.
 
 > **`reason` is `"ok"` on a workspace that does not exist yet, and `exitCode` is `0`.** A missing log
 > is not an error — it is the normal state of a project that has never run this skill — so the engine

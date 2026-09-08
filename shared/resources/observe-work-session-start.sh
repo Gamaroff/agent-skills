@@ -41,26 +41,46 @@ LOG_DIR="${OBS_DIR}/observation-log"
 #
 # A missing `status:` is read as open (the contract's rule), so the second grep
 # counts headers that carry no status line at all.
-# Tolerate surrounding whitespace. `grep -l '^status: open$'` matched neither
-# `status: open ` (one trailing space) nor the statusless fallback below, so
-# such a file counted as neither and the hook UNDER-reported the backlog —
-# reporting 1 open where the engine reported 2. Undercounting is the worse
-# direction: an overstated backlog gets noticed and corrected, an understated
-# one is indistinguishable from a clean log, which is the silent failure this
-# whole file exists to prevent.
-open_explicit=$(
-  grep -lE '^status:[[:space:]]*open[[:space:]]*$' "$LOG_DIR"/*.md 2>/dev/null | wc -l | tr -d ' '
-)
-total=$(ls -1 "$LOG_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
-statusless=$(
-  # `grep -c` exits 1 on zero matches while still printing 0, so the exit code is
-  # deliberately ignored here; the printed value is the one that matters.
-  for f in "$LOG_DIR"/*.md; do
-    [ -f "$f" ] || continue
-    grep -qE '^status:[[:space:]]*[^[:space:]]' "$f" 2>/dev/null || echo "$f"
-  done | wc -l | tr -d ' '
-)
-open=$((open_explicit + statusless))
+# Read `status` from the FRONTMATTER BLOCK ONLY, and tolerate surrounding
+# whitespace. Two defects live here, one on each side of the count, and both
+# came from matching the whole file with an over-tight pattern:
+#
+#   under: `grep -l '^status: open$'` matched neither `status: open ` (one
+#          trailing space) nor the statusless fallback, so such a file counted
+#          as neither — 1 open reported where the engine said 2.
+#   over:  an unscoped match counts a line in an observation's BODY. These
+#          observations are about skills and their status fields, so a resolved
+#          entry quoting `status: open` in its prose counted as open — 1 open
+#          reported where the engine said 0.
+#
+# Undercounting is the more dangerous direction (an understated backlog is
+# indistinguishable from a clean log, which is the silent failure this file
+# exists to prevent), but both make the hook disagree with the engine, and the
+# engine is the authority.
+#
+# frontmatter_status prints the value of `status:` from between the first two
+# `---` fences, or nothing when the field or the block is absent.
+frontmatter_status() {
+  awk '
+    /^---[[:space:]]*$/ { fence++; if (fence >= 2) exit; next }
+    fence == 1 && /^status:[[:space:]]*/ {
+      sub(/^status:[[:space:]]*/, ""); sub(/[[:space:]]+$/, ""); print; exit
+    }
+  ' "$1" 2>/dev/null
+}
+
+total=0
+open=0
+for f in "$LOG_DIR"/*.md; do
+  [ -f "$f" ] || continue
+  total=$((total + 1))
+  st=$(frontmatter_status "$f")
+  # A missing status is read as open — the contract's rule, and the only default
+  # that cannot make a malformed file vanish from the work queue.
+  case "$st" in
+    "" | open) open=$((open + 1)) ;;
+  esac
+done
 
 [ "$total" -gt 0 ] || exit 0
 

@@ -586,15 +586,15 @@ Two changes are worth naming because they are not confined to the new directory:
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: FAIL (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-08
-**Quality Score**: 60/100
+**Quality Score**: 70/100 (cycle 1: 60/100)
 **Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.94.qa.1.observe-work-skill.md](./task.94.qa.1.observe-work-skill.md)
-- **Gate File**: [task.94.gate.1.observe-work-skill.yml](./task.94.gate.1.observe-work-skill.yml)
+- **Cycle 2 (current)**: [task.94.qa.2.observe-work-skill.md](./task.94.qa.2.observe-work-skill.md) · [gate.2](./task.94.gate.2.observe-work-skill.yml)
+- **Cycle 1**: [task.94.qa.1.observe-work-skill.md](./task.94.qa.1.observe-work-skill.md) · [gate.1](./task.94.gate.1.observe-work-skill.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 2884 (2883 pass, 0 fail, 1 skipped)
@@ -619,6 +619,11 @@ Every document-anchored check passes — that is why the decisive finding needed
 - [bug.2 — SessionStart hook disagrees with the engine on the open count](./task.94.bug.2.hook-status-whitespace.md) — MEDIUM — ✅ Ready for QA (fixed 2026-09-08)
 - [bug.3 — Bundled contract ships six links that resolve nowhere](./task.94.bug.3.bundled-contract-dangling-links.md) — MEDIUM — ✅ Ready for QA (fixed 2026-09-08)
 
+**Fixed in cycle 2 (both were introduced by cycle 1's fixes)**
+
+- [bug.4 — The cycle-1 fix blocks capture in every fresh install](./task.94.bug.4.healthy-false-blocks-fresh-install.md) — HIGH — ✅ Ready for QA (fixed 2026-09-08, mutation-proved)
+- [bug.5 — Hook counts a body line as a status, overcounting](./task.94.bug.5.hook-grep-not-frontmatter-scoped.md) — MEDIUM — ✅ Ready for QA (fixed 2026-09-08)
+
 ---
 
 ## Change Log
@@ -632,6 +637,8 @@ Every document-anchored check passes — that is why the decisive finding needed
 | 2026-09-08 |         | Implemented — 14 files, 20 tests | develop |
 | 2026-09-08 |         | QA gate FAIL (60/100) — 4 findings (1 HIGH, 2 MEDIUM, 1 LOW) | qa-task |
 | 2026-09-08 |         | QA findings fixed — 3 of 4 addressed (1 LOW advisory), 1 iteration | qa-fix |
+| 2026-09-08 |         | QA gate FAIL (70/100) — cycle 1 closed; 2 new findings introduced by the fixes | qa-task |
+| 2026-09-08 |         | QA findings fixed — 2 of 2 addressed, 2 iterations | qa-fix |
 
 ---
 
