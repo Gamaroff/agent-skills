@@ -68,11 +68,31 @@ _ow_encode_project_path() {
 }
 
 # _ow_project_root
-# The absolute path of the project this workspace belongs to. Prefer the git
-# toplevel so that running from a subdirectory resolves the same workspace; fall
-# back to $PWD outside a repository.
+# The absolute path of the project this workspace belongs to.
+#
+# This resolves to the MAIN worktree, never the linked one. `--show-toplevel`
+# would be the obvious call and it is wrong here: inside a linked worktree it
+# returns the WORKTREE path, so the encoded project-identity segment differs per
+# worktree and the same project resolves two different workspaces. That is the
+# silent fork `doctor` exists to catch, manufactured by the resolver itself —
+# and it is not hypothetical, because /develop-batch dispatches every parallel
+# story into a linked worktree.
+#
+# `--git-common-dir` is shared by every worktree of a repository and points at
+# the main checkout's `.git`, so its parent is the main worktree. Falls back to
+# $PWD outside a repository.
 _ow_project_root() {
-  local root
+  local common root
+  if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) &&
+    [ -n "$common" ]; then
+    root=$(dirname "$common")
+    # A bare repository has no worktree to anchor to; fall through rather than
+    # anchoring the workspace inside the repository's own git directory.
+    if [ -n "$root" ] && [ "$root" != "/" ] && [ -d "$root" ]; then
+      printf '%s' "$root"
+      return 0
+    fi
+  fi
   if root=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ]; then
     printf '%s' "$root"
   else

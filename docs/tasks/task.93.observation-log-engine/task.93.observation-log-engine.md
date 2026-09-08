@@ -500,6 +500,90 @@ None. Every file is new, nothing consumes them yet, and the blast radius of a de
 
 ---
 
+## Dev Agent Record
+
+### QA Fix Cycle 1 — 2026-09-08
+
+All three gate findings fixed, each verified by reproducing the defect first and confirming the
+remedy second, then mutation-proven.
+
+**Completion notes**
+
+- **TASK-93-001 (HIGH)** — `_ow_project_root` now derives from
+  `git rev-parse --path-format=absolute --git-common-dir`, whose parent is the **main** worktree and
+  is shared by every linked worktree of the repository. `--show-toplevel` was the wrong call: inside
+  a linked worktree it returns the worktree, so one project resolved two workspaces. Guarded against
+  a bare repository (`root != "/"`, and the path must be a directory) with the old `--show-toplevel`
+  call kept as the fallback. Verified: main checkout and a real linked worktree now resolve the same
+  workspace, and a subdirectory of the main checkout still resolves it too.
+- **TASK-93-002 (MEDIUM)** — `forkCandidates()` now sweeps `~/.claude/projects/*/skill-observations`,
+  excluding the resolved workspace's own path. That directory is where the project-identity default
+  actually writes, so it is where a fork actually lands; the three pre-existing candidates only
+  covered hand-configured anchors. A missing `~/.claude/projects` is caught and yields an empty list
+  rather than throwing.
+- **TASK-93-003 (MEDIUM)** — `readFrontmatterBounded()` now accumulates through a `StringDecoder`,
+  which holds an incomplete multi-byte sequence back until the next chunk completes it, with
+  `decoder.end()` flushed on the EOF path. `decoder.end()` is deliberately **not** called on the
+  early-return path: the closing `---` was found among complete lines, so the whole header is
+  already decoded and anything still held belongs to the body, which this function never returns.
+
+**Adversarial pass over the fixes** (all four transitions probed, nothing found): the file descriptor
+close remains in `finally`; the decoder's early-return path loses nothing; `forkCandidates` degrades
+to `[]` on a missing directory rather than throwing; and the three fixes do not interact — one is
+bash, the other two are in unrelated JavaScript functions.
+
+**Mutation proofs — 3/3**
+
+| Fix | Mutation | Result |
+|---|---|---|
+| TASK-93-001 | `--git-common-dir` → `--show-toplevel` | ✅ RED |
+| TASK-93-002 | `~/.claude/projects/*` sweep removed | ✅ RED |
+| TASK-93-003 | `decoder.write(...)` → `buf.toString("utf8", ...)` | ✅ RED |
+
+**One thing worth recording about the test for TASK-93-001.** It creates a **real linked worktree**
+and fails the assertion outright if it cannot. A cheaper test that merely changes directory passes
+against the broken code, so it would have proven nothing — and the same shape applies to
+TASK-93-003, whose test sweeps eight byte alignments because the first single-offset probe of that
+defect passed by luck.
+
+**File list**
+
+- `shared/resources/resolve-observation-workspace.sh` — modified (TASK-93-001)
+- `shared/resources/observation-log.js` — modified (TASK-93-002, TASK-93-003)
+- `shared/resources/tests/observation-log.test.mjs` — 3 regression tests added (41 → 44)
+
+---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-08
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.93.qa.1.observation-log-engine.md](./task.93.qa.1.observation-log-engine.md)
+- **Gate File**: [task.93.gate.1.observation-log-engine.yml](./task.93.gate.1.observation-log-engine.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 41 (new suite) / 2,856 (full repo) + 448 shell assertions
+- **Phases Verified**: 5/5 (3 clean, 2 with findings)
+- **Critical Issues**: 1 HIGH, 2 MEDIUM
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+All three findings sit in one seam — **the boundary between the process and the world outside it**. Everything the engine does to its own data is correct and mutation-proven.
+
+1. **[HIGH] TASK-93-001** — `resolve-observation-workspace.sh` derives a *different workspace per linked git worktree*, producing exactly the silent fork `doctor` exists to catch. Not hypothetical: `/develop-batch` dispatches into linked worktrees. Fix: derive from `--git-common-dir` (verified).
+2. **[MEDIUM] TASK-93-002** — `forkCandidates()` never scans `~/.claude/projects/*/skill-observations`, so `doctor` cannot detect the fork above. The two compound.
+3. **[MEDIUM] TASK-93-003** — UTF-8 characters spanning the 8192-byte chunk boundary corrupt to U+FFFD, at all eight alignments tested. Fix: `StringDecoder` (verified).
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -509,6 +593,10 @@ None. Every file is new, nothing consumes them yet, and the blast radius of a de
 | 2026-09-08 |         | Status → ready-for-development | review-task |
 | 2026-09-08 |         | Implemented — 4 files created, 1 modified (AGENTS.md), 40 tests, 18 guards mutation-proven | develop |
 | 2026-09-08 |         | Status → ready-for-review | develop |
+| 2026-09-08 |         | QA gate FAIL (70/100) — 3 findings: worktree-dependent workspace (HIGH), doctor blind to project-path forks, UTF-8 chunk-boundary corruption | qa-task |
+| 2026-09-08 |         | Status → in-progress (QA FAIL) | qa-task |
+| 2026-09-08 |         | QA findings fixed — 3 findings (1 HIGH, 2 MEDIUM), 1 iteration; all mutation-proven | qa-fix |
+| 2026-09-08 |         | Status → ready-for-review | qa-fix |
 
 ---
 

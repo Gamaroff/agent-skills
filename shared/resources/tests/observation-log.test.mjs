@@ -27,7 +27,7 @@ import {
   mkdirSync,
   statSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 
 const require = createRequire(import.meta.url);
@@ -1244,6 +1244,138 @@ test("the resolver does not leak its private helpers into the caller's shell", (
   const [fns, vars] = r.stdout.trim().split("\n").map(Number);
   assert.equal(fns, 0, "helper functions leaked");
   assert.equal(vars, 0, "helper variables leaked");
+});
+
+// ── QA cycle 1 regressions ───────────────────────────────────────────────────
+//
+// Three defects found by QA cycle 1, all in the same seam: the boundary between
+// the process and the world outside it. Each test below reproduces its defect —
+// which for two of the three means the obvious cheap test does NOT work, and the
+// comment says why.
+
+test("the project-identity default is the same from a linked worktree as from the main checkout", () => {
+  // MUTATION: change `--git-common-dir` back to `--show-toplevel` in
+  // `_ow_project_root`.
+  //
+  // TASK-93-001. `--show-toplevel` returns the WORKTREE path inside a linked
+  // worktree, so the encoded project-identity segment differs per worktree and
+  // one project resolves two workspaces — the silent fork `doctor` exists to
+  // catch, manufactured by the resolver itself. Not hypothetical: /develop-batch
+  // dispatches every parallel story into a linked worktree.
+  //
+  // This test creates a REAL linked worktree, because nothing else reproduces
+  // it. A test that merely `cd`s somewhere else passes against the broken code.
+  const repoRoot = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    cwd: SHARED,
+  }).stdout.trim();
+  const wt = join(mkdtempSync(join(tmpdir(), "observation-log-wt-")), "probe");
+
+  const added = spawnSync("git", ["worktree", "add", "--detach", wt, "HEAD"], {
+    encoding: "utf8",
+    cwd: repoRoot,
+  });
+  if (added.status !== 0) {
+    // A sandbox that cannot create worktrees must not silently pass this test.
+    assert.fail(`could not create a linked worktree: ${added.stderr}`);
+  }
+
+  try {
+    const read = (cwd) =>
+      spawnSync(
+        "/bin/bash",
+        [
+          "-c",
+          `unset OBS_WORKSPACE; source "$1" || exit 1; printf '%s\\n' "$OBS_WORKSPACE"`,
+          "bash",
+          RESOLVER,
+        ],
+        { encoding: "utf8", env: { ...process.env, OBS_WORKSPACE: "" }, cwd },
+      );
+
+    const fromMain = read(SHARED);
+    const fromWorktree = read(wt);
+    assert.equal(fromMain.status, 0, fromMain.stderr);
+    assert.equal(fromWorktree.status, 0, fromWorktree.stderr);
+    assert.equal(
+      fromWorktree.stdout.trim(),
+      fromMain.stdout.trim(),
+      "a linked worktree must resolve the SAME workspace as the main checkout",
+    );
+  } finally {
+    spawnSync("git", ["worktree", "remove", "--force", wt], { cwd: repoRoot });
+    rmSync(dirname(wt), { recursive: true, force: true });
+  }
+});
+
+test("doctor detects a second workspace under ~/.claude/projects", () => {
+  // MUTATION: remove the `~/.claude/projects/*` sweep from forkCandidates().
+  //
+  // TASK-93-002. The other three candidates cover hand-configured anchors; this
+  // one covers the directory the project-identity DEFAULT writes to, which is
+  // where a fork actually lands. Without it `doctor` answered `no-fork` on a
+  // workspace that had one — the check reporting the reassuring half of the two
+  // states it exists to tell apart.
+  const { dir } = initWs("fork-projects");
+  const projects = join(homedir(), ".claude", "projects");
+  const planted = join(projects, ".observation-log-test-sibling");
+  try {
+    mkdirSync(join(planted, "skill-observations"), { recursive: true });
+    const r = cli([
+      "doctor",
+      "--workspace",
+      dir,
+      "--audit-root",
+      dir,
+      "--json",
+    ]);
+    assert.equal(r.json.reason, "fork-detected");
+    assert.equal(r.code, 1);
+    const check = r.json.checks.find((c) => c.check === "no-fork");
+    assert.equal(check.ok, false);
+    assert.match(check.detail, /observation-log-test-sibling/);
+  } finally {
+    rmSync(planted, { recursive: true, force: true });
+    cleanup(dir);
+  }
+});
+
+test("a multi-byte character spanning the chunk boundary is not corrupted", () => {
+  // MUTATION: change `decoder.write(buf.subarray(0, n))` back to
+  // `buf.toString("utf8", 0, n)`.
+  //
+  // TASK-93-003. Decoding each chunk independently splits a multi-byte
+  // character straddling the 8192-byte boundary into two invalid sequences,
+  // both of which become U+FFFD. Silent — the header still parses.
+  //
+  // The sweep across alignments is the point, not thoroughness for its own
+  // sake: the FIRST single-offset probe of this defect PASSED. One fixture can
+  // land on a character boundary and report clean while seven others corrupt.
+  const { dir, P } = initWs("utf8-boundary");
+  try {
+    for (let shift = 0; shift < 8; shift++) {
+      const name = `000${shift + 1}-utf8-${shift}.md`;
+      writeFileSync(
+        join(P.logDir, name),
+        `---\nid: ${shift + 1}\n${"a".repeat(shift)}note: "${"x".repeat(shift)}"\n` +
+          `title: "${"é".repeat(5000)}"\nstatus: open\n---\n\nBODY\n`,
+      );
+      const r = engine.readFrontmatterBounded(join(P.logDir, name));
+      assert.ok(r.fm, `alignment ${shift}: header did not parse`);
+      assert.equal(r.fm.id, shift + 1, `alignment ${shift}: wrong id`);
+      assert.equal(
+        r.fm.title.length,
+        5000,
+        `alignment ${shift}: title length ${r.fm.title.length} — a character was split`,
+      );
+      assert.ok(
+        !r.fm.title.includes("\uFFFD"),
+        `alignment ${shift}: replacement character in the decoded title`,
+      );
+    }
+  } finally {
+    cleanup(dir);
+  }
 });
 
 // ── the engine's independence ────────────────────────────────────────────────

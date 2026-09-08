@@ -75,6 +75,7 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const { StringDecoder } = require("string_decoder");
 
 const { parseYamlSubset } = require("./yaml-subset.js");
 
@@ -246,6 +247,14 @@ function readFrontmatterBounded(file) {
   }
   try {
     const buf = Buffer.allocUnsafe(FM_CHUNK);
+    // A StringDecoder, not `buf.toString("utf8", …)`. Decoding each chunk
+    // independently splits any multi-byte character that straddles the chunk
+    // boundary into two invalid sequences, and both decode to U+FFFD — silent
+    // corruption, because the header still parses afterwards. Reproduced at all
+    // eight byte alignments; a single-offset probe passes by luck, which is why
+    // the covering test sweeps alignments. StringDecoder holds an incomplete
+    // sequence back until the next chunk completes it.
+    const decoder = new StringDecoder("utf8");
     let acc = "";
     let bytesRead = 0;
     let seenOpen = false;
@@ -253,7 +262,7 @@ function readFrontmatterBounded(file) {
       const n = fs.readSync(fd, buf, 0, FM_CHUNK, null);
       if (n <= 0) break;
       bytesRead += n;
-      acc += buf.toString("utf8", 0, n);
+      acc += decoder.write(buf.subarray(0, n));
 
       // Find the opening marker once, then the closing one. Only ever look at
       // complete lines, so a `---` split across a chunk boundary is not missed.
@@ -277,7 +286,9 @@ function readFrontmatterBounded(file) {
       }
       if (bytesRead >= FM_MAX) break;
     }
-    // EOF (or the cap) with no closing marker.
+    // EOF (or the cap) with no closing marker. Flush whatever the decoder is
+    // still holding, so a final complete character is not dropped.
+    acc += decoder.end();
     return { fm: seenOpen ? parseFrontmatter(acc) : null, bytesRead };
   } catch {
     return { fm: null, bytesRead: 0 };
@@ -986,12 +997,33 @@ function cmdCheckpoint(P, args) {
   return { reason: "ok", line: line.trim(), exitCode: 0 };
 }
 
-/** Other places a workspace plausibly gets anchored — where a fork would hide. */
+/**
+ * Other places a workspace plausibly gets anchored — where a fork would hide.
+ *
+ * The `~/.claude/projects/*` sweep is the load-bearing one, and it was missing
+ * from the first implementation. That directory is where the project-identity
+ * default actually writes, so it is where a fork actually lands — and without
+ * this sweep `doctor` reported `no-fork` on a workspace that had one. The other
+ * three entries cover hand-configured anchors, which are the less likely case.
+ */
 function forkCandidates(workspace, cwd) {
   const out = new Set();
   out.add(path.join(cwd, "skill-observations"));
   out.add(path.join(os.homedir(), "skill-observations"));
   out.add(path.join(os.homedir(), ".claude", "skill-observations"));
+
+  const projects = path.join(os.homedir(), ".claude", "projects");
+  let entries = [];
+  try {
+    entries = fs.readdirSync(projects, { withFileTypes: true });
+  } catch {
+    entries = [];
+  }
+  for (const e of entries) {
+    if (e.isDirectory())
+      out.add(path.join(projects, e.name, "skill-observations"));
+  }
+
   const ours = path.join(workspace, "skill-observations");
   return [...out].filter((c) => path.resolve(c) !== path.resolve(ours));
 }

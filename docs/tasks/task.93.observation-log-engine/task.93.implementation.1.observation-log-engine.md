@@ -35,7 +35,7 @@ Build `shared/resources/observation-log.js` (ten-subcommand engine), `shared/res
 | 1. create-branch           | ✅ Done    | Branch `feature/task.93.*` exists in git                               | `feature/task.93.observation-log-engine` created from `develop` at `9b1828d6`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.93.review.1.observation-log-engine.md` exists                    | 9/10 READY TO IMPLEMENT; 0 Critical / 1 Important / 2 Optional; status promoted `Planned → Ready for Development` | Pre-pass B + C (in-line, below) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 files created, 2 modified; 41 tests; **19 guards mutation-proven**; shellcheck + prettier clean | Pre-develop surface map (in-line, below) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #353](https://github.com/Gamaroff/agent-skills/pull/353); commit `b542db10`; issue #339 commented; board `in-review` → `stage-disabled` (correct, non-blocking) | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.93.qa.{N}.*.md`; `task.93.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.93.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -56,6 +56,13 @@ Build `shared/resources/observation-log.js` (ten-subcommand engine), `shared/res
 - **Tracker**: GitHub (`JIRA_URL` unset). Issue **#339**, state OPEN, board column `Todo`, labels `task`, `priority:high`.
 - **Pipeline mode**: `standard`. Computed from `risk_level=absent` (risk_ok=true) AND `phase_count=5` (**not** < 3) AND single_module — the phase count alone forces `standard`.
 - **Always-load files**: 3 files resolved from `skills-config.yaml` `devLoadAlwaysFiles`; all three verified present on disk.
+
+### Step 4 — create-pr — 2026-09-08
+
+- Scope built from the work-item dir plus the changed-code top-level dirs: `docs/tasks/task.93.observation-log-engine`, `shared/resources`, `skills`, `AGENTS.md`, `CHANGELOG.md`. All 59 changed paths were in scope; nothing out-of-scope was staged (verified by pathspec check, not assumed).
+- **One commit, deliberately.** `b542db10` covers the engine, the `read-config.sh` key it requires, and the 48 generated bundle copies. Splitting them would leave a commit that fails the bundle-freshness check in isolation.
+- PR [#353](https://github.com/Gamaroff/agent-skills/pull/353) → `develop`. Issue comment `reason: posted`.
+- Board `in-review`: `reason: stage-disabled` — the moment is not declared in this board's `pipeline:` map. A correct outcome, exit 0, non-blocking.
 
 ### Step 3 — develop — 2026-09-08
 
@@ -204,8 +211,8 @@ _Track each QA review/fix cycle._
 
 **Finished**: _pending_
 **Final Status**: _pending_
-**Branch**: _pending — populated after Step 1_
-**PR**: _pending — populated after Step 4_
+**Branch**: `feature/task.93.observation-log-engine`
+**PR**: [#353](https://github.com/Gamaroff/agent-skills/pull/353)
 **QA Iterations**: _pending_
 **DoD Summary**: _pending — populated after Step 7_
 **Tracker debt**: _pending — populated after Step 7_
