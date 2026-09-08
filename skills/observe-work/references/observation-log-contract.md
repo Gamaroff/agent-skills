@@ -2,6 +2,7 @@
 name: observation-log-contract
 description: The canonical storage format for the observation log — the directory layout, the frontmatter fields, the id rule, the archival gate, parked semantics, skill families and siblings_checked, the carrier pattern, and the version-control hazards. Every read and write of the log goes through observation-log.js; this file specifies what that engine stores and why each rule is shaped the way it is.
 ---
+<!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/observation-log-contract.md. Regenerate via `npm run bundle`. -->
 
 # The observation log
 
@@ -287,7 +288,7 @@ repository's shared-resources directory; `observation-log.js` sits beside them t
 **They are named here rather than linked, deliberately.** A relative link resolves in situ and
 breaks the moment the bundler copies this file into a skill's `references/` directory — which it
 does, without bringing unrelated siblings along, because it keys on the literal
-`shared/resources/<name>` form and never sees a `./`-prefixed link. Writing them in that linkable
+`references/<name>` form and never sees a `./`-prefixed link. Writing them in that linkable
 form instead would drag three unrelated engines into every consumer of a skill that bundles this
 contract, to satisfy six cross-references. Nothing under `skills/` is link-checked in CI, so the
 broken form would have shipped green.
@@ -326,7 +327,7 @@ Never derive the workspace from the current working directory. Source the
 resolver, guarded:
 
 ```bash
-source shared/resources/resolve-observation-workspace.sh || exit 1
+source references/resolve-observation-workspace.sh || exit 1
 # OBS_WORKSPACE, OBS_LOG_DIR and OBS_STAGING_DIR are now set.
 ```
 

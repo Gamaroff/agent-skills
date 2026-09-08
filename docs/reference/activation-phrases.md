@@ -99,6 +99,9 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Create a new skill for X" | `create-skill` |
 | "Document this existing project" | `document-existing-project` |
 | "Remember this — we use NX for testing" | `remember-insight` |
+| "Any observations logged?" / "What did you learn this session?" | `observe-work` |
+| "Review the observation log" / "Run the skill review" | `observe-work` (the second phrasing picks `--review`) |
+| "One skill to rule them all" | `observe-work` (the upstream methodology's name) |
 
 ## Architecture
 

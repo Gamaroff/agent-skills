@@ -6,6 +6,40 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The `observe-work` meta-skill** (`skills/observe-work/`) — the first consumer of the
+  observation-log engine below. It runs alongside ordinary work, notices the moments that would
+  otherwise evaporate (a correction, a gap no skill covers, a rule the agent broke), writes each as a
+  durable observation, and periodically turns that backlog into **staged** skill updates the user
+  installs. `/observe-work` is capture mode; `/observe-work --review` runs the review cycle.
+
+  Adapted from [rebelytics/one-skill-to-rule-them-all](https://github.com/rebelytics/one-skill-to-rule-them-all)
+  (CC BY 4.0, Eoghan Henn / rebelytics.com) — **changes were made**. Three of them are structural:
+
+  - **The body is 256 lines against upstream's ~710**, which is what makes progressive disclosure real
+    rather than stated. The body is an always-loaded per-invocation cost and the five references are
+    not, so a paragraph earns a place in the body only by changing behaviour on *every* invocation.
+    Every pointer states its own load trigger — an unconditioned list of filenames is a bibliography,
+    not progressive disclosure, and reads as optional.
+  - **Every log operation is one engine call.** No snippet in the prose derives an id, sweeps the
+    archive or parses frontmatter, so the guards in `observation-log.js` cannot be skipped by a
+    reader who retypes a snippet imperfectly.
+  - **Authoring guidance is cross-referenced, never restated.** `create-skill`, `authoring-skills.md`
+    and `CONTRIBUTING.md` remain the single sources; a rule kept in two places drifts, and the agent
+    then follows whichever it happened to load.
+
+  Also shipped: `shared/resources/observe-work-session-start.sh`, an **opt-in** `SessionStart` hook
+  that computes the open-observation count and review staleness and injects them as
+  `additionalContext`. Shipping the file is not installing it — that stays the user's decision. It
+  counts `status: open` files rather than the directory (a raw count overstates the backlog by every
+  entry the last review just closed, for a day, in every session), and compares ISO dates by lexical
+  sort rather than `<` inside `[ ]`, which is a bash/ksh extension that zsh rejects.
+
+  **The install is activation unverified**, deliberately and by construction: the installing session
+  cannot prove activation, because a skill being callable right after install only shows it was
+  invoked by hand. `AGENTS.md` carries the activation instruction — demanding the Session Start
+  Protocol *by name*, plus a post-task backstop line — and the next-session check is handed to the
+  user as a concrete first action.
+
 - **The observation-log engine, workspace resolver and contract** (`shared/resources/observation-log.js`,
   `resolve-observation-workspace.sh`, `observation-log-contract.md`). The mechanism a forthcoming
   `observe-work` meta-skill stands on: a durable, cross-session record of moments where an agent's

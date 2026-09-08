@@ -133,6 +133,8 @@ family that reads `assignee`.
 | `/create-skill` | Scaffold a new skill | [Authoring skills](../contributing/authoring-skills.md) |
 | `/document-existing-project` | Generate brownfield architecture doc | [Document Existing Project](../runbooks/document-existing-project.md) |
 | `/remember-insight` | Save an insight to project memory | [`remember-insight`](../../skills/remember-insight/SKILL.md) |
+| `/observe-work` | Watch the session for skill-improvement signals and write each to the observation log | [`observe-work`](../../skills/observe-work/SKILL.md) |
+| `/observe-work --review` | Work the observation backlog and stage skill updates for you to install | [Review cycle](../../skills/observe-work/references/review-cycle.md) |
 
 ## Checklists
 

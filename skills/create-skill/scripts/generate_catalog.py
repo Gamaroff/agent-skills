@@ -94,7 +94,7 @@ CATEGORIES = [
     ]),
     ("Skill Tooling", [
         "create-skill", "find-skills", "autoskill", "agent-md-refactor",
-        "execute-checklist", "generate-ui-prompt",
+        "execute-checklist", "generate-ui-prompt", "observe-work",
     ]),
     ("User Experience", [
         "ux-expert", "building-components", "browser-use", "markdown-wireframe",

@@ -156,6 +156,30 @@ Canonical rules: [`docs/standards/bug-registry.md`](./docs/standards/bug-registr
 
 Never use symlinks or relative paths.
 
+## Observing This Session
+
+Before the first tool call of any session — and before writing or proposing a
+plan, not merely before executing one — invoke the `observe-work` skill AND
+execute its Session Start Protocol (workspace probe, frontmatter scan, review
+trigger). Loading the skill and running the protocol are separate steps; a
+session that loads the file and stops has activated nothing. Any turn that will
+involve a tool call counts; do not classify the session as "too simple" from its
+opening message.
+
+After completing each task, report in one line the observations written this
+session (ids and titles, or "none logged and why").
+
+Skill: [`skills/observe-work/SKILL.md`](./skills/observe-work/SKILL.md). Activation tiers, the opt-in
+`SessionStart` hook (`shared/resources/observe-work-session-start.sh`, shipped but **not** installed)
+and the fallback ladder for when writing this file is refused:
+[`skills/observe-work/references/environments.md`](./skills/observe-work/references/environments.md).
+
+Two properties above are load-bearing, and both come from reported failures. The instruction demands
+the **protocol by name**, because an agent that loads the skill and stops leaves nothing to surface
+the omission — a loaded-but-inert skill looks identical to an active one from the user's side. And the
+post-task line is the **backstop**: it forces a look at the log at every task boundary, so a session
+that silently skipped the protocol is discovered at the first boundary instead of never.
+
 ## Development Pipeline
 
 Stories are the unit of work; tasks are standalone. Pipeline reference: [`docs/operations/workflows.md`](./docs/operations/workflows.md). Walkthroughs: [`docs/runbooks/`](./docs/runbooks/README.md). Anti-patterns: [`docs/reference/anti-patterns.md`](./docs/reference/anti-patterns.md). Design rationale: [`docs/reference/faq.md`](./docs/reference/faq.md).
