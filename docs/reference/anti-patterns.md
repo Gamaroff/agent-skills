@@ -122,6 +122,31 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 **Do this instead:** state results and decisions directly. One sentence per real update.
 
+## Never let one signal report two states
+
+**Rule:** for each falsy, empty or zero value a check can emit, name the distinct situations that produce it. If more than one situation produces the same value, and the right response differs between them, the signal needs separate values.
+
+**Why:** "found nothing" and "could not look" are byte-identical from the caller's side, and a caller under time pressure reads whichever is more reassuring. This repository has diagnosed the same shape at least four times — a `probes: []` that meant either nothing-to-probe or probing-never-ran; a bug status that meant either legitimately-closed or outside-the-lifecycle; a runnable count of zero that meant either an under-configured run or a deliberately deny-listed one; an activation check that meant either the project has no instruction or no instruction file was found to read. Each time it was named in the postmortem of that instance, which is the one artifact the next instance does not read.
+
+**If you ignore it:** the check reports clean, the reader believes it, and the failure it existed to catch ships. A green tick beside a property is worse than no tick, because an unguarded property invites scrutiny and a guarded-looking one never gets looked at again.
+
+**Do this instead:** emit a distinct value per state — `review-security`'s verdict vocabulary (`engages` / `present-but-inert` / `absent` / `unverifiable`) is the working example — and, where the values must stay backward-compatible, add a `state` field beside the boolean rather than overloading it. In review, the observable finding is: *this condition is reached by two distinguishable states and reports one value.*
+
+## Never fix N call sites without a population check
+
+**Rule:** when a fix is the same edit applied at more than one call site, or the root cause is "this site was not updated when the contract changed", the deliverable is the check that finds site N+1 — not the N edits.
+
+**Why:** enumeration defects are invisible to behavioural testing by construction. Every site is correct in isolation, every test passes, and the bug lives entirely in the set of sites nobody listed. Testing the sites you found re-confirms the finding; only testing the population can fail on the site you missed.
+
+**If you ignore it:** the next site surfaces as a separate bug weeks later, and its fix repeats the same omission.
+
+**Do this instead:** write a check that enumerates the population and asserts every member complies, carrying two properties that are load-bearing and usually skipped:
+
+- a **non-vacuity floor** — a minimum expected match count — so a scan whose pattern stops matching fails instead of passing on zero;
+- **staleness failure** on any allowlist, so an exempted site that no longer exists is an error rather than silent dead weight.
+
+Then review the guard itself adversarially, and **build it on a matcher independent of the one under test**. A population check that reuses the buggy matcher inherits its blind spot and can never contradict it — it passes vacuously on exactly the defect it was written for.
+
 ## See also
 
 - [Troubleshooting](./troubleshooting.md) — what to do when something breaks
