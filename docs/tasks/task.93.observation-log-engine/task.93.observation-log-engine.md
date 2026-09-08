@@ -658,31 +658,41 @@ defect passed by luck.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-08
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 96/100
+**Gate Decision**: PASS (cycle 4 of 5)
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.93.qa.1.observation-log-engine.md](./task.93.qa.1.observation-log-engine.md)
-- **Gate File**: [task.93.gate.1.observation-log-engine.yml](./task.93.gate.1.observation-log-engine.yml)
+| Cycle | Gate | Score | Report |
+|---|---|---|---|
+| 1 | FAIL | 70 | [qa.1](./task.93.qa.1.observation-log-engine.md) · [gate.1](./task.93.gate.1.observation-log-engine.yml) |
+| 2 | FAIL | 70 | [qa.2](./task.93.qa.2.observation-log-engine.md) · [gate.2](./task.93.gate.2.observation-log-engine.yml) |
+| 3 | CONCERNS | 90 | [qa.3](./task.93.qa.3.observation-log-engine.md) · [gate.3](./task.93.gate.3.observation-log-engine.yml) |
+| 4 | **PASS** | **96** | [qa.4](./task.93.qa.4.observation-log-engine.md) · [gate.4](./task.93.gate.4.observation-log-engine.yml) |
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 41 (new suite) / 2,856 (full repo) + 448 shell assertions
-- **Phases Verified**: 5/5 (3 clean, 2 with findings)
-- **Critical Issues**: 1 HIGH, 2 MEDIUM
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Tests Executed**: 48 (this suite) / 2,863 repo-wide + 448 shell assertions
+- **Phases Verified**: 5/5
+- **Findings**: 7 raised, 7 closed, 0 remaining
+- **HIGH by cycle**: 1, 2, 0, 0 — converging
+- **NFR Status**: Security PASS, Performance PASS, Reliability PASS, Maintainability PASS
 
 ### Key Findings
 
-All three findings sit in one seam — **the boundary between the process and the world outside it**. Everything the engine does to its own data is correct and mutation-proven.
+All seven closed and mutation-proven. Three concerned the boundary between the process and the world
+outside it (which checkout am I in, where does a buffer end, whose home directory is this); three
+were introduced by fixes to earlier findings; one was found only because the operator stopped an
+unsafe verification script.
 
-1. **[HIGH] TASK-93-001** — `resolve-observation-workspace.sh` derives a *different workspace per linked git worktree*, producing exactly the silent fork `doctor` exists to catch. Not hypothetical: `/develop-batch` dispatches into linked worktrees. Fix: derive from `--git-common-dir` (verified).
-2. **[MEDIUM] TASK-93-002** — `forkCandidates()` never scans `~/.claude/projects/*/skill-observations`, so `doctor` cannot detect the fork above. The two compound.
-3. **[MEDIUM] TASK-93-003** — UTF-8 characters spanning the 8192-byte chunk boundary corrupt to U+FFFD, at all eight alignments tested. Fix: `StringDecoder` (verified).
+The pattern that held across every cycle: **the cheap version of a check reports success.** A
+single-offset UTF-8 probe passed. A `cd`-based worktree test would have passed. A one-directional
+fork test did pass, and let a HIGH through. A test that cleaned up after itself still wrote into the
+user's home directory. The first encoder-parity test passed while exercising neither shipped
+encoder — the finding reproduced inside its own fix.
 
 ---
 
@@ -705,6 +715,7 @@ All three findings sit in one seam — **the boundary between the process and th
 | 2026-09-08 |         | Status → ready-for-review | qa-fix |
 | 2026-09-08 |         | QA cycle 3 CONCERNS (90/100) — 3 cycle-2 findings verified fixed, 0 HIGH (converging 1,2,0); 1 new: two path encoders with no cross-check | qa-task |
 | 2026-09-08 |         | QA cycle 3 finding fixed — end-to-end encoder-parity test, both shipped encoders mutation-proven | qa-fix |
+| 2026-09-08 |         | QA cycle 4 gate PASS (96/100) — all 7 findings closed, 0 remaining | qa-task |
 
 ---
 
