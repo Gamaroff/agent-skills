@@ -36,8 +36,57 @@ unfixable.
 From the PR review report (when present — read it whatever its verdict; the blocking
 distinction is made below, not by skipping the file):
 
-Findings are **rendered text, not YAML** — `/review-pr` writes its subagents' YAML into this fixed
-three-line shape and does not persist the raw fields. Parse that shape:
+The report carries its findings **twice**: once as rendered text for a human, and once as a
+structured block for you. **Prefer the structured block.** Take the rendered text only when the block
+is absent, which means the report was written before the block existed.
+
+### Preferred — the machine-readable block
+
+Look for a `## Machine-Readable Findings` section holding a ```` ```yaml ```` fence:
+
+```yaml
+findings:
+  - id: PC-1
+    category: coverage
+    severity: high
+    confidence: high
+    ref: "AC-3"
+    finding: "<one sentence: what is wrong>"
+    suggested_action: "<one sentence: the fix approach>"
+truncated_count: 0
+```
+
+Every block field has exactly one destination. **No field carries across by name** — the block's
+names and the output schema's names differ almost everywhere, and assuming otherwise is how a typed
+field arrives somewhere the schema does not define:
+
+| Block field | Output schema field | Rule |
+|---|---|---|
+| `id` (`PC-1`, `CR-1`) | `id` (`F1`, `F2`, …) | **Renumber.** The output ids are `F{n}` in the order you emit them. Keep the block id in `description` when it is worth citing; never emit `PC-1` as an output `id`. |
+| `severity` | `severity` | Same name, same values (`high`/`medium`/`low`). The one field that does carry directly. |
+| `finding` | `description` | Verbatim. |
+| `suggested_action` | `suggested_fix_path` | Verbatim. Despite the field's name it holds a description of the fix approach, not a path. |
+| `ref` | `file` | Conditional — see below. |
+| `category` | — | **Dropped.** The output schema has no category field; `pr-review` findings are already distinguished by `source`. |
+| `confidence` | — | **Dropped.** The output schema carries no confidence. Do not fold it into `severity` — a `high`/`medium` finding stays `high`/`medium` whatever its confidence. |
+| — | `source` | Always the literal `pr-review` for every entry taken from this block. |
+
+**`ref` → `file`**: when `ref` looks like `path:line`, use it as `file`. Otherwise set `file: null`
+and carry `ref` verbatim inside `description` — it is a criterion id, an artifact path, a frontmatter
+field or a section reference, and coercing it into a path loses it.
+
+**`truncated_count`**: the block's value counts findings `/review-pr` dropped; your own counts
+findings **you** dropped at the 20-finding cap. Report the **sum**, so the field answers "how many
+findings exist that are not in this summary?" — which is the question its consumer asks. The two
+causes are not distinguished, and do not need to be.
+
+**`findings: []` is a real answer, not a missing block.** A report with nothing to report still
+writes the section. An *absent section* means a legacy report and only then do you fall back.
+
+### Fallback — the rendered three-line shape (reports written before the block existed)
+
+`/review-pr` writes its subagents' YAML into this fixed three-line shape and does not persist the raw
+fields. Parse that shape:
 
 ```
 [PC-1] coverage · high · confidence: high — AC-3
@@ -50,8 +99,11 @@ three-line shape and does not persist the raw fields. Parse that shape:
 ```
 
 - **Header line**: `[{id}] {category} · {severity} · confidence: {confidence} — {ref}`.
-  `id` is `PC-*` for conformance findings and `CR-*` for code findings. `severity` is the **third**
-  field, bare — there is no `severity:` key anywhere in the file, so do not search for one.
+  `id` is `PC-*` for conformance findings and `CR-*` for code findings. In this rendered shape
+  `severity` is the **third** bare field: the rendered shape has no `severity:` key, so do not search
+  the rendered text for one. The machine-readable block above *does* carry a `severity:` key, and it
+  is the block you should prefer — but if you have reached this fallback, that block is not in the
+  file and searching for its keys will find nothing.
 - **`ref` is not always a `file:line`.** Code findings usually give one; conformance findings often
   give an acceptance-criterion id (`AC-3`), a frontmatter field, a filename, or a section reference.
   Carry it verbatim as the finding's location and do not attempt to coerce it into `file:line`.
@@ -60,11 +112,17 @@ three-line shape and does not persist the raw fields. Parse that shape:
 - An `APPROVE` or `CONCERNS` report is advisory — surface its findings but do not treat them as
   blocking, since neither verdict returns the run to qa-fix.
 
-> **This shape is pinned by a test.** `evals/shared/tests/pr-review-loop-parity.test.mjs` asserts that
-> the header format described here matches the one `skills/review-pr/SKILL.md` renders. The two files
-> previously shared no assertion, and drifted: this block once described the subagents' YAML field
-> names (`severity:`, `file:line`), which are consumed in memory and never reach disk — so the sole
-> carrier of findings on the `REQUEST CHANGES` path described a schema that does not exist.
+> **Both shapes are pinned by a test.** `evals/shared/tests/pr-review-loop-parity.test.mjs` asserts
+> that the block schema and the rendered header format described here match what
+> `skills/review-pr/SKILL.md` emits, that both arms survive, and that a real legacy report
+> (`docs/tasks/task.66.review-pr/task.66.pr-review.1.review-pr.md`) has no block and still matches the
+> rendered shape — so the fallback has an actual file to fire on.
+>
+> The two files previously shared no assertion, and drifted: this block once described the subagents'
+> YAML field names (`severity:`, `file:line`), which are consumed in memory and never reach disk — so
+> the sole carrier of findings on the `REQUEST CHANGES` path described a schema that did not exist.
+> The machine-readable block is the durable fix for that class of defect: it puts the fields **on
+> disk** instead of describing a rendering of them.
 
 From each gate YAML:
 - Gate status (PASS|CONCERNS|FAIL|WAIVED)
