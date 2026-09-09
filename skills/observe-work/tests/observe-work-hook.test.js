@@ -291,11 +291,22 @@ test("the hook emits well-formed SessionStart JSON", (t) => {
 const daysAgo = (n) =>
   new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
-/** Does the hook's output nag about a stale review? */
+/**
+ * Does the hook's output nag about a stale review?
+ *
+ * Anchored to the review-state clause the hook actually emits — `last run
+ * <date> — stale (over N days)` or `never run` — rather than matching the word
+ * "stale" anywhere in the context. A bare substring test would report a false
+ * positive the day the hook mentions staleness for some other reason, and a
+ * staleness assertion that cannot tell the two apart is the thing it exists to
+ * prevent.
+ */
 function saysStale(stdout) {
   if (!stdout) return false;
   const ctx = JSON.parse(stdout).hookSpecificOutput.additionalContext;
-  return /stale|never run/.test(ctx);
+  return /last run \d{4}-\d{2}-\d{2} — stale \(over \d+ days\)|never run/.test(
+    ctx,
+  );
 }
 
 test("OBS_STALE_DAYS: the applied default is 14, not 7", (t) => {

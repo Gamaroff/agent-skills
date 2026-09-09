@@ -465,6 +465,36 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.95.qa.1.observe-work-docs-boundaries.md](./task.95.qa.1.observe-work-docs-boundaries.md)
+- **Gate File**: [task.95.gate.1.observe-work-docs-boundaries.yml](./task.95.gate.1.observe-work-docs-boundaries.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2902 (2901 pass, 0 fail, 1 pre-existing skip)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Bug Reports
+
+- [task.95.bug.1: default workspace path undocumented](./task.95.bug.1.default-workspace-path-undocumented.md) — ✅ Ready for QA — Severity: MEDIUM (Fixed 2026-09-09)
+
+### Key Findings
+
+One MEDIUM documentation defect ([task.95.bug.1](./task.95.bug.1.default-workspace-path-undocumented.md)): the new `## Observation workspace` section never states the default workspace path, and the schema block's example (`~/.agents/...`) points at a different tree from the real default (`~/.claude/projects/<encoded>`). A reader cannot locate their own log from the documentation. Two LOW advisory cleanups in the new tests. No HIGH issues; every phase verified against the tree rather than the document; all seven development-time mutations independently spot-checked.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
@@ -473,6 +503,8 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 | 2026-09-09 | 1.1     | Review: 4 Critical, 5 Important — two config keys nothing reads, a template format the parser cannot read, an invented `Coherence model` field, a seeded family failing its own audit (8 gaps, reproduced). All fixed in-document; no engine change | review-task |
 | 2026-09-09 |         | Status → ready-for-development | review-task |
 | 2026-09-09 |         | Implemented — 10 files, 8 tests added (4 family-template, 3 resolver contract, 2 OBS_STALE_DAYS; all mutation-proven) | develop |
+| 2026-09-09 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 2 LOW | qa-task |
+| 2026-09-09 |         | QA findings fixed — 1 MEDIUM + 2 LOW addressed, 1 iteration | qa-fix |
 
 ---
 

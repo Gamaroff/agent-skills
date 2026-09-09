@@ -25,7 +25,9 @@
  */
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const { execFileSync, spawnSync } = require("child_process");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -574,8 +576,6 @@ test("family template: parses into the engine's actual shape, with real members"
   const engine = readOutside("shared", "resources", "observation-log.js");
   if (engine === null) return; // packaged install — repo siblings absent
 
-  const { execFileSync } = require("node:child_process");
-  const os = require("node:os");
   const repoRoot = path.join(SKILL_DIR, "..", "..");
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "obs-families-"));
   try {
@@ -638,8 +638,6 @@ test("family template: `families --audit` against this repo returns ZERO gaps", 
   const engine = readOutside("shared", "resources", "observation-log.js");
   if (engine === null) return; // packaged install — repo siblings absent
 
-  const { execFileSync } = require("node:child_process");
-  const os = require("node:os");
   const repoRoot = path.join(SKILL_DIR, "..", "..");
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "obs-families-audit-"));
   try {
@@ -722,7 +720,6 @@ const RESOLVER = path.join(
  * Uses bash: the resolver is bash, not POSIX sh.
  */
 function resolveIn(cwd, env = {}) {
-  const { spawnSync } = require("node:child_process");
   const r = spawnSync(
     "bash",
     [
@@ -745,7 +742,6 @@ function resolveIn(cwd, env = {}) {
 
 /** A durable scratch project. See the header note on /tmp. */
 function makeProject(configBody) {
-  const os = require("node:os");
   const root = fs.mkdtempSync(
     path.join(os.homedir(), ".observe-work-resolver-"),
   );

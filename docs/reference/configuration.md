@@ -142,13 +142,19 @@ loopSupervisor: # optional — fresh-context sequential loop runner
       stateFile: .claude/state/develop-next.state.json
 
 # observe-work — where the observation log lives.
-# The key is optional. Absent block == the project-identity default workspace.
+# The key is optional. Omit the whole block and the workspace defaults to
+#   ~/.claude/projects/<project path with every "/" replaced by "-">
+# e.g. /Users/ada/Projects/app  ->  ~/.claude/projects/-Users-ada-Projects-app
 observations:
   # The workspace ROOT. Absolute, or ~-relative. This is the highest-precedence
-  # source; $OBS_WORKSPACE is second; the project-identity path is the default.
-  # It must be ONE STABLE path that outlives a session — never derived from the
-  # cwd, and never inside an ephemeral checkout (a git worktree, a temp clone),
-  # which is torn down and takes the log with it.
+  # source; $OBS_WORKSPACE is second; the project-identity path above is the
+  # default. It must be ONE STABLE path that outlives a session — never derived
+  # from the cwd, and never inside an ephemeral checkout (a git worktree, a temp
+  # clone), which is torn down and takes the log with it.
+  #
+  # The value below is an EXAMPLE OVERRIDE, not the default — it is what you set
+  # when the skills being observed are installed at user scope and their
+  # observations belong in one place across every project.
   workspace: ~/.agents/skill-observations
 ```
 
@@ -213,7 +219,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `loopSupervisor.cooldownSeconds`                 | integer                         | `10`                                             | Pause between iterations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `loopSupervisor.dashboardUrl`                    | URL                             | unset                                            | Where `loop-supervisor` POSTs a status frame on each iteration boundary. Inert when unset. `--dashboard` overrides. The payload contract is in [`skills/loop-supervisor/README.md`](../../skills/loop-supervisor/README.md#publishing-the-run-to-a-dashboard); a failed push warns once and never affects the run. **The token is deliberately not a config key** — this file is committed, so it comes from `--dashboard-token` or `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` instead. |
 | `loopSupervisor.adapters.<name>`                 | map of paths                    | (adapter defaults)                               | Per-adapter overrides for `stateFile`, `lockFile`, `haltFile`, `probeScript` and `command`. **Declarative only** — a config key that could name a module to `require()` would be a code-execution surface, so JavaScript adapters are deliberately not supported.                                                                                                                                                                                                                          |
-| `observations.workspace`                         | path (absolute or `~`-relative) | (project-identity path under the agent home)     | Root of the `observe-work` observation workspace — the anchor holding `skill-observations/` (the log, the families registry, the review date) and `skill-updates/` (staged skill updates). **Highest-precedence source**; `$OBS_WORKSPACE` is second and the project-identity path is the default, so an absent key is a working default rather than a disabled feature. Must be one stable path that outlives a session: a resolved value inside `/tmp`, `.claude/worktrees/`, or a linked git worktree is **refused outright**, not warned about and not silently defaulted. Set it to a shared user-scope path when the skills being observed are installed at user scope — see [Observation workspace](#observation-workspace). There is deliberately **no `observations.enabled` and no `observations.review_interval_days`**: nothing reads either, and the review-staleness threshold is the `OBS_STALE_DAYS` environment variable instead. |
+| `observations.workspace`                         | path (absolute or `~`-relative) | `~/.claude/projects/<project-path with / → ->`   | Root of the `observe-work` observation workspace — the anchor holding `skill-observations/` (the log, the families registry, the review date) and `skill-updates/` (staged skill updates). **Highest-precedence source**; `$OBS_WORKSPACE` is second and the project-identity path is the default, so an absent key is a working default rather than a disabled feature. That default is the project's absolute path with every `/` replaced by `-`, under `~/.claude/projects/` — so `/Users/ada/Projects/app` resolves to `~/.claude/projects/-Users-ada-Projects-app`. Note it is `.claude/`, not `.agents/`: this one path is fixed by the agent home, not by this repository's agent-agnostic-path convention. Must be one stable path that outlives a session: a resolved value inside `/tmp`, `.claude/worktrees/`, or a linked git worktree is **refused outright**, not warned about and not silently defaulted. Set it to a shared user-scope path when the skills being observed are installed at user scope — see [Observation workspace](#observation-workspace). There is deliberately **no `observations.enabled` and no `observations.review_interval_days`**: nothing reads either, and the review-staleness threshold is the `OBS_STALE_DAYS` environment variable instead. |
 
 ## QA artifacts are co-located
 
@@ -311,7 +317,14 @@ Three sources, highest precedence first:
 
 1. `observations.workspace` in `skills-config.yaml`
 2. the `OBS_WORKSPACE` environment variable
-3. the project-identity default path under the agent home
+3. the project-identity default: `~/.claude/projects/<project path with every "/" replaced by "-">`
+
+So a project at `/Users/ada/Projects/app`, with no config key and no environment variable, resolves
+to `~/.claude/projects/-Users-ada-Projects-app`. Two things about that path are worth stating
+because guessing either one wrong sends you to an empty directory: it is under **`.claude/`**, not
+`.agents/` — the agent home fixes it, and this repository's agent-agnostic-path convention does not
+reach it — and the project path is **encoded, not nested**, so there is one flat directory per
+project rather than a mirrored tree.
 
 The resolver is [`shared/resources/resolve-observation-workspace.sh`](../../shared/resources/resolve-observation-workspace.sh),
 sourced **guarded**:
