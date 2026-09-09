@@ -1,0 +1,106 @@
+schema: 1
+task: 'task.98.bundle-freshness-check-mode'
+task_title: 'A per-file bundle-freshness assertion the regenerate-and-diff check cannot provide'
+gate: CONCERNS
+status_reason: 'All 7 success criteria met and the check found a live defect on its first run. Two findings in the classifier itself: a stale headerless copy reports AMBIGUOUS under a remedy that leads with the wrong action, and an unreadable file is reported with a detail asserting something the check could not determine.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T21:55:00Z'
+
+top_issues:
+  - id: 'T98-QA-001'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      A STALE copy of a headerless suffix (.json) is classified AMBIGUOUS, and the
+      AMBIGUOUS remedy leads with "Rename the authored file" — the wrong action for
+      this case. The classification is correct given the available evidence (nothing
+      distinguishes a stale bundled .json from an authored one), but the remedy sends
+      the reader the wrong way. This is not hypothetical: it is the exact shape of the
+      live defect this check found in the tree on its first run.
+    suggested_action: >-
+      Name the headerless case in the AMBIGUOUS remedy, or add the detail to the
+      finding when the suffix cannot carry a banner, so the reader is told that
+      "delete and re-bundle" is the likely fix rather than "rename".
+    suggested_owner: dev
+    status: open
+  - id: 'T98-QA-002'
+    severity: low
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      An unreadable file (mode 000) is reported AMBIGUOUS with the detail "carries no
+      provenance banner and is not byte-identical to the rewritten source" — an
+      assertion about content the check could not read. It is the conflation this
+      repository separates elsewhere as `empty` vs `scan-broken`: "found nothing" and
+      "could not look" must not share a message. The `except OSError` branch on
+      read_bytes below is consequently dead for this input.
+    suggested_action: >-
+      Detect the unreadable case before calling `_looks_bundled` and report it with a
+      detail that says the file could not be read.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 3
+    notes: >-
+      Three hostile probes executed against the check boundary. (1) A symlink in
+      references/ escaping the repo — reported SYMLINK, target file left byte-intact,
+      never followed. (2) A symlink pointing at its own shared source, the case where a
+      write-through would clobber the source — reported, source hash unchanged. (3) A
+      banner declaring a traversal path (shared/resources/../../etc/passwd) — classified
+      MISDECLARED; the declared path is echoed into the report but never used to open a
+      file. The check performs no writes, opens no network connection and takes no
+      untrusted input beyond file content it only reads.
+  performance:
+    status: PASS
+    notes: >-
+      126 skills checked in ~3.4s (measured in the test that asserts the real repository
+      is clean). Adds one read pass over references/ per skill to a CI job that already
+      runs a full bundle. No regression to the existing steps.
+  reliability:
+    status: PASS
+    notes: >-
+      Read-only, asserted on bytes + mode + the path set, and mutation-proved twice — a
+      write inserted into the check path reds, and a directory creation reds separately.
+      Degraded inputs are handled without crashing: unreadable file, directory at a
+      reference name, symlink, missing source, non-UTF-8 content.
+  maintainability:
+    status: PASS
+    notes: >-
+      Built on `expected_bytes` and sharing the writer's discovery functions, so the
+      check cannot drift from the bundler — the property the task named as the one that
+      matters. Every non-obvious decision carries the reason at the site. 20 tests, 11
+      mutation proofs.
+
+recommendations:
+  immediate:
+    - action: 'Name the headerless-suffix case so the AMBIGUOUS remedy points at the right fix (T98-QA-001)'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'Distinguish an unreadable file from one that was read and found unconvincing (T98-QA-002)'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+  future:
+    - action: >-
+        `shared/resources/observation-log-contract.md` contains the literal
+        `shared/resources/<name>` in prose, so discovery warns on every bundle and every
+        check run. Pre-existing and out of scope here; worth its own task.
+      refs: ['shared/resources/observation-log-contract.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'Address T98-QA-001 — the remedy for the class the check most often reports should name the right action'

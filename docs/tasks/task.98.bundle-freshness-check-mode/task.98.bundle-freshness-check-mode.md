@@ -5,18 +5,23 @@ type: task
 description: "The CI bundle-freshness check regenerates and diffs. That is adequate now that the bundler reconciles against disk, but it still cannot see a bundled copy whose source was deleted, a symlinked reference, or a copy that is not bundler output. A --check mode was built for this during task.86, ran five QA cycles, and was split out unmerged; this task carries it forward with its findings as the starting backlog."
 tags: [bundler, build, tooling, ci]
 category: infrastructure
-status: draft
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-09
+completed_date: 2026-09-09
+pr_number: 367
 assignee:
 estimated_effort_hours: 8
+github_issue: 366
 ---
 
 # Technical Task: A per-file bundle-freshness assertion
 
-**Status:** Draft
+**Status:** Accepted
+**GitHub Issue**: [#366](https://github.com/Gamaroff/agent-skills/issues/366)
+**Review**: ✅ All review recommendations from `task.98.review.1.bundle-freshness-check-mode.md` implemented 2026-09-09
 
 ---
 
@@ -119,27 +124,48 @@ behaviour is a subset of the new one.
 
 ## 6. Implementation Plan
 
-**Phase 1 — Decide whether to resume or restart (Low risk).**
+**Phase 1 — Read the inherited findings, then write fresh (Low risk).**
 
-- [ ] Read the five task-86 gate files. Decide deliberately whether to recover the prior implementation
-      or write a smaller one. It reached ~200 lines and seven classes; a narrower check covering
-      ORPHANED and SYMLINK only may be worth more than a complete one.
+> **Decided at review (2026-09-09), not left to the implementer.** The earlier wording offered a fork —
+> recover task 86's ~200-line implementation, or write a narrower ORPHANED/SYMLINK-only check — which
+> contradicts §4 In Scope and §9 Success Criteria, both of which already name all seven classes as
+> required. The success criteria are the contract, so the narrow option is not actually available; and
+> recovering the implementation that failed to converge across five QA cycles is what §2 warns against.
+> **Write a fresh, minimal implementation covering exactly the seven classes §4 names**, with task 86's
+> gate findings used as a pre-written defect list to check the new code against.
+
+- [x] Read the five task-86 gate files as a findings backlog — not as source to port. Record which of
+      the ~45 findings apply to a fresh implementation; each one is a test case, not a code change.
+      Four inherited traps became tests directly (§8's table); residual 4 (a directory at a needed
+      reference name, previously bucketed regenerable) is fixed rather than inherited.
 
 **Phase 2 — Build the check (Medium risk).**
 
-- [ ] Reuse `expected_bytes`; do not re-implement the transform.
-- [ ] Read-only: assert no filesystem mutation is reachable from the check path.
-- [ ] Mode comparison in both directions, keyed on the source's mode, not on a suffix.
+- [x] Reuse `expected_bytes`; do not re-implement the transform. `check_skill` calls it directly and
+      shares `discover_needed` / `source_backed_on_disk` / `_looks_bundled` with the writer, so the
+      check's population and its definition of "in sync" are the writer's.
+- [x] Read-only: asserted, and mutation-proved twice — a `write_if_changed` inserted into the check
+      path reds, and a `refs_dir.mkdir()` reds separately (a created directory is a mutation no
+      content snapshot of an existing tree would catch).
+- [x] Mode comparison in both directions, keyed on the source's mode, not on a suffix. Both
+      directions are tested; narrowing the comparison to one direction reds.
 
 **Phase 3 — Correct remedies (Low risk).**
 
-- [ ] Branch the summary on problem class. Verify by measurement: check → bundle → check, and confirm
-      the classes you call regenerable actually clear.
+- [x] Branch the summary on problem class. Verified by measurement in both directions: each of
+      STALE / MISSING / WRONG MODE is dirtied in its own fixture and cleared by a bundle run, and each
+      of ORPHANED / SYMLINK / AMBIGUOUS survives one — so the regenerate remedy is printed for exactly
+      the classes it clears. The summary names only the classes it counted, which is what keeps
+      "class X was not reported" assertable.
 
 **Phase 4 — Wire into CI (Low risk).**
 
-- [ ] `validate.yml`. Do **not** add an `npm run …` term to `test.yml` without adding it to the `ci`
-      composite — `evals/shared/tests/ci-gate-parity.test.mjs` asserts set equality both ways.
+- [x] `validate.yml` only — added as a step *before* regenerate-and-diff (the check is read-only and
+      must speak about the tree as committed; the older step has already rewritten it by the time it
+      speaks). The two are complements: `--check` sees what the bundler does not write, and
+      regenerate-and-diff sees pass 3, which `--check` deliberately does not assert.
+      `test.yml` was not touched, so `ci-gate-parity.test.mjs` is unaffected — re-run and green.
+      `npm run bundle:check` added for local use; neither `test.yml` nor the `ci` composite calls it.
 
 ---
 
@@ -149,10 +175,18 @@ behaviour is a subset of the new one.
 
 - `skills/create-skill/scripts/bundle_skill.py`
 - `.github/workflows/validate.yml`
+- `package.json` — adds a `bundle:check` script for local use. Deliberately called by neither
+  `test.yml` nor the `ci` composite, so `ci-gate-parity.test.mjs` is unaffected.
+- `skills/create-skill/references/skill-dependencies.json` — the stale bundled copy the check found on
+  its first run against the tree, regenerated. Added to this list at PR review (PC-1): it is a
+  substantive change, not bundler noise, and a Files Summary that omits it understates what shipped.
 
 ### Add
 
-- Tests under `tests/` (cross-cutting, per `source-tree.md`)
+- `tests/bundle-check-mode.test.js` — cross-cutting, per `source-tree.md`. Verified at review: the
+  `test` script in `package.json` already globs `'tests/*.test.js'`, so a file added here is collected
+  without a `package.json` edit. (A new `skills/*/tests/` directory would **not** be — those globs are
+  listed by hand.)
 
 ---
 
@@ -175,14 +209,15 @@ Specific traps, each of which was a real finding:
 
 ## 9. Success Criteria
 
-- [ ] A staled **orphan** (source deleted) fails the check — mutation-proved
-- [ ] A symlinked reference is reported
-- [ ] An authored file sharing a name with a shared resource is reported, never rewritten
-- [ ] The check is read-only — no mutation reachable, asserted
-- [ ] Every class's printed remedy actually clears that class, verified check → bundle → check
-- [ ] `npm run bundle` remains idempotent; 858 bundled files, 0 added, 0 removed
-- [ ] `npm run ci` green **and** the `validate.yml` job reproduced locally — `ci` runs neither
-      `validate:all` nor the freshness step
+- [x] A staled **orphan** (source deleted) fails the check — mutation-proved (disabling the orphan scan reds 5 tests), including the case where the banner sits after long frontmatter
+- [x] A symlinked reference is reported, and reported as SYMLINK rather than MISSING — the branch order is mutation-proved
+- [x] An authored file sharing a name with a shared resource is reported, never rewritten — both halves asserted in one test
+- [x] The check is read-only — no mutation reachable, asserted on bytes + mode + the path set (not mtime, whose one-second granularity would make the assertion vacuous)
+- [x] Every class's printed remedy actually clears that class, verified check → bundle → check — and the three that cannot be cleared are verified to survive a bundle run
+- [x] `npm run bundle` remains idempotent — verified: two consecutive runs, 0 writes on each
+- [x] `npm run ci` green **and** the `validate.yml` job reproduced locally — all four steps run by
+      hand (`validate:all` 126/126, skill-dependencies drift clean, the new per-file check 126 skills
+      / 0 problems, regenerate-and-diff clean)
 
 ---
 
@@ -208,11 +243,105 @@ STALE/MISSING after task 86, so rollback loses the four extra classes and nothin
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate**: `task.98.gate.3.bundle-freshness-check-mode.yml` — ✅ **PASS**, 100/100, `top_issues: []`
+**QA cycles**: 3 (CONCERNS 90 → FAIL 80 → PASS 100)
+**Step 5c `/review-pr`**: ✅ APPROVE — 4 findings, all `severity: low`
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 7/7, each cited to code **and** the test that would fail if it regressed
+✅ **Implementation Phases:** 4/4, verified against the diff rather than against their checkboxes
+✅ **Tests:** 29 new tests, **18 mutation proofs** — a passing test proves the code runs, a mutation proves the test can fail
+✅ **CI:** `CI_ROLLUP` = SUCCESS on the final head — 5/5 jobs green, resolved by polling rather than assumed
+✅ **Security:** `evidence: measured`, **6 probes executed**. No writes, no network, no shell interpolation reachable from the check path (verified statically across 240 lines and dynamically by snapshot)
+✅ **Documentation:** task doc, Change Log, implementation report, and in-code rationale at every non-obvious decision
+⚠️ **Compliance:** N/A — internal build tooling. Repo conventions (CI gate parity, relationship-assertion lint, artifact naming) all checked and green
+
+**Two results worth recording beyond the checklist:**
+
+1. The check **found a live defect on its first run** — a bundled `skill-dependencies.json` 44 bytes
+   behind its source, missing the `observe-work → create-skill` edge, that regenerate-and-diff is
+   structurally incapable of seeing. The task predicted no live instance existed; that held for the
+   four classes it enumerated and not for this one.
+2. The **refute pass found a HIGH defect in the pipeline's own fix** — cycle 1's correction was correct
+   but incomplete, and cycles 2 and 3 found the same conflation at two further sites. Each lived in
+   code the previous fix's diff never touched, so a narrowed re-review would have missed both.
+
+**Methodology caveat:** no Explore subagents ran at any step (session policy), so reviews were
+performed by the context that wrote the code. Compensated by execution rather than more reading —
+every finding came from a probe that was run.
+
+**Detailed Verification Log:** [`task.98.dod.1.bundle-freshness-check-mode.md`](./task.98.dod.1.bundle-freshness-check-mode.md)
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS (cycle 3; CONCERNS → FAIL → PASS)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Cycle 1**: [task.98.qa.1.bundle-freshness-check-mode.md](./task.98.qa.1.bundle-freshness-check-mode.md) · [gate.1](./task.98.gate.1.bundle-freshness-check-mode.yml) — CONCERNS 90/100
+- **Cycle 2 (refute pass)**: [task.98.qa.2.bundle-freshness-check-mode.md](./task.98.qa.2.bundle-freshness-check-mode.md) · [gate.2](./task.98.gate.2.bundle-freshness-check-mode.yml) — FAIL 80/100
+- **Cycle 3**: [task.98.qa.3.bundle-freshness-check-mode.md](./task.98.qa.3.bundle-freshness-check-mode.md) · [gate.3](./task.98.gate.3.bundle-freshness-check-mode.yml) — **PASS 100/100**
+
+### Test Coverage Summary
+
+- **Tests Executed**: 29 new (3022 in the full suite), 18 mutation proofs
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (measured, 6 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Both findings are in how the check *reports*, not in what it detects — all 7 success criteria are met
+and the check found a live stale copy in the tree on its first run.
+
+- **T98-QA-001 (medium)** — a stale copy of a headerless suffix (`.json`) lands in AMBIGUOUS, whose
+  remedy leads with "rename the authored file"; the right action for that case is delete-and-re-bundle.
+  This is the exact shape of the live defect the check found.
+- **T98-QA-002 (low)** — an unreadable file is reported as "carries no provenance banner and is not
+  byte-identical", asserting content the check never read.
+- **T98-QA-003 (high, cycle 2)** — the cycle-1 fix for T98-QA-002 was correct and **incomplete**: the
+  same conflation survived in the orphan scan twenty lines away, so a copy that was both orphaned and
+  unreadable reported `0 problems`. A clean result from a failed read, in the one check whose purpose
+  is to make invisible staleness visible. Found by the cycle-2 refute pass, which a narrowed re-review
+  would have missed — it would have read only the fixes, where the defect is absent.
+- **T98-QA-004 (medium, cycle 3)** — and a *third* instance of the same class, one level up: an
+  unreadable directory under `references/` was silently unwalked by `Path.rglob`, so the run reported
+  `0 problems` over files it had never listed. All three sites are now handled.
+
+Two mutations proved nothing on first run (M3, M18). Both were statements about the tests rather than
+the code, and each drove a new test rather than a quiet edit.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                                                        | Author      |
 | ---------- | ------- | ------------------------------------------------------------------ | ----------- |
 | 2026-09-08 | 1.0     | Split out of task.86 after its QA loop's convergence guard tripped | develop-task |
+| 2026-09-09 | 1.1     | Review passed (9/10) — Phase 1's resume-or-restart fork resolved in favour of a fresh minimal implementation; success criterion 6 rephrased off a point-in-time file count; test path made explicit; GitHub issue #366 created and linked | review-task |
+| 2026-09-09 |         | Status → ready-for-development | review-task |
+| 2026-09-09 |         | Implemented: `--check` mode (7 classes, read-only), 20 tests, wired into `validate.yml`; found and fixed a live stale bundled copy the existing check was blind to | develop |
+| 2026-09-09 |         | Status → ready-for-review | develop |
+| 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both in the classifier's reporting; 7/7 success criteria met | qa-task |
+| 2026-09-09 |         | QA cycle 2 (refute pass) FAIL (80/100) — orphan scan reported a clean result over an unreadable file; fixed | qa-task |
+| 2026-09-09 |         | QA cycle 3 PASS (100/100) — third instance of the same class fixed (unwalkable subtree); 29 tests, 18 mutation proofs | qa-task |
+| 2026-09-09 |         | PR review APPROVE — 4 low findings; §7 Files Summary corrected (PC-1) | review-pr |
+| 2026-09-09 | 1.2     | DoD verified 7/7 criteria, CI green on final head — accepted (PR #367) | finalise |
 
 ---
 
@@ -220,10 +349,10 @@ STALE/MISSING after task 86, so rollback loses the four extra classes and nothin
 
 | Phase | Status | Notes |
 | --- | --- | --- |
-| Phase 1 — Resume or restart | ⏳ Pending | Read the five task-86 gates first |
-| Phase 2 — Build the check | ⏳ Pending | |
-| Phase 3 — Correct remedies | ⏳ Pending | |
-| Phase 4 — Wire into CI | ⏳ Pending | |
+| Phase 1 — Read findings, write fresh | ✅ Complete | Fork resolved at review; task-86 gates read as a test backlog, not ported |
+| Phase 2 — Build the check | ✅ Complete | `check_skill` / `check_all` in `bundle_skill.py`, built on `expected_bytes` |
+| Phase 3 — Correct remedies | ✅ Complete | Remedy correctness verified by measurement in both directions |
+| Phase 4 — Wire into CI | ✅ Complete | `validate.yml` step + `npm run bundle:check`; `test.yml` untouched |
 
 ---
 

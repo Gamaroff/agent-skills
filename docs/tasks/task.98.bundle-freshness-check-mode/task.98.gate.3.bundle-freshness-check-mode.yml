@@ -1,0 +1,88 @@
+schema: 1
+task: 'task.98.bundle-freshness-check-mode'
+task_title: 'A per-file bundle-freshness assertion the regenerate-and-diff check cannot provide'
+gate: PASS
+status_reason: 'Cycle 3 found and fixed a third instance of the same conflation (an unwalkable subtree reported as a clean result) and a coverage gap a mutation exposed. All prior findings verified fixed. 29 tests, 18 mutation proofs, ci:fast green.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T23:10:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 29
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 6
+    notes: >-
+      Six hostile probes across three cycles, all executed rather than reasoned
+      about. Cycle 1 (3): a symlink escaping the repo — reported, target
+      byte-intact, never followed; a symlink at its own shared source, where a
+      write-through would clobber the source — reported, source hash unchanged; a
+      banner declaring `shared/resources/../../etc/passwd` — classified
+      MISDECLARED, the path echoed but never opened. Cycle 3 (3): an unreadable
+      directory at a reference name; an unreadable subtree under references/; an
+      unreadable references/ directory itself. The check performs no writes, opens
+      no network connection, and echoes only exception class names rather than
+      file content.
+  performance:
+    status: PASS
+    notes: >-
+      126 skills in ~2.8s. The cycle-2 `_is_binary` fix removed two full file
+      reads per non-UTF-8 reference. The cycle-3 switch from `Path.rglob` to
+      `os.walk` is equivalent in cost.
+  reliability:
+    status: PASS
+    notes: >-
+      The class of defect this cycle set closed — a failed read presented as a
+      clean result — was found in three separate places in the same function and
+      is now handled at all three, each with a test and a mutation proof in both
+      directions where over-reporting was also possible. One pre-existing crash
+      remains (see below) and fails safe.
+  maintainability:
+    status: PASS
+    notes: >-
+      Built on `expected_bytes` and the writer's own discovery, so the check
+      cannot drift from the bundler. Every non-obvious decision carries its reason
+      at the site, including the two "this mutation proved nothing" moments.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        An unreadable `references/` DIRECTORY ITSELF crashes with a raw
+        PermissionError traceback. Verified pre-existing — `bundle_skill.py`
+        without `--check` crashes identically on the same input, in the write path
+        this check shares. It fails SAFE (loud, exit non-zero, CI red), which is
+        why it is not a blocker here, and the task's Out of Scope explicitly
+        excludes changing the bundler's write behaviour. Worth a follow-up so the
+        message names the directory instead of showing a traceback.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        `shared/resources/observation-log-contract.md` contains the literal
+        `shared/resources/<name>` in prose, so discovery warns on every bundle and
+        every check run. Pre-existing — a plain `npm run bundle` prints it too.
+      refs: ['shared/resources/observation-log-contract.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-09'
+  total_iterations: 3
+  verification_method: 'Per-finding re-probe + 18 mutation proofs (2 of which initially proved nothing and drove new tests)'

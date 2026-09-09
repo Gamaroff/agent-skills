@@ -18,6 +18,7 @@ Usage:
 Exit codes: 0 success; 1 a skill failed to bundle; 2 usage error.
 """
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -514,6 +515,372 @@ def assert_sourced_siblings_landed(refs_dir, shared_dir):
     return missing, scan_broken
 
 
+# ---------------------------------------------------------------------------
+# Read-only freshness check (`--check`).
+#
+# `validate.yml` asserts freshness by running the bundler and diffing the tree.
+# That is effective for everything the bundler WRITES, and blind to everything it
+# does not: a copy whose source was deleted keeps a banner naming a file that no
+# longer exists and stays green forever; a symlinked reference the bundler
+# refuses to write through is never diffed; an authored file sharing a name with
+# a shared resource is correctly left alone and therefore never reported.
+#
+# Every comparison below goes through `expected_bytes`, so the check cannot drift
+# from the writer: "in sync" has one definition and two readers.
+# ---------------------------------------------------------------------------
+
+# Classes a `npm run bundle` run actually clears. Membership here is a claim that
+# is verified by measurement (check -> bundle -> check), not by assertion — see
+# tests/bundle-check-mode.test.js. Printing the regenerate remedy for a class the
+# bundler provably cannot clear leaves CI permanently red under an instruction
+# that does nothing, which is worse than no remedy at all.
+REGENERABLE = ('STALE', 'MISSING', 'WRONG MODE')
+
+REMEDIES = {
+    'STALE': 'run `npm run bundle` and commit the result',
+    'MISSING': 'run `npm run bundle` and commit the result',
+    'WRONG MODE': 'run `npm run bundle` and commit the result',
+    'ORPHANED': (
+        'the declared source no longer exists — delete the bundled copy, or '
+        'restore the shared/resources/ file it names'
+    ),
+    'SYMLINK': (
+        'replace the link with a real file — the bundler refuses to write '
+        'through a symlink, so this can never be regenerated'
+    ),
+    'AMBIGUOUS': (
+        'not bundler output and not a symlink — the bundler leaves it alone. '
+        'Rename the authored file, or delete it if it is a stale hand-copy'
+    ),
+    'MISDECLARED': (
+        'the banner names a different path than the file occupies — correct the '
+        'banner, or delete the copy and re-bundle from the path it claims'
+    ),
+    'UNREADABLE': (
+        'the file could not be opened, so nothing is known about it — fix its '
+        'permissions and re-run the check. This is a broken instrument, not a '
+        'clean result'
+    ),
+}
+
+# The banner's declared source, WITHOUT requiring it to match the file's own
+# location. `declared_source` deliberately requires the match, because for the
+# write gate a non-matching banner is not provenance. Here the two cases are
+# different findings — MISDECLARED vs ORPHANED — so the raw declaration is what
+# is needed, and reusing `declared_source` would collapse them into "no banner".
+def banner_declaration(text):
+    """The path a file's banner claims, whatever that path is, or None."""
+    m = BANNER_SOURCE_RE.search(_banner_head(text))
+    return m.group(1) if m else None
+
+
+def _read_text_or_none(path):
+    text, _ = _read_text_or_error(path)
+    return text
+
+
+def _read_text_or_error(path):
+    """(text, error) — the text, or None plus a short reason it could not be read.
+
+    Two callers want different things from the same failure, which is why the
+    error is returned rather than swallowed: the orphan scan only needs "no text,
+    move on", while the main loop must tell an unreadable file apart from one it
+    read and found unconvincing.
+    """
+    try:
+        return path.read_text(), None
+    except UnicodeDecodeError:
+        return None, 'not valid UTF-8'
+    except OSError as exc:
+        return None, exc.__class__.__name__
+
+
+def _is_binary(path):
+    """True when the file is readable as bytes but not as text.
+
+    Distinguishes "we cannot open this" from "this is not text" — the first is a
+    broken instrument, the second is a legitimate file the bundler already has a
+    policy for.
+
+    Reads ONE byte, not the file: the question is whether the handle opens, and a
+    whole-file read made every non-UTF-8 reference cost three full reads per check
+    (this, the failed decode before it, and `_looks_bundled` after).
+    """
+    try:
+        with path.open('rb') as fh:
+            fh.read(1)
+        return True
+    except OSError:
+        return False
+
+
+def _ambiguity_detail(rel):
+    """Why the copy could not be shown to be bundler output — per suffix.
+
+    A suffix that never receives a banner cannot supply evidence 1 *by
+    construction*, so evidence 2 (byte-equality with the rewritten source) is the
+    only test available — and it fails the instant the copy drifts. Every stale
+    `.json` therefore lands in AMBIGUOUS, where the generic remedy leads with
+    "rename the authored file". That is the wrong action for the common case, and
+    it is not hypothetical: it is the exact shape of the live defect this check
+    found on its first run against the tree — a bundled `skill-dependencies.json`
+    44 bytes behind its source. The generic detail sent the reader the wrong way,
+    so the headerless case says its own name.
+    """
+    suffix = Path(rel).suffix
+    if not autogen_header(rel, suffix):
+        return (
+            f'differs from the rewritten source, and `{suffix}` files carry no '
+            f'provenance banner — so a stale bundled copy and an authored file '
+            f'are indistinguishable here. If this is a bundled copy, delete it '
+            f'and re-bundle'
+        )
+    return (
+        'carries no provenance banner and is not byte-identical to the '
+        'rewritten source'
+    )
+
+
+def check_skill(skill_path):
+    """Per-file freshness assertion. READ-ONLY — no write, chmod, mkdir or unlink
+    is reachable from this path.
+
+    Returns (problems, ok) where `problems` is a list of
+    (skill_name, rel, klass, detail) and `ok` is False only when the skill itself
+    could not be resolved. An unresolvable skill is not "clean".
+    """
+    resolved = resolve_paths(skill_path)
+    if resolved is None:
+        return [], False
+    skill_path, shared_dir, refs_dir = resolved
+
+    problems = []
+
+    def report(rel, klass, detail):
+        problems.append((skill_path.name, rel, klass, detail))
+
+    needed, _ = discover_needed(skill_path, shared_dir, refs_dir)
+    reconcilable = source_backed_on_disk(refs_dir, shared_dir, needed)
+
+    # Everything that has a source: what discovery reaches, plus what is already
+    # on disk mirroring a shared file. Same union the two write passes cover, so
+    # the check's population is the writer's population.
+    expected = dict(needed)
+    expected.update(reconcilable)
+
+    for rel in sorted(expected):
+        src = expected[rel]
+        dst = refs_dir / rel
+
+        # Symlink first, and before `exists()`: a link to a missing target is not
+        # "missing", and reporting it as MISSING would bucket it regenerable —
+        # under a remedy that provably cannot clear it, because `writable_copy`
+        # refuses a symlink.
+        if dst.is_symlink():
+            report(rel, 'SYMLINK', f'symlink -> {os.readlink(dst)}')
+            continue
+
+        if not dst.exists():
+            report(rel, 'MISSING', 'has a shared source but no bundled copy')
+            continue
+
+        if not dst.is_file():
+            # A directory sitting at a needed reference name. The write gate
+            # refuses it forever, so it is emphatically not regenerable — which
+            # is exactly why it must not fall through to the MISSING branch.
+            report(rel, 'AMBIGUOUS', 'not a regular file (a directory sits at this name)')
+            continue
+
+        text, read_error = _read_text_or_error(dst)
+
+        # "Could not look" and "looked and found nothing" must not share a
+        # message. `_looks_bundled` collapses them — its OSError arm returns the
+        # same False as a file that was read and failed both evidence tests — so
+        # an unreadable file was reported as "carries no provenance banner and is
+        # not byte-identical", asserting two facts about content nobody had seen.
+        # That is the `empty` vs `scan-broken` conflation this repository
+        # separates by design elsewhere, and it matters here for the same reason:
+        # of the two readings, the reassuring one is the one that gets believed.
+        #
+        # A non-UTF-8 file is NOT this case. It reads fine as bytes and
+        # `_looks_bundled` has a deliberate answer for it (binary — historically
+        # reconciled), so it falls through to the byte comparison below.
+        if read_error is not None and not _is_binary(dst):
+            report(rel, 'UNREADABLE', f'could not be read: {read_error}')
+            continue
+
+        if text is not None:
+            declared = banner_declaration(text)
+            if declared is not None and declared != rel:
+                report(
+                    rel, 'MISDECLARED',
+                    f'banner declares shared/resources/{declared}',
+                )
+                continue
+
+        if not _looks_bundled(dst, src, rel):
+            report(rel, 'AMBIGUOUS', _ambiguity_detail(rel))
+            continue
+
+        # From here the file IS bundler output, so both remaining comparisons are
+        # ones `npm run bundle` will act on.
+        try:
+            actual = dst.read_bytes()
+        except OSError as exc:
+            report(rel, 'AMBIGUOUS', f'unreadable: {exc.__class__.__name__}')
+            continue
+
+        if actual != expected_bytes(src, rel):
+            report(rel, 'STALE', 'content differs from the rewritten source')
+            continue
+
+        # Mode is compared in both directions and keyed on the SOURCE's mode —
+        # never on the suffix. `write_if_changed` mirrors the source's mode
+        # whatever it is, so a 0644 copy of a 0755 source and a 0755 copy of a
+        # 0644 source are both drift, and both are repaired by a bundle run.
+        src_mode = src.stat().st_mode & 0o777
+        dst_mode = dst.stat().st_mode & 0o777
+        if src_mode != dst_mode:
+            report(
+                rel, 'WRONG MODE',
+                f'{dst_mode:04o} on disk, source is {src_mode:04o}',
+            )
+
+    # Copies with NO source on disk. `expected` cannot contain these by
+    # construction — `source_backed_on_disk` requires `src.is_file()` — so a
+    # bundled copy whose source was deleted is invisible to every branch above,
+    # and to regenerate-and-diff. Its own banner is the evidence.
+    if refs_dir.is_dir():
+        # `Path.rglob` swallows a directory it cannot enter and yields nothing for
+        # it, so an unreadable subtree under references/ would simply not be
+        # walked — and the run would report "0 problems" over files it never
+        # listed. That is the third instance in this function of the same
+        # conflation: a failed read presented as a clean result. `os.walk` with an
+        # `onerror` callback is the version that can tell them apart.
+        unwalkable = []
+        walked = []
+        for dirpath, _dirnames, filenames in os.walk(
+            refs_dir, onerror=lambda exc: unwalkable.append(exc)
+        ):
+            for fname in filenames:
+                walked.append(Path(dirpath) / fname)
+            # os.walk does not yield directories as entries, and a SYMLINK to a
+            # directory is a finding, so collect those explicitly.
+            for dname in _dirnames:
+                d = Path(dirpath) / dname
+                if d.is_symlink():
+                    walked.append(d)
+
+        for exc in unwalkable:
+            bad = Path(getattr(exc, 'filename', '') or refs_dir)
+            try:
+                rel = bad.relative_to(refs_dir).as_posix()
+            except ValueError:
+                rel = '.'
+            report(
+                rel, 'UNREADABLE',
+                f'directory could not be listed ({exc.__class__.__name__}) — '
+                f'anything beneath it was not checked',
+            )
+
+        for dst in sorted(walked):
+            rel_parts = dst.relative_to(refs_dir).parts
+            if any(p in EXCLUDE_DIRS for p in rel_parts):
+                continue
+            rel = dst.relative_to(refs_dir).as_posix()
+            if rel in expected:
+                continue
+            if dst.is_symlink():
+                # A symlink with no shared source still ships a dangling link to
+                # anyone who copies the directory verbatim.
+                report(rel, 'SYMLINK', f'symlink -> {os.readlink(dst)}')
+                continue
+            if not dst.is_file():
+                continue
+            text, read_error = _read_text_or_error(dst)
+
+            # The same distinction the main loop draws, and for the same reason.
+            # `if text is None: continue` treated "could not open it" as "it
+            # makes no provenance claim", so an orphan that was ALSO unreadable
+            # produced `0 problems` — a clean result from a failed read, in the
+            # one check whose whole purpose is to make invisible staleness
+            # visible. Cycle 1 fixed this conflation in the main loop and did not
+            # carry it here, twenty lines down in the same function.
+            #
+            # A non-UTF-8 file is deliberately still skipped in silence: a banner
+            # genuinely cannot be read from binary content, which is residual 6 —
+            # a documented, bounded limitation — rather than a broken instrument.
+            if read_error is not None:
+                if not _is_binary(dst):
+                    report(rel, 'UNREADABLE', f'could not be read: {read_error}')
+                continue
+
+            declared = banner_declaration(text)
+            if declared is None:
+                continue        # skill-native, no provenance claim — not ours
+            if declared != rel:
+                report(
+                    rel, 'MISDECLARED',
+                    f'banner declares shared/resources/{declared}',
+                )
+            elif not (shared_dir / declared).is_file():
+                report(
+                    rel, 'ORPHANED',
+                    f'banner declares shared/resources/{declared}, which no '
+                    f'longer exists',
+                )
+
+    return problems, True
+
+
+def check_all(targets):
+    """Run `check_skill` over every target and print a class-correct summary.
+
+    Returns the process exit code.
+    """
+    all_problems = []
+    unresolved = 0
+    for t in targets:
+        problems, ok = check_skill(t)
+        if not ok:
+            unresolved += 1
+            continue
+        if problems:
+            print(f"❌ {Path(t).name}: {len(problems)} problem(s)")
+            for _skill, rel, klass, detail in problems:
+                print(f"  {klass:<12} references/{rel} — {detail}")
+            all_problems.extend(problems)
+
+    if not all_problems and not unresolved:
+        print(f"✅ bundle freshness: {len(targets)} skill(s) checked, 0 problems")
+        return 0
+
+    counts = {}
+    for _skill, _rel, klass, _detail in all_problems:
+        counts[klass] = counts.get(klass, 0) + 1
+
+    skills_affected = len({p[0] for p in all_problems})
+    print("")
+    print(
+        f"❌ bundle freshness: {len(all_problems)} problem(s) "
+        f"across {skills_affected} skill(s)"
+    )
+
+    # Only classes that actually occurred are named. A summary that lists the
+    # whole taxonomy every run puts every class name in stdout, which makes
+    # "this class was not reported" unassertable by anyone reading the output —
+    # including a test.
+    for klass in REGENERABLE:
+        if klass in counts:
+            print(f"   {klass} x{counts[klass]} — {REMEDIES[klass]}")
+    for klass in sorted(k for k in counts if k not in REGENERABLE):
+        print(f"   {klass} x{counts[klass]} — {REMEDIES[klass]}")
+
+    if unresolved:
+        print(f"   {unresolved} target(s) could not be resolved as skills")
+    return 1
+
+
 def bundle_skill(skill_path):
     resolved = resolve_paths(skill_path)
     if resolved is None:
@@ -627,7 +994,10 @@ def bundle_skill(skill_path):
     return True
 
 
-USAGE = "Usage: bundle_skill.py <skill-path>... | --all"
+USAGE = (
+    "Usage: bundle_skill.py <skill-path>... | --all\n"
+    "       bundle_skill.py --check [<skill-path>... | --all]"
+)
 
 
 def main():
@@ -636,7 +1006,11 @@ def main():
     # Unknown flags are rejected outright rather than treated as skill paths: a
     # typo (`--al`, `-all`) must not fall through to a write.
     all_mode = '--all' in args
-    args = [a for a in args if a != '--all']
+    # `--check` is READ-ONLY. It shares argument handling with the write path so
+    # the two cannot disagree about which skills they address — a check that
+    # inspects a different set than the bundler writes proves nothing about it.
+    check_mode = '--check' in args
+    args = [a for a in args if a not in ('--all', '--check')]
 
     # ANY leading dash, not just `--`. `-check` was treated as a skill path, so a
     # single-dash typo on a read-only request ran the MUTATING bundle and exited 0.
@@ -645,6 +1019,12 @@ def main():
         print(f"❌ Unknown option(s): {' '.join(unknown)}")
         print(USAGE)
         sys.exit(2)
+
+    # `--check` with no target means every skill: the CI use is a whole-tree
+    # assertion, and requiring `--check --all` there is a spelling nobody would
+    # get wrong twice but everybody gets wrong once.
+    if check_mode and not args:
+        all_mode = True
 
     if not all_mode and not args:
         print(USAGE)
@@ -660,6 +1040,9 @@ def main():
         targets = sorted(d for d in skills_dir.iterdir() if (d / 'SKILL.md').exists())
     else:
         targets = [Path(a) for a in args]
+
+    if check_mode:
+        sys.exit(check_all(targets))
 
     failed = 0
     for t in targets:
