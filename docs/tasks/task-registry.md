@@ -121,7 +121,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 79 | [Write down the inputs that defeat each sink, once](task.79.security-input-corpus/task.79.security-input-corpus.md) | accepted | infrastructure | High | 2026-09-02 | — | — |
 | 80 | [Make a security probe runnable without widening the snippet allow-list](task.80.security-probe-engine/task.80.security-probe-engine.md) | accepted | infrastructure | High | 2026-09-02 | — | task.79 |
 | 81 | [Ship /review-security: prove a control engages, not that it is present](task.81.review-security-skill/task.81.review-security-skill.md) | accepted | infrastructure | High | 2026-09-02 | — | task.79, task.80 |
-| 82 | [Feed the measured security verdict into the QA gate](task.82.security-gate-evidence-field/task.82.security-gate-evidence-field.md) | ready-for-development | infrastructure | Medium | 2026-09-02 | — | task.81 |
+| 82 | [Feed the measured security verdict into the QA gate](task.82.security-gate-evidence-field/task.82.security-gate-evidence-field.md) | accepted | infrastructure | Medium | 2026-09-02 | 2026-09-09 | task.81 |
 | 83 | [Platform-aware skill exclusion in setup-consumer.sh](task.83.platform-aware-skill-exclusion/task.83.platform-aware-skill-exclusion.md) | accepted | infrastructure | Medium | 2026-09-02 | — | PR #315 merged |
 | 84 | [Skill install profiles with dependency closure](task.84.skill-install-profiles/task.84.skill-install-profiles.md) | accepted | infrastructure | Medium | 2026-09-02 | — | task.83 · PR #318 merged |
 | 85 | [Give /review-pr a machine-readable findings block](task.85.review-pr-machine-readable-findings/task.85.review-pr-machine-readable-findings.md) | draft | infrastructure | Medium | 2026-09-03 | — | task.77 |
