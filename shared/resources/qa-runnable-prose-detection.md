@@ -107,6 +107,15 @@ command column was dropped and the file reported zero blocks, zero findings and 
 open at end of line falls back to the naive split, because collapsing the row into a single cell would
 make the command column disappear entirely — worse than the bug being fixed.
 
+**An escaped backtick (`\``) outside a span is a literal backtick and does not open one.** Two of them
+in a row otherwise read as a span opening and closing, so the real delimiter between them became
+content and the whole row collapsed to a single cell — the command column then did not exist and its
+command was dropped in silence. That was a *regression introduced by the code-span rule above*, found
+by the QA loop's refute pass, and it is the reason a fix is treated as new code rather than as the
+closure of a finding. The guard is `spanLen === 0` rather than unconditional because markdown's rule is
+asymmetric: inside a code span a backslash is literal, so a backtick there still counts toward the
+closing run.
+
 Table-cell commands are classified, sandboxed and dual-shell compared by the **same** code as fenced
 blocks, and reported in the same finding shapes. Every result and every finding carries an `origin` of
 `fence` or `table-cell`; the human-readable report annotates the latter as `line N (table cell)`,

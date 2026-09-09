@@ -2376,3 +2376,80 @@ test("TASK87-001: a command column whose OWN cell holds an unescaped pipe", () =
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0].code, "ls -la /dev/null | wc -l");
 });
+
+// ── 11. TASK87-002 — an escaped backtick does not open a code span ────────────
+//
+// Found by QA cycle 2's REFUTE pass, and it is a regression from cycle 1's own
+// fix: the code-span tracking added for TASK87-001 read `\`` as a span delimiter.
+// A fix is new code, not the closure of a finding.
+
+test("TASK87-002: two escaped backticks no longer collapse the row", () => {
+  // The defect: `\`` opened a span at "a", the second `\`` closed it at "c", so
+  // the real delimiter between them became content and the row collapsed to ONE
+  // cell — `["a \\` b | c \\` d"]`. A command column in such a row does not exist,
+  // so its command was dropped in silence. Same class as TASK87-001,
+  // reintroduced by the fix for it.
+  assert.deepEqual(splitTableRow("| a \\` b | c \\` d |"), [
+    "a \\` b",
+    "c \\` d",
+  ]);
+});
+
+test("TASK87-002: a single escaped backtick splits correctly without the fallback", () => {
+  // Before the fix this only worked by accident — the span never closed, so the
+  // unclosed-span fallback rescued it. Relying on a fallback to get the common
+  // case right is not the same as getting it right.
+  assert.deepEqual(splitTableRow("| a \\` b | c |"), ["a \\` b", "c"]);
+});
+
+test("TASK87-002: inside a code span a backslash is literal, so the backtick still closes", () => {
+  // markdown's asymmetry, not ours: backslash escapes do not apply inside a code
+  // span, so a backtick there still counts toward the closing run. That is why the
+  // escape branch is guarded on `spanLen === 0` rather than being unconditional.
+  //
+  // ⚠️ The obvious assertion for this — `splitTableRow("| x | `a \\` | y |")` —
+  // is VACUOUS, and was in the suite for one cycle before the mutation check
+  // caught it. Dropping the guard leaves the span open to end of line, the
+  // unclosed-span fallback fires, and the fallback's naive split happens to give
+  // the same cells. The test passed under the exact mutation it claimed to guard.
+  //
+  // This input distinguishes them because the guarded reading CLOSES the span
+  // (so the row needs no fallback) while the unguarded one does not:
+  //   guard on  → ["x", "`a|b\\`", "y"]        — one cell, pipe inside the span
+  //   guard off → ["x", "`a", "b\\`", "y"]      — span left open, fallback, mis-split
+  // Found by brute-forcing short strings over {| ` \\ a space} for a difference,
+  // rather than by reasoning about which input ought to differ.
+  assert.deepEqual(splitTableRow("| x | `a|b\\` | y |"), ["x", "`a|b\\`", "y"]);
+});
+
+test("TASK87-002: a command in a row that also carries escaped backticks is still found", () => {
+  const doc = [
+    "| Note | Verification command |",
+    "| --- | --- |",
+    "| use \\` for code | `echo still here` |",
+  ].join("\n");
+  assert.deepEqual(
+    extractTableCellCommands(doc).map((b) => b.code),
+    ["echo still here"],
+  );
+});
+
+test("TASK87-001 and TASK87-002 hold together, not just separately", () => {
+  // The refute directive's "review the COMBINATION" rule, made a test: one row
+  // carrying an escaped backtick AND an unescaped pipe inside a code span. Each
+  // fix alone gets this wrong in a different direction.
+  assert.deepEqual(splitTableRow("| a \\` b | `x|y` | `echo both` |"), [
+    "a \\` b",
+    "`x|y`",
+    "`echo both`",
+  ]);
+  const doc = [
+    "| Note | Artifact | Verification command |",
+    "| --- | --- | --- |",
+    "| a \\` b | `x|y` | `echo both` |",
+  ].join("\n");
+  assert.deepEqual(
+    extractTableCellCommands(doc).map((b) => b.code),
+    ["echo both"],
+  );
+});

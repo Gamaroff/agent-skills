@@ -280,6 +280,8 @@ extractor must turn that test red. This is the criterion that distinguishes "the
       implementation report
 - [x] A pipe inside a code span is content, not a delimiter — an unescaped pipe in any cell of a row
       no longer drops the command in the command column (TASK87-001)
+- [x] An escaped backtick outside a span is literal and does not open one — two of them in a row no
+      longer collapse it to a single cell (TASK87-002)
 - [x] Full `npm run ci` green
 
 ## 10. Risk Assessment
@@ -308,30 +310,35 @@ returns to its pre-change `blocks` count.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.87.qa.1.execute-table-cell-snippets.md](./task.87.qa.1.execute-table-cell-snippets.md)
-- **Gate File**: [task.87.gate.1.execute-table-cell-snippets.yml](./task.87.gate.1.execute-table-cell-snippets.yml)
+- **Full Report**: [task.87.qa.2.execute-table-cell-snippets.md](./task.87.qa.2.execute-table-cell-snippets.md) (cycle 2) · [cycle 1](./task.87.qa.1.execute-table-cell-snippets.md)
+- **Gate File**: [task.87.gate.2.execute-table-cell-snippets.yml](./task.87.gate.2.execute-table-cell-snippets.yml) (cycle 2) · [cycle 1](./task.87.gate.1.execute-table-cell-snippets.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 117 focused (2983 repo-wide, 0 fail); 7 adversarial probes executed
-- **Phases Verified**: 4/4 (Phase 1 CONCERNS)
-- **Critical Issues**: 0 HIGH, 1 MEDIUM, 2 LOW
+- **Tests Executed**: 127 focused (0 fail); 14 adversarial probes executed across two cycles
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 0 open (2 MEDIUM found and fixed, 2 LOW documented)
 - **NFR Status**: Security: PASS (measured, 7 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-TASK87-001 — a runnable command in a well-formed command-column cell is silently dropped when a
-sibling cell in the same row carries an unescaped pipe inside a code span. Reproduced by execution.
-All 8 success criteria met; the defect is in a path no criterion names, found because the probes went
-past the criteria.
+**Cycle 1** — TASK87-001: a runnable command in a well-formed command-column cell was silently dropped
+when a sibling cell in the same row carried an unescaped pipe inside a code span. Reproduced by
+execution, then fixed.
+
+**Cycle 2 (refute pass)** — TASK87-002: the fix for TASK87-001 introduced a regression of the *same
+class*. An escaped backtick was read as a code-span delimiter, so two of them in one row collapsed it
+to a single cell and the command column ceased to exist. Also caught a **vacuous test** of the pipeline's
+own making, which passed under the exact mutation it claimed to guard. Both fixed; seven mutations now
+red. All 9 success criteria met.
 
 ## Change Log
 
@@ -343,7 +350,8 @@ past the criteria.
 | 2026-09-09 |         | Implemented — 3 files (+6 bundled copies), 19 tests added (117 total), 3-way mutation proof, corpus measured: 4 files / 42 new blocks / 0 new findings | develop |
 | 2026-09-09 |         | Status → ready-for-review                  | develop |
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 1 medium finding (TASK87-001), 8/8 success criteria met | qa-task |
-| 2026-09-09 |         | QA findings fixed — TASK87-001 (code-span-aware row split) plus both named cleanups and two documented limitations, 1 iteration | qa-fix |
+| 2026-09-09 |         | QA findings fixed — TASK87-001 (code-span-aware row split) and TASK87-002 (escaped backtick is not a span delimiter), plus both named cleanups, two documented limitations and one vacuous test replaced, 2 iterations | qa-fix |
+| 2026-09-09 |         | QA gate PASS (100/100) — refute pass found and closed a regression from cycle 1's own fix; 7-mutation matrix all red | qa-task |
 
 ## Progress Tracking
 

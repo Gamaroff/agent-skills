@@ -299,6 +299,66 @@ does not are different risks, and this one does not.
 
 5 tests added (117 → 122).
 
+### QA Cycle 2 — 2026-09-09 (refute pass)
+
+**Gate**: PASS (100/100) — `task.87.gate.2.execute-table-cell-snippets.yml`
+**QA report**: `task.87.qa.2.execute-table-cell-snippets.md`
+**PR Review**: pending — 5c not yet run
+
+`PRIOR_GATES=1` → **REFUTE_PASS=true**, whole branch diff. `SAFETY_REPROBE=false` (gate 1's security
+axis read `OK measured`). The refute pass produced two findings, and both are the reason it exists.
+
+**TASK87-002 — a regression introduced by cycle 1's own fix.** An *escaped* backtick was read as a
+code-span delimiter, so two of them in one row (`| a \` b | c \` d |`) opened and closed a span, the
+real delimiter between them became content, and the row collapsed to a **single cell**. A command
+column in such a row does not exist, so its command was dropped in silence — the same class of defect
+as TASK87-001, reintroduced by the fix for TASK87-001. Fixed: the escape branch consumes `\`` as
+literal content when no span is open, guarded on `spanLen === 0` because markdown's rule is asymmetric
+(inside a span a backslash is literal, so the backtick still counts toward closing).
+
+Reachability stated honestly: no in-scope corpus file writes an escaped backtick in a table row, but
+**5 markdown files in the repo already do**, and the engine accepts any `--file`.
+
+**A vacuous test — mine, from cycle 1 — caught by the mutation check.** The assertion offered as proof
+of the `spanLen === 0` guard passed **with the guard removed**: dropping it leaves the span open to end
+of line, the unclosed-span fallback fires, and the fallback's naive split gives the same cells. It
+reported coverage that was not there, which is exactly what Step 3c exists to catch, in the suite the
+previous cycle had just written.
+
+Replaced with `splitTableRow("| x | \`a|b\` | y |")`, where the guarded reading *closes* the span and
+the unguarded one does not. Found by **brute-forcing short strings over `{| \` \\ a space}`** for a
+difference rather than by reasoning about which input ought to differ — the reasoning had already
+failed once, which is the argument for searching instead of thinking harder.
+
+**The full mutation matrix — every behaviour this task added, reverted one at a time.** Baseline 127/0.
+
+| # | Reverted behaviour | Result |
+| - | ------------------ | ------ |
+| A | `executeFile` back to `extractBlocks` alone | **4 fail** |
+| B | `unescapeCell` returns its input | **4 fail** |
+| C | the `status` disagreement channel disabled | **2 fail** |
+| D | code-span-aware splitting off | **5 fail** |
+| E | the unclosed-span fallback removed | **1 fail** |
+| F | the escaped-backtick branch removed | **2 fail** |
+| G | the `spanLen === 0` guard dropped | **1 fail** |
+| — | restored | **127 pass / 0 fail** |
+
+Two honesty notes worth keeping: **G was `mutation-proven: no` on first attempt** — that is the vacuous
+test, reported as a finding rather than quietly repaired, because a cycle that silently fixes its own
+instrument reports a cleaner history than it earned. And one batch attempt at B produced `pass 0 /
+fail 1`, a module-load failure from a malformed edit rather than a clean mutation; it was re-run
+properly. **A broken mutation is not evidence**, and counting it would have inflated the matrix.
+
+**Refute directive's four transition classes**, translated to a pure text extractor rather than
+dismissed as inapplicable: end-of-input (span open at EOL → fallback, mutation E), in-flight state
+(`spanLen` fresh per row; two calls byte-identical), error path (six pathological inputs including a
+2000-backtick string — none threw, slowest 4ms), re-entrancy (stable). Plus scale: 5000 rows in 22ms.
+
+**Corpus re-measured again: unchanged** — 4 files, 42 blocks, 0 findings. Neither fix widened the
+surface.
+
+5 tests added (122 → 127).
+
 ---
 
 ## Completion

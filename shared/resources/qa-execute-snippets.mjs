@@ -164,6 +164,23 @@ function splitOnDelimiters(line, codeSpanAware) {
       continue;
     }
 
+    // An ESCAPED backtick outside a span is a literal backtick and must not open
+    // one — TASK87-002, found by QA cycle 2's refute pass as a regression from
+    // cycle 1's own fix. Two escaped backticks in a row (`| a \` b | c \` d |`)
+    // read as a span opening and closing, so the real delimiter between them
+    // became content and the whole row collapsed to ONE cell. The command column
+    // then did not exist and its command was dropped in silence — the same class
+    // of defect as TASK87-001, reintroduced by the fix for it.
+    //
+    // The asymmetry is markdown's, not ours: inside a code span a backslash is
+    // literal, so a backtick there still counts toward the closing run. Hence
+    // `spanLen === 0` rather than an unconditional skip.
+    if (codeSpanAware && ch === "\\" && line[i + 1] === "`" && spanLen === 0) {
+      cur += "\\`";
+      i++;
+      continue;
+    }
+
     if (codeSpanAware && ch === "`") {
       let run = 0;
       while (line[i + run] === "`") run++;
