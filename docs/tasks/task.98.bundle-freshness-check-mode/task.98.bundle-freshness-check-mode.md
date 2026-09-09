@@ -5,11 +5,13 @@ type: task
 description: "The CI bundle-freshness check regenerates and diffs. That is adequate now that the bundler reconciles against disk, but it still cannot see a bundled copy whose source was deleted, a symlinked reference, or a copy that is not bundler output. A --check mode was built for this during task.86, ran five QA cycles, and was split out unmerged; this task carries it forward with its findings as the starting backlog."
 tags: [bundler, build, tooling, ci]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-08
 updated: 2026-09-09
+completed_date: 2026-09-09
+pr_number: 367
 assignee:
 estimated_effort_hours: 8
 github_issue: 366
@@ -17,7 +19,7 @@ github_issue: 366
 
 # Technical Task: A per-file bundle-freshness assertion
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#366](https://github.com/Gamaroff/agent-skills/issues/366)
 **Review**: ✅ All review recommendations from `task.98.review.1.bundle-freshness-check-mode.md` implemented 2026-09-09
 
@@ -241,6 +243,46 @@ STALE/MISSING after task 86, so rollback loses the four extra classes and nothin
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate**: `task.98.gate.3.bundle-freshness-check-mode.yml` — ✅ **PASS**, 100/100, `top_issues: []`
+**QA cycles**: 3 (CONCERNS 90 → FAIL 80 → PASS 100)
+**Step 5c `/review-pr`**: ✅ APPROVE — 4 findings, all `severity: low`
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 7/7, each cited to code **and** the test that would fail if it regressed
+✅ **Implementation Phases:** 4/4, verified against the diff rather than against their checkboxes
+✅ **Tests:** 29 new tests, **18 mutation proofs** — a passing test proves the code runs, a mutation proves the test can fail
+✅ **CI:** `CI_ROLLUP` = SUCCESS on the final head — 5/5 jobs green, resolved by polling rather than assumed
+✅ **Security:** `evidence: measured`, **6 probes executed**. No writes, no network, no shell interpolation reachable from the check path (verified statically across 240 lines and dynamically by snapshot)
+✅ **Documentation:** task doc, Change Log, implementation report, and in-code rationale at every non-obvious decision
+⚠️ **Compliance:** N/A — internal build tooling. Repo conventions (CI gate parity, relationship-assertion lint, artifact naming) all checked and green
+
+**Two results worth recording beyond the checklist:**
+
+1. The check **found a live defect on its first run** — a bundled `skill-dependencies.json` 44 bytes
+   behind its source, missing the `observe-work → create-skill` edge, that regenerate-and-diff is
+   structurally incapable of seeing. The task predicted no live instance existed; that held for the
+   four classes it enumerated and not for this one.
+2. The **refute pass found a HIGH defect in the pipeline's own fix** — cycle 1's correction was correct
+   but incomplete, and cycles 2 and 3 found the same conflation at two further sites. Each lived in
+   code the previous fix's diff never touched, so a narrowed re-review would have missed both.
+
+**Methodology caveat:** no Explore subagents ran at any step (session policy), so reviews were
+performed by the context that wrote the code. Compensated by execution rather than more reading —
+every finding came from a probe that was run.
+
+**Detailed Verification Log:** [`task.98.dod.1.bundle-freshness-check-mode.md`](./task.98.dod.1.bundle-freshness-check-mode.md)
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS (cycle 3; CONCERNS → FAIL → PASS)
@@ -298,6 +340,8 @@ the code, and each drove a new test rather than a quiet edit.
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both in the classifier's reporting; 7/7 success criteria met | qa-task |
 | 2026-09-09 |         | QA cycle 2 (refute pass) FAIL (80/100) — orphan scan reported a clean result over an unreadable file; fixed | qa-task |
 | 2026-09-09 |         | QA cycle 3 PASS (100/100) — third instance of the same class fixed (unwalkable subtree); 29 tests, 18 mutation proofs | qa-task |
+| 2026-09-09 |         | PR review APPROVE — 4 low findings; §7 Files Summary corrected (PC-1) | review-pr |
+| 2026-09-09 | 1.2     | DoD verified 7/7 criteria, CI green on final head — accepted (PR #367) | finalise |
 
 ---
 
