@@ -1,0 +1,30 @@
+schema: 1
+task: "task.RECON.no-glob-match"
+gate: CONCERNS
+status_reason: "ANTI-VACUITY FIXTURE. Every condition holds except the glob match: two zero-HIGH cycles, no product-defect signal, every finding carries a file — but the files sit under a directory the configured globs do not cover. If the exit fires on this, condition 2 is not being read."
+reviewer: "QA Engineer"
+updated: "2026-09-09T11:15:00Z"
+
+top_issues:
+  - id: "NOGLOB-001"
+    severity: medium
+    file: "verification/guard-check.ts"
+    finding: "A test-shaped file under a directory the globs do not name."
+    suggested_owner: dev
+    status: open
+  - id: "NOGLOB-002"
+    severity: low
+    file: "verification/gate-check.ts"
+    finding: "Ditto."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 82
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

@@ -1,0 +1,56 @@
+schema: 1
+task: "task.99.qa-loop-diminishing-returns-exit"
+task_title: "A diminishing-returns exit for the QA loop"
+gate: PASS
+status_reason: "Cycle 4's MEDIUM is fixed and its three route-table rows each verified against the document's own statements elsewhere. All 12 success criteria mechanically re-verified. No finding above LOW; third consecutive zero-HIGH cycle. The engine has been untouched since cycle 1 and its 33 tests and nine mutations have held throughout."
+reviewer: "QA Engineer"
+updated: "2026-09-09T17:00:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2937
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No security surface across the whole change set. The engine is pure — no filesystem access (asserted by test), no network, no child processes, no credential handling, no eval. `globToRegExp` builds a RegExp from operator config, and escapes every metacharacter outside the four glob tokens; its inputs are a committed config file and a committed gate file, so there is no untrusted-input path regardless. No new dependencies."
+  performance:
+    status: PASS
+    notes: "Two single-pass line scanners over one gate file plus one RegExp compile per configured glob per candidate path, once per QA cycle. Immaterial beside the ~19-minute CI cycle the exit exists to save."
+  reliability:
+    status: PASS
+    notes: "Never-throws holds against eight malformed inputs, none of which returns `exit`. Every ambiguity resolves toward `continue`. The cycle-1 silent-failure mode is closed and mutation-proved. Verified live this run: with condition 1 satisfied and globs unset, the exit declines — the fail-safe is the default rather than an opt-out."
+  maintainability:
+    status: PASS
+    notes: "The engine follows review-report-freshness.js closely enough that a reader of one can read the other, and each non-obvious property carries the failure it prevents rather than a description of the line. The gate scanner reuses the Convergence check's two indent rules instead of re-deriving them. The route table added at cycle 4 answers 'what does each route's gate carry' in one checkable place — which is why cycle 4 could check it row by row."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "The exit section's 'Hand to 5c, exactly as a PASS gate does' now sits beside a table distinguishing what a PASS gate and a route-2 gate carry. The handoff mechanics genuinely are the same, so this is not false — but 'as route 1 does' would remove the friction. Deliberately NOT fixed: this is the machinery of the prose around the rule, and refining it is the behaviour the rule ends."
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "CARRIED (gates 1-4): `indentOf` reads a tab-indented line as column 0, ending the top_issues scan early. Latent — YAML forbids tab indentation."
+      refs: ["shared/resources/qa-diminishing-returns.js"]
+    - action: "CARRIED (gates 1-4): `readNfrStatuses` would read a `notes:` block-scalar line beginning `status:` as an NFR status. Latent."
+      refs: ["shared/resources/qa-diminishing-returns.js"]
+    - action: "CARRIED (gates 1-4): the preamble's 'two ways the loop reaches Step 7' beside 'only 5c opens Step 7'. Improved by cycle 2's fix, not resolved by it — recorded honestly at gate 3 after the cycle-2 comment overclaimed."
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "CARRIED (gate 2): `mutation-proving.md` names four vacuity shapes. This task surfaced a fifth — a fixture corpus containing no instance of the input class, which no mutation can reveal, because mutation-proving asks whether a test CAN fail rather than whether the corpus exercises the behaviour. Worth its own task against that reference."
+      refs: ["shared/resources/mutation-proving.md"]
+    - action: "Nothing yet emits `category:` on a gate entry. The exit honours it when present, so a QA skill could start writing it and strengthen condition 3 beyond the nfr_validation signal it rests on today."
+      refs: ["skills/qa-task/SKILL.md", "skills/qa-story/SKILL.md"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

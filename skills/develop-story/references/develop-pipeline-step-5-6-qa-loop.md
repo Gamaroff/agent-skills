@@ -20,11 +20,20 @@ This is the iterative heart of the pipeline. Maintain a **QA cycle counter** sta
 means the work is ready to be *reviewed as a PR*, not that the loop is over. 5c
 (`/review-pr`) is the loop's exit gate, and its verdict can send the run back to 5b.
 
-There is **one way the loop exits to Step 7**: **5c returning `APPROVE` or `CONCERNS`**.
+There are **two ways the loop reaches Step 7**, and both go through 5c: a gate that reads clean
+(`PASS` / `WAIVED`), and — from cycle 3 onward — the **Diminishing-returns exit**, which ends a loop
+whose HIGH findings are gone and whose residue is entirely test machinery. The second is still an
+exit *to 5c*, not around it: `APPROVE` or `CONCERNS` from 5c remains the only thing that opens
+Step 7.
 
 There are **two ways it escalates** instead: the 5-cycle limit, and — from cycle 3 onward — the
 **Convergence check**, which halts the moment the loop stops reducing HIGH findings. The convergence
 check usually fires first; see its section below. Both land in the same **Loop Escalation** block.
+
+**The two cycle-3 rules are opposites and must not be confused.** The Convergence check fires when
+HIGH findings *remain and stop falling* and it **escalates**; the Diminishing-returns exit fires when
+HIGH findings are *gone* and it **exits cleanly**. One says the loop stopped working, the other says
+it finished working.
 
 Separately, several **HALT** paths end the run without reaching escalation: the no-code-change HALT
 and the mid-loop PR MERGED/CLOSED HALT (both in 5b), the twice-red fast-gate bail-out (5b step 0a),
@@ -243,7 +252,9 @@ After completion, find and read the latest gate file:
 
 - `PASS` with no `top_issues` → **proceed to 5c** (the loop's exit gate), not straight to Step 7
 - `WAIVED` with `waiver.active: true` and a documented reason/approver → **proceed to 5c** (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
-- `CONCERNS`, `FAIL`, or has `top_issues` → run the **Convergence check** (below), then proceed to 5b unless it trips
+- `CONCERNS`, `FAIL`, or has `top_issues` → run the **Convergence check** (below); if it does not
+  trip, run the **Diminishing-returns exit** (below that). Proceed to 5b only when neither fires —
+  the Convergence check escalates, the Diminishing-returns exit hands to 5c.
 
 **On either gate that reaches 5c**, commit this cycle's gate `.yml` and QA report `.md` and push once
 before invoking `/review-pr` — there is no `fix(...)` commit on this path to carry them, and 5c reads
@@ -262,6 +273,7 @@ Log the result in the QA Iteration History section:
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
 **PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
+**Loop exit**: {n/a — this exit not taken / the `describeDiminishingReturns()` message verbatim}
 **Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of 5) / Proceeding to finalise / Escalating — loop not converging}
 ```
 
@@ -274,6 +286,17 @@ writes the row when it writes the entry, and at that moment no 5c verdict exists
 writes `pending — 5c not yet run`, and **5c overwrites it** with its verdict. A cycle whose gate never
 reached 5c keeps `not reached — gate did not exit the loop`. It is never omitted. An omitted row is
 indistinguishable from a review that was skipped, and on resume the two must not be confused.
+
+`**Loop exit**` is the **Diminishing-returns exit**'s record, and it exists for one reader: whoever
+opens this history six months from now and has to tell a clean early exit from a stall. On every
+cycle that did not take that exit it reads `n/a — this exit not taken`, which is a claim rather than
+a gap. On the cycle that did, write `describeDiminishingReturns(r)` **verbatim** — the message is a
+function precisely so that what lands here is assertable rather than composed afresh each time.
+
+> **The default says "this exit not taken", not "loop continued".** Those are different claims, and
+> the second is false on the cycle where a clean `PASS` gate hands to 5c and 5c returns APPROVE: the
+> loop did not continue there, it exited by the ordinary route. A row whose whole purpose is letting a
+> reader distinguish two exits must not itself assert something untrue about one of them.
 
 **Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
@@ -393,6 +416,109 @@ exits early loses it. Escalation hands the residual to a person **together with 
 the loop had stopped working**, which is the project's Fail Loudly rule and the entire point of
 this check. A convergence stall is never a reason to write a PASS, to waive, or to proceed to
 Step 7.
+
+### Diminishing-returns exit (shared) — the QA loop's clean early exit
+
+Perform this check **after** the Convergence check above, in the same place: the cycle's gate has
+been written and read (5a), and 5b has not been entered. It runs **only when the Convergence check
+did not trip**, and only from **cycle 3 onward**.
+
+The two guards answer opposite questions and must never both claim the same run:
+
+| | Convergence check (above) | Diminishing-returns exit (here) |
+| :-- | :--- | :--- |
+| Fires when | HIGH findings **remain and stop falling** | HIGH findings are **gone**, and the residue is machinery |
+| Outcome | **Escalate** — the loop stopped working | **Exit cleanly** — the loop finished working |
+| Because | a real blocker is unfixed | nothing is blocked; further cycles refine the pins |
+
+Escalating a run with zero HIGH would misreport finished work as stalled, and the Fail Loudly rule
+cuts the other way here: what is loud is the *record*, not the halt.
+
+**The conditions.** Ask the engine; do not evaluate them by eye. Its four inputs are bound as follows
+— an orchestrator that cannot resolve one of them has not met the precondition for running the check
+at all, and should continue into 5b rather than guess:
+
+| Variable | Where it comes from |
+| :--- | :--- |
+| `$CYCLE` | the QA cycle counter from **Loop Setup** — the cycle whose gate was just written |
+| `$HIGH_SEQUENCE_JSON` | the `**HIGH findings**` rows of the `### QA Cycle {N}` entries in QA Iteration History, oldest first, as a JSON array. This is the Convergence check's own recorded sequence; do **not** recount it from the gates |
+| `$LATEST_GATE` | the gate path resolved in **Loop Setup** (`…gate.{N}.{name}.yml`, highest `{N}`) |
+| `$TEST_ARTIFACT_GLOBS_JSON` | `qa.testArtifactGlobs` from the consumer's `skills-config.yaml`, as a JSON array. **Absent ⇒ `[]`**, which matches nothing and is why an unconfigured project never takes this exit |
+
+```bash
+command node -e '
+  const fs = require("fs");
+  const { classifyDiminishingReturns, describeDiminishingReturns } =
+    require("./.agents/skills/{develop-story|develop-task}/references/qa-diminishing-returns.js");
+  const r = classifyDiminishingReturns({
+    cycle:              Number(process.argv[1]),
+    highCounts:         JSON.parse(process.argv[2]),
+    latestGateContent:  fs.readFileSync(process.argv[3], "utf8"),
+    testArtifactGlobs:  JSON.parse(process.argv[4]),
+  });
+  console.log(JSON.stringify({ ...r, message: describeDiminishingReturns(r) }));
+' "$CYCLE" "$HIGH_SEQUENCE_JSON" "$LATEST_GATE" "$TEST_ARTIFACT_GLOBS_JSON"
+```
+
+Engine source: `references/qa-diminishing-returns.js` (bundled into each skill as
+`references/qa-diminishing-returns.js`). It is a **library, not a CLI** — deliberately, on the same
+reasoning as `review-report-freshness.js`: its only caller is this gate, and a CLI would be a second
+interface to keep honest.
+
+It returns `{verdict, reason, detail, findings}` with `verdict ∈ {exit, continue}`. **Only `exit`
+exits.** Every other answer continues into 5b exactly as today.
+
+What it evaluates, stated so the JSON's `reason` values are readable:
+
+1. `HIGH_N == 0` **and** `HIGH_{N-1} == 0` — two consecutive gates with no blocker. **`HIGH_N` is
+   the number the Convergence check already computed**, passed in from this cycle's and the previous
+   cycle's `**HIGH findings**` lines in QA Iteration History. It is not recounted here: a second
+   implementation of one count drifts silently, and the two guards would then disagree about the same
+   run while each looked right alone. One quiet cycle is normal and is not enough.
+2. **Every** `top_issues[]` entry in the latest gate names a `file:` that matches
+   `qa.testArtifactGlobs`. A finding with **no** `file:`, or one the globs do not match, **fails**
+   the condition — the exit is opt-in on positive evidence, never on absence. This is the same
+   `file:` the third-strike rule already depends on.
+3. No positive signal that product behaviour is implicated: every `nfr_validation.*.status` reads
+   `PASS`, and no entry declares `category: bug` against a non-machinery path. Condition 3 reads a
+   **different part of the gate** from condition 2, and that independence is the point — it is what
+   catches a product defect filed against the test that found it.
+
+> **Condition 3 and the `category:` field.** No gate in this corpus carries `category:` — real
+> entries carry `id`, `severity`, `file`, `finding`, `suggested_action`, `suggested_owner`, `status`.
+> A rule requiring a field nothing emits would be unreachable, which is not conservative but dead,
+> and indistinguishable from broken. So `nfr_validation` carries condition 3 today and `category:` is
+> honoured as an optional refinement for the day a QA skill starts emitting it.
+>
+> Note the asymmetry with condition 2, which is deliberate: condition 2 wants positive evidence that
+> every finding **is** machinery, so absence fails it; condition 3 asks whether any finding **is** a
+> product defect, so only positive evidence fails it. Demanding proof of a negative there would make
+> every gate fail, which is the dead rule again.
+
+**A gate with no findings at all does not take this exit.** Condition 2 is vacuously true of an empty
+`top_issues[]`, and a rule that fires on vacuous truth fires hardest exactly when its reader is
+broken. A clean gate is a clean gate: it leaves through 5c on the ordinary `PASS` path.
+
+**`qa.testArtifactGlobs` defaults to `[]`**, which matches nothing, so a consumer who has not
+configured it keeps today's behaviour exactly. That is the fail-safe direction expressed as the
+default rather than as an opt-out. See [`configuration.md`](../../docs/reference/configuration.md).
+
+#### On exit
+
+1. **Do not run 5b.**
+2. **Hand to 5c**, exactly as a `PASS` gate does. Since 5c became the loop's exit gate the only route
+   to Step 7 is 5c returning `APPROVE` or `CONCERNS`, and this must not become the one path that
+   reaches Step 7 without a PR conformance review — that would make it a *weaker* exit than a clean
+   gate takes, on a run that by construction has stopped finding blockers.
+3. Record the residual in the gate's `recommendations.future` **and** on the work item.
+4. Write `describeDiminishingReturns(r)` verbatim into this cycle's `### QA Cycle {N}` entry, on its
+   own `**Loop exit**` row. A reader six months later must be able to tell this exit from a stall,
+   and the message is a function rather than a sentence composed here precisely so it is assertable.
+
+> **This is not a licence to stop at the first quiet cycle.** It needs two consecutive zero-HIGH
+> gates **and** a residue that is entirely machinery **and** two full adversarial passes behind it.
+> The run it was derived from spent cycles 3 and 4 examining the repairs to cycle 2's repairs, and
+> reached this conclusion by hand at cycle 4; the rule reaches it at cycle 3.
 
 ### 5b. Run QA Fix (shared)
 
@@ -704,9 +830,24 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fi
 
 ### 5c. PR Conformance Review (shared)
 
-Perform this step **after a gate exits 5a with `PASS` or `WAIVED`, before Step 7**. A gate that
-routes to 5b never reaches it. This is the loop's **exit gate**: 5a and 5b can cycle without it,
-but nothing leaves the loop except through here.
+Perform this step **before Step 7**, on either of the **two routes out of 5a**:
+
+1. a gate that reads **`PASS` or `WAIVED`** — the ordinary route; or
+2. a gate that took the **Diminishing-returns exit** above. That gate is `CONCERNS` by construction —
+   the exit's own condition 2 requires a non-empty `top_issues[]`, and any MEDIUM makes the gate
+   CONCERNS — so it must be named here explicitly. It arrives with a residue that is entirely test
+   machinery and no HIGH finding across two consecutive cycles.
+
+A gate that routes to **5b** never reaches this step, and neither route above routes to 5b. This is
+the loop's **exit gate**: 5a and 5b can cycle without it, but nothing leaves the loop except through
+here.
+
+> **Route 2 is named rather than left implied, and that is not tidiness.** An earlier draft of the
+> Diminishing-returns exit said it hands to 5c "exactly as a `PASS` gate does" while this sentence
+> still admitted only `PASS` / `WAIVED` — so one runnable document held two rules about whether a
+> CONCERNS gate may reach 5c, and an orchestrator's behaviour depended on which section it read
+> first. Whatever else changes here, the set of gates 5c accepts is stated in **one** place, and this
+> is it.
 
 **Why this exists, and what is genuinely new.** `/qa-story` and `/qa-task` already dispatch the
 **code** reviewer every cycle, so 5c's code lens is duplication and is not the reason it runs. Its
@@ -787,9 +928,8 @@ path already exists.
 position line `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` before the
 invocation below — the second of the two firing points this section owns.
 
-The ordinary 5b invocation passes the latest **gate file**, and on this path that gate reads
-`PASS`/`WAIVED` with an empty `top_issues[]` — it carries none of the review's findings. Pass the
-**PR review report** as well:
+The ordinary 5b invocation passes the latest **gate file**, and on neither route into 5c does that
+gate carry the review's findings. Pass the **PR review report** as well:
 
 ```
 Skill(qa-fix, args="gate={gate-file-path} pr_review={pr-review-report-path}")
@@ -801,6 +941,22 @@ The findings ingester globs `*.pr-review.*.md` for exactly this reason (see
 ingester warns by name against searching for one. Without both halves of this — the glob and the passed path — qa-fix reads a
 clean gate, finds nothing, changes nothing, and 5b step 0 HALTs reporting the issues as unfixable
 when in fact they were never delivered.
+
+> **What the gate carries differs by route, and on no route is it the work.** Three shapes arrive
+> here:
+>
+> | Gate | `top_issues[]` | Is it the fix target? |
+> | :--- | :--- | :--- |
+> | `PASS` (route 1) | empty | — nothing to mistake |
+> | `WAIVED` (route 1) | its HIGH entries, with `waiver.active: true` | **No.** They were waived on purpose; the outcome-branching list above says re-running qa-fix on them "would churn against an intentionally-waived gate" |
+> | `CONCERNS` (route 2, the Diminishing-returns exit) | the test-machinery residue that exit declined to fix | **No.** Leave it where the exit put it — the gate's `recommendations.future` and the work item |
+>
+> **Only the review's findings are the work**, and they arrive in the `pr_review=` report, not in the
+> gate. Working a gate's carried entries instead re-does what was waived, or resumes refining the
+> pins — the behaviour the Diminishing-returns exit exists to end, re-entered through the back door.
+>
+> Nothing mechanical prevents either: `/qa-fix`'s priority order picks up whatever `top_issues[]`
+> holds, so **the instruction is the whole guard.**
 
 > **REQUEST CHANGES re-enters 5b, not 5a.** The gate for this cycle has already been written and
 > read; what is wanted is a fix pass against the review's findings, after which the loop returns to
@@ -849,6 +1005,14 @@ the report path in the implementation report. Then emit the Step 7 transition bl
 **Two triggers reach this block, and they share everything below except the heading and the
 opening sentence.** There is deliberately no second escalation path: same artifact, same
 commit-and-HALT shape, one set of templates.
+
+> **The Diminishing-returns exit is not one of them, and the distinction is the whole reason that
+> exit exists.** It ends a loop that *finished working* — zero HIGH across two consecutive gates,
+> residue entirely machinery — and it hands to 5c and then Step 7. It writes no escalation entry and
+> raises no HALT. A reader who finds a run that stopped at cycle 3 with a `CONCERNS` gate must be
+> able to tell which of the two happened; the `**Loop exit**` row that exit writes into the cycle's
+> QA Iteration History entry is what tells them, and it says so in words rather than leaving it to be
+> inferred from the absence of an escalation entry.
 
 | Trigger               | Entry heading           | Fires when                                                                                                             |
 | --------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |

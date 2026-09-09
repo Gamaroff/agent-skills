@@ -30,6 +30,44 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A diminishing-returns exit for the QA loop.** The loop had one stall guard, the Convergence
+  check, and it measures HIGH findings. A run that reaches zero HIGH but keeps producing MEDIUM and
+  LOW findings *inside its own test machinery* satisfied nothing that guard looks at, so it ran to
+  the five-cycle limit refining pins while the product had been finished for two cycles. Measured on
+  a consumer run: HIGH `2, 0, 0, 0` across four cycles, 21 findings, **not one of them in the three
+  fixes the task existed to make**.
+
+  The two guards are opposites and now say so. The Convergence check fires when HIGH findings
+  *remain and stop falling* and it **escalates** — the loop stopped working. The new exit fires when
+  HIGH findings are *gone* and the residue is entirely machinery, and it **exits cleanly** — the loop
+  finished working. Escalating the second would misreport finished work as stalled. Neither can claim
+  the other's run: the exit requires two consecutive zero-HIGH gates, so a flat non-zero sequence is
+  never its business.
+
+  The Convergence check's arithmetic, its `HIGH_N` awk and its escalation text are **byte-unchanged**
+  — verified by diff, not by assertion. The exit does not recount HIGH; it takes the sequence the
+  Convergence check already recorded, because two implementations of one count drift silently and
+  would leave the two guards disagreeing about the same run while each looked right alone.
+
+  It hands to **5c**, exactly as a clean gate does. Since 5c became the loop's exit gate the only
+  route to Step 7 is a PR conformance review, and this must not become the one path around it — that
+  would make it a *weaker* exit than a `PASS` takes, on a run that by construction has stopped
+  finding blockers.
+
+  Engine: `shared/resources/qa-diminishing-returns.js`, a pure library (no filesystem access, never
+  throws) whose only caller is the prose gate — the shape `review-report-freshness.js` already
+  establishes. 33 tests replay reconstructed gate sequences through it, including an anti-vacuity
+  fixture where every condition holds *except* the glob match. Mutation-proved eight ways; the
+  eighth mutation initially stayed green, because no fixture distinguished "two consecutive
+  zero-HIGH gates" from "the latest gate is zero" — a `2, 1, 0` case was added for it.
+
+- **`qa.testArtifactGlobs`** — which paths the exit above treats as test machinery rather than
+  product. **Defaults to `[]`**, which matches nothing, so the exit never fires and an unconfigured
+  project keeps today's behaviour exactly: the fail-safe direction is the default rather than
+  something to opt into. A finding with no `file:`, or one no glob covers, **fails** the condition —
+  the exit is opt-in on positive evidence and never on absence. Matching is on whole path segments,
+  so `src/latest-price.ts` is production code whatever letters it contains.
+
 - **`observe-work`** — a meta-skill that observes the working session for skill-improvement signals,
   writes each as an observation to a durable log, and periodically reviews that backlog to stage
   skill updates for a human to install. The log is a directory of one Markdown file per observation;

@@ -1,0 +1,69 @@
+schema: 1
+task: "task.99.qa-loop-diminishing-returns-exit"
+task_title: "A diminishing-returns exit for the QA loop"
+gate: CONCERNS
+status_reason: "Cycle 3's MEDIUM is fixed. One MEDIUM this cycle, in the note cycle 3 added: it restates that a route-1 gate carries an empty top_issues[], which is false for WAIVED — and the same file says so eighty lines up, and again at line 253. No HIGH for the second consecutive cycle."
+reviewer: "QA Engineer"
+updated: "2026-09-09T16:00:00Z"
+
+top_issues:
+  - id: "TASK-99-008"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: >-
+      The route-comparison note added in cycle 3 says "On route 1 the gate reads PASS/WAIVED with an
+      empty top_issues[]". That is true of PASS and false of WAIVED: the Convergence check section in
+      the same file states that "a WAIVED gate carries its HIGH top_issues[] with waiver.active:
+      true", and the outcome-branching list at line 253 already names the consequence — "re-running
+      qa-fix would churn against an intentionally-waived gate". So on route 1 with a WAIVED gate plus
+      a REQUEST CHANGES verdict, qa-fix is handed HIGH findings that were deliberately waived, and
+      works them. Same shape as TASK-99-007, different route.
+      The falsehood predates this change set — the original sentence said the same thing — but cycle
+      3 restated it in a note whose entire subject is what each route's gate carries, which is where a
+      reader will now look for the answer.
+    suggested_action: >-
+      Correct the note: a PASS gate carries an empty top_issues[]; a WAIVED gate carries its HIGH
+      entries with waiver.active: true, and those are not the fix target either. Three routes, one
+      rule — only the review's findings are the work.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2937
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged; prose only."
+  performance:
+    status: PASS
+    notes: "Unchanged."
+  reliability:
+    status: PASS
+    notes: "TASK-99-007 verified closed: the generalised sentence no longer asserts anything route-specific, and the route detail moved into a note where it can be checked. That note is what TASK-99-008 corrects — the structure is right, one of its three claims is not."
+  maintainability:
+    status: PASS
+    notes: "The route note is the right shape: it answers 'what does the gate carry on each route' in one place. Getting one of its rows wrong is a content defect, not a structural one."
+
+recommendations:
+  immediate:
+    - action: "Fix TASK-99-008 — correct the WAIVED row of the route note; a waived HIGH is not the fix target either"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+  future:
+    - action: "CARRIED (gates 1-3): `indentOf` tab handling; `readNfrStatuses` block-scalar `status:`; the preamble wording; the fifth vacuity shape for `mutation-proving.md`; and gate 3's record of the cycle-2 overclaim."
+      refs: ["shared/resources/qa-diminishing-returns.js", "shared/resources/mutation-proving.md"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Resolve TASK-99-008"

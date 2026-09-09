@@ -1,0 +1,25 @@
+schema: 1
+task: "task.RECON.diminishing-returns"
+gate: PASS
+status_reason: "Reconstruction of cycle 4 — the repairs to cycle 3's repairs. Reached the same conclusion by hand that this rule now reaches at cycle 3."
+reviewer: "QA Engineer"
+updated: "2026-09-09T10:30:00Z"
+
+top_issues:
+  - id: "RECON-007"
+    severity: low
+    file: "src/pipeline/guard.spec.ts"
+    finding: "A repair's stated rationale is refuted by measurement — prose, not code."
+    suggested_action: "Correct the comment."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

@@ -1,0 +1,35 @@
+schema: 1
+task: "task.RECON.diminishing-returns"
+gate: CONCERNS
+status_reason: "Reconstruction of cycle 3 — the repairs to cycle 2's repairs."
+reviewer: "QA Engineer"
+updated: "2026-09-09T10:00:00Z"
+
+top_issues:
+  - id: "RECON-005"
+    severity: medium
+    file: "src/pipeline/guard.spec.ts"
+    finding: "The new assertion duplicates RECON-003's without narrowing it."
+    suggested_action: "Collapse the two."
+    suggested_owner: dev
+    status: open
+  - id: "RECON-006"
+    severity: low
+    file: "tests/fixtures/guard-decoys.yml"
+    finding: "One decoy is now unreachable by any assertion."
+    suggested_action: "Delete it or assert it."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
+  performance:
+    status: PASS
+    notes: "Unchanged."

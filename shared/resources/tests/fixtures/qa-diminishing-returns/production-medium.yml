@@ -1,0 +1,30 @@
+schema: 1
+task: "task.RECON.production-medium"
+gate: CONCERNS
+status_reason: "Zero HIGH, but one MEDIUM sits on a production path — the residue is not entirely machinery."
+reviewer: "QA Engineer"
+updated: "2026-09-09T11:10:00Z"
+
+top_issues:
+  - id: "PROD-001"
+    severity: medium
+    file: "src/pipeline/guard.spec.ts"
+    finding: "Machinery."
+    suggested_owner: dev
+    status: open
+  - id: "PROD-002"
+    severity: medium
+    file: "src/pipeline/gate.ts"
+    finding: "Production behaviour."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 78
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
