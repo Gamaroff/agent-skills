@@ -238,23 +238,24 @@ STALE/MISSING after task 86, so rollback loses the four extra classes and nothin
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS → FAIL (cycle 2) → fixed
+**QA Status**: PASS (cycle 3; CONCERNS → FAIL → PASS)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
 - **Cycle 1**: [task.98.qa.1.bundle-freshness-check-mode.md](./task.98.qa.1.bundle-freshness-check-mode.md) · [gate.1](./task.98.gate.1.bundle-freshness-check-mode.yml) — CONCERNS 90/100
 - **Cycle 2 (refute pass)**: [task.98.qa.2.bundle-freshness-check-mode.md](./task.98.qa.2.bundle-freshness-check-mode.md) · [gate.2](./task.98.gate.2.bundle-freshness-check-mode.yml) — FAIL 80/100
+- **Cycle 3**: [task.98.qa.3.bundle-freshness-check-mode.md](./task.98.qa.3.bundle-freshness-check-mode.md) · [gate.3](./task.98.gate.3.bundle-freshness-check-mode.yml) — **PASS 100/100**
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 20 new (3013 in the full suite), 11 mutation proofs
+- **Tests Executed**: 29 new (3022 in the full suite), 18 mutation proofs
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS (measured, 3 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS (measured, 6 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
@@ -271,6 +272,12 @@ and the check found a live stale copy in the tree on its first run.
   unreadable reported `0 problems`. A clean result from a failed read, in the one check whose purpose
   is to make invisible staleness visible. Found by the cycle-2 refute pass, which a narrowed re-review
   would have missed — it would have read only the fixes, where the defect is absent.
+- **T98-QA-004 (medium, cycle 3)** — and a *third* instance of the same class, one level up: an
+  unreadable directory under `references/` was silently unwalked by `Path.rglob`, so the run reported
+  `0 problems` over files it had never listed. All three sites are now handled.
+
+Two mutations proved nothing on first run (M3, M18). Both were statements about the tests rather than
+the code, and each drove a new test rather than a quiet edit.
 
 ---
 
@@ -285,6 +292,7 @@ and the check found a live stale copy in the tree on its first run.
 | 2026-09-09 |         | Status → ready-for-review | develop |
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both in the classifier's reporting; 7/7 success criteria met | qa-task |
 | 2026-09-09 |         | QA cycle 2 (refute pass) FAIL (80/100) — orphan scan reported a clean result over an unreadable file; fixed | qa-task |
+| 2026-09-09 |         | QA cycle 3 PASS (100/100) — third instance of the same class fixed (unwalkable subtree); 29 tests, 18 mutation proofs | qa-task |
 
 ---
 
