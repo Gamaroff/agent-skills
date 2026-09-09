@@ -210,7 +210,7 @@ how the corpus-wide surface is measured before merge.
 - [x] Run the gate over the corpus and record the new surface (files newly reporting findings, and
       their kinds) in the implementation report. This is a **measurement**, not a triage: acting on the
       findings is out of scope per §4.
-- [ ] `npm run ci` green.
+- [x] `npm run ci` green.
 
 **Dependencies**: Phases 1–3.
 
@@ -278,7 +278,7 @@ extractor must turn that test red. This is the criterion that distinguishes "the
 - [x] `zero-blocks-executed` still fires when nothing runs
 - [x] The corpus-wide finding surface introduced by the change is measured and recorded in the
       implementation report
-- [ ] Full `npm run ci` green
+- [x] Full `npm run ci` green
 
 ## 10. Risk Assessment
 

@@ -37,7 +37,7 @@ a zsh-broken verification predicate through three QA cycles.
 | 1. create-branch           | ✅ Done    | Branch `feature/task.87.*` exists in git                               | `feature/task.87.execute-table-cell-snippets` cut from `develop` at `a3d8273b`; pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.87.review.{N}.{name}.md` exists (or skip logged)                 | `task.87.review.1.execute-table-cell-snippets.md` — READY TO IMPLEMENT, 8/10; 2 Critical + 5 Important + 2 Optional all fixed; `draft` → `ready-for-development` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases; 115/115 tests green; mutation proof 3× red then green; bundle propagated to 6 skills | inline (no subagents) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #365](https://github.com/Gamaroff/agent-skills/pull/365); 2 commits (`48f987ee` feat, `e7931bf4` docs); issue comment `posted` | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.87.qa.{N}.*.md`; `task.87.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.87.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -186,6 +186,16 @@ mistake for a regression, which is exactly why it is recorded here with the befo
 Triage of these 42 blocks is **out of scope** per §4 of the task. Nothing needs triaging: none of them
 produced a finding.
 
+### Full `npm run ci` — green, and run here rather than deferred to the merge gate
+
+`CI_EXIT=0`. **2983 pass, 0 fail**, and the log confirms all four stages ran: `format:check`, `test`,
+`eval:all` and the composite. Run against the exact tree that was committed — the working tree was clean
+between the run finishing and the push.
+
+Run at Step 3/4 rather than left to `develop-next`'s merge gate on purpose: `eval:all` and
+`prettier --check` are the two things the fast tier does not cover, and task.67 shipped a red build
+because `/finalise` accepted a task whose only local evidence was `npm test`.
+
 ### Design decisions worth recording
 
 - **Command-column restriction, not an explicit marker.** The task's scope offered either; the column
@@ -243,7 +253,7 @@ _Track each QA review/fix cycle._
 **Finished**: _pending_
 **Final Status**: _pending_
 **Branch**: `feature/task.87.execute-table-cell-snippets`
-**PR**: _pending — populated after Step 4_
+**PR**: [#365](https://github.com/Gamaroff/agent-skills/pull/365)
 **QA Iterations**: _pending_
 **DoD Summary**: _pending — populated after Step 7_
 **Tracker debt**: _pending — populated after Step 7_
