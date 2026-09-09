@@ -24,21 +24,28 @@ Three insertions, each matching the file's existing style — the Full schema bl
 **1. Into the Full schema block**, near the other consumer-facing blocks:
 
 ```yaml
-# observe-work — where the observation log lives, and whether it is written at all.
-# Every key is optional. Absent block == enabled with the default workspace.
+# observe-work — where the observation log lives.
+# The key is optional. Absent block == the project-identity default workspace.
 observations:
-  enabled: true
   # The workspace ROOT. Absolute, or ~-relative. This is the highest-precedence
   # source; $OBS_WORKSPACE is second; the project-identity path is the default.
   # It must be ONE STABLE path that outlives a session — never derived from the
   # cwd, and never inside an ephemeral checkout (a git worktree, a temp clone),
   # which is torn down and takes the log with it.
   workspace: ~/.agents/skill-observations
-  # Days before the session-start review offer fires. Default 7.
-  review_interval_days: 7
 ```
 
-**2. Key reference rows**, in the existing table format — one row per key, each stating the default and what an absent value means.
+**One key only.** `resolve-observation-workspace.sh:145` reads `observations.workspace` and nothing
+else. `observations.enabled` and `observations.review_interval_days` do not exist anywhere in the
+tree — verified by grep across `.sh`, `.js`, `.mjs`, `.md` and `.yaml`. Documenting either ships a
+knob that silently does nothing.
+
+**2. Key reference row** for `observations.workspace`, in the existing table format, stating the
+default and what an absent value means.
+
+**2b. `OBS_STALE_DAYS` into the existing `## Environment variables` section.** This is the real
+review-staleness knob — `observe-work-session-start.sh:111`, `stale_days="${OBS_STALE_DAYS:-14}"`.
+An environment variable, default **14**. It is not a config key and the default is not 7.
 
 **3. A `## Observation workspace` prose section.** Two things belong here that a schema table cannot carry:
 
@@ -54,7 +61,11 @@ OBS_WORKSPACE=/tmp/from-env sh -c 'cd /tmp/probe && . …/resolve-observation-wo
 # expect /tmp/from-config
 ```
 
-(Use a real scratch dir, not `/tmp` itself — the resolver refuses `/tmp` anchors, which is itself worth asserting.)
+(Use a real scratch dir, not `/tmp` itself — the resolver refuses `/tmp` anchors, which is itself worth asserting. Note the refusal also rules out the harness scratchpad, so probe workspaces belong under `$HOME`.)
+
+**And assert the weaker property the stronger one assumes:** every key documented under
+`observations:` has a reader. A precedence test on `workspace` says nothing about a second key that
+no code consults.
 
 ---
 
@@ -76,6 +87,11 @@ Place each note where a reader already looks for scope — next to the existing 
 
 > **Related: `observe-work`.** `double-check` audits the artifact just produced — does it match the disk, the constraints and the original request. `observe-work` observes the behaviour that produced it. They meet at the findings: a `double-check` finding that generalises beyond this artifact — a rule the agent violated, a gate that failed to fire — is exactly the shape of an observation, and is worth logging as one.
 
+**One sentence in all three is load-bearing.** Phase 3's family audit greps each member for the
+family's `Shared` value as a **literal substring** (`body.includes(rule)`). Pick that sentence here,
+write it verbatim into all three notes, and seed the template from it. If the notes paraphrase, the
+audit reports every member as drifted on its first run.
+
 **The check that matters, after all three:**
 
 ```bash
@@ -93,6 +109,13 @@ An empty diff is the proof that no `description:` moved. Run it; do not reason a
 
 Ships as an **asset**, not a live registry — `assets/` is for templates used in output, which is exactly what this is. The live file belongs at `$OBS_WORKSPACE/skill-observations/skill-families.md`, copied from here on first use.
 
+**The format is dictated by the parser, not chosen.** `parseFamilies()`
+(`shared/resources/observation-log.js:907`) skips every line not starting with `|` and every row
+with fewer than four cells. It reads `Family | Members | Shared | Member-specific` and returns
+`{ name, members, shared, memberSpecific }`. There is **no coherence field** — it appears in task
+93's plan and was dropped from task 93's implementation. `Members` splits on `,` or `/`; `Shared`
+and `Member-specific` split on `;`.
+
 Content:
 
 ```markdown
@@ -106,50 +129,50 @@ the set.
 
 Two columns carry the weight:
 
-- **Shared** — the material every member should carry. This is what the drift
-  audit greps for.
-- **Member-specific** — what legitimately differs, and why. Without it, every
-  observation looks like it might apply everywhere and the check generates
-  noise instead of signal. Duplication is sometimes correct and absence is not
-  always drift; this column is what records the difference.
+- **Shared** — the material every member should carry, semicolon-separated.
+  The drift audit greps each member's SKILL.md for each of these as a LITERAL
+  SUBSTRING, so write the exact sentence that is in the members — not a
+  paraphrase of it.
+- **Member-specific** — what legitimately differs, and why. An absence is
+  checked against this column before it is called drift, and that check is a
+  substring test too. Without it, every observation looks like it might apply
+  everywhere and the check generates noise instead of signal.
 
-**Coherence model** decides what fixing drift *means*:
+Deciding what "fix the drift" means is a judgement you make per family. Two
+models cover almost every case — record which one applies in the family's own
+notes:
 
 | Model | Meaning | Fixing drift means |
 |---|---|---|
-| `synced-duplicates` | each member is self-contained and shared sections are kept in sync | edit every member |
-| `shared-core` | one skill holds the common material; others load it as a companion | edit the core once, check the pointers |
+| synced-duplicates | each member is self-contained and shared sections are kept in sync | edit every member |
+| shared-core | one skill holds the common material; others load it as a companion | edit the core once, check the pointers |
 
-## Format
+(Guidance only. Neither the parser nor the audit reads it.)
 
-## [family name]
-**Members:** skill-a, skill-b, skill-c
-**Coherence model:** synced-duplicates | shared-core
-**Shared:** [the material every member should carry]
-**Member-specific:** [what legitimately differs, and why]
-
-## meta-skills
-**Members:** observe-work, autoskill, remember-insight, double-check
-**Coherence model:** shared-core
-**Shared:** self-observation output is presented for review and never applied
-  silently; any check a member recommends asserts behaviour rather than the
-  presence of source text.
-**Member-specific:** the trigger (passive vs explicit), the durable artefact
-  (observation log / none / memory directory / none), and the unit observed
-  (the session / the session / a stated insight / the artifact just produced).
+| Family | Members | Shared | Member-specific |
+|---|---|---|---|
+| meta-skills | observe-work, autoskill, remember-insight, double-check | <the exact sentence written into all four members in Phase 2> | trigger; durable artefact; unit observed |
 ```
+
+Keep the guidance table to **three** columns so `parseFamilies()` skips it — a four-column
+explanatory table would parse as a family.
 
 **Pointer**, one line into `observe-work`'s Session Start Protocol step 1:
 
-> When the workspace has no `skill-families.md`, copy `assets/skill-families.template.md` into it rather than starting empty — the sibling check needs a registry, and the seeded meta-skills family is the one this skill belongs to.
+> When `skill-families.md` exists but holds no family rows, seed it from `assets/skill-families.template.md` — the sibling check needs a registry, and the seeded meta-skills family is the one this skill belongs to. `init` always creates the file, so an absent registry is never the state you find; an empty one is.
 
 **Test additions** to `skills/observe-work/tests/observe-work.test.js`:
 
 ```js
-// the template ships, is pointed at, and parses
+// the template ships and is pointed at from SKILL.md
+// it parses through the engine into { name, members, shared, memberSpecific }
 // every member it names is a real skills/ directory
-// coherence model is one of the two defined values
+// families --audit against the repo returns ZERO gaps
 ```
+
+The zero-gap assertion is the one that matters: it is behavioural, and it is what catches a `Shared`
+value that reads well and matches nothing. A seeded family that fails its own audit on first run
+teaches the adopter to ignore the check.
 
 The member-resolves-to-a-directory assertion must tolerate ENOENT: `tests/` ships inside the packaged skill, where the sibling directories are absent. Skip rather than fail in that case, exactly as the existing per-skill suites do.
 
@@ -157,7 +180,7 @@ The member-resolves-to-a-directory assertion must tolerate ENOENT: `tests/` ship
 
 ### Phase 4: README and changelog
 
-**`README.md`** — the count and badge are hand-maintained; after tasks 93–95 the number is off by the skills added. Update both, and add `observe-work` to the featured list if the list is meant to be representative rather than exhaustive.
+**`README.md`** — the count and badge are hand-maintained and had already drifted before this work: line 5 (badge) and line 7 (prose) both read **115**, while `ls -d skills/*/ | wc -l` returns **126**. Set both from the live count, not from 115 plus the skills this work adds. Add `observe-work` to the featured list if the list is meant to be representative rather than exhaustive.
 
 **`CHANGELOG.md`** — one entry for the capability, not three for the tasks. A reader wants "the library can now observe its own use and stage improvements", with the three task numbers as the trail:
 
@@ -197,4 +220,6 @@ done
 - **Framework**: node's built-in runner; assertions land in the existing `skills/observe-work/tests/observe-work.test.js`, so no new `package.json` glob is needed — task 94 added it.
 - **The catalog check is the load-bearing one.** Three `SKILL.md` files are edited and the only thing standing between a tidy-up of a description and an unrelated CI failure is running `npm run generate-catalog` and looking at the diff.
 - **Assert the resolver's behaviour, not its comments.** The contract test drives the script with a config file and an env var and reads what it exports. A test that greps the script for the word "precedence" proves the word is there.
+- **Assert that every documented key has a reader.** Precedence is the second question; the first is whether anything consults the key at all. Two keys in the original draft of this plan had no reader anywhere in the tree.
+- **The family audit is a behavioural test, not a parse test.** `families --audit` returning zero gaps proves the seeded `Shared` value is really present in all four members. Asserting the template "parses" proves only that it is a table.
 - **Bundle freshness**: editing a `SKILL.md` fires the pre-commit hook. Commit what it stages, then run `npm run bundle` again and confirm no diff — that second run is the actual check.
