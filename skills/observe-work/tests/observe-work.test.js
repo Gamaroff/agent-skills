@@ -577,7 +577,7 @@ test("family template: parses into the engine's actual shape, with real members"
   if (engine === null) return; // packaged install — repo siblings absent
 
   const repoRoot = path.join(SKILL_DIR, "..", "..");
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "obs-families-"));
+  const ws = fs.mkdtempSync(path.join(os.homedir(), ".obs-families-"));
   try {
     fs.mkdirSync(path.join(ws, "skill-observations"), { recursive: true });
     fs.copyFileSync(
@@ -639,7 +639,7 @@ test("family template: `families --audit` against this repo returns ZERO gaps", 
   if (engine === null) return; // packaged install — repo siblings absent
 
   const repoRoot = path.join(SKILL_DIR, "..", "..");
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "obs-families-audit-"));
+  const ws = fs.mkdtempSync(path.join(os.homedir(), ".obs-families-audit-"));
   try {
     fs.mkdirSync(path.join(ws, "skill-observations"), { recursive: true });
     fs.copyFileSync(
@@ -697,7 +697,12 @@ test("family template: `families --audit` against this repo returns ZERO gaps", 
 // wrong in exactly the way a source-text test cannot see.
 //
 // Fixtures live under os.homedir(), not os.tmpdir() — the resolver refuses a
-// /tmp anchor, which is itself asserted below.
+// /tmp anchor, which is itself asserted below. The SAME rule binds the family
+// fixtures above, for the same reason: `observation-log.js` refuses an ephemeral
+// `--workspace` too, returning `reason: "ephemeral-workspace"` and exit 1.
+// That is easy to miss on macOS, where `os.tmpdir()` is `/var/folders/…` and
+// passes; on Linux it is literally `/tmp` and fails. A first version of the
+// family tests used `os.tmpdir()`, passed locally, and went red only in CI.
 
 const RESOLVER = path.join(
   SKILL_DIR,

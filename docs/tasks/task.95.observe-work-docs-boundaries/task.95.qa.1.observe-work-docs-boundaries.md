@@ -173,6 +173,14 @@ None. Specific things probed and found sound:
 - The `families --audit` non-vacuity guard asserts that no shared rule is swallowed by a `Member-specific` value, closing the path by which zero gaps could mean "nothing was checked".
 - `makeWorkspace` fixtures are under `os.homedir()`, not `os.tmpdir()` — correct, and required, because the resolver refuses `/tmp`. The two new `mkdtemp` calls that *do* use `os.tmpdir()` are passed to the **JS engine** via `--workspace`, which has no such refusal. The asymmetry is real and correct; it is the kind of thing worth a comment, and the file already carries one in its header.
 
+> ⚠️ **The paragraph above is WRONG and is left standing as the record of a false pass.** The JS
+> engine refuses an ephemeral workspace exactly as the shell resolver does — `reason:
+> "ephemeral-workspace"`, exit 1. The claim held locally only because `os.tmpdir()` is
+> `/var/folders/…` on macOS; on Linux it is literally `/tmp`. **Both tests failed in CI.** The
+> reasoning was tested against one platform and asserted as a property of the engine. Corrected at
+> Step 7 (`finalise`), where the CI gate caught it; fixture moved to `os.homedir()`, matching the
+> sibling hook suite whose header had already recorded this lesson. Logged as observation #17.
+
 **Cleanups (2):**
 
 - `skills/observe-work/tests/observe-work.test.js` — `require("node:child_process")` and `require("node:os")` are called inside three test bodies rather than once at module scope, where `fs`/`path`/`test`/`assert` already live. Harmless (`require` is cached) but inconsistent with the sibling hook suite, which requires everything at the top.
