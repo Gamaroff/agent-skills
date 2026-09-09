@@ -1,0 +1,108 @@
+schema: 1
+task: "task.99.qa-loop-diminishing-returns-exit"
+task_title: "A diminishing-returns exit for the QA loop"
+gate: FAIL
+status_reason: "Cycle 1's three findings are all fixed and mutation-proved, and the fix is sound. The mandatory cycle-2 refute pass found what cycle 1's document-anchored reading did not: 5c's own entry condition excludes the very gate this exit hands it, so the deliverable's exit path is undefined in the document that defines it. Two further false claims in prose."
+reviewer: "QA Engineer"
+updated: "2026-09-09T14:00:00Z"
+
+top_issues:
+  - id: "TASK-99-004"
+    severity: high
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: >-
+      The Diminishing-returns exit section says it hands to 5c "exactly as a `PASS` gate does". 5c's
+      own opening sentence says "Perform this step after a gate exits 5a with `PASS` or `WAIVED`".
+      A gate that takes this exit is by construction a `CONCERNS` gate — condition 2's premise is that
+      `top_issues[]` is non-empty, and the deterministic gate rules make any MEDIUM finding CONCERNS.
+      So 5c's stated precondition excludes precisely the gate the new exit sends it, and the two
+      sections of one runnable document now disagree about whether a CONCERNS gate may reach 5c. An
+      orchestrator reading 5c refuses; one reading the exit proceeds. The behaviour is undefined,
+      which is the failure the task's own §3 comparison table exists to prevent.
+    suggested_action: >-
+      Widen 5c's entry condition to name both routes — a clean gate, and the diminishing-returns exit
+      — and state that the second arrives with a CONCERNS gate carrying machinery-only residue. Keep
+      "a gate that routes to 5b never reaches it": that sentence stays true, because this exit does
+      not run 5b.
+    suggested_owner: dev
+    status: open
+  - id: "TASK-99-005"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: >-
+      The `**Loop exit**` row added in cycle 1 defaults to `n/a — loop continued`. On the cycle where
+      a clean `PASS` gate hands to 5c and 5c returns APPROVE, the loop did not continue — it exited,
+      by the ordinary route. The default text would write a false statement into the one record a
+      future reader consults to tell the two exits apart, which is the record's whole purpose.
+    suggested_action: >-
+      Default to `n/a — this exit not taken`, which is true on every cycle that did not take it,
+      whatever else that cycle did.
+    suggested_owner: dev
+    status: open
+  - id: "TASK-99-006"
+    severity: medium
+    file: "CHANGELOG.md"
+    finding: >-
+      "32 tests replay reconstructed gate sequences through it" — the suite is now 33, after cycle 1
+      added the capitalised-path regression. The same stale count appears twice in the task document's
+      current-state prose (implementation summary, testing results). These are claims about what is in
+      the repository right now, not historical Change Log rows, and they are false. The task's own
+      Motivation section records that four of the twenty-one findings on the run it was derived from
+      were exactly this — "false claims in prose, a repair's stated rationale that measurement
+      refuted" — so it is the defect class this work was filed against.
+    suggested_action: >-
+      Update the three current-state counts to 33. Leave the dated Change Log rows alone: they record
+      what was true when written, which is what a change log is for.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 2937
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. The fix narrowed a string transformation; it added no surface. Still no filesystem access, no network, no child processes, no new dependencies."
+  performance:
+    status: PASS
+    notes: "Unchanged. The fix replaced an unconditional method call with a Set lookup plus the same call on three of four keys — strictly less work, and immaterial either way."
+  reliability:
+    status: PASS
+    notes: "Upgraded from CONCERNS. The silent-failure mode that drove the cycle-1 CONCERNS is closed: a capitalised path now matches a correctly-cased glob, the fix is mutation-proved, and the regression test asserts both directions so folding the glob instead would not pass either. The never-throws property is untouched."
+  maintainability:
+    status: PASS
+    notes: "The narrowing carries a comment naming the failure it prevents and, unusually and usefully, why the suite could not see it. That note is the most valuable line added this cycle: it names a vacuity shape — a fixture corpus with no instance of the input class — that the repository's own mutation-proving reference does not cover."
+
+recommendations:
+  immediate:
+    - action: "Fix TASK-99-004 — widen 5c's entry condition to admit the diminishing-returns exit's CONCERNS gate"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "Fix TASK-99-005 — default the `**Loop exit**` row to `n/a — this exit not taken`"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "Fix TASK-99-006 — correct the three current-state test counts to 33"
+      refs: ["CHANGELOG.md", "docs/tasks/task.99.qa-loop-diminishing-returns-exit/task.99.qa-loop-diminishing-returns-exit.md"]
+  future:
+    - action: "CARRIED FROM GATE 1, deliberately unfixed: `indentOf` reads a tab-indented line as column 0, ending the `top_issues` scan early. Latent — YAML forbids tab indentation."
+      refs: ["shared/resources/qa-diminishing-returns.js"]
+    - action: "CARRIED FROM GATE 1: `readNfrStatuses` would read a `notes:` block-scalar line beginning `status:` as an NFR status. Latent."
+      refs: ["shared/resources/qa-diminishing-returns.js"]
+    - action: "CARRIED FROM GATE 1: the preamble's `two ways the loop reaches Step 7` reads awkwardly against `APPROVE or CONCERNS from 5c remains the only thing that opens Step 7`. TASK-99-004's fix may resolve this incidentally; if it does not, leave it."
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "The repository's `mutation-proving.md` names four vacuity shapes. This task surfaced a fifth — a fixture corpus containing no instance of the input class, which no mutation can reveal. Worth its own task against that reference."
+      refs: ["shared/resources/mutation-proving.md"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "Resolve TASK-99-004 — the exit path is undefined in the document that defines it"
+    - "Resolve TASK-99-005 and TASK-99-006 — two false claims in shipped prose"

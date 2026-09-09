@@ -282,16 +282,16 @@ satisfy condition 2.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: FAIL (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 50/100
+**Quality Score**: 60/100 (cycle 1: 50/100)
 **Gate Decision**: FAIL
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.99.qa.1.qa-loop-diminishing-returns-exit.md](./task.99.qa.1.qa-loop-diminishing-returns-exit.md)
-- **Gate File**: [task.99.gate.1.qa-loop-diminishing-returns-exit.yml](./task.99.gate.1.qa-loop-diminishing-returns-exit.yml)
+- **Cycle 2 (latest)**: [task.99.qa.2.qa-loop-diminishing-returns-exit.md](./task.99.qa.2.qa-loop-diminishing-returns-exit.md) · [gate.2](./task.99.gate.2.qa-loop-diminishing-returns-exit.yml)
+- **Cycle 1**: [task.99.qa.1.qa-loop-diminishing-returns-exit.md](./task.99.qa.1.qa-loop-diminishing-returns-exit.md) · [gate.1](./task.99.gate.1.qa-loop-diminishing-returns-exit.yml)
 
 ### Test Coverage Summary
 
@@ -302,7 +302,12 @@ satisfy condition 2.
 
 ### Key Findings
 
-The glob matcher case-folds `file:` paths, so a consumer whose `qa.testArtifactGlobs` carries an
+**Cycle 2 (refute pass).** 5c's own entry condition — "after a gate exits 5a with `PASS` or
+`WAIVED`" — excludes the `CONCERNS` gate this exit hands it, so the deliverable's exit path is
+undefined in the document that defines it (TASK-99-004, HIGH). Plus two false claims in prose: the
+`**Loop exit**` default sentence, and a stale "32 tests" now that the suite is 33.
+
+**Cycle 1 (all fixed).** The glob matcher case-folds `file:` paths, so a consumer whose `qa.testArtifactGlobs` carries an
 uppercase character can never take the exit — silently, and indistinguishably from an unconfigured
 project. The new 32-test suite cannot detect it because every fixture path in it is lowercase,
 including the anti-vacuity fixture. Filed as
@@ -323,6 +328,8 @@ the invocation snippet's four variables have no documented source.
 | 2026-09-09 |  | Implemented — 8 files (3 added incl. 12 fixtures, 5 modified), 32 tests, all 8 conditions mutation-proved. Corrected criterion 2 from "cycle 2" to "cycle 3": §7's own rule cannot fire at cycle 2 on a `2,0,0,0` sequence. | develop |
 | 2026-09-09 |  | QA gate FAIL (50/100) — 1 HIGH (glob matcher case-folds `file:` paths, silently disabling the exit for capitalised paths; the new suite cannot see it), 2 MEDIUM, 3 LOW | qa-task |
 | 2026-09-09 |  | QA findings fixed — 1 HIGH + 2 MEDIUM closed, 1 iteration. The HIGH was a case-fold applied to `file:` as well as to the three enumerations, which silently disabled the exit for capitalised paths; the fix is mutation-proved and the new test is the only one in the suite that exercises a capitalised path. | qa-fix |
+| 2026-09-09 |  | QA gate 2 FAIL (60/100) — cycle-2 refute pass: 1 HIGH (5c's entry condition excludes the CONCERNS gate this exit hands it) + 2 MEDIUM (two false claims in prose). Cycle 1's three findings verified fixed. | qa-task |
+| 2026-09-09 |  | QA findings fixed — 1 HIGH + 2 MEDIUM closed, 2nd iteration. 5c's entry condition now names both routes out of 5a, so the exit's destination no longer refuses it; `**Loop exit**` default corrected; three stale test counts corrected. | qa-fix |
 
 ## Progress Tracking
 
@@ -334,7 +341,7 @@ the invocation snippet's four variables have no documented source.
 
 A pure library, `shared/resources/qa-diminishing-returns.js`, decides the exit; the new
 *Diminishing-returns exit* section in `develop-pipeline-step-5-6-qa-loop.md` is the contract it
-implements and the thing a pipeline reader executes. 32 tests replay reconstructed gate sequences
+implements and the thing a pipeline reader executes. 33 tests replay reconstructed gate sequences
 through the module; 12 fixtures carry the sequences. `qa.testArtifactGlobs` is documented with a
 `[]` default that makes the fail-safe direction the default rather than an opt-out.
 
@@ -402,7 +409,8 @@ the behaviour the rule this task ships exists to stop.
 
 ### Testing results
 
-- 32/32 tests pass in `shared/resources/tests/qa-diminishing-returns.test.mjs`.
+- 33/33 tests pass in `shared/resources/tests/qa-diminishing-returns.test.mjs` (32 at the develop
+  step; the 33rd is the capitalised-path regression added in qa-fix cycle 1).
 - **Mutation-proved**: eight mutations, one per condition — cycle floor, both halves of condition 1,
   the empty-residue guard, the missing-`file:` guard, condition 3's NFR signal, the empty-glob
   default, glob separator handling, and condition 2 itself. Seven went red immediately. **The
@@ -419,7 +427,8 @@ the behaviour the rule this task ships exists to stop.
 
 ### In QA Verification
 
-- [Bug 1: Glob matching case-folds `file:` paths](./task.99.bug.1.glob-matching-case-folds-file-paths.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09)
+- [Bug 1: Glob matching case-folds `file:` paths](./task.99.bug.1.glob-matching-case-folds-file-paths.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09, verified at gate 2)
+- [Bug 2: 5c's entry condition excludes the gate the new exit hands it](./task.99.bug.2.5c-entry-condition-excludes-the-new-exit.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09)
 
 ### Closed Bugs
 

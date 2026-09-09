@@ -56,7 +56,7 @@ All notable changes to this project will be documented in this file. Format foll
 
   Engine: `shared/resources/qa-diminishing-returns.js`, a pure library (no filesystem access, never
   throws) whose only caller is the prose gate — the shape `review-report-freshness.js` already
-  establishes. 32 tests replay reconstructed gate sequences through it, including an anti-vacuity
+  establishes. 33 tests replay reconstructed gate sequences through it, including an anti-vacuity
   fixture where every condition holds *except* the glob match. Mutation-proved eight ways; the
   eighth mutation initially stayed green, because no fixture distinguished "two consecutive
   zero-HIGH gates" from "the latest gate is zero" — a `2, 1, 0` case was added for it.

@@ -272,7 +272,7 @@ Log the result in the QA Iteration History section:
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
 **PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
-**Loop exit**: {n/a — loop continued / the `describeDiminishingReturns()` message verbatim}
+**Loop exit**: {n/a — this exit not taken / the `describeDiminishingReturns()` message verbatim}
 **Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of 5) / Proceeding to finalise / Escalating — loop not converging}
 ```
 
@@ -288,9 +288,14 @@ indistinguishable from a review that was skipped, and on resume the two must not
 
 `**Loop exit**` is the **Diminishing-returns exit**'s record, and it exists for one reader: whoever
 opens this history six months from now and has to tell a clean early exit from a stall. On every
-cycle that did not take that exit it reads `n/a — loop continued`, which is a claim rather than a
-gap. On the cycle that did, write `describeDiminishingReturns(r)` **verbatim** — the message is a
+cycle that did not take that exit it reads `n/a — this exit not taken`, which is a claim rather than
+a gap. On the cycle that did, write `describeDiminishingReturns(r)` **verbatim** — the message is a
 function precisely so that what lands here is assertable rather than composed afresh each time.
+
+> **The default says "this exit not taken", not "loop continued".** Those are different claims, and
+> the second is false on the cycle where a clean `PASS` gate hands to 5c and 5c returns APPROVE: the
+> loop did not continue there, it exited by the ordinary route. A row whose whole purpose is letting a
+> reader distinguish two exits must not itself assert something untrue about one of them.
 
 **Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
@@ -824,9 +829,24 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fi
 
 ### 5c. PR Conformance Review (shared)
 
-Perform this step **after a gate exits 5a with `PASS` or `WAIVED`, before Step 7**. A gate that
-routes to 5b never reaches it. This is the loop's **exit gate**: 5a and 5b can cycle without it,
-but nothing leaves the loop except through here.
+Perform this step **before Step 7**, on either of the **two routes out of 5a**:
+
+1. a gate that reads **`PASS` or `WAIVED`** — the ordinary route; or
+2. a gate that took the **Diminishing-returns exit** above. That gate is `CONCERNS` by construction —
+   the exit's own condition 2 requires a non-empty `top_issues[]`, and any MEDIUM makes the gate
+   CONCERNS — so it must be named here explicitly. It arrives with a residue that is entirely test
+   machinery and no HIGH finding across two consecutive cycles.
+
+A gate that routes to **5b** never reaches this step, and neither route above routes to 5b. This is
+the loop's **exit gate**: 5a and 5b can cycle without it, but nothing leaves the loop except through
+here.
+
+> **Route 2 is named rather than left implied, and that is not tidiness.** An earlier draft of the
+> Diminishing-returns exit said it hands to 5c "exactly as a `PASS` gate does" while this sentence
+> still admitted only `PASS` / `WAIVED` — so one runnable document held two rules about whether a
+> CONCERNS gate may reach 5c, and an orchestrator's behaviour depended on which section it read
+> first. Whatever else changes here, the set of gates 5c accepts is stated in **one** place, and this
+> is it.
 
 **Why this exists, and what is genuinely new.** `/qa-story` and `/qa-task` already dispatch the
 **code** reviewer every cycle, so 5c's code lens is duplication and is not the reason it runs. Its
