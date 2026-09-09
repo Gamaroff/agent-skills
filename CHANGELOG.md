@@ -4,6 +4,61 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **The snippet-execution gate now sees commands written in markdown table cells, not only fenced
+  ` ```bash ` blocks.** The places table-cell commands appear are disproportionately *verification*
+  commands, where a false pass is the worst available failure — and task 77 shipped one: a predicate
+  in `develop-pipeline-resume-contract.md`'s Steps 5–6 verification cell that returned a false PASS
+  under zsh whenever its glob matched nothing, and would have verified a run with **no QA artifacts
+  at all** as complete. Three QA cycles and a full CI run missed it, for one reason: the extractor
+  only looked at fences.
+
+  `extractTableCellCommands()` merges into the same block stream, so classification, the allow-list,
+  the sandbox and the dual-shell comparison are untouched — a table-cell command runs through exactly
+  the same code as a fenced one. A span is in scope when it sits in a genuine table (delimiter row
+  required), its column header names a command, it is backtick-delimited, it contains whitespace, and
+  it is not inside a fenced block. The column restriction is a **noise bound, not a safety one**:
+  backticked spans in table cells are overwhelmingly field names, statuses and verdict tokens, and
+  feeding all of them to a fail-closed classifier would push most documents into
+  `no-executable-blocks` — the "noise trains reviewers to ignore it" failure the rule doc argues
+  against.
+
+  Two properties of table cells that fenced blocks do not have drove two separate fixes, and the
+  second was **a regression introduced by the first**, caught by the QA loop's refute pass:
+
+  - A pipe inside an open backtick span is **content**, not a delimiter. This diverges from GFM,
+    which splits an unescaped pipe even inside a code span — deliberately, because rendering cares
+    where the cell boundaries are and this engine cares whether a command was seen at all. Without
+    it, one unescaped pipe in *any* cell of a row shifted every later column, so a well-formed
+    command in the command column was dropped and the file reported zero blocks, zero findings and
+    no note.
+  - An **escaped** backtick outside a span is a literal backtick and does not open one. Two of them
+    in a row otherwise read as a span opening and closing, collapsing the whole row to a single cell
+    — the same silent-drop class, reintroduced by the fix for it.
+
+  `shell-disagreement` gained a `channel` (`stdout` / `status`). The comparison was stdout-only, and
+  the task-77 predicate prints nothing under either shell: its entire defect is the exit status
+  (`bash` 2, `zsh` 0). The two channels are each other's blind spot and this repo has now shipped one
+  of each. `kind` is unchanged, and the addition cannot turn a clean file red — a status disagreement
+  implies a non-zero status, which has already raised `execution-failure`.
+
+  Every result and finding carries `origin` (`fence` / `table-cell`) and the report annotates
+  `line N (table cell: Verification command)`, because the two constructs are fixed in different ways.
+
+  Verified by execution rather than by reading: **26 adversarial probes** across QA and DoD, including
+  12 that tried to reach `runnable` with a mutating command through the new path — all refused, nothing
+  escaped the sandbox. **A seven-mutation matrix**, every added behaviour reverted one at a time, each
+  red, restored green. And a **corpus measurement**: of 182 tracked `SKILL.md` and
+  `shared/resources/*.md` files, 4 carry table-cell commands, contributing 42 new blocks and **zero**
+  new findings — so the change is protective going forward rather than a change to what the gate
+  reports today. One file got *cleaner*, because two now-runnable cells falsify
+  `zero-blocks-executed`'s premise; that guard is a coverage statement, not a defect, and both halves
+  of the resulting behaviour are pinned by tests.
+
+  Two limitations are documented rather than fixed, neither with a corpus instance: a blockquoted
+  table is not recognised, and an unequal backtick run truncates the span.
+
 ### Fixed
 
 - **`bundle_skill.py` now follows shell dependencies sourced as `"${var}/dep.sh"`, and asserts the

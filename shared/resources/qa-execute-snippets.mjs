@@ -89,6 +89,7 @@ export function extractBlocks(markdown) {
         blocks.push({
           line: open.start + 1,
           code: open.body.join("\n"),
+          origin: "fence",
         });
       }
       open = null;
@@ -100,6 +101,276 @@ export function extractBlocks(markdown) {
   }
 
   // An unterminated fence is not a block — we never execute what we cannot delimit.
+  return blocks;
+}
+
+// ── Table-cell extraction ─────────────────────────────────────────────────────
+
+/**
+ * A header cell naming a column whose cells hold commands. The corpus spells it
+ * "Verification command", "Command" and "Commands"; the word itself is the signal.
+ *
+ * The restriction to command columns is a NOISE bound, not a safety one.
+ * Backticked spans in table cells are overwhelmingly not commands — they are
+ * field names, statuses, file globs and verdict tokens (`PASS`, `accepted`,
+ * `task.*.gate.*.yml`). Feeding all of them to the classifier would push most
+ * documents into `no-executable-blocks` on a flood of `unrecognised-command`
+ * refusals, which is the "noise trains reviewers to ignore it" failure the rule
+ * doc argues against. SAFE_COMMANDS remains the safety boundary, untouched.
+ */
+const COMMAND_COLUMN = /\bcommands?\b/i;
+
+/** Every backtick-delimited span in a string, honouring multi-backtick delimiters. */
+const CODE_SPAN = /(`+)(.+?)\1/g;
+
+/**
+ * A markdown table row, for our purposes, starts with a pipe. Requiring the
+ * leading pipe is what stops an ordinary prose line containing a `|` from being
+ * read as a table header; every table in this repository writes it.
+ */
+function isTableRow(line) {
+  return line.trimStart().startsWith("|");
+}
+
+/**
+ * The delimiter row (`| --- | :---: |`) is what makes the line above it a header
+ * rather than a body row, so it is required rather than inferred.
+ */
+function isDelimiterRow(line) {
+  const t = line.trim();
+  return t.includes("|") && t.includes("-") && /^[\s:|-]+$/.test(t);
+}
+
+/**
+ * One pass of the row splitter.
+ *
+ * `codeSpanAware` decides whether a `|` inside an open backtick span is content
+ * or a delimiter — the whole of TASK87-001. Returns `open: true` when a span was
+ * still open at end of line, which is the caller's signal that this reading of
+ * the row cannot be trusted.
+ */
+function splitOnDelimiters(line, codeSpanAware) {
+  const cells = [];
+  let cur = "";
+  let spanLen = 0; // length of the open backtick run; 0 = no span open
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+
+    if (ch === "\\" && line[i + 1] === "|") {
+      // Keep the escape; `unescapeCell` removes it once the span is carved out.
+      cur += "\\|";
+      i++;
+      continue;
+    }
+
+    // An ESCAPED backtick outside a span is a literal backtick and must not open
+    // one — TASK87-002, found by QA cycle 2's refute pass as a regression from
+    // cycle 1's own fix. Two escaped backticks in a row (`| a \` b | c \` d |`)
+    // read as a span opening and closing, so the real delimiter between them
+    // became content and the whole row collapsed to ONE cell. The command column
+    // then did not exist and its command was dropped in silence — the same class
+    // of defect as TASK87-001, reintroduced by the fix for it.
+    //
+    // The asymmetry is markdown's, not ours: inside a code span a backslash is
+    // literal, so a backtick there still counts toward the closing run. Hence
+    // `spanLen === 0` rather than an unconditional skip.
+    if (codeSpanAware && ch === "\\" && line[i + 1] === "`" && spanLen === 0) {
+      cur += "\\`";
+      i++;
+      continue;
+    }
+
+    if (codeSpanAware && ch === "`") {
+      let run = 0;
+      while (line[i + run] === "`") run++;
+      // A span closes on a run of EXACTLY its own length — that is what makes
+      // `` `a` `` inside a two-backtick span content rather than a terminator.
+      if (spanLen === 0) spanLen = run;
+      else if (run === spanLen) spanLen = 0;
+      cur += "`".repeat(run);
+      i += run - 1;
+      continue;
+    }
+
+    if (ch === "|" && spanLen === 0) {
+      cells.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  cells.push(cur);
+  return { cells, open: spanLen !== 0 };
+}
+
+/**
+ * Split a table row on its UNESCAPED pipes.
+ *
+ * Splitting on a bare `|` is the first thing that breaks on the real cells. The
+ * resume contract's verification column contains
+ * `gh pr view {PR} --comments --json comments \| grep -i "QA"` — one cell holding
+ * a pipeline whose pipe is escaped for the table. Split naively and the row gains
+ * a phantom column, every later column shifts, and the command column read is the
+ * wrong text.
+ *
+ * The escape is preserved here and removed by `unescapeCell` after the span has
+ * been carved out, so the two concerns stay separable.
+ *
+ * A pipe inside an OPEN backtick span is content, not a delimiter — TASK87-001.
+ * GFM does split an unescaped pipe even inside a code span, so this deliberately
+ * diverges from the rendering spec, and the divergence is the point: rendering
+ * cares where the cell boundaries are, this engine cares whether a command was
+ * seen at all. Before the fix, one unescaped pipe in ANY cell of a row shifted
+ * every later column, so a perfectly well-formed command in the command column
+ * was dropped and the file reported zero blocks, zero findings and no note —
+ * byte-identical to a document with no commands in it. That is the silent skip
+ * this engine exists to eliminate, reached through a different door.
+ *
+ * The divergence can only ever extract MORE, never mis-target: a code span's
+ * text is exactly what the author wrote, and header and body rows go through
+ * this same function so column indices stay consistent.
+ */
+export function splitTableRow(line) {
+  const split = splitOnDelimiters(line, true);
+  // TASK87-001 — a span left OPEN at end of line means the code-span tracking
+  // was wrong about this row, and treating everything after the stray backtick
+  // as one cell is worse than the naive split: the whole row collapses into a
+  // single cell and the command column disappears. Fall back rather than trust
+  // a reading the input has already contradicted.
+  const cells = split.open ? splitOnDelimiters(line, false).cells : split.cells;
+  // `| a | b |` splits to ["", " a ", " b ", ""] — the outer pipes are delimiters,
+  // not content. Drop those two, and only when they are actually empty, so a
+  // pipe-less or half-fenced row keeps its cells in the right positions.
+  if (cells.length > 1 && cells[0].trim() === "") cells.shift();
+  if (cells.length > 1 && cells[cells.length - 1].trim() === "") cells.pop();
+  return cells.map((c) => c.trim());
+}
+
+/**
+ * Undo the table-cell pipe escape — and only that one.
+ *
+ * GFM processes `\|` inside a table cell before any other inline parsing, code
+ * spans included, so a command that reaches us via a cell has pipes that markdown
+ * put there. Nothing else is unescaped: a command legitimately containing `\\`
+ * (`printf 'a\\nb'`) must survive verbatim, and markdown does not process
+ * backslash escapes inside a code span for any other character. Unescaping more
+ * than the pipe would corrupt the command in the name of reading it.
+ */
+export function unescapeCell(text) {
+  return text.replace(/\\\|/g, "|");
+}
+
+/**
+ * Is this span plausibly an invocation at all?
+ *
+ * A span with no whitespace is a filename, a glob, a frontmatter key or a verdict
+ * token — not a command. This bound fails toward running LESS, never toward
+ * running something unsafe: everything that gets past it still goes through
+ * `classifyBlock`, and the allow-list is still what decides.
+ *
+ * It also cannot hide the defect class this extractor exists to catch. A
+ * shell-portability disagreement needs a glob inside a command substitution, a
+ * `[` test, or a pipeline — none of which fit in a single unspaced word.
+ */
+function looksLikeCommand(code) {
+  return /\s/.test(code);
+}
+
+/**
+ * Which lines sit inside a fenced code block (the fences themselves included).
+ *
+ * Tables appear inside fenced blocks all over this repository — every document
+ * that shows an example table does it. Those are illustrations, not instructions,
+ * and extracting from them would execute a document's own examples. The state
+ * machine deliberately mirrors `extractBlocks`, including its treatment of an
+ * unterminated fence as open to end-of-file: two extractors reading one file must
+ * agree about where the fences are, and a malformed document is better read
+ * conservatively by both than differently by each.
+ */
+function fenceMask(lines) {
+  const mask = new Array(lines.length).fill(false);
+  let open = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const fence = /^(\s*)(`{3,}|~{3,})\s*([A-Za-z0-9_+-]*)([^`]*)$/.exec(
+      lines[i],
+    );
+    if (!fence) {
+      if (open !== null) mask[i] = true;
+      continue;
+    }
+    const [, , marker, info] = fence;
+    mask[i] = true;
+    if (open === null) {
+      open = { ch: marker[0], len: marker.length };
+      continue;
+    }
+    if (marker[0] === open.ch && marker.length >= open.len && info === "") {
+      open = null;
+    }
+  }
+  return mask;
+}
+
+/**
+ * Every command written inside a markdown table cell, in the same shape
+ * `extractBlocks` returns plus an `origin` discriminator.
+ *
+ * This exists because the gate's whole value is executing what prose claims, and
+ * the places table-cell commands appear are disproportionately *verification*
+ * commands — where a false pass is the worst available failure. Task 77 shipped
+ * one: a predicate in the resume contract's Steps 5–6 verification cell that
+ * returned a false PASS under zsh whenever its glob matched nothing. Three QA
+ * cycles and a full CI run did not catch it, because the extractor could not see
+ * the cell it was written in.
+ */
+export function extractTableCellCommands(markdown) {
+  const lines = markdown.split("\n");
+  const inFence = fenceMask(lines);
+  const blocks = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (inFence[i] || !isTableRow(lines[i])) continue;
+    if (
+      i + 1 >= lines.length ||
+      inFence[i + 1] ||
+      !isDelimiterRow(lines[i + 1])
+    ) {
+      continue;
+    }
+
+    const header = splitTableRow(lines[i]);
+    const columns = [];
+    for (let c = 0; c < header.length; c++) {
+      if (COMMAND_COLUMN.test(header[c])) columns.push(c);
+    }
+
+    // Consume the whole table either way. A body row skipped rather than consumed
+    // would be re-examined as a candidate header on the next iteration, and a body
+    // row followed by another body row full of dashes would read as one.
+    let r = i + 2;
+    for (; r < lines.length && !inFence[r] && isTableRow(lines[r]); r++) {
+      if (columns.length === 0) continue;
+      const cells = splitTableRow(lines[r]);
+      for (const c of columns) {
+        const cell = cells[c];
+        if (!cell) continue;
+        for (const match of cell.matchAll(CODE_SPAN)) {
+          const code = unescapeCell(match[2]).trim();
+          if (!looksLikeCommand(code)) continue;
+          blocks.push({
+            line: r + 1,
+            code,
+            origin: "table-cell",
+            column: header[c],
+          });
+        }
+      }
+    }
+    i = r - 1;
+  }
+
   return blocks;
 }
 
@@ -1242,15 +1513,51 @@ export function runBlock(
     }
   }
 
+  // Two channels a shell can disagree on, and the stdout one is not the only one
+  // that matters. The task-66 fixture disagrees on stdout while its exit status
+  // AGREES, which is why the stdout comparison exists and is load-bearing. The
+  // task-77 predicate is the mirror case: both shells print nothing and the entire
+  // defect is in the exit status (`bash` 2, `zsh` 0 — a failed zsh glob aborts the
+  // command substitution, and zsh's `[` then reads the empty operand in `-ge` as
+  // 0). Comparing only stdout labels that a plain `execution-failure` and never
+  // names the portability defect, which is the thing a reader needs to see.
+  //
+  // `channel` rather than a second `kind`: every existing consumer keys on
+  // `kind === "shell-disagreement"` and keeps working, and the detail says which
+  // channel diverged.
+  //
+  // This cannot turn a previously clean file red. A status disagreement implies at
+  // least one non-zero status, which has already produced an `execution-failure`
+  // finding above — so the file was never clean. The addition is a label on a
+  // failure the gate already caught, not a new gate.
   if (shells.length > 1) {
     const [a, b] = shells;
+    const lineCount = (out) => (out === "" ? 0 : out.split("\n").length);
+    const statusDiffers = runs[a].status !== runs[b].status;
     if (runs[a].stdout !== runs[b].stdout) {
       findings.push({
         kind: "shell-disagreement",
+        channel: "stdout",
         confidence: "medium",
         detail:
-          `${a} printed ${runs[a].stdout === "" ? 0 : runs[a].stdout.split("\n").length} line(s), ` +
-          `${b} printed ${runs[b].stdout === "" ? 0 : runs[b].stdout.split("\n").length} line(s)`,
+          `${a} printed ${lineCount(runs[a].stdout)} line(s), ` +
+          `${b} printed ${lineCount(runs[b].stdout)} line(s)` +
+          // Only ONE finding fires per block — stdout is the more specific
+          // statement — but staying silent about a status divergence that is also
+          // present understates the defect to the one reader who must act on it.
+          (statusDiffers
+            ? `; exit status also differs (${a} ${runs[a].status}, ${b} ${runs[b].status})`
+            : ""),
+      });
+    } else if (statusDiffers) {
+      findings.push({
+        kind: "shell-disagreement",
+        channel: "status",
+        confidence: "medium",
+        detail:
+          `identical output, different exit status — ${a} exited ${runs[a].status}, ` +
+          `${b} exited ${runs[b].status}. A predicate used as a gate would pass in ` +
+          `one shell and fail in the other`,
       });
     }
   }
@@ -1269,7 +1576,15 @@ export function executeFile(filePath, opts = {}) {
   } = opts;
 
   const markdown = readFileSync(filePath, "utf8");
-  const blocks = extractBlocks(markdown);
+  // Two extractors, one stream. Everything downstream consumes `{line, code}` and
+  // is source-agnostic, so a table-cell command is classified, sandboxed and
+  // dual-shell compared by exactly the same code that handles a fenced block —
+  // which is why this change needed no classification or safety rework. Sorted by
+  // line so the report still reads in document order.
+  const blocks = [
+    ...extractBlocks(markdown),
+    ...extractTableCellCommands(markdown),
+  ].sort((a, b) => a.line - b.line);
 
   const useZsh = allowZsh && zshAvailable();
   const shells = useZsh ? ["bash", "zsh"] : ["bash"];
@@ -1296,7 +1611,14 @@ export function executeFile(filePath, opts = {}) {
     for (const block of blocks) {
       const { klass, reason } = classifyBlock(block.code, bindings);
       if (klass !== "runnable") {
-        results.push({ line: block.line, klass, reason, skipped: true });
+        results.push({
+          line: block.line,
+          origin: block.origin,
+          column: block.column,
+          klass,
+          reason,
+          skipped: true,
+        });
         continue;
       }
       const { runs, findings: blockFindings } = runBlock(block.code, {
@@ -1308,12 +1630,19 @@ export function executeFile(filePath, opts = {}) {
       });
       results.push({
         line: block.line,
+        origin: block.origin,
+        column: block.column,
         klass,
         reason: null,
         skipped: false,
         runs,
       });
-      for (const f of blockFindings) findings.push({ ...f, line: block.line });
+      // A finding carries the origin too. `line 82` alone sends a reader to a
+      // table row and leaves them looking for a fence that is not there; the
+      // discriminator is what makes the finding actionable.
+      for (const f of blockFindings) {
+        findings.push({ ...f, line: block.line, origin: block.origin });
+      }
     }
   } finally {
     rmSync(tmpRoot, { recursive: true, force: true });
@@ -1473,17 +1802,29 @@ export function main(argv = process.argv.slice(2)) {
 
 function render(report) {
   const lines = [`Snippet execution — ${report.file}`, ""];
+  const fromCells = report.results.filter(
+    (r) => r.origin === "table-cell",
+  ).length;
   lines.push(
-    `  ${report.blocks} bash block(s): ` +
-      `${report.counts.runnable} runnable, ${report.counts.placeholder} placeholder, ` +
+    `  ${report.blocks} bash block(s)` +
+      (fromCells ? ` (${fromCells} from table cells)` : "") +
+      `: ${report.counts.runnable} runnable, ${report.counts.placeholder} placeholder, ` +
       `${report.counts.mutating} mutating`,
   );
   lines.push(
     `  shells: ${report.shells.join(", ")}${report.zshAvailable ? "" : "  (zsh-unavailable)"}`,
   );
   lines.push("");
+  // `(table cell)` rather than nothing: the two constructs are found by different
+  // means and fixed in different ways, and a reader who cannot tell them apart
+  // goes looking for a fence at a line that holds a table row.
+  const where = (r) =>
+    `line ${r.line}` +
+    (r.origin === "table-cell"
+      ? ` (table cell${r.column ? `: ${r.column}` : ""})`
+      : "");
   for (const r of report.results.filter((x) => x.skipped)) {
-    lines.push(`  SKIP  line ${r.line}  ${r.klass} — ${r.reason}`);
+    lines.push(`  SKIP  ${where(r)}  ${r.klass} — ${r.reason}`);
   }
   // Notes print BEFORE the findings verdict. "No findings." is true and must stay
   // sayable, but a reader who sees only that line cannot tell a file the step
@@ -1498,7 +1839,7 @@ function render(report) {
     lines.push("");
     for (const f of report.findings) {
       lines.push(
-        `  ${f.kind}  ${f.line ? `line ${f.line}  ` : ""}[${f.confidence}] ${f.detail}`,
+        `  ${f.kind}  ${f.line ? `${where(f)}  ` : ""}[${f.confidence}] ${f.detail}`,
       );
     }
   }
