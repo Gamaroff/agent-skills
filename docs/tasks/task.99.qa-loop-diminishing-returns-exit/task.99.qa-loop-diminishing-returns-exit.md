@@ -282,15 +282,16 @@ satisfy condition 2.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (cycle 3)
+**QA Status**: CONCERNS (cycle 4)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 90/100 (cycle 2: 60/100, cycle 1: 50/100)
+**Quality Score**: 90/100 (cycle 3: 90, cycle 2: 60, cycle 1: 50)
 **Gate Decision**: CONCERNS
 
 ### QA Reports
 
-- **Cycle 3 (latest)**: [task.99.qa.3.qa-loop-diminishing-returns-exit.md](./task.99.qa.3.qa-loop-diminishing-returns-exit.md) · [gate.3](./task.99.gate.3.qa-loop-diminishing-returns-exit.yml)
+- **Cycle 4 (latest)**: [task.99.qa.4.qa-loop-diminishing-returns-exit.md](./task.99.qa.4.qa-loop-diminishing-returns-exit.md) · [gate.4](./task.99.gate.4.qa-loop-diminishing-returns-exit.yml)
+- **Cycle 3**: [task.99.qa.3.qa-loop-diminishing-returns-exit.md](./task.99.qa.3.qa-loop-diminishing-returns-exit.md) · [gate.3](./task.99.gate.3.qa-loop-diminishing-returns-exit.yml)
 - **Cycle 2**: [task.99.qa.2.qa-loop-diminishing-returns-exit.md](./task.99.qa.2.qa-loop-diminishing-returns-exit.md) · [gate.2](./task.99.gate.2.qa-loop-diminishing-returns-exit.yml)
 - **Cycle 1**: [task.99.qa.1.qa-loop-diminishing-returns-exit.md](./task.99.qa.1.qa-loop-diminishing-returns-exit.md) · [gate.1](./task.99.gate.1.qa-loop-diminishing-returns-exit.yml)
 
@@ -302,6 +303,17 @@ satisfy condition 2.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
+
+**Cycle 4 — the live demonstration.** HIGH reached `1, 1, 0, 0`, so condition 1 of the new exit was
+satisfied for the first time on a real sequence. The Convergence check correctly did not trip
+(`0 >= 1` is false), and the exit correctly did **not** fire — because this repository has never set
+`qa.testArtifactGlobs`, so it defaults to `[]` and matches nothing. Configure the globs to cover the
+residue and it fires, with the right reason. The fail-safe default, the non-overlap of the two
+guards, and the exit's reachability are all shown on a live run rather than a fixture.
+
+One MEDIUM (TASK-99-008, fixed): the route note cycle 3 added says a route-1 gate carries an empty
+`top_issues[]`, which is false for `WAIVED` — a waived gate carries its HIGH entries, and the file
+says so twice elsewhere.
 
 **Cycle 3.** No HIGH. One MEDIUM, and it was a direct consequence of cycle 2's own fix: widening 5c
 to admit route 2 falsified a sentence further down 5c asserting that an arriving gate carries an
@@ -343,6 +355,7 @@ the invocation snippet's four variables have no documented source.
 | 2026-09-09 |  | QA gate 2 FAIL (60/100) — cycle-2 refute pass: 1 HIGH (5c's entry condition excludes the CONCERNS gate this exit hands it) + 2 MEDIUM (two false claims in prose). Cycle 1's three findings verified fixed. | qa-task |
 | 2026-09-09 |  | QA findings fixed — 1 HIGH + 2 MEDIUM closed, 2nd iteration. 5c's entry condition now names both routes out of 5a, so the exit's destination no longer refuses it; `**Loop exit**` default corrected; three stale test counts corrected. | qa-fix |
 | 2026-09-09 |  | QA gate 3 CONCERNS (90/100) — no HIGH; 1 MEDIUM (route 2 falsified 5c's own empty-`top_issues` claim, which would have sent the machinery residue back to qa-fix), fixed in a 3rd iteration. Both guards verified to decline correctly on this run's own `1,1,0` sequence. | qa-task |
+| 2026-09-09 |  | QA gate 4 CONCERNS (90/100) — no HIGH (2nd consecutive); 1 MEDIUM (the route note's `WAIVED` row was false), fixed in a 4th iteration. Condition 1 satisfied for the first time on the live sequence `1,1,0,0`; the exit correctly declined on this repo's unset globs and fires when they are configured. | qa-task |
 
 ## Progress Tracking
 

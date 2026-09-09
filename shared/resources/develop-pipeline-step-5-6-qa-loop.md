@@ -941,17 +941,21 @@ ingester warns by name against searching for one. Without both halves of this �
 clean gate, finds nothing, changes nothing, and 5b step 0 HALTs reporting the issues as unfixable
 when in fact they were never delivered.
 
-> **What the gate carries differs by route, and on route 2 it is not the work.** On route 1 the gate
-> reads `PASS`/`WAIVED` with an empty `top_issues[]`, so passing it alongside the review report is
-> harmless. On **route 2** — the Diminishing-returns exit — the gate is `CONCERNS` and its
-> `top_issues[]` is deliberately **non-empty**: it holds the test-machinery residue that exit
-> declined to fix. **That residue is not the fix target.** Fix the review's findings, from the
-> `pr_review=` report, and leave the carried residue where the exit put it — in the gate's
-> `recommendations.future` and on the work item.
+> **What the gate carries differs by route, and on no route is it the work.** Three shapes arrive
+> here:
 >
-> Working it instead resumes refining the pins, which is precisely the behaviour the exit exists to
-> end, re-entered through the back door. Nothing mechanical prevents this: `/qa-fix`'s priority order
-> would pick those entries up like any others, so the instruction is the whole guard.
+> | Gate | `top_issues[]` | Is it the fix target? |
+> | :--- | :--- | :--- |
+> | `PASS` (route 1) | empty | — nothing to mistake |
+> | `WAIVED` (route 1) | its HIGH entries, with `waiver.active: true` | **No.** They were waived on purpose; the outcome-branching list above says re-running qa-fix on them "would churn against an intentionally-waived gate" |
+> | `CONCERNS` (route 2, the Diminishing-returns exit) | the test-machinery residue that exit declined to fix | **No.** Leave it where the exit put it — the gate's `recommendations.future` and the work item |
+>
+> **Only the review's findings are the work**, and they arrive in the `pr_review=` report, not in the
+> gate. Working a gate's carried entries instead re-does what was waived, or resumes refining the
+> pins — the behaviour the Diminishing-returns exit exists to end, re-entered through the back door.
+>
+> Nothing mechanical prevents either: `/qa-fix`'s priority order picks up whatever `top_issues[]`
+> holds, so **the instruction is the whole guard.**
 
 > **REQUEST CHANGES re-enters 5b, not 5a.** The gate for this cycle has already been written and
 > read; what is wanted is a fix pass against the review's findings, after which the loop returns to
