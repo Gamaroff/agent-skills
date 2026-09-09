@@ -440,6 +440,7 @@ code reviewed. Mutation-proving found a third problem — in the new corpus chec
 | 2026-09-02 | 1.0     | Initial draft — filed from the rebirth-wallet security-review handover           | create-task |
 | 2026-09-09 | 1.1     | Review passed (8/10) — named the pre-existing top-level `evidence:` key collision in §3; stated the `measured\|reasoned` ⊂ `measured\|reasoned\|unverified` domain nesting in Phase 4; refreshed drifted line citations | review-task |
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both closed in-cycle; 5 mutations proved | qa-task |
+| 2026-09-09 |         | QA findings fixed — maintainability CONCERNS minimised, 1 iteration | qa-fix |
 
 ---
 
@@ -466,6 +467,32 @@ code reviewed. Mutation-proving found a third problem — in the new corpus chec
 - [x] Bundle + CHANGELOG
 
 ---
+
+## Dev Agent Record — QA fix cycle 1
+
+**Ambiguities**: none requiring user input. The only open item was an NFR CONCERNS on
+maintainability with an empty `recommendations.immediate`, and priority rule 6 ("NFR CONCERNS →
+minimize or document") resolves it without a judgement call the user has to make.
+
+**Approach chosen**: *minimize*, not *document*. The thing that grew is the thing that is
+**triplicated** — the probe is copied verbatim into both QA skills — so the ~10-line constraint
+comment was replaced with a 3-line pointer, and the explanation moved once into a new "Transit
+constraints" section of `shared/resources/qa-re-review-scope.md`, outside the code block. Net: the
+duplicated artefact shrank, the single-source file carries the reasoning, and the parity test is
+unaffected (it strips comments before comparing).
+
+**Not chosen**: extracting the probe to a script both skills invoke. That would end the duplication
+outright and make both transit hazards structurally impossible, but it contradicts the task's stated
+Phase 3 design and the parity suite's verbatim-mirroring architecture. The gate's own recommendation
+sets the threshold at a **fourth** constraint; there are three. The threshold is now written into
+the rule file rather than left in a gate nobody re-reads.
+
+**Files modified**: `shared/resources/qa-re-review-scope.md`, `skills/qa-task/SKILL.md`,
+`skills/qa-story/SKILL.md`, plus bundled mirrors.
+
+**Validation**: 55/55 tests; `npm run ci` exit 0; all four guards re-proved by mutation after the
+shortening (whole-record variable → 2 red, apostrophe → 20 red, GNU escape → 1 red, fail-open → 3
+red).
 
 ## References
 

@@ -240,23 +240,15 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    SAFETY_REPROBE=false
    if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
      SECURITY_AXIS=$(awk '
-       # NOTHING HERE MAY NAME THE WHOLE-RECORD VARIABLE (dollar-zero), and that
-       # is not a style choice. This snippet ships as prose an agent copies and
-       # runs, and a harness that loads a SKILL.md with arguments substitutes that
-       # token with the invocation argument — so match(dollar-zero, ...) arrives as
-       # match(some/file/path, ...) before awk ever sees it, and the block bounding
-       # silently reads garbage. The warning is spelled out rather than written
-       # literally for the same reason: a corrupted warning is worse than none.
-       # Every reference below uses an implicit form instead: a bare /regex/ tests
-       # the whole record, `length` with no argument is its length, and
-       # two-argument sub() edits it in place.
+       # Three transit constraints govern every line below — no whole-record
+       # variable, no apostrophe, no GNU-only escape. See "Transit constraints"
+       # in the shared rule for why each one fails silently. Each has a test.
        !f && /^[[:space:]]*security:[[:space:]]*$/ {
          n = length; sub(/^[[:space:]]*/, ""); ind = n - length; f = 1; next
        }
        f {
          # A key at or left of the indent of security: ends the block, so keys
          # belonging to a later NFR axis can never be read as this one.
-         # No apostrophes here: the program is single-quoted by its caller.
          n = length; sub(/^[[:space:]]*/, ""); lead = n - length
          if (length > 0 && lead <= ind) exit
          if (st == "" && /^status:/) {

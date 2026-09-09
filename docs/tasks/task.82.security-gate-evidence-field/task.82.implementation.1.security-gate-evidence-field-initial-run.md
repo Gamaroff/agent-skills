@@ -167,7 +167,27 @@ markdown **link targets** and check membership. Compared on basename, because th
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-09
+
+- **Gate**: CONCERNS (90/100) — `task.82.gate.1.security-gate-evidence-field.yml`
+- **Report**: `task.82.qa.1.security-gate-evidence-field.md`
+- **Findings**: HIGH 1, MEDIUM 1 — **both found and closed within the cycle**
+  - TASK82-001 (HIGH): the rewritten awk probe named the whole-record variable 8×; a skill harness
+    substitutes that token with the invocation argument. **Observed live in this very cycle** — the
+    `/qa-task` invocation rendered `qa-task/SKILL.md` with the task path spliced into `match(...)`.
+    The probe it replaced used the token zero times.
+  - TASK82-002 (MEDIUM): the comment written to fix the above contained an apostrophe, closing the
+    single-quoted program. 18 of 52 tests red at once.
+- **What set the gate**: not the findings — both are closed. Deterministic **rule 4**: an NFR at
+  CONCERNS forces the gate to CONCERNS as a minimum, and `maintainability` is CONCERNS because the
+  probe grew from 5 lines to ~25 and now carries three transit constraints.
+- **Security NFR**: PASS, `evidence: measured`, `probes_executed: 15` — the first gate in the repo
+  to carry the field this task adds. It reads `OK measured` under its own shipped probe.
+- **Mutation proving**: 5/5 red. M2 initially green — the new corpus check used `git ls-files`
+  (tracked files only) and so could not see the uncommitted gates it exists to judge.
+- **PR Review**: not reached — gate did not exit the loop
+- **Loop exit**: n/a — this exit not taken
+- **Action**: → 5b `/qa-fix` (cycle 1 of 5)
 
 ---
 

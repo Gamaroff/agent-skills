@@ -71,23 +71,15 @@ carry this exact snippet:
 SAFETY_REPROBE=false
 if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
   SECURITY_AXIS=$(awk '
-    # NOTHING HERE MAY NAME THE WHOLE-RECORD VARIABLE (dollar-zero), and that
-    # is not a style choice. This snippet ships as prose an agent copies and
-    # runs, and a harness that loads a SKILL.md with arguments substitutes that
-    # token with the invocation argument — so match(dollar-zero, ...) arrives as
-    # match(some/file/path, ...) before awk ever sees it, and the block bounding
-    # silently reads garbage. The warning is spelled out rather than written
-    # literally for the same reason: a corrupted warning is worse than none.
-    # Every reference below uses an implicit form instead: a bare /regex/ tests
-    # the whole record, `length` with no argument is its length, and
-    # two-argument sub() edits it in place.
+    # Three transit constraints govern every line below — no whole-record
+    # variable, no apostrophe, no GNU-only escape. See "Transit constraints"
+    # in the shared rule for why each one fails silently. Each has a test.
     !f && /^[[:space:]]*security:[[:space:]]*$/ {
       n = length; sub(/^[[:space:]]*/, ""); ind = n - length; f = 1; next
     }
     f {
       # A key at or left of the indent of security: ends the block, so keys
       # belonging to a later NFR axis can never be read as this one.
-      # No apostrophes here: the program is single-quoted by its caller.
       n = length; sub(/^[[:space:]]*/, ""); lead = n - length
       if (length > 0 && lead <= ind) exit
       if (st == "" && /^status:/) {
@@ -111,6 +103,25 @@ if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
   esac
 fi
 ```
+
+### Transit constraints — three characters that break this snippet silently
+
+This probe is not stored as a script and executed. It ships as **prose an agent copies and runs**,
+and it is triplicated: once here, once in each QA skill. Three characters cannot appear in it, each
+for a different reason, and **all three fail quietly rather than loudly**. Each has its own test in
+`evals/shared/tests/qa-re-review-scope-parity.test.mjs`, because the two that were introduced during
+task.82 were both introduced by someone who had just read a comment warning against them.
+
+| Must not appear | Why | Use instead |
+| --- | --- | --- |
+| The whole-record variable (dollar-zero) | A harness loading a `SKILL.md` **with arguments** substitutes the token with the invocation argument, so `match(<record>, …)` arrives as `match(docs/tasks/task.82…md, …)`. The indent arithmetic then reads garbage and the block boundary is wrong — with no error. Observed live | a bare `/regex/` tests the whole record; `length` with no argument is its length; two-argument `sub()` edits it in place |
+| An apostrophe — **including inside a comment** | The program is single-quoted by its caller, so one apostrophe closes the quote early and every fixture fails at once | reword. This is the one that fails loudly, and it is still cheaper to prevent |
+| `\s`, `\d`, `\w` | GNU extensions. BSD awk and mawk neither match nor error on them, so the probe returns empty and the carve-out never fires on any platform where the pipeline happens to run | POSIX classes — `[[:space:]]`, `[[:digit:]]`, `[[:alpha:]]` |
+
+**If a fourth constraint appears, stop copying this and extract it to a script both skills invoke.**
+Three is the agreed limit. The reason it is prose at all is that the parity test can then assert
+both skills carry it *verbatim*, which is what keeps two separately-maintained QA skills resolving
+the same gate identically — but that argument gets weaker with every line added.
 
 > **POSIX character classes only.** `\s` is a GNU extension. BSD awk and mawk do not match it and
 > do not error — the probe returns empty, `SAFETY_REPROBE` stays `false`, and the carve-out never
