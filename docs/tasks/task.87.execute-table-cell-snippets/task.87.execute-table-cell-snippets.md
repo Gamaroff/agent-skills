@@ -5,11 +5,13 @@ type: task
 description: "qa-execute-snippets.mjs runs fenced bash blocks under bash and zsh, which is how this repo catches shell-portability defects in prose. Commands written inside markdown table cells are invisible to it. A verification command in a table cell shipped with a zsh false-pass that three QA cycles did not catch."
 tags: [qa, tooling, shell-portability, silent-failure]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-03
 updated: 2026-09-09
+completed_date: 2026-09-09
+pr_number: 365
 assignee:
 estimated_effort_hours: 4
 github_issue: 364
@@ -17,7 +19,7 @@ github_issue: 364
 
 # Technical Task: Shell commands in table cells escape the snippet-execution gate
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#364](https://github.com/Gamaroff/agent-skills/issues/364)
 **Review**: ✅ All review recommendations from `task.87.review.1.execute-table-cell-snippets.md` implemented 2026-09-09
 
@@ -357,6 +359,42 @@ to a single cell and the command column ceased to exist. Also caught a **vacuous
 own making, which passed under the exact mutation it claimed to guard. Both fixed; seven mutations now
 red. All 9 success criteria met.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**Final Gate**: `task.87.gate.2.execute-table-cell-snippets.yml` — ✅ **PASS**, 100/100,
+`top_issues: []`, no waiver. 2 QA cycles (CONCERNS 90 → PASS 100).
+**PR Conformance Review**: `task.87.pr-review.1.execute-table-cell-snippets.md` — ⚠️ CONCERNS, its one
+finding (PC-1) fixed.
+
+✅ **Acceptance Criteria** — 10/10, each traced to **both** code and test evidence by grep rather than
+to a claim about it.
+✅ **Tests** — 127 focused (98 → 127); repo-wide 2993 pass / 0 fail. **Seven-mutation matrix**, every
+added behaviour reverted one at a time, each red, restored green.
+✅ **CI** — `CI_ROLLUP: SUCCESS`, 5/5 jobs, on a head equal to local `HEAD`. The first sample read
+PENDING and acceptance was withheld until the fourth read SUCCESS.
+✅ **Documentation** — rule doc §1 / §1a / §3; `CHANGELOG.md` `[Unreleased]` entry (a gap the DoD docs
+check found and closed); 6 bundled copies regenerated.
+✅ **Security** — `evidence: measured`, **12 probes executed here / 26 across the task, 0 reproduced**.
+The boundary was probed by execution because the change makes the engine run strictly more shell:
+twelve mutating commands were pushed through the new table-cell path — including three constructed
+specifically against the new escape and code-span handling — and all twelve were refused. Nothing
+escaped the sandbox.
+⚠️ **Compliance** — NOT_APPLICABLE. Internal tooling: no personal data, payments, UI or storage.
+
+**Two residuals, recorded rather than resolved**: no human PR reviewer exists in this repository
+(Step 5c is the substitute), and the finalise commit is docs-only on top of the CI-verified commit
+(covered by `develop-next`'s merge gate).
+
+**Detailed Verification Log:** see
+[`task.87.dod.1.execute-table-cell-snippets.md`](./task.87.dod.1.execute-table-cell-snippets.md) for
+every citation, the full probe table and the per-job CI conclusions.
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
 ## Change Log
 
 | Date       | Version | Description                               | Author       |
@@ -370,6 +408,7 @@ red. All 9 success criteria met.
 | 2026-09-09 |         | QA findings fixed — TASK87-001 (code-span-aware row split) and TASK87-002 (escaped backtick is not a span delimiter), plus both named cleanups, two documented limitations and one vacuous test replaced, 2 iterations | qa-fix |
 | 2026-09-09 |         | QA gate PASS (100/100) — refute pass found and closed a regression from cycle 1's own fix; 7-mutation matrix all red | qa-task |
 | 2026-09-09 |         | Step 5c `/review-pr` CONCERNS — PC-1 fixed: §4, §5 and §7 now record the additive `channel`/`column` schema fields the change ships | review-pr |
+| 2026-09-09 | 1.2     | DoD verified 10/10 — accepted (PR #365); CI SUCCESS 5/5, security measured with 12 probes / 0 reproduced, CHANGELOG gap closed | finalise |
 
 ## Progress Tracking
 

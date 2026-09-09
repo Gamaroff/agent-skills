@@ -39,8 +39,8 @@ a zsh-broken verification predicate through three QA cycles.
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases; 115/115 tests green; mutation proof 3× red then green; bundle propagated to 6 skills | inline (no subagents) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #365](https://github.com/Gamaroff/agent-skills/pull/365); 2 commits (`48f987ee` feat, `e7931bf4` docs); issue comment `posted` | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.87.qa.{N}.*.md`; `task.87.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles: CONCERNS 90 → PASS 100; 5c CONCERNS (PC-1 fixed) | inline (no subagents) |
-| 7. finalise                | ⏳ Pending | `task.87.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.87.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     |       | —                    |
 
 ---
 
@@ -398,12 +398,46 @@ documented limitations — prose, not code.
 
 ---
 
+## Step 7 — Finalise
+
+**DoD: 10/10 → ACCEPTED.** `task.87.dod.1.execute-table-cell-snippets.md`.
+
+The four DoD checks were run **inline** rather than as four parallel Explore subagents (Agent tool
+prohibited this session), so every citation was produced by running a command or reading a file
+directly. Three of the four found something worth recording:
+
+- **CI was the gate that actually bit.** The first rollup sample read **PENDING** — `test` was
+  `IN_PROGRESS` with `conclusion: ""`, which is exactly the shape that once got rounded up to green —
+  and acceptance was withheld. Three further samples 30s apart still read PENDING; the fourth read
+  SUCCESS (5/5 jobs, head equal to local `HEAD`). Per-job conclusions are recorded in the DoD summary
+  so the decision is auditable rather than asserted.
+- **Security was probed, not reasoned.** `boundary: true`, because the change makes the engine execute
+  strictly *more* shell. **12 mutating commands pushed through the new table-cell path, all 12
+  refused** — including three built specifically against the new escape and code-span handling
+  (escaped-pipe, unescaped-pipe and multi-backtick routes to `rm -rf`). Nothing escaped the sandbox.
+  26 probes across the task in total.
+- **The docs check found a real gap and closed it.** `CHANGELOG.md` has a live `[Unreleased]` section
+  and had no entry for a behaviour change to the QA gate. Nothing else in the pipeline would have
+  caught it — the gate scores the code, not the release notes.
+
+**The doc sweep also produced four false positives, and leaving them alone was the correct action.**
+The roadmap and three task/QA documents describe the gate as fenced-only; every one is a **dated
+historical record**. Rewriting them would falsify the record to tidy a grep result. A live spec gets
+corrected; a log entry does not.
+
+**Two residuals recorded rather than resolved**, neither a gap: no human PR reviewer exists in this
+repository (Step 5c is the substitute, and it was **not** rounded up to APPROVED), and this Step 8
+commit is docs-only on top of the CI-verified commit — `develop-next`'s merge gate runs the full
+`npm run ci` on the final branch state, which is where it is verified.
+
+---
+
 ## Completion
 
-**Finished**: _pending_
-**Final Status**: _pending_
+**Finished**: 2026-09-09 21:20
+**Final Status**: Completed
 **Branch**: `feature/task.87.execute-table-cell-snippets`
 **PR**: [#365](https://github.com/Gamaroff/agent-skills/pull/365)
-**QA Iterations**: _pending_
-**DoD Summary**: _pending — populated after Step 7_
-**Tracker debt**: _pending — populated after Step 7_
+**QA Iterations**: 2 (CONCERNS 90 → PASS 100), plus Step 5c `/review-pr` CONCERNS
+**DoD Summary**: `task.87.dod.1.execute-table-cell-snippets.md` — 10/10, ACCEPTED
+**Tracker debt**: none — `access.tracker: full`; issue #364 commented and closed (verified `CLOSED`), board `already` Done, Document link re-pointed to `develop`
