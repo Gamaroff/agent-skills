@@ -279,3 +279,68 @@ test("the hook emits well-formed SessionStart JSON", (t) => {
     rm(ws);
   }
 });
+
+// ── OBS_STALE_DAYS ───────────────────────────────────────────────────────────
+//
+// docs/reference/configuration.md documents this as an ENVIRONMENT VARIABLE with
+// a default of 14 — not as a `skills-config.yaml` key, and not as 7. Both halves
+// have been wrong in a draft of that doc, so both are asserted by DRIVING the
+// hook rather than by reading the default out of it.
+
+/** The date `n` days before today, ISO. */
+const daysAgo = (n) =>
+  new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+
+/** Does the hook's output nag about a stale review? */
+function saysStale(stdout) {
+  if (!stdout) return false;
+  const ctx = JSON.parse(stdout).hookSpecificOutput.additionalContext;
+  return /stale|never run/.test(ctx);
+}
+
+test("OBS_STALE_DAYS: the applied default is 14, not 7", (t) => {
+  if (!shipped) return t.skip("hook or engine not shipped in this install");
+
+  // A review 10 days old straddles the two candidate defaults: fresh under 14,
+  // stale under 7. One fixture therefore distinguishes them.
+  const ws = makeWorkspace({ "0001.md": fm(1, "open") }, daysAgo(10));
+  try {
+    assert.equal(
+      saysStale(runHook(ws)),
+      false,
+      "a 10-day-old review was reported stale, so the applied default is " +
+        "below 14 — the documented default is wrong, or the hook is",
+    );
+  } finally {
+    rm(ws);
+  }
+
+  // And the same fixture must flip when the threshold is lowered, or the test
+  // above would pass for a hook that never reports staleness at all.
+  const ws2 = makeWorkspace({ "0001.md": fm(1, "open") }, daysAgo(10));
+  try {
+    assert.equal(
+      saysStale(runHook(ws2, { OBS_STALE_DAYS: "7" })),
+      true,
+      "OBS_STALE_DAYS=7 did not make a 10-day-old review stale — the " +
+        "variable is not being read, so its documentation is inert",
+    );
+  } finally {
+    rm(ws2);
+  }
+});
+
+test("OBS_STALE_DAYS: a review inside the window is not nagged about", (t) => {
+  if (!shipped) return t.skip("hook or engine not shipped in this install");
+  const ws = makeWorkspace({ "0001.md": fm(1, "open") }, daysAgo(1));
+  try {
+    assert.equal(
+      saysStale(runHook(ws)),
+      false,
+      "yesterday's review reported stale — silence is a correct outcome and " +
+        "a hook that always nags trains the reader to ignore it",
+    );
+  } finally {
+    rm(ws);
+  }
+});

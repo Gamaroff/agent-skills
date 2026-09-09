@@ -140,6 +140,16 @@ loopSupervisor: # optional — fresh-context sequential loop runner
   adapters: # optional — declarative path overrides only, never JavaScript
     develop-next:
       stateFile: .claude/state/develop-next.state.json
+
+# observe-work — where the observation log lives.
+# The key is optional. Absent block == the project-identity default workspace.
+observations:
+  # The workspace ROOT. Absolute, or ~-relative. This is the highest-precedence
+  # source; $OBS_WORKSPACE is second; the project-identity path is the default.
+  # It must be ONE STABLE path that outlives a session — never derived from the
+  # cwd, and never inside an ephemeral checkout (a git worktree, a temp clone),
+  # which is torn down and takes the log with it.
+  workspace: ~/.agents/skill-observations
 ```
 
 `develop-batch` reuses the `developNext:` keys above (same roadmap, base branch, merge
@@ -203,6 +213,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `loopSupervisor.cooldownSeconds`                 | integer                         | `10`                                             | Pause between iterations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `loopSupervisor.dashboardUrl`                    | URL                             | unset                                            | Where `loop-supervisor` POSTs a status frame on each iteration boundary. Inert when unset. `--dashboard` overrides. The payload contract is in [`skills/loop-supervisor/README.md`](../../skills/loop-supervisor/README.md#publishing-the-run-to-a-dashboard); a failed push warns once and never affects the run. **The token is deliberately not a config key** — this file is committed, so it comes from `--dashboard-token` or `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` instead. |
 | `loopSupervisor.adapters.<name>`                 | map of paths                    | (adapter defaults)                               | Per-adapter overrides for `stateFile`, `lockFile`, `haltFile`, `probeScript` and `command`. **Declarative only** — a config key that could name a module to `require()` would be a code-execution surface, so JavaScript adapters are deliberately not supported.                                                                                                                                                                                                                          |
+| `observations.workspace`                         | path (absolute or `~`-relative) | (project-identity path under the agent home)     | Root of the `observe-work` observation workspace — the anchor holding `skill-observations/` (the log, the families registry, the review date) and `skill-updates/` (staged skill updates). **Highest-precedence source**; `$OBS_WORKSPACE` is second and the project-identity path is the default, so an absent key is a working default rather than a disabled feature. Must be one stable path that outlives a session: a resolved value inside `/tmp`, `.claude/worktrees/`, or a linked git worktree is **refused outright**, not warned about and not silently defaulted. Set it to a shared user-scope path when the skills being observed are installed at user scope — see [Observation workspace](#observation-workspace). There is deliberately **no `observations.enabled` and no `observations.review_interval_days`**: nothing reads either, and the review-staleness threshold is the `OBS_STALE_DAYS` environment variable instead. |
 
 ## QA artifacts are co-located
 
@@ -279,6 +290,77 @@ Enforcement mirrors sign-off: `advisory` keeps `/develop-next` and `/develop-bat
 **No backfill.** Adoption is additive and going-forward only, matching sign-off and OKF v0.1. Documents written before the spec have no section; the first skill to record a moment creates one at the correct anchor.
 
 Full spec: [`document-change-log.md`](../../shared/resources/document-change-log.md). Engine: [`change-log.js`](../../shared/resources/change-log.js).
+
+## Observation workspace
+
+`observe-work` keeps its observation log, its families registry, its last-review date and its staged
+skill updates in one **workspace** directory. Everything the skill reads and writes hangs off it:
+
+```
+$OBS_WORKSPACE/
+├── skill-observations/
+│   ├── observation-log/        # one Markdown file per observation
+│   ├── skill-families.md       # the sibling-check registry
+│   └── last-review-date.txt
+└── skill-updates/              # staged skill edits, never installed automatically
+```
+
+### Resolver order
+
+Three sources, highest precedence first:
+
+1. `observations.workspace` in `skills-config.yaml`
+2. the `OBS_WORKSPACE` environment variable
+3. the project-identity default path under the agent home
+
+The resolver is [`shared/resources/resolve-observation-workspace.sh`](../../shared/resources/resolve-observation-workspace.sh),
+sourced **guarded**:
+
+```bash
+source shared/resources/resolve-observation-workspace.sh || exit 1
+```
+
+The `|| exit 1` is required, not stylistic. A bare `source` prints the resolver's error and then
+carries on with `OBS_WORKSPACE`, `OBS_LOG_DIR` and `OBS_STAGING_DIR` unset, which turns every
+subsequent read into a match-nothing glob and reports an empty, clean backlog — the one answer nobody
+questions.
+
+### An ephemeral anchor is refused, not defaulted
+
+A resolved path inside `/tmp` (or `/private/tmp`, `/var/tmp`), inside `.claude/worktrees/`, or inside
+a **linked** git worktree is rejected outright. The resolver does not fall back to the default when it
+sees one; it fails and says why.
+
+That severity is deliberate. A log written into a checkout that is torn down goes with it, and the
+failure is silent in exactly the wrong direction: the next scan does not error, it reports zero
+observations. An empty backlog and a destroyed one are byte-identical from the caller's side, so the
+only safe moment to object is before the first write.
+
+For the same reason the workspace is **never derived from the current working directory**. The
+project anchor comes from `git rev-parse --git-common-dir`, which resolves to the *main* worktree
+from inside any linked one — `--show-toplevel` would resolve to the linked worktree and give one
+project two different workspaces depending on where a session happened to start.
+
+### Scope: match the workspace to where the skills live
+
+The default is per-project, and that is right only for skills that exist in one project.
+
+Skills installed at **user or global scope are observed from every project you work in**. Their
+observations belong in one user-scope workspace, so set `observations.workspace` to a shared path
+(`~/.agents/skill-observations`, say) rather than accepting the per-project default. Left per-project,
+observations about a globally-installed skill scatter across every repository you touch, and a review
+run in any one of them looks complete while seeing a fraction of the backlog.
+
+### One documented key
+
+`observations.workspace` is the only key under `observations:`, because it is the only one anything
+reads. The review-staleness threshold is the `OBS_STALE_DAYS` environment variable (default `14`),
+read by the `SessionStart` hook and by nothing else. Neither `observations.enabled` nor
+`observations.review_interval_days` exists — documenting a key with no reader ships a knob that
+silently does nothing, which is worse than an undocumented feature.
+
+Skill: [`skills/observe-work/SKILL.md`](../../skills/observe-work/SKILL.md). Log contract:
+[`observation-log-contract.md`](../../shared/resources/observation-log-contract.md).
 
 ## Tracker workflow
 
@@ -901,6 +983,18 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no e
 
 `gh-stage.js` treats an unauthenticated `gh` as a **dead end, not a handoff**: one warning, exit 0, no
 board change. There is no MCP fallback for the GitHub path — unlike Jira, there is no second transport.
+
+### observe-work
+
+| Variable          | Example                        | Required | Purpose                                                                                                                                                                    |
+| ----------------- | ------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OBS_WORKSPACE`   | `~/.agents/skill-observations` | No       | Observation workspace root. **Second** in precedence — `observations.workspace` in `skills-config.yaml` wins over it, and the project-identity path is the default below it |
+| `OBS_STALE_DAYS`  | `14`                           | No       | How many days old the last review may be before the `SessionStart` hook offers a new one. Default **14**                                                                    |
+
+`OBS_STALE_DAYS` is an environment variable and **not** a `skills-config.yaml` key — the hook
+(`shared/resources/observe-work-session-start.sh`) reads `${OBS_STALE_DAYS:-14}` directly and
+consults no config file. There is no `observations.review_interval_days`; adding one would document
+a knob with no reader.
 
 ### Platform resolution order
 
