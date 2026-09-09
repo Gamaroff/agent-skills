@@ -36,7 +36,7 @@ reached by executing probes is distinguishable from one reached by reading.
 | 1. create-branch           | ✅ Done    | Branch `feature/task.82.*` exists in git                               | `feature/task.82.security-gate-evidence-field` created at `511b67f3`, pushed to origin | —                    |
 | 2. review-task             | ✅ Done    | `task.82.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10 — 0 critical, 3 important (all fixed). Report: `task.82.review.1.security-gate-evidence-field.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 4 phases; 52 tests (34→52); `npm run ci` exit 0; 3/3 mutations proved | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #362](https://github.com/Gamaroff/agent-skills/pull/362) → `develop`. No tracker issue to comment (none linked) | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.82.qa.{N}.*.md`; `task.82.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.82.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -176,7 +176,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.82.security-gate-evidence-field`
-**PR**: {populated after Step 4}
+**PR**: [#362](https://github.com/Gamaroff/agent-skills/pull/362)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

@@ -71,24 +71,32 @@ carry this exact snippet:
 SAFETY_REPROBE=false
 if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
   SECURITY_AXIS=$(awk '
+    # NOTHING HERE MAY NAME THE WHOLE-RECORD VARIABLE (dollar-zero), and that
+    # is not a style choice. This snippet ships as prose an agent copies and
+    # runs, and a harness that loads a SKILL.md with arguments substitutes that
+    # token with the invocation argument — so match(dollar-zero, ...) arrives as
+    # match(some/file/path, ...) before awk ever sees it, and the block bounding
+    # silently reads garbage. The warning is spelled out rather than written
+    # literally for the same reason: a corrupted warning is worse than none.
+    # Every reference below uses an implicit form instead: a bare /regex/ tests
+    # the whole record, `length` with no argument is its length, and
+    # two-argument sub() edits it in place.
     !f && /^[[:space:]]*security:[[:space:]]*$/ {
-      f=1; match($0, /^[[:space:]]*/); ind=RLENGTH; next
+      n = length; sub(/^[[:space:]]*/, ""); ind = n - length; f = 1; next
     }
     f {
       # A key at or left of the indent of security: ends the block, so keys
       # belonging to a later NFR axis can never be read as this one.
       # No apostrophes here: the program is single-quoted by its caller.
-      if ($0 ~ /[^[:space:]]/) {
-        match($0, /^[[:space:]]*/)
-        if (RLENGTH <= ind) exit
+      n = length; sub(/^[[:space:]]*/, ""); lead = n - length
+      if (length > 0 && lead <= ind) exit
+      if (st == "" && /^status:/) {
+        st = (/[[:space:]]FAIL[[:space:]]*$/) ? "FAIL" : "OK"
       }
-      if (st == "" && $0 ~ /^[[:space:]]*status:/) {
-        st = ($0 ~ /[[:space:]]FAIL[[:space:]]*$/) ? "FAIL" : "OK"
-      }
-      if (ev == "" && $0 ~ /^[[:space:]]*evidence:/) {
+      if (ev == "" && /^evidence:/) {
         ev = "unverified"
-        if ($0 ~ /evidence:[^[:alpha:]]*measured/) ev = "measured"
-        else if ($0 ~ /evidence:[^[:alpha:]]*reasoned/) ev = "reasoned"
+        if (/evidence:[^[:alpha:]]*measured/) ev = "measured"
+        else if (/evidence:[^[:alpha:]]*reasoned/) ev = "reasoned"
       }
     }
     END {

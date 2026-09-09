@@ -1057,3 +1057,71 @@ test("readSecurityEvidence ignores the gate's TOP-LEVEL evidence: block", () => 
   );
   assert.equal(r.found, true);
 });
+
+/* ---------------------------------------------------------------------------
+ * 10. The probe ships as PROSE AN AGENT COPIES AND RUNS, and two characters can
+ * corrupt it in transit. Both of these were real defects in the task.82 change
+ * set, found during QA, and both fail silently rather than loudly.
+ * ------------------------------------------------------------------------- */
+
+/** The awk program only — between `awk '` and the closing quote before the file arg. */
+function awkProgram() {
+  const m = /awk '\n([\s\S]*?)\n\s*' "\$LATEST_GATE"/.exec(clause1());
+  assert.ok(
+    m,
+    "clause 1 must invoke awk with a single-quoted multi-line program",
+  );
+  return m[1];
+}
+
+test("the awk program never names the whole-record variable", () => {
+  // A harness that loads a SKILL.md with arguments substitutes this token with
+  // the invocation argument, so `match(<record>, ...)` arrives as
+  // `match(docs/tasks/task.82.../task.82....md, ...)` before awk sees it and the
+  // block bounding reads garbage. Observed: qa-task/SKILL.md rendered with 8
+  // substitutions when the skill was invoked with a file path.
+  //
+  // Every reference must use an implicit form instead: a bare /regex/ tests the
+  // whole record, `length` with no argument is its length, two-argument sub()
+  // edits it in place.
+  const prog = awkProgram();
+  const hits = [...prog.matchAll(/\$0/g)];
+  assert.equal(
+    hits.length,
+    0,
+    `the awk program refers to the whole-record variable ${hits.length} time(s) — ` +
+      `a skill harness will substitute each one with its invocation argument`,
+  );
+});
+
+test("the awk program contains no apostrophe", () => {
+  // The program is single-quoted by its caller, so one apostrophe — including
+  // one inside a COMMENT — closes the quote early and breaks every downstream
+  // fixture at once. Introduced once during this task by rewording a comment
+  // from "AWK" to "AWK'S".
+  const prog = awkProgram();
+  assert.ok(
+    !prog.includes("'"),
+    "an apostrophe anywhere in the program, comments included, terminates the " +
+      "single-quoted string early",
+  );
+});
+
+test("both skills carry the same two properties", () => {
+  // The verbatim-mirroring test above compares the probe body, but it strips
+  // comments before comparing — so a comment-only corruption in one skill would
+  // not surface there. Check each skill's own text directly.
+  for (const [name, text] of skillText) {
+    const m = /awk '\n([\s\S]*?)\n\s*' "\$LATEST_GATE"/.exec(text);
+    assert.ok(m, `${name} must carry the single-quoted awk program`);
+    assert.equal(
+      [...m[1].matchAll(/\$0/g)].length,
+      0,
+      `${name}: the awk program names the whole-record variable`,
+    );
+    assert.ok(
+      !m[1].includes("'"),
+      `${name}: the awk program contains an apostrophe`,
+    );
+  }
+});

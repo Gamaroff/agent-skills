@@ -1,0 +1,68 @@
+schema: 1
+task: 'task.82.security-gate-evidence-field'
+task_title: 'Feed the measured security verdict into the QA gate'
+gate: CONCERNS
+status_reason: 'All four phases delivered and mutation-proven, CI green. QA found one HIGH defect in the change set itself — the new awk probe referenced the whole-record variable, which a skill harness substitutes with its invocation argument — plus one MEDIUM introduced while fixing it. Both were fixed in-cycle and are now pinned by three regression tests; the gate records CONCERNS because the defects were real and the fixes postdate the code under review.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T15:20:00Z'
+
+top_issues:
+  - id: 'TASK82-001'
+    severity: high
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The rewritten clause-1 awk program referenced the whole-record variable 8 times. This snippet ships as prose an agent copies and runs, and a harness that loads a SKILL.md with arguments substitutes that token with the invocation argument — observed live: qa-task/SKILL.md rendered as match(docs/tasks/task.82.../task.82....md, /^[[:space:]]*/). The block bounding then reads garbage, silently. The probe this replaced used the token zero times.'
+    suggested_action: 'Use awk implicit forms only — bare /regex/, argument-less length, two-argument sub(). Pin with a test that greps the extracted program.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-09'
+  - id: 'TASK82-002'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'The comment added to fix TASK82-001 contained an apostrophe ("AWK''S"). The awk program is single-quoted by its caller, so one apostrophe — including inside a comment — closes the quote early. 18 of 52 tests went red at once.'
+    suggested_action: 'Remove the apostrophe; pin with a test asserting the extracted program contains none.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-09'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 55
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    notes: 'The change set IS a security-adjacent boundary — the re-review trigger that decides whether a security surface is re-examined unscoped. It was probed by execution, not by reading: 10 adversarial gate fixtures run against the real extracted probe (hijacked first status slot, a later axis leaking its evidence key, quoted and comment-suffixed values, missing key, absent security block, legacy PASS and FAIL gates) plus 5 mutations, each reverting a specific behaviour and each confirmed to redden. Two real defects were found this way and both are now pinned. What this verdict does NOT cover: the probe was executed under bash only on this host; zsh was not exercised.'
+  performance:
+    status: PASS
+    notes: 'The probe reads the gate once instead of piping awk into grep — one process fewer. Suite runtime 0.28s → 0.42s for 21 more tests.'
+  reliability:
+    status: PASS
+    notes: 'The guard and </dev/null are preserved and still asserted. The fail-open half is deliberate and documented in three places; the fail-closed half is unchanged. A missing security block remains a non-trigger, asserted.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The probe grew from 5 lines to ~25 and now carries three separate "do not do this" constraints (no whole-record variable, no apostrophes, no GNU-only escapes), each held by its own test. That is the right structure, but the snippet is now near the limit of what should live as copied prose in two skill files. If a fourth constraint appears, extract it to a script.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Exercise the clause-1 probe under zsh as well as bash — the parity suite spawns bash only, and the repo ships a zsh-availability check used elsewhere.'
+      refs: ['evals/shared/tests/qa-re-review-scope-parity.test.mjs']
+    - action: 'If clause 1 gains a fourth transit constraint, extract the probe to shared/resources/ as a script both skills invoke, rather than copy.'
+      refs: ['shared/resources/qa-re-review-scope.md']
+    - action: 'Every gate in the corpus now reads as evidence: unverified, so every re-review fires. Expected and correct, but it means the trigger is uninformative until adoption spreads.'
+      refs: ['shared/resources/qa-gate-security-evidence.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

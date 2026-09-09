@@ -388,6 +388,47 @@ without touching the trigger.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.82.qa.1.security-gate-evidence-field.md](./task.82.qa.1.security-gate-evidence-field.md)
+- **Gate File**: [task.82.gate.1.security-gate-evidence-field.yml](./task.82.gate.1.security-gate-evidence-field.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 55 (was 34 before this task)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 open (1 HIGH + 1 MEDIUM found and closed in-cycle)
+- **NFR Status**: Security: PASS (`evidence: measured`, 15 probes), Performance: PASS,
+  Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+QA found **two defects in the change set itself**, both of the silent-failure shape this task exists
+to prevent, and both now pinned by regression tests:
+
+1. **HIGH** — the rewritten awk probe referenced the whole-record variable 8 times. That snippet
+   ships as prose an agent copies and runs, and a harness loading a `SKILL.md` with arguments
+   substitutes the token with the invocation argument. Observed live during this QA cycle. The probe
+   it replaced used it zero times.
+2. **MEDIUM** — the comment written to fix (1) contained an apostrophe, which closes the
+   single-quoted awk program. 18 tests went red at once. Notably, the adjacent pre-existing comment
+   already warned against apostrophes: a prose warning did not prevent the defect in the same edit
+   that read it.
+
+The gate is CONCERNS rather than PASS because those defects were real and their fixes postdate the
+code reviewed. Mutation-proving found a third problem — in the new corpus check itself, which used
+`git ls-files` and so could not see the uncommitted gates it exists to judge.
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -398,6 +439,7 @@ without touching the trigger.
 | ---------- | ------- | ------------------------------------------------------------------------------ | ----------- |
 | 2026-09-02 | 1.0     | Initial draft — filed from the rebirth-wallet security-review handover           | create-task |
 | 2026-09-09 | 1.1     | Review passed (8/10) — named the pre-existing top-level `evidence:` key collision in §3; stated the `measured\|reasoned` ⊂ `measured\|reasoned\|unverified` domain nesting in Phase 4; refreshed drifted line citations | review-task |
+| 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both closed in-cycle; 5 mutations proved | qa-task |
 
 ---
 
