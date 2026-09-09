@@ -285,6 +285,42 @@ test("a capitalised path is matched as written, not case-folded", () => {
   );
 });
 
+test("a run of stars collapses — no catastrophic backtracking", () => {
+  // Found at the DoD security gate by EXECUTING the predicate against generated
+  // candidates, not by reading it: four QA cycles had walked past it.
+  //
+  // `*` × N compiled to `[^/]*` × N — adjacent quantifiers, the textbook
+  // catastrophic-backtracking shape. Measured before the fix against a
+  // 60-character path: 8 stars 15ms, 10 stars 193ms, 12 stars 2.2s, 14 stars
+  // **23 seconds**, and rising ~10× per star. Not a vulnerability — both inputs
+  // are repo-controlled — but a hang, in a rule that runs inside the QA loop.
+  //
+  // The bound is generous on purpose. A tight one would make this test a
+  // flake-generator on a loaded machine, and the defect it guards is four orders
+  // of magnitude away from the bound, not a few percent.
+  const started = Date.now();
+  assert.equal(matchesAnyGlob("a".repeat(200), ["*".repeat(40) + "X"]), false);
+  const elapsed = Date.now() - started;
+  assert.ok(
+    elapsed < 2000,
+    `40-star glob took ${elapsed}ms — backtracking has returned`,
+  );
+
+  // Collapsing must be a no-op on MEANING, which is why it is safe: three or more
+  // consecutive stars mean exactly what two mean in glob semantics.
+  assert.equal(
+    matchesAnyGlob("a/b/c", ["***"]),
+    matchesAnyGlob("a/b/c", ["**"]),
+  );
+  assert.equal(
+    matchesAnyGlob("a/b/x", ["****/x"]),
+    matchesAnyGlob("a/b/x", ["**/x"]),
+  );
+  // And the single-star / double-star distinction must survive the collapse.
+  assert.equal(matchesAnyGlob("a/b/c.spec.ts", ["**/*.spec.ts"]), true);
+  assert.equal(matchesAnyGlob("a/b/c.spec.ts", ["*.spec.ts"]), false);
+});
+
 test("path normalisation does not widen the match", () => {
   assert.equal(matchesAnyGlob("./a/b.spec.ts", ["**/*.spec.ts"]), true);
   assert.equal(matchesAnyGlob("a\\b.spec.ts", ["**/*.spec.ts"]), true);

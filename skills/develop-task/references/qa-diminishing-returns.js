@@ -116,6 +116,29 @@ function globToRegExp(glob) {
   while (i < glob.length) {
     const c = glob[i];
     if (c === "*") {
+      // COLLAPSE RUNS OF `*` FIRST. Three or more consecutive stars mean exactly
+      // what two mean in glob semantics, so collapsing is a no-op on meaning —
+      // and it is what stops the compiler emitting a chain of adjacent
+      // quantifiers.
+      //
+      // Without it, `*` × N compiles to `[^/]*` × N, which is the textbook
+      // catastrophic-backtracking shape: matching a non-matching path takes time
+      // exponential in N. Measured on the shipped code before this fix, against a
+      // 60-character path: 8 stars 15ms, 10 stars 193ms, 12 stars 2.2s, **14
+      // stars 23s** — and it does not stop, it just takes longer.
+      //
+      // Not a vulnerability: both inputs are repo-controlled — the globs come
+      // from a committed `skills-config.yaml` and the paths from a committed gate
+      // file — so there is no untrusted-input path. It is a **hang**, self-
+      // inflicted by an unusual but legal config, in a rule that runs inside the
+      // QA loop. Found by executing the predicate against generated candidates at
+      // the DoD security gate, not by reading it; four QA cycles of review had
+      // walked past it.
+      let run = 0;
+      while (glob[i + run] === "*") run++;
+      if (run > 2) {
+        i += run - 2; // leave exactly two for the `**` handling below
+      }
       if (glob[i + 1] === "*") {
         if (glob[i + 2] === "/") {
           out += "(?:.*/)?"; // `**/` — any number of directories, including none
