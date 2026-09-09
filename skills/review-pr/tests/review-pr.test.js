@@ -493,6 +493,7 @@ test("the report template is given literally", () => {
     "## Acceptance Criteria Traceability",
     "## Conformance Findings",
     "## Code Review Findings",
+    "## Machine-Readable Findings",
     "## Recommended Actions",
   ]) {
     assert.ok(SKILL.includes(heading), `report section ${heading} present`);

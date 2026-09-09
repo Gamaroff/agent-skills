@@ -554,10 +554,22 @@ test("the ingester describes the format /review-pr actually renders", () => {
   );
 
   // The specific wrong turn, forbidden by name so it cannot come back quietly.
+  //
+  // This assertion was RE-SCOPED by task 85, not relaxed. It used to require the sentence "there is
+  // no `severity:` key anywhere in the file" — a claim about the whole report, which the
+  // machine-readable block falsifies the moment it exists. The dangerous repair was deletion: the
+  // wrong turn it forbids (searching the RENDERED text for a `severity:` key) is still a wrong turn,
+  // and deleting the warning would have gone green while removing the guard. So the claim is now
+  // scoped to the rendered shape, and the scoping is what is asserted.
   assert.match(
     ingester,
-    /there is no `severity:` key anywhere in the file/i,
-    "the ingester must warn against searching for the YAML key that never reaches disk",
+    /rendered shape has no `severity:` key/i,
+    "the ingester must still warn against searching the RENDERED text for a severity: key",
+  );
+  assert.doesNotMatch(
+    ingester,
+    /no `severity:` key anywhere in the file/i,
+    "the whole-file claim is false once the machine-readable block exists — it must stay scoped",
   );
   assert.match(
     ingester,
@@ -570,6 +582,150 @@ test("the ingester describes the format /review-pr actually renders", () => {
     ingester,
     /source: gate\|report\|pr-review\|bug/,
     "the ingester's own output enum must admit a pr-review source",
+  );
+});
+
+test("the PR review report carries a machine-readable findings block", () => {
+  // Task 85. The rendered three-line shape above is a RENDERING; parsing it means an agent matching
+  // a text format described in another file. The block puts the fields on disk instead, so the
+  // REQUEST CHANGES path stops depending on that match. These assertions pin the emitter half.
+  const section = reviewPr;
+
+  assert.match(
+    reviewPr,
+    /^## Machine-Readable Findings$/m,
+    "Step 7's report template must carry the section the ingester anchors on",
+  );
+
+  // A yaml-TAGGED fence, specifically: the rendered findings sit in untagged ``` fences, so an
+  // untagged block here would be indistinguishable from them to anything scanning for it.
+  assert.match(
+    section,
+    /## Machine-Readable Findings\n\n```yaml\n/,
+    "the block must be a yaml-tagged fence, not an untagged one",
+  );
+
+  const block = section.match(
+    /## Machine-Readable Findings\n\n```yaml\n([\s\S]*?)```/,
+  );
+  assert.ok(block, "the Machine-Readable Findings fence must have a body");
+  const body = block[1];
+
+  for (const key of [
+    "findings:",
+    "id:",
+    "category:",
+    "severity:",
+    "confidence:",
+    "ref:",
+    "finding:",
+    "suggested_action:",
+    "truncated_count:",
+  ]) {
+    assert.ok(
+      body.includes(key),
+      `the block schema must carry \`${key}\` — a silently dropped field reads as undefined downstream`,
+    );
+  }
+
+  // Both lenses in ONE block, so the ingester has exactly one anchor to find.
+  assert.match(body, /id: PC-1/, "the block must carry conformance findings");
+  assert.match(body, /id: CR-1/, "the block must carry code findings");
+
+  // The trap: `pr_conformance` emits `ref:` but `code_review` emits `file_line:`. Step 6's
+  // "deliberately parallel" field list omits the location field entirely, which is how the
+  // discrepancy stays invisible. Emitting `file_line` for CR-* entries would re-create, one layer
+  // down, the parse-by-position problem this block exists to remove.
+  //
+  // Matched against a whitespace-collapsed copy: the sentence is prose and wraps, so a literal
+  // pattern would break on a reflow that changed nothing about the rule. Asserted with `ok` rather
+  // than `match` so a failure prints the message instead of the whole 40KB skill file.
+  assert.ok(
+    /`CR-\*` entry's `ref` is its subagent `file_line` verbatim/.test(
+      reviewPr.replace(/\s+/g, " "),
+    ),
+    "review-pr must state the ref <- file_line normalisation for code findings",
+  );
+  assert.doesNotMatch(
+    body,
+    /file_line:/,
+    "the block must normalise to `ref` — never emit `file_line` for CR-* entries",
+  );
+
+  // An absent section must mean "legacy report" and never "no findings". If a findings-free report
+  // omitted the block, a bug in emitting it would be indistinguishable from a pre-task-85 report,
+  // and the ingester would take the fallback on a report that was supposed to have a block.
+  assert.match(
+    reviewPr,
+    /findings: \[\]/,
+    "review-pr must say an empty review still emits the section as `findings: []`",
+  );
+});
+
+test("the ingester prefers the block and keeps the legacy fallback", () => {
+  // Task 85, consumer half. Two arms must survive together: without preference the ingester may
+  // parse the rendered text of a report that has a block; without the fallback every report written
+  // before task 85 becomes unparseable.
+  assert.match(
+    ingester,
+    /## Machine-Readable Findings/,
+    "the ingester must name the section it reads the block from",
+  );
+  assert.match(
+    ingester,
+    /Prefer the structured block/i,
+    "the ingester must state which source wins when both are present",
+  );
+  assert.match(
+    ingester,
+    /Fallback — the rendered three-line shape/i,
+    "the ingester must retain the rendered parse for reports written before the block existed",
+  );
+  assert.match(
+    ingester,
+    /`findings: \[\]` is a real answer, not a missing block/i,
+    "an empty block must not be mistaken for an absent one — that is what selects the fallback",
+  );
+  // `ref` is free-form on the block too, so the coercion warning has to survive the move.
+  assert.match(
+    ingester,
+    /`ref` → `file`/,
+    "the ingester must say how the block's polymorphic `ref` maps onto its own `file` field",
+  );
+});
+
+test("a real legacy PR review report still parses via the fallback", () => {
+  // The fallback arm needs a real file to fire on, not a synthetic fixture. This is the report
+  // task.85's own success criteria name: written before the block existed, so it must carry the
+  // rendered shape and NOT the block. If someone back-fills a block into it, this test says so —
+  // the fallback would then be exercised by nothing.
+  const legacyPath =
+    "docs/tasks/task.66.review-pr/task.66.pr-review.1.review-pr.md";
+  assert.ok(
+    existsSync(join(repoRoot, legacyPath)),
+    `${legacyPath} is the fallback's only real fixture — it must not be moved or deleted without replacing it here`,
+  );
+  const legacy = read(legacyPath);
+
+  assert.doesNotMatch(
+    legacy,
+    /^## Machine-Readable Findings$/m,
+    "the legacy fixture must stay legacy — a back-filled block leaves the fallback untested",
+  );
+  assert.match(
+    legacy,
+    /\[(?:PC|CR)-\d+\] \w+ · \w+ · confidence: \w+ —/,
+    "the legacy fixture must match the rendered header shape the fallback parses",
+  );
+  assert.match(
+    legacy,
+    /^## Conformance Findings$/m,
+    "the fallback reads PC-* findings from this section",
+  );
+  assert.match(
+    legacy,
+    /^## Code Review Findings$/m,
+    "the fallback reads CR-* findings from this section",
   );
 });
 

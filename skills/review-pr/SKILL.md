@@ -279,6 +279,17 @@ The two schemas are deliberately parallel (`id` / `category` / `severity` / `con
 
 Conformance findings first (they judge whether the change is the right change), then code findings. Within each, sort by severity. If `truncated_count > 0`, note the omitted count.
 
+**The location field is the one place the two schemas are *not* parallel, and it must be normalised.**
+The list above omits it, which is exactly how the discrepancy stays invisible: `pr_conformance` emits
+**`ref:`** (a criterion id, artifact path, frontmatter field, or `path:line`), while `code_review`
+emits **`file_line:`** (always `path:line`). Both render into the same trailing `— {ref}` position
+above, and both are written as **`ref`** in the structured block Step 7 emits — a `CR-*` entry's `ref`
+is its subagent `file_line` verbatim.
+
+Carrying `file_line` through for code findings would re-create, one layer down, the very
+parse-by-position problem the structured block exists to remove: a consumer would again have to test
+which key is present before it could read a location.
+
 **Deterministic verdict — advisory only:**
 
 | Condition | Verdict |
@@ -312,7 +323,7 @@ docs/tasks/task.65.registry-aware-selection/task.65.pr-review.1.registry-aware-s
 
 ALWAYS use this exact template structure:
 
-```markdown
+````markdown
 # PR Review Report: PR #{number} — {title}
 
 **Reviewed:** {YYYY-MM-DD}
@@ -350,10 +361,50 @@ ALWAYS use this exact template structure:
 
 {rendered CR-* findings, or "None."}
 
+## Machine-Readable Findings
+
+```yaml
+findings:
+  - id: PC-1
+    category: coverage
+    severity: high
+    confidence: high
+    ref: "AC-3"
+    finding: "<one sentence: what is wrong>"
+    suggested_action: "<one sentence: the fix approach>"
+  - id: CR-1
+    category: bug
+    severity: high
+    confidence: high
+    ref: "src/x/y.ts:42"
+    finding: "<one sentence: what is wrong>"
+    suggested_action: "<one sentence: the fix approach>"
+truncated_count: 0
+```
+
 ## Recommended Actions
 
 1. {highest-priority action}
-```
+````
+
+**About the machine-readable block.** It is what `/qa-fix`'s findings ingester reads; the rendered
+sections above it are for humans. Four rules, each of which has a way of going wrong:
+
+- **One block, both lenses**, conformance entries first then code entries — the same order as the
+  rendered sections, so a human diffing the two sees them line up. One block means the ingester has
+  exactly one anchor to find.
+- **Tag the fence `yaml`.** The rendered findings sit in untagged ``` fences; an untagged block here
+  would be indistinguishable from them.
+- **`ref` for both lenses**, per the normalisation rule in Step 6. A `CR-*` entry's `ref` is its
+  subagent `file_line` verbatim.
+- **Always emit the section, even with nothing to report** — as `findings: []` with
+  `truncated_count: 0`. If a findings-free report omitted it, an absent section would mean both
+  "report written before this existed" and "no findings", and the ingester's legacy fallback would
+  fire on a report that had a block. A bug in emitting the block would then be indistinguishable from
+  a legacy report.
+
+`truncated_count` is the **sum** of the two lenses' counts. The rendered omitted-count note in Step 6
+stays as it is — this field is the machine-readable half of the same fact, not a replacement for it.
 
 ### Step 8 — `--comment` (optional)
 
