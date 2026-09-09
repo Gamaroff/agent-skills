@@ -467,16 +467,17 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 90/100)
+**QA Cycles**: 2
 
 ### QA Report
 
-- **Full Report**: [task.95.qa.1.observe-work-docs-boundaries.md](./task.95.qa.1.observe-work-docs-boundaries.md)
-- **Gate File**: [task.95.gate.1.observe-work-docs-boundaries.yml](./task.95.gate.1.observe-work-docs-boundaries.yml)
+- **Full Report**: [task.95.qa.2.observe-work-docs-boundaries.md](./task.95.qa.2.observe-work-docs-boundaries.md) (cycle 2) · [cycle 1](./task.95.qa.1.observe-work-docs-boundaries.md)
+- **Gate File**: [task.95.gate.2.observe-work-docs-boundaries.yml](./task.95.gate.2.observe-work-docs-boundaries.yml) (cycle 2) · [cycle 1](./task.95.gate.1.observe-work-docs-boundaries.yml)
 
 ### Test Coverage Summary
 
@@ -487,11 +488,15 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 
 ### Bug Reports
 
-- [task.95.bug.1: default workspace path undocumented](./task.95.bug.1.default-workspace-path-undocumented.md) — ✅ Ready for QA — Severity: MEDIUM (Fixed 2026-09-09)
+- [task.95.bug.1: default workspace path undocumented](./task.95.bug.1.default-workspace-path-undocumented.md) — ✅ **Closed** — Severity: MEDIUM (fixed and verified 2026-09-09)
 
 ### Key Findings
 
-One MEDIUM documentation defect ([task.95.bug.1](./task.95.bug.1.default-workspace-path-undocumented.md)): the new `## Observation workspace` section never states the default workspace path, and the schema block's example (`~/.agents/...`) points at a different tree from the real default (`~/.claude/projects/<encoded>`). A reader cannot locate their own log from the documentation. Two LOW advisory cleanups in the new tests. No HIGH issues; every phase verified against the tree rather than the document; all seven development-time mutations independently spot-checked.
+**Cycle 1 (CONCERNS, 90/100)** found one MEDIUM ([task.95.bug.1](./task.95.bug.1.default-workspace-path-undocumented.md)) — the new `## Observation workspace` section never stated the default workspace path, and the schema block's `~/.agents/...` example pointed at a different tree from the real default — plus two LOW advisory cleanups in the new tests. All three were fixed in one iteration and verified by driving the resolver rather than reading the diff.
+
+**Cycle 2 (PASS, 100/100)** was an unscoped refute pass over the whole branch diff. It closed all three and produced one new LOW: the newly-documented path formula is silent about linked git worktrees, where the resolver deliberately anchors to the *main* worktree. The rule is already stated 33 lines further down in the same document, so it does not gate; it is carried as a `future` recommendation and matters here because `/develop-batch` runs every parallel story in a linked worktree.
+
+No HIGH or MEDIUM issues remain. Every phase was verified against the tree rather than the document, and every invariant added by either cycle is mutation-proven.
 
 ---
 
@@ -505,6 +510,7 @@ One MEDIUM documentation defect ([task.95.bug.1](./task.95.bug.1.default-workspa
 | 2026-09-09 |         | Implemented — 10 files, 8 tests added (4 family-template, 3 resolver contract, 2 OBS_STALE_DAYS; all mutation-proven) | develop |
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 2 LOW | qa-task |
 | 2026-09-09 |         | QA findings fixed — 1 MEDIUM + 2 LOW addressed, 1 iteration | qa-fix |
+| 2026-09-09 |         | QA gate PASS (100/100) — refute pass, 1 new LOW (advisory) | qa-task |
 
 ---
 

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-95-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-09
 
@@ -147,3 +147,27 @@ documented key has a reader, and a new key name would fail it.
 | 2026-09-09 | New          | qa-task    | Found during QA cycle 1                            |
 | 2026-09-09 | In Progress  | qa-fix     | Investigation — documentation defect, not code     |
 | 2026-09-09 | Ready for QA | qa-fix     | Three documentation edits; suite green             |
+
+| 2026-09-09 | Closed       | qa-task    | Verified in QA cycle 2 — resolver driven, documented shape matches |
+
+---
+
+## QA Verification (Cycle 2)
+
+**Verified**: 2026-09-09 · **Gate**: [task.95.gate.2](./task.95.gate.2.observe-work-docs-boundaries.yml) (PASS, 100/100)
+
+The fix was checked against the **resolver**, not against the diff: driving the default tier from a
+scratch project returns `~/.claude/projects/-Users-<user>-<encoded>`, which matches the newly
+documented shape character-for-character, including the `/` → `-` encoding.
+
+Also confirmed: the added prose introduced no phantom config key — the contract test
+`resolver: every documented observations.* key has a reader` still passes, and its scan is confined
+to the schema block and the key-reference table, so the new sentences naming `.claude/` and
+`.agents/` cannot be misread as key names.
+
+**One residual, recorded as a separate LOW rather than reopening this bug**: the documented formula
+is silent about linked git worktrees, where the resolver anchors to the *main* worktree. That rule is
+stated elsewhere in the same document, so the information is present rather than missing — which is
+what distinguishes it from the defect this bug reports. Carried as a `future` recommendation on gate 2.
+
+**Status**: Closed.

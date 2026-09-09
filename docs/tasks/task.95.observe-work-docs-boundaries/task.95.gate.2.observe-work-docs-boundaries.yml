@@ -1,0 +1,58 @@
+schema: 1
+task: "task.95.observe-work-docs-boundaries"
+task_title: "observe-work: config schema, skill boundaries and the meta-skill family"
+gate: PASS
+status_reason: "Cycle 1's MEDIUM is fixed and verified by driving the resolver rather than reading the diff; both LOW advisories closed. The cycle-2 refute pass produced one new LOW whose substance is already stated elsewhere in the same document. No HIGH, no MEDIUM, no NFR below PASS."
+reviewer: "QA Engineer"
+updated: "2026-09-09T10:45:00Z"
+
+# THIS CYCLE'S findings only. Cycle 1's TASK-95-BUG-1 is deliberately NOT carried
+# forward here — its history lives in bug_resolution below, in the QA report's
+# Re-Review Context table, and in the bug report itself.
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2902
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No credential, auth, network or file-write surface touched. The .claude/ path now named in the documentation is a directory the resolver already used; documenting it exposes nothing not already on disk."
+  performance:
+    status: PASS
+    notes: "No runtime path changed. Documentation and two test files only."
+  reliability:
+    status: PASS
+    notes: "Improved. The staleness assertion is anchored to the clause the hook emits rather than a loose substring, and the tightening was mutation-proven in both directions — still matches real output, and goes red when the behaviour it names is reverted."
+  maintainability:
+    status: PASS
+    notes: "Improved. The consumer-facing default is stated as a value rather than a role, and the test file's imports now match its sibling's convention."
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: "2026-09-09"
+  total_iterations: 1
+  verification_method: "Drove the resolver's default tier and compared with the documented shape character-for-character; full suite green; mutation-proved the one new invariant."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "State the linked-worktree qualifier beside the path formula in resolver item 3, or cross-reference the paragraph that carries it. The resolver anchors to the MAIN worktree, so a reader inside a linked worktree computes the wrong path — and /develop-batch runs every parallel story in one."
+      refs: ["docs/reference/configuration.md"]
+    - action: "Consider binding observation-log-contract.md's precedence statement to the resolver, closing the third unbound copy."
+      refs: ["shared/resources/observation-log-contract.md"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
