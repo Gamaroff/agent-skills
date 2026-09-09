@@ -47,6 +47,20 @@ Do **not** use it as a general code review (`/review-code`), as a QA gate for a
 tracked story or task (`/qa-story`, `/qa-task`), or to keep polishing an artifact
 the user has already accepted.
 
+### Related: `observe-work`
+
+`double-check` audits the artifact just produced — does it match the disk, the
+constraints and the original request. `observe-work` observes the *behaviour*
+that produced it.
+
+They meet at the findings. A `double-check` finding that generalises beyond this
+artifact — a rule the agent violated, a gate that failed to fire, a step no skill
+covers — is exactly the shape of an observation, and is worth logging as one.
+Fixing the artifact leaves the behaviour that produced it unchanged, so an audit
+that ends at the fix will surface the same class of defect again next session.
+
+Disambiguate by input: a stated insight is a memory, a finished artifact is an audit, an explicit end-of-session pass is `autoskill`, and anything noticed in passing during the work is an observation.
+
 ## Arguments
 
 Invoke as `/double-check [target] [--report-only] [--fresh-eyes]`.

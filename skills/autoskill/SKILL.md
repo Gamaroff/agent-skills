@@ -16,6 +16,14 @@ Trigger on explicit requests:
 
 Do NOT activate for one-off corrections or when the user declines skill modifications.
 
+### Related: `observe-work`
+
+`autoskill` is the explicit, on-demand pass: you ask it to learn from *this* session, and it proposes edits to the skills that were active. `observe-work` runs continuously and writes what it notices to a durable observation log for a later review. They are complements, not alternatives — `observe-work` is what catches the insight you would otherwise have lost by the time you thought to ask, and `autoskill` is what you reach for when you want the edits now.
+
+If an observation log exists, check it for open observations naming the skills you are about to edit **before** proposing changes to them. An observation already written about a skill is evidence you would otherwise re-derive from a single session's signals, and re-deriving it usually produces a weaker version of the same rule.
+
+Disambiguate by input: a stated insight is a memory, a finished artifact is an audit, an explicit end-of-session pass is `autoskill`, and anything noticed in passing during the work is an observation.
+
 ## Signal detection
 
 Scan the session for:

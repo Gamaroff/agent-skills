@@ -25,7 +25,9 @@
  */
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const { execFileSync, spawnSync } = require("child_process");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -528,4 +530,376 @@ test("in this repo, the cross-file assertions actually ran", () => {
     "running in the agent-skills repo but create-skill was not readable — the " +
       "invokes: assertion silently skipped",
   );
+});
+
+// ── Family template ──────────────────────────────────────────────────────────
+//
+// The registry the sibling check reads is created empty by `init`, so a shipped
+// seed is the difference between a check that has a family to reason about on
+// day one and one that reports "no families" forever. These assertions are
+// behavioural on purpose: that the template *parses* proves only that it is a
+// table, and a `Shared` value that reads well but matches nothing would pass
+// such a test while reporting every member as drifted on first run.
+
+const TEMPLATE_REL = path.join("assets", "skill-families.template.md");
+const TEMPLATE_PATH = path.join(SKILL_DIR, TEMPLATE_REL);
+
+test("family template: ships as an asset", () => {
+  assert.ok(
+    fs.existsSync(TEMPLATE_PATH),
+    "assets/skill-families.template.md must ship with the skill — the live " +
+      "registry is copied from it on first use",
+  );
+});
+
+test("family template: SKILL.md points at it, with a trigger", () => {
+  // A pointer without a condition reads as optional and gets skipped. The
+  // trigger is the state you actually find: `init` always creates the file, so
+  // the registry is never missing — it is empty.
+  assert.match(
+    BODY,
+    /assets\/skill-families\.template\.md/,
+    "SKILL.md must reference the template by path",
+  );
+  const pointer = BODY.split("\n")
+    .filter((l) => l.includes("skill-families.template.md"))
+    .join("\n");
+  assert.match(
+    pointer + BODY,
+    /no family rows|holds no family|empty one is/,
+    "the pointer must name the condition that triggers seeding (an EMPTY " +
+      "registry, not a missing one) — an unconditioned pointer is a bibliography",
+  );
+});
+
+test("family template: parses into the engine's actual shape, with real members", () => {
+  const engine = readOutside("shared", "resources", "observation-log.js");
+  if (engine === null) return; // packaged install — repo siblings absent
+
+  const repoRoot = path.join(SKILL_DIR, "..", "..");
+  const ws = fs.mkdtempSync(path.join(os.homedir(), ".obs-families-"));
+  try {
+    fs.mkdirSync(path.join(ws, "skill-observations"), { recursive: true });
+    fs.copyFileSync(
+      TEMPLATE_PATH,
+      path.join(ws, "skill-observations", "skill-families.md"),
+    );
+    const out = execFileSync(
+      process.execPath,
+      [
+        path.join(repoRoot, "shared", "resources", "observation-log.js"),
+        "families",
+        "--workspace",
+        ws,
+        "--json",
+      ],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    const res = JSON.parse(out);
+
+    assert.equal(
+      res.count,
+      1,
+      "exactly one family row must parse — a second row means the three-column " +
+        "guidance table was widened to four and is now being read as a family",
+    );
+    const fam = res.families[0];
+    // The shape parseFamilies() actually returns. Asserting a `coherence` field
+    // would assert task 93's plan rather than task 93's implementation.
+    assert.deepEqual(
+      Object.keys(fam).sort(),
+      ["members", "memberSpecific", "name", "shared"].sort(),
+    );
+    assert.equal(fam.name, "meta-skills");
+    assert.ok(fam.members.length >= 2, "a family of one is not a family");
+    assert.ok(
+      fam.shared.length >= 1,
+      "a family with no shared material has nothing to drift",
+    );
+    assert.ok(
+      fam.memberSpecific.length >= 1,
+      "without Member-specific values every absence reads as drift and the " +
+        "audit generates noise instead of signal",
+    );
+
+    for (const member of fam.members) {
+      assert.ok(
+        fs.existsSync(path.join(repoRoot, "skills", member, "SKILL.md")),
+        `seeded family names '${member}', which is not a skill directory — ` +
+          "the audit would report it as a permanent member-not-found gap",
+      );
+    }
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("family template: `families --audit` against this repo returns ZERO gaps", () => {
+  const engine = readOutside("shared", "resources", "observation-log.js");
+  if (engine === null) return; // packaged install — repo siblings absent
+
+  const repoRoot = path.join(SKILL_DIR, "..", "..");
+  const ws = fs.mkdtempSync(path.join(os.homedir(), ".obs-families-audit-"));
+  try {
+    fs.mkdirSync(path.join(ws, "skill-observations"), { recursive: true });
+    fs.copyFileSync(
+      TEMPLATE_PATH,
+      path.join(ws, "skill-observations", "skill-families.md"),
+    );
+    const out = execFileSync(
+      process.execPath,
+      [
+        path.join(repoRoot, "shared", "resources", "observation-log.js"),
+        "families",
+        "--audit",
+        "--workspace",
+        ws,
+        "--json",
+      ],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    const res = JSON.parse(out);
+
+    // This is the assertion that matters. It proves the seeded `Shared` value is
+    // really present, verbatim, in every member it names — the property a parse
+    // test cannot reach. A seeded family that fails its own audit on first run
+    // teaches the adopter to ignore the check.
+    assert.deepEqual(
+      res.gaps,
+      [],
+      "the seeded family must audit clean against this repo; gaps: " +
+        JSON.stringify(res.gaps),
+    );
+
+    // Non-vacuity: a `Shared` value that the suppression column swallows would
+    // also produce zero gaps while checking nothing. Assert the check can fail.
+    const fam = res.families[0];
+    for (const rule of fam.shared) {
+      assert.ok(
+        !fam.memberSpecific.some(
+          (ms) => rule.includes(ms) || ms.includes(rule),
+        ),
+        `shared rule "${rule.slice(0, 40)}…" is suppressed by a Member-specific ` +
+          "value, so the audit skips it and zero gaps proves nothing",
+      );
+    }
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+// ── Resolver contract ────────────────────────────────────────────────────────
+//
+// docs/reference/configuration.md § "Observation workspace" documents a
+// precedence order and a hard refusal. Both are asserted by DRIVING the resolver,
+// never by grepping it: a test that finds the word "precedence" in the script
+// proves the word is there. Two claims in an earlier draft of that section were
+// wrong in exactly the way a source-text test cannot see.
+//
+// Fixtures live under os.homedir(), not os.tmpdir() — the resolver refuses a
+// /tmp anchor, which is itself asserted below. The SAME rule binds the family
+// fixtures above, for the same reason: `observation-log.js` refuses an ephemeral
+// `--workspace` too, returning `reason: "ephemeral-workspace"` and exit 1.
+// That is easy to miss on macOS, where `os.tmpdir()` is `/var/folders/…` and
+// passes; on Linux it is literally `/tmp` and fails. A first version of the
+// family tests used `os.tmpdir()`, passed locally, and went red only in CI.
+
+const RESOLVER = path.join(
+  SKILL_DIR,
+  "references",
+  "resolve-observation-workspace.sh",
+);
+
+/**
+ * Source the resolver in `cwd`. Returns `{ refused, workspace }`.
+ *
+ * The two fields are deliberately separate. A first draft of this helper
+ * returned `null` for both "the resolver refused" and "the resolver exported an
+ * empty value", and the ephemeral-refusal test below then passed against a
+ * mutant that had been changed to warn-and-continue — because the refusal block
+ * unsets its candidate before falling through, so a warn-and-continue resolver
+ * exports the empty string and the two states are byte-identical. One signal
+ * reporting two states is the defect the assertion exists to catch, so the
+ * helper must not reproduce it.
+ *
+ * Uses bash: the resolver is bash, not POSIX sh.
+ */
+function resolveIn(cwd, env = {}) {
+  const r = spawnSync(
+    "bash",
+    [
+      "-c",
+      `. "${RESOLVER}"; printf 'RC=%s\\nWS=%s\\n' "$?" "\${OBS_WORKSPACE:-}"`,
+    ],
+    {
+      cwd,
+      env: { ...process.env, OBS_WORKSPACE: "", ...env },
+      encoding: "utf8",
+    },
+  );
+  const rc = /RC=(\d+)/.exec(r.stdout || "");
+  const ws = /WS=(.*)/.exec(r.stdout || "");
+  return {
+    // `ran` is what stops a refusal assertion passing on a dead harness. Without
+    // it, `refused: true` covers both "the resolver returned non-zero" and "bash
+    // never produced output" — the same two-states-one-signal shape this helper
+    // already fixed for the VALUE, left standing on the STATUS. The sibling
+    // tests would fail first in practice, but that mitigation lives in other
+    // test bodies; the test that depends on the guarantee should carry it.
+    ran: rc !== null,
+    refused: rc ? rc[1] !== "0" : true,
+    workspace: ws ? ws[1].trim() : "",
+  };
+}
+
+/**
+ * A durable scratch project. See the header note on /tmp.
+ *
+ * Deliberately takes no config-body argument: only one of the three tests below
+ * wants a `skills-config.yaml`, and it writes one itself so the path it points
+ * at can be a directory this function has already created. A parameter every
+ * caller passes `null` to is a branch nothing exercises.
+ */
+function makeProject() {
+  const root = fs.mkdtempSync(
+    path.join(os.homedir(), ".observe-work-resolver-"),
+  );
+  fs.mkdirSync(path.join(root, "proj"), { recursive: true });
+  return root;
+}
+
+test("resolver: skills-config.yaml beats $OBS_WORKSPACE", (t) => {
+  if (!fs.existsSync(RESOLVER))
+    return t.skip("resolver not shipped in this install");
+  const root = makeProject();
+  try {
+    const fromConfig = path.join(root, "from-config");
+    const fromEnv = path.join(root, "from-env");
+    fs.mkdirSync(fromConfig);
+    fs.mkdirSync(fromEnv);
+    fs.writeFileSync(
+      path.join(root, "proj", "skills-config.yaml"),
+      `observations:\n  workspace: ${fromConfig}\n`,
+    );
+    const r = resolveIn(path.join(root, "proj"), { OBS_WORKSPACE: fromEnv });
+    assert.equal(r.refused, false, "resolver refused a durable config path");
+    assert.equal(
+      r.workspace,
+      fromConfig,
+      "config must win over env — the documented order is config → env → default",
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("resolver: $OBS_WORKSPACE is used when the config key is absent", (t) => {
+  if (!fs.existsSync(RESOLVER))
+    return t.skip("resolver not shipped in this install");
+  const root = makeProject();
+  try {
+    const fromEnv = path.join(root, "from-env");
+    fs.mkdirSync(fromEnv);
+    const r = resolveIn(path.join(root, "proj"), { OBS_WORKSPACE: fromEnv });
+    assert.equal(r.refused, false, "resolver refused a durable env path");
+    assert.equal(
+      r.workspace,
+      fromEnv,
+      "with no config key the env var is the second tier — if this returns the " +
+        "default instead, the env tier is dead and its documentation is inert",
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("resolver: an ephemeral anchor is REFUSED, not silently defaulted", (t) => {
+  if (!fs.existsSync(RESOLVER))
+    return t.skip("resolver not shipped in this install");
+  const root = makeProject();
+  try {
+    // The distinction that matters: refusing returns non-zero (=> null here).
+    // Falling back to the default would return a path, and the caller would
+    // never learn its chosen anchor was rejected.
+    const r = resolveIn(path.join(root, "proj"), {
+      OBS_WORKSPACE: "/tmp/observe-work-should-be-refused",
+    });
+    // Assert the RETURN STATUS, not the exported value. A warn-and-continue
+    // resolver exports the empty string here, which is indistinguishable from a
+    // refusal if you only look at the value — and that is the whole difference
+    // between refusing and defaulting.
+    assert.ok(
+      r.ran,
+      "the RC probe produced no output — bash did not run, so `refused` below " +
+        "would report a dead harness as a successful refusal",
+    );
+    assert.equal(
+      r.refused,
+      true,
+      "a /tmp anchor did not make the resolver return non-zero — a log written " +
+        "there is torn down with the checkout, and because the documented " +
+        "`source … || exit 1` guard keys on the return status, a warning that " +
+        "returns 0 is silently ignored by every caller",
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("resolver: every documented `observations.*` key has a reader", (t) => {
+  // The weaker property a precedence test assumes and does not check. Two keys
+  // in an earlier draft of the config doc — `observations.enabled` and
+  // `observations.review_interval_days` — were documented with no reader
+  // anywhere in the tree, which ships a knob that silently does nothing.
+  const doc = readOutside("docs", "reference", "configuration.md");
+  const resolver = readOutside(
+    "shared",
+    "resources",
+    "resolve-observation-workspace.sh",
+  );
+  if (doc === null || resolver === null) return t.skip("repo siblings absent");
+
+  assert.ok(
+    doc.includes("## Observation workspace"),
+    "configuration.md must carry an `## Observation workspace` section",
+  );
+
+  // A key is DOCUMENTED where it is offered to the reader as settable: as a
+  // field of the `observations:` block in the Full schema listing, or as a row
+  // of the Key reference table. Prose that names a key in order to say it does
+  // NOT exist is the opposite of documenting it, so scanning the whole file
+  // would count the disclaimer as the thing it disclaims.
+  const documented = new Set();
+
+  const schemaBlock = doc.match(/^observations:\n((?:[ \t]+.*\n|\n)*)/m);
+  if (schemaBlock) {
+    for (const m of schemaBlock[1].matchAll(/^\s{2}([a-z_]+):/gm)) {
+      documented.add(m[1]);
+    }
+  }
+  for (const m of doc.matchAll(/^\|\s*`observations\.([a-z_]+)`/gm)) {
+    documented.add(m[1]);
+  }
+
+  // Non-vacuity: an empty set would pass the loop below while checking nothing.
+  assert.ok(
+    documented.size > 0,
+    "no `observations.*` key found in the schema block or the key-reference " +
+      "table — the scan is broken, not the documentation clean",
+  );
+  assert.ok(
+    documented.has("workspace"),
+    "`observations.workspace` is the one key that exists; a scan that misses " +
+      "it is reading the wrong part of the document",
+  );
+
+  for (const key of documented) {
+    assert.match(
+      resolver,
+      new RegExp(`read_nested_config_key\\s+observations\\s+${key}\\b`),
+      `configuration.md offers \`observations.${key}\` as settable, but the ` +
+        "resolver never reads it — a documented key with no reader is a knob " +
+        "that silently does nothing",
+    );
+  }
 });

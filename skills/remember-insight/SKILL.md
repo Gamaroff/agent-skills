@@ -99,3 +99,11 @@ Reject or redirect insights that fall into these categories — they don't belon
 - Ephemeral task details or in-progress work state
 
 If the insight falls into one of these, tell the user why it won't be saved and suggest where it should go instead (e.g. a commit message, a CLAUDE.md update, a code comment).
+
+### Related: `observe-work`
+
+`remember-insight` persists an insight **the user states** to the project memory directory. `observe-work` notices signals unprompted during ordinary work and writes them to the observation log, targeting *skills* rather than memory.
+
+Rule of thumb: if it changes how you want the agent to behave across projects, it is a memory; if it names a missing rule, step or principle in a specific skill, it is an observation. The two destinations are not interchangeable — a memory is loaded into every session's context, while an observation waits in a backlog for a review that turns it into a skill edit. Filing a skill gap as a memory means carrying it in context forever instead of fixing it once.
+
+Disambiguate by input: a stated insight is a memory, a finished artifact is an audit, an explicit end-of-session pass is `autoskill`, and anything noticed in passing during the work is an observation.

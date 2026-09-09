@@ -5,25 +5,28 @@ type: task
 description: "Document the observations: config block, add reciprocal boundary notes to the three neighbouring meta-skills, and declare the meta-skill family so observe-work's sibling check has a registry from day one."
 tags: [observe-work, documentation, configuration, skill-boundaries]
 category: documentation
-status: planned
+status: accepted
 priority: High
 created: 2026-09-07
-updated: 2026-09-07
+updated: 2026-09-09
 assignee:
 estimated_effort_hours: 4
 github_issue: 341
+pr_number: 360
+completed_date: 2026-09-09
 ---
 
 # Technical Task: observe-work — config schema, skill boundaries and the meta-skill family
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.95.review.1.observe-work-docs-boundaries.md` implemented 2026-09-09
 **GitHub Issue**: [#341](https://github.com/Gamaroff/agent-skills/issues/341)
 
 ---
 
 ## 1. Overview
 
-Close the documentation gaps that tasks 93 and 94 deliberately left open: the `observations:` block that `resolve-observation-workspace.sh` reads has no schema entry, the three neighbouring meta-skills say nothing about where `observe-work` starts and they stop, and the skill-families registry that `observe-work`'s sibling check depends on does not exist.
+Close the documentation gaps that tasks 93 and 94 deliberately left open: the `observations:` block that `resolve-observation-workspace.sh` reads has no schema entry, the three neighbouring meta-skills say nothing about where `observe-work` starts and they stop, and the skill-families registry that `observe-work`'s sibling check depends on is created empty and never seeded.
 
 This is the task that makes four overlapping skills legible as a set rather than a coin toss at invocation time.
 
@@ -45,16 +48,16 @@ This is the task that makes four overlapping skills legible as a set rather than
 
 1. **The `observations:` key is read but not documented.** Task 93's resolver consults `skills-config.yaml` → `observations.workspace` as its highest-precedence source. `docs/reference/configuration.md` is the canonical schema and says nothing about it, so the only way to learn the key exists is to read the shell script.
 2. **The overlap is stated in one direction only.** Task 94 puts a Related-skills table in `observe-work`. A user who opens `autoskill` — the closest neighbour, and the one most likely to be reached for — sees nothing telling them a continuous-capture alternative exists. One-way disambiguation disambiguates for the person who already found the right skill.
-3. **`observe-work`'s sibling check has no registry.** The skill requires a `siblings_checked:` verdict on every observation and resolves the target against `skill-observations/skill-families.md`. With no registry and no template, every early observation falls through to the no-registry fallback, and the field's value — making the *absence* of a judgement visible — is weakened at exactly the moment the log is being established.
+3. **`observe-work`'s sibling check has an empty registry and no template.** The skill requires a `siblings_checked:` verdict on every observation, and `observation-log-contract.md` is where the target is resolved against `skill-observations/skill-families.md` — `SKILL.md` itself never names the file. `init` *does* create the registry, seeded with a bare four-column header, so the state to fix is an **empty** registry rather than an absent one. With nothing in it and no template to seed it from, every early observation falls through to the empty-registry fallback, and the field's value — making the *absence* of a judgement visible — is weakened at exactly the moment the log is being established.
 4. **Four skills in the same conceptual space with no map.** `autoskill`, `remember-insight`, `double-check` and `observe-work` all involve the agent reflecting on its own work. Without a stated boundary, activation between them is decided by description-match luck.
-5. **The README skill count is stale and hand-maintained.** It will be wrong by two after task 94.
+5. **The README skill count is stale and hand-maintained.** The badge (`README.md:5`) and the prose (`README.md:7`) both read **115**; `ls -d skills/*/ | wc -l` returns **126**. It is wrong by **eleven**, not by the two that tasks 93–95 add — it had already drifted before this work started.
 
 ### Benefits
 
 1. **The config key becomes discoverable** where every other key already is, in the one file the schema lives in.
 2. **Disambiguation works from whichever skill the user opens first**, which is the only version of disambiguation that helps.
 3. **The family registry exists before the log fills up**, so `siblings_checked:` carries a real verdict from the first observation rather than a fallback.
-4. **The family declares its coherence model**, which decides what "fixing drift" even means — edit every member, or edit a core and check the pointers. Without it, a drift finding has no defined remedy.
+4. **The template explains the two coherence models**, which is what decides what "fixing drift" even means — edit every member, or edit a core and check the pointers. It is guidance for the human writing an entry, not a parsed field; without it a drift finding has no defined remedy.
 5. **No catalog regeneration cascade.** Boundary notes go in the bodies only; `description:` fields are untouched, so the generated catalog does not move.
 
 ---
@@ -67,7 +70,7 @@ After tasks 93 and 94:
 
 - `shared/resources/resolve-observation-workspace.sh` reads `observations.workspace` from `skills-config.yaml`. Undocumented.
 - `skills/observe-work/SKILL.md` carries a Related-skills table naming `autoskill`, `remember-insight`, `double-check` and `loop-supervisor`. None of those four names `observe-work`.
-- `skills/observe-work/` ships no `skill-families.md` template, though the skill's rules depend on one.
+- `skills/observe-work/` ships no `skill-families.md` template, though the skill's rules depend on one. `init` creates the live file with a bare four-column header and nothing else.
 - `docs/reference/configuration.md` documents every other consumer-facing key, in a "Full schema" block followed by a "Key reference" section.
 
 The four skills, precisely:
@@ -86,7 +89,8 @@ They are genuinely different. The problem is that nothing says so from three of 
 ```
 docs/reference/configuration.md
   ├── Full schema             ← gains the observations: block
-  └── Key reference           ← gains rows for observations.{enabled,workspace,review_interval_days}
+  └── Key reference           ← gains one row: observations.workspace
+  └── Environment variables   ← gains OBS_STALE_DAYS (default 14)
   └── (new) ## Observation workspace   ← the prose section, in the shape of the existing per-topic sections
 
 skills/autoskill/SKILL.md           ← body-only "Related skills" note
@@ -100,29 +104,52 @@ skills/observe-work/assets/skill-families.template.md   ← seeded with the meta
 
 ```yaml
 observations:
-  enabled: true                              # default true; false disables observe-work's writes
   workspace: ~/.agents/skill-observations    # absolute or ~-relative; highest-precedence source
-  review_interval_days: 7                    # default 7; drives the session-start review offer
 ```
 
-**Family entry to seed**, in the format `observe-work` expects:
+**One key, because one key is what anything reads.** `resolve-observation-workspace.sh` consults
+`observations.workspace` and nothing else (line 145). There is no `observations.enabled` and no
+`observations.review_interval_days` anywhere in the shipped tree — documenting either would ship a
+knob that silently does nothing, which is the same silent-ignore failure §10 Risk 2 already names.
+
+**The review-staleness threshold is an environment variable, not a config key.**
+`observe-work-session-start.sh:111` reads `OBS_STALE_DAYS`, **defaulting to 14**. It belongs in
+`configuration.md`'s existing `## Environment variables` section alongside the other env knobs, not
+in the `observations:` block.
+
+**Family entry to seed**, in the format the engine actually parses — a four-column pipe table:
 
 ```markdown
-## meta-skills
-**Members:** observe-work, autoskill, remember-insight, double-check
-**Coherence model:** shared-core
-**Shared:** the rule that self-observation output is presented for review and never applied silently;
-  the "assert behaviour, not source text" standard for any check they recommend.
-**Member-specific:** the trigger (passive vs explicit), the durable artefact (log / none / memory dir),
-  and the unit observed (session / session / stated insight / artifact).
+# Skill families
+
+| Family | Members | Shared | Member-specific |
+|---|---|---|---|
+| meta-skills | observe-work, autoskill, remember-insight, double-check | {SHARED_LITERAL} | trigger; durable artefact; unit observed |
 ```
+
+**The format is not a style choice.** `parseFamilies()` (`shared/resources/observation-log.js:907`)
+skips every line that does not start with `|` and every row with fewer than four cells. A
+headings-and-bold-lines registry parses to zero families, so the seeded entry would be invisible to
+`families --audit` — the only consumer it exists for. `init` seeds exactly this header
+(`observation-log.js:494-497`); the template's job is to fill it, not to replace it.
+
+**There is no `Coherence model` field.** It appears in task 93's *plan* and was dropped from task
+93's *implementation*: the parser returns `{ name, members, shared, memberSpecific }`. The two
+coherence models stay in the template as **prose guidance for the human writing an entry** — they
+are genuinely useful there — but nothing parses them and no test asserts them.
+
+**`{SHARED_LITERAL}` must be a literal substring of all four members.** `families --audit` matches
+with `body.includes(rule)` (`observation-log.js:981`). Seeding prose sentences that appear verbatim
+in no `SKILL.md` produces a clean-looking table and 8 `rule-absent` gaps on the very first audit —
+verified by execution, not inferred. Pick a short sentence, write that exact sentence into each of
+the three boundary notes in Phase 2, and let the audit prove it.
 
 ### Important Clarifications
 
 - **Body-only edits.** `description:` fields must not change. The catalog generator reads descriptions and is CI drift-checked; touching one forces a regeneration that has nothing to do with this task.
-- **`skill-families.md` ships as an asset, not a live file.** The live registry belongs in the user's workspace, written on first use. Committing a populated registry into the skill would make it a shipped opinion rather than the adopter's own evidence trail — the same reason `starter-principles.md` marks its entries as imported.
-- **`coherence model` is load-bearing.** `synced-duplicates` means fixing drift is editing every member; `shared-core` means editing the core and checking the pointers. A family without one produces findings with no defined remedy.
-- **Absence is not always drift.** The `Member-specific` column is what stops the family audit generating noise instead of signal.
+- **`skill-families.md` ships as an asset, not a live file.** The live registry belongs in the user's workspace, seeded from the template on first use. The template *is* a shipped opinion — one seeded family, in a library that has one obvious family — and the guard against that is not shipping it empty but shipping it **provably correct**: the zero-gap audit test in Phase 3 is what earns it a place in the adopter's workspace. An empty template guards nothing and helps nobody.
+- **The coherence model is guidance, not a field.** `synced-duplicates` means fixing drift is editing every member; `shared-core` means editing the core and checking the pointers. Knowing which one applies is what tells a human what "fix the drift" means — so the template explains both. It is **not** parsed, **not** a column, and **not** asserted by any test.
+- **Absence is not always drift.** The `Member-specific` column is what stops the family audit generating noise instead of signal — but only because the audit checks each `Shared` rule against it before calling an absence drift. That suppression is a substring test, so both columns must hold literal strings, not paraphrase.
 
 ---
 
@@ -139,7 +166,7 @@ observations:
 ### Out of Scope
 
 ❌ **The engine, resolver or contract** — task 93.
-❌ **`observe-work` itself** — task 94. This task adds nothing to its `SKILL.md` except the pointer to the family template.
+❌ **`observe-work` itself** — task 94. This task adds nothing to its `SKILL.md` except the pointer to the family template **and the family's shared sentence** — the audit in Phase 3 greps every member the family lists, `observe-work` included, so omitting it would make the seeded family fail its own audit on first run. See Implementation Notes.
 ❌ **Changing any skill's `description:`** — deliberately excluded to avoid a catalog cascade.
 ❌ **Retiring or merging `autoskill`.** The chosen direction is coexistence with documented boundaries. Consolidation, if it is ever right, needs evidence from real use and a harvest-before-retire pass of its own.
 ❌ **Wiring observation flush points into `develop-story` / `develop-task` / `finalise`.** Deliberately deferred until there is evidence from real use.
@@ -151,7 +178,7 @@ observations:
 
 **None — API stable.** Every change is additive documentation.
 
-The one thing worth naming as a non-change: `observations.enabled` defaults to `true`, but the key's absence is also `true`, so an existing `skills-config.yaml` with no `observations:` block behaves identically before and after this task. Documenting a key does not activate it — `observe-work` still has to be invoked, and activation is a separate problem the skill's own `environments.md` owns.
+The one thing worth naming as a non-change: `observations.workspace` is optional and its absence already resolves to the project-identity default, so an existing `skills-config.yaml` with no `observations:` block behaves identically before and after this task. Documenting a key does not activate it — `observe-work` still has to be invoked, and activation is a separate problem the skill's own `environments.md` owns.
 
 ---
 
@@ -167,10 +194,12 @@ The one thing worth naming as a non-change: `observations.enabled` defaults to `
 - `docs/reference/configuration.md`
 
 **Changes**:
-- [ ] Add the `observations:` block to the Full schema listing, with inline comments in the file's established style
-- [ ] Add one Key reference row per key: `observations.enabled`, `observations.workspace`, `observations.review_interval_days`
-- [ ] Add a short `## Observation workspace` prose section: the three-source resolver order, the ephemeral-anchor refusal, and why the workspace must never be derived from the cwd
-- [ ] State the scope rule: skills installed at user scope are observed from every project, so their log is one user-scope path — a per-project anchor is right only for skills that exist in one project
+- [x] Add the `observations:` block to the Full schema listing — **`workspace` only** — with inline comments in the file's established style
+- [x] Add one Key reference row: `observations.workspace`
+- [x] Add `OBS_STALE_DAYS` (default **14**) to the existing `## Environment variables` section — this, not a config key, is the review-staleness knob `observe-work-session-start.sh` reads
+- [x] Do **not** document `observations.enabled` or `observations.review_interval_days`: nothing in the tree reads either, and a documented key with no reader is the silent-ignore failure Risk 2 names
+- [x] Add a short `## Observation workspace` prose section: the three-source resolver order, the ephemeral-anchor refusal, and why the workspace must never be derived from the cwd
+- [x] State the scope rule: skills installed at user scope are observed from every project, so their log is one user-scope path — a per-project anchor is right only for skills that exist in one project
 
 **Dependencies**: task 93 merged (the resolver defines the precedence being documented)
 
@@ -186,11 +215,12 @@ The one thing worth naming as a non-change: `observations.enabled` defaults to `
 - `skills/double-check/SKILL.md`
 
 **Changes**:
-- [ ] `autoskill`: note that `observe-work` captures continuously into a durable log, while `autoskill` is the explicit on-demand pass that proposes edits now — and that they are complements, not alternatives
-- [ ] `remember-insight`: note that it persists an insight the **user states** to project memory, while `observe-work` notices signals unprompted and writes them to the observation log, targeting skills rather than memory
-- [ ] `double-check`: note that it audits the artifact just produced, while `observe-work` observes the behaviour that produced it — and that a `double-check` finding is often worth logging as an observation
-- [ ] Body-only in all three: **do not touch any `description:` field**
-- [ ] Confirm `npm run generate-catalog` produces no diff afterwards — the proof that no description moved
+- [x] `autoskill`: note that `observe-work` captures continuously into a durable log, while `autoskill` is the explicit on-demand pass that proposes edits now — and that they are complements, not alternatives
+- [x] `remember-insight`: note that it persists an insight the **user states** to project memory, while `observe-work` notices signals unprompted and writes them to the observation log, targeting skills rather than memory
+- [x] `double-check`: note that it audits the artifact just produced, while `observe-work` observes the behaviour that produced it — and that a `double-check` finding is often worth logging as an observation
+- [x] Write the family's shared sentence **verbatim** into all three notes — Phase 3's audit greps for it as a literal substring, so the wording is a contract, not prose
+- [x] Body-only in all three: **do not touch any `description:` field**
+- [x] Confirm `npm run generate-catalog` produces no diff afterwards — the proof that no description moved
 
 **Dependencies**: task 94 merged (the skill must exist to be pointed at)
 
@@ -206,13 +236,14 @@ The one thing worth naming as a non-change: `observations.enabled` defaults to `
 - `skills/observe-work/tests/observe-work.test.js`
 
 **Changes**:
-- [ ] Write the template: the per-family format, and the seeded meta-skills entry
-- [ ] Explain both coherence models and what fixing drift means under each
-- [ ] Explain the `Member-specific` column as the thing that stops the audit generating noise
-- [ ] Add one line to `observe-work`'s Session Start Protocol: when the workspace has no `skill-families.md`, copy the template rather than starting empty
-- [ ] Extend the `observe-work` suite: the template exists, parses into the expected fields, and every member it names is a real skill directory
+- [x] Write the template as a **four-column pipe table** (`Family | Members | Shared | Member-specific`) — the only shape `parseFamilies()` reads
+- [x] Seed the meta-skills entry, with a `Shared` value that is a literal substring of all four members (the sentence written in Phase 2)
+- [x] Explain both coherence models and what fixing drift means under each — as **prose guidance in the preamble**, not as a column and not as a parsed field
+- [x] Explain the `Member-specific` column as the thing that stops the audit generating noise, and that its suppression is a substring test so it too must hold literal strings
+- [x] Add one line to `observe-work`'s Session Start Protocol: when `skill-families.md` exists but holds **no family rows**, seed it from `assets/skill-families.template.md` — `init` always creates the file, so "missing" is never the state you find
+- [x] Extend the `observe-work` suite: the template exists, parses into the engine's actual shape (`name`, `members`, `shared`, `memberSpecific`), every member it names is a real skill directory, **and `families --audit` against the repo returns zero gaps**
 
-**Dependencies**: Phase 2
+**Dependencies**: Phase 2 — and not merely on its completion: the seeded `Shared` value must be the exact sentence Phase 2 wrote into the three boundary notes
 
 ---
 
@@ -225,10 +256,10 @@ The one thing worth naming as a non-change: `observations.enabled` defaults to `
 - `CHANGELOG.md`
 
 **Changes**:
-- [ ] Correct the hand-maintained skill count and badge
-- [ ] Add `observe-work` to the featured list if it belongs there
-- [ ] `CHANGELOG.md` entry covering tasks 93–95 as one capability
-- [ ] `npm run format`, `npm test`
+- [x] Correct the hand-maintained skill count and badge — 115 → the live `ls -d skills/*/ | wc -l`, currently **126**, not 115+2
+- [x] Add `observe-work` to the featured list if it belongs there
+- [x] `CHANGELOG.md` entry covering tasks 93–95 as one capability
+- [x] `npm run format`, `npm test`
 
 **Dependencies**: Phase 3
 
@@ -252,7 +283,8 @@ The one thing worth naming as a non-change: `observations.enabled` defaults to `
 ### Files to Modify (Core Implementation)
 
 8. ✅ `skills/observe-work/SKILL.md` — one pointer line to the template
-9. ✅ `skills/observe-work/tests/observe-work.test.js` — template assertions
+9. ✅ `skills/observe-work/tests/observe-work.test.js` — family-template assertions + resolver contract tests
+10. ✅ `skills/observe-work/tests/observe-work-hook.test.js` — `OBS_STALE_DAYS` contract tests (default 14, asserted by driving the hook)
 
 ### Files to Delete
 
@@ -267,10 +299,10 @@ None.
 **Scope**: the family template and the pointer to it.
 
 **Actions**:
-- [ ] `skill-families.template.md` exists and is referenced from `SKILL.md`
-- [ ] It parses into the expected fields: `Members`, `Coherence model`, `Shared`, `Member-specific`
-- [ ] `Coherence model` is one of the two defined values
-- [ ] Every member it names resolves to a real directory under `skills/`
+- [x] `skill-families.template.md` exists and is referenced from `SKILL.md`
+- [x] It parses through the engine into `{ name, members, shared, memberSpecific }` — the shape `parseFamilies()` actually returns
+- [x] Every member it names resolves to a real directory under `skills/` (tolerating ENOENT inside a packaged skill, as the existing per-skill suites do)
+- [x] **`families --audit` against this repository returns zero gaps** — the assertion that catches a seeded `Shared` value no member literally contains
 
 **Command**: `npm test`
 
@@ -281,9 +313,9 @@ None.
 **Scope**: the repo-level suites that catch documentation drift.
 
 **Actions**:
-- [ ] `tests/skill-frontmatter.test.js` — catalog still in sync, which is the proof no `description:` moved
-- [ ] `tests/skill-doc-coverage.test.js` — the three edited skills are still documented
-- [ ] Bundle-freshness check — three `SKILL.md` files were edited, so the pre-commit hook re-bundles; the second run must produce no diff
+- [x] `tests/skill-frontmatter.test.js` — catalog still in sync, which is the proof no `description:` moved
+- [x] `tests/skill-doc-coverage.test.js` — the three edited skills are still documented
+- [x] Bundle-freshness check — three `SKILL.md` files were edited, so the pre-commit hook re-bundles; the second run must produce no diff
 
 ---
 
@@ -292,8 +324,9 @@ None.
 **Scope**: the documented config keys match what the resolver actually reads.
 
 **Actions**:
-- [ ] Every key documented in `configuration.md` under `observations:` is consulted somewhere in `resolve-observation-workspace.sh`
-- [ ] The documented precedence order matches the resolver's implemented order — assert against the script's behaviour, not against a comment in it
+- [x] `observations.workspace` — the one key documented under `observations:` — is consulted by `resolve-observation-workspace.sh`, and no key is documented that is not
+- [x] `OBS_STALE_DAYS` is documented with the default the hook actually applies (14), asserted by driving the hook rather than by reading it
+- [x] The documented precedence order matches the resolver's implemented order — assert against the script's behaviour, not against a comment in it
 
 ---
 
@@ -308,9 +341,9 @@ Not applicable — documentation only. No runtime path changes.
 **Scope**: the three edited skills must still work.
 
 **Actions**:
-- [ ] `quick_validate.py` passes on `autoskill`, `remember-insight`, `double-check`
-- [ ] `double-check`'s own suite, if it has one, still passes
-- [ ] No edited skill's body grew past the point where its own structure tests fail
+- [x] `quick_validate.py` passes on `autoskill`, `remember-insight`, `double-check`
+- [x] `double-check`'s own suite, if it has one, still passes
+- [x] No edited skill's body grew past the point where its own structure tests fail
 
 ---
 
@@ -318,29 +351,31 @@ Not applicable — documentation only. No runtime path changes.
 
 ### Functional
 
-- [ ] `observations:` documented in both the Full schema block and the Key reference section
-- [ ] The documented resolver precedence matches the resolver's actual behaviour, asserted rather than assumed
-- [ ] All three neighbouring skills carry a boundary note naming `observe-work`
-- [ ] `skill-families.template.md` ships and is pointed at from the Session Start Protocol
-- [ ] Every member named in the template resolves to a real skill directory
+- [x] `observations.workspace` documented in both the Full schema block and the Key reference section — and no key documented that nothing reads
+- [x] `OBS_STALE_DAYS` documented in the Environment variables section with its real default of 14
+- [x] The documented resolver precedence matches the resolver's actual behaviour, asserted rather than assumed
+- [x] All three neighbouring skills carry a boundary note naming `observe-work`, each containing the family's shared sentence verbatim
+- [x] `skill-families.template.md` ships as a four-column pipe table and is pointed at from the Session Start Protocol
+- [x] Every member named in the template resolves to a real skill directory
+- [x] `families --audit` returns zero gaps against the seeded family
 
 ### Performance
 
-- [ ] No runtime path changed; no measurable effect. Stated explicitly rather than left implied
+- [x] No runtime path changed; no measurable effect. Stated explicitly rather than left implied
 
 ### Code Quality
 
-- [ ] `npm run generate-catalog` produces **no diff** — the proof no `description:` field was touched
-- [ ] `npm run bundle` produces a clean diff on a second run
-- [ ] `npm test` passes
-- [ ] `npm run format` clean
-- [ ] `quick_validate.py` passes on all four affected skills
+- [x] `npm run generate-catalog` produces **no diff** — the proof no `description:` field was touched
+- [x] `npm run bundle` produces a clean diff on a second run
+- [x] `npm test` passes
+- [x] `npm run format` clean
+- [x] `quick_validate.py` passes on all four affected skills
 
 ### Migration
 
-- [ ] `CHANGELOG.md` covers tasks 93–95 as one capability, not three unrelated entries
-- [ ] README skill count and badge correct
-- [ ] No existing `skills-config.yaml` needs editing — key absence and `enabled: true` behave identically
+- [x] `CHANGELOG.md` covers tasks 93–95 as one capability, not three unrelated entries
+- [x] README skill count and badge correct
+- [x] No existing `skills-config.yaml` needs editing — key absence and `enabled: true` behave identically
 
 ---
 
@@ -362,10 +397,10 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 
 **2. The documented precedence and the implemented precedence diverge**
 
-- **Risk**: the schema documents config → env → default while the resolver implements something else, or the resolver changes later and the docs do not.
+- **Risk**: the schema documents config → env → default while the resolver implements something else, or the resolver changes later and the docs do not. **The same failure one step wider — documenting a key that no code reads at all — is the one that actually bit this task in review**: `observations.enabled` and `observations.review_interval_days` were both specified for documentation and neither exists in the tree.
 - **Probability**: Medium over time; low within this task.
 - **Impact**: Major — a user pins a workspace that is silently ignored, and the symptom is an empty, clean-looking backlog.
-- **Mitigation**: a contract test asserting the order against the resolver's **behaviour**, not against a comment inside it. This repo has been explicit that grepping source text proves the string exists, not that it works.
+- **Mitigation**: a contract test asserting the order against the resolver's **behaviour**, not against a comment inside it — *and* asserting that every documented key has a reader at all. This repo has been explicit that grepping source text proves the string exists, not that it works.
 - **Rollback**: correct whichever side is wrong.
 
 ### Low Risk Areas
@@ -432,41 +467,123 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**QA Reports**: `task.95.qa.1` (CONCERNS 90) · `task.95.qa.2` (PASS 100, refute pass)
+**Gate File**: `task.95.gate.2.observe-work-docs-boundaries.yml`
+**Gate Status**: ✅ PASS · **Quality Score**: 100/100 · **QA Cycles**: 2
+**PR Review (Step 5c)**: ✅ APPROVE — `task.95.pr-review.1.observe-work-docs-boundaries.md`
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 9/9 met — the seven functional ones enforced by executable assertions, not inspection
+✅ **Tests:** 10 added (4 family-template, 4 resolver contract, 2 `OBS_STALE_DAYS`), every one mutation-proven
+✅ **CI:** green on `2c6dfc13` — `test`, `validate`, `link-check`, `shellcheck`, `branch-policy` all SUCCESS
+✅ **PR:** #360 → `develop`, reviewed at Step 5c with all findings actioned
+✅ **Documentation:** config schema, key reference, environment variable, prose section, README, CHANGELOG
+✅ **Security:** PASS — no boundary deliverable, no credential/network/write surface, no injection surface in tests
+⚠️ **Compliance:** NOT APPLICABLE — no personal, payment or health data; no UI. CC BY 4.0 attribution present in three places
+✅ **Reliability / Maintainability:** PASS — four previously-ambiguous skills now state their boundaries; the family registry ships seeded
+
+**One episode worth carrying forward.** CI caught what six local gates did not: both family-template
+tests used `os.tmpdir()` for the engine workspace, which is `/var/folders/…` on macOS and `/tmp` on
+Linux — and the engine refuses an ephemeral workspace. The suite was green locally through three
+runs, a QA cycle, an independent QA re-verification and a PR review, and red in CI. Fixed by moving
+the fixtures to `os.homedir()`; reproduced and proven locally with `TMPDIR=/tmp` rather than pushed
+and hoped. QA report 1, which had examined that exact construct and blessed it, was corrected in
+place so the record of the false pass survives. Logged as observation #17.
+
+**Detailed Verification Log:** see [`task.95.dod.1.observe-work-docs-boundaries.md`](./task.95.dod.1.observe-work-docs-boundaries.md).
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 90/100)
+**QA Cycles**: 2
+
+### QA Report
+
+- **Full Report**: [task.95.qa.2.observe-work-docs-boundaries.md](./task.95.qa.2.observe-work-docs-boundaries.md) (cycle 2) · [cycle 1](./task.95.qa.1.observe-work-docs-boundaries.md)
+- **Gate File**: [task.95.gate.2.observe-work-docs-boundaries.yml](./task.95.gate.2.observe-work-docs-boundaries.yml) (cycle 2) · [cycle 1](./task.95.gate.1.observe-work-docs-boundaries.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2902 (2901 pass, 0 fail, 1 pre-existing skip)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Bug Reports
+
+- [task.95.bug.1: default workspace path undocumented](./task.95.bug.1.default-workspace-path-undocumented.md) — ✅ **Closed** — Severity: MEDIUM (fixed and verified 2026-09-09)
+
+### Key Findings
+
+**Cycle 1 (CONCERNS, 90/100)** found one MEDIUM ([task.95.bug.1](./task.95.bug.1.default-workspace-path-undocumented.md)) — the new `## Observation workspace` section never stated the default workspace path, and the schema block's `~/.agents/...` example pointed at a different tree from the real default — plus two LOW advisory cleanups in the new tests. All three were fixed in one iteration and verified by driving the resolver rather than reading the diff.
+
+**Cycle 2 (PASS, 100/100)** was an unscoped refute pass over the whole branch diff. It closed all three and produced one new LOW: the newly-documented path formula is silent about linked git worktrees, where the resolver deliberately anchors to the *main* worktree. The rule is already stated 33 lines further down in the same document, so it does not gate; it is carried as a `future` recommendation and matters here because `/develop-batch` runs every parallel story in a linked worktree.
+
+No HIGH or MEDIUM issues remain. Every phase was verified against the tree rather than the document, and every invariant added by either cycle is mutation-proven.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-09-07 | 1.0     | Initial draft | create-task |
+| 2026-09-09 | 1.1     | Review: 4 Critical, 5 Important — two config keys nothing reads, a template format the parser cannot read, an invented `Coherence model` field, a seeded family failing its own audit (8 gaps, reproduced). All fixed in-document; no engine change | review-task |
+| 2026-09-09 |         | Status → ready-for-development | review-task |
+| 2026-09-09 |         | Implemented — 10 files, 8 tests added (4 family-template, 3 resolver contract, 2 OBS_STALE_DAYS; all mutation-proven) | develop |
+| 2026-09-09 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 2 LOW | qa-task |
+| 2026-09-09 |         | QA findings fixed — 1 MEDIUM + 2 LOW addressed, 1 iteration | qa-fix |
+| 2026-09-09 |         | QA gate PASS (100/100) — refute pass, 1 new LOW (advisory) | qa-task |
+| 2026-09-09 |         | PR review APPROVE — 3 low findings actioned | review-pr |
+| 2026-09-09 |         | CI red on Linux — os.tmpdir() fixtures refused as ephemeral; fixed | qa-fix |
+| 2026-09-09 | 1.2     | DoD verified — accepted (PR #360) | finalise |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Config schema
-- [ ] `observations:` block in the Full schema
-- [ ] Key reference rows
-- [ ] `## Observation workspace` prose section
-- [ ] Scope rule stated
+- [x] `observations:` block in the Full schema — `workspace` only
+- [x] Key reference row for `observations.workspace`
+- [x] `OBS_STALE_DAYS` (default 14) in the Environment variables section
+- [x] `## Observation workspace` prose section
+- [x] Scope rule stated
 
 ### Phase 2: Boundary notes
-- [ ] `autoskill`
-- [ ] `remember-insight`
-- [ ] `double-check`
-- [ ] No `description:` touched
-- [ ] Catalog regen produces no diff
+- [x] `autoskill`
+- [x] `remember-insight`
+- [x] `double-check`
+- [x] Shared sentence written verbatim into all three
+- [x] No `description:` touched
+- [x] Catalog regen produces no diff
 
 ### Phase 3: Family template
-- [ ] Template written and seeded
-- [ ] Coherence models explained
-- [ ] `Member-specific` column explained
-- [ ] Session Start Protocol pointer
-- [ ] Test assertions
+- [x] Template written as a four-column pipe table and seeded
+- [x] Coherence models explained as prose guidance, not as a field
+- [x] `Member-specific` column explained
+- [x] Session Start Protocol pointer (seed an empty registry, not a missing one)
+- [x] Test assertions, including zero-gap `families --audit`
 
 ### Phase 4: README and changelog
-- [ ] Skill count and badge
-- [ ] Featured list
-- [ ] `CHANGELOG.md`
-- [ ] Format and test
+- [x] Skill count and badge
+- [x] Featured list
+- [x] `CHANGELOG.md`
+- [x] Format and test
 
 ---
 
@@ -487,12 +604,38 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 - **Do not touch any `description:` field.** Body-only edits. `npm run generate-catalog` producing no diff is how you prove it.
 - **Three `SKILL.md` edits fire the pre-commit bundler.** Let it run and commit what it stages; do not hand-edit anything it generates.
 - **Assert the resolver's behaviour, not its comments.** A documented precedence that matches a comment but not the code is the failure this task exists partly to prevent.
-- **The family template ships as an asset, not as live state.** The adopter's registry belongs in their workspace, and its authority comes from their own evidence trail.
+- **The family template ships as an asset, not as live state.** The adopter's registry belongs in their workspace, seeded from the template on first use.
+- **The registry format is the engine's, not yours.** Four-column pipe table. `parseFamilies()` skips anything else, silently, and a template it cannot read looks exactly like a template with nothing in it.
+- **`Shared` and `Member-specific` hold literal substrings, not paraphrase.** The audit is `body.includes(rule)`. A seeded family whose rules read well and match nothing produces 8 gaps on first run and teaches the adopter to ignore the check.
+
+### Implementation Notes (added by `/develop`, 2026-09-09)
+
+- **One Success Criterion carries stale wording and was ticked on its substance.** The Migration
+  criterion reads "key absence and `enabled: true` behave identically". `observations.enabled` was
+  removed during review 1 precisely because nothing reads it, so the criterion names a key that does
+  not exist. The substance is satisfied and asserted: an absent `observations:` block resolves to the
+  project-identity default, so no existing `skills-config.yaml` needs editing. The clause about
+  `enabled: true` is unsatisfiable as written and is recorded here rather than silently ticked.
+- **The shared sentence is written into four members, not three.** Phase 2 names three neighbouring
+  skills, but Phase 3's zero-gap audit covers every member the family lists — including
+  `observe-work` itself. Its `SKILL.md` therefore also carries the sentence verbatim, in the existing
+  "Related skills — what this is not" section. Without it the seeded family reports one gap on its
+  first run, which is the exact failure Phase 3 was written to prevent.
+- **Contract tests were added beyond the Unit Tests scope.** §8's Contract Tests section asks for the
+  resolver precedence and the `OBS_STALE_DAYS` default to be "asserted by driving" rather than read.
+  Ad-hoc probes in a session log are not assertions, so three resolver tests and two hook tests were
+  committed. All are mutation-proven — the config tier, the env tier, the ephemeral refusal and the
+  no-reader check each go red when the behaviour they name is reverted.
+- **One of those tests was vacuous when first written and was rewritten.** The `resolveIn` helper
+  initially returned a single value, collapsing "the resolver refused" and "the resolver returned an
+  empty string" into one signal — so the ephemeral-refusal test passed against a warn-and-continue
+  mutant. The helper now returns `{ refused, workspace }` and the refusal test reads the status.
+  Logged as observation #16.
 
 ### Known Issues
 
 **Open** (Non-blocking):
-- ⚠️ The README skill count is hand-maintained and nothing checks it. Corrected here; it will drift again.
+- ⚠️ The README skill count is hand-maintained and nothing checks it. It had already drifted by eleven before this task started. Corrected here; it will drift again — the follow-up test below is now the second occurrence, not a hypothetical.
 
 ### Future Improvements
 
@@ -502,7 +645,7 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the implementation plan

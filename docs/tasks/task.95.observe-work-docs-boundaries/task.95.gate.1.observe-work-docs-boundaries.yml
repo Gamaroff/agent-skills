@@ -1,0 +1,60 @@
+schema: 1
+task: "task.95.observe-work-docs-boundaries"
+task_title: "observe-work: config schema, skill boundaries and the meta-skill family"
+gate: CONCERNS
+status_reason: "All 4 phases complete and every success criterion verified against the tree. One MEDIUM documentation defect: the section that exists to help a reader find the observation workspace never states the default path, and its example points at a different directory tree from the real default."
+reviewer: "QA Engineer"
+updated: "2026-09-09T10:30:00Z"
+
+top_issues:
+  - id: "TASK-95-BUG-1"
+    severity: medium
+    file: "docs/reference/configuration.md"
+    finding: "The default observation workspace is documented as '(project-identity path under the agent home)' with no path given, while the schema block's example value uses ~/.agents/. The actual default is ~/.claude/projects/<abs-project-path with / replaced by ->. A reader cannot locate their own log, and the .agents/ example points at the wrong tree."
+    suggested_action: "State the default's shape and its / -> - encoding in both the Key reference row and the prose resolver list, and mark the schema block's value as an override example rather than the default."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2902
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No credential, auth, network or file-write surface touched. Staged diff scanned for secrets and debug logging — clean. The documented ephemeral-anchor refusal is asserted to return non-zero, which is the property the `source ... || exit 1` guard actually depends on."
+  performance:
+    status: PASS
+    notes: "No runtime path changed. Added suite time is under one second against a 70s suite."
+  reliability:
+    status: PASS
+    notes: "Rollback plan documented and trivial for this change set. Seven mutations applied during development each turned a named test red; QA independently re-ran one and confirmed red-then-green."
+  maintainability:
+    status: PASS
+    notes: "Four previously-ambiguous skills now state their boundaries and the family registry ships seeded. Three copies of the precedence rule now exist, recorded as a LOW issue; the consumer-facing copy is the one bound to executable assertions."
+
+recommendations:
+  immediate:
+    - action: "State the default workspace path and its / -> - encoding; mark the schema example as an override."
+      refs: ["docs/reference/configuration.md"]
+  future:
+    - action: "Lift the two in-body require() calls to module scope, matching the sibling hook suite."
+      refs: ["skills/observe-work/tests/observe-work.test.js"]
+    - action: "Anchor saysStale() to the review-state clause rather than matching the whole context string."
+      refs: ["skills/observe-work/tests/observe-work-hook.test.js"]
+    - action: "Consider binding observation-log-contract.md's precedence statement to the resolver, closing the third unbound copy."
+      refs: ["shared/resources/observation-log-contract.md"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Fix TASK-95-BUG-1 (documented default workspace path) before merge."

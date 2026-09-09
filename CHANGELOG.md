@@ -30,6 +30,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`observe-work`** — a meta-skill that observes the working session for skill-improvement signals,
+  writes each as an observation to a durable log, and periodically reviews that backlog to stage
+  skill updates for a human to install. The log is a directory of one Markdown file per observation;
+  every read and write goes through `shared/resources/observation-log.js`, which owns id derivation,
+  the archival sweep and the frontmatter parse, so no snippet can hand-roll them. The workspace is
+  resolved once by `shared/resources/resolve-observation-workspace.sh` and never derived from the
+  cwd — an ephemeral anchor (`/tmp`, `.claude/worktrees/`, a linked git worktree) is refused rather
+  than warned about, because a log written into a torn-down checkout does not error on the next
+  scan, it reports zero observations.
+
+  Methodology adapted from [task-observer](https://github.com/rebelytics/one-skill-to-rule-them-all)
+  by Eoghan Henn (CC BY 4.0); the methodology is kept, the mechanism is a rewrite. Tasks 93–95.
+
+  Shipped with it: the `observations.workspace` config key and the `OBS_STALE_DAYS` environment
+  variable documented in [`docs/reference/configuration.md`](docs/reference/configuration.md);
+  reciprocal boundary notes in `autoskill`, `remember-insight` and `double-check` so a reader can
+  tell at invocation time which of the four they want; and a seeded
+  `skills/observe-work/assets/skill-families.template.md`, so the sibling check has a registry with a
+  real family in it on day one rather than an empty file.
+
 - **Two named defect classes in [`docs/reference/anti-patterns.md`](docs/reference/anti-patterns.md),
   and a Signal Design Principle section in `create-skill`.** *Never let one signal report two states*
   — for each falsy, empty or zero value a check emits, name the situations that produce it; where

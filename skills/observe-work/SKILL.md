@@ -94,6 +94,11 @@ Then act on `reason`:
 > `empty` vs `scan-broken` exists precisely so a broken reader cannot masquerade as an empty log —
 > reading only `reason` here reintroduces at the caller the confusion the engine removed internally.
 
+**Seed the families registry when it is empty.** When `skill-families.md` exists but holds no family
+rows, seed it from [`assets/skill-families.template.md`](assets/skill-families.template.md) — the
+sibling check needs a registry, and the seeded meta-skills family is the one this skill belongs to.
+`init` always creates the file, so an absent registry is never the state you find; an empty one is.
+
 **2. Scan.**
 
 ```bash
@@ -253,9 +258,13 @@ Disambiguation happens at invocation time, so it lives here rather than in a ref
 | `double-check` | audits the artifact just produced | audit artifacts — it observes the behaviour that produced them |
 | `loop-supervisor` | per-iteration ledger for unattended loops | own loop runs — it observes any session |
 
-If two of these would fire, prefer the one whose **input** matches: a stated insight → `remember-insight`;
-a finished artifact → `double-check`; an explicit end-of-session pass → `autoskill`; anything noticed
-in passing → here.
+If two of these would fire, prefer the one whose **input** matches.
+Disambiguate by input: a stated insight is a memory, a finished artifact is an audit, an explicit end-of-session pass is `autoskill`, and anything noticed in passing during the work is an observation.
+
+That sentence is the `Shared` value of the **meta-skills** family in the families registry, written
+verbatim into all four members. The drift audit greps for it as a literal substring, so if you reword
+it here, reword it in `autoskill`, `remember-insight` and `double-check` in the same edit — or the
+audit reports every one of them as drifted.
 
 ---
 
