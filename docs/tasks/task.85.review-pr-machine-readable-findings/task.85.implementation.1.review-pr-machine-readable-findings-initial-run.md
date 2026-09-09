@@ -36,7 +36,7 @@ text, and make the qa-fix ingester prefer that block while still parsing legacy 
 | 2. review-task             | ✅ Done    | `task.85.review.{N}.{name}.md` exists (or skip logged)                 | Ran (status `Draft`, no prior report). 5/10 NEEDS REVISION as found → 3 Critical + 4 Important fixed in place → 9/10 READY TO IMPLEMENT. Promoted `draft → ready-for-development`. Report: `task.85.review.1.review-pr-machine-readable-findings.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1-3 landed in 1 iteration (no stall, no re-invoke). 13 mutations proven. `npm run ci:fast` green: prettier clean + 2965 tests, 0 fail | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #363: https://github.com/Gamaroff/agent-skills/pull/363. Issue comment skipped — no linked tracker issue. Leak check: OK | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.85.qa.{N}.*.md`; `task.85.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.85.qa.{N}.*.md`; `task.85.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.85.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -226,6 +226,37 @@ example rather than to a rule.
 
 `npm run ci:fast` green after the fixes: prettier clean, 2965 tests, 0 failures. `npm run bundle`
 re-run; the one bundled consumer is in sync.
+
+---
+
+### QA Cycle 2 — 2026-09-09
+
+**Gate**: PASS (95/100) — `task.85.gate.2.review-pr-machine-readable-findings.yml`
+**Report**: `task.85.qa.2.review-pr-machine-readable-findings.md`
+**PR Review**: _Step 5c — see below_
+
+All three cycle-1 findings verified fixed. Mandatory cycle-2 **refute pass** (unscoped, whole-branch,
+because `PRIOR_GATES=1`) found nothing in the fixes. One new LOW — TASK85-004, `truncated_count` is
+carried on the block path but dropped on the legacy fallback — pre-existing, and its remedy needs a
+stable text shape for the rendered omitted-count note, which §4 Out of Scope forbids changing here.
+
+**Full `npm run ci` run at this point rather than deferred**, exit 0 including `eval:all`. Success
+criterion 10 says *full* `npm run ci`; cycle 1 could only mark it PARTIAL because only the fast tier
+had run, and a criterion marked PARTIAL at acceptance is a criterion nothing verified.
+
+**Two further probe misreadings this cycle**, both recorded in the QA report where they occurred:
+
+- The Step 4b engine reported an `execution-failure` at high confidence in **both** shells — the
+  strongest shape that finding takes. It was the probe's own binding: `DOC_FILE` was bound to a
+  repo-relative path while `--copy` places the directory's *contents* at the temp root, so `dirname`
+  yielded a directory absent from the sandbox and `find` exited 1 with stderr suppressed.
+- An exhaustiveness regex reported the mapping table's `id` row missing — the very defect just fixed,
+  apparently reintroduced. The row reads ``| `id` (`PC-1`, `CR-1`) |`` and the pattern expected a bare
+  backticked word.
+
+Together with cycle 1's M5, that is three probes in one task whose output was a claim about the
+instrument. Logged as observation **#26**; the pattern is that a probe's result — positive *or*
+negative — is not evidence until the probe is shown to have acted on its subject.
 
 ---
 

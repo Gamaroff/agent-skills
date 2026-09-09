@@ -5,7 +5,7 @@ type: task
 description: "The qa-fix ingester parses /review-pr's rendered three-line finding format by prose description. That contract is the sole carrier of findings on the Step 5c REQUEST CHANGES path, and it currently rests on an LLM matching a format described in another file. Emit a structured findings block so the path is deterministic."
 tags: [review-pr, qa-fix, pipeline, contracts]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-03
@@ -16,7 +16,7 @@ estimated_effort_hours: 4
 
 # Technical Task: Give `/review-pr` a machine-readable findings block
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.85.review.1.review-pr-machine-readable-findings.md` implemented 2026-09-09
 
 ---
@@ -322,31 +322,39 @@ assertions.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.85.qa.1.review-pr-machine-readable-findings.md](./task.85.qa.1.review-pr-machine-readable-findings.md)
-- **Gate File**: [task.85.gate.1.review-pr-machine-readable-findings.yml](./task.85.gate.1.review-pr-machine-readable-findings.yml)
+- **Cycle 2 (final)**: [task.85.qa.2.review-pr-machine-readable-findings.md](./task.85.qa.2.review-pr-machine-readable-findings.md) · [gate.2](./task.85.gate.2.review-pr-machine-readable-findings.yml) — **PASS 95/100**
+- **Cycle 1**: [task.85.qa.1.review-pr-machine-readable-findings.md](./task.85.qa.1.review-pr-machine-readable-findings.md) · [gate.1](./task.85.gate.1.review-pr-machine-readable-findings.yml) — FAIL 70/100
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 2965 (0 failures)
-- **Phases Verified**: 2/3 clean (Phase 2 CONCERNS)
-- **Critical Issues**: 1 HIGH, 1 MEDIUM, 1 LOW
-- **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Tests Executed**: 2965 (0 failures) + full `npm run ci` including `eval:all` — exit 0
+- **Phases Verified**: 3/3
+- **QA Cycles**: 2
+- **Issues**: cycle 1 — 1 HIGH, 1 MEDIUM, 1 LOW (**all fixed**); cycle 2 — 1 LOW (pre-existing, out of scope)
+- **NFR Status**: Security: PASS (`reasoned`, 0 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-The emitter half and the contract tests are sound and mutation-proven. **TASK85-001 (HIGH)**: the
-ingester's block-to-output mapping contradicts itself (`suggested_action` both "carries across by
-name" and "becomes `suggested_fix_path`", and the output schema defines no `suggested_action`) and
-gives no destination for `id`, `category` or `confidence`. That is the consumer half of the very
-contract this task exists to make deterministic.
+Cycle 1 gated **FAIL (70/100)** on TASK85-001: the ingester's block-to-output mapping contradicted
+itself — `suggested_action` was said both to "carry across by name" and to "become
+`suggested_fix_path`", while the output schema defines no `suggested_action` key at all — and gave no
+destination for `id`, `category` or `confidence`. That was the consumer half of the very contract this
+task exists to make deterministic, so an ambiguous mapping there would have moved the defect one layer
+along rather than removing it.
+
+Cycle 2 gated **PASS (95/100)**. All three findings fixed; the mandatory refute pass over the fixes
+found nothing, and the mapping table's exhaustiveness was verified mechanically in both directions
+(7 block fields → 7 rows; 6 output fields → 6 destinations). One LOW remains — `truncated_count` is
+carried on the block path but not on the legacy fallback — which is pre-existing and whose remedy
+§4 Out of Scope explicitly forbids here.
 
 ## Change Log
 
@@ -358,3 +366,4 @@ contract this task exists to make deterministic.
 | 2026-09-09 |         | Phases 1-3 implemented; 13 mutations proven; `npm run ci:fast` green (2965 tests, 0 fail); status → ready-for-review | develop |
 | 2026-09-09 |         | QA gate FAIL (70/100) — 3 findings, 1 HIGH in the ingester mapping | qa-task |
 | 2026-09-09 |         | QA findings fixed — TASK85-001/002/003 closed, 4 new mutations proven, 1 iteration | qa-fix |
+| 2026-09-09 |         | QA gate PASS (95/100) cycle 2 — refute pass clean, full `npm run ci` green, 1 LOW out of scope | qa-task |
