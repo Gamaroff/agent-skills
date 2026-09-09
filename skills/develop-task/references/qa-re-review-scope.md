@@ -98,9 +98,21 @@ if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
     }
   ' "$LATEST_GATE" </dev/null)
   case "$SECURITY_AXIS" in
-    absent)       : ;;
-    *FAIL*)       SAFETY_REPROBE=true ;;
-    *unverified*) SAFETY_REPROBE=true ;;
+    absent)                     : ;;
+    *FAIL*)                     SAFETY_REPROBE=true ;;
+    *unverified*)               SAFETY_REPROBE=true ;;
+    "OK measured"|"OK reasoned") : ;;
+    # The branches above are EXHAUSTIVE over what the program can emit, so
+    # reaching here means the reader produced something it cannot produce —
+    # in practice the EMPTY string, from an awk that died, is missing, or had
+    # its program corrupted in transit. That is a claim about the instrument,
+    # not about the gate, so it fires: nothing has established the axis is
+    # fine. `absent` is a deliberate answer; empty is not an answer at all.
+    #
+    # The clean readings must be listed BEFORE this. Leaving them to the
+    # catch-all makes every passing gate fire — which is what happened when
+    # this branch was first added.
+    *)                          SAFETY_REPROBE=true ;;
   esac
 fi
 ```

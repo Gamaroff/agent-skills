@@ -28,7 +28,14 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, writeFileSync, rmSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  writeFileSync,
+  rmSync,
+  mkdirSync,
+  chmodSync,
+} from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
@@ -1124,4 +1131,107 @@ test("both skills carry the same two properties", () => {
       `${name}: the awk program contains an apostrophe`,
     );
   }
+});
+
+/* ---------------------------------------------------------------------------
+ * 11. An empty reading is a claim about the INSTRUMENT, not about the gate.
+ *
+ * Found by the cycle-2 refute pass. `absent` is a deliberate answer meaning
+ * "this gate has no security block". The EMPTY string means awk produced
+ * nothing — it died, it is missing, or its program was corrupted in transit,
+ * which is exactly what the whole-record-variable defect did. Collapsing the
+ * two into one branch made a security FAIL gate silently not fire.
+ *
+ * So this is the runtime backstop for section 10's transit constraints: those
+ * stop the corruption being introduced, this catches its effect if it ever is.
+ * ------------------------------------------------------------------------- */
+
+/** Run the probe with a PATH whose `awk` exits non-zero, producing no output. */
+function runClause1WithBrokenAwk(yaml) {
+  const dir = join(tmpdir(), `qa-scope-brokenbin-${randomUUID()}`);
+  const gate = join(tmpdir(), `qa-scope-gate-${randomUUID()}.yml`);
+  mkdirSync(dir, { recursive: true });
+  const fake = join(dir, "awk");
+  writeFileSync(fake, "#!/bin/sh\nexit 127\n");
+  chmodSync(fake, 0o755);
+  writeFileSync(gate, yaml);
+  try {
+    return execFileSync(
+      "bash",
+      ["-c", `${clause1()}\nprintf '%s' "$SAFETY_REPROBE"`],
+      {
+        env: {
+          ...process.env,
+          LATEST_GATE: gate,
+          PATH: `${dir}:${process.env.PATH}`,
+        },
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        timeout: SPAWN_TIMEOUT_MS,
+      },
+    ).trim();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(gate, { force: true });
+  }
+}
+
+test("a broken reader fires the trigger — empty is not `absent`", () => {
+  const failGate = [
+    "schema: 1",
+    "gate: FAIL",
+    "nfr_validation:",
+    "  security:",
+    "    status: FAIL",
+    "",
+  ].join("\n");
+  // Control: with a working awk this gate fires for the ordinary reason.
+  assert.equal(
+    runClause1(failGate),
+    "true",
+    "control: the FAIL must fire normally",
+  );
+  // The finding: with a broken awk it must STILL fire, because nothing has
+  // established that the security axis is fine.
+  assert.equal(
+    runClause1WithBrokenAwk(failGate),
+    "true",
+    "a reader that produced no verdict must fail OPEN — otherwise a corrupted " +
+      "awk program silently disables the carve-out, which is the same failure " +
+      "the transit constraints exist to prevent, one layer down",
+  );
+});
+
+test("a broken reader fires even on a gate that would otherwise be clean", () => {
+  const cleanGate = [
+    "schema: 1",
+    "gate: PASS",
+    "nfr_validation:",
+    "  security:",
+    "    status: PASS",
+    "    evidence: measured",
+    "    probes_executed: 9",
+    "",
+  ].join("\n");
+  assert.equal(runClause1(cleanGate), "false", "control: this gate is clean");
+  assert.equal(
+    runClause1WithBrokenAwk(cleanGate),
+    "true",
+    "the instrument being broken is not evidence that the gate is clean",
+  );
+});
+
+test("`absent` and an empty reading are distinct branches in the case", () => {
+  // Structural, so the distinction cannot be tidied away into one wildcard.
+  const probe = clause1();
+  assert.match(
+    probe,
+    /absent\)\s*:\s*;;/,
+    "`absent` must be its own no-op branch",
+  );
+  assert.match(
+    probe,
+    /\*\)\s*SAFETY_REPROBE=true\s*;;/,
+    "the catch-all must set the trigger, not fall through silently",
+  );
 });

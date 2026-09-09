@@ -189,6 +189,44 @@ markdown **link targets** and check membership. Compared on basename, because th
 - **Loop exit**: n/a — this exit not taken
 - **Action**: → 5b `/qa-fix` (cycle 1 of 5)
 
+### QA Fix — cycle 1 — 2026-09-09
+
+- Only open item was the maintainability NFR CONCERNS with an empty `recommendations.immediate`.
+  Priority rule 6 ("minimize **or** document") → **minimize**.
+- The thing that grew is the thing that is **triplicated**, so the ~10-line constraint comment inside
+  the copied snippet became a 3-line pointer, and the reasoning moved once into a new "Transit
+  constraints" section of `shared/resources/qa-re-review-scope.md`, outside the code block.
+- Extraction threshold (a **fourth** constraint → stop copying, extract to a script) written into the
+  rule file rather than left in a gate nobody re-reads.
+- Not chosen: extracting now. It would end the duplication and make both transit hazards structurally
+  impossible, but contradicts the task's Phase 3 design and the parity suite's verbatim-mirroring
+  architecture. Three constraints; threshold is four.
+- All four guards re-proved by mutation **after** the shortening — a shortened comment must not
+  weaken the tests guarding its subject.
+
+### QA Cycle 2 — 2026-09-09
+
+- **Gate**: PASS (100/100) — `task.82.gate.2.security-gate-evidence-field.yml`
+- **Report**: `task.82.qa.2.security-gate-evidence-field.md`
+- **Scope**: unscoped — cycle 2 is always a full refute pass. `SAFETY_REPROBE` resolved **false**
+  from gate 1, whose own axis reads `OK measured`: the carve-out this task widens, evaluated against
+  its own first gate, correctly declining to fire.
+- **Re-Review Context**: TASK82-001 FIXED, TASK82-002 FIXED, maintainability CONCERNS RESOLVED.
+- **New finding — TASK82-003 (MEDIUM)**: an **empty** reading was treated as `absent`. `absent` is a
+  deliberate answer; empty means awk died, is missing, or had its program corrupted — which is
+  exactly what TASK82-001 produced. A `security: FAIL` gate silently did not fire. Found by running
+  the probe with a `PATH` whose `awk` exits 127. The transit constraints stop the corruption being
+  introduced; this is the runtime backstop for its effect.
+- **A defect in the fix for the finding, recorded not hidden**: the catch-all as first written
+  swallowed every clean reading (`"OK measured"` matched none of the three branches), reddening 7 of
+  the 8 "does not fire" tests including two real-gate replays. Caught by the existing suite. The
+  `case` is now exhaustive with clean readings listed first, and a structural test asserts `absent`
+  and the catch-all stay distinct branches.
+- **Mutation proving**: 7/7 red, including M7 which reproduces exactly the bad first fix.
+- **PR Review**: pending — 5c not yet run
+- **Loop exit**: n/a — this exit not taken
+- **Action**: clean gate → **5c** `/review-pr`
+
 ---
 
 ## Completion

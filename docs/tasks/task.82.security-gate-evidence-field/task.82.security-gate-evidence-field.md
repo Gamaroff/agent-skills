@@ -390,24 +390,25 @@ without touching the trigger.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS (cycle 2; cycle 1 was CONCERNS)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.82.qa.1.security-gate-evidence-field.md](./task.82.qa.1.security-gate-evidence-field.md)
-- **Gate File**: [task.82.gate.1.security-gate-evidence-field.yml](./task.82.gate.1.security-gate-evidence-field.yml)
+- **Latest Report**: [task.82.qa.2.security-gate-evidence-field.md](./task.82.qa.2.security-gate-evidence-field.md)
+- **Latest Gate**: [task.82.gate.2.security-gate-evidence-field.yml](./task.82.gate.2.security-gate-evidence-field.yml)
+- **Cycle 1**: [task.82.qa.1.security-gate-evidence-field.md](./task.82.qa.1.security-gate-evidence-field.md) · [gate.1](./task.82.gate.1.security-gate-evidence-field.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 55 (was 34 before this task)
+- **Tests Executed**: 58 (was 34 before this task)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 open (1 HIGH + 1 MEDIUM found and closed in-cycle)
-- **NFR Status**: Security: PASS (`evidence: measured`, 15 probes), Performance: PASS,
-  Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 open (1 HIGH + 2 MEDIUM found and closed across 2 cycles)
+- **NFR Status**: Security: PASS (`evidence: measured`, 24 probes), Performance: PASS,
+  Reliability: PASS, Maintainability: PASS (was CONCERNS in cycle 1)
 
 ### Key Findings
 
@@ -423,9 +424,17 @@ to prevent, and both now pinned by regression tests:
    already warned against apostrophes: a prose warning did not prevent the defect in the same edit
    that read it.
 
-The gate is CONCERNS rather than PASS because those defects were real and their fixes postdate the
-code reviewed. Mutation-proving found a third problem — in the new corpus check itself, which used
-`git ls-files` and so could not see the uncommitted gates it exists to judge.
+Cycle 2's refute pass then found a **third**, and it is the one worth remembering: the probe could
+not tell a **broken reader** from a gate with **no security axis**, so a corrupted awk program
+silently disabled the carve-out — the cycle-1 defect's own failure mode, one layer down. Found by
+running the probe with an `awk` that exits 127, not by reading it. The first fix for it was itself
+wrong (its catch-all swallowed every clean reading, reddening 7 tests) and that is recorded rather
+than quietly corrected.
+
+Mutation-proving found a fourth problem, in the new corpus check itself: it used `git ls-files`, which
+lists only tracked files, and so could not see the uncommitted gates it exists to judge.
+
+**Cycle 2 gate: PASS, 100/100** — all findings closed, all four NFRs at PASS, 7/7 mutations red.
 
 ---
 
@@ -441,6 +450,7 @@ code reviewed. Mutation-proving found a third problem — in the new corpus chec
 | 2026-09-09 | 1.1     | Review passed (8/10) — named the pre-existing top-level `evidence:` key collision in §3; stated the `measured\|reasoned` ⊂ `measured\|reasoned\|unverified` domain nesting in Phase 4; refreshed drifted line citations | review-task |
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both closed in-cycle; 5 mutations proved | qa-task |
 | 2026-09-09 |         | QA findings fixed — maintainability CONCERNS minimised, 1 iteration | qa-fix |
+| 2026-09-09 |         | QA gate PASS (100/100) — refute pass found 1 further defect, closed; 7 mutations proved | qa-task |
 
 ---
 
