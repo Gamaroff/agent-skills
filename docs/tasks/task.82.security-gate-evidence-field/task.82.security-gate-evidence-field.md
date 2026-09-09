@@ -5,11 +5,13 @@ type: task
 description: "nfr_validation.security carries a status and free-text notes, so a verdict reached by executing twelve candidates is indistinguishable from one reached by reading. Add evidence: measured | reasoned | unverified beside the existing status — additively, because task.74's trigger parses that field mechanically and fails closed and silently on a shape it does not expect."
 tags: [security, qa, gate, schema, evidence]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-02
 updated: 2026-09-09
+completed_date: 2026-09-09
+pr_number: 362
 assignee:
 estimated_effort_hours: 4
 depends_on: task.81
@@ -17,7 +19,7 @@ depends_on: task.81
 
 # Technical Task: Feed the measured security verdict into the QA gate
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.82.review.1.security-gate-evidence-field.md` implemented 2026-09-09
 
 ---
@@ -438,6 +440,57 @@ lists only tracked files, and so could not see the uncommitted gates it exists t
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Gate**: `task.82.gate.2.security-gate-evidence-field.yml` — ✅ **PASS**, 100/100, after 2 cycles
+**Reports**: `task.82.qa.1.*.md` (CONCERNS 90) → `task.82.qa.2.*.md` (PASS 100)
+**PR conformance review**: `task.82.pr-review.1.*.md` — ⚠️ CONCERNS; 2 of 3 findings fixed before
+acceptance, 1 accepted knowingly
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 11/11 — Functional 4/4, Regression 4/4 (two carrying a documented
+deviation), Safety 3/3
+✅ **Tests:** 58 in the parity suite, up from 34. **7/7 mutations proven** — each names its exact
+edit and red count
+✅ **CI:** green on head `298e60a952bd`, **verified equal to local HEAD**. The rollup was PENDING when
+finalise began and was waited on, not assumed
+✅ **Documentation:** CHANGELOG, a new single-source `qa-gate-security-evidence.md`, both QA skills
+linking rather than restating (asserted structurally), producer side documented
+✅ **Security:** `evidence: measured`, **24 probes executed**, boundary held. Three defects reproduced
+and closed
+⚠️ **Compliance:** N/A — the change set is Markdown, YAML and one test file
+
+### What this run found, which is the point
+
+The task's thesis is that a verdict reached by executing differs from one reached by reading. This
+run is its own first evidence: **every defect found was found by running something, not by reading
+it.**
+
+| # | Found by | Defect |
+|---|---|---|
+| 1 | invoking `/qa-task` with an argument | the new awk program named the whole-record variable, and the harness substituted the invocation argument into it |
+| 2 | the existing suite | an apostrophe in the comment written to fix (1) closed the single-quoted program — 18 tests red at once |
+| 3 | mutation-proving | the new corpus check used `git ls-files`, so it could not see the **uncommitted** gates it exists to judge |
+| 4 | the cycle-2 refute pass | an empty reading was treated as `absent`, so a corrupted reader silently disabled the carve-out |
+| 5 | the existing suite | the first fix for (4) swallowed every clean reading — 7 tests red |
+
+### The residual, named rather than absorbed
+
+Clause 1 has been executed under **bash only**. The suite spawns no zsh, and this file's own history
+records a GNU-vs-BSD `awk` divergence in this exact snippet. A `measured` verdict that hid this would
+be the thing the task was written to prevent.
+
+**Detailed Verification Log:** `task.82.dod.1.security-gate-evidence-field.md`
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -451,6 +504,7 @@ lists only tracked files, and so could not see the uncommitted gates it exists t
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both closed in-cycle; 5 mutations proved | qa-task |
 | 2026-09-09 |         | QA findings fixed — maintainability CONCERNS minimised, 1 iteration | qa-fix |
 | 2026-09-09 |         | QA gate PASS (100/100) — refute pass found 1 further defect, closed; 7 mutations proved | qa-task |
+| 2026-09-09 | 1.2     | DoD verified — accepted (PR #362); CI green on the final head | finalise |
 
 ---
 

@@ -37,9 +37,9 @@ reached by executing probes is distinguishable from one reached by reading.
 | 2. review-task             | ✅ Done    | `task.82.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 8/10 — 0 critical, 3 important (all fixed). Report: `task.82.review.1.security-gate-evidence-field.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 4 phases; 52 tests (34→52); `npm run ci` exit 0; 3/3 mutations proved | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #362](https://github.com/Gamaroff/agent-skills/pull/362) → `develop`. No tracker issue to comment (none linked) | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.82.qa.{N}.*.md`; `task.82.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.82.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.82.qa.{N}.*.md`; `task.82.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles. Gate 2 PASS 100/100; 5c CONCERNS (PC-1 + CR-1 fixed, PC-2 accepted) | —                    |
+| 7. finalise                | ✅ Done    | `task.82.dod.{N}.*.md`; task `status: accepted`                        | ACCEPTED. CI gate was PENDING → waited, resolved SUCCESS on head `298e60a9` (= local HEAD) | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 6 commits on the branch | —                    |
 
 ---
 
@@ -223,18 +223,63 @@ markdown **link targets** and check membership. Compared on basename, because th
   `case` is now exhaustive with clean readings listed first, and a structural test asserts `absent`
   and the catch-all stay distinct branches.
 - **Mutation proving**: 7/7 red, including M7 which reproduces exactly the bad first fix.
-- **PR Review**: pending — 5c not yet run
+- **PR Review**: **CONCERNS** — `task.82.pr-review.1.security-gate-evidence-field.md`
 - **Loop exit**: n/a — this exit not taken
 - **Action**: clean gate → **5c** `/review-pr`
 
+### Step 5c — PR conformance review — 2026-09-09
+
+- **Verdict**: ⚠️ **CONCERNS** (2 conformance findings, 2 code findings). Per the routing table
+  CONCERNS records findings without blocking and exits to Step 7.
+- **Coverage**: 11/11 success criteria traced to evidence in the diff. No scope drift — every file
+  touched is named in the task's §7.
+- **Trail**: complete for this point in the pipeline. DoD and sprint-review absent is *expected* at
+  5c, not a gap — Step 7 writes them.
+- **PC-1 (medium)** — the gate **schema** was symmetric across both QA skills but the QA **report
+  templates** were not: qa-story gained explicit Evidence / Probes-executed lines, qa-task's Security
+  section stayed free-text. **Fixed** by the orchestrator before Step 7 — it is the last asymmetry in
+  a change whose purpose is that both skills resolve the same gate identically.
+- **CR-1 (low)** — the broken-reader FAIL-gate assertion is vacuous in isolation; the clean-gate
+  companion is what proves the PATH shadow took effect. **Fixed** (comment), so it is not deleted
+  later as redundant.
+- **PC-2 (low)** — `estimated_effort_hours: 4` vs an actual nearer 8. **Accepted knowingly**:
+  revising an estimate after the fact turns it into a record of the outcome, which is what makes an
+  estimate corpus useless.
+- The 5c report is deliberately **not re-verdicted** after those fixes — it records what the review
+  found on the commit it reviewed (`eb753e85`).
+
 ---
+
+## Completion Summary
+
+The task's thesis — that a verdict reached by **executing** differs from one reached by **reading** —
+was demonstrated by the run itself. **Five defects, every one found by running something:**
+
+| # | Found by | Defect |
+|---|---|---|
+| 1 | invoking `/qa-task` with an argument | the new awk program named the whole-record variable; the harness substituted the invocation path into it. The probe it replaced used the token zero times |
+| 2 | the existing suite | an apostrophe in the comment written to fix (1) closed the single-quoted program — 18 tests red |
+| 3 | mutation-proving | the new corpus check used `git ls-files`, so it could not see the **uncommitted** gates it exists to judge |
+| 4 | the cycle-2 refute pass | an empty reading was treated as `absent`, so a corrupted reader silently disabled the carve-out |
+| 5 | the existing suite | the first fix for (4) swallowed every clean reading — 7 tests red |
+
+Not one was findable by reading the diff. Two (1 and 4) are the *same failure mode* the task exists
+to prevent, occurring inside the change that prevents it.
+
+**What the run also corrected in the plan itself:** §9 asserted both "every existing parity assertion
+still passes" and "a gate with no `evidence:` key triggers". Those cannot both hold — three real
+gates carry `security: PASS` with no evidence key. Fail-open won (stated four times in the task); the
+three changed assertions are named at their own sites and §9 no longer asserts a contradiction.
+
+**What the run does not claim:** clause 1 was executed under **bash only**. Named in both gates, both
+QA reports, the DoD and the sprint review rather than absorbed into a PASS.
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-09 17:00
+**Final Status**: Completed
 **Branch**: `feature/task.82.security-gate-evidence-field`
 **PR**: [#362](https://github.com/Gamaroff/agent-skills/pull/362)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 2 (cycle 1 CONCERNS 90 → cycle 2 PASS 100)
+**DoD Summary**: `task.82.dod.1.security-gate-evidence-field.md`
+**Tracker debt**: none — no tracker issue linked (tasks here are tracked in `docs/tasks/task-registry.md`)
