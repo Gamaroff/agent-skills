@@ -901,7 +901,8 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Validate relationships and constraints
 
 5. **Configuration Accuracy**:
-   - Check environment variables exist
+   - Every config key, env var or flag the story proposes MUST have a reader in the code — grep for the key name, not just for its documentation
+   - Check each documented default against the code's actual default
    - Verify file paths match project structure
    - Validate naming conventions
 

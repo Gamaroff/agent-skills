@@ -786,6 +786,11 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Check imports are from valid paths
    - Validate examples match project coding standards
 
+6. **Configuration Key Accuracy**:
+   - Every config key, env var or CLI flag the task proposes documenting MUST have a reader — grep the tree for the key name itself
+   - A documented knob that nothing reads is silently ignored: the user sets it, nothing happens, and the documentation is the only reason they believed otherwise
+   - Check each documented default against the code's actual default, not against surrounding prose
+
 **Common Hallucination Patterns to Detect**:
 
 - ❌ Libraries not in package.json or tech stack
@@ -793,6 +798,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ API patterns not documented in architecture
 - ❌ Database fields not in Prisma schema
 - ❌ Code patterns that violate project standards
+- ❌ Config keys, env vars or flags that no code reads
 
 **Issues to Flag**:
 
@@ -1814,6 +1820,7 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 3. **Pattern Verification**: Code patterns MUST match architecture standards
 4. **API Verification**: Endpoints MUST match documented APIs
 5. **Schema Verification**: Database fields MUST exist in Prisma schema
+6. **Config Key Verification**: Every config key, env var or flag MUST have a reader in the tree
 
 ### Reporting Hallucinations
 
