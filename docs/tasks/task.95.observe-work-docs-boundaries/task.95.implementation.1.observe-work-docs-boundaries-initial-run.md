@@ -3,7 +3,7 @@
 **Task**: `task.95.observe-work-docs-boundaries.md`
 **Run Number**: 1
 **Started**: 2026-09-09 07:58
-**Status**: In Progress
+**Status**: ✅ Complete — Accepted
 
 ---
 
@@ -39,7 +39,7 @@ Close the documentation gaps left open by tasks 93 and 94: document the `observa
 | 4. create-pr               | ⏳ Pending | PR URL targets `develop`; issue comment posted                                                                                                                          |                                                                       | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.95.qa.{N}.*.md`; `task.95.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted        |                                                                       | —                    |
 | 7. finalise                | ⏳ Pending | `task.95.dod.{N}.*.md`; task `status: accepted`                                                                                                                         |                                                                       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                                                                                                                      |                                                                       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                                                                                                                      | final report + DoD + sprint review committed | —                    |
 
 ---
 
@@ -80,6 +80,8 @@ Close the documentation gaps left open by tasks 93 and 94: document the `observa
 _Problems encountered and how they were resolved or escalated._
 
 - **Step 1** — the pre-existing branch had no upstream and did not exist on `origin`. Pushed with `git push -u` before writing the lock, so the branch named in the `work-started` comment actually resolves. Non-blocking; no other effect.
+- **Step 4 (pre-existing, not introduced here)** — the pre-commit bundler prints `⚠️  shared/resources/<name> not found` while bundling `observe-work`. Confirmed pre-existing: it reproduces at the parent commit `399799b7` in a detached worktree, before any of this task's changes. Benign — the bundler still reports `observe-work: in sync` and exits 0. The literal `<name>` appears in none of `observe-work`'s own files, so the placeholder is reaching the bundler by some other path. Out of scope for task 95; recorded rather than chased.
+- **Housekeeping (pre-existing)** — `git stash list` holds `stash@{0}: On develop: develop-task: implementation report pre-branch`, left by an earlier aborted pipeline run. Not touched: dropping another run's stash is not this pipeline's call.
 
 ---
 
@@ -128,3 +130,95 @@ Phases, each verified rather than asserted:
 **Gates**: `npm run format` clean · `npm run ci:fast` **2901 pass / 0 fail** (2902 total, 1 skipped) · `generate-catalog` no diff · `npm run bundle` idempotent on the second run · `quick_validate.py` passes on all four affected skills · bundled resolver confirmed byte-identical to its source apart from the generated banner (mutation residue check).
 
 **Deferred**: nothing. `/finalise` correctly **not** invoked — pipeline bypass applies, Step 7 owns it.
+
+### Step 4 — create-pr — 2026-09-09
+
+- **SCOPE_PATHS (8)**: `docs/tasks/task.95.observe-work-docs-boundaries`, `docs/reference/configuration.md`, `skills/autoskill`, `skills/double-check`, `skills/observe-work`, `skills/remember-insight`, `README.md`, `CHANGELOG.md`. Both root-level files were passed explicitly — the reference's `dirname` derivation yields `.` for them, which it skips, so a scope built only from that loop would have dropped the README and CHANGELOG edits from the commit.
+- **Pre-flight guard**: no untracked path fell outside the scope set, so nothing was held. Post-commit leak check clean — all 12 staged paths in scope, nothing left unstaged.
+- **Commit** `d955f01f`, single logical commit. The four phases are one capability and Phase 3's audit depends on Phase 2's sentence, so splitting them would have produced a commit that fails its own tests.
+- **Implementation report committed here**, per the Step 4 rule — this is its first commit, not a deferred update.
+- **PR #360** → `develop`, `Closes #341` in the body.
+- **Issue comment**: `reason: posted` via `tracker-comment.js --stage in-review` (marker-aware, so a resume will not duplicate it).
+- Lock updated with `pr_url`, advanced to step 5.
+
+### Step 5 — qa-task (QA cycle 1) — 2026-09-09
+
+- **Gate: CONCERNS (90/100)** — `task.95.gate.1.observe-work-docs-boundaries.yml`. Deterministic rule 2: one MEDIUM `top_issues` entry, no HIGH, no NFR below PASS.
+- Phases verified **4/4**, each against the tree rather than the document. Suite green: 2901 pass / 0 fail / 1 pre-existing skip. `format:check` clean.
+- **Step 3b** run **inline, not via an Explore subagent** — same session-level constraint recorded at Step 3. Whole-branch diff, first review (`PRIOR_GATES=0`, no refute or safety-re-probe scoping). 0 correctness bugs, 2 advisory cleanups. `code_review_blocking` unset → `CR_BLOCKING=false`, nothing promoted to the gate.
+- **Step 4b** fired (four `SKILL.md` modified; `observe-work` carries bash blocks) and returned `no-executable-blocks` — 5 blocks, all correctly refused as `mutating`, **0 placeholder**. Per the rule this is information, not a finding. The diff adds no new bash block to any `SKILL.md`.
+- **Step 3c** — QA independently re-ran one of the seven development-time mutations (paraphrasing the shared sentence in `remember-insight`) and confirmed the zero-gap audit goes red and recovers. The dev record was verified, not accepted.
+- **Finding (MEDIUM, `task.95.bug.1`)**: the new `## Observation workspace` section never states the default workspace path, and the schema block's `~/.agents/skill-observations` example points at a different tree from the real default (`~/.claude/projects/<abs-path with / → ->`). Established by driving the resolver, not by reading it.
+- **Two LOW advisories**: in-body `require()` calls in the new tests; `saysStale()` matching the whole context string. Neither gates.
+- Checks run that produced **no** finding, recorded so a later cycle need not redo them: the template **does** ship in the packaged skill (verified empirically — `package_skill.py` never names `assets/`, so reading it would have given the wrong answer); the root-level zip it emits is covered by `.gitignore`'s `*.zip`; the shared sentence survives `npm run format` because `.prettierrc` leaves `proseWrap` at `preserve`.
+- PR comment posted (#360), issue #341 commented.
+
+### Step 6 — qa-fix (QA cycle 1) — 2026-09-09
+
+- **Fixed TASK-95-BUG-1 (MEDIUM)** in `docs/reference/configuration.md`: the Key reference `Default` column now carries the path shape `~/.claude/projects/<project-path with / → ->` with a worked example; the prose resolver item 3 gains the same plus the encoded-not-nested point; the schema block header states the default and labels `~/.agents/skill-observations` an example override. Root cause was a documentation defect, not a code one — the resolver's behaviour is correct and task 93 owns it.
+- **Both LOW advisories taken** in the same pass: `require()` calls lifted to module scope in `observe-work.test.js`; `saysStale()` anchored to the review-state clause in `observe-work-hook.test.js`.
+- **Constraint honoured**: no new `observations.*` key name was added. The contract test asserts every documented key has a reader, so a new name would have failed it — and the test's scan is confined to the schema block and key-reference table, so the added prose naming `.claude/` and `.agents/` is not misread as a key.
+- **Mutation-proven**: changing the hook's applied default 14 → 7 turns exactly one test red and nothing else. A first attempt mangled the variable rather than the value; it went red for the wrong reason and was redone, because a mutation that proves the wrong thing is not proof.
+- Bug report → **Ready for QA** with Investigation / Fix Implementation / Status History.
+- Commit `cb1ef7f5`, pushed. **Implementation report excluded** from this commit per the Steps 5–6 rule (it is already tracked; Step 8 commits its final state). Verified: 0 implementation-report paths staged.
+- Gates: `format` clean · `ci:fast` **2901 pass / 0 fail** · `generate-catalog` no diff. PR comment posted.
+- No third strike (cycle 1). No ambiguity in the findings, so no clarification was needed.
+
+### Step 5 — qa-task (QA cycle 2, refute pass) — 2026-09-09
+
+- **Gate: PASS (100/100)** — `task.95.gate.2.*.yml`, `top_issues: []`. Deterministic rule 5.
+- Scope: **unscoped refute pass** (`PRIOR_GATES=1` → `REFUTE_PASS=true`), the whole branch diff re-read to disprove. `SAFETY_REPROBE=false` — gate 1's security was PASS and the finding was documentation, not a safety boundary.
+- All three cycle-1 findings verified FIXED, each against the regression its own fix invites: no unused import survived the require-lift, and the tightened `saysStale()` regex was mutation-proved non-vacuous.
+- **One new LOW** — the newly-documented path formula is silent about linked git worktrees, where the resolver anchors to the **main** worktree. Established empirically: a detached worktree at `/tmp/wt-refute` resolved to the main checkout's identity. Stays LOW because the rule is already stated 33 lines further down in the same document; carried as a `future` recommendation. It matters here specifically because `/develop-batch` runs every parallel story in a linked worktree.
+- Cycle 1's entry deliberately **not** carried forward into gate 2. The third-strike rule keys on the `file:` of HIGH entries across the last three gates and ignores `status: closed`, so a copied-forward entry would make one finding look like a file struck twice.
+- `task.95.bug.1` → **Closed**. Commit `ca79177c`.
+
+### Step 5c — review-pr (QA loop exit gate) — 2026-09-09
+
+- **Verdict: ✅ APPROVE** — `task.95.pr-review.1.observe-work-docs-boundaries.md`. Deterministic table: no HIGH, no MEDIUM, three LOW.
+- Work item resolved via **branch stem**. 19 files, +2242/−136; **no** files excluded as auto-generated (the change touches no bundled `references/` copy — worth stating, because on this repo a skill change usually carries thousands of generated lines and their absence is a property of this PR, not of the filter).
+- **Coverage 9/9** — every success criterion has evidence in the diff, and the seven functional ones are enforced by executable assertions rather than inspection.
+- Trail complete and honest. CI at review time: `validate`, `link-check`, `shellcheck`, `branch-policy` all ✅; `test` in progress, with the local equivalent green.
+- Both lenses run **inline rather than via parallel Explore subagents**, same session constraint as Steps 3 and 5.
+- **Three LOW findings, all actioned immediately** rather than deferred (commit `b1a454ec`): PC-1 reconciled §4's Out-of-Scope bullet with what shipped; CR-1 dropped a dead parameter; CR-2 closed a residual one-signal-two-states in `resolveIn` — the *status* half of the same defect the helper had already fixed for the *value*. The CR-2 guard is mutation-proven: silencing the RC probe makes it fire with its own message.
+- APPROVE exits the loop to Step 7. **2 of 5 QA cycles used.**
+
+### Step 7 — finalise — 2026-09-09
+
+**Outcome: ACCEPTED.** But the CI gate fired first, and that is the most important thing that happened in this pipeline run.
+
+- First pass read `CI_ROLLUP=PENDING` and **waited rather than assuming**. The rollup then resolved to **FAILURE** — on a head whose local suite was green (2901 pass / 0 fail) through three separate runs, one QA cycle, an independent QA re-verification and a `/review-pr` pass.
+- **Both failures were this task's own family-template tests.** They built the engine workspace with `fs.mkdtempSync(path.join(os.tmpdir(), …))`. `os.tmpdir()` is `/var/folders/…` on macOS and literally `/tmp` on Linux, and `observation-log.js` **refuses an ephemeral workspace** (`reason: "ephemeral-workspace"`, exit 1). Identical code, opposite outcomes, decided by where the OS puts temporary files.
+- **The lesson was already written down one file away.** `observe-work-hook.test.js` opens with *"Fixtures live under os.homedir(), NOT os.tmpdir()… That cost real time during cycle 4's review before the fixtures were moved."* New tests were written in the same directory without applying it. A lesson recorded in a file header protects only the file it heads.
+- **QA had examined this exact construct and blessed it.** Cycle 1's report stated *"the JS engine … has no such refusal. The asymmetry is real and correct."* That was reasoned from one platform and asserted as a property of the engine; `/review-pr` read the same code and did not challenge it. The report was **corrected in place**, with the false paragraph left standing under a correction, because the record of a false pass is more useful than a clean report.
+- **Fixed and proven, not pushed and hoped**: `TMPDIR=/tmp node --test 'skills/observe-work/tests/*.test.js'` reproduces the CI failure locally and passes on the fix. Verified in both directions. Commit `2c6dfc13`; CI then green on all five checks.
+- Logged as **observation #17**.
+- DoD: 9/9 success criteria, security PASS, compliance N/A, docs PASS, CI SUCCESS. No section needed manual review; no open bugs.
+- Tracker: issue #341 commented and **closed** (verified `CLOSED`); board `done` → `reason: already` (the close had already moved it); Document link already durable, nothing to re-point.
+- Artifacts: `task.95.dod.1.*.md`, `sprint-review-summary.md`, canonical PR comment.
+
+### Step 8 — commit-changes — 2026-09-09
+
+Final state of the implementation report, the DoD summary and the sprint review summary committed and pushed. Pipeline lock removed.
+
+---
+
+## Completion Summary
+
+**Finished**: 2026-09-09 11:35 · **Final Status**: ✅ Accepted · **QA Iterations**: 2
+
+Task 95 shipped in **7 commits** on `feature/task.95.observe-work-docs-boundaries`, merged via [PR #360](https://github.com/Gamaroff/agent-skills/pull/360) into `develop`.
+
+**Delivered**: the `observations.workspace` config schema with its resolver order and refusal semantics; `OBS_STALE_DAYS` documented as the environment variable it is; reciprocal boundary notes making four meta-skills legible as a set; a seeded `skill-families.md` template so the sibling check has a real family on day one; the README count corrected after an eleven-skill drift; and one CHANGELOG entry covering tasks 93–95 as a single capability.
+
+**Deliberately not delivered**: `observations.enabled` and `observations.review_interval_days`. Neither has a reader, and a test now fails if a reader-less key is documented.
+
+**Tests**: 10 added, every one mutation-proven. Repo suite 2902 tests, 0 failures, CI green.
+
+**The run's real lesson**, in three parts, each a case where a check caught what a green result hid:
+
+1. A test was **vacuous when first written** — `resolveIn()` collapsed "refused" and "returned empty" into one signal, so the refusal assertion passed against a warn-and-continue mutant. The mutation pass exposed it (observation #16).
+2. A mutation **went red for the wrong reason** and was redone precisely. A red test is not self-validating.
+3. **CI caught what six local gates did not** — a platform-variable fixture path. A green suite is evidence about the platform it ran on, not about the code (observation #17).
+
+**Carried, non-blocking**: the documented path formula is silent about linked git worktrees (`/develop-batch` runs every parallel story in one); the precedence order now sits in three places with only the consumer-facing copy bound to assertions.

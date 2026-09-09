@@ -5,18 +5,20 @@ type: task
 description: "Document the observations: config block, add reciprocal boundary notes to the three neighbouring meta-skills, and declare the meta-skill family so observe-work's sibling check has a registry from day one."
 tags: [observe-work, documentation, configuration, skill-boundaries]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: High
 created: 2026-09-07
 updated: 2026-09-09
 assignee:
 estimated_effort_hours: 4
 github_issue: 341
+pr_number: 360
+completed_date: 2026-09-09
 ---
 
 # Technical Task: observe-work — config schema, skill boundaries and the meta-skill family
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.95.review.1.observe-work-docs-boundaries.md` implemented 2026-09-09
 **GitHub Issue**: [#341](https://github.com/Gamaroff/agent-skills/issues/341)
 
@@ -465,6 +467,42 @@ None. Documentation only, no runtime path touched, and the one mechanical hazard
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**QA Reports**: `task.95.qa.1` (CONCERNS 90) · `task.95.qa.2` (PASS 100, refute pass)
+**Gate File**: `task.95.gate.2.observe-work-docs-boundaries.yml`
+**Gate Status**: ✅ PASS · **Quality Score**: 100/100 · **QA Cycles**: 2
+**PR Review (Step 5c)**: ✅ APPROVE — `task.95.pr-review.1.observe-work-docs-boundaries.md`
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 9/9 met — the seven functional ones enforced by executable assertions, not inspection
+✅ **Tests:** 10 added (4 family-template, 4 resolver contract, 2 `OBS_STALE_DAYS`), every one mutation-proven
+✅ **CI:** green on `2c6dfc13` — `test`, `validate`, `link-check`, `shellcheck`, `branch-policy` all SUCCESS
+✅ **PR:** #360 → `develop`, reviewed at Step 5c with all findings actioned
+✅ **Documentation:** config schema, key reference, environment variable, prose section, README, CHANGELOG
+✅ **Security:** PASS — no boundary deliverable, no credential/network/write surface, no injection surface in tests
+⚠️ **Compliance:** NOT APPLICABLE — no personal, payment or health data; no UI. CC BY 4.0 attribution present in three places
+✅ **Reliability / Maintainability:** PASS — four previously-ambiguous skills now state their boundaries; the family registry ships seeded
+
+**One episode worth carrying forward.** CI caught what six local gates did not: both family-template
+tests used `os.tmpdir()` for the engine workspace, which is `/var/folders/…` on macOS and `/tmp` on
+Linux — and the engine refuses an ephemeral workspace. The suite was green locally through three
+runs, a QA cycle, an independent QA re-verification and a PR review, and red in CI. Fixed by moving
+the fixtures to `os.homedir()`; reproduced and proven locally with `TMPDIR=/tmp` rather than pushed
+and hoped. QA report 1, which had examined that exact construct and blessed it, was corrected in
+place so the record of the false pass survives. Logged as observation #17.
+
+**Detailed Verification Log:** see [`task.95.dod.1.observe-work-docs-boundaries.md`](./task.95.dod.1.observe-work-docs-boundaries.md).
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -511,6 +549,9 @@ No HIGH or MEDIUM issues remain. Every phase was verified against the tree rathe
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 1 MEDIUM, 2 LOW | qa-task |
 | 2026-09-09 |         | QA findings fixed — 1 MEDIUM + 2 LOW addressed, 1 iteration | qa-fix |
 | 2026-09-09 |         | QA gate PASS (100/100) — refute pass, 1 new LOW (advisory) | qa-task |
+| 2026-09-09 |         | PR review APPROVE — 3 low findings actioned | review-pr |
+| 2026-09-09 |         | CI red on Linux — os.tmpdir() fixtures refused as ephemeral; fixed | qa-fix |
+| 2026-09-09 | 1.2     | DoD verified — accepted (PR #360) | finalise |
 
 ---
 
@@ -604,7 +645,7 @@ No HIGH or MEDIUM issues remain. Every phase was verified against the tree rathe
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. Implement according to the implementation plan
