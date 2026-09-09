@@ -2,14 +2,14 @@
 id: task.100
 title: "[Task 100] mutation-proving covers the false GREEN but not the false RED"
 type: task
-description: "The mutation-proving reference tells you to confirm a mutation applied before believing a survival — and that check works. It says nothing about the mirror: a suite that goes red because the runner never executed it reads exactly like a dead mutant, and is more convincing because red was the prediction. Four invalid probe readings in one consumer run, two of them false REDs that would have certified coverage never exercised."
+description: "The mutation-proving reference tells you to confirm a mutation applied before believing a survival — and that check works. It says nothing about the mirror: a suite that goes red because the runner never executed it, or executed the wrong change, reads exactly like a dead mutant, and is more convincing because red was the prediction. Five invalid probe readings across two independent runs, three of them false REDs that would have certified coverage never exercised — and one of those defeats the existing applied-check too."
 tags: [mutation-proving, testing, evidence, shared-resources]
 category: documentation
 status: draft
 priority: Medium
 risk_level: low
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-09
 assignee:
 estimated_effort_hours: 2
 ---
@@ -27,13 +27,16 @@ against a pre-mutation copy before believing a survival, with the observed case 
 the source had `...`) recorded. The *"When the proof does not go red"* table covers the three reasons
 a mutant survives.
 
-It says nothing about the **mirror**: a suite that goes red for an **environmental** reason reads
-exactly like a dead mutant — and is *more* persuasive, because red was the prediction.
+It says nothing about the **mirror**: a suite that goes red for a reason other than the behaviour
+you broke reads exactly like a dead mutant — and is *more* persuasive, because red was the
+prediction. That covers two cases the document does not separate: the runner never executed the
+suite, and the mutation changed something other than the value under test.
 
 ## 2. Motivation
 
-Four invalid probe readings in a single consumer run (tinker-city task.103, 2026-09-08), in both
-directions:
+Five invalid probe readings across **two independent runs**, in both directions. Rows 1-4 are from
+tinker-city task.103 (2026-09-08); row 5 was found separately during agent-skills task.95
+(2026-09-09) — different repository, different operator, same failure class:
 
 | # | Cause | Presented as |
 | :-- | :--- | :--- |
@@ -41,6 +44,7 @@ directions:
 | 2 | `--reporter=basic` does not exist in that Vitest; the runner threw while loading it | 4 dead mutants — **false RED** |
 | 3 | a fixture whose decoy was a *comment*, which the comment-stripper already removes — it passed with its own fix reverted | a live mutant — **false GREEN** |
 | 4 | a heredoc mangled the replacement, so the mutation never applied | 2 survivors — **false SURVIVAL** |
+| 5 | a mutation **mangled a shell variable rather than changing its value** — the edit landed, but it broke the script instead of altering the behaviour under test | a dead mutant — **false RED** |
 
 Rows 3 and 4 are already covered by this document (the six shapes; step 2). **Rows 1 and 2 are not.**
 
@@ -48,8 +52,23 @@ The detail worth keeping: **row 1 was the repository's own guard working exactly
 correct refusal is what made the reading convincing. Nothing in the output said "this suite did not
 run" in terms a reader scanning for red would notice.
 
-Both false REDs would have recorded a mutation matrix as complete having executed **zero** tests —
+Rows 1 and 2 would have recorded a mutation matrix as complete having executed **zero** tests —
 certifying coverage that was never exercised, while looking like diligence.
+
+⚠️ **Row 5 is the hardest of the five, because it defeats both existing safeguards at once.** The
+mutation *did* apply, so step 2's `diff` check passes — there is a real change in the output. The
+suite *did* go red, which is what was predicted. Every signal agrees, and the proof is still void,
+because the edit broke the script rather than changing the value under test. Nothing external can
+catch this: the only check that works is **re-reading the mutation and confirming it expresses the
+behaviour you meant to break**.
+
+That makes row 5 a distinct shape rather than a variant of row 4. Row 4 is *no diff, unexpected
+green*; row 5 is *a diff, an expected red, and the wrong thing changed*. A rule that only says
+"confirm it applied" passes row 5 without comment.
+
+The operator who found it put it in one line worth quoting in the finished section:
+
+> *"a red test isn't self-validating."*
 
 ## 3. Scope
 
@@ -57,7 +76,10 @@ certifying coverage that was never exercised, while looking like diligence.
 
 - A new section, *"When the proof goes red for the WRONG reason"*, immediately after *"When the proof
   does not go red"*.
-- A three-check probe-validation procedure.
+- A probe-validation procedure: **three mechanical checks plus one judgement**.
+- The judgement is the row-5 check, which the mechanical three cannot catch: re-read the mutation and
+  confirm it expresses the behaviour you meant to break. Say plainly that it is a judgement rather
+  than dressing it as a command — nothing external can verify it.
 
 **Out of scope**
 
@@ -72,9 +94,12 @@ None — additive prose.
 ## 5. Implementation Plan
 
 - [ ] **Phase 1** — add the section and its table (mirror of the existing one).
-- [ ] **Phase 2** — add the three-check probe validation: baseline GREEN with the *exact* command
+- [ ] **Phase 2** — add the three MECHANICAL checks: baseline GREEN with the *exact* command
       the matrix will use; one known-bad mutation RED **killed by its named case**; the mutation
       asserted applied.
+- [ ] **Phase 2b** — add the row-5 check: the mutation must change the VALUE under test, not merely
+      produce a diff. Include the shell-variable example, since a mangled substitution is the
+      everyday way this happens and it satisfies every other check.
 - [ ] **Phase 3** — `npm run bundle`, commit the regenerated `references/`.
 
 ## 6. Files Summary
@@ -84,22 +109,29 @@ None — additive prose.
 
 ## 7. Testing Strategy
 
-Prose, so the test is a **review against the four recorded readings**: each of the four must be
-identifiable from the finished section — two as the new class, two as already-covered — and a reader
-who follows the three checks must be unable to record any of them as evidence.
+Prose, so the test is a **review against the five recorded readings**: each must be identifiable from
+the finished section — three as the new class, two as already-covered — and a reader who follows the
+checks must be unable to record any of them as evidence.
 
-The section's own claim to check: that the three checks cost ~20 seconds. If they cost materially
-more, the rule will be skipped and is worth restating cheaper.
+⚠️ Row 5 is the discriminating case. A draft that catches rows 1 and 2 but not row 5 has only
+restated "did the runner run?", which is the easy half. **If the finished section would let row 5
+through, it is not done** — that is the anti-vacuity test for this task's own deliverable.
+
+The section's own claim to check: that the three **mechanical** checks cost ~20 seconds. If they cost
+materially more, the rule will be skipped and is worth restating cheaper. The fourth is a judgement
+and carries no time claim — do not give it one.
 
 ## 8. Success Criteria
 
 1. [ ] A reader can classify a red run as *a real kill* / *environmental refusal* / *invocation
-       error* from the table alone.
-2. [ ] The probe-validation procedure states all three checks, and states that a matrix collected
+       error* / *wrong thing mutated* from the table alone.
+2. [ ] The probe-validation procedure states all four checks, and states that a matrix collected
        before them proves nothing **in either direction**.
 3. [ ] The document says plainly that a **false RED is worse than a false GREEN**, and why: it
        certifies coverage that was never exercised.
-4. [ ] The existing false-GREEN material is unchanged.
+4. [ ] Row 5 is covered explicitly, **and the document states that it passes the applied-check** —
+       a reader must not come away thinking step 2's `diff` closes it.
+5. [ ] The existing false-GREEN material is unchanged.
 
 ## 9. Risk Assessment
 
@@ -116,6 +148,7 @@ Delete the section; `npm run bundle`.
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-09-08 | 0.1 | Filed from four invalid probe readings measured in one consumer run — two false REDs the reference does not cover, one of which was the repository's own guard correctly refusing to run. | Claude |
+| 2026-09-09 | 0.2 | Added a **fifth** reading, found independently during agent-skills task.95 — a mutation that mangled a shell variable rather than changing its value. It is the hardest of the five: the edit lands, so the applied-check passes, and the suite goes red as predicted, yet the proof is void. Promotes the evidence base from one run to **two independent runs** and makes row 5 the anti-vacuity test for this task's own deliverable. | Claude |
 
 ## Progress Tracking
 
@@ -124,8 +157,12 @@ Not started.
 ## References
 
 - `shared/resources/mutation-proving.md` — the false-GREEN half this mirrors
-- tinker-city `docs/tasks/task.103.dialog-migration-followups/task.103.qa.{3,4}.*.md` — the probe
-  invalidity is recorded in both, with the commands that produced each reading
+- tinker-city `docs/tasks/task.103.dialog-migration-followups/task.103.qa.{3,4}.*.md` — rows 1-4,
+  with the commands that produced each reading
+- agent-skills `docs/tasks/task.95.observe-work-docs-boundaries/task.95.implementation.1.*.md` —
+  row 5, and a second finding worth reading beside it: a QA report that asserted something false by
+  reasoning from one platform, which is the same false-claims-in-prose pattern that produced four of
+  task.103's twenty-one findings
 
 ## Notes
 
