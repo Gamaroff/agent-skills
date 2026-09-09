@@ -589,8 +589,6 @@ test("the PR review report carries a machine-readable findings block", () => {
   // Task 85. The rendered three-line shape above is a RENDERING; parsing it means an agent matching
   // a text format described in another file. The block puts the fields on disk instead, so the
   // REQUEST CHANGES path stops depending on that match. These assertions pin the emitter half.
-  const section = reviewPr;
-
   assert.match(
     reviewPr,
     /^## Machine-Readable Findings$/m,
@@ -600,12 +598,12 @@ test("the PR review report carries a machine-readable findings block", () => {
   // A yaml-TAGGED fence, specifically: the rendered findings sit in untagged ``` fences, so an
   // untagged block here would be indistinguishable from them to anything scanning for it.
   assert.match(
-    section,
+    reviewPr,
     /## Machine-Readable Findings\n\n```yaml\n/,
     "the block must be a yaml-tagged fence, not an untagged one",
   );
 
-  const block = section.match(
+  const block = reviewPr.match(
     /## Machine-Readable Findings\n\n```yaml\n([\s\S]*?)```/,
   );
   assert.ok(block, "the Machine-Readable Findings fence must have a body");

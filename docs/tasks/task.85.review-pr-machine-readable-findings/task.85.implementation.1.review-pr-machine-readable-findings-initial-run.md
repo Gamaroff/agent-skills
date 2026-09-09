@@ -233,7 +233,7 @@ re-run; the one bundled consumer is in sync.
 
 **Gate**: PASS (95/100) — `task.85.gate.2.review-pr-machine-readable-findings.yml`
 **Report**: `task.85.qa.2.review-pr-machine-readable-findings.md`
-**PR Review**: _Step 5c — see below_
+**PR Review**: ⚠️ **CONCERNS** — `task.85.pr-review.1.review-pr-machine-readable-findings.md`. 2 conformance + 1 code finding, none blocking; CONCERNS records findings and exits to Step 7. All three were fixed anyway (see below).
 
 All three cycle-1 findings verified fixed. Mandatory cycle-2 **refute pass** (unscoped, whole-branch,
 because `PRIOR_GATES=1`) found nothing in the fixes. One new LOW — TASK85-004, `truncated_count` is
@@ -257,6 +257,40 @@ had run, and a criterion marked PARTIAL at acceptance is a criterion nothing ver
 Together with cycle 1's M5, that is three probes in one task whose output was a claim about the
 instrument. Logged as observation **#26**; the pattern is that a probe's result — positive *or*
 negative — is not evidence until the probe is shown to have acted on its subject.
+
+### Step 5c — /review-pr — 2026-09-09
+
+**Verdict**: ⚠️ **CONCERNS** → records findings, does not block, exits to Step 7.
+**Report**: `task.85.pr-review.1.review-pr-machine-readable-findings.md`
+**PR comment**: posted (marker `<!-- agent-skills-pr-review -->`, first post — no existing comment to update)
+
+Scope: 11 files / 2130 lines after excluding `*/references/*` (1 auto-generated file excluded).
+**Both lenses run inline rather than dispatched** — standing no-Agent-tool instruction — and the
+report says so plainly, because the review's independence is weaker when the context that wrote the
+change also reviews it.
+
+| Id | Cat | Sev | Finding | Action taken |
+| --- | --- | --- | --- | --- |
+| PC-1 | trail | medium | The Steps 5–6 Pipeline Progress row read `✅ Done` while its own Required Artifacts cell named a Step 5c PR Review verdict that did not exist | **Fixed** — the verdict is now written into the QA Cycle 2 entry, so the tick is backed by the artifact its row names |
+| PC-2 | consistency | low | The PR body still listed `npm run eval:all` as unrun and deferred to the merge gate; cycle 2 had run full `npm run ci` green | **Fixed** — PR body corrected via `gh pr edit` |
+| CR-1 | cleanup | low | `const section = reviewPr` created a second name for one value, used interleaved with the original | **Fixed** — alias dropped; 25/25 still green |
+
+**All three were fixed even though CONCERNS does not require it.** CONCERNS means "do not block", not
+"ignore" — and each fix was one line. Shipping a finding written minutes earlier, when the fix costs
+seconds, would make the review decorative.
+
+**Three candidate findings were dropped after checking their premises**, and the report records them
+rather than silently omitting them: §7 Files Summary was claimed to omit the test file (it does not —
+the row is present and labelled a scope addition); the positive and negative `severity:` assertions
+were suspected of conflicting (they do not — both regexes were run against the file); and the
+rewritten template block was suspected of no longer being valid YAML (it parses — the brace
+placeholders are flow mappings).
+
+**The report is the first in this repo to carry the block this task adds**, and its own block was
+validated against the contract it reviews: parses as YAML, 3 findings, all 7 keys on every entry, and
+it happens to carry **both** `ref` shapes — a `path:line` derived from a `file_line` (CR-1) and a
+non-path ref (PC-2). That is the polymorphism §3 of the task is about, exercised end to end rather
+than only asserted.
 
 ---
 
