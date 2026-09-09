@@ -36,8 +36,8 @@ Add a fourth, clean exit to the develop pipeline's QA loop — a diminishing-ret
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 5/5 phases, 12/12 success criteria; 8 files (3 added, 5 modified); 32 new tests, all conditions mutation-proved; `npm run ci:fast` green at 2936/0 | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [#361](https://github.com/Gamaroff/agent-skills/pull/361) → `develop`; 2 commits (`e934cefc`, `c788f769`); no issue comment — none linked | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.99.qa.{N}.*.md`; `task.99.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles: FAIL 50 → FAIL 60 → CONCERNS 90 → CONCERNS 90 → **PASS 100**; HIGH sequence `1,1,0,0,0`; 5c = CONCERNS (non-blocking) | —                    |
-| 7. finalise                | ⏳ Pending | `task.99.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.99.dod.{N}.*.md`; task `status: accepted`                        | DoD PASSED; CI SUCCESS on head `38d37885`; security probe mode executed 7 candidates and reproduced 1 (fixed) | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 9 commits on the branch; implementation report committed at Step 4 and finalised here | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -192,12 +192,66 @@ All fixed in the task document during review Step 8.5 except where noted.
 
 ---
 
+### Step 7 — the security probe found what five QA cycles did not (2026-09-09)
+
+The DoD security gate identified the deliverable as a **boundary** — it is a predicate — so probe mode
+fired: 7 candidate inputs generated and **executed against the shipped code**. One reproduced.
+
+`*` × N compiled to `[^/]*` × N, the textbook catastrophic-backtracking shape. Against a 60-character
+path: 8 stars 15ms, 10 stars 193ms, 12 stars 2.2s, **14 stars 23s**, rising ~10× per star. Not a
+vulnerability — both inputs are repo-controlled — but a hang inside the QA loop, from an unusual but
+legal config. Fixed by collapsing runs of `*` (a no-op on meaning), mutation-proved at 3301×, and all
+7 probes re-run clean.
+
+> **Five QA cycles of review walked past it; probe mode found it on its first pass.** The difference is
+> not diligence — the same reviewer did both — it is that probe mode *ran* the predicate instead of
+> reading it. That is the single clearest datum this run produced about the value of executing a
+> boundary rather than inspecting it, and it is the argument `review-security` makes, observed here on
+> a live deliverable.
+>
+> **Two things this run cannot claim.** There was **no independent reviewer at any point** — every
+> lens ran in the context that authored the change. And the probe fix (`38d37885`) **postdates gate 5**
+> (`4d7e3bcd`), so gate 5 does not cover it; what does is its own mutation-proved test, the full
+> 2938-test suite, the seven re-run probes, and a green CI rollup on that exact head.
+
+## Completion Summary
+
+**What shipped.** A pure predicate (`shared/resources/qa-diminishing-returns.js`) plus the runnable-prose
+contract it implements, a config key defaulting to the fail-safe, 34 tests over 11 reconstructed
+fixtures, and the surrounding prose corrections that five QA cycles turned up. The Convergence check
+beside it is byte-identical to `develop`, verified by diff at every cycle.
+
+**What the run cost, and what it bought.** Five QA cycles, nine findings — 2 HIGH, 5 MEDIUM, 1 promoted
+LOW, 1 security probe. Three observations worth carrying forward:
+
+1. **Every finding after cycle 1 was in the prose, not the engine.** The module took one HIGH at cycle
+   1 and was untouched until the Step 7 probe. Its tests and mutations held throughout.
+2. **Three consecutive cycles found a defect introduced by the previous cycle's fix.** That is qa-fix's
+   *"a fix is new code, not the closure of a finding"* holding three times running, and the argument for
+   its Step 3.5.
+3. **The cycle-2 refute pass and the Step 7 probe each found something no amount of re-reading had.**
+   The refute pass, because it re-read the *whole* diff rather than the previous cycle's repairs — one
+   of its two findings was in the original change. The probe, because it *executed* the predicate
+   rather than reading it, on the sixth pass over code five cycles had already reviewed.
+
+**The rule, tested on itself.** It was run against this run's own gates throughout: declining three
+times for three distinct correct reasons (`high-findings-remain`, `non-test-finding`, `no-residue`) and
+firing once when globs were configured to cover the residue. **It would not have shortened this loop,
+and should not have** — the findings were real defects in the deliverable, not pin-refinement, which is
+exactly the distinction it draws.
+
+**What this run cannot claim.** No independent reviewer at any point: every lens ran in the context that
+authored the change. And the probe fix postdates gate 5, so the gate does not cover it — its own
+mutation-proved test, the full suite, the re-run probes and a green CI rollup on that head do.
+
+---
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-09
+**Final Status**: Completed
 **Branch**: `feature/task.99.qa-loop-diminishing-returns-exit`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/361
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 5 (gate series FAIL 50 → FAIL 60 → CONCERNS 90 → CONCERNS 90 → PASS 100; HIGH sequence `1,1,0,0,0`)
+**DoD Summary**: `task.99.dod.1.qa-loop-diminishing-returns-exit.md` — PASSED
+**Tracker debt**: none. No `github_issue:` was ever linked, so no tracker mutation was attempted, deferred or failed — the task is simply absent from the board. `/sync-github-task` links it if a board entry is wanted.
