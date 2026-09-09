@@ -320,11 +320,19 @@ Three sources, highest precedence first:
 3. the project-identity default: `~/.claude/projects/<project path with every "/" replaced by "-">`
 
 So a project at `/Users/ada/Projects/app`, with no config key and no environment variable, resolves
-to `~/.claude/projects/-Users-ada-Projects-app`. Two things about that path are worth stating
-because guessing either one wrong sends you to an empty directory: it is under **`.claude/`**, not
-`.agents/` — the agent home fixes it, and this repository's agent-agnostic-path convention does not
-reach it — and the project path is **encoded, not nested**, so there is one flat directory per
-project rather than a mirrored tree.
+to `~/.claude/projects/-Users-ada-Projects-app`. Three things about that path are worth stating
+because guessing any of them wrong sends you to an empty directory:
+
+- It is under **`.claude/`**, not `.agents/` — the agent home fixes it, and this repository's
+  agent-agnostic-path convention does not reach it.
+- The project path is **encoded, not nested**, so there is one flat directory per project rather
+  than a mirrored tree.
+- **Inside a linked git worktree, the project path is the _main_ worktree's, not the one you are
+  standing in.** A session running in `/tmp/wt` still resolves to the main checkout's workspace.
+  That is deliberate — it is what stops one project resolving two different workspaces — and the
+  mechanism is described under *"An ephemeral anchor is refused"* below. It matters more than it
+  looks: `/develop-batch` dispatches every parallel story into a linked worktree, so this is an
+  ordinary state, not an exotic one.
 
 The resolver is [`shared/resources/resolve-observation-workspace.sh`](../../shared/resources/resolve-observation-workspace.sh),
 sourced **guarded**:

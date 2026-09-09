@@ -903,3 +903,70 @@ test("resolver: every documented `observations.*` key has a reader", (t) => {
     );
   }
 });
+
+test("resolver: the CONTRACT's stated precedence matches the resolver's implemented order", (t) => {
+  // The third copy. The precedence rule is stated in three places — the
+  // resolver's own header, observation-log-contract.md, and
+  // configuration.md — and the tests above bind only the last of those to
+  // behaviour. This binds the contract too, so a copy cannot drift while the
+  // other two stay honest.
+  //
+  // It asserts ORDER, not wording: the three tiers must appear in the contract
+  // in the same sequence the resolver consults them. Anchored on the tokens the
+  // resolver actually branches on (`observations.workspace`, `OBS_WORKSPACE`),
+  // so a rewrite of the surrounding prose does not fail this, but reordering the
+  // list does.
+  const contract = readOutside(
+    "shared",
+    "resources",
+    "observation-log-contract.md",
+  );
+  const resolver = readOutside(
+    "shared",
+    "resources",
+    "resolve-observation-workspace.sh",
+  );
+  if (contract === null || resolver === null)
+    return t.skip("repo siblings absent");
+
+  const section = contract.split(/^Resolver order:$/m)[1];
+  assert.ok(
+    section,
+    "observation-log-contract.md must state a `Resolver order:` list — the " +
+      "assertion below cannot bind a rule the contract does not state",
+  );
+  const list = section
+    .split(/\n\s*\n/)
+    .slice(0, 2)
+    .join("\n");
+
+  const iConfig = list.indexOf("observations.workspace");
+  const iEnv = list.indexOf("OBS_WORKSPACE");
+  const iDefault = list.search(/project-identity/);
+  assert.ok(
+    iConfig !== -1 && iEnv !== -1 && iDefault !== -1,
+    `contract's resolver-order list is missing a tier — config:${iConfig} ` +
+      `env:${iEnv} default:${iDefault}. A list that names fewer than three ` +
+      "tiers makes the ordering assertion below vacuous",
+  );
+  assert.ok(
+    iConfig < iEnv && iEnv < iDefault,
+    "the contract lists the tiers in a different order from the one the " +
+      "resolver implements (config → $OBS_WORKSPACE → project-identity), " +
+      "which the behavioural tests above prove. Two documents stating " +
+      "different precedence is worse than one stating none",
+  );
+
+  // Non-vacuity: the resolver must actually consult them in that order, so the
+  // assertion above is checked against something real rather than against a
+  // second copy of the same prose.
+  const rConfig = resolver.indexOf(
+    "read_nested_config_key observations workspace",
+  );
+  const rEnv = resolver.indexOf("${OBS_WORKSPACE:-}");
+  assert.ok(
+    rConfig !== -1 && rEnv !== -1 && rConfig < rEnv,
+    "the resolver no longer reads the config tier before the env tier — the " +
+      "contract assertion above is now measuring against the wrong baseline",
+  );
+});
