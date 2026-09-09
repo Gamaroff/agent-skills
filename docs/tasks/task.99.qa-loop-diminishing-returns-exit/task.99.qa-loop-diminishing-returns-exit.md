@@ -5,18 +5,20 @@ type: task
 description: "The QA loop's only stall guard measures HIGH findings. A run that reaches zero HIGH but keeps producing MEDIUM/LOW findings inside its own test machinery runs to the five-cycle limit, refining guards while the product has been finished for two cycles. Measured on a consumer run: HIGH 2,0,0,0 across four cycles, 21 findings, none of them in the three fixes. Adds a clean exit distinct from the existing escalation."
 tags: [develop-pipeline, qa-loop, convergence, cost]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-08
 updated: 2026-09-09
+completed_date: 2026-09-09
+pr_number: 361
 assignee:
 estimated_effort_hours: 9
 ---
 
 # Technical Task: A diminishing-returns exit for the QA loop
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.99.review.1.qa-loop-diminishing-returns-exit.md` implemented 2026-09-09
 
 ---
@@ -364,6 +366,7 @@ the invocation snippet's four variables have no documented source.
 | 2026-09-09 |  | QA gate 3 CONCERNS (90/100) — no HIGH; 1 MEDIUM (route 2 falsified 5c's own empty-`top_issues` claim, which would have sent the machinery residue back to qa-fix), fixed in a 3rd iteration. Both guards verified to decline correctly on this run's own `1,1,0` sequence. | qa-task |
 | 2026-09-09 |  | QA gate 4 CONCERNS (90/100) — no HIGH (2nd consecutive); 1 MEDIUM (the route note's `WAIVED` row was false), fixed in a 4th iteration. Condition 1 satisfied for the first time on the live sequence `1,1,0,0`; the exit correctly declined on this repo's unset globs and fires when they are configured. | qa-task |
 | 2026-09-09 |  | QA gate 5 PASS (100/100) — no findings above LOW; all 12 success criteria mechanically re-verified. Every finding after cycle 1 was in the prose, not the engine; three consecutive cycles found a defect introduced by the previous cycle's fix. | qa-task |
+| 2026-09-09 | 0.3 | DoD verified — accepted (PR #361). Security probe mode executed 7 candidates against the shipped predicate and reproduced one: catastrophic backtracking in the glob compiler (14 stars → 23s). Fixed by collapsing star runs, mutation-proved at 3301×. Full `npm run ci` green at 2938/0; CI green on the final head. | finalise |
 
 ## Progress Tracking
 
@@ -456,6 +459,42 @@ the behaviour the rule this task ships exists to stop.
 - Full fast gate green: `npm run ci:fast` → 2936 tests, 0 failures, Prettier clean.
 - Success criterion 9 verified **by diff, not by assertion**: the *Convergence check* section is
   byte-identical to its `develop` version (5624 bytes both sides).
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Gate**: `task.99.gate.5.qa-loop-diminishing-returns-exit.yml` — **PASS**, 100/100
+**Gate series**: FAIL 50 → FAIL 60 → CONCERNS 90 → CONCERNS 90 → **PASS 100** · HIGH `1,1,0,0,0`
+**PR**: [#361](https://github.com/Gamaroff/agent-skills/pull/361) · **CI**: ✅ SUCCESS on head `38d37885`
+
+✅ **Acceptance Criteria** — 12/12, re-verified mechanically at cycle 5 and at Step 5c
+✅ **Tests** — 34 in the new suite; `npm run ci` (the full merge-gate tier including `eval:all`) green at 2938/0
+✅ **PR Review** — Step 5c `/review-pr`: CONCERNS (non-blocking), zero code findings
+✅ **Documentation** — CHANGELOG, configuration reference, the runnable-prose contract, both bundled copies
+✅ **Security** — **7 boundary probes executed**, 1 reproduced (catastrophic backtracking in the glob compiler) and **fixed**, 0 remaining
+⚠️ **Compliance** — N/A: no personal, payment or health data; no UI; no auth surface
+
+**The probe finding is the one worth reading.** `*` × N compiled to `[^/]*` × N, so a 14-star glob
+took **23 seconds** against a 60-character path, rising ~10× per star. Not a vulnerability — both
+inputs are repo-controlled — but a hang inside the QA loop. **Four QA cycles walked past it; probe
+mode found it on its first pass, because it executed the predicate instead of reading it.** Fixed by
+collapsing runs of `*`, which is a no-op on meaning, and mutation-proved at 3301×.
+
+**Honest caveats, recorded rather than smoothed over:**
+
+- **No human approval on the PR**, and no independent reviewer at any point: every review lens ran
+  in-line, in the context that authored the change.
+- **The probe fix postdates gate 5.** Gate 5 was written against `4d7e3bcd`; the fix is `38d37885`.
+  What covers it is its own mutation-proved test, the full suite, the re-run probes and a green CI
+  rollup on that exact head — not gate 5.
+
+**Detailed Verification Log:** [`task.99.dod.1.qa-loop-diminishing-returns-exit.md`](./task.99.dod.1.qa-loop-diminishing-returns-exit.md)
+**PR Conformance Review:** [`task.99.pr-review.1.qa-loop-diminishing-returns-exit.md`](./task.99.pr-review.1.qa-loop-diminishing-returns-exit.md)
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
+---
 
 ## Bug Reports
 
