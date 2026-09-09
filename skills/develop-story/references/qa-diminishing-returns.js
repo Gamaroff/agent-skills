@@ -283,6 +283,27 @@ function readTopIssues(gateContent) {
 const KEY_RE =
   /(?:^|[{,\s])(severity|file|category|status)[ \t]*:[ \t]*([^,}]*)/g;
 
+// Three of the four keys are ENUMERATIONS, where case carries no information and
+// folding makes the comparison robust. The fourth, `file:`, is a FILESYSTEM
+// PATH, where case IS information.
+//
+// Folding all four was the original form, and it silently disabled the whole
+// feature for any consumer whose `qa.testArtifactGlobs` contains a capital
+// letter: the glob is written against the real path and matched against the
+// folded one, so `src/Components/**` could never match. The direction was
+// fail-safe — the exit simply never fires — which is precisely why it was
+// invisible, because that is byte-identical from the consumer's side to never
+// having configured the key at all. It also put a path that does not exist on
+// disk into the reported `findings[].file`, sending anyone who tried to open it
+// nowhere.
+//
+// The 32-test suite could not see it, and no mutation of that line would have
+// been visible either: every fixture path and every glob in the suite was
+// lowercase, so the fold was a no-op suite-wide. Mutation-proving asks whether a
+// test can fail when the behaviour is removed; it cannot see a fixture
+// population that never exercises the behaviour in the first place.
+const CASE_INSENSITIVE_KEYS = new Set(["severity", "category", "status"]);
+
 function readKeysInto(entry, text) {
   KEY_RE.lastIndex = 0;
   let m;
@@ -293,7 +314,11 @@ function readKeysInto(entry, text) {
     // least likely to be looking at.
     if (entry[key] !== null) continue;
     const v = scalarValue(m[2]);
-    entry[key] = v === "" ? null : v.toLowerCase();
+    if (v === "") {
+      entry[key] = null;
+      continue;
+    }
+    entry[key] = CASE_INSENSITIVE_KEYS.has(key) ? v.toLowerCase() : v;
   }
 }
 

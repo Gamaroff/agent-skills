@@ -1,0 +1,106 @@
+schema: 1
+task: "task.99.qa-loop-diminishing-returns-exit"
+task_title: "A diminishing-returns exit for the QA loop"
+gate: FAIL
+status_reason: "All 5 phases implemented and all 12 success criteria verified; `npm run ci:fast` green at 2936/0 and the exit mutation-proved eight ways. One HIGH: the glob matcher case-folds `file:` paths, so a consumer whose globs carry a capital letter can never take the exit — the deliverable is silently inoperative for them, and every fixture in the new suite is lowercase so the suite cannot see it."
+reviewer: "QA Engineer"
+updated: "2026-09-09T13:00:00Z"
+
+top_issues:
+  - id: "TASK-99-001"
+    severity: high
+    file: "shared/resources/qa-diminishing-returns.js"
+    finding: >-
+      `readKeysInto` lowercases every captured value, including `file:`, which is a filesystem path
+      rather than an enumeration. `qa.testArtifactGlobs` is matched against the folded path while the
+      operator wrote the glob against the real one, so any glob containing an uppercase character
+      never matches and the exit never fires. Reproduced: `src/Components/Button/Button.spec.tsx`
+      against glob `src/Components/**` returns `continue / non-test-finding`. The 32-test suite
+      passes with the defect present because every fixture path and glob in it is lowercase — the
+      anti-vacuity fixture included.
+    suggested_action: >-
+      Fold only `severity`, `category` and `status`; keep `file` verbatim. Add a regression test with
+      a capitalised path and a correctly-cased glob, and mutation-prove it by restoring the
+      unconditional `.toLowerCase()`.
+    suggested_owner: dev
+    status: open
+  - id: "TASK-99-002"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: >-
+      The new section instructs writing the exit's reason into a `**Loop exit**` row of the
+      `### QA Cycle {N}` entry, but the QA Cycle entry template earlier in the same file defines five
+      rows and none of them is `**Loop exit**`. A reader following the template omits it; a reader
+      following the exit section adds a row the template does not know about. Success criterion 8 —
+      that a reader six months later can tell this exit from a stall — rests entirely on that row.
+    suggested_action: >-
+      Add `**Loop exit**` to the QA Cycle entry template with its default value, alongside the note
+      that already explains who writes `**PR Review**` and when.
+    suggested_owner: dev
+    status: open
+  - id: "TASK-99-003"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: >-
+      The invocation snippet consumes `$CYCLE`, `$HIGH_SEQUENCE_JSON`, `$LATEST_GATE` and
+      `$TEST_ARTIFACT_GLOBS_JSON`, and the section never says how any of them is populated — in
+      particular that `qa.testArtifactGlobs` is read from the consumer's `skills-config.yaml`. Every
+      other config-consuming step in this corpus names its source at the call site. As written an
+      orchestrator has a documented command and no documented way to run it.
+    suggested_action: >-
+      State the four bindings above the snippet: cycle counter from Loop Setup, the HIGH sequence
+      from the `**HIGH findings**` rows in QA Iteration History, the gate path from the Loop Setup
+      resolution, and the globs from `qa.testArtifactGlobs` in `skills-config.yaml` (default `[]`).
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 2936
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No security surface. The engine is a pure library — no filesystem access (asserted by test), no network, no child processes, no credential handling. It parses text it is handed. No new dependencies; the repo still has zero production runtime deps."
+  performance:
+    status: PASS
+    notes: "Two single-pass line scanners over one gate file, plus one RegExp compile per configured glob per candidate path. Gate files are a few hundred lines; the globs list is a handful of entries. The check runs once per QA cycle, so its cost is invisible beside the cycle it may save."
+  reliability:
+    status: CONCERNS
+    notes: "The never-throws property holds and is tested against eight malformed inputs, and every ambiguity resolves toward `continue`. But TASK-99-001 is a silent-failure mode: the feature is inoperative for a class of consumers and emits no signal at all, which is the shape the task's own `empty result is a claim about the instrument` reasoning warns about. Fail-safe in direction, undiagnosable in practice."
+  maintainability:
+    status: PASS
+    notes: "The engine follows review-report-freshness.js closely enough that a reader of one can read the other, and each non-obvious property carries the reason it exists. The gate scanner reuses the Convergence check's two indent rules rather than re-deriving them. 32 tests, mutation-proved eight ways, with the one surviving mutation fixed and recorded."
+
+recommendations:
+  immediate:
+    - action: "Fix TASK-99-001 — fold only the enumerations, keep `file:` verbatim, and add a capitalised-path regression test that is mutation-proved"
+      refs: ["shared/resources/qa-diminishing-returns.js", "shared/resources/tests/qa-diminishing-returns.test.mjs"]
+    - action: "Fix TASK-99-002 — add the `**Loop exit**` row to the QA Cycle entry template"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "Fix TASK-99-003 — state where the snippet's four variables come from"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+  future:
+    - action: "`indentOf` treats a tab-indented line as column 0, which would end the `top_issues` scan early. YAML forbids tab indentation so this is latent, not live — but a hand-edited gate could trip it, and the failure would look like a gate with fewer findings than it has."
+      refs: ["shared/resources/qa-diminishing-returns.js"]
+    - action: "`readNfrStatuses` matches any line whose first non-whitespace token is `status:`, so a `notes:` block scalar whose line begins that way would be read as an NFR status. Latent; no gate in the corpus does it."
+      refs: ["shared/resources/qa-diminishing-returns.js"]
+    - action: "The preamble's `two ways the loop reaches Step 7` sits awkwardly beside `APPROVE or CONCERNS from 5c remains the only thing that opens Step 7`. Both are true; `two ways the loop reaches 5c` says it without the apparent contradiction."
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "Nothing yet emits `category:` on a gate entry. The exit honours it when present, so the QA skills could start writing it and strengthen condition 3 beyond the `nfr_validation` signal it rests on today."
+      refs: ["skills/qa-task/SKILL.md", "skills/qa-story/SKILL.md"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "Resolve TASK-99-001 — the deliverable is inoperative for capitalised paths"
+    - "Resolve TASK-99-002 and TASK-99-003 — the section instructs a row the template lacks, and a command with undocumented inputs"

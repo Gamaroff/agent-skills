@@ -280,6 +280,39 @@ restores today's behaviour exactly. Setting `qa.testArtifactGlobs: []` is the ch
 rollback — it disarms the exit without removing anything, because an empty glob list can never
 satisfy condition 2.
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 50/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.99.qa.1.qa-loop-diminishing-returns-exit.md](./task.99.qa.1.qa-loop-diminishing-returns-exit.md)
+- **Gate File**: [task.99.gate.1.qa-loop-diminishing-returns-exit.yml](./task.99.gate.1.qa-loop-diminishing-returns-exit.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2936 (32 new)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 1 HIGH, 2 MEDIUM, 3 LOW
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+The glob matcher case-folds `file:` paths, so a consumer whose `qa.testArtifactGlobs` carries an
+uppercase character can never take the exit — silently, and indistinguishably from an unconfigured
+project. The new 32-test suite cannot detect it because every fixture path in it is lowercase,
+including the anti-vacuity fixture. Filed as
+[task.99.bug.1](./task.99.bug.1.glob-matching-case-folds-file-paths.md).
+
+Two MEDIUMs: the section instructs a `**Loop exit**` row the QA Cycle template does not define, and
+the invocation snippet's four variables have no documented source.
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -288,6 +321,8 @@ satisfy condition 2.
 | 2026-09-09 | 0.2 | Review passed (8/10) after fixes — added the missing executable artifact (`qa-diminishing-returns.js`) and reconstructed fixtures the replay tests need, since the tinker-city gates live in another repo; corrected the exit to hand to 5c rather than bypass it; specified `qa.testArtifactGlobs` shape and `[]` default; corrected the stale "three exits" scope item; effort 6h → 9h. | review-task |
 | 2026-09-09 |  | Status → ready-for-development | review-task |
 | 2026-09-09 |  | Implemented — 8 files (3 added incl. 12 fixtures, 5 modified), 32 tests, all 8 conditions mutation-proved. Corrected criterion 2 from "cycle 2" to "cycle 3": §7's own rule cannot fire at cycle 2 on a `2,0,0,0` sequence. | develop |
+| 2026-09-09 |  | QA gate FAIL (50/100) — 1 HIGH (glob matcher case-folds `file:` paths, silently disabling the exit for capitalised paths; the new suite cannot see it), 2 MEDIUM, 3 LOW | qa-task |
+| 2026-09-09 |  | QA findings fixed — 1 HIGH + 2 MEDIUM closed, 1 iteration. The HIGH was a case-fold applied to `file:` as well as to the three enumerations, which silently disabled the exit for capitalised paths; the fix is mutation-proved and the new test is the only one in the suite that exercises a capitalised path. | qa-fix |
 
 ## Progress Tracking
 
@@ -337,6 +372,34 @@ through the module; 12 fixtures carry the sequences. `qa.testArtifactGlobs` is d
 - **"Cycle 2" was arithmetically impossible.** See the note under success criterion 2. Implemented to
   §7 and the §11 risk table, which agree; the outlier phrasing was the optimistic one.
 
+### QA cycle 1 fixes (2026-09-09)
+
+Gate 1 read FAIL (50/100) — 1 HIGH, 2 MEDIUM. All three closed in one qa-fix iteration.
+
+- **TASK-99-001 (HIGH)** — `readKeysInto` folded case on all four captured keys. Three are
+  enumerations; `file:` is a path. Folding it meant the glob was written against the real path and
+  matched against the folded one, so any glob with a capital letter could never match and the exit
+  silently never fired. Fixed by folding only `severity`, `category` and `status`. **Mutation-proved:
+  restoring the unconditional fold turns the new test red.**
+  - The instructive part is why nothing caught it: **every fixture path and every glob in the suite
+    was lowercase**, so the fold was a no-op suite-wide and 32/32 passed with the defect present —
+    the anti-vacuity test included. Mutation-proving could not have found it either. It asks whether
+    a test can fail when the behaviour is removed; it cannot see a fixture corpus containing no
+    instance of the input class. That is a **fifth vacuity shape**, distinct from the four in
+    `mutation-proving.md`, and it is the one an author reviewing their own work is least likely to
+    look for.
+- **TASK-99-002 (MEDIUM)** — the new section instructed writing a `**Loop exit**` row that the QA
+  Cycle entry template did not define. Added to the template with its default (`n/a — loop
+  continued`) and a note on who writes it, matching the existing treatment of `**PR Review**`.
+- **TASK-99-003 (MEDIUM)** — the invocation snippet consumed four variables with no stated source.
+  Added a binding table above it naming each one, and the rule that an orchestrator which cannot
+  resolve one has not met the precondition and should continue into 5b rather than guess — which is
+  what the engine already does for each of those inputs.
+
+The three LOW items were **deliberately not fixed** and remain in the gate's `recommendations.future`:
+two are latent under YAML's own rules and one is a wording preference. Refining them would be exactly
+the behaviour the rule this task ships exists to stop.
+
 ### Testing results
 
 - 32/32 tests pass in `shared/resources/tests/qa-diminishing-returns.test.mjs`.
@@ -351,6 +414,18 @@ through the module; 12 fixtures carry the sequences. `qa.testArtifactGlobs` is d
 - Full fast gate green: `npm run ci:fast` → 2936 tests, 0 failures, Prettier clean.
 - Success criterion 9 verified **by diff, not by assertion**: the *Convergence check* section is
   byte-identical to its `develop` version (5624 bytes both sides).
+
+## Bug Reports
+
+### In QA Verification
+
+- [Bug 1: Glob matching case-folds `file:` paths](./task.99.bug.1.glob-matching-case-folds-file-paths.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09)
+
+### Closed Bugs
+
+_None yet._
+
+---
 
 ## References
 

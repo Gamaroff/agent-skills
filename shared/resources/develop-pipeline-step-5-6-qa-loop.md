@@ -272,6 +272,7 @@ Log the result in the QA Iteration History section:
 **Issues Found**: {count and brief descriptions, or "none"}
 **HIGH findings**: {HIGH_N}
 **PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
+**Loop exit**: {n/a — loop continued / the `describeDiminishingReturns()` message verbatim}
 **Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of 5) / Proceeding to finalise / Escalating — loop not converging}
 ```
 
@@ -284,6 +285,12 @@ writes the row when it writes the entry, and at that moment no 5c verdict exists
 writes `pending — 5c not yet run`, and **5c overwrites it** with its verdict. A cycle whose gate never
 reached 5c keeps `not reached — gate did not exit the loop`. It is never omitted. An omitted row is
 indistinguishable from a review that was skipped, and on resume the two must not be confused.
+
+`**Loop exit**` is the **Diminishing-returns exit**'s record, and it exists for one reader: whoever
+opens this history six months from now and has to tell a clean early exit from a stall. On every
+cycle that did not take that exit it reads `n/a — loop continued`, which is a claim rather than a
+gap. On the cycle that did, write `describeDiminishingReturns(r)` **verbatim** — the message is a
+function precisely so that what lands here is assertable rather than composed afresh each time.
 
 **Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
@@ -421,7 +428,16 @@ The two guards answer opposite questions and must never both claim the same run:
 Escalating a run with zero HIGH would misreport finished work as stalled, and the Fail Loudly rule
 cuts the other way here: what is loud is the *record*, not the halt.
 
-**The conditions.** Ask the engine; do not evaluate them by eye:
+**The conditions.** Ask the engine; do not evaluate them by eye. Its four inputs are bound as follows
+— an orchestrator that cannot resolve one of them has not met the precondition for running the check
+at all, and should continue into 5b rather than guess:
+
+| Variable | Where it comes from |
+| :--- | :--- |
+| `$CYCLE` | the QA cycle counter from **Loop Setup** — the cycle whose gate was just written |
+| `$HIGH_SEQUENCE_JSON` | the `**HIGH findings**` rows of the `### QA Cycle {N}` entries in QA Iteration History, oldest first, as a JSON array. This is the Convergence check's own recorded sequence; do **not** recount it from the gates |
+| `$LATEST_GATE` | the gate path resolved in **Loop Setup** (`…gate.{N}.{name}.yml`, highest `{N}`) |
+| `$TEST_ARTIFACT_GLOBS_JSON` | `qa.testArtifactGlobs` from the consumer's `skills-config.yaml`, as a JSON array. **Absent ⇒ `[]`**, which matches nothing and is why an unconfigured project never takes this exit |
 
 ```bash
 command node -e '

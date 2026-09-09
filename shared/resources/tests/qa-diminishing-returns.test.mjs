@@ -237,6 +237,54 @@ test("** crosses directories, * does not", () => {
   assert.equal(matchesAnyGlob("tests/a/b.mjs", ["tests/**"]), true);
 });
 
+test("a capitalised path is matched as written, not case-folded", () => {
+  // TASK-99-001. `readKeysInto` folded EVERY captured value, including `file:`,
+  // which is a path rather than an enumeration. The glob is written against the
+  // real path and was matched against the folded one, so any glob carrying a
+  // capital letter could never match — the exit silently never fired, which from
+  // the consumer's side is byte-identical to never having configured the key.
+  //
+  // Every other fixture and glob in this file is lowercase, so the fold was a
+  // no-op suite-wide: 32/32 passed with the defect present, the anti-vacuity
+  // test included. This is the only case in the file that exercises it.
+  const gate = [
+    "top_issues:",
+    "  - id: X",
+    "    severity: MEDIUM",
+    "    file: src/Components/Button/Button.spec.tsx",
+    "    status: open",
+    "",
+    "nfr_validation:",
+    "  security:",
+    "    status: PASS",
+  ].join("\n");
+
+  // The path survives verbatim...
+  const entry = readTopIssues(gate)[0];
+  assert.equal(entry.file, "src/Components/Button/Button.spec.tsx");
+  // ...while the enumeration is still folded, which is what makes the fix a
+  // narrowing rather than a removal.
+  assert.equal(entry.severity, "medium");
+
+  // ...and a correctly-cased glob therefore matches, so the exit fires.
+  const r = classifyDiminishingReturns({
+    cycle: 3,
+    highCounts: [0, 0, 0],
+    latestGateContent: gate,
+    testArtifactGlobs: ["src/Components/**"],
+  });
+  assert.equal(r.verdict, VERDICTS.EXIT);
+  assert.equal(r.findings[0].file, "src/Components/Button/Button.spec.tsx");
+
+  // And case still matters in the other direction — a lowercase glob does NOT
+  // match a capitalised path. Without this half, re-introducing the fold on the
+  // GLOB side instead of the path side would pass.
+  assert.equal(
+    matchesAnyGlob("src/Components/Button.spec.tsx", ["src/components/**"]),
+    false,
+  );
+});
+
 test("path normalisation does not widen the match", () => {
   assert.equal(matchesAnyGlob("./a/b.spec.ts", ["**/*.spec.ts"]), true);
   assert.equal(matchesAnyGlob("a\\b.spec.ts", ["**/*.spec.ts"]), true);
