@@ -55,15 +55,32 @@ findings:
 truncated_count: 0
 ```
 
-- Map each entry straight onto the output schema's `findings[]`. `severity` and `suggested_action`
-  carry across by name; `finding` becomes `description`; `suggested_action` becomes
-  `suggested_fix_path`; `source` is `pr-review`.
-- **`ref` → `file`**: when `ref` looks like `path:line`, use it as `file`. Otherwise set `file: null`
-  and carry `ref` verbatim inside `description` — it is a criterion id, an artifact path, a
-  frontmatter field or a section reference, and coercing it into a path loses it.
-- Add the block's `truncated_count` to your own.
-- **`findings: []` is a real answer, not a missing block.** A report with nothing to report still
-  writes the section. An *absent section* means a legacy report and only then do you fall back.
+Every block field has exactly one destination. **No field carries across by name** — the block's
+names and the output schema's names differ almost everywhere, and assuming otherwise is how a typed
+field arrives somewhere the schema does not define:
+
+| Block field | Output schema field | Rule |
+|---|---|---|
+| `id` (`PC-1`, `CR-1`) | `id` (`F1`, `F2`, …) | **Renumber.** The output ids are `F{n}` in the order you emit them. Keep the block id in `description` when it is worth citing; never emit `PC-1` as an output `id`. |
+| `severity` | `severity` | Same name, same values (`high`/`medium`/`low`). The one field that does carry directly. |
+| `finding` | `description` | Verbatim. |
+| `suggested_action` | `suggested_fix_path` | Verbatim. Despite the field's name it holds a description of the fix approach, not a path. |
+| `ref` | `file` | Conditional — see below. |
+| `category` | — | **Dropped.** The output schema has no category field; `pr-review` findings are already distinguished by `source`. |
+| `confidence` | — | **Dropped.** The output schema carries no confidence. Do not fold it into `severity` — a `high`/`medium` finding stays `high`/`medium` whatever its confidence. |
+| — | `source` | Always the literal `pr-review` for every entry taken from this block. |
+
+**`ref` → `file`**: when `ref` looks like `path:line`, use it as `file`. Otherwise set `file: null`
+and carry `ref` verbatim inside `description` — it is a criterion id, an artifact path, a frontmatter
+field or a section reference, and coercing it into a path loses it.
+
+**`truncated_count`**: the block's value counts findings `/review-pr` dropped; your own counts
+findings **you** dropped at the 20-finding cap. Report the **sum**, so the field answers "how many
+findings exist that are not in this summary?" — which is the question its consumer asks. The two
+causes are not distinguished, and do not need to be.
+
+**`findings: []` is a real answer, not a missing block.** A report with nothing to report still
+writes the section. An *absent section* means a legacy report and only then do you fall back.
 
 ### Fallback — the rendered three-line shape (reports written before the block existed)
 

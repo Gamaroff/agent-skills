@@ -628,9 +628,21 @@ test("the PR review report carries a machine-readable findings block", () => {
     );
   }
 
-  // Both lenses in ONE block, so the ingester has exactly one anchor to find.
-  assert.match(body, /id: PC-1/, "the block must carry conformance findings");
-  assert.match(body, /id: CR-1/, "the block must carry code findings");
+  // Both lenses in ONE block, so the ingester has exactly one anchor to find. Asserted on the id
+  // SHAPE rather than on literal `PC-1` / `CR-1`: the block is a template an agent fills in, so
+  // pinning example values would make the test fail on a correct placeholder rewrite — and it did,
+  // which is how this assertion was found to be over-fitted.
+  assert.match(
+    body,
+    /PC-n|PC-\d/,
+    "the block must show conformance findings (PC-*)",
+  );
+  assert.match(body, /CR-n|CR-\d/, "the block must show code findings (CR-*)");
+  assert.match(
+    body,
+    /conformance first then code/i,
+    "the block must state the lens ordering that mirrors the rendered sections",
+  );
 
   // The trap: `pr_conformance` emits `ref:` but `code_review` emits `file_line:`. Step 6's
   // "deliberately parallel" field list omits the location field entirely, which is how the
@@ -691,6 +703,37 @@ test("the ingester prefers the block and keeps the legacy fallback", () => {
     ingester,
     /`ref` → `file`/,
     "the ingester must say how the block's polymorphic `ref` maps onto its own `file` field",
+  );
+
+  // QA cycle 1, TASK85-001. The mapping was first written as prose and contradicted itself:
+  // `suggested_action` was said to "carry across by name" AND to "become `suggested_fix_path`",
+  // while the output schema defines no `suggested_action` key at all — and `id`, `category` and
+  // `confidence` were given no destination. An ambiguous mapping in the consumer half defeats the
+  // point of putting typed fields on disk, so every block field must name a destination or an
+  // explicit drop.
+  for (const field of [
+    "id",
+    "severity",
+    "finding",
+    "suggested_action",
+    "ref",
+    "category",
+    "confidence",
+  ]) {
+    assert.ok(
+      new RegExp(`\\|\\s*\`${field}\``).test(ingester),
+      `the block-to-output mapping table must give \`${field}\` a destination or an explicit drop`,
+    );
+  }
+  assert.match(
+    ingester,
+    /\*\*No field carries across by name\*\*/,
+    "the mapping must not claim fields carry across by name — the two schemas' names differ",
+  );
+  assert.match(
+    ingester,
+    /\*\*Dropped\.\*\*/,
+    "fields with no destination must be marked dropped, not left unmentioned",
   );
 });
 

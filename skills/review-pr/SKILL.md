@@ -365,21 +365,15 @@ ALWAYS use this exact template structure:
 
 ```yaml
 findings:
-  - id: PC-1
-    category: coverage
-    severity: high
-    confidence: high
-    ref: "AC-3"
-    finding: "<one sentence: what is wrong>"
-    suggested_action: "<one sentence: the fix approach>"
-  - id: CR-1
-    category: bug
-    severity: high
-    confidence: high
-    ref: "src/x/y.ts:42"
-    finding: "<one sentence: what is wrong>"
-    suggested_action: "<one sentence: the fix approach>"
-truncated_count: 0
+  # one entry per rendered finding, conformance first then code
+  - id: {PC-n or CR-n, matching the rendered finding}
+    category: {coverage|scope|trail|consistency for PC-*, bug|cleanup for CR-*}
+    severity: {low|medium|high}
+    confidence: {low|medium|high}
+    ref: {the same ref rendered after the em-dash, quoted}
+    finding: {one sentence: what is wrong}
+    suggested_action: {one sentence: the fix approach}
+truncated_count: {integer — the two lenses' counts summed}
 ```
 
 ## Recommended Actions

@@ -35,7 +35,7 @@ text, and make the qa-fix ingester prefer that block while still parsing legacy 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.85.*` exists in git                               | `feature/task.85.review-pr-machine-readable-findings` created from `develop` at `08293212`, pushed, tracking origin | —                    |
 | 2. review-task             | ✅ Done    | `task.85.review.{N}.{name}.md` exists (or skip logged)                 | Ran (status `Draft`, no prior report). 5/10 NEEDS REVISION as found → 3 Critical + 4 Important fixed in place → 9/10 READY TO IMPLEMENT. Promoted `draft → ready-for-development`. Report: `task.85.review.1.review-pr-machine-readable-findings.md` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1-3 landed in 1 iteration (no stall, no re-invoke). 13 mutations proven. `npm run ci:fast` green: prettier clean + 2965 tests, 0 fail | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #363: https://github.com/Gamaroff/agent-skills/pull/363. Issue comment skipped — no linked tracker issue. Leak check: OK | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.85.qa.{N}.*.md`; `task.85.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.85.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -164,9 +164,68 @@ _Problems encountered and how they were resolved or escalated._
 
 ---
 
+### Step 4 — Create PR — 2026-09-09
+
+- **Staging scope**: `docs/tasks/task.85.…`, `evals/shared/tests`, `shared/resources`,
+  `skills/qa-fix/references`, `skills/review-pr`. Pre-flight guard held **0** files — both untracked
+  paths were inside the work-item dir. Post-commit leak check: OK, nothing outside scope.
+- **Two commits, and the split is deliberate**: `16267305` carries the whole contract change
+  (emitter + consumer + the test that pins both) and `2b2959b0` the task documentation. Emitter and
+  consumer were **not** split from each other because the test asserts the ingester's exact wording —
+  landing the ingester without the re-pinned test, or vice versa, leaves a red commit in between.
+- **A pre-commit hook ran `npm run bundle`** during commit 1 and reported every skill in sync, so the
+  bundled copy committed in the same commit was already current. One pre-existing warning surfaced,
+  `⚠️ shared/resources/<name> not found` — a literal placeholder in another skill, unrelated to this
+  change and not introduced by it.
+- PR body records the `npm run eval:all` tier as **not yet run** rather than implying full CI passed;
+  it runs once at `/develop-next`'s merge gate.
+
+---
+
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-09
+
+**Gate**: FAIL (70/100) — `task.85.gate.1.review-pr-machine-readable-findings.yml`
+**Report**: `task.85.qa.1.review-pr-machine-readable-findings.md`
+**PR Review**: _pending — Step 5c runs only on a clean gate_
+
+| Id | Sev | File | Finding | Status |
+| --- | --- | --- | --- | --- |
+| TASK85-001 | HIGH | `shared/resources/qa-findings-ingester-prompt.md` | The block-to-output mapping contradicted itself — `suggested_action` was said to "carry across by name" **and** to "become `suggested_fix_path`", and the output schema defines no `suggested_action` key — and gave no destination for `id`, `category` or `confidence` | ✅ Fixed |
+| TASK85-002 | MEDIUM | `skills/review-pr/SKILL.md` | The template's yaml block used literal example values (`id: PC-1`, `ref: "AC-3"`) under "ALWAYS use this exact template structure", against the brace convention every sibling section uses | ✅ Fixed |
+| TASK85-003 | LOW | `shared/resources/qa-findings-ingester-prompt.md` | `truncated_count` summing conflicted with the field's own schema comment | ✅ Fixed |
+
+**Fixes applied (cycle 1):**
+
+- **TASK85-001** — replaced the prose sentence with an 8-row per-field mapping table. Every block
+  field now names a destination or an explicit **Dropped.**, and the table opens by stating that
+  **no** field carries across by name, which is the assumption that produced the contradiction.
+  `id` renumbering (`PC-1`/`CR-1` → `F{n}`) is spelled out; `category` and `confidence` are marked
+  dropped with the reason, including "do not fold `confidence` into `severity`".
+- **TASK85-002** — converted the block's example entries to the template's own brace convention and
+  added a comment line stating the lens ordering.
+- **TASK85-003** — replaced "add the block's `truncated_count` to your own" with a paragraph naming
+  what each count measures and why the sum is the right answer for the field's consumer.
+
+**A test in this file was itself over-fitted, and the fix exposed it.** The cycle-1 assertions
+`assert.match(body, /id: PC-1/)` and `/id: CR-1/` pinned the *literal example values* — so a
+correct placeholder rewrite turned them red. They now assert the id **shape** (`PC-n|PC-\d`) plus the
+stated lens ordering. Worth recording: the assertion was green while the defect it sat next to was
+live, and went red only when the defect was fixed. That is the signature of a test pinned to an
+example rather than to a rule.
+
+**4 further mutations proven (M14-M17), all red:**
+
+| # | Mutation | Result |
+| --- | --- | --- |
+| M14 | "**No field carries across by name**" softened | ✅ red |
+| M15 | the `confidence` row removed from the mapping table | ✅ red |
+| M16 | the `**Dropped.**` markers removed | ✅ red |
+| M17 | the lens-ordering comment removed from the template block | ✅ red |
+
+`npm run ci:fast` green after the fixes: prettier clean, 2965 tests, 0 failures. `npm run bundle`
+re-run; the one bundled consumer is in sync.
 
 ---
 
@@ -175,7 +234,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.85.review-pr-machine-readable-findings`
-**PR**: {populated after Step 4}
+**PR**: [#363](https://github.com/Gamaroff/agent-skills/pull/363)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

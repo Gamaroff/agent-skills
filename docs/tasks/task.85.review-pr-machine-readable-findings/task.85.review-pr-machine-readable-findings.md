@@ -5,7 +5,7 @@ type: task
 description: "The qa-fix ingester parses /review-pr's rendered three-line finding format by prose description. That contract is the sole carrier of findings on the Step 5c REQUEST CHANGES path, and it currently rests on an LLM matching a format described in another file. Emit a structured findings block so the path is deterministic."
 tags: [review-pr, qa-fix, pipeline, contracts]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 risk_level: low
 created: 2026-09-03
@@ -16,7 +16,7 @@ estimated_effort_hours: 4
 
 # Technical Task: Give `/review-pr` a machine-readable findings block
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.85.review.1.review-pr-machine-readable-findings.md` implemented 2026-09-09
 
 ---
@@ -320,6 +320,34 @@ assertions.
 - The existing pin: `evals/shared/tests/pr-review-loop-parity.test.mjs:512`
 - A real legacy report: `docs/tasks/task.66.review-pr/task.66.pr-review.1.review-pr.md`
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.85.qa.1.review-pr-machine-readable-findings.md](./task.85.qa.1.review-pr-machine-readable-findings.md)
+- **Gate File**: [task.85.gate.1.review-pr-machine-readable-findings.yml](./task.85.gate.1.review-pr-machine-readable-findings.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2965 (0 failures)
+- **Phases Verified**: 2/3 clean (Phase 2 CONCERNS)
+- **Critical Issues**: 1 HIGH, 1 MEDIUM, 1 LOW
+- **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+The emitter half and the contract tests are sound and mutation-proven. **TASK85-001 (HIGH)**: the
+ingester's block-to-output mapping contradicts itself (`suggested_action` both "carries across by
+name" and "becomes `suggested_fix_path`", and the output schema defines no `suggested_action`) and
+gives no destination for `id`, `category` or `confidence`. That is the consumer half of the very
+contract this task exists to make deterministic.
+
 ## Change Log
 
 | Date       | Version | Description                                        | Author      |
@@ -328,3 +356,5 @@ assertions.
 | 2026-09-09 | 1.1     | Review 5/10 → NEEDS REVISION as found; 3 Critical + 5 Important fixed in place — added §3 Technical Background (the two subagent schemas are not field-identical), §5 Breaking Changes, §6 Implementation Plan (3 phases), §7 Files Summary, §8 Testing Strategy (8 assertions + mutation proof), §10 Risk Assessment, §11 Rollback Plan, Progress Tracking; named the test assertion the change falsifies; specified block placement, fence tag and the `ref` ← `file_line` normalisation | review-task |
 | 2026-09-09 |         | Status → ready-for-development                      | review-task |
 | 2026-09-09 |         | Phases 1-3 implemented; 13 mutations proven; `npm run ci:fast` green (2965 tests, 0 fail); status → ready-for-review | develop |
+| 2026-09-09 |         | QA gate FAIL (70/100) — 3 findings, 1 HIGH in the ingester mapping | qa-task |
+| 2026-09-09 |         | QA findings fixed — TASK85-001/002/003 closed, 4 new mutations proven, 1 iteration | qa-fix |
