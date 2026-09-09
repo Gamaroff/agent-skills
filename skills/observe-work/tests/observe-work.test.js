@@ -735,27 +735,38 @@ function resolveIn(cwd, env = {}) {
   const rc = /RC=(\d+)/.exec(r.stdout || "");
   const ws = /WS=(.*)/.exec(r.stdout || "");
   return {
+    // `ran` is what stops a refusal assertion passing on a dead harness. Without
+    // it, `refused: true` covers both "the resolver returned non-zero" and "bash
+    // never produced output" — the same two-states-one-signal shape this helper
+    // already fixed for the VALUE, left standing on the STATUS. The sibling
+    // tests would fail first in practice, but that mitigation lives in other
+    // test bodies; the test that depends on the guarantee should carry it.
+    ran: rc !== null,
     refused: rc ? rc[1] !== "0" : true,
     workspace: ws ? ws[1].trim() : "",
   };
 }
 
-/** A durable scratch project. See the header note on /tmp. */
-function makeProject(configBody) {
+/**
+ * A durable scratch project. See the header note on /tmp.
+ *
+ * Deliberately takes no config-body argument: only one of the three tests below
+ * wants a `skills-config.yaml`, and it writes one itself so the path it points
+ * at can be a directory this function has already created. A parameter every
+ * caller passes `null` to is a branch nothing exercises.
+ */
+function makeProject() {
   const root = fs.mkdtempSync(
     path.join(os.homedir(), ".observe-work-resolver-"),
   );
   fs.mkdirSync(path.join(root, "proj"), { recursive: true });
-  if (configBody !== null) {
-    fs.writeFileSync(path.join(root, "proj", "skills-config.yaml"), configBody);
-  }
   return root;
 }
 
 test("resolver: skills-config.yaml beats $OBS_WORKSPACE", (t) => {
   if (!fs.existsSync(RESOLVER))
     return t.skip("resolver not shipped in this install");
-  const root = makeProject(null);
+  const root = makeProject();
   try {
     const fromConfig = path.join(root, "from-config");
     const fromEnv = path.join(root, "from-env");
@@ -780,7 +791,7 @@ test("resolver: skills-config.yaml beats $OBS_WORKSPACE", (t) => {
 test("resolver: $OBS_WORKSPACE is used when the config key is absent", (t) => {
   if (!fs.existsSync(RESOLVER))
     return t.skip("resolver not shipped in this install");
-  const root = makeProject(null);
+  const root = makeProject();
   try {
     const fromEnv = path.join(root, "from-env");
     fs.mkdirSync(fromEnv);
@@ -800,7 +811,7 @@ test("resolver: $OBS_WORKSPACE is used when the config key is absent", (t) => {
 test("resolver: an ephemeral anchor is REFUSED, not silently defaulted", (t) => {
   if (!fs.existsSync(RESOLVER))
     return t.skip("resolver not shipped in this install");
-  const root = makeProject(null);
+  const root = makeProject();
   try {
     // The distinction that matters: refusing returns non-zero (=> null here).
     // Falling back to the default would return a path, and the caller would
@@ -812,6 +823,11 @@ test("resolver: an ephemeral anchor is REFUSED, not silently defaulted", (t) => 
     // resolver exports the empty string here, which is indistinguishable from a
     // refusal if you only look at the value — and that is the whole difference
     // between refusing and defaulting.
+    assert.ok(
+      r.ran,
+      "the RC probe produced no output — bash did not run, so `refused` below " +
+        "would report a dead harness as a successful refusal",
+    );
     assert.equal(
       r.refused,
       true,

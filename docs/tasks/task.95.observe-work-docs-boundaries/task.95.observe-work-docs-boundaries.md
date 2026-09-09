@@ -164,7 +164,7 @@ the three boundary notes in Phase 2, and let the audit prove it.
 ### Out of Scope
 
 ❌ **The engine, resolver or contract** — task 93.
-❌ **`observe-work` itself** — task 94. This task adds nothing to its `SKILL.md` except the pointer to the family template.
+❌ **`observe-work` itself** — task 94. This task adds nothing to its `SKILL.md` except the pointer to the family template **and the family's shared sentence** — the audit in Phase 3 greps every member the family lists, `observe-work` included, so omitting it would make the seeded family fail its own audit on first run. See Implementation Notes.
 ❌ **Changing any skill's `description:`** — deliberately excluded to avoid a catalog cascade.
 ❌ **Retiring or merging `autoskill`.** The chosen direction is coexistence with documented boundaries. Consolidation, if it is ever right, needs evidence from real use and a harvest-before-retire pass of its own.
 ❌ **Wiring observation flush points into `develop-story` / `develop-task` / `finalise`.** Deliberately deferred until there is evidence from real use.
