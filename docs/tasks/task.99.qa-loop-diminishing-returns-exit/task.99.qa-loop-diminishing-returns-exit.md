@@ -282,15 +282,16 @@ satisfy condition 2.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS (cycle 4)
+**QA Status**: PASS (cycle 5)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 90/100 (cycle 3: 90, cycle 2: 60, cycle 1: 50)
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100 (cycles 4→1: 90, 90, 60, 50)
+**Gate Decision**: PASS
 
 ### QA Reports
 
-- **Cycle 4 (latest)**: [task.99.qa.4.qa-loop-diminishing-returns-exit.md](./task.99.qa.4.qa-loop-diminishing-returns-exit.md) · [gate.4](./task.99.gate.4.qa-loop-diminishing-returns-exit.yml)
+- **Cycle 5 (latest)**: [task.99.qa.5.qa-loop-diminishing-returns-exit.md](./task.99.qa.5.qa-loop-diminishing-returns-exit.md) · [gate.5](./task.99.gate.5.qa-loop-diminishing-returns-exit.yml)
+- **Cycle 4**: [task.99.qa.4.qa-loop-diminishing-returns-exit.md](./task.99.qa.4.qa-loop-diminishing-returns-exit.md) · [gate.4](./task.99.gate.4.qa-loop-diminishing-returns-exit.yml)
 - **Cycle 3**: [task.99.qa.3.qa-loop-diminishing-returns-exit.md](./task.99.qa.3.qa-loop-diminishing-returns-exit.md) · [gate.3](./task.99.gate.3.qa-loop-diminishing-returns-exit.yml)
 - **Cycle 2**: [task.99.qa.2.qa-loop-diminishing-returns-exit.md](./task.99.qa.2.qa-loop-diminishing-returns-exit.md) · [gate.2](./task.99.gate.2.qa-loop-diminishing-returns-exit.yml)
 - **Cycle 1**: [task.99.qa.1.qa-loop-diminishing-returns-exit.md](./task.99.qa.1.qa-loop-diminishing-returns-exit.md) · [gate.1](./task.99.gate.1.qa-loop-diminishing-returns-exit.yml)
@@ -303,6 +304,12 @@ satisfy condition 2.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
+
+**Cycle 5 — PASS.** No finding above LOW. All twelve criteria mechanically re-verified; third
+consecutive zero-HIGH cycle. The engine has been untouched since cycle 1 and its 33 tests and nine
+mutations held throughout. Across the run the exit declined for three distinct correct reasons
+(`high-findings-remain`, `non-test-finding`, `no-residue`) and fired once when globs were configured —
+four reason codes exercised on real gates.
 
 **Cycle 4 — the live demonstration.** HIGH reached `1, 1, 0, 0`, so condition 1 of the new exit was
 satisfied for the first time on a real sequence. The Convergence check correctly did not trip
@@ -356,6 +363,7 @@ the invocation snippet's four variables have no documented source.
 | 2026-09-09 |  | QA findings fixed — 1 HIGH + 2 MEDIUM closed, 2nd iteration. 5c's entry condition now names both routes out of 5a, so the exit's destination no longer refuses it; `**Loop exit**` default corrected; three stale test counts corrected. | qa-fix |
 | 2026-09-09 |  | QA gate 3 CONCERNS (90/100) — no HIGH; 1 MEDIUM (route 2 falsified 5c's own empty-`top_issues` claim, which would have sent the machinery residue back to qa-fix), fixed in a 3rd iteration. Both guards verified to decline correctly on this run's own `1,1,0` sequence. | qa-task |
 | 2026-09-09 |  | QA gate 4 CONCERNS (90/100) — no HIGH (2nd consecutive); 1 MEDIUM (the route note's `WAIVED` row was false), fixed in a 4th iteration. Condition 1 satisfied for the first time on the live sequence `1,1,0,0`; the exit correctly declined on this repo's unset globs and fires when they are configured. | qa-task |
+| 2026-09-09 |  | QA gate 5 PASS (100/100) — no findings above LOW; all 12 success criteria mechanically re-verified. Every finding after cycle 1 was in the prose, not the engine; three consecutive cycles found a defect introduced by the previous cycle's fix. | qa-task |
 
 ## Progress Tracking
 
@@ -451,14 +459,10 @@ the behaviour the rule this task ships exists to stop.
 
 ## Bug Reports
 
-### In QA Verification
+### Closed
 
-- [Bug 1: Glob matching case-folds `file:` paths](./task.99.bug.1.glob-matching-case-folds-file-paths.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09, verified at gate 2)
-- [Bug 2: 5c's entry condition excludes the gate the new exit hands it](./task.99.bug.2.5c-entry-condition-excludes-the-new-exit.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09, verified at gate 3)
-
-### Closed Bugs
-
-_None yet._
+- [Bug 1: Glob matching case-folds `file:` paths](./task.99.bug.1.glob-matching-case-folds-file-paths.md) — ✅ Closed — Severity: HIGH (fixed 2026-09-09, verified at gate 2)
+- [Bug 2: 5c's entry condition excludes the gate the new exit hands it](./task.99.bug.2.5c-entry-condition-excludes-the-new-exit.md) — ✅ Closed — Severity: HIGH (fixed 2026-09-09, verified at gate 3)
 
 ---
 

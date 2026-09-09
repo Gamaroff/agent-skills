@@ -4,7 +4,7 @@
 **Bug ID**: TASK-99-BUG-2
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 refute pass)
 **Date Found**: 2026-09-09
 
@@ -94,3 +94,5 @@ Convergence check still byte-identical at 5624 bytes.
 | 2026-09-09 | New | QA Engineer | Found by the cycle-2 refute pass over the whole branch diff |
 | 2026-09-09 | In Progress | qa-fix | Root cause: written against what 5c does, not what it says it accepts |
 | 2026-09-09 | Ready for QA | qa-fix | 5c now enumerates both routes; the excluding formulation is removed, not merely contradicted |
+
+| 2026-09-09 | Closed | QA Engineer | Fix verified at gate 3; no recurrence through gate 5 |

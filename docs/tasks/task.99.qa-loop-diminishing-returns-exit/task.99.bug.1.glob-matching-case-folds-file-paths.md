@@ -4,7 +4,7 @@
 **Bug ID**: TASK-99-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-09
 
@@ -161,3 +161,5 @@ failures.
 | 2026-09-09 | New | QA Engineer | Found during QA cycle 1 by executing the module against a capitalised probe path |
 | 2026-09-09 | In Progress | qa-fix | Root cause: one case rule applied to two kinds of value |
 | 2026-09-09 | Ready for QA | qa-fix | Fold narrowed to the three enumerations; regression test added and mutation-proved |
+
+| 2026-09-09 | Closed | QA Engineer | Fix verified at gate 2; no recurrence through gate 5 |
