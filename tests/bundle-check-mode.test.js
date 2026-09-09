@@ -925,6 +925,91 @@ test("a non-UTF-8 orphan is still skipped in silence — residual 6, not a broke
   assert.equal(res.status, 0);
 });
 
+test("an unreadable subdirectory under references/ is reported, not silently unwalked", (t) => {
+  // The third instance in this function of one conflation: a failed read
+  // presented as a clean result. `Path.rglob` swallows a directory it cannot
+  // enter and yields nothing for it, so an unreadable subtree simply would not be
+  // walked — and the run reported "0 problems" over files it had never listed.
+  //
+  // The finding matters more than its likelihood: the check's whole product is
+  // the claim "I looked and it is fine".
+  const fx = makeFixture(
+    { skillFiles: { "SKILL.md": silentSkill() }, sharedFiles: {} },
+    t,
+  );
+  const sub = path.join(fx.skillDir, "references", "sub");
+  fs.mkdirSync(sub, { recursive: true });
+  fs.writeFileSync(path.join(sub, "x.md"), "# x\n");
+  fs.chmodSync(sub, 0o000);
+  t.after(() => {
+    try {
+      fs.chmodSync(sub, 0o755);
+    } catch {
+      /* already removed by fixture cleanup */
+    }
+  });
+
+  const res = fx.check();
+
+  // Restore the mode BEFORE asserting, not only in `t.after`. A mode-000
+  // directory cannot be removed by the fixture's recursive teardown, so an
+  // assertion failure here would leak a temp tree AND mask itself behind an
+  // ENOTEMPTY from the cleanup hook. The hook stays as a belt-and-braces path
+  // for a throw between chmod 000 and here.
+  fs.chmodSync(sub, 0o755);
+
+  assert.deepEqual(res.classesFound, ["UNREADABLE"]);
+  assert.match(res.problems[0].detail, /could not be listed/);
+  assert.match(
+    res.problems[0].detail,
+    /was not checked$/,
+    "must say what the failure means for the result, not only that it happened",
+  );
+  assert.equal(res.status, 1);
+});
+
+test("a symlinked DIRECTORY under references/ is reported — os.walk does not yield it as an entry", (t) => {
+  // Caught by a mutation that proved nothing: dropping the `_dirnames` collection
+  // reded no test, which meant the branch was real but unguarded.
+  //
+  // It is real because the traversal changed. `Path.rglob` yielded directories as
+  // entries, so a symlinked directory hit the `is_symlink()` check like any other
+  // path. `os.walk` yields directory NAMES in `dirnames` and never as entries,
+  // and does not descend a symlinked directory (followlinks=False), so without
+  // this branch the fix for the unwalkable-subtree defect would have silently
+  // lost a case rglob covered — trading one blind spot for another.
+  const fx = makeFixture(
+    { skillFiles: { "SKILL.md": silentSkill() }, sharedFiles: {} },
+    t,
+  );
+  const elsewhere = path.join(fx.root, "elsewhere");
+  fs.mkdirSync(elsewhere, { recursive: true });
+  fs.writeFileSync(path.join(elsewhere, "y.md"), "# Y\n");
+  fs.mkdirSync(path.join(fx.skillDir, "references"), { recursive: true });
+  fs.symlinkSync(elsewhere, path.join(fx.skillDir, "references", "linked"));
+
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["SYMLINK"]);
+  assert.deepEqual(res.relsFound, ["linked"]);
+});
+
+test("a readable nested references/ subtree is still walked — the fix is not a blanket refusal", (t) => {
+  // The negative half: replacing rglob with os.walk must not lose nested files.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee [x](shared/resources/sub/x.md).\n`,
+      },
+      sharedFiles: { "sub/x.md": "# X\n\nUPDATED.\n" },
+      refsFiles: { "sub/x.md": `${BANNER("sub/x.md")}# X\n\nORIGINAL.\n` },
+    },
+    t,
+  );
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["STALE"]);
+  assert.deepEqual(res.relsFound, ["sub/x.md"], "nested paths still reached");
+});
+
 // ---------------------------------------------------------------------------
 // CLI surface.
 // ---------------------------------------------------------------------------

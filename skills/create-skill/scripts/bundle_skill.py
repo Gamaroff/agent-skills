@@ -751,7 +751,39 @@ def check_skill(skill_path):
     # bundled copy whose source was deleted is invisible to every branch above,
     # and to regenerate-and-diff. Its own banner is the evidence.
     if refs_dir.is_dir():
-        for dst in sorted(refs_dir.rglob('*')):
+        # `Path.rglob` swallows a directory it cannot enter and yields nothing for
+        # it, so an unreadable subtree under references/ would simply not be
+        # walked — and the run would report "0 problems" over files it never
+        # listed. That is the third instance in this function of the same
+        # conflation: a failed read presented as a clean result. `os.walk` with an
+        # `onerror` callback is the version that can tell them apart.
+        unwalkable = []
+        walked = []
+        for dirpath, _dirnames, filenames in os.walk(
+            refs_dir, onerror=lambda exc: unwalkable.append(exc)
+        ):
+            for fname in filenames:
+                walked.append(Path(dirpath) / fname)
+            # os.walk does not yield directories as entries, and a SYMLINK to a
+            # directory is a finding, so collect those explicitly.
+            for dname in _dirnames:
+                d = Path(dirpath) / dname
+                if d.is_symlink():
+                    walked.append(d)
+
+        for exc in unwalkable:
+            bad = Path(getattr(exc, 'filename', '') or refs_dir)
+            try:
+                rel = bad.relative_to(refs_dir).as_posix()
+            except ValueError:
+                rel = '.'
+            report(
+                rel, 'UNREADABLE',
+                f'directory could not be listed ({exc.__class__.__name__}) — '
+                f'anything beneath it was not checked',
+            )
+
+        for dst in sorted(walked):
             rel_parts = dst.relative_to(refs_dir).parts
             if any(p in EXCLUDE_DIRS for p in rel_parts):
                 continue
