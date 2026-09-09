@@ -478,6 +478,18 @@ test("no class called non-regenerable is cleared by a bundle run", (t) => {
         path.join(fx.root, "shared", "resources", "contract.md"),
       );
     },
+    UNREADABLE: (fx) => {
+      fx.bundle();
+      const target = fx.refPath("contract.md");
+      fs.chmodSync(target, 0o000);
+      t.after(() => {
+        try {
+          fs.chmodSync(target, 0o644);
+        } catch {
+          /* already removed by fixture cleanup */
+        }
+      });
+    },
   };
 
   for (const [klass, dirty] of Object.entries(cases)) {
@@ -714,6 +726,138 @@ test("a directory sitting at a needed reference name is AMBIGUOUS, not MISSING",
   const res = fx.check();
   assert.deepEqual(res.classesFound, ["AMBIGUOUS"]);
   assert.match(res.problems[0].detail, /not a regular file/);
+});
+
+// ---------------------------------------------------------------------------
+// Reporting accuracy (QA cycle 1 findings).
+//
+// Neither of these is about DETECTION — the check found both files before the
+// fix too. They are about what it then tells the reader, which for a diagnostic
+// tool is the whole product.
+// ---------------------------------------------------------------------------
+
+test("a stale headerless copy names the headerless case, not `rename the authored file`", (t) => {
+  // A suffix that never receives a banner cannot supply evidence 1 by
+  // construction, so evidence 2 is the only test available and it fails the
+  // instant the copy drifts. EVERY stale .json therefore lands in AMBIGUOUS,
+  // whose generic remedy leads with "rename the authored file" — the wrong
+  // action. This is the exact shape of the live defect the check found in the
+  // real tree on its first run.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee [data](shared/resources/data.json).\n`,
+      },
+      sharedFiles: { "data.json": '{"a": 1}\n' },
+    },
+    t,
+  );
+  fx.bundle();
+  fs.writeFileSync(
+    path.join(fx.root, "shared", "resources", "data.json"),
+    '{"a": 2}\n',
+  );
+
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["AMBIGUOUS"]);
+  assert.match(
+    res.problems[0].detail,
+    /`\.json` files carry no provenance banner/,
+    "the detail must name the reason this suffix can never prove itself",
+  );
+  assert.match(
+    res.problems[0].detail,
+    // Anchored: the detail ENDS on this phrase, and an unbounded `re-bundle`
+    // would also match a longer token beginning with it — so a rename that
+    // appended a suffix would keep this test green while the message changed.
+    /delete it and re-bundle$/,
+    "and must point at the action that actually fixes the common case",
+  );
+});
+
+test("a .md AMBIGUOUS keeps the generic detail — the per-suffix branch is not a blanket rewrite", (t) => {
+  // The negative half of the test above. A suffix that CAN carry a banner and
+  // does not is genuinely ambiguous, and telling that reader to "delete and
+  // re-bundle" would be advice to destroy their authored file.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("contract.md") },
+      sharedFiles: { "contract.md": "# Contract\n\nShared.\n" },
+      refsFiles: { "contract.md": "# Authored\n\nMine.\n" },
+    },
+    t,
+  );
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["AMBIGUOUS"]);
+  assert.match(res.problems[0].detail, /carries no provenance banner/);
+  assert.doesNotMatch(
+    res.problems[0].detail,
+    /delete it and re-bundle$/,
+    "never tell the owner of an authored file to delete it",
+  );
+});
+
+test("an unreadable file is UNREADABLE, not AMBIGUOUS — the instrument is broken, not the file clean", (t) => {
+  // `_looks_bundled` returns the same False for "read it and neither evidence
+  // test passed" and "could not open it at all". Reporting the second as the
+  // first asserts two facts about content nobody saw. This repository separates
+  // exactly this pair elsewhere as `empty` vs `scan-broken`, for the same reason:
+  // of the two readings, the reassuring one is the one that gets believed.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("contract.md") },
+      sharedFiles: { "contract.md": "# Contract\n\nBody.\n" },
+    },
+    t,
+  );
+  fx.bundle();
+  const target = fx.refPath("contract.md");
+  fs.chmodSync(target, 0o000);
+  t.after(() => {
+    try {
+      fs.chmodSync(target, 0o644);
+    } catch {
+      /* already removed by fixture cleanup */
+    }
+  });
+
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["UNREADABLE"]);
+  assert.match(res.problems[0].detail, /could not be read/);
+  assert.doesNotMatch(
+    res.problems[0].detail,
+    /byte-identical/,
+    "must not assert a comparison it could not perform",
+  );
+});
+
+test("a non-UTF-8 file is NOT reported UNREADABLE — unopenable and non-text are different", (t) => {
+  // The carve-out. A binary file opens fine as bytes; `_looks_bundled` has a
+  // deliberate answer for it (historically reconciled), so it must fall through
+  // to the byte comparison rather than being reported as a broken instrument.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("blob.md") },
+      sharedFiles: {},
+    },
+    t,
+  );
+  const shared = path.join(fx.root, "shared", "resources", "blob.md");
+  fs.writeFileSync(shared, Buffer.from([0xff, 0xfe, 0x00, 0x01]));
+  fx.bundle();
+
+  assert.deepEqual(
+    fx.check().classesFound,
+    [],
+    "a correctly-bundled binary copy is clean, not UNREADABLE",
+  );
+
+  fs.writeFileSync(shared, Buffer.from([0xff, 0xfe, 0x00, 0x02]));
+  assert.deepEqual(
+    fx.check().classesFound,
+    ["STALE"],
+    "and when it drifts it is STALE — the byte comparison still runs",
+  );
 });
 
 // ---------------------------------------------------------------------------

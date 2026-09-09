@@ -236,6 +236,39 @@ STALE/MISSING after task 86, so rollback loses the four extra classes and nothin
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.98.qa.1.bundle-freshness-check-mode.md](./task.98.qa.1.bundle-freshness-check-mode.md)
+- **Gate File**: [task.98.gate.1.bundle-freshness-check-mode.yml](./task.98.gate.1.bundle-freshness-check-mode.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 20 new (3013 in the full suite), 11 mutation proofs
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (measured, 3 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Both findings are in how the check *reports*, not in what it detects — all 7 success criteria are met
+and the check found a live stale copy in the tree on its first run.
+
+- **T98-QA-001 (medium)** — a stale copy of a headerless suffix (`.json`) lands in AMBIGUOUS, whose
+  remedy leads with "rename the authored file"; the right action for that case is delete-and-re-bundle.
+  This is the exact shape of the live defect the check found.
+- **T98-QA-002 (low)** — an unreadable file is reported as "carries no provenance banner and is not
+  byte-identical", asserting content the check never read.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                                                        | Author      |
@@ -245,6 +278,7 @@ STALE/MISSING after task 86, so rollback loses the four extra classes and nothin
 | 2026-09-09 |         | Status → ready-for-development | review-task |
 | 2026-09-09 |         | Implemented: `--check` mode (7 classes, read-only), 20 tests, wired into `validate.yml`; found and fixed a live stale bundled copy the existing check was blind to | develop |
 | 2026-09-09 |         | Status → ready-for-review | develop |
+| 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both in the classifier's reporting; 7/7 success criteria met | qa-task |
 
 ---
 

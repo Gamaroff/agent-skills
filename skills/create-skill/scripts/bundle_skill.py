@@ -556,6 +556,11 @@ REMEDIES = {
         'the banner names a different path than the file occupies — correct the '
         'banner, or delete the copy and re-bundle from the path it claims'
     ),
+    'UNREADABLE': (
+        'the file could not be opened, so nothing is known about it — fix its '
+        'permissions and re-run the check. This is a broken instrument, not a '
+        'clean result'
+    ),
 }
 
 # The banner's declared source, WITHOUT requiring it to match the file's own
@@ -570,10 +575,65 @@ def banner_declaration(text):
 
 
 def _read_text_or_none(path):
+    text, _ = _read_text_or_error(path)
+    return text
+
+
+def _read_text_or_error(path):
+    """(text, error) — the text, or None plus a short reason it could not be read.
+
+    Two callers want different things from the same failure, which is why the
+    error is returned rather than swallowed: the orphan scan only needs "no text,
+    move on", while the main loop must tell an unreadable file apart from one it
+    read and found unconvincing.
+    """
     try:
-        return path.read_text()
-    except (UnicodeDecodeError, OSError):
-        return None
+        return path.read_text(), None
+    except UnicodeDecodeError:
+        return None, 'not valid UTF-8'
+    except OSError as exc:
+        return None, exc.__class__.__name__
+
+
+def _is_binary(path):
+    """True when the file is readable as bytes but not as text.
+
+    Distinguishes "we cannot open this" from "this is not text" — the first is a
+    broken instrument, the second is a legitimate file the bundler already has a
+    policy for.
+    """
+    try:
+        path.read_bytes()
+        return True
+    except OSError:
+        return False
+
+
+def _ambiguity_detail(rel):
+    """Why the copy could not be shown to be bundler output — per suffix.
+
+    A suffix that never receives a banner cannot supply evidence 1 *by
+    construction*, so evidence 2 (byte-equality with the rewritten source) is the
+    only test available — and it fails the instant the copy drifts. Every stale
+    `.json` therefore lands in AMBIGUOUS, where the generic remedy leads with
+    "rename the authored file". That is the wrong action for the common case, and
+    it is not hypothetical: it is the exact shape of the live defect this check
+    found on its first run against the tree — a bundled `skill-dependencies.json`
+    44 bytes behind its source. The generic detail sent the reader the wrong way,
+    so the headerless case says its own name.
+    """
+    suffix = Path(rel).suffix
+    if not autogen_header(rel, suffix):
+        return (
+            f'differs from the rewritten source, and `{suffix}` files carry no '
+            f'provenance banner — so a stale bundled copy and an authored file '
+            f'are indistinguishable here. If this is a bundled copy, delete it '
+            f'and re-bundle'
+        )
+    return (
+        'carries no provenance banner and is not byte-identical to the '
+        'rewritten source'
+    )
 
 
 def check_skill(skill_path):
@@ -626,7 +686,24 @@ def check_skill(skill_path):
             report(rel, 'AMBIGUOUS', 'not a regular file (a directory sits at this name)')
             continue
 
-        text = _read_text_or_none(dst)
+        text, read_error = _read_text_or_error(dst)
+
+        # "Could not look" and "looked and found nothing" must not share a
+        # message. `_looks_bundled` collapses them — its OSError arm returns the
+        # same False as a file that was read and failed both evidence tests — so
+        # an unreadable file was reported as "carries no provenance banner and is
+        # not byte-identical", asserting two facts about content nobody had seen.
+        # That is the `empty` vs `scan-broken` conflation this repository
+        # separates by design elsewhere, and it matters here for the same reason:
+        # of the two readings, the reassuring one is the one that gets believed.
+        #
+        # A non-UTF-8 file is NOT this case. It reads fine as bytes and
+        # `_looks_bundled` has a deliberate answer for it (binary — historically
+        # reconciled), so it falls through to the byte comparison below.
+        if read_error is not None and not _is_binary(dst):
+            report(rel, 'UNREADABLE', f'could not be read: {read_error}')
+            continue
+
         if text is not None:
             declared = banner_declaration(text)
             if declared is not None and declared != rel:
@@ -637,11 +714,7 @@ def check_skill(skill_path):
                 continue
 
         if not _looks_bundled(dst, src, rel):
-            report(
-                rel, 'AMBIGUOUS',
-                'carries no provenance banner and is not byte-identical to the '
-                'rewritten source',
-            )
+            report(rel, 'AMBIGUOUS', _ambiguity_detail(rel))
             continue
 
         # From here the file IS bundler output, so both remaining comparisons are

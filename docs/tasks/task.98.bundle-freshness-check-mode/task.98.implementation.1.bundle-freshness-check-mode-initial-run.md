@@ -34,7 +34,7 @@ Carry forward the `--check` mode split out of task 86 unmerged: a per-file bundl
 | 1. create-branch           | ✅ Done    | Branch `feature/task.98.*` exists in git                               | `feature/task.98.bundle-freshness-check-mode` created from `develop` at `48cfae98`; pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.98.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 9/10 — 0 Critical / 3 Important / 1 Optional, all fixed in Step 8.5; status promoted draft → ready-for-development; issue #366 created and linked | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 7-class `--check` mode + 20 tests + 11 mutation proofs; `validate.yml` wired; `ci:fast` green (3013 pass / 0 fail); found+fixed a live stale bundled copy | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #367](https://github.com/Gamaroff/agent-skills/pull/367) → `develop`; comment posted to #366 | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.98.qa.{N}.*.md`; `task.98.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.98.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -92,9 +92,36 @@ _Problems encountered and how they were resolved or escalated._
 
 - **Fast gate caught a formatting failure the test run could not** (2026-09-09). `npm run ci:fast` failed on `prettier --check` for the new test file while every test passed. This is precisely the task-67 failure mode the fast gate was widened to catch — `npm test` alone would have gone green locally and red in CI. Fixed with `prettier --write` and the gate re-run.
 
+- **The repo's own relationship-assertion lint caught an unbounded assertion in a qa-fix test** (2026-09-09, QA cycle 1 fixes). `tests/relationship-assertion-lint.test.js` flagged `assert.match(detail, /delete it and re-bundle/)` under rule B: the pattern ends on a renameable token with no boundary, so a rename that *appended* a suffix would keep the test green while the message it guards had changed. Both occurrences anchored with `$`. Worth recording for two reasons: the finding is exactly the vacuity class this task's own §8 warns about, and it was caught by a repo-wide check rather than by the author — a second instance in this run of the fast gate finding what the targeted suite could not.
+
 ---
 
 ## QA Iteration History
+
+### QA Cycle 1 — 2026-09-09
+
+| Field | Value |
+|---|---|
+| **Gate** | CONCERNS — 90/100 |
+| **Artifacts** | `task.98.qa.1.bundle-freshness-check-mode.md`, `task.98.gate.1.bundle-freshness-check-mode.yml` |
+| **Success criteria** | 7/7 met |
+| **Phases** | 4/4 verified |
+| **Issues** | HIGH 0 · MEDIUM 1 · LOW 1 |
+| **NFR** | Security PASS (*measured*, 3 hostile probes) · Performance PASS · Reliability PASS · Maintainability PASS |
+| **PR Review** | *(Step 5c — pending)* |
+
+**Findings** — both in how the check *reports*, not in what it detects:
+
+- **T98-QA-001 (medium)** — a stale copy of a **headerless** suffix (`.json`) always lands in `AMBIGUOUS`: no banner is possible, so evidence 1 is unavailable by construction and evidence 2 fails the moment the copy drifts. The classification is defensible; the remedy was not — it led with "rename the authored file" when the right action is delete-and-re-bundle. Not hypothetical: the live defect this check found in the tree was exactly this shape, and the generic remedy would have sent the reader the wrong way.
+- **T98-QA-002 (low)** — an unreadable file (mode 000) was reported as "carries no provenance banner and is not byte-identical", asserting two facts about content the check never read. `_looks_bundled` returns the same `False` for "read it and neither test passed" and "could not open it", and the message took the first reading.
+
+**Methodology caveat, recorded rather than glossed**: Step 3b's diff review ran **inline**, not via an independent read-only subagent (session policy bars unrequested dispatch). The same context that wrote the code reviewed it, which is a genuine weakening. Every finding was therefore reached by *executing a probe* rather than by reading and reasoning.
+
+**Fixes (cycle 1)** — both applied, both re-probed, all three behaviours mutation-proved:
+
+- `_ambiguity_detail()` gives a headerless suffix its own detail naming why it can never prove itself, and pointing at delete-and-re-bundle. The `.md` case keeps the generic text — a test pins that, because telling the owner of an authored file to delete it would be worse than the original bug.
+- `_read_text_or_error()` + a new **`UNREADABLE`** class, with a `_is_binary()` carve-out so a non-UTF-8 file (which opens fine as bytes, and for which `_looks_bundled` has a deliberate answer) still falls through to the byte comparison instead of being reported as a broken instrument.
+- 4 new tests (24 total), 3 new mutation proofs (M12–M14), all red; control 24/24.
 
 _Track each QA review/fix cycle._
 
@@ -105,7 +132,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.98.bundle-freshness-check-mode`
-**PR**: {populated after Step 4}
+**PR**: [#367](https://github.com/Gamaroff/agent-skills/pull/367)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
