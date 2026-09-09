@@ -44,10 +44,13 @@ const {
   commandWords,
   executeFile,
   extractBlocks,
+  extractTableCellCommands,
   runBlock,
   sandboxEnv,
   snapshotTree,
+  splitTableRow,
   unboundVariables,
+  unescapeCell,
   zshAvailable,
 } = await import(MODULE);
 
@@ -1957,4 +1960,348 @@ test("task.80 parity: snapshotTree still honours skipDir", () => {
     !skipped.has("work/inside.txt"),
     "skipDir must prune the whole subtree, not just its direct entries",
   );
+});
+
+// ── 9. Table-cell extraction (task.87) ────────────────────────────────────────
+//
+// Task 77 shipped a verification predicate inside a markdown table cell that
+// returned a FALSE PASS under zsh whenever its glob matched nothing. Three QA
+// cycles and a full CI run did not catch it, for one reason: the extractor only
+// ever looked at fenced blocks, so the cell was never read. These tests cover the
+// second extractor, and the last one is the mutation proof.
+
+/** A minimal command-column table. */
+function cmdTable(...cells) {
+  return [
+    "| Step | Artifact | Verification command |",
+    "| ---- | -------- | -------------------- |",
+    ...cells.map((c, i) => `| ${i + 1} | thing | ${c} |`),
+  ].join("\n");
+}
+
+test("a command column's backticked span is extracted with its row's line number", () => {
+  const doc = ["# Title", "", cmdTable("`git status --short`")].join("\n");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "git status --short");
+  assert.equal(blocks[0].origin, "table-cell");
+  assert.equal(blocks[0].column, "Verification command");
+  // "# Title"(1), ""(2), header(3), delimiter(4), body(5).
+  assert.equal(blocks[0].line, 5);
+});
+
+test("a table with no command column yields nothing", () => {
+  const doc = [
+    "| Setting | Value |",
+    "| ------- | ----- |",
+    "| shell | `echo hello world` |",
+  ].join("\n");
+  assert.deepEqual(extractTableCellCommands(doc), []);
+});
+
+test("only the command column is read, not its neighbours", () => {
+  const doc = [
+    "| Artifact | Verification command |",
+    "| -------- | -------------------- |",
+    "| `echo not-me` | `echo me` |",
+  ].join("\n");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "echo me");
+});
+
+test("a header row with no delimiter row beneath it is not a table", () => {
+  // Without this, any prose line that happens to start with a pipe becomes a
+  // header and the line after it becomes a command.
+  const doc = ["| Step | Verification command |", "| 1 | `echo run me` |"].join(
+    "\n",
+  );
+  assert.deepEqual(extractTableCellCommands(doc), []);
+});
+
+test("an escaped pipe is unescaped before the code becomes shell", () => {
+  // This is the real cell text from develop-pipeline-resume-contract.md. Left
+  // escaped, `\\|` is a literal argument and the command means something else
+  // entirely; split naively on a bare `|`, the row gains phantom columns and the
+  // command column read is the wrong text.
+  const doc = cmdTable('`gh pr view 7 --json comments \\| grep -i "QA"`');
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, 'gh pr view 7 --json comments | grep -i "QA"');
+});
+
+test("splitTableRow splits on unescaped pipes only", () => {
+  assert.deepEqual(splitTableRow("| a | b \\| c | d |"), ["a", "b \\| c", "d"]);
+});
+
+test("unescapeCell touches the pipe escape and nothing else", () => {
+  assert.equal(unescapeCell("a \\| b"), "a | b");
+  // A command legitimately containing a doubled backslash must survive verbatim:
+  // markdown does not process backslash escapes inside a code span for anything
+  // but the table pipe, so unescaping more would corrupt the command.
+  assert.equal(unescapeCell("printf 'a\\\\nb'"), "printf 'a\\\\nb'");
+  assert.equal(
+    unescapeCell("sed -E 's/.*\\.gate\\.//'"),
+    "sed -E 's/.*\\.gate\\.//'",
+  );
+});
+
+test("several spans in one cell are several blocks", () => {
+  // The real cells join two or three commands with prose. Concatenating the cell
+  // would run the prose as shell.
+  const doc = cmdTable("`ls -la docs` AND `echo second` AND `wc -l README.md`");
+  const blocks = extractTableCellCommands(doc);
+  assert.deepEqual(
+    blocks.map((b) => b.code),
+    ["ls -la docs", "echo second", "wc -l README.md"],
+  );
+  // All three come from the same row.
+  assert.deepEqual(new Set(blocks.map((b) => b.line)), new Set([3]));
+});
+
+test("a multi-backtick span is not truncated at an inner backtick", () => {
+  const doc = cmdTable("`` echo `date` ``");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "echo `date`");
+});
+
+test("a span with no whitespace is not read as a command", () => {
+  // Bare tokens in a command column are globs, statuses and field names. This
+  // bound fails toward running LESS — the allow-list still decides everything
+  // that gets past it — and no single unspaced word can carry the shell
+  // disagreement this extractor exists to catch.
+  const doc = cmdTable("`PASS`, `accepted`, `task.*.gate.*.yml`");
+  assert.deepEqual(extractTableCellCommands(doc), []);
+});
+
+test("a table inside a fenced block is an illustration, not an instruction", () => {
+  // Every document that documents a table shows one. Extracting from those would
+  // execute a document's own examples.
+  const doc = [
+    "````markdown",
+    cmdTable("`echo do-not-run-me`"),
+    "````",
+    "",
+    cmdTable("`echo run-me`"),
+  ].join("\n");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "echo run-me");
+});
+
+test("two tables in one document are both read", () => {
+  const doc = [
+    cmdTable("`echo first`"),
+    "",
+    "prose",
+    "",
+    cmdTable("`echo second`"),
+  ].join("\n");
+  assert.deepEqual(
+    extractTableCellCommands(doc).map((b) => b.code),
+    ["echo first", "echo second"],
+  );
+});
+
+test("a document with no tables produces the pre-change report exactly", () => {
+  // The invariant success criterion 3 asserts, made testable: for a document with
+  // no command column, the merged extractor must be indistinguishable from the
+  // fenced-only one.
+  const dir = tmp();
+  const file = join(dir, "no-tables.md");
+  writeFileSync(
+    file,
+    ["# Doc", "", bash("ls -la"), "", "prose", "", bash("rm -rf /tmp/x")].join(
+      "\n",
+    ),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(report.blocks, extractBlocks(readFileSync(file, "utf8")).length);
+  assert.ok(
+    report.results.every((r) => r.origin === "fence"),
+    "no result may claim a table-cell origin in a document with no tables",
+  );
+});
+
+test("origin is carried onto every result and onto findings", () => {
+  const dir = tmp();
+  const file = join(dir, "mixed.md");
+  writeFileSync(
+    file,
+    ["# Doc", "", bash("ls -la"), "", cmdTable("`wc -l /dev/null`")].join("\n"),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  const origins = report.results.map((r) => r.origin);
+  assert.ok(
+    origins.includes("fence"),
+    "the fenced block must report origin fence",
+  );
+  assert.ok(
+    origins.includes("table-cell"),
+    "the table-cell command must report origin table-cell",
+  );
+  assert.ok(
+    report.results.every((r) => r.origin !== undefined),
+    "every result must name its origin — a finding without one is not traceable",
+  );
+});
+
+test("blocks are reported in document order across both extractors", () => {
+  const dir = tmp();
+  const file = join(dir, "order.md");
+  writeFileSync(
+    file,
+    [cmdTable("`echo from-cell`"), "", bash("echo from-fence")].join("\n"),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  const lines = report.results.map((r) => r.line);
+  assert.deepEqual(
+    lines,
+    [...lines].sort((a, b) => a - b),
+    "merging two extractors must not shuffle the report out of document order",
+  );
+});
+
+test("MUTATION PROOF: the task-77 predicate in a table cell is a shell disagreement", () => {
+  // The predicate verbatim, as `cd72e4d4` replaced it. Its defect is entirely in
+  // the exit status — both shells print nothing — so this also exercises the
+  // status channel of shell-disagreement. Verified independently of this engine:
+  // in an empty directory bash exits 2 (`[: : integer expected`) and zsh exits 0
+  // (a failed zsh glob aborts the command substitution, and zsh's `[` reads the
+  // empty operand in `-ge` as 0).
+  //
+  // Reverting extractTableCellCommands turns this test red, which is the whole
+  // point: the code being present is not the same as the check firing.
+  if (!zshAvailable()) {
+    // Recorded rather than silently passed — a skip that looks like a pass is the
+    // failure mode this entire engine exists to prevent.
+    assert.ok(true, "zsh unavailable — dual-shell comparison cannot run here");
+    return;
+  }
+  const predicate =
+    "G=$(ls *.gate.*.yml \\| sed -E 's/.*\\.gate\\.([0-9]+)\\..*/\\1/' \\| sort -n \\| tail -1); " +
+    "R=$(ls *.pr-review.*.md 2>/dev/null \\| sed -E 's/.*\\.pr-review\\.([0-9]+)\\..*/\\1/' \\| sort -n \\| tail -1); " +
+    '[ "${R:-0}" -ge "$G" ]';
+
+  const dir = tmp();
+  const file = join(dir, "task-77-predicate.md");
+  writeFileSync(file, cmdTable(`\`${predicate}\``));
+
+  // Extraction first — a failure here and a failure below have different causes.
+  const blocks = extractTableCellCommands(readFileSync(file, "utf8"));
+  assert.equal(
+    blocks.length,
+    1,
+    "the predicate must be extracted from its cell",
+  );
+  assert.ok(
+    blocks[0].code.includes("| sort -n |"),
+    "the escaped pipes must be unescaped, or this is not the predicate",
+  );
+
+  const report = executeFile(file, { allowZsh: true });
+  assert.equal(
+    report.counts.runnable,
+    1,
+    "the predicate must classify as runnable",
+  );
+
+  const disagreement = report.findings.find(
+    (f) => f.kind === "shell-disagreement",
+  );
+  assert.ok(
+    disagreement,
+    "expected a shell-disagreement finding — this is the defect task 77 shipped",
+  );
+  assert.equal(disagreement.channel, "status");
+  assert.equal(disagreement.origin, "table-cell");
+  assert.equal(
+    report.findings.filter((f) => f.confidence === "high").length > 0,
+    true,
+  );
+});
+
+test("a status disagreement is reported even when stdout agrees", () => {
+  // The stdout channel exists because the task-66 fixture disagrees on output
+  // while its exit status agrees. This is the mirror, and it used to be reported
+  // only as a bare execution-failure.
+  if (!zshAvailable()) {
+    assert.ok(true, "zsh unavailable — dual-shell comparison cannot run here");
+    return;
+  }
+  // CLI_BUDGET, not a literal. `tests/test-harness-concurrency.test.js` fails the
+  // suite on a hardcoded spawn timeout, and correctly: a number chosen against an
+  // idle machine sits ~1.2x above the loaded worst case, which is close enough to
+  // be hit and rare enough to look like a mystery (bug.2). This block spawns two
+  // real shells, so it is exactly the shape that budget is sized for.
+  const { findings } = runBlock('[ 0 -ge "" ]', {
+    shells: ["bash", "zsh"],
+    cwd: tmp(),
+    timeout: CLI_BUDGET.timeoutMs,
+  });
+  const d = findings.find((f) => f.kind === "shell-disagreement");
+  assert.ok(
+    d,
+    "differing exit statuses with identical output must be a disagreement",
+  );
+  assert.equal(d.channel, "status");
+});
+
+test("a runnable table cell falsifies zero-blocks-executed, which is the correct outcome", () => {
+  // Measured on the real corpus: develop-pipeline-resume-contract.md went from
+  // one finding and exit 1 to zero findings and exit 0. Its four fenced blocks are
+  // all placeholders, so before this change `counts.runnable === 0` held and the
+  // gate reported "the gate did nothing here". Two of its table cells are runnable,
+  // so the guard's premise is now false — and the guard is a statement about
+  // COVERAGE, not a defect, so it must stop firing rather than be kept alive.
+  //
+  // Pinned as a test because it is the one corpus-visible behaviour change that is
+  // easy to mistake for a regression. The finding lost was `medium` confidence and
+  // never gate-blocking (only `high` + `category: bug` gates), and the coverage it
+  // complained about genuinely improved.
+  const dir = tmp();
+  const file = join(dir, "placeholder-fences-runnable-cell.md");
+  writeFileSync(
+    file,
+    [bash("ls {task-directory}"), "", cmdTable("`wc -l /dev/null`")].join("\n"),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(
+    report.counts.placeholder,
+    1,
+    "the fenced block stays a placeholder",
+  );
+  assert.equal(report.counts.runnable, 1, "the table cell is what runs");
+  assert.equal(
+    report.findings.find((f) => f.kind === "zero-blocks-executed"),
+    undefined,
+    "zero-blocks-executed must not fire once something has actually run",
+  );
+});
+
+test("zero-blocks-executed still fires when nothing runs, cells included", () => {
+  // The other half of the pair, and success criterion 4. A document whose fenced
+  // AND table-cell commands are all placeholders must still be reported as a run
+  // that covered nothing — the silent-pass this whole engine exists to prevent.
+  const dir = tmp();
+  const file = join(dir, "all-placeholders.md");
+  writeFileSync(
+    file,
+    [bash("ls {task-directory}"), "", cmdTable("`wc -l {task-file}`")].join(
+      "\n",
+    ),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(report.counts.runnable, 0);
+  assert.equal(
+    report.counts.placeholder,
+    2,
+    "both sources contribute placeholders",
+  );
+  const finding = report.findings.find(
+    (f) => f.kind === "zero-blocks-executed",
+  );
+  assert.ok(finding, "a run that executed nothing is never a pass");
+  assert.equal(finding.confidence, "medium");
 });
