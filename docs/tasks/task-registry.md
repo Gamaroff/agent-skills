@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-09
-**Next Available Task Number:** **103**
+**Next Available Task Number:** **104**
 
 ## How to use
 
@@ -141,6 +141,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 100 | [mutation-proving covers the false GREEN but not the false RED](task.100.mutation-proving-false-red/task.100.mutation-proving-false-red.md) | draft | documentation | Medium | 2026-09-08 | — | — |
 | 101 | [develop.fastGateCommand defaults to a script consumers need not have](task.101.fast-gate-command-existence-check/task.101.fast-gate-command-existence-check.md) | draft | infrastructure | Medium | 2026-09-08 | — | — |
 | 102 | [The card preflight runs in every review-* skill and no create-* skill](task.102.authoring-time-card-preflight/task.102.authoring-time-card-preflight.md) | draft | infrastructure | Medium | 2026-09-09 | — | — |
+| 103 | [Nothing updates the task-registry row after a task is accepted](task.103.pipeline-owns-the-registry-tick/task.103.pipeline-owns-the-registry-tick.md) | draft | infrastructure | Medium | 2026-09-09 | — | — |
 
 - **Tasks 99-101 were filed from a consumer pipeline run** — tinker-city task.103 (PR #829, 2026-09-08), a 245-minute run of which 117 minutes was CI. Four QA cycles produced 21 findings and **not one was in the three fixes the task existed to make**; every finding was in the machinery built to pin them, and four were false claims in prose rather than defects in code. 99 is the substantive one (the loop has no exit for that state); 100 and 101 are the two smaller gaps the same run exposed.
 

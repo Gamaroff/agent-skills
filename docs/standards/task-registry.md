@@ -15,7 +15,25 @@ Before creating a new task:
 3. Increment **Next Available Task Number**.
 4. Commit the registry update **in the same commit** as the new task files — atomic.
 
-After completion, `finalise` updates the registry row's status; you don't edit it by hand.
+After completion:
+
+5. **Tick the row by hand** — set its status to `accepted` and note the merge PR.
+
+`finalise` does **not** do this. It sets the *document's* `status: accepted` and `completed_date`,
+and touches no registry. Nothing else writes the row either: `create-task` appends it at creation,
+`develop-next` only *reads* it for selection fallback, and no skill updates it afterwards. Until
+[task.103](../tasks/task.103.pipeline-owns-the-registry-tick/task.103.pipeline-owns-the-registry-tick.md)
+gives the pipeline ownership of that write, ticking the row is a manual step in acceptance.
+
+> **This paragraph previously claimed `finalise` owned the write and told readers not to edit the row
+> by hand.** Both halves were wrong, and together they suppressed the only mechanism that worked.
+> Seventeen rows (T67–T96) were stale until a sweep on 2026-09-09 — the registry reported 22 open
+> tasks when 5 were.
+>
+> The drift does not stall the pipeline: the selector judges eligibility on the **document's**
+> frontmatter, not the registry row, so a stale row cannot cause a finished task to be re-selected.
+> That is exactly why it went unnoticed for so long. The cost is borne entirely by human readers, and
+> it lands hardest on the one question the registry exists to answer — *how much is left?*
 
 ## Why globally unique
 
