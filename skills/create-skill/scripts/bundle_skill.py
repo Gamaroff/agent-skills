@@ -601,9 +601,14 @@ def _is_binary(path):
     Distinguishes "we cannot open this" from "this is not text" — the first is a
     broken instrument, the second is a legitimate file the bundler already has a
     policy for.
+
+    Reads ONE byte, not the file: the question is whether the handle opens, and a
+    whole-file read made every non-UTF-8 reference cost three full reads per check
+    (this, the failed decode before it, and `_looks_bundled` after).
     """
     try:
-        path.read_bytes()
+        with path.open('rb') as fh:
+            fh.read(1)
         return True
     except OSError:
         return False
@@ -760,9 +765,24 @@ def check_skill(skill_path):
                 continue
             if not dst.is_file():
                 continue
-            text = _read_text_or_none(dst)
-            if text is None:
+            text, read_error = _read_text_or_error(dst)
+
+            # The same distinction the main loop draws, and for the same reason.
+            # `if text is None: continue` treated "could not open it" as "it
+            # makes no provenance claim", so an orphan that was ALSO unreadable
+            # produced `0 problems` — a clean result from a failed read, in the
+            # one check whose whole purpose is to make invisible staleness
+            # visible. Cycle 1 fixed this conflation in the main loop and did not
+            # carry it here, twenty lines down in the same function.
+            #
+            # A non-UTF-8 file is deliberately still skipped in silence: a banner
+            # genuinely cannot be read from binary content, which is residual 6 —
+            # a documented, bounded limitation — rather than a broken instrument.
+            if read_error is not None:
+                if not _is_binary(dst):
+                    report(rel, 'UNREADABLE', f'could not be read: {read_error}')
                 continue
+
             declared = banner_declaration(text)
             if declared is None:
                 continue        # skill-native, no provenance claim — not ours

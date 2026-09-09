@@ -238,7 +238,7 @@ STALE/MISSING after task 86, so rollback loses the four extra classes and nothin
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS → FAIL (cycle 2) → fixed
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
 **Quality Score**: 90/100
@@ -246,8 +246,8 @@ STALE/MISSING after task 86, so rollback loses the four extra classes and nothin
 
 ### QA Report
 
-- **Full Report**: [task.98.qa.1.bundle-freshness-check-mode.md](./task.98.qa.1.bundle-freshness-check-mode.md)
-- **Gate File**: [task.98.gate.1.bundle-freshness-check-mode.yml](./task.98.gate.1.bundle-freshness-check-mode.yml)
+- **Cycle 1**: [task.98.qa.1.bundle-freshness-check-mode.md](./task.98.qa.1.bundle-freshness-check-mode.md) · [gate.1](./task.98.gate.1.bundle-freshness-check-mode.yml) — CONCERNS 90/100
+- **Cycle 2 (refute pass)**: [task.98.qa.2.bundle-freshness-check-mode.md](./task.98.qa.2.bundle-freshness-check-mode.md) · [gate.2](./task.98.gate.2.bundle-freshness-check-mode.yml) — FAIL 80/100
 
 ### Test Coverage Summary
 
@@ -266,6 +266,11 @@ and the check found a live stale copy in the tree on its first run.
   This is the exact shape of the live defect the check found.
 - **T98-QA-002 (low)** — an unreadable file is reported as "carries no provenance banner and is not
   byte-identical", asserting content the check never read.
+- **T98-QA-003 (high, cycle 2)** — the cycle-1 fix for T98-QA-002 was correct and **incomplete**: the
+  same conflation survived in the orphan scan twenty lines away, so a copy that was both orphaned and
+  unreadable reported `0 problems`. A clean result from a failed read, in the one check whose purpose
+  is to make invisible staleness visible. Found by the cycle-2 refute pass, which a narrowed re-review
+  would have missed — it would have read only the fixes, where the defect is absent.
 
 ---
 
@@ -279,6 +284,7 @@ and the check found a live stale copy in the tree on its first run.
 | 2026-09-09 |         | Implemented: `--check` mode (7 classes, read-only), 20 tests, wired into `validate.yml`; found and fixed a live stale bundled copy the existing check was blind to | develop |
 | 2026-09-09 |         | Status → ready-for-review | develop |
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both in the classifier's reporting; 7/7 success criteria met | qa-task |
+| 2026-09-09 |         | QA cycle 2 (refute pass) FAIL (80/100) — orphan scan reported a clean result over an unreadable file; fixed | qa-task |
 
 ---
 

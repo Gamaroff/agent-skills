@@ -860,6 +860,71 @@ test("a non-UTF-8 file is NOT reported UNREADABLE — unopenable and non-text ar
   );
 });
 
+test("an orphan that is ALSO unreadable is reported — never a silent clean result", (t) => {
+  // Found by the cycle-2 refute pass. The orphan scan skipped an unreadable file
+  // via `if text is None: continue`, treating "could not open it" as "it makes no
+  // provenance claim" — so this fixture reported `0 problems`. A clean result
+  // produced by a failed read, in the one check whose entire purpose is to make
+  // invisible staleness visible.
+  //
+  // Cycle 1 fixed this exact conflation in the main loop and did not carry it
+  // twenty lines down into the orphan scan. The symptom of the incompleteness was
+  // a green tick, which is why it survived a passing suite.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("contract.md") },
+      sharedFiles: { "contract.md": "# Contract\n\nBody.\n" },
+    },
+    t,
+  );
+  fx.bundle();
+  fx.rmShared("contract.md"); // now an orphan — and out of `expected`
+  const target = fx.refPath("contract.md");
+  fs.chmodSync(target, 0o000);
+  t.after(() => {
+    try {
+      fs.chmodSync(target, 0o644);
+    } catch {
+      /* already removed by fixture cleanup */
+    }
+  });
+
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["UNREADABLE"]);
+  assert.equal(res.status, 1, "must not exit 0 over a file it could not open");
+  assert.doesNotMatch(
+    res.stdout,
+    /0 problems/,
+    "a failed read must never be reported as a clean result",
+  );
+});
+
+test("a non-UTF-8 orphan is still skipped in silence — residual 6, not a broken instrument", (t) => {
+  // The other half. A banner genuinely cannot be read from binary content, so a
+  // header-less orphan is a documented, bounded limitation rather than an
+  // instrument failure. Reporting it UNREADABLE would be noise, and noise is how
+  // a check stops being read.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("blob.md") },
+      sharedFiles: {},
+    },
+    t,
+  );
+  const shared = path.join(fx.root, "shared", "resources", "blob.md");
+  fs.writeFileSync(shared, Buffer.from([0xff, 0xfe, 0x00, 0x01]));
+  fx.bundle();
+  fs.rmSync(shared);
+
+  const res = fx.check();
+  assert.deepEqual(
+    res.classesFound,
+    [],
+    "binary orphan is a known limit, not a finding",
+  );
+  assert.equal(res.status, 0);
+});
+
 // ---------------------------------------------------------------------------
 // CLI surface.
 // ---------------------------------------------------------------------------
