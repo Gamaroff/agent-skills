@@ -928,9 +928,8 @@ path already exists.
 position line `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` before the
 invocation below — the second of the two firing points this section owns.
 
-The ordinary 5b invocation passes the latest **gate file**, and on this path that gate reads
-`PASS`/`WAIVED` with an empty `top_issues[]` — it carries none of the review's findings. Pass the
-**PR review report** as well:
+The ordinary 5b invocation passes the latest **gate file**, and on neither route into 5c does that
+gate carry the review's findings. Pass the **PR review report** as well:
 
 ```
 Skill(qa-fix, args="gate={gate-file-path} pr_review={pr-review-report-path}")
@@ -942,6 +941,18 @@ The findings ingester globs `*.pr-review.*.md` for exactly this reason (see
 ingester warns by name against searching for one. Without both halves of this — the glob and the passed path — qa-fix reads a
 clean gate, finds nothing, changes nothing, and 5b step 0 HALTs reporting the issues as unfixable
 when in fact they were never delivered.
+
+> **What the gate carries differs by route, and on route 2 it is not the work.** On route 1 the gate
+> reads `PASS`/`WAIVED` with an empty `top_issues[]`, so passing it alongside the review report is
+> harmless. On **route 2** — the Diminishing-returns exit — the gate is `CONCERNS` and its
+> `top_issues[]` is deliberately **non-empty**: it holds the test-machinery residue that exit
+> declined to fix. **That residue is not the fix target.** Fix the review's findings, from the
+> `pr_review=` report, and leave the carried residue where the exit put it — in the gate's
+> `recommendations.future` and on the work item.
+>
+> Working it instead resumes refining the pins, which is precisely the behaviour the exit exists to
+> end, re-entered through the back door. Nothing mechanical prevents this: `/qa-fix`'s priority order
+> would pick those entries up like any others, so the instruction is the whole guard.
 
 > **REQUEST CHANGES re-enters 5b, not 5a.** The gate for this cycle has already been written and
 > read; what is wanted is a fix pass against the review's findings, after which the loop returns to

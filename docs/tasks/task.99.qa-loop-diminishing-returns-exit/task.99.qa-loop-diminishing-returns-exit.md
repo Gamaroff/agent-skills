@@ -282,15 +282,16 @@ satisfy condition 2.
 
 ## QA Testing Results
 
-**QA Status**: FAIL (cycle 2)
+**QA Status**: CONCERNS (cycle 3)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-09
-**Quality Score**: 60/100 (cycle 1: 50/100)
-**Gate Decision**: FAIL
+**Quality Score**: 90/100 (cycle 2: 60/100, cycle 1: 50/100)
+**Gate Decision**: CONCERNS
 
 ### QA Reports
 
-- **Cycle 2 (latest)**: [task.99.qa.2.qa-loop-diminishing-returns-exit.md](./task.99.qa.2.qa-loop-diminishing-returns-exit.md) · [gate.2](./task.99.gate.2.qa-loop-diminishing-returns-exit.yml)
+- **Cycle 3 (latest)**: [task.99.qa.3.qa-loop-diminishing-returns-exit.md](./task.99.qa.3.qa-loop-diminishing-returns-exit.md) · [gate.3](./task.99.gate.3.qa-loop-diminishing-returns-exit.yml)
+- **Cycle 2**: [task.99.qa.2.qa-loop-diminishing-returns-exit.md](./task.99.qa.2.qa-loop-diminishing-returns-exit.md) · [gate.2](./task.99.gate.2.qa-loop-diminishing-returns-exit.yml)
 - **Cycle 1**: [task.99.qa.1.qa-loop-diminishing-returns-exit.md](./task.99.qa.1.qa-loop-diminishing-returns-exit.md) · [gate.1](./task.99.gate.1.qa-loop-diminishing-returns-exit.yml)
 
 ### Test Coverage Summary
@@ -301,6 +302,17 @@ satisfy condition 2.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
+
+**Cycle 3.** No HIGH. One MEDIUM, and it was a direct consequence of cycle 2's own fix: widening 5c
+to admit route 2 falsified a sentence further down 5c asserting that an arriving gate carries an
+empty `top_issues[]` — and on route 2 plus a REQUEST CHANGES verdict, `/qa-fix` would then work the
+machinery residue the exit declined to fix, resuming the pin-refining the task exists to end
+(TASK-99-007, fixed).
+
+**Cycle 3 dogfood check.** The rule was run against this run's own sequence, HIGH `1, 1, 0`. The
+Convergence check does not trip (`0 >= 1` is false) and the diminishing-returns exit does not fire
+(`condition 1 needs two consecutive zero-HIGH gates`). Both guards correctly decline, for the right
+reasons and without overlapping — criterion 3 shown on a real sequence rather than a fixture.
 
 **Cycle 2 (refute pass).** 5c's own entry condition — "after a gate exits 5a with `PASS` or
 `WAIVED`" — excludes the `CONCERNS` gate this exit hands it, so the deliverable's exit path is
@@ -330,6 +342,7 @@ the invocation snippet's four variables have no documented source.
 | 2026-09-09 |  | QA findings fixed — 1 HIGH + 2 MEDIUM closed, 1 iteration. The HIGH was a case-fold applied to `file:` as well as to the three enumerations, which silently disabled the exit for capitalised paths; the fix is mutation-proved and the new test is the only one in the suite that exercises a capitalised path. | qa-fix |
 | 2026-09-09 |  | QA gate 2 FAIL (60/100) — cycle-2 refute pass: 1 HIGH (5c's entry condition excludes the CONCERNS gate this exit hands it) + 2 MEDIUM (two false claims in prose). Cycle 1's three findings verified fixed. | qa-task |
 | 2026-09-09 |  | QA findings fixed — 1 HIGH + 2 MEDIUM closed, 2nd iteration. 5c's entry condition now names both routes out of 5a, so the exit's destination no longer refuses it; `**Loop exit**` default corrected; three stale test counts corrected. | qa-fix |
+| 2026-09-09 |  | QA gate 3 CONCERNS (90/100) — no HIGH; 1 MEDIUM (route 2 falsified 5c's own empty-`top_issues` claim, which would have sent the machinery residue back to qa-fix), fixed in a 3rd iteration. Both guards verified to decline correctly on this run's own `1,1,0` sequence. | qa-task |
 
 ## Progress Tracking
 
@@ -428,7 +441,7 @@ the behaviour the rule this task ships exists to stop.
 ### In QA Verification
 
 - [Bug 1: Glob matching case-folds `file:` paths](./task.99.bug.1.glob-matching-case-folds-file-paths.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09, verified at gate 2)
-- [Bug 2: 5c's entry condition excludes the gate the new exit hands it](./task.99.bug.2.5c-entry-condition-excludes-the-new-exit.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09)
+- [Bug 2: 5c's entry condition excludes the gate the new exit hands it](./task.99.bug.2.5c-entry-condition-excludes-the-new-exit.md) — ✅ Ready for QA — Severity: HIGH (fixed 2026-09-09, verified at gate 3)
 
 ### Closed Bugs
 
