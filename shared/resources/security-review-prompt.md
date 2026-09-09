@@ -145,6 +145,31 @@ security_review:
 
 `reason` is the engine's own string — copy it, do not paraphrase it.
 
+### Lifting the block into a QA gate
+
+`probes_executed:` and `evidence:` carry the **same names and the same meanings** as
+`nfr_validation.security` in a QA gate, so a QA cycle can lift them verbatim rather than translating:
+
+```yaml
+nfr_validation:
+  security:
+    status: PASS|CONCERNS|FAIL    # the gate's own judgement — NOT lifted from here
+    evidence: measured            # lifted verbatim
+    probes_executed: 12           # lifted verbatim
+```
+
+Two boundaries on that, and both matter:
+
+- **The value domains are nested, not equal.** This block emits `measured | reasoned`. The gate's
+  domain is `measured | reasoned | unverified`, and `unverified` is **gate-only** — it means *no
+  security review supplied a verdict at all*, which is not an answer a review that ran can give. Do
+  not add `unverified` here.
+- **`status:` is not ours to set.** This skill reports per-control verdicts; the gate's PASS /
+  CONCERNS / FAIL is the QA reviewer's call. Consuming this block is **optional** — `qa-story` and
+  `qa-task` own the field; this skill advises.
+
+Values and the placement constraint: [`qa-gate-security-evidence.md`](qa-gate-security-evidence.md).
+
 ---
 
 ## 5. Modes

@@ -483,12 +483,60 @@ test("replay: task.67.gate.1 (security FAIL) fires the trigger", () => {
   assert.equal(runClause1(readFileSync(g, "utf-8")), "true");
 });
 
-test("replay: task.67.gate.2 (security PASS) does not fire the trigger", () => {
+/**
+ * CHANGED BY task.82, deliberately. This asserted "false" until clause 1 gained
+ * its evidence half.
+ *
+ * `task.67.gate.2` is a real gate: `security: PASS`, no `evidence:` key, because
+ * it was written before the key existed. Under the widened clause 1 a missing
+ * key reads as `unverified` and FIRES — which is the whole point of the change.
+ * Writing that half fail-closed instead would leave every pre-existing gate
+ * reporting "no trigger", and the widening would accomplish nothing while
+ * appearing to work.
+ *
+ * So the verdict on this fixture moved from false to true, and the task's own
+ * "identical verdicts on the real gate fixtures" regression line could not
+ * survive alongside its "a missing key triggers" functional line. The functional
+ * line won: it is stated four times in the task, and the alternative is named
+ * there as the fail-closed bug in a new place.
+ *
+ * The `status: PASS` half is still asserted — via `securityStatusOnly()` below,
+ * which pins the SAME fixture with evidence supplied, so the status reading is
+ * not silently untested now that the evidence half dominates.
+ */
+test("replay: task.67.gate.2 (security PASS, no evidence key) NOW fires on absence", () => {
   const g = join(gateDir, "task.67.gate.2.execute-the-skill-qa-gate.yml");
   assert.ok(existsSync(g), "replay fixture task.67.gate.2 must exist");
-  assert.equal(runClause1(readFileSync(g, "utf-8")), "false");
+  assert.equal(runClause1(readFileSync(g, "utf-8")), "true");
 });
 
+/** The same real gate with `evidence:` supplied — isolates the status half. */
+test("replay: task.67.gate.2 with evidence: reasoned does NOT fire", () => {
+  const g = join(gateDir, "task.67.gate.2.execute-the-skill-qa-gate.yml");
+  const withEvidence = readFileSync(g, "utf-8").replace(
+    /^(\s*)status: PASS$/m,
+    "$1status: PASS\n$1evidence: reasoned",
+  );
+  assert.notEqual(
+    withEvidence,
+    readFileSync(g, "utf-8"),
+    "the fixture must actually have been rewritten, or this test is vacuous",
+  );
+  assert.equal(
+    runClause1(withEvidence),
+    "false",
+    "a PASS whose evidence is stated is not a trigger — the status half must " +
+      "still read PASS correctly now that the evidence half exists",
+  );
+});
+
+/**
+ * This test is about ONE thing: the probe must not read a different axis's
+ * `status:` as the security one. task.82 added `evidence: reasoned` to the
+ * fixture so that the new evidence half does not fire and mask what is being
+ * asserted — without it, this returns true for a reason that has nothing to do
+ * with maintainability, and the original assertion stops testing anything.
+ */
 test("replay: CONCERNS on maintainability does not fire the trigger", () => {
   assert.equal(
     runClause1(
@@ -498,6 +546,7 @@ test("replay: CONCERNS on maintainability does not fire the trigger", () => {
         "nfr_validation:",
         "  security:",
         "    status: PASS",
+        "    evidence: reasoned",
         "  maintainability:",
         "    status: FAIL",
         "",
@@ -558,4 +607,453 @@ test("clause-1 guards the read before invoking awk", () => {
     "the probe must close stdin so awk's read-stdin fallback is unreachable even " +
       "if the guard is later removed",
   );
+});
+
+/* ---------------------------------------------------------------------------
+ * 7. task.82 Phase 1 — the `evidence:` addition must not disturb clause 1.
+ *
+ * `nfr_validation.security` is gaining `evidence: measured|reasoned|unverified`
+ * (and `probes_executed:`) so that a verdict reached by executing probes is
+ * distinguishable from one reached by reading. The whole risk of that change
+ * is THIS probe: its awk program takes the FIRST `status:` line after
+ * `security:`, so a key inserted in the wrong place changes what it reads —
+ * and it fails CLOSED and SILENTLY, exactly like the `\s` bug one section up.
+ *
+ * These four tests ran GREEN against the unmodified probe before any schema
+ * edit was made (34 pass / 0 fail, 2026-09-09), which is what makes them
+ * evidence about placement rather than a restatement of the new behaviour.
+ * ------------------------------------------------------------------------- */
+
+/** A gate carrying the new shape, with `evidence:` in its sanctioned position. */
+function gateWithEvidence(status, evidence, extra = []) {
+  return [
+    "schema: 1",
+    `gate: ${status === "FAIL" ? "FAIL" : "PASS"}`,
+    "nfr_validation:",
+    "  security:",
+    `    status: ${status}`,
+    `    evidence: ${evidence}`,
+    ...extra,
+    "    notes: 'from the shipped review-security block'",
+    "  performance:",
+    "    status: PASS",
+    "",
+  ].join("\n");
+}
+
+test("evidence: after status: leaves a security FAIL still firing the trigger", () => {
+  assert.equal(
+    runClause1(
+      gateWithEvidence("FAIL", "measured", ["    probes_executed: 12"]),
+    ),
+    "true",
+    "adding evidence: BELOW status: must not stop clause 1 seeing the FAIL",
+  );
+});
+
+test("evidence: after status: leaves a security PASS still not firing", () => {
+  assert.equal(
+    runClause1(
+      gateWithEvidence("PASS", "measured", ["    probes_executed: 12"]),
+    ),
+    "false",
+    "adding evidence: BELOW status: must not invent a trigger on a passing gate",
+  );
+});
+
+test("probes_executed: between status: and notes: does not disturb the probe", () => {
+  // The count sits below `status:` too, so the first-status-wins scan is
+  // unaffected. Asserted separately from `evidence:` because the two keys land
+  // in the same block and a future edit could reorder only one of them.
+  assert.equal(
+    runClause1(
+      gateWithEvidence("FAIL", "reasoned", ["    probes_executed: 0"]),
+    ),
+    "true",
+  );
+});
+
+/**
+ * The ordering control, rewritten by task.82 once clause 1 gained its evidence
+ * half — and the rewrite is the interesting part.
+ *
+ * The original fixture (a value that is not FAIL occupying the first `status:`
+ * slot, no `evidence:` key) now returns TRUE. Not because the hijack was
+ * detected, but because the missing evidence key fires independently. The
+ * evidence half MASKS the status hijack, and a fixture that cannot tell the two
+ * apart is not a control.
+ *
+ * So the fixture carries `evidence: measured` — silencing the evidence half —
+ * and the assertion is then purely about the status slot. This is the remaining
+ * hazard, and it is now sharper than before: once gates routinely carry
+ * evidence, a hijacked status slot is once again silent.
+ */
+test("with evidence supplied, a hijacked first status: slot silently disables the FAIL trigger", () => {
+  const broken = [
+    "schema: 1",
+    "gate: FAIL",
+    "nfr_validation:",
+    "  security:",
+    "    status: measured", // an evidence-shaped value reaching the status slot
+    "    status: FAIL",
+    "    evidence: measured",
+    "    probes_executed: 9",
+    "    notes: 'the forbidden placement'",
+    "",
+  ].join("\n");
+  assert.equal(
+    runClause1(broken),
+    "false",
+    "first-status-wins: a non-FAIL value occupying the first status slot " +
+      "disables the carve-out, and with evidence supplied nothing else catches " +
+      "it — this is why evidence: must go BELOW status:, and it fails closed " +
+      "with no diagnostic",
+  );
+});
+
+/* ---------------------------------------------------------------------------
+ * 8. task.82 Phase 3 — clause 1 reads `evidence`, and fails OPEN on absence.
+ *
+ * The inversion is the point. The status half fails closed; this half must fail
+ * open, or every gate written before the field existed reads as "no trigger".
+ * ------------------------------------------------------------------------- */
+
+/** A security block with an arbitrary set of keys, at the canonical indent. */
+function securityBlock(...keys) {
+  return [
+    "schema: 1",
+    "gate: PASS",
+    "nfr_validation:",
+    "  security:",
+    ...keys.map((k) => `    ${k}`),
+    "  performance:",
+    "    status: PASS",
+    "",
+  ].join("\n");
+}
+
+test("evidence: unverified fires even when status is PASS", () => {
+  assert.equal(
+    runClause1(securityBlock("status: PASS", "evidence: unverified")),
+    "true",
+  );
+});
+
+test("evidence: measured does not fire on a passing gate", () => {
+  assert.equal(
+    runClause1(
+      securityBlock(
+        "status: PASS",
+        "evidence: measured",
+        "probes_executed: 12",
+      ),
+    ),
+    "false",
+  );
+});
+
+test("evidence: reasoned does not fire on a passing gate", () => {
+  assert.equal(
+    runClause1(securityBlock("status: PASS", "evidence: reasoned")),
+    "false",
+  );
+});
+
+test("a security block with NO evidence: key fires — the fail-open half", () => {
+  assert.equal(
+    runClause1(securityBlock("status: PASS", "notes: 'pre-task.82 gate'")),
+    "true",
+    "a missing key must read as unverified, not as reasoned — otherwise every " +
+      "gate predating the field silently never triggers",
+  );
+});
+
+test("no security block at all is still a non-trigger, evidence half notwithstanding", () => {
+  assert.equal(
+    runClause1(
+      [
+        "schema: 1",
+        "gate: PASS",
+        "nfr_validation:",
+        "  maintainability:",
+        "    status: PASS",
+        "",
+      ].join("\n"),
+    ),
+    "false",
+    "absence of the KEY means the verdict does not say how it was reached; " +
+      "absence of the BLOCK means the gate makes no security claim. Only the " +
+      "first is a gap in evidence",
+  );
+});
+
+test("a quoted or comment-suffixed evidence value still parses", () => {
+  assert.equal(
+    runClause1(securityBlock("status: PASS", "evidence: 'reasoned'")),
+    "false",
+  );
+  assert.equal(
+    runClause1(
+      securityBlock("status: PASS", "evidence: reasoned # read, not run"),
+    ),
+    "false",
+  );
+});
+
+test("a later axis's evidence: cannot be read as the security block's", () => {
+  assert.equal(
+    runClause1(
+      [
+        "schema: 1",
+        "gate: PASS",
+        "nfr_validation:",
+        "  security:",
+        "    status: PASS",
+        "  performance:",
+        "    status: PASS",
+        "    evidence: measured",
+        "",
+      ].join("\n"),
+    ),
+    "true",
+    "the security block ends at the next key at or left of its indent, so " +
+      "performance's evidence must NOT satisfy security's — security here has " +
+      "no evidence of its own and must fire",
+  );
+});
+
+test("the shared rule states the fail-open inversion in prose, not only in code", () => {
+  const t = ruleText();
+  assert.match(
+    t,
+    /fails?\s+\*\*open\*\*|fail\s+\*\*open\*\*/i,
+    "the rule must say the evidence half fails open — the asymmetry with the " +
+      "status half is the single thing a future editor is most likely to " +
+      "'tidy' into consistency",
+  );
+  // Structural, not a substring scan: read the rule's markdown LINK TARGETS and
+  // require the definition to be one of them. The filename appearing anywhere —
+  // in prose, in a code comment, inside another link's text — would satisfy a
+  // substring test without the rule actually pointing anywhere.
+  const linkTargets = [...t.matchAll(/\]\(([^)\s]+)\)/g)].map((m) =>
+    m[1].split("/").pop(),
+  );
+  assert.ok(
+    linkTargets.includes("qa-gate-security-evidence.md"),
+    "the rule must LINK to the file defining the three evidence values; found " +
+      `targets: ${[...new Set(linkTargets)].join(", ")}`,
+  );
+});
+
+/* ---------------------------------------------------------------------------
+ * 9. task.82 Phase 2 — `measured` is a claim, not an adjective.
+ *
+ * `evidence: measured` asserts that hostile candidates were EXECUTED. Asserting
+ * it with a zero count is a schema error, not a warning: zero executed
+ * candidates is a finding, not a pass. Same rule `review-security` holds on its
+ * own machine block, and `finalise-dod-security-prompt.md` holds one layer up.
+ * ------------------------------------------------------------------------- */
+
+const EVIDENCE_DEF_PATH = join(
+  repoRoot,
+  "shared",
+  "resources",
+  "qa-gate-security-evidence.md",
+);
+
+/**
+ * Read `nfr_validation.security`'s evidence fields out of a gate.
+ *
+ * Deliberately anchored on the NESTING, not on the bare key: the gate schema
+ * also carries a TOP-LEVEL `evidence:` block (tests_reviewed / trace), and a
+ * scan for `evidence:` alone matches both. That collision is why this helper
+ * exists rather than a one-line regex.
+ */
+function readSecurityEvidence(yaml) {
+  const lines = yaml.split("\n");
+  let indent = null;
+  const out = { evidence: null, probes_executed: null, found: false };
+  for (const line of lines) {
+    if (indent === null) {
+      const m = /^(\s*)security:\s*$/.exec(line);
+      if (m) {
+        indent = m[1].length;
+        out.found = true;
+      }
+      continue;
+    }
+    if (/\S/.test(line) && /^\s*/.exec(line)[0].length <= indent) break;
+    const ev = /^\s*evidence:\s*['"]?([a-z]+)/.exec(line);
+    if (ev && out.evidence === null) out.evidence = ev[1];
+    const pe = /^\s*probes_executed:\s*(\d+)/.exec(line);
+    if (pe && out.probes_executed === null) out.probes_executed = Number(pe[1]);
+  }
+  return out;
+}
+
+test("the documented gate schema satisfies measured ⇒ probes_executed > 0", () => {
+  for (const [name, text] of skillText) {
+    const blocks = [...text.matchAll(/```yaml\n([\s\S]*?)```/g)].map(
+      (m) => m[1],
+    );
+    const withSecurity = blocks.filter((b) => /^\s*security:\s*$/m.test(b));
+    assert.ok(
+      withSecurity.length > 0,
+      `${name} must document a gate block carrying nfr_validation.security`,
+    );
+    for (const b of withSecurity) {
+      const { evidence, probes_executed } = readSecurityEvidence(b);
+      if (evidence === "measured") {
+        assert.ok(
+          Number.isInteger(probes_executed),
+          `${name}: a documented block asserting evidence: measured must also ` +
+            `carry probes_executed`,
+        );
+      }
+    }
+  }
+});
+
+test("every gate on disk honours measured ⇒ probes_executed > 0", () => {
+  // Scans the real corpus, not a fixture — so a gate written after this task
+  // that claims `measured` with nothing executed reddens the build.
+  // `--others --exclude-standard` alongside `--cached` is load-bearing, not
+  // thoroughness. A plain `git ls-files` lists only TRACKED files, and a QA
+  // gate is written and checked BEFORE it is committed — so the one moment
+  // this check exists for is the moment it would see nothing. Found by
+  // mutation-proving: dropping a violating gate into the tree left the suite
+  // green.
+  const gates = execFileSync(
+    "git",
+    [
+      "ls-files",
+      "--cached",
+      "--others",
+      "--exclude-standard",
+      "docs/**/*.gate.*.yml",
+      "docs/**/*.gate.*.yaml",
+    ],
+    { cwd: repoRoot, encoding: "utf-8", timeout: SPAWN_TIMEOUT_MS },
+  )
+    .split("\n")
+    .filter(Boolean);
+  assert.ok(
+    gates.length > 0,
+    "the gate corpus must be non-empty, or this test is vacuous — it would " +
+      "pass by finding nothing to check",
+  );
+  let checked = 0;
+  for (const rel of gates) {
+    const { evidence, probes_executed } = readSecurityEvidence(
+      readFileSync(join(repoRoot, rel), "utf-8"),
+    );
+    if (evidence === null) continue; // pre-task.82 gate — reads as unverified
+    checked += 1;
+    if (evidence === "measured") {
+      assert.ok(
+        Number.isInteger(probes_executed) && probes_executed > 0,
+        `${rel}: evidence: measured with probes_executed ` +
+          `${probes_executed === null ? "absent" : probes_executed} — zero ` +
+          `executed candidates is a finding, not a pass`,
+      );
+    }
+    assert.ok(
+      ["measured", "reasoned", "unverified"].includes(evidence),
+      `${rel}: evidence: ${evidence} is not one of measured|reasoned|unverified`,
+    );
+  }
+  // `checked` is reported rather than asserted non-zero: adoption is
+  // going-forward only, so zero is the correct value on the day this lands and
+  // a floor here would be a false failure. The vacuity that matters — an empty
+  // gate corpus — is asserted above.
+  assert.ok(checked >= 0);
+});
+
+test("the three evidence values are defined once, in a shared resource", () => {
+  assert.ok(
+    existsSync(EVIDENCE_DEF_PATH),
+    "shared/resources/qa-gate-security-evidence.md must exist — the values are " +
+      "consumed by qa-task, qa-story and the re-review rule, and restating them " +
+      "in each is the drift task.74 found three copies of",
+  );
+  const def = readFileSync(EVIDENCE_DEF_PATH, "utf-8");
+  for (const v of ["measured", "reasoned", "unverified"]) {
+    assert.ok(def.includes(v), `the definition must name ${v}`);
+  }
+  assert.match(
+    def,
+    /probes_executed/,
+    "the definition must carry the probes_executed rule",
+  );
+  for (const [name, text] of skillText) {
+    // Link targets again, for the same reason. `basename` is compared because
+    // the bundler rewrites `shared/resources/X` to `references/X` in place, so
+    // the directory differs between the source tree and a packaged skill.
+    const targets = [...text.matchAll(/\]\(([^)\s]+)\)/g)].map((m) =>
+      m[1].split("/").pop(),
+    );
+    assert.ok(
+      targets.includes("qa-gate-security-evidence.md"),
+      `${name} must LINK to the shared definition rather than restating the values`,
+    );
+  }
+});
+
+/**
+ * The corpus scan above is VACUOUS TODAY — adoption is going-forward only, so
+ * no gate on disk carries `evidence:` yet and the loop checks nothing. A scan
+ * that finds no instance of the class it exists to judge is indistinguishable
+ * from a scan that is broken, so the reader is exercised directly here against
+ * both a violating and a conforming input. Without this, the first gate to
+ * claim `measured` with nothing executed would be the test's first real input.
+ */
+test("readSecurityEvidence catches the violation the corpus scan exists to catch", () => {
+  const violating = [
+    "nfr_validation:",
+    "  security:",
+    "    status: PASS",
+    "    evidence: measured",
+    "    probes_executed: 0",
+    "",
+  ].join("\n");
+  const v = readSecurityEvidence(violating);
+  assert.equal(v.evidence, "measured");
+  assert.equal(v.probes_executed, 0);
+  assert.ok(
+    !(Number.isInteger(v.probes_executed) && v.probes_executed > 0),
+    "a zero count under evidence: measured must fail the invariant",
+  );
+
+  const conforming = violating.replace(
+    "probes_executed: 0",
+    "probes_executed: 7",
+  );
+  const c = readSecurityEvidence(conforming);
+  assert.equal(c.probes_executed, 7);
+  assert.ok(Number.isInteger(c.probes_executed) && c.probes_executed > 0);
+});
+
+test("readSecurityEvidence ignores the gate's TOP-LEVEL evidence: block", () => {
+  // The collision that motivated the helper. A top-level `evidence:` block sits
+  // ABOVE nfr_validation in the real schema; a bare-key scan reads its contents
+  // as the security axis's.
+  const gate = [
+    "schema: 1",
+    "evidence:",
+    "  tests_reviewed: 12",
+    "  trace:",
+    "    ac_covered: [1, 2]",
+    "nfr_validation:",
+    "  security:",
+    "    status: PASS",
+    "",
+  ].join("\n");
+  const r = readSecurityEvidence(gate);
+  assert.equal(
+    r.evidence,
+    null,
+    "the security block has no evidence: of its own — the top-level block is a " +
+      "different field and must not be read as one",
+  );
+  assert.equal(r.found, true);
 });

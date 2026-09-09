@@ -38,11 +38,26 @@ fix cycle changes the behaviour of code its own diff never touched.
 
 `SAFETY_REPROBE=true` when the prior gate has **any** of:
 
-1. `nfr_validation.security.status: FAIL`
+1. `nfr_validation.security.status: FAIL`, **or** `nfr_validation.security.evidence` that is
+   `unverified` — including a gate whose `security:` block carries **no** `evidence:` key at all.
+   Values: [`qa-gate-security-evidence.md`](qa-gate-security-evidence.md)
 2. a `top_issues[]` entry with `severity: high` whose `finding` concerns a **boundary** — a
    classifier, validator, parser, sanitiser, allow-list, deny-list, or authorisation check
 3. `gate: FAIL` **and** the work item's own Success Criteria contain any of the words
    `never`, `must not`, `fails closed`, `refused`
+
+> **Clause 1's two halves fail in opposite directions, and that asymmetry is the point.** The
+> `status` half fails **closed**: an unreadable or absent gate yields `false`, because a gate that
+> cannot be read is not evidence of a failure. The `evidence` half fails **open**: an absent key
+> yields `unverified`, which fires.
+>
+> Written the other way — a missing key read as `reasoned` — every gate produced before this field
+> existed would report "no trigger", and the widening would accomplish nothing while appearing to
+> work. That is the `\s`-vs-POSIX bug one section down, in a new place.
+>
+> **A gate with no `security:` block at all is still a non-trigger.** Absence of the key inside a
+> security block means *this verdict does not say how it was reached*; absence of the block means
+> *this gate makes no security claim*. Only the first is a gap in evidence.
 
 ### Clause 1 — the mechanical probe
 
@@ -50,12 +65,42 @@ Clauses 2 and 3 are judgement calls. Clause 1 is not, so it is written once, her
 carry this exact snippet:
 
 ```bash
-# $LATEST_GATE is the prior gate file.
+# $LATEST_GATE is the prior gate file. Reads the nfr_validation.security block
+# once and reports "<status> <evidence>", or "absent" when there is no such
+# block. Both of clause 1's halves are decided from that one scan.
 SAFETY_REPROBE=false
 if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
-  awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
-       f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" </dev/null \
-    | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+  SECURITY_AXIS=$(awk '
+    !f && /^[[:space:]]*security:[[:space:]]*$/ {
+      f=1; match($0, /^[[:space:]]*/); ind=RLENGTH; next
+    }
+    f {
+      # A key at or left of the indent of security: ends the block, so keys
+      # belonging to a later NFR axis can never be read as this one.
+      # No apostrophes here: the program is single-quoted by its caller.
+      if ($0 ~ /[^[:space:]]/) {
+        match($0, /^[[:space:]]*/)
+        if (RLENGTH <= ind) exit
+      }
+      if (st == "" && $0 ~ /^[[:space:]]*status:/) {
+        st = ($0 ~ /[[:space:]]FAIL[[:space:]]*$/) ? "FAIL" : "OK"
+      }
+      if (ev == "" && $0 ~ /^[[:space:]]*evidence:/) {
+        ev = "unverified"
+        if ($0 ~ /evidence:[^[:alpha:]]*measured/) ev = "measured"
+        else if ($0 ~ /evidence:[^[:alpha:]]*reasoned/) ev = "reasoned"
+      }
+    }
+    END {
+      if (!f) { print "absent"; exit }
+      printf "%s %s\n", (st == "" ? "OK" : st), (ev == "" ? "unverified" : ev)
+    }
+  ' "$LATEST_GATE" </dev/null)
+  case "$SECURITY_AXIS" in
+    absent)       : ;;
+    *FAIL*)       SAFETY_REPROBE=true ;;
+    *unverified*) SAFETY_REPROBE=true ;;
+  esac
 fi
 ```
 

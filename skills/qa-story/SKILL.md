@@ -448,11 +448,43 @@ Perform a comprehensive test architecture review with quality assessment. This a
    # LATEST_GATE is EMPTY on a first review. `awk 'prog' ""` passes no filename, falls back to
    # reading stdin, and hangs indefinitely — a hang, not an error. Guard it, and close stdin so the
    # fallback is unreachable even if the guard is ever removed.
+   # Clause 1 has TWO halves and they fail in opposite directions: the status half
+   # fails CLOSED (an unreadable gate is not evidence of a failure), the evidence half
+   # fails OPEN (a missing `evidence:` key reads as `unverified` and FIRES). See the
+   # shared rule — writing the second half closed makes every pre-existing gate silent.
    SAFETY_REPROBE=false
    if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
-     awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
-          f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" </dev/null \
-       | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+     SECURITY_AXIS=$(awk '
+       !f && /^[[:space:]]*security:[[:space:]]*$/ {
+         f=1; match($0, /^[[:space:]]*/); ind=RLENGTH; next
+       }
+       f {
+         # A key at or left of the indent of security: ends the block, so keys
+         # belonging to a later NFR axis can never be read as this one.
+         # No apostrophes here: the program is single-quoted by its caller.
+         if ($0 ~ /[^[:space:]]/) {
+           match($0, /^[[:space:]]*/)
+           if (RLENGTH <= ind) exit
+         }
+         if (st == "" && $0 ~ /^[[:space:]]*status:/) {
+           st = ($0 ~ /[[:space:]]FAIL[[:space:]]*$/) ? "FAIL" : "OK"
+         }
+         if (ev == "" && $0 ~ /^[[:space:]]*evidence:/) {
+           ev = "unverified"
+           if ($0 ~ /evidence:[^[:alpha:]]*measured/) ev = "measured"
+           else if ($0 ~ /evidence:[^[:alpha:]]*reasoned/) ev = "reasoned"
+         }
+       }
+       END {
+         if (!f) { print "absent"; exit }
+         printf "%s %s\n", (st == "" ? "OK" : st), (ev == "" ? "unverified" : ev)
+       }
+     ' "$LATEST_GATE" </dev/null)
+     case "$SECURITY_AXIS" in
+       absent)       : ;;
+       *FAIL*)       SAFETY_REPROBE=true ;;
+       *unverified*) SAFETY_REPROBE=true ;;
+     esac
    fi
    ```
 
@@ -1294,6 +1326,14 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 ### Security ✅
 
 - Status: PASS/CONCERNS/FAIL
+- Evidence: measured/reasoned/unverified — **how** the verdict was reached. `measured` only when
+  hostile candidates were actually executed, and then `probes_executed` must be > 0; a verdict
+  reached by reading is `reasoned`, which is accurate rather than a failing grade. Values, the
+  placement constraint and the fail-open rule for a missing key:
+  [`references/qa-gate-security-evidence.md`](references/qa-gate-security-evidence.md).
+  `/review-security` emits a liftable block with the same key names — consuming it is optional;
+  this skill owns the field
+- Probes executed: [count — required when Evidence is `measured`]
 - Notes: [Findings]
 
 ### Maintainability ✅
@@ -1413,6 +1453,12 @@ evidence:
 nfr_validation:
   security:
     status: PASS|CONCERNS|FAIL
+    # `evidence:` goes BELOW `status:`, never between `security:` and `status:` —
+    # the re-review probe reads the first `status:` after `security:` and fails
+    # closed and silently if a key reaches that slot first. Values and the
+    # probes_executed rule: references/qa-gate-security-evidence.md
+    evidence: measured|reasoned|unverified
+    probes_executed: 0 # REQUIRED when evidence: measured; `measured` with 0 is a schema error
     notes: 'Specific findings'
   performance:
     status: PASS|CONCERNS|FAIL
@@ -2220,6 +2266,7 @@ nfr_validation:
   _assessed: [security, performance, reliability, maintainability]
   security:
     status: CONCERNS
+    evidence: reasoned # measured|reasoned|unverified — below status:, always
     notes: "No rate limiting on auth endpoints"
   performance:
     status: PASS

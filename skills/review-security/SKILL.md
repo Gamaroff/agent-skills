@@ -113,6 +113,7 @@ than good intentions:
 | The agent cannot write a verdict | `computeVerdict` in the engine; the agent supplies only `{sink, entry}` |
 | Zero executed probes never reads as a pass | `runProbeSpec` returns `unverifiable` on `no-cases-executed` |
 | `evidence: measured` implies `probes_executed > 0` | contract test in CI |
+| The block's keys match the QA gate's, so a cycle lifts rather than translates | `evals/shared/tests/qa-re-review-scope-parity.test.mjs`; values defined once in [`references/qa-gate-security-evidence.md`](references/qa-gate-security-evidence.md) |
 | A bare PASS is unrepresentable | no PASS token exists in the output schema |
 | A grep-passing control is still caught | the falsifiability fixtures — each inert variant *contains* the tokens a grep reviewer accepts |
 
