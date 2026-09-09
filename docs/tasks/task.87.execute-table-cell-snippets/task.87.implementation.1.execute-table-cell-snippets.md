@@ -38,7 +38,7 @@ a zsh-broken verification predicate through three QA cycles.
 | 2. review-task             | ✅ Done    | `task.87.review.{N}.{name}.md` exists (or skip logged)                 | `task.87.review.1.execute-table-cell-snippets.md` — READY TO IMPLEMENT, 8/10; 2 Critical + 5 Important + 2 Optional all fixed; `draft` → `ready-for-development` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases; 115/115 tests green; mutation proof 3× red then green; bundle propagated to 6 skills | inline (no subagents) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #365](https://github.com/Gamaroff/agent-skills/pull/365); 2 commits (`48f987ee` feat, `e7931bf4` docs); issue comment `posted` | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.87.qa.{N}.*.md`; `task.87.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.87.qa.{N}.*.md`; `task.87.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles: CONCERNS 90 → PASS 100; 5c CONCERNS (PC-1 fixed) | inline (no subagents) |
 | 7. finalise                | ⏳ Pending | `task.87.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
