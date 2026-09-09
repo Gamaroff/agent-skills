@@ -1,0 +1,29 @@
+schema: 1
+task: "task.RECON.missing-file"
+gate: CONCERNS
+status_reason: "One finding carries no `file:` at all. Condition 2 is opt-in on positive evidence, so this must not exit."
+reviewer: "QA Engineer"
+updated: "2026-09-09T11:20:00Z"
+
+top_issues:
+  - id: "NOFILE-001"
+    severity: medium
+    file: "src/pipeline/guard.spec.ts"
+    finding: "Machinery, correctly filed."
+    suggested_owner: dev
+    status: open
+  - id: "NOFILE-002"
+    severity: low
+    finding: "No file named. A reader cannot tell whether this is machinery or product."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

@@ -100,6 +100,24 @@ branching: # optional — epic integration branches (create-branch, develop-stor
 develop: # optional — develop-story / develop-task / develop-bug pipelines
   fastGateCommand: npm run ci:fast # fast gate run in the develop loop, each qa-fix cycle, and each develop-bug verify cycle
 
+qa: # optional — the QA loop's diminishing-returns exit
+  # Which paths count as TEST MACHINERY rather than product. Glob strings, each
+  # matched against a gate finding's `file:` read as a repo-relative path.
+  #
+  # DEFAULT IS `[]`, and that is the fail-safe direction stated as a default
+  # rather than as an opt-out: an empty list matches nothing, so the exit can
+  # never fire and an unconfigured project keeps today's behaviour exactly. A
+  # missed exit costs time; a wrong exit ships a defect a later cycle would have
+  # caught. Configure it only when you want the loop to be able to stop early.
+  #
+  # `**` crosses directories, `*` does not, and matching is on whole path
+  # segments — `src/latest-price.ts` is NOT machinery, however much of the word
+  # "test" it contains.
+  testArtifactGlobs:
+    - "**/*.spec.ts"
+    - "**/*.test.*"
+    - "tests/**"
+
 developNext: # optional — develop-next roadmap orchestrator
   roadmapPath: docs/development/project-completion-roadmap.md
   baseBranch: develop
@@ -200,6 +218,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `branching.epicIntegration.branchPattern`        | string                          | `epic/{n}.{slug}`                                | Fallback name, used only when an epic opts in but names no branch. `{n}` = epic number, `{slug}` = epic name slug. `epic/*` is deliberately distinct from `feature/epic.*`, which is an ordinary short-lived branch for epic-**document** work.                                                                                                                                                                                                                                           |
 | `branching.epicIntegration.offerWhenUndeclared`  | boolean                         | `true`                                           | Whether `/create-branch` and `/develop-story` offer "create an epic integration branch" for a story whose epic declared nothing. `false` restricts integration branches to epics that opted in explicitly. Never the _recommended_ option either way.                                                                                                                                                                                                                                     |
 | `develop.fastGateCommand`                        | shell command                   | `npm run ci:fast`                                | Fast gate the develop loop, each qa-fix cycle, and each `develop-bug` verify cycle run before committing. Deliberately **excludes** the slow tier: paying it per iteration is what makes the correct fix feel expensive enough to be reverted. Should be the project's cheap CI-equivalent — formatting plus the hermetic suite. |
+| `qa.testArtifactGlobs`                           | list of globs                   | `[]`                                             | Which paths the QA loop's **Diminishing-returns exit** treats as test machinery rather than product behaviour. Each glob is matched against a gate finding's `file:`, read as a repo-relative path; `**` crosses directories and `*` does not, so matching is on whole segments rather than substrings. The exit fires only when **every** `top_issues[]` entry in the latest gate matches — a finding with no `file:`, or one no glob covers, fails the condition, because the exit is opt-in on positive evidence and never on absence. **The `[]` default is the fail-safe**: it matches nothing, the exit never fires, and the loop behaves exactly as it does today. See [Diminishing-returns exit](../../shared/resources/develop-pipeline-step-5-6-qa-loop.md). |
 | `developNext.roadmapPath`                        | path                            | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`).                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `developNext.baseBranch`                         | branch name                     | `develop`                                        | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to.                                                                                                                                                                                                                                                                                                                                                                                  |
 | `developNext.qualityGateCommand`                 | shell command                   | `npm run ci`                                     | Local merge gate `develop-next` and `develop-batch` run on every branch before merging (the whole gate for projects without PR CI). **Expected to be the project's full CI-equivalent** — everything the CI job runs, in one command — so that a local green predicts a CI green. Defaulted to `npm test` until 2026-09-01, which was quietly weaker than the CI it was meant to predict; an explicit value here still wins. |
@@ -234,6 +253,20 @@ story directory:
 ```
 
 Older skill text may still reference `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are **deprecated** — the canonical location is alongside the work item. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts).
+
+## The QA loop's diminishing-returns exit
+
+`qa.testArtifactGlobs` is the only configuration the [Diminishing-returns exit](../../shared/resources/develop-pipeline-step-5-6-qa-loop.md) has, and it is **off until you set it**.
+
+The exit ends a QA loop that has *finished working* — two consecutive gates with no HIGH findings, and a residue consisting entirely of findings about the test machinery built to pin the fixes. It is the opposite of the Convergence check beside it, which escalates a loop that has *stopped working*. Both evaluate from cycle 3 onward and they never both claim the same run.
+
+Three things about the key are worth stating plainly, because each is a decision rather than an accident:
+
+- **The default `[]` matches nothing**, so the exit never fires and a project that has not configured it keeps today's behaviour exactly. The fail-safe direction is the default, not something you opt into.
+- **A finding with no `file:` fails the condition**, as does one no glob covers. The exit needs positive evidence that every remaining finding is machinery; it never infers that from missing data.
+- **Matching is on whole path segments.** `**` crosses directories, `*` does not, and neither matches a substring — `src/latest-price.ts` is production code, whatever letters it contains.
+
+A consumer whose test layout is unusual and matches nothing simply never takes the exit. That is a cost in time, not in correctness.
 
 ## Stakeholder sign-off
 

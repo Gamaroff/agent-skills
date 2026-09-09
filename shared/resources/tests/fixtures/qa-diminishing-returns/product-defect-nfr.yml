@@ -1,0 +1,27 @@
+schema: 1
+task: "task.RECON.product-defect-nfr"
+gate: CONCERNS
+status_reason: "CONDITION 3. Every `file:` is machinery and condition 2 would pass — but nfr_validation reports a product concern. This is the case condition 3 exists for: a defect in behaviour, filed against the test that found it."
+reviewer: "QA Engineer"
+updated: "2026-09-09T11:25:00Z"
+
+top_issues:
+  - id: "NFR-001"
+    severity: medium
+    file: "src/pipeline/guard.spec.ts"
+    finding: "The test that surfaced a reliability regression. `file:` names where a fix would start, which is the test — not where the defect lives."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 74
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
+  reliability:
+    status: CONCERNS
+    notes: "Retry backoff regressed under load."

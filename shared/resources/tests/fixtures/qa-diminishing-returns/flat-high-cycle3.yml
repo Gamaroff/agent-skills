@@ -1,0 +1,24 @@
+schema: 1
+task: "task.RECON.flat-high"
+gate: FAIL
+status_reason: "The 7,7,7,7,4 sequence the Convergence check owns. This gate exists so the two guards can be shown never to claim the same run."
+reviewer: "QA Engineer"
+updated: "2026-09-09T11:00:00Z"
+
+top_issues:
+  - id: "FLAT-001"
+    severity: high
+    file: "src/pipeline/guard.spec.ts"
+    finding: "A real blocker, and it happens to sit in a test file — which is why HIGH, not the file path, is condition 1."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
