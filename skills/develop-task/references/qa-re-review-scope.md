@@ -39,11 +39,26 @@ fix cycle changes the behaviour of code its own diff never touched.
 
 `SAFETY_REPROBE=true` when the prior gate has **any** of:
 
-1. `nfr_validation.security.status: FAIL`
+1. `nfr_validation.security.status: FAIL`, **or** `nfr_validation.security.evidence` that is
+   `unverified` — including a gate whose `security:` block carries **no** `evidence:` key at all.
+   Values: [`qa-gate-security-evidence.md`](qa-gate-security-evidence.md)
 2. a `top_issues[]` entry with `severity: high` whose `finding` concerns a **boundary** — a
    classifier, validator, parser, sanitiser, allow-list, deny-list, or authorisation check
 3. `gate: FAIL` **and** the work item's own Success Criteria contain any of the words
    `never`, `must not`, `fails closed`, `refused`
+
+> **Clause 1's two halves fail in opposite directions, and that asymmetry is the point.** The
+> `status` half fails **closed**: an unreadable or absent gate yields `false`, because a gate that
+> cannot be read is not evidence of a failure. The `evidence` half fails **open**: an absent key
+> yields `unverified`, which fires.
+>
+> Written the other way — a missing key read as `reasoned` — every gate produced before this field
+> existed would report "no trigger", and the widening would accomplish nothing while appearing to
+> work. That is the `\s`-vs-POSIX bug one section down, in a new place.
+>
+> **A gate with no `security:` block at all is still a non-trigger.** Absence of the key inside a
+> security block means *this verdict does not say how it was reached*; absence of the block means
+> *this gate makes no security claim*. Only the first is a gap in evidence.
 
 ### Clause 1 — the mechanical probe
 
@@ -51,14 +66,75 @@ Clauses 2 and 3 are judgement calls. Clause 1 is not, so it is written once, her
 carry this exact snippet:
 
 ```bash
-# $LATEST_GATE is the prior gate file.
+# $LATEST_GATE is the prior gate file. Reads the nfr_validation.security block
+# once and reports "<status> <evidence>", or "absent" when there is no such
+# block. Both of clause 1's halves are decided from that one scan.
 SAFETY_REPROBE=false
 if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
-  awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
-       f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" </dev/null \
-    | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+  SECURITY_AXIS=$(awk '
+    # Three transit constraints govern every line below — no whole-record
+    # variable, no apostrophe, no GNU-only escape. See "Transit constraints"
+    # in the shared rule for why each one fails silently. Each has a test.
+    !f && /^[[:space:]]*security:[[:space:]]*$/ {
+      n = length; sub(/^[[:space:]]*/, ""); ind = n - length; f = 1; next
+    }
+    f {
+      # A key at or left of the indent of security: ends the block, so keys
+      # belonging to a later NFR axis can never be read as this one.
+      n = length; sub(/^[[:space:]]*/, ""); lead = n - length
+      if (length > 0 && lead <= ind) exit
+      if (st == "" && /^status:/) {
+        st = (/[[:space:]]FAIL[[:space:]]*$/) ? "FAIL" : "OK"
+      }
+      if (ev == "" && /^evidence:/) {
+        ev = "unverified"
+        if (/evidence:[^[:alpha:]]*measured/) ev = "measured"
+        else if (/evidence:[^[:alpha:]]*reasoned/) ev = "reasoned"
+      }
+    }
+    END {
+      if (!f) { print "absent"; exit }
+      printf "%s %s\n", (st == "" ? "OK" : st), (ev == "" ? "unverified" : ev)
+    }
+  ' "$LATEST_GATE" </dev/null)
+  case "$SECURITY_AXIS" in
+    absent)                     : ;;
+    *FAIL*)                     SAFETY_REPROBE=true ;;
+    *unverified*)               SAFETY_REPROBE=true ;;
+    "OK measured"|"OK reasoned") : ;;
+    # The branches above are EXHAUSTIVE over what the program can emit, so
+    # reaching here means the reader produced something it cannot produce —
+    # in practice the EMPTY string, from an awk that died, is missing, or had
+    # its program corrupted in transit. That is a claim about the instrument,
+    # not about the gate, so it fires: nothing has established the axis is
+    # fine. `absent` is a deliberate answer; empty is not an answer at all.
+    #
+    # The clean readings must be listed BEFORE this. Leaving them to the
+    # catch-all makes every passing gate fire — which is what happened when
+    # this branch was first added.
+    *)                          SAFETY_REPROBE=true ;;
+  esac
 fi
 ```
+
+### Transit constraints — three characters that break this snippet silently
+
+This probe is not stored as a script and executed. It ships as **prose an agent copies and runs**,
+and it is triplicated: once here, once in each QA skill. Three characters cannot appear in it, each
+for a different reason, and **all three fail quietly rather than loudly**. Each has its own test in
+`evals/shared/tests/qa-re-review-scope-parity.test.mjs`, because the two that were introduced during
+task.82 were both introduced by someone who had just read a comment warning against them.
+
+| Must not appear | Why | Use instead |
+| --- | --- | --- |
+| The whole-record variable (dollar-zero) | A harness loading a `SKILL.md` **with arguments** substitutes the token with the invocation argument, so `match(<record>, …)` arrives as `match(docs/tasks/task.82…md, …)`. The indent arithmetic then reads garbage and the block boundary is wrong — with no error. Observed live | a bare `/regex/` tests the whole record; `length` with no argument is its length; two-argument `sub()` edits it in place |
+| An apostrophe — **including inside a comment** | The program is single-quoted by its caller, so one apostrophe closes the quote early and every fixture fails at once | reword. This is the one that fails loudly, and it is still cheaper to prevent |
+| `\s`, `\d`, `\w` | GNU extensions. BSD awk and mawk neither match nor error on them, so the probe returns empty and the carve-out never fires on any platform where the pipeline happens to run | POSIX classes — `[[:space:]]`, `[[:digit:]]`, `[[:alpha:]]` |
+
+**If a fourth constraint appears, stop copying this and extract it to a script both skills invoke.**
+Three is the agreed limit. The reason it is prose at all is that the parity test can then assert
+both skills carry it *verbatim*, which is what keeps two separately-maintained QA skills resolving
+the same gate identically — but that argument gets weaker with every line added.
 
 > **POSIX character classes only.** `\s` is a GNU extension. BSD awk and mawk do not match it and
 > do not error — the probe returns empty, `SAFETY_REPROBE` stays `false`, and the carve-out never

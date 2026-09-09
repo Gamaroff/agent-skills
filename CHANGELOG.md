@@ -30,6 +30,43 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The QA gate's security verdict now states how it was reached.** `nfr_validation.security` was
+  `{status, notes}`, so a `PASS` derived from executing twelve hostile candidates and one derived
+  from reading the diff rendered as the same sentence — while the most rigorous consumer in the
+  system, task.74's `SAFETY_REPROBE`, parsed that field **mechanically**. The most exacting trigger
+  was fed by the least exacting input, and the schema could not tell the two apart.
+
+  The block gains `evidence: measured | reasoned | unverified` and `probes_executed:`, defined once
+  in `shared/resources/qa-gate-security-evidence.md` and referenced from `qa-story`, `qa-task` and
+  the re-review rule rather than restated in each. `measured` requires `probes_executed > 0` —
+  asserting it with a zero count is a schema error, enforced across the whole on-disk gate corpus.
+  `review-security`'s machine block already emitted the same two keys, so a QA cycle lifts them
+  rather than translating; the value domains are **nested, not equal** (`{measured, reasoned}` ⊂
+  `{measured, reasoned, unverified}`), because `unverified` is the gate-only value meaning no review
+  supplied a verdict, which a review that ran can never say.
+
+  **Clause 1 of the re-review trigger now has two halves that fail in opposite directions, and the
+  asymmetry is the feature.** The `status` half fails **closed** — an unreadable gate is not
+  evidence of a failure. The `evidence` half fails **open** — a missing key reads as `unverified`
+  and fires. Written the other way, every gate produced before this field existed would report "no
+  trigger" and the widening would accomplish nothing while appearing to work, which is precisely the
+  `\s`-vs-POSIX bug the same file already records. A gate with no `security:` **block** remains a
+  non-trigger: absence of the key means the verdict does not say how it was reached; absence of the
+  block means the gate makes no security claim.
+
+  Three consequences worth stating plainly. The probe was rewritten to bound the security block by
+  indent, so a later NFR axis's keys can never be read as security's. Three pre-existing parity
+  assertions changed **deliberately** — three real gates (`task.67.gate.2`, both `task.74` gates)
+  carry `security: PASS` with no `evidence:` key and now fire on absence; each site records why, and
+  a companion test re-pins the `status` half so it is not left silently untested. And the evidence
+  half **masks** a hijacked first `status:` slot, so the placement constraint keeps its own negative
+  control with evidence supplied rather than relying on the new trigger to catch it.
+
+  Mutation-proven on all three mutations the task specified. The second exposed a real defect in the
+  new corpus check: it used `git ls-files`, which lists only **tracked** files, while a QA gate is
+  written and checked *before* it is committed — the one moment the check exists for was the moment
+  it saw nothing.
+
 - **A diminishing-returns exit for the QA loop.** The loop had one stall guard, the Convergence
   check, and it measures HIGH findings. A run that reaches zero HIGH but keeps producing MEDIUM and
   LOW findings *inside its own test machinery* satisfied nothing that guard looks at, so it ran to
