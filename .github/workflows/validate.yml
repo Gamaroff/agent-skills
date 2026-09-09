@@ -93,6 +93,31 @@ jobs:
             exit 1
           fi
 
+      # Per-file freshness assertion. Runs BEFORE regenerate-and-diff because it
+      # is read-only: it reports on the tree as committed, whereas the step below
+      # has already rewritten it by the time it speaks.
+      #
+      # The two are complements, not alternatives, and neither subsumes the other:
+      #
+      #   --check sees what the bundler does NOT write — a copy whose source was
+      #   deleted (ORPHANED), a symlinked reference, an authored file sharing a
+      #   name with a shared resource (AMBIGUOUS), a banner declaring another path
+      #   (MISDECLARED). regenerate-and-diff is structurally blind to all four:
+      #   the bundler leaves them alone, so there is no diff to see. It found a
+      #   live instance on its first run — a bundled skill-dependencies.json 44
+      #   bytes behind its source, green in CI for as long as it had been wrong.
+      #
+      #   regenerate-and-diff sees pass 3 — the in-place rewrite of a skill's OWN
+      #   files — which --check deliberately does not assert. Asserting pass 3
+      #   would compel the rewrite, and that rewrite is an ungated blind regex.
+      #
+      # Exit 1 lists every problem with a per-class remedy; only STALE, MISSING
+      # and WRONG MODE name `npm run bundle`, because those are the only three it
+      # provably clears (verified check -> bundle -> check in
+      # tests/bundle-check-mode.test.js).
+      - name: Bundle freshness — per-file check
+        run: python3 skills/create-skill/scripts/bundle_skill.py --check
+
       # A shared/resources/ edit committed without re-bundling ships skills whose
       # references/ copies are stale — or, worse, that reference a file which is
       # not in their bundle at all. Until now only scripts/release.sh caught this,

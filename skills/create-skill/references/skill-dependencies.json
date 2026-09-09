@@ -139,6 +139,9 @@
   "nestjs-debug": [],
   "nestjs-patterns": [],
   "new-product-prd": [],
+  "observe-work": [
+    "create-skill"
+  ],
   "offline-first-enforcer": [],
   "optimize": [],
   "performance-optimizer": [],
