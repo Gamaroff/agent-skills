@@ -244,7 +244,60 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-09
+
+**Gate**: CONCERNS (90/100) — `task.87.gate.1.execute-table-cell-snippets.yml`
+**QA report**: `task.87.qa.1.execute-table-cell-snippets.md`
+**PR Review**: pending — 5c not yet run
+
+**Findings**: 0 HIGH, 1 MEDIUM, 2 LOW, 2 cleanups. 8/8 success criteria met — the defect sits in a
+path no criterion names, and was found because the probes went past the criteria.
+
+**How it was found matters.** Step 3b's Explore subagent is prohibited in this session, so the pass
+was conducted by **executing seven probes** against the module rather than reading the diff. Six found
+nothing (and are listed in the QA report so the silence is auditable); one found TASK87-001. Reading
+the diff would not have found it — the defect is in the interaction between two cells of the same row.
+
+**TASK87-001 (MEDIUM, confidence high) — fixed this cycle.** A runnable command in a well-formed
+command-column cell was silently dropped when *another* cell in the same row carried an unescaped pipe
+inside a code span: `| \`a|b\` | \`echo shifted\` |` split into three cells, the command column index
+read the wrong one, and the file reported zero blocks, zero findings and no note — byte-identical to a
+document with no commands in it. **That is the silent skip this engine exists to eliminate, reached
+through a different door**, which is why a MEDIUM was worth a fix cycle rather than a waiver.
+
+Fix: `splitOnDelimiters(line, codeSpanAware)` — a pipe inside an open backtick span is content. A span
+closes only on a run of its own length, so `\`a\`` inside a two-backtick span stays content. This
+**deliberately diverges from GFM**, which splits an unescaped pipe even inside a code span; rendering
+cares where the boundaries are, this engine cares whether a command was seen. A span left open at end
+of line falls back to the naive split — trusting the code-span reading there would collapse the row
+into one cell and make the command column disappear, worse than the bug being fixed.
+
+**Both cleanups the gate named were also done**, since each was a few lines:
+
+- `column` now earns its place — carried into `results[]` and printed as `line 79 (table cell:
+  Verification command)`. It was previously set on every block and never read.
+- A block diverging on stdout **and** exit status now says so: the stdout finding appends
+  `; exit status also differs (bash 2, zsh 0)`. One finding still fires per block — stdout is the more
+  specific statement — but silence about a second divergence understates the defect.
+
+**The two LOW findings were documented rather than fixed** (§1a of the rule doc): blockquoted tables
+are not recognised, and an unequal backtick run truncates the span. Neither has a corpus instance and
+both fail toward extracting less.
+
+**Mutation proof of the fix — two reverts, each red.** Baseline 122/0.
+
+| Mutation | Reverted | Result |
+| -------- | -------- | ------ |
+| D | `splitOnDelimiters(line, false)` — code-span awareness off | **3 fail** |
+| E | the unclosed-span fallback removed | **1 fail** |
+| — | restored | **122 pass / 0 fail** |
+
+**Corpus re-measured after the fix: unchanged** — 4 files, 42 blocks, 0 findings. No corpus document
+has an unescaped pipe in a command-column row, so the fix is protective going forward rather than a
+change to what the gate reports today. Worth stating: a fix that widens the surface and a fix that
+does not are different risks, and this one does not.
+
+5 tests added (117 → 122).
 
 ---
 

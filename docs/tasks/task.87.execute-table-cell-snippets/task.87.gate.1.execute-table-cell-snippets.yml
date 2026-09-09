@@ -1,0 +1,94 @@
+schema: 1
+task: 'task.87.execute-table-cell-snippets'
+task_title: 'Shell commands in table cells escape the snippet-execution gate'
+gate: CONCERNS
+status_reason: 'All 4 phases complete, 117/117 tests green, mutation-proved three ways, and the full CI tier passes. One demonstrated defect: a command is silently dropped when a sibling cell in the same row carries an unescaped pipe — the same silent-skip shape this engine exists to eliminate, reached through a different door.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T19:15:00Z'
+
+top_issues:
+  - id: 'TASK87-001'
+    severity: medium
+    file: 'shared/resources/qa-execute-snippets.mjs'
+    finding: >-
+      A runnable command in a well-formed command-column cell is silently dropped when ANOTHER cell in
+      the same row contains an unescaped pipe inside a code span. Reproduced by execution:
+      `| `a|b` | `echo shifted` |` splits to ["`a", "b`", "`echo shifted`"], so the command column
+      index (1) reads "b`" and `echo shifted` is never extracted. The file reports zero blocks, zero
+      findings and no note — indistinguishable from a document with no commands in it. GFM does split
+      an unescaped pipe this way, so the behaviour is spec-conformant for RENDERING; it is wrong for
+      this engine, whose entire purpose is to stop a command escaping the gate unseen.
+    suggested_action: >-
+      Track backtick state in `splitTableRow` so a pipe inside an open code span is content, not a
+      delimiter. Header and body rows go through the same splitter, so column indices stay consistent;
+      the change can only ever extract MORE, never mis-target, because a code span's text is exactly
+      what the author wrote. Add a test using the reproduced row above.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 117
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 7
+    notes: >-
+      The safety boundary is unchanged — SAFE_COMMANDS, COMMAND_RUNNERS, the deny-list, the sandbox
+      sentinel and the temp working copy are untouched by this diff, and the 98 pre-existing tests
+      that pin them all pass. Seven adversarial probes were EXECUTED against the new extractor, not
+      reasoned about: matchAll lastIndex leakage across calls (stable), two command columns in one
+      table (both read), an unescaped pipe in a sibling cell (found TASK87-001), an unequal backtick
+      run (truncates — LOW), a body row with fewer cells than the header (no crash, no throw), a
+      blockquoted table (not recognised — LOW), and header-word boundary ("Commanding officer" and
+      "Recommended" correctly rejected). The new code executes strictly MORE shell than before, which
+      is why the boundary was probed rather than assumed: every extracted span still passes through
+      `classifyBlock`, and the whitespace bound fails toward running less.
+  performance:
+    status: PASS
+    notes: >-
+      Extraction is a single O(lines) pass plus one fence mask; measured across 182 corpus files in
+      well under a second in one process. Execution cost scales with runnable blocks, and the corpus
+      measurement shows the change adds 2 runnable blocks in total across the whole tree.
+  reliability:
+    status: PASS
+    notes: >-
+      Rollback plan present, tested in substance: the change is additive (a second extractor merged
+      into one stream, plus one field), and reverting the merge was performed three times during the
+      mutation proof — each revert restored fenced-only behaviour and turned the expected tests red.
+      Malformed input degrades rather than throws: a header with no delimiter row is not a table, a
+      short body row is skipped, an unterminated fence masks conservatively.
+  maintainability:
+    status: PASS
+    notes: >-
+      Every non-obvious rule carries its reason in a comment tied to the incident that produced it
+      (the pipe escape, the whitespace bound, the fence mask, the two disagreement channels). Rule doc
+      §1a and §3 updated in the same change. Two cleanups noted below, neither structural.
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK87-001 — treat a pipe inside a code span as content when splitting a table row'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+  future:
+    - action: 'Surface or drop the unused `column` field on table-cell blocks'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Name both channels in the detail when a block diverges on stdout AND exit status'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Consider recognising blockquoted tables (`> | … |`); no corpus instance today'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK87-001 fixed and covered by a test'

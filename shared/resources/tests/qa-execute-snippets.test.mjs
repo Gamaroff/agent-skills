@@ -2305,3 +2305,74 @@ test("zero-blocks-executed still fires when nothing runs, cells included", () =>
   assert.ok(finding, "a run that executed nothing is never a pass");
   assert.equal(finding.confidence, "medium");
 });
+
+// ── 10. TASK87-001 — a pipe inside a code span is content, not a delimiter ────
+
+test("TASK87-001: an unescaped pipe in a SIBLING cell no longer drops the command", () => {
+  // QA cycle 1 found this by execution. Before the fix, `| `a|b` | `echo x y` |`
+  // split into three cells, so the command column index pointed at "b`" and the
+  // real command was never extracted — the file reported zero blocks, zero
+  // findings and no note, byte-identical to a document with no commands in it.
+  // That is the silent skip this engine exists to eliminate, reached through a
+  // different door.
+  const doc = [
+    "| Artifact | Verification command |",
+    "| --- | --- |",
+    "| `a|b` | `echo shifted` |",
+  ].join("\n");
+  assert.deepEqual(splitTableRow("| `a|b` | `echo shifted` |"), [
+    "`a|b`",
+    "`echo shifted`",
+  ]);
+  assert.deepEqual(
+    extractTableCellCommands(doc).map((b) => b.code),
+    ["echo shifted"],
+  );
+});
+
+test("TASK87-001: the escaped pipe path is unaffected by the code-span rule", () => {
+  // The two mechanisms are independent and must stay so: `\|` is preserved by the
+  // splitter and removed by unescapeCell, regardless of whether it sits inside a
+  // span. Reusing the real cell text from develop-pipeline-resume-contract.md.
+  assert.deepEqual(splitTableRow("| a | b \\| c | d |"), ["a", "b \\| c", "d"]);
+  const doc = [
+    "| Step | Verification command |",
+    "| --- | --- |",
+    '| 1 | `gh pr view 7 --json comments \\| grep -i "QA"` |',
+  ].join("\n");
+  assert.equal(
+    extractTableCellCommands(doc)[0].code,
+    'gh pr view 7 --json comments | grep -i "QA"',
+  );
+});
+
+test("TASK87-001: an unclosed span falls back to the naive split", () => {
+  // A stray backtick must not swallow the rest of the row. Trusting the code-span
+  // reading here would collapse the row into one cell and make the command column
+  // disappear entirely — worse than the bug being fixed.
+  assert.deepEqual(splitTableRow("| a | `oops | b |"), ["a", "`oops", "b"]);
+});
+
+test("TASK87-001: a span closes only on a run of its own length", () => {
+  // `` `a` `` inside a two-backtick span is content, so the pipe after it is
+  // still inside the span. A parity-only rule would close the span at the first
+  // single backtick and read that pipe as a delimiter.
+  assert.deepEqual(splitTableRow("| x | `` a `b|c` d `` | y |"), [
+    "x",
+    "`` a `b|c` d ``",
+    "y",
+  ]);
+});
+
+test("TASK87-001: a command column whose OWN cell holds an unescaped pipe", () => {
+  // The case the fix most directly buys: a pipeline written without escaping the
+  // pipe. Previously the row split mid-command and neither half was runnable.
+  const doc = [
+    "| Step | Verification command |",
+    "| --- | --- |",
+    "| 1 | `ls -la /dev/null | wc -l` |",
+  ].join("\n");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "ls -la /dev/null | wc -l");
+});

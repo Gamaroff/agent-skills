@@ -278,6 +278,8 @@ extractor must turn that test red. This is the criterion that distinguishes "the
 - [x] `zero-blocks-executed` still fires when nothing runs
 - [x] The corpus-wide finding surface introduced by the change is measured and recorded in the
       implementation report
+- [x] A pipe inside a code span is content, not a delimiter — an unescaped pipe in any cell of a row
+      no longer drops the command in the command column (TASK87-001)
 - [x] Full `npm run ci` green
 
 ## 10. Risk Assessment
@@ -304,6 +306,33 @@ returns to its pre-change `blocks` count.
 
 **Estimated rollback time**: under 10 minutes.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.87.qa.1.execute-table-cell-snippets.md](./task.87.qa.1.execute-table-cell-snippets.md)
+- **Gate File**: [task.87.gate.1.execute-table-cell-snippets.yml](./task.87.gate.1.execute-table-cell-snippets.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 117 focused (2983 repo-wide, 0 fail); 7 adversarial probes executed
+- **Phases Verified**: 4/4 (Phase 1 CONCERNS)
+- **Critical Issues**: 0 HIGH, 1 MEDIUM, 2 LOW
+- **NFR Status**: Security: PASS (measured, 7 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+TASK87-001 — a runnable command in a well-formed command-column cell is silently dropped when a
+sibling cell in the same row carries an unescaped pipe inside a code span. Reproduced by execution.
+All 8 success criteria met; the defect is in a path no criterion names, found because the probes went
+past the criteria.
+
 ## Change Log
 
 | Date       | Version | Description                               | Author       |
@@ -313,6 +342,8 @@ returns to its pre-change `blocks` count.
 | 2026-09-09 |         | Status → ready-for-development             | review-task |
 | 2026-09-09 |         | Implemented — 3 files (+6 bundled copies), 19 tests added (117 total), 3-way mutation proof, corpus measured: 4 files / 42 new blocks / 0 new findings | develop |
 | 2026-09-09 |         | Status → ready-for-review                  | develop |
+| 2026-09-09 |         | QA gate CONCERNS (90/100) — 1 medium finding (TASK87-001), 8/8 success criteria met | qa-task |
+| 2026-09-09 |         | QA findings fixed — TASK87-001 (code-span-aware row split) plus both named cleanups and two documented limitations, 1 iteration | qa-fix |
 
 ## Progress Tracking
 

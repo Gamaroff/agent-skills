@@ -88,6 +88,25 @@ the whitespace rule fails toward running **less**, never toward running somethin
 unspaced word can carry a shell disagreement anyway — that needs a glob inside a substitution, a `[`
 test, or a pipeline.
 
+**Two known limitations, stated rather than left to be rediscovered.** Both were found by QA probing
+the extractor and both fail toward extracting *less*, never toward running the wrong thing:
+
+- **A blockquoted table is not recognised.** A row must start with `|` after trimming, so
+  `> | Step | Verification command |` is skipped. No document in the corpus writes a command column
+  inside a blockquote; if one appears, this is the rule to relax.
+- **An unequal backtick run truncates the span.** `` `echo a``b` `` extracts `echo a` and drops the
+  rest. GFM's own code-span rules are ambiguous at this shape, and no corpus instance exists.
+
+The **escaped** and **unescaped** pipe are both handled, and they are handled by different mechanisms
+for different reasons — see the `\|` bullet above for the escape, and note separately that a pipe
+inside an *open* backtick span is treated as content. That second rule deliberately diverges from GFM,
+which splits an unescaped pipe even inside a code span. The divergence is the point: rendering cares
+where the cell boundaries are, this engine cares whether a command was seen at all. Without it, one
+unescaped pipe in *any* cell of a row shifted every later column, so a well-formed command in the
+command column was dropped and the file reported zero blocks, zero findings and no note. A span left
+open at end of line falls back to the naive split, because collapsing the row into a single cell would
+make the command column disappear entirely — worse than the bug being fixed.
+
 Table-cell commands are classified, sandboxed and dual-shell compared by the **same** code as fenced
 blocks, and reported in the same finding shapes. Every result and every finding carries an `origin` of
 `fence` or `table-cell`; the human-readable report annotates the latter as `line N (table cell)`,

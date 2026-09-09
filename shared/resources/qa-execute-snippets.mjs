@@ -142,6 +142,52 @@ function isDelimiterRow(line) {
 }
 
 /**
+ * One pass of the row splitter.
+ *
+ * `codeSpanAware` decides whether a `|` inside an open backtick span is content
+ * or a delimiter — the whole of TASK87-001. Returns `open: true` when a span was
+ * still open at end of line, which is the caller's signal that this reading of
+ * the row cannot be trusted.
+ */
+function splitOnDelimiters(line, codeSpanAware) {
+  const cells = [];
+  let cur = "";
+  let spanLen = 0; // length of the open backtick run; 0 = no span open
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+
+    if (ch === "\\" && line[i + 1] === "|") {
+      // Keep the escape; `unescapeCell` removes it once the span is carved out.
+      cur += "\\|";
+      i++;
+      continue;
+    }
+
+    if (codeSpanAware && ch === "`") {
+      let run = 0;
+      while (line[i + run] === "`") run++;
+      // A span closes on a run of EXACTLY its own length — that is what makes
+      // `` `a` `` inside a two-backtick span content rather than a terminator.
+      if (spanLen === 0) spanLen = run;
+      else if (run === spanLen) spanLen = 0;
+      cur += "`".repeat(run);
+      i += run - 1;
+      continue;
+    }
+
+    if (ch === "|" && spanLen === 0) {
+      cells.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  cells.push(cur);
+  return { cells, open: spanLen !== 0 };
+}
+
+/**
  * Split a table row on its UNESCAPED pipes.
  *
  * Splitting on a bare `|` is the first thing that breaks on the real cells. The
@@ -153,25 +199,29 @@ function isDelimiterRow(line) {
  *
  * The escape is preserved here and removed by `unescapeCell` after the span has
  * been carved out, so the two concerns stay separable.
+ *
+ * A pipe inside an OPEN backtick span is content, not a delimiter — TASK87-001.
+ * GFM does split an unescaped pipe even inside a code span, so this deliberately
+ * diverges from the rendering spec, and the divergence is the point: rendering
+ * cares where the cell boundaries are, this engine cares whether a command was
+ * seen at all. Before the fix, one unescaped pipe in ANY cell of a row shifted
+ * every later column, so a perfectly well-formed command in the command column
+ * was dropped and the file reported zero blocks, zero findings and no note —
+ * byte-identical to a document with no commands in it. That is the silent skip
+ * this engine exists to eliminate, reached through a different door.
+ *
+ * The divergence can only ever extract MORE, never mis-target: a code span's
+ * text is exactly what the author wrote, and header and body rows go through
+ * this same function so column indices stay consistent.
  */
 export function splitTableRow(line) {
-  const cells = [];
-  let cur = "";
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === "\\" && line[i + 1] === "|") {
-      cur += "\\|";
-      i++;
-      continue;
-    }
-    if (ch === "|") {
-      cells.push(cur);
-      cur = "";
-      continue;
-    }
-    cur += ch;
-  }
-  cells.push(cur);
+  const split = splitOnDelimiters(line, true);
+  // TASK87-001 — a span left OPEN at end of line means the code-span tracking
+  // was wrong about this row, and treating everything after the stray backtick
+  // as one cell is worse than the naive split: the whole row collapses into a
+  // single cell and the command column disappears. Fall back rather than trust
+  // a reading the input has already contradicted.
+  const cells = split.open ? splitOnDelimiters(line, false).cells : split.cells;
   // `| a | b |` splits to ["", " a ", " b ", ""] — the outer pipes are delimiters,
   // not content. Drop those two, and only when they are actually empty, so a
   // pipe-less or half-fenced row keeps its cells in the right positions.
@@ -1466,6 +1516,7 @@ export function runBlock(
   if (shells.length > 1) {
     const [a, b] = shells;
     const lineCount = (out) => (out === "" ? 0 : out.split("\n").length);
+    const statusDiffers = runs[a].status !== runs[b].status;
     if (runs[a].stdout !== runs[b].stdout) {
       findings.push({
         kind: "shell-disagreement",
@@ -1473,9 +1524,15 @@ export function runBlock(
         confidence: "medium",
         detail:
           `${a} printed ${lineCount(runs[a].stdout)} line(s), ` +
-          `${b} printed ${lineCount(runs[b].stdout)} line(s)`,
+          `${b} printed ${lineCount(runs[b].stdout)} line(s)` +
+          // Only ONE finding fires per block — stdout is the more specific
+          // statement — but staying silent about a status divergence that is also
+          // present understates the defect to the one reader who must act on it.
+          (statusDiffers
+            ? `; exit status also differs (${a} ${runs[a].status}, ${b} ${runs[b].status})`
+            : ""),
       });
-    } else if (runs[a].status !== runs[b].status) {
+    } else if (statusDiffers) {
       findings.push({
         kind: "shell-disagreement",
         channel: "status",
@@ -1540,6 +1597,7 @@ export function executeFile(filePath, opts = {}) {
         results.push({
           line: block.line,
           origin: block.origin,
+          column: block.column,
           klass,
           reason,
           skipped: true,
@@ -1556,6 +1614,7 @@ export function executeFile(filePath, opts = {}) {
       results.push({
         line: block.line,
         origin: block.origin,
+        column: block.column,
         klass,
         reason: null,
         skipped: false,
@@ -1743,7 +1802,10 @@ function render(report) {
   // means and fixed in different ways, and a reader who cannot tell them apart
   // goes looking for a fence at a line that holds a table row.
   const where = (r) =>
-    `line ${r.line}${r.origin === "table-cell" ? " (table cell)" : ""}`;
+    `line ${r.line}` +
+    (r.origin === "table-cell"
+      ? ` (table cell${r.column ? `: ${r.column}` : ""})`
+      : "");
   for (const r of report.results.filter((x) => x.skipped)) {
     lines.push(`  SKIP  ${where(r)}  ${r.klass} — ${r.reason}`);
   }
