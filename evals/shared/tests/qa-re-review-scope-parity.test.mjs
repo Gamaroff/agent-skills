@@ -1193,6 +1193,12 @@ test("a broken reader fires the trigger — empty is not `absent`", () => {
   );
   // The finding: with a broken awk it must STILL fire, because nothing has
   // established that the security axis is fine.
+  //
+  // This assertion is VACUOUS IN ISOLATION — if the PATH shadow ever failed to
+  // take effect, awk would work and a FAIL gate returns "true" either way. The
+  // companion test below, on a CLEAN gate, is what proves the shadow took
+  // effect: it returns "false" with a working awk and "true" only with a broken
+  // one. Do not delete it as redundant; it is the discriminating half.
   assert.equal(
     runClause1WithBrokenAwk(failGate),
     "true",

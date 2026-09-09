@@ -918,7 +918,14 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 {Criteria evaluated, findings, recommendations}
 
 ### Security — PASS/CONCERNS/FAIL
-{Criteria evaluated, findings, recommendations}
+
+- **Status**: PASS/CONCERNS/FAIL
+- **Evidence**: measured/reasoned/unverified — **how** the verdict was reached. `measured` only when
+  hostile candidates were actually executed, and then **Probes executed** must be > 0; a verdict
+  reached by reading is `reasoned`, which is accurate rather than a failing grade. Values and the
+  placement constraint: [`references/qa-gate-security-evidence.md`](references/qa-gate-security-evidence.md)
+- **Probes executed**: {count — required when Evidence is `measured`}
+- {Criteria evaluated, findings, recommendations}
 
 ### Maintainability — PASS/CONCERNS/FAIL
 {Criteria evaluated, findings, recommendations}
