@@ -38,7 +38,7 @@ a zsh-broken verification predicate through three QA cycles.
 | 2. review-task             | ✅ Done    | `task.87.review.{N}.{name}.md` exists (or skip logged)                 | `task.87.review.1.execute-table-cell-snippets.md` — READY TO IMPLEMENT, 8/10; 2 Critical + 5 Important + 2 Optional all fixed; `draft` → `ready-for-development` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4 phases; 115/115 tests green; mutation proof 3× red then green; bundle propagated to 6 skills | inline (no subagents) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #365](https://github.com/Gamaroff/agent-skills/pull/365); 2 commits (`48f987ee` feat, `e7931bf4` docs); issue comment `posted` | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.87.qa.{N}.*.md`; `task.87.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.87.qa.{N}.*.md`; `task.87.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.87.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -303,7 +303,7 @@ does not are different risks, and this one does not.
 
 **Gate**: PASS (100/100) — `task.87.gate.2.execute-table-cell-snippets.yml`
 **QA report**: `task.87.qa.2.execute-table-cell-snippets.md`
-**PR Review**: pending — 5c not yet run
+**PR Review**: **CONCERNS** — `task.87.pr-review.1.execute-table-cell-snippets.md`
 
 `PRIOR_GATES=1` → **REFUTE_PASS=true**, whole branch diff. `SAFETY_REPROBE=false` (gate 1's security
 axis read `OK measured`). The refute pass produced two findings, and both are the reason it exists.
@@ -358,6 +358,43 @@ dismissed as inapplicable: end-of-input (span open at EOL → fallback, mutation
 surface.
 
 5 tests added (122 → 127).
+
+### Step 5c — PR Conformance Review (the loop's exit gate) — 2026-09-09
+
+**Verdict**: ⚠️ **CONCERNS** — records findings, does not block. Report:
+`task.87.pr-review.1.execute-table-cell-snippets.md`. Work item resolved via **branch stem**.
+`ready-for-merge` signalled.
+
+Both lenses run inline (Agent tool prohibited). 11 auto-generated `references/` copies excluded from
+the reviewed diff — half the changed files, and reviewing them would have crowded out real findings.
+
+**The code lens had nothing new, and that is reported rather than padded.** `qa-task` ran the
+adversarial reviewer in both cycles with `code_review_blocking=true`, 14 probes were executed across
+them, and the diff has not moved since gate 2. One low interaction was recorded (CR-1): the whitespace
+bound narrows the TASK87-001 fix — `` `ls | wc` `` extracts, `` `ls|wc` `` does not, verified by
+execution. A deliberate noise bound that fails toward extracting less, so `cleanup` not `bug`.
+
+**The conformance lens found the one thing nothing else in the pipeline checks (PC-1, medium).** The
+change ships a **new `channel` field on the `shell-disagreement` finding**, and it is load-bearing —
+without it success criterion 2 is not satisfiable, because the old comparison was stdout-only and the
+task-77 predicate's whole defect is its exit status. It was documented in this report, both QA reports,
+rule doc §3 and the PR body — and **nowhere in the task document**, which is the artifact of record.
+`grep -i channel` over the work item returned nothing, while §5 claimed "None to the CLI contract".
+
+The QA gate scores the *work*; it does not score the *document's account* of the work. That gap is
+exactly what this lens is for, and it is the concrete argument for 5c existing at all.
+
+**Fixed immediately**: §4 records the field and why it is in scope by consequence rather than original
+intent; §5 gains a "Two additive schema fields" subsection covering `channel` and `origin`/`column`,
+including why neither can turn a clean file red; §7 names them; a Change Log row records the
+correction. The finding is **retained in the review report** rather than deleted — a review that
+quietly edits away its own findings leaves no evidence the check ran.
+
+**Coverage was traced by grep against the diff, not read off the QA report**: all 10 success criteria
+have `+`-line evidence. **Scope verified clean**: `SAFE_COMMANDS`, `COMMAND_RUNNERS`, `DENY_PATTERNS`,
+`classifyBlock`'s body and the sandbox sentinel are absent from both `+` and `-` lines. The only
+matches for `blockquote|definition list|<table` are the out-of-scope statement itself and the two
+documented limitations — prose, not code.
 
 ---
 

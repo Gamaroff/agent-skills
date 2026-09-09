@@ -100,6 +100,11 @@ is meant to be run.
   `category: bug` finding exactly as a fenced one is.
 - Carry an `origin` field through `results[]` and the human-readable report so a finding is traceable
   to its source construct.
+- Add a `channel` field to the `shell-disagreement` finding (`stdout` / `status`). **Added during
+  implementation, and recorded here rather than left in the implementation report**: the existing
+  comparison was stdout-only, and the task-77 predicate prints nothing under either shell — its entire
+  defect is the exit status. Without this field success criterion 2 is not satisfiable at all, so it is
+  in scope by consequence rather than by original intent.
 
 ### Out of Scope
 
@@ -119,6 +124,18 @@ three exit codes are unchanged.
 table-cell command column now has a higher `blocks` count and may report findings where it previously
 reported none. That is a true positive being surfaced for the first time, not a regression. See §10 for
 how the corpus-wide surface is measured before merge.
+
+**Two additive schema fields**, neither of which removes or renames anything:
+
+- `shell-disagreement` gains `channel` (`stdout` / `status`). `kind` is unchanged, so a consumer keying
+  on `kind === "shell-disagreement"` is unaffected; a consumer reading the finding's fields sees one
+  more. It cannot turn a previously clean file red — a status disagreement implies a non-zero status,
+  which has already raised `execution-failure`.
+- `results[]` entries gain `origin` and `column`.
+
+Recorded here after `/review-pr` (Step 5c) found PC-1: the `channel` addition was documented in the
+implementation report, both QA reports, rule doc §3 and the PR body, but not in this document — the
+artifact of record. A reader learning what shipped from the task alone would have missed it.
 
 ## 6. Implementation Plan
 
@@ -218,8 +235,8 @@ how the corpus-wide surface is measured before merge.
 
 ### Modify
 
-- `shared/resources/qa-execute-snippets.mjs` — new extractor, `origin` field, merged block stream,
-  `render()` annotation
+- `shared/resources/qa-execute-snippets.mjs` — new extractor, `origin` and `column` fields, merged
+  block stream, `render()` annotation, `shell-disagreement.channel`
 - `shared/resources/tests/qa-execute-snippets.test.mjs` — extraction, regression and mutation-proof tests
 - `shared/resources/qa-runnable-prose-detection.md` — §1 scope extended
 
@@ -352,6 +369,7 @@ red. All 9 success criteria met.
 | 2026-09-09 |         | QA gate CONCERNS (90/100) — 1 medium finding (TASK87-001), 8/8 success criteria met | qa-task |
 | 2026-09-09 |         | QA findings fixed — TASK87-001 (code-span-aware row split) and TASK87-002 (escaped backtick is not a span delimiter), plus both named cleanups, two documented limitations and one vacuous test replaced, 2 iterations | qa-fix |
 | 2026-09-09 |         | QA gate PASS (100/100) — refute pass found and closed a regression from cycle 1's own fix; 7-mutation matrix all red | qa-task |
+| 2026-09-09 |         | Step 5c `/review-pr` CONCERNS — PC-1 fixed: §4, §5 and §7 now record the additive `channel`/`column` schema fields the change ships | review-pr |
 
 ## Progress Tracking
 
