@@ -5,18 +5,20 @@ type: task
 description: "The qa-fix ingester parses /review-pr's rendered three-line finding format by prose description. That contract is the sole carrier of findings on the Step 5c REQUEST CHANGES path, and it currently rests on an LLM matching a format described in another file. Emit a structured findings block so the path is deterministic."
 tags: [review-pr, qa-fix, pipeline, contracts]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-03
 updated: 2026-09-09
+completed_date: 2026-09-09
+pr_number: 363
 assignee:
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Give `/review-pr` a machine-readable findings block
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.85.review.1.review-pr-machine-readable-findings.md` implemented 2026-09-09
 
 ---
@@ -356,6 +358,41 @@ found nothing, and the mapping table's exhaustiveness was verified mechanically 
 carried on the block path but not on the legacy fallback — which is pre-existing and whose remedy
 §4 Out of Scope explicitly forbids here.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.85.gate.2.review-pr-machine-readable-findings.yml` — ✅ **PASS, 95/100**
+**QA Cycles**: 2 (cycle 1 FAIL 70/100 → 3 findings fixed → cycle 2 PASS)
+**Step 5c `/review-pr`**: ⚠️ CONCERNS — non-blocking; all three findings fixed anyway
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 10/10, each with a code or test citation
+✅ **Tests:** 2965 passing, 0 failures; 17 mutations proven red across both QA cycles
+✅ **CI:** ✅ **SUCCESS** on the final head — `test`, `validate`, `link-check`, `shellcheck` all green.
+   Sampled as `PENDING` first and the run **waited**; a pending rollup is non-acceptance
+✅ **Full `npm run ci`:** exit 0, including the `eval:all` slow tier
+✅ **Documentation:** emitter and consumer contracts updated together; 1 bundled consumer regenerated
+✅ **Security:** PASS — `evidence: reasoned`, 0 probes, boundary rule did not fire (no predicate,
+   validator or allow-list in the change). `reasoned` is the accurate value, not a failing grade
+⚠️ **Compliance:** NOT_APPLICABLE — internal developer tooling; no personal data, payments, UI or storage
+✅ **Advisory contract:** unchanged — 0 added lines in `skills/` or `shared/` writing a gate or calling
+   `gh pr review`
+
+**One LOW remains open and is not a gap:** TASK85-004 — `truncated_count` is carried across on the
+block path but dropped on the legacy fallback. Pre-existing, and its remedy needs a stable text shape
+for the rendered omitted-count note, which §4 Out of Scope forbids changing here. Recorded in gate 2's
+`recommendations.future[]`.
+
+**Detailed Verification Log:** see
+[`task.85.dod.1.review-pr-machine-readable-findings.md`](./task.85.dod.1.review-pr-machine-readable-findings.md)
+for the complete evidence table.
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
 ## Change Log
 
 | Date       | Version | Description                                        | Author      |
@@ -367,3 +404,5 @@ carried on the block path but not on the legacy fallback — which is pre-existi
 | 2026-09-09 |         | QA gate FAIL (70/100) — 3 findings, 1 HIGH in the ingester mapping | qa-task |
 | 2026-09-09 |         | QA findings fixed — TASK85-001/002/003 closed, 4 new mutations proven, 1 iteration | qa-fix |
 | 2026-09-09 |         | QA gate PASS (95/100) cycle 2 — refute pass clean, full `npm run ci` green, 1 LOW out of scope | qa-task |
+| 2026-09-09 |         | Step 5c PR review CONCERNS — 3 findings, all fixed | review-pr |
+| 2026-09-09 | 1.2     | DoD verified 10/10 with CI green on the final head — accepted (PR #363) | finalise |

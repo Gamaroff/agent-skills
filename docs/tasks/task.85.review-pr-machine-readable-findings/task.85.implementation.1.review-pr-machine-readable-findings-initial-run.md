@@ -37,8 +37,8 @@ text, and make the qa-fix ingester prefer that block while still parsing legacy 
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1-3 landed in 1 iteration (no stall, no re-invoke). 13 mutations proven. `npm run ci:fast` green: prettier clean + 2965 tests, 0 fail | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #363: https://github.com/Gamaroff/agent-skills/pull/363. Issue comment skipped — no linked tracker issue. Leak check: OK | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.85.qa.{N}.*.md`; `task.85.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.85.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.85.dod.{N}.*.md`; task `status: accepted`                        | DoD 10/10; CI SUCCESS on final head (sampled PENDING first, waited); status `accepted`; sprint-review + canonical PR comment written. Issue close / board move skipped — no linked issue | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final commit + push; lock removed | —                    |
 
 ---
 
@@ -296,10 +296,37 @@ than only asserted.
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-09
+**Final Status**: Completed
 **Branch**: `feature/task.85.review-pr-machine-readable-findings`
 **PR**: [#363](https://github.com/Gamaroff/agent-skills/pull/363)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 2 (cycle 1 FAIL 70/100 → cycle 2 PASS 95/100), plus Step 5c CONCERNS with all findings fixed
+**DoD Summary**: [`task.85.dod.1.review-pr-machine-readable-findings.md`](./task.85.dod.1.review-pr-machine-readable-findings.md) — 10/10, CI SUCCESS
+**Tracker debt**: none. `access.tracker` is `full` and nothing was deferred — no handover artifacts
+exist. The task simply has no linked tracker issue, which is a deliberate non-action recorded at
+Step 2, not an outstanding debt. Run `/sync-github-task` if a card is wanted retrospectively.
+
+---
+
+## Completion Summary
+
+Task 85 landed in **one develop iteration and two QA cycles**, with 17 mutation proofs and a full
+`npm run ci` green.
+
+Three things are worth carrying forward from this run:
+
+1. **The QA loop earned its keep on the author's own work.** Cycle 1 gated FAIL on a HIGH finding in
+   the ingester's field mapping — a sentence that claimed `suggested_action` both "carries across by
+   name" and "becomes `suggested_fix_path`", against an output schema defining no such key. That is
+   the same defect class the task was filed to remove, reintroduced one layer along, and it was
+   written by the same run that then caught it.
+
+2. **Four mechanical probes produced results that were claims about the instrument, not the subject** —
+   a mutation that never applied, a Step 4b `execution-failure` that was a binding error, an
+   exhaustiveness regex that missed a row it could not match, and an advisory-contract grep that
+   counted its own report's prose. Two would have become false findings; one would have become a false
+   "unheld assertion". Each cost one command to disprove. Logged as observation **#26**.
+
+3. **The deliverable was exercised, not only asserted.** This task's own PR review report is the first
+   artifact in the repo to carry the block, and it happens to contain both `ref` shapes — a `path:line`
+   normalised from a code finding's `file_line`, and a non-path ref from a conformance finding.
