@@ -14,7 +14,7 @@ jira_url: null
 github_issue: 92
 github_url: https://github.com/Gamaroff/agent-skills/issues/92
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-12
 ---
 
 # [Story 2.2] Capture all 4 epic docs as worked examples

@@ -12,7 +12,7 @@ jira_url: null
 github_issue: 86
 github_url: https://github.com/Gamaroff/agent-skills/issues/86
 created: 2026-05-11
-updated: 2026-05-11
+updated: 2026-05-13
 ---
 
 # [Story 4.5] First-week index
