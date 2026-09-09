@@ -173,6 +173,11 @@ behaviour is a subset of the new one.
 
 - `skills/create-skill/scripts/bundle_skill.py`
 - `.github/workflows/validate.yml`
+- `package.json` — adds a `bundle:check` script for local use. Deliberately called by neither
+  `test.yml` nor the `ci` composite, so `ci-gate-parity.test.mjs` is unaffected.
+- `skills/create-skill/references/skill-dependencies.json` — the stale bundled copy the check found on
+  its first run against the tree, regenerated. Added to this list at PR review (PC-1): it is a
+  substantive change, not bundler noise, and a Files Summary that omits it understates what shipped.
 
 ### Add
 

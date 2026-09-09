@@ -35,7 +35,7 @@ Carry forward the `--check` mode split out of task 86 unmerged: a per-file bundl
 | 2. review-task             | ✅ Done    | `task.98.review.{N}.{name}.md` exists (or skip logged)                 | READY TO IMPLEMENT, 9/10 — 0 Critical / 3 Important / 1 Optional, all fixed in Step 8.5; status promoted draft → ready-for-development; issue #366 created and linked | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 7-class `--check` mode + 20 tests + 11 mutation proofs; `validate.yml` wired; `ci:fast` green (3013 pass / 0 fail); found+fixed a live stale bundled copy | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #367](https://github.com/Gamaroff/agent-skills/pull/367) → `develop`; comment posted to #366 | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.98.qa.{N}.*.md`; `task.98.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.98.qa.{N}.*.md`; `task.98.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.98.dod.{N}.*.md`; task `status: accepted`                        |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -108,7 +108,7 @@ _Problems encountered and how they were resolved or escalated._
 | **Phases** | 4/4 verified |
 | **Issues** | HIGH 0 · MEDIUM 1 · LOW 1 |
 | **NFR** | Security PASS (*measured*, 3 hostile probes) · Performance PASS · Reliability PASS · Maintainability PASS |
-| **PR Review** | *(Step 5c — pending)* |
+| **PR Review** | ✅ **APPROVE** — `task.98.pr-review.1.bundle-freshness-check-mode.md`, 4 findings all `severity: low`; PC-1 applied inline |
 
 **Findings** — both in how the check *reports*, not in what it detects:
 
