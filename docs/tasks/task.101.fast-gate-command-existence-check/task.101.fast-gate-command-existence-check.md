@@ -193,6 +193,16 @@ Cases the dedicated test covers:
   before relying on it. Verified against npm 11.17.0: script names are listed one per line, indented
   by exactly two spaces, under a `Lifecycle scripts included in …:` / `available via \`npm run-script\`:`
   header, and `npm run` exits 0
+- **zsh is not present everywhere.** It ships with macOS and is **absent from `ubuntu-latest`**, where
+  CI runs. The shell matrix is therefore derived from the snippet engine's own memoised
+  `zshAvailable()` rather than hardcoded, and the suite records `zsh-unavailable` as visible
+  information when zsh is missing. `bash` is asserted to be in the matrix unconditionally — if the
+  probe ever answered false for both, every behavioural case would be skipped and the suite would
+  pass having executed nothing.
+
+  Criterion 5 is therefore *"both shells agree wherever both exist, and the matrix says which ran"* —
+  not *"both shells always run"*. Claiming the latter on a host with one shell would be asserting
+  something no machine checked.
 
 ## 9. Success Criteria
 
@@ -200,7 +210,7 @@ Cases the dedicated test covers:
 2. [x] The HALT message names `develop.fastGateCommand` and `skills-config.yaml`.
 3. [x] A compound or non-npm command is left alone, not guessed at.
 4. [x] The document no longer implies `npm run ci:fast` exists everywhere.
-5. [x] Both shells agree (Step 4b).
+5. [x] Both shells agree **wherever both exist** — and the matrix says which actually ran.
 
 ## 10. Risk Assessment
 
@@ -269,6 +279,7 @@ rediscovered as a mystery).
 | 2026-09-10 |  | QA gate CONCERNS (90/100) cycle 2 refute pass — 1 finding: precondition filed where the loop reader does not reach it | qa-task |
 | 2026-09-10 |  | QA findings fixed — 2 MEDIUM (§8 route; loop-entry pointer + section-scoped regression assertion), 2 iterations | qa-fix |
 | 2026-09-10 |  | QA gate PASS (100/100) cycle 3 — both findings verified fixed and mutation-proved; 1 LOW recorded | qa-task |
+| 2026-09-10 |  | CI red on the final head — the zsh matrix was hardcoded and ubuntu-latest has no zsh; matrix now derived from `zshAvailable()` with a visible `zsh-unavailable` note | finalise |
 
 ## Progress Tracking
 

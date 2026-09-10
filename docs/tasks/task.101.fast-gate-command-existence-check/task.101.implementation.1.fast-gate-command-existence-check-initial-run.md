@@ -35,7 +35,7 @@ Add a startup precondition to the develop loop's fast gate so a consumer whose `
 | 2. review-task             | ✅ Done    | `task.101.review.1.fast-gate-command-existence-check.md`                | READY TO IMPLEMENT, 8/10; 0 critical / 3 important (all applied) / 1 optional. Status Draft → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 3 phases, 5/5 success criteria. 14 files touched, 11 tests added. Fast gate green (3033 pass / 0 fail) after 2 red cycles, both this run's own work | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #371 (4 commits, scoped staging, zero leaks). Issue #370 commented (`posted`). Board `in-review`: `stage-disabled` | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.101.qa.{N}.*.md`; `task.101.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | qa.{1,2,3}, gate.{1,2,3} (gate 3 PASS 100/100), pr-review.1 | 3 cycles: CONCERNS → CONCERNS (refute) → PASS. HIGH=0 throughout. 5c: CONCERNS, all 3 findings applied. PR comments posted each cycle | —                    |
 | 7. finalise                | ⏳ Pending | `task.101.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -173,6 +173,6 @@ Notes:
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.101.fast-gate-command-existence-check`
 **PR**: [#371](https://github.com/Gamaroff/agent-skills/pull/371)
-**QA Iterations**: {populated at end}
+**QA Iterations**: 3 (cycle 2 = mandatory refute pass) + Step 5c
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

@@ -41,6 +41,10 @@ import {
   spawnBudget,
   neverRan,
 } from "../../../shared/resources/spawn-budget.mjs";
+// The shipped, memoised probe the snippet engine uses for exactly this decision.
+// Reused rather than re-derived: a second zsh detector would be a second thing to
+// keep honest, and this one already handles the memoisation.
+import { zshAvailable } from "../../../shared/resources/qa-execute-snippets.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -124,7 +128,19 @@ function runCheck({ shell, gateCommand, scripts }) {
   }
 }
 
-const SHELLS = ["bash", "zsh"];
+/**
+ * The shells this run can actually execute in.
+ *
+ * `zsh` is present on macOS and ABSENT on ubuntu-latest, where CI runs. Hardcoding
+ * both is what turned a green local suite into four red CI tests: the four `[zsh]`
+ * cases spawned a shell that does not exist, and every attempt returned a child
+ * that never ran. (The spawn guard reported that accurately — "a claim about the
+ * machine, not about the check" — which is the guard working, not the bug.)
+ *
+ * The snippet engine already solved this: `shells = useZsh ? ["bash","zsh"] : ["bash"]`.
+ * This mirrors it rather than inventing a second rule.
+ */
+const SHELLS = zshAvailable() ? ["bash", "zsh"] : ["bash"];
 const WITH_FAST = { "ci:fast": "echo fast", build: "echo build" };
 const WITHOUT_FAST = { test: "echo test", build: "echo build" };
 
@@ -186,6 +202,29 @@ test("the loop's entry point points at the precondition", () => {
     /before iteration 1/i,
     "the pointer must say WHEN to run it, not merely that it exists",
   );
+});
+
+test("the shell matrix is honest about what actually ran", () => {
+  // Two failures this prevents, in opposite directions.
+  //
+  // Silence: if zsh is missing and nothing says so, a report claiming "both shells
+  // agree" is asserting something no machine checked. The engine records
+  // `zsh-unavailable` as information for the same reason; so does this.
+  //
+  // Vacuity: if the probe ever returned false for BOTH, every behavioural test
+  // below would be skipped and the suite would pass having run nothing. bash is
+  // not optional.
+  assert.ok(
+    SHELLS.includes("bash"),
+    "bash must always be in the matrix — without it the suite passes having executed nothing",
+  );
+  if (!SHELLS.includes("zsh")) {
+    // Not a failure. Recorded so "zsh agreed" is never inferred from silence.
+    console.log(
+      "  info: zsh-unavailable on this host — the matrix ran bash only. " +
+        "Cross-shell agreement is verified wherever zsh is present (e.g. macOS), not here.",
+    );
+  }
 });
 
 for (const shell of SHELLS) {
