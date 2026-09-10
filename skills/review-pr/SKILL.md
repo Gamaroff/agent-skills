@@ -407,12 +407,25 @@ stays as it is — this field is the machine-readable half of the same fact, not
 First build the body file — every command below reads it, and none of them creates it:
 
 ```bash
+# The lead goes BELOW the marker — see the warning under this block. `in-review`
+# is the same stage the tracker comment for this moment uses; one vocabulary.
+LEAD=$(node references/stakeholder-summary-cli.js --stage in-review) || exit 1
+
 BODY_FILE="$(mktemp -t review-pr-comment.XXXXXX.md)"
 {
   printf '%s\n\n' '<!-- agent-skills-pr-review -->'
+  printf '%s\n\n---\n\n' "$LEAD"
   cat "$REPORT_FILE"            # or the rendered summary when no report was written
 } > "$BODY_FILE"
 ```
+
+> **The marker stays on the first line, and that is what keeps this comment idempotent.** Both arms
+> below find an existing comment with `startswith("<!-- agent-skills-pr-review -->")` and then edit
+> it by id. A lead inserted *above* the marker makes that search miss, so a re-run posts a **new**
+> comment instead of updating the old one — visible as duplicate comments, which reads as a
+> formatting problem rather than a bug, and never fails. `$BODY_FILE` is built once here and read by
+> the GitHub PATCH path, the GitHub POST path and both Bitbucket paths, so the lead reaches the
+> **update** path as well as the create path. That is the half that is easy to miss.
 
 **GitHub:**
 

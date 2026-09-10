@@ -68,6 +68,50 @@ If the summary comment *itself* cannot be posted, the run reports
 `summary-failed` and exits non-zero **only under `--strict`** — but it prints
 every undelivered finding to stderr first, so the text still reaches a human.
 
+### What the summary comment is composed of, in order
+
+The summary comment is the one a non-technical reader reaches — it is what the
+tracker comment's link leads to — so it opens with a plain-language lead. The
+composition is exactly:
+
+| Position | Content | When |
+| :-- | :--- | :--- |
+| 1 | the caller's `--summary-file`, verbatim | whenever one is supplied |
+| 1 | `renderLead("pr-summary", {degraded})` | **only** when no `--summary-file` was supplied *and* there is at least one degraded finding |
+| 2 | `DEGRADED_HEADING` and the count sentence | when there is at least one degraded finding |
+| 3 | one block per degraded finding: `path:line`, why, body | as above |
+
+Two rules that are easy to get wrong in opposite directions:
+
+**A caller-supplied summary wins outright and is never double-led.** The review
+skills write their own summary, and that summary *is* the lead. Prepending a
+catalogue lead as well gives the reader two orienting paragraphs before any
+content, the second contradicting the first whenever the caller's summary is
+about something other than anchoring. So do not put a lead in your
+`--summary-file`: the engine adds one on the path that needs it.
+
+**A caller summary with no degraded findings gets no lead at all.** The summary
+comment is posted when *either* a caller summary or a degraded finding is
+present, so that combination is reachable — and a `pr-summary` lead there would
+explain unanchored findings that do not exist.
+
+## Inline findings carry no lead, deliberately
+
+Each **inline** body is `marker + finding.body` and nothing else. This is a
+design decision, not an omission.
+
+A comment anchored to line 47 of a diff has exactly one reader — the developer
+who wrote line 47. A non-technical paragraph on each of forty findings is noise
+for the only audience they have, and it would push the actual finding below the
+fold. The lead belongs on the **summary** comment, which is the one a reader
+outside the review loop actually reaches.
+
+Because this reads as an oversight, it is held by tests rather than by prose:
+`pr-inline-comment.test.mjs` §10 asserts that no catalogue lead appears in an
+inline body, *and* that the source still builds that shape — the second exists
+because a shape assertion alone would keep passing on its own fixture after the
+real construction had changed. "Fixing" the exclusion turns both red.
+
 ## The re-run rule: marker + update-in-place
 
 Each inline body is prefixed with an invisible marker (`<!-- agent-skills-inline:{id} -->`

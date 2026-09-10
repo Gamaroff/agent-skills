@@ -1043,7 +1043,16 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    FINAL_GATE=$(ls {document-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
      | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
 
+   # The plain-language lead. It goes BELOW the marker and above everything
+   # else — see the warning under Step 6c. `done` is the same stage the tracker
+   # comment uses; one vocabulary, not a second one for pull requests.
+   LEAD=$(node references/stakeholder-summary-cli.js --stage done) || exit 1
+
    BODY="$MARKER
+   $LEAD
+
+   ---
+
    ## ✅ Accepted — Canonical Pipeline Summary
 
    **PR**: ${PR_URL}
@@ -1054,6 +1063,14 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    All Definition of Done criteria verified. Story/task accepted."
    ```
+
+   > **The lead goes below the marker, and the ordering is load-bearing.** Step 6c finds this
+   > comment with `select(.body | startswith("<!-- finalise-canonical-summary -->"))` and then
+   > PATCHes it by id. A lead inserted *above* the marker makes that search miss, and the pipeline
+   > posts a **new** comment on every run instead of updating the existing one — which surfaces as
+   > duplicate comments, reads as a formatting problem, and never fails. `$BODY` is built once here
+   > and used by the POST path, the PATCH path and the Bitbucket arm alike, so the lead cannot reach
+   > one and miss another.
 
    **Step 6c — Idempotent post (search-then-edit):**
 
@@ -1403,39 +1420,40 @@ EOF
      The CLI exits 0 for every row above, so never treat a zero exit as proof the card moved; read `reason`. Reasons produced only by `--probe-board`, `--write-ladder`, `--dry-run` or `--add-to-board` (`probe`, `write-failed`, `exists`, `dry-run`) cannot occur here — this call passes none of those flags.
 
    - **If `reason` is `not-on-board`:**
-     - Do NOT silently skip. Post a PR comment warning that the board was not updated, using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
-       ```
-       ⚠️ Project Board Not Updated
+     - Do NOT silently skip. Build the body **once** — the lead above the arm split — then post it with the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
+       ```bash
+       LEAD=$(node references/stakeholder-summary-cli.js --stage board-warning \
+         --slot what="The card for this work was not found on any board, so it could not be moved to Done automatically") || exit 1
+       PR_COMMENT_BODY=$(printf '⚠️ Project Board Not Updated\n\n%s\n\n---\n\n%s' "$LEAD" \
+         "This story/task was accepted but GitHub issue #<github_issue> was not found on any project board — the board status was **not** moved to Done automatically.
 
-       This story/task was accepted but GitHub issue #<github_issue> was not found on any project board — the board status was **not** moved to Done automatically.
-
-       **Action required:** manually move the card to Done on the project board, or add the issue to the board first.
-
+       **Action required:** manually move the card to Done on the project board, or add the issue to the board first.")
        ```
      - Record this as a warning (not a blocker) in the running summary.
 
    - **If `reason` is `deferred`:** reuse the escalation above with the wording below. It is the same shape — the board did not move and a human must move it — but the *cause* is a policy the operator themselves declared, so the message must not read as a malfunction:
+       ```bash
+       LEAD=$(node references/stakeholder-summary-cli.js --stage board-warning \
+         --slot what="Moving the card to Done was deliberately recorded for someone to do later, rather than done automatically") || exit 1
+       PR_COMMENT_BODY=$(printf '⏸️ Project Board Move Deferred\n\n%s\n\n---\n\n%s' "$LEAD" \
+         "This story/task was accepted. \`access.tracker\` is set to **<access>**, so the board move to **Done** was recorded rather than performed — recorded as \`<record>\`.
+
+       **Action required:** run the handover checklist committed beside the implementation report (\`*.handover.*.sh\` to apply, \`*.handover.*.md\` to do it by hand). Moving the card to Done on the project board is one of its entries.")
        ```
-       ⏸️ Project Board Move Deferred
-
-       This story/task was accepted. `access.tracker` is set to **<access>**, so the board move to **Done** was recorded rather than performed — recorded as `<record>`.
-
-       **Action required:** run the handover checklist committed beside the implementation report (`*.handover.*.sh` to apply, `*.handover.*.md` to do it by hand). Moving the card to Done on the project board is one of its entries.
-
-       ```
-       Take `<access>` and `<record>` from the CLI's JSON. **Never post this without the record id** — a deferral the operator cannot locate in the journal is indistinguishable from a silent skip, which is the failure the whole deferred-mutation mechanism exists to remove.
+       Take `<access>` and `<record>` from the CLI's JSON. **Never post this without the record id** — a deferral the operator cannot locate in the journal is indistinguishable from a silent skip, which is the failure the whole deferred-mutation mechanism exists to remove. The lead does **not** carry the record id and is not a substitute for it: the lead says a human must act, the body says which record tells them what to do. Both are required.
+       The `what` clause says *deliberately* recorded, because this notice is the one of the three that is not a malfunction — a deferral is the operator's own declared policy working as intended, and a lead that read as breakage would misreport it.
      - Record it in the running summary as a deferral, **not** as a failure. The Definition of Done is unaffected: a card that a declared restriction stopped the pipeline moving is not an incomplete task.
 
-   - **If `reason` is `mutation-failed`:** post a PR comment using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
-       ```
-       ⚠️ Project Board Update Failed
+   - **If `reason` is `mutation-failed`:** build the body **once** — the lead above the arm split — then post it with the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
+       ```bash
+       LEAD=$(node references/stakeholder-summary-cli.js --stage board-warning \
+         --slot what="The attempt to move the card to Done failed") || exit 1
+       PR_COMMENT_BODY=$(printf '⚠️ Project Board Update Failed\n\n%s\n\n---\n\n%s' "$LEAD" \
+         "This story/task was accepted but the attempt to move GitHub issue #<github_issue> to **Done** on the project board failed.
 
-       This story/task was accepted but the attempt to move GitHub issue #<github_issue> to **Done** on the project board failed.
+       **Error details:** \`<paste the CLI's JSON output>\`
 
-       **Error details:** `<paste the CLI's JSON output>`
-
-       **Action required:** manually move the card to Done on the project board.
-
+       **Action required:** manually move the card to Done on the project board.")
        ```
      - Record the failure (and the error detail) in the running summary. The CLI has already retried internally — do not re-run it.
 
@@ -1589,13 +1607,56 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    ```
 
 5. **Add PR Comment (if PR exists):**
-   - Use the active `$PLATFORM` branch to notify about gaps (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6)
+   - Build the body **once**, with the lead above the arm split, then post it with the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6)
    - Request changes to address gaps
 
-   **Example PR Comment:**
+   ```bash
+   # Bind the two values this block interpolates, HERE, before use. Step 4 writes
+   # the gap report into the document body; it does not leave it in a variable, so
+   # capture it back out of the document rather than assuming it is in scope.
+   #
+   # An unbound name does NOT fail here — it expands to the empty string, the
+   # numeric slot is silently dropped, and the comment posts as a heading, a lead
+   # and a bare horizontal rule with no gaps under it. That is the silent shape
+   # this whole page keeps warning about, so the binding is not optional tidiness.
+   DOC_FILE="{story-or-task-file}"
+   # Bounded to the section: set the flag AFTER the heading (`next`), and clear it
+   # at the NEXT `## ` heading. Without the stop condition this captures to
+   # end-of-file — dragging Change Log, Progress Tracking, References and Notes
+   # into the comment, and counting THEIR checkboxes as gaps. Measured on a
+   # two-gap fixture: 5 counted instead of 2, four unrelated sections pasted in.
+   GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
+   # Unmet criteria across every section of the gap report — an unchecked box.
+   # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
+   # `|| echo 0`, which would append a second zero and make the value "0\n0").
+   GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^- \[ \]' || true)
+   GAP_COUNT=${GAP_COUNT:-0}
+
+   # Omit nothing: the catalogue drops a zero as absent, so a count of 0 renders
+   # the shorter true sentence rather than "(0 of them)".
+   LEAD=$(node references/stakeholder-summary-cli.js --stage dod-gaps --slot count="${GAP_COUNT}") || exit 1
+   PR_COMMENT_BODY=$(printf '## ⚠️ Definition of Done - Gaps Identified\n\n%s\n\n---\n\n%s' "$LEAD" "$GAP_REPORT_BODY")
+
+   # Post-condition: refuse to post a body whose gap section is empty. A reviewer
+   # reading "gaps identified" with nothing under the rule learns nothing and is
+   # told nothing is wrong.
+   [ -n "$GAP_REPORT_BODY" ] || { echo "gap report body is empty — not posting"; exit 1; }
+   ```
+
+   > This is the one pull-request comment on this page that says the work is **not** finished, and
+   > it is the one a stakeholder is most likely to misread as a failure. `dod-gaps` says what is
+   > true and what happens next — some checks are outstanding, they are listed, the work comes back
+   > — without a verdict token or a score. Do not substitute the `done` lead here.
+
+   **Example PR Comment** (the lead, then the rule, then the body unchanged):
 
    ```markdown
    ## ⚠️ Definition of Done - Gaps Identified
+
+   This work is not finished yet. Some of the checks it has to pass are still outstanding (7 of them),
+   and they are listed below. It will come back here once they have been dealt with.
+
+   ---
 
    This story/task cannot be marked as Accepted due to the following gaps:
 

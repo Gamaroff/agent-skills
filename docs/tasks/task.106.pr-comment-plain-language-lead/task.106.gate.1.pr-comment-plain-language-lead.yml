@@ -1,0 +1,124 @@
+schema: 1
+task: "task.106.pr-comment-plain-language-lead"
+task_title: "Pull-request summary comments open with a plain-language lead"
+gate: CONCERNS
+status_reason: >-
+  SUPERSEDED VERDICT — this gate was first written PASS while the Step 3b diff code review
+  was still running, and is corrected here. That review returned two confirmed defects: an
+  unbound-variable pair at finalise site 6 that would post an empty gap body, and a capture
+  bug making the new Guard C skip 4 of the 11 sites it was written to protect. Both were
+  reproduced independently before being accepted. Fixed under this cycle; see gate 2.
+reviewer: "QA Engineer"
+updated: "2026-09-10T16:20:00Z"
+
+top_issues:
+  - id: "T106-001"
+    severity: high
+    file: "skills/finalise/SKILL.md"
+    finding: >-
+      Site 6 (Definition of Done - Gaps Identified) interpolates ${GAP_COUNT} and
+      $GAP_REPORT_BODY, neither of which is bound anywhere in the file. Step 4 writes the
+      gap report into the document body and leaves nothing in a variable. Both expand to
+      empty, so the comment posts as a heading, a lead and a bare horizontal rule with no
+      gaps beneath it — the reviewer reads "gaps identified" and is shown nothing. The
+      numeric slot is dropped silently by design, so nothing errors and nothing warns.
+    suggested_action: >-
+      Bind both before use, following the derive-then-comment pattern every sibling site in
+      this diff already uses (FIX_CYCLE in qa-fix, GATE_DECISION in qa-story/qa-task).
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+  - id: "T106-002"
+    severity: medium
+    file: "shared/resources/tests/comment-slot-coverage.test.mjs"
+    finding: >-
+      The stage capture /--stage\s+([^\s\\]+)/ absorbs shell punctuation, so the
+      single-line call shape $(node … --stage done) captured "done)". That is not a
+      catalogue key, so both Guard C content assertions hit their hasOwnProperty guard and
+      skipped the site. Four of the eleven pull-request sites were found but never checked;
+      the non-vacuity floor passed regardless, because it counts sites found. A guard added
+      to prevent vacuous coverage was itself vacuous for over a third of its targets.
+    suggested_action: >-
+      Tighten the capture to [A-Za-z0-9_-]+ and add an assertion that every collected stage
+      resolves to a real catalogue key, so a skip cannot be silent.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 115
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: >-
+      No auth, secret or network surface added. The only new module,
+      stakeholder-summary-cli.js, requires exactly one thing — the pure catalogue —
+      and performs no I/O beyond stdout. Verdict reached by reading the diff and the
+      module's require graph, not by executing hostile input, so `reasoned` is the
+      accurate value and probes_executed is 0.
+  performance:
+    status: PASS
+    notes: >-
+      No new network calls. Every lead travels in the body of a call that was already
+      being made; the CLI is one local node invocation per comment. Confirmed against
+      the criterion in section 9.
+  reliability:
+    status: PASS
+    notes: >-
+      All 11 call sites guard the CLI with `|| exit 1`, verified by reassembling each
+      continued shell command rather than by grepping adjacent lines. The engine fails
+      loudly (exit 2) on an unknown stage rather than emitting an empty lead, which
+      would post a comment opening with a bare horizontal rule. Rollback plan carries
+      all four subsections with a forward-fix path.
+  maintainability:
+    status: PASS
+    notes: >-
+      Three test suites extended (52 + 53 + 10). The catalogue/namespace invariants are
+      held by four assertions rather than by prose. stakeholder-summary.js purity contract
+      intact — the only `process.exit` match in the file is the contract sentence itself.
+
+code_review:
+  step_4b:
+    status: advisory
+    finding: >-
+      The snippet engine fails closed on `node` as an unrecognised command, so every block
+      containing a stakeholder-summary-cli.js call is refused as `mutating`. Checked against
+      origin/develop in a detached worktree: runnable=0 on every file at the base too, so
+      this is pre-existing and not a regression. Consistent with the existing
+      tracker-comment.js invocations, which are refused identically.
+    severity: low
+
+mutation_proofs:
+  method: "snapshot restore (cp aside, cp back) — never git checkout --, which restores HEAD"
+  engine_invariants: "4/4 red on mutation, green on restore, each with an assert proving the mutation applied"
+  guard_c_invariants: "4/4 red on mutation"
+  note: >-
+    The developer's first four proofs were invalid (git checkout -- deleted the uncommitted
+    fix) and two mutants had survived. QA re-ran the two survivors independently: both now
+    fail 52/1. Not taken from the implementation report's table.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Consider whether the snippet engine's allow-list should recognise `node <script>`
+        invocations of repo-local, non-mutating CLIs, so Step 4b can reach the blocks that
+        obtain a lead. Engine-side change, outside this task.
+      refs: ["shared/resources/qa-execute-snippets.mjs"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

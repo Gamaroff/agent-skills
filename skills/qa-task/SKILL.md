@@ -1127,6 +1127,27 @@ cat > "$BODY_FILE" <<'EOF'
 ---
 EOF
 
+# The plain-language lead, obtained ONCE and folded into $BODY_FILE — ABOVE the
+# arm split below, so the GitHub and Bitbucket arms post the same bytes and
+# cannot drift. `qa-gate` is the same stage the tracker comment for this moment
+# uses; a pull-request comment about a moment that also exists on the tracker
+# reuses that stage rather than inventing a second vocabulary.
+#
+# GATE_DECISION is bound HERE, deliberately. The heredoc above is quoted
+# (`<<'EOF'`), so its [GATE_DECISION] placeholder is filled in textually when
+# the body is written — it never becomes a shell variable. Set this to the same
+# verdict you wrote into the body: PASS, CONCERNS, FAIL or WAIVED.
+GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the body above}"
+
+# The verdict is MAPPED, never passed through: `CONCERNS` tells an outside reader
+# nothing about whether to worry. Pass the raw token and let the catalogue map
+# it — an unknown verdict renders "the results are recorded below" rather than
+# defaulting to reassurance.
+LEAD=$(node references/stakeholder-summary-cli.js --stage qa-gate \
+  --slot verdict="$GATE_DECISION") || exit 1
+printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
+  && mv "${BODY_FILE}.tmp" "$BODY_FILE"
+
 if [ "$VCS" = "github" ]; then
   tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE"
   COMMENT_RC=$?
