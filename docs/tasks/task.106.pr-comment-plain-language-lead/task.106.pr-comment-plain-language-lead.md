@@ -5,11 +5,13 @@ type: task
 description: "Eleven pull-request conversation templates — the Definition of Done comment, finalise's canonical summary, the three board-warning notices, the QA reviews, and the two review-skill summaries — are the most technical text the pipeline writes and are read by anyone following a linked pull request. Give each a plain-language lead from task.104's catalogue. Per-line inline findings stay technical by design."
 tags: [pr-inline-comment, stakeholder-communication, review-pr, finalise, migration]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Low
 risk_level: low
 created: 2026-09-09
 updated: 2026-09-10
+completed_date: 2026-09-10
+pr_number: 381
 assignee:
 estimated_effort_hours: 8
 github_issue: 380
@@ -17,7 +19,7 @@ github_issue: 380
 
 # Technical Task: the lead reaches the pull request
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.106.review.1.pr-comment-plain-language-lead.md` implemented 2026-09-10
 **GitHub Issue**: [#380](https://github.com/Gamaroff/agent-skills/issues/380)
 
@@ -280,7 +282,7 @@ new stages are rendered via `renderLead(...)`, not passed as `--stage`, so that 
 | `shared/resources/tests/pr-inline-comment.test.mjs` | §5.2 |
 | ~~`skills/review-pr/tests/review-pr.test.js`~~ | **not modified** — its assertions are generic over the body file and did not need changing |
 | ~~`skills/review-code/tests/review-code.test.js`~~ | **not modified** — same reason |
-| `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` | the de-escaping assertion at L211 |
+| ~~`evals/shared/tests/finalise-dod-prompt-contract.test.mjs`~~ | **not modified** — the edit landed above the de-escaping assertion at L211 and did not disturb it |
 | ~~`shared/resources/tests/qa-execute-snippets.test.mjs`~~ | **not modified** — the converted blocks are refused as `mutating` (`node` is fail-closed in the engine's allow-list), so there is no executed snippet to assert on. See the cycle-1 Step 4b finding |
 | `evals/shared/tests/transition-protocol-parity.test.mjs` | **added to this list** — taught the third `--stage` engine; without it twenty literals were misattributed |
 
@@ -459,6 +461,40 @@ detached worktree — `runnable=0` there too. Belongs to `qa-execute-snippets.mj
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**Final gate:** `task.106.gate.3.pr-comment-plain-language-lead.yml` — PASS 90/100, 0 open issues
+**QA cycles:** 3 (CONCERNS 80 → PASS 95 → PASS 90)
+**Step 5c `/review-pr`:** ✅ APPROVE
+**CI:** SUCCESS, 5/5, on `008f95aa` — the same commit as local HEAD
+
+✅ **Success Criteria:** 12/12 with code evidence; 10/12 with automated test evidence
+✅ **PR Review:** advisory `/review-pr` APPROVE; both its findings fixed in-cycle
+✅ **Security:** PASS — **measured**, `boundary: true`, 15 probes executed, 0 reproduced
+✅ **Compliance:** PASS — repo standards; external regimes correctly N/A
+✅ **Documentation:** PASS after a FAIL that was found and fixed (see below)
+
+### Recorded honestly
+
+- **Four defects were found in-cycle, not zero.** T106-001 (high), T106-002 (medium), T106-003
+  (high — introduced *by* the fix for T106-001), and a §7 population failure where a correction
+  fixed three of four stale rows. All closed.
+- **Three criteria rest on inspection, not tests** — SC-4 (idempotency of sites 2 and 10, called
+  *"the weakest-evidenced SC"* by the reviewer), SC-6, SC-10.
+- **The eleven new call sites have no automated shell coverage.** `shellcheck` lints tracked `*.sh`
+  and this branch changes none; Step 4b refuses the blocks as `mutating`. Hand-linted for this
+  change only. Recorded in gate 3 as `coverage_gap`.
+- **`npm run eval:all` has not run** — it fires at the merge gate.
+
+**Detailed Verification Log:** see
+[`task.106.dod.1.pr-comment-plain-language-lead.md`](./task.106.dod.1.pr-comment-plain-language-lead.md).
+
+**Task marked as ACCEPTED on:** 2026-09-10
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -470,6 +506,7 @@ detached worktree — `runnable=0` there too. Belongs to `qa-execute-snippets.mj
 | 2026-09-10 |  | QA cycle 1 CONCERNS (80/100) — 2 findings: unbound GAP_COUNT/GAP_REPORT_BODY (high), Guard C capture bug skipping 4 of 11 sites (medium) | qa-task |
 | 2026-09-10 |  | QA cycle 2 PASS (95/100) — both findings fixed and mutation-proved, 0 open | qa-task |
 | 2026-09-10 |  | QA cycle 3 PASS (90/100) — CR-1/PC-1: the cycle-2 awk fix over-captured to end-of-file (5 gaps counted where 2); bounded to the section. PC-2: §7 corrected to match the diff | qa-task |
+| 2026-09-10 | 1.2 | DoD verified — accepted (PR #381). 4 defects found and closed in-cycle; 3 criteria rest on inspection; the eleven call sites have no automated shell coverage | finalise |
 
 ---
 
@@ -480,8 +517,8 @@ detached worktree — `runnable=0` there too. Belongs to `qa-execute-snippets.mj
 - [x] Phase 3 — `finalise`
 - [x] Phase 4 — QA and review skills
 - [x] Phase 5 — Tests and bundle
-- [ ] QA review
-- [ ] Quality gate
+- [x] QA review
+- [x] Quality gate
 
 ---
 

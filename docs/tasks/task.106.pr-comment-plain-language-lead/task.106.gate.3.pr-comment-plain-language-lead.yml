@@ -58,6 +58,13 @@ coverage_gap:
     but it is not durable, and the next person to edit that block has no guard.
   severity: medium
   owner: "shared/resources/qa-execute-snippets.mjs"
+  wider_than_first_recorded: >-
+    Confirmed after writing the above: the CI shellcheck lane lints git-tracked *.sh SOURCES only
+    (`git ls-files '*.sh'` minus bundled copies). This branch changes zero .sh files, so all eleven
+    new call sites — every one of them shell embedded in markdown — are covered by NO automated
+    shell linting whatever: not shellcheck, not Step 4b. They were linted by hand for this change
+    (extracted to a scratch script, shellcheck --severity=warning, clean), which is a one-off, not
+    a guard.
 
 nfr_validation:
   security:

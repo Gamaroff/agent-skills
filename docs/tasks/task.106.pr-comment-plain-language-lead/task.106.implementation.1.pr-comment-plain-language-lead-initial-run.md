@@ -260,14 +260,43 @@ assertion was added.
 
 `npm run ci:fast` green, 0 failures. Committed as `284325a1`.
 
+### QA Cycle 3 — PASS (90/100)
+
+**Gate**: `task.106.gate.3.pr-comment-plain-language-lead.yml`. Triggered by Step 5c `/review-pr`,
+whose two lenses **independently found the same defect**.
+
+| id | severity | finding |
+| :-- | :--- | :--- |
+| T106-003 (CR-1 / PC-1) | high | The cycle-2 fix for T106-001 was itself defective: the `GAP_REPORT_BODY` awk had no stop condition and captured to end-of-file. Every task and story document carries `## Progress Tracking` checkboxes after the gaps section, so it would have fired on **essentially every** gaps comment. Measured on a two-gap fixture: GAP_COUNT=5, four unrelated sections pasted in. |
+| PC-2 | medium | §7 Files Summary listed three test files as modified that the diff never touches, and omitted one it does. |
+
+The conformance lens' judgement on the trail is recorded rather than softened: *gate 2's PASS and
+"0 open issues" for T106-001 was not fully earned* — the fix had closed the symptom, not the
+behaviour.
+
+**A fourth defect was found later, at DoD.** The PC-2 correction fixed **three of four** stale rows
+— exactly the three the reviewer named. That is the "never fix N call sites without a population
+check" anti-pattern, committed in the document by the same change that obeys it scrupulously in
+code. Fixed with a two-directional population check over the whole table, not a spot repair.
+
+`npm run ci:fast` green, 0 failures. Committed as `008f95aa`.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-10
+**Final Status**: Completed
 **Branch**: `feature/task.106.pr-comment-plain-language-lead`
 **PR**: [#381](https://github.com/Gamaroff/agent-skills/pull/381)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 3 (CONCERNS 80 → PASS 95 → PASS 90). Four defects found in-cycle, all fixed; one
+of them — T106-003 — was introduced by the fix for T106-001 and caught only by Step 5c.
+**DoD Summary**: ✅ **ACCEPTED** — `task.106.dod.1.pr-comment-plain-language-lead.md`. Every
+decision-matrix column passes: 12/12 success criteria met in code (10/12 with automated test
+evidence), CI 5/5 green on `008f95aa` == local HEAD, `/review-pr` APPROVE, security PASS (measured,
+15 probes, 0 reproduced), docs PASS after the §7 population fix, gate 3 PASS 90/100 with 0 open
+issues. The DoD records four things the acceptance does **not** claim — see its closing section.
+**Tracker debt**: none. Issue [#380](https://github.com/Gamaroff/agent-skills/issues/380) carries the
+full comment trail (`work-started`, `review-task`, `in-review`, `qa-gate`, `qa-cycle-2`, `done`), the
+card is closed on the *Agent Skills* board, the DoD and canonical summary are posted to PR #381, and
+the task-registry row is ticked `accepted` with the issue link.
