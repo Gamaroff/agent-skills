@@ -337,18 +337,46 @@ duplicating the text. Duplicated prose in this repository drifts within weeks
 
 ## 7. Files Summary
 
-**Modified — sources (18)**
+**Modified — sources (20)**
 
+Call sites (15):
 `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md`,
 `…-step-2-review.md`, `…-step-3-develop-loop.md`, `…-step-4-create-pr.md`,
 `…-step-5-6-qa-loop.md`, `…-step-7-finalise.md`,
 `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`,
 `skills/create-pr/SKILL.md`, `skills/finalise/SKILL.md`, `skills/qa-fix/SKILL.md`,
 `skills/qa-story/SKILL.md`, `skills/qa-task/SKILL.md`, `skills/review-bug/SKILL.md`,
-`skills/review-story/SKILL.md`, `skills/review-task/SKILL.md`,
-`shared/resources/tracker-comment-contract.md`,
-`tests/mutation-call-site-coverage.test.js`,
-`evals/shared/tests/transition-protocol-parity.test.mjs`
+`skills/review-story/SKILL.md`, `skills/review-task/SKILL.md`
+
+Contract and docs (2):
+`shared/resources/tracker-comment-contract.md` (§9 Migration — the incomplete-migration
+paragraph rewritten, not deleted),
+`AGENTS.md` (carried the same now-false claim; Phase 5's doc sweep)
+
+Tests (3):
+`tests/mutation-call-site-coverage.test.js` (Guard A repaired — twice),
+`evals/shared/tests/transition-protocol-parity.test.mjs` (every comment `--stage` literal must
+resolve to a lead template),
+`shared/resources/tests/review-report-freshness.test.mjs` (a pre-existing guard **narrowed** — see below)
+
+**Added — sources (1)**
+
+`shared/resources/tests/comment-slot-coverage.test.mjs` — Guard B, the population check for the slot
+half. Covered by the existing `shared/resources/tests/*.test.mjs` glob in `package.json`, so it runs
+without a `npm test` edit (checked, per `project_npm_test_glob_orphans_suites`).
+
+> **Three of these were not in the original Files Summary, and the additions are worth naming rather
+> than absorbing.** `AGENTS.md` and the contract are the Phase 5 doc sweep finding its own targets —
+> both asserted that several sites still post a bare `gh issue comment`, which this task makes false.
+>
+> **`review-report-freshness.test.mjs` is the one genuinely debatable file in this change.** It is not
+> a call site and not a doc sweep: it pinned *every line* of every `#### develop-story` section in
+> `develop-pipeline-step-2-review.md` against `origin/develop`, to hold an earlier task's promise that
+> its **tables** were unchanged. Adding slots to the review comment is required at both arms — the lead
+> is a property of the moment, not of the tracker — so the symmetric, correct change failed a guard
+> that had nothing to say about it. It was **narrowed to the decision tables**, which is what that
+> task's §9 actually claimed, and mutation-proved. Recorded here so a reviewer meets the decision in
+> the Files Summary rather than discovering it in a diff.
 
 > `skills/develop-bug/references/develop-bug-step-*.md` are **source** files — they carry no
 > auto-generated banner and have no `shared/resources/` counterpart. Every other
@@ -407,34 +435,48 @@ before believing a failure in it — it is load-flaky (`project_qa_execute_snipp
 
 **Functional**
 
-- [ ] All 22 call sites pass at least one `--slot`; each slot value is bound at that point in the step;
-      and **each slot name is one that stage's template actually reads** — proven by Phase 4's Guard B
-      importing the mapping from `stakeholder-summary.js`, not by a count in the report. A slot name no
-      template reads is silently inert, so the count alone cannot establish this criterion.
-- [ ] Zero bare `gh issue comment` / `gh issue close --comment` in shipped `.md` outside the named
+- [x] **Every** `tracker-comment.js` call site in shipped source passes at least one `--slot`; each slot
+      value is bound at that point in the step; and **each slot name is one that stage's template
+      actually reads** — proven by Phase 4's Guard B importing the mapping from
+      `stakeholder-summary.js`, not by a count in the report. A slot name no template reads is silently
+      inert, so a count alone cannot establish this criterion.
+
+      > **Deliberately not "all 22".** The inventory in §3 was 22 when this was authored and the
+      > delivered figure is **24**: converting `step-7-finalise.md`'s GitHub arm turns each of its two
+      > bare `gh` pairs (story variant, task variant) into a `tracker-comment.js` site, where the
+      > inventory counted each pair once. A criterion pinned to a number would have to be edited by
+      > whoever is proving it, which is the wrong way round. Guard B's population walk is the arbiter,
+      > and its non-vacuity floor is what stops "every site" being vacuously true.
+- [x] Zero bare `gh issue comment` / `gh issue close --comment` in shipped `.md` outside the named
       allowlist, proven by a test rather than a grep in the report.
-- [ ] The five converted sites post a marker and are idempotent across a re-run.
-- [ ] `review-story`'s Jira and GitHub arms produce the same comment text.
-- [ ] Comment-then-close ordering is asserted, not just documented.
+- [x] **All seven** converted sites post a marker and are idempotent across a re-run.
+
+      > This read "the five converted sites" and was ambiguous against the rest of the document. §3's
+      > table and §5.1 both say **seven**; §6 Phase 3 says "three `gh issue comment`" plus "two
+      > `gh issue close --comment`", which is five only because `qa-story` and `qa-task`'s two were
+      > converted in Phase 2 as part of the same edit that added their slots. Seven is the number of
+      > sites that stopped bypassing the engine, and it is the number this criterion is about.
+- [x] `review-story`'s Jira and GitHub arms produce the same comment text.
+- [x] Comment-then-close ordering is asserted, not just documented.
 
 **Performance**
 
-- [ ] No call site gains an extra network round-trip except the two `--comment`-on-close sites, which
+- [x] No call site gains an extra network round-trip except the two `--comment`-on-close sites, which
       necessarily become two. No other site's call count changes.
 
 **Code quality**
 
-- [ ] No `skills/*/references/` file hand-edited; `npm run bundle` produces no diff after the commit.
-- [ ] `qa-fix`'s two bodies share their content through one variable, not two copies.
-- [ ] Every converted site reads `reason` and acts on it per the contract; none posts over
+- [x] No `skills/*/references/` file hand-edited; `npm run bundle` produces no diff after the commit.
+- [x] `qa-fix`'s two bodies share their content through one variable, not two copies.
+- [x] Every converted site reads `reason` and acts on it per the contract; none posts over
       `unverifiable`.
 
 **Migration**
 
-- [ ] `tracker-comment-contract.md` L20–24 — the paragraph admitting the incomplete GitHub migration
+- [x] `tracker-comment-contract.md` L20–24 — the paragraph admitting the incomplete GitHub migration
       — is rewritten to describe the finished state. It must not be deleted silently: it is the
       record of why the guard exists.
-- [ ] Consumer docs restating comment behaviour swept.
+- [x] Consumer docs restating comment behaviour swept.
 
 ---
 

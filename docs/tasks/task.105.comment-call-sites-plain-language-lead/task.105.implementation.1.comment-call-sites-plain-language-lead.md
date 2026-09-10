@@ -35,7 +35,7 @@ Feed `--slot` values to all 22 `tracker-comment.js` call sites, convert the seve
 | 2. review-task             | ✅ Done    | `task.105.review.{N}.{name}.md` exists (or skip logged)                | `task.105.review.1.comment-call-sites-plain-language-lead.md` — READY TO IMPLEMENT, 8/10, 1 Critical + 6 Important + 5 Optional, all Critical + Important applied; Planned → Ready for Development | 2 pre-pass Explore agents (inline) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 complete. `npm run ci:fast` green (3132 pass / 0 fail, exit 0). 24 shipped call sites carry slots (was 22 + 2 created by the finalise split); 7 bypass sites converted; Guard A repaired, Guard B added, parity extended; bundle + catalogue regenerated | — (pre-pass maps reused) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #379](https://github.com/Gamaroff/agent-skills/pull/379) ← `develop`; commit `3babd7a4`; issue #378 commented (`in-review`, lead rendered); board `in-review` stage-disabled (correct — not in this board's pipeline map) | — |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.105.qa.{N}.*.md`; `task.105.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.105.qa.{N}.*.md`; `task.105.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle. Gate CONCERNS 90/100, 0 open findings; 5c CONCERNS. **Both review subagents hung and were killed** — code lens and conformance lens each performed in-line, disclosed in every artifact | — (both hung) |
 | 7. finalise                | ⏳ Pending | `task.105.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -282,6 +282,18 @@ which is exactly the boundary §4 draws.
 ### Step 2 — review-task
 
 - **Board `Estimate` field absent.** `set-github-project-estimate.sh` reported `'Estimate' number field not found` on the `Agent Skills` board. Non-blocking; priority (P2) was set successfully. Nothing to fix — the board has no Estimate field.
+### Step 5 — qa-task
+
+- **The Step 3b independent code-review subagent hung and was killed.** Dispatched over the full
+  branch diff, it ran ~6 minutes without returning; killed and the diff review performed **in-line**.
+  This is the third Explore subagent to hang in this repository's sessions, and it is recorded in the
+  QA report, the gate's `status_reason`, the Change Log row and here — because the one thing this QA
+  cycle lacked is a reviewer who did not write the code, and an artifact trail that does not say so
+  reads as though a full independent review happened. It is one of the two reasons the gate is
+  CONCERNS rather than PASS.
+
+### Step 2 — review-task
+
 - **Card preflight passes but the Success Criteria block it would publish is 14 characters.** `summariseSection` treats a leading bold sub-heading (`**Functional**`) as the section's prose and stops there, so the card publishes that and nothing else, with 8 items omitted. Measured across the corpus: **15 of 106 task documents** are affected. This is a defect in the summariser, **not** in task.105, and is deliberately not fixed here — it is recorded in the review report §1 and logged as observation #49 for a follow-up bug report. Flagged so the passing preflight is not later read as evidence the card is good.
 
 ---
@@ -291,6 +303,7 @@ which is exactly the boundary §4 draws.
 ### QA Cycle 1 — 2026-09-10
 
 **Gate**: CONCERNS (90/100) · **HIGH findings**: 0 · **Open findings**: 0
+**PR Review** (Step 5c): ⚠️ **CONCERNS** — [`task.105.pr-review.1.*.md`](./task.105.pr-review.1.comment-call-sites-plain-language-lead.md), 5 conformance + 2 code findings, all fixed or deliberately accepted; no `high` severity, so the middle row of the verdict table. Exits to Step 7.
 **Artifacts**: [`task.105.qa.1.*.md`](./task.105.qa.1.comment-call-sites-plain-language-lead.md), [`task.105.gate.1.*.yml`](./task.105.gate.1.comment-call-sites-plain-language-lead.yml)
 
 Verified by execution rather than inspection throughout: 24 call sites, 7 mutation proofs, 8 hostile
