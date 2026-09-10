@@ -36,7 +36,7 @@ Build the plain-language lead as an engine primitive: a per-stage catalogue of n
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 4 phases implemented. `ci:fast` 3106 pass / 0 fail; `eval:all` green. 3 mutation proofs recorded | `ab561e9` surface map (in-context) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #377](https://github.com/Gamaroff/agent-skills/pull/377) → `develop`. `in-review` comment posted (`reason: posted`, `lead: template`). Board: `stage-disabled` (non-blocking) | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.104.qa.{N}.*.md`; `task.104.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.104.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 7. finalise                | ✅ Done    | `task.104.dod.1.*.md`; task `status: accepted`                          | DoD 13/13. Security `measured` — 45 boundary probes against the shipped commit, 0 reproduced. Issue #376 closed, board already Done, registry row ticked | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -163,10 +163,10 @@ The lesson generalises past this task: **a QA gate is a statement about a workin
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-10
+**Final Status**: Completed
 **Branch**: `feature/task.104.tracker-comment-plain-language-lead`
 **PR**: [#377](https://github.com/Gamaroff/agent-skills/pull/377)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 2 (gate 1 FAIL 30/100 → gate 2 PASS 92/100), plus a Step 5c PR review
+**DoD Summary**: [`task.104.dod.1.tracker-comment-plain-language-lead.md`](./task.104.dod.1.tracker-comment-plain-language-lead.md)
+**Tracker debt**: none — `access.tracker` was `full` throughout; every tracker action performed rather than deferred

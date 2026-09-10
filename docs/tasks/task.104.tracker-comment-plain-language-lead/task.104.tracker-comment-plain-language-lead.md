@@ -5,11 +5,13 @@ type: task
 description: "Stakeholders reading Jira cards and GitHub issues cannot follow the pipeline's comments — they open with gate verdicts, file paths and step numbers. Build the primitive: a per-stage catalogue of non-technical lead paragraphs, rendered by tracker-comment.js and prepended above every body, with a guard that refuses to post a comment for which no lead can be produced."
 tags: [tracker-comment, stakeholder-communication, shared-resources, engine]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-09
 updated: 2026-09-10
+completed_date: 2026-09-10
+pr_number: 377
 assignee:
 estimated_effort_hours: 8
 github_issue: 376
@@ -17,7 +19,7 @@ github_issue: 376
 
 # Technical Task: the plain-language lead, as an engine primitive
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#376](https://github.com/Gamaroff/agent-skills/issues/376)
 **Review**: ✅ All review recommendations from `task.104.review.1.tracker-comment-plain-language-lead.md` implemented 2026-09-10
 
@@ -478,6 +480,37 @@ Jira arm, with a `status: closed` sitting on top of it. That is the case the ref
 | 2026-09-10 |  | qa-fix cycle 1 — all 7 findings closed; slot coercion at the boundary, hasOwnProperty lookup guard, empty --summary-file rejected, `desired:` label preserved, help text reconciled, Jira ADF test driven through the composition path, 12 duplicate flags removed. Each fix mutation-proven | qa-fix |
 | 2026-09-10 |  | QA cycle 2 (refute pass) — gate PASS 92/100, zero open findings. 4 new findings + 2 cleanups, both defects in cycle 1's own fixes: slot coercion was swallowing legitimate text values, and a zero-width-only summary file bypassed the empty check. all in cycle 1's own fixes, all closed and mutation-proven within the cycle | qa-task |
 | 2026-09-10 |  | Step 5c PR review — CONCERNS, 11 findings all resolved. The head commit was missing a full cycle of work gate 2 had certified; also three low-severity slot-coercion bugs, and contract/report/document accuracy corrections | review-pr |
+| 2026-09-10 | 1.2 | DoD verified 13/13 — accepted (PR #377). Security measured with 45 boundary probes, 0 reproduced; CI green on acd0dcd4 | finalise |
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+| Artifact | Result |
+| :--- | :--- |
+| Gate 1 | ❌ FAIL 30/100 — 7 findings |
+| Gate 2 | ✅ **PASS 92/100** — 6 further findings, zero open |
+| Step 5c PR review | ⚠️ CONCERNS — 11 findings, all resolved |
+| CI on PR head `acd0dcd4` | ✅ SUCCESS (5/5 checks) |
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 13/13 — functional, performance, code quality and migration
+✅ **Tests:** `ci:fast` 3127 pass / 0 fail; `eval:all` exit 0; **13 mutation proofs**, each naming the test it turns red
+✅ **PR Review:** Step 5c conformance + code lenses; every finding closed
+✅ **Documentation:** new canonical spec, contract section, `AGENTS.md` register entry, 13 skills re-bundled
+✅ **Security:** `measured` — **45 boundary probes executed against the shipped commit, 0 reproduced**
+⚠️ **Compliance:** NOT_APPLICABLE — internal developer tooling; no personal, payment, health or user-facing surface
+
+**The result the task set out to produce:** every comment the pipeline posts to a tracker issue now opens with a paragraph written for a reader with no technical background, and **no call site was edited to get one**. The engine renders it from the stage value each caller already passes, and a comment for which no lead can be produced does not post.
+
+**Detailed Verification Log:** see [`task.104.dod.1.tracker-comment-plain-language-lead.md`](./task.104.dod.1.tracker-comment-plain-language-lead.md) for complete evidence, the probe inventory, and what the run cost.
+
+**Task marked as ACCEPTED on:** 2026-09-10
 
 ---
 
