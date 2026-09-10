@@ -136,6 +136,23 @@ _Problems encountered and how they were resolved or escalated._
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 2 of 5)
 
+### QA Cycle 3 — 2026-09-10
+**Gate Result**: PASS (100/100)
+**Issues Found**: none blocking; 1 LOW recorded in the report only (the placement assertion pins the precondition below the loop section)
+**HIGH findings**: 0
+**PR Review**: CONCERNS (Step 5c — 1 medium, 2 low; all three applied by the orchestrator before Step 7)
+**Loop exit**: clean gate → handed to 5c
+**Action**: Proceeding to finalise
+
+### Step 5c — PR conformance review — 2026-09-10
+**Verdict**: ⚠️ CONCERNS → exits to Step 7 (only REQUEST CHANGES routes back to 5b), no QA cycle consumed.
+**Report**: `task.101.pr-review.1.fast-gate-command-existence-check.md`
+- **CR-1 (medium)** — `runCheck` took `timeoutMs` from `spawnBudget` but ignored the retry half, so a `spawnSync` `status: null` (timeout / fork pressure) reached an equality assertion and would report a *behavioural* failure for a child that never ran. This suite is the repo's heaviest spawn profile (26 `npm run` children) and bug.2 documents ~6x load inflation. **Applied.**
+- **CR-2 (low)** — `replaceAll` passed the gate command as a replacement string, where `$&` and friends are special. Latent, not live. **Applied.**
+- **PC-1 (low)** — `CHANGELOG.md` changed but absent from §7 Files Summary; found mechanically against `git diff --name-only`. **Applied.**
+- **Scope note**: the `*/references/*` exclusion also caught `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`, which is **skill-native, not generated**. Reviewed by hand rather than dropped — the same asymmetry `ci-gate-parity.test.mjs` names as the reason task 75 missed that file for a release.
+- **A discarded mutation, recorded deliberately**: the first CR-1 mutation (`if (false) break;`) left the suite green, but it removed only the early exit — the final attempt still returned a real result, so the guard correctly did not fire. That is `mutation-proving.md`'s *"wrong thing mutated"* row, not a vacuous assertion. The second mutation (nonexistent shell) killed it: 9 of 11 red, each with the explicit "never produced an answer" message.
+
 Notes:
 - **The refute pass paid for itself.** The finding is in the *original* change, at a location cycle 1's fix never touched — exactly what the cycle-2 no-narrowing rule exists to surface.
 - **Cycle 1's placement check was vacuous in the precise sense.** It asserted the precondition precedes the Output Capture Pattern. True — and satisfiable without the property it was meant to establish, because the Output Capture Pattern was the wrong reference point. The right one is the loop's control flow.

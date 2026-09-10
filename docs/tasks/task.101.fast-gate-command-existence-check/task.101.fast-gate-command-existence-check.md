@@ -130,6 +130,8 @@ consequence — it decides what every iteration is checked against — and it be
   "defaulting to"
 - `skills/develop/SKILL.md` — the `/develop` skill's own copy of the fast-gate paragraph
 - `skills/develop-next/SKILL.md` — the slow-tier note that names the fast tier's default
+- `CHANGELOG.md` — the change is behavioural for consumers (a startup HALT replaces a mid-loop
+  death), so it is a changelog-worthy event rather than an internal refactor
 
 **Added**
 

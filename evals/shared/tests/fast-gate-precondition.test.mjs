@@ -37,12 +37,17 @@ import { fileURLToPath } from "node:url";
 // below forks `npm run` in a child, and a literal chosen against an idle machine
 // sits ~1.2x above the loaded worst case — bug.2. `tests/test-harness-concurrency.test.js`
 // fails the build on any `timeout: <number>` literal in a test file.
-import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
+import {
+  spawnBudget,
+  neverRan,
+} from "../../../shared/resources/spawn-budget.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
 
-const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("FAST_GATE_PRECONDITION");
+const { timeoutMs: SPAWN_TIMEOUT_MS, retries: SPAWN_RETRIES } = spawnBudget(
+  "FAST_GATE_PRECONDITION",
+);
 
 const LOOP_DOC = "shared/resources/develop-pipeline-step-3-develop-loop.md";
 const LOOP_SECTION = "## Develop Loop — Run Until Complete (Bounded)";
@@ -72,7 +77,20 @@ const snippet = bashBlockUnder(
   HEADING,
 );
 
-/** Run the extracted snippet in a throwaway project defining `scripts`. */
+/**
+ * Run the extracted snippet in a throwaway project defining `scripts`.
+ *
+ * Retries while the child NEVER RAN — killed on timeout, or never started at all
+ * under fork pressure. That is not the same as a child that ran and exited
+ * non-zero, and conflating them is how a loaded box reports a behavioural
+ * divergence that never happened (bug.2). This suite is the repo's heaviest
+ * spawn profile — 26 children, each running `npm run` — so it is exactly the
+ * shape that inflates ~6x under load.
+ *
+ * `spawnSync` returns `status: null` in that case. Letting null reach the
+ * equality assertions below would fail with "a project defining ci:fast must
+ * not be halted", which is a claim about the check that nothing established.
+ */
 function runCheck({ shell, gateCommand, scripts }) {
   const dir = mkdtempSync(join(tmpdir(), "fast-gate-"));
   try {
@@ -80,13 +98,26 @@ function runCheck({ shell, gateCommand, scripts }) {
       join(dir, "package.json"),
       JSON.stringify({ name: "fixture", version: "1.0.0", scripts }),
     );
-    // Substitute the placeholder exactly as a reader of the document would.
-    const script = snippet.replaceAll(PLACEHOLDER, gateCommand);
-    const r = spawnSync(shell, ["-c", script], {
-      cwd: dir,
-      encoding: "utf-8",
-      timeout: SPAWN_TIMEOUT_MS,
-    });
+    // A replacer FUNCTION, not a replacement string: `$&`, `$'` and `` $` `` are
+    // special in the latter, so a gate command containing one would be silently
+    // mangled into something other than what this test claims to run.
+    const script = snippet.replaceAll(PLACEHOLDER, () => gateCommand);
+
+    let r;
+    for (let attempt = 0; attempt <= SPAWN_RETRIES; attempt++) {
+      r = spawnSync(shell, ["-c", script], {
+        cwd: dir,
+        encoding: "utf-8",
+        timeout: SPAWN_TIMEOUT_MS,
+      });
+      if (!neverRan(r)) break;
+    }
+    assert.ok(
+      !neverRan(r),
+      `child never produced an answer after ${SPAWN_RETRIES + 1} attempt(s) ` +
+        `(${shell}, ${SPAWN_TIMEOUT_MS}ms): this is a claim about the machine, ` +
+        "not about the check — raise the budget with FAST_GATE_PRECONDITION_SPAWN_TIMEOUT_MS",
+    );
     return { code: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}` };
   } finally {
     rmSync(dir, { recursive: true, force: true });
