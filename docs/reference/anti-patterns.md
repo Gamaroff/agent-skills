@@ -147,6 +147,16 @@ Rules scattered across the docs, collected and explained. Each entry: the rule, 
 
 Then review the guard itself adversarially, and **build it on a matcher independent of the one under test**. A population check that reuses the buggy matcher inherits its blind spot and can never contradict it — it passes vacuously on exactly the defect it was written for.
 
+## Never claim a relationship in an assertion that tests only co-occurrence
+
+**Rule:** when an assertion's *message* claims a relationship — *X routes to Y*, *X fires at Y*, *X owns Y*, *X is listed under Z* — its *pattern* must establish that relationship, not merely that both names appear somewhere in the haystack. `assert.match(doc, /ALPHA[^|]*BRAVO/, "ALPHA must route to BRAVO")` passes when ALPHA and BRAVO sit in unrelated sentences of the same paragraph.
+
+**Why:** the assertion passes against the exact mutation it was written to catch, so mutation-proving it *confirms* it. It is the message that is wrong, and nothing executes a message. Task 77 shipped this six times across eleven independent gates, and **two of the six were written inside the fix for the previous one** — widening the regex is the natural repair and is also the defect. Every one was caught by a human reviewer, one at a time.
+
+**If you ignore it:** a reader auditing the file finds an assertion whose message says it checks the row when it does not, and stops looking. The property is unguarded and looks guarded — the failure mode of *Never let one signal report two states*, arriving through prose instead of through a return value.
+
+**Do this instead:** anchor the pattern to the structure the claim is about — the table cell, the list item, the code block — rather than to a span of characters between the two names. Ask the assertion the question directly where you can (`indexOf(x) < indexOf(y)` under an ordering claim is still co-occurrence; `row.includes(y)` is not). `tests/lib/relationship-assertion-lint.js` fails CI on the four shapes this has taken; it models the six instances that happened, so a seventh in an unmodelled shape still needs you to read the message against the pattern.
+
 ## See also
 
 - [Troubleshooting](./troubleshooting.md) — what to do when something breaks

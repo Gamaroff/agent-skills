@@ -159,6 +159,10 @@ Canonical rules: [`docs/standards/plan-file-locations.md`](./docs/standards/plan
 
 Canonical rules: [`docs/standards/task-registry.md`](./docs/standards/task-registry.md). TL;DR: `docs/tasks/task-registry.md` owns task numbering. Read **Next Available Task Number** before `/create-task`, append a row, increment the counter, commit atomically with the new task files. Task numbers are globally unique and never reused.
 
+**The row has two writers and neither is you.** `/create-task` appends it; **`/finalise` ticks the Status column** via [`shared/resources/registry-tick.js`](./shared/resources/registry-tick.js), in the same moment it writes the document's `status: accepted` — one moment, one writer, so the row and the document cannot disagree by construction. Do not hand-tick a row, and do not skip `/finalise` expecting to tick it later. `evals/shared/tests/task-registry-drift.test.mjs` fails when a task document reads `accepted` and its row does not, or the reverse.
+
+**The write never blocks acceptance** — every outcome exits 0, including "no row found", because refusing to finalise genuinely complete work over a human-readable index line would trade a cosmetic defect for a stuck pipeline. The drift test is the loud backstop, so a no-op is caught rather than lost. A **story** run writes nothing here: the guard lives in the writer, which returns `not-a-task` for a story, epic or bug document, rather than in a condition every caller has to remember.
+
 ## Epic Registry
 
 Canonical rules: [`docs/standards/epic-registry.md`](./docs/standards/epic-registry.md). Epic numbers are globally unique; the registry at `docs/development/epic-registry.md` is the single source of truth.
