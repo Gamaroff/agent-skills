@@ -5,11 +5,13 @@ type: task
 description: "The mutation-proving reference tells you to confirm a mutation applied before believing a survival — and that check works. It says nothing about the mirror: a suite that goes red because the runner never executed it, or executed the wrong change, reads exactly like a dead mutant, and is more convincing because red was the prediction. Five invalid probe readings across two independent runs, three of them false REDs that would have certified coverage never exercised — and one of those defeats the existing applied-check too."
 tags: [mutation-proving, testing, evidence, shared-resources]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-08
 updated: 2026-09-10
+completed_date: 2026-09-10
+pr_number: 369
 assignee:
 estimated_effort_hours: 2
 github_issue: 368
@@ -17,7 +19,7 @@ github_issue: 368
 
 # Technical Task: the false-RED mirror in mutation-proving
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#368](https://github.com/Gamaroff/agent-skills/issues/368)
 **Review**: ✅ All review recommendations from `task.100.review.1.mutation-proving-false-red.md` implemented 2026-09-10
 
@@ -188,6 +190,32 @@ meets "and why did it die?" in the same breath.
 
 Delete the section; `npm run bundle`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate**: `task.100.gate.3.mutation-proving-false-red.yml` — ✅ **PASS**, 95/100, `top_issues: []`
+**QA cycles**: 3 (CONCERNS 80 → CONCERNS 85 → PASS 95)
+**PR review (Step 5c)**: `task.100.pr-review.1.mutation-proving-false-red.md` — CONCERNS; its one medium finding applied before acceptance
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 5 of 5 met, including SC4 — the row-5 case is covered explicitly *and* the document states that it passes the applied-check, which is the falsification test this task set for itself
+✅ **CI:** 5/5 checks green on the final head `eac101f1` (`test`, `validate`, `link-check`, `shellcheck`, branch-policy). The first sample read PENDING; acceptance was held until it resolved
+✅ **Local gates:** `npm run ci:fast` exit 0 — 3023 tests, 3022 pass, 0 fail, 1 pre-existing skip; `npm run eval:all` exit 0; `prettier --check` clean
+✅ **Documentation:** CHANGELOG entry under Unreleased → Added; §7 Files Summary refreshed against `git diff --numstat`; all six bundled copies regenerated and verified as clean regenerations
+✅ **Security Review:** NOT_APPLICABLE, recorded with evidence basis `reasoned` (0 probes) — the change ships no code, no credentials and no newly executable command
+✅ **Compliance Review:** NOT_APPLICABLE — no user-data, auth or payment surface
+✅ **Additive:** 109 insertions, 1 deletion on the source; the sole deletion is the frontmatter `description`, extended not truncated. The false-GREEN material is byte-identical across all three QA cycles
+
+**Detailed Verification Log:** See [`task.100.dod.1.mutation-proving-false-red.md`](./task.100.dod.1.mutation-proving-false-red.md) for complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-09-10
+
+---
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -248,6 +276,7 @@ All five success criteria met, including SC4 — the row-5 anti-vacuity check th
 | 2026-09-10 |  | QA findings fixed — 2 iterations; cost claim restated without arithmetic, referent named, line re-wrapped | qa-fix |
 | 2026-09-10 |  | QA cycle 3 PASS (95/100) — all 3 cycle-2 findings closed, no new findings | qa-task |
 | 2026-09-10 |  | PR review (Step 5c) CONCERNS — §7 Files Summary refreshed against the final diff (PC-1) | review-pr |
+| 2026-09-10 | 0.4 | DoD verified 7/7 — accepted (PR #369); CI green on final head | finalise |
 
 ## Progress Tracking
 

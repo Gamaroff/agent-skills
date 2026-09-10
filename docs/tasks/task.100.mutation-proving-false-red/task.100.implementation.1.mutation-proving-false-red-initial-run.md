@@ -34,9 +34,9 @@ Add a *"When the proof goes red for the WRONG reason"* section to `shared/resour
 | 1. create-branch           | ✅ Done    | Branch `feature/task.100.*` exists in git                              | `feature/task.100.mutation-proving-false-red` created at `317a4d98`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.100.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT, 9/10; 0 Critical / 2 Important (both fixed); `draft → ready-for-development` | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 4/4 phases; 7 files (1 source +6 bundled) + CHANGELOG; `ci:fast` green 3022/3023 (1 pre-existing skip), 0 fail | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.100.qa.{N}.*.md`; `task.100.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.100.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #369: https://github.com/Gamaroff/agent-skills/pull/369 — commit `c31e9756`, 11 files, +1080/−30 | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.100.qa.{N}.*.md`; `task.100.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: CONCERNS 80 → CONCERNS 85 (refute pass) → **PASS 95**. Step 5c `/review-pr`: CONCERNS, 1 medium applied | —                    |
+| 7. finalise                | ✅ Done    | `task.100.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -60,6 +60,13 @@ Add a *"When the proof goes red for the WRONG reason"* section to `shared/resour
 - Planned/Draft promoted to Ready for Development by review-task.
 - Tracker linkage created during Step 2: GitHub issue #368 (board add + Priority P2). The Step 1 `work-started` signal was therefore fired retroactively here, once an issue existed to signal — comment posted, board verified `Todo → In Progress`.
 - Step 2 pre-pass subagents not dispatched (session policy) — both axes covered inline.
+
+### Step 4 — Create PR — 2026-09-10
+
+- Scope staging: 9 `--scope` paths (work-item dir, `shared/resources`, the six `skills/*/references` dirs, `CHANGELOG.md`). Pre-flight guard found **no** out-of-scope untracked files — both untracked files were the implementation and review reports inside the work-item dir. Leak check after commit: clean.
+- Implementation report and review report committed **here**, per the Step 4 rule — a reviewer can read the audit trail during QA, and no tracked document acquires a dangling relative link that only fails in CI.
+- One commit (`c31e9756`), 11 files, +1080/−30. Issue #368 commented (`in-review` stage).
+- The repo's pre-commit hook re-ran `npm run bundle` and emitted `⚠️ shared/resources/<name> not found`. **Pre-existing and out of scope** — it comes from the literal placeholder string in `shared/resources/observation-log-contract.md` and is recorded as known discovery noise in task.98's implementation report and QA. Confirmed not caused by this change.
 
 ### Step 3 — Develop — 2026-09-10
 
@@ -88,12 +95,23 @@ _Track each QA review/fix cycle._
 
 ---
 
+### Steps 5–7 — QA loop, PR review, finalise — 2026-09-10
+
+- **QA cycle 1** (CONCERNS 80): the new section's "~20 seconds" cost claim was an unmeasured constant. §8 of the task had nominated that exact claim for checking. Measured 294 ms scoped / 53,966 ms whole-suite.
+- **QA cycle 2** (CONCERNS 85) — mandatory refute pass over the whole diff, not a narrowed re-read. **All three findings were in text cycle 1's fix introduced**, the chief one being that the replacement ratio `2/N` miscounted the matrix baseline: `## The procedure` runs the suite twice per invariant (step 3 mutated, step 5 restore-and-confirm), so the matrix pays ~2N and every percentage was 2× too high. A narrowed cycle 2 would have seen the constant correctly removed and passed.
+- **QA cycle 3** (PASS 95): all closed, none replaced. The four claims in the replacement text were re-derived from source rather than read.
+- **Step 5c `/review-pr`**: CONCERNS. PC-1 (medium) — the task's own §7 Files Summary still carried develop-time figures two fix cycles had invalidated, and omitted `CHANGELOG.md`. The same defect class as the deliverable's, one level up. Applied and committed before finalise. PC-2 (low) — line-number citations in the cycle-1/2 QA reports are stale; no action, they are dated snapshots.
+- **Step 7 `/finalise`**: the CI gate genuinely fired — the first rollup sample read `PENDING` with `test`, `validate` and `link-check` all in progress. Acceptance was held until the rollup resolved to `SUCCESS` (5/5 on the final head `eac101f1`) rather than rounded up. DoD 7/7, task `accepted`, issue #368 closed, board `already` at Done, Document link re-pointed to `develop`.
+- Phase 0/1.5/3b/5 subagents were not dispatched at any step (session policy); every check was performed inline against the same inputs, and each report records that.
+
+---
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-10
+**Final Status**: Completed
 **Branch**: `feature/task.100.mutation-proving-false-red`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: [#369](https://github.com/Gamaroff/agent-skills/pull/369)
+**QA Iterations**: 3 (gates: CONCERNS 80 → CONCERNS 85 → PASS 95)
+**DoD Summary**: `task.100.dod.1.mutation-proving-false-red.md` — 7/7, ACCEPTED
+**Tracker debt**: none — `access.tracker` is `full`; issue #368 commented and closed, board `already` at Done, Document link re-pointed to `develop`. No deferred mutations.
