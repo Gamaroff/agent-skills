@@ -5,11 +5,13 @@ type: task
 description: "The registry row is written once by /create-task and never updated. finalise sets the document's status and completed_date but touches no registry; develop-next only reads it. The standard claimed finalise owned the write AND told readers not to edit by hand, so the row drifted silently — 17 rows (T67-T96) were stale until a sweep. Give the pipeline ownership of the write, or make the manual step enforceable."
 tags: [develop-pipeline, finalise, task-registry, ownership]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-09
 updated: 2026-09-10
+completed_date: 2026-09-10
+pr_number: 375
 assignee:
 estimated_effort_hours: 4
 github_issue: 374
@@ -17,7 +19,7 @@ github_issue: 374
 
 # Technical Task: give the registry tick an owner
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#374](https://github.com/Gamaroff/agent-skills/issues/374)
 **Review**: ✅ All review recommendations from `task.103.review.1.pipeline-owns-the-registry-tick.md` implemented 2026-09-10
 
@@ -256,6 +258,37 @@ single-sided blindness reintroduced one level down, and a documented rule that n
 closed in-cycle. Two mutants survived during the loop and both were closed rather than explained
 away.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.103.gate.3.pipeline-owns-the-registry-tick.yml` — ✅ PASS, 96/100, `top_issues: []`
+**QA Cycles**: 3 (FAIL 80 → PASS 95 → PASS 96)
+**PR Conformance Review (Step 5c)**: `pr-review.1` REQUEST CHANGES → `pr-review.2` ✅ APPROVE
+
+All Definition of Done criteria verified:
+
+✅ **Acceptance Criteria:** 9/9, each with evidence in the tree rather than in a report
+✅ **Tests:** 20 committed tests (5 drift-check, 15 registry-tick); 13 mutations across the loop, each checked against which test *and* which assertion
+✅ **CI:** green on `2a3024dcdab5`, the final head. First sampled PENDING and acceptance was withheld until it completed
+✅ **PR Review:** Step 5c APPROVE after a REQUEST CHANGES that sent the run back for a third cycle
+✅ **Documentation:** CHANGELOG, the standard, § 7 Files Summary, and the `finalise` wiring
+✅ **Security:** `measured` — `registry-tick.js` identified as a boundary, 9 adversarial candidates executed, **0 reproduced**
+⚠️ **Compliance:** NOT_APPLICABLE — no regulated data category is touched
+
+**What the pipeline caught, which is the point of it:** three of this task's defects were the same
+shape — *a guarantee asserted in prose with nothing behind it*. The standard named an owner that
+owned nothing (the task's premise). The drift check was cited for a case it could not see (QA cycle
+1 — and fixing it found task 97, accepted and merged yet absent from the registry since creation). A
+success criterion was ticked on evidence due to expire at this very step (Step 5c). Each was found
+by a **different** lens, and none by the one that introduced it.
+
+**Detailed Verification Log:** See [`task.103.dod.1.pipeline-owns-the-registry-tick.md`](./task.103.dod.1.pipeline-owns-the-registry-tick.md) for complete evidence, the probe table and the CI rollup.
+
+**Task marked as ACCEPTED on:** 2026-09-10
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -269,6 +302,7 @@ away.
 | 2026-09-10 |  | QA gate PASS (95/100) — cycle 2 refute pass found 3 issues inside cycle 1's own fixes, all closed in-cycle; 0 open findings | qa-task |
 | 2026-09-10 |  | PR conformance review (Step 5c): REQUEST CHANGES — criterion 4 had no committed test, only incidental corpus coverage that Step 7 would have removed. Fixed with a synthetic fixture exercising the shared predicate; Files Summary completed. | qa-fix |
 | 2026-09-10 |  | QA gate PASS (96/100) — cycle 3 scoped re-review, 0 new findings; the Step 5c blocking finding verified closed with corpus-independent coverage | qa-task |
+| 2026-09-10 | 0.3 | DoD verified 9/9 — accepted (PR #375). CI green on the final head; security boundary probed with 9 candidates, none reproduced. | finalise |
 
 ## Progress Tracking
 

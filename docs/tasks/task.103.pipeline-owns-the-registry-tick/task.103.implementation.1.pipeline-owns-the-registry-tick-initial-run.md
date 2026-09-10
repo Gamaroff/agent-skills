@@ -3,7 +3,7 @@
 **Task**: `task.103.pipeline-owns-the-registry-tick.md`
 **Run Number**: 1
 **Started**: 2026-09-10 09:25
-**Status**: In Progress
+**Status**: Complete
 
 ---
 
@@ -34,10 +34,10 @@ Give the task-registry status tick an owner: land a mutation-proven drift check 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.103.*` exists in git                              | `feature/task.103.pipeline-owns-the-registry-tick` created at `1e2f4787`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.103.review.{N}.{name}.md` exists (or skip logged)                | `task.103.review.1.pipeline-owns-the-registry-tick.md` — READY TO IMPLEMENT, 9/10, 0 critical / 4 important / 1 optional, all fixed in place. Status Draft → Ready for Development | — (pre-pass run inline) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 5 phases. Added the drift check (3 tests) + `registry-tick.js` (11 tests); wired into `finalise`; standard rewritten. 8 mutations run, each red the correct test. Fast gate caught prettier on the two new files — fixed, re-bundled. | — (inline) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.103.qa.{N}.*.md`; `task.103.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
-| 7. finalise                | ⏳ Pending | `task.103.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #375: https://github.com/Gamaroff/agent-skills/pull/375 — 4 commits, base `develop`, `Closes #374`. State OPEN, head `018648a60b43` matches local HEAD. | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.103.qa.{N}.*.md`; `task.103.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 7. finalise                | ✅ Done    | `task.103.dod.{N}.*.md`; task `status: accepted`                       | DoD 9/9. CI first sampled PENDING — acceptance withheld until green on the final head. Security `measured`: 9 probes, 0 reproduced. Registry row ticked by the task's own mechanism (`reason: ticked`). | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report state committed and pushed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -68,6 +68,26 @@ Give the task-registry status tick an owner: land a mutation-proven drift check 
 - Step 1 "Signal Work Started": skipped — `TRACKER_ISSUE` empty (no `github_issue:` on the task document), so per the 0c-reg contract the entire section is skipped with no fallback register.
 
 ---
+
+### Step 4 — Create PR — 2026-09-10
+
+- `SCOPE_PATHS`: `docs/tasks/task.103.pipeline-owns-the-registry-tick`, `docs/standards/task-registry.md`,
+  `docs/development/epic-registry.md`, `skills/finalise`, `shared/resources`, `evals/shared/tests`,
+  `CHANGELOG.md`. Derived from the working tree rather than `git diff develop...HEAD`, which was empty
+  — the branch had no commits yet at this point. Pre-flight guard held nothing: every untracked file
+  fell inside a scope path. Leak check after commit: clean.
+- Four logical commits rather than one: the check, the writer, the standard + data fixes, the task
+  documents. The check is committed **before** the writer deliberately — it is the half that is worth
+  landing even if the ownership decision had gone the other way, and the history should say so.
+- The implementation report is committed **here**, at Step 4, not withheld to Step 8 — a reviewer needs
+  the audit trail during QA, and the task document links to it, which would otherwise be a dangling
+  relative link that resolves locally and fails in CI.
+- A pre-commit hook re-ran `npm run bundle`. It emitted `⚠️  shared/resources/<name> not found`;
+  **verified pre-existing on `develop`** via a detached worktree probe (2 occurrences there), so it is
+  not something this branch introduced.
+- Post-PR verification: PR #375 state `OPEN`, head `018648a60b43` equals local `HEAD`.
+- GitHub board `in-review`: `stage-disabled` — not mapped in this project's `pipeline:` block. Correct
+  outcome, exits 0, nothing to do.
 
 ### Step 3 — Develop — 2026-09-10
 
@@ -182,6 +202,195 @@ trusting the summary. An instrument that returns a clean answer has not thereby 
    "post-merge owner" argument that survives — a post-merge step could fill it. Nothing reads it, so
    it is not urgent.
 
+### Steps 5–6 — QA cycle 1 — 2026-09-10
+
+**qa-task gate 1: FAIL, 80/100** — 1 HIGH, 1 MEDIUM, 2 LOW. Artifacts:
+`task.103.qa.1.*.md`, `task.103.gate.1.*.yml`.
+
+The HIGH is worth recording in full, because it is the task's own thesis turned back on it. The drift
+check iterated registry **rows**, so a task document with no row at all was invisible to it — while
+`finalise/SKILL.md:932`, its DoD line, and the rewritten standard all told a reader that CI would
+catch exactly that case. A backstop trusted for a case it does not cover is worse than no backstop,
+and it is the same shape as the defect this task was filed about: a standard naming an owner that
+owned nothing.
+
+**And it was not hypothetical.** The document-driven test found **task 97** on its first run:
+`status: accepted`, merged under PR #350 on 2026-09-08, and absent from `docs/tasks/task-registry.md`
+since creation — never written, not merely stale. 106 task directories, 105 rows. Every check in this
+repository, including the one written earlier in this very task, had been structurally incapable of
+seeing it. The row was added in the fix cycle.
+
+**qa-fix cycle 1 — all four findings resolved:**
+
+| Finding | Fix |
+| :--- | :--- |
+| TASK-103-001 (high) | Fourth test: walks `docs/tasks/task.{N}.*/`, resolves each directory's primary document, fails on any with no registry row. Own floor (`MIN_DOCS = 90`, separate from `MIN_ROWS` because the two walks fail independently). Plus the missing row for task 97. |
+| TASK-103-002 (medium) | The tick now preserves the cell's **exact width**, not merely some padding; the test compares cell and row lengths instead of matching `accepted +`. Both boundaries (no padding, cell too narrow) asserted rather than left to a comment. |
+| TASK-103-003 (low) | Removed the no-op `replace(/^(\s*)\|/, "$1\|")`. |
+| TASK-103-004 (low) | Rewrote the guard comment to describe the code's actual asymmetry: the filename stem is required, `type` may only contradict it, an absent `type` passes. |
+
+**Mutation proofs for the fixes** (Step 3.5 — a fix is new code, not the closure of a finding):
+
+| Mutation | Expected red | Result |
+| :--- | :--- | :--- |
+| Remove row 97 again | document-driven test | ✅ correct test |
+| Gut the directory walk to match nothing | `MIN_DOCS` floor | ✅ correct test **and correct assertion** — message read "examined only 0 task directories", not the orphan assertion |
+| Revert width preservation | width test | ✅ correct test |
+| Tighten the guard to reject an absent `type` | *(nothing)* | ❌ **survived** — see below |
+| Revert EOL preservation | line-endings test | ✅ correct test |
+
+**Two mutants survived and both were closed rather than explained away.**
+
+1. Tightening the guard to `docType !== "task"` reddened nothing. The rule I had just written into the
+   comment was checked nowhere — which is precisely the overstatement class TASK-103-002 and -004 were
+   about, reintroduced by their own fix. Added `a task document with no type frontmatter is still
+   ticked`; the mutation now reds it.
+2. The adversarial pass over the fixes (Step 3.5, "bulk teardown / in-flight / error path / reconnect"
+   applied to a file rewrite) found that `split(/\r?\n/).join("\n")` silently normalises a **CRLF**
+   registry to LF — every line changes, turning a one-cell tick into a whole-file diff. That is the
+   same harm width preservation exists to prevent, in the other dimension, and invisible in a rendered
+   diff. Probed on a real CRLF fixture: 5 CRLF before, 0 after. Fixed by detecting the file's own EOL,
+   tested, and mutation-proven.
+
+Test count: 14 → **18** (4 drift-check, 14 registry-tick).
+
+### Steps 5–6 — QA cycle 2 (refute pass) — 2026-09-10
+
+**Gate 2: PASS, 95/100, zero open findings.** Cycle 1's four findings all verified closed by
+mutation.
+
+The refute pass — unscoped, the whole branch diff, read to falsify rather than confirm — found
+**three further issues, every one inside cycle 1's own fixes.** That is the expected yield of a
+refute pass, not a surprising one: a fix is the least-reviewed code in a change set.
+
+| Finding | Severity | Resolution |
+| :--- | :--- | :--- |
+| TASK-103-005 — `develop-batch`'s write-disjointness no longer holds for task batches | low | Documented in the standard. Not a code fix: fixing it means reversing the § 3 decision, and the cost is one table-row conflict |
+| TASK-103-006 — the new document walk had **its own silent skip** | medium | Unparseable directories now collected and asserted empty, with the naming standard named |
+| TASK-103-007 — the EOL heuristic got **mixed-ending** files backwards | low | Heuristic **removed**: the split keeps its separators, so only the target line is ever rewritten |
+
+**TASK-103-006 is the one worth remembering.** The fix for "the check is blind to what it does not
+iterate" reintroduced exactly that, one level down: a `continue` past any directory not matching
+`^task\.(\d+)\.`. Probed by creating `docs/tasks/task-oddname-no-number/` holding an accepted
+document — suite stayed 4/0 green. The lesson is not that a `continue` is wrong; it is that a
+`continue` in a checker is a silent exemption and must be collected, the way `parseRegistry` already
+collects `malformed[]` rather than dropping rows.
+
+**TASK-103-007's resolution is better than its fix.** Cycle 1 answered "which line ending does this
+file use?" with a guess. Cycle 2 removed the question: `split(/(\r?\n)/)` keeps the separators, so
+every byte outside the one cell survives by construction rather than by rule. Two tests pin it,
+including a mixed-ending file asserted byte-for-byte.
+
+**I corrected my own severity rating on TASK-103-005 mid-cycle**, and recorded it in the QA report
+rather than quietly filing the lower number: I first rated it medium assuming every batch would
+conflict, then established that git merges edits to distant lines cleanly and only *adjacent* row
+numbers collide. The rating followed the evidence.
+
+**Two mutants survived across the whole loop, and neither was explained away:**
+
+1. Tightening the story guard to reject an absent `type` reddened nothing — the rule TASK-103-004's
+   fix had just written into a comment was checked nowhere. Same overstatement class the fix was
+   addressing, reintroduced by the fix. Test added; the mutation now reds it.
+2. The CRLF normalisation, found by applying Step 3.5's transition probes to a file rewrite.
+
+Test count across the loop: 14 → 18 → **19**.
+
+### Step 5c — PR conformance review — 2026-09-10
+
+**Verdict: 🚨 REQUEST CHANGES.** Report: `task.103.pr-review.1.pipeline-owns-the-registry-tick.md`.
+Code lens: zero findings. Conformance lens: three, one blocking.
+
+**PC-1 (coverage, high/high) — criterion 4 had no committed test, and its accidental protection
+expired inside this run.**
+
+Success criterion 4 says `cancelled` and in-flight tasks must not trip the check; § 8 names it as a
+required test; both QA reports recorded it as verified. It was verified — by three ad-hoc mutations
+during development, **none of which was committed**. What remained in the tree was two comments.
+
+The conformance lens established, by probe, that the criterion was protected only by *incidental
+corpus state*: replacing the `accepted` predicate with full-string equality currently reds the suite,
+but only because task 103's own row (`draft`) disagreed with its own document (`ready-for-review`).
+Simulating the post-Step-7 state — document `accepted`, row ticked — leaves the corpus at
+`{accepted/accepted: 102, cancelled/cancelled: 1, planned/planned: 3}`, entirely self-consistent on
+full strings, and the same mutation then passes **4/4**.
+
+So **Step 7 of this very run would have silently removed the only thing protecting criterion 4.**
+That is the third instance in one task of the same shape — a guarantee that does not hold. The first
+was the standard naming an owner that owned nothing; the second was the check being blind to absence;
+this is the third.
+
+**The first fix for it was itself vacuous, and that is worth recording.** I wrote a synthetic-fixture
+test that computed the predicate *inline* — asserting the rule while leaving the implementation free
+to drift away from it. A mutation to the production comparison would have reddened the corpus test
+and left the new test green. Caught by asking what the mutation would actually red, before running
+it. Resolved by extracting `disagreesOnAcceptance()` and routing **both** tests through it, so the
+fixture exercises the implementation rather than restating it.
+
+Mutation proof, run with the corpus deliberately placed in its post-Step-7 state so the coincidence
+could not do the work: full-string comparison reds `cancelled and in-flight rows do not trip the
+agreement check`, and only that test.
+
+**PC-2 (scope, low)** — the diff edits `docs/development/epic-registry.md`, which § 3 lists as out of
+scope. No action: § 3's own measure-first clause admits it, the measurement is recorded, and the
+correction is verified against all three of epic 3's stories. Flagged for the record.
+
+**PC-3 (trail, low)** — § 7 Files Summary omitted `CHANGELOG.md`. Added.
+
+### Steps 5–6 — QA cycle 3 + Step 5c re-run — 2026-09-10
+
+**Gate 3: PASS 96/100, zero findings.** Scoped re-review (`since gate 2`; `SAFETY_REPROBE` false from
+gate 2's `OK reasoned` security axis). Three files changed, one of them source.
+
+**Step 5c re-run: ✅ APPROVE.** Report: `task.103.pr-review.2.*.md`. Both lenses clean. All nine
+success criteria now have evidence **in the tree** — 20 committed tests — rather than in a report.
+
+**Loop totals:** 3 QA cycles + 2 PR conformance reviews. 13 mutations, each checked against which
+test *and*, where a test held two assertions, which assertion. Two survivors, both closed with new
+tests.
+
+| Cycle | Gate | Score | What it found |
+| :--- | :--- | ---: | :--- |
+| 1 | FAIL | 80 | Check blind to absence — and fixing it found task 97 |
+| 2 | PASS | 95 | Three issues *inside* cycle 1's own fixes |
+| 5c.1 | REQUEST CHANGES | — | Criterion 4's coverage was incidental corpus state, expiring at Step 7 |
+| 3 | PASS | 96 | Nothing new |
+| 5c.2 | APPROVE | — | Nothing |
+
+**Worth recording, because it is the run's own lesson.** Three of this task's defects were the same
+shape — *a guarantee asserted in prose with nothing behind it*. The standard named an owner that
+owned nothing (the task's premise). The check was cited for a case it could not see (cycle 1). A
+criterion was ticked on evidence about to expire (5c). Each was caught by a **different** lens, and
+none by the one that introduced it — which is the argument for having more than one, and is exactly
+the failure mode this task was filed about.
+
+### Step 7 — Finalise — 2026-09-10
+
+**ACCEPTED.** DoD 9/9, CI green, security `measured`.
+
+- **The CI gate fired, and withholding was the right call.** The rollup's first sample read `PENDING`
+  with the `test` job `IN_PROGRESS`. Acceptance was withheld and the rollup polled to completion
+  rather than assumed — which is precisely the failure mode that gate documents (a pending rollup
+  rounded up to green). Final: `SUCCESS` on `2a3024dcdab5`, equal to local `HEAD`.
+- **Security moved from `reasoned` to `measured`.** `registry-tick.js` is a boundary — it decides
+  task-vs-not-task and accepted-vs-not from document content it does not control, then writes a file
+  on that decision. Nine adversarial candidates were **executed**: `type: story` under a task-shaped
+  filename, `type: bug` likewise, a `type: task` document with a non-conforming filename, Title-Case
+  and quoted and comment-trailing status values, an uppercase `type`, no frontmatter at all, and a
+  `../` path. **None reproduced.** Gate 3's `reasoned` was accurate for QA, which executed none.
+- **One probe was scored a mismatch and re-run, because the expectation was wrong rather than the
+  code.** `status: planned  # was accepted` returns `not-accepted` — correct, but the input does not
+  *discriminate*: a failure to strip the comment gives the same verdict. Replaced with
+  `status: accepted  # done`, which does discriminate. Recorded because a probe that cannot fail is
+  the same defect as a test that cannot fail, one layer out.
+- **The mechanism's first live use was on its own row.** `registry-tick.js` returned `reason: ticked`
+  (`draft` → `accepted`, line 145), and the drift check re-run immediately afterwards stayed green.
+  The writer and the backstop agreeing about the same file in the same run is the property the § 3
+  decision was chosen for.
+- **The Issue cell was filled by hand**, as the standard says it must be: `registry-tick.js` writes
+  only the Status column. This is deferred follow-up 3 in its concrete form.
+- Issue #374: Document link re-pointed to `develop` **before** closing (the feature branch dies at
+  merge), commented, closed, verified `CLOSED`. Board `done`: `already` — the close had advanced it.
+
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
@@ -215,12 +424,49 @@ _Track each QA review/fix cycle._
 
 ---
 
+## Completion Summary
+
+Task 103 gave the task-registry tick an owner and, more importantly, made its absence loud.
+
+**What shipped:** a drift check that fails CI when a task document and its registry row disagree
+about acceptance *or when a document has no row at all*; `registry-tick.js`, called from `/finalise`
+at the moment it already writes `status: accepted`; the standard rewritten to name the real owner;
+and two live data defects corrected along the way.
+
+**The § 3 decision** — `finalise` owns the write — was settled by implementation rather than by
+argument: once the check exists, every task acceptance reds CI until someone hand-edits the row, so
+the check is what makes automation necessary rather than optional. Post-merge ownership was rejected
+because it would red CI on anyone finalising outside `/develop-next`.
+
+**Two live defects found in passing**, neither of which this task set out to find:
+
+- **task 97** — accepted, merged under PR #350, and absent from the registry since creation. 106 task
+  directories against 105 rows. Every check in the repository, including the one written earlier in
+  this same task, was structurally incapable of seeing it.
+- **epic 3** — its registry row read `Planned` while the document and all three of its stories read
+  `accepted`. Found by the Phase 2 sibling measurement the task's scope section demanded before any
+  widening.
+
+**The run's own lesson.** Three of this task's defects were the same shape — *a guarantee asserted in
+prose with nothing behind it*. The standard named an owner that owned nothing; the drift check was
+cited for a case it could not see; a success criterion was ticked on evidence due to expire at
+Step 7. **Each was found by a different lens** — `review-task`, QA cycle 1, Step 5c — **and none by
+the one that introduced it.** That is the argument for having more than one lens, and it is the same
+failure mode the task was filed about.
+
+Two further self-corrections are recorded rather than smoothed over: the first fix for the Step 5c
+finding was itself vacuous (it asserted the rule while leaving the implementation free to drift), and
+one security probe was scored a mismatch when the expectation, not the code, was wrong.
+
+**Numbers:** 3 QA cycles, 2 PR conformance reviews, 13 mutations (2 survivors, both closed with new
+tests), 9 security probes with 0 reproduced, 20 committed tests, CI green on the final head.
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-10 11:00
+**Final Status**: Completed
 **Branch**: `feature/task.103.pipeline-owns-the-registry-tick`
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**PR**: #375 — https://github.com/Gamaroff/agent-skills/pull/375
+**QA Iterations**: 3 (FAIL 80 → PASS 95 → [5c REQUEST CHANGES] → PASS 96 → 5c APPROVE)
+**DoD Summary**: `task.103.dod.1.pipeline-owns-the-registry-tick.md` — ACCEPTED
+**Tracker debt**: none — `access.tracker` is `full`; every tracker action was performed, not deferred
