@@ -156,10 +156,20 @@ const LEAD_TEMPLATES = Object.freeze({
  * in the one paragraph aimed at a reader who cannot check the body underneath
  * it. `blocking_count=0` and `count=0` failed the same way.
  *
- * Coerce at the boundary, so a template can go on being written the obvious way.
- * A missing lead is a gap; a confidently wrong one is misinformation.
+ * Coerce at the boundary — but PER SLOT TYPE, not with one list applied to
+ * everything. The first version of this fix ran every slot through the falsey-
+ * string list, so a text slot legitimately valued "No", "None" or "0" was
+ * silently dropped: `--slot title=None` rendered as though no title were given.
+ * Swallowing a real value is a worse failure than the one being fixed, because
+ * it is silent in the other direction and nothing in the output hints at it.
+ *
+ * "false"/"no"/"none" are only meaningful as negations for a BOOLEAN slot, and
+ * "0" only for a NUMERIC one. A text slot is passed through untouched: the
+ * caller's string is the caller's business.
  */
-const FALSEY_SLOT_VALUES = Object.freeze([
+const BOOLEAN_SLOTS = Object.freeze(["blocking"]);
+const NUMERIC_SLOTS = Object.freeze(["count", "blocking_count", "cycle"]);
+const BOOLEAN_FALSE_WORDS = Object.freeze([
   "",
   "0",
   "false",
@@ -167,25 +177,43 @@ const FALSEY_SLOT_VALUES = Object.freeze([
   "none",
   "null",
   "undefined",
+  "off",
 ]);
 
 function normaliseSlots(slots) {
   if (!slots || typeof slots !== "object") return {};
-  const out = Object.create(null);
+  const out = {};
   // OWN properties only. An inherited slot is never something the caller meant
   // to pass, and reading one lets a caller-constructed prototype reach the lead.
   for (const key of Object.keys(slots)) {
     const raw = slots[key];
     if (raw === null || raw === undefined) continue;
     const value = typeof raw === "string" ? raw.trim() : raw;
-    if (
-      typeof value === "string" &&
-      FALSEY_SLOT_VALUES.includes(value.toLowerCase())
-    ) {
-      continue; // absent, not false — the template's own `? :` then reads correctly
+
+    if (BOOLEAN_SLOTS.includes(key)) {
+      if (value === false) continue;
+      if (
+        typeof value === "string" &&
+        BOOLEAN_FALSE_WORDS.includes(value.toLowerCase())
+      ) {
+        continue; // absent, not false — the template's own `? :` then reads right
+      }
+      out[key] = value;
+      continue;
     }
-    if (typeof value === "number" && !Number.isFinite(value)) continue;
-    if (value === false) continue;
+
+    if (NUMERIC_SLOTS.includes(key)) {
+      const n = typeof value === "number" ? value : Number(value);
+      // A non-numeric string in a numeric slot is a caller error, not a zero.
+      // Dropping it renders the shorter true sentence rather than "(NaN pieces)".
+      if (!Number.isFinite(n) || n === 0) continue;
+      out[key] = value;
+      continue;
+    }
+
+    // Text slot: pass through. "" is still dropped, because an empty string
+    // fills a sentence gap with nothing and reads as a typo.
+    if (typeof value === "string" && value === "") continue;
     out[key] = value;
   }
   return out;

@@ -1858,3 +1858,34 @@ test("the deferred record's `desired` label names the comment, not the lead", as
     "the composed body, lead included, is still what would be posted",
   );
 });
+
+test("a zero-width-only --summary-file is empty, not an invisible lead", async () => {
+  // Cycle-2 finding: `.trim()` leaves U+200B/U+FEFF/U+2060, so a file holding
+  // only those passed the empty check and posted a lead nobody could see — the
+  // same bypass the check closes, wearing a different character.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  for (const invisible of ["​​", "﻿", "⁠", " ​ \n"]) {
+    const empty = join(dir, "invisible.md");
+    writeFileSync(empty, invisible, "utf8");
+    const gh = stubGh();
+    const r = await cli.run({
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--summary-file",
+        empty,
+        "--quiet",
+      ],
+      execImpl: gh.execImpl,
+      repoRoot: dir,
+      env: { ...baseEnv },
+    });
+    assert.equal(r.exitCode, 2, `${JSON.stringify(invisible)} was accepted`);
+    assert.equal(gh.calls.filter((c) => c.argv[1] === "comment").length, 0);
+  }
+});

@@ -262,3 +262,50 @@ test("slots are read as own properties, never through the prototype chain", () =
   assert.ok(!renderLead("work-started", hostile).includes("PWNED"));
   assert.ok(!renderLead("done", hostile).includes("PWNED"));
 });
+
+// ── Slot coercion is per-type (QA cycle 2) ─────────────────────────────────
+
+test("a TEXT slot is passed through, even when it reads like a negation", () => {
+  // The cycle-2 finding, and it was self-inflicted by the cycle-1 fix: one
+  // falsey-string list applied to every slot dropped a text slot legitimately
+  // valued "No", "None" or "0". Swallowing a real value is the worse failure —
+  // it is silent in the other direction and nothing in the output hints at it.
+  for (const [stage, slots, needle] of [
+    ["work-started", { title: "No" }, "No"],
+    ["work-started", { title: "None" }, "None"],
+    ["work-started", { title: "0" }, "0"],
+    ["in-review", { pr: "0" }, "0"],
+    ["review", { outcome: "no" }, "no"],
+  ]) {
+    const lead = renderLead(stage, slots);
+    assert.ok(
+      lead.includes(needle),
+      `${stage} dropped a legitimate text slot ${JSON.stringify(slots)}`,
+    );
+    assert.notEqual(
+      lead,
+      renderLead(stage, {}),
+      `${stage} rendered as though the slot were absent`,
+    );
+  }
+});
+
+test("a NUMERIC slot rejects a non-numeric string rather than rendering NaN", () => {
+  for (const junk of ["abc", "3 pieces", "--"]) {
+    const lead = renderLead("develop-complete", { count: junk });
+    assert.ok(!lead.includes("NaN"), `count=${junk} leaked NaN`);
+    assert.equal(lead, renderLead("develop-complete", {}));
+  }
+  assert.ok(
+    renderLead("develop-complete", { count: "3" }).includes("(3 separate"),
+  );
+});
+
+test("an unknown verdict reaches the mapper and gets the safe fallback", () => {
+  // Distinct from being filtered out: the slot IS passed through, and
+  // verdictSentence maps anything it does not know to a sentence that asserts
+  // nothing about the outcome.
+  const lead = renderLead("qa-gate", { verdict: "none" });
+  assert.ok(lead.includes("recorded below"));
+  assert.ok(!lead.includes("no problems"), "must not read as reassurance");
+});

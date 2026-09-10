@@ -124,6 +124,20 @@ Artifacts: [`task.104.qa.1.*.md`](./task.104.qa.1.tracker-comment-plain-language
 1. **My Jira ADF verification was vacuous, and I reported it as a pass.** I ran 33 stage × body-shape cases against `buildCommentAdf` on a hand-composed string — exercising the renderer, never the composition path. It would have passed identically had `tracker-comment.js` composed nothing for Jira. The subagent independently found the shipped test (T104-006) making the same mistake. The task's highest-ranked risk was **uncovered**, and I had announced it as held down. This is the `feedback_assert_behaviour_not_source_text` failure in a new costume: I asserted against a value I constructed rather than one the system produced.
 2. **The bulk argv migration in Step 3 was worse than I found.** I noticed one test whose premise it corrupted because that test failed. Twelve others absorbed a duplicate `--stage` silently and stayed green (T104-007). A mechanical edit across a test file needs a mechanical check afterwards, not the test runner's opinion.
 
+### Cycle 1 fixes — 2026-09-10
+
+All 7 findings closed, each mutation-proven against a **named** test. Details in the qa-fix PR comment.
+
+### Cycle 2 — 2026-09-10 — refute pass
+
+Per the re-review rule, cycle 2 is a full refute pass over the whole branch diff, not a narrowed re-read of the fixes. **Two new findings, both defects in cycle 1's own fixes, both found and closed within this cycle:**
+
+**C2-001 (MEDIUM) — my slot-coercion fix swallowed legitimate values.** `normaliseSlots` applied one falsey-string list to *every* slot, so a **text** slot legitimately valued `"No"`, `"None"` or `"0"` was silently dropped: `--slot title=None` rendered as though no title were given. This is precisely the failure I named in that fix's own commit message — "coercion that swallowed real values would be the worse bug" — and then shipped. It is worse than the bug it replaced, because it fails silently in the *other* direction and nothing in the output hints at it. Fixed by making coercion **per slot type**: `"false"`/`"no"`/`"none"` are negations only for a boolean slot, `"0"` only for a numeric one, and a text slot passes through untouched.
+
+**C2-002 (LOW) — the empty-`--summary-file` check had a second door.** `.trim()` does not remove U+200B, U+FEFF or U+2060, so a summary file holding only zero-width characters passed the check and posted an **invisible** lead — the same bypass T104-003 closed, wearing a different character. Fixed by stripping the zero-width set before trimming.
+
+**A third thing, about the proof rather than the code.** My first attempt to mutation-prove C2-002 used a regex substitution with a `2>/dev/null ||` fallback. It silently failed to apply, the suite stayed green, and I was one step from recording "no test caught this" — a false negative in the very mechanism that exists to prevent false confidence. Re-run as a deterministic line-based deletion, the test went red correctly. **A mutation proof needs its own check that the mutation applied**; a green suite after a mutation that never happened is indistinguishable from a vacuous test.
+
 **What the subagent caught that I did not:** T104-001 entirely, plus T104-002/003/004 and both test-quality findings. My own 16-probe security pass found only T104-005. The lesson is not "use a subagent" — it is that I probed the surface I had just written **for the failure modes I had already thought about**, which is the one thing an author cannot do adversarially.
 
 ---

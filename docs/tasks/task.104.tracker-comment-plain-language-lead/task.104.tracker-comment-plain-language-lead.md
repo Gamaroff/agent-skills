@@ -472,6 +472,7 @@ composition path.
 | 2026-09-10 |  | Status → ready-for-review — all four phases implemented; ci:fast 3106 pass / 0 fail and eval:all green; three mutation proofs recorded | develop |
 | 2026-09-10 |  | QA gate FAIL (30/100) — 7 findings; slot values are strings consumed by truthiness, so `blocking=false` renders the blocking sentence | qa-task |
 | 2026-09-10 |  | qa-fix cycle 1 — all 7 findings closed; slot coercion at the boundary, hasOwnProperty lookup guard, empty --summary-file rejected, `desired:` label preserved, help text reconciled, Jira ADF test driven through the composition path, 12 duplicate flags removed. Each fix mutation-proven | qa-fix |
+| 2026-09-10 |  | QA cycle 2 (refute pass) — 2 new findings, both defects in cycle 1's own fixes: slot coercion was swallowing legitimate text values, and a zero-width-only summary file bypassed the empty check. Both closed and mutation-proven within the cycle | qa-task |
 
 ---
 

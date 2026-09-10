@@ -559,6 +559,11 @@ async function run({
       leadSource = fs
         .readFileSync(args.summaryFile, "utf-8")
         .replace(/\r\n/g, "\n")
+        // `.trim()` alone leaves zero-width and word-joiner characters, so a
+        // file holding only U+200B passed the empty check below and posted an
+        // INVISIBLE lead — the same bypass the check exists to close, wearing a
+        // different character. Strip the zero-width set before trimming.
+        .replace(/[\u200B-\u200D\uFEFF\u2060]/g, "")
         .trim();
     } catch (e) {
       output.err(
