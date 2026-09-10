@@ -1611,11 +1611,31 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    - Request changes to address gaps
 
    ```bash
-   # GAP_COUNT is the number of unmet criteria across every section of the gap
-   # report. Omit the slot rather than passing 0 — the lead reads correctly with
-   # no count, and the catalogue treats a zero as absent anyway.
+   # Bind the two values this block interpolates, HERE, before use. Step 4 writes
+   # the gap report into the document body; it does not leave it in a variable, so
+   # capture it back out of the document rather than assuming it is in scope.
+   #
+   # An unbound name does NOT fail here — it expands to the empty string, the
+   # numeric slot is silently dropped, and the comment posts as a heading, a lead
+   # and a bare horizontal rule with no gaps under it. That is the silent shape
+   # this whole page keeps warning about, so the binding is not optional tidiness.
+   DOC_FILE="{story-or-task-file}"
+   GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1} f' "$DOC_FILE")
+   # Unmet criteria across every section of the gap report — an unchecked box.
+   # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
+   # `|| echo 0`, which would append a second zero and make the value "0\n0").
+   GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^- \[ \]' || true)
+   GAP_COUNT=${GAP_COUNT:-0}
+
+   # Omit nothing: the catalogue drops a zero as absent, so a count of 0 renders
+   # the shorter true sentence rather than "(0 of them)".
    LEAD=$(node references/stakeholder-summary-cli.js --stage dod-gaps --slot count="${GAP_COUNT}") || exit 1
    PR_COMMENT_BODY=$(printf '## ⚠️ Definition of Done - Gaps Identified\n\n%s\n\n---\n\n%s' "$LEAD" "$GAP_REPORT_BODY")
+
+   # Post-condition: refuse to post a body whose gap section is empty. A reviewer
+   # reading "gaps identified" with nothing under the rule learns nothing and is
+   # told nothing is wrong.
+   [ -n "$GAP_REPORT_BODY" ] || { echo "gap report body is empty — not posting"; exit 1; }
    ```
 
    > This is the one pull-request comment on this page that says the work is **not** finished, and

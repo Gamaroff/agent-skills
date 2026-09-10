@@ -142,7 +142,14 @@ function collectCallSites(
         j += 1;
         inv += "\n" + lines[j];
       }
-      const stage = /--stage\s+([^\s\\]+)/.exec(inv)?.[1] ?? null;
+      // Stop at a non-identifier character. `[^\s\\]+` absorbed shell
+      // punctuation: a single-line call written `$(node … --stage done)` — the
+      // shape 4 of the 11 pull-request sites use — captured `done)`, which is
+      // not a catalogue key, so the two content guards below `continue`d past it
+      // and validated nothing. The non-vacuity floor still passed, because the
+      // site was FOUND; it was just never CHECKED. Found by adversarial review,
+      // not by the guard itself.
+      const stage = /--stage\s+([A-Za-z0-9_-]+)/.exec(inv)?.[1] ?? null;
       const slots = [
         ...inv.matchAll(/--slot\s+([A-Za-z_][A-Za-z0-9_]*)=/g),
       ].map((m) => m[1]);
@@ -405,6 +412,30 @@ test("Guard B — where a block both comments and closes, the comment comes firs
 // differs between the two audiences, and folding them together would mean
 // weakening one to fit the other.
 // ---------------------------------------------------------------------------
+
+test("Guard C — every collected stage resolves to a real catalogue key", () => {
+  // The floor below proves sites were FOUND. This proves they are CHECKABLE.
+  // Both content guards skip a stage that is not a catalogue key, so a capture
+  // bug downgrades them to no-ops without failing anything — which is exactly
+  // what happened: `done)` and `in-review)` skipped 4 of 11 sites silently.
+  // Assert what the guards depend on rather than trusting the extraction.
+  const unresolved = [...SITES, ...PR_SITES]
+    .filter((s) => s.stage)
+    .filter(
+      (s) =>
+        !Object.prototype.hasOwnProperty.call(
+          LEAD_TEMPLATES,
+          baseStage(s.stage),
+        ) && !/^\{|\}$/.test(s.stage), // `{moment}` placeholders in contract prose
+    )
+    .map(
+      (s) =>
+        `${s.file}:${s.line} — --stage ${JSON.stringify(s.stage)} is not a ` +
+        `catalogue key. If this is shell punctuation absorbed by the capture, ` +
+        `the two content guards are silently skipping this site.`,
+    );
+  assert.deepEqual(unresolved, [], unresolved.join("\n"));
+});
 
 test("Guard C — the walk found the pull-request call sites (non-vacuity floor)", () => {
   // Eleven conversation templates is what task 106 converted. The floor sits

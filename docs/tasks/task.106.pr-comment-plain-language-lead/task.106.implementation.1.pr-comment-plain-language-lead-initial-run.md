@@ -35,7 +35,7 @@ Give the eleven pull-request conversation templates a plain-language lead drawn 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.106.*` exists in git                              | `feature/task.106.pr-comment-plain-language-lead` created from `develop` at `606a0078`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.106.review.1.pr-comment-plain-language-lead.md` exists                | READY TO IMPLEMENT, 9/10. 0 Critical / 2 Important / 3 Optional — all applied. Status promoted `planned → ready-for-development` | PREPASS_B `aligned`; PREPASS_C `not-started` |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 5 phases; 3 test suites extended (52+53+10); 8 mutation proofs (4 re-run after a bad restore method); `npm run ci:fast` green, 0 failures | Pre-develop surface map (Explore) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #381](https://github.com/Gamaroff/agent-skills/pull/381) ← `develop`. Commit `44eacbe3`, 65 files, 65/65 in scope (no leak). Issue #380 commented (`in-review`, posted) | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.106.qa.{N}.*.md`; `task.106.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.106.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -232,7 +232,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.106.pr-comment-plain-language-lead`
-**PR**: {populated after Step 4}
+**PR**: [#381](https://github.com/Gamaroff/agent-skills/pull/381)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

@@ -1,0 +1,87 @@
+schema: 1
+task: "task.106.pr-comment-plain-language-lead"
+task_title: "Pull-request summary comments open with a plain-language lead"
+gate: PASS
+status_reason: >-
+  Cycle 2. Both cycle-1 findings fixed and verified by mutation rather than by re-reading.
+  T106-001 (unbound GAP_COUNT / GAP_REPORT_BODY) now binds both from the document with a
+  post-condition refusing an empty gap body. T106-002 (capture bug making Guard C skip 4 of
+  11 sites) is fixed at the regex AND backed by a new assertion that every collected stage
+  resolves to a real catalogue key, so a future skip cannot be silent. ci:fast green, 0 failures.
+reviewer: "QA Engineer"
+updated: "2026-09-10T16:55:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 116
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: "2026-09-10"
+  total_iterations: 1
+  verification_method: >-
+    Mutation proof with snapshot restore, plus the full fast gate. Two mutations, both red:
+    reverting the capture regex trips the new resolvability assertion; planting a wrong slot
+    name at a site the OLD regex used to skip now fails the suite. The second is the decisive
+    one — it proves the hole is closed rather than the symptom masked.
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: >-
+      No auth, secret or network surface added. The cycle-1 fix adds one awk read of a local
+      document and one grep, both on paths the skill already reads. Verdict reached by reading
+      the diff and the require graph, not by executing hostile input — `reasoned` is accurate.
+  performance:
+    status: PASS
+    notes: "No new network calls. The fix adds two local shell reads on an already-local path."
+  reliability:
+    status: PASS
+    notes: >-
+      Improved this cycle. Site 6 previously interpolated two unbound variables and would have
+      posted an empty gap body silently; it now binds both and refuses to post when the gap
+      body is empty. All 11 CLI call sites remain guarded with `|| exit 1`.
+  maintainability:
+    status: PASS
+    notes: >-
+      Guard C is no longer vacuous for 4 of 11 sites. The added assertion checks the property
+      the content guards depend on rather than trusting the extraction, which is the difference
+      between a guard that skips loudly and one that skips silently.
+
+process_note: >-
+  Gate 1 was written PASS and published to PR #381 and issue #380 while the Step 3b code
+  review was still running; the review then returned both findings. Gate 1 has been corrected
+  in place to CONCERNS rather than rewritten to look clean, and the ordering defect is logged
+  as observation #56 against qa-task and qa-story: Step 3b ends at DISPATCH, and Step 10 has
+  no precondition requiring the result. A late gate costs minutes; an early one is broadcast.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Nothing checks that a shell variable a documented block interpolates is actually bound
+        in that block. Guard C covers slot NAMES; the variable half is what shipped T106-001,
+        and it is the same class as observation #54.
+      refs: ["shared/resources/tests/comment-slot-coverage.test.mjs"]
+    - action: >-
+        Consider whether the snippet engine's allow-list should recognise `node <script>` for
+        repo-local non-mutating CLIs, so Step 4b can reach lead-obtaining blocks.
+      refs: ["shared/resources/qa-execute-snippets.mjs"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

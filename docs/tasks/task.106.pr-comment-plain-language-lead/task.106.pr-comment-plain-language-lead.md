@@ -415,6 +415,48 @@ sites with it.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS (cycle 2)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 95/100 (cycle 1: CONCERNS 80/100)
+**Gate Decision**: PASS
+**QA Cycles**: 2
+
+### QA Report
+- **Full Report**: [task.106.qa.1.pr-comment-plain-language-lead.md](./task.106.qa.1.pr-comment-plain-language-lead.md)
+- **Gate — cycle 1 (CONCERNS)**: [task.106.gate.1.pr-comment-plain-language-lead.yml](./task.106.gate.1.pr-comment-plain-language-lead.yml)
+- **Gate — cycle 2 (PASS)**: [task.106.gate.2.pr-comment-plain-language-lead.yml](./task.106.gate.2.pr-comment-plain-language-lead.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 115 across three extended suites (52 + 53 + 10), plus `npm run ci:fast` green
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (`reasoned`, 0 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+**Cycle 1 found two defects and is recorded as CONCERNS.** The Step 3b code review returned
+`T106-001` (HIGH — `finalise` site 6 interpolated `GAP_COUNT` and `GAP_REPORT_BODY`, neither bound
+anywhere in the file, so the gaps comment would post empty) and `T106-002` (MEDIUM — the new Guard C
+captured `done)` from a single-line call and silently skipped 4 of 11 sites while its non-vacuity
+floor still passed). Both fixed and mutation-proved; cycle 2 is PASS.
+
+12/12 success criteria met, each verified by execution rather than by reading. Both weaknesses the
+implementation report self-disclosed were re-probed independently: the two previously-surviving
+mutants now fail 52/1 with the mutation proven to have applied, and the namespace split is enforced
+by the engine — all three pull-request stages rejected by name, with a `qa-gate` control proving the
+gate is not simply rejecting everything.
+
+One LOW advisory finding: the snippet engine fails closed on `node`, so Step 4b cannot execute blocks
+that obtain a lead. Established as pre-existing by running the engine against `origin/develop` in a
+detached worktree — `runnable=0` there too. Belongs to `qa-execute-snippets.mjs`, not to this task.
+
+`npm run eval:all` has not run; it fires at the merge gate.
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -423,6 +465,8 @@ sites with it.
 | 2026-09-10 | 1.1 | Review passed (9/10) — added §5.4 (lead catalogue vs `COMMENT_STAGES` namespace collision, mutation-verified), raised Phase 1 to Medium risk, refreshed §3 line numbers, added two catalogue-guard test files to §7/§8, discharged the task.105 dependency risk | review-task |
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Implemented — 5 phases, 12 files, 3 test suites (52 + 53 + 10 tests), 8 mutation proofs | develop |
+| 2026-09-10 |  | QA cycle 1 CONCERNS (80/100) — 2 findings: unbound GAP_COUNT/GAP_REPORT_BODY (high), Guard C capture bug skipping 4 of 11 sites (medium) | qa-task |
+| 2026-09-10 |  | QA cycle 2 PASS (95/100) — both findings fixed and mutation-proved, 0 open | qa-task |
 
 ---
 
