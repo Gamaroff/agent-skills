@@ -78,8 +78,20 @@ Three exits, and they are not interchangeable:
 | Exit | Fires when | Effect |
 |---|---|---|
 | Clean gate | `PASS` / `WAIVED` | Hands to Step 5c |
-| **Diminishing returns** | Two consecutive **zero-HIGH** gates, and the residue is entirely test machinery | Hands to Step 5c — the loop *finished working* |
+| **Diminishing returns** | All three conditions below hold | Hands to Step 5c — the loop *finished working* |
 | Convergence check | HIGH findings **remain and stop falling** | Escalates — the loop *stopped working* |
+
+**The diminishing-returns exit needs all three conditions, and every one of them fails closed.** This is the canonical statement; other pages give the short form and point here.
+
+| # | Condition | Fails when |
+|---|---|---|
+| 1 | Two consecutive gates with no blocker | The HIGH sequence is shorter than the cycle count, or the last two are not both zero |
+| 2 | Every finding names a file, and every file is machinery | **Any finding carries no `file:`** — condition 2 is opt-in on positive evidence, so a finding that names nothing fails it — or any named file sits outside `qa.testArtifactGlobs` |
+| 3 | Nothing implicates product behaviour | `nfr_validation` reports any status other than `pass`, or any finding is `category: bug` against a file that is not machinery |
+
+**Condition 3 is evaluated before condition 2**, deliberately: a product defect filed *against a test file* satisfies condition 2 and must still block the exit, and only that ordering surfaces it.
+
+So "zero HIGH and the rest is test noise" is the short form, not the rule. A run with a clean HIGH sequence, every finding inside the test globs, and a single `security: CONCERNS` in `nfr_validation` does **not** take this exit.
 
 The last two are opposites and now say so. The Convergence check measures HIGH findings that persist;
 the diminishing-returns exit fires when they are gone and what is left is the run refining its own

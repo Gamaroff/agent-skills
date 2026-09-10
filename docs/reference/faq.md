@@ -20,6 +20,8 @@ The Convergence check watches HIGH findings that remain and stop falling — the
 
 So the **diminishing-returns exit** fires when HIGH is gone and the residue is machinery, and it *exits cleanly* rather than escalating — escalating finished work would misreport it as stalled. It requires two consecutive zero-HIGH gates, which is what stops it claiming a run the Convergence check should have.
 
+It is deliberately harder to satisfy than that summary suggests. A third condition vetoes the exit whenever product behaviour is implicated — a non-`pass` `nfr_validation` status, or a finding filed `category: bug` against anything that is not machinery — and it is evaluated *before* the machinery check, because a product defect filed against a test file would otherwise pass it. Every condition fails closed. The full table is in [QA Flow → How the loop ends](../runbooks/qa-flow.md#how-the-loop-ends); it is stated once there and summarised everywhere else.
+
 It hands to Step 5c exactly as a clean gate does. That is deliberate: a weaker exit than a `PASS` takes, on a run that by construction has stopped finding blockers, would be the wrong way round.
 
 ### Why are QA gate files owned exclusively by QA skills?

@@ -196,10 +196,12 @@ See [Status lifecycle](../standards/status-lifecycle.md).
 | Exit | Fires when | What it means |
 |---|---|---|
 | Clean gate | `PASS` / `WAIVED` | The work is done. Hands to Step 5c |
-| **Diminishing returns** | Two consecutive **zero-HIGH** gates and the remaining findings are entirely test machinery | The loop **finished working**. Exits cleanly and hands to Step 5c, exactly as a clean gate does |
+| **Diminishing returns** | Two consecutive **zero-HIGH** gates, the residue is entirely test machinery, **and** nothing implicates product behaviour | The loop **finished working**. Exits cleanly and hands to Step 5c, exactly as a clean gate does |
 | Convergence check | HIGH findings **remain and stop falling** | The loop **stopped working**. Escalates |
 
 The two guards are opposites, and neither can claim the other's run: the diminishing-returns exit requires two consecutive zero-HIGH gates, so a flat non-zero sequence is never its business. If you are seeing cycle 4 and 5 spent refining test pins while the product has been finished since cycle 2, that is the case the exit was added for — check `qa.testArtifactGlobs` in `skills-config.yaml`, which is what tells it which paths count as machinery.
+
+**If you expected that exit and did not get it**, the reason is one of three conditions, all of which fail closed — read the `reason` the engine emits rather than guessing. The most commonly missed are that a finding carrying **no `file:`** fails on its own, and that **any non-`pass` `nfr_validation` status vetoes the exit** even when every finding sits inside the test globs. Full condition table: [QA Flow → How the loop ends](../runbooks/qa-flow.md#how-the-loop-ends).
 
 Either way the only route to Step 7 is Step 5c, the PR conformance review. The diminishing-returns exit is deliberately not a path around it.
 
