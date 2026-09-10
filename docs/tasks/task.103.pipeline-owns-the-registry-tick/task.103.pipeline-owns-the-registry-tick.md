@@ -5,18 +5,21 @@ type: task
 description: "The registry row is written once by /create-task and never updated. finalise sets the document's status and completed_date but touches no registry; develop-next only reads it. The standard claimed finalise owned the write AND told readers not to edit by hand, so the row drifted silently — 17 rows (T67-T96) were stale until a sweep. Give the pipeline ownership of the write, or make the manual step enforceable."
 tags: [develop-pipeline, finalise, task-registry, ownership]
 category: infrastructure
-status: draft
+status: ready-for-review
 priority: Medium
 risk_level: medium
 created: 2026-09-09
-updated: 2026-09-09
+updated: 2026-09-10
 assignee:
 estimated_effort_hours: 4
+github_issue: 374
 ---
 
 # Technical Task: give the registry tick an owner
 
-**Status:** Draft
+**Status:** Ready for Review
+**GitHub Issue**: [#374](https://github.com/Gamaroff/agent-skills/issues/374)
+**Review**: ✅ All review recommendations from `task.103.review.1.pipeline-owns-the-registry-tick.md` implemented 2026-09-10
 
 ---
 
@@ -57,24 +60,31 @@ release-planning input, and it was wrong for weeks.
 > one. An unticked roadmap row *does* stall the loop; an unticked registry row does not. Conflating
 > them would misprice the fix.
 
-## 3. Scope
+## 3. Technical Background
 
-**In scope**
+### Current
 
-- Decide the owner (§ 4) and implement the write.
-- A check that fails when a document is `accepted` and its registry row is not — the backstop that
-  makes any future drift loud instead of silent.
-- Whatever documentation follows from the chosen owner.
+Two files carry a task's completion state, and only one of them is ever updated.
 
-**Out of scope**
+| Artefact | Field | Written by | Updated after acceptance |
+| :--- | :--- | :--- | :--- |
+| Task document | frontmatter `status:`, `completed_date:` | `create-task` (initial), `finalise` (acceptance) | **Yes** — `finalise` |
+| `docs/tasks/task-registry.md` | the row's Status column | `create-task` (initial) | **No — nobody** |
 
-- The bug registry and the epic registry. Their standards make no ownership claim and no drift has
-  been measured; sweeping them in without evidence would be scope creep. **Measure first** — § 6
-  covers the check that would produce that evidence.
-- The roadmap tick, which is a separate mechanism with a separate (real) stalling consequence.
-- Re-ticking the 17 historical rows. Already done.
+`develop-next`'s selector reads the registry only as a *selection fallback*, and even then it judges
+eligibility on the **document's** frontmatter (`select-next.mjs`, `registryFrontier.passedOver[].documentStatus`)
+rather than on the row. That is why the drift is silent: no machine consumer of the registry can be
+made wrong by a stale row, so nothing ever fails.
 
-## 4. The decision this task must make
+Verified against the tree at the time of writing: `skills/finalise/SKILL.md` is 1783 lines and contains
+zero occurrences of `task-registry`; the only skills that reference the file at all are `create-task`
+(writes) and `develop-next` (reads).
+
+### Target
+
+The target state is one of the three below — **§ 3 is where this task's central decision is made**, and
+§ 6 Phase 3 is where the reasoning is recorded. All three share a common floor: the drift becomes
+*loud* rather than silent.
 
 Three candidate owners, and the choice is genuinely open:
 
@@ -88,24 +98,77 @@ Three candidate owners, and the choice is genuinely open:
 pass, and a check that fails loudly may be worth more than automation that has to reason about lite
 mode, cancelled tasks, and pre-merge versus post-merge state.
 
+## 4. Scope
+
+**In scope**
+
+- Decide the owner (§ 3 Target) and implement the write.
+- A check that fails when a document is `accepted` and its registry row is not — the backstop that
+  makes any future drift loud instead of silent.
+- Whatever documentation follows from the chosen owner.
+
+**Out of scope**
+
+- The bug registry and the epic registry. Their standards make no ownership claim and no drift has
+  been measured; sweeping them in without evidence would be scope creep. **Measure first** — § 6
+  covers the check that would produce that evidence.
+- The roadmap tick, which is a separate mechanism with a separate (real) stalling consequence.
+- Re-ticking the 17 historical rows. Already done.
+
 ## 5. Breaking Changes
 
 None if a check. If `finalise` gains the write, it gains a side effect on a file it has never touched
-— see § 8.
+— see § 9 criterion 6 (the behaviour that must hold) and § 10 (the risk it carries).
 
 ## 6. Implementation Plan
 
-- [ ] **Phase 1 — the check, first and regardless of § 4.** A test asserting that every task document
-      with `status: accepted` has a registry row reading `accepted`, and the converse. This is the
-      part that makes drift loud; it is worth landing even if § 4 chooses "no automation".
-- [ ] **Phase 2 — measure the siblings.** Run the same comparison over the bug and epic registries
-      and report. Scope stays as § 3 says unless the numbers say otherwise.
-- [ ] **Phase 3 — decide § 4 and record the reasoning** in the implementation report.
-- [ ] **Phase 4 — implement the chosen owner**, if it is a write.
-- [ ] **Phase 5 — update `docs/standards/task-registry.md`** to name the real owner, replacing the
-      interim "tick it by hand" instruction.
+- [x] **Phase 1 — the check, first and regardless of § 3.** Add
+      `evals/shared/tests/task-registry-drift.test.mjs`: for every task document under `docs/tasks/`,
+      compare its frontmatter `status:` against the Status cell of its row in
+      `docs/tasks/task-registry.md`, and fail on either direction of divergence
+      (`accepted` document with a non-`accepted` row, and the converse). Carry the non-vacuity floor
+      and the exclusions from § 8. **Verify the file is actually executed** — `package.json`'s `test`
+      script lists per-directory globs by hand; `evals/shared/tests/*.test.mjs` is currently among
+      them, but confirm rather than assume, because a suite outside every glob runs nowhere and
+      reports nothing. This is the part that makes drift loud; it is worth landing even if § 3
+      chooses "no automation".
+- [x] **Phase 2 — measure the siblings.** Run the same comparison, as a one-off script (not a
+      committed test), over `docs/bugs/bug-registry.md` and `docs/development/epic-registry.md`
+      against their documents. **Report the counts in this run's implementation report** under a
+      "Sibling registry measurement" heading — the numbers are the deliverable, whether or not they
+      change anything. Scope stays as § 4 says unless the numbers say otherwise.
+- [x] **Phase 3 — decide § 3 and record the reasoning** in the implementation report, under a
+      "Registry-tick ownership decision" heading: the option chosen, the two rejected, and why.
+- [x] **Phase 4 — implement the chosen owner**, if it is a write. Files per § 7; edit
+      `shared/resources/` sources and re-run `npm run bundle` if the change lands in a bundled file.
+- [x] **Phase 5 — update `docs/standards/task-registry.md`** to name the real owner, replacing the
+      interim "tick it by hand" instruction and the forward-reference to this task.
 
-## 7. Testing Strategy
+## 7. Files Summary
+
+### Add
+
+| File | What it is |
+| :--- | :--- |
+| `evals/shared/tests/task-registry-drift.test.mjs` | Phase 1 — the drift check. 3 tests. Imports `parseRegistry` / `parseFrontmatterStatus` from `select-next.mjs`; never restates the parser or the vocabulary. `MIN_ROWS = 90` is the non-vacuity floor. Landed in `evals/shared/tests/` because `package.json`'s `test` script already globs that directory — verified, not assumed (§ 8). |
+| `shared/resources/registry-tick.js` | Phase 4 — the writer. CLI, `--json`/`reason` contract, peer of `tracker-comment.js`. Exits 0 on every outcome. Carries the story-run guard. |
+| `shared/resources/tests/registry-tick.test.mjs` | Phase 4 — 11 behavioural tests, all of which run the CLI against a throwaway registry. Globbed by `shared/resources/tests/*.test.mjs`. |
+
+### Modify
+
+| File | Change |
+| :--- | :--- |
+| `skills/finalise/SKILL.md` | New acceptance step 4 calling `registry-tick.js`, with the full `reason` table and the lite-mode statement; one new DoD checklist line. |
+| `skills/finalise/references/registry-tick.js` | Generated by `npm run bundle` — do not edit. |
+| `docs/standards/task-registry.md` | Phase 5 — names `/finalise` as the owner, explains why a pre-merge tick is correct for the Status column, and points at the drift check as the backstop. Replaces the interim "tick it by hand" step. |
+| `docs/tasks/task-registry.md` | Row 103's own tick (by `registry-tick.js` at Step 7 — the mechanism's first live use). |
+| `docs/development/epic-registry.md` | Epic 3's Status corrected `📋 Planned` → `✅ Accepted`. Found by the Phase 2 measurement; the document and all three of its stories read `accepted`. |
+
+### Delete
+
+None.
+
+## 8. Testing Strategy
 
 - **The drift check itself, mutation-proven:** revert one swept row to `planned` and confirm the
   check goes red. A check that cannot fail on the exact defect that motivated it is not a check.
@@ -118,32 +181,34 @@ None if a check. If `finalise` gains the write, it gains a side effect on a file
   the path where side effects were skipped.
 - A story run must **not** attempt a task-registry write.
 
-## 8. Success Criteria
+## 9. Success Criteria
 
-1. [ ] A check fails when a document is `accepted` and its registry row is not, and vice versa.
-2. [ ] That check is mutation-proven — reverting a row makes it go red.
-3. [ ] The check carries a non-vacuity floor and cannot pass by matching nothing.
-4. [ ] `cancelled` and in-flight tasks do not trip it.
-5. [ ] The § 4 decision is recorded with its reasoning, not just its outcome.
-6. [ ] If a write is implemented: lite mode ticks the row, and a story run does not attempt one.
-7. [ ] `docs/standards/task-registry.md` names the real owner and no longer says "by hand" if that
+1. [x] A check fails when a document is `accepted` and its registry row is not, and vice versa.
+2. [x] That check is mutation-proven — reverting a row makes it go red.
+3. [x] The check carries a non-vacuity floor and cannot pass by matching nothing.
+4. [x] `cancelled` and in-flight tasks do not trip it.
+5. [x] The § 3 decision is recorded with its reasoning, not just its outcome.
+6. [x] If a write is implemented: lite mode ticks the row, and a story run does not attempt one.
+7. [x] `docs/standards/task-registry.md` names the real owner and no longer says "by hand" if that
        has stopped being true.
-8. [ ] The bug and epic registries are **measured** and the result reported, whether or not they are
+8. [x] The bug and epic registries are **measured** and the result reported, whether or not they are
        changed.
+9. [x] The check is wired into a suite `npm test` actually executes — evidenced by the assertion count
+       appearing in the run output, not by the file's presence on disk.
 
-## 9. Risk Assessment
+## 10. Risk Assessment
 
 **Medium**, and the risk is in the write, not the check.
 
 | Risk | Mitigation |
 | :--- | :--- |
-| `finalise` writes the row before merge, citing a PR that has not merged | Part of the § 4 decision; the post-merge owner exists precisely for this |
-| The write lands on a story run, where the task registry is meaningless | Explicit test (§ 7) |
-| Lite mode skips the new side effect, as it has before | Explicit test (§ 7) |
+| `finalise` writes the row before merge, citing a PR that has not merged | Part of the § 3 decision; the post-merge owner exists precisely for this |
+| The write lands on a story run, where the task registry is meaningless | Explicit test (§ 8) |
+| Lite mode skips the new side effect, as it has before | Explicit test (§ 8) |
 | Automation writes a *wrong* row, which is worse than a stale one | Phase 1 lands the check first, so a wrong write is caught by the same assertion |
-| Sibling registries are swept without evidence of drift | Phase 2 measures before § 3 is widened |
+| Sibling registries are swept without evidence of drift | Phase 2 measures before § 4 is widened |
 
-## 10. Rollback Plan
+## 11. Rollback Plan
 
 Remove the write; keep the check. The check is independently valuable — with it and no automation,
 the repository is still strictly better off than before this task, because the omission becomes loud.
@@ -153,10 +218,15 @@ the repository is still strictly better off than before this task, because the o
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-09-09 | 0.1 | Filed after a sweep of 17 stale rows (T67–T96). Root cause: no skill owns the write, and the standard named `finalise` as the owner while telling readers not to tick by hand. The standard was corrected in the same change; this task gives the write an owner. | Claude |
+| 2026-09-10 | 0.2 | Review passed (9/10, READY TO IMPLEMENT) — 0 critical, 4 important fixed. Added the missing mandatory § 3 Technical Background (current-vs-target, absorbing the former § 4 decision table) and § 7 Files Summary; renumbered to the 11-section template contract and repaired every § cross-reference. Named file paths and report destinations in every Implementation Plan phase, and added success criterion 9 (the check must be in a glob `npm test` executes). Linked GitHub issue #374. | review-task |
+| 2026-09-10 |  | Status → ready-for-development | review-task |
+| 2026-09-10 |  | Implemented — 6 files, 14 tests (3 drift-check + 11 registry-tick). `finalise` chosen as the § 3 owner; check landed first and retained. Epic registry measured: 1 stale row of 4, corrected. Bug registry measured: 0 of 12. | develop |
 
 ## Progress Tracking
 
-Not started.
+All 5 phases complete. The § 3 decision was **`finalise` owns the write**, with the Phase 1 check
+retained as the backstop. Reasoning, the two rejected options, and the Phase 2 measurement are in
+`task.103.implementation.1.pipeline-owns-the-registry-tick-initial-run.md`.
 
 ## References
 
