@@ -153,8 +153,15 @@ function main(argv) {
   }
 
   if (args.json) {
+    // `body` is deliberately dropped from the payload. It exists on the
+    // returned object only so the parity test can assert the authoring and
+    // sync paths resolved the same text; emitting it makes the JSON 94%
+    // document (17.3 KB of an 18.3 KB payload on this repo's own task file),
+    // which is noise for every consumer and a log-bloat hazard for the ones
+    // that capture it.
+    const { body: _body, ...payload } = result;
     process.stdout.write(
-      JSON.stringify({ action: "card-preflight", ...result }, null, 2) + "\n",
+      JSON.stringify({ action: "card-preflight", ...payload }, null, 2) + "\n",
     );
   } else if (!args.quiet || !result.ok) {
     process.stdout.write(

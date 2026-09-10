@@ -38,7 +38,7 @@ trip.
 | 2. review-task             | ✅ Done    | `task.102.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT, 8/10. 0 Critical, 4 Important (all applied), 2 Optional. Report: `task.102.review.1.authoring-time-card-preflight.md`. Status Draft → Ready for Development. | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 4 phases. 11 new tests, 4 mutations proved red. `npm run ci:fast` green (3047 tests, 0 fail). 1 develop iteration; 2 fast-gate runs (first red on prettier only). | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #373 → develop. Commit `8f7c9983`, 46 files, +12,714/−112. Issue #372 commented (`in-review`). Scope leak check: clean. | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.102.qa.{N}.*.md`; `task.102.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.102.qa.{N}.*.md`; `task.102.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle. QA CONCERNS(90) → qa-fix → PASS(100). Step 5c `/review-pr` **CONCERNS**, 3 of 4 findings fixed in-review; PC-2 left for Step 7. | —                    |
 | 7. finalise                | ⏳ Pending | `task.102.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -230,6 +230,34 @@ distinction is the whole game.
 ---
 
 ## QA Iteration History
+
+### Cycle 1 — 2026-09-10
+
+| Stage | Outcome |
+| :--- | :--- |
+| Step 5 `/qa-task` | **CONCERNS** (90/100). 9/9 success criteria verified by execution; 0 HIGH, 1 MEDIUM, 1 LOW. |
+| Step 5b `/qa-fix` | Both fixed and mutation-proved. Gate updated in place → **PASS** (100/100). |
+| Step 5c `/review-pr` | **CONCERNS** — 3 medium + 1 low. Three fixed in-review; one left for Step 7. |
+
+**What each stage actually caught, because the three are not redundant:**
+
+- **QA (T102-001)** — `card-preflight.js` hand-rolled a frontmatter parse `jira-sync.js` already
+  exports, and the two diverged. Probed across all 177 documents in the repo: 0 verdict
+  disagreements, so latent. Still the duplication class this task removes, one function down.
+- **qa-fix, and its own first attempt was wrong** — the regression test initially compared the two
+  paths' **verdicts**. Reinstating the hand-rolled parse turned only the structural test red: the
+  divergence matches on every verdict it was tested against, so a verdict-only assertion would have
+  passed while the two paths read different text. Corrected to compare the resolved **body**.
+- **review-pr (CR-1)** — the correction above added `body` to `preflight()`'s return, and it flowed
+  into the `--json` payload: **17,271 of 18,321 bytes, 94% document**. A regression introduced by a
+  fix, invisible to the QA gate that had already passed. This is the case for running a lens *after*
+  the gate rather than only inside it.
+- **review-pr (PC-1)** — § 9 Files Summary omitted `card-preflight.js`, the deliverable. The
+  conformance lens is the only one that reads the document against the diff, and it is the only
+  reason this was found.
+
+Findings by stage: QA 2, review-pr 4. Fixed: 5. Deferred to Step 7: 1 (PC-2, ticking the success
+criteria — Step 7's job).
 
 _Track each QA review/fix cycle._
 

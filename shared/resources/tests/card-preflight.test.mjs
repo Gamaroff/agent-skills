@@ -371,6 +371,35 @@ test("B: the authoring path and the sync path read the SAME body", () => {
   assert.equal(compared, 4, "non-vacuity: every shape must have been compared");
 });
 
+test("B: --json does not emit the document body", () => {
+  // `body` is on the returned object for the parity test above. Emitting it
+  // makes the payload 94% document — found by /review-pr's code lens after the
+  // parity fix added the field.
+  const real = join(
+    repoRoot,
+    "docs/tasks/task.102.authoring-time-card-preflight/task.102.authoring-time-card-preflight.md",
+  );
+  const { code, stdout } = runCli(["--file", real, "--json"]);
+  assert.equal(code, 0);
+  const payload = JSON.parse(stdout);
+  assert.equal(
+    payload.body,
+    undefined,
+    "--json must not carry the document body",
+  );
+  assert.ok(
+    payload.ok === true && Array.isArray(payload.blocks),
+    "non-vacuity: the payload must still be a real result",
+  );
+  assert.ok(
+    stdout.length < 4096,
+    `--json payload is ${stdout.length} bytes — the body is probably back in it`,
+  );
+
+  // ...while the library caller still gets it, which is what the parity test needs.
+  assert.equal(typeof pf.preflight(real, "task").body, "string");
+});
+
 test("B: card-preflight does not implement its own frontmatter parse", () => {
   const src = readFileSync(CLI, "utf8");
   assert.match(
