@@ -265,7 +265,9 @@ EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage develop-complete --json
+  --stage develop-complete \
+  --slot count="{audit.completed}" \
+  --json
 ```
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
@@ -288,10 +290,19 @@ EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage develop-complete --json
+  --stage develop-complete \
+  --slot count="{audit.completed}" \
+  --json
 ```
 
 Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
+
+> **`count` is the only slot `develop-complete` reads, and it is numeric.** It renders as
+> "(N separate pieces of work)". `audit.completed` is bound by the loop-audit result immediately above,
+> which is why the slot goes here and not in an earlier step. The engine accepts **positive integers
+> only** — a non-numeric string, a zero or a negative is dropped rather than rendered, so the lead
+> degrades to the shorter true sentence instead of printing "(NaN pieces)". Do not pass
+> `{audit.completed}/{audit.total}`; that is a string, and it will be dropped silently.
 
 Use `audit.completed` / `audit.total` from the final loop-audit result. Use the last `TEST_EXIT` value: `0` → "all passing"; non-zero → "{N} failures — see implementation report". On failure: log warning in Issues Log and continue.
 

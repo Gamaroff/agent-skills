@@ -312,8 +312,22 @@ EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage qa-cycle-{N} --json
+  --stage qa-cycle-{N} \
+  --slot verdict="{PASS / CONCERNS / FAIL / WAIVED}" \
+  --slot cycle="{N}" \
+  --json
 ```
+
+> **`qa-cycle` reads exactly two slots: `verdict` and `cycle`.** It does **not** read `count` — that
+> slot belongs to `develop-complete`, and passing it here is silently dropped.
+>
+> `verdict` is the one slot that is **mapped rather than printed**: the engine turns `PASS` /
+> `CONCERNS` / `FAIL` / `WAIVED` into a plain sentence, because nothing about the word "CONCERNS" tells
+> an outside reader whether to worry. Pass the **raw gate token** here — this is the one place a raw
+> token is correct, because the mapping exists. An unrecognised verdict renders "The results are
+> recorded below" rather than defaulting to reassurance, so a typo degrades safely.
+>
+> `cycle` is numeric and positive-integer-only; it is the same `{N}` already in the stage suffix.
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
@@ -796,8 +810,13 @@ EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage qa-fix-{N} --json
+  --stage qa-fix-{N} \
+  --slot cycle="{N}" \
+  --json
 ```
+
+> **`cycle` is the only slot `qa-fix` reads**, and it is the same `{N}` as the stage suffix. Numeric,
+> positive integers only.
 
 Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
 

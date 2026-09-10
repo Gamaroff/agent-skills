@@ -12,13 +12,40 @@ description: How every pipeline step and skill posts a comment to a tracker issu
 > intercepted, retried by code, or made idempotent, because interception needs a
 > chokepoint and prose has none.
 >
-> **On GitHub the picture is not yet complete.** A number of authored prose sites
-> still post with a bare `gh issue comment` — they are covered by
-> `tracker_write()` for interception, but they carry no marker, so they are not
-> idempotent and a resumed run comments again. Those sites were out of this
-> task's scope, which targeted the MCP sites and the one stray `curl`. Do not
-> read the paragraph above as "nothing else posts a comment"; read it as "nothing
-> else *should*, and on Jira nothing else does."
+> **The GitHub picture is now complete too, and a test is what keeps it that
+> way.** Until task 105 a number of authored prose sites still posted with a bare
+> `gh issue comment`: covered by `tracker_write()` for interception, but carrying
+> no marker, so they were not idempotent and a resumed run commented again — and
+> being `gh`-only, they silently posted nothing at all on a Jira project. Seven
+> such sites remained, across `develop-pipeline-step-7-finalise.md`, `qa-story`,
+> `qa-task` and `review-story`. All seven now route through this CLI.
+>
+> **This paragraph is kept rather than deleted, because it is the record of why
+> the guard exists.** A convention documented and not enforced is a convention
+> that drifts: this one drifted for months while the sentence above it claimed
+> otherwise, and nothing noticed, because a comment with no marker posts exactly
+> as successfully as one with a marker. What changed is not that the prose was
+> corrected — it is that `tests/mutation-call-site-coverage.test.js` now fails on
+> a bare `gh issue comment` **invocation** in shipped source outside a named
+> allowlist. Correct the prose and the drift returns; keep the test and it
+> cannot.
+>
+> **One genuine exception exists, and it is a matter of scope rather than of
+> allowlisting.** `develop-pipeline-on-precompact.sh` still posts with a bare
+> `gh issue comment`, because it is a shell hook that must run with no Node
+> available and must never block compaction. The guard reads **`.md` canonical
+> prose** — skill bodies and the shared sources they are bundled from — so a
+> `.sh` hook is outside its scope entirely and needs no entry. That is deliberate:
+> it is the only shell site in the tree and its exclusion is permanent, so
+> widening the guard to `.sh` would buy three allowlist entries and no protection.
+>
+> The allowlist proper (`NOT_CALL_SITES`) holds files whose mentions are
+> *classification* — the defer roster, the CLI contracts — and each entry states
+> why. Prose *about* a bare `gh issue comment`, including the sentences in this
+> very paragraph, needs no entry at all: the guard matches invocation shape, not
+> the bare literal. A guard that failed on the documentation of its own rule would
+> be patched by widening its allowlist, which is how an allowlist stops meaning
+> anything.
 >
 > PR comments are a different concern entirely and are not covered here.
 
@@ -35,8 +62,18 @@ EOF
 
 node .agents/skills/{skill}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage {moment} --json
+  --stage {moment} \
+  --slot {name}="{value}" \
+  --json
 ```
+
+The `--slot` line is part of the canonical shape, not an optional extra: the
+plain-language lead is rendered from the stage whether or not slots are supplied,
+but with none it says the same thing every time, and a paragraph a reader has
+seen five times is a paragraph they have learned to skip. **Which slot names a
+stage reads is fixed** — see [`stakeholder-summary.md`](stakeholder-summary.md)
+— and the engine validates none of them, so a name the stage's template does not
+read is silently dropped.
 
 **Always `--body-file`, never an inline `--body` string.** Comment bodies carry
 backticks, `$(…)`, quotes and newlines; an interpolated body is a shell

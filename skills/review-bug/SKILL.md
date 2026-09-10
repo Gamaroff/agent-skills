@@ -162,8 +162,22 @@ EOF
 
 node .agents/skills/review-bug/references/tracker-comment.js \
   --issue "${TRACKER_ISSUE}" --body-file .claude/state/comment-body.md \
-  --stage review-bug --json
+  --stage review-bug \
+  --slot outcome="{plain-language outcome — see below}" \
+  --slot blocking="${CRITICAL}" \
+  --json
 ```
+
+> **`review-bug` reads `outcome` and `blocking`.** `outcome` is a **text** slot interpolated verbatim,
+> so do **not** pass `${RECOMMENDATION}` raw — `GO` / `NO-GO` are internal vocabulary, and
+> [`references/stakeholder-summary.md`](references/stakeholder-summary.md) requires internal tokens to
+> be mapped rather than passed through. Map at the call site: GO → `ready to fix`, NEEDS DETAIL →
+> `needs more detail`, NO-GO → `not ready to fix`. `blocking` is a **boolean** slot whose two
+> renderings are opposites; `${CRITICAL}` is safe because the engine reads `"0"` as *absent*, which
+> renders "Nothing is blocking a fix from starting" — the right sentence for a clean review.
+>
+> The fix-readiness score stays in the body: a number on an unexplained scale is what the standard
+> forbids in a lead.
 
 Read `reason` per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md). Failure logs a warning and does not halt.
 

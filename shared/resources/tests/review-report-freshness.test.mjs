@@ -841,18 +841,32 @@ test("the no-report message makes no claim about a review having run", () => {
 
 // ── 12. §9's scope guarantee, asserted mechanically ────────────────────────
 
-test("the develop-story halves of the step-2 resource are untouched by this change", () => {
+test("the develop-story TABLES in the step-2 resource are untouched by this change", () => {
   // §9 requires "/develop-story's tables are unchanged — asserted, not assumed".
   // It was verified by hand three times during the run, which is exactly the kind
-  // of guarantee that regresses silently. This pins it: a future edit or bundler
-  // change that alters a develop-story section fails here.
+  // of guarantee that regresses silently. This pins it: an edit or bundler change
+  // that alters a develop-story DECISION TABLE fails here.
+  //
+  // **Scoped to the tables, which is what §9 actually promised.** The first cut
+  // extracted every line of every `#### develop-story` section and compared the
+  // lot against origin/develop — turning one task's scope promise into a
+  // permanent freeze on a file other tasks legitimately edit. Task 105 hit it
+  // immediately: adding `--slot` values to the review comment is required at BOTH
+  // arms (the lead is a property of the moment, not of the tracker), so the
+  // symmetric, correct change failed a guard that had nothing to say about it.
+  //
+  // A guard whose failure message names a constraint the change does not violate
+  // gets satisfied by contorting the change or by deleting the guard. Narrowing
+  // it to the tables keeps the protection that was argued for and drops the part
+  // that was never claimed.
   const extract = (text) => {
     const out = [];
     let on = false;
     for (const line of text.split("\n")) {
       if (line.startsWith("#### develop-story")) on = true;
       else if (line.startsWith("#### develop-task")) on = false;
-      if (on) out.push(line);
+      // Table rows and their header rules only — the decision tables §9 named.
+      if (on && /^\|/.test(line)) out.push(line);
     }
     return out.join("\n");
   };
@@ -876,6 +890,8 @@ test("the develop-story halves of the step-2 resource are untouched by this chan
   assert.equal(
     extract(resource),
     extract(base),
-    "a `#### develop-story` section changed; §9 requires them byte-identical",
+    "a `#### develop-story` DECISION TABLE changed; §9 requires them byte-identical. " +
+      "Prose and code fences inside those sections are deliberately NOT pinned — " +
+      "only the tables are.",
   );
 });

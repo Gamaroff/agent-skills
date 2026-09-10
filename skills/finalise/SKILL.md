@@ -1240,7 +1240,9 @@ EOF
 
         node .agents/skills/finalise/references/tracker-comment.js \
           --issue {jira_key} --body-file .claude/state/comment-body.md \
-          --stage done --json
+          --stage done \
+          --slot pr="{PR_URL}" \
+          --json
         ```
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
@@ -1335,12 +1337,18 @@ EOF
 Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.
 EOF
    node references/tracker-comment.js --issue {github_issue} \
-     --body-file .claude/state/comment-body.md --stage done --json
+     --body-file .claude/state/comment-body.md --stage done \
+     --slot pr="{PR_URL}" \
+     --json
 
    # Close the issue
    node references/tracker-issue.js --kind close --issue {github_issue} --reason completed
    ```
 
+   > **`pr` is the only slot `done` reads.** Pass the URL, not the number — the lead names it for a
+   > reader deciding whether anything is left to do, and a bare `#412` tells them nothing they can act
+   > on.
+   >
    > The close no longer carries `--comment`. The completion comment is posted by
    > `tracker-comment.js` immediately above, which is the marked, idempotent path —
    > a `--comment` on the close is an *unmarked* second comment that the marker

@@ -2272,8 +2272,12 @@ User Can Now: Run `/develop` to begin implementation
 EOF
 
    node .agents/skills/review-story/references/tracker-comment.js \
-     --issue {jira_key from frontmatter} --body-file .claude/state/comment-body.md \
-     --stage review-story --json
+     --issue "$REVIEW_ISSUE" --body-file .claude/state/comment-body.md \
+     --stage review-story \
+     --slot outcome="{plain-language outcome — see the table below}" \
+     --slot blocking="${CRITICAL}" \
+     --json \
+     || echo "⚠️  Tracker issue comment failed — continuing"
    ```
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
@@ -2307,27 +2311,50 @@ EOF
    bash references/set-github-project-priority.sh "$GITHUB_ISSUE" || true
    ```
 
-   Post the comment (wrapped in `tracker_call_with_retry` — 3× exponential backoff, sourced from `references/resolve-platform.sh`):
+   **There is no separate comment call on this arm.** The Jira block above is the whole of it —
+   `tracker-comment.js` resolves `TRACKER` itself, so the two arms differ only in which identifier
+   `$REVIEW_ISSUE` holds. Set it once, before that block, and let the single call serve both:
 
    ```bash
-   tracker_call_with_retry gh issue comment "$GITHUB_ISSUE" --body "## Story Review Complete
-
-   **Recommendation**: ${RECOMMENDATION}
-   **Readiness Score**: ${SCORE}/10
-
-   | Severity | Count |
-   |----------|-------|
-   | Critical 🚨 | ${CRITICAL} |
-   | Important ⚠️ | ${IMPORTANT} |
-   | Optional 💡 | ${OPTIONAL} |
-
-   **Review artifact**: \`${REVIEW_FILE}\`
-   ${CHANGES_SECTION}" \
-     || echo "⚠️ GitHub issue comment failed — continuing"
+   if [ "$TRACKER" = "jira" ]; then
+     REVIEW_ISSUE=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
+   else
+     REVIEW_ISSUE="$GITHUB_ISSUE"
+   fi
+   [ "$REVIEW_ISSUE" = "null" ] && REVIEW_ISSUE=""
    ```
 
-   On success → confirm: "✅ Review summary posted to GitHub issue #${GITHUB_ISSUE}."
-   On failure → report error, do NOT halt.
+   If `REVIEW_ISSUE` is empty, skip the comment silently.
+
+   On `posted` → confirm: "✅ Review summary posted to tracker issue ${REVIEW_ISSUE}."
+   On failure → report the error, do NOT halt.
+
+   > **This replaced a bare `gh issue comment` carrying a multi-line inline `--body`, and
+   > `review-story` was the last `review-*` skill whose GitHub arm was not on the CLI.** `review-task`
+   > has had both arms on the engine for some time; the asymmetry was an accident, and it is why the
+   > same review outcome read differently depending on which tracker a project used.
+   >
+   > **Which body won, and why.** The two arms carried the *same content* — recommendation, score, the
+   > severity table, the review artifact, the changes section — so nothing had to be chosen between
+   > them on substance. The Jira arm's **form** won: it is a heredoc with body lines at column 0,
+   > whereas the GitHub arm's inline `--body` was indented to match the surrounding numbered list, and
+   > those leading spaces are written into the posted comment verbatim. The collapse therefore also
+   > fixes a stray indented block that GitHub readers were seeing and Jira readers were not.
+   >
+   > **It gave up the `tracker_call_with_retry` 3× backoff.** The engine owns the `ACCESS_TRACKER`
+   > deferral gate but has no retry of its own, and re-wrapping it would double-defer — so the retry is
+   > genuinely given up, and `|| echo … continuing` stands in its place, matching `review-task`.
+   >
+   > **`review-story` reads `outcome` and `blocking`.** `outcome` is a **text** slot interpolated
+   > verbatim, so do **not** pass `${RECOMMENDATION}` raw — `GO`, `NO-GO` and `NEEDS REVISION` are
+   > internal vocabulary, and `stakeholder-summary.md` requires internal tokens to be mapped rather
+   > than passed through. Map at the call site: GO → `ready to build`, NEEDS REVISION →
+   > `needs more detail`, NO-GO → `needs rework`. `blocking` is a **boolean** slot whose two renderings
+   > are opposites; `${CRITICAL}` is safe because the engine reads `"0"` as *absent*, which renders
+   > "Nothing is blocking the work from starting" — the correct sentence for a clean review.
+   >
+   > The score stays in the body. A number on an unexplained scale is what the standard forbids in a
+   > lead.
 
 **Output**: Tracker issue updated with review outcome comment (Jira or GitHub, whichever is active).
 
