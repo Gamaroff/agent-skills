@@ -131,11 +131,17 @@ When `/develop` runs tests during the develop loop, test output must be captured
 
 ### What the loop runs — the fast gate
 
-`<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
-**`npm run ci:fast`**. It is the project's cheap CI-equivalent: formatting plus the hermetic suite,
-and deliberately **not** the slow tier.
+`<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`. It is the project's
+cheap CI-equivalent: formatting plus the hermetic suite, and deliberately **not** the slow tier.
 
-Two halves of that, and both are load-bearing:
+**This key is required configuration with a suggested value, not a default that works everywhere.**
+The suggested value is **`npm run ci:fast`**, which is what this repository defines and what the
+key falls back to when a project sets nothing — but a fallback is a guess. A skills library cannot
+know a consumer's script names, and plenty of projects define neither `ci:fast` nor `ci`, and have
+no formatter for the default's formatting half to run. Set the key to your project's own cheap
+CI-equivalent; the precondition below is what tells you when you have not.
+
+Two halves of that value, and both are load-bearing:
 
 - **Formatting belongs in the loop.** Its absence is what shipped the task-67 red build — `npm test`
   passed locally throughout, and CI failed on `prettier --check` after `/finalise` had already
@@ -144,8 +150,53 @@ Two halves of that, and both are load-bearing:
   paying it on every iteration is what makes the correct fix feel expensive enough to be reverted.
   It runs once, at `develop-next`'s merge gate, via `<qualityGateCommand>`.
 
-A project that sets neither key gets `npm run ci:fast`; a project whose scripts are named differently
-sets `develop.fastGateCommand` and nothing else changes.
+### Precondition — the gate must resolve before the first iteration
+
+Run this **once, before the loop's first iteration**. It does not belong in the Output Capture
+Pattern below, which runs on every pass.
+
+```bash
+# Bind the configured value FIRST. `<fastGateCommand>` is a placeholder this
+# document's reader substitutes; a bare `$fastGateCommand` is an UNSET variable,
+# and an unset variable makes the extraction below yield nothing, which makes the
+# check skip — a vacuous pass indistinguishable from a correct one.
+FAST_GATE_COMMAND="<fastGateCommand>"
+
+# `npm run` with no arguments lists the scripts the project actually defines,
+# one per line, indented by two spaces.
+GATE_SCRIPT=$(printf '%s' "$FAST_GATE_COMMAND" | sed -nE 's/^npm run ([A-Za-z0-9:_-]+).*/\1/p')
+if [ -n "$GATE_SCRIPT" ] && ! npm run 2>/dev/null | grep -qE "^[[:space:]]+${GATE_SCRIPT}$"; then
+  echo "HALT: develop.fastGateCommand runs '${GATE_SCRIPT}', which this project does not define."
+  echo "      Set develop.fastGateCommand in skills-config.yaml to this project's cheap CI-equivalent."
+  exit 1
+fi
+```
+
+**HALT rather than substitute.** Choosing a replacement gate is a project decision with a
+correctness consequence — it decides what every iteration is checked against — and it belongs in
+`skills-config.yaml`, where the next run reads the same value. Without this precondition the failure
+lands mid-iteration, as `Missing script: ci:fast`, at the point where a substitute gets invented
+under time pressure; on the run that produced this check the substitution was invented per-run, so
+the fast gate silently differed between runs and nothing recorded that it had.
+
+**What the extraction claims, and what it does not.** The `sed` matches only a command that *begins*
+`npm run <script>`, and the character class deliberately excludes `.` and `/`, so nothing reaching
+`grep -E` can be a regex metacharacter:
+
+| `develop.fastGateCommand` | `GATE_SCRIPT` | Behaviour |
+| --- | --- | --- |
+| `npm run ci:fast` | `ci:fast` | checked |
+| `npm run ci:fast --silent` | `ci:fast` | checked |
+| `npm run ci:fast && npm run lint` | `ci:fast` | **first** script checked — it must exist for the command to get off the ground |
+| `prettier --check . && jest` | *(empty)* | skipped |
+| `make test`, `pnpm run ci:fast`, `npm test` | *(empty)* | skipped |
+| unset or empty | *(empty)* | skipped |
+
+**Extracting nothing means skip, never fail.** A check that mis-parses would HALT every consumer,
+including correct ones, so the extraction is narrow and its fail-safe direction points at *skipping*.
+That is the opposite of the QA loop's exit condition and deliberately so: a false HALT here is loud
+and instantly diagnosable from the message, whereas a false skip merely returns to the silent
+mid-loop death this precondition exists to remove.
 
 ### Output Capture Pattern
 

@@ -624,9 +624,12 @@ TEST_LOG=".claude/state/test-output-${ITER}-$(date +%s).log"
 TEST_EXIT=$?
 ```
 
-`<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
-**`npm run ci:fast`** — the project's cheap CI-equivalent (formatting plus the hermetic suite), and
-deliberately not its slow end-to-end tier. Running only the test suite here is what let a task ship a
+`<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml` — the project's cheap
+CI-equivalent (formatting plus the hermetic suite), and deliberately not its slow end-to-end tier.
+**`npm run ci:fast` is the suggested value, not a default that works everywhere**: a skills library
+cannot know a consumer's script names, so when this skill runs inside the develop loop that loop
+verifies the named script resolves before its first iteration and HALTs naming the key if it does
+not. Running only the test suite here is what let a task ship a
 red build on formatting alone; running the slow tier here is what would make the correct fix feel
 expensive enough to be reverted. The slow tier runs once, at `develop-next`'s merge gate, via
 `<qualityGateCommand>`.
