@@ -143,9 +143,19 @@ that the survivors survived.
 diff /tmp/pre-mutation.ts path/to/source.ts || echo "MUTATION APPLIED"
 ```
 
-The three cost about twenty seconds. They are cheap on purpose: a validation step
-expensive enough to feel like a detour is one that gets skipped on the run where
-it mattered.
+**The three cost two more runs of the matrix command, plus a diff.** Not a fixed
+number of seconds — checks 1 and 2 each run that command, so their cost is whatever
+it costs, which is why this is stated as a multiple rather than a constant. Measure
+it once for your suite if you want the wall-clock figure; on the repository this
+document ships in, one run is 0.3 s scoped to a file and 54 s across the whole
+suite, so a constant would have been wrong either way.
+
+The number that matters is the **ratio**, and it is what makes this cheap: a matrix
+of N mutations already pays N runs of that command, so validating the probe first
+adds `2/N`. At five mutations that is a 40% surcharge; at twenty it is 10%; and the
+alternative it buys you out of is recording all N as evidence when none of them
+executed. Keep it cheap anyway — a validation step expensive enough to feel like a
+detour is one that gets skipped on the run where it mattered.
 
 4. **The judgement — the mutation must change the VALUE under test, not merely
    produce a diff.** Re-read the edit and confirm it expresses the behaviour you
@@ -169,10 +179,10 @@ than changing its value:
 +STATU S="ready"
 ```
 
-**That edit passes the applied-check.** There is a real diff, so step 2 is
-satisfied; the suite goes red, which is what was predicted; every mechanical signal
-agrees — and the proof is void, because the script broke rather than the behaviour
-changing. Step 2's `diff` closes the *"nothing happened"* case. It does not close
+**That edit passes the applied-check.** There is a real diff, so step 2 of the
+procedure is satisfied; the suite goes red, which is what was predicted; every
+mechanical signal agrees — and the proof is void, because the script broke rather
+than the behaviour changing. That `diff` closes the *"nothing happened"* case. It does not close
 this one, and a reader who takes "confirm it applied" as the whole rule will record
 this reading as a kill.
 

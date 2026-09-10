@@ -1,0 +1,60 @@
+schema: 1
+task: 'task.100.mutation-proving-false-red'
+task_title: 'the false-RED mirror in mutation-proving'
+gate: CONCERNS
+status_reason: 'All five success criteria met, including the discriminating row-5 check; full test and eval tiers green. One medium finding: the section ships an unmeasured wall-clock cost claim that is wrong in both directions, and it is the claim the task itself nominated for checking.'
+reviewer: 'QA Engineer'
+updated: '2026-09-10T03:40:00Z'
+
+top_issues:
+  - id: 'TASK-100-001'
+    severity: medium
+    file: 'shared/resources/mutation-proving.md'
+    finding: '"The three cost about twenty seconds" is an unmeasured constant. The three mechanical checks are two runs of the matrix command plus a diff, so their cost scales with that command. Measured here: 53,966 ms per whole-suite run (claim ~5x too fast) and 294 ms per scoped run (claim ~33x too slow).'
+    suggested_action: 'Express the cost in matrix-command runs rather than wall-clock seconds, and make the cheapness argument relative — an N-mutation matrix already costs N runs, so probe validation adds two more runs and a diff (2/N overhead). Keep check 4 free of any time claim, per the task section 8.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3023
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, '2b', 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No executable code, no credential handling, no new executed command. The snippet engine classified all three bash blocks as mutating and ran none. Verdict reached by reading the diff and the engine output, not by executing hostile candidates — hence reasoned, which is the accurate value rather than a failing grade.'
+  performance:
+    status: PASS
+    notes: 'No runtime code. Document grows 220 to 317 lines; loaded on demand by six skills rather than always, so the cost lands only where it is read.'
+  reliability:
+    status: PASS
+    notes: 'Purely additive. Rollback (delete section, re-bundle) verified feasible by the same mechanism the change used. No heading renamed or removed, so no inbound reference can dangle.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Well-placed section mirroring the structure it complements, and six provably clean regenerations. The concern is TASK-100-001 — an unverified quantitative claim in a reference document that closes by forbidding unverified claims. Resolving it clears this axis.'
+
+recommendations:
+  immediate:
+    - action: 'Replace the twenty-second constant with a cost in matrix-command runs; state the 2/N relative overhead.'
+      refs: ['shared/resources/mutation-proving.md']
+  future:
+    - action: 'Qualify the two bare "Step 2" references as "step 2 of the procedure" — the section has its own item 2, so the referent is ambiguous at lines 171 and 174.'
+      refs: ['shared/resources/mutation-proving.md']
+    - action: 'No action now: frontmatter description is 95 words against the ~100-word guidance, so the next edit has little headroom.'
+      refs: ['shared/resources/mutation-proving.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-100-001 resolved'

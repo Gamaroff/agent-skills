@@ -186,6 +186,40 @@ meets "and why did it die?" in the same breath.
 
 Delete the section; `npm run bundle`.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.100.qa.1.mutation-proving-false-red.md](./task.100.qa.1.mutation-proving-false-red.md)
+- **Gate File**: [task.100.gate.1.mutation-proving-false-red.yml](./task.100.gate.1.mutation-proving-false-red.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3023 (3022 pass, 0 fail, 1 pre-existing skip) + full `eval:all` tier, exit 0
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Bug Resolution Summary (QA cycle 1 → fixes applied 2026-09-10)
+
+| ID | Severity | Resolution |
+| :-- | :--- | :--- |
+| `TASK-100-001` | MEDIUM | **Fixed.** The unmeasured "about twenty seconds" is replaced by a cost stated in **matrix-command runs** — "two more runs of the matrix command, plus a diff" — with the measured spread named (0.3 s scoped, 54 s whole-suite) as the reason a constant could not have been right. The cheapness argument is now the **ratio**: an N-mutation matrix already pays N runs, so validating the probe adds `2/N` (40% at five mutations, 10% at twenty). Check 4 still carries no time claim, per §8. |
+| LOW-1 | LOW | **Fixed.** Both bare `Step 2` references qualified — L181 now reads "step 2 of the procedure", and the second was rewritten to "That `diff`", removing the referent question entirely. All three mentions in the file now name the procedure explicitly. |
+| LOW-2 | LOW | **No action, by design.** `description` is 95 words against ~100 guidance — inside the limit. Recorded so the next editor knows the headroom is small. |
+
+### Key Findings
+
+All five success criteria met, including SC4 — the row-5 anti-vacuity check this task named as its own falsification test. One medium finding (`TASK-100-001`): the section states *"The three cost about twenty seconds"*, which is an unmeasured constant. The three mechanical checks are two runs of the matrix command plus a diff, so the cost scales with that command — measured at 53,966 ms per whole-suite run (claim ~5× too fast) and 294 ms per scoped run (claim ~33× too slow). §8 of this task nominated that exact claim for checking, and the document ends with `## Do not claim it unless you did it`.
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -195,6 +229,7 @@ Delete the section; `npm run bundle`.
 | 2026-09-10 | 0.3 | Review passed (9/10) — READY TO IMPLEMENT. Added the missing `## 3. Technical Background` section and renumbered §4–§11 to restore the 11-section template contract; linked GitHub issue #368. | review-task |
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Implemented — 7 files (1 source + 6 regenerated), 0 new tests (prose-only change; verified by review against the five recorded readings) | develop |
+| 2026-09-10 |  | QA gate CONCERNS (80/100) — 1 medium, 2 low; the section's ~20s cost claim does not hold | qa-task |
 
 ## Progress Tracking
 
