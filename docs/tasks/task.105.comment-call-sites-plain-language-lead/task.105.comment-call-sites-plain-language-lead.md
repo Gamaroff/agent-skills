@@ -5,11 +5,13 @@ type: task
 description: "Task 104's catalogue renders a generic lead from --stage alone. This task feeds it real values at all 22 call sites so the lead says something specific, converts the seven bare `gh issue comment` sites onto the engine so they get a lead at all, and updates the 16 test files that assert on comment shape."
 tags: [tracker-comment, stakeholder-communication, develop-pipeline, migration]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-09
 updated: 2026-09-10
+completed_date: 2026-09-10
+pr_number: 379
 assignee:
 estimated_effort_hours: 12
 github_issue: 378
@@ -19,7 +21,7 @@ github_issue: 378
 
 **GitHub Issue**: [#378](https://github.com/Gamaroff/agent-skills/issues/378)
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.105.review.1.comment-call-sites-plain-language-lead.md` implemented 2026-09-10
 
 ---
@@ -533,6 +535,46 @@ than breaking the comment. That property was designed for exactly this rollback.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**QA Report**: `task.105.qa.1.comment-call-sites-plain-language-lead.md`
+**Gate File**: `task.105.gate.1.comment-call-sites-plain-language-lead.yml` — ⚠️ CONCERNS (90/100), **0 open findings**
+**PR Review (Step 5c)**: `task.105.pr-review.1.comment-call-sites-plain-language-lead.md` — ⚠️ CONCERNS, 7 findings, all fixed or deliberately accepted
+**CI**: ✅ SUCCESS — 5/5 jobs green on `1abc34a7`, the exact commit accepted
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria**: 11/11 — every one grounded in something executed, not re-read
+✅ **CI**: 5/5 green on the accepted head. Sampled `PENDING` first and **waited** rather than rounding up
+✅ **Tests**: `npm run ci:fast` — 3133 pass / 0 fail. 7 mutation proofs, each turning exactly its own assertion red
+✅ **Security**: `evidence: measured` — 17 probes (8 lead-renderer, 9 guard-classifier), 1 reproduced and fixed in-cycle
+✅ **Documentation**: task doc, contract, `AGENTS.md`, bundle and catalogue all swept
+⚠️ **Compliance**: NOT_APPLICABLE — internal developer tooling; recorded rather than skipped
+
+**Two limitations are recorded rather than resolved, and the gate reads CONCERNS because of them:**
+
+1. **The seven converted sites give up the 3× exponential backoff.** The engine owns the
+   `ACCESS_TRACKER` deferral gate but has no retry of its own, and re-wrapping would double-defer, so
+   the retry is genuinely traded away rather than relocated. Documented at every converted site, in
+   §5.1, and in the implementation report. Follow-up recorded in the gate's `recommendations.future`.
+2. **Neither review lens ran independently.** Four Explore subagents hung in this session; the code
+   review and the PR conformance review were both performed in-line by the agent that wrote the
+   change. Every conclusion rests on something executed, which is the best available substitute — and
+   it did find real defects, including one the first repair had missed. It is still a substitute.
+
+Neither is a gap in the work. Both are facts about it that a reader should have.
+
+**Detailed Verification Log:** See `task.105.dod.1.comment-call-sites-plain-language-lead.md` for
+complete verification evidence, the probe tables and the CI reading.
+
+**Task marked as ACCEPTED on:** 2026-09-10
+
+---
+
 ## QA Testing Results
 
 **QA Status**: CONCERNS
@@ -580,6 +622,8 @@ wrote the code.
 | 2026-09-10 |  | Implemented — 24 call sites fed slots, 7 bypass sites converted, 2 anti-regression guards (one repaired, one added), 5 mutation proofs; 20 source files + 47 bundled copies | develop |
 | 2026-09-10 |  | Status → ready-for-review | develop |
 | 2026-09-10 |  | QA gate CONCERNS (90/100) — 0 open findings; 1 MEDIUM found and fixed in-cycle; Reliability CONCERNS (backoff traded away), independent review did not run | qa-task |
+| 2026-09-10 |  | PR conformance review CONCERNS — 5 conformance findings fixed (§7 Files Summary, §9 criteria 1 and 3, trail disclosure) | review-pr |
+| 2026-09-10 | 1.2 | DoD verified 11/11 — accepted (PR #379), CI 5/5 green on the accepted head | finalise |
 
 ---
 

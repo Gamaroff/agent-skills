@@ -36,8 +36,8 @@ Feed `--slot` values to all 22 `tracker-comment.js` call sites, convert the seve
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 complete. `npm run ci:fast` green (3132 pass / 0 fail, exit 0). 24 shipped call sites carry slots (was 22 + 2 created by the finalise split); 7 bypass sites converted; Guard A repaired, Guard B added, parity extended; bundle + catalogue regenerated | — (pre-pass maps reused) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #379](https://github.com/Gamaroff/agent-skills/pull/379) ← `develop`; commit `3babd7a4`; issue #378 commented (`in-review`, lead rendered); board `in-review` stage-disabled (correct — not in this board's pipeline map) | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.105.qa.{N}.*.md`; `task.105.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle. Gate CONCERNS 90/100, 0 open findings; 5c CONCERNS. **Both review subagents hung and were killed** — code lens and conformance lens each performed in-line, disclosed in every artifact | — (both hung) |
-| 7. finalise                | ⏳ Pending | `task.105.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.105.dod.{N}.*.md`; task `status: accepted`                       | DoD 11/11; CI 5/5 green on `1abc34a7` (sampled PENDING first and waited); issue #378 commented + closed, board already Done; registry row 147 ticked `planned` → `accepted`; sprint-review summary written. **4 DoD subagents not dispatched** — four had already hung this session; checks performed in-line and disclosed in the DoD summary | — (in-line) |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     |       | —                    |
 
 ---
 
@@ -342,10 +342,10 @@ the pipeline's own backlog.
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-10
+**Final Status**: Completed
 **Branch**: `feature/task.105.comment-call-sites-plain-language-lead`
 **PR**: [#379](https://github.com/Gamaroff/agent-skills/pull/379)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 1 (gate CONCERNS 90/100, 0 open findings; 5c CONCERNS)
+**DoD Summary**: [`task.105.dod.1.comment-call-sites-plain-language-lead.md`](./task.105.dod.1.comment-call-sites-plain-language-lead.md) — 11/11
+**Tracker debt**: none — `access.tracker` is `full`; issue #378 commented and closed, board at Done, registry ticked. Nothing deferred.
