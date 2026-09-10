@@ -1,0 +1,59 @@
+schema: 1
+task: "task.103.pipeline-owns-the-registry-tick"
+task_title: "Nothing updates the task-registry row after a task is accepted"
+gate: PASS
+status_reason: "The Step 5c blocking finding (PC-1) is closed: criterion 4 now has a synthetic-fixture test that exercises the same predicate the corpus test uses, mutation-proven with the corpus placed in its post-Step-7 state so the previous coincidence could not do the work. Scoped re-review of the three files changed since gate 2 found nothing new."
+reviewer: "QA Engineer"
+updated: "2026-09-10T10:35:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: "Unchanged and re-confirmed. The cycle-3 diff touches one test file and two documents; no new input surface. `frontmatterField`'s field argument remains a hardcoded literal at both call sites."
+  performance:
+    status: PASS
+    notes: "Full gate 3069 pass. The new fixture test is in-memory and adds no filesystem work."
+  reliability:
+    status: PASS
+    notes: "Unchanged. The extraction is a pure refactor of an existing comparison into a named function, verified by the corpus test continuing to pass and by the mutation reaching both call sites."
+  maintainability:
+    status: PASS
+    notes: "Improved by this cycle. The acceptance comparison now exists once, as `disagreesOnAcceptance()`, called by both the corpus path and the fixture path — which is what makes the fixture exercise the implementation rather than restate the rule."
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: "2026-09-10"
+  total_iterations: 3
+  verification_method: "13 mutations across the loop, each checked against which test AND which assertion went red; two survivors closed with new tests; the final proof run with the corpus deliberately placed in its post-finalise state"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Bug reports have no card preflight at any layer — carried from task.102's close-out, still open"
+      refs: ["skills/create-bug-report/SKILL.md"]
+    - action: "Epic frontmatter uses `status: \"✅ Accepted\"` against a lifecycle spec requiring lowercase-kebab-case; blocks an epic drift check"
+      refs: ["docs/prd/onboarding/epics/", "shared/resources/document-status-lifecycle.md"]
+    - action: "The registry's notes column is still hand-written; registry-tick writes only the Status cell"
+      refs: ["shared/resources/registry-tick.js"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
