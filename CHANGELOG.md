@@ -6,6 +6,50 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The task-registry row now has an owner: `/finalise` ticks it, and CI fails when it drifts.**
+  `docs/tasks/task-registry.md` carries a Status column per task and *nothing wrote it after
+  creation*. `create-task` appended the row, `develop-next` only read it as a selection fallback, and
+  `finalise` — which does set the document's `status: accepted` and `completed_date` — touched no
+  registry at all. Seventeen rows (T67–T96) were finished, accepted and merged, and never ticked; the
+  registry reported 22 open tasks when 5 were, and it was wrong for weeks.
+
+  It survived that long because **nothing failed on it**. The selector judges eligibility on the
+  document's own frontmatter, never on the row, so a stale row cannot cause a finished task to be
+  re-selected. The entire cost fell on human readers, on the one question the registry exists to
+  answer. A cost with no failure attached is a cost nobody is told about.
+
+  Two changes, in the order they matter:
+
+  - **`evals/shared/tests/task-registry-drift.test.mjs`** fails when a task document reads `accepted`
+    and its row does not, or the reverse — a row claiming work is finished that the document says is
+    not. It imports the registry parser and the lifecycle vocabulary from `select-next.mjs` rather
+    than restating either, and carries a non-vacuity floor: a parser that stopped matching would
+    otherwise report a clean, reassuring zero, which is a failure this repository has seen before.
+    Only the `accepted` predicate is compared, so a task legitimately mid-flight and a `cancelled`
+    task do not trip it — a check that fires on healthy states is one that gets muted.
+  - **`shared/resources/registry-tick.js`**, called from `/finalise` immediately after it writes
+    `status: accepted`. One moment, one writer, so the row and the document cannot disagree by
+    construction — strictly stronger than detecting a disagreement afterwards. The pre-merge timing
+    is correct for the *Status* column, which mirrors the document's status; the row's prose note may
+    still cite a PR that has not merged, and nothing reads that column.
+
+  **The write never blocks acceptance.** Every outcome exits 0, including "no row found" — refusing
+  to finalise genuinely complete work over a human-readable index line would trade a cosmetic defect
+  for a stuck pipeline. The check is the loud backstop, so a no-op is caught rather than lost.
+
+  It is a CLI rather than a paragraph in `finalise/SKILL.md` because two behaviours had to be
+  *proved*: that lite mode still ticks, and that a **story** run does not attempt a task-registry
+  write. Prose admits only a grep of itself. The story guard therefore lives in the writer — which
+  returns `not-a-task` for a story, epic or bug document — rather than in a condition every caller
+  has to remember, and the lite-mode guarantee is pinned by a test that asserts the CLI's entire
+  argument surface, so a mode-conditional flag cannot be added without that decision being made
+  deliberately.
+
+  Also corrected: **epic 3's registry row**, found by measuring the sibling registries. The bug
+  registry was measured too and is clean; neither gained a check, because the epic documents carry
+  `status: "✅ Accepted"` against a lifecycle spec that says `lowercase-kebab-case`, and settling
+  that is its own change.
+
 - **The develop loop's fast gate now refuses to start when its command names a script the project
   does not define.** `develop.fastGateCommand` fell back to `npm run ci:fast`, which a consumer need
   not have. Nothing checked that before use, so the mismatch surfaced *mid-iteration* as

@@ -1,0 +1,80 @@
+schema: 1
+task: "task.103.pipeline-owns-the-registry-tick"
+task_title: "Nothing updates the task-registry row after a task is accepted"
+gate: FAIL
+status_reason: "Implementation is sound and thoroughly mutation-proven, but the drift check is row-driven only: an `accepted` task document with no registry row passes it, while finalise's reason table and the standard both promise CI will fail on exactly that case. Proven by probe."
+reviewer: "QA Engineer"
+updated: "2026-09-10T09:55:00Z"
+
+top_issues:
+  - id: "TASK-103-001"
+    severity: high
+    file: "evals/shared/tests/task-registry-drift.test.mjs"
+    finding: "The check iterates registry ROWS only, so a task document with `status: accepted` and no row at all is invisible to it. Three shipped claims say otherwise: skills/finalise/SKILL.md:932 (`no-row` -> 'CI's drift check will fail on this'), skills/finalise/SKILL.md:1446 (DoD line), and docs/standards/task-registry.md ('a write that does not happen ... is loud rather than silent'). Verified: an accepted task.998 document with no row leaves the suite 3/3 green."
+    suggested_action: "Add a fourth test that walks docs/tasks/*/task.{N}.*.md and asserts every task document has a registry row — the document-driven direction the row-driven tests structurally cannot see. Carry its own non-vacuity floor."
+    suggested_owner: dev
+    status: open
+  - id: "TASK-103-002"
+    severity: medium
+    file: "shared/resources/tests/registry-tick.test.mjs"
+    finding: "The test named 'cell padding is preserved so an aligned table stays aligned' asserts only /\\| accepted +\\|/ — that SOME trailing padding survives. The width actually shifts: ' planned              ' (22 chars) becomes ' accepted              ' (23). The test name, its docstring ('a whole-file diff') and the CLI's own comment ('so a column-aligned table stays aligned') all claim a property the code does not have and the test does not check."
+    suggested_action: "Preserve total cell width by absorbing the length delta into the trailing padding when there is room, and strengthen the assertion to compare cell lengths exactly. Where the new value is longer than the cell, say so in the comment rather than claiming alignment."
+    suggested_owner: dev
+    status: open
+  - id: "TASK-103-003"
+    severity: low
+    file: "shared/resources/registry-tick.js"
+    finding: "Line 236: `original.replace(/^(\\s*)\\|/, \"$1|\")` before `.split(\"|\")` is a no-op — it replaces a leading pipe with itself. Confirmed by execution."
+    suggested_action: "Delete the replace; split the original line directly."
+    suggested_owner: dev
+    status: open
+  - id: "TASK-103-004"
+    severity: low
+    file: "shared/resources/registry-tick.js"
+    finding: "The story-guard comment says 'Two independent signals must both say \"task\"', but the condition `(docType && docType !== \"task\")` lets an ABSENT `type:` through — a task document with no frontmatter type is accepted on the filename alone. The behaviour is the right one (legacy documents predate OKF `type`); the comment describes a stricter rule than the code implements."
+    suggested_action: "Reword the comment: the filename stem is required, and `type` may only CONTRADICT it, not be missing. Say why absence is tolerated."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 14
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: "The CLI reads and writes repo-relative paths supplied by its caller and builds no dynamic RegExp from untrusted input (the `field` argument to frontmatterField is a hardcoded literal at both call sites). No hostile candidates were executed, so this is reasoned rather than measured — accurate, not a downgrade. The write surface is a local developer/CI tool with no network and no credentials."
+  performance:
+    status: PASS
+    notes: "Drift check adds ~0.2s to a ~107s suite. The tick is one file read plus one write, guarded by an early `already` short-circuit that makes a re-run free."
+  reliability:
+    status: PASS
+    notes: "Every CLI outcome exits 0 by design so acceptance cannot be blocked; idempotent; --dry-run available; `ambiguous-row` refuses rather than guessing, which is the correct direction since a wrong row is worse than a stale one. All guards mutation-proven."
+  maintainability:
+    status: CONCERNS
+    notes: "Strong: the parser and lifecycle vocabulary are imported from select-next.mjs rather than restated, and every non-obvious decision carries its rationale. But TASK-103-002 and TASK-103-004 are both comments/test-names asserting more than the code does — the same overstatement class the task was filed to remove, reintroduced in its own implementation."
+
+recommendations:
+  immediate:
+    - action: "Add the document-driven direction to the drift check, or withdraw the three claims that promise it"
+      refs: ["evals/shared/tests/task-registry-drift.test.mjs", "skills/finalise/SKILL.md", "docs/standards/task-registry.md"]
+  future:
+    - action: "Preserve cell width in the tick and tighten the test that claims it"
+      refs: ["shared/resources/registry-tick.js", "shared/resources/tests/registry-tick.test.mjs"]
+    - action: "Remove the no-op replace and correct the story-guard comment"
+      refs: ["shared/resources/registry-tick.js"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "TASK-103-001 resolved — the check must cover the direction its documentation promises"

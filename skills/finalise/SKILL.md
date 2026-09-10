@@ -899,6 +899,51 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    If the document predates the Change Log template and has no such section, create it — for a
    task, after `## 11. Rollback Plan`.
 
+4. **Tick the task registry row** — in the same step, for a **task** only.
+
+   `docs/tasks/task-registry.md` carries a Status column per task, and until task.103 nothing wrote
+   it after creation. `/finalise` is that writer, because this is the one moment that already sets
+   the document's `status: accepted`: doing both here is what makes the row and the document unable
+   to disagree by construction, which is a stronger guarantee than detecting a disagreement later.
+
+   ```bash
+   node .agents/skills/finalise/references/registry-tick.js \
+     --file "{document-path}" --json
+   ```
+
+   > Engine source: `references/registry-tick.js` (bundled into each skill as
+   > `references/registry-tick.js`).
+
+   **Call it unconditionally** — do not wrap it in a "is this a task?" check of your own. The CLI
+   reads the document's own `type` and filename stem and returns `not-a-task` for a story, epic or
+   bug run without touching any registry. `/finalise` is shared across document kinds, and a
+   condition the caller has to remember is one that eventually gets forgotten; the guard belongs in
+   the writer, where it is tested.
+
+   Read `reason` from the JSON and log it:
+
+   | `reason` | What it means | What to do |
+   |---|---|---|
+   | `ticked` | The row now reads `accepted` | Nothing |
+   | `already` | The row already read `accepted` | Nothing — this is a re-run |
+   | `not-a-task` | A story / epic / bug run | Nothing — expected on the story path |
+   | `not-accepted` | The document's status is not `accepted` | Investigate — step 2 above should have set it |
+   | `no-registry` | This project keeps no task registry | Nothing |
+   | `no-row` | The registry has no row for this task | **Log it.** CI's drift check will fail on this |
+   | `ambiguous-row` | The Status column could not be identified | **Log it and tick by hand** |
+   | `engine-unavailable` | The registry parser could not be located | **Log it and tick by hand** |
+
+   **Every outcome exits 0 — never block acceptance on it.** The work is finished by the time this
+   runs, and refusing to finalise a complete task because its index line could not be found trades a
+   cosmetic defect for a stuck pipeline. The loud backstop is
+   `evals/shared/tests/task-registry-drift.test.mjs`, which fails CI whenever a row and its document
+   disagree, so a no-op here is caught there.
+
+   **This runs in lite mode exactly as it does in standard mode.** Lite mode trades QA depth for
+   speed; it has previously been the path where Step 7 side-effects were quietly skipped, which is
+   why this is stated rather than left implied. The CLI takes no mode flag, and a test pins its whole
+   argument surface so one cannot be added without that decision being made deliberately.
+
 4. **Add DoD Verification Section to Document Body:**
    - Add a "## Definition of Done - PASSED ✅" section to the document
    - Summarize all verified criteria
@@ -1398,6 +1443,7 @@ EOF
 
 - [ ] Running summary file finalized (status = COMPLETED - ACCEPTED)
 - [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
+- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails)
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`

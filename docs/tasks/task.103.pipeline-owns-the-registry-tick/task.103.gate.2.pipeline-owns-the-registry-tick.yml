@@ -1,0 +1,57 @@
+schema: 1
+task: "task.103.pipeline-owns-the-registry-tick"
+task_title: "Nothing updates the task-registry row after a task is accepted"
+gate: PASS
+status_reason: "Cycle 1's four findings are all closed and verified. The cycle-2 refute pass over the fixes found three further issues — all resolved in-cycle: the new document walk had its own silent skip, the EOL heuristic got mixed-ending files backwards, and the develop-batch write-disjointness consequence was undocumented. No open findings."
+reviewer: "QA Engineer"
+updated: "2026-09-10T10:25:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 19
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: "Unchanged from cycle 1. No dynamic RegExp from untrusted input; `frontmatterField`'s field argument is a hardcoded literal at both call sites. The write target is caller-supplied in a local tool with no network and no credentials. Reached by reading, so `reasoned` — accurate rather than a downgrade."
+  performance:
+    status: PASS
+    notes: "Full gate 3067 -> unchanged runtime band; the two new suites total ~0.4s. The rewrite now splits keeping separators, which is the same single pass."
+  reliability:
+    status: PASS
+    notes: "Every CLI outcome still exits 0. The rewrite is now byte-preserving outside the one cell — the EOL question was removed rather than answered, which is why the mixed-ending case is covered by construction rather than by a rule."
+  maintainability:
+    status: PASS
+    notes: "Cycle 1's CONCERNS is cleared. The two comments that overstated the code now match it, and both are pinned by tests — the absent-`type` rule and the width boundaries were each asserted only after a mutation survived. The remaining risk noted in cycle 1 (claims outrunning coverage) was the thing cycle 2 went looking for."
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: "2026-09-10"
+  total_iterations: 1
+  verification_method: "Mutation proofs against each fix (5 in cycle 1, 2 more in cycle 2), plus the full hermetic suite"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Bug reports have no card preflight at any layer (authoring, review-bug, CI corpus) — carried forward from task.102's close-out, still open"
+      refs: ["skills/create-bug-report/SKILL.md"]
+    - action: "Epic frontmatter uses `status: \"✅ Accepted\"` against a lifecycle spec requiring lowercase-kebab-case; blocks an epic drift check"
+      refs: ["docs/prd/onboarding/epics/", "shared/resources/document-status-lifecycle.md"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
