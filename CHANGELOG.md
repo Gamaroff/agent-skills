@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.46.0] - 2026-09-10
+
 ### Added
 
 - **The plain-language lead now reaches the pull request, not only the tracker card.** Tasks 104 and
