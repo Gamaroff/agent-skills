@@ -1,0 +1,219 @@
+/**
+ * Executes the develop loop's fast-gate precondition against real fixture
+ * projects, in both `bash` and `zsh`.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * `develop.fastGateCommand` names a shell command the develop loop runs on every
+ * iteration, and its fallback (`npm run ci:fast`) is a script a consumer need not
+ * have. Before this precondition existed the mismatch surfaced *mid-iteration* as
+ * `Missing script: ci:fast`, at the point where an operator invents a substitute
+ * under time pressure — and on the run that produced this check the substitution
+ * was invented per-run, so the gate silently differed between runs and nothing
+ * recorded that it had.
+ *
+ * The precondition is runnable prose: it lives inside a fenced ```bash block in a
+ * markdown document that ships verbatim into consumer repos. Asserting that the
+ * document *contains* the right text would prove only that a string exists. This
+ * file instead EXTRACTS the block and RUNS it against fixture projects, so what is
+ * under test is the behaviour a consumer will actually get.
+ *
+ * The fail-safe direction is asymmetric and deliberate: a command shape the
+ * extraction cannot reason about is SKIPPED, never failed. A check that
+ * mis-parsed would HALT every consumer including correct ones, and the two
+ * anti-vacuity assertions at the bottom are what stop the whole suite from
+ * degenerating into "everything skips, everything passes".
+ *
+ * Run: node --test evals/shared/tests/fast-gate-precondition.test.mjs
+ */
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+// Spawn timeout comes from the shared budget, never a literal: each assertion
+// below forks `npm run` in a child, and a literal chosen against an idle machine
+// sits ~1.2x above the loaded worst case — bug.2. `tests/test-harness-concurrency.test.js`
+// fails the build on any `timeout: <number>` literal in a test file.
+import { spawnBudget } from "../../../shared/resources/spawn-budget.mjs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(__dirname, "..", "..", "..");
+
+const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("FAST_GATE_PRECONDITION");
+
+const LOOP_DOC = "shared/resources/develop-pipeline-step-3-develop-loop.md";
+const HEADING =
+  "### Precondition — the gate must resolve before the first iteration";
+/** The placeholder the surrounding document tells its reader to substitute. */
+const PLACEHOLDER = "<fastGateCommand>";
+
+/**
+ * The first fenced ```bash block that follows `heading`.
+ *
+ * Anchored to the heading rather than to the first bash block in the file: the
+ * document holds several, and picking the wrong one would silently test the
+ * Output Capture Pattern instead — which passes vacuously, since it contains no
+ * conditional.
+ */
+function bashBlockUnder(doc, heading) {
+  const at = doc.indexOf(heading);
+  if (at === -1) return null;
+  const rest = doc.slice(at);
+  const m = rest.match(/```bash\n([\s\S]*?)\n```/);
+  return m ? m[1] : null;
+}
+
+const snippet = bashBlockUnder(
+  readFileSync(join(repoRoot, LOOP_DOC), "utf-8"),
+  HEADING,
+);
+
+/** Run the extracted snippet in a throwaway project defining `scripts`. */
+function runCheck({ shell, gateCommand, scripts }) {
+  const dir = mkdtempSync(join(tmpdir(), "fast-gate-"));
+  try {
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "fixture", version: "1.0.0", scripts }),
+    );
+    // Substitute the placeholder exactly as a reader of the document would.
+    const script = snippet.replaceAll(PLACEHOLDER, gateCommand);
+    const r = spawnSync(shell, ["-c", script], {
+      cwd: dir,
+      encoding: "utf-8",
+      timeout: SPAWN_TIMEOUT_MS,
+    });
+    return { code: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}` };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const SHELLS = ["bash", "zsh"];
+const WITH_FAST = { "ci:fast": "echo fast", build: "echo build" };
+const WITHOUT_FAST = { test: "echo test", build: "echo build" };
+
+// ---------------------------------------------------------------------------
+
+test("the precondition block is present and is a real conditional", () => {
+  assert.ok(
+    snippet,
+    `${LOOP_DOC} must carry a fenced bash block under "${HEADING}" — without it ` +
+      "every behavioural test below would have nothing to run and would pass",
+  );
+  assert.ok(
+    snippet.includes(PLACEHOLDER),
+    `the block must bind ${PLACEHOLDER}, not dereference an unset $fastGateCommand — ` +
+      "an unset variable extracts nothing, which skips the check and passes vacuously",
+  );
+  assert.match(snippet, /\bexit 1\b/, "the block must be able to HALT");
+});
+
+for (const shell of SHELLS) {
+  test(`[${shell}] a defined script does not HALT`, () => {
+    // Anti-vacuity: without this the check could reject every project and the
+    // "missing script HALTs" case below would still pass.
+    const { code } = runCheck({
+      shell,
+      gateCommand: "npm run ci:fast",
+      scripts: WITH_FAST,
+    });
+    assert.equal(code, 0, "a project defining ci:fast must not be halted");
+  });
+
+  test(`[${shell}] a missing script HALTs and names the key`, () => {
+    const { code, out } = runCheck({
+      shell,
+      gateCommand: "npm run ci:fast",
+      scripts: WITHOUT_FAST,
+    });
+    assert.equal(code, 1, "a project without the named script must HALT");
+    assert.match(
+      out,
+      /develop\.fastGateCommand/,
+      "message must name the config key",
+    );
+    assert.match(
+      out,
+      /skills-config\.yaml/,
+      "message must name the file to edit",
+    );
+    assert.match(
+      out,
+      /ci:fast/,
+      "message must name the script that did not resolve",
+    );
+  });
+
+  test(`[${shell}] a compound beginning 'npm run' checks its FIRST script`, () => {
+    // Documented behaviour, and the case most likely to be "corrected" into a
+    // skip by a later reader: the first component must exist for the command to
+    // get off the ground, so checking it is strictly better than guessing.
+    const missing = runCheck({
+      shell,
+      gateCommand: "npm run ci:fast && npm run lint",
+      scripts: WITHOUT_FAST,
+    });
+    assert.equal(
+      missing.code,
+      1,
+      "missing first script in a compound must HALT",
+    );
+
+    const present = runCheck({
+      shell,
+      gateCommand: "npm run ci:fast && npm run lint",
+      scripts: WITH_FAST,
+    });
+    assert.equal(
+      present.code,
+      0,
+      "present first script in a compound must not HALT",
+    );
+  });
+
+  test(`[${shell}] a shape the extraction cannot read is skipped, not failed`, () => {
+    // Every one of these projects lacks ci:fast. None may HALT: the fail-safe
+    // direction for an unreadable command is skip, because a false HALT would
+    // block correct consumers.
+    for (const gateCommand of [
+      "prettier --check . && jest", // non-npm compound
+      "make test", // non-npm
+      "pnpm run ci:fast", // different package manager
+      "npm test", // npm, but not `npm run <script>`
+      "", // unset / empty — the vacuous-pass shape
+    ]) {
+      const { code } = runCheck({ shell, gateCommand, scripts: WITHOUT_FAST });
+      assert.equal(
+        code,
+        0,
+        `"${gateCommand || "(empty)"}" must be skipped, not halted`,
+      );
+    }
+  });
+}
+
+test("the suite is not vacuous — it observes both verdicts", () => {
+  // If a future edit made the check unconditional in either direction, every
+  // per-shell test above could still be satisfied by one verdict. This asserts
+  // the snippet is genuinely discriminating.
+  const halts = runCheck({
+    shell: "bash",
+    gateCommand: "npm run ci:fast",
+    scripts: WITHOUT_FAST,
+  }).code;
+  const passes = runCheck({
+    shell: "bash",
+    gateCommand: "npm run ci:fast",
+    scripts: WITH_FAST,
+  }).code;
+  assert.notEqual(
+    halts,
+    passes,
+    "the same command must produce different verdicts against different projects, " +
+      "or the check is not reading the project at all",
+  );
+});
