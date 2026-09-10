@@ -32,29 +32,11 @@ const CL = require("../references/change-log.js");
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-// What the CARD carries — a summary, not a copy. The task file is the source of
-// truth and every card links to it; see shared/resources/tracker-card-summary.md.
-//
-// This list used to name ELEVEN sections — Overview, Motivation, Technical
-// Background, Scope, Breaking Changes, Implementation Plan, Files Summary,
-// Testing Strategy, Success Criteria, Risk Assessment, Rollback Plan — i.e. the
-// whole task document, republished onto the card verbatim on every sync.
-//
-// `Breaking Changes` survives the cut because it is the one piece of detail a
-// board reader must not have to open a file to discover. It is capped harder
-// than the rest and omitted entirely when the section is absent, which is the
-// common case.
-const TASK_CARD_SECTIONS = [
-  { heading: "Summary", names: ["Overview"] },
-  { heading: "Success Criteria", names: ["Success Criteria"] },
-  {
-    heading: "Breaking Changes",
-    names: ["Breaking Changes"],
-    maxItems: 3,
-    maxSentences: 2,
-    optional: true,
-  },
-];
+// The card section spec is defined ONCE, in the shared library beside the
+// checker that consumes it (task.102). It is re-exported below so existing
+// callers and their tests are unchanged, and so the `create-*` authoring
+// skills can run the same preflight without this skill being installed.
+const TASK_CARD_SECTIONS = lib.TASK_CARD_SECTIONS;
 
 const ISSUE_TYPE = "Task";
 const SYNC_LABEL_PREFIX = "synced-from-";

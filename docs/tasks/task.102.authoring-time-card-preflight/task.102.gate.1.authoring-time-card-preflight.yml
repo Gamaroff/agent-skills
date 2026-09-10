@@ -1,0 +1,101 @@
+schema: 1
+task: 'task.102.authoring-time-card-preflight'
+task_title: 'The card preflight runs in every review-* skill and no create-* skill'
+gate: PASS
+status_reason: 'T102-001 fixed: card-preflight.js now takes its body from lib.parseFrontmatter, the same parser every sync path uses. Two regression tests added — one asserting the two paths resolve the same BODY (not merely the same verdict, which the divergence always matched), one forbidding a re-implementation. Both mutation-proved. Nine of nine success criteria verified by execution; 3049 tests, 0 failures.'
+reviewer: 'QA Engineer'
+updated: '2026-09-10T10:05:00Z'
+
+top_issues:
+  - id: 'T102-001'
+    severity: medium
+    file: 'shared/resources/card-preflight.js'
+    finding: >-
+      stripFrontmatter() is a second implementation of a parse the same library
+      already exports as parseFrontmatter(). The two diverge on leading
+      whitespace and on CRLF documents (lib strips leading newlines from the
+      body, this one does not), so the authoring check and the sync check can
+      read different bodies from the same file. No verdict differs across the
+      177 real documents in this repo today, so the divergence is latent — but
+      the file's own header says it defines nothing of its own precisely to stop
+      this drift, and it does it anyway one function down.
+    suggested_action: >-
+      Delete stripFrontmatter() and use lib.parseFrontmatter(text).body, which
+      is exported and already the source of truth for every sync path. Add a
+      test asserting the authoring path and the --check-card path resolve the
+      same body for a document with CRLF line endings and one whose body opens
+      with a horizontal rule.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-10'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3047
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: >-
+      No new network, auth or credential surface. card-preflight.js reads one
+      file and writes nothing; it takes no shell input and spawns no process.
+      The one execution path added to the create-* skills is a node invocation
+      of a read-only CLI. Verdict reached by reading the diff and the CLI's
+      surface, not by executing hostile candidates — hence reasoned, not
+      measured.
+  performance:
+    status: PASS
+    notes: >-
+      Offline check, single file read, sub-100ms in every observed run. Adds one
+      invocation per authoring session. The 12,714-line diff is almost entirely
+      generated references/ copies; runtime cost is unchanged.
+  reliability:
+    status: PASS
+    notes: >-
+      Advisory by construction — exit 0 even with findings, so a preflight
+      failure cannot break an authoring run. Unknown document kind, missing file
+      and unparseable kind all return exit 2 with a message naming the fix
+      rather than throwing. process.exitCode is set instead of process.exit(),
+      so a piped --json payload cannot be truncated (bug.3).
+  maintainability:
+    status: PASS
+    notes: >-
+      Four spec definitions became one, and one parse definition stayed one.
+      Held by three independent guards: a one-definition test with a non-vacuity
+      floor, a bundle-drift test that catches a stale generated copy, and a
+      parity test asserting the authoring and sync paths resolve the same body.
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Close the bug-report preflight gap — no check at authoring, in review-bug, or in the CI corpus'
+      refs: ['skills/review-bug/SKILL.md', 'shared/resources/tests/jira-sync-card-summary.test.mjs']
+    - action: 'Teach qa-execute-snippets that a read-only `node <script> --file` invocation is not mutating, so Step 4b can exercise blocks like this one'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Guard preflight() against a missing file for library callers — DONE this cycle, kept here as the record'
+      refs: ['shared/resources/card-preflight.js']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-10'
+  total_iterations: 1
+  verification_method: >-
+    Body-parity test across four frontmatter shapes plus a structural test
+    forbidding a re-implementation; both mutation-proved by reinstating the
+    hand-rolled parse (2 tests red, restored to 13/13). Corpus re-probe over all
+    177 documents: 0 body mismatches. Full fast gate: 3049 tests, 0 failures.
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
