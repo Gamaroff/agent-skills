@@ -155,7 +155,19 @@ Then review the guard itself adversarially, and **build it on a matcher independ
 
 **If you ignore it:** a reader auditing the file finds an assertion whose message says it checks the row when it does not, and stops looking. The property is unguarded and looks guarded — the failure mode of *Never let one signal report two states*, arriving through prose instead of through a return value.
 
-**Do this instead:** anchor the pattern to the structure the claim is about — the table cell, the list item, the code block — rather than to a span of characters between the two names. Ask the assertion the question directly where you can (`indexOf(x) < indexOf(y)` under an ordering claim is still co-occurrence; `row.includes(y)` is not). `tests/lib/relationship-assertion-lint.js` fails CI on the four shapes this has taken; it models the six instances that happened, so a seventh in an unmodelled shape still needs you to read the message against the pattern.
+**Do this instead:** anchor the pattern to the structure the claim is about — the table cell, the list item, the code block — rather than to a span of characters between the two names, and **ask the assertion the question the message asks**. Comparing two `indexOf` results proves *ordering*, which is a fine test of an ordering claim and no test at all of a **containment** claim:
+
+```js
+// The defect: ordering evidence, containment message.
+const s5c = doc.indexOf("### 5c. ");
+const stage = doc.indexOf("--stage ready-for-merge");
+assert.ok(stage > s5c, "ready-for-merge must sit INSIDE 5c");   // also true if it sits in 5d
+
+// The fix: extract the region, then ask it directly.
+assert.ok(section5c().includes("--stage ready-for-merge"), "the stage call must sit inside 5c");
+```
+
+`tests/lib/relationship-assertion-lint.js` fails CI on the four shapes this has taken; it models the six instances that happened, so a seventh in an unmodelled shape still needs you to read the message against the pattern.
 
 ## See also
 

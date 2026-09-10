@@ -4,6 +4,62 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **A new anti-pattern: _Never claim a relationship in an assertion that tests only co-occurrence_**
+  ([`docs/reference/anti-patterns.md`](docs/reference/anti-patterns.md)). An assertion whose
+  *message* claims *X routes to Y* while its *pattern* only checks that both names appear in the same
+  slice of prose. It passes against the mutation it was written to catch, so mutation-proving
+  **confirms** it — the message is what is wrong, and nothing executes a message. The lint that fails
+  CI on it shipped in v0.46.0 (task 89); the class it names did not reach the collection until now.
+
+- **Nine terms in [`docs/reference/glossary.md`](docs/reference/glossary.md)** — *diminishing-returns
+  exit*, *Convergence check*, *install profile*, `invokes:`, *plain-language lead*, *slot*,
+  *anchor-failed*, *card preflight*, *observation log*. The glossary gained nothing across v0.46.0
+  while the vocabulary it exists to define roughly doubled.
+
+### Changed
+
+- **The diminishing-returns exit is documented as the three-condition guard it is.** Every page
+  describing it — the runbook, troubleshooting, the FAQ, the glossary — stated *two consecutive
+  zero-HIGH gates plus test-only findings*, which is the short form and **more permissive than the
+  engine**. Two conditions were missing from the prose: a finding carrying **no `file:`** fails on
+  its own (condition 2 is opt-in on positive evidence), and **any non-`pass` `nfr_validation` status
+  vetoes the exit** even when every finding sits inside `qa.testArtifactGlobs` — evaluated *before*
+  the machinery check, because a product defect filed against a test file would otherwise satisfy it.
+
+  A doc that makes a guard sound more permissive than it is will be trusted in exactly the runs where
+  it should not be. The full condition table now lives **once**, in
+  [QA Flow → How the loop ends](docs/runbooks/qa-flow.md#how-the-loop-ends); the other three pages
+  carry the short form and point at it, rather than restating a three-condition rule four times.
+
+- **`AGENTS.md`'s Task Registry TL;DR names the tick's owner.** Task 103 gave `/finalise` the Status
+  column via `registry-tick.js`; the always-loaded summary still described only the create-time half,
+  so an agent reading it would hand-tick a row it no longer owns.
+
+### Fixed
+
+- **Tree-derived counts stated as standing fact, in three places.** The ShellCheck lane's input size
+  was written as "247 files, 56 sources, 191 copies" in the workflow comment, `CONTRIBUTING.md` and —
+  added during the v0.46.0 release sweep — `docs/contributing/releases.md`. Measured five days later:
+  **266 / 58 / 208**. Correct when written, wrong on the next release, and unfailable because it is
+  prose.
+
+  The third instance is the instructive one: it was produced *by* a documentation sweep, which read
+  `CONTRIBUTING.md` to describe the lane and copied its numbers without running the command behind
+  them. **Reading prose to write prose propagates whatever was already wrong and stamps it with a
+  fresh commit date.** Fixed by printing the invocation instead of its output, and keeping a figure
+  only where it carries an argument the reader cannot reconstruct — with an explicit measurement date
+  on it.
+
+- **`npm run bundle -- --check`, `generate-skill-deps`, `skill-deps:candidates`,
+  `test:tracker-access` and `test:bitbucket-auth` were documented nowhere.** Now in `README.md`,
+  `CONTRIBUTING.md`, [`docs/contributing/packaging.md`](docs/contributing/packaging.md) and
+  [`source-tree.md`](docs/architecture/concepts/source-tree.md) as appropriate — including the
+  `AMBIGUOUS` verdict on `skills/create-skill/references/skill-dependencies.json`, where
+  `npm run bundle` reports `in sync` and `--check` reports a problem, because `.json` carries no
+  provenance banner and the bundler will not overwrite a file it cannot prove it wrote.
+
 ## [v0.46.0] - 2026-09-10
 
 ### Added
