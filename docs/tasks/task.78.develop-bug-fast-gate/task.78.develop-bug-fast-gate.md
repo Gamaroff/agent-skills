@@ -5,18 +5,21 @@ type: task
 description: "Task 75 put a fast gate before the commit in the develop loop and in each qa-fix cycle. develop-bug shares the develop loop, so it picked that half up for free — but its per-cycle fix loop lives in its own document and got nothing. A bug fix cycle can still commit an unformatted tree where a task fix cycle now cannot."
 tags: [ci, quality-gate, develop-bug, pipeline, tooling]
 category: infrastructure
-status: ready-for-development
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-04
+completed_date: 2026-09-04
+pr_number: 314
 assignee:
 estimated_effort_hours: 2
 ---
 
 # Technical Task: Give develop-bug's fix cycle the same fast gate as the other pipelines
 
-**Status:** Ready for Development
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.78.review.1.develop-bug-fast-gate.md` implemented 2026-09-04
 
 ---
 
@@ -28,8 +31,13 @@ Task 75 introduced `develop.fastGateCommand` (default `npm run ci:fast`) and pla
 - **each qa-fix cycle**, before the commit — `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
 
 `develop-bug` shares the first document, so its develop loop already runs the fast gate. Its
-**per-cycle fix loop is a different document** — `shared/resources/develop-bug-step-5-6-verify-loop.md`
+**per-cycle fix loop is a different document** — `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`
 — and task 75's file list did not include it.
+
+That path is the whole reason it was missed. The other two loop documents live in
+`shared/resources/` and are bundled into each skill; this one is **skill-native**, authored
+directly in `skills/develop-bug/references/` with no shared source. A file list drawn from
+`shared/resources/` cannot see it.
 
 The result is an asymmetry with a concrete consequence: **a bug fix cycle can commit an unformatted
 tree where a task fix cycle now cannot.**
@@ -60,16 +68,22 @@ tree where a task fix cycle now cannot.**
 
 ### Current architecture
 
-| Document | Used by | Fast gate |
-| --- | --- | --- |
-| `develop-pipeline-step-3-develop-loop.md` | story, task, **bug** | ✅ |
-| `develop-pipeline-step-5-6-qa-loop.md` | story, task | ✅ |
-| `develop-bug-step-5-6-verify-loop.md` | **bug** | ❌ |
+| Document | Location | Used by | Fast gate |
+| --- | --- | --- | --- |
+| `develop-pipeline-step-3-develop-loop.md` | `shared/resources/` | story, task, **bug** | ✅ |
+| `develop-pipeline-step-5-6-qa-loop.md` | `shared/resources/` | story, task | ✅ |
+| `develop-bug-step-5-6-verify-loop.md` | **`skills/develop-bug/references/`** | **bug** | ❌ |
+
+The Location column is the point. Two of the three are shared resources; the third is
+skill-native and has no `shared/resources/` counterpart, which is exactly why a
+`shared/resources/`-shaped file list skipped it.
 
 ### Target architecture
 
 The verify loop gains the step-0a equivalent, adapted to its own cycle structure, and
-`ci-gate-parity.test.mjs` asserts all three documents name `<fastGateCommand>`.
+`ci-gate-parity.test.mjs` asserts all three documents name `<fastGateCommand>` — reading each
+one at its own authoritative source, whether that is `shared/resources/` or a skill's
+`references/`.
 
 ### Important clarifications
 
@@ -85,7 +99,7 @@ The verify loop gains the step-0a equivalent, adapted to its own cycle structure
 
 ### In Scope
 
-✅ **The fast gate** in `develop-bug-step-5-6-verify-loop.md`, at that file's pre-commit seam
+✅ **The fast gate** in `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`, at that file's pre-commit seam
 ✅ **The retry budget** stated correctly, matching the corrected qa-loop wording
 ✅ **A parity assertion** covering all three loop documents
 ✅ **Bundle regeneration**
@@ -110,10 +124,12 @@ and it makes no previously-passing run fail.
 ### Phase 1: Locate the seam
 
 **Risk Level**: Low
-**Files**: `shared/resources/develop-bug-step-5-6-verify-loop.md` (read only)
+**Files**: `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` (read only)
 
-- [ ] Find the point where a verify cycle commits, and whether it has a no-change check to sit after
-- [ ] Note the cycle-counter variable name that file uses, for the log filename
+- [x] Find the point where a verify cycle commits, and whether it has a no-change check to sit after
+- [x] Establish how that file refers to its cycle counter. It declares **no shell variable** — unlike
+      the qa-loop's `${QA_CYCLE}`, it tracks the counter in prose as `{N}`. Use `{N}`; do not
+      introduce a variable the document does not otherwise have
 
 **Dependencies**: none
 
@@ -122,14 +138,15 @@ and it makes no previously-passing run fail.
 ### Phase 2: Add the gate
 
 **Risk Level**: Low
-**Files**: `shared/resources/develop-bug-step-5-6-verify-loop.md`
+**Files**: `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`
 
-- [ ] Add the fast-gate block at the seam from Phase 1, capturing to a log rather than streaming
-- [ ] Reference `develop.fastGateCommand` as `<fastGateCommand>` — **a config key, not a literal**;
+- [x] Add the fast-gate block at the seam from Phase 1, capturing to a log rather than streaming;
+      name the log with this document's own `{N}` placeholder, per Phase 1
+- [x] Reference `develop.fastGateCommand` as `<fastGateCommand>` — **a config key, not a literal**;
       this document ships verbatim into consumer repos with no `ci:fast` script of their own
-- [ ] State the **2-attempt retry budget** and what happens after it, matching the corrected wording in
+- [x] State the **2-attempt retry budget** and what happens after it, matching the corrected wording in
       the qa-loop document — do not restate the `MAX_ITER` claim task 75 removed
-- [ ] State why the gate sits where it does, so the next edit does not undo it
+- [x] State why the gate sits where it does, so the next edit does not undo it
 
 **Dependencies**: Phase 1
 
@@ -140,20 +157,29 @@ and it makes no previously-passing run fail.
 **Risk Level**: Low
 **Files**: `evals/shared/tests/ci-gate-parity.test.mjs`
 
-- [ ] Extend the existing "develop loop and qa-fix cycle name the fast gate" test to cover all three
+- [x] Extend the existing "develop loop and qa-fix cycle name the fast gate" test to cover all three
       loop documents from a single list
-- [ ] Assert each names both `<fastGateCommand>` and the `develop.fastGateCommand` config key
+- [x] Assert each names both `<fastGateCommand>` and the `develop.fastGateCommand` config key
+- [x] Comment the list: one entry is a `skills/…/references/` path and two are `shared/resources/`
+      paths, because each document is read at its own authoritative source. Without the comment the
+      mixed list reads like an oversight
 
 **Dependencies**: Phase 2
 
 ---
 
-### Phase 4: Bundle
+### Phase 4: Bundle drift check
 
 **Risk Level**: Low
-**Files**: `skills/*/references/*`
+**Files**: none expected
 
-- [ ] `npm run bundle`; commit the regenerated copies
+- [x] `npm run bundle`, then confirm `git status --porcelain` is empty — confirmed, no diff produced
+
+**This is a check, not a regeneration step.** Neither file this task touches is bundled: the verify
+loop is already *in* a skill's `references/` and has no `shared/resources/` source, and
+`evals/shared/tests/ci-gate-parity.test.mjs` is not bundled at all. So the expected outcome is **no
+diff**. If bundle does produce one, it is drift from some other change — inspect it and commit it
+deliberately rather than sweeping it in.
 
 **Dependencies**: Phase 3
 
@@ -163,13 +189,107 @@ and it makes no previously-passing run fail.
 
 ### Files to Modify
 
-1. ✅ `shared/resources/develop-bug-step-5-6-verify-loop.md` — the fast gate
+1. ✅ `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` — the fast gate
 2. ✅ `evals/shared/tests/ci-gate-parity.test.mjs` — cover all three loop documents
 3. ✅ `CHANGELOG.md` — observable for `develop-bug` runs
+4. ✅ `docs/reference/configuration.md` — the two descriptions of where the fast gate runs
+5. ✅ `skills/develop-next/SKILL.md` — the same description, one site
+
+Files 4 and 5 were **not** in the original plan. They came from QA finding **TASK-78-003**: all three
+sites described the gate as running in two places, which this change makes wrong. Recorded here
+rather than only in the QA trail, because this section is the file inventory a reviewer diffs
+against.
 
 ### Files Regenerated
 
-4. ✅ `skills/*/references/*` — `npm run bundle` output
+None expected — see Phase 4. `npm run bundle` is run as a drift check and should produce no diff.
+**Confirmed on implementation:** bundle produced no diff.
+
+---
+
+## Implementation Record
+
+**Started**: 2026-09-04 · **Completed**: 2026-09-04
+
+### Summary
+
+`develop-bug`'s verify loop now gates its per-cycle commit on `<fastGateCommand>`, closing the one
+pipeline where a fix cycle could still commit an unformatted tree. A parity test holds all three
+loop documents to it.
+
+### Approach
+
+**Phase 1 — the seam.** `## 5b. Fix (on FAIL — reopen + qa-fix)` runs: step 3 `git diff --stat HEAD`
+(no-change → **HALT**), step 4 `git reset` + `/commit-changes` + `git push`. The gate belongs
+between them, which is structurally identical to where the qa-fix loop's `0a` sits relative to its
+own steps 0 and 1 — so TASK-75-001 (gate placed *before* the no-change check) is avoided by
+construction rather than by care.
+
+The document declares **no shell variable** for its cycle counter — it tracks it in prose as `{N}`,
+unlike the qa-loop's `${QA_CYCLE}`. The log filename uses `{N}` accordingly; introducing a variable
+purely to name a log file would have been a change to the document's conventions, not to its gate.
+
+**Phase 2 — the gate.** Added as step `3a`, capturing to `.claude/state/bug-fix-gate-{N}-*.log`
+rather than streaming. The retry budget is stated as **2 attempts**, with `MAX_ITER` described as
+bounding *cycles* and explicitly not this inner retry — the wording task 75's QA corrected, not the
+wording it replaced. A trailing note records why the gate sits between 3 and 4, and why this
+document was the one that missed the gate.
+
+**Phase 3 — the parity test.** The two-element list became a named `LOOP_DOCUMENTS` constant of
+three, each read at its own authoritative source. A `length === 3` assertion sits above the loop so
+that silently dropping an entry fails rather than shrinking the test's coverage. The mixed shape of
+the list (two `shared/resources/` paths, one `skills/…/references/`) carries a comment explaining
+that the asymmetry *is* the finding.
+
+**Phase 4 — bundle.** Run as a drift check; produced no diff, as predicted. Neither changed file is
+bundled: the verify loop already lives in a skill's `references/` with no shared source, and the
+eval test is not bundled at all.
+
+### Testing Results
+
+`node --test evals/shared/tests/ci-gate-parity.test.mjs` — **10/10 pass**.
+
+Mutation proving — each loop document had `<fastGateCommand>` and `develop.fastGateCommand`
+stripped in turn, the test re-run, and the file restored:
+
+| Mutated document | Result |
+| --- | --- |
+| `shared/resources/develop-pipeline-step-3-develop-loop.md` | ✅ red |
+| `shared/resources/develop-pipeline-step-5-6-qa-loop.md` | ✅ red |
+| `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` | ✅ red |
+
+All three go red under mutation and green on restore, which is what distinguishes a genuinely
+iterated list from one that happens to pass on its first element.
+
+### QA Fix Cycle 1 — 2026-09-04
+
+All three MEDIUM findings from gate 1 closed.
+
+- **TASK-78-001** — replaced the numbered "step-3" reference with a named one (the develop loop's
+  Test Failure Triage, linked), plus a note recording *why* it is named rather than numbered: the
+  qa-fix loop can say "step-3" unambiguously because it has no local step 3, and this file does.
+- **TASK-78-002** — added a `**Fast gate**` field to the Verify Cycle report entry, stating that 5b
+  step 3a fills it, that it reads `n/a` on a cycle that passed at 5a, and that it is recorded on a
+  pass as well as a failure — a result that appears only on failure is indistinguishable from a gate
+  that never ran.
+- **TASK-78-003** — swept the three live sites that still described the gate as running in two
+  places: `docs/reference/configuration.md` (×2) and `skills/develop-next/SKILL.md`. Historical
+  records left untouched.
+
+**Found by the Step 3.5 adversarial pass, in this cycle's own fix.** The first version of the
+TASK-78-002 fix added the `**Fast gate**` field to *both* the report entry and the tracker-comment
+template. The report entry is a document the cycle keeps writing to, so it can be completed later;
+the tracker comment is a single POST made at the end of **5a**, before 5b runs the gate — so on a
+FAIL cycle that field could never be filled at post time. That is the same defect TASK-78-002
+described, inverted: a slot with no value rather than a value with no slot. The comment-template
+half was reverted and the asymmetry is now documented in the file so the next editor does not
+"restore" it.
+
+### Deferred Work
+
+None. One Important review finding stays open and is **not** deferred implementation work: the task
+carries no `github_issue`, so this run posted no tracker signals. Run `/sync-github-task` on the
+task file to link it.
 
 ---
 
@@ -177,15 +297,15 @@ and it makes no previously-passing run fail.
 
 ### Contract Tests
 
-- [ ] All three loop documents name `<fastGateCommand>` and the config key
-- [ ] Removing it from any one of the three fails the test
+- [x] All three loop documents name `<fastGateCommand>` and the config key
+- [x] Removing it from any one of the three fails the test
 
 **Command**: `node --test evals/shared/tests/ci-gate-parity.test.mjs`
 
 ### Mutation Proving
 
-- [ ] Remove the gate from the verify loop → the parity test goes red
-- [ ] Remove it from the qa-fix loop → red (proves the list is genuinely iterated, not hardcoded to one file)
+- [x] Remove the gate from the verify loop → the parity test goes red — **verified**
+- [x] Remove it from the qa-fix loop → red (proves the list is genuinely iterated, not hardcoded to one file) — **verified**, and the develop loop too: all three mutate red
 
 ---
 
@@ -193,18 +313,18 @@ and it makes no previously-passing run fail.
 
 ### Functional
 
-- [ ] `develop-bug`'s per-cycle fix loop runs `<fastGateCommand>` before committing
-- [ ] The gate sits at that file's own pre-commit seam, after any no-change check
-- [ ] The retry budget is stated as 2 attempts, without the removed `MAX_ITER` claim
+- [x] `develop-bug`'s per-cycle fix loop runs `<fastGateCommand>` before committing
+- [x] The gate sits at that file's own pre-commit seam, after any no-change check — step `3a`, between the step-3 no-change HALT and the step-4 commit
+- [x] The retry budget is stated as 2 attempts, without the removed `MAX_ITER` claim
 
 ### Regression
 
-- [ ] The other two loop documents are unchanged
-- [ ] No new check is added — same tier, same command
+- [x] The other two loop documents are unchanged — `git diff --stat` touches neither
+- [x] No new check is added — same tier, same command (`develop.fastGateCommand`)
 
 ### Safety
 
-- [ ] The parity test fails if any one of the three documents loses the gate
+- [x] The parity test fails if any one of the three documents loses the gate — mutation-proved on all three
 
 ---
 
@@ -242,27 +362,100 @@ None. One document gains a step that two others already have.
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
 
+## Definition of Done - PASSED
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Gate**: `task.78.gate.2.develop-bug-fast-gate.yml` — ✅ **PASS**, 100/100 (2 cycles; gate 1 was
+CONCERNS 80/100 with three MEDIUM findings, all closed)
+**PR conformance** (Step 5c `/review-pr`): ⚠️ CONCERNS — non-blocking; its one medium finding closed
+before finalise ran.
+
+All Definition of Done criteria verified:
+
+- ✅ **Success Criteria:** 6/6 met, each traced to a specific line
+- ✅ **Safety criterion held by a mutation proof, not a green test:** each of the three loop documents
+  was stripped of the gate in turn, the parity test went red on each, and all three restored green
+- ✅ **CI:** SUCCESS on `302ed3f` — the PR's current head, waited for rather than assumed (the first
+  sample read PENDING with three jobs in progress)
+- ✅ **Documentation:** CHANGELOG entry, both consumer reference sites, task Change Log
+- ✅ **Security:** no executable code, no new command, retained `$FIX_LOG` confirmed gitignored
+- ⚠️ **Compliance:** NOT_APPLICABLE — no regulated surface
+
+**Out of scope, recorded rather than deferred:** widening the Step 4b runnable-prose rule to
+skill-native `references/*.md` (this task's own blind spot, one layer up), and the uncommitted-fix
+handover on a fifth-cycle twice-red gate — which is identical to the story/task qa-fix loop, so
+changing it here alone would break the parity this task exists to establish.
+
+**Detailed Verification Log:** see [`task.78.dod.1.develop-bug-fast-gate.md`](./task.78.dod.1.develop-bug-fast-gate.md).
+
+**Task marked as ACCEPTED on:** 2026-09-04
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-04
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 80/100)
+
+### QA Reports
+
+- **Cycle 2 (latest)**: [task.78.qa.2.develop-bug-fast-gate.md](./task.78.qa.2.develop-bug-fast-gate.md) · [gate](./task.78.gate.2.develop-bug-fast-gate.yml)
+- **Cycle 1**: [task.78.qa.1.develop-bug-fast-gate.md](./task.78.qa.1.develop-bug-fast-gate.md) · [gate](./task.78.gate.1.develop-bug-fast-gate.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 2320 (2319 pass, 0 fail)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+Cycle 1 raised three MEDIUM findings, none in the gate's behaviour: **TASK-78-001** — "step-3"
+collided with 5b's own step 3; **TASK-78-002** — the failure output was directed at a template with
+no field for it; **TASK-78-003** — three live docs still described the gate as running in two places.
+
+All three verified closed in cycle 2 by reading the current files. The cycle-2 refute pass over the
+whole branch diff found nothing false. The fix cycle had itself already caught and reverted one
+defect of the shape that pass looks for — a change correct in the steady state and wrong in a
+transition.
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                                                  | Author      |
 | ---------- | ------- | ------------------------------------------------------------ | ----------- |
 | 2026-09-01 | 1.0     | Initial draft — filed from the task.75 QA trail               | create-task |
+| 2026-09-04 | 1.1     | Review passed (9/10) — corrected the target document's path throughout (it is skill-native, not a shared resource), rewrote Phase 4 as a bundle drift check, and pinned the `{N}` cycle-counter convention | review-task |
+| 2026-09-04 |         | Implemented — 4 files, parity test extended to 3 loop documents and mutation-proved on each | develop |
+| 2026-09-04 |         | QA gate CONCERNS (80/100) — 3 MEDIUM findings, none in the gate's behaviour | qa-task |
+| 2026-09-04 |         | QA findings fixed — all 3 closed, 1 iteration; a fourth defect found by the adversarial pass over the fixes themselves | qa-fix |
+| 2026-09-04 |         | QA cycle 2 — gate PASS (100/100), all three findings verified closed, refute pass found nothing new | qa-task |
+| 2026-09-04 |         | Step 5c review-pr — CONCERNS; PC-1 closed (§7 Files Summary now lists all five modified files) | review-pr |
+| 2026-09-04 | 1.2     | DoD verified — accepted (PR #314), CI green on the final head | finalise |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Locate the seam
-- [ ] Commit point and no-change check identified
+- [x] Commit point and no-change check identified
 
 ### Phase 2: Add the gate
-- [ ] Block added at the seam, config key not literal, retry budget stated
+- [x] Block added at the seam, config key not literal, retry budget stated
 
 ### Phase 3: Parity test
-- [ ] All three loop documents covered
+- [x] All three loop documents covered
 
-### Phase 4: Bundle
-- [ ] `npm run bundle` committed
+### Phase 4: Bundle drift check
+- [x] `npm run bundle` run; no diff produced
 
 ---
 

@@ -694,10 +694,16 @@ Iterate until:
 
 Use the PR metadata stored in Step 0 (Prerequisites). Compose the comment body then post it via the active platform.
 
-```bash
-COMMENT_BODY="## 🛠️ QA Fixes Applied
+**One content variable, two wrappers.** The PR comment and the tracker-issue comment carry the same
+fix summary, but they are not the same comment: the tracker comment opens with a plain-language lead
+rendered by `tracker-comment.js`, and the PR comment is written for a reviewer already reading the
+diff. Keeping `FIX_SUMMARY` as the single source of the shared text — rather than duplicating the prose
+into two variables — is what stops the two drifting apart, which duplicated prose in this repository
+does within weeks.
 
-**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
+```bash
+# The shared content. Edit this once; both wrappers below pick the change up.
+FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 **Date**: [date]
 **PR**: #$PR_NUMBER - $PR_TITLE
 **PR State**: $PR_STATE
@@ -760,6 +766,38 @@ COMMENT_BODY="## 🛠️ QA Fixes Applied
 
 ---
 "
+
+# The cycle number, derived from the gate this fix cycle is answering. Gate files
+# are `*.gate.{N}.{name}.yml` and {N} IS the QA cycle, so the number is already on
+# disk — no caller has to pass it, and nothing invents it. `$STORY_FILE` is the
+# resolved story or task document, bound in Step 0 (locate-story).
+#
+# Derived HERE, once, because both comments need it: the pull-request lead below
+# and the tracker comment further down. Deriving it twice would let the two
+# comments disagree about which round this is.
+DOC_DIR=$(dirname "$STORY_FILE")
+FIX_CYCLE=$(ls -t "$DOC_DIR"/*.gate.*.yml 2>/dev/null | head -1 \
+  | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+
+# The pull-request wrapper — its own heading, then its own plain-language lead.
+# The lead is added HERE, once, above the arm split below, so both arms post the
+# same bytes. It must NOT be folded into $FIX_SUMMARY: that variable also feeds
+# $TRACKER_COMMENT_BODY, where tracker-comment.js renders the lead itself, and a
+# lead in the shared value would double-lead the tracker comment.
+QA_FIX_LEAD=$(node references/stakeholder-summary-cli.js --stage qa-fix \
+  --slot cycle="$FIX_CYCLE") || exit 1
+PR_COMMENT_BODY="## 🛠️ QA Fixes Applied
+
+${QA_FIX_LEAD}
+
+---
+
+${FIX_SUMMARY}"
+
+# The tracker-issue wrapper — no heading of its own. tracker-comment.js renders the
+# plain-language lead above this body, and a heading between the lead and the detail
+# reads as a second opening.
+TRACKER_COMMENT_BODY="${FIX_SUMMARY}"
 ```
 
 **Post the comment (dual-path):**
@@ -767,10 +805,10 @@ COMMENT_BODY="## 🛠️ QA Fixes Applied
 ```bash
 if [ "$PLATFORM" = "github" ]; then
   # Wrapped in tracker_call_with_retry (3× exponential backoff). Source the helper from references/resolve-platform.sh first.
-  tracker_call_with_retry gh pr comment "$PR_URL" --body "$COMMENT_BODY"
+  tracker_call_with_retry gh pr comment "$PR_URL" --body "$PR_COMMENT_BODY"
   COMMENT_RC=$?
 elif [ "$PLATFORM" = "bitbucket" ]; then
-  BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$COMMENT_BODY" '{content: {raw: $raw}}')
+  BB_COMMENT_PAYLOAD=$(jq -n --arg raw "$PR_COMMENT_BODY" '{content: {raw: $raw}}')
   curl -sf -X POST \
     "${BB_CURL_AUTH[@]}" \
     -H "Content-Type: application/json" \
@@ -786,28 +824,58 @@ fi
 
 **Non-blocking**: GitHub path retries 3× automatically via `tracker_call_with_retry`. If all attempts fail (`COMMENT_RC != 0`), log the warning and continue. Bitbucket path is single-shot for now (no equivalent helper); a failure logs and continues. The implementation report (in git) is the durable audit trail; this PR comment is convenience only.
 
-**Jira tracker comment (optional — after PR comment confirmed):**
+**Tracker issue comment (after the PR comment is confirmed):**
 
-When `TRACKER=jira` (set by resolver in the Platform Detection section above), also post the fix summary to the linked Jira issue. This is **non-blocking** — a failure here does NOT stop qa-fix from completing.
+Also post the fix summary to the linked tracker issue. **Non-blocking** — a failure here does NOT stop
+qa-fix from completing. `tracker-comment.js` resolves `TRACKER` itself, so this is one call on either
+tracker; only the issue identifier differs.
 
-First, read `$STORY_FILE` (the resolved story or task document — set during Step 0 locate-story) and extract `jira_key`:
-
-```bash
-JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
-```
-
-If `TRACKER=jira` and `JIRA_KEY` is non-empty (and not `null`):
-
-Post it through the CLI — the same `$COMMENT_BODY` used for the PR comment:
+`$STORY_FILE` is the resolved story or task document, bound in Step 0 (locate-story).
 
 ```bash
-mkdir -p .claude/state
-printf '%s' "$COMMENT_BODY" > .claude/state/comment-body.md
-
-node .agents/skills/qa-fix/references/tracker-comment.js \
-  --issue "$JIRA_KEY" --body-file .claude/state/comment-body.md \
-  --stage qa-fix --json
+if [ "$TRACKER" = "jira" ]; then
+  FIX_ISSUE=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
+else
+  FIX_ISSUE=$(grep -E '^github_issue:' "$STORY_FILE" | head -1 | sed -E 's/github_issue:[[:space:]]*//' | tr -d '"'"'"' ')
+fi
+[ "$FIX_ISSUE" = "null" ] && FIX_ISSUE=""
 ```
+
+If `FIX_ISSUE` is empty, skip this step silently.
+
+```bash
+if [ -n "$FIX_ISSUE" ]; then
+  mkdir -p .claude/state
+  printf '%s' "$TRACKER_COMMENT_BODY" > .claude/state/comment-body.md
+
+  # $FIX_CYCLE was derived once, where $PR_COMMENT_BODY is built — from the gate
+  # filename, which is where the round number genuinely lives. Reused here so the
+  # pull-request comment and this tracker comment cannot disagree about which
+  # round they are reporting. Re-derive it only if you are running this block on
+  # its own.
+
+  node .agents/skills/qa-fix/references/tracker-comment.js \
+    --issue "$FIX_ISSUE" --body-file .claude/state/comment-body.md \
+    --stage qa-fix \
+    --slot cycle="$FIX_CYCLE" \
+    --json \
+    || echo "⚠️  Tracker issue comment failed — continuing"
+fi
+```
+
+> **`cycle` is the only slot `qa-fix` reads**, and it is numeric — positive integers only, so a
+> non-numeric value is dropped and the lead degrades to the shorter true sentence rather than rendering
+> a stray token.
+>
+> **It is derived, not passed in, and that is deliberate.** An earlier draft of this block read
+> `--slot cycle="$QA_CYCLE"` — a variable that exists nowhere in this skill. It would have expanded to
+> the empty string, which the engine drops, so the lead would have degraded silently and correctly and
+> nobody would ever have found out. Deriving from the gate filename uses a value that is genuinely on
+> disk at this point. When no gate file is found, `FIX_CYCLE` is empty and the slot is dropped by the
+> same rule — the degraded path is reached by the engine's own coercion rather than by hoping.
+>
+> This posts `$TRACKER_COMMENT_BODY`, not `$PR_COMMENT_BODY`. The two differ only by their wrapper and
+> share `$FIX_SUMMARY` — edit the summary in one place; never duplicate the prose.
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 

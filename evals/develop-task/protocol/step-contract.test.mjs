@@ -38,7 +38,7 @@ const STEP_KEYWORDS = {
   2: ["review", "skip"],
   3: ["develop", "loop", "MAX_ITER"],
   4: ["create-pr", "PR"],
-  "5-6": ["qa-task", "qa-fix", "gate"],
+  "5-6": ["qa-task", "qa-fix", "gate", "review-pr"],
   7: ["finalise", "DoD"],
   8: ["commit", "push"],
 };

@@ -1,8 +1,8 @@
 # Bug Registry
 
 **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
-**Last Updated:** 2026-09-02
-**Next Available Bug Number:** **9**
+**Last Updated:** 2026-09-06
+**Next Available Bug Number:** **13**
 
 ## How to use
 
@@ -32,9 +32,13 @@
 | 3 | [Three CLIs call `process.exit()` after an async stdout write, truncating piped output at ~64KB](bug.3.stdout-truncation-on-exit/bug.3.stdout-truncation-on-exit.md) | closed | Major | Critical | 2026-09-01 | CLI output / test harness |
 | 4 | [Snippet engine silently no-ops when invoked through a symlinked path](bug.4.snippet-engine-symlink-noop/bug.4.snippet-engine-symlink-noop.md) | closed | Major | High | 2026-09-01 | qa-task / Step 4b snippet engine |
 | 5 | [access-config parity JS probe records a timeout as a real answer](bug.5.access-parity-js-probe-conflates-timeout/bug.5.access-parity-js-probe-conflates-timeout.md) | closed | Major | High | 2026-09-01 | test harness / config reader |
-| 6 | [Ten more fail-open routes past the snippet classifier, plus two over-refusals](bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md) | new | Major | High | 2026-09-02 | qa-execute-snippets / classifier |
-| 7 | [`zero-blocks-executed` fires on skills whose every documented command is correctly refused](bug.7.zero-blocks-executed-fires-on-correct-refusal/bug.7.zero-blocks-executed-fires-on-correct-refusal.md) | new | Minor | Medium | 2026-09-02 | qa-task Step 4b / snippet engine |
-| 8 | [A bug status outside the lifecycle is silently invisible to selection](bug.8.bug-status-outside-lifecycle-is-invisible/bug.8.bug-status-outside-lifecycle-is-invisible.md) | new | Major | High | 2026-09-02 | selection / bug authoring / validation |
+| 6 | [Ten more fail-open routes past the snippet classifier, plus two over-refusals](bug.6.snippet-classifier-ten-more-fail-open-routes/bug.6.snippet-classifier-ten-more-fail-open-routes.md) | closed | Major | High | 2026-09-02 | qa-execute-snippets / classifier |
+| 7 | [`zero-blocks-executed` fires on skills whose every documented command is correctly refused](bug.7.zero-blocks-executed-fires-on-correct-refusal/bug.7.zero-blocks-executed-fires-on-correct-refusal.md) | closed | Minor | Medium | 2026-09-02 | qa-task Step 4b / snippet engine |
+| 8 | [A bug status outside the lifecycle is silently invisible to selection](bug.8.bug-status-outside-lifecycle-is-invisible/bug.8.bug-status-outside-lifecycle-is-invisible.md) | closed | Major | High | 2026-09-02 | selection / bug authoring / validation |
+| 9 | [The registry frontier ignores the `Depends on` column, so it can nominate work whose prerequisite is unbuilt](bug.9.registry-frontier-ignores-depends-on/bug.9.registry-frontier-ignores-depends-on.md) | closed | Major | High | 2026-09-02 | selection / task registry |
+| 10 | [sed's `w` write flag is only caught when a space follows it, leaving seven glued forms fail-open](bug.10.sed-w-glued-filename/bug.10.sed-w-glued-filename.md) | closed | Major | High | 2026-09-05 | qa-execute-snippets / classifier |
+| 11 | [finalise's Document-link re-point regresses a card out of the terminal status it just set, stranding the resolution](bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md) | closed | Major | High | 2026-09-06 | finalise Step 7 / sync-jira status drive |
+| 12 | [Three review-* body/link-only syncs still re-resolve status after the ladder has moved the card](bug.12.review-syncs-relink-without-no-transition/bug.12.review-syncs-relink-without-no-transition.md) | closed | Major | Medium | 2026-09-06 | review-story 9.6 / review-task 8.6 / review-epic |
 
 ---
 

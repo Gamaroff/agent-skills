@@ -1,0 +1,113 @@
+schema: 1
+task: "task.84.skill-install-profiles"
+task_title: "Skill install profiles with dependency closure"
+gate: CONCERNS
+status_reason: "The cycle-3 confirmation pass found FIVE more defects, two HIGH, and three of the five were introduced by cycle 2's own fixes. The worst is a bare command-substitution assignment that aborts the wizard under errexit — introduced in the same commit as a comment explicitly warning against it, and invisible to its own test because that test ran under `set +e`. All five are fixed and mutation-proven. Gate is CONCERNS, not PASS: three consecutive cycles have each found the previous cycle's fixes defective, and I am the author of all three."
+reviewer: "QA Engineer"
+updated: "2026-09-04T23:30:00Z"
+
+top_issues:
+  - id: "TASK-84-C3-001"
+    severity: high
+    file: "scripts/setup-consumer.sh"
+    finding: "Cycle 2 rewrote the resolver call from `if _RESOLVED_SET=$(_resolve_skill_set …); then` to a bare `_RESOLVED_SET=$(…); _resolve_rc=$?`. Under `set -euo pipefail` a bare assignment whose command substitution exits non-zero triggers errexit, so the shell dies at that line and `$?` is never read. Both rc branches cycle 2 added were DEAD CODE. In the same commit, a comment was added above the function reading 'CALL THIS INSIDE A CONDITION … a BARE call would abort the whole wizard … Verified both ways; keep it that way' — describing a call form that no longer existed anywhere in the file."
+    failure_scenario: "Any resolver failure — a typo'd include, a missing node, a malformed data file — aborts the wizard AFTER the tarball is downloaded and extracted and .agents/skills/ is created, but BEFORE a single skill is copied. The user gets an empty install, a leaked temp dir, and 'Wizard exited prematurely (code 2)'. Cycle 1's defect installed everything, which is recoverable; this bricks the install."
+    suggested_action: "Restore the condition form. Test it WITHOUT `set +e` — the cycle-2 test disabled errexit, which is exactly why it could not see this."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-C3-002"
+    severity: high
+    file: "scripts/generate-skill-dependencies.mjs"
+    finding: "Cycle 2's block-form guard required the first `- item` on the line immediately after `invokes:`. YAML permits a blank line or a comment line between them, and both shapes fell through to the `!raw` early-return — the same silent under-collection the guard was added to prevent, one newline away."
+    failure_scenario: "`invokes:` / blank line / `  - create-branch` returns []. The generator succeeds, the committed JSON matches, CI is green, and a consumer on a profile install gets a skill whose entire closure was never pulled in. Latent rather than active: no SKILL.md in the tree uses these shapes today."
+    suggested_action: "Allow intervening blank and comment lines in the detection; assert every block shape in the drift test, not just the adjacent one."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-C3-003"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "Cycle 2 widened the comment strip from `\\s+#` to `\\s*#` in the JS parser only. The awk parser in `_config_skills_list` reads a YAML FLOW SEQUENCE, where an unspaced `#` IS a comment, and still used `[[:space:]]+#`. The two parsers of the same file disagreed. (The two scalar parsers correctly keep `+` — in a plain scalar an unspaced `#` is part of the value, and widening those would have been a new bug.)"
+    failure_scenario: "`exclude: [qa-story]# temporarily off` parsed as `qa-story#temporarilyoff`. The CLI's unknown-exclude warning fires, the exclusion is ignored, and qa-story is installed anyway — the user's exclusion silently does nothing. With `include:` the same mangling produces exit 2, which under C3-001 aborted the whole wizard."
+    suggested_action: "Widen line 1003 only; leave the scalar parsers narrow and say why."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-C3-004"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "The dry-run count discarded the CLI's stderr and collapsed every non-zero exit into 'resolver unavailable locally'. Cycle 2's fix #3 removed exactly that mis-attribution from the real path and left it on the dry-run path, edited in the same commit."
+    failure_scenario: "`--dry-run` against a config with a typo'd include prints 'resolver unavailable locally, count not computed', sending the user to look for a missing node when the CLI ran fine and had already named the offending entry on the stderr the wizard threw away. A dry run is where a config typo should be cheapest to find."
+    suggested_action: "Capture rc and stderr; surface the CLI's message on rc 2; reserve 'unavailable' for a genuinely absent CLI."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-C3-005"
+    severity: low
+    file: "scripts/setup-consumer.sh"
+    finding: "The zero-skill warning hardcoded 'check your skills.exclude list' and asserted 'every seed is excluded'. The tracker filter runs last, so a profile whose seeds are all inapplicable to the tracker also resolves empty with an empty exclude."
+    failure_scenario: "A user-authored profile whose seeds are all Jira-only, installed on GitHub: the wizard blames a `skills.exclude` key they never set. Latent — not reachable with the three shipped profiles."
+    suggested_action: "Name both causes."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+vacuous_tests_replaced:
+  - test: "C2-M1: a zero-skill resolution is honoured but warned about"
+    why_vacuous: "Contained no behaviour. Two greps of the script, one of which — `match(src, /EVEN IF EMPTY/)` — asserted the text of a CODE COMMENT. A comment cannot fail. It would have passed with the warning emitted after the install loop, with `_have_set` never set, or, as was actually the case, with the surrounding rc dispatch aborting the shell."
+    replacement: "Drives the real function under real errexit and asserts rc, emptiness, and that the shell survived. Plus a new C2-M1b asserting the rc branches are reachable — mutation-proven by reintroducing the bare assignment, with the mutation asserted to have applied."
+  - test: "C2-H2: the CLI's exit code is propagated"
+    why_vacuous: "Half real. The behavioural half genuinely fails if `return $_rc` is reverted. But it ran under an explicit `set +e` — precisely the condition that does not hold in production — and its only evidence for the caller was a grep for a branch that was unreachable."
+    replacement: "Kept, with C2-M1b covering the errexit condition it could not see."
+  - test: "C2-M2: the dry-run preview forwards --all-skills"
+    why_vacuous: "Its comment claimed a behavioural backstop; the behavioural half calls the CLI directly and never touches setup-consumer.sh, so it would pass with the forwarding deleted."
+    replacement: "Assertions unchanged (the grep is genuine); the COMMENT corrected to state the real scope rather than overclaim. Honest scope beats a false coverage claim."
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 67
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged across all three cycles."
+  performance:
+    status: PASS
+    notes: "Unchanged. ~115ms per resolution."
+  reliability:
+    status: CONCERNS
+    notes: "C3-001 is the most severe defect found in this task and it was introduced by a fix. The trend in blast radius is downward — installs everything, then one skill's edges, then an aborted install on a failure path — but three consecutive cycles have each found the previous cycle's repairs defective, and every one of those repairs was mine. The convergence (11 -> 5 -> 5) is real but not yet demonstrated to have converged."
+  maintainability:
+    status: CONCERNS
+    notes: "Two more vacuous tests found, one asserting on a code comment. The pattern across three cycles is consistent and worth stating plainly: tests that assert on SOURCE TEXT rather than behaviour have not caught a single one of the seventeen defects in this task, and have twice given false confidence about the specific line the defect was on. Where behaviour is testable, assert behaviour; where it is not, say so in the comment rather than implying coverage."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Extract the install loop's per-skill decision into a helper so the eight-case truth table is executable. This is now the third cycle to note that install_skills has no behavioural coverage; the follow-up is overdue rather than optional."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Add a lint or test forbidding bare `X=$(...)` command substitutions of functions that return non-zero as a normal outcome, under set -e. C3-001 is a repeatable trap, not a one-off slip."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Extract one `_config_skills_scalar` / `_config_skills_flow` pair — three cycles have now had to edit the duplicated awk rules, and C3-003 was caused by editing one copy and not the other."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Run shellcheck once task 92's lane lands. It would very likely have caught C3-001."
+      refs: ["scripts/setup-consumer.sh"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - "One further confirmation pass finding no new HIGH defects. Three cycles have each found the previous cycle's fixes defective; a fourth clean pass is what would establish convergence rather than assert it."

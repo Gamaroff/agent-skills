@@ -1,0 +1,63 @@
+schema: 1
+task: 'task.85.review-pr-machine-readable-findings'
+task_title: 'Give /review-pr a machine-readable findings block'
+gate: PASS
+status_reason: 'All three cycle-1 findings are fixed and each fix is pinned by a mutation-proven assertion. The refute pass over the fixes found nothing; the one remaining finding is LOW, pre-existing, and its remedy is explicitly out of the task''s scope.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T00:00:00Z'
+
+top_issues:
+  - id: 'TASK85-004'
+    severity: low
+    file: 'shared/resources/qa-findings-ingester-prompt.md'
+    finding: 'The block path is told to carry `truncated_count` across; the rendered fallback is not. `/review-pr` Step 6 emits the omitted count as free prose in the rendered output, and the fallback section never says to parse it — so on a legacy report with truncated findings the ingester under-reports `truncated_count`. Pre-existing (the fallback never parsed it), and newly visible only because the block path now states the opposite.'
+    suggested_action: 'Either tell the fallback to read the rendered omitted-count note, or state plainly that truncated_count is unavailable on the legacy path so an under-report is not read as zero. The first needs a stable text shape for the note, which §4 Out of Scope forbids changing here.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 2965
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Unchanged from cycle 1: documentation and contract-test change only — no executable code, no new inputs, no auth, network or data surface. Verdict reached by reading rather than by executing hostile candidates, so `reasoned` is the accurate value; recording `measured` with zero probes would be a schema error.'
+  performance:
+    status: PASS
+    notes: 'No runtime code. Full `npm run ci` (fast tier + eval:all) completed green.'
+  reliability:
+    status: PASS
+    notes: 'Additive; legacy fallback preserved and pinned against a real pre-block report. Rollback is one revert plus `npm run bundle`.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-1 CONCERNS resolved. The block-to-output mapping is now an 8-row table covering every block field in both directions — verified mechanically, exhaustive with no uncovered field on either side.'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-09'
+  total_iterations: 1
+  verification_method: 'Contract tests + 4 further mutation proofs + mechanical exhaustiveness check of the mapping table in both directions'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Resolve the truncated_count asymmetry on the legacy fallback path (TASK85-004)'
+      refs: ['shared/resources/qa-findings-ingester-prompt.md']
+    - action: 'Consider a success criterion requiring the mapping to be unambiguous — the current set could be fully satisfied by the contradictory mapping that cycle 1 found'
+      refs: ['docs/tasks/task.85.review-pr-machine-readable-findings/task.85.review-pr-machine-readable-findings.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

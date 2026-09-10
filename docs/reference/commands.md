@@ -8,7 +8,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 
 | Command | What it does | Reference |
 |---|---|---|
-| `/develop-story <path>` | Full story lifecycle: branch → review → develop → PR → QA → fix → finalise → commit | [Story Development](../runbooks/story-development.md) |
+| `/develop-story <path>` | Full story lifecycle: branch → review → develop → PR → QA → fix → PR review (5c) → finalise → commit | [Story Development](../runbooks/story-development.md) |
 | `/develop-task <path>` | Full task lifecycle (no epic) | [Task Development](../runbooks/task-development.md) |
 | `/develop-bug <path>` | Full bug-fix lifecycle: branch → review-bug → investigate & fix → PR → verify loop → close | [Bug Fix Runbook](../runbooks/bug-fix.md), [`develop-bug` README](../../skills/develop-bug/README.md) |
 | `/develop <path>` | Just the implementation loop — used inside the orchestrators | [`develop` SKILL.md](../../skills/develop/SKILL.md) |
@@ -54,8 +54,12 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/review-bug --validate <path>` | Non-interactive GO/NO-GO fix-readiness score (the gate `develop-bug` Step 2 runs) | [`review-bug`](../../skills/review-bug/SKILL.md) |
 | `/review-code` | Adversarial diff review of the working tree or a PR — advisory by default | [`review-code`](../../skills/review-code/SKILL.md) |
 | `/review-code --comment` / `--fix` | Post findings as inline PR comments, or apply them to the working tree | [`review-code`](../../skills/review-code/SKILL.md) |
-| `/review-pr [PR\|branch]` | Review a PR against its work item and pipeline artifacts — conformance + code, advisory | [`review-pr`](../../skills/review-pr/SKILL.md) |
+| `/review-pr [PR\|branch]` | Review a PR against its work item and pipeline artifacts — conformance + code, advisory. Also runs automatically as **Step 5c**, the exit gate of the develop pipelines' QA loop | [`review-pr`](../../skills/review-pr/SKILL.md) |
 | `/review-pr --comment` / `--no-code` / `--no-docs` | Post one summary PR comment, or run a single lens | [`review-pr`](../../skills/review-pr/SKILL.md) |
+| `/review-security [work-item]` | Establish whether each security control **engages**, by executing it against adversarial input — per-control `engages` / `present-but-inert` / `absent` / `unverifiable`. Advisory; owns no gate | [`review-security`](../../skills/review-security/SKILL.md) |
+| `/review-security --mode full` | Review the work item's whole security surface regardless of what changed | [`review-security`](../../skills/review-security/SKILL.md) |
+| `/double-check [target]` | Adversarial audit of the work just produced — disk state, negative constraints, clean-room re-derivation, requirement coverage | [`double-check`](../../skills/double-check/SKILL.md) |
+| `/double-check --report-only` / `--fresh-eyes` | Report defects without correcting, or run the non-empirical gates in a subagent with no reasoning trace | [`double-check`](../../skills/double-check/SKILL.md) |
 
 ## QA
 
@@ -92,9 +96,11 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/sync-jira-epic <path>` | Create/update Jira epic from local file | [Jira Publish](../runbooks/jira-publish.md) |
 | `/sync-jira-story <path>` | Create/update Jira story, link to epic | [Jira Publish](../runbooks/jira-publish.md) |
 | `/sync-jira-task <path>` | Create/update standalone Jira task | [Jira Publish](../runbooks/jira-publish.md) |
+| `/sync-jira-bug <path>` | Create/update a Jira bug, issue-linked to its parent's card | [`sync-jira-bug`](../../skills/sync-jira-bug/SKILL.md) |
 | `/sync-github-epic <path>` | Create/update GitHub epic issue, add to board, mirror priority | [`sync-github-epic`](../../skills/sync-github-epic/SKILL.md) |
 | `/sync-github-story <path>` | Create/update GitHub story issue, link as sub-issue of the epic | [`sync-github-story`](../../skills/sync-github-story/SKILL.md) |
 | `/sync-github-task <path>` | Create/update standalone GitHub task issue | [`sync-github-task`](../../skills/sync-github-task/SKILL.md) |
+| `/sync-github-bug <path>` | Create/update a GitHub bug issue, sub-issue of its parent | [`sync-github-bug`](../../skills/sync-github-bug/SKILL.md) |
 | `/jira-epic-creator` | Bulk Jira epic creation from PRD | [`jira-epic-creator`](../../skills/jira-epic-creator/SKILL.md) |
 
 Which family fires is resolved per-run, not chosen by hand — see [platform detection](../../shared/resources/platform-detection.md) and [tracker workflow](./tracker-workflow.md).
@@ -127,6 +133,8 @@ family that reads `assignee`.
 | `/create-skill` | Scaffold a new skill | [Authoring skills](../contributing/authoring-skills.md) |
 | `/document-existing-project` | Generate brownfield architecture doc | [Document Existing Project](../runbooks/document-existing-project.md) |
 | `/remember-insight` | Save an insight to project memory | [`remember-insight`](../../skills/remember-insight/SKILL.md) |
+| `/observe-work` | Watch the session for skill-improvement signals and write each to the observation log | [`observe-work`](../../skills/observe-work/SKILL.md) |
+| `/observe-work --review` | Work the observation backlog and stage skill updates for you to install | [Review cycle](../../skills/observe-work/references/review-cycle.md) |
 
 ## Checklists
 

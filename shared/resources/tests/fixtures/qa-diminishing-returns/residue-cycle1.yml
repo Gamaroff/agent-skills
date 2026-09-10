@@ -1,0 +1,35 @@
+schema: 1
+task: "task.RECON.diminishing-returns"
+gate: FAIL
+status_reason: "Reconstruction of cycle 1 — two HIGH findings in the guards themselves."
+reviewer: "QA Engineer"
+updated: "2026-09-09T09:00:00Z"
+
+top_issues:
+  - id: "RECON-001"
+    severity: high
+    file: "src/pipeline/guard.ts"
+    finding: "The wiring pin is circular — it asserts the property by reading the value it set."
+    suggested_action: "Assert against an independent reading."
+    suggested_owner: dev
+    status: open
+  - id: "RECON-002"
+    severity: high
+    file: "src/pipeline/gate.ts"
+    finding: "The wiring pins are defeatable by a gate that short-circuits before they run."
+    suggested_action: "Move the pins ahead of the short circuit."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No security surface touched."
+  performance:
+    status: PASS
+    notes: "No hot path affected."

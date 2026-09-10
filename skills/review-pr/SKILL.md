@@ -29,17 +29,18 @@ A PR can be flawless code that implements the wrong thing, or correct work whose
 - Reviewing someone else's pipeline-produced PR before merging it
 - Auditing a merged PR after the fact — the trail is still on disk
 
-Do **not** use this for a pure diff review with no work item — use `/review-code`. Do **not** use it as a QA gate — use `/qa-story` or `/qa-task`.
+Do **not** use this for a pure diff review with no work item — use `/review-code`. Do **not** use it *as* a QA gate — it writes no gate file; `/qa-story` and `/qa-task` do. (The develop pipelines run it at **Step 5c**, inside their QA loop, and act on its verdict themselves — that is consultation, not gating. See *Relationship to the develop pipelines*.)
 
 ## Arguments
 
-Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--no-code] [--no-docs]`.
+Invoke as `/review-pr [target] [--effort LEVEL] [--comment] [--inline] [--no-code] [--no-docs]`.
 
 | Arg | Values | Default | Meaning |
 | --- | --- | --- | --- |
 | `target` | _(none)_ \| `<PR-number>` \| `<PR-URL>` \| `<branch>` | open PR for the current branch | Which PR to review |
 | `--effort` | `low` \| `medium` \| `high` \| `max` | `medium` | Breadth vs. precision, for **both** lenses |
 | `--comment` | flag | off | Post one summary comment to the PR |
+| `--inline` | flag | off | Additionally post each finding as an inline comment on its own line. Implies `--comment` |
 | `--no-code` | flag | off | Skip the code lens |
 | `--no-docs` | flag | off | Skip the conformance lens |
 
@@ -278,6 +279,17 @@ The two schemas are deliberately parallel (`id` / `category` / `severity` / `con
 
 Conformance findings first (they judge whether the change is the right change), then code findings. Within each, sort by severity. If `truncated_count > 0`, note the omitted count.
 
+**The location field is the one place the two schemas are *not* parallel, and it must be normalised.**
+The list above omits it, which is exactly how the discrepancy stays invisible: `pr_conformance` emits
+**`ref:`** (a criterion id, artifact path, frontmatter field, or `path:line`), while `code_review`
+emits **`file_line:`** (always `path:line`). Both render into the same trailing `— {ref}` position
+above, and both are written as **`ref`** in the structured block Step 7 emits — a `CR-*` entry's `ref`
+is its subagent `file_line` verbatim.
+
+Carrying `file_line` through for code findings would re-create, one layer down, the very
+parse-by-position problem the structured block exists to remove: a consumer would again have to test
+which key is present before it could read a location.
+
 **Deterministic verdict — advisory only:**
 
 | Condition | Verdict |
@@ -311,7 +323,7 @@ docs/tasks/task.65.registry-aware-selection/task.65.pr-review.1.registry-aware-s
 
 ALWAYS use this exact template structure:
 
-```markdown
+````markdown
 # PR Review Report: PR #{number} — {title}
 
 **Reviewed:** {YYYY-MM-DD}
@@ -349,10 +361,44 @@ ALWAYS use this exact template structure:
 
 {rendered CR-* findings, or "None."}
 
+## Machine-Readable Findings
+
+```yaml
+findings:
+  # one entry per rendered finding, conformance first then code
+  - id: {PC-n or CR-n, matching the rendered finding}
+    category: {coverage|scope|trail|consistency for PC-*, bug|cleanup for CR-*}
+    severity: {low|medium|high}
+    confidence: {low|medium|high}
+    ref: {the same ref rendered after the em-dash, quoted}
+    finding: {one sentence: what is wrong}
+    suggested_action: {one sentence: the fix approach}
+truncated_count: {integer — the two lenses' counts summed}
+```
+
 ## Recommended Actions
 
 1. {highest-priority action}
-```
+````
+
+**About the machine-readable block.** It is what `/qa-fix`'s findings ingester reads; the rendered
+sections above it are for humans. Four rules, each of which has a way of going wrong:
+
+- **One block, both lenses**, conformance entries first then code entries — the same order as the
+  rendered sections, so a human diffing the two sees them line up. One block means the ingester has
+  exactly one anchor to find.
+- **Tag the fence `yaml`.** The rendered findings sit in untagged ``` fences; an untagged block here
+  would be indistinguishable from them.
+- **`ref` for both lenses**, per the normalisation rule in Step 6. A `CR-*` entry's `ref` is its
+  subagent `file_line` verbatim.
+- **Always emit the section, even with nothing to report** — as `findings: []` with
+  `truncated_count: 0`. If a findings-free report omitted it, an absent section would mean both
+  "report written before this existed" and "no findings", and the ingester's legacy fallback would
+  fire on a report that had a block. A bug in emitting the block would then be indistinguishable from
+  a legacy report.
+
+`truncated_count` is the **sum** of the two lenses' counts. The rendered omitted-count note in Step 6
+stays as it is — this field is the machine-readable half of the same fact, not a replacement for it.
 
 ### Step 8 — `--comment` (optional)
 
@@ -361,12 +407,25 @@ ALWAYS use this exact template structure:
 First build the body file — every command below reads it, and none of them creates it:
 
 ```bash
+# The lead goes BELOW the marker — see the warning under this block. `in-review`
+# is the same stage the tracker comment for this moment uses; one vocabulary.
+LEAD=$(node references/stakeholder-summary-cli.js --stage in-review) || exit 1
+
 BODY_FILE="$(mktemp -t review-pr-comment.XXXXXX.md)"
 {
   printf '%s\n\n' '<!-- agent-skills-pr-review -->'
+  printf '%s\n\n---\n\n' "$LEAD"
   cat "$REPORT_FILE"            # or the rendered summary when no report was written
 } > "$BODY_FILE"
 ```
+
+> **The marker stays on the first line, and that is what keeps this comment idempotent.** Both arms
+> below find an existing comment with `startswith("<!-- agent-skills-pr-review -->")` and then edit
+> it by id. A lead inserted *above* the marker makes that search miss, so a re-run posts a **new**
+> comment instead of updating the old one — visible as duplicate comments, which reads as a
+> formatting problem rather than a bug, and never fails. `$BODY_FILE` is built once here and read by
+> the GitHub PATCH path, the GitHub POST path and both Bitbucket paths, so the lead reaches the
+> **update** path as well as the create path. That is the half that is easy to miss.
 
 **GitHub:**
 
@@ -415,7 +474,49 @@ The GitHub path goes through `tracker_call_with_retry`, inheriting 3× exponenti
 
 Commenting never gates. Never post over an `unverifiable` reason.
 
-**Inline PR comments are out of scope.** No skill in this repo posts one, and building that primitive on two platforms is its own task.
+#### `--inline` — findings beside the lines they are about
+
+The summary comment above stays the default and is always posted. `--inline` adds a second delivery:
+each finding that carries a `file_line` is also posted as an inline comment anchored to that line, via
+the shared primitive. It resolves `$VCS` itself, so this step does not branch:
+
+```bash
+# Findings from both lenses, reshaped into the CLI's input contract.
+# `.code_review.findings[]`, NOT `.code_review[]` — the latter iterates the
+# WRAPPER's values (`reviewed`, the findings array, `truncated_count`), so
+# `select(.file_line != null)` indexes a string and jq aborts outright.
+# `.finding` is the schema's key; there is no `.summary`.
+# Two lenses, two different anchor keys. `code_review` findings carry
+# `file_line`; `pr_conformance` findings carry `ref`, which is a criterion id, a
+# frontmatter field, an artifact path OR a `path:line` — only the last form can
+# be anchored. Both are normalised and then filtered by SHAPE, so a `ref` of
+# "AC-3" is excluded rather than aborting the program. jq is all-or-nothing
+# inside `[ … ]`: one malformed entry would otherwise empty the file and drop
+# every finding. Conformance findings that cannot anchor stay in the summary
+# comment, which is posted regardless.
+jq '[ (.code_review.findings[]? | . + {anchor: .file_line}),
+      (.pr_conformance.findings[]? | . + {anchor: .ref})
+      | select((.anchor? // "") | test("^.+:[0-9]+$"))
+      | {path: (.anchor | split(":")[0]),
+         line: (.anchor | split(":")[1] | tonumber),
+         body: (.finding
+                + (if .suggested_action then "\n\n→ " + .suggested_action else "" end))} ]' \
+   "$FINDINGS_JSON" > "$INLINE_FILE" || {
+  echo "findings JSON did not match the schema — not posting inline"; exit 1; }
+
+node .agents/skills/review-pr/references/pr-inline-comment.js \
+  --pr "$PR_NUMBER" --findings-file "$INLINE_FILE" \
+  --summary-file "$BODY_FILE" --json
+```
+
+**Anchoring failure degrades; it never drops a finding.** A line outside the diff hunk is rejected —
+routinely, since a finding about an unchanged function whose caller moved has no line to attach to —
+and that finding is appended to the summary comment instead, reporting `anchor-failed` rather than
+`posted`. Read the per-finding `reason`s, not just the top-level one: a run reporting `partial` has
+delivered everything, just not all of it inline.
+
+Full contract, the `reason` vocabulary and the marker-plus-update-in-place re-run rule:
+[`references/pr-inline-comment-contract.md`](references/pr-inline-comment-contract.md).
 
 ### Step 9 — Cleanup
 
@@ -441,4 +542,29 @@ After editing, run `npm run bundle`.
 
 ## Relationship to the develop pipelines
 
-`/develop-story` and `/develop-task` do **not** call `/review-pr`. Their QA step already runs the code reviewer every cycle with `code_review_blocking=true`. `/review-pr` is for the human-in-the-loop moment those pipelines do not cover: someone opening a finished PR and asking whether to merge it.
+`/develop-story` and `/develop-task` **do** call `/review-pr`, as **Step 5c** — the exit gate of
+their Steps 5–6 QA loop. It runs once a QA gate reads `PASS` or `WAIVED`, and nothing leaves that
+loop without passing through it. The full routing lives in the pipelines' Steps 5–6 QA loop step
+file, §5c — deliberately not linked by path, because the bundler follows such a reference and would
+copy that file and its transitive dependencies into this skill, which does not need them to run.
+(`/develop-bug` does not call this skill — it runs its own verify loop.)
+
+**Only the conformance lens is new value there.** Those pipelines' QA step already runs the code
+reviewer every cycle with `code_review_blocking=true`, so 5c's code lens is duplication. Its
+conformance lens is not duplicated anywhere: whether the diff *covers* what the work item promised,
+whether it drifted outside that *scope*, whether the artifact *trail* is complete and honest, and
+whether the work item is *consistent* with what shipped. That gap is why the wiring exists.
+
+**Being consulted by a pipeline is not the same as gating one, and this skill still does not gate.**
+The distinction is the whole reason the wiring is legitimate:
+
+- `/review-pr` **reports** a verdict. It writes no gate `.yml`, never submits a formal GitHub
+  review, and never edits code — exactly as before.
+- The **orchestrator** acts on that verdict: `REQUEST CHANGES` sends the run back to `/qa-fix` on
+  the shared 5-cycle budget; `CONCERNS` records findings without blocking; `APPROVE` exits to
+  Step 7.
+
+Gate files remain the exclusive output of `/qa-story` and `/qa-task`.
+
+Invoking it by hand is unchanged and still worthwhile — someone opening a finished PR and asking
+whether to merge it is the same question, asked outside a pipeline run.

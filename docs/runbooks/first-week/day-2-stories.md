@@ -78,7 +78,7 @@ Run these checks before calling Day 2 done:
 
 ## What you learned
 
-- **Story pipeline shape:** PRD → epic → story → branch → review → develop → PR → QA → (qa-fix) → finalise → accepted
+- **Story pipeline shape:** PRD → epic → story → branch → review → develop → PR → QA → (qa-fix) → review-pr → finalise → accepted
 - **The full Phase 0 prompt set for `/develop-story`:** what each question means and why the recommended defaults are safe
 - **How epic-registry numbering coordinates with story creation** and why numbers are never reused
 

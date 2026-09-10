@@ -18,6 +18,9 @@
  *   - In-place frontmatter updates (no key reorder churn)
  *   - --json / --quiet / --dry-run / --force
  *   - --check-card: offline preflight of the document against the card spec
+ *   - --no-transition: re-point links / refresh the description WITHOUT
+ *     driving the issue's status, so a caller that has already decided the
+ *     status (finalise's ladder) is not overruled by a second resolver
  *   - Pluggable fetch (`module.exports.run({ fetchImpl })`) for tests
  */
 
@@ -29,29 +32,11 @@ const CL = require("../references/change-log.js");
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-// What the CARD carries — a summary, not a copy. The task file is the source of
-// truth and every card links to it; see shared/resources/tracker-card-summary.md.
-//
-// This list used to name ELEVEN sections — Overview, Motivation, Technical
-// Background, Scope, Breaking Changes, Implementation Plan, Files Summary,
-// Testing Strategy, Success Criteria, Risk Assessment, Rollback Plan — i.e. the
-// whole task document, republished onto the card verbatim on every sync.
-//
-// `Breaking Changes` survives the cut because it is the one piece of detail a
-// board reader must not have to open a file to discover. It is capped harder
-// than the rest and omitted entirely when the section is absent, which is the
-// common case.
-const TASK_CARD_SECTIONS = [
-  { heading: "Summary", names: ["Overview"] },
-  { heading: "Success Criteria", names: ["Success Criteria"] },
-  {
-    heading: "Breaking Changes",
-    names: ["Breaking Changes"],
-    maxItems: 3,
-    maxSentences: 2,
-    optional: true,
-  },
-];
+// The card section spec is defined ONCE, in the shared library beside the
+// checker that consumes it (task.102). It is re-exported below so existing
+// callers and their tests are unchanged, and so the `create-*` authoring
+// skills can run the same preflight without this skill being installed.
+const TASK_CARD_SECTIONS = lib.TASK_CARD_SECTIONS;
 
 const ISSUE_TYPE = "Task";
 const SYNC_LABEL_PREFIX = "synced-from-";
@@ -389,6 +374,7 @@ function parseArgs(argv) {
     json: false,
     quiet: false,
     failOnStatusSkip: false,
+    noTransition: false,
     probeWorkflow: false,
     writeRecord: "",
   };
@@ -430,6 +416,9 @@ function parseArgs(argv) {
         break;
       case "--fail-on-status-skip":
         opts.failOnStatusSkip = true;
+        break;
+      case "--no-transition":
+        opts.noTransition = true;
         break;
       case "--probe-workflow":
         opts.probeWorkflow = true;
@@ -489,7 +478,7 @@ async function run({
   if (!args.file) {
     output.err("Error: --file is required");
     output.err(
-      "Usage: sync-jira-task --file <task.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet]",
+      "Usage: sync-jira-task --file <task.md> [--check-card] [--doc-branch <name>] [--dry-run] [--force] [--json] [--quiet] [--no-transition]",
     );
     return { exitCode: 1 };
   }
@@ -670,27 +659,13 @@ async function run({
       });
     }
 
-    const changedFields = current
-      ? lib.diffFields({
-          prev: current,
-          next: {
-            summary,
-            priority: lib.normalisePriority(
-              args.priority || frontmatter.priority,
-              livePriorities,
-            ),
-            labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || [],
-          },
-          prevBodyHash: frontmatter.jira_last_body_hash,
-          newBodyHash,
-          prevMetaHash: frontmatter.jira_last_meta_hash,
-          newMetaHash,
-        })
-      : ["summary", "description", "priority", "labels"];
-    changeSummary = changedFields.length
-      ? `Updated: ${changedFields.join(", ")}`
-      : "Sync (no field changes detected)";
-
+    // Build the payload FIRST, then diff against the set actually being sent.
+    //
+    // The diff used to rebuild `labels` from frontmatter here, which can never
+    // match: `collectIssueFields` appends the `synced-from-*` idempotency label
+    // to the set it sends, so the comparison was always a set-without-the-label
+    // against a Jira issue that has it. `labels` was reported changed on every
+    // run.
     const descAdf = buildDescriptionAdf({
       body,
       frontmatter,
@@ -710,6 +685,17 @@ async function run({
       output,
       syncLabel,
     });
+
+    const changedFields = lib.diffAgainstPayload({
+      current,
+      fields,
+      frontmatter,
+      newBodyHash,
+      newMetaHash,
+    });
+    changeSummary = changedFields.length
+      ? `Updated: ${changedFields.join(", ")}`
+      : "Sync (no field changes detected)";
 
     if (args.dryRun) {
       output.info(`\n=== DRY RUN — Would UPDATE ${existingJiraKey} ===`);
@@ -955,7 +941,36 @@ async function run({
       currentStatus: current?.status || null,
       docKind: "task",
       output,
+      noTransition: args.noTransition,
     });
+  }
+
+  // A transition is a write: Jira bumps the issue's own `updated`. Persisting
+  // the pre-transition value would tell the NEXT run that Jira has moved since
+  // this sync — which is exactly what `guardConcurrentEdit` aborts on — so the
+  // card would refuse every subsequent sync over a change this tool made itself
+  // moments earlier.
+  //
+  // Refreshing is best-effort: a failed re-read leaves the earlier value, which
+  // is no worse than not refreshing at all.
+  //
+  // All three guards are load-bearing: `transitioned` (nothing moved, nothing
+  // to re-read), `issueKey` (nothing to query), `!deferred` (a restricted run
+  // performed no transition and must make no network call).
+  if (statusOutcome?.transitioned && result?.issueKey && !deferred) {
+    try {
+      result.updated = await lib.fetchUpdatedTimestampStrict({
+        http,
+        baseUrl: auth.baseUrl,
+        email: auth.email,
+        token: auth.token,
+        issueKey: result.issueKey,
+      });
+    } catch (e) {
+      output.warn(
+        `⚠️  Could not re-read the issue timestamp after the transition (${e.message}). The next sync may report a concurrent edit; re-run with --force if so.`,
+      );
+    }
   }
 
   // Write-back. A deferred update changed nothing in Jira, so recording a

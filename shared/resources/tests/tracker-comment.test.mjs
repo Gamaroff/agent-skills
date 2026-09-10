@@ -38,6 +38,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SHARED = join(__dirname, "..");
 
 const cli = require(join(SHARED, "tracker-comment.js"));
+const { renderLead } = require(join(SHARED, "stakeholder-summary.js"));
 const jira = require(join(SHARED, "jira-sync.js"));
 
 const RESTRICTED = ["read-only", "approve", "command", "manual"];
@@ -156,14 +157,38 @@ test("deferred record carries the body in command.stdin, never interpolated into
     "Backticks `x`, subshell $(rm -rf /), quote ' and \" and \\ and\nnewline";
   const f = bodyFile(dir, nasty);
   await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     repoRoot: dir,
     env: { ...baseEnv, ACCESS_TRACKER: "manual" },
   });
   const rec = readJournal(dir)[0];
   assert.ok(Array.isArray(rec.command.argv), "argv is an array, not a string");
-  assert.equal(rec.command.stdin, nasty, "body rides in stdin verbatim");
+  // The lead is composed ABOVE the access gate, so command.stdin is
+  // `lead + rule + body` rather than the body alone. The property under test is
+  // unchanged — the body reaches stdin byte-for-byte and never touches argv —
+  // so it is asserted as a substring, with the lead asserted separately. The
+  // old equality was doing two jobs at once; splitting them keeps both rather
+  // than weakening one into nothing.
+  assert.ok(rec.command.stdin.includes(nasty), "body rides in stdin verbatim");
+  assert.ok(
+    rec.command.stdin.endsWith(nasty),
+    "nothing is appended after the caller's body",
+  );
+  assert.ok(
+    rec.command.stdin.startsWith(renderLead("done", {})),
+    "the deferred record carries the lead a human will paste by hand",
+  );
   for (const a of rec.command.argv) {
     assert.ok(
       !a.includes("$(") && !a.includes("rm -rf"),
@@ -171,7 +196,7 @@ test("deferred record carries the body in command.stdin, never interpolated into
     );
   }
   assert.equal(rec.manual.fields[0].name, "Comment");
-  assert.equal(rec.manual.fields[0].value, nasty);
+  assert.ok(rec.manual.fields[0].value.includes(nasty));
 });
 
 test("two different bodies on the same issue produce two records; the same body dedups", async () => {
@@ -214,7 +239,17 @@ test("access.tracker unset reads as full — the gate is inert for ordinary cons
   const f = bodyFile(dir, "hello");
   const gh = stubGh();
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -352,12 +387,45 @@ test("an unreadable comment list → 'unverifiable', not a blind post", async ()
   assert.ok(!gh.calls.some((c) => c.argv[1] === "comment"));
 });
 
-test("no --stage → unmarked comment, no marker search at all", async () => {
+test("no --stage and no --summary-file → exit 2, and NOTHING is posted", async () => {
   const dir = withRepo();
   const f = bodyFile(dir, "plain body");
   const gh = stubGh();
   const r = await cli.run({
     argv: ["node", "x", "--issue", "42", "--body-file", f, "--quiet"],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.exitCode, 2);
+  // Asserting the exit code ALONE would pass on a build that posts and then
+  // exits 2 — which is the failure that actually matters, because the unwanted
+  // comment is already visible to everyone reading the issue.
+  assert.equal(
+    gh.calls.filter((c) => c.argv[1] === "comment").length,
+    0,
+    "the guard must refuse before the transport, not after",
+  );
+});
+
+test("--summary-file with no --stage → unmarked comment, no marker search at all", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "plain body");
+  const lead = join(dir, "lead.md");
+  writeFileSync(lead, "Someone wrote this note by hand.", "utf8");
+  const gh = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--summary-file",
+      lead,
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -368,7 +436,11 @@ test("no --stage → unmarked comment, no marker search at all", async () => {
     "an unmarked comment does not search",
   );
   const post = gh.calls.find((c) => c.argv[1] === "comment");
-  assert.equal(post.input, "plain body", "no marker added");
+  assert.equal(
+    post.input,
+    "Someone wrote this note by hand.\n\n---\n\nplain body",
+    "no marker added, and the hand-written lead leads",
+  );
 });
 
 // ── Credentials and dry-run ─────────────────────────────────────────────────
@@ -381,7 +453,17 @@ test("gh unauthenticated → reason 'no-credentials', exit 0 (the MCP fallback's
     throw new Error("should not reach a write");
   };
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -405,6 +487,8 @@ test("--strict turns a skip into exit 1, but never turns 'already' into one", as
       "42",
       "--body-file",
       f,
+      "--stage",
+      "done",
       "--quiet",
       "--strict",
     ],
@@ -472,6 +556,8 @@ test("--dry-run is exempt from the access gate (it mutates nothing)", async () =
       "42",
       "--body-file",
       f,
+      "--stage",
+      "done",
       "--dry-run",
       "--quiet",
     ],
@@ -831,7 +917,17 @@ test("a failed gh post reports unverifiable, never a silent success", async () =
   const f = bodyFile(dir, "body");
   const gh = stubGh({ postFails: true });
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "42", "--body-file", f, "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: gh.execImpl,
     repoRoot: dir,
     env: { ...baseEnv },
@@ -1085,7 +1181,17 @@ test("jira: no credentials → no-credentials, the MCP fallback's only cue", asy
   const dir = withRepo();
   const f = bodyFile(dir, "body");
   const r = await cli.run({
-    argv: ["node", "x", "--issue", "PROJ-1", "--body-file", f, "--quiet"],
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
     execImpl: explode("gh"),
     fetchImpl: explode("fetch"),
     repoRoot: dir,
@@ -1394,4 +1500,532 @@ test("the numeric suffix is legal only for cycle-scoped stages (NEW-6)", () => {
   assert.equal(cli.isKnownStage("done-1"), false);
   assert.equal(cli.isKnownStage("review-3"), false);
   assert.deepEqual([...cli.CYCLE_SCOPED_STAGES], ["qa-cycle", "qa-fix"]);
+});
+
+// ── The plain-language lead ────────────────────────────────────────────────
+// Standard and catalogue: shared/resources/stakeholder-summary.md.
+
+test("the lead sits below the marker and above the caller's body", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "## Definition of Done\n\n| AC | 7/7 |");
+  const gh = stubGh();
+  await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  const body = gh.calls.find((c) => c.argv[1] === "comment").input;
+  const marker = cli.markerHtml("done");
+  const lead = renderLead("done", {});
+  // Marker FIRST is load-bearing: the idempotency search and the update-in-place
+  // paths both match on a prefix, so a lead that displaced it would silently
+  // break duplicate detection rather than fail visibly.
+  assert.ok(body.startsWith(marker), "marker must remain the first thing");
+  assert.ok(body.includes(lead), "the lead is present");
+  assert.ok(body.indexOf(marker) < body.indexOf(lead), "marker before lead");
+  assert.ok(
+    body.indexOf(lead) < body.indexOf("## Definition of Done"),
+    "lead before the caller's body",
+  );
+  assert.ok(
+    body.includes("| AC | 7/7 |"),
+    "the caller's body is unchanged, not rewritten",
+  );
+});
+
+test("--summary-file overrides the stage template rather than joining it", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "plain body");
+  const lead = join(dir, "lead.md");
+  writeFileSync(lead, "Someone wrote this note by hand.", "utf8");
+  const gh = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--summary-file",
+      lead,
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.reason, "posted");
+  const body = gh.calls.find((c) => c.argv[1] === "comment").input;
+  assert.ok(body.includes("Someone wrote this note by hand."));
+  assert.ok(
+    !body.includes(renderLead("done", {})),
+    "the template must not also be rendered",
+  );
+});
+
+test("a slot is folded into the lead, and a verdict token never reaches it", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "QA CONCERNS (78/100)");
+  const gh = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "qa-cycle-2",
+      "--slot",
+      "verdict=CONCERNS",
+      "--slot",
+      "cycle=2",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.reason, "posted");
+  const body = gh.calls.find((c) => c.argv[1] === "comment").input;
+  const leadPart = body.split("\n\n---\n\n")[0];
+  assert.ok(leadPart.includes("round 2"), "the cycle slot is folded in");
+  assert.ok(
+    !leadPart.includes("CONCERNS"),
+    "the raw verdict token must never reach the lead",
+  );
+  assert.ok(
+    leadPart.includes("worth knowing about"),
+    "the verdict is mapped to a sentence",
+  );
+  assert.ok(
+    body.includes("QA CONCERNS (78/100)"),
+    "the token survives in the body, for the reader who knows the scale",
+  );
+});
+
+test("--slot without a k=v value is a usage error", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--slot",
+      "novalue",
+      "--quiet",
+    ],
+    execImpl: explode("gh"),
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.exitCode, 2);
+});
+
+test("--json reports which route produced the lead", async () => {
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const leadFile = join(dir, "lead.md");
+  writeFileSync(leadFile, "By hand.", "utf8");
+  // --json is emitted with process.stdout.write (NOT console.log — emit() calls
+  // the stream directly), and there is no injectable writer, so the stated
+  // contract ("--json gains a `lead` field") can only be tested where it is
+  // actually written. Restored in a finally so a failure cannot silence the
+  // rest of the file.
+  for (const [extra, expected] of [
+    [["--stage", "done"], "template"],
+    [["--summary-file", leadFile], "summary-file"],
+  ]) {
+    const gh = stubGh();
+    const lines = [];
+    const real = process.stdout.write.bind(process.stdout);
+    process.stdout.write = (chunk, ...rest) => {
+      lines.push(String(chunk));
+      return true;
+    };
+    try {
+      await cli.run({
+        argv: [
+          "node",
+          "x",
+          "--issue",
+          "42",
+          "--body-file",
+          f,
+          ...extra,
+          "--json",
+        ],
+        execImpl: gh.execImpl,
+        repoRoot: dir,
+        env: { ...baseEnv },
+      });
+    } finally {
+      process.stdout.write = real;
+    }
+    const payload = JSON.parse(lines.join(""));
+    assert.equal(payload.lead, expected);
+    assert.equal(payload.reason, "posted");
+  }
+});
+
+test("jira: the lead reaches the ADF document as its own paragraph node", async () => {
+  // THE HIGH RISK THIS TASK NAMES, and it must be tested through the composition
+  // path, not the renderer. The first version of this test hand-built the string
+  // `${lead}\n\n---\n\n${body}` and passed it to buildCommentAdf — so it asserted
+  // on its own construction and would have passed unchanged if tracker-comment.js
+  // never composed a lead for Jira at all, or composed it AFTER the body. The
+  // reviewer's own independent check made the identical mistake. Drive it through
+  // cli.run and assert on the document the transport actually receives.
+  const dir = withRepo();
+  const f = bodyFile(
+    dir,
+    "## Accepted\n\n| AC | 7/7 |\n| --- | --- |\n| a | b |",
+  );
+  const j = stubJira({ comments: [] });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "posted");
+
+  const post = j.calls.find((c) => c.method === "POST");
+  const doc = JSON.parse(post.body).body;
+  assert.equal(doc.type, "doc", "ADF document, not a plain string");
+
+  // Node tree, never a serialised string: a string match would pass on exactly
+  // the malformed document this risk is about (a lead rendered as literal text).
+  const lead = renderLead("done", {});
+  assert.equal(doc.content[0].type, "paragraph", "the lead leads");
+  assert.equal(
+    doc.content[0].content.map((n) => n.text || "").join(""),
+    lead,
+    "the lead arrives verbatim, not markdown-mangled",
+  );
+  assert.equal(
+    doc.content[1].type,
+    "heading",
+    "the caller's body follows the lead",
+  );
+  // The identity marker stays the LAST node — the lead is unshifted at the
+  // front, never appended, so it cannot displace the footer.
+  assert.ok(
+    (doc.content.at(-1).content || []).some((n) =>
+      (n.marks || []).some((m) => m.type === "em"),
+    ),
+    "the italic identity footer is still last",
+  );
+});
+
+test("jira: every stage's lead survives the composition path intact", async () => {
+  // The per-stage sweep the renderer-only check was standing in for. Driven
+  // through cli.run so it covers composition, for all eleven stages.
+  for (const stage of cli.COMMENT_STAGES) {
+    const dir = withRepo();
+    const f = bodyFile(dir, "## Heading\n\nprose");
+    const j = stubJira({ comments: [] });
+    const r = await cli.run({
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "PROJ-1",
+        "--body-file",
+        f,
+        "--stage",
+        stage,
+        "--quiet",
+      ],
+      execImpl: explode("gh"),
+      fetchImpl: j.fetchImpl,
+      repoRoot: dir,
+      env: { ...JIRA_ENV },
+    });
+    assert.equal(r.reason, "posted", `${stage} did not post`);
+    const doc = JSON.parse(j.calls.find((c) => c.method === "POST").body).body;
+    assert.equal(
+      doc.content[0].type,
+      "paragraph",
+      `${stage}: first node is ${doc.content[0].type}, not the lead`,
+    );
+    assert.equal(
+      doc.content[0].content.map((n) => n.text || "").join(""),
+      renderLead(stage, {}),
+      `${stage}: lead did not survive composition`,
+    );
+  }
+});
+
+// ── QA cycle 1 fixes (T104-003, T104-004) ──────────────────────────────────
+
+test("an empty --summary-file is a usage error, not a silently absent lead", async () => {
+  // T104-003. It used to post with no lead while --json still reported
+  // `lead: "summary-file"` — so the JSON contract lied, and
+  // `--summary-file /dev/null` was a one-flag bypass of the whole standard.
+  // Same rule as --body-file, which has always been exit 2 when empty.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  for (const content of ["", "   \n  \n"]) {
+    const empty = join(dir, "empty.md");
+    writeFileSync(empty, content, "utf8");
+    const gh = stubGh();
+    const r = await cli.run({
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--summary-file",
+        empty,
+        "--quiet",
+      ],
+      execImpl: gh.execImpl,
+      repoRoot: dir,
+      env: { ...baseEnv },
+    });
+    assert.equal(r.exitCode, 2);
+    assert.equal(
+      gh.calls.filter((c) => c.argv[1] === "comment").length,
+      0,
+      "nothing may be posted for an empty lead",
+    );
+  }
+});
+
+test("the deferred record's `desired` label names the comment, not the lead", async () => {
+  // T104-004. `desired` is what a human reads in the handover checklist to tell
+  // one pending action from another. Merging the lead into `body` made it
+  // near-identical for every comment sharing a stage — the label stopped
+  // labelling. command.stdin still carries the composed body, since that is what
+  // actually gets posted.
+  const dir = withRepo();
+  const f = bodyFile(dir, "## QA Gate: FAIL — story 4.2 cache\n\ndetail");
+  await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "qa-gate",
+      "--quiet",
+    ],
+    execImpl: explode("gh"),
+    repoRoot: dir,
+    env: { ...baseEnv, ACCESS_TRACKER: "manual" },
+  });
+  const rec = readJournal(dir)[0];
+  assert.equal(rec.desired, "QA Gate: FAIL — story 4.2 cache");
+  assert.ok(
+    rec.command.stdin.startsWith(renderLead("qa-gate", {})),
+    "the composed body, lead included, is still what would be posted",
+  );
+});
+
+test("a zero-width-only --summary-file is empty, not an invisible lead", async () => {
+  // Cycle-2 finding: `.trim()` leaves U+200B/U+FEFF/U+2060, so a file holding
+  // only those passed the empty check and posted a lead nobody could see — the
+  // same bypass the check closes, wearing a different character.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  for (const invisible of ["​​", "﻿", "⁠", " ​ \n"]) {
+    const empty = join(dir, "invisible.md");
+    writeFileSync(empty, invisible, "utf8");
+    const gh = stubGh();
+    const r = await cli.run({
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--summary-file",
+        empty,
+        "--quiet",
+      ],
+      execImpl: gh.execImpl,
+      repoRoot: dir,
+      env: { ...baseEnv },
+    });
+    assert.equal(r.exitCode, 2, `${JSON.stringify(invisible)} was accepted`);
+    assert.equal(gh.calls.filter((c) => c.argv[1] === "comment").length, 0);
+  }
+});
+
+test("jira: the PRE-GATE deferred record labels with the comment, not the lead", async () => {
+  // Named for what it actually covers. ACCESS_TRACKER=manual reaches run()'s
+  // pre-gate defer (skill: "tracker-comment") on the Jira arm — NOT
+  // jira.addComment's in-flight defer, which needs jira-sync's own
+  // ACCESS_ENV_AT_LOAD snapshot to disagree with run()'s. This test passed with
+  // the addComment fix reverted, so it was renamed rather than left claiming
+  // coverage it does not give; the contract itself is held by
+  // "jira addComment labels its deferred record with `desired`" below.
+  const dir = withRepo();
+  const f = bodyFile(dir, "## QA Gate: FAIL — story 4.2 cache\n\ndetail");
+  await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "qa-gate",
+      "--quiet",
+    ],
+    execImpl: explode("gh"),
+    fetchImpl: explode("fetch"),
+    repoRoot: dir,
+    env: { ...JIRA_ENV, ACCESS_TRACKER: "manual" },
+  });
+  const rec = readJournal(dir)[0];
+  assert.equal(rec.desired, "QA Gate: FAIL — story 4.2 cache");
+  assert.ok(
+    rec.command.stdin.startsWith(renderLead("qa-gate", {})),
+    "the composed body, lead included, is still what would be posted",
+  );
+});
+
+test("a lead's zero-width characters are tested against, never stripped from, what posts", async () => {
+  // The cycle-2 refute pass caught this in the cycle-2 fix: stripping the
+  // zero-width set from the CONTENT deleted U+200D — the joiner inside every
+  // ZWJ emoji sequence, and load-bearing for Indic and Arabic shaping. Closing
+  // an emptiness hole is no licence to rewrite a human's text.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const lead = join(dir, "zwj.md");
+  writeFileSync(lead, "Shipped by 👩‍💻 today", "utf8");
+  const gh = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--summary-file",
+      lead,
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.reason, "posted");
+  const posted = gh.calls.find((c) => c.argv[1] === "comment").input;
+  assert.ok(
+    posted.includes("👩‍💻"),
+    "the ZWJ emoji sequence must survive verbatim",
+  );
+  assert.ok(posted.startsWith("Shipped by 👩‍💻 today"));
+});
+
+test("a zero-width-only --body-file is empty too, so the two flags agree", async () => {
+  const dir = withRepo();
+  const f = join(dir, "invisible-body.md");
+  writeFileSync(f, "​​﻿", "utf8");
+  const gh = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.exitCode, 2);
+  assert.equal(gh.calls.filter((c) => c.argv[1] === "comment").length, 0);
+});
+
+test("jira addComment labels its deferred record with `desired`, not the body's first line", async () => {
+  // WHY THIS IS A UNIT TEST AND NOT AN END-TO-END ONE. The first attempt drove
+  // cli.run with ACCESS_TRACKER=manual and asserted on the journal — and it
+  // PASSED with the fix reverted, because that env reaches the PRE-GATE defer in
+  // run() (skill: "tracker-comment"), never addComment's in-flight defer, which
+  // fires only when jira-sync's own ACCESS_ENV_AT_LOAD snapshot disagrees with
+  // run()'s. The mutation proof is what exposed it: reverting the fix turned no
+  // test red. Injecting `http` and asserting on the descriptor addComment builds
+  // tests the contract directly, without depending on a module-load race.
+  const captured = [];
+  const http = async (url, opts) => {
+    captured.push(opts);
+    return { ok: true, status: 201, json: async () => ({ id: "1" }) };
+  };
+  const common = {
+    http,
+    baseUrl: "https://x.atlassian.net",
+    email: "a@b.c",
+    token: "t",
+    issueKey: "PROJ-1",
+  };
+  const body =
+    "The lead sentence.\n\n---\n\n## QA Gate: FAIL — story 4.2 cache";
+
+  await jira.addComment({
+    ...common,
+    body,
+    desired: "QA Gate: FAIL — story 4.2 cache",
+    momentId: "qa-gate",
+  });
+  assert.equal(
+    captured.at(-1).defer.desired,
+    "QA Gate: FAIL — story 4.2 cache",
+    "the caller's label must win",
+  );
+
+  // And without it, the old behaviour — so every other caller is unaffected.
+  await jira.addComment({ ...common, body, momentId: "qa-gate" });
+  assert.equal(
+    captured.at(-1).defer.desired,
+    jira.firstLineOf(body),
+    "absent `desired` falls back to the body's first line",
+  );
 });

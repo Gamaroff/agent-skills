@@ -97,7 +97,7 @@ This means 124+ skills can coexist without blowing the context window. Only the 
 The core workflow for implementing stories:
 
 ```
-review-story --validate → develop → qa-story → qa-fix (if needed) → finalise
+review-story --validate → develop → qa-story → qa-fix (if needed) → review-pr → finalise
 ```
 
 `develop-story` and `develop-task` automate this full pipeline end-to-end, including branch creation, PR, QA cycles (up to 5), and finalisation. QA gate files (`PASS / CONCERNS / FAIL / WAIVED`) are owned exclusively by QA skills — dev skills never touch them.

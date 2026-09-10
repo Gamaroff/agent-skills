@@ -1,0 +1,79 @@
+schema: 1
+task: 'task.100.mutation-proving-false-red'
+task_title: 'the false-RED mirror in mutation-proving'
+gate: CONCERNS
+status_reason: "Cycle 1's finding is properly closed and all five success criteria survive the fix. One new medium, introduced by that fix: the 2/N ratio that replaced the unmeasured constant is itself unchecked and 2x too high, because it counts one suite run per mutation where this document's own procedure specifies two."
+reviewer: 'QA Engineer'
+updated: '2026-09-10T03:55:00Z'
+
+top_issues:
+  - id: 'TASK-100-002'
+    severity: medium
+    file: 'shared/resources/mutation-proving.md'
+    finding: "The text claims a matrix of N mutations pays N runs, so probe validation adds 2/N (40% at five, 10% at twenty). The procedure in this same document runs the suite twice per invariant — step 3 re-runs it mutated, step 5 restores and confirms green again — so an N-mutation matrix pays ~2N runs and the real overhead is ~1/N (20% at five, 5% at twenty). Every stated percentage is exactly 2x too high."
+    suggested_action: "Drop the percentage arithmetic rather than re-deriving it against a denominator readers may count differently. State the count-independent form: probe validation adds two runs to a matrix that already pays about two per mutation, so it costs roughly one extra mutation's worth, at any N."
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-100-003'
+    severity: low
+    file: 'shared/resources/mutation-proving.md'
+    finding: "The LOW-1 fix rewrote a bare 'Step 2' to 'That `diff`', but the same paragraph says 'There is a real diff' three sentences earlier — so the pronoun can be read as the mangled edit's diff rather than step 2's applied-check. One ambiguous referent was traded for another."
+    suggested_action: "Name the mechanism instead of pronouning it: 'The applied-check closes the …'."
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-100-004'
+    severity: low
+    file: 'shared/resources/mutation-proving.md'
+    finding: 'The same rewrite left a ~95-column line in a file wrapped at ~80. prettier does not reflow prose, so no gate caught it.'
+    suggested_action: 'Re-wrap when fixing TASK-100-003 — same line, same edit.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 3023
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, '2b', 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: "Cycle 1's fix added no code, no command and no new fenced block. Verdict reached by reading, so reasoned remains the accurate value."
+  performance:
+    status: PASS
+    notes: 'No runtime code. Unchanged from cycle 1.'
+  reliability:
+    status: PASS
+    notes: 'Still purely additive; rollback plan unchanged and still feasible.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Same axis as cycle 1, sharper reason: the document now carries a second unverified quantitative claim, introduced by the fix for the first. Resolving TASK-100-002 clears it.'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-10'
+  total_iterations: 1
+  verification_method: 'Re-read of the changed paragraph against the procedure it cites; npm run ci:fast exit 0; success criteria re-verified 5/5'
+
+recommendations:
+  immediate:
+    - action: 'Replace the 2/N percentages with the count-independent form (roughly one extra mutation, at any N).'
+      refs: ['shared/resources/mutation-proving.md']
+  future:
+    - action: "Name the applied-check rather than writing 'That `diff`', and re-wrap the line to ~80 columns in the same edit."
+      refs: ['shared/resources/mutation-proving.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-100-002 resolved'

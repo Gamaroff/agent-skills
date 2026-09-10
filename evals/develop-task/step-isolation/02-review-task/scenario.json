@@ -1,9 +1,12 @@
 {
   "name": "develop-task-step-02-review-task",
   "skill": "develop-task",
-  "description": "Step 2: review-task skipped when task is ready-for-development and review report exists.",
+  "description": "Step 2 fixture check (replay): seeds a `planned` task whose review report is CURRENT, the input shape that authorises the skip. Asserts the fixture, NOT the decision — replay executes no skill, so no assertion here can distinguish a skip from a run. The behavioural net is shared/resources/tests/review-report-freshness.test.mjs.",
   "prompt": "Run step 2 (review-task) of the develop-task pipeline for task.42.example.",
   "assertions": [
-    { "fn": "fileExists", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.review.2026-05-11.md"] }
+    { "fn": "fileExists", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.example.md"] },
+    { "fn": "fileExists", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.review.2026-05-11.md"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.review.2026-05-11.md", "\\*\\*Reviewed:\\*\\* 2026-05-11"] },
+    { "fn": "fileMatches", "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.example.md", "\\nupdated: 2026-05-10\\n"] }
   ]
 }

@@ -1,0 +1,100 @@
+schema: 1
+task: "task.77.review-pr-in-pipeline"
+task_title: "Run the PR conformance review before a work item is finalised"
+gate: FAIL
+status_reason: "Convergence stall. Cycles 1, 2 and 3 each returned 3 HIGH findings — the count has not strictly decreased, which is the condition the loop's own guard exists to detect. Nine of cycle 2's eleven closures are real; the three that are not cluster on one predicate, and two of this cycle's three HIGH findings were created by cycle 2's fix to it. Escalating rather than attempting a fourth correction."
+reviewer: "QA Engineer"
+updated: "2026-09-03T00:00:00Z"
+
+top_issues:
+  - id: "TASK77-019"
+    severity: high
+    file: "shared/resources/develop-pipeline-resume-contract.md"
+    finding: "The Verification command added in cycle 2 returns a FALSE PASS under zsh when the gate glob matches nothing. Demonstrated by execution: a failed zsh glob aborts the command substitution leaving G empty, and zsh's `[` treats an empty operand in `-ge` as 0, so `[ 0 -ge \"\" ]` is TRUE (`zsh -c '[ 0 -ge \"\" ]; echo $?'` -> 0; bash -> 2). Reachable in practice: unlike every other command in the table, the snippet uses bare relative globs with no directory prefix, so run from the repo root — the pipeline's cwd — it matches nothing on macOS's default shell. The Steps 5-6 row then verifies as complete on a run with NO QA artifacts at all, and resume proceeds to Step 7 and finalises with neither a gate nor a PR review. That is the exact failure the row exists to prevent."
+    suggested_action: "See TASK77-021 — do not patch this predicate a fourth time."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-020"
+    severity: high
+    file: "shared/resources/develop-pipeline-resume-contract.md"
+    finding: "The same command compares two counters that count different things, so it is false on almost every real run. `gate.{N}` is indexed by QA cycle; `pr-review.{n}` is indexed by 5c INVOCATION, and 5c runs only on a clean gate. On the ordinary shape (cycle 1 CONCERNS, cycle 2 PASS) a fully complete run has gate.1, gate.2 and pr-review.1: G=2, R=1, predicate false — verified by execution. A resumed run therefore re-enters the QA loop on work that had already cleared 5c, burning a cycle, and at cycle 5 escalates a run that had exited clean. Re-running does not repair it: the next cycle yields gate.3 / pr-review.2, still short. docs/reference/pipeline-artifacts.md:68 restates the same broken comparison as human-facing guidance, contradicting the paragraph three lines above it."
+    suggested_action: "See TASK77-021."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-021"
+    severity: high
+    file: "shared/resources/develop-pipeline-resume-contract.md"
+    finding: "THIRD STRIKE on one mechanism. The 5c resume predicate has now failed three consecutive cycles: cycle 1 shipped it as prose with no command behind it; cycle 2 added a command and bound it to the wrong quantity; cycle 3 demonstrated it wrong on two independent axes. The repo's own third-strike rule (develop-pipeline-step-5-6-qa-loop.md, 'Honour the third strike — replace, do not patch again') states that a fourth correction to a mechanism corrected three times is the loop's failure mode, not its progress, and that the permitted moves are delete / replace the mechanism / waive."
+    suggested_action: "DELETE the index-comparison predicate rather than correct it again. The cheapest sound replacement is to stop comparing indices entirely — either have 5c name the gate file it reviewed inside the report (so the check is a content match, not an arithmetic one), or drop the conditional resume check and accept that a run killed inside 5c re-enters at 5a, which costs one cycle and cannot silently finalise. Both are decisions for a human, which is why this escalates."
+    suggested_owner: po
+    status: open
+  - id: "TASK77-022"
+    severity: high
+    file: "shared/resources/qa-findings-ingester-prompt.md"
+    finding: "UNPROBED CONTRACT, now probed: the 'From the PR review report' extraction block describes a schema /review-pr never writes to disk. It expects findings keyed by `severity`, `file:line`, `finding`, `suggested_action` — but those are the SUBAGENT output contract of pr-conformance-prompt.md, consumed in memory and never persisted. What lands in the report is the rendered form, confirmed against the only genuine example on disk (task.66.pr-review.1.review-pr.md): `[CR-1] bug · high · confidence: high — path:158`. The literal `severity:` appears nowhere in it. Conformance findings also carry `ref` (e.g. AC-3), not `file:line`. And the ingester's own output enum is `source: gate|report|bug.<N>` with no value for a PR-review finding. This is the SOLE carrier of findings on the REQUEST CHANGES path; if the shapes disagree, qa-fix ingests nothing, changes nothing, and 5b step 0 HALTs reporting the findings as unfixable. It may survive on LLM tolerance, which is why confidence is medium — but nothing makes it deterministic."
+    suggested_action: "Have review-pr Step 7 emit a machine-readable `findings:` block alongside the rendered text and point the ingester at it, or quote the exact rendered line format in the ingester. Either way add a test pinning the two ends together — they currently share no assertion."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-023"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Cycle 2's TASK77-012 fix is NOT CLOSED and made the contradiction sharper. The new blockquote says the review-driven 5b re-entry 'commits without pushing', but the unchanged summary 30 lines above still says 'exactly one git push per cycle, at step 3 below', and unchanged numbered step 3 still says 'once, here, and nowhere else in this cycle' with no conditional arm — unlike step 0, which cycle 2 DID make conditional. Three statements now disagree in one subsection, one of them the step an orchestrator actually executes. 'The next transition that leaves 5b' is also undefined: step 7 returns to 5a and does not push, so the fix commit can sit unpushed while step 5 polls the PR state it was meant to have updated."
+    suggested_action: "Give step 3 an explicit conditional arm and reword the summary line, or revert the blockquote and accept two pushes on that path."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-024"
+    severity: medium
+    file: "shared/resources/develop-pipeline-resume-contract.md"
+    finding: "Two cycle-2 fixes left a seam between them. TASK77-009 added a `review failed` value to the PR Review enum and writes it on a 5c failure HALT; TASK77-015's resume clause matches only `not reached` or blank. So `review failed` is write-only — a run resumed after a review-failure HALT falls through to naive reconstruction, re-enters at 5a and burns a cycle, which is precisely the waste TASK77-015 exists to prevent, on the one state TASK77-009 added."
+    suggested_action: "Extend the resume clause to include `review failed`."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-025"
+    severity: low
+    file: "skills/qa-story/references/develop-pipeline-resume-contract.md"
+    finding: "Partial re-bundle, same shape as TASK77-008. lite-mode reached all seven consumers, but resume-contract, autonomous-defaults, step-0 and the resume-detector reached only develop-bug/story/task/review-pr. The qa-story and qa-task copies contain zero occurrences of 5c and still describe a pipeline without it. No test catches this — every assertion reads shared/resources/."
+    suggested_action: "Re-bundle, and add a bundle-freshness assertion so a partial re-bundle fails CI rather than waiting for a reviewer."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 325
+  phases_verified: "7/7"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [1, 3, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged across all three cycles."
+  performance:
+    status: PASS
+    notes: "Unchanged."
+  reliability:
+    status: FAIL
+    notes: "The resume predicate is wrong in both directions — it can verify a run with no artifacts as complete (zsh false pass), and it fails to verify a genuinely complete run (index mismatch). Either is enough to fail this axis; together they mean the check cannot be trusted in any direction."
+  maintainability:
+    status: CONCERNS
+    notes: "The test suite is now 15 tests and none is vacuous — a real improvement over cycle 1. But every assertion reads shared/resources/, so neither the partial re-bundle nor the ingester shape mismatch is visible to it."
+
+recommendations:
+  immediate:
+    - action: "Human decision on TASK77-021 — delete or replace the resume predicate; do not patch it a fourth time"
+      refs: ["shared/resources/develop-pipeline-resume-contract.md"]
+    - action: "Human decision on TASK77-022 — the ingester/report shape contract carries the whole REQUEST CHANGES path"
+      refs: ["shared/resources/qa-findings-ingester-prompt.md", "skills/review-pr/SKILL.md"]
+  future:
+    - action: "A bundle-freshness assertion in CI would have caught TASK77-008 and TASK77-025 mechanically"
+      refs: ["skills/create-skill/scripts/bundle_skill.py"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "Convergence stall — escalated to a human. Two decisions required before the loop can usefully resume."

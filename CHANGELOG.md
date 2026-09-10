@@ -4,6 +4,1264 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **The plain-language lead now reaches the pull request, not only the tracker card.** Tasks 104 and
+  105 gave every *tracker* comment an opening paragraph a non-technical reader can follow. Anyone
+  who then clicked through to the PR landed on the most technical text this pipeline writes — a
+  five-row Definition of Done table, a QA review of findings, a code review of file-and-line
+  references. The chain a stakeholder actually walks is board comment → pull request → detail, and
+  it was readable at the first step only.
+
+  **Eleven pull-request conversation templates** now lead: the DoD comment, `finalise`'s canonical
+  summary, the three board-warning notices, the DoD-gaps comment, both QA reviews, the `qa-fix`
+  summary and the two review-skill summaries. The one engine-built body —
+  `pr-inline-comment.js`'s `buildSummaryBody()` — leads too, while a caller-supplied
+  `--summary-file` still wins outright and is never double-led.
+
+  **Per-line inline findings deliberately carry no lead.** A comment anchored to line 47 of a diff
+  has exactly one reader, and that reader is reading the diff. The exclusion is held by two tests
+  rather than by a sentence in a task document that disappears on acceptance.
+
+  New `shared/resources/stakeholder-summary-cli.js` so a shell call site obtains its lead **once**,
+  above the GitHub/Bitbucket arm split — eleven sites × two arms is twenty-two places one lead could
+  drift into two. The PR stages come from the same catalogue as the tracker stages, so where a
+  moment exists on both, one stage renders both and there is a single vocabulary.
+
+  Demonstrated on itself: this task's own QA gate decision and review comments were posted to
+  PR #381 by the feature the task adds. Three QA cycles (CONCERNS 80 → PASS 95 → PASS 90), Step 5c
+  APPROVE, 15 adversarial probes with 0 reproduced. **Residual, deliberate**: the eleven new call
+  sites have no automated shell coverage — `shellcheck` lints tracked `*.sh` and this change adds
+  none, and Step 4b refuses the blocks as `mutating` because `node` is fail-closed in the snippet
+  allow-list. They were linted by hand, which is a one-off and not a guard. (task 106)
+
+- **Every tracker-comment call site now feeds the lead real values, and the seven that bypassed the
+  engine stopped bypassing it.** Task 104's lead worked and said the same thing every cycle, because
+  no call site told it anything specific. **24 call sites** now pass `--slot` values, up from zero —
+  the comment names the pull request, the verdict, the round number and the count. `review-story` was
+  the last `review-*` skill whose GitHub arm sat off the CLI; its two arms are now literally one
+  call, so one review outcome reads the same way on either tracker.
+
+  The **seven bare `gh issue comment` sites** are the more consequential half. Unmarked, so a resumed
+  run posted a second copy; `gh`-only, so a Jira project silently received nothing at all. They now
+  take the same path as everything else, gaining an idempotency marker and becoming postable on Jira.
+
+  **A guard already existed for this, named the exact bug, and passed all seven sites.**
+  `mutation-call-site-coverage` has watched `gh issue comment` since tasks 51–56 with
+  `tracker-comment.js` listed as its required chokepoint. Two independent defects blinded it, and
+  **fixing the first changed nothing** — the mutation proof stayed green, which is how the second was
+  found. A third hole (`cmd && gh issue comment …`) turned up afterwards by *probing* the repaired
+  guard with eight shell forms rather than reading it. One sufficient explanation for a miss is not
+  evidence it was the only one.
+
+  The durable output is **Guard B** (`shared/resources/tests/comment-slot-coverage.test.mjs`): every
+  call site must pass a slot, *and* every slot name must be one its stage's template actually reads —
+  importing the mapping from `stakeholder-summary.js` rather than restating it. The engine validates
+  no slot names, so a wrong one posts successfully, reports `posted: true`, and is discarded in
+  silence; this task shipped three such names into review precisely because each is a real slot on a
+  *different* stage.
+
+  **Residual, deliberate**: the seven converted sites give up the 3× exponential backoff they had.
+  The engine owns the `ACCESS_TRACKER` deferral gate but has no retry, and re-wrapping would
+  double-defer. A real reduction in resilience, traded knowingly. (task 105)
+
+- **Every comment this repository posts to a tracker issue now opens with a plain-language lead.**
+  Stakeholders who read the board — and only the board — reported the pipeline's comments as
+  unreadable, and they were right: they opened with gate verdicts, step numbers, file paths and
+  scores on scales nobody outside the pipeline knows. A comment now begins with two to four sentences
+  answering *what happened, what it means, what happens next*, then a `---`, then everything the
+  comment used to say, **unchanged**. Nothing was taken from the developer; something was added for
+  everyone else.
+
+  **No call site was edited.** `tracker-comment.js` renders the lead from the `--stage` every caller
+  already passes, so every existing site gained one the moment this merged — and **a comment for
+  which no lead can be produced does not post**: no template and no `--summary-file` is exit 2, with
+  nothing sent. That is the whole design. A call site cannot forget a lead it never supplies, and a
+  new stage cannot ship without one. This repository supplied the counter-example itself: a comment
+  convention that was documented, not enforced, and that seven sites still bypassed months later.
+
+  Two rules carry the weight. **A verdict token is mapped, never passed through** — `CONCERNS` tells
+  an outside reader nothing about whether to worry, and an unknown verdict renders "the results are
+  recorded below" rather than defaulting to reassurance, which is the one direction this must not
+  fail in. And **every template must read correctly with no slots filled**, because the slot-free
+  rendering is what shipped first and is therefore the most visible and least exercised.
+
+  Engine: `shared/resources/stakeholder-summary.js` (pure — a frozen per-stage catalogue and
+  `renderLead(stage, slots)`; no I/O, no `process.exit`), specified in
+  `shared/resources/stakeholder-summary.md`. The catalogue is keyed by `COMMENT_STAGES`, which its
+  test **imports from the engine rather than restating**, so adding a stage without a lead turns that
+  test red before the stage can be used anywhere.
+
+  The blocking defect found in review is worth recording: slot values arrive from the CLI as strings
+  and were consumed by truthiness, so `--slot blocking=false` rendered *"Some things need answering
+  before work can start"* — the exact opposite of the caller's intent, in the one paragraph aimed at a
+  reader who cannot check the body underneath it. **A missing lead is a gap; a confidently wrong one
+  is misinformation.**
+
+  **Known limitation**: the `---` separator renders on GitHub and is dropped on Jira, whose ADF
+  converter emits no rule node. Accepted and documented rather than fixed — teaching the converter
+  would change every Jira description this repo renders. (task 104)
+
+- **The task-registry row now has an owner: `/finalise` ticks it, and CI fails when it drifts.**
+  `docs/tasks/task-registry.md` carries a Status column per task and *nothing wrote it after
+  creation*. `create-task` appended the row, `develop-next` only read it as a selection fallback, and
+  `finalise` — which does set the document's `status: accepted` and `completed_date` — touched no
+  registry at all. Seventeen rows (T67–T96) were finished, accepted and merged, and never ticked; the
+  registry reported 22 open tasks when 5 were, and it was wrong for weeks.
+
+  It survived that long because **nothing failed on it**. The selector judges eligibility on the
+  document's own frontmatter, never on the row, so a stale row cannot cause a finished task to be
+  re-selected. The entire cost fell on human readers, on the one question the registry exists to
+  answer. A cost with no failure attached is a cost nobody is told about.
+
+  Two changes, in the order they matter:
+
+  - **`evals/shared/tests/task-registry-drift.test.mjs`** fails when a task document reads `accepted`
+    and its row does not, or the reverse — a row claiming work is finished that the document says is
+    not. It imports the registry parser and the lifecycle vocabulary from `select-next.mjs` rather
+    than restating either, and carries a non-vacuity floor: a parser that stopped matching would
+    otherwise report a clean, reassuring zero, which is a failure this repository has seen before.
+    Only the `accepted` predicate is compared, so a task legitimately mid-flight and a `cancelled`
+    task do not trip it — a check that fires on healthy states is one that gets muted.
+  - **`shared/resources/registry-tick.js`**, called from `/finalise` immediately after it writes
+    `status: accepted`. One moment, one writer, so the row and the document cannot disagree by
+    construction — strictly stronger than detecting a disagreement afterwards. The pre-merge timing
+    is correct for the *Status* column, which mirrors the document's status; the row's prose note may
+    still cite a PR that has not merged, and nothing reads that column.
+
+  **The write never blocks acceptance.** Every outcome exits 0, including "no row found" — refusing
+  to finalise genuinely complete work over a human-readable index line would trade a cosmetic defect
+  for a stuck pipeline. The check is the loud backstop, so a no-op is caught rather than lost.
+
+  It is a CLI rather than a paragraph in `finalise/SKILL.md` because two behaviours had to be
+  *proved*: that lite mode still ticks, and that a **story** run does not attempt a task-registry
+  write. Prose admits only a grep of itself. The story guard therefore lives in the writer — which
+  returns `not-a-task` for a story, epic or bug document — rather than in a condition every caller
+  has to remember, and the lite-mode guarantee is pinned by a test that asserts the CLI's entire
+  argument surface, so a mode-conditional flag cannot be added without that decision being made
+  deliberately.
+
+  Also corrected: **epic 3's registry row**, found by measuring the sibling registries. The bug
+  registry was measured too and is clean; neither gained a check, because the epic documents carry
+  `status: "✅ Accepted"` against a lifecycle spec that says `lowercase-kebab-case`, and settling
+  that is its own change.
+
+- **The card preflight now runs where the defect is created, not one step after it.** `--check-card`
+  is offline — no auth, no network, no writes — and it reports whether a document will publish a
+  complete tracker card or a thin one. All three `review-*` skills ran it. None of the three
+  `create-*` skills did, so the check sat one step *after* the moment the defect it catches is
+  introduced.
+
+  The cost was measured, not hypothetical: `task.99` was authored without a `## Success Criteria`
+  block, and the first thing to notice was a zero-tolerance corpus assertion on PR #355 — a full
+  push–CI round trip for something an offline call catches in under a second. Second known occurrence
+  of the class. The failure is **silent by construction**: a heading the spec does not recognise
+  raises no error, the sync succeeds, reports success, and publishes a thin card. There was nothing
+  for an author to notice.
+
+  `create-task`, `create-story` and `create-epic` now each run the preflight on the document they
+  just wrote, via the new tracker-neutral `shared/resources/card-preflight.js`, specified in
+  `shared/resources/authoring-card-preflight.md`. **Advisory at authoring, blocking at review** — the
+  CLI exits 0 even with findings, because a gate at authoring pushes an author toward writing filler,
+  and filler is worse than a thin card since it looks deliberate. The advise-then-gate split in
+  `review-*` is unchanged.
+
+  **The section specs now live in exactly one place**, as `CARD_SECTIONS_BY_KIND` in
+  `shared/resources/jira-sync.js` beside the `checkCardSections` that consumes them; all four
+  `sync-jira-*` scripts re-export from there. There turned out to be **four** specs, not the three the
+  task assumed, and "exactly one place" was unsatisfiable until the fourth moved too. A test asserts
+  the one-definition property with a non-vacuity floor, and a second asserts every generated
+  `references/` copy still matches its source — one *authored* definition is only one *effective*
+  definition while the copies match.
+
+  Two findings from the run generalise. The new CLI hand-rolled a frontmatter parse the library
+  already exported, and the two diverged — latent across all 177 documents in the repo, which is how a
+  parse divergence stays invisible. And the *fix* for that leaked the whole document body into the
+  `--json` payload (17.3 KB of 18.3 KB), a regression introduced by a fix and invisible to a gate that
+  had already passed. That is the case for a lens that runs *after* the gate.
+
+  **Known gap, filed rather than forgotten**: bug reports have no card preflight at any layer — not at
+  authoring, not in `review-bug`, not in the CI corpus. The spec move already lands the bug spec in
+  the shared definition, so the follow-up is a call site and a test, not another move. (task 102)
+
+- **The develop loop's fast gate now refuses to start when its command names a script the project
+  does not define.** `develop.fastGateCommand` fell back to `npm run ci:fast`, which a consumer need
+  not have. Nothing checked that before use, so the mismatch surfaced *mid-iteration* as
+  `Missing script: ci:fast` — the point at which a substitute gets invented under time pressure. On
+  the run that produced this change the substitution was invented per-run, so the fast gate silently
+  differed between runs and nothing recorded that it had. A default cannot know a consumer's script
+  names; it can refuse to start when it is wrong.
+
+  A precondition now runs **once, before the loop's first iteration** (not in the per-iteration
+  capture block), extracts the script name from a command beginning `npm run <script>`, checks it
+  against `npm run`'s own listing, and HALTs naming both `develop.fastGateCommand` and
+  `skills-config.yaml`. It never substitutes: choosing a replacement gate decides what every
+  iteration is checked against, and that belongs in config where the next run reads the same value.
+
+  **Anything the extraction cannot parse is skipped, never failed** — `prettier --check . && jest`,
+  `make test`, `pnpm run ci:fast`, `npm test`, and an unset value all pass through untouched. The
+  fail-safe direction points at skipping deliberately, and is the opposite of the QA loop's exit
+  condition: a false HALT here would block correct consumers, while a false skip merely restores
+  today's silent mid-loop death. A compound command that *begins* `npm run <script>` is the one
+  exception — its first component is checked, because that component must exist for the command to
+  get off the ground.
+
+  `npm run ci:fast` is now documented as a **suggested value for required configuration** rather
+  than a default that works everywhere, in all six places that state it — the develop loop, the
+  qa-fix cycle, `develop-bug`'s verify cycle, `skills/develop/SKILL.md`,
+  `skills/develop-next/SKILL.md` and `docs/reference/configuration.md`. Behavioural and intended: a
+  consumer whose gate does not resolve now fails at startup with an instruction instead of mid-loop
+  without one.
+
+- **`mutation-proving.md` now covers the false RED, not only the false GREEN.** The document's
+  procedure and its *"When the proof does not go red"* table were both organised around a green run
+  that should have been red — the case that announces itself. Nothing addressed the mirror: a suite
+  that goes red for a reason other than the behaviour you broke reads exactly like a dead mutant,
+  and is *more* persuasive, because red was the prediction. Five invalid probe readings across two
+  independent runs and two repositories drove this; three of them were false REDs.
+
+  The new `## When the proof goes red for the WRONG reason` states the asymmetry plainly — a false
+  GREEN leaves a survivor, which is a finding, while a false RED writes `dead` into a row nothing
+  executed, certifying coverage that was never exercised — and gives a four-row table keyed on why
+  a suite went red: *a real kill*, *environmental refusal*, *invocation error*, *wrong thing
+  mutated*. Rows two and three each recorded four dead mutants having run **zero** tests; in one,
+  the reading was convincing precisely because the repository's own node-major guard was working as
+  designed and refusing the run.
+
+  Probe validation is **three mechanical checks plus one judgement**, and the split is the point.
+  The three — baseline GREEN with the *exact* command the matrix will use, one known-bad mutation
+  red and killed by its **named** case, and the existing applied-check `diff` — cost about twenty
+  seconds and are stated as cheap on purpose. The fourth is that the mutation must change the
+  *value* under test rather than merely produce a diff, and it carries no command and no time claim
+  because nothing external can perform it: a mutation that mangled a shell variable
+  (`STATU S="ready"`) landed a real diff, turned the suite red as predicted, satisfied every
+  mechanical signal, and proved nothing. **A matrix collected before these four checks proves
+  nothing in either direction.**
+
+  Ships into `develop`, `double-check`, `finalise`, `qa-story`, `qa-task` and `review-security`.
+  Purely additive — the false-GREEN material, the six shapes and `## Do not claim it unless you did
+  it` are unchanged. (task 100)
+
+- **The snippet-execution gate now sees commands written in markdown table cells, not only fenced
+  ` ```bash ` blocks.** The places table-cell commands appear are disproportionately *verification*
+  commands, where a false pass is the worst available failure — and task 77 shipped one: a predicate
+  in `develop-pipeline-resume-contract.md`'s Steps 5–6 verification cell that returned a false PASS
+  under zsh whenever its glob matched nothing, and would have verified a run with **no QA artifacts
+  at all** as complete. Three QA cycles and a full CI run missed it, for one reason: the extractor
+  only looked at fences.
+
+  `extractTableCellCommands()` merges into the same block stream, so classification, the allow-list,
+  the sandbox and the dual-shell comparison are untouched — a table-cell command runs through exactly
+  the same code as a fenced one. A span is in scope when it sits in a genuine table (delimiter row
+  required), its column header names a command, it is backtick-delimited, it contains whitespace, and
+  it is not inside a fenced block. The column restriction is a **noise bound, not a safety one**:
+  backticked spans in table cells are overwhelmingly field names, statuses and verdict tokens, and
+  feeding all of them to a fail-closed classifier would push most documents into
+  `no-executable-blocks` — the "noise trains reviewers to ignore it" failure the rule doc argues
+  against.
+
+  Two properties of table cells that fenced blocks do not have drove two separate fixes, and the
+  second was **a regression introduced by the first**, caught by the QA loop's refute pass:
+
+  - A pipe inside an open backtick span is **content**, not a delimiter. This diverges from GFM,
+    which splits an unescaped pipe even inside a code span — deliberately, because rendering cares
+    where the cell boundaries are and this engine cares whether a command was seen at all. Without
+    it, one unescaped pipe in *any* cell of a row shifted every later column, so a well-formed
+    command in the command column was dropped and the file reported zero blocks, zero findings and
+    no note.
+  - An **escaped** backtick outside a span is a literal backtick and does not open one. Two of them
+    in a row otherwise read as a span opening and closing, collapsing the whole row to a single cell
+    — the same silent-drop class, reintroduced by the fix for it.
+
+  `shell-disagreement` gained a `channel` (`stdout` / `status`). The comparison was stdout-only, and
+  the task-77 predicate prints nothing under either shell: its entire defect is the exit status
+  (`bash` 2, `zsh` 0). The two channels are each other's blind spot and this repo has now shipped one
+  of each. `kind` is unchanged, and the addition cannot turn a clean file red — a status disagreement
+  implies a non-zero status, which has already raised `execution-failure`.
+
+  Every result and finding carries `origin` (`fence` / `table-cell`) and the report annotates
+  `line N (table cell: Verification command)`, because the two constructs are fixed in different ways.
+
+  Verified by execution rather than by reading: **26 adversarial probes** across QA and DoD, including
+  12 that tried to reach `runnable` with a mutating command through the new path — all refused, nothing
+  escaped the sandbox. **A seven-mutation matrix**, every added behaviour reverted one at a time, each
+  red, restored green. And a **corpus measurement**: of 182 tracked `SKILL.md` and
+  `shared/resources/*.md` files, 4 carry table-cell commands, contributing 42 new blocks and **zero**
+  new findings — so the change is protective going forward rather than a change to what the gate
+  reports today. One file got *cleaner*, because two now-runnable cells falsify
+  `zero-blocks-executed`'s premise; that guard is a coverage statement, not a defect, and both halves
+  of the resulting behaviour are pinned by tests.
+
+  Two limitations are documented rather than fixed, neither with a corpus instance: a blockquoted
+  table is not recognised, and an unequal backtick run truncates the span.
+
+### Fixed
+
+- **`bundle_skill.py` now follows shell dependencies sourced as `"${var}/dep.sh"`, and asserts the
+  dependency graph it produced instead of assuming it.** `SH_SIBLING_RE`'s prefix alternation
+  covered `$(dirname …)/` and `./` but not the `${var}/` spelling — which is exactly what
+  `shared/resources/resolve-observation-workspace.sh` uses — so `read-config.sh` was never bundled
+  into `skills/observe-work/references/`. The three spellings are interchangeable to bash and
+  distinct to the regex, so the one nobody wrote a case for stayed invisible.
+
+  It stayed invisible after runtime too, because the consumer degraded **softly**: the resolver
+  printed a warning, left `read_nested_config_key` undefined, still exported a workspace and still
+  exited 0 — so the documented guard `source … || exit 1` never tripped, and a missing config tier
+  was indistinguishable from an absent one.
+
+  Widening the alternation is exact rather than speculative: across every `shared/resources/*.sh` in
+  the tree it adds **one** match and **no** false positives. Alongside it,
+  `assert_sourced_siblings_landed()` re-reads every bundled `.sh` and fails the bundle when a sourced
+  sibling with a shared source did not land. Two properties make it worth having — it uses a matcher
+  **independent** of the one under test (the first version reused `SH_SIBLING_RE`, inherited its
+  blind spot and passed vacuously on the exact defect it was written for), and it carries a
+  **non-vacuity floor**, so a `.sh` that visibly sources something but yields no matches reports a
+  broken scan rather than a clean graph. Mutation-proven: reverting the regex while keeping the
+  assertion makes the assertion fire and exit 1.
+
+### Added
+
+- **The QA gate's security verdict now states how it was reached.** `nfr_validation.security` was
+  `{status, notes}`, so a `PASS` derived from executing twelve hostile candidates and one derived
+  from reading the diff rendered as the same sentence — while the most rigorous consumer in the
+  system, task.74's `SAFETY_REPROBE`, parsed that field **mechanically**. The most exacting trigger
+  was fed by the least exacting input, and the schema could not tell the two apart.
+
+  The block gains `evidence: measured | reasoned | unverified` and `probes_executed:`, defined once
+  in `shared/resources/qa-gate-security-evidence.md` and referenced from `qa-story`, `qa-task` and
+  the re-review rule rather than restated in each. `measured` requires `probes_executed > 0` —
+  asserting it with a zero count is a schema error, enforced across the whole on-disk gate corpus.
+  `review-security`'s machine block already emitted the same two keys, so a QA cycle lifts them
+  rather than translating; the value domains are **nested, not equal** (`{measured, reasoned}` ⊂
+  `{measured, reasoned, unverified}`), because `unverified` is the gate-only value meaning no review
+  supplied a verdict, which a review that ran can never say.
+
+  **Clause 1 of the re-review trigger now has two halves that fail in opposite directions, and the
+  asymmetry is the feature.** The `status` half fails **closed** — an unreadable gate is not
+  evidence of a failure. The `evidence` half fails **open** — a missing key reads as `unverified`
+  and fires. Written the other way, every gate produced before this field existed would report "no
+  trigger" and the widening would accomplish nothing while appearing to work, which is precisely the
+  `\s`-vs-POSIX bug the same file already records. A gate with no `security:` **block** remains a
+  non-trigger: absence of the key means the verdict does not say how it was reached; absence of the
+  block means the gate makes no security claim.
+
+  Three consequences worth stating plainly. The probe was rewritten to bound the security block by
+  indent, so a later NFR axis's keys can never be read as security's. Three pre-existing parity
+  assertions changed **deliberately** — three real gates (`task.67.gate.2`, both `task.74` gates)
+  carry `security: PASS` with no `evidence:` key and now fire on absence; each site records why, and
+  a companion test re-pins the `status` half so it is not left silently untested. And the evidence
+  half **masks** a hijacked first `status:` slot, so the placement constraint keeps its own negative
+  control with evidence supplied rather than relying on the new trigger to catch it.
+
+  Mutation-proven on all three mutations the task specified. The second exposed a real defect in the
+  new corpus check: it used `git ls-files`, which lists only **tracked** files, while a QA gate is
+  written and checked *before* it is committed — the one moment the check exists for was the moment
+  it saw nothing.
+
+- **A diminishing-returns exit for the QA loop.** The loop had one stall guard, the Convergence
+  check, and it measures HIGH findings. A run that reaches zero HIGH but keeps producing MEDIUM and
+  LOW findings *inside its own test machinery* satisfied nothing that guard looks at, so it ran to
+  the five-cycle limit refining pins while the product had been finished for two cycles. Measured on
+  a consumer run: HIGH `2, 0, 0, 0` across four cycles, 21 findings, **not one of them in the three
+  fixes the task existed to make**.
+
+  The two guards are opposites and now say so. The Convergence check fires when HIGH findings
+  *remain and stop falling* and it **escalates** — the loop stopped working. The new exit fires when
+  HIGH findings are *gone* and the residue is entirely machinery, and it **exits cleanly** — the loop
+  finished working. Escalating the second would misreport finished work as stalled. Neither can claim
+  the other's run: the exit requires two consecutive zero-HIGH gates, so a flat non-zero sequence is
+  never its business.
+
+  The Convergence check's arithmetic, its `HIGH_N` awk and its escalation text are **byte-unchanged**
+  — verified by diff, not by assertion. The exit does not recount HIGH; it takes the sequence the
+  Convergence check already recorded, because two implementations of one count drift silently and
+  would leave the two guards disagreeing about the same run while each looked right alone.
+
+  It hands to **5c**, exactly as a clean gate does. Since 5c became the loop's exit gate the only
+  route to Step 7 is a PR conformance review, and this must not become the one path around it — that
+  would make it a *weaker* exit than a `PASS` takes, on a run that by construction has stopped
+  finding blockers.
+
+  Engine: `shared/resources/qa-diminishing-returns.js`, a pure library (no filesystem access, never
+  throws) whose only caller is the prose gate — the shape `review-report-freshness.js` already
+  establishes. 33 tests replay reconstructed gate sequences through it, including an anti-vacuity
+  fixture where every condition holds *except* the glob match. Mutation-proved eight ways; the
+  eighth mutation initially stayed green, because no fixture distinguished "two consecutive
+  zero-HIGH gates" from "the latest gate is zero" — a `2, 1, 0` case was added for it.
+
+- **`qa.testArtifactGlobs`** — which paths the exit above treats as test machinery rather than
+  product. **Defaults to `[]`**, which matches nothing, so the exit never fires and an unconfigured
+  project keeps today's behaviour exactly: the fail-safe direction is the default rather than
+  something to opt into. A finding with no `file:`, or one no glob covers, **fails** the condition —
+  the exit is opt-in on positive evidence and never on absence. Matching is on whole path segments,
+  so `src/latest-price.ts` is production code whatever letters it contains.
+
+- **`observe-work`** — a meta-skill that observes the working session for skill-improvement signals,
+  writes each as an observation to a durable log, and periodically reviews that backlog to stage
+  skill updates for a human to install. The log is a directory of one Markdown file per observation;
+  every read and write goes through `shared/resources/observation-log.js`, which owns id derivation,
+  the archival sweep and the frontmatter parse, so no snippet can hand-roll them. The workspace is
+  resolved once by `shared/resources/resolve-observation-workspace.sh` and never derived from the
+  cwd — an ephemeral anchor (`/tmp`, `.claude/worktrees/`, a linked git worktree) is refused rather
+  than warned about, because a log written into a torn-down checkout does not error on the next
+  scan, it reports zero observations.
+
+  Methodology adapted from [task-observer](https://github.com/rebelytics/one-skill-to-rule-them-all)
+  by Eoghan Henn (CC BY 4.0); the methodology is kept, the mechanism is a rewrite. Tasks 93–95.
+
+  Shipped with it: the `observations.workspace` config key and the `OBS_STALE_DAYS` environment
+  variable documented in [`docs/reference/configuration.md`](docs/reference/configuration.md);
+  reciprocal boundary notes in `autoskill`, `remember-insight` and `double-check` so a reader can
+  tell at invocation time which of the four they want; and a seeded
+  `skills/observe-work/assets/skill-families.template.md`, so the sibling check has a registry with a
+  real family in it on day one rather than an empty file.
+
+- **Two named defect classes in [`docs/reference/anti-patterns.md`](docs/reference/anti-patterns.md),
+  and a Signal Design Principle section in `create-skill`.** *Never let one signal report two states*
+  — for each falsy, empty or zero value a check emits, name the situations that produce it; where
+  more than one does and the right response differs, they need separate values. This repository had
+  independently diagnosed that shape at least four times and named it only in the postmortem of each
+  occurrence, which is the one artefact the next occurrence does not read. *Never fix N call sites
+  without a population check* — when a fix is the same edit at more than one site, the deliverable is
+  the check that finds site N+1, carrying a non-vacuity floor and allowlist-staleness failure.
+
+  Both are also review-time findings now: `shared/resources/code-review-prompt.md` gains categories
+  **C (ambiguous signals)** and **D (enumeration risk)**, so they reach `review-code`, `review-pr`,
+  `qa-story`, `qa-task`, `develop-story` and `develop-task` through the one shared lens.
+
+- **`AGENTS.md` links `.agents/handoff.md`.** The handoff opens with "Read this first if you are
+  picking up work in `agent-skills`" and was referenced by nothing — no skill named it, no doc linked
+  it, no script read it, and the always-loaded instruction file did not contain the word "handoff".
+  The pointer carries a re-measure caution rather than a bare link: every state figure in that
+  document records the command that produced it, and state decays within days while the traps section
+  stays true much longer.
+
+### Added
+
+- **The `observe-work` meta-skill** (`skills/observe-work/`) — the first consumer of the
+  observation-log engine below. It runs alongside ordinary work, notices the moments that would
+  otherwise evaporate (a correction, a gap no skill covers, a rule the agent broke), writes each as a
+  durable observation, and periodically turns that backlog into **staged** skill updates the user
+  installs. `/observe-work` is capture mode; `/observe-work --review` runs the review cycle.
+
+  Adapted from [rebelytics/one-skill-to-rule-them-all](https://github.com/rebelytics/one-skill-to-rule-them-all)
+  (CC BY 4.0, Eoghan Henn / rebelytics.com) — **changes were made**. Three of them are structural:
+
+  - **The body is 256 lines against upstream's ~710**, which is what makes progressive disclosure real
+    rather than stated. The body is an always-loaded per-invocation cost and the five references are
+    not, so a paragraph earns a place in the body only by changing behaviour on *every* invocation.
+    Every pointer states its own load trigger — an unconditioned list of filenames is a bibliography,
+    not progressive disclosure, and reads as optional.
+  - **Every log operation is one engine call.** No snippet in the prose derives an id, sweeps the
+    archive or parses frontmatter, so the guards in `observation-log.js` cannot be skipped by a
+    reader who retypes a snippet imperfectly.
+  - **Authoring guidance is cross-referenced, never restated.** `create-skill`, `authoring-skills.md`
+    and `CONTRIBUTING.md` remain the single sources; a rule kept in two places drifts, and the agent
+    then follows whichever it happened to load.
+
+  Also shipped: `shared/resources/observe-work-session-start.sh`, an **opt-in** `SessionStart` hook
+  that computes the open-observation count and review staleness and injects them as
+  `additionalContext`. Shipping the file is not installing it — that stays the user's decision. It
+  counts `status: open` files rather than the directory (a raw count overstates the backlog by every
+  entry the last review just closed, for a day, in every session), and compares ISO dates by lexical
+  sort rather than `<` inside `[ ]`, which is a bash/ksh extension that zsh rejects.
+
+  **The install is activation unverified**, deliberately and by construction: the installing session
+  cannot prove activation, because a skill being callable right after install only shows it was
+  invoked by hand. `AGENTS.md` carries the activation instruction — demanding the Session Start
+  Protocol *by name*, plus a post-task backstop line — and the next-session check is handed to the
+  user as a concrete first action.
+
+- **The observation-log engine, workspace resolver and contract** (`shared/resources/observation-log.js`,
+  `resolve-observation-workspace.sh`, `observation-log-contract.md`). The mechanism a forthcoming
+  `observe-work` meta-skill stands on: a durable, cross-session record of moments where an agent's
+  behaviour could have been better, written at the time rather than reconstructed later.
+
+  Adapted from [rebelytics/one-skill-to-rule-them-all](https://github.com/rebelytics/one-skill-to-rule-them-all)
+  (CC BY 4.0, Eoghan Henn / rebelytics.com) — **changes were made**: the methodology is kept, the
+  mechanism is a rewrite. Upstream carries its correctness guards as 20–40-line POSIX shell snippets
+  embedded in prose that the agent must retype correctly before **every** write, and a skipped snippet
+  is silent — the log still looks healthy. Here the guards are inside the call path, so there is no way
+  to call `write` without them.
+
+  Four things the rewrite buys, each of which was a live defect or a live hazard:
+
+  - **The octal bug becomes structurally impossible.** Upstream feeds zero-padded filename prefixes into
+    shell arithmetic, where `$(( 0105 + 1 ))` evaluates as octal and yields 70, and a prefix containing
+    an 8 or 9 (`0108`) is an invalid octal constant that errors the whole derivation. Its mitigation is
+    a `sed` that strips leading zeros — which works exactly as often as it is retyped. `parseInt(s, 10)`
+    has no octal reading of a leading zero, so the defect class does not exist rather than being managed.
+  - **"An empty result is a claim about the instrument" becomes an exit code.** A scan returning nothing
+    means either there is nothing to find or the reader is broken; those are byte-identical from the
+    caller's side. `empty` and `scan-broken` are now separate `reason` values, and both `scan` and
+    `next-id` carry an independent count check — two counts derived by different means — that trips
+    rather than returning a clean, believable zero.
+  - **Archival cannot be skipped.** The stale sweep is folded *inside* `next-id`, so no write path can
+    reach an id without having swept. Upstream couples the two by prose preamble and records that the
+    preamble under-fires.
+  - **The `[ABSOLUTE PATH]` placeholder disappears.** One resolver, three sources (config → env →
+    project identity), one answer — and an ephemeral anchor (`/tmp`, `.claude/worktrees/`, a linked git
+    worktree) is refused with a non-zero exit rather than accepted, because a snippet run against a
+    torn-down checkout reports an empty, clean backlog, which upstream itself names as "the one answer
+    that never gets questioned".
+
+  `parked` is deliberately **not** a resolved state: it means decided-but-blocked, requires
+  `parked_until:`, leaves the work queue, and never archives. There is deliberately **no `--id` flag** on
+  `write` — a batch that pre-computes a base and hardcodes sequential numbers collapses N independent
+  max-checks into one stale read, and the absent flag is the enforcement rather than a prose request.
+
+  48 tests, and **every guard is mutation-proven** — the guard reverted, a named test confirmed red, the
+  guard restored. That pass found two tests that did not test what they claimed (the parked-archival
+  exemption was held up by the date half of the gate rather than by set membership; the resolver's
+  `export` was read back in the sourcing shell, where a plain assignment is visible too) and one live
+  defect in the engine (`write --id 7` was silently accepted and ignored, so a caller saw exit 0 and
+  believed the id had taken effect). Nothing consumes these files yet, so the `reason` vocabulary and
+  exit codes are a contract from this commit forward.
+
+- **`/review-security` — a review skill that establishes whether a security control *engages*, by
+  running it.** Nothing in the repository took application code as its subject and executed
+  adversarial input against it. Three instruments came close and each missed for its own reason: the
+  `finalise` DoD security agent gates probe mode on the deliverable *being* an accept/reject
+  predicate, so a connection-options object and a URL composer — neither of which is a decider —
+  skip it entirely; `qa-story` / `qa-task` reduce the security axis to one line of judgement; and
+  `review-code` gives security a single bullet with no security lens.
+
+  The gap all three share is that a control can be **present and inert**, and every one of them
+  passes it. The motivating defect: `...(isTls ? { tls: {} } : {})` satisfies a grep for `tls`,
+  produces a citation, and passes the presence checklist — while the connection it configures is
+  plaintext, and the accompanying unit test asserts `toBeDefined()` on it and stays green.
+
+  Four verdicts — `engages`, `present-but-inert`, `absent`, `unverifiable` — with
+  **`present-but-inert` rated high**, above `absent`. That ordering is deliberate: an absent
+  control is a gap someone will notice, while an inert one has already been read, reviewed and
+  believed, carrying the credibility of a control while providing none of the protection.
+
+  **The agent cannot write the verdict.** It produces a probe *specification* (`{sink, entry}`);
+  `security-probe.mjs` runs it against the corpus in a sandboxed child process and computes the
+  outcome. An agent that executed nothing has no field to forge — which is why this skill does not
+  become a second, more confident copy of the vacuum it replaces. There is no PASS token in the
+  schema, so a bare pass is unrepresentable rather than merely discouraged, and zero executed probes
+  render `unverifiable`.
+
+  Its own PASS is falsifiable in CI: four fixtures model both measured defects in engaged and inert
+  variants, and the suite asserts `engaged → engages` and `inert → present-but-inert` from the
+  **engine's** computed verdict, with no agent in the loop. Each inert variant deliberately contains
+  the literal tokens a grep reviewer accepts — `tls`, `rejectUnauthorized`, `sslmode=require` —
+  so that tidying it into an `absent` case any grep would catch fails the suite instead of quietly
+  proving nothing.
+
+  Modes are `diff` (default) and `full`, the latter reviewing a work item's security surface
+  regardless of what changed — every other security instrument here is anchored to a diff, so a
+  control that shipped last month is reviewed by nothing. Advisory in v1: it writes a co-located
+  `*.security.{N}.{name}.md` report, owns no gate and edits no code.
+
+  **Note the name.** Claude Code ships a built-in `/security-review`; this skill is
+  `review-security`. The dispatch strings do not collide but the natural language does — "do a
+  security review" matches both, and the built-in wins. Prefer the built-in for a broad read of a
+  pending diff; prefer `/review-security` when you need proof that a named control fires.
+
+- **Bug reports can now be published to a tracker: `sync-jira-bug` + `ensure-bug-jira-issue`, and
+  `sync-github-bug` + `ensure-bug-github-issue`.** `sync-{jira,github}-{story,epic,task}` all
+  existed; there was no bug equivalent for either tracker, so bug cards were created through the
+  generic `/create-issue` path with a hand-authored description. Measured on a live Jira board, bug
+  card RAPP-713 and its three siblings each had a description whose ADF contained **zero** `link`
+  marks — the bug report was a bare plain-text path — with `parent: null` and an empty `remotelink`
+  list. The card linked to nothing: not the bug file, not the story doc, not the epic, not the
+  story's own card. The bug *file* linked out correctly, so the both-ways relationship held in one
+  direction only. `develop-bug` already described the gap, in a comment saying *"most general/story/
+  task bugs will not [have a tracker issue] — skip silently when empty"*; that branch now ensures one.
+
+  Three modes — story bug, task bug, general bug — inferred from the file's own **path**, never
+  asked for. The brief for this work named `story_id` / `task_id` frontmatter keys; those do not
+  exist. They are `create-bug-report` *inputs*, and the documented schema carries parentage only in
+  the free-text `related:` string. So the path decides, `related:` is read as corroboration, and a
+  disagreement is **warned about but not obeyed** — a wrong parent link is worse than a missing one.
+
+- **The bug card is a Jira sibling with a real issue link, not a child.** Jira cannot nest a Bug
+  under a Story without switching it to a sub-task type, and that is not a neutral change: sub-task
+  type names differ per board, a sub-task has no independent backlog placement and usually no sprint
+  of its own, and sub-task workflows are frequently shorter than the project's standard one. In a
+  company-managed project `parent` on a standard issue *is* the Epic Link, so pointing it at a story
+  key is simply invalid. The relationship therefore travels as `POST /rest/api/3/issueLink`, with the
+  link type resolved by introspecting `/rest/api/3/issueLinkType` against a candidate list
+  (`Relates → Relates To → Related → Problem/Incident → Blocks`) — never a hardcoded name — plus
+  link-marked entries in a `Source Documents` section. A board offering none of them reports
+  `no-link-type` and keeps its description links: a degraded success, not a failure.
+
+  GitHub takes the stronger relationship its API actually supports and nests the bug as a
+  **sub-issue**. Same intent, different mechanism, because the platforms differ.
+
+  `linkIssues` reads `fields=issuelinks` before posting. That is not an optimisation: Jira happily
+  creates a *duplicate* link of the same type between the same pair, so an unconditional POST would
+  add one more identical row to the link panel on every sync.
+
+- **`shared/resources/status-history.js` — the bug-type Change Log.** Bug reports are barred from
+  carrying a `## Change Log`; `## Status History` is the equivalent and is richer, because it has a
+  `Status` column. Until now nothing wrote that table in code — only prose. The trap this closes:
+  `change-log.js` has no `bug` anchor, so `upsertChangeLog(content, e, {docType: "bug"})` does not
+  fail — it falls through to the end-of-file path and silently appends the one table the standard
+  forbids, added by the code meant to respect it.
+
+- **`shared/resources/bug-doc.js` — bug-document semantics in one place.** Mode inference,
+  header-block parsing, parent and sibling resolution, and frontmatter adoption, shared by the Jira
+  script and the GitHub prose skills via a `--json` CLI. Two implementations would disagree the first
+  time a filename surprised one of them, and the disagreement would be invisible: each tracker would
+  simply link the card to a different parent. It requires nothing but node builtins, deliberately —
+  bundling follows `require()` edges, and a Jira dependency here would vendor a Jira client into the
+  GitHub-only skills.
+
+- **A bug file with no frontmatter now gets one.** About half the bug documents in a mature repo
+  predate the template and open with a `**Bug ID**:` header block. On those, `upsertFrontmatterKeys`
+  returns its input **unchanged, and silently** — so the card was created, the link line written, and
+  `jira_key` never persisted, and the next run created a duplicate unless the `synced-from-*` label
+  search happened to rescue it. A minimal block is now prepended, seeded from the header block, with
+  the body concatenated verbatim. `review-bug` already flags a bold-line header with no YAML block as
+  Critical, so adoption clears a finding rather than creating one.
+
+- **`DEFAULT_STATUS_MAP` gains the four bug-lifecycle words it lacked** — `new`, `ready-for-qa`,
+  `closed`, `reopened` (`in-progress` was already there). All four were previously *unmapped* and
+  fell through `mapStatusCandidates`' verbatim single-candidate pass-through, so a board was offered
+  the literal word. `closed` also joins `TERMINAL_LOCAL_STATUSES`, which is what makes
+  `resolveTransition`'s `statusCategory=done` fallback available to a closing bug. Adding keys that
+  were absent cannot move any existing status, and a test asserts the document lifecycle is unchanged.
+
+- **A security probe now runs, and the engine computes the verdict (task.80).** `task.73` gave the DoD
+  security check a probe mode, but the mode was prose: it told the agent to hand-write a script and run
+  it, then trusted the `probes_executed` count the agent typed. The guard *"`boundary: true` and
+  `probes_executed: 0` → FAIL"* was a self-guard whose input was self-reported — an agent that executed
+  nothing could write `probes_executed: 12`.
+
+  New `shared/resources/security-probe.mjs` runs each corpus case in its own child process and computes
+  one of four verdicts from what actually happened: **`engages`**, **`present-but-inert`**, **`absent`**,
+  **`unverifiable`**. Two properties are the point of it. Zero executed cases yields `unverifiable`,
+  never a pass — and `unverifiable` exits **1**, not 0, so a CI check reading `$?` cannot mistake "could
+  not tell" for "the control holds". And `declined` is its own state, never folded into `executed: 0`:
+  both render as "nothing ran", but one says the engine could not reach the target and the other says it
+  reached it and found nothing to run. Collapsing them is the defect `task.73` chased through four QA
+  cycles.
+
+  `present-but-inert` is the high-severity verdict, and the ordering is deliberate — worse than
+  `absent`, because an inert control has already been reviewed and believed. `engages` additionally
+  requires at least one *legitimate* case to pass, so a stub that throws on every input scores
+  `unverifiable` rather than a clean probe.
+
+- **`sandboxEnv()` and `snapshotTree()` extracted from `qa-execute-snippets.mjs` (task.80).** The
+  hardened containment the snippet path has used since task.67 — a six-key allow-list environment so no
+  parent token reaches a child, plus the escape sentinel — is now reusable rather than re-improvised per
+  caller. Behaviour-preserving: the extraction landed with parity tests pinning `QA-1…QA-17` and was
+  mutation-proved (reverting `sandboxEnv` to spread `process.env` turns the token-leak tests red).
+
+- **`shared/resources/probe-boundary-rule.md` — the written refusal to widen the snippet allow-list
+  (task.80).** Making probes runnable through the snippet path would need an interpreter on
+  `SAFE_COMMANDS`. It is one line and it looks small. It would let **any fenced bash block in any
+  document** run arbitrary code through the QA path, because the classifier cannot tell a probe's `node`
+  from a document's `node`. The rule doc records the refusal with its reason, the trust-class argument
+  that makes it unnecessary (the engine constructs its own runner; inputs cross as JSON on stdin, never
+  as shell text), the honest v1 limits (importable entry points only; no OS-level sandbox), and the
+  derivation of the verdict from the corpus `direction` field. The refusal is also asserted in code —
+  `qa-execute-snippets.test.mjs` enumerates ten interpreters against both `SAFE_COMMANDS` and
+  `COMMAND_RUNNERS`.
+
+### Fixed
+
+- **`bundle_skill.py` no longer reports `in sync` for bundled references it never examined, and
+  `npm run bundle` now refreshes them.** Discovery walks a skill's own files and follows references
+  to a fixed point; a copy already in `<skill>/references/` that the walk no longer reaches was never
+  opened, compared or refreshed — and the bundler said `in sync` anyway. Measured across this repo:
+  858 bundled files, 749 regenerated by a clean run, **109 never regenerated**, of which **26 had a
+  `shared/resources/` source and 8 were stale**. Two were copies of a pipeline contract carrying
+  `"current_step": 1` — the exact value the shared source's own warning block exists to forbid, with
+  that block missing from the copy. Zero of the 749 *discovered* files were stale, so the bundler was
+  correct on everything it examined and silent about everything else.
+
+  Pass 2 now reconciles against **disk**: a copy is refreshed because it exists and has a source, not
+  because discovery reached it. `.json` joins the `references/X` suffix alternation (a skill whose
+  only reference was `references/x.json` previously computed an empty needed-set, took the early
+  return, and never touched its `references/` at all). Files with **no** shared source are
+  skill-native and deliberately untouched — 83 of the 109.
+
+  *Rejected on measurement:* following `references/X` out of shared text, the obvious-looking fix,
+  vendored **38 unwanted files** — including a Jira client into GitHub-only skills — because
+  `tracker-card-summary.md` names `references/jira-sync.js` in prose while explicitly avoiding the
+  `shared/resources/` form so the bundler would not vendor it. A prose mention is not a dependency;
+  a regression test pins that.
+
+- **The CI bundle-freshness check now compares per file instead of regenerating and diffing.**
+  Regenerate-and-diff inherits the bundler's blind spots by construction: a copy the bundler does not
+  write produces no git diff, so a stale file passes. Proved in a pristine worktree at `HEAD` — after
+  a developer does exactly what the old check instructs (`npm run bundle`, commit), the old check
+  reports **green with 8 stale copies**. The new `bundle_skill.py --check --all` names all 8 and exits
+  1. It reuses the bundler's own `rewrite_text`/`inject_header` (hoisted to module level for this), so
+  the comparison cannot drift from the transform it checks — a raw checksum can never match, since a
+  bundled copy is its source plus a banner plus the path rewrite.
+
+- **`sync-jira-story`, `sync-jira-task` and `sync-jira-epic` now converge: syncing an unchanged
+  document twice reports no field changes on the second run, and a card that transitions can be
+  synced again without `--force`.** Two defects, both fixed on the bug path in the work above and
+  deliberately left in the three siblings, are now fixed there too.
+
+  The first is a label diff that could never match. Each script built its diff input as
+  `labels: lib.sanitiseLabels(args.labels || frontmatter.labels) || []` — rebuilt from frontmatter —
+  while the payload `collectIssueFields` actually sends appends the `synced-from-*` idempotency
+  label. The comparison was therefore always a set-without-the-label against a Jira issue that has
+  it, so `labels` was reported changed on **every run**. For `sync-jira-story` and `sync-jira-epic`,
+  which gate their PUT on `changedFields.length === 0`, that defeated the gate and fired a write
+  every time. `sync-jira-task` has no such gate and PUTs regardless, so there the damage was
+  confined to a permanently wrong change summary. The fix is to build the payload first and diff
+  against it, now shared as `diffAgainstPayload` in `jira-sync.js` and called by all four scripts —
+  the rule the duplication kept losing is *diff the outgoing payload, never a rebuilt field set*.
+
+  The second is a stale timestamp. A transition is a write and bumps Jira's own `updated`;
+  persisting the pre-transition value told the next run that Jira had moved since the last sync,
+  which is exactly what `guardConcurrentEdit` aborts on. A card synced once and then refused every
+  subsequent run — over a change the tool had made moments earlier — recoverable only with
+  `--force`, which is the one habit that makes the guard useless when a *real* concurrent edit
+  happens. All three now re-read `updated` after any successful transition, best-effort: a failed
+  re-read warns and keeps the earlier value, which is no worse than not refreshing.
+
+  `sync-jira-epic` looked half-fixed and was not. It already re-read after a transition, but only
+  inside its skip branch — and that branch is gated on `changedFields.length === 0`, which the first
+  defect made impossible. The correct code was unreachable. This is why the two fixes had to land
+  together: the label fix alone would have activated the skip-path re-read while the update path
+  stayed stale, converting a consistent failure into an intermittent one that depends on whether an
+  unrelated field happened to drift.
+
+  Behaviour worth stating for anyone parsing output: story, task and epic syncs used to report
+  `Updated: labels` on every run. An unchanged document now reports no field changes, and story and
+  epic issue no PUT. Nothing in this repo scraped that string, and a caller depending on it was
+  depending on a defect.
+
+  **`sync-jira-story --force` gains behaviour**, and it is new rather than restored. It now bypasses
+  the no-change fast path and re-publishes the description, matching `sync-jira-epic`. Neither half
+  worked before: story's gate never carried epic's `!args.force` term, and a forced unchanged sync
+  computed `includeDescription === false` in any case, so the forced write carried only the fields
+  the diff had already proved identical. Both were unreachable while the label defect kept the gate
+  shut. `--force` is now what an operator repairing a card edited in the Jira UI expects it to be.
+
+  One more consequence of making that gate reachable, caught at PR review: the gate compares only
+  what `diffFields` compares, so `assignee`, `due_date`, `components` and `fix_versions` — carried by
+  the payload, compared by nothing — were being silently dropped on story and epic. They are folded
+  into the meta hash, with a regression test on each script.
+
+  **That fold has a one-off cost, and it is deliberate.** Adding keys to the meta hash changes it for
+  every already-synced story and epic, so the next sync of each reports `Updated: metadata` and
+  issues one PUT — even where none of the four fields is set. The payload is correct, nothing is
+  corrupted, and convergence resumes on the run after. One redundant write per document, once, is
+  the price of closing a path that dropped real edits while reporting success.
+
+  The regression coverage is the point as much as the fix. Both defects survived a full unit suite,
+  because those tests asserted `diffFields` and `collectIssueFields` each behaved correctly *in
+  isolation* and nothing asserted the two agreed with each other. The new end-to-end suites
+  (`skills/sync-jira-{story,task,epic}/tests/end-to-end.test.js`) read the payload back from a fake
+  Jira, now shared at `shared/resources/fake-jira.js` (vendored into each consuming skill's
+  `references/` by the bundler) after being lifted out of the bug suite, where it was
+  a private function with bug-specific stubs and no fake for the backlog or project endpoints the
+  siblings call. Each script also carries a counterweight test asserting a **genuine** remote edit
+  still aborts — without it, the cheapest way to pass everything else would be to disable the guard.
+
+- **The idempotency label is derived from the bug's own filename stem, not its directory.**
+  `sync-jira-task` labels by parent-directory basename, which is unique because a task owns its
+  directory. A bug does not: a story bug shares a directory with its story, that story's QA reports
+  and every sibling bug. Carrying that rule over would have given every bug in a story the same
+  `synced-from-*` label, and the pre-flight "have I already created this?" search would then adopt
+  the first card it found — so bug 2 would silently update bug 1's card. This label is the sole
+  guarantor of idempotent create when the write-back fails, so it must be unique per bug.
+
+- **`sync-jira-bug` diffs against the payload it is about to send, not a separately-computed one.**
+  The update path builds `fields` first and diffs `fields.labels`. Diffing a list rebuilt from
+  frontmatter compares a set that is missing the `synced-from-*` and mode labels against a Jira issue
+  that has them; the two never converge, `labels` is reported changed on **every** run, and the
+  skip-when-no-diff path never fires. Caught by the end-to-end test asserting the second sync changes
+  nothing. _The three sibling sync scripts appear to share this shape and have not been changed here._
+
+- **`jira_last_synced_at` is re-read after a transition that fired.** The timestamp captured on
+  create is from _before_ the status transition, and a transition is a write. Storing the earlier
+  value tells the next run that Jira has moved since this sync — which is precisely what the
+  concurrent-edit guard aborts on. The symptom is a card that syncs once and then refuses every
+  subsequent run with _"Jira issue updated since last local sync"_, pointing at a change the tool
+  made itself seconds earlier. Also caught by the end-to-end test. _The sibling scripts appear to
+  share this ordering too._
+
+
+- **`finalise` no longer reports a close it may have just undone (bug.11).** Step 7 transitions the
+  card to a terminal status and then re-runs `sync-jira-*` to re-point the Document link at the
+  durable branch. Task 40 set that order deliberately and justified it on the premise that the sync
+  would then *"find the issue already in Done and no-op"*.
+
+  **That premise only holds when the consumer maps `accepted → Done`** — and this same step
+  recommends the opposite, telling boards that want a card to wait for the merge to leave `done` to
+  a human. On such a project the sync resolves `accepted` through its own `loadStatusMap`, finds a
+  non-terminal candidate and walks the card **backwards out of the status the ladder just set**,
+  leaving the resolution stranded where neither a `resolution IS EMPTY` sweep nor a status-is-done
+  filter will find it. Observed on a consumer 2026-09-05: closed to `Done` + `resolution: Done`,
+  returned by the re-link to `Waiting for Review` still carrying `resolution: Done`, matched by name
+  because that workflow offers a transition literally called `Waiting for Review`.
+
+  The order is **unchanged** — reversing it hands the decision back to `loadStatusMap`, which is what
+  task 40 removed. What changed is that the block no longer asserts the sync no-ops, names the
+  configuration under which it does not, and Step 7 now **requires the terminal status to be re-read
+  after the re-link and re-asserted if it moved**, with a matching checklist item. Verification is by
+  reading the issue back, never by trusting the transition call's `204`.
+
+  The durable fix — a `--no-transition` flag so the re-link cannot carry a status decision at all —
+  is specified in [`bug.11`](docs/bugs/bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md)
+  and deliberately not bundled here, to keep this one change. **It has since landed — see below.**
+
+- **`sync-jira-{story,task,epic}` can now be status-neutral: `--no-transition` (bug.11, durable fix).**
+  The sync previously had no way to re-point a Document link *without* also deciding the issue's
+  status: `syncDocumentStatus` ran whenever frontmatter carried a `status:`. So finalise's link-only
+  re-point was unavoidably a second status resolver running after the `tracker-workflow.yaml` ladder
+  had already made the call — the mechanism behind the regression above. `finalise` Step 7 now passes
+  the flag, and its post-re-link status re-read drops from a repair of expected damage to a cheap
+  confirmation (kept, because it still catches a consumer pinned to an older sync).
+
+  **The gate lives inside `syncDocumentStatus`, not at its callers.** There are four call sites across
+  the three scripts, and putting the check at the callers means the guarantee is only as good as the
+  least-updated one — during this fix, `sync-jira-epic`'s no-field-changes path was in fact missed on
+  the first pass while every behavioural test still passed. Gated centrally, `--no-transition` issues
+  **no HTTP request at all**, which is what the regression test asserts.
+
+  **The outcome reason is `transition-suppressed`, not `no-transition`.** The latter was already taken
+  by the opposite condition — *the board offers no matching transition from here* — which is a real
+  skip that must keep failing under `--fail-on-status-skip`. Reusing the name (briefly done, and
+  caught) would have silently stopped every genuine unreachable-transition skip from failing. A
+  regression test now pins both meanings apart.
+
+  `--no-transition` composes with `--fail-on-status-skip` (a suppressed transition is a run behaving
+  as configured, so it exits 0) and writes no Change Log row, because nothing moved. `review-story`'s
+  `--doc-branch` sync is unaffected and still drives status — there, the transition is the point.
+
+### Added
+
+- **The security input corpus: the inputs that defeat each sink, written down once (task.79).**
+  `shared/resources/security-input-corpus.md` and its machine-readable peer
+  `security-input-corpus.mjs` ship 73 cases across five sinks — `url-authority`, `sql-orm`,
+  `shell-exec`, `path`, `template-render` — exporting `SINKS`, `corpusFor(sink)` and `allCases()`.
+
+  The DoD security prompt's Step 4 previously asked the agent to *generate* candidates along five
+  named axes, from prose, on every run. Two runs of the same probe against the same boundary could
+  therefore test different inputs and reach different verdicts, and nothing recorded which inputs
+  were tried — `probes_executed: 12` does not say *which* twelve. The prompt now points at the
+  corpus and deliberately does not restate its inputs; a contract test reads the corpus and fails if
+  any case literal reappears in the prompt, so the two cannot drift into a second copy.
+
+  Two properties make the corpus an oracle rather than a list. Every case carries **`why`** it is
+  dangerous and **`correct`** — what a right implementation does to it — so an engine can compute a
+  verdict instead of asking an agent to judge one. And every sink carries **`legitimate`** cases as
+  well as hostile ones, enforced by the schema test: an implementation that closes a hole by refusing
+  everything passes a hostile-only corpus perfectly, and is also a defect.
+
+  The 27 `shell-exec` hostile cases are measured rather than invented — 14 from `task.67.bug.3` and
+  13 from `bug.6` — and bug.6's 2 over-refusals seed the accept direction. `corpusFor` **throws** on
+  an unknown sink rather than returning `[]`: a typo yielding an empty array would produce a probe
+  that executes zero candidates and reports no findings, which is indistinguishable from a boundary
+  that held.
+
+  No behaviour change to `finalise`'s returned `security_review` YAML shape. The engine that consumes
+  the corpus is `task.80`; the `/review-security` skill is `task.81`.
+
+- **Skill install profiles with dependency closure.** `setup-consumer.sh` now asks which install
+  profile you want — `full` (every skill, the default and today's behaviour), `pipeline` (the
+  story/task/bug lifecycle) or `minimal` (branching, commits, PRs, code review) — plus optional
+  per-skill add-ons, and writes the answer to `skills-config.yaml` so `--update` reproduces it.
+
+  **The measured saving, not an estimate.** Description bytes are what sit in the agent's context on
+  every request, before it reads an instruction. Measured on this tree (120 skills; the numbers below
+  are for a GitHub consumer, after task 83's tracker filter):
+
+  | Profile    | Skills | Description bytes | ≈ tokens | vs `full` |
+  | ---------- | -----: | ----------------: | -------: | --------: |
+  | `full`     |    109 |            35,425 |    8,856 |         — |
+  | `pipeline` |     36 |            14,281 |    3,570 |  **−60%** |
+  | `minimal`  |      5 |             1,893 |      473 |  **−95%** |
+
+  Method matters and is stated because two reasonable ones disagree by ~10%: this sums the
+  `description:` frontmatter value of each installed skill. **No test hardcodes these numbers** — the
+  assertion measures `full` and `pipeline` in the same run and compares them, so it asserts a
+  property of the resolver rather than a fact about one release.
+
+  **A broken selection is unrepresentable.** A profile names *seeds*; the installer resolves each
+  seed's transitive callees and installs those too, so choosing `develop-story` cannot leave you
+  without the eight skills it invokes as pipeline steps. The wizard prints what the closure added and
+  why before it copies anything. The tracker filter from task 83 runs **after** the closure — the
+  ordering is load-bearing, because `review-story → ensure-story-jira-issue → sync-jira-story` puts a
+  Jira-only skill in a GitHub consumer's closure, and filtering first would silently undo task 83 for
+  every profile user. That ordering is mutation-proven.
+
+  **The call graph is declared, not scraped.** Each SKILL.md carries an optional
+  `invokes: [a, b]` frontmatter key; `npm run generate-skill-deps` compiles those into
+  `shared/resources/skill-dependencies.json`, and CI fails on drift (in `validate.yml`, the PR gate,
+  as well as `release.yml`). Task 84 originally specified extracting `/slash-command` tokens from
+  prose. That was built first and measured, and it does not work: prose is full of *reverse*
+  references — a leaf naming its callers, cross-references, and negations such as
+  `review-code`'s literal "`/develop-story` and `/develop-task` do **not** call `/review-code`",
+  which the scrape turned into two edges. Every scrape variant either exploded the graph (`minimal`
+  and `pipeline` both closed to ~34 of 120 skills — indistinguishable, so the feature would have
+  shipped worthless while reporting success) or lost real pipeline steps. An absent `invokes:` key
+  means no outgoing edges, which is the safe default. The prose scrape survives as an advisory
+  report: `npm run skill-deps:candidates`.
+
+  **Nothing is ever pruned.** A skill outside your profile that is already installed is *kept* and
+  reported, exactly as task 83 does for the tracker filter, and the summary states the resulting
+  config/disk divergence plainly with the prune recipe — that divergence is the expected state for
+  an existing project adopting a profile, not an error. An **absent `skills:` block means `full`**,
+  so every config written before this feature behaves identically.
+
+  A skill in `skills.exclude` that something else requires is reported as a **conflict** — named,
+  with what requires it and what will break — never silently re-added and never silently dropped.
+
+### Changed
+
+- **`/develop-task` Step 2 now skips the review on *evidence of review* rather than on status alone,
+  giving a correct-but-unrecoverable gate a recovery path.** The skip table keyed on `Ready for
+  Development` / `In Progress`; a task at `planned` always re-ran `/review-task`, and if the status
+  was still `planned` afterwards the post-review table halted unconditionally.
+
+  Both tables were internally consistent — the halt was the *correct* response to a promotion that
+  did not happen. What was wrong is that **the only remedy an operator reaches for is provably a
+  no-op**: the halt lands before any work exists, which is exactly when re-running the review looks
+  like the fix, and whatever withheld the promotion fires again identically on the second pass.
+
+  Two supported configurations do withhold it after a full, successful review —
+  `sign-off.enforcement: blocking` with an unsigned row, and `change-log.enforcement: blocking` with
+  a missing log. Both are documented in `review-task` Step 9 as declining to promote *"regardless of
+  the review outcome, and including the pipeline auto-answer path"*. Under stock defaults neither
+  applies, which is why the halt had **never been observed** — it was reported by a consumer who
+  predicted it from reading the tables and steered around it by hand, and whose diagnosis (that the
+  two tables contradict each other) does not survive measurement.
+
+  Now: `planned` + a **current** review report skips; `planned` with no report, or a stale one, still
+  runs the review; and unchanged `planned` halts only when no report was written and none already
+  existed. The genuine gate — a review that produced nothing at all — is kept, because buying
+  liveness by removing it would trade a needless halt for developing against an unreviewed card.
+
+  **Freshness is defined, not judged, and deliberately does not use mtime.** New pure helper
+  `shared/resources/review-report-freshness.js` compares the task's frontmatter `updated:` against
+  the report's body `**Reviewed:**` (falling back to `**Review Date:**`). mtime is the checkout time
+  in a fresh clone — which is what CI and `/develop-batch` worktrees are — so an mtime rule decides
+  differently in the pipeline than on a developer's machine, and that difference is invisible until
+  it matters. This **diverges from the mtime-based plan-freshness rule** in
+  `develop-pipeline-resume-contract.md`, which is left unchanged; the divergence is now stated in
+  the resource rather than left for a reader to trip over. Report frontmatter is not consulted even
+  when present: of the 68 tracked task review reports, 20 carry a frontmatter block and only 7 an
+  `updated:` field, while every one carries the body form. Every ambiguity — unparseable date, missing
+  date, missing report — resolves to *run the review*.
+
+  **The halt message now names which precondition failed.** It carries the status, the report's
+  presence and age, and the review's own outcome, plus a pointer at the two enforcement settings.
+  The old message said only *"review-task left it Planned"*, and that is how a consumer with every
+  relevant file installed still reached a confident wrong diagnosis.
+
+  `/develop-story`'s tables are unchanged and asserted byte-identical — `/review-story` genuinely
+  promotes, so an unchanged `Draft` there really is a failed promotion. The asymmetry is deliberate.
+
+  Guarded by **68 tests, every fix mutation-proved**. There was **no prior test net**: the only test
+  touching this file asserted that the substrings `review` and `skip` appear somewhere in it, and
+  would have passed with both decision tables deleted. Three QA cycles plus a PR review found the
+  rule defeatable **seven** ways toward `fresh` — once because two of the first round's own fixes
+  cancelled each other out — so the count above is the size of the net that closed them, not a
+  measure of how clean the first cut was.
+
+- **⚠️ CI GATE ADDED — a new `ShellCheck` workflow fails any PR that introduces a warning-tier shell
+  finding.** Shell was the least-gated language in the repo: `npm run ci` runs `prettier --check` over
+  everything and `node --test` over the suite, and nine of those suites *are* shell scripts executed by
+  `bash`, but nothing statically analysed shell. A quoting bug could ship on any path the tests do not
+  take. This had already cost a QA cycle — task 83 carried a `shellcheck scripts/setup-consumer.sh`
+  success criterion through three QA cycles, a gate and a DoD, and no automated step could evaluate it.
+
+  **The gate is `--severity=warning` over the 56 tracked *source* scripts**, pinned to ShellCheck
+  **v0.11.0**. Measured on this tree: 0 errors, 26 warnings, 79 info, 81 style. All 26 warnings are
+  resolved in this change — **9 by a real fix** (three genuinely dead variables removed, three string
+  literals quoted, one `ls | grep` replaced by a glob loop, two assertion messages whose backticks were
+  being executed as command substitution) and **17 by a `# shellcheck disable` with a stated reason**.
+  A bare disable is a suppression; a disable with a reason is documentation, and the lane's own error
+  message says so.
+
+  **What this means for you:** a PR that adds a warning-tier finding — in any tracked `.sh` file, including
+  one you did not know was being watched — now goes red. Run it locally first; both the binary and the
+  container form are documented in [`CONTRIBUTING.md`](./CONTRIBUTING.md) under "Before you open a PR".
+  The lane lints **sources only** (56 files, not 247): the 191 bundled copies under `skills/*/references/`
+  would otherwise report every shared finding four or five times — a ~9x inflation.
+
+- **⚠️ BEHAVIOUR CHANGE — `resolve-platform.sh` now reads `.env` when resolving `TRACKER`, and
+  `setup-consumer.sh` no longer re-implements that resolution.** Install time and run time answered
+  "which platform is this repo?" with two different implementations, and they disagreed on three
+  config shapes.
+
+  **Who is affected, and the one-line opt-out.** A repo with **no `tracker:` key** in
+  `skills-config.yaml` **and** a `JIRA_URL=` line in a repo-root `.env` now resolves `jira` at run
+  time where it previously resolved `github`. If that `JIRA_URL` is stale — left behind by a setup
+  that no longer applies — set an explicit **`tracker: github`** in `skills-config.yaml`. An explicit
+  key wins outright, above both the environment and `.env`. Since task 83 the wizard always writes a
+  `tracker:` key, so **no wizard-generated config can reach this rung at all**; the exposed window is
+  hand-authored and pre-task-83 configs.
+
+  The three shapes that used to diverge, install vs run:
+
+  | `skills-config.yaml` | Before (install → run) | Now |
+  | --- | --- | --- |
+  | no key, `JIRA_URL` in `.env` | `jira` → `github` | **`jira` → `jira`** |
+  | `tracker: bitbucket` | `github` → refused | **refused → refused** |
+  | `tracker:<TAB>jira` | `jira` → `github` | **`github` → `github`** |
+
+  The first shape is the one that bites: the installer pruned the six GitHub-only skills from a repo
+  whose skills then resolved `github` and reached for exactly those skills — a silent install-time
+  decision surfacing days later, inside a pipeline step, as a skill that is not on disk.
+
+  **An unrecognised `tracker:` scalar now halts the install.** `docs/reference/configuration.md` has
+  always documented that it halts the run, and the runtime resolver has always delivered that; the
+  installer fell through to a `github` default and filtered on the guess. Halting is the consistent
+  grade — a config the runtime refuses is one whose skills would not start anyway, so a
+  working-looking install of the wrong half of the skills was strictly worse than a named error.
+
+  **`--dry-run` may now report the tracker as unresolved.** The dry-run branch returns before the
+  release archive is downloaded, and the documented invocation is `bash <(curl …)`, so no copy of
+  `resolve-platform.sh` is reachable there. It says so rather than guessing — a dry run that guesses
+  differently from the real run is the same bug class this change closes. Run the wizard from a repo
+  checkout, or after any install, to preview the filter.
+
+  `_resolve_install_tracker` now delegates to `resolve-platform.sh` in a subshell (the subshell
+  contains the resolver's `return 1`, which was the original reason for not sourcing it) and its local
+  `awk` parser is deleted. Parity is structural rather than maintained by hand.
+
+- **`setup-consumer.sh` now installs only the tracker skills a consumer's platform can actually
+  fire.** 17 of the shipped skills are tracker-specific and mutually exclusive — 11 Jira-only, 6
+  GitHub-only — and every consumer received all 17 regardless of platform. A GitHub repo got
+  `sync-jira-story`, `jira-sprint-manager` and nine others that can never run.
+
+  The cost worth fixing is **mis-selection**, not disk. Auto-activation matches on the `description`
+  field, and the two siblings differ there only in the platform noun, so an agent asked to "sync this
+  story to the tracker" can pick the one that cannot work — and the failure is not a clean error at
+  the top, because `resolve-platform.sh` is sourced *inside* the skill and the run gets some distance
+  in first. The context saving is real but secondary: ~1,493 tokens of ~11,602 for a GitHub consumer,
+  about 13%. Install profiles are where the larger saving lives.
+
+  **No existing install loses a skill.** An excluded skill already on disk is *kept*, not pruned, and
+  reported as such — the grandfather branch is evaluated before any delete, and is held by a test
+  that fails if the branch or its `continue` is removed. `--update` over an existing install is
+  therefore byte-for-byte unchanged in what it leaves behind. To prune, delete `.agents/skills/` and
+  re-run the wizard; to disable the filter entirely, pass the new `--all-skills` flag.
+
+  Which tracker is resolved mirrors `resolve-platform.sh` — config, then the wizard answer, then
+  `JIRA_URL`, otherwise `github` — in **order and in value parsing both**, so a quoted scalar
+  (`tracker: "jira"`) or a CRLF line ending resolves the same at install time as at run time. That
+  second half is not a detail: while the parse was `awk '{print $2}'` against an `[a-z]` pattern, a
+  quoted or CRLF `tracker: jira` fell through to the `github` default and a Jira repo installed with
+  none of its eleven Jira skills — silently, the failure surfacing days later inside a pipeline step.
+  A parity test now asserts the two resolvers agree across ten spellings rather than asserting a
+  hardcoded answer on each side. One asymmetry is deliberate and pinned by its own test: the
+  installer additionally reads `.env` for `JIRA_URL`, because it runs once in a plain shell whereas
+  the skills run later in a shell that has the variable. That default is load-bearing rather than cosmetic: `write_skills_config` wrote a `tracker:`
+  key only for Jira consumers, so a GitHub consumer running `--update` (the path that never runs the
+  wizard) matched no probe at all, and an earlier design that resolved such a repo to "unknown" would
+  have left the filter inert for precisely the consumers it was built for. The wizard now writes
+  `tracker: github` explicitly as well, so a generated config states its own platform.
+
+### Added
+
+- **The PR conformance review now runs inside the develop pipelines, as Step 5c.** `/review-pr`
+  shipped deliberately standalone: its **code** lens duplicates the reviewer `/qa-story` and
+  `/qa-task` already dispatch every cycle, so wiring it in looked like paying twice. That reasoning
+  was sound about the code lens and silent about the **conformance** lens — does the diff *cover*
+  what the work item promised, did it drift outside that *scope*, is the artifact *trail* complete
+  and honest, is the work item *consistent* with what shipped — which had no counterpart anywhere
+  in the pipeline. A run could reach `accepted` on a complete-looking trail that did not hold.
+
+  That is not hypothetical. `/review-pr` itself shipped `accepted` through two QA cycles, a DoD gate
+  and 40 contract tests while carrying a glob that collected six files under bash and **zero** under
+  zsh, the default macOS shell. What caught it was pointing the instrument at its own PR.
+
+  It runs as the **exit gate of the existing Steps 5–6 QA loop**, not as a ninth pipeline step: a
+  gate reading `PASS` or `WAIVED` hands to 5c instead of going straight to `finalise`.
+  `REQUEST CHANGES` routes back into `/qa-fix` and consumes a cycle from the **same** 5-cycle
+  budget; `CONCERNS` records findings without blocking; `APPROVE` exits. Lite mode degrades it to
+  `--effort low` and never skips it. Each completed run leaves one `*.pr-review.{n}.{name}.md`
+  beside the work item — a filename `docs/standards/file-naming.md` has defined all along while
+  nothing emitted it.
+
+  **`/review-pr` gains no new power.** It still writes no gate file, never submits a formal review
+  and never edits code; the orchestrator is what acts on the verdict it reports. Being consulted by
+  a pipeline is not the same as gating one, and that distinction is what makes the wiring
+  legitimate.
+
+  **`ready-for-merge` moved behind the review.** It used to fire the moment the QA gate read PASS,
+  which advertised a card as merge-ready while the run could still loop back into `/qa-fix`. It now
+  fires only once nothing can send the run backwards.
+
+  `/develop-next` and `/develop-batch` needed no change — they delegate, so every PR they merge is
+  pre-reviewed by inheritance. `/develop-bug` is untouched: it runs its own verify loop. The
+  pipeline is still 8 steps, the lock still validates `1..8`, and no `{N}/8` string changed.
+
+- **`/double-check` — an adversarial audit of work the agent has just produced.** Generation and
+  verification are different jobs: a finishing turn carries forward its own plan, its own
+  assumptions, and a transcript that reads like proof, and none of that is evidence about the
+  artifact. The skill discards that carry-forward and rebuilds the picture from the two sources
+  that cannot lie about themselves — the user's original words, and the current state of disk.
+
+  Four sequential gates. **A** reconciles every claimed write against `git status`, checks
+  wholeness (truncation, overwrite loss, unbalanced fences), hashes what `git diff` cannot speak
+  to, and runs the narrowest executable check first. **B** audits negative constraints and
+  boundaries — the highest-yield class, since prohibitions get satisfied by accident or not at
+  all. **C** re-derives deterministic logic, preferring an executed oracle to a re-derivation
+  (which is only another sample from the same model), and sweeps for placeholders sitting inside
+  work reported as complete. **D** maps every requirement to named evidence and flags delivered
+  work nobody asked for.
+
+  It is a gate, not a second implementation pass, and it runs **at most once per cycle** —
+  residual defects are surfaced to the user rather than chased in a loop. Verifying its own patch
+  is inside that cycle, not a new one; without that, an `AUTO-CORRECTED` verdict would ship
+  unchecked changes, which is the exact failure the skill exists to catch. Gate A is bounded away
+  from mutating and destructive commands: a check left unrun and reported honestly beats a green
+  bought by breaking the environment.
+
+  Sibling to `/review-code` (which reviews a *diff* for bugs) and to `/qa-story` / `/qa-task`
+  (which need a tracked work item and write a gate file). `/double-check` audits a *deliverable*
+  against its *contract* — prose, a plan, a calculation, or a config as readily as code — and
+  needs neither.
+
+- **Inline pull-request comments, on GitHub and Bitbucket** (`shared/resources/pr-inline-comment.js`,
+  specified in `shared/resources/pr-inline-comment-contract.md`). `/review-code --comment` had
+  documented "post each finding as an inline review comment at its `file_line`" since it was written,
+  and no code implemented it — there was no `pulls/*/comments` or `pulls/*/reviews` call anywhere in
+  the repository. `/review-pr` scoped the behaviour out and named it as its own task.
+
+  The CLI is the peer of `tracker-comment.js` one axis over: that one comments on a tracker **issue**
+  and resolves `$TRACKER`; this one comments on a pull **request** and resolves `$VCS`. **That is the
+  `VCS` axis deliberately** — where a PR lives is a property of the remote, and a Bitbucket repo
+  tracking work in Jira must not take a `gh` path that cannot address it. Same exit codes, same
+  `--json` `reason` vocabulary, `--findings-file` only.
+
+  **A finding is never dropped — that is the one invariant.** Line anchoring fails routinely (a line
+  outside the diff hunk is a 422), so six paths degrade rather than drop: 422, duplicate marker,
+  unreadable comment list, stale anchor, update failure, non-anchor batch failure. Each reports
+  `anchor-failed`, never `posted`, because reporting a degraded finding as posted makes the failure
+  invisible — which from the reader's side is the same outcome as dropping it. Read the per-finding
+  `reason`s, not just the top-level one. Re-runs are marker + update-in-place; resolving and replying
+  to threads is out of scope, and the rule was chosen so it needs neither.
+
+  QA cycle 1 gated **FAIL (50/100)**: the module whose sole purpose is *"a finding is never dropped"*
+  dropped findings on two reachable paths, and the `jq` wiring it into both review skills could not
+  execute at all — while its own suite was 40/40 green. **Three of the four worst defects came from
+  the independent reviewer, not the self-check.** Cycle 2 ran as a refute pass over the whole diff and
+  found eight more, two of them in the original commit and invisible to cycle 1. The durable outcome
+  is a guard rather than two corrections: both skill test suites now **extract the documented `jq`
+  from `SKILL.md` and execute it** against a schema-shaped fixture, because a snippet that is only
+  read will drift again.
+
+  **Known limitation**: the Bitbucket arm has never run against Bitbucket. Payloads and re-run
+  behaviour are fixture-tested; the transport is not. Treat a first Bitbucket run as a smoke test.
+  (task 70)
+
+### Fixed
+
+- **`develop-bug`'s fix cycle could commit an unformatted tree where the other two pipelines could
+  not.** Task 75 put a fast gate (`develop.fastGateCommand`, default `npm run ci:fast`) at two
+  points: the develop loop, and each `qa-fix` cycle before its commit. `develop-bug` shares the
+  develop-loop document, so it picked that half up for free — but its per-cycle **verify** loop is a
+  different document and got nothing. The consequence was concrete rather than theoretical:
+  `npm test` does not run `format:check`, so a bug fix cycle could close green, push, and fail CI on
+  a file it had just rewritten. That is the task-67 failure, still live for bug fixes only, and it is
+  the run least able to afford a round trip through red CI.
+
+  The gate now sits at that document's own pre-commit seam — step **3a** of `5b. Fix`, after the
+  no-change check that HALTs and before the commit, mirroring where the qa-fix loop's step `0a`
+  sits. It is not a copy: the retry budget is stated as **2 attempts** with `MAX_ITER` described
+  honestly as bounding *cycles* rather than this inner retry, and the log filename uses this
+  document's own `{N}` cycle-counter convention instead of importing a shell variable it does not
+  have.
+
+  **Why it was missed is the durable part.** The other two loop documents live in
+  `shared/resources/`; this one is skill-native, authored directly in
+  `skills/develop-bug/references/` with no shared counterpart — so a file list drawn from
+  `shared/resources/` could not see it. `evals/shared/tests/ci-gate-parity.test.mjs` now iterates
+  all three documents at their real sources and fails if any one loses the gate, which is what stops
+  the next loop document from drifting out the same way.
+
+- **`advance-pipeline-lock.sh` reported a successful advance for a transition that never happened.**
+  The lock file is the develop pipelines' state machine — every `develop-*` orchestrator advances it
+  as the last action of each step, and both the `PreCompact` and `Stop` hooks read `current_step` from
+  it to decide where to resume. Given a **zero-byte** lock, the script printed
+  `advance-pipeline-lock: step 0 → 5`, exited `0`, and left the file empty.
+
+  The cause is a property of `jq` that is silent in both directions: on empty input it emits nothing
+  and exits **0**. So the defensive read fell back to `0`, and — the actual hole — the
+  `if ! jq … > "$LOCK.tmp"` write guard did not fire either, so `mv` installed an empty file and the
+  caller was told the pipeline had moved. A whitespace-only lock was worse: the same path *truncated*
+  a file that had content, and still reported success.
+
+  **The same fabrication happened for any input `jq` could parse but that held no object** — a bare
+  `null`, `[]`, `"str"` or `42`, where `.current_step = $n` invents `{"current_step":5}` out of
+  nothing and reports it as an advance.
+
+  The task was filed claiming that eighteen other malformed `current_step` values — `null`, absent,
+  `"abc"`, `-3`, `3.7`, `1e400`, malformed JSON, non-JSON — "all correctly preserve the lock and exit
+  non-zero", making the empty file a lone hole in a sound validator. **That claim was inherited
+  unverified and is false**: executed against the old script, six of those eight advance and exit 0.
+  What actually held is simpler — it failed closed on input `jq` could not *parse*, and advanced on
+  everything else. The empty file and the bare `null` both sat in the second group.
+
+  A lock that is **not a JSON object** — empty, whitespace-only, malformed, or parseable-but-not-an-
+  object — now fails closed at every site that reads or writes the lock JSON: non-zero exit, file
+  untouched, nothing on stdout. One predicate decides (`jq -e 'type == "object"'`); an earlier
+  revision tested emptiness separately and mutation proof retired that branch, because with the type
+  check present, deleting it left every test green. It survives only to choose the error message.
+
+  **`--complete` is deliberately exempt** — it removes the lock without parsing it, and gating it
+  would make a corrupt lock permanently unclearable, which is a worse failure than the one being
+  fixed. That exemption is pinned by its own test so a later widening of the guard breaks rather than
+  ships.
+
+  Also fixed in the same script: the temp write went to `$LOCK.tmp`, a predictable path whose
+  redirect **followed a pre-existing symlink**, writing the JSON through to the target before `mv`.
+  It now writes through `mktemp` in the lock's own directory — `O_EXCL` on an unpredictable name, so
+  a planted symlink is never opened. (`set -o noclobber` was the weaker alternative: it refuses to
+  overwrite an existing file, but a symlink pointing at a *non-existent* target is still created
+  through it.) One deliberate side effect: the lock's mode becomes `0600` rather than umask-derived
+  `0644`. `.claude/state/` is per-user state, so this is a tightening with no reader affected.
+
+  The two original defects were found by the DoD security probe on task 77 (3029 executed probes) and
+  verified byte-identical on `develop` before any change was made; the `null` case and the false
+  "single hole" claim were both found by QA on this task's own PR. The new test scenarios run under
+  **bash and zsh** (30 total), and each fix was mutation-proved individually — removing the guard
+  predicate turns the empty, whitespace and `null` scenarios red on both interpreters; reverting
+  `mktemp` turns only the symlink scenario red. Scenario 12's `[]`, `"str"` and `42` shapes are
+  asserted but **not** mutation-proved against that predicate: they already failed closed through the
+  write path, so they document intent rather than bind it.
+
+- **The registry fallback frontier ignored the `Depends on` column, so it could nominate work whose
+  prerequisite was unbuilt.** `compareCandidates` orders tasks by priority then ascending number and
+  consults nothing about dependencies, and `DEFAULT_COLUMNS.task` had no `deps` index at all — even
+  though the comment directly above it documented the header as `| # | Title | Status | Category |
+  Priority | Created | Issue | Deps |`. The `⛔ blocked until X accepted` machinery that handles this
+  correctly is **roadmap-only**; nothing equivalent guarded the registry path.
+
+  **The ascending-number tie-break is what hid it.** A dependency usually carries the lower number, so
+  it usually won on the tie-break and the ordering looked right by accident. Raise a dependent row's
+  priority above its prerequisite's — the exact case this repo's own tasks 83 and 84 would hit — and
+  the frontier nominated the dependent with its dependency still `planned`. Every fixture added here
+  therefore inverts the numbering or the priority, so a passing test cannot be explained by the
+  tie-break alone.
+
+  A dependency is satisfied when **the document it points at** reads `accepted` — the same
+  "frontmatter decides, the row only nominates" rule the frontier already applied to the candidate
+  itself. References resolve across both registries, so a task may depend on a bug and vice versa,
+  and the cell accepts the spellings a hand-maintained table carries (`task.83`, `T83`, `bug.4`,
+  `B4`, `#83`, bare `83`). The check runs after the eligibility floor and before the ranked-lower
+  branch, so a blocked row reports the dependency rather than claiming it was merely outranked.
+
+  **Three cases are satisfied-with-a-warning rather than blockers**: a `cancelled` dependency, a
+  reference naming no row in either registry, and one whose document is unreadable. The direction
+  follows the ground task 71 settled the eligibility floor on — selecting early costs one visible
+  cycle, since `develop-*` Step 2 reviews before any code is written and HALTs on findings, while an
+  unresolvable blocker costs indefinite silence. A wasted cycle beats an invisible row, and all three
+  still warn, so the condition is never mute.
+
+  **The check is one level deep by design.** A transitive walk would need cycle detection over a
+  hand-maintained table nothing validates; the shallow check needs none, and the deeper ordering
+  falls out anyway, because a dependency cannot itself be selected until *its* dependencies are
+  accepted. `/develop-batch` is unaffected — `selectBatch` works off the roadmap, where `⛔` already
+  covered this.
+
 ## [v0.45.0] - 2026-09-02
 
 ### Added

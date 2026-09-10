@@ -1,0 +1,74 @@
+schema: 1
+task: "task.99.qa-loop-diminishing-returns-exit"
+task_title: "A diminishing-returns exit for the QA loop"
+gate: CONCERNS
+status_reason: "Cycle 2's three findings are all verified fixed, and the HIGH is closed at the root — the excluding formulation is gone rather than contradicted. One MEDIUM, and it is a direct consequence of cycle 2's own fix: widening 5c to admit route 2 falsified a sentence further down 5c which asserts that a gate reaching it carries an empty top_issues[]. No HIGH this cycle."
+reviewer: "QA Engineer"
+updated: "2026-09-09T15:00:00Z"
+
+top_issues:
+  - id: "TASK-99-007"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: >-
+      5c's REQUEST CHANGES arm says "The ordinary 5b invocation passes the latest gate file, and on
+      this path that gate reads PASS/WAIVED with an empty top_issues[]". Cycle 2 added a second route
+      into 5c whose gate is CONCERNS with a deliberately NON-empty top_issues[], so that sentence is
+      now false for route 2. The behavioural consequence is worse than the wrong sentence: on
+      route 2 + REQUEST CHANGES, qa-fix receives a gate whose top_issues are exactly the machinery
+      residue the Diminishing-returns exit declined to fix, and qa-fix's priority order will work
+      them — the loop resumes refining the pins, through the back door, which is the one outcome this
+      task exists to prevent.
+    suggested_action: >-
+      Qualify the sentence for both routes, and state that on route 2 the gate's machinery findings
+      are NOT the fix target — only the review's findings are. The `pr_review=` argument already
+      carries those, so no mechanism changes; what is missing is the instruction not to treat the
+      carried-over residue as work.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2937
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged. Cycle 2 touched prose only."
+  performance:
+    status: PASS
+    notes: "Unchanged."
+  reliability:
+    status: PASS
+    notes: "TASK-99-004 is closed at the root: the excluding formulation is removed rather than contradicted elsewhere, so there is no second rule left to be read first. Verified by grep, not by reading the replacement."
+  maintainability:
+    status: PASS
+    notes: "5c's note explaining why route 2 is named rather than implied is the kind of comment that survives an editor tightening the prose — it says what breaks if the distinction is collapsed."
+
+recommendations:
+  immediate:
+    - action: "Fix TASK-99-007 — qualify the empty-top_issues claim for both routes and state that route 2's carried residue is not the fix target"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+  future:
+    - action: "The cycle-2 PR comment claimed gate 1's preamble LOW was 'incidentally resolved'. It is improved — the preamble now mirrors 5c's two routes — but 'two ways the loop reaches Step 7' still sits beside 'only 5c opens Step 7'. Recording the overclaim rather than letting it stand; the LOW itself remains correctly unfixed."
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "CARRIED (gate 1, gate 2): `indentOf` reads a tab-indented line as column 0. Latent."
+      refs: ["shared/resources/qa-diminishing-returns.js"]
+    - action: "CARRIED (gate 1, gate 2): `readNfrStatuses` would read a `notes:` block-scalar line beginning `status:` as an NFR status. Latent."
+      refs: ["shared/resources/qa-diminishing-returns.js"]
+    - action: "CARRIED (gate 2): `mutation-proving.md` names four vacuity shapes; this task surfaced a fifth — a fixture corpus with no instance of the input class. Worth its own task."
+      refs: ["shared/resources/mutation-proving.md"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "Resolve TASK-99-007 before merge — it reopens the behaviour the task exists to close"

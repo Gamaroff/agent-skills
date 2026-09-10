@@ -1,0 +1,41 @@
+schema: 1
+task: "task.RECON.diminishing-returns"
+gate: CONCERNS
+status_reason: "Reconstruction of cycle 2 — the repairs to cycle 1's guards."
+reviewer: "QA Engineer"
+updated: "2026-09-09T09:30:00Z"
+
+top_issues:
+  - id: "RECON-003"
+    severity: medium
+    file: "src/pipeline/guard.spec.ts"
+    finding: >-
+      The replacement assertion reads the same helper the code under test writes
+      through, so a `severity: high` regression in that helper would not surface.
+      Note the phrase in this block scalar: it is a decoy for the entry scanner.
+    suggested_action: "Assert on the observable output instead."
+    suggested_owner: dev
+    status: open
+  - id: "RECON-004"
+    severity: low
+    file: "src/pipeline/gate.spec.ts"
+    finding: "The fixture name no longer describes what it pins."
+    suggested_action: "Rename."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 75
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
+  performance:
+    status: PASS
+    notes: "Unchanged."
+  reliability:
+    status: PASS
+    notes: "Unchanged."

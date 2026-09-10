@@ -1,0 +1,191 @@
+schema: 1
+task: 'task.86.bundle-transitive-refresh'
+task_title: '`bundle_skill.py` prints `in sync` for bundled references it never examines'
+gate: FAIL
+status_reason: >-
+  Cycle 4 found the most serious problems of the run, and two of them were errors introduced by
+  cycle 3's own fixes. The `UNREWRITTEN` class added for F-001 is NON-CONVERGENT — pass 3 runs after
+  the early return, so a reference to a missing source left CI permanently red behind a remedy that
+  provably does nothing, which is precisely the failure TASK86-013 exists to prevent. Pass 3 itself is
+  the one ungated write in the file and demonstrably corrupts URLs and fenced blocks, and
+  `UNREWRITTEN` newly compels that rewrite. Separately, TWO cycle-3 fixes never landed at all and a
+  third corrupted line 1 of the test file, destroying its `"use strict"` — while the commit message
+  claimed all three were applied. All fixed; seven behaviours mutation-proven, including the path traversal the reviewer raised only as a residual.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T12:00:00Z'
+
+top_issues:
+  - id: 'C4-001'
+    severity: high
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `UNREWRITTEN` is non-convergent. `check_skill` reported it unconditionally, but pass 3 sits
+      after `bundle_skill`'s early return: a skill whose only `shared/resources/X` mention names a
+      file that does not exist gets `needed={}` and `reconcilable={}`, takes the early return, and
+      rewrites nothing. Reproduced — bundle, check(exit 1), bundle again, check STILL exit 1, source
+      byte-identical. CI permanently red under "Run `npm run bundle`", a remedy that does nothing.
+      This is the exact failure TASK86-013 was written to prevent, reintroduced by the fix for F-001.
+      Live trap: deleting any shared resource wedges the lane.
+    suggested_action: 'Raise UNREWRITTEN only when the bundler would actually run pass 3.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'C4-002'
+    severity: high
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Pass 3 is the only write in the file behind no gate — a blind regex over every `.md`/`.js`/
+      `.mjs`/`.sh` in a skill, with no code-fence or URL awareness. Demonstrated: a
+      `https://…/blob/main/shared/resources/real.md` link becomes a 404, and a fenced
+      `cp mylib.sh shared/resources/real.md` instruction becomes wrong. Worse, applied to this repo's
+      real sentence in `review-code/SKILL.md` with the filename spelled out, the rewrite INVERTS its
+      meaning ("the source prompt `references/…`, **not** the bundled `references/` copy"). The tree
+      survives today only because every surviving mention stops at a backtick, space or `*`. It was
+      harmless while nothing compelled the rewrite; `UNREWRITTEN` compels it.
+    suggested_action: >-
+      Give pass 3 its own rewrite that skips fenced blocks and URLs, while `rewrite_text` (used for
+      bundled-copy CONTENT) keeps rewriting them — a bundled snippet must be rewritten to run.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'C4-003'
+    severity: medium
+    file: 'tests/bundle-transitive.test.js'
+    finding: >-
+      Line 1 of the test file was `check: (() => run(["--check", skillDir]), "use strict");` — a
+      stray fragment introduced by commit 0a028197 that DESTROYED the file's `"use strict"` directive
+      (a string literal after a label is not a directive prologue). Cause: the cycle-3 edit computed
+      a slice whose start index came AFTER its end, producing an empty string, and
+      `str.replace("", X, 1)` prepends at position 0. This repo's own roadmap records the identical
+      `str.replace("", …)` failure on T90.
+    suggested_action: 'Restore the directive; assert slice bounds before replacing.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'C4-004'
+    severity: medium
+    file: 'tests/bundle-transitive.test.js'
+    finding: >-
+      Cycle 3's F-011 and F-012 NEVER LANDED, while the commit message claimed both were fixed.
+      `check()` still lacked the signal-kill guard its twin `run()` carries (a missing `python3` would
+      surface as a staleness assertion failure), and `TASK86-011` had no `fx.check()` call at all.
+    suggested_action: 'Apply both; verify by grep rather than by assuming the edit succeeded.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'C4-005'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Three behaviours pinned by nothing, each mutation-verified as unpinned by the reviewer: the
+      expected-set MISDECLARED branch (TASK86-012's fixture has no same-named source, so it exercises
+      the ORPHAN-scan branch instead), the `UsageError` raise/catch, and `UNREWRITTEN`'s membership of
+      the regenerable bucket. Each could have been reverted in silence.
+    suggested_action: 'Add one test per behaviour; mutation-prove each.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'C4-007'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Path traversal, reproduced: `name` is an unsanitised regex capture permitting `.` and `/`, so a
+      SKILL.md containing `shared/resources/../../OUTSIDE.md` made the bundler print
+      `bundled references/../../OUTSIDE.md` and CREATE `<root>/skills/OUTSIDE.md` — outside
+      references/, outside the skill. Overwriting an existing file was already blocked by the write
+      gate; creating one was not. Raised by the reviewer as a residual; fixed rather than handed over,
+      since it is the only one that is a hazard rather than a latent nit.
+    suggested_action: 'Refuse any discovered name whose resolved path leaves refs_dir or shared_dir.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'C4-006'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      `discover_needed`'s `f.read_text()` was the one unguarded read in the file. A non-UTF-8
+      `.md`/`.js`/`.mjs`/`.sh` anywhere in a skill aborted the whole 125-skill `--all` run with a raw
+      `UnicodeDecodeError` traceback and exit 1 — indistinguishable from drift. Every sibling read is
+      guarded.
+    suggested_action: 'Guard it like its siblings.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+waiver:
+  active: false
+
+quality_score: 62
+
+evidence:
+  tests_reviewed: 52
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No auth, network, secrets or user data. The one hazard found this cycle — a crafted
+      `shared/resources/../../X.md` reference CREATING a file outside references/ — was reproduced and
+      FIXED (C4-007), not deferred: any discovered name whose resolved path leaves refs_dir or
+      shared_dir is now refused. Overwriting an existing file was already blocked by the write gate.
+  performance:
+    status: PASS
+    notes: '`--check --all` ~2s over 125 skills; bundle idempotent (0 ops).'
+  reliability:
+    status: CONCERNS
+    notes: >-
+      Two of the three fixes this cycle repaired defects introduced by the previous cycle. That is the
+      salient reliability fact about this work, and it is why the gate is FAIL rather than CONCERNS.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      Now ~780 lines from an original 258, carrying seven problem classes, two rewrite variants and
+      two kinds of evidence. Every cycle has found real defects, and cycle 4 found defects in cycle
+      3's fixes. The file has outgrown incremental patching.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        RESIDUAL (not fixed): fixed-depth rewrite prefix. `../references/X` for .sh/.js/.mjs and bare
+        `references/X` for .md assume the referencing file is exactly one level deep. A
+        `scripts/sub/deep.sh` gets a path that does not resolve. Latent — nothing in this repo is that
+        deep today, but `skills/*/examples|resources|assets/` already exist at that depth.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        RESIDUAL (not fixed): `expected_bytes` catches only UnicodeDecodeError while its siblings also
+        catch OSError; a 0000-mode source gives an uncaught PermissionError mid-pass-2.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        RESIDUAL (not fixed): a directory at `references/<needed-name>` is reported MISSING and bucketed
+        regenerable, but the write gate correctly refuses it, so the bundler says "left alone" forever.
+        The bucket is chosen by message class rather than by whether the bundler would act.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions:
+    - 'The three remaining residuals above are triaged by a human. All three are latent; the one real hazard (path traversal) was fixed rather than deferred.'
+    - 'A decision is taken on whether this module should keep absorbing incremental fixes.'
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: '2026-09-08'
+  total_iterations: 4
+  verification_method: >-
+    52 tests (was 19 at cycle 1). Seven mutation proofs, each reddening exactly its own test. Two of the
+    six mutations initially proved nothing and were redone: one had the wrong anchor, and one exposed
+    C4-006's own test as VACUOUS — its fixture produced a MISSING problem that kept the regenerable
+    bucket non-empty regardless, so the test was rewritten to bundle first and isolate UNREWRITTEN.

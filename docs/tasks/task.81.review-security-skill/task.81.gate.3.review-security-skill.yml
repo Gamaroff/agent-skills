@@ -1,0 +1,59 @@
+schema: 1
+task: 'task.81.review-security-skill'
+task_title: 'Ship /review-security: prove a control engages, not that it is present'
+gate: PASS
+status_reason: 'All four findings across three cycles are fixed and each was verified independently rather than from the fix record. No new findings this cycle. Two advisory cleanups remain and are deliberately not blocking — they are named in recommendations.future so a reader does not take PASS to mean nothing is left to consider.'
+reviewer: 'QA Engineer'
+updated: '2026-09-07T19:30:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 28
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-07'
+  total_iterations: 2
+  verification_method: 'Direct call for the loopback guard (15 cases); word count for the description; both cycle-1 fixes re-verified by mutation and by re-derived fence boundaries'
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Restored from CONCERNS — the loopback guard now fails closed on any digits-and-dots host that is not a clean four-octet quad, so 127.1, 0177.0.0.1 and 2130706433 are all refused. The comment states the residual limit explicitly: DNS is not resolved, so a hostname pointing at loopback still passes. No credentials, no network, no new dependencies; sandbox containment unchanged.'
+  performance:
+    status: PASS
+    notes: '28 tests; full gate 2729. No material runtime change across three cycles.'
+  reliability:
+    status: PASS
+    notes: 'Every fix in this task is mutation-proven, and each mutation reds only its own assertion: the present-but-inert branch (2 red), grep decoys (1), zero-case vacuity (1), the test glob (gate log delta), the spec import (3, two ways), and the loopback guard (1, two ways).'
+  maintainability:
+    status: PASS
+    notes: 'One source of truth for the probe entry paths; the prompt contract renders correctly; description within the ~100-word standard. Two deliberate deviations recorded with reasons rather than left implicit.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'encodeURIComponent is applied to compile-time constants ("app", "appdb") — harmless, but it reads as protection that is not doing anything, in a fixture whose subject is exactly that distinction'
+      refs: ['skills/review-security/tests/fixtures/db-url/engaged.mjs']
+    - action: 'The loopback regression test hardcodes the fixture path a second time, alongside the probe spec entry. It fails loudly on a move (import error) rather than silently, so it is not a recurrence of TASK81-002 — but deriving the path from the imported spec would leave exactly one'
+      refs: ['skills/review-security/tests/review-security.test.js']
+    - action: 'The suite reads shared/resources/security-review-prompt.md rather than the bundled references/ copy, unlike the review-pr sibling. Deliberate: asserting against the bundled copy could mask source-vs-bundle drift'
+      refs: ['skills/review-security/tests/review-security.test.js']
+    - action: 'evidence: measured requires probes_executed > 0 is enforced against the prompt documented example, not an emitted report, because v1 ships no emitter. Wiring is task.82'
+      refs: ['shared/resources/security-review-prompt.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

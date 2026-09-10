@@ -5,11 +5,13 @@ type: task
 description: "nfr_validation.security carries a status and free-text notes, so a verdict reached by executing twelve candidates is indistinguishable from one reached by reading. Add evidence: measured | reasoned | unverified beside the existing status — additively, because task.74's trigger parses that field mechanically and fails closed and silently on a shape it does not expect."
 tags: [security, qa, gate, schema, evidence]
 category: infrastructure
-status: ready-for-development
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-09
+completed_date: 2026-09-09
+pr_number: 362
 assignee:
 estimated_effort_hours: 4
 depends_on: task.81
@@ -17,7 +19,8 @@ depends_on: task.81
 
 # Technical Task: Feed the measured security verdict into the QA gate
 
-**Status:** Ready for Development
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.82.review.1.security-gate-evidence-field.md` implemented 2026-09-09
 
 ---
 
@@ -25,7 +28,7 @@ depends_on: task.81
 
 There is a loop in this repo worth naming plainly.
 
-`qa-task/SKILL.md:567` produces `nfr_validation.security` from one line of instruction: *"Review for
+`qa-task/SKILL.md:580` produces `nfr_validation.security` from one line of instruction: *"Review for
 security issues; check dependencies; validate auth/authorization preserved."* A judgement, from reading.
 
 `task.74`'s `SAFETY_REPROBE` then parses that field **mechanically** — an `awk` scan for
@@ -75,8 +78,19 @@ nfr_validation:
     notes: 'free text'
 ```
 
-Written by `qa-story` / `qa-task` (`qa-task/SKILL.md:661-664`). Read mechanically in exactly one place —
-`shared/resources/qa-re-review-scope.md:52-59`, mirrored verbatim into both QA skills:
+> **The gate already spends the name `evidence:` one level up, and this task must not pretend
+> otherwise.** `qa-task/SKILL.md:675` and `qa-story/SKILL.md:1406` define a **top-level**
+> `evidence:` block — `tests_reviewed`, `phases_verified` / `risks_identified`, `trace`. The field
+> this task adds lives at `nfr_validation.security.evidence`, a different path, so the two are legal
+> YAML side by side and no rename is needed or wanted.
+>
+> They are not, however, distinguishable by **grep**, which is how this repo's drift audits and
+> Phase 1's fixtures actually find things. So Phase 2's schema documentation must name the path it
+> means (`nfr_validation.security.evidence`), never the bare key, and any test that greps for
+> `evidence:` in a gate must anchor on the nesting or it will match both.
+
+Written by `qa-story` / `qa-task` (`qa-task/SKILL.md:682-685`). Read mechanically in exactly one place —
+`shared/resources/qa-re-review-scope.md:54-60`, mirrored verbatim into both QA skills:
 
 ```bash
 SAFETY_REPROBE=false
@@ -213,6 +227,13 @@ Do this **before** changing any schema.
 
 **Changes**:
 - [ ] The skill's machine block matches the gate's key names exactly, so a QA cycle can lift it verbatim
+- [ ] **State the value-domain nesting.** `task.81` shipped `evidence: measured | reasoned` — two
+      values (`shared/resources/security-review-prompt.md:135`). This gate specifies three. The
+      domains are **nested, not equal**: the skill's two are a strict subset, and `unverified` is
+      **gate-only**, meaning *no security review supplied a verdict* — which is exactly the
+      pre-existing-gate case Phase 3 fails **open** on. Neither side renames anything, and
+      `unverified` must **not** be added to the skill: a review that ran always reaches `measured`
+      or `reasoned`, and has no third answer to give
 - [ ] Document in both QA skills where the block comes from and that consuming it is optional — the skill
       advises, it does not own
 - [ ] `npm run bundle`; `CHANGELOG.md`
@@ -272,23 +293,51 @@ Procedure: [`shared/resources/mutation-proving.md`](../../../shared/resources/mu
 
 ### Functional
 
-- [ ] `nfr_validation.security` carries `evidence:`, and `probes_executed:` when measured
-- [ ] `SAFETY_REPROBE` fires on `status: FAIL` **or** on unverified evidence
-- [ ] A gate with no `evidence:` key reads as `unverified` and triggers
-- [ ] `review-security`'s block is liftable into the gate without renaming
+- [x] `nfr_validation.security` carries `evidence:`, and `probes_executed:` when measured
+- [x] `SAFETY_REPROBE` fires on `status: FAIL` **or** on unverified evidence
+- [x] A gate with no `evidence:` key reads as `unverified` and triggers
+- [x] `review-security`'s block is liftable into the gate without renaming — key names align and the
+      value-domain nesting is stated on both sides
 
 ### Regression
 
-- [ ] Every existing parity assertion in `qa-re-review-scope-parity.test.mjs` still passes
-- [ ] The `awk` probe returns identical verdicts on the two real `task.74` gate fixtures
-- [ ] Gate decision rules and quality-score formula unchanged
-- [ ] `npm run ci` green
+- [x] Every existing parity assertion in `qa-re-review-scope-parity.test.mjs` still passes **except
+      the three the fail-open inversion deliberately changes** — see the correction below
+- [x] The `awk` probe returns identical verdicts on the two real `task.74` gate fixtures **for the
+      `status` half**; both now additionally fire on absent evidence, which is the intended change
+- [x] Gate decision rules and quality-score formula unchanged
+- [x] `npm run ci` green
+
+> **Correction, made during implementation: two lines in this section contradicted the rest of the
+> task, and could not both be satisfied.**
+>
+> "Every existing parity assertion still passes" and "identical verdicts on the real gate fixtures"
+> cannot hold alongside "a gate with no `evidence:` key reads as `unverified` and triggers"
+> (Functional, below), because `task.67.gate.2`, `task.74.gate.1` and `task.74.gate.2` are all real
+> gates with `security: PASS` and **no** `evidence:` key. Under the fail-open rule they now fire;
+> the existing assertions said they must not.
+>
+> The functional line wins, and not on a coin toss: fail-open is stated four times in this document
+> — §5 Breaking Changes, Phase 3's second bullet, §8 Mutation Proving, and §9 Functional — and
+> Phase 3 names the alternative outright as "the `\s` bug in a new place". Three assertions were
+> therefore changed **deliberately and with the reason recorded at each site**, not deleted:
+>
+> | Assertion | Before | After | Why |
+> | --- | --- | --- | --- |
+> | `replay: task.67.gate.2` | does not fire | **fires on absence** | the inversion, on a real gate; a companion test re-pins the `status` half with evidence supplied |
+> | `replay: CONCERNS on maintainability` | does not fire | unchanged verdict, fixture gains `evidence: reasoned` | its subject is *the probe must not read another axis's status*; without the added key the evidence half fires and the assertion stops testing that |
+> | the Phase 1 ordering control | probe reads the hijacked slot | same, with `evidence: measured` supplied | the evidence half **masks** a status hijack; a control that cannot separate the two is not a control |
+>
+> The third row is a finding in its own right: **once gates routinely carry evidence, a hijacked
+> `status:` slot is silent again.** That is why the ordering constraint keeps its own test rather
+> than relying on the new trigger to catch it.
 
 ### Safety
 
-- [ ] `evidence:` never appears between `security:` and `status:` — pinned by a negative control
-- [ ] `measured` cannot be claimed with zero probes
-- [ ] The addition is additive: no consumer that ignores the key changes behaviour
+- [x] `evidence:` never appears between `security:` and `status:` — pinned by a negative control
+- [x] `measured` cannot be claimed with zero probes — enforced over the whole gate corpus, including
+      **uncommitted** gates (mutation-proving found the tracked-files-only defect)
+- [x] The addition is additive: no consumer that ignores the key changes behaviour
 
 ---
 
@@ -341,6 +390,107 @@ without touching the trigger.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS (cycle 2; cycle 1 was CONCERNS)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-09
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Latest Report**: [task.82.qa.2.security-gate-evidence-field.md](./task.82.qa.2.security-gate-evidence-field.md)
+- **Latest Gate**: [task.82.gate.2.security-gate-evidence-field.yml](./task.82.gate.2.security-gate-evidence-field.yml)
+- **Cycle 1**: [task.82.qa.1.security-gate-evidence-field.md](./task.82.qa.1.security-gate-evidence-field.md) · [gate.1](./task.82.gate.1.security-gate-evidence-field.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 58 (was 34 before this task)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 open (1 HIGH + 2 MEDIUM found and closed across 2 cycles)
+- **NFR Status**: Security: PASS (`evidence: measured`, 24 probes), Performance: PASS,
+  Reliability: PASS, Maintainability: PASS (was CONCERNS in cycle 1)
+
+### Key Findings
+
+QA found **two defects in the change set itself**, both of the silent-failure shape this task exists
+to prevent, and both now pinned by regression tests:
+
+1. **HIGH** — the rewritten awk probe referenced the whole-record variable 8 times. That snippet
+   ships as prose an agent copies and runs, and a harness loading a `SKILL.md` with arguments
+   substitutes the token with the invocation argument. Observed live during this QA cycle. The probe
+   it replaced used it zero times.
+2. **MEDIUM** — the comment written to fix (1) contained an apostrophe, which closes the
+   single-quoted awk program. 18 tests went red at once. Notably, the adjacent pre-existing comment
+   already warned against apostrophes: a prose warning did not prevent the defect in the same edit
+   that read it.
+
+Cycle 2's refute pass then found a **third**, and it is the one worth remembering: the probe could
+not tell a **broken reader** from a gate with **no security axis**, so a corrupted awk program
+silently disabled the carve-out — the cycle-1 defect's own failure mode, one layer down. Found by
+running the probe with an `awk` that exits 127, not by reading it. The first fix for it was itself
+wrong (its catch-all swallowed every clean reading, reddening 7 tests) and that is recorded rather
+than quietly corrected.
+
+Mutation-proving found a fourth problem, in the new corpus check itself: it used `git ls-files`, which
+lists only tracked files, and so could not see the uncommitted gates it exists to judge.
+
+**Cycle 2 gate: PASS, 100/100** — all findings closed, all four NFRs at PASS, 7/7 mutations red.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Gate**: `task.82.gate.2.security-gate-evidence-field.yml` — ✅ **PASS**, 100/100, after 2 cycles
+**Reports**: `task.82.qa.1.*.md` (CONCERNS 90) → `task.82.qa.2.*.md` (PASS 100)
+**PR conformance review**: `task.82.pr-review.1.*.md` — ⚠️ CONCERNS; 2 of 3 findings fixed before
+acceptance, 1 accepted knowingly
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 11/11 — Functional 4/4, Regression 4/4 (two carrying a documented
+deviation), Safety 3/3
+✅ **Tests:** 58 in the parity suite, up from 34. **7/7 mutations proven** — each names its exact
+edit and red count
+✅ **CI:** green on head `298e60a952bd`, **verified equal to local HEAD**. The rollup was PENDING when
+finalise began and was waited on, not assumed
+✅ **Documentation:** CHANGELOG, a new single-source `qa-gate-security-evidence.md`, both QA skills
+linking rather than restating (asserted structurally), producer side documented
+✅ **Security:** `evidence: measured`, **24 probes executed**, boundary held. Three defects reproduced
+and closed
+⚠️ **Compliance:** N/A — the change set is Markdown, YAML and one test file
+
+### What this run found, which is the point
+
+The task's thesis is that a verdict reached by executing differs from one reached by reading. This
+run is its own first evidence: **every defect found was found by running something, not by reading
+it.**
+
+| # | Found by | Defect |
+|---|---|---|
+| 1 | invoking `/qa-task` with an argument | the new awk program named the whole-record variable, and the harness substituted the invocation argument into it |
+| 2 | the existing suite | an apostrophe in the comment written to fix (1) closed the single-quoted program — 18 tests red at once |
+| 3 | mutation-proving | the new corpus check used `git ls-files`, so it could not see the **uncommitted** gates it exists to judge |
+| 4 | the cycle-2 refute pass | an empty reading was treated as `absent`, so a corrupted reader silently disabled the carve-out |
+| 5 | the existing suite | the first fix for (4) swallowed every clean reading — 7 tests red |
+
+### The residual, named rather than absorbed
+
+Clause 1 has been executed under **bash only**. The suite spawns no zsh, and this file's own history
+records a GNU-vs-BSD `awk` divergence in this exact snippet. A `measured` verdict that hid this would
+be the thing the task was written to prevent.
+
+**Detailed Verification Log:** `task.82.dod.1.security-gate-evidence-field.md`
+
+**Task marked as ACCEPTED on:** 2026-09-09
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
 -->
@@ -350,40 +500,71 @@ without touching the trigger.
 | Date       | Version | Description                                                                    | Author      |
 | ---------- | ------- | ------------------------------------------------------------------------------ | ----------- |
 | 2026-09-02 | 1.0     | Initial draft — filed from the rebirth-wallet security-review handover           | create-task |
+| 2026-09-09 | 1.1     | Review passed (8/10) — named the pre-existing top-level `evidence:` key collision in §3; stated the `measured\|reasoned` ⊂ `measured\|reasoned\|unverified` domain nesting in Phase 4; refreshed drifted line citations | review-task |
+| 2026-09-09 |         | QA gate CONCERNS (90/100) — 2 findings, both closed in-cycle; 5 mutations proved | qa-task |
+| 2026-09-09 |         | QA findings fixed — maintainability CONCERNS minimised, 1 iteration | qa-fix |
+| 2026-09-09 |         | QA gate PASS (100/100) — refute pass found 1 further defect, closed; 7 mutations proved | qa-task |
+| 2026-09-09 | 1.2     | DoD verified — accepted (PR #362); CI green on the final head | finalise |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: Prove the trigger survives
-- [ ] Fixtures with the new shape; probe unchanged
-- [ ] Negative control: wrong placement breaks it
-- [ ] Suite run before and after, both recorded
+- [x] Fixtures with the new shape; probe unchanged (5 tests, added and run against the **unmodified** probe)
+- [x] Negative control: wrong placement breaks it
+- [x] Suite run before and after, both recorded — 34 pass/0 fail before, 39 pass/0 fail after Phase 1
 
 ### Phase 2: Add the field
-- [ ] Schema in both QA skills, after `status:`
-- [ ] Values defined once and referenced
-- [ ] `measured` requires a non-zero count
+- [x] Schema in both QA skills, after `status:`
+- [x] Values defined once in `shared/resources/qa-gate-security-evidence.md` and referenced from both
+- [x] `measured` requires a non-zero count — asserted over the documented schema **and** the on-disk corpus
 
 ### Phase 3: Teach the trigger
-- [ ] Clause 1 widened
-- [ ] Missing key → unverified → trigger (fail open, deliberately)
-- [ ] Mutation-proved
+- [x] Clause 1 widened; the probe now reads the security block once and reports `<status> <evidence>`
+- [x] Missing key → unverified → trigger (fail open, deliberately); a missing *block* stays a non-trigger
+- [x] Mutation-proved — all three mutations red, and mutation 2 exposed a real defect in the new check
 
 ### Phase 4: Wire the skill's block
-- [ ] Key names aligned
-- [ ] Advisory relationship documented
-- [ ] Bundle + CHANGELOG
+- [x] Key names aligned; the value-domain nesting stated on both sides
+- [x] Advisory relationship documented in both QA skills and in the producer prompt
+- [x] Bundle + CHANGELOG
 
 ---
 
+## Dev Agent Record — QA fix cycle 1
+
+**Ambiguities**: none requiring user input. The only open item was an NFR CONCERNS on
+maintainability with an empty `recommendations.immediate`, and priority rule 6 ("NFR CONCERNS →
+minimize or document") resolves it without a judgement call the user has to make.
+
+**Approach chosen**: *minimize*, not *document*. The thing that grew is the thing that is
+**triplicated** — the probe is copied verbatim into both QA skills — so the ~10-line constraint
+comment was replaced with a 3-line pointer, and the explanation moved once into a new "Transit
+constraints" section of `shared/resources/qa-re-review-scope.md`, outside the code block. Net: the
+duplicated artefact shrank, the single-source file carries the reasoning, and the parity test is
+unaffected (it strips comments before comparing).
+
+**Not chosen**: extracting the probe to a script both skills invoke. That would end the duplication
+outright and make both transit hazards structurally impossible, but it contradicts the task's stated
+Phase 3 design and the parity suite's verbatim-mirroring architecture. The gate's own recommendation
+sets the threshold at a **fourth** constraint; there are three. The threshold is now written into
+the rule file rather than left in a gate nobody re-reads.
+
+**Files modified**: `shared/resources/qa-re-review-scope.md`, `skills/qa-task/SKILL.md`,
+`skills/qa-story/SKILL.md`, plus bundled mirrors.
+
+**Validation**: 55/55 tests; `npm run ci` exit 0; all four guards re-proved by mutation after the
+shortening (whole-record variable → 2 red, apostrophe → 20 red, GNU escape → 1 red, fail-open → 3
+red).
+
 ## References
 
-- **The trigger this must not break**: `shared/resources/qa-re-review-scope.md:52-59` (task.74)
+- **The trigger this must not break**: `shared/resources/qa-re-review-scope.md:54-60` (task.74)
 - **Its parity suite**: `evals/shared/tests/qa-re-review-scope-parity.test.mjs`
 - **The fail-closed precedent**: the `\s`-vs-POSIX note in the same rule file
-- **Where the field is written**: `skills/qa-task/SKILL.md:567,661-664`; `skills/qa-story/SKILL.md:2112-2135`
-- **`probes_executed` precedent**: `shared/resources/finalise-dod-security-prompt.md:139-142` (task.73)
+- **Where the field is written**: `skills/qa-task/SKILL.md:580` (instruction), `:682-685` (schema); `skills/qa-story/SKILL.md:1413-1416` (schema), `:2219-2230` (NFR output block)
+- **`probes_executed` precedent**: `shared/resources/finalise-dod-security-prompt.md:155-157,198` (task.73)
 - **The producer**: `task.81`
 
 ---

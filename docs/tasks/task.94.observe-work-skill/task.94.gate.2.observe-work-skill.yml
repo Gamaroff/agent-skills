@@ -1,0 +1,109 @@
+schema: 1
+task: 'task.94.observe-work-skill'
+task_title: 'Add the observe-work meta-skill'
+gate: FAIL
+status_reason: >-
+  Cycle 1's three findings are all genuinely closed and were re-verified. The refute pass found two
+  NEW defects introduced by those fixes: a catch-all row that blocks capture in every fresh install
+  (HIGH), and an overcount left behind by the undercount fix (MEDIUM). Both are the shape this pass
+  exists to find — a fix is new code, not the closure of a finding.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T14:05:00Z'
+
+top_issues:
+  - id: 'TASK-94-004'
+    severity: high
+    file: 'skills/observe-work/SKILL.md'
+    finding: >-
+      The TASK-94-001 fix added a catch-all row — "`healthy: false` for any other failing check →
+      do not write until it is resolved". `healthy` is false whenever `activation-configured` fails,
+      which is the state of every project on first install. The rule therefore forbids capture in
+      exactly the projects the skill most needs to work in, and step 4 (which suggests adding the
+      activation instruction) runs AFTER step 1, so the protocol blocks before reaching its own remedy.
+    suggested_action: >-
+      Replace the catch-all with the four checks named explicitly. `workspace-exists` false → init;
+      `activation-configured` false → note and CONTINUE (step 4 owns it); `anchor-durable` / `no-fork`
+      are already carried by `reason`. State that `healthy: false` alone is not a reason to stop.
+    suggested_owner: dev
+    bug_ref: 'task.94.bug.4.healthy-false-blocks-fresh-install.md'
+    status: open
+
+  - id: 'TASK-94-005'
+    severity: medium
+    file: 'shared/resources/observe-work-session-start.sh'
+    finding: >-
+      The status probes match anywhere in the file, not just the frontmatter. A resolved observation
+      whose body contains a line reading `status: open` is counted as open — hook reported 1 open
+      where the engine reported 0. The cycle-1 fix closed the undercount and left this overcount;
+      both have the same root cause, namely that the hook re-implements the queue rule with grep.
+    suggested_action: >-
+      Scope both probes to the frontmatter block, or count through the engine when node is available
+      and keep the grep only as a fallback.
+    suggested_owner: dev
+    bug_ref: 'task.94.bug.5.hook-grep-not-frontmatter-scoped.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 2884
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 6]
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 2
+  fix_date: '2026-09-08'
+  total_iterations: 1
+  verification_method: >-
+    Each cycle-1 fix re-verified against the case that produced it, not against the suite alone.
+    TASK-94-001's regression assertion mutation-proved. TASK-94-002 checked against a five-file
+    fixture. TASK-94-003 re-bundled and rescanned, confirming the six dangling links were demoted
+    and the five that resolve were correctly left as links.
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from cycle 1. No credentials, no network, no untrusted input. shellcheck clean.'
+  performance:
+    status: PASS
+    notes: 'Body 260 lines against a 500 ceiling after the step-1 rewrite. Authored total unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: >-
+      Better than cycle 1 — the startup path now reads the right field — but TASK-94-004 makes it fail
+      in a new way on first run, and TASK-94-005 leaves the hook and the engine still disagreeing on a
+      reachable input. Two cycles, two counting bugs, one root cause: the hook duplicates the queue
+      rule. The third instance should replace the mechanism rather than correct it again.
+  maintainability:
+    status: PASS
+    notes: >-
+      The step-1 rewrite states why it reads `healthy` before `reason`, which is the part a future
+      editor would otherwise undo. 21 structural assertions, the newest of which is mutation-proved.
+
+recommendations:
+  immediate:
+    - action: 'Enumerate the four doctor checks; never let `healthy: false` alone block a write'
+      refs: ['skills/observe-work/SKILL.md']
+    - action: 'Scope the hook status probes to the frontmatter block'
+      refs: ['shared/resources/observe-work-session-start.sh']
+  future:
+    - action: >-
+        The hook duplicating the engine's queue rule has now produced two defects in two cycles. If a
+        third arises, replace the grep with an engine call rather than correcting it again.
+      refs: ['shared/resources/observe-work-session-start.sh']
+    - action: 'qa-execute-snippets cannot execute `command node`, so Step 4b is inert for compliant skills'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'docs-link-check is path-filtered to docs/**; skills/** ships unchecked markdown'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-94-004 fixed and verified against a project with no activation instruction'

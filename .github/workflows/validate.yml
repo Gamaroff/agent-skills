@@ -4,12 +4,31 @@ on:
   pull_request:
     paths:
       - 'skills/**'
+      - 'scripts/generate-skill-dependencies.mjs'
+      # `skill-dependencies.json` is the file the drift check regenerates and
+      # diffs — without it here, a hand-edit of the graph would not even trigger
+      # this workflow. `skill-profiles.json` is listed so a profile edit re-runs
+      # the catalog and bundle checks; the drift step does not read it (its seed
+      # validation lives in skill-dependencies-drift.test.mjs, run by test.yml).
+      # shared/resources/** rather than the three explicit files: the BUNDLE
+      # FRESHNESS check in this same job covers every shared resource that gets
+      # copied into skills' references/, and resolve-skill-set*.mjs are two of
+      # them. Listing only the drift check's own inputs left a resolver edit
+      # triggering no workflow at all.
+      - 'shared/resources/**'
       - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
   push:
     branches: [main, develop]
     paths:
       - 'skills/**'
+      - 'scripts/generate-skill-dependencies.mjs'
+      # shared/resources/** rather than the three explicit files: the BUNDLE
+      # FRESHNESS check in this same job covers every shared resource that gets
+      # copied into skills' references/, and resolve-skill-set*.mjs are two of
+      # them. Listing only the drift check's own inputs left a resolver edit
+      # triggering no workflow at all.
+      - 'shared/resources/**'
       - 'docs/reference/skill-catalog.md'
       - '.github/workflows/validate.yml'
 
@@ -29,6 +48,16 @@ jobs:
       # which is exactly what this job exists to catch.
       - name: Install PyYAML
         run: pip install pyyaml
+
+      # The catalog and bundle checks below are pure Python; the
+      # skill-dependencies generator is Node. `ubuntu-latest` does ship a Node,
+      # so this is not about availability — it pins the same major that
+      # release.yml's drift check runs on, so the two cannot disagree about the
+      # generated file and produce a PR that is green here and red at tag time.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Validate all skills
         run: |
@@ -50,6 +79,44 @@ jobs:
             git --no-pager diff docs/reference/skill-catalog.md | head -100
             exit 1
           fi
+
+      - name: Skill dependency graph up-to-date check
+        run: |
+          # The graph is generated from each SKILL.md's `invokes:` frontmatter.
+          # A stale graph means install profiles resolve the wrong closure — a
+          # consumer gets a pipeline missing a step, and finds out mid-run.
+          node scripts/generate-skill-dependencies.mjs
+          if ! git diff --quiet shared/resources/skill-dependencies.json; then
+            echo "::error::skill-dependencies.json is out of date."
+            echo "Run 'npm run generate-skill-deps' locally and commit the diff."
+            git --no-pager diff shared/resources/skill-dependencies.json | head -100
+            exit 1
+          fi
+
+      # Per-file freshness assertion. Runs BEFORE regenerate-and-diff because it
+      # is read-only: it reports on the tree as committed, whereas the step below
+      # has already rewritten it by the time it speaks.
+      #
+      # The two are complements, not alternatives, and neither subsumes the other:
+      #
+      #   --check sees what the bundler does NOT write — a copy whose source was
+      #   deleted (ORPHANED), a symlinked reference, an authored file sharing a
+      #   name with a shared resource (AMBIGUOUS), a banner declaring another path
+      #   (MISDECLARED). regenerate-and-diff is structurally blind to all four:
+      #   the bundler leaves them alone, so there is no diff to see. It found a
+      #   live instance on its first run — a bundled skill-dependencies.json 44
+      #   bytes behind its source, green in CI for as long as it had been wrong.
+      #
+      #   regenerate-and-diff sees pass 3 — the in-place rewrite of a skill's OWN
+      #   files — which --check deliberately does not assert. Asserting pass 3
+      #   would compel the rewrite, and that rewrite is an ungated blind regex.
+      #
+      # Exit 1 lists every problem with a per-class remedy; only STALE, MISSING
+      # and WRONG MODE name `npm run bundle`, because those are the only three it
+      # provably clears (verified check -> bundle -> check in
+      # tests/bundle-check-mode.test.js).
+      - name: Bundle freshness — per-file check
+        run: python3 skills/create-skill/scripts/bundle_skill.py --check
 
       # A shared/resources/ edit committed without re-bundling ships skills whose
       # references/ copies are stale — or, worse, that reference a file which is

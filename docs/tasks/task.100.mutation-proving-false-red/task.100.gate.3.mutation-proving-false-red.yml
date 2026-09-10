@@ -1,0 +1,53 @@
+schema: 1
+task: 'task.100.mutation-proving-false-red'
+task_title: 'the false-RED mirror in mutation-proving'
+gate: PASS
+status_reason: 'All three cycle-2 findings closed with no new findings replacing them. Five of five success criteria met, including the row-5 anti-vacuity check. Full suite and eval tier green; the change remains additive.'
+reviewer: 'QA Engineer'
+updated: '2026-09-10T04:05:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 3023
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, '2b', 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Three cycles have added no code, no command and no new fenced block. Verdict reached by reading the diff and the snippet engine output rather than by executing hostile candidates, so reasoned is the accurate value.'
+  performance:
+    status: PASS
+    notes: 'No runtime code.'
+  reliability:
+    status: PASS
+    notes: 'Purely additive; rollback (delete the section, re-bundle) unchanged and still feasible.'
+  maintainability:
+    status: PASS
+    notes: 'Both unverified quantitative claims are gone — the first replaced, the second removed rather than re-derived. What remains is a comparison a reader can check against the procedure two sections above without arithmetic.'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-10'
+  total_iterations: 2
+  verification_method: 'Grep-level confirmation that each finding is absent, plus independent re-derivation of all four claims in the replacement text against the procedure they cite; npm run ci:fast exit 0'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

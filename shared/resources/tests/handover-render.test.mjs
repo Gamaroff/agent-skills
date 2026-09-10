@@ -68,11 +68,11 @@ function withTmp(fn) {
 
 // ── 1. Totality — every kind × every renderer ──────────────────────────────
 
-test("§1 the roster in the schema doc has exactly 23 kinds, 10 Jira + 13 GitHub", () => {
+test("§1 the roster in the schema doc has exactly 24 kinds, 10 Jira + 13 GitHub + 1 Bitbucket", () => {
   const roster = dm.loadRoster();
   assert.equal(
     roster.size,
-    23,
+    24,
     "roster size changed — update the schema doc's own count too",
   );
   const bySystem = {};
@@ -80,7 +80,7 @@ test("§1 the roster in the schema doc has exactly 23 kinds, 10 Jira + 13 GitHub
     const s = k.split(".")[0];
     bySystem[s] = (bySystem[s] || 0) + 1;
   }
-  assert.deepEqual(bySystem, { jira: 10, github: 13 });
+  assert.deepEqual(bySystem, { jira: 10, github: 13, bitbucket: 1 });
 });
 
 test("§1 every roster kind has a renderer, and every renderer has a roster kind", () => {
@@ -108,7 +108,7 @@ test("§1 every kind renders non-empty in all four formats, with nothing unsubst
   const { records } = loadFixture("handover-all-kinds.jsonl");
   assert.equal(
     records.length,
-    23,
+    24,
     "the all-kinds fixture must carry every kind",
   );
 

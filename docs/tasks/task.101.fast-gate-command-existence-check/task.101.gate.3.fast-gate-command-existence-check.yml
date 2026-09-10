@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.101.fast-gate-command-existence-check'
+task_title: 'fail fast on a missing fastGateCommand'
+gate: PASS
+status_reason: 'Cycle 2 finding verified fixed and mutation-proved in both directions, including the relocation mutation a naive whole-file check would have passed. Scoped re-review of the fix found one LOW brittleness (report-only, no gate impact) and no medium or high findings. HIGH count 0 across all three cycles.'
+reviewer: 'QA Engineer'
+updated: '2026-09-10T08:20:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3035
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged across all cycles. No credential, network or authz surface; the grep interpolation cannot receive a metacharacter because the extracting character class excludes . and /.'
+  performance:
+    status: PASS
+    notes: 'One `npm run` listing per pipeline run, before iteration 1.'
+  reliability:
+    status: PASS
+    notes: >-
+      Cycle 2 raised this to CONCERNS because nothing established the check would FIRE.
+      Resolved: the loop section now points forward to it, and the assertion is scoped to the
+      text between the loop heading and the next H2 — verified that `### LOOP` (H3) is not
+      treated as a boundary and that the section stops before Test Failure Triage.
+  maintainability:
+    status: PASS
+    notes: 'Six authoring sites swept; bundle and catalog verified in sync; two regression assertions added across the cycles, both mutation-proved.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        The placement assertion requires the precondition to sit AFTER the loop section. Moving
+        it above the loop — a legitimate improvement that would make the pointer unnecessary —
+        would redden it. Recorded as LOW; relax only if that move is actually proposed.
+      refs: ['evals/shared/tests/fast-gate-precondition.test.mjs']
+    - action: 'Consider whether the snippet engine should classify a bare `npm run` (a pure read) as runnable. Own task.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

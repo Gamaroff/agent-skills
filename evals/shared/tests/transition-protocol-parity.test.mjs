@@ -70,15 +70,32 @@ for (const [label, stage] of PAIRS) {
 }
 
 test("every --stage literal in shipped markdown names a real stage", () => {
-  // Two CLIs take `--stage`, and their value domains differ on purpose.
+  // THREE CLIs take `--stage`, and their value domains differ on purpose.
   // gh-stage/jira-stage take a BOARD MOMENT; tracker-comment takes a COMMENT
   // IDENTITY, whose namespace is a superset — a QA cycle is worth commenting on
   // without being worth a column. Validating every literal against the board
   // set would force comment-only moments to invent columns nobody wants, so the
   // check resolves which CLI each literal belongs to first.
+  //
+  // stakeholder-summary-cli.js (task 106) is the third. It RENDERS a lead for a
+  // shell site to fold into a pull-request comment body it posts itself, so its
+  // domain is the whole catalogue — every tracker stage plus the pull-request
+  // ones, which are deliberately absent from COMMENT_STAGES because
+  // tracker-comment.js must keep refusing them.
+  //
+  // Adding an engine without adding it here is not a silent gap: every literal
+  // belonging to it gets misattributed to whichever of the other two was
+  // mentioned last, and is then validated against the wrong namespace. That is
+  // how this test failed when task 106 first landed — `--stage board-warning`
+  // read as a BOARD stage, `--stage pr-summary` as a COMMENT stage, and
+  // `--stage qa-gate` (a real comment stage) as a board one. The failure was
+  // loud and correct; the lesson is that the attributor is a third enumeration
+  // of "which engines exist" and has to move with them.
   const boardStages = new Set(lib.STAGE_NAMES);
   const commentCli = require(join(sharedDir, "tracker-comment.js"));
   const commentStages = new Set(commentCli.COMMENT_STAGES);
+  const leadCatalogue = require(join(sharedDir, "stakeholder-summary.js"));
+  const leadStages = new Set(leadCatalogue.LEAD_STAGES);
   const offenders = [];
   const scan = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -111,15 +128,38 @@ test("every --stage literal in shipped markdown names a real stage", () => {
           before.lastIndexOf("gh-stage.js"),
           before.lastIndexOf("jira-stage.js"),
         );
-        const isComment = lastComment > lastBoard;
+        const lastLead = before.lastIndexOf("stakeholder-summary-cli.js");
+        const isLead = lastLead > lastComment && lastLead > lastBoard;
+        const isComment = !isLead && lastComment > lastBoard;
         // `--stage qa-cycle-{N}` captures a trailing hyphen before the
         // placeholder; cycle-scoped stages are legitimately dynamic, because
         // cycle 2 must not be suppressed by cycle 1's marker.
         const name = m[1].replace(/-$/, "");
-        const known = isComment ? commentStages : boardStages;
+        const known = isLead
+          ? leadStages
+          : isComment
+            ? commentStages
+            : boardStages;
+        const which = isLead ? "lead" : isComment ? "comment" : "board";
         if (!known.has(name)) {
+          offenders.push(`${p}: --stage ${m[1]} (${which} stage)`);
+          continue;
+        }
+        // A comment stage must also RESOLVE TO A LEAD. Being a known stage and
+        // having a lead template are two different facts, and the gap between
+        // them is silent in the direction that matters: tracker-comment.js
+        // exits 2 with nothing sent when no lead can be produced, so a stage
+        // added to COMMENT_STAGES without a catalogue entry makes every call
+        // site using it stop posting — at runtime, on a live board, with the
+        // comment simply absent rather than wrong.
+        //
+        // `hasTemplate` is IMPORTED, not reimplemented: it owns the cycle-suffix
+        // normalisation, and a second copy of that rule here would drift from
+        // the one the engine actually consults.
+        if ((isComment || isLead) && !leadCatalogue.hasTemplate(name)) {
           offenders.push(
-            `${p}: --stage ${m[1]} (${isComment ? "comment" : "board"} stage)`,
+            `${p}: --stage ${m[1]} is a known comment stage but has no lead ` +
+              `template — tracker-comment.js exits 2 and posts nothing.`,
           );
         }
       }
@@ -130,7 +170,9 @@ test("every --stage literal in shipped markdown names a real stage", () => {
   assert.deepEqual(
     offenders,
     [],
-    `Unknown stage name(s).\n  board: ${[...boardStages].join(", ")}\n  comment: ${[...commentStages].join(", ")}`,
+    `Unknown stage name(s).\n  board: ${[...boardStages].join(", ")}\n` +
+      `  comment: ${[...commentStages].join(", ")}\n` +
+      `  lead: ${[...leadStages].join(", ")}`,
   );
 });
 
@@ -270,9 +312,12 @@ test("`--stage pr-merged` sits INSIDE develop-batch's per-item merge loop", () =
     "per-item merge lane not found",
   );
   const body = src.slice(loopStart, loopEnd);
+  // Task 89: the lookahead is load-bearing. `--stage pr-merged` is a PREFIX of
+  // `--stage pr-merged-DEFERRED`, so a renamed call satisfied a bare match while the lane no
+  // longer signalled the stage this asserts it signals.
   assert.match(
     body,
-    /--stage pr-merged/,
+    /--stage pr-merged(?![-\w])/,
     "pr-merged must be invoked inside the per-item serial merge lane",
   );
   assert.match(

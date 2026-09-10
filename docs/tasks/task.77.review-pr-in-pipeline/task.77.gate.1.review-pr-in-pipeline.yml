@@ -1,0 +1,110 @@
+schema: 1
+task: "task.77.review-pr-in-pipeline"
+task_title: "Run the PR conformance review before a work item is finalised"
+gate: FAIL
+status_reason: "The 5c wiring is structurally sound and every regression criterion holds, but three high-confidence contradictions make the new path unrunnable: Loop Setup still says a clean PASS exits the loop, the shared cycle counter is incremented twice on a review-driven cycle, and the REQUEST CHANGES path cannot deliver its findings to qa-fix so it dead-ends in the no-code-change HALT."
+reviewer: "QA Engineer"
+updated: "2026-09-03T00:00:00Z"
+
+top_issues:
+  - id: "TASK77-001"
+    severity: high
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Loop Setup (L16-L29) still states three times that a clean PASS exits the loop immediately, and enumerates the exits as 'a clean gate (PASS/WAIVED -> Step 7), the 5-cycle limit, and the Convergence check'. This is the first thing an agent reads and it contradicts L233 ('proceed to 5c ... not straight to Step 7') and 5c's own 'nothing leaves the loop except through here'. An agent acting on Loop Setup never runs 5c at all."
+    suggested_action: "Rewrite L16-L29 so a clean gate hands to 5c, and re-enumerate the exits as: 5c returning APPROVE/CONCERNS, the 5-cycle limit, and the Convergence check."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-002"
+    severity: high
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Double increment of the shared QA cycle counter on a review-driven cycle. 5c's REQUEST CHANGES row (L676) says 'Increment the shared QA cycle counter', and 5b step 7 (L626) — which every 5b run executes on exit — says 'Increment the cycle counter and return to 5a'. One review-driven fix pass therefore burns two of the five cycles. Secondary damage: the counter advances without a matching '### QA Cycle {N}' heading, and resume reconstructs the cycle number by counting those headings (L484), so a resumed run desynchronises."
+    suggested_action: "Delete the increment instruction from the 5c row; state that 5b step 7 performs the increment on exit as on any other cycle. Keep the shared-budget sentence that follows."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-003"
+    severity: high
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "The REQUEST CHANGES path is a dead end. 5c says 'run /qa-fix with the review's findings', but 5b's only invocation contract (L391) passes the most recent gate file and calls it 'the authoritative source of issues for qa-fix' — on this path that is the PASS/WAIVED gate with no top_issues. qa-fix's findings ingester globs (skills/qa-fix/references/qa-findings-ingester-prompt.md L17-L25) cover gate/qa/bug artifacts only and do NOT include '*.pr-review.*.md'. qa-fix therefore ingests a clean gate, finds nothing, changes nothing, and 5b step 0 fires the no-code-change HALT with the misleading message 'qa-fix could not address the remaining issues'."
+    suggested_action: "Add '*.pr-review.*.md' to the qa-fix ingester globs AND state an explicit 5c invocation passing the pr-review report path; add a 5b step-0 carve-out so a review-driven entry with no code change is not misreported as an unfixable gate."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-004"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Contradictory commit points for the same artifacts. The new L237-L239 says commit the gate .yml and QA report .md and push 'before invoking /review-pr'; the unchanged 'Where the gate and QA report get committed' section (L486-L494), which L239 explicitly points at, still says to commit them 'as part of the Step 7 transition, before invoking /finalise'. The framing sentence at L486 ('Two paths reach Step 7 or a HALT') is also stale — the first path now reaches 5c."
+    suggested_action: "Rewrite path 1 in the 5b commit section to 'before invoking /review-pr at 5c' and update the L486 framing. Exactly one stated commit point."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-005"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "The Convergence check's stated scope (L293-L294) is now false: 'A gate that exits the loop (PASS/WAIVED) has already left and never reaches it.' A clean gate no longer leaves — it goes to 5c, and 5c's REQUEST CHANGES re-enters 5b directly, bypassing the stall guard. A run alternating clean gate -> REQUEST CHANGES -> 5b -> 5a can consume the whole budget with the guard never evaluated, and the HIGH-findings sequence the escalation tabulates acquires holes."
+    suggested_action: "Reword the scope sentence, and state in 5c that a REQUEST CHANGES re-entry is not convergence-checked and why — or route it through the check using the review's finding count. Say what '**HIGH findings**' reads on a review-driven cycle."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-006"
+    severity: low
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Two incompatible loop-exit banner formats: L289 specifies 'Steps 5-6/8 — QA LOOP complete ({N} cycles, {gate})'; 5c's record step specifies the same string plus ', PR review {verdict}'."
+    suggested_action: "Update L289 to the 5c form, or delete the format there and point at 5c."
+    suggested_owner: dev
+    status: open
+  - id: "TASK77-007"
+    severity: low
+    file: "docs/concepts/restricted-access.md"
+    finding: "The new item 5 claims 5c's summary PR comment 'goes through tracker_call_with_retry and so inherits the ACCESS_TRACKER deferral gate like any other'. skills/review-pr/SKILL.md:415 states only the GitHub path does; the Bitbucket path is single-shot. The claim is true on GitHub and overstated on Bitbucket."
+    suggested_action: "Qualify to 'on GitHub' and note the Bitbucket single-shot gap, mirroring review-pr's own wording."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 324
+  phases_verified: "7/7"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [1, 3, 6]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No credentials, tokens or secrets introduced (scanned the full diff). No new attack surface — the change is prose contracts, one shell case arm and one test file. review-pr's advisory contract is preserved: no gate file, no formal review, no code edits, and its 52 contract tests pass untouched."
+  performance:
+    status: PASS
+    notes: "No runtime cost added to the develop loop. 5c runs once per completed run, at the loop exit, not per iteration. Lite mode degrades it to --effort low rather than skipping. No change to the fast gate."
+  reliability:
+    status: FAIL
+    notes: "TASK77-003 makes the REQUEST CHANGES path dead-end in the no-code-change HALT, so the loop's new failure route cannot actually complete. TASK77-001 means an agent reading Loop Setup exits at Step 7 and never reaches 5c. TASK77-002 halves the effective cycle budget on review-driven cycles and desynchronises resume."
+  maintainability:
+    status: CONCERNS
+    notes: "The change is well documented and the sweep is thorough. Two individually vacuous assertions in the new parity test (an index of -1 makes 'stage > s5c' trivially true, and the existsSync/frontmatter checks assert nothing about task 77), and two regexes matched against a slice running to end-of-file rather than to the end of 5c. Banner format drift (TASK77-006)."
+
+recommendations:
+  immediate:
+    - action: "Remove the Loop Setup contradiction — a clean gate hands to 5c"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "Remove the duplicate cycle-counter increment from the 5c REQUEST CHANGES row"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "Make the REQUEST CHANGES findings reachable by qa-fix — ingester glob plus an explicit invocation"
+      refs:
+        [
+          "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
+          "shared/resources/qa-findings-ingester-prompt.md",
+        ]
+    - action: "Reconcile the two commit points and the Convergence check's stated scope"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+  future:
+    - action: "Tighten the two weak assertions and scope the 5c slice to the section, not to EOF"
+      refs: ["evals/shared/tests/pr-review-loop-parity.test.mjs"]
+    - action: "Consider a repo-wide fix for ../../docs links in bundled references (148 files already carry the same broken depth) — its own task, not this one"
+      refs: ["skills/create-skill/scripts/bundle_skill.py"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "TASK77-001, TASK77-002 and TASK77-003 resolved and re-reviewed"

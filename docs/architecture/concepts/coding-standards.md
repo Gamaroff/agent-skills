@@ -68,6 +68,16 @@ Run these locally when you touch a skill or shared resource:
 - `npm run bundle` — required after `shared/resources/` edits.
 - `npm run generate-catalog` — required after adding/editing skills.
 - `npm test` — Node 22+ test runner suite (skill unit tests + eval protocol tests; relies on `node --test` glob expansion).
+- ShellCheck — **required after any `.sh` edit**; the `ShellCheck` workflow gates every PR at `--severity=warning`. Sources only (56 files, not 247 — the rest are bundled copies):
+
+  ```bash
+  shellcheck --severity=warning $(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
+  # no binary on this host? use the container:
+  docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable \
+    --severity=warning $(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
+  ```
+
+  Every `# shellcheck disable=SCxxxx` must carry a stated reason. A directive covers only the next command.
 
 ## Do not
 

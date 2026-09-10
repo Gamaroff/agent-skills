@@ -27,7 +27,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { neverRan, spawnBudget } from "./spawn-budget.mjs";
+import { neverRan, spawnBudget } from "../spawn-budget.mjs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,14 +37,20 @@ const MODULE = join(__dirname, "..", "qa-execute-snippets.mjs");
 
 const {
   COMMAND_RUNNERS,
+  DENY_PATTERNS,
   main,
   SAFE_COMMANDS,
   classifyBlock,
   commandWords,
   executeFile,
   extractBlocks,
+  extractTableCellCommands,
   runBlock,
+  sandboxEnv,
+  snapshotTree,
+  splitTableRow,
   unboundVariables,
+  unescapeCell,
   zshAvailable,
 } = await import(MODULE);
 
@@ -1074,6 +1080,130 @@ test("zero runnable blocks in a file that HAS blocks is itself a finding", () =>
   rmSync(dir, { recursive: true, force: true });
 });
 
+// ── bug.7: "nothing ran" is two states, and only one of them is actionable ────
+//
+// The guard above used to fire on BOTH, so six of ten skills surveyed carried a
+// permanent finding they could never clear — three of them without even the
+// `--bind` hint, because the hint is suppressed when there is no placeholder to
+// bind. These four tests pin the split. Revert the discrimination in
+// `executeFile` and the first, third and fourth go red.
+
+test("bug.7: all-mutating with zero placeholders is information, not a finding", () => {
+  const dir = tmp();
+  const file = join(dir, "SKILL.md");
+  // Every block is refused, and NONE is a placeholder — the case-B shape. No
+  // --bind, --copy or any other configuration can move these into `runnable`,
+  // so there is nothing for a reader to act on.
+  writeFileSync(
+    file,
+    md(bash("gh pr comment 1 --body x"), bash("rm -rf /tmp/whatever")),
+  );
+
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(report.counts.runnable, 0);
+  assert.equal(report.counts.placeholder, 0);
+  assert.equal(report.counts.mutating, 2);
+
+  assert.equal(
+    report.findings.find((x) => x.kind === "zero-blocks-executed"),
+    undefined,
+    "a file whose every block is correctly refused must not carry a finding it " +
+      "can never clear — that is the noise bug.7 reported",
+  );
+
+  const note = report.notes.find((x) => x.kind === "no-executable-blocks");
+  assert.ok(
+    note,
+    "it must still be RECORDED — silence here would be the silent no-op the " +
+      "step exists to prevent, which is the opposite over-correction",
+  );
+  assert.match(note.detail, /2 bash block\(s\)/);
+  assert.match(note.detail, /refused as mutating/);
+});
+
+test("bug.7: the informational record names each refusal reason and its count", () => {
+  const dir = tmp();
+  const file = join(dir, "SKILL.md");
+  // Two refusals of the SAME reason plus one of another. An `unrecognised-command
+  // (fail-closed)` refusal is not the same thing as a deny-listed one — the first
+  // may be an over-refusal the classifier should learn (bug.6, bug.10). Summing
+  // them into "all correctly refused" is how that would stop being visible.
+  writeFileSync(
+    file,
+    md(bash("gh pr view 1"), bash("gh pr view 2"), bash("gh issue list")),
+  );
+
+  const report = executeFile(file, { allowZsh: false });
+  const note = report.notes.find((x) => x.kind === "no-executable-blocks");
+  assert.ok(note);
+  assert.match(
+    note.detail,
+    /Refusals:/,
+    "the breakdown is what lets a reader tell a deny-list refusal from a " +
+      "fail-closed one",
+  );
+  assert.match(
+    note.detail,
+    /fail-closed\) \u00d72/,
+    "the repeated reason must carry its count",
+  );
+  // Both refusal kinds are present and stay distinguishable: `gh pr view` is
+  // unrecognised (fail-closed), `gh issue` is on the deny-list. Collapsing them
+  // is the thing this breakdown exists to prevent.
+  assert.match(note.detail, /deny-list/);
+  assert.match(note.detail, /fail-closed/);
+});
+
+test("bug.7: a placeholder present keeps it a finding, with the --bind remedy", () => {
+  const dir = tmp();
+  const file = join(dir, "SKILL.md");
+  // The case-A shape: one refused block AND one unbound placeholder. This run WAS
+  // under-configured, `--bind` is the fix, and it must stay a finding. Without
+  // this the fix could be "delete the guard", which passes the test above.
+  writeFileSync(file, md(bash("rm -rf /tmp/whatever"), bash("echo {id}")));
+
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(report.counts.runnable, 0);
+  assert.ok(report.counts.placeholder > 0);
+
+  const f = report.findings.find((x) => x.kind === "zero-blocks-executed");
+  assert.ok(f, "an under-configured run is still a finding");
+  assert.equal(f.confidence, "medium");
+  assert.match(
+    f.detail,
+    /--bind/,
+    "the remedy must be stated — this is the branch where one exists",
+  );
+
+  assert.equal(
+    report.notes.find((x) => x.kind === "no-executable-blocks"),
+    undefined,
+    "the two records are alternatives, never both",
+  );
+});
+
+test("bug.7: the split reaches the exit code — refused-only is clean, unbound is not", () => {
+  const dir = tmp();
+  const refusedOnly = join(dir, "refused.md");
+  const underConfigured = join(dir, "unbound.md");
+  writeFileSync(refusedOnly, bash("gh pr comment 1 --body x"));
+  writeFileSync(underConfigured, bash("echo {id}"));
+
+  // Exit status is what a CI job and a shell `&&` chain actually read. Splitting
+  // the report but leaving both at exit 1 would leave the noise exactly where it
+  // was for every non-JSON caller.
+  assert.equal(
+    main(["--file", refusedOnly, "--no-zsh"]).exitCode,
+    0,
+    "a file the step correctly cannot execute is not a failure",
+  );
+  assert.equal(
+    main(["--file", underConfigured, "--no-zsh"]).exitCode,
+    1,
+    "an under-configured run still exits non-zero",
+  );
+});
+
 test("a file with no bash blocks raises nothing — the step is cheap where it does not apply", () => {
   const dir = tmp();
   const file = join(dir, "SKILL.md");
@@ -1316,4 +1446,1010 @@ test("CLI: no engine copy carries a naive entrypoint guard", () => {
       `${file} defines no reachable isInvokedDirectly() call site`,
     );
   }
+});
+
+/* -------------------------------------------------------------------------- *
+ *  BUG-6 counterweights.
+ *
+ *  The thirteen routes themselves are pinned in
+ *  evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs, which also
+ *  holds the discriminating pre-fix half. What lives here is the other
+ *  direction: the inputs that must NOT change verdict as a result of closing
+ *  them. Every one of these passes trivially on a classifier that refuses
+ *  everything, which is exactly why they belong beside a fail-open corpus that
+ *  such a classifier would also satisfy.
+ * -------------------------------------------------------------------------- */
+
+test("BUG-6: scanning past a keyword does not refuse the constructs around it", () => {
+  // `for` is followed by a NAME, not a command. Continuing to scan past it would
+  // report the loop variable `f` as an unrecognised command.
+  assert.equal(
+    classifyBlock("for f in a b; do echo $f; done", { f: "a" }).klass,
+    "runnable",
+  );
+  // `[` is a builtin that cannot look like a command name. It reaches the scanner
+  // now that `if` no longer terminates the segment, and must be read as a keyword
+  // rather than as an unreadable command position.
+  assert.equal(
+    classifyBlock('N=1\nif [ -n "$N" ]; then echo x; fi').klass,
+    "runnable",
+  );
+  assert.equal(
+    classifyBlock('while read -r l; do echo "$l"; done').klass,
+    "runnable",
+  );
+  // `!` negates a command that still RUNS. It is in the command-introducing set
+  // for that reason; without it this input would have become runnable.
+  assert.equal(classifyBlock("! touch /tmp/x").klass, "mutating");
+});
+
+test("BUG-6: widening the write-redirect pre-context spares descriptors and /dev/null", () => {
+  assert.equal(classifyBlock("echo hi 2>/dev/null").klass, "runnable");
+  assert.equal(classifyBlock("echo hi >/dev/null 2>&1").klass, "runnable");
+  assert.equal(classifyBlock("ls >&2").klass, "runnable");
+  // This repository's own documented zsh guard. It was runnable before only
+  // because `if` cleared the segment; it must still be runnable now that the
+  // segment is actually scanned.
+  assert.equal(
+    classifyBlock("if command -v zsh >/dev/null 2>&1; then echo yes; fi").klass,
+    "runnable",
+  );
+  // A `>` inside a quoted string is text, not a redirection.
+  assert.equal(classifyBlock('echo "a > b"').klass, "runnable");
+});
+
+test("BUG-6: resolving git's subcommand past global flags keeps safe ones safe", () => {
+  assert.equal(classifyBlock("git -C /path status").klass, "runnable");
+  assert.equal(classifyBlock("git -c user.name=x log").klass, "runnable");
+  assert.equal(classifyBlock("git --git-dir=/p/.git status").klass, "runnable");
+  // The route itself: the flag operand must not be mistaken for the subcommand.
+  assert.equal(classifyBlock("git -C log push origin main").klass, "mutating");
+  assert.equal(classifyBlock("git -C /path push").klass, "mutating");
+});
+
+test("BUG-6: scoping -o to its command does not un-refuse the commands that write", () => {
+  assert.equal(classifyBlock("sort -o /tmp/x file.txt").klass, "mutating");
+  assert.equal(classifyBlock("sort -o out.txt in.txt").klass, "mutating");
+  assert.equal(classifyBlock("git diff --output=/tmp/x").klass, "mutating");
+  // Exempt for grep and find only, and only for those commands' own `-o`.
+  assert.equal(classifyBlock("grep -o 'foo' README.md").klass, "runnable");
+  assert.equal(classifyBlock("find . -name a -o -name b").klass, "runnable");
+  // A pipeline is scoped per segment: the grep half is exempt, the sort half is not.
+  assert.equal(
+    classifyBlock("grep -o foo README.md | sort -o /tmp/x").klass,
+    "mutating",
+  );
+});
+
+test("BUG-6: quote-state awareness does not break the heredoc forms that shield bodies", () => {
+  // The quotes around a heredoc terminator are SYNTAX. Blanking them before
+  // detection would erase the terminator and expose the body to the scan.
+  assert.equal(
+    classifyBlock("cat <<'EOF'\ngit push origin main\nEOF").klass,
+    "runnable",
+  );
+  assert.equal(classifyBlock("cat <<EOF > /tmp/x\nhi\nEOF").klass, "mutating");
+  // A `<<` inside a quoted string is documentation ABOUT a heredoc.
+  assert.equal(classifyBlock('echo "cat <<EOF"').klass, "runnable");
+});
+
+test("BUG-6: an unterminated quote blanks nothing, so it cannot hide a command", () => {
+  // Found while reviewing the quote-state walker before it shipped. Blanking from
+  // an unclosed quote to the end of the block would have hidden every following
+  // command from the scan while bash still ran them — a new fail-open route
+  // introduced by the fix for an old one. The scanner must always see MORE text
+  // than bash will run, never less.
+  assert.equal(classifyBlock("echo don't\ntouch /tmp/x").klass, "mutating");
+  assert.equal(classifyBlock('echo "unclosed\ntouch /tmp/x').klass, "mutating");
+  assert.equal(
+    classifyBlock("echo 'unclosed\ngit push origin main").klass,
+    "mutating",
+  );
+  // A terminated span still blanks, or root cause C is not fixed.
+  assert.equal(
+    classifyBlock(`echo "it's fine"; touch /tmp/x; echo "don't"`).klass,
+    "mutating",
+  );
+  assert.equal(classifyBlock('echo "a > b"').klass, "runnable");
+});
+
+test("BUG-6: `>` inside a conditional or arithmetic span is a comparison, not a redirection", () => {
+  // Widening WRITE_REDIRECT's pre-context (root cause B) made these match. Inside
+  // `[[ … ]]` and `(( … ))` a `>` compares; it never writes.
+  assert.equal(classifyBlock("[[ 1 > 2 ]]").klass, "runnable");
+  assert.equal(classifyBlock("[[ -f README.md ]]").klass, "runnable");
+  // The guard must not become a hiding place. A command substitution inside a
+  // conditional is still scanned, because only the write-redirect path is blanked.
+  assert.equal(classifyBlock("[[ $(touch /tmp/x) ]]").klass, "mutating");
+  // A redirection OUTSIDE the brackets is still a redirection.
+  assert.equal(classifyBlock("[[ -f a ]] > /tmp/x").klass, "mutating");
+  assert.equal(classifyBlock("(( a > b )) > /tmp/x").klass, "mutating");
+  // And the route the widening exists to close is still closed.
+  assert.equal(classifyBlock("echo pwned>/tmp/x").klass, "mutating");
+});
+
+/* -------------------------------------------------------------------------- *
+ *  BUG-6 verify-cycle findings.
+ *
+ *  An adversarial review of the first cut of this fix found five defects in the
+ *  fix itself, one of them a NEW fail-open. Each is pinned here, because a fix
+ *  for a fail-open that opens another one is the worst outcome available to this
+ *  change and must not be re-introduced quietly.
+ * -------------------------------------------------------------------------- */
+
+test("BUG-6/verify: a command substitution does not inherit the -o exemption", () => {
+  // THE regression that matters. Scoping `-o` to its command was first written as
+  // a regex anchored to `^` and `[\n;&|]`. `$(` was not an anchor, so a write
+  // nested inside a grep/find-led segment inherited that segment's exemption and
+  // became runnable — a fail-open created by the fix for an over-refusal.
+  assert.equal(
+    classifyBlock("find . -name '*.md' -newer $(sort -o /tmp/pwned notes.md)")
+      .klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("grep -c TODO $(sort -o /tmp/pwned notes.md)").klass,
+    "mutating",
+  );
+  assert.equal(classifyBlock("echo `sort -o /tmp/x f`").klass, "mutating");
+});
+
+test("BUG-6/verify: the -o exemption holds wherever the command actually sits", () => {
+  // The lookahead version worked only at zero-whitespace positions, because `\s*`
+  // backtracked to empty and the negative lookahead then trivially succeeded. It
+  // left this repository's own documented `| grep -o …` snippet refused.
+  assert.equal(classifyBlock("grep -o foo f").klass, "runnable");
+  assert.equal(classifyBlock("  grep -o foo f").klass, "runnable");
+  assert.equal(classifyBlock("echo x | grep -o foo").klass, "runnable");
+  assert.equal(classifyBlock("echo x |grep -o foo").klass, "runnable");
+  assert.equal(classifyBlock("ls; grep -o foo f").klass, "runnable");
+  assert.equal(
+    classifyBlock("ls && find . -name a -o -name b").klass,
+    "runnable",
+  );
+  assert.equal(classifyBlock("sudo grep -o foo f").klass, "mutating"); // sudo itself is refused
+  // …and a real writer is still caught wherever IT sits.
+  assert.equal(classifyBlock("ls; sort -o /tmp/x f").klass, "mutating");
+  assert.equal(classifyBlock("  sort -o /tmp/x f").klass, "mutating");
+});
+
+test("BUG-6/verify: git's subcommand is read from after THIS git token", () => {
+  // The slice was taken from the segment's second token, which was only ever
+  // correct while the scan stopped at the segment's first token.
+  assert.equal(
+    classifyBlock("if git status; then echo ok; fi").klass,
+    "runnable",
+  );
+  assert.equal(
+    classifyBlock("if false; then :; elif git ls-remote origin; then :; fi")
+      .klass,
+    "runnable",
+  );
+  assert.equal(classifyBlock("! git diff --quiet").klass, "runnable");
+  // The fail-open half: `git:log` was resolved from a `case` arm pattern and the
+  // allow-list then licensed a `git checkout` that discards the working tree.
+  assert.equal(
+    classifyBlock("case log in log) git checkout -- . ;; esac").klass,
+    "mutating",
+  );
+});
+
+test("BUG-6/verify: a multi-line quoted string is data, not a command position", () => {
+  // Preserving the newline inside a quoted span made the string's last line its
+  // own segment, whose only surviving token was the closing quote.
+  assert.equal(
+    classifyBlock('MSG="first line\nsecond line"\necho "$MSG"').klass,
+    "runnable",
+  );
+  assert.equal(classifyBlock("X='one\ntwo'\necho ok").klass, "runnable");
+  // A quoted string in COMMAND position is still unreadable, and still refused —
+  // the scanner must not learn to skip empty command words.
+  assert.equal(classifyBlock('"$CMD" --flag').klass, "mutating");
+});
+
+test("BUG-6/verify: a glued arithmetic evaluation is not an invocation", () => {
+  assert.equal(classifyBlock("if ((a>b)); then echo hi; fi").klass, "runnable");
+  assert.equal(classifyBlock("echo $((x>>2))").klass, "runnable");
+  // But one carrying a command substitution still reaches the fail-closed path.
+  assert.equal(classifyBlock("((a+$(touch /tmp/x)))").klass, "mutating");
+});
+
+/* -------------------------------------------------------------------------- *
+ *  BUG-10 — sed's `w` write flag, caught by position rather than by shape.
+ *
+ *  bug.6 closed this rule with a regex requiring whitespace after `w`. GNU sed
+ *  does not require it, so seven glued spellings stayed runnable. `w` means
+ *  "write" in flag position and means the letter w inside a pattern, and
+ *  `s/warning/x/` contains `/w` exactly as `s/a/b/wfile` does — which is why no
+ *  regex closed it and the script is walked instead.
+ * -------------------------------------------------------------------------- */
+
+test("BUG-10: a glued sed write filename is still a write", () => {
+  for (const input of [
+    "sed 's/a/b/wpwned.txt' README.md",
+    "sed 's|a|b|wpwned.txt' README.md", // `|` is a legal s/// delimiter
+    "sed 's#a#b#wpwned.txt' README.md",
+    "sed -e 's/a/b/wpwned.txt' README.md",
+    "sed --expression='s/a/b/wpwned.txt' README.md",
+    "sed 'wpwned.txt' README.md", // bare w command
+    "sed 's/a/b/Wpwned.txt' README.md", // W writes too
+    "sed '/re/wpwned.txt' README.md", // address-prefixed
+    "sed '1,3wpwned.txt' README.md", // range-prefixed
+    "sed '2wpwned.txt' README.md", // line-number-prefixed
+  ]) {
+    assert.equal(classifyBlock(input).klass, "mutating", input);
+  }
+  // The spaced forms bug.6 closed must stay closed.
+  assert.equal(
+    classifyBlock("sed -n 's/a/b/w /tmp/x' README.md").klass,
+    "mutating",
+  );
+  assert.equal(classifyBlock("sed 'w /tmp/x' README.md").klass, "mutating");
+});
+
+test("BUG-10: an unreadable sed script fails closed", () => {
+  // `-f` names a script file the classifier cannot read. It cannot say what the
+  // script does, and "cannot say" must never resolve to "safe".
+  assert.equal(classifyBlock("sed -f evil.sed README.md").klass, "mutating");
+  assert.equal(
+    classifyBlock("sed --file=evil.sed README.md").klass,
+    "mutating",
+  );
+});
+
+test("BUG-10: every sed in a segment is examined, not just the first", () => {
+  // Checking only the leading invocation would miss the one that writes.
+  assert.equal(
+    classifyBlock("sed 's/a/b/' f | sed 'w /tmp/x'").klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("sed 's/a/b/' f | sed 'wpwned.txt'").klass,
+    "mutating",
+  );
+  assert.equal(
+    classifyBlock("echo hi; sed 's/a/b/wpwned.txt' f").klass,
+    "mutating",
+  );
+});
+
+test("BUG-10: a w inside pattern text is not a write", () => {
+  // These are what defeated every regex attempted for this rule.
+  for (const input of [
+    "sed 's/warning/x/' README.md",
+    "sed 's/w/x/' README.md",
+    "sed 's/x/write/' README.md",
+    "sed 's/a/b/g' README.md",
+    "sed -e 's/a/b/' -e 's/c/d/' README.md",
+    "sed -n 's/a/b/p' README.md",
+    "sed -n '2p' README.md",
+    "sed '/re/d' README.md",
+    "sed 'y/abc/xyz/' README.md",
+    "echo w file | sed 's/a/b/'",
+    "grep w f | sed 's/a/b/'",
+    "echo watershed",
+  ]) {
+    assert.equal(classifyBlock(input).klass, "runnable", input);
+  }
+});
+
+// ── task.80 Phase 1: extraction parity ───────────────────────────────────────
+//
+// `sandboxEnv()` and `snapshotTree()` were lifted out of `runBlock` so the probe
+// engine (`security-probe.mjs`) can contain its children with the SAME mechanism
+// rather than re-improvising one. The extraction is only safe if it changed
+// nothing observable in the snippet path, and "nothing changed" is a claim that
+// needs a test rather than a code review — this block is that test.
+//
+// The classifier assertions below are the load-bearing half. `runBlock` is the
+// containment for a boundary with 26 documented fail-open routes behind it
+// (bug.3 + bug.6); an extraction that quietly altered classification would
+// reopen them, and would do so in a diff that looks like pure motion.
+
+test("task.80 parity: the classifier surface is exported and unchanged in shape", () => {
+  // Pins the four classifier primitives as EXPORTS. The extraction touched the
+  // module's export list, so the cheapest way this could have gone wrong is a
+  // name disappearing from it — after which every consumer silently gets
+  // `undefined` and every `SAFE_COMMANDS.has(...)` throws rather than denying.
+  assert.ok(SAFE_COMMANDS instanceof Set, "SAFE_COMMANDS is a Set");
+  assert.ok(COMMAND_RUNNERS instanceof Set, "COMMAND_RUNNERS is a Set");
+  assert.ok(Array.isArray(DENY_PATTERNS), "DENY_PATTERNS is an Array");
+  assert.equal(typeof classifyBlock, "function");
+});
+
+test("task.80 parity: no interpreter is on the snippet allow-list", () => {
+  // THE central safety property of this task, asserted rather than asserted-in-prose.
+  //
+  // Adding `node` here is the obvious shortcut for making a probe runnable, and
+  // it is the one thing task.80 exists to refuse: SAFE_COMMANDS gates untrusted
+  // text extracted from markdown fences, so an interpreter on it lets ANY fenced
+  // bash block in ANY document run arbitrary code through the QA path. The
+  // allow-list would stop being an allow-list.
+  //
+  // The probe engine needs no entry here — it constructs its own runner and
+  // never routes through `classifyBlock`. See `probe-boundary-rule.md`.
+  for (const interpreter of [
+    "node",
+    "nodejs",
+    "python",
+    "python3",
+    "ruby",
+    "perl",
+    "php",
+    "deno",
+    "bun",
+    "osascript",
+  ]) {
+    assert.ok(
+      !SAFE_COMMANDS.has(interpreter),
+      `${interpreter} must never be on SAFE_COMMANDS — see probe-boundary-rule.md`,
+    );
+    // COMMAND_RUNNERS is NOT a second allow-list, and the distinction matters
+    // enough to state here: it names commands whose ARGUMENT is another command,
+    // so the classifier recurses into it. Membership makes classification
+    // STRICTER, not laxer — which is why `eval` and `exec` are legitimately on
+    // it, and why `eval "rm -rf /"` classifies mutating.
+    //
+    // The assertion stays, but for a different reason than the one above: an
+    // interpreter here would make the classifier read JS or Python source as a
+    // shell command line, which is noise rather than safety. The SAFE_COMMANDS
+    // half is the security property; this half is a correctness one.
+    assert.ok(
+      !COMMAND_RUNNERS.has(interpreter),
+      `${interpreter} on COMMAND_RUNNERS would make the classifier read source as a command line`,
+    );
+  }
+});
+
+test("task.80 parity: QA-1…QA-17 classify exactly as they did before the extraction", () => {
+  // One assertion per documented fail-open route, pinned by expected class. If
+  // the extraction perturbed the classification OF THESE CASES, this reds with
+  // the case id that moved — which is the information a bisect actually needs.
+  //
+  // Scope, stated precisely because the earlier wording overreached: this pins
+  // seventeen enumerated inputs, not the allow-list's membership. A destructive
+  // command ADDED to SAFE_COMMANDS is a different mutation and slips past every
+  // case here — see the test immediately below, which exists because of it.
+  //
+  // The set runs to QA-17, not QA-14: three routes (QA-15 glob-in-command-
+  // position, QA-16 heredoc-line redirection, QA-17 write-flags-anywhere) were
+  // added after task.80 was authored. Pinning only 1–14 would have left the
+  // three newest fail-open routes unpinned by the very test that exists to pin
+  // them.
+  const cases = [
+    ["QA-1", "ls -la", "runnable"],
+    ["QA-2", "rm -rf /tmp/x", "mutating"],
+    ["QA-3", "frobnicate --all", "mutating"],
+    ["QA-4", "gh pr list", "mutating"],
+    ["QA-5", "curl https://example.com", "mutating"],
+    ["QA-6", "git status", "runnable"],
+    ["QA-7", "git push origin main", "mutating"],
+    ["QA-8", "echo $(rm -rf /tmp/x)", "mutating"],
+    ["QA-9", "echo $((1 + 2))", "runnable"],
+    ["QA-10", "sed 's/watershed/x/' README.md", "runnable"],
+    ["QA-11", "sed 's/a/b/w pwned.txt' f", "mutating"],
+    ["QA-12", "cat <<EOF\nrm -rf /\nEOF", "runnable"],
+    ["QA-13", "ls \\\n  -la", "runnable"],
+    ["QA-14", "echo hi; rm -rf /tmp/x", "mutating"],
+    ["QA-15", "./*.sh", "mutating"],
+    ["QA-16", "cat <<EOF > out.txt\nbody\nEOF", "mutating"],
+    ["QA-17", "tee -a out.txt < in.txt", "mutating"],
+  ];
+  for (const [id, code, expected] of cases) {
+    assert.equal(classifyBlock(code).klass, expected, `${id}: ${code}`);
+  }
+});
+
+test("task.80 parity: a destructive command must fail closed via the ALLOW-LIST, not only the deny-list", () => {
+  // The gap the QA cycle found, and the reason the comment above was narrowed.
+  //
+  // Adding a single destructive command to SAFE_COMMANDS is the cheapest
+  // possible fail-open — `rm README.md` becomes `runnable`, and a QA gate that
+  // executes documented snippets would delete the file. Before this test, that
+  // one-word mutation left 105/105 tests green across BOTH this suite and the
+  // bug.3 fail-open replay eval. Nothing caught it.
+  //
+  // The reason nothing caught it is worth keeping: every `rm` case in the suite
+  // uses `rm -rf`, which DENY_PATTERNS rejects first. The deny-list masks the
+  // allow-list breach, so the suite tested the second mechanism while believing
+  // it was testing the first. These inputs are chosen to have NO deny-pattern,
+  // which is what makes SAFE_COMMANDS membership the only thing standing
+  // between them and `runnable`.
+  //
+  // Mutation-proof: add "rm" to SAFE_COMMANDS and this test reds. It is the
+  // only one that does.
+  for (const code of [
+    "rm README.md",
+    "mv README.md OTHER.md",
+    "cp -r src dest",
+    "truncate -s 0 README.md",
+    "install -m 777 a b",
+  ]) {
+    assert.equal(
+      classifyBlock(code).klass,
+      "mutating",
+      `${code} must fail closed — it has no deny-pattern, so only SAFE_COMMANDS membership decides it`,
+    );
+  }
+});
+
+test("task.80 parity: sandboxEnv is an allow-list — no parent token reaches a child", () => {
+  // The mutation proof for the extraction. Revert `sandboxEnv` to spread
+  // `process.env` and this test reds on the first assertion: the secret it
+  // plants in the parent appears in the child env.
+  //
+  // Planting the secret here rather than reading whatever the real environment
+  // happens to hold is what makes the test deterministic — it fails on a
+  // developer laptop with no GITHUB_TOKEN set exactly as it fails in CI.
+  const CANARY = "QA_SNIPPETS_CANARY_TOKEN";
+  const previous = process.env[CANARY];
+  process.env[CANARY] = "ghp_this_must_not_cross_the_boundary";
+  try {
+    const env = sandboxEnv({ cwd: "/tmp/example" });
+
+    assert.equal(
+      env[CANARY],
+      undefined,
+      "a parent env var leaked into the sandbox environment",
+    );
+    assert.deepEqual(
+      Object.keys(env).sort(),
+      ["HOME", "LANG", "PATH", "PWD", "TERM", "TMPDIR"],
+      "sandboxEnv must carry exactly six keys — an allow-list, not a filter",
+    );
+    assert.equal(env.TERM, "dumb");
+    assert.equal(env.PWD, "/tmp/example", "PWD tracks cwd, never the parent's");
+  } finally {
+    if (previous === undefined) delete process.env[CANARY];
+    else process.env[CANARY] = previous;
+  }
+});
+
+test("task.80 parity: sandboxEnv applies caller bindings last", () => {
+  // Bindings are values the CALLER chose, not values inherited from the ambient
+  // environment, so they are allowed to override a base key. This pins the
+  // precedence the inlined version had, which is the part a re-implementation
+  // would most plausibly get backwards.
+  const env = sandboxEnv({
+    cwd: "/tmp/a",
+    bindings: { TERM: "xterm", X: "1" },
+  });
+  assert.equal(env.TERM, "xterm", "an explicit binding wins over the base");
+  assert.equal(env.X, "1");
+  assert.equal(env.PATH, process.env.PATH ?? "");
+});
+
+test("task.80 parity: sandboxEnv defaults PWD to process.cwd() when no cwd is given", () => {
+  const env = sandboxEnv();
+  assert.equal(env.PWD, process.cwd());
+});
+
+test("task.80 parity: snapshotTree is exported and still sees a write", () => {
+  // `snapshotTree` was module-private before this task, so the export itself is
+  // the change. This asserts it is reachable AND that it still detects the write
+  // the escape sentinel depends on.
+  const dir = tmp();
+  writeFileSync(join(dir, "a.txt"), "one");
+  const before = snapshotTree(dir);
+  assert.ok(before.has("a.txt"));
+
+  writeFileSync(join(dir, "b.txt"), "two");
+  const after_ = snapshotTree(dir);
+  assert.ok(
+    after_.has("b.txt"),
+    "a new file must appear in the second snapshot",
+  );
+  assert.equal(after_.size, before.size + 1);
+});
+
+test("task.80 parity: snapshotTree still honours skipDir", () => {
+  // The skipDir argument is what stops the sentinel walking a large `--copy`
+  // twice per block. Losing it in the extraction would turn a safety net into
+  // the run's dominant cost — the exact regression the comment above it records.
+  const dir = tmp();
+  mkdirSync(join(dir, "work"));
+  writeFileSync(join(dir, "work", "inside.txt"), "x");
+  writeFileSync(join(dir, "outside.txt"), "y");
+
+  const all = snapshotTree(dir);
+  assert.ok(all.has("work/inside.txt"));
+
+  const skipped = snapshotTree(dir, "work");
+  assert.ok(skipped.has("outside.txt"));
+  assert.ok(
+    !skipped.has("work/inside.txt"),
+    "skipDir must prune the whole subtree, not just its direct entries",
+  );
+});
+
+// ── 9. Table-cell extraction (task.87) ────────────────────────────────────────
+//
+// Task 77 shipped a verification predicate inside a markdown table cell that
+// returned a FALSE PASS under zsh whenever its glob matched nothing. Three QA
+// cycles and a full CI run did not catch it, for one reason: the extractor only
+// ever looked at fenced blocks, so the cell was never read. These tests cover the
+// second extractor, and the last one is the mutation proof.
+
+/** A minimal command-column table. */
+function cmdTable(...cells) {
+  return [
+    "| Step | Artifact | Verification command |",
+    "| ---- | -------- | -------------------- |",
+    ...cells.map((c, i) => `| ${i + 1} | thing | ${c} |`),
+  ].join("\n");
+}
+
+test("a command column's backticked span is extracted with its row's line number", () => {
+  const doc = ["# Title", "", cmdTable("`git status --short`")].join("\n");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "git status --short");
+  assert.equal(blocks[0].origin, "table-cell");
+  assert.equal(blocks[0].column, "Verification command");
+  // "# Title"(1), ""(2), header(3), delimiter(4), body(5).
+  assert.equal(blocks[0].line, 5);
+});
+
+test("a table with no command column yields nothing", () => {
+  const doc = [
+    "| Setting | Value |",
+    "| ------- | ----- |",
+    "| shell | `echo hello world` |",
+  ].join("\n");
+  assert.deepEqual(extractTableCellCommands(doc), []);
+});
+
+test("only the command column is read, not its neighbours", () => {
+  const doc = [
+    "| Artifact | Verification command |",
+    "| -------- | -------------------- |",
+    "| `echo not-me` | `echo me` |",
+  ].join("\n");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "echo me");
+});
+
+test("a header row with no delimiter row beneath it is not a table", () => {
+  // Without this, any prose line that happens to start with a pipe becomes a
+  // header and the line after it becomes a command.
+  const doc = ["| Step | Verification command |", "| 1 | `echo run me` |"].join(
+    "\n",
+  );
+  assert.deepEqual(extractTableCellCommands(doc), []);
+});
+
+test("an escaped pipe is unescaped before the code becomes shell", () => {
+  // This is the real cell text from develop-pipeline-resume-contract.md. Left
+  // escaped, `\\|` is a literal argument and the command means something else
+  // entirely; split naively on a bare `|`, the row gains phantom columns and the
+  // command column read is the wrong text.
+  const doc = cmdTable('`gh pr view 7 --json comments \\| grep -i "QA"`');
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, 'gh pr view 7 --json comments | grep -i "QA"');
+});
+
+test("splitTableRow splits on unescaped pipes only", () => {
+  assert.deepEqual(splitTableRow("| a | b \\| c | d |"), ["a", "b \\| c", "d"]);
+});
+
+test("unescapeCell touches the pipe escape and nothing else", () => {
+  assert.equal(unescapeCell("a \\| b"), "a | b");
+  // A command legitimately containing a doubled backslash must survive verbatim:
+  // markdown does not process backslash escapes inside a code span for anything
+  // but the table pipe, so unescaping more would corrupt the command.
+  assert.equal(unescapeCell("printf 'a\\\\nb'"), "printf 'a\\\\nb'");
+  assert.equal(
+    unescapeCell("sed -E 's/.*\\.gate\\.//'"),
+    "sed -E 's/.*\\.gate\\.//'",
+  );
+});
+
+test("several spans in one cell are several blocks", () => {
+  // The real cells join two or three commands with prose. Concatenating the cell
+  // would run the prose as shell.
+  const doc = cmdTable("`ls -la docs` AND `echo second` AND `wc -l README.md`");
+  const blocks = extractTableCellCommands(doc);
+  assert.deepEqual(
+    blocks.map((b) => b.code),
+    ["ls -la docs", "echo second", "wc -l README.md"],
+  );
+  // All three come from the same row.
+  assert.deepEqual(new Set(blocks.map((b) => b.line)), new Set([3]));
+});
+
+test("a multi-backtick span is not truncated at an inner backtick", () => {
+  const doc = cmdTable("`` echo `date` ``");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "echo `date`");
+});
+
+test("a span with no whitespace is not read as a command", () => {
+  // Bare tokens in a command column are globs, statuses and field names. This
+  // bound fails toward running LESS — the allow-list still decides everything
+  // that gets past it — and no single unspaced word can carry the shell
+  // disagreement this extractor exists to catch.
+  const doc = cmdTable("`PASS`, `accepted`, `task.*.gate.*.yml`");
+  assert.deepEqual(extractTableCellCommands(doc), []);
+});
+
+test("a table inside a fenced block is an illustration, not an instruction", () => {
+  // Every document that documents a table shows one. Extracting from those would
+  // execute a document's own examples.
+  const doc = [
+    "````markdown",
+    cmdTable("`echo do-not-run-me`"),
+    "````",
+    "",
+    cmdTable("`echo run-me`"),
+  ].join("\n");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "echo run-me");
+});
+
+test("two tables in one document are both read", () => {
+  const doc = [
+    cmdTable("`echo first`"),
+    "",
+    "prose",
+    "",
+    cmdTable("`echo second`"),
+  ].join("\n");
+  assert.deepEqual(
+    extractTableCellCommands(doc).map((b) => b.code),
+    ["echo first", "echo second"],
+  );
+});
+
+test("a document with no tables produces the pre-change report exactly", () => {
+  // The invariant success criterion 3 asserts, made testable: for a document with
+  // no command column, the merged extractor must be indistinguishable from the
+  // fenced-only one.
+  const dir = tmp();
+  const file = join(dir, "no-tables.md");
+  writeFileSync(
+    file,
+    ["# Doc", "", bash("ls -la"), "", "prose", "", bash("rm -rf /tmp/x")].join(
+      "\n",
+    ),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(report.blocks, extractBlocks(readFileSync(file, "utf8")).length);
+  assert.ok(
+    report.results.every((r) => r.origin === "fence"),
+    "no result may claim a table-cell origin in a document with no tables",
+  );
+});
+
+test("origin is carried onto every result and onto findings", () => {
+  const dir = tmp();
+  const file = join(dir, "mixed.md");
+  writeFileSync(
+    file,
+    ["# Doc", "", bash("ls -la"), "", cmdTable("`wc -l /dev/null`")].join("\n"),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  const origins = report.results.map((r) => r.origin);
+  assert.ok(
+    origins.includes("fence"),
+    "the fenced block must report origin fence",
+  );
+  assert.ok(
+    origins.includes("table-cell"),
+    "the table-cell command must report origin table-cell",
+  );
+  assert.ok(
+    report.results.every((r) => r.origin !== undefined),
+    "every result must name its origin — a finding without one is not traceable",
+  );
+});
+
+test("blocks are reported in document order across both extractors", () => {
+  const dir = tmp();
+  const file = join(dir, "order.md");
+  writeFileSync(
+    file,
+    [cmdTable("`echo from-cell`"), "", bash("echo from-fence")].join("\n"),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  const lines = report.results.map((r) => r.line);
+  assert.deepEqual(
+    lines,
+    [...lines].sort((a, b) => a - b),
+    "merging two extractors must not shuffle the report out of document order",
+  );
+});
+
+test("MUTATION PROOF: the task-77 predicate in a table cell is a shell disagreement", () => {
+  // The predicate verbatim, as `cd72e4d4` replaced it. Its defect is entirely in
+  // the exit status — both shells print nothing — so this also exercises the
+  // status channel of shell-disagreement. Verified independently of this engine:
+  // in an empty directory bash exits 2 (`[: : integer expected`) and zsh exits 0
+  // (a failed zsh glob aborts the command substitution, and zsh's `[` reads the
+  // empty operand in `-ge` as 0).
+  //
+  // Reverting extractTableCellCommands turns this test red, which is the whole
+  // point: the code being present is not the same as the check firing.
+  if (!zshAvailable()) {
+    // Recorded rather than silently passed — a skip that looks like a pass is the
+    // failure mode this entire engine exists to prevent.
+    assert.ok(true, "zsh unavailable — dual-shell comparison cannot run here");
+    return;
+  }
+  const predicate =
+    "G=$(ls *.gate.*.yml \\| sed -E 's/.*\\.gate\\.([0-9]+)\\..*/\\1/' \\| sort -n \\| tail -1); " +
+    "R=$(ls *.pr-review.*.md 2>/dev/null \\| sed -E 's/.*\\.pr-review\\.([0-9]+)\\..*/\\1/' \\| sort -n \\| tail -1); " +
+    '[ "${R:-0}" -ge "$G" ]';
+
+  const dir = tmp();
+  const file = join(dir, "task-77-predicate.md");
+  writeFileSync(file, cmdTable(`\`${predicate}\``));
+
+  // Extraction first — a failure here and a failure below have different causes.
+  const blocks = extractTableCellCommands(readFileSync(file, "utf8"));
+  assert.equal(
+    blocks.length,
+    1,
+    "the predicate must be extracted from its cell",
+  );
+  assert.ok(
+    blocks[0].code.includes("| sort -n |"),
+    "the escaped pipes must be unescaped, or this is not the predicate",
+  );
+
+  const report = executeFile(file, { allowZsh: true });
+  assert.equal(
+    report.counts.runnable,
+    1,
+    "the predicate must classify as runnable",
+  );
+
+  const disagreement = report.findings.find(
+    (f) => f.kind === "shell-disagreement",
+  );
+  assert.ok(
+    disagreement,
+    "expected a shell-disagreement finding — this is the defect task 77 shipped",
+  );
+  assert.equal(disagreement.channel, "status");
+  assert.equal(disagreement.origin, "table-cell");
+  assert.equal(
+    report.findings.filter((f) => f.confidence === "high").length > 0,
+    true,
+  );
+});
+
+test("a status disagreement is reported even when stdout agrees", () => {
+  // The stdout channel exists because the task-66 fixture disagrees on output
+  // while its exit status agrees. This is the mirror, and it used to be reported
+  // only as a bare execution-failure.
+  if (!zshAvailable()) {
+    assert.ok(true, "zsh unavailable — dual-shell comparison cannot run here");
+    return;
+  }
+  // CLI_BUDGET, not a literal. `tests/test-harness-concurrency.test.js` fails the
+  // suite on a hardcoded spawn timeout, and correctly: a number chosen against an
+  // idle machine sits ~1.2x above the loaded worst case, which is close enough to
+  // be hit and rare enough to look like a mystery (bug.2). This block spawns two
+  // real shells, so it is exactly the shape that budget is sized for.
+  const { findings } = runBlock('[ 0 -ge "" ]', {
+    shells: ["bash", "zsh"],
+    cwd: tmp(),
+    timeout: CLI_BUDGET.timeoutMs,
+  });
+  const d = findings.find((f) => f.kind === "shell-disagreement");
+  assert.ok(
+    d,
+    "differing exit statuses with identical output must be a disagreement",
+  );
+  assert.equal(d.channel, "status");
+});
+
+test("a runnable table cell falsifies zero-blocks-executed, which is the correct outcome", () => {
+  // Measured on the real corpus: develop-pipeline-resume-contract.md went from
+  // one finding and exit 1 to zero findings and exit 0. Its four fenced blocks are
+  // all placeholders, so before this change `counts.runnable === 0` held and the
+  // gate reported "the gate did nothing here". Two of its table cells are runnable,
+  // so the guard's premise is now false — and the guard is a statement about
+  // COVERAGE, not a defect, so it must stop firing rather than be kept alive.
+  //
+  // Pinned as a test because it is the one corpus-visible behaviour change that is
+  // easy to mistake for a regression. The finding lost was `medium` confidence and
+  // never gate-blocking (only `high` + `category: bug` gates), and the coverage it
+  // complained about genuinely improved.
+  const dir = tmp();
+  const file = join(dir, "placeholder-fences-runnable-cell.md");
+  writeFileSync(
+    file,
+    [bash("ls {task-directory}"), "", cmdTable("`wc -l /dev/null`")].join("\n"),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(
+    report.counts.placeholder,
+    1,
+    "the fenced block stays a placeholder",
+  );
+  assert.equal(report.counts.runnable, 1, "the table cell is what runs");
+  assert.equal(
+    report.findings.find((f) => f.kind === "zero-blocks-executed"),
+    undefined,
+    "zero-blocks-executed must not fire once something has actually run",
+  );
+});
+
+test("zero-blocks-executed still fires when nothing runs, cells included", () => {
+  // The other half of the pair, and success criterion 4. A document whose fenced
+  // AND table-cell commands are all placeholders must still be reported as a run
+  // that covered nothing — the silent-pass this whole engine exists to prevent.
+  const dir = tmp();
+  const file = join(dir, "all-placeholders.md");
+  writeFileSync(
+    file,
+    [bash("ls {task-directory}"), "", cmdTable("`wc -l {task-file}`")].join(
+      "\n",
+    ),
+  );
+  const report = executeFile(file, { allowZsh: false });
+  assert.equal(report.counts.runnable, 0);
+  assert.equal(
+    report.counts.placeholder,
+    2,
+    "both sources contribute placeholders",
+  );
+  const finding = report.findings.find(
+    (f) => f.kind === "zero-blocks-executed",
+  );
+  assert.ok(finding, "a run that executed nothing is never a pass");
+  assert.equal(finding.confidence, "medium");
+});
+
+// ── 10. TASK87-001 — a pipe inside a code span is content, not a delimiter ────
+
+test("TASK87-001: an unescaped pipe in a SIBLING cell no longer drops the command", () => {
+  // QA cycle 1 found this by execution. Before the fix, `| `a|b` | `echo x y` |`
+  // split into three cells, so the command column index pointed at "b`" and the
+  // real command was never extracted — the file reported zero blocks, zero
+  // findings and no note, byte-identical to a document with no commands in it.
+  // That is the silent skip this engine exists to eliminate, reached through a
+  // different door.
+  const doc = [
+    "| Artifact | Verification command |",
+    "| --- | --- |",
+    "| `a|b` | `echo shifted` |",
+  ].join("\n");
+  assert.deepEqual(splitTableRow("| `a|b` | `echo shifted` |"), [
+    "`a|b`",
+    "`echo shifted`",
+  ]);
+  assert.deepEqual(
+    extractTableCellCommands(doc).map((b) => b.code),
+    ["echo shifted"],
+  );
+});
+
+test("TASK87-001: the escaped pipe path is unaffected by the code-span rule", () => {
+  // The two mechanisms are independent and must stay so: `\|` is preserved by the
+  // splitter and removed by unescapeCell, regardless of whether it sits inside a
+  // span. Reusing the real cell text from develop-pipeline-resume-contract.md.
+  assert.deepEqual(splitTableRow("| a | b \\| c | d |"), ["a", "b \\| c", "d"]);
+  const doc = [
+    "| Step | Verification command |",
+    "| --- | --- |",
+    '| 1 | `gh pr view 7 --json comments \\| grep -i "QA"` |',
+  ].join("\n");
+  assert.equal(
+    extractTableCellCommands(doc)[0].code,
+    'gh pr view 7 --json comments | grep -i "QA"',
+  );
+});
+
+test("TASK87-001: an unclosed span falls back to the naive split", () => {
+  // A stray backtick must not swallow the rest of the row. Trusting the code-span
+  // reading here would collapse the row into one cell and make the command column
+  // disappear entirely — worse than the bug being fixed.
+  assert.deepEqual(splitTableRow("| a | `oops | b |"), ["a", "`oops", "b"]);
+});
+
+test("TASK87-001: a span closes only on a run of its own length", () => {
+  // `` `a` `` inside a two-backtick span is content, so the pipe after it is
+  // still inside the span. A parity-only rule would close the span at the first
+  // single backtick and read that pipe as a delimiter.
+  assert.deepEqual(splitTableRow("| x | `` a `b|c` d `` | y |"), [
+    "x",
+    "`` a `b|c` d ``",
+    "y",
+  ]);
+});
+
+test("TASK87-001: a command column whose OWN cell holds an unescaped pipe", () => {
+  // The case the fix most directly buys: a pipeline written without escaping the
+  // pipe. Previously the row split mid-command and neither half was runnable.
+  const doc = [
+    "| Step | Verification command |",
+    "| --- | --- |",
+    "| 1 | `ls -la /dev/null | wc -l` |",
+  ].join("\n");
+  const blocks = extractTableCellCommands(doc);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].code, "ls -la /dev/null | wc -l");
+});
+
+// ── 11. TASK87-002 — an escaped backtick does not open a code span ────────────
+//
+// Found by QA cycle 2's REFUTE pass, and it is a regression from cycle 1's own
+// fix: the code-span tracking added for TASK87-001 read `\`` as a span delimiter.
+// A fix is new code, not the closure of a finding.
+
+test("TASK87-002: two escaped backticks no longer collapse the row", () => {
+  // The defect: `\`` opened a span at "a", the second `\`` closed it at "c", so
+  // the real delimiter between them became content and the row collapsed to ONE
+  // cell — `["a \\` b | c \\` d"]`. A command column in such a row does not exist,
+  // so its command was dropped in silence. Same class as TASK87-001,
+  // reintroduced by the fix for it.
+  assert.deepEqual(splitTableRow("| a \\` b | c \\` d |"), [
+    "a \\` b",
+    "c \\` d",
+  ]);
+});
+
+test("TASK87-002: a single escaped backtick splits correctly without the fallback", () => {
+  // Before the fix this only worked by accident — the span never closed, so the
+  // unclosed-span fallback rescued it. Relying on a fallback to get the common
+  // case right is not the same as getting it right.
+  assert.deepEqual(splitTableRow("| a \\` b | c |"), ["a \\` b", "c"]);
+});
+
+test("TASK87-002: inside a code span a backslash is literal, so the backtick still closes", () => {
+  // markdown's asymmetry, not ours: backslash escapes do not apply inside a code
+  // span, so a backtick there still counts toward the closing run. That is why the
+  // escape branch is guarded on `spanLen === 0` rather than being unconditional.
+  //
+  // ⚠️ The obvious assertion for this — `splitTableRow("| x | `a \\` | y |")` —
+  // is VACUOUS, and was in the suite for one cycle before the mutation check
+  // caught it. Dropping the guard leaves the span open to end of line, the
+  // unclosed-span fallback fires, and the fallback's naive split happens to give
+  // the same cells. The test passed under the exact mutation it claimed to guard.
+  //
+  // This input distinguishes them because the guarded reading CLOSES the span
+  // (so the row needs no fallback) while the unguarded one does not:
+  //   guard on  → ["x", "`a|b\\`", "y"]        — one cell, pipe inside the span
+  //   guard off → ["x", "`a", "b\\`", "y"]      — span left open, fallback, mis-split
+  // Found by brute-forcing short strings over {| ` \\ a space} for a difference,
+  // rather than by reasoning about which input ought to differ.
+  assert.deepEqual(splitTableRow("| x | `a|b\\` | y |"), ["x", "`a|b\\`", "y"]);
+});
+
+test("TASK87-002: a command in a row that also carries escaped backticks is still found", () => {
+  const doc = [
+    "| Note | Verification command |",
+    "| --- | --- |",
+    "| use \\` for code | `echo still here` |",
+  ].join("\n");
+  assert.deepEqual(
+    extractTableCellCommands(doc).map((b) => b.code),
+    ["echo still here"],
+  );
+});
+
+test("TASK87-001 and TASK87-002 hold together, not just separately", () => {
+  // The refute directive's "review the COMBINATION" rule, made a test: one row
+  // carrying an escaped backtick AND an unescaped pipe inside a code span. Each
+  // fix alone gets this wrong in a different direction.
+  assert.deepEqual(splitTableRow("| a \\` b | `x|y` | `echo both` |"), [
+    "a \\` b",
+    "`x|y`",
+    "`echo both`",
+  ]);
+  const doc = [
+    "| Note | Artifact | Verification command |",
+    "| --- | --- | --- |",
+    "| a \\` b | `x|y` | `echo both` |",
+  ].join("\n");
+  assert.deepEqual(
+    extractTableCellCommands(doc).map((b) => b.code),
+    ["echo both"],
+  );
 });

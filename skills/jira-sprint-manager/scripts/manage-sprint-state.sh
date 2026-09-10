@@ -42,9 +42,16 @@ URL="https://$JIRA_INSTANCE/rest/agile/1.0/sprint/$SPRINT_ID"
 
 # Name the mutation for the access gate, so a restricted run records "close
 # sprint 42" rather than a URL and a payload. See jsm_curl in jira-sprint-lib.sh.
+# JSM_DEFER_* are the access gate's input contract: set here, read by jsm_curl in
+# jira-sprint-lib.sh (which this script sources), never used locally. A directive
+# covers only the next command, so each assignment carries its own.
+# shellcheck disable=SC2034  # access-gate input contract; see the note above
 JSM_DEFER_KIND="jira.sprint.set-state"
+# shellcheck disable=SC2034  # access-gate input contract; see the note above
 JSM_DEFER_INTENT="Set sprint $SPRINT_ID to state: $STATE"
+# shellcheck disable=SC2034  # access-gate input contract; see the note above
 JSM_DEFER_TARGET="{\"sprint\":\"$SPRINT_ID\",\"url\":\"$URL\",\"ui_url\":\"https://$JIRA_INSTANCE/jira/software/projects\"}"
+# shellcheck disable=SC2034  # access-gate input contract; see the note above
 JSM_DEFER_DESIRED="{\"state\":\"$STATE\"}"
 
 # Documented partial update is POST. Some proxies/tenants reject POST → fall back to PUT.

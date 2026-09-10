@@ -94,7 +94,7 @@ Run these checks before calling Day 1 done:
 
 ## What you learned
 
-- **Task pipeline shape:** create → develop → review → PR → QA → (qa-fix) → finalise → accepted
+- **Task pipeline shape:** create → develop → review → PR → QA → (qa-fix) → review-pr → finalise → accepted
 - **Phase 0 prompts:** what they mean and why the recommended defaults exist
 - **The messy path:** QA findings are normal — `qa-fix` is how you close them, not a sign of failure
 

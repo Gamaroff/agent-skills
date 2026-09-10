@@ -1,0 +1,171 @@
+schema: 1
+task: "task.84.skill-install-profiles"
+task_title: "Skill install profiles with dependency closure"
+gate: CONCERNS
+status_reason: "Cycle 1 found eleven defects — ten from an independent adversarial review, one from the repo's own stdout-drain guard. Four silently installed every skill in reachable configurations, one broke both CI drift checks on legal YAML, two misreported what the installer did. ALL ELEVEN ARE FIXED, each with a regression test, and six are mutation-proven. This gate records cycle 1's findings and their resolution; the re-review writes gate 2."
+
+bug_resolution:
+  bugs_fixed: 11
+  bugs_remaining: 0
+  fix_date: "2026-09-04"
+  total_iterations: 1
+  verification_method: "16 new regression tests (one per defect); six fixes mutation-proven by reverting each and confirming red; end-to-end re-verification of every fixed path against a simulated tarball install"
+  note: "TASK-84-007 was resolved by correcting the PLAN rather than the code — the resolver does not exist at prompt time, so the counts it documented were not implementable without adding a network request to a prompt that must not make one."
+  found_after_first_ten: "TASK-84-011 — process.exit() after a stdout write in resolve-skill-set-cli.mjs, caught by the pre-existing stdout-drain-on-exit guard. setup-consumer.sh pipes this CLI's stdout, so the ~64KB truncation applies; 120 names sit under it today, which is why it would have surfaced only once the library grew."
+reviewer: "QA Engineer"
+updated: "2026-09-04T22:05:00Z"
+
+top_issues:
+  - id: "TASK-84-001"
+    severity: medium
+    file: "shared/resources/resolve-skill-set-cli.mjs"
+    finding: "`include` entries are echoed to stdout verbatim without being validated against the known skill set. Verified: `--include Create-PR,NotARealSkill` emits both names. Those lines then fail the bash name-shape guard, which rejects the WHOLE batch, so a single typo in the wizard's extras answer downgrades to a full unfiltered install — blamed on node/PATH by the warning text."
+    suggested_action: "Validate `include` against `allSkills` in the CLI and exit 2 naming the unknown entry, so a bad name never reaches stdout. Also strip quotes per element in `_config_skills_list`, matching `_config_skills_profile`."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-002"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "`[[ -n \"$_out\" ]] || return 1` conflates a legitimately-empty resolved set with a resolver failure. Verified: `--profile minimal --exclude <all five minimal seeds>` resolves to 0 skills and exits 0; bash then reads empty stdout as failure and installs EVERY skill. The user asked for almost nothing and got the maximum."
+    suggested_action: "Discriminate on the CLI's exit code, not on emptiness: capture `_rc=$?` and treat rc==0 as authoritative even with empty output. If an empty set still warrants a guard, warn explicitly ('profile resolved to 0 skills — check your exclude list') rather than silently inverting intent."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-003"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "Both awk parsers open the skills block only on `/^skills:[[:space:]]*$/`, so nothing may follow `skills:` on that line. The very next rule `/^[^[:space:]#]/ { inblock=0 }` then matches that same line. Verified: `skills:  # which skills` followed by `  profile: minimal` yields an empty profile, falls back to `full`, and installs everything — with NO warning at all, since this path never reaches the 'could not resolve' branch."
+    suggested_action: "Match `/^skills:[[:space:]]*(#.*)?$/`, or gate the close rule with `!/^skills:/` so the header cannot re-close its own block. Apply to `_config_skills_profile` and `_config_skills_list` alike."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-004"
+    severity: medium
+    file: "scripts/generate-skill-dependencies.mjs"
+    finding: "`parseInvokes` checks `raw.endsWith(']')` without stripping a trailing YAML comment. Verified: `invokes: [create-branch, develop]  # steps 1-2` throws \"unterminated 'invokes:' list — missing ']'\" — for a line where the bracket is plainly present. Both CI drift checks then fail with a misleading message, blocking the release."
+    suggested_action: "Strip a trailing ` #...` before the bracket checks (`raw = raw.replace(/\\s+#.*$/, '')`), mirroring the awk parsers."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-005"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "The profile grandfather branch runs BEFORE the tracker-exclusion branch, and the resolver has already removed tracker-excluded skills from `_RESOLVED_SET`. So whenever a profile is active, every tracker-excluded skill is consumed by the profile branch: `_kept` is always 0, the tracker-specific warning (with its `--all-skills` and prune guidance) is unreachable, and Jira-only skills are mis-reported as 'outside profile'."
+    suggested_action: "Evaluate `_skill_excluded_for_tracker` first, or test it inside the profile branch, so tracker-driven keeps land in `_kept` with the tracker message and only genuine profile keeps land in `_outside`."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-006"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "The profile branch increments `_skipped` for every not-yet-installed skill outside the profile, but the summary renders `_skipped` as `skipped (${_tracker})`. On a fresh `pipeline` install that reads as '85 skipped (github)' — telling the user 85 skills do not apply to GitHub when only ~11 do."
+    suggested_action: "Use a separate counter for profile skips and report it as `N not in profile '<name>'`, leaving `_skipped` to mean tracker skips only."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-007"
+    severity: medium
+    file: "docs/tasks/task.84.skill-install-profiles/task.84.plan.skill-install-profiles.md"
+    finding: "Plan Phase 3 shows the menu printing `~${_full_tokens} tokens for all ${_full_count}` and states these come from a `--count` call before the menu. The shipped `select_skill_profile()` makes no such call and prints no counts."
+    suggested_action: "Implement the count (preferred — it is what makes the choice concrete), or correct the plan."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-008"
+    severity: low
+    file: "shared/resources/resolve-skill-set.mjs"
+    finding: "`graph[name] ?? []` is an unguarded prototype-chain lookup assuming an array. Verified: `--include toString` reaches `Object.prototype.toString`, throws 'function is not iterable' uncaught, and the installer falls back to a full install. A hand-edited graph with a string value iterates its characters as skill names."
+    suggested_action: "`Object.hasOwn(graph, name) && Array.isArray(graph[name]) ? graph[name] : []`, and wrap `main()` in try/catch exiting 2."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-009"
+    severity: low
+    file: "shared/resources/resolve-skill-set.mjs"
+    finding: "The unknown-profile guard filters `$`-prefixed keys out of the error message but not out of the lookup. Verified: `--profile '$comment'` returns an empty set and exits 0 instead of 'Unknown profile' — which the installer then reads as a failure and turns into a full install."
+    suggested_action: "Reject `profile.startsWith('$')` in the same guard."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-010"
+    severity: low
+    file: "scripts/setup-consumer.sh"
+    finding: "The dry-run count invokes the CLI with only `--profile` and `--tracker`, never the config's `--include`/`--exclude`, so the number previewed is not the number the real run would produce. Previewing the real run is the entire purpose of `--dry-run`. `_dry_n` is also assigned without `local`, leaking into global scope from inside `install_skills`."
+    suggested_action: "Factor the arg assembly out of `_resolve_skill_set` into a helper both paths call; declare `local _dry_n`."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+  - id: "TASK-84-011"
+    severity: medium
+    file: "shared/resources/resolve-skill-set-cli.mjs"
+    finding: "Four `process.exit(2)` calls after stdout writes. Caught by the repo's pre-existing `stdout-drain-on-exit.test.mjs` guard, not by review: `process.exit()` truncates a piped write at the pipe buffer (~64KB), and setup-consumer.sh consumes this CLI's stdout through a pipe. 120 skill names sit under 64KB today, so this would have stayed invisible until the library grew past it — the same class as bug.3.stdout-truncation-on-exit."
+    suggested_action: "Use `process.exitCode = 2` and return, never `process.exit()`."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-04"
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 42
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [1, 2, 3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No credentials or secrets involved. The new subprocess call passes arguments as a bash array, so no config value reaches a word-splitting context. The CLI reads two JSON files from the extracted tarball — a boundary the installer already crosses when it copies tarball content — so no new trust assumption. TASK-84-008 is a robustness defect, not a security one: the input is a committed file and the wizard's own prompt, not untrusted input."
+  performance:
+    status: PASS
+    notes: "~115ms per resolution over 120 nodes against a <1s criterion. Tarball download unchanged. The dry-run path stays offline."
+  reliability:
+    status: CONCERNS
+    notes: "The headline failure directions are right — node absent, and a shadowed node emitting help text, both fall back to the unfiltered install rather than an empty one, and the grandfather branch is correctly ordered against the rm -rf. But FOUR reachable inputs silently produce a full unfiltered install while reporting success or blaming the wrong cause: a typo'd include (001), an exclude list that empties the profile (002), a trailing comment after `skills:` (003), and a `$`-prefixed profile name (009). For a feature whose entire purpose is to not install things, 'silently installs everything' is the wrong direction to fail in even though it is the safe one."
+  maintainability:
+    status: CONCERNS
+    notes: "The resolver is pure, injected and well tested, and non-obvious decisions carry their rationale in-file — including the measurement behind the graph redesign. Against that: two comments added to validate.yml state incorrect premises (ubuntu-latest does ship Node; the drift check does not read skill-profiles.json), the conflict dedupe in the resolver is dead code while real duplicate conflicts go unmerged, and the two config parsers disagree on quote handling. A plan that documents unimplemented behaviour (007) is the same class of problem."
+
+recommendations:
+  immediate:
+    - action: "Fix the four silent-full-install paths — 001, 002, 003, 009"
+      refs: ["scripts/setup-consumer.sh", "shared/resources/resolve-skill-set-cli.mjs", "shared/resources/resolve-skill-set.mjs"]
+    - action: "Fix the parseInvokes trailing-comment throw (004) — it breaks both CI drift checks on legal YAML"
+      refs: ["scripts/generate-skill-dependencies.mjs"]
+    - action: "Fix the two reporting defects (005, 006) so the summary does not misattribute profile skips to the tracker filter and the tracker grandfather message is reachable"
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Resolve the plan/implementation divergence (007)"
+      refs: ["docs/tasks/task.84.skill-install-profiles/task.84.plan.skill-install-profiles.md", "scripts/setup-consumer.sh"]
+    - action: "Add regression tests for each — several of these are exactly the shape the existing suite already covers elsewhere and simply were not asserted"
+      refs: ["shared/resources/tests/setup-consumer-skill-profiles.test.mjs"]
+  future:
+    - action: "Run shellcheck once task 92's lane lands; the §9 criterion is unverified, not met"
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Correct the two inaccurate comments in validate.yml"
+      refs: [".github/workflows/validate.yml"]
+    - action: "Dedupe conflicts on `skill`, collecting `requiredBy` into one entry, and drop the dead `.some()` scan"
+      refs: ["shared/resources/resolve-skill-set.mjs"]
+    - action: "Consider recomputing the closure after the tracker drop, or document the over-approximation deliberately"
+      refs: ["shared/resources/resolve-skill-set.mjs"]
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions:
+    - "TASK-84-001 through TASK-84-006 fixed and regression-tested"
+    - "TASK-84-007 resolved so the plan matches the code"

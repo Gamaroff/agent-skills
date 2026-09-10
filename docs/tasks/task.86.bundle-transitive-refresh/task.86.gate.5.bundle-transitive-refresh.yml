@@ -1,0 +1,158 @@
+schema: 1
+task: 'task.86.bundle-transitive-refresh'
+task_title: '`bundle_skill.py` prints `in sync` for bundled references it never examines'
+gate: CONCERNS
+status_reason: >-
+  Cycle 5 is the last in the 5-cycle budget. It found two HIGH findings, both defects introduced by
+  cycle 4 — continuing the pattern where each cycle's fix creates the next cycle's finding. Both are
+  fixed and mutation-proven, and the more serious one is a straight REVERT of a cycle-4 change rather
+  than new work. The gate is CONCERNS rather than PASS because the loop has reached its limit with the
+  churn still live, and rather than FAIL because every finding is closed, the deliverable is sound, and
+  all evidence is recorded for the handover.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T14:30:00Z'
+
+top_issues:
+  - id: 'C5-003'
+    severity: high
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Cycle 4's pass-3 FENCE EXEMPTION was a functional regression, reverted here. The reasoning behind
+      it — "a fenced block is an example" — is false for this repo: skill docs use fences for the
+      commands the agent runs. 75 lines across 24 SKILL.md files invoke
+      `source references/resolve-platform.sh`, `node references/tracker-issue.js` and the like inside
+      ```bash blocks, and they hold the `references/` form BECAUSE pass 3 rewrote them. Under the
+      exemption, the next author writing the `shared/resources/` form inside a fence ships a path that
+      exists in no install — with `--check` reporting green. That is the exact failure this task exists
+      to eliminate, introduced while fixing it. No live breakage (the tree is already rewritten), so it
+      would have bitten a future author silently.
+    suggested_action: >-
+      Revert the fence exemption; keep the URL exemption, which covers the 404 case cycle 4 actually
+      had evidence for.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'C5-004'
+    severity: high
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      Cycle 4's C4-006 guard went on the WRONG READ, and its comment overstated what it fixed. It
+      claimed `discover_needed`'s `f.read_text()` was "the only unguarded read in the file"; it was
+      not. Pass 3's read is the one that actually crashes, and it stayed unguarded. Because the
+      check-side equivalent WAS already guarded, `--check` reported green for a skill on which
+      `npm run bundle` died with a raw UnicodeDecodeError — green-CI-but-broken-bundler, the same split
+      this task exists to close. With multiple targets it also aborted before later skills bundled.
+    suggested_action: 'Guard pass 3''s read too; correct the "only unguarded read" claim.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+  - id: 'C5-001'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      A 0444 source is self-locking: run 1 writes the copy and mirrors the mode, and run 2 dies with an
+      uncaught PermissionError before it can update it after a source change. Found by direct probe.
+      **Attribution corrected by the cycle-5 reviewer**: this is PRE-EXISTING, not a cycle-4 regression
+      — `write_if_changed`'s unconditional `chmod` is present verbatim at e14bccae, and cycle 4 only
+      removed a vestigial `if True:` wrapper in `check_skill` (a verified no-op). No live exposure:
+      every file under `shared/resources/` is 0644 or 0755.
+    suggested_action: 'Restore write permission on the destination before writing.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+waiver:
+  active: false
+
+quality_score: 72
+
+evidence:
+  tests_reviewed: 44
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      No auth, network, secrets or user data. The path-traversal hazard found in cycle 4 was fixed and
+      is mutation-proven; the reviewer confirmed `_within` rejects `../../OUT.md`, `a/../../b.md` and
+      absolute paths while accepting legitimate nested names.
+  performance:
+    status: PASS
+    notes: >-
+      `--check --all` ~2s over 125 skills. One measured redundancy carried as a residual:
+      `source_backed_on_disk` is called 182 times for 125 skills (57 redundant rglob scans) because the
+      UNREWRITTEN guard recomputes what `expected` already holds. Cost negligible; the duplication
+      invites drift.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      Cycles 2, 4 and 5 each found defects introduced by the previous cycle's fix. That is the central
+      reliability fact about this work and no amount of green CI displaces it.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      ~790 lines from an original 258, carrying seven problem classes, two rewrite variants and two
+      kinds of evidence. The file has outgrown incremental patching, and the loop budget is exhausted.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        HANDOVER — the pattern, stated plainly. `source_backed_on_disk`, the actual task.86 fix, was
+        written in the FIRST commit and has not changed in substance since. Every finding across five
+        cycles (~45 in total) has been in the `--check` CI assertion added beyond the task's stated
+        scope, or in its class taxonomy. The deliverable converged immediately; the elaboration never
+        did. A reviewer deciding what to do with this branch should weigh those separately.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        RESIDUAL: `FENCE_RE`-class parsing is gone with the exemption, so the CommonMark fence-length
+        and unclosed-fence defects the reviewer found are moot. Recorded because they would return with
+        any future attempt to reintroduce a fence exemption — do not reintroduce one without handling
+        4+-char fences, `~~~` inside ``` blocks, and the 3 files in this repo that already parse as
+        unbalanced.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        RESIDUAL: `_md_reference_sub`'s token heuristic has two symmetric edge failures — a URL
+        containing `(` truncates the token and is wrongly rewritten; a `|`-delimited line without
+        spaces wrongly skips a legitimate reference. No live instances (zero URLs containing
+        `shared/resources/` exist anywhere in the tree). Fix by matching whole-line URL spans once.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        RESIDUAL: the UNREWRITTEN guard duplicates `expected`; `if expected:` is provably equivalent.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        RESIDUAL (latent, carried from cycle 4): fixed-depth rewrite prefix mis-resolves for a file
+        more than one level deep; `expected_bytes` catches only UnicodeDecodeError where siblings also
+        catch OSError; a directory at a needed reference name is bucketed regenerable while the write
+        gate refuses it forever.
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        RESIDUAL: two traversal-guard clauses and two other behaviours are individually unpinned
+        (removing either half of the guard leaves the suite green; only removing both reds it). Same
+        shape as the symlink double-guard residual from cycle 2 — recorded, not claimed as covered.
+      refs: ['tests/bundle-transitive.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'A human weighs the deliverable (stable since commit 1) separately from the --check elaboration (five cycles of churn).'
+    - 'The six residuals above are triaged. All are latent; none has a live instance in this tree.'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-08'
+  total_iterations: 5
+  verification_method: >-
+    44 tests in the bundler suite (was 19 at cycle 1), 54 across both bundler files. Three mutation
+    proofs this cycle, each reddening exactly its own test — including MUT-32, which re-adds the fence
+    exemption and reds C4-002, pinning the revert itself. The `qa-execute-snippets` failure in the
+    first cycle-5 gate run was the load-flake this repo's memory documents: 98/98 pass, exit 0, when
+    the file is run alone.

@@ -12,7 +12,7 @@ Skills in this repo read a consumer project's architecture documentation to grou
 
 ## Purpose
 
-The pipeline (story → develop → review → QA → finalise) treats certain architecture files as **always-loaded context**. If they are missing, downstream skills either fail loudly or silently produce generic output that ignores project conventions. This spec defines the minimum required layout, the optional sharded structure, and how the layout connects to `skills-config.yaml`.
+The pipeline (story → develop → review → QA → PR review → finalise) treats certain architecture files as **always-loaded context**. If they are missing, downstream skills either fail loudly or silently produce generic output that ignores project conventions. This spec defines the minimum required layout, the optional sharded structure, and how the layout connects to `skills-config.yaml`.
 
 ## Directory layout
 

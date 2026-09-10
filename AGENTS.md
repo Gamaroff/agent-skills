@@ -2,6 +2,8 @@
 
 This file provides guidance to AI agents working with code in this repository.
 
+> **Picking up work here? Read [`.agents/handoff.md`](./.agents/handoff.md) first** — where things stand, what to pick up, the standing decisions, and the traps that cost time. Its state figures each carry the command that produced them: **re-run those commands rather than trusting the date at the top**. State decays within days (branch tip, what is in flight, next available task number); the traps section stays true much longer.
+
 ## Repository Purpose
 
 This is a library of agent skills — modular, self-contained packages that extend AI agent capabilities with specialized workflows, domain knowledge, and tooling. Skills are loaded into agents via `.agents/skills/` in target projects.
@@ -103,6 +105,36 @@ Canonical spec: [`shared/resources/tracker-comment-contract.md`](./shared/resour
 
 **`addCommentToJiraIssue` is prohibited in shipped prose.** It is legal in exactly one place — the `no-credentials` fallback documented in the contract file — and `evals/shared/tests/transition-protocol-parity.test.mjs` enforces that as an absolute rule with a two-file allowlist, so do not restate the fallback at a call site. An earlier version of that guard allowed the call near the literal `no-credentials`, which every site's own reason table pre-satisfied; it passed on the exact regression it named. Keeping the procedure in one file is what makes the rule enforceable.
 
+## Stakeholder Summaries
+
+Canonical spec: [`shared/resources/stakeholder-summary.md`](./shared/resources/stakeholder-summary.md). Engine: [`shared/resources/stakeholder-summary.js`](./shared/resources/stakeholder-summary.js) (pure — a frozen per-stage catalogue and `renderLead(stage, slots)`; no I/O, no `process.exit`). TL;DR: every comment this repository posts to a tracker issue opens with a **plain-language lead** — two to four sentences answering *what happened, what it means, what happens next*, written for a reader with no technical background, followed by a `---` and then the body unchanged. Nothing is taken away from the developer; something is added for everyone else.
+
+**The call site does not write the lead, and that is the whole point.** `tracker-comment.js` renders it from the `--stage` the caller already passes, so the rule needs no discipline to hold: a call site cannot forget a lead it never supplies, and **a comment for which no lead can be produced does not post** — no template and no `--summary-file` is exit 2, with nothing sent. This repository supplied its own counter-example: the comment contract asked every GitHub site to route through `tracker-comment.js`, and for months seven still posted a bare `gh issue comment`, because prose has no chokepoint. A convention documented and not enforced is a convention that drifts. Task 105 converted all seven and, more to the point, made the rule mechanical — `tests/mutation-call-site-coverage.test.js` now fails on a bare `gh issue comment` **invocation** in shipped source, and `shared/resources/tests/comment-slot-coverage.test.mjs` fails on a call site that feeds the lead nothing or feeds it a slot name its stage does not read.
+
+**Which slots a stage reads is fixed, and passing a name it does not read fails silently.** The engine validates no slot names: `--slot k=v` stores any key, and an unrecognised one reaches a template that never reads it — no exit code, no warning, a comment that posts and reads exactly as it would have with none. The mapping lives once, in the templates themselves, and `comment-slot-coverage.test.mjs` derives its expectations from that source rather than restating them. Task 105 shipped three wrong names into review (`pr` on `qa-gate`, `count` on `qa-cycle`) precisely because each is a real slot name on a *different* stage.
+
+Two rules carry the weight. **A verdict token is mapped, never passed through** — `CONCERNS` tells an outside reader nothing about whether to worry, and guessing wrong in either direction is worse than the raw token; the sentence lives in `GATE_MEANING`, and an unknown verdict renders "the results are recorded below" rather than defaulting to reassurance. And **every template must read correctly with no slots filled**, because the slot-free rendering is the one that ships first and is therefore the most visible and least exercised.
+
+The catalogue is keyed by `COMMENT_STAGES`, which its test **imports from the engine rather than restating** — so adding a stage without a lead turns that test red before the stage can be used anywhere. Two enumerations of "what stages exist" drift silently and in the worst direction; that is the enumeration class in [`docs/reference/anti-patterns.md`](./docs/reference/anti-patterns.md).
+
+## Inline PR Comments
+
+Canonical spec: [`shared/resources/pr-inline-comment-contract.md`](./shared/resources/pr-inline-comment-contract.md). Engine: [`shared/resources/pr-inline-comment.js`](./shared/resources/pr-inline-comment.js) (peer of `tracker-comment.js`, same exit codes and `--json` `reason` contract). TL;DR: a comment on a pull **request**, anchored to a line of the diff, is one CLI call — the engine resolves `VCS` itself. **This is the `VCS` axis, not `TRACKER`**: where a PR lives is a property of the remote, and a Bitbucket repo tracking work in Jira must not take a `gh` path that cannot address it.
+
+**A finding is never dropped.** Line anchoring fails routinely — a line outside the diff hunk is a 422 — so anchoring failure **degrades to the summary comment** and reports `anchor-failed`, never `posted`. Reporting a degraded finding as posted makes the failure invisible, which from the reader's side is the same outcome as dropping it. Read the per-finding `reason`s, not just the top-level one. Always `--findings-file`, never inline bodies: findings quote the code they are about. Re-runs are marker + **update-in-place** — resolving and replying to existing threads is deliberately out of scope, and the rule was chosen so it needs neither.
+
+## Authoring-Time Card Preflight
+
+Canonical spec: [`shared/resources/authoring-card-preflight.md`](./shared/resources/authoring-card-preflight.md). Engine: [`shared/resources/card-preflight.js`](./shared/resources/card-preflight.js) (offline, tracker-neutral; no auth, no network, no writes). TL;DR: `create-task`, `create-story` and `create-epic` each run the preflight on the document they just wrote, so a document that would publish a thin tracker card is caught **where the defect is introduced** rather than one step later in `review-*` — or, as happened to `task.99`, by a zero-tolerance corpus assertion after a full push–CI round trip. **Advisory at authoring, blocking at review**: the CLI exits 0 even with findings, because a gate at authoring pushes an author toward writing filler, and filler is worse than a thin card since it looks deliberate.
+
+**The section specs are defined exactly once**, as `CARD_SECTIONS_BY_KIND` in [`shared/resources/jira-sync.js`](./shared/resources/jira-sync.js), beside the `checkCardSections` that consumes them; all four `sync-jira-*` scripts re-export from there and no skill restates them. Two definitions of "what sections a card needs" drift silently and in the worst direction — the authoring check passing a document the sync then publishes thin — which is the enumeration class in [`docs/reference/anti-patterns.md`](./docs/reference/anti-patterns.md). A test asserts the one-definition property with a non-vacuity floor, and a second asserts every generated `references/` copy still matches its source: one *authored* definition is only one *effective* definition while the copies match it.
+
+## Observation Log
+
+Canonical spec: [`shared/resources/observation-log-contract.md`](./shared/resources/observation-log-contract.md). Engine: [`shared/resources/observation-log.js`](./shared/resources/observation-log.js) (pure, local, tracker-agnostic; same exit codes and `--json` `reason` contract as `tracker-comment.js`). TL;DR: the observation log is a **directory** — one Markdown file per observation, YAML frontmatter plus an Issue → Improvement → Principle body — and every read and write of it is one CLI call. Never hand-roll the id: `write` folds the archival sweep, the base-10 parse and the `wx` create into the same call, and there is deliberately **no `--id` flag** (a batch that pre-computes ids collapses N max-checks into one stale read). `parked` means decided-but-blocked: it leaves the work queue, requires `parked_until:`, and **never archives** — stamping a `resolved:` date on one to tidy it away loses it rather than deferring it. The workspace is resolved once by [`shared/resources/resolve-observation-workspace.sh`](./shared/resources/resolve-observation-workspace.sh), sourced as `source … || exit 1`, and never derived from the cwd; an ephemeral anchor (`/tmp`, `.claude/worktrees/`, a linked worktree) is refused, not warned about.
+
+**An empty result is a claim about the instrument.** A scan returning nothing means either there is nothing to find or the reader is broken, and those are byte-identical from the caller's side — so `empty` and `scan-broken` are separate `reason` values, and both `scan` and `next-id` carry an independent count check that trips rather than returning a clean zero. Adapted from [rebelytics/one-skill-to-rule-them-all](https://github.com/rebelytics/one-skill-to-rule-them-all) (CC BY 4.0, Eoghan Henn); the methodology is kept, the mechanism is a rewrite — see the contract for the attribution and what changed.
+
 ## Document Change Log
 
 Canonical spec: [`shared/resources/document-change-log.md`](./shared/resources/document-change-log.md). Engine: [`shared/resources/change-log.js`](./shared/resources/change-log.js) (pure, tracker-agnostic). TL;DR: every PRD, epic, story, and task carries an append-only `## Change Log` — four columns (`Date`, `Version`, `Description`, `Author`), newest at the bottom. Authoring/review/edit skills bump `Version`; machine writers (sync, QA, finalise, develop) leave it blank. **Every entry bumps frontmatter `updated:` in the same edit** (`updated` ≡ OKF `timestamp`). PRDs keep a nested `### Change Log`; readers accept H2 or H3 with optional numbering and preserve the level found. Markers are `<!-- change-log-start/end -->`, superseding the two legacy `jira-sync-`/`github-sync-` pairs, which migrate in place. Two exclusions: bug reports use `## Status History`, and tracker cards never carry the log. Adoption is additive and going-forward only — no backfill.
@@ -143,6 +175,30 @@ Canonical rules: [`docs/standards/bug-registry.md`](./docs/standards/bug-registr
 - **`bundle_skill.py`** (in-tree, for `setup-consumer.sh` tarball installs and similar) — does the same rewrite but writes `references/` into each skill directory and updates source `.md`/`.js` files in place. Commit the result. Run via `npm run bundle`.
 
 Never use symlinks or relative paths.
+
+## Observing This Session
+
+Before the first tool call of any session — and before writing or proposing a
+plan, not merely before executing one — invoke the `observe-work` skill AND
+execute its Session Start Protocol (workspace probe, frontmatter scan, review
+trigger). Loading the skill and running the protocol are separate steps; a
+session that loads the file and stops has activated nothing. Any turn that will
+involve a tool call counts; do not classify the session as "too simple" from its
+opening message.
+
+After completing each task, report in one line the observations written this
+session (ids and titles, or "none logged and why").
+
+Skill: [`skills/observe-work/SKILL.md`](./skills/observe-work/SKILL.md). Activation tiers, the opt-in
+`SessionStart` hook (`shared/resources/observe-work-session-start.sh`, shipped but **not** installed)
+and the fallback ladder for when writing this file is refused:
+[`skills/observe-work/references/environments.md`](./skills/observe-work/references/environments.md).
+
+Two properties above are load-bearing, and both come from reported failures. The instruction demands
+the **protocol by name**, because an agent that loads the skill and stops leaves nothing to surface
+the omission — a loaded-but-inert skill looks identical to an active one from the user's side. And the
+post-task line is the **backstop**: it forces a look at the log at every task boundary, so a session
+that silently skipped the protocol is discovered at the first boundary instead of never.
 
 ## Development Pipeline
 

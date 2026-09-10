@@ -1,0 +1,138 @@
+# Implementation Report: Add the observe-work meta-skill
+
+**Task**: `task.94.observe-work-skill.md`
+**Run Number**: 1
+**Started**: 2026-09-08 13:35
+**Status**: In Progress
+
+---
+
+## Summary
+
+Author `skills/observe-work/` — a meta-skill that observes the session for skill-improvement signals, writes them to the durable observation log built by task 93, and runs a periodic review that stages skill updates — plus every registration gate this repo's CI enforces.
+
+---
+
+## Pipeline Configuration
+
+| Setting             | Value                                                                      |
+| ------------------- | -------------------------------------------------------------------------- |
+| Feature branch base | develop                                                                    |
+| PR target           | develop                                                                    |
+| qa-planning gate    | skipped (auto)                                                             |
+| Task risk level     | not set                                                                    |
+| Pipeline mode       | standard (6 implementation phases ≥ 3)                                     |
+| Always-load files   | 3 files — docs/architecture/concepts/coding-standards.md, docs/architecture/concepts/tech-stack.md, docs/architecture/concepts/source-tree.md |
+| Tracker Issue       | #340 (GitHub)                                                              |
+| Board status        | In Progress ✅ (Todo → In Progress, verified)                              |
+| Board priority      | P1 High (already set — P2 default not applied)                             |
+
+---
+
+## Pipeline Progress
+
+| Step                       | Status     | Required Artifacts                                                     | Notes | Subagent summary ref |
+| -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
+| 1. create-branch           | ✅ Done    | Branch `feature/task.94.*` exists in git                               | `feature/task.94.observe-work-skill` created from `develop` at `5ae6cb50`, pushed with tracking | —                    |
+| 2. review-task             | ✅ Done    | `task.94.review.{N}.{name}.md` exists (or skip logged)                 | `task.94.review.1.observe-work-skill.md` — READY TO IMPLEMENT, 9/10, 0 critical / 2 important / 1 optional, all fixed; status promoted planned → ready-for-development | —                    |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 6/6 phases. 14 files created/modified. `npm run ci:fast` exit 0 — 2883 pass / 0 fail. New suite 20/20, glob mutation-proved RED→GREEN. | — (inline; no subagent) |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #354: https://github.com/Gamaroff/agent-skills/pull/354 — 23 files, no out-of-scope leak. Issue #340 commented (`in-review`). | — |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.94.qa.{N}.*.md`; `task.94.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 7. finalise                | ✅ Done    | `task.94.dod.{N}.*.md`; task `status: accepted`                        | `task.94.dod.1.observe-work-skill.md`; status → accepted; sprint-review summary written; canonical PR comment posted; issue #340 closed + verified; board `done` → `already` | — (inline; no subagent) |
+| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+
+---
+
+## Decisions Log
+
+### Pipeline Startup — 2026-09-08
+
+- Invoked by `/develop-next` (roadmap orchestrator) — autonomous run: all Phase 0d questions auto-answered with the recommended option.
+- Feature branch base: `develop` — auto-answered (recommended default; standard Gitflow, task is not a hotfix).
+- PR target branch: `develop` — auto-answered (recommended default; matches base).
+- qa-planning gate: skipped (auto — no prompt).
+- Phase 0 resolution run inline rather than via Explore subagents — the session's operating instructions bar subagent dispatch unless requested, and the task path was already resolved by the selector. No information was lost: 0b, 0c and the lite-mode inputs were all read directly.
+- Pipeline mode: standard — task declares 6 implementation phases (≥ 3), so the lite-mode conjunction fails at the phase-count clause regardless of the absent `risk_level`.
+- Step 7 finalise: the four DoD checks are normally four parallel Explore subagents; all four ran **inline**, since this session's instructions bar subagent dispatch. The security check's probe mode still executed 4 candidates against the resolver rather than reasoning about the boundary — 0 reproduced.
+- CI was verified on the **exact head** (`df882735`, local == PR head), all 5 jobs `COMPLETED`/`SUCCESS`. No entry resolved through the empty-string path that would round a running job up to green.
+- GitHub board: work-started → transitioned (Todo → In Progress, verified). Pipeline-start comment posted to #340 (reason: `posted`).
+- review-task output format auto-answered: "Comprehensive report" — required for the pipeline audit trail.
+- review-task Step 8.5 auto-answered: "Yes, apply all critical + important fixes" — pipeline proceeds autonomously.
+- review-task Step 9 auto-answered: "Yes, fixes complete" — outcome was READY TO IMPLEMENT, so the task was promoted planned → ready-for-development.
+- review-task Phase 1.5 pre-pass agents (B: architecture alignment, C: codebase already-implemented) were **not dispatched** — session instructions bar subagent dispatch unless requested. Both axes were covered inline instead: 25 technical claims verified directly against the working tree, and `skills/observe-work/` confirmed absent (no partial implementation to reconcile).
+- Step 4 staging scope: `docs/tasks/task.94.observe-work-skill`, `skills/observe-work`, `shared/resources`, `docs/reference`, `skills/create-skill/scripts`, `package.json`, `AGENTS.md`, `CHANGELOG.md`. No out-of-scope untracked files, so the pre-flight hold was not needed. Leak check clean over all 23 committed paths.
+- The implementation report is committed here (Step 4), by design — a reviewer can read the audit trail during QA, and a tracked document linking to an untracked file is a dangling link that fails only in CI.
+- Pre-develop surface map (20 files) and plan-file read done **inline** rather than via Explore subagents — session instructions bar subagent dispatch unless requested. Nothing was lost: the engine's subcommand set, flag set and reason vocabulary were read from source, and every registration target was located before Phase 1.
+- Alignment analysis: 🆕 No Implementation — `skills/observe-work/` absent, so greenfield; no alignment gate reached.
+- Draft/Planned gate: auto-answered "Yes, ready to implement" (review-task validated in Step 2).
+- High-risk gate: not reached (`risk_level` absent).
+- Task status on entry: `planned` — proceed per the develop-task status table; Step 2 (`/review-task`) validates and promotes.
+
+---
+
+## Issues Log
+
+_Problems encountered and how they were resolved or escalated._
+
+### Step 3 — findings during develop (all resolved in-step)
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | `json.dump` re-encoded unrelated non-ASCII in `package.json` (`…`→`\u2026`, `●`→`\u25cf`) on the first glob edit, producing a 2-line diff instead of 1 | Reverted; used a targeted text edit. Diff is now the single intended line |
+| 2 | My own bare-`node` assertion matched from the character *before* `node`, so its `command node` post-filter never saw the word it filtered on — the assertion was firing on every correct line | Replaced the post-filter with a negative lookbehind |
+| 3 | My own reason-vocabulary assertion collected only `reason: "x"` literals, missing `fork-detected` (emitted by assignment) and `already` (from a ternary). An under-collected vocabulary fails on reasons that are real — the failure mode that most resembles a finding | Collector widened to every line mentioning `reason` |
+| 4 | `tests/relationship-assertion-lint.test.js` rejected my "every reference is pointed at" assertion: it claimed a *relationship* but used a substring match, which a reference name appearing in unrelated prose would satisfy | Rewrote to parse the pointer table and key on each row's own link destination. Mutation-proved by deleting a pointer row while leaving the name in prose — exactly the case the old form could not catch. Used a `Set` rather than the lint's offered suppression, so exactness is structural rather than annotated |
+| 5 | `quick_validate.py` failed on a literal `shared/resources/<file>` placeholder in `applying-updates.md`, which `collect_shared_refs` reads as a filename | Row rephrased in prose |
+| 6 | Authored references used `shared/resources/…` paths. `bundle_skill.py` writes *into* `references/` and does not rewrite files already there, so those paths would never be fixed up and are dead in a consumer install | Authored references now name the bundled location (`references/…`); only `SKILL.md` carries the pre-bundle path the bundler keys on |
+
+### Step 2 — review-task findings (all resolved in-step)
+
+| # | Severity | Finding | Resolution |
+|---|---|---|---|
+| 1 | Important | §8 Integration Tests named `evals/shared/tests/skill-dependencies-drift.test.mjs`; that file does not exist (real path `shared/resources/tests/skill-dependencies-drift.test.mjs`) | Path corrected in the task document |
+| 2 | Important | Duplicate `**Status:**` line — header said `Ready for Development`, footer boilerplate still said `Planned` | Footer line corrected; both now agree |
+| 3 | Optional | §2 Motivation stated 124 skills; actual count is 125 | Corrected |
+
+---
+
+## QA Iteration History
+
+### QA Cycle 5 (final)
+
+| Item | Value |
+|---|---|
+| Gate | **PASS** — `task.94.gate.5.observe-work-skill.yml`, 100/100 |
+| **PR Review** | **CONCERNS** — `task.94.pr-review.1.observe-work-skill.md` (Step 5c); both findings closed before Step 7 |
+| Findings across the loop | 7 raised, 7 closed (2 HIGH, 5 MEDIUM) + 2 LOW advisory |
+| Cycles used | 5 of 5 |
+
+### Cycle-by-cycle
+
+| Cycle | Gate | Score | HIGH | What it found |
+|---|---|---|---|---|
+| 1 | FAIL | 60 | 1 | Session Start branched on a `doctor` reason the engine never emits; hook undercount; bundled contract's dangling links |
+| 2 (refute) | FAIL | 70 | 1 | **Both new findings were introduced by cycle 1's fixes** — a catch-all that disabled capture on every fresh install, and an overcount left by the undercount fix |
+| 3 | CONCERNS | 90 | 0 | Third counting divergence, in opposite directions, **cancelling** — caught only because `total` disagreed. Mechanism replaced per gate 2's pre-committed rule |
+| 4 | CONCERNS | 90 | 0 | The reference still documented the mechanism cycle 3 removed |
+| 5 | **PASS** | **100** | 0 | Nothing above LOW. Two never-executed degradation branches run for the first time; both hold |
+
+### Step 5c — PR review
+
+Verdict **CONCERNS**: one `medium` code finding (the suite asserted nothing about the hook — the file behind 4 of 7 findings), one `low` conformance finding (§7 omitted a file the PR edits). Both closed rather than carried:
+
+- `observe-work-hook.test.js` added — 6 tests, mutation-proved twice (reinstating the cycle-3 off-by-one turns 3 red; making a degradation path guess instead of staying silent turns 1 red).
+- §7 records the contract file and the new test.
+
+Writing that suite surfaced behaviour nothing had tested: a log holding **only** a frontmatter-less file trips the engine's own `scan-broken` guard, and the hook goes silent rather than reporting a partial count.
+
+---
+
+## Completion
+
+**Finished**: 2026-09-08
+**Final Status**: Completed
+**Branch**: `feature/task.94.observe-work-skill`
+**PR**: [#354](https://github.com/Gamaroff/agent-skills/pull/354)
+**QA Iterations**: 5 cycles (4 qa-fix rounds) — 7 findings raised, 7 closed
+**DoD Summary**: [`task.94.dod.1.observe-work-skill.md`](./task.94.dod.1.observe-work-skill.md) — ACCEPTED
+**Tracker debt**: none — issue #340 closed and verified, board `done` reported `already`, no deferred mutations

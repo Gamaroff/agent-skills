@@ -118,19 +118,129 @@ bash <(curl -fsSL https://raw.githubusercontent.com/Gamaroff/agent-skills/main/s
 
 ### What the wizard does
 
-The full wizard runs all 9 steps. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
+The full wizard runs all 10 steps. The `--update` flag runs only steps 1 and 8 — all others are skipped, so the consumer's config, registries, docs scaffold, and hooks are left untouched.
 
 | Step | Action                                                                                                                             | Skippable?                                           |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | 1    | Checks `node`, `git`, `jq`, `curl` are on PATH — exits if any missing                                                              | No                                                   |
 | 2    | Prompts for platform: GitHub+Issues / GitHub+Jira / Bitbucket+Jira, then **tracker access** (`full` / `read-only` / `approve` / `command` / `manual`) | No                                                   |
+| 2b   | Prompts for the **skill install profile** (`full` / `pipeline` / `minimal`) plus optional per-skill add-ons (see below). Appears in the wizard summary as `Skill profile` | Yes (Enter accepts `full`, today's behaviour)        |
 | 3    | Checks `gh` auth (GitHub), collects Bitbucket/Jira credentials with hidden input                                                   | —                                                    |
 | 4    | Writes `.env.example` (keys only); optionally writes `.env` + adds to `.gitignore`                                                 | Yes                                                  |
 | 5    | Scaffolds `skills-config.yaml` — prompts PRD path, story layout, coding-standards path                                             | Yes (skips if file exists and you decline overwrite) |
 | 6    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md` if absent                                            | Idempotent                                           |
 | 7    | Scaffolds `docs/prd/`, `docs/architecture/concepts/` (3 required stubs), `docs/tasks/`                                             | Idempotent                                           |
-| 8    | Downloads the latest release from GitHub and extracts skills into `.agents/skills/`                                                | Yes                                                  |
+| 8    | Downloads the latest release from GitHub and extracts skills into `.agents/skills/`, applying **your install profile** (see below) and **skipping the tracker-specific skills your platform can never fire** (see below)                                                | Yes                                                  |
 | 9    | Patches `.claude/settings.json` directly with the three pipeline hooks (inline jq — no dependency on skills being installed first) | Yes                                                  |
+
+#### Skill profiles — choosing how much of the library to install
+
+Early in the wizard, right after the platform question, you are asked which **install profile** you
+want. This is a different axis from the tracker filter below: the filter removes skills that *cannot
+work* on your platform, the profile removes skills you *do not use*.
+
+```
+  1) full      — every skill. Today's behaviour.
+  2) pipeline  — story/task/bug lifecycle: create → review → develop → QA → finalise.
+  3) minimal   — branching, commits, PRs, code review only.
+```
+
+**Why this exists: context, not disk.** Every installed skill's `description` is loaded into the
+agent's context on every single request, before it reads a single instruction. The library's
+descriptions total tens of thousands of bytes. Disk space is irrelevant; that standing context cost
+is not.
+
+**A profile names seeds, not the whole set.** Each profile lists a handful of skills; the installer
+then resolves everything those skills *invoke*, transitively, and installs those too. Choosing
+`pipeline` gets you `develop-story` **and** the eight skills it calls as pipeline steps, because
+`develop-story` declares them. This is why a profile cannot leave you with a pipeline that dies at
+step 4 — that outcome is not representable. The wizard prints what the closure added before it
+installs:
+
+```
+→ Profile: pipeline — 35 skills (26 chosen, 9 pulled in by dependency)
+    + mermaid-architect (required by review-task)
+    + ensure-task-github-issue (required by review-task)
+  ...
+    − sync-jira-story (not applicable to tracker: github)
+```
+
+**Adding individual skills.** Choosing a non-`full` profile prompts for extra skills, comma
+separated — the way to pick up something from the long tail (`jira-sprint-retrospective`,
+`use-railway`, `explain-simply`) without dropping to `full`. Everything you name brings its own
+dependencies with it.
+
+**Your choice is written to `skills-config.yaml`** so `--update` reproduces it:
+
+```yaml
+skills:
+  profile: pipeline
+  include: []
+  exclude: []
+```
+
+Commit that file and every developer and CI run resolve the same set. An **absent `skills:` block
+means `full`** — every config written before this feature existed keeps behaving exactly as it did.
+
+**Changing profile later** is a config edit plus an update:
+
+```bash
+# edit skills-config.yaml → skills.profile: minimal
+bash scripts/setup-consumer.sh --update
+```
+
+**Nothing is ever pruned** — see the note under Step 8, which applies here identically. After
+switching to a smaller profile your `.agents/skills/` will still hold everything it held before, and
+the wizard says so explicitly rather than pretending config and disk agree:
+
+```
+⚠ 74 skill(s) are outside profile 'pipeline' but were kept because they are already
+  installed. Your skills-config.yaml and .agents/skills/ therefore disagree, which is
+  expected after adopting a profile — nothing is ever pruned on your behalf.
+  To make disk match config: rm -rf .agents/skills && re-run with --update.
+```
+
+That divergence is the **normal** state for an existing project adopting a profile, not an error.
+
+**`exclude` reports conflicts rather than resolving them.** If you exclude a skill that something
+else in your set requires, the installer names it, names what requires it, and leaves it out:
+
+```
+⚠  create-pr is in skills.exclude but required by develop-story — not installed.
+   Anything invoking create-pr will fail at that step. Remove it from skills.exclude,
+   or drop develop-story from your profile.
+```
+
+It is never silently re-added (that would ignore what you asked for) and never silently dropped
+(that would fail mid-pipeline with nothing pointing at the cause).
+
+#### Step 8 — the platform skill filter
+
+17 of the shipped skills are tracker-specific and mutually exclusive: 11 exist only for Jira
+(`sync-jira-*`, `ensure-*-jira-issue`, `jira-sprint-*`, …), 6 only for GitHub Issues
+(`sync-github-*`, `ensure-*-github-issue`). The wizard installs only the set that can actually fire.
+
+The saving in context is modest — roughly 1,500 tokens of metadata for a GitHub consumer. The real
+reason is **mis-selection**: skill auto-activation matches on the `description` field, and two
+siblings whose descriptions differ only in the platform noun are a live hazard when an agent is asked
+to "sync this story to the tracker".
+
+- **Which tracker is resolved** follows the same order the skills themselves use at runtime:
+  `tracker:` in `skills-config.yaml`, then the wizard's own answer, then a `JIRA_URL` in the
+  environment or `.env`, and otherwise `github`. The wizard writes a `tracker:` key on both
+  platforms, so a config generated by it always states its own answer.
+- **Nothing is ever deleted.** A skill that is already installed is *kept* even when it no longer
+  applies, and reported as `kept … (already installed; not pruned)`. Running `--update` over an
+  existing install therefore removes nothing, on either platform.
+- **To prune an existing install**, delete `.agents/skills/` and re-run the wizard. This is
+  deliberately manual — deleting a skill some custom workflow calls is not something to do on your
+  behalf.
+- **To turn the filter off entirely**, pass `--all-skills`:
+
+  ```bash
+  bash scripts/setup-consumer.sh --all-skills          # full wizard, every skill
+  bash scripts/setup-consumer.sh --update --all-skills # re-download every skill
+  ```
 
 ### Files produced
 

@@ -98,6 +98,61 @@ git_with_remote "$D6" "https://bitbucket.org/acme/repo.git"
 run_fixture "$D6" "JIRA_URL=https://acme.atlassian.net"
 assert_eq "No config file (env JIRA_URL + BB remote)" "$TRACKER_GOT" "$VCS_GOT" "jira" "bitbucket"
 
+# ── Scenario 7: the `.env` rung — pinned from the RUNTIME side ───────────────
+#
+# WHY THESE LIVE HERE and not only in the installer's suite. Task 91 added a
+# `.env` probe to TRACKER resolution, which changes behaviour for EVERY skill in
+# the repo. All twelve spelling cases were written into
+# shared/resources/tests/setup-consumer-skill-exclusion.test.mjs — the
+# INSTALLER's file — so this resolver's own regression net, the one §8 of that
+# task names for catching "an unintended change to it", never covered the rung
+# at all. Delete the installer tomorrow and the coverage goes with it.
+#
+# Each case is a `.env` spelling that cost a defect. The env var is explicitly
+# cleared so the `.env` rung is what is under test, not the process environment.
+env_case() {
+  # env_case NAME DOTENV_CONTENT EXPECTED_TRACKER
+  local name="$1" content="$2" want="$3"
+  local d="$TMPDIR_TEST/env-$PASS-$FAIL-$RANDOM" && mkdir -p "$d"
+  git_with_remote "$d" "https://github.com/acme/repo.git"
+  printf '%b' "$content" > "$d/.env"
+  run_fixture "$d" "JIRA_URL="
+  assert_eq ".env $name" "$TRACKER_GOT" "$VCS_GOT" "$want" "github"
+}
+
+env_case "plain assignment"            'JIRA_URL=https://acme.atlassian.net\n'        "jira"
+# Missed by a bare `^JIRA_URL=` anchor. A shell that SOURCES such a .env has
+# JIRA_URL exported and resolves jira, so missing it recreated the very
+# install-vs-run split this rung exists to close.
+env_case "export prefix"               'export JIRA_URL=https://acme.atlassian.net\n' "jira"
+# A trailing CR satisfies `.+`, so an emptied key read as SET. CRLF is the exact
+# spelling task 83 was written to fix.
+env_case "empty value, CRLF ending"    'JIRA_URL=\r\n'                                "github"
+env_case "quoted empty value"          'JIRA_URL=""\n'                                "github"
+# A shell sourcing this file takes the LAST assignment, so first-match-wins
+# disagreed with it.
+env_case "set then emptied (last wins)" 'JIRA_URL=https://x\nJIRA_URL=\n'             "github"
+env_case "a different key ending in JIRA_URL" 'MYJIRA_URL=https://x\n'                 "github"
+
+# The config key must still beat a stale .env — the documented one-line opt-out
+# for this behaviour change. If this goes red, a repo that pinned `tracker: github`
+# to protect itself from a stale .env has lost that protection.
+D8="$TMPDIR_TEST/s8" && mkdir "$D8"
+git_with_remote "$D8" "https://github.com/acme/repo.git"
+printf 'tracker: github\n' > "$D8/skills-config.yaml"
+printf 'JIRA_URL=https://stale.atlassian.net\n' > "$D8/.env"
+run_fixture "$D8" "JIRA_URL="
+assert_eq "explicit tracker: github beats a stale .env" "$TRACKER_GOT" "$VCS_GOT" "github" "github"
+
+# The process environment ranks ABOVE .env. Both spell jira when set, so the
+# ordering is outcome-invisible in the positive case — this pins the negative
+# one: an EMPTY .env value must not override a set environment variable.
+D9="$TMPDIR_TEST/s9" && mkdir "$D9"
+git_with_remote "$D9" "https://github.com/acme/repo.git"
+printf 'JIRA_URL=\n' > "$D9/.env"
+run_fixture "$D9" "JIRA_URL=https://acme.atlassian.net"
+assert_eq "env JIRA_URL wins over an emptied .env" "$TRACKER_GOT" "$VCS_GOT" "jira" "github"
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

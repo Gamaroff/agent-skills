@@ -75,7 +75,52 @@ Files not intended to be loaded into context, but rather used within the output 
 - **Use cases**: Templates, images, icons, boilerplate code, fonts, sample documents that get copied or modified
 - **Benefits**: Separates output resources from documentation, enables Claude to use files without loading them into context
 
-### Progressive Disclosure Design Principle
+### Declaring what a skill invokes (`invokes:`)
+
+If your skill **invokes other skills** — a pipeline orchestrator, a review skill that delegates to a
+sub-routine — declare them in the frontmatter:
+
+```yaml
+---
+name: develop-task
+description: ...
+invokes: [create-branch, review-task, develop, create-pr, qa-task, qa-fix, finalise, commit-changes]
+---
+```
+
+**Why it matters.** `setup-consumer.sh` offers install profiles (`minimal` / `pipeline` / `full`). A
+profile names *seed* skills and the installer resolves each seed's transitive callees from this
+declaration, so a consumer who picks `pipeline` gets your orchestrator **and** everything it calls.
+Without the key your skill declares no edges, and a profile install can ship it with none of its
+steps — failing mid-run in the consumer's repo, hours after the install, at the step whose skill is
+missing.
+
+Rules:
+
+- **Inline flow form only, all on the key line** — `invokes: [a, b]`. Both other spellings are
+  **rejected with an error**, deliberately: the YAML block form (`invokes:` then `  - a`), and the
+  wrapped flow form (`invokes:` then `  [a, b]` on the next line). Each used to parse as an empty
+  list, and a silently-empty edge list is invisible to CI — the generator and the committed manifest
+  agree on it, so the drift check stays green — while breaking a consumer's pipeline. The wrapped
+  form is not hypothetical: `develop-bug` shipped nine declared callees as zero edges for a cycle,
+  and a `profile: pipeline` install lost `ensure-bug-{jira,github}-issue` with it.
+- **Keep it on one line even when it is long.** Prettier does not reflow a long inline flow sequence
+  in frontmatter, so nothing in the toolchain will wrap it for you. If your list feels too long to
+  read on one line, that is a signal about the skill, not about the formatting.
+- **Every name must be a real directory under `skills/`.** Unknown names fail the generator.
+- **Absent key = no edges**, which is the safe default. Only add it if your skill genuinely calls
+  others.
+- After editing, run `npm run generate-skill-deps` and commit
+  `references/skill-dependencies.json`. CI fails on drift — `validate.yml` on PRs,
+  `release.yml` at tag time.
+- `npm run skill-deps:candidates` lists skills your prose mentions but your `invokes:` does not.
+  It is **advisory**: most mentions are legitimate cross-references, so scan it for a genuine missed
+  call rather than bulk-adding.
+
+**Checklist for a new orchestrator skill**: does it invoke others? If yes, is every one declared? Has
+`npm run generate-skill-deps` been run and the JSON committed?
+
+## Progressive Disclosure Design Principle
 
 Skills use a three-level loading system to manage context efficiently:
 
@@ -84,6 +129,31 @@ Skills use a three-level loading system to manage context efficiently:
 3. **Bundled resources** - As needed by Claude (Unlimited\*)
 
 \*Unlimited because scripts can be executed without reading into context window.
+
+## Signal Design Principle
+
+A skill that emits a check, status, count or verdict is designing a **signal**, and a signal is read
+by someone deciding what to do next. Two rules, both learned the expensive way:
+
+**Name the states behind every empty value.** For each falsy, empty or zero value a check can emit,
+list the distinct situations that produce it. If two situations produce the same value and the right
+response differs between them, they need different values — a `state` field beside the boolean, or a
+verdict vocabulary instead of a boolean. "Found nothing" and "could not look" are identical from the
+caller's side, and the caller will take the reassuring reading.
+
+**Anchor a check to the thing it makes a claim about.** A check that reads `process.cwd()`, or the
+first file it happens to find, is making a claim about the caller's location while being worded as a
+claim about the project. Where a skill establishes an anchor precisely because some ambient value is
+untrustworthy, every check downstream inherits that rule.
+
+Corollary for the guidance you write around a check: **if the correct response to a signal is always
+"note it and continue", the signal is broken.** Documenting the workaround makes the check unable to
+report a true positive either, and a signal that is always ignored carries no information. Fix the
+check.
+
+Full rationale and the review-time form of both rules:
+[`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § *Never let one signal
+report two states*.
 
 ## Skill Creation Process
 

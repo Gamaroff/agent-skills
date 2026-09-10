@@ -12,13 +12,40 @@ description: How every pipeline step and skill posts a comment to a tracker issu
 > intercepted, retried by code, or made idempotent, because interception needs a
 > chokepoint and prose has none.
 >
-> **On GitHub the picture is not yet complete.** A number of authored prose sites
-> still post with a bare `gh issue comment` — they are covered by
-> `tracker_write()` for interception, but they carry no marker, so they are not
-> idempotent and a resumed run comments again. Those sites were out of this
-> task's scope, which targeted the MCP sites and the one stray `curl`. Do not
-> read the paragraph above as "nothing else posts a comment"; read it as "nothing
-> else *should*, and on Jira nothing else does."
+> **The GitHub picture is now complete too, and a test is what keeps it that
+> way.** Until task 105 a number of authored prose sites still posted with a bare
+> `gh issue comment`: covered by `tracker_write()` for interception, but carrying
+> no marker, so they were not idempotent and a resumed run commented again — and
+> being `gh`-only, they silently posted nothing at all on a Jira project. Seven
+> such sites remained, across `develop-pipeline-step-7-finalise.md`, `qa-story`,
+> `qa-task` and `review-story`. All seven now route through this CLI.
+>
+> **This paragraph is kept rather than deleted, because it is the record of why
+> the guard exists.** A convention documented and not enforced is a convention
+> that drifts: this one drifted for months while the sentence above it claimed
+> otherwise, and nothing noticed, because a comment with no marker posts exactly
+> as successfully as one with a marker. What changed is not that the prose was
+> corrected — it is that `tests/mutation-call-site-coverage.test.js` now fails on
+> a bare `gh issue comment` **invocation** in shipped source outside a named
+> allowlist. Correct the prose and the drift returns; keep the test and it
+> cannot.
+>
+> **One genuine exception exists, and it is a matter of scope rather than of
+> allowlisting.** `develop-pipeline-on-precompact.sh` still posts with a bare
+> `gh issue comment`, because it is a shell hook that must run with no Node
+> available and must never block compaction. The guard reads **`.md` canonical
+> prose** — skill bodies and the shared sources they are bundled from — so a
+> `.sh` hook is outside its scope entirely and needs no entry. That is deliberate:
+> it is the only shell site in the tree and its exclusion is permanent, so
+> widening the guard to `.sh` would buy three allowlist entries and no protection.
+>
+> The allowlist proper (`NOT_CALL_SITES`) holds files whose mentions are
+> *classification* — the defer roster, the CLI contracts — and each entry states
+> why. Prose *about* a bare `gh issue comment`, including the sentences in this
+> very paragraph, needs no entry at all: the guard matches invocation shape, not
+> the bare literal. A guard that failed on the documentation of its own rule would
+> be patched by widening its allowlist, which is how an allowlist stops meaning
+> anything.
 >
 > PR comments are a different concern entirely and are not covered here.
 
@@ -35,8 +62,18 @@ EOF
 
 node .agents/skills/{skill}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage {moment} --json
+  --stage {moment} \
+  --slot {name}="{value}" \
+  --json
 ```
+
+The `--slot` line is part of the canonical shape, not an optional extra: the
+plain-language lead is rendered from the stage whether or not slots are supplied,
+but with none it says the same thing every time, and a paragraph a reader has
+seen five times is a paragraph they have learned to skip. **Which slot names a
+stage reads is fixed** — see [`stakeholder-summary.md`](stakeholder-summary.md)
+— and the engine validates none of them, so a name the stage's template does not
+read is silently dropped.
 
 **Always `--body-file`, never an inline `--body` string.** Comment bodies carry
 backticks, `$(…)`, quotes and newlines; an interpolated body is a shell
@@ -46,14 +83,84 @@ what makes two different comments on the same issue hash to two different
 records instead of collapsing into one.
 
 **`--stage` is the comment's identity**, not a board column. It is what builds
-the idempotency marker, so a resumed pipeline does not comment twice. Omit it
-only for a comment that genuinely should be posted every time.
+the idempotency marker, so a resumed pipeline does not comment twice — and, since
+the plain-language lead was added, it is also what selects the lead. A comment
+that genuinely should be posted every time may still omit it, but must then pass
+`--summary-file` (see below); an omitted `--stage` alone is now a usage error.
 
 > `--stage` here is deliberately **not** read from `pipeline:` in
 > `tracker-workflow.yaml`. That block decides which column a card moves to, and
 > an omitted moment there means "do not move the card" — it does not mean "do
 > not say anything". A project whose board has no review column still wants the
 > PR-opened comment. There is therefore no `stage-disabled` reason on this CLI.
+
+## The plain-language lead
+
+Every posted body opens with a paragraph written for a reader with no technical
+background. **The caller does not supply it** — the engine renders it from the
+`--stage` it was already given and prepends it. Standard, writing rules and the
+full per-stage catalogue: [`stakeholder-summary.md`](stakeholder-summary.md).
+
+The composition order is fixed, and it is the thing a reader will get wrong:
+
+```
+{marker}
+{lead}
+
+---
+
+{the caller's body, unchanged}
+```
+
+**The marker stays first.** The idempotency search and the update-in-place paths
+both match on a prefix, so a lead that displaced the marker would break duplicate
+detection silently rather than visibly. The lead is second — the first thing a
+human sees, since the marker is an HTML comment.
+
+Two flags exist for it, and neither is needed by an ordinary call site:
+
+| Flag | Effect |
+| :--- | :--- |
+| `--slot k=v` | Fill a slot in the stage's lead. Repeatable. Every slot is optional — a template must read correctly with none |
+| `--summary-file <path>` | A hand-written lead, overriding the template. The escape hatch, not an opt-out |
+
+`--json` gains `lead: "template" | "summary-file"`, so a caller can assert which
+route fired without parsing the body.
+
+### The guard
+
+**A comment for which no lead can be produced does not post.** A call with neither
+a stage that has a template nor a `--summary-file` exits 2, having posted nothing,
+and the error names both routes. This is what makes the lead a property of the
+system rather than a convention: a call site cannot forget it, and a new stage
+cannot be added without one.
+
+Prefer adding a stage over reaching for `--summary-file`. A stage is reusable,
+catalogued and tested; a summary file is a paragraph one call site knows about.
+
+### Two consequences worth stating
+
+**Deferred records changed shape.** The lead is composed *above* the access gate,
+so it reaches `command.stdin`. That is deliberate — a deferred comment is the one a
+human pastes by hand, so it is the last one that should arrive without its lead —
+but it means the record's identity hash differs from one written before this change.
+A replayed old record re-posts the old body, which is correct: the record is a
+verbatim snapshot of an intended call.
+
+**The `desired:` label is deliberately *not* the lead.** It is the one line a human
+reads in the handover checklist to tell one pending action from another, and the lead
+is by design near-identical across every comment of a given stage — so labelling with
+it would stop the label labelling. The caller's own first line is captured before the
+merge and threaded to both arms, GitHub's pre-gate record and Jira's in-flight one
+alike. `command.stdin` still carries the composed body, because that is what posts.
+
+**On Jira the `---` does not render.** `textToAdfNodes` emits no `rule` node, so the
+lead arrives as its own ADF paragraph followed directly by the body's first node.
+This is accepted rather than fixed: teaching the converter to emit rules would change
+every Jira description this repository has ever rendered, far beyond a comment lead,
+and the paragraph boundary already separates the two visually. The lead itself is a
+real ADF node and is asserted as one — a string match would have passed on exactly
+the malformed document that risk was about.
 
 ## Reading `reason`
 

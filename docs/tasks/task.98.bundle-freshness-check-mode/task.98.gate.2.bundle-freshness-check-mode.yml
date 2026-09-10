@@ -1,0 +1,99 @@
+schema: 1
+task: 'task.98.bundle-freshness-check-mode'
+task_title: 'A per-file bundle-freshness assertion the regenerate-and-diff check cannot provide'
+gate: FAIL
+status_reason: 'The cycle-2 refute pass found that an orphaned copy which is also unreadable reports "0 problems" — a clean result from a read that failed. Cycle 1 fixed this exact conflation in the main loop and left it in the orphan scan, twenty lines away in the same function.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T22:30:00Z'
+
+top_issues:
+  - id: 'T98-QA-003'
+    severity: high
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: >-
+      In the orphan scan, an unreadable file is skipped by `if text is None:
+      continue`, which treats "could not read it" as "it makes no provenance
+      claim". A copy whose source was deleted AND which cannot be read therefore
+      produces the output "✅ bundle freshness: 1 skill(s) checked, 0 problems" —
+      a clean result produced by a failed read. For a CI gate whose entire purpose
+      is to catch staleness that is otherwise invisible, silently reporting
+      success is the worst available failure mode, and it is the one this
+      repository names as its central principle: an empty result is a claim about
+      the instrument. Cycle 1 corrected precisely this conflation in the main loop
+      and did not carry the correction twenty lines down into the orphan scan.
+    suggested_action: >-
+      Use `_read_text_or_error` in the orphan scan and report UNREADABLE when the
+      read fails on a file that is not binary. A non-UTF-8 file must still be
+      skipped silently — a banner genuinely cannot be read from it, which is
+      residual 6 (documented, bounded), not a broken instrument.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 24
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 3
+    notes: >-
+      Carried forward from cycle 1 — three hostile probes (symlink escaping the
+      repo, symlink at its own source, banner declaring a traversal path), all of
+      which report without following or writing. Cycle 2 re-probed the two new
+      branches and found no new security surface: `_is_binary` and
+      `_read_text_or_error` both only read, and UNREADABLE echoes only an
+      exception class name.
+  performance:
+    status: CONCERNS
+    notes: >-
+      A non-UTF-8 file is now read in full three times per check — once by
+      `_read_text_or_error` (which raises), once by `_is_binary`, and once by
+      `_looks_bundled`. Bounded in practice (binary references are rare and
+      small) but avoidable: `_is_binary` needs one byte, not the file.
+  reliability:
+    status: FAIL
+    notes: >-
+      The check can report a clean result over a file it could not open (see
+      T98-QA-003). Everything else holds — read-only still mutation-proved, the
+      degraded-input matrix still handled.
+  maintainability:
+    status: PASS
+    notes: >-
+      The cycle-1 fixes are well-factored and carry their reasons. The defect
+      found here is a missed second call site, not a design problem.
+
+recommendations:
+  immediate:
+    - action: 'Report UNREADABLE from the orphan scan; keep the non-UTF-8 skip (T98-QA-003)'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+  future:
+    - action: '`_is_binary` should read one byte rather than the whole file'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: >-
+        `shared/resources/observation-log-contract.md` contains the literal
+        `shared/resources/<name>` in prose, so discovery warns on every run.
+        Pre-existing and out of scope; worth its own task.
+      refs: ['shared/resources/observation-log-contract.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'T98-QA-003 must be fixed — a check that can silently report clean is worse than no check'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-09-09'
+  total_iterations: 1
+  verification_method: 'Re-probe of each finding + 3 new mutation proofs (M12-M14)'

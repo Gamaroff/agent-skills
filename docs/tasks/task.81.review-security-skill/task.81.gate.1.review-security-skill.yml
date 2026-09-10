@@ -1,0 +1,69 @@
+schema: 1
+task: 'task.81.review-security-skill'
+task_title: 'Ship /review-security: prove a control engages, not that it is present'
+gate: CONCERNS
+status_reason: 'Deliverable works and its falsifiability holds — all four mutation proofs pass and the engine computes every asserted verdict. Two medium defects in the artifacts themselves: the reviewer prompt''s Output Contract is broken by nested code fences, and the six probe.mjs specs are referenced nowhere.'
+reviewer: 'QA Engineer'
+updated: '2026-09-07T18:20:00Z'
+
+top_issues:
+  - id: 'TASK81-001'
+    severity: medium
+    file: 'shared/resources/security-review-prompt.md'
+    finding: 'Nested three-backtick fences in §4 close the outer ```markdown block early: lines 123-126 render outside any block and lines 127-144 collapse into one untitled block, corrupting the Output Contract and the security_review YAML schema as rendered.'
+    suggested_action: 'Open the outer example fence with four backticks so the inner ```bash and ```yaml fences are content. Re-run the fence scan to confirm zero nested-fence reports.'
+    suggested_owner: dev
+    bug_ref: 'task.81.bug.1.malformed-nested-fences-in-prompt.md'
+    status: open
+  - id: 'TASK81-002'
+    severity: medium
+    file: 'skills/review-security/tests/fixtures/redis-tls/probe.mjs'
+    finding: 'The six probe.mjs spec files are imported by nothing. review-security.test.js redeclares the same {sink, entry} objects, so the declared Phase 2 deliverable is dead code with zero coverage and can drift silently from the paths actually probed.'
+    suggested_action: 'Import the specs in the test and build the FIXTURES map from them, so there is one source of truth and the specs are executed rather than merely present.'
+    suggested_owner: dev
+    bug_ref: 'task.81.bug.2.probe-specs-referenced-nowhere.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 57
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No credentials, no network calls, no new dependencies. Fixtures are pure composers executed only inside the engine sandbox (temp dir, six-key env allowlist). The engine deny-lists `node`, so the skill''s own documented command is correctly refused by the snippet executor rather than run.'
+  performance:
+    status: PASS
+    notes: 'Suite adds 25 tests / ~17s wall. Cost is 12 child spawns per fixture; the test memoises each spec so 4 fixtures cost 48 spawns, not ~60. Full ci:fast went 2701 to 2726 tests with no material change in runtime.'
+  reliability:
+    status: PASS
+    notes: 'All four mutation proofs held — reverting the present-but-inert branch reds exactly the two inert verdict tests; the decoy, vacuity and glob proofs each red their own assertion. Verdicts are engine-computed, so the assertions cannot drift with agent judgement.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two sources of truth for the probe entry paths (TASK81-002), and the reviewer prompt''s core contract section renders incorrectly (TASK81-001). Both are in the artifacts a future reader learns the contract from.'
+
+recommendations:
+  immediate:
+    - action: 'Fix the nested fences in the reviewer prompt §4 (four-backtick outer fence)'
+      refs: ['shared/resources/security-review-prompt.md']
+    - action: 'Import the probe specs in the test rather than redeclaring the entry paths'
+      refs: ['skills/review-security/tests/review-security.test.js', 'skills/review-security/tests/fixtures/redis-tls/probe.mjs', 'skills/review-security/tests/fixtures/db-url/probe.mjs']
+  future:
+    - action: 'Narrow the private-range guard so a DNS name like 10.example.com is not rejected as an RFC1918 address'
+      refs: ['skills/review-security/tests/fixtures/redis-tls/engaged.mjs']
+    - action: 'Consider reading the bundled references/ copy rather than the shared/resources/ source, matching the review-pr sibling precedent and keeping the suite runnable in a consumer install'
+      refs: ['skills/review-security/tests/review-security.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'Fix TASK81-001 — the Output Contract is the part of the prompt a reviewing agent must follow most precisely'

@@ -899,6 +899,51 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    If the document predates the Change Log template and has no such section, create it — for a
    task, after `## 11. Rollback Plan`.
 
+4. **Tick the task registry row** — in the same step, for a **task** only.
+
+   `docs/tasks/task-registry.md` carries a Status column per task, and until task.103 nothing wrote
+   it after creation. `/finalise` is that writer, because this is the one moment that already sets
+   the document's `status: accepted`: doing both here is what makes the row and the document unable
+   to disagree by construction, which is a stronger guarantee than detecting a disagreement later.
+
+   ```bash
+   node .agents/skills/finalise/references/registry-tick.js \
+     --file "{document-path}" --json
+   ```
+
+   > Engine source: `references/registry-tick.js` (bundled into each skill as
+   > `references/registry-tick.js`).
+
+   **Call it unconditionally** — do not wrap it in a "is this a task?" check of your own. The CLI
+   reads the document's own `type` and filename stem and returns `not-a-task` for a story, epic or
+   bug run without touching any registry. `/finalise` is shared across document kinds, and a
+   condition the caller has to remember is one that eventually gets forgotten; the guard belongs in
+   the writer, where it is tested.
+
+   Read `reason` from the JSON and log it:
+
+   | `reason` | What it means | What to do |
+   |---|---|---|
+   | `ticked` | The row now reads `accepted` | Nothing |
+   | `already` | The row already read `accepted` | Nothing — this is a re-run |
+   | `not-a-task` | A story / epic / bug run | Nothing — expected on the story path |
+   | `not-accepted` | The document's status is not `accepted` | Investigate — step 2 above should have set it |
+   | `no-registry` | This project keeps no task registry | Nothing |
+   | `no-row` | The registry has no row for this task | **Log it.** CI's drift check will fail on this |
+   | `ambiguous-row` | The Status column could not be identified | **Log it and tick by hand** |
+   | `engine-unavailable` | The registry parser could not be located | **Log it and tick by hand** |
+
+   **Every outcome exits 0 — never block acceptance on it.** The work is finished by the time this
+   runs, and refusing to finalise a complete task because its index line could not be found trades a
+   cosmetic defect for a stuck pipeline. The loud backstop is
+   `evals/shared/tests/task-registry-drift.test.mjs`, which fails CI whenever a row and its document
+   disagree, so a no-op here is caught there.
+
+   **This runs in lite mode exactly as it does in standard mode.** Lite mode trades QA depth for
+   speed; it has previously been the path where Step 7 side-effects were quietly skipped, which is
+   why this is stated rather than left implied. The CLI takes no mode flag, and a test pins its whole
+   argument surface so one cannot be added without that decision being made deliberately.
+
 4. **Add DoD Verification Section to Document Body:**
    - Add a "## Definition of Done - PASSED ✅" section to the document
    - Summarize all verified criteria
@@ -998,7 +1043,16 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    FINAL_GATE=$(ls {document-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
      | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
 
+   # The plain-language lead. It goes BELOW the marker and above everything
+   # else — see the warning under Step 6c. `done` is the same stage the tracker
+   # comment uses; one vocabulary, not a second one for pull requests.
+   LEAD=$(node references/stakeholder-summary-cli.js --stage done) || exit 1
+
    BODY="$MARKER
+   $LEAD
+
+   ---
+
    ## ✅ Accepted — Canonical Pipeline Summary
 
    **PR**: ${PR_URL}
@@ -1009,6 +1063,14 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    All Definition of Done criteria verified. Story/task accepted."
    ```
+
+   > **The lead goes below the marker, and the ordering is load-bearing.** Step 6c finds this
+   > comment with `select(.body | startswith("<!-- finalise-canonical-summary -->"))` and then
+   > PATCHes it by id. A lead inserted *above* the marker makes that search miss, and the pipeline
+   > posts a **new** comment on every run instead of updating the existing one — which surfaces as
+   > duplicate comments, reads as a formatting problem, and never fails. `$BODY` is built once here
+   > and used by the POST path, the PATCH path and the Bitbucket arm alike, so the lead cannot reach
+   > one and miss another.
 
    **Step 6c — Idempotent post (search-then-edit):**
 
@@ -1103,13 +1165,49 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    Use the Atlassian MCP tools. Derive `cloudId` from `JIRA_URL` by extracting the hostname (e.g. `yourorg.atlassian.net`). If a tool call fails with a cloud resolution error, call `getAccessibleAtlassianResources` and use the `id` from the matching entry.
 
-   > **Order matters — the transition runs first, the re-link second.** Both `jira-stage.js` (via the
-   > transition protocol) and the `sync-jira-*` re-link below can drive the status to Done, but they
-   > resolve it from **different config sources**: the transition uses the `tracker-workflow.yaml`
-   > ladder, the sync uses its own `loadStatusMap`. Running the ladder first makes it the single
-   > resolver — the sync's own transition then finds the issue already in Done and no-ops, while its
-   > real job (re-pointing the Document link at the durable branch) still happens. Do not reverse
-   > these two blocks.
+   > **Order matters — the transition runs first, the re-link second.** Historically both
+   > `jira-stage.js` (via the transition protocol) and the `sync-jira-*` re-link below could drive the
+   > status, resolving it from **different config sources**: the transition uses the
+   > `tracker-workflow.yaml` ladder, the sync its own `loadStatusMap`. The re-link now runs with
+   > `--no-transition` (step 3), so it carries no status decision at all and the ladder is the single
+   > resolver by construction rather than by sequencing.
+   >
+   > **Keep the order anyway — but as convention, not as a safeguard.** Nothing about ladder-first
+   > *protects* anything once step 3 is status-neutral, and it is worth being exact about why, because
+   > two plausible-sounding justifications are both wrong:
+   >
+   > - *"It protects a consumer on a pre-flag `sync-jira-*`."* No: that sync rejects
+   >   `--no-transition` with `Unknown option` and exits before resolving anything, so its re-link
+   >   never runs, in either order.
+   > - *"It protects a consumer on an older **finalise** whose step 3 omits the flag."* Also no — and
+   >   this one is backwards. In that pairing the sync runs **second** with status resolution live, so
+   >   it writes **last** and can walk the card straight off the ladder's target. That is the RAPP-715
+   >   sequence recorded above, not a case ordering prevents.
+   >
+   > **What actually protects the close is block 4** — reading the status back and re-asserting it.
+   > Keep the order because reversing it buys nothing and would need re-arguing; rely on block 4.
+   > Do not reverse these two blocks.
+   >
+   > ⚠️ **The sync does not no-op — it is made status-neutral, and that is why step 3 passes
+   > `--no-transition`.** This block used to claim the sync no-ops on its own — *"the sync's own
+   > transition then finds the issue already in Done and no-ops"* — and that is only true when the
+   > consumer's `jira.statusMap` maps `accepted` to `Done`. **On a project that maps it to anything
+   > else, the sync moved the card BACKWARDS out of the terminal status the ladder just set**, and the
+   > resolution it was closed with was stranded on a non-terminal status, where `resolution IS EMPTY`
+   > sweeps cannot see it either. `--no-transition` removes the second resolver from the path
+   > entirely, rather than correcting after the fact.
+   >
+   > This is not an exotic configuration — **it is the one this very step recommends**. See the
+   > `stage-disabled` row below: *"a board that wants a card to sit in a merge queue until the PR
+   > actually lands should leave `done` to a human"*. A consumer that took that advice is exactly the
+   > consumer this bites. Observed on RAPP-715 (2026-09-05): closed to `Done` + `resolution: Done`,
+   > then the re-link returned it to `Waiting for Review` still carrying `resolution: Done` — matched
+   > by *name*, because that workflow offers a transition literally called `Waiting for Review` and
+   > that name was in the project's `accepted` candidate list.
+   >
+   > Full analysis: [`bug.11`](../../docs/bugs/bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md).
+   > The flag is implemented on `sync-jira-{story,task,epic}` and gated inside `syncDocumentStatus`,
+   > so it holds for every caller of the sync, not just this one.
 
    1. **Transition to Done** — follow `references/jira-transition-protocol.md` exactly, with
       `candidates = ["Done", "Closed", "Resolved", "Complete", "Completed"]` and `terminal = true`.
@@ -1159,7 +1257,9 @@ EOF
 
         node .agents/skills/finalise/references/tracker-comment.js \
           --issue {jira_key} --body-file .claude/state/comment-body.md \
-          --stage done --json
+          --stage done \
+          --slot pr="{PR_URL}" \
+          --json
         ```
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
@@ -1169,20 +1269,50 @@ EOF
 
    Log outcome in running summary: "Jira issue {jira_key} transitioned to Done ✅" or the warning detail.
 
-   3. **Re-point the Jira Document link** — the description is ADF (can't be patched in place), so re-run the sync with the durable branch pinned. This is best-effort and additive. It also drives the status transition from frontmatter (`accepted` → Done), but because step 1 has already run, that transition resolves to a no-op and the ladder remains the single resolver:
+   3. **Re-point the Jira Document link** — the description is ADF (can't be patched in place), so re-run the sync with the durable branch pinned. This is best-effort and additive. It is run with **`--no-transition`**, which makes it link-only: the sync issues no status request at all, so the ladder in step 1 stays the single resolver and the re-link cannot overrule it (bug.11):
 
    ```bash
    WORKITEM=story   # set to "task" when finalising a task
    if [ -n "$JIRA_URL" ] && [ -n "$JIRA_API_TOKEN" ]; then
      # sync-jira-{story|task} (same script the create/sync flow uses)
+     # --no-transition is REQUIRED here, not optional tidiness. Without it the
+     # sync resolves `accepted` through its own loadStatusMap and can walk the
+     # card back out of the terminal status step 1 just set (bug.11).
      node .agents/skills/sync-jira-${WORKITEM}/scripts/sync-jira-${WORKITEM}.js \
-       -f "$DOC_PATH" --doc-branch "$DURABLE_BRANCH" --quiet \
+       -f "$DOC_PATH" --doc-branch "$DURABLE_BRANCH" --no-transition --quiet \
        && echo "✅ Jira Document link re-pointed to ${DURABLE_BRANCH}" \
        || echo "⚠️ sync-jira re-link failed — the transition in step 1 already ran; re-sync from develop after merge"
    else
      echo "ℹ️ JIRA_* env not set — skipping Document-link refresh; re-sync from develop after merge to pin a durable link"
    fi
    ```
+
+   4. **Confirm the terminal status — still MANDATORY, and read it back rather than assuming.** With
+      `--no-transition` in step 3 the re-link no longer moves the card, so this is now a confirmation
+      rather than a repair of expected damage. **Keep it — this block is what actually protects the
+      close.** It is one cheap read; it catches an older *finalise* copy whose step 3 omits the flag
+      (the sync then runs second and can undo step 1), and anything outside this step that moved the
+      card; and step 1's own `204` is a statement about step 1, not about the state the step ends in.
+      Check, and repair if needed:
+
+   ```bash
+   POST_SYNC=$(curl -s -u "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" -H "Accept: application/json" \
+     "${JIRA_URL}/rest/api/3/issue/${JIRA_KEY}?fields=status,resolution" \
+     | python3 -c 'import sys,json; f=json.load(sys.stdin)["fields"]; print(f["status"]["name"])')
+   ```
+
+   - Terminal (`Done`/`Closed`/whatever step 1 targeted) → nothing to do.
+   - **Anything else** → step 1's close was undone. This should no longer be reachable through step 3
+     as written above. The reachable causes are a **finalise copy older than this one** (whose step 3
+     omits the flag, so the sync still resolves status), or something outside this step moving the
+     card. Note that a `sync-jira-*` too old to know the flag does *not* cause this — it rejects
+     `--no-transition` with `Unknown option` and exits without touching the status. Re-run the step-1
+     transition, supplying the same required fields (a `resolution` is the common one), then
+     **re-read again** to confirm. Log in the running summary: *"re-asserted terminal status after
+     the Document-link re-point (bug.11)"*.
+
+   Never report the close on the strength of step 1 alone once step 3 has run — a `204` from step 1 is
+   a statement about step 1, not about the state the step ends in.
 
    `${WORKITEM}` is `story` or `task` depending on the document being finalised.
 
@@ -1224,12 +1354,18 @@ EOF
 Story/task development complete — PR: {PR_URL}. Status: accepted. All DoD criteria verified.
 EOF
    node references/tracker-comment.js --issue {github_issue} \
-     --body-file .claude/state/comment-body.md --stage done --json
+     --body-file .claude/state/comment-body.md --stage done \
+     --slot pr="{PR_URL}" \
+     --json
 
    # Close the issue
    node references/tracker-issue.js --kind close --issue {github_issue} --reason completed
    ```
 
+   > **`pr` is the only slot `done` reads.** Pass the URL, not the number — the lead names it for a
+   > reader deciding whether anything is left to do, and a bare `#412` tells them nothing they can act
+   > on.
+   >
    > The close no longer carries `--comment`. The completion comment is posted by
    > `tracker-comment.js` immediately above, which is the marked, idempotent path —
    > a `--comment` on the close is an *unmarked* second comment that the marker
@@ -1284,39 +1420,40 @@ EOF
      The CLI exits 0 for every row above, so never treat a zero exit as proof the card moved; read `reason`. Reasons produced only by `--probe-board`, `--write-ladder`, `--dry-run` or `--add-to-board` (`probe`, `write-failed`, `exists`, `dry-run`) cannot occur here — this call passes none of those flags.
 
    - **If `reason` is `not-on-board`:**
-     - Do NOT silently skip. Post a PR comment warning that the board was not updated, using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
-       ```
-       ⚠️ Project Board Not Updated
+     - Do NOT silently skip. Build the body **once** — the lead above the arm split — then post it with the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
+       ```bash
+       LEAD=$(node references/stakeholder-summary-cli.js --stage board-warning \
+         --slot what="The card for this work was not found on any board, so it could not be moved to Done automatically") || exit 1
+       PR_COMMENT_BODY=$(printf '⚠️ Project Board Not Updated\n\n%s\n\n---\n\n%s' "$LEAD" \
+         "This story/task was accepted but GitHub issue #<github_issue> was not found on any project board — the board status was **not** moved to Done automatically.
 
-       This story/task was accepted but GitHub issue #<github_issue> was not found on any project board — the board status was **not** moved to Done automatically.
-
-       **Action required:** manually move the card to Done on the project board, or add the issue to the board first.
-
+       **Action required:** manually move the card to Done on the project board, or add the issue to the board first.")
        ```
      - Record this as a warning (not a blocker) in the running summary.
 
    - **If `reason` is `deferred`:** reuse the escalation above with the wording below. It is the same shape — the board did not move and a human must move it — but the *cause* is a policy the operator themselves declared, so the message must not read as a malfunction:
+       ```bash
+       LEAD=$(node references/stakeholder-summary-cli.js --stage board-warning \
+         --slot what="Moving the card to Done was deliberately recorded for someone to do later, rather than done automatically") || exit 1
+       PR_COMMENT_BODY=$(printf '⏸️ Project Board Move Deferred\n\n%s\n\n---\n\n%s' "$LEAD" \
+         "This story/task was accepted. \`access.tracker\` is set to **<access>**, so the board move to **Done** was recorded rather than performed — recorded as \`<record>\`.
+
+       **Action required:** run the handover checklist committed beside the implementation report (\`*.handover.*.sh\` to apply, \`*.handover.*.md\` to do it by hand). Moving the card to Done on the project board is one of its entries.")
        ```
-       ⏸️ Project Board Move Deferred
-
-       This story/task was accepted. `access.tracker` is set to **<access>**, so the board move to **Done** was recorded rather than performed — recorded as `<record>`.
-
-       **Action required:** run the handover checklist committed beside the implementation report (`*.handover.*.sh` to apply, `*.handover.*.md` to do it by hand). Moving the card to Done on the project board is one of its entries.
-
-       ```
-       Take `<access>` and `<record>` from the CLI's JSON. **Never post this without the record id** — a deferral the operator cannot locate in the journal is indistinguishable from a silent skip, which is the failure the whole deferred-mutation mechanism exists to remove.
+       Take `<access>` and `<record>` from the CLI's JSON. **Never post this without the record id** — a deferral the operator cannot locate in the journal is indistinguishable from a silent skip, which is the failure the whole deferred-mutation mechanism exists to remove. The lead does **not** carry the record id and is not a substitute for it: the lead says a human must act, the body says which record tells them what to do. Both are required.
+       The `what` clause says *deliberately* recorded, because this notice is the one of the three that is not a malfunction — a deferral is the operator's own declared policy working as intended, and a lead that read as breakage would misreport it.
      - Record it in the running summary as a deferral, **not** as a failure. The Definition of Done is unaffected: a card that a declared restriction stopped the pipeline moving is not an incomplete task.
 
-   - **If `reason` is `mutation-failed`:** post a PR comment using the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
-       ```
-       ⚠️ Project Board Update Failed
+   - **If `reason` is `mutation-failed`:** build the body **once** — the lead above the arm split — then post it with the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6):
+       ```bash
+       LEAD=$(node references/stakeholder-summary-cli.js --stage board-warning \
+         --slot what="The attempt to move the card to Done failed") || exit 1
+       PR_COMMENT_BODY=$(printf '⚠️ Project Board Update Failed\n\n%s\n\n---\n\n%s' "$LEAD" \
+         "This story/task was accepted but the attempt to move GitHub issue #<github_issue> to **Done** on the project board failed.
 
-       This story/task was accepted but the attempt to move GitHub issue #<github_issue> to **Done** on the project board failed.
+       **Error details:** \`<paste the CLI's JSON output>\`
 
-       **Error details:** `<paste the CLI's JSON output>`
-
-       **Action required:** manually move the card to Done on the project board.
-
+       **Action required:** manually move the card to Done on the project board.")
        ```
      - Record the failure (and the error detail) in the running summary. The CLI has already retried internally — do not re-run it.
 
@@ -1332,11 +1469,15 @@ EOF
 
 - [ ] Running summary file finalized (status = COMPLETED - ACCEPTED)
 - [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
+- [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails)
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
 - [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API)
 - [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
+- [ ] **Jira only — terminal status RE-READ after the Document-link re-point**, and re-asserted if the
+      sync walked it back (bug.11). A `204` from the close is evidence about the close, not about the
+      state this step ends in
 - [ ] Tracker board updated: Jira — N/A (handled by transition above) **OR** GitHub project board item moved to Done via GraphQL mutation **OR** warning comment posted (if mutation failed after retry)
 - [ ] Running summary records issue close outcome AND board update outcome (success, failure, not-found — with detail)
 - [ ] User notified with success message, artifact paths, PR comment link, and board update status
@@ -1466,13 +1607,56 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    ```
 
 5. **Add PR Comment (if PR exists):**
-   - Use the active `$PLATFORM` branch to notify about gaps (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6)
+   - Build the body **once**, with the lead above the arm split, then post it with the active `$PLATFORM` branch (GitHub: `gh pr comment <pr-number>` / Bitbucket: REST POST as in Step 6)
    - Request changes to address gaps
 
-   **Example PR Comment:**
+   ```bash
+   # Bind the two values this block interpolates, HERE, before use. Step 4 writes
+   # the gap report into the document body; it does not leave it in a variable, so
+   # capture it back out of the document rather than assuming it is in scope.
+   #
+   # An unbound name does NOT fail here — it expands to the empty string, the
+   # numeric slot is silently dropped, and the comment posts as a heading, a lead
+   # and a bare horizontal rule with no gaps under it. That is the silent shape
+   # this whole page keeps warning about, so the binding is not optional tidiness.
+   DOC_FILE="{story-or-task-file}"
+   # Bounded to the section: set the flag AFTER the heading (`next`), and clear it
+   # at the NEXT `## ` heading. Without the stop condition this captures to
+   # end-of-file — dragging Change Log, Progress Tracking, References and Notes
+   # into the comment, and counting THEIR checkboxes as gaps. Measured on a
+   # two-gap fixture: 5 counted instead of 2, four unrelated sections pasted in.
+   GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
+   # Unmet criteria across every section of the gap report — an unchecked box.
+   # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
+   # `|| echo 0`, which would append a second zero and make the value "0\n0").
+   GAP_COUNT=$(printf '%s' "$GAP_REPORT_BODY" | grep -c '^- \[ \]' || true)
+   GAP_COUNT=${GAP_COUNT:-0}
+
+   # Omit nothing: the catalogue drops a zero as absent, so a count of 0 renders
+   # the shorter true sentence rather than "(0 of them)".
+   LEAD=$(node references/stakeholder-summary-cli.js --stage dod-gaps --slot count="${GAP_COUNT}") || exit 1
+   PR_COMMENT_BODY=$(printf '## ⚠️ Definition of Done - Gaps Identified\n\n%s\n\n---\n\n%s' "$LEAD" "$GAP_REPORT_BODY")
+
+   # Post-condition: refuse to post a body whose gap section is empty. A reviewer
+   # reading "gaps identified" with nothing under the rule learns nothing and is
+   # told nothing is wrong.
+   [ -n "$GAP_REPORT_BODY" ] || { echo "gap report body is empty — not posting"; exit 1; }
+   ```
+
+   > This is the one pull-request comment on this page that says the work is **not** finished, and
+   > it is the one a stakeholder is most likely to misread as a failure. `dod-gaps` says what is
+   > true and what happens next — some checks are outstanding, they are listed, the work comes back
+   > — without a verdict token or a score. Do not substitute the `done` lead here.
+
+   **Example PR Comment** (the lead, then the rule, then the body unchanged):
 
    ```markdown
    ## ⚠️ Definition of Done - Gaps Identified
+
+   This work is not finished yet. Some of the checks it has to pass are still outstanding (7 of them),
+   and they are listed below. It will come back here once they have been dealt with.
+
+   ---
 
    This story/task cannot be marked as Accepted due to the following gaps:
 

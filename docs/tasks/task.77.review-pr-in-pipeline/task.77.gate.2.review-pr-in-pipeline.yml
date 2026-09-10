@@ -1,0 +1,143 @@
+schema: 1
+task: "task.77.review-pr-in-pipeline"
+task_title: "Run the PR conformance review before a work item is finalised"
+gate: FAIL
+status_reason: "Cycle 2 was a refute pass and it earned that design: two of its three HIGH findings were introduced by cycle 1's own fixes. The pattern was that cycle 1 corrected the sentence each finding quoted rather than the contract it belonged to — most consequentially leaving the increment rule intact in the autonomous-defaults table, which is what unattended runs actually consult, while the new test could only see the file that was fixed. All 11 findings are now closed."
+reviewer: "QA Engineer"
+updated: "2026-09-03T00:00:00Z"
+
+top_issues:
+  - id: "TASK77-008"
+    severity: high
+    file: "shared/resources/develop-pipeline-autonomous-defaults.md"
+    finding: "Cycle 1's TASK77-002 fix was incomplete. The increment rule is stated in TWO files; only the QA-loop file was corrected. develop-pipeline-autonomous-defaults.md:33 still read 'REQUEST CHANGES -> return to 5b and increment the shared cycle counter', and that table is what governs an unattended run at exactly this fork. Four bundled copies carried it. The new test named 'the cycle counter is incremented in exactly one place' greps only section5c() of the QA-loop file, so it was green throughout — a test certifying the contradiction it was written to prevent."
+    suggested_action: "Correct the defaults table to name 5b step 7 as the single increment site, and extend the test with a doesNotMatch over the defaults file so the two cannot drift again."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-009"
+    severity: high
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "5c is declared the loop's only exit but had no failure arm. The verdict table had three rows and the QA Cycle template's PR Review enum four values, none covering /review-pr HALTing (it HALTs when it cannot resolve a PR) or erroring. The state is reachable in-loop: the PASS->5c path never enters 5b, so it skips 5b step 5's mid-loop PR-state poll — meaning a PR closed or merged underneath the run is first discovered BY /review-pr. With no arm for that, the likeliest improvisation is falling through to Step 7, silently finalising with no review at all."
+    suggested_action: "Add a fourth verdict-table row for a failed review that HALTs rather than exiting, plus a 'review failed' value in the template enum so a resumed run can read the state back."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-010"
+    severity: high
+    file: "shared/resources/develop-pipeline-resume-contract.md"
+    finding: "The new conditional resume check was prose only — the Verification command column was never updated, so nothing implemented it — and as written it was an existence glob with no cycle correspondence. After any REQUEST CHANGES the run already has pr-review.1 on disk, so a run killed inside cycle 2's 5c would satisfy the check off the stale first report, be marked complete, and resume straight to Step 7: finalising a run whose exit gate never ran on the final gate."
+    suggested_action: "Bind the check to the cycle (highest pr-review.{n} must be >= the highest PASS/WAIVED gate number) and put a real command in the command column."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-011"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Cycle 1's TASK77-005 and TASK77-002 fixes contradict each other. The convergence blockquote instructed writing 'HIGH findings: n/a (review-driven cycle — no gate written)', but under the deferral the review-driven fix rides INSIDE cycle N, whose entry already carries a real HIGH count from that cycle's PASS gate. Following the instruction would overwrite a real reading with n/a, punching a hole in the sequence the convergence check and escalation read back. Each fix was right alone; together they described a cycle that cannot exist."
+    suggested_action: "Delete the n/a instruction and state that the review-driven fix rides inside cycle N, whose count stands."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-012"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "TASK77-004 moved path 1's commit to before /review-pr and called it the single commit point, but on a REQUEST CHANGES verdict the run re-enters 5b in the SAME cycle N and 5b commits and pushes again at step 3. Two pushes in one cycle violates the one-push-per-cycle invariant stated 20 lines above, whose stated purpose is preventing a cycle's second push cancelling its own in-flight CI run."
+    suggested_action: "State that cycle N's push budget is spent at the pre-5c commit, and that the review-driven 5b re-entry commits without pushing."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-013"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "5b step 0's HALT path unconditionally instructs committing the gate and report 'per path 2', but a cycle reaching 5b via 5c REQUEST CHANGES arrived through path 1, which already committed and pushed them earlier in the same cycle — producing an empty commit or a redundant push on the exact path cycle 1 taught the orchestrator to reach."
+    suggested_action: "Make the step-0 commit conditional on the cycle not having already committed before 5c."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-014"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "The Loop Escalation trigger table was extended to cover a loop exhausted by review verdicts, but the escalation entry template an agent actually writes still hard-codes 'completed 5 cycles without a clean PASS'. On the REQUEST-CHANGES-exhaustion path that sentence is false, and it is the first thing the human picking the run up reads."
+    suggested_action: "Add a third bracketed variant to both templates naming the review-exhaustion case."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-015"
+    severity: medium
+    file: "shared/resources/develop-pipeline-resume-contract.md"
+    finding: "QA Cycle Count Reconstruction has no notion of a 5c sub-state. The '### QA Cycle {N}' heading is written at 5a, so a run killed inside 5c has N headings; reconstruction sets NEXT_CYCLE=N+1 and re-enters at 5a, re-running the whole QA review against an unchanged tree and burning a cycle — contradicting the resume-contract row that detects the same state."
+    suggested_action: "Add a 5c clause: when the highest cycle entry's PR Review row is unset while its gate reads PASS/WAIVED, set the counter to N and re-enter at 5c."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-016"
+    severity: low
+    file: "evals/shared/tests/pr-review-loop-parity.test.mjs"
+    finding: "Two of cycle 1's 'hardened' assertions are vacuous — they pass against the pre-change file. The REQUEST CHANGES table-row regex and the 'budget is shared' match both hold pre-fix, and the latter duplicates an assertion in another test. The hardening removed a weak assertion but added no coverage."
+    suggested_action: "Assert what the path actually needs — that the row points at the invocation block, that the block exists — and swap the duplicated budget assertion for the CONCERNS row semantics."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-017"
+    severity: low
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "'The loop has three exits ... Both halting exits land in the same Loop Escalation block' undercounts: the no-code-change HALT, the mid-loop PR MERGED/CLOSED HALT, the twice-red fast-gate bail-out and a 5c failure all terminate without reaching escalation. Also 'its HIGH count is zero by construction' is false for WAIVED, which carries HIGH top_issues with waiver.active true."
+    suggested_action: "Distinguish loop exits from HALT paths, and replace the 'zero by construction' reason with 'the gate is accept-eligible'."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+  - id: "TASK77-018"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.review-pr-in-pipeline.md"
+    finding: "Three 'End-to-end dogfood' boxes were ticked with no supporting artifact anywhere on the branch — including one asserting behaviour that cycle 1's fix then reversed. The implementation report's Issues Log and QA Iteration History were both still empty template stubs after a full QA cycle, despite the branch's own contract making the cycle entry mandatory. This is the conformance failure the task exists to catch, in its own paperwork."
+    suggested_action: "Untick the unevidenced dogfood items and defer them to the first real run; write the QA Iteration History and Issues Log."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-03"
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 325
+  phases_verified: "7/7"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [1, 3, 5, 6]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1. No credentials or secrets; no new attack surface; review-pr's advisory contract preserved with its 52 tests green."
+  performance:
+    status: PASS
+    notes: "Unchanged. 5c runs once per clean gate at the loop exit, not per iteration."
+  reliability:
+    status: FAIL
+    notes: "The decisive axis again, for different reasons than cycle 1. The unhandled 5c failure path could silently finalise a run with no review; the resume check could mark an incomplete 5c complete off a stale report; and the surviving second increment site would have doubled cycle consumption on every unattended review-driven fix."
+  maintainability:
+    status: CONCERNS
+    notes: "Two cycle-1 assertions had become vacuous, and the test asserting 'exactly one place' could see only one of the two places. Both now corrected, and the defaults file is pinned so the pair cannot drift again."
+
+recommendations:
+  immediate:
+    - action: "Close the second increment site and pin it in the test"
+      refs: ["shared/resources/develop-pipeline-autonomous-defaults.md"]
+    - action: "Give 5c a failure arm that HALTs rather than falling through"
+      refs: ["shared/resources/develop-pipeline-step-5-6-qa-loop.md"]
+    - action: "Bind the resume check to the cycle and implement it in the command column"
+      refs: ["shared/resources/develop-pipeline-resume-contract.md"]
+  future:
+    - action: "Verify /review-pr's conformance lens emits findings in the shape the ingester's new PR Review extraction block expects — that contract now carries the whole REQUEST CHANGES path, and it was not probed this cycle"
+      refs: ["shared/resources/qa-findings-ingester-prompt.md", "skills/review-pr/SKILL.md"]
+    - action: "The QA-loop file executes zero of its 16 fenced blocks under the Step 4b engine (pre-existing) — worth its own task"
+      refs: ["shared/resources/qa-execute-snippets.mjs"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "Cycle 3 re-review confirms the 11 findings are closed and introduced no new HIGH"

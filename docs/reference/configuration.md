@@ -75,6 +75,11 @@ github:
 devLoadAlwaysFiles:
   - docs/architecture/concepts/coding-standards.md
 
+skills: # optional — which skills setup-consumer.sh installs (default: every skill)
+  profile: pipeline # full | pipeline | minimal
+  include: [] # extra skills on top of the profile
+  exclude: [] # skills to leave out (a closure-required entry is reported, never silently re-added)
+
 sign-off: # optional — stakeholder sign-off gate on stories/tasks (default: off)
   enabled: true
   enforcement: advisory # advisory | blocking | off
@@ -93,7 +98,25 @@ branching: # optional — epic integration branches (create-branch, develop-stor
     offerWhenUndeclared: true # false ⇒ only offer where an epic has opted in
 
 develop: # optional — develop-story / develop-task / develop-bug pipelines
-  fastGateCommand: npm run ci:fast # fast gate run in the develop loop and each qa-fix cycle
+  fastGateCommand: npm run ci:fast # REQUIRED (suggested value shown) — fast gate run in the develop loop, each qa-fix cycle, and each develop-bug verify cycle
+
+qa: # optional — the QA loop's diminishing-returns exit
+  # Which paths count as TEST MACHINERY rather than product. Glob strings, each
+  # matched against a gate finding's `file:` read as a repo-relative path.
+  #
+  # DEFAULT IS `[]`, and that is the fail-safe direction stated as a default
+  # rather than as an opt-out: an empty list matches nothing, so the exit can
+  # never fire and an unconfigured project keeps today's behaviour exactly. A
+  # missed exit costs time; a wrong exit ships a defect a later cycle would have
+  # caught. Configure it only when you want the loop to be able to stop early.
+  #
+  # `**` crosses directories, `*` does not, and matching is on whole path
+  # segments — `src/latest-price.ts` is NOT machinery, however much of the word
+  # "test" it contains.
+  testArtifactGlobs:
+    - "**/*.spec.ts"
+    - "**/*.test.*"
+    - "tests/**"
 
 developNext: # optional — develop-next roadmap orchestrator
   roadmapPath: docs/development/project-completion-roadmap.md
@@ -135,6 +158,22 @@ loopSupervisor: # optional — fresh-context sequential loop runner
   adapters: # optional — declarative path overrides only, never JavaScript
     develop-next:
       stateFile: .claude/state/develop-next.state.json
+
+# observe-work — where the observation log lives.
+# The key is optional. Omit the whole block and the workspace defaults to
+#   ~/.claude/projects/<project path with every "/" replaced by "-">
+# e.g. /Users/ada/Projects/app  ->  ~/.claude/projects/-Users-ada-Projects-app
+observations:
+  # The workspace ROOT. Absolute, or ~-relative. This is the highest-precedence
+  # source; $OBS_WORKSPACE is second; the project-identity path above is the
+  # default. It must be ONE STABLE path that outlives a session — never derived
+  # from the cwd, and never inside an ephemeral checkout (a git worktree, a temp
+  # clone), which is torn down and takes the log with it.
+  #
+  # The value below is an EXAMPLE OVERRIDE, not the default — it is what you set
+  # when the skills being observed are installed at user scope and their
+  # observations belong in one place across every project.
+  workspace: ~/.agents/skill-observations
 ```
 
 `develop-batch` reuses the `developNext:` keys above (same roadmap, base branch, merge
@@ -145,7 +184,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 
 | Key                                              | Type                            | Default                                          | What it controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | ------------------------------------------------ | ------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tracker`                                        | `jira` \| `github` \| `auto`, **or** a map | (auto-detected)                       | Issue tracker override. Two forms, graded differently. As a **scalar** it is a platform override, validated against `jira` / `github` / `auto` — anything else halts the run (`tracker: bitbucket` is rejected; it is legal for `vcs`, not here). As a **map** it is the `tracker.workflowFile` form below, which is not a platform override and resolves as if `auto`. See [Platform Detection](../../shared/resources/platform-detection.md)                                              |
+| `tracker`                                        | `jira` \| `github` \| `auto`, **or** a map | (auto-detected)                       | Issue tracker override. Two forms, graded differently. As a **scalar** it is a platform override, validated against `jira` / `github` / `auto` — anything else halts the run (`tracker: bitbucket` is rejected; it is legal for `vcs`, not here), **at install time as well as at run time** since task 91. As a **map** it is the `tracker.workflowFile` form below, which is not a platform override and resolves as if `auto`. When absent, resolution falls through to `JIRA_URL` in the environment, then to `JIRA_URL=` in a repo-root `.env`, then to `github`. See [Platform Detection](../../shared/resources/platform-detection.md)                                              |
 | `vcs`                                            | `github` \| `bitbucket` \| `auto` | (auto-detected from git remote)                | VCS override. Validated against `github` / `bitbucket` / `auto` — anything else halts the run (`vcs: jira` is rejected; legal sets are per key). See [Platform Detection](../../shared/resources/platform-detection.md)                                                                                                                                                                                                                                                                    |
 | `access.tracker`                                 | `full` \| `read-only` \| `approve` \| `command` \| `manual` | `full`                | How much access the agent has to the tracker — a separate axis from `tracker`, which says only *which* tracker. Also settable via `AGENT_SKILLS_ACCESS_TRACKER`; config and env are read independently and the **more restrictive** wins, so an env var can lock a run down but never escalate it. An unrecognised value halts. On a host without `pyyaml` the no-dependency reader accepts a documented subset of YAML and **refuses** anything outside it rather than reading it as unset — so a merge key, an anchor or a quoted key now halts with the line, the construct and two ways forward, where it used to resolve silently to `full`. See [Platform Detection](../../shared/resources/platform-detection.md) → *Tier 2 — the strict subset*. **Since task.61 the JavaScript gates read this key too.** Previously only a shell that sourced `resolve-platform.sh` saw it, so the documented bare `node …` invocations of the sync, sprint and epic-creator scripts resolved to `full` and a committed restriction was inert. They now resolve the same three tiers by asking the same reader, so there is one answer rather than two implementations of one. A config that cannot be read correctly resolves to `manual` and prints one line naming the file and the reason — it never throws, so the read-only CLI modes (`--check`, `--print-plan`, `--probe-board`, `--probe-workflow`) keep working. Under any value but `full`, every Jira REST mutation is refused and appended to `.claude/state/tracker-actions.jsonl` instead of being sent; the affected CLIs report `reason: "deferred"` with the record id in their `--json` payload, and a deferred create returns `jira_key: null` rather than a placeholder. **Since task.54 the GitHub side is covered too** — board Status and membership (`gh-stage.js`), the Priority and Estimate board fields (`set-github-project-{priority,estimate}.sh`), and every `gh` mutation routed through `tracker_write` in `resolve-platform.sh` (`gh issue comment`, `gh pr comment`, `gh issue close`, …). **Since task.56 the GitHub issue lifecycle is covered as well** — `create`, `edit`, `close`, `reopen`, milestone create and the sub-issue link, through `tracker-issue.js`. Those are the calls whose stdout a caller *captures*, so they needed a CLI rather than a wrapper: a wrapper that refuses returns nothing, and `$( )` binds the empty string. The CLI prints nothing to stdout under a deferring mode (every notice goes to stderr) and records the mutation with `produces` set. A `create` or `milestone` additionally records `blocking: true`, and the checklist opens with a banner naming the **two-run convergence** — perform the action, write the value it produced into the document's frontmatter, re-run. **No placeholder is ever written**: `github_issue: 0` would defeat the idempotent search that stops the next run creating a duplicate, so a wrong key is worse than no key. Contract: [`tracker-issue-cli.md`](../../shared/resources/tracker-issue-cli.md). Still **not** covered, by design: Jira writes issued as raw `curl` from skill prose or through the Atlassian MCP tools. The runtime notice on every restricted run names both sides. See [`tracker-access-record.md`](../../shared/resources/tracker-access-record.md) and [Troubleshooting → My Jira card did not move](./troubleshooting.md#my-jira-card-did-not-move-and-nothing-failed)                                                                                      |
 | `access.vcs`                                     | `full`                          | `full`                                           | Accepted and validated so the schema is stable, but **only `full` works today** — VCS write is a hard requirement for the pipelines (`/create-pr` returns a PR URL later steps consume, `/develop-next` gates on `gh pr merge`). Any other value is rejected with a message naming the reason rather than silently ignored                                                                                                                                                                  |
@@ -153,6 +192,9 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `prd.prdShardedLocation`                         | path                            | `docs/prd`                                       | Base directory for the PRD shard tree. Resolved to `${PRD_ROOT}` by skills.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `architecture.architectureShardedLocation`       | path                            | `docs/architecture`                              | Base directory for architecture docs. Resolved to `${ARCH_ROOT}` by skills. Full spec: [Architecture documents](../standards/architecture-docs.md)                                                                                                                                                                                                                                                                                                                                        |
 | `devLoadAlwaysFiles`                             | list[path]                      | `[]`                                             | Files loaded at the start of every pipeline run (coding standards, tech stack, etc.)                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `skills.profile`                                 | `full` \| `pipeline` \| `minimal` | `full`                                        | Which install profile `setup-consumer.sh` uses. An **absent `skills:` block means `full`**, which is exactly the pre-task-84 behaviour, so no existing config changes meaning. A profile names **seed** skills only: the installer resolves each seed's transitive callees from `shared/resources/skill-dependencies.json` and installs those too, so a profile can never produce a half-installed pipeline. The tracker filter (see [`skills.exclude`](#key-reference) and task 83) runs **after** that closure, so a Jira-only skill reached via a dependency is still dropped on a GitHub repo. This key is what makes `--update` reproducible: `--update` short-circuits before the wizard runs, so the profile is read from this file or not at all. Motivation is context, not disk — every installed skill's `description` sits in the agent's context on every request. Choosing `pipeline` installs roughly a third of the library. |
+| `skills.include`                                 | list[string]                    | `[]`                                             | Extra skills installed on top of the profile, each with its own dependency closure. The way to reach the long tail (sprint ceremonies, deployment, UI design) without dropping to `full`. A skill excluded by the tracker filter is **not** rescued by listing it here — the filter is about applicability, not preference; use `--all-skills` for that.                                                                                                                                     |
+| `skills.exclude`                                 | list[string]                    | `[]`                                             | Skills to leave out. Applied to the seeds **and** re-applied during closure. A skill that something else in the resolved set requires is reported as a **conflict** — named, with what requires it and what will break — and left uninstalled. It is never silently re-added (that would override an explicit instruction) and never silently dropped (that would surface as a mid-pipeline failure with no clue as to the cause).                                                          |
 | `jira.statusMap`                                 | map[string→string\|list]        | (built-in candidate lists)                       | Maps local document status → the Jira status name(s) to transition to, as a scalar or ordered candidate list. May carry a per-issue-type sub-map (`story`/`task`/`epic`). Usually unnecessary — check with `--probe-workflow` first. See [Jira status mapping](#jira-status-mapping), and [Migration](#migration--if-your-config-already-has-a-statusmap) if your config was generated by an older wizard.                                                                                                                                                                                                     |
 | `jira.workflowRecord`                            | path                            | `docs/development/jira-workflow.json`            | JSON description of the board: which pipeline stages to drive, per Jira issue type, and the status ranks the monotonicity guard uses. Absent or unreadable → built-in defaults, i.e. exactly the old behaviour. Generate with `--probe-workflow --write-record`. See [Pipeline stages](#pipeline-stages).                                                                                                                                                                                 |
 | `jira.worklogTimeSpent`                          | string                          | (unset — no worklog is ever sent)                | Duration logged **only** to satisfy a workflow validator that demands time spent, sent inline with the transition that needs it, at most once per transition. Never invented: unset means such a transition fails as it always did. Env override: `JIRA_WORKLOG_TIME_SPENT`. See [Pipeline stages](#pipeline-stages).                                                                                                                                                                     |
@@ -175,7 +217,8 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `branching.epicIntegration.branchKey`            | string                          | `integration_branch`                             | Epic frontmatter key holding the branch name. Used **verbatim** when present — the epic document is the authority on its own branch name.                                                                                                                                                                                                                                                                                                                                                 |
 | `branching.epicIntegration.branchPattern`        | string                          | `epic/{n}.{slug}`                                | Fallback name, used only when an epic opts in but names no branch. `{n}` = epic number, `{slug}` = epic name slug. `epic/*` is deliberately distinct from `feature/epic.*`, which is an ordinary short-lived branch for epic-**document** work.                                                                                                                                                                                                                                           |
 | `branching.epicIntegration.offerWhenUndeclared`  | boolean                         | `true`                                           | Whether `/create-branch` and `/develop-story` offer "create an epic integration branch" for a story whose epic declared nothing. `false` restricts integration branches to epics that opted in explicitly. Never the _recommended_ option either way.                                                                                                                                                                                                                                     |
-| `develop.fastGateCommand`                        | shell command                   | `npm run ci:fast`                                | Fast gate the develop loop and each qa-fix cycle run before committing. Deliberately **excludes** the slow tier: paying it per iteration is what makes the correct fix feel expensive enough to be reverted. Should be the project's cheap CI-equivalent — formatting plus the hermetic suite. |
+| `develop.fastGateCommand`                        | shell command                   | `npm run ci:fast` (suggested — set it explicitly) | Fast gate the develop loop, each qa-fix cycle, and each `develop-bug` verify cycle run before committing. Deliberately **excludes** the slow tier: paying it per iteration is what makes the correct fix feel expensive enough to be reverted. Should be the project's cheap CI-equivalent — formatting plus the hermetic suite. **The fallback is a suggestion, not a working default**: a project that defines no `ci:fast` script would previously discover that mid-iteration, so the develop loop now checks the named script resolves *before* its first iteration and HALTs naming this key. |
+| `qa.testArtifactGlobs`                           | list of globs                   | `[]`                                             | Which paths the QA loop's **Diminishing-returns exit** treats as test machinery rather than product behaviour. Each glob is matched against a gate finding's `file:`, read as a repo-relative path; `**` crosses directories and `*` does not, so matching is on whole segments rather than substrings. The exit fires only when **every** `top_issues[]` entry in the latest gate matches — a finding with no `file:`, or one no glob covers, fails the condition, because the exit is opt-in on positive evidence and never on absence. **The `[]` default is the fail-safe**: it matches nothing, the exit never fires, and the loop behaves exactly as it does today. See [Diminishing-returns exit](../../shared/resources/develop-pipeline-step-5-6-qa-loop.md). |
 | `developNext.roadmapPath`                        | path                            | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`).                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `developNext.baseBranch`                         | branch name                     | `develop`                                        | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to.                                                                                                                                                                                                                                                                                                                                                                                  |
 | `developNext.qualityGateCommand`                 | shell command                   | `npm run ci`                                     | Local merge gate `develop-next` and `develop-batch` run on every branch before merging (the whole gate for projects without PR CI). **Expected to be the project's full CI-equivalent** — everything the CI job runs, in one command — so that a local green predicts a CI green. Defaulted to `npm test` until 2026-09-01, which was quietly weaker than the CI it was meant to predict; an explicit value here still wins. |
@@ -195,6 +238,7 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `loopSupervisor.cooldownSeconds`                 | integer                         | `10`                                             | Pause between iterations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `loopSupervisor.dashboardUrl`                    | URL                             | unset                                            | Where `loop-supervisor` POSTs a status frame on each iteration boundary. Inert when unset. `--dashboard` overrides. The payload contract is in [`skills/loop-supervisor/README.md`](../../skills/loop-supervisor/README.md#publishing-the-run-to-a-dashboard); a failed push warns once and never affects the run. **The token is deliberately not a config key** — this file is committed, so it comes from `--dashboard-token` or `$LOOP_SUPERVISOR_DASHBOARD_TOKEN` instead. |
 | `loopSupervisor.adapters.<name>`                 | map of paths                    | (adapter defaults)                               | Per-adapter overrides for `stateFile`, `lockFile`, `haltFile`, `probeScript` and `command`. **Declarative only** — a config key that could name a module to `require()` would be a code-execution surface, so JavaScript adapters are deliberately not supported.                                                                                                                                                                                                                          |
+| `observations.workspace`                         | path (absolute or `~`-relative) | `~/.claude/projects/<project-path with / → ->`   | Root of the `observe-work` observation workspace — the anchor holding `skill-observations/` (the log, the families registry, the review date) and `skill-updates/` (staged skill updates). **Highest-precedence source**; `$OBS_WORKSPACE` is second and the project-identity path is the default, so an absent key is a working default rather than a disabled feature. That default is the project's absolute path with every `/` replaced by `-`, under `~/.claude/projects/` — so `/Users/ada/Projects/app` resolves to `~/.claude/projects/-Users-ada-Projects-app`. Note it is `.claude/`, not `.agents/`: this one path is fixed by the agent home, not by this repository's agent-agnostic-path convention. Must be one stable path that outlives a session: a resolved value inside `/tmp`, `.claude/worktrees/`, or a linked git worktree is **refused outright**, not warned about and not silently defaulted. Set it to a shared user-scope path when the skills being observed are installed at user scope — see [Observation workspace](#observation-workspace). There is deliberately **no `observations.enabled` and no `observations.review_interval_days`**: nothing reads either, and the review-staleness threshold is the `OBS_STALE_DAYS` environment variable instead. |
 
 ## QA artifacts are co-located
 
@@ -209,6 +253,20 @@ story directory:
 ```
 
 Older skill text may still reference `{qa.qaLocation}/gates/...` or `{qa.qaLocation}/assessments/...`. Those paths are **deprecated** — the canonical location is alongside the work item. See [Story documents](../standards/story-documents.md#co-located-artifacts) and [Task documents](../standards/task-documents.md#co-located-artifacts).
+
+## The QA loop's diminishing-returns exit
+
+`qa.testArtifactGlobs` is the only configuration the [Diminishing-returns exit](../../shared/resources/develop-pipeline-step-5-6-qa-loop.md) has, and it is **off until you set it**.
+
+The exit ends a QA loop that has *finished working* — two consecutive gates with no HIGH findings, and a residue consisting entirely of findings about the test machinery built to pin the fixes. It is the opposite of the Convergence check beside it, which escalates a loop that has *stopped working*. Both evaluate from cycle 3 onward and they never both claim the same run.
+
+Three things about the key are worth stating plainly, because each is a decision rather than an accident:
+
+- **The default `[]` matches nothing**, so the exit never fires and a project that has not configured it keeps today's behaviour exactly. The fail-safe direction is the default, not something you opt into.
+- **A finding with no `file:` fails the condition**, as does one no glob covers. The exit needs positive evidence that every remaining finding is machinery; it never infers that from missing data.
+- **Matching is on whole path segments.** `**` crosses directories, `*` does not, and neither matches a substring — `src/latest-price.ts` is production code, whatever letters it contains.
+
+A consumer whose test layout is unusual and matches nothing simply never takes the exit. That is a cost in time, not in correctness.
 
 ## Stakeholder sign-off
 
@@ -272,6 +330,92 @@ Enforcement mirrors sign-off: `advisory` keeps `/develop-next` and `/develop-bat
 
 Full spec: [`document-change-log.md`](../../shared/resources/document-change-log.md). Engine: [`change-log.js`](../../shared/resources/change-log.js).
 
+## Observation workspace
+
+`observe-work` keeps its observation log, its families registry, its last-review date and its staged
+skill updates in one **workspace** directory. Everything the skill reads and writes hangs off it:
+
+```
+$OBS_WORKSPACE/
+├── skill-observations/
+│   ├── observation-log/        # one Markdown file per observation
+│   ├── skill-families.md       # the sibling-check registry
+│   └── last-review-date.txt
+└── skill-updates/              # staged skill edits, never installed automatically
+```
+
+### Resolver order
+
+Three sources, highest precedence first:
+
+1. `observations.workspace` in `skills-config.yaml`
+2. the `OBS_WORKSPACE` environment variable
+3. the project-identity default: `~/.claude/projects/<project path with every "/" replaced by "-">`
+
+So a project at `/Users/ada/Projects/app`, with no config key and no environment variable, resolves
+to `~/.claude/projects/-Users-ada-Projects-app`. Three things about that path are worth stating
+because guessing any of them wrong sends you to an empty directory:
+
+- It is under **`.claude/`**, not `.agents/` — the agent home fixes it, and this repository's
+  agent-agnostic-path convention does not reach it.
+- The project path is **encoded, not nested**, so there is one flat directory per project rather
+  than a mirrored tree.
+- **Inside a linked git worktree, the project path is the _main_ worktree's, not the one you are
+  standing in.** A session running in `/tmp/wt` still resolves to the main checkout's workspace.
+  That is deliberate — it is what stops one project resolving two different workspaces — and the
+  mechanism is described under *"An ephemeral anchor is refused"* below. It matters more than it
+  looks: `/develop-batch` dispatches every parallel story into a linked worktree, so this is an
+  ordinary state, not an exotic one.
+
+The resolver is [`shared/resources/resolve-observation-workspace.sh`](../../shared/resources/resolve-observation-workspace.sh),
+sourced **guarded**:
+
+```bash
+source shared/resources/resolve-observation-workspace.sh || exit 1
+```
+
+The `|| exit 1` is required, not stylistic. A bare `source` prints the resolver's error and then
+carries on with `OBS_WORKSPACE`, `OBS_LOG_DIR` and `OBS_STAGING_DIR` unset, which turns every
+subsequent read into a match-nothing glob and reports an empty, clean backlog — the one answer nobody
+questions.
+
+### An ephemeral anchor is refused, not defaulted
+
+A resolved path inside `/tmp` (or `/private/tmp`, `/var/tmp`), inside `.claude/worktrees/`, or inside
+a **linked** git worktree is rejected outright. The resolver does not fall back to the default when it
+sees one; it fails and says why.
+
+That severity is deliberate. A log written into a checkout that is torn down goes with it, and the
+failure is silent in exactly the wrong direction: the next scan does not error, it reports zero
+observations. An empty backlog and a destroyed one are byte-identical from the caller's side, so the
+only safe moment to object is before the first write.
+
+For the same reason the workspace is **never derived from the current working directory**. The
+project anchor comes from `git rev-parse --git-common-dir`, which resolves to the *main* worktree
+from inside any linked one — `--show-toplevel` would resolve to the linked worktree and give one
+project two different workspaces depending on where a session happened to start.
+
+### Scope: match the workspace to where the skills live
+
+The default is per-project, and that is right only for skills that exist in one project.
+
+Skills installed at **user or global scope are observed from every project you work in**. Their
+observations belong in one user-scope workspace, so set `observations.workspace` to a shared path
+(`~/.agents/skill-observations`, say) rather than accepting the per-project default. Left per-project,
+observations about a globally-installed skill scatter across every repository you touch, and a review
+run in any one of them looks complete while seeing a fraction of the backlog.
+
+### One documented key
+
+`observations.workspace` is the only key under `observations:`, because it is the only one anything
+reads. The review-staleness threshold is the `OBS_STALE_DAYS` environment variable (default `14`),
+read by the `SessionStart` hook and by nothing else. Neither `observations.enabled` nor
+`observations.review_interval_days` exists — documenting a key with no reader ships a knob that
+silently does nothing, which is worse than an undocumented feature.
+
+Skill: [`skills/observe-work/SKILL.md`](../../skills/observe-work/SKILL.md). Log contract:
+[`observation-log-contract.md`](../../shared/resources/observation-log-contract.md).
+
 ## Tracker workflow
 
 `tracker-workflow.yaml` at the repo root declares your board's statuses **in order**, plus which
@@ -329,7 +473,7 @@ configures the second; the workflow record configures the first.
 | `work-started`    | Step 1, once the branch and lock exist      | on      |
 | `in-review`       | Step 4, once the PR URL is confirmed        | on      |
 | `in-qa`           | Step 5, once, on entering the QA loop       | **off** |
-| `ready-for-merge` | Step 6, on a gate that exits the loop       | **off** |
+| `ready-for-merge` | Step 5c, on APPROVE / CONCERNS              | **off** |
 | `blocked`         | before a terminal HALT, real blockages only | **off** |
 | `done`            | Step 7, by `/finalise`                      | on      |
 
@@ -893,6 +1037,18 @@ GitHub operations use the `gh` CLI. Authenticate once with `gh auth login`; no e
 
 `gh-stage.js` treats an unauthenticated `gh` as a **dead end, not a handoff**: one warning, exit 0, no
 board change. There is no MCP fallback for the GitHub path — unlike Jira, there is no second transport.
+
+### observe-work
+
+| Variable          | Example                        | Required | Purpose                                                                                                                                                                    |
+| ----------------- | ------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OBS_WORKSPACE`   | `~/.agents/skill-observations` | No       | Observation workspace root. **Second** in precedence — `observations.workspace` in `skills-config.yaml` wins over it, and the project-identity path is the default below it |
+| `OBS_STALE_DAYS`  | `14`                           | No       | How many days old the last review may be before the `SessionStart` hook offers a new one. Default **14**                                                                    |
+
+`OBS_STALE_DAYS` is an environment variable and **not** a `skills-config.yaml` key — the hook
+(`shared/resources/observe-work-session-start.sh`) reads `${OBS_STALE_DAYS:-14}` directly and
+consults no config file. There is no `observations.review_interval_days`; adding one would document
+a knob with no reader.
 
 ### Platform resolution order
 

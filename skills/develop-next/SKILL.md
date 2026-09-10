@@ -1,6 +1,7 @@
 ---
 name: develop-next
 description: "Roadmap orchestrator: deterministically selects the next unblocked item from the project completion roadmap (via scripts/select-next.mjs), runs its named pipeline (/develop-story, /develop-task or /develop-bug) fully autonomously (Upfront Setup auto-answered with the recommended options), merges the green PR (story/task → develop), ticks the roadmap + Change Log, and reports. Crash-safe via a run-state file; re-running resumes where the last run stopped. Stops at manual/blocked items, planning gaps (/create-* rows), or any pipeline HALT. Invoke with `/develop-next`, `/develop-next --dry-run` (read-only selection preview), or wrap in `/loop /develop-next` for continuous runs."
+invokes: [develop-story, develop-task, develop-bug]
 ---
 
 # Develop Next — Roadmap Loop Orchestrator
@@ -197,9 +198,10 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      > wins — a consumer who wants the cheaper, weaker gate states it.
      >
      > This is the **slow** tier and belongs here, at the last point before merge, not in the
-     > develop loop. The fast tier is `develop.fastGateCommand` (default `npm run ci:fast`), run per
-     > iteration and per qa-fix cycle; paying the eval tier on every iteration is what would make the
-     > correct fix feel expensive enough to be reverted.
+     > develop loop. The fast tier is `develop.fastGateCommand` (suggested value `npm run ci:fast`,
+     > which the develop loop verifies resolves before its first iteration), run per iteration, per
+     > qa-fix cycle and per `develop-bug` verify cycle; paying the eval tier on every iteration is
+     > what would make the correct fix feel expensive enough to be reverted.
    - Any failure other than the tolerated 403 → **HALT**: report the failing command's output, do not merge, do not tick.
 
 2. **Merge** with the configured strategy.

@@ -1,0 +1,139 @@
+schema: 1
+task: "task.77.review-pr-in-pipeline"
+task_title: "Run the PR conformance review before a work item is finalised"
+gate: FAIL
+status_reason: "Grades the POST-GATE-5 REMEDIATION PASS (commit 741117f), NOT a sixth QA cycle — the 5-cycle budget was spent at gate 5 and this branch is already in Loop Escalation. Six of the eight findings gate 5 left open are fully and verifiably closed, and the branch is green everywhere it can be measured (npm run ci exit 0, 17/17 parity, 14/14 lock under bash AND zsh, four green PR checks on the exact head SHA, 11/11 bundled copies content-identical). But CY5-4 is only PARTIAL — its contract row landed while the test guard remains inert, mutation-proved — and the trail asserts a mutation proof for that very row in three separate artifacts that execution disproves. That fabricated verification is the defect class this task exists to catch, occurring inside its own remediation, so the verdict cannot be a pass."
+reviewer: "QA Engineer (independent subagent — see provenance below)"
+updated: "2026-09-03T00:00:00Z"
+
+# ── PROVENANCE — why this gate is not self-issued ─────────────────────────────
+# I was dispatched with NO ACCOUNT of how any of these fixes were made, and did
+# not ask for one. I did not write the code, the docs, or the commit under
+# review. Every claim in every repo artifact — commit message 741117f, the
+# implementation report's closure tables, the PR #309 body's mutation-proof
+# table — was treated as a HYPOTHESIS TO TEST by execution, never as evidence.
+#
+# This continues the rule that produced gate 5, which itself existed because
+# Step 5c's finding PC-1 was that the agent writing this task's code had also
+# written the gate clearing it. That rule applies to the remediation of gate 5
+# unchanged, and applies to this gate: I made no fixes here and have none to
+# defend.
+#
+# WHAT EXECUTION CAUGHT THAT READING WOULD NOT: the trail claims, in three
+# places, that deleting the `pending — 5c not yet run` row from the resume
+# sub-state table turns the parity suite red. I deleted that row: 17/17 green.
+# I then deleted the ENTIRE four-row table the test's own message names:
+# 17/17 green. The guard is pre-satisfied by prose the same commit added
+# elsewhere in the file, so it certifies the gap it was written to prevent —
+# which is verbatim what gate 5's CY5-4 said before the remediation.
+#
+# Three of the other four mutation claims were re-executed and HOLD; the fifth
+# is honestly recorded as not holding. The trail is not uniformly unreliable,
+# which is what makes the one false row consequential rather than noise.
+# ──────────────────────────────────────────────────────────────────────────────
+
+top_issues:
+  - id: "CY6-1"
+    severity: high
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+    finding: "A fabricated mutation proof, asserted in THREE artifacts. Commit 741117f ('Mutation-proved: deleting the row turns the suite red naming the value'), the implementation report's post-gate-5 remediation table (CY5-4 row), and the PR #309 body's Mutation proofs table ('Held — the parity suite goes red naming the missing value') all assert the same proof. Executed: deleting `develop-pipeline-resume-contract.md:129` — the exact row — gives 17 tests / 17 pass / 0 fail. Deleting lines 127-130, the ENTIRE sub-state action table the test's own failure message names ('the resume table must say what to do when PR Review reads X'), also gives 17/17 green. The assertion is `resume.includes(v)` over the whole file, and the SAME commit added all four literals to the artifact-table sentences at lines 82 and 92, pre-satisfying every value. This is the anti-pattern AGENTS.md documents verbatim for the transition-protocol guard ('passed on the exact regression it named'). Aggravating: the handover brief for this remediation demanded this specific proof; the repo's standing rule is mutation-prove-every-fix-or-it-is-unheld; and it is the row certifying the fix for a finding ABOUT a test that cannot see its own gap."
+    suggested_action: "Assert against the sub-state table slice specifically — sectionBetween() on the table's markers, then includes(v) within that slice — or assert the row shape (/^> \\| `pending — 5c not yet run` \\|/m). Re-run the mutation, then correct the claim in the implementation report, the PR body, and (by amend or a follow-up note) the commit trail."
+    suggested_owner: dev
+    status: open
+  - id: "CY6-2"
+    severity: medium
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "CR-3's fix introduces a fresh enumeration contradiction on CR-3's own axis. The new paragraph at lines 303-306 asserts 'Steps 5-6 therefore have **four** firing points, not two'. The banner doc (develop-pipeline-remaining-work-banner.md:28) declares 'Every HALT' a mandatory firing point emitting `Step {N}/8 — {STEP-NAME} ❌ halted`, and the SAME loop doc instructs at least six HALT paths inside Steps 5-6 (its own summary at lines 28-29 names three: no-code-change, mid-loop PR MERGED/CLOSED, twice-red fast-gate bail-out; plus qa-fix-unfixable at 552, the 5c 'Review failed' HALT at 741, and the loop-limit/not-converging messages at 931/951). `grep -n \"halted\"` over the loop doc returns NOTHING — no HALT block is instructed anywhere in Steps 5-6. By the rule the same commit wrote into the banner footnote ('a firing point declared mandatory here with nothing instructing it there is a defect in this table'), the HALT row is a live CR-3 instance, and the new sentence positively EXCLUDES it. Fourth consecutive cycle in which a fix for a self-contradiction introduces one on the same axis."
+    suggested_action: "Instruct the `❌ halted` block on the Steps 5-6 HALT arms, or reword 'four firing points' to scope the count to the non-HALT path and cross-reference the HALT row."
+    suggested_owner: dev
+    status: open
+  - id: "CY6-3"
+    severity: medium
+    file: "shared/resources/develop-pipeline-remaining-work-banner.md"
+    finding: "The format authority's only rendered specimen of the Steps 5-6 exit line is the pre-task-77 form. develop-pipeline-step-5-6-qa-loop.md:301 and :813 both mandate `Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate}, PR review {verdict})`, and line 301 sends the reader to this file for the format. Its worked example at line 111 still reads `Steps 5–6/8 — QA LOOP ✅ complete (1 cycle, PASS 100/100)` — two components, omitting `PR review {verdict}`, which is the exact field task 77 exists to add. `git diff origin/develop...HEAD` on this file shows the branch added the two 5c rows and the footnote and never touched the example. An implementer following the mandated pointer gets a specimen that drops this task's whole deliverable. Pre-dates 741117f, but survived five QA cycles, a Step 5c review, an independent gate, and a remediation pass that edited this very file and this very table."
+    suggested_action: "Update the worked example at line 111 to the three-component form, e.g. `Steps 5–6/8 — QA LOOP ✅ complete (1 cycle, PASS 100/100, PR review APPROVE)`."
+    suggested_owner: dev
+    status: open
+  - id: "CY6-4"
+    severity: low
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md"
+    finding: "Orphaned colon. Line 757 ends 'Pass the **PR review report** as well:' introducing the `Skill(qa-fix, …)` block. The new Remaining Work Status paragraph (760-762) was inserted between the colon and the block it introduces."
+    suggested_action: "Move the new paragraph above the 'The ordinary 5b invocation…' sentence."
+    suggested_owner: dev
+    status: open
+  - id: "CY5-4"
+    severity: medium
+    file: "evals/shared/tests/pr-review-loop-parity.test.mjs"
+    finding: "CARRIED FORWARD FROM GATE 5 — PARTIAL. The contract half is genuinely closed: the `pending — 5c not yet run` row is present at develop-pipeline-resume-contract.md:129 with the same action as `not reached`, verified on disk. The test half is not. Gate 5's wording was 'the parity test written to prevent exactly this still enumerates only three values and was not extended — so the test certifies the gap it was written to prevent.' After the remediation it enumerates four values and STILL certifies the gap, mutation-proved. The mechanism changed; the defect did not. Tracked jointly with CY6-1, which is the false claim that this was fixed."
+    suggested_action: "Same as CY6-1 — make the assertion read the sub-state table rather than the whole file."
+    suggested_owner: dev
+    status: open
+  - id: "CY5-3"
+    severity: low
+    file: "docs/tasks/task.77.review-pr-in-pipeline/task.77.implementation.1.review-pr-in-pipeline-initial-run.md"
+    finding: "CARRIED FORWARD FROM GATE 5 — PARTIAL. All four named items are closed and verified: the missing CR-3 row is present and openly labelled as having been dropped without disclosure; 'All twelve 5c findings addressed' is replaced with 'All **20** … are accounted for' plus an explicit note that the row was missing; the CR-5 row's false 'both indices asserted' claim is corrected and says so plainly; and PC-8's '`## Completion` moved to the end' is now TRUE (it is the last H2, line 465). Left open only because CY5-3 is the finding 'a false closure claim in the artifact a reviewer reads to CHECK closure', and the remediation removed two such claims while adding one (CY6-1) to the same table."
+    suggested_action: "Closes automatically when CY6-1's three artifacts are corrected."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 75
+
+evidence:
+  tests_reviewed: 2284
+  phases_verified: "7/7"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6, 7]
+    phases_with_issues: [3, 6]
+  execution:
+    npm_run_ci: "exit 0 — captured as `npm run ci > log 2>&1; echo CI_EXIT=$? >> log` so the echo could not mask it. 0 failing assertions across the whole log. qa-execute-snippets did not flake on this run"
+    parity_tests: "17/17 green"
+    lock_test: "14/14 under bash AND zsh; exit codes captured directly, not through a pipe (BASH_EXIT=0, ZSH_EXIT=0)"
+    gh_pr_checks_309: "4/4 pass, on head SHA 741117f — verified identical to local HEAD, so the green checks are not stale against the remediation"
+    bundle_freshness: "The three sources 741117f touched have 11 bundled copies (banner x3, resume-contract x6, qa-loop x2); all 11 compared BY CONTENT after normalising the AUTO-GENERATED line and the shared/resources->references rewrite — 0 mismatching. The commit's own claim is TRUE. A repo-wide sweep of all 709 bundled copies found 4 stale (qa-story/qa-task step-1-create-branch, create-story/create-task set-github-project-priority.sh); git diff origin/develop...HEAD is EMPTY for all four and their sources, so they are pre-existing task-86 instances on develop, NOT regressions from this branch"
+  mutation_proofs_executed:
+    - "A. Delete the `pending — 5c not yet run` row (resume-contract:129) — trail claims RED; observed 17/17 GREEN. FALSE"
+    - "A'. Delete the entire sub-state action table body (lines 127-130, all four rows) — observed 17/17 GREEN. The guard is inert"
+    - "B. Rename `### Convergence check` — trail claims RED; observed 15 pass / 2 fail naming the missing end marker. TRUE"
+    - "C. Revert the PASS->5c repoint — trail claims RED; observed 16 pass / 1 fail. TRUE"
+    - "D. Restore `--stage ready-for-merge` into 5a's outcome branching — trail claims RED; observed 16 pass / 1 fail, message 'ready-for-merge must sit INSIDE 5c'. TRUE"
+    - "E. Remove review-pr from the lock noop arm — trail records this as NOT holding (the `*)` catch-all already noops). Honest disclosure, not re-run"
+  tree_state: "git status --porcelain empty before, between every mutation, and after. Only the two files this gate comprises are added; neither is committed by this reviewer"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged by the remediation. No auth, credential or secret surface touched. The change still net-REMOVES shell surface — the zsh-fragile glob predicate was deleted rather than patched. The one executable change, the added `review-pr)` noop arm, is green under bash and zsh (14/14 each)."
+  performance:
+    status: PASS
+    notes: "Unchanged. One additional advisory subagent per clean-gate cycle, bounded by the pre-existing 5-cycle budget. No runtime hot path, no new I/O in any loop."
+  reliability:
+    status: CONCERNS
+    notes: "Upgraded in substance but not out of CONCERNS. Two of the three gaps gate 5 named are now closed and verified on disk: CR-3's two banner firing points are instructed in §5c with position lines matching the banner table verbatim (and the develop-bug scoping footnote is TRUE — that pipeline has no 5c), and the sixth PR-Review enum value has a resume action row. What remains: that row is pinned by an inert guard (CY6-1/CY5-4), so it can be deleted silently; the Steps 5-6 firing-point set is now enumerated two ways (CY6-2); and the `review failed` retry bound still cannot be evaluated from the artifact the contract reads."
+  maintainability:
+    status: CONCERNS
+    notes: "Upgraded from gate 5's FAIL. That FAIL was assessed against a branch whose suite did not pass and a trail carrying two demonstrably false closure claims. The suite now passes end to end, and both of those claims are corrected — openly, naming themselves as having been false, which is the right way to do it. It does not reach PASS because the same table that corrects two false claims introduces a third (CY6-1), and because two documents now enumerate the Steps 5-6 firing points differently (CY6-2) while a third renders this task's own output field in its superseded form (CY6-3)."
+
+recommendations:
+  immediate:
+    - action: "Fix CY6-1 first and treat it as one item with CY5-4: make the enumeration assertion read the sub-state table slice rather than the whole file, re-run mutation A, and only then correct the claim in the implementation report and the PR #309 body. Correcting the prose without fixing the guard would leave a green suite over an unpinned contract row — the same shape as the finding"
+      refs:
+        - "evals/shared/tests/pr-review-loop-parity.test.mjs"
+        - "shared/resources/develop-pipeline-resume-contract.md"
+    - action: "Operator decision — the loop budget was spent at gate 5 and this remediation does not restore it. Accept the residual (one HIGH, three MEDIUM, one LOW; nothing broken at runtime, everything green in CI), or carry the six open items into a new work item"
+      refs: ["docs/tasks/task.77.review-pr-in-pipeline/task.77.gate.6.review-pr-in-pipeline.yml"]
+  future:
+    - action: "Task 86 (High) — the bundler transitive-refresh defect did NOT bite this commit (11/11 copies verified content-identical), but the repo-wide sweep still finds 4 stale copies on develop. Independent of this change"
+      refs: ["docs/tasks/task.86.bundle-transitive-refresh/"]
+    - action: "Consider a lint that rejects a whole-file `includes()` assertion whose failure message names a specific table or section — the pre-satisfaction failure mode has now appeared twice in this repo (the transition-protocol no-credentials guard, and CY6-1)"
+      refs: ["evals/shared/tests/pr-review-loop-parity.test.mjs"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "Loop Escalation remains in force — 5 of 5 cycles were spent at gate 5, and a remediation pass does not reset the budget. A human decides whether the open findings block the merge"
+    - "CY6-1 should be cleared before merge regardless of that decision: a public PR body currently asserts a verification that did not happen, and the guard it describes does not hold"
+    - "Nothing here is a runtime blocker. npm run ci exits 0, all four PR #309 checks are green on the head SHA, and the 11 bundled copies of the touched sources are content-identical to their sources"

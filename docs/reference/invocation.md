@@ -86,7 +86,7 @@ Prefer the orchestrators — they run the full lifecycle automatically.
 "Develop and QA this story end to end"
 ```
 
-Calls: `create-branch → review-story → develop → create-pr → qa-story → qa-fix (up to 5 cycles) → finalise → commit-changes`
+Calls: `create-branch → review-story → develop → create-pr → qa-story → qa-fix (up to 5 cycles) → review-pr (Step 5c) → finalise → commit-changes`
 
 ### `develop-task` — Automated Task Lifecycle
 
@@ -95,7 +95,7 @@ Calls: `create-branch → review-story → develop → create-pr → qa-story �
 "Develop and QA this task end to end"
 ```
 
-Calls: `create-branch → review-task → develop → create-pr → qa-task → qa-fix (up to 5 cycles) → finalise → commit-changes`
+Calls: `create-branch → review-task → develop → create-pr → qa-task → qa-fix (up to 5 cycles) → review-pr (Step 5c) → finalise → commit-changes`
 
 For the full pipeline breakdown and workflow chains see [Workflows](../operations/workflows.md).
 

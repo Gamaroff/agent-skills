@@ -62,7 +62,7 @@ const ROSTER_DOC = "tracker-access-record.md";
 
 // Asserted, not merely non-zero. A reformatted row used to truncate the roster
 // silently; pinning the count turns that into an immediate, explicit failure.
-const EXPECTED_KIND_COUNT = 23;
+const EXPECTED_KIND_COUNT = 24;
 
 const ACCESS_MODES = Object.freeze([
   "full",

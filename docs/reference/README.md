@@ -10,6 +10,7 @@ Spec-style documents to consult when you need a fact, not a walkthrough.
 - [Activation phrases](./activation-phrases.md) — natural-language phrases that trigger each skill
 - [Commands](./commands.md) — every `/foo` invocation, consolidated
 - [Configuration](./configuration.md) — `skills-config.yaml` keys, worked examples, placeholders
+- [Tracker workflow](./tracker-workflow.md) — `tracker-workflow.yaml`, the board's status ladder and which pipeline moment targets each rung
 - [Pipeline artifacts](./pipeline-artifacts.md) — every file `develop-story` / `develop-task` create, step by step
 - [Skill Catalog](./skill-catalog.md) — generated, categorised index of every skill
 - [Glossary](./glossary.md) — terms used across the docs

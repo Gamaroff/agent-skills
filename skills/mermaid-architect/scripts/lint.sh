@@ -60,8 +60,6 @@ if (( ${#BLOCK_FILES[@]} == 0 )); then
   exit 2
 fi
 
-VALID_TYPES_RE='^[[:space:]]*(flowchart|graph|sequenceDiagram|stateDiagram-v2|stateDiagram|erDiagram|classDiagram|journey|gantt|pie|mindmap|timeline|C4Context|C4Container|C4Component|C4Dynamic|C4Deployment|requirementDiagram|gitGraph|quadrantChart|sankey-beta|xychart-beta|block-beta)\b'
-
 WARN=0
 EXIT=0
 

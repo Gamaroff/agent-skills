@@ -83,7 +83,6 @@ fi
 
 SKILL=$(jq -r '.skill // ""' "$LOCK" 2>/dev/null)
 REPORT=$(jq -r '.report_path // ""' "$LOCK" 2>/dev/null)
-TASK_ID=$(jq -r '.task_or_story_id // ""' "$LOCK" 2>/dev/null)
 BRANCH=$(jq -r '.branch // ""' "$LOCK" 2>/dev/null)
 PR_URL=$(jq -r '.pr_url // ""' "$LOCK" 2>/dev/null)
 TRACKER=$(jq -r '.tracker // ""' "$LOCK" 2>/dev/null)

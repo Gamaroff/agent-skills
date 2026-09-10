@@ -1,0 +1,63 @@
+{
+  "$comment": [
+    "Install profiles for setup-consumer.sh. Each profile names SEED skills only \u2014",
+    "resolve-skill-set.mjs expands the seeds over skill-dependencies.json, so a seed's",
+    "callees do not need listing here and must not be listed defensively: a hand-copied",
+    "closure is a second source of truth that goes stale silently.",
+    "",
+    "`full` uses the sentinel \"*\" rather than an enumerated list for the same reason \u2014",
+    "the set changes every time a skill is added, and an enumerated list would have to be",
+    "regenerated to stay correct.",
+    "",
+    "A skill in no profile is reachable via skills.include, and is legitimate: the long",
+    "tail (deployment, Railway, Jira sprint ceremonies, UI design) is not part of the",
+    "document pipeline. skill-dependencies-drift.test.mjs REPORTS the unprofiled set in",
+    "CI output rather than failing on it."
+  ],
+  "minimal": {
+    "description": "Branching, commits, PRs and ad-hoc code review. No document pipeline.",
+    "seeds": [
+      "commit-changes",
+      "create-branch",
+      "create-issue",
+      "create-pr",
+      "review-code"
+    ]
+  },
+  "pipeline": {
+    "description": "The full story/task/bug lifecycle: create -> review -> develop -> QA -> finalise.",
+    "seeds": [
+      "commit-changes",
+      "create-branch",
+      "create-bug-report",
+      "create-epic",
+      "create-issue",
+      "create-pr",
+      "create-prd",
+      "create-story",
+      "create-task",
+      "develop",
+      "develop-bug",
+      "develop-next",
+      "develop-story",
+      "develop-task",
+      "finalise",
+      "qa-fix",
+      "qa-gate",
+      "qa-planning",
+      "qa-story",
+      "qa-task",
+      "review-bug",
+      "review-code",
+      "review-epic",
+      "review-pr",
+      "review-prd",
+      "review-story",
+      "review-task"
+    ]
+  },
+  "full": {
+    "description": "Every skill in the library.",
+    "seeds": "*"
+  }
+}

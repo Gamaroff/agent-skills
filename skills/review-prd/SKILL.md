@@ -6,6 +6,7 @@ description:
   and asks clarifying questions. Produces a co-located review report or inline action
   plan. Use to catch inaccuracies, gaps, and inconsistencies before epic/story work
   begins."
+invokes: [mermaid-architect]
 ---
 
 # Review PRD

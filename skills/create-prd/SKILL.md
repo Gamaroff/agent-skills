@@ -1,6 +1,7 @@
 ---
 name: create-prd
 description: Create Product Requirements Documents. Default mode is brownfield (enhancements to existing projects with 4+ stories or architectural changes). Greenfield mode is invoked indirectly via the new-product-prd skill. Orchestrates create-doc, the appropriate PRD template, and pm-checklist.
+invokes: [create-doc, prd-template, brownfield-prd-template, pm-checklist, mermaid-architect]
 ---
 
 # PRD Creation

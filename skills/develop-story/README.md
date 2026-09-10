@@ -117,8 +117,11 @@ flowchart TD
     S5map --> S5
     S5[Step 5: qa-story<br/>traceability_matrix arg if mapper ran<br/>lite directive if PIPELINE_MODE=lite]
     S5 --> S5gate{Gate result}
-    S5gate -- PASS no top_issues --> S7
+    S5gate -- PASS / WAIVED --> S5c[Step 5c: review-pr<br/>--effort medium, low if lite<br/>--comment]
     S5gate -- CONCERNS / FAIL --> S6[Step 6: qa-fix]
+    S5c --> S5cv{Verdict}
+    S5cv -- REQUEST CHANGES<br/>commit only, push already spent --> S6
+    S5cv -- APPROVE / CONCERNS --> S5cm[signal ready-for-merge] --> S7
     S6 --> S6chg{Code changed?}
     S6chg -- no --> HALTNOFIX[HALT: qa-fix made no changes]
     S6chg -- yes --> S6commit[/commit-changes + push/]
@@ -278,6 +281,7 @@ sequenceDiagram
     participant TM as Explore<br/>QA traceability mapper
     participant Q as /qa-story
     participant F as /qa-fix
+    participant PR as /review-pr
     participant CC as /commit-changes
     participant PG as Explore<br/>tracker state poller
     participant FS as Filesystem
@@ -304,8 +308,22 @@ sequenceDiagram
         Q-->>-H: gate result
 
         H->>FS: read gate file
-        alt gate == PASS, no top_issues
-            note right of H: EXIT loop → Step 7
+        alt gate == PASS / WAIVED
+            H->>+CC: /commit-changes<br/>"docs(story.{epic}.{story}): QA cycle {N} gate + report"
+            CC-->>-H: committed + pushed (cycle's one push)
+            H->>+PR: /review-pr --effort {medium|low} --comment<br/>Step 5c — the loop's exit gate
+            PR->>FS: write story.{epic}.{story}.pr-review.{n}.*.md
+            PR-->>-H: verdict
+            alt verdict == REQUEST CHANGES
+                note right of H: back to 5b — same 5-cycle budget,<br/>counter incremented by 5b step 7
+                H->>+F: /qa-fix {gate} + {pr-review report}
+                F-->>-H: returns (commit only — push already spent)
+            else verdict == APPROVE / CONCERNS
+                H->>H: signal ready-for-merge
+                note right of H: EXIT loop → Step 7
+            else verdict == review failed
+                H->>H: HALT — 5c could not run (do NOT fall through to Step 7)
+            end
         else CONCERNS / FAIL / has top_issues
             H->>+F: /qa-fix {gate-file-path}
             F->>FS: edit code per gate findings
@@ -336,7 +354,7 @@ sequenceDiagram
         end
     end
 
-    alt cycle > 5 without PASS
+    alt cycle > 5 without clearing 5c
         H->>FS: write escalation entry<br/>(per-cycle summaries, root cause, next steps)
         H->>+CC: docs(story.{epic}.{story}): implementation report — qa loop escalation
         CC-->>-H: hash
@@ -468,7 +486,7 @@ Every board move goes through a **moment** — a named point in the pipeline —
 | Step 4 (PR opened)             | `in-review`         | `/create-pr` passes `--base develop` and `--issue {N}` + `gh-stage.js --stage in-review`                                                                                                     |
 | Step 5 (QA start)              | `in-qa`             | `gh-stage.js --stage in-qa` — **once**, not per cycle. *Off by default.*                                                                                                                     |
 | Step 5b (entering a fix cycle) | `changes-requested` | `gh-stage.js --stage changes-requested` — **per cycle**, because it marks a state the card re-enters. *Off by default.*                                                                      |
-| Step 6 (gate exits the loop)   | `ready-for-merge`   | `gh-stage.js --stage ready-for-merge`. *Off by default.*                                                                                                                                     |
+| Step 5c (APPROVE / CONCERNS)   | `ready-for-merge`   | `gh-stage.js --stage ready-for-merge`. *Off by default.*                                                                                                                                     |
 | Step 5b (post qa-fix push)     | —                   | tracker state poller checks `pr.state` is OPEN                                                                                                                                              |
 | Step 7 (finalise)              | `done`              | `gh issue close {N}` + `gh-stage.js --stage done` + DoD body posted as PR comment                                                                                                            |
 | Terminal HALT                  | `blocked`           | `gh-stage.js --stage blocked` — only for a real blockage, never an interruption. *Off by default.*                                                                                           |
@@ -487,7 +505,7 @@ Same moments, same call sites, same off-by-default set — only the CLI differs.
 | Step 4         | `in-review`         | `tracker-comment.js --stage in-review` + `jira-stage.js --stage in-review`                        |
 | Step 5         | `in-qa`             | `jira-stage.js --stage in-qa` — once. *Off by default.*                                             |
 | Step 5b        | `changes-requested` | `jira-stage.js --stage changes-requested` — per cycle. *Off by default.*                            |
-| Step 6         | `ready-for-merge`   | `jira-stage.js --stage ready-for-merge`. *Off by default.*                                          |
+| Step 5c        | `ready-for-merge`   | `jira-stage.js --stage ready-for-merge`. *Off by default.*                                          |
 | Step 5b        | —                   | tracker state poller (Jira branch — board status read)                                              |
 | Step 7         | `done`              | `tracker-comment.js --stage done` + `jira-stage.js --stage done`                                   |
 | Terminal HALT  | `blocked`           | `jira-stage.js --stage blocked` — real blockage only. *Off by default.*                             |

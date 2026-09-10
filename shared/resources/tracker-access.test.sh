@@ -1031,13 +1031,13 @@ done
 # first version of this probe still missed.
 D=$(fixture spelling-explicit-key '? access\n: {tracker: manual}\nx: 1\nx: 2\n')
 run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
-assert_rc "malformed + explicit-key `? access` → refused" "$RC" "1"
+assert_rc "malformed + explicit-key '? access' → refused" "$RC" "1"
 if [ "$AT" = "full" ]; then bad "…and must not grant full" "AT=full"; else ok "…and does not grant full"; fi
 
 # …and an explicit key that is NOT access must not trip it.
 D=$(fixture spelling-explicit-other '? other\n: 1\nx: 1\nx: 2\n')
 run_case "$D" "AGENT_SKILLS_CONFIG_TIER=python"
-assert_rc "malformed + explicit-key `? other` → still degrades" "$RC" "0"
+assert_rc "malformed + explicit-key '? other' → still degrades" "$RC" "0"
 
 # The over-match is deliberate and bounded: a file with NO access key at all still degrades with a
 # warning rather than halting, which is what keeps a consumer who never opted in from being locked
@@ -1483,12 +1483,30 @@ if [ -d "$HERE" ]; then
   # scraping that prose collects English words instead of key names.
   # Production resolvers only. The test files name these readers inside assertion STRINGS, which no
   # comment-stripping can tell from a call — and a suite that scans itself finds its own prose.
-  READER_SOURCES=$(ls "$HERE"/*.sh 2>/dev/null | grep -v '\.test\.sh$')
-  # shellcheck disable=SC2086
-  READER_CALLS=$(sed 's/[[:space:]]#.*$//; s/^[[:space:]]*#.*$//' $READER_SOURCES \
-    | grep -oE '(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+[a-zA-Z][a-zA-Z0-9_]*([[:space:]]+[a-zA-Z][a-zA-Z0-9_]*)?' \
-    | sed -E 's/^(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+//' \
-    | tr ' ' '\n' | sort -u)
+  # Glob loop rather than `ls | grep`: `ls` output is not a safe list (SC2010), and the
+  # array form also removes the word-splitting that previously needed an SC2086 disable.
+  READER_SOURCES=()
+  for _rs in "$HERE"/*.sh; do
+    [ -e "$_rs" ] || continue          # unmatched glob stays literal under nullglob-off
+    case "$_rs" in *.test.sh) continue ;; esac
+    READER_SOURCES+=("$_rs")
+  done
+  # Guard the empty case explicitly: `sed` with no file operands reads STDIN and hangs,
+  # which the `ls` form was also exposed to and never checked.
+  #
+  # Structured as if/else rather than an early return: section 44 runs inside a TOP-LEVEL
+  # `if [ -d "$HERE" ]` block, not inside a function, so `return` here is illegal — and
+  # `return 1 2>/dev/null || true` (the first attempt) hid both the error and the status,
+  # so control fell straight through into the very sed this guard exists to skip.
+  if [ ${#READER_SOURCES[@]} -eq 0 ]; then
+    bad "reader-key guard" "no production resolvers found beside $HERE"
+    READER_CALLS=""
+  else
+    READER_CALLS=$(sed 's/[[:space:]]#.*$//; s/^[[:space:]]*#.*$//' "${READER_SOURCES[@]}" \
+      | grep -oE '(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+[a-zA-Z][a-zA-Z0-9_]*([[:space:]]+[a-zA-Z][a-zA-Z0-9_]*)?' \
+      | sed -E 's/^(read_(nested_)?config_key(_strict)?|config_child_shape)[[:space:]]+//' \
+      | tr ' ' '\n' | sort -u)
+  fi
   for key in $READER_CALLS; do
     [ -n "$key" ] || continue
     echo "$GUARDED" | tr '|' '\n' | grep -qxF "$key" || MISSING="$MISSING $key"

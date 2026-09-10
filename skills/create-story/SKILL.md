@@ -1,6 +1,7 @@
 ---
 name: create-story
 description: Primary workflow for creating the next logical story in a development sequence. Implements a rigorous 10-step process to identify, extract, and document story requirements with complete technical context and anti-hallucination safeguards.
+invokes: [ensure-epic-github-issue, ensure-epic-jira-issue, ensure-story-github-issue, ensure-story-jira-issue, mermaid-architect]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
@@ -837,6 +838,27 @@ Review all sections for:
    - Confirm: dots used as structural separators, hyphens within descriptive name, all lowercase
    - Confirm: all required YAML frontmatter fields present and ISO-formatted dates
    - Fix any violations before proceeding to adversarial review (6.3)
+
+### 6.2a Card Preflight (offline, advisory)
+
+Run the tracker-card preflight on the document just written, **before** reporting completion:
+
+```bash
+node references/card-preflight.js --file "{epic-directory}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md"
+```
+
+Offline — no auth, no network, no writes. It reports whether this document will publish a complete
+tracker card or a thin one, printing the exact heading to add or rename beside each finding.
+
+- **No findings** → say nothing. A clean preflight is not news.
+- **Findings** → print the tool's output verbatim and tell the user it is **advisory**: the document
+  is not blocked, and `/review-story` is the gate that will block it.
+
+Do not paraphrase a finding or re-derive its fix, and **never restate the list of required sections
+in this skill**. The list lives once, in `CARD_SECTIONS_BY_KIND` in `references/jira-sync.js`;
+a second copy here would drift, and it would drift silently in the direction that matters — this
+check passing a document the sync then publishes thin. Full contract:
+[`references/authoring-card-preflight.md`](references/authoring-card-preflight.md).
 
 ### 6.3 Execute Adversarial Quality Review
 

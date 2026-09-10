@@ -1,0 +1,199 @@
+schema: 1
+task: "task.104.tracker-comment-plain-language-lead"
+task_title: "Every tracker comment opens with a plain-language summary — the engine primitive"
+gate: FAIL
+status_reason: "All four phases are implemented and every success criterion passes, but an adversarial diff review found a HIGH correctness defect: slot values arrive from the CLI as strings and the templates consume them by truthiness, so `--slot blocking=false` renders 'Some things need answering before work can start' — the opposite of the truth, to exactly the non-technical reader this feature exists for. Four MEDIUM findings accompany it, including a documentation/behaviour contradiction and a lead-composition regression in the deferred-record label."
+reviewer: "QA Engineer"
+updated: "2026-09-10T12:20:00Z"
+
+top_issues:
+  - id: "T104-001"
+    severity: high
+    file: "shared/resources/stakeholder-summary.js:68"
+    finding: >-
+      Slot values always arrive from `--slot k=v` as STRINGS, but every template consumes them by
+      truthiness. `--slot blocking=false` (likewise `no`, `0`, `none`) makes `s.blocking` the truthy
+      string "false", so review / review-story / review-task / review-bug render "Some things need
+      answering before work can start; they are listed below." — the opposite of what the caller
+      said. Same class at :119 (`blocking_count=0` renders "0 of them must be dealt with before this
+      item can be finished") and :107 (`count=0` renders "(0 separate pieces of work)"). Verified by
+      execution. This defeats the feature's own purpose: the reader who cannot check the technical
+      body is precisely the reader who is misled.
+    suggested_action: >-
+      Coerce at the boundary. Normalise slots in renderLead before calling the template — treat "",
+      "0", "false", "no" as absent for boolean slots, and parse numeric slots with Number(), dropping
+      non-finite and zero values. Test `blocking=false` and `blocking_count=0` explicitly.
+    suggested_owner: dev
+    status: open
+
+  - id: "T104-002"
+    severity: medium
+    file: "shared/resources/tracker-comment.js:133"
+    finding: >-
+      The guard makes an omitted `--stage` a hard exit 2, but the USAGE text still reads "Omit for an
+      unmarked comment that is posted every time", the synopsis still shows `[--stage <name>]`, and
+      the module header still describes stage-less comments as supported. The new `--summary-file`
+      help says "Required when --stage has no template" — but all 11 stages have templates, so the
+      only case where it IS required (an omitted --stage) is the one the help does not name. A
+      breaking change whose own help text still documents the old behaviour.
+    suggested_action: >-
+      Update the USAGE block, the synopsis and the module header to state that --stage is required
+      unless --summary-file is given, and rewrite the --summary-file description to name that case.
+    suggested_owner: dev
+    status: open
+
+  - id: "T104-003"
+    severity: medium
+    file: "shared/resources/tracker-comment.js:582"
+    finding: >-
+      An empty or whitespace-only `--summary-file` produces a comment with NO lead while `--json`
+      still reports `lead: "summary-file"`. So the JSON contract lies — a consumer cannot distinguish
+      "a lead was rendered" from "nothing was" — and `--summary-file /dev/null` is a one-flag bypass
+      of the entire standard this module exists to make mechanical. Inconsistent with `--body-file`,
+      where an empty file is exit 2. QA note: this branch was written deliberately, to stop an empty
+      lead emitting a bare horizontal rule; that reasoning is right about the rule and wrong about
+      the remedy.
+    suggested_action: >-
+      Treat an empty/whitespace-only --summary-file exactly as an empty --body-file: exit 2. If a
+      deliberately absent lead must remain possible, give it an explicit flag and report `lead: null`.
+    suggested_owner: dev
+    status: open
+
+  - id: "T104-004"
+    severity: medium
+    file: "shared/resources/tracker-comment.js:632"
+    finding: >-
+      `desired: firstLineOf(body)` now reads the LEAD, because `body` is mutated before this line.
+      `desired` is the one-line label a human reads in the deferred/handover checklist to tell one
+      pending action from another — and it is now near-identical for every comment sharing a stage.
+      A qa-gate comment that read "QA Gate: FAIL — story 4.2 cache" now reads "The finished work has
+      been through testing, and the results are in…". This regresses exactly the population the early
+      merge was chosen to serve.
+    suggested_action: >-
+      Capture `const desiredLine = firstLineOf(body)` BEFORE merging the lead (or keep an unmutated
+      `callerBody`), and leave command.stdin / manual.fields[0].value on the composed body.
+    suggested_owner: dev
+    status: open
+
+  - id: "T104-005"
+    severity: medium
+    file: "shared/resources/stakeholder-summary.js:164"
+    finding: >-
+      `LEAD_TEMPLATES[key]` is a bare bracket lookup on a plain object, so it walks the prototype
+      chain. renderLead("__proto__") and renderLead("valueOf") THROW; renderLead("constructor")
+      returns an object; renderLead("toString") returns "[object Undefined]". The module's docblock
+      promises it "returns null — never throws", and tracker-comment.js's exit-2 guard depends on
+      null. `hasTemplate` eight lines below already guards correctly with hasOwnProperty.call, so the
+      two exported predicates disagree on the same input. Unreachable via the CLI today —
+      isKnownStage uses Array.includes and runs first, verified end-to-end — but renderLead is
+      exported public API and task.106 plans to import it.
+    suggested_action: >-
+      Guard the lookup as hasTemplate already does, or build the catalogue with
+      Object.assign(Object.create(null), {...}). Add __proto__, constructor, toString and valueOf to
+      the "unknown stage returns null and does not throw" test — "nonsense" cannot catch this class.
+    suggested_owner: dev
+    status: open
+
+  - id: "T104-006"
+    severity: medium
+    file: "shared/resources/tests/tracker-comment.test.mjs:1716"
+    finding: >-
+      The Jira ADF test — the one whose own comment calls it "the HIGH risk this task names" — does
+      not exercise the Jira arm. It hand-builds the composed string and passes it to
+      `jira.buildCommentAdf`, so it asserts on its own construction and would pass unchanged if
+      tracker-comment.js never composed a lead for Jira, or composed it after the body. Every other
+      behaviour in this file is driven through `cli.run` with a stub. QA note: this reviewer's own
+      33-case verification made the identical mistake, so the task's highest-ranked risk is at
+      present UNVERIFIED at the composition level, not verified.
+    suggested_action: >-
+      Drive it through `cli.run({argv: [..., '--tracker','jira','--stage','done'], fetchImpl: stub})`
+      and assert on the ADF document the stub actually receives.
+    suggested_owner: dev
+    status: open
+
+  - id: "T104-007"
+    severity: medium
+    file: "shared/resources/tests/tracker-comment.test.mjs:279"
+    finding: >-
+      A mechanical argv edit left a duplicate `--stage` pair in 12 argv arrays — `--stage done
+      --stage in-review`, `--stage done --stage done`, and notably `--stage done --stage
+      totally-made-up`, which now depends on last-wins to still be testing an unknown stage at all.
+      They pass only because --stage last-wins, and they read as though the leading stage matters.
+    suggested_action: "Delete the redundant leading --stage/done pair from every argv array that already carries a real stage."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 30
+
+evidence:
+  tests_reviewed: 3107
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 16
+    notes: >-
+      16 hostile candidates executed: four prototype-chain keys as --stage, four as a verdict slot, a
+      prototype-poisoned slots object, three non-object slots, markdown injection through a slot,
+      catalogue immutability, the cycle-suffix regex against a real hyphenated stage, and a 10MB slot.
+      Findings folded into T104-005. None is reachable through the shipped CLI — isKnownStage uses
+      Array.includes and runs at :531, before the lead at :565; all four --stage probes exit 2
+      end-to-end. GATE_MEANING is safe, but by luck rather than design: verdictSentence uppercases the
+      key and no Object.prototype member is all-caps. That should carry a comment saying the uppercase
+      is load-bearing, or someone will simplify it away.
+  performance:
+    status: PASS
+    notes: "Pure string concatenation, no I/O, no new dependency, no extra network call. A 10MB slot renders without error."
+  reliability:
+    status: CONCERNS
+    notes: >-
+      The guard itself fails closed and is proven to post nothing. Against that: T104-003 is a
+      one-flag bypass of the standard, and T104-001 makes the engine assert the opposite of the
+      caller's intent for a whole class of slot value.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The imported-not-restated stage list is a genuine structural strength. Against it: help text
+      that contradicts behaviour (T104-002), a test that asserts on its own construction (T104-006),
+      12 argv arrays carrying a meaningless duplicate flag (T104-007), and a third looser copy of the
+      cycle-suffix rule that disagrees with isKnownStage on "done-1".
+
+recommendations:
+  immediate:
+    - action: "Coerce slot values at the boundary — T104-001, the one finding that makes the feature actively misinform"
+      refs: ["shared/resources/stakeholder-summary.js"]
+    - action: "Reconcile USAGE and the module header with the new --stage requirement — T104-002"
+      refs: ["shared/resources/tracker-comment.js"]
+    - action: "Reject an empty --summary-file — T104-003"
+      refs: ["shared/resources/tracker-comment.js"]
+    - action: "Preserve the caller's first line as the deferred record's `desired` label — T104-004"
+      refs: ["shared/resources/tracker-comment.js"]
+    - action: "Guard the catalogue lookup and test the prototype keys — T104-005"
+      refs: ["shared/resources/stakeholder-summary.js"]
+    - action: "Drive the Jira ADF assertion through cli.run so the composition path is actually covered — T104-006"
+      refs: ["shared/resources/tests/tracker-comment.test.mjs"]
+    - action: "Remove the 12 duplicate --stage pairs — T104-007"
+      refs: ["shared/resources/tests/tracker-comment.test.mjs"]
+  future:
+    - action: "Export one stripCycleSuffix() honouring CYCLE_SCOPED_STAGES; renderLead('done-1') renders while isKnownStage('done-1') is false"
+      refs: ["shared/resources/stakeholder-summary.js"]
+    - action: "Run the jargon/sentence assertions over slot-filled renderings too — today only the slot-free path is graded"
+      refs: ["shared/resources/tests/stakeholder-summary.test.mjs"]
+    - action: "State in the standard and contract that the `---` separator is GitHub-only; Jira drops it and the lead is delimited by paragraph boundary alone"
+      refs: ["shared/resources/stakeholder-summary.md"]
+    - action: "Reconcile the task's Files Summary, which lists jira-sync.js as modified; the implementation achieved the ADF property without touching it"
+      refs: ["docs/tasks/task.104.tracker-comment-plain-language-lead/task.104.tracker-comment-plain-language-lead.md"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "T104-001 through T104-007 resolved and re-reviewed"

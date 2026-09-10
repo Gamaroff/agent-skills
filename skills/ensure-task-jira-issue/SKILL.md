@@ -2,6 +2,7 @@
 name: ensure-task-jira-issue
 description: 'Internal sub-routine called from create-task and review-task. Given a task markdown file path, ensures the task has a corresponding Jira issue. Creates it if missing by delegating to sync-jira-task (which handles backlog add, ADF rendering, and the Change Log rows for creation and status transition), and writes jira_key + jira_url to the task frontmatter. Tasks are standalone — NOT linked to a Jira epic. Sets TASK_JIRA_KEY (e.g. "PROJ-456") in caller scope, or empty string on failure. Jira-only: exits 0 with informational message when TRACKER!=jira. Jira sibling of ensure-task-github-issue. Callers branch on TRACKER (set by references/resolve-platform.sh) to pick the right sub-routine.'
 type: internal
+invokes: [sync-jira-task]
 ---
 
 # Ensure Task Jira Issue — Sub-Routine

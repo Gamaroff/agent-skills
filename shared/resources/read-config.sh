@@ -49,9 +49,11 @@
 # `SKILLS_CONFIG_FILE=skills-config.yaml`, which names the default and so behaves identically to
 # leaving it unset.
 if [ -n "${SKILLS_CONFIG_FILE:-}" ] && [ "$SKILLS_CONFIG_FILE" != "skills-config.yaml" ]; then
-  _CONFIG_FILE_ORIGIN=env
+  # Quoted: `env` is a shell builtin, so an unquoted assignment is read by
+  # ShellCheck (SC2209) as a mistyped `$(env)`. Both arms quoted for symmetry.
+  _CONFIG_FILE_ORIGIN="env"
 else
-  _CONFIG_FILE_ORIGIN=default
+  _CONFIG_FILE_ORIGIN="default"
 fi
 SKILLS_CONFIG_FILE="${SKILLS_CONFIG_FILE:-skills-config.yaml}"
 
@@ -457,12 +459,13 @@ _CONFIG_SUBSET_VERDICT=""
 #
 #   read_config_key                 tracker | vcs
 #   read_nested_config_key          prd.prdShardedLocation | architecture.architectureShardedLocation
+#                                   observations.workspace
 #   read_nested_config_key_strict   access.tracker | access.vcs
 #   config_child_shape              access
 #
 # Widening the surface without widening this list would re-open the hole for the new key, quietly.
 # tracker-access.test.sh pins the list against the live call sites so that cannot pass unnoticed.
-_CONFIG_GUARDED_KEYS='access|tracker|vcs|prd|architecture|prdShardedLocation|architectureShardedLocation'
+_CONFIG_GUARDED_KEYS='access|tracker|vcs|prd|architecture|prdShardedLocation|architectureShardedLocation|observations|workspace'
 
 # _config_subset_scan — populate $_CONFIG_SUBSET_VERDICT. Echoes nothing.
 #

@@ -1,0 +1,65 @@
+schema: 1
+task: "task.83.platform-aware-skill-exclusion"
+task_title: "Platform-aware skill exclusion in setup-consumer.sh"
+gate: PASS
+status_reason: "All three promoted findings across the loop are closed, each verified by re-running the check that found it rather than by re-reading the fix, and each mutation-proven. No new findings this cycle. The one outstanding success criterion (shellcheck) cannot be verified on this host or by any CI workflow, so it is escalated to Step 7 as a named decision rather than kept open in a cycle that could not close it."
+reviewer: "QA Engineer"
+updated: "2026-09-04T22:15:00Z"
+
+# Only this cycle's findings belong here. Cycle 1 and 2 issues are NOT carried
+# forward: the pipeline's third-strike rule reads the `file:` of every HIGH entry
+# across the last three gates and deliberately ignores `status: closed`, so a
+# copied-forward entry makes one finding look like a file struck twice. The
+# history lives in bug_resolution below, in the Re-Review Context tables of qa.2
+# and qa.3, and in the three bug reports.
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 2356
+  phases_verified: "4/4 complete, all PASS"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged across all three cycles. No network, credential or filesystem surface added; the filter can only reduce what reaches disk, and grep -qxF means a skill name cannot be interpreted as a pattern."
+  performance:
+    status: PASS
+    notes: "Fixed-string matching over 17 names; tarball still one request; --dry-run still makes no network call. The suite grew by one case this cycle."
+  reliability:
+    status: PASS
+    notes: "Raised from CONCERNS. RF-001 — by which the guard for the HIGH fix could be flipped by an ambient environment variable — is closed and verified with the polluting variables actually exported into the test runner, across two variables rather than the one reported. The .env residual remains and is stated plainly: a repo with no tracker: key whose JIRA_URL is in .env and never exported still resolves differently at the two ends. It is bounded (the wizard now always writes a tracker: key), grandfathered for existing installs, escapable via --all-skills, and documented, tested and argued rather than accidental. Its proper close changes every skill's resolution and is a separate task. A known limitation with an owner, not a reliability failure — and holding the gate on it would create a loop that cannot converge."
+  maintainability:
+    status: PASS
+    notes: "One scrub list with its rationale replaces three copies, so the failure this task actually suffered — a list copied and not extended — is structurally impossible in that file. runtimeTracker's exit-status assertion means the next failure of this kind names its own cause. The resolver's header comment explains why the value parsing must mirror, and warns against the plausible wrong move of deleting the .env probe."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "shellcheck needs a decision at merge, not another cycle: it is not installed on this host and no CI workflow runs it, so the criterion cannot be ticked by the loop. Either run it on a host that has it before merging, or add a shellcheck job to validate.yml as its own task — a new lane would run against every shell script in the repo, not just this one."
+      refs: ["scripts/setup-consumer.sh", ".github/workflows/validate.yml"]
+    - action: "File the resolve-platform.sh .env follow-up so the documented residual has an owner."
+      refs: ["shared/resources/resolve-platform.sh"]
+    - action: "Decide whether the installer should refuse malformed tracker: input rather than defaulting to github, matching the runtime's halt. Covers CR-003 (unrecognised scalar) and RF-002 (tab separator — pre-existing; the pre-fix script at 9edb699 behaves identically, and yaml.safe_load itself rejects the value)."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Correct hermeticEnv's comment to say three copies rather than two, next time that file is edited. Cosmetic."
+      refs: ["shared/resources/tests/setup-consumer-skill-exclusion.test.mjs"]
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: "2026-09-04"
+  total_iterations: 2
+  verification_method: "Each finding re-verified by re-running the check that produced it: the resolver differential and the end-to-end fixture install for CR-001/CR-002, and the suite re-run with SKILLS_CONFIG_FILE and AGENT_SKILLS_ACCESS_TRACKER genuinely exported for RF-001. Eight QA mutation proofs across three cycles (M1-M8)."
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

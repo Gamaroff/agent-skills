@@ -1,6 +1,7 @@
 ---
 name: develop-task
-description: 'Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → finalise → commit-changes. Adapted from develop-story for standalone technical tasks (refactoring, infra, cleanup) in docs/tasks/. Features: Explore subagent for task resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk tasks; resume with per-step artifact verification; optional task-register integration; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-task [task-file-path]` or "develop and QA this task end to end".'
+description: 'Automates the full end-to-end task development lifecycle: create-branch → review-task → develop → create-pr → qa-task → qa-fix (iterative, up to 5 cycles) → review-pr (Step 5c, the QA loop''s exit gate) → finalise → commit-changes. Adapted from develop-story for standalone technical tasks (refactoring, infra, cleanup) in docs/tasks/. Features: Explore subagent for task resolution and pre-develop codebase mapping; context hygiene between steps; lite mode for low-risk tasks; resume with per-step artifact verification; optional task-register integration; `--base` branch pre-supplied to create-pr. Records all decisions in a co-located implementation report. Invoke with `/develop-task [task-file-path]` or "develop and QA this task end to end".'
+invokes: [create-branch, review-task, develop, create-pr, qa-task, qa-fix, review-pr, finalise, commit-changes]
 ---
 
 # Develop Task — Automated Lifecycle Orchestrator
@@ -180,11 +181,20 @@ See `references/develop-pipeline-step-4-create-pr.md` for the full Step 4 protoc
 
 See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 protocol: QA cycle counter setup, gate file location, QA skill invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, commit/push per cycle, escalation entry, and loop limit HALT message.
 
+**The loop's exit gate is Step 5c — `/review-pr`, not the QA gate.** A gate that reads `PASS` or
+`WAIVED` hands to 5c, which runs `/review-pr --effort {medium|low} --comment` over the open PR.
+`REQUEST CHANGES` routes back to 5b `/qa-fix` and consumes a cycle from the **shared** 5-cycle
+budget; `CONCERNS` records findings without blocking; `APPROVE` exits to Step 7. The
+`ready-for-merge` stage fires there, after the review clears — not on the QA gate. `/review-pr`
+stays advisory throughout: it writes no gate file and never edits code, and this orchestrator is
+what acts on its verdict. Lite mode degrades it to `--effort low` and never skips it. It leaves
+`task.{id}.pr-review.{n}.{name}.md` beside the work item.
+
 ### Step 7: Finalise
 
 See `references/develop-pipeline-step-7-finalise.md` for the full Step 7 protocol: `/finalise` invocation, completion detection, DoD gaps halt (with commit + push), DoD-body-to-PR comment, tracker issue update (GitHub close + board Done, Jira Done transition), DoD summary file location, Step 7 Completion Checklist, and Pipeline Progress update.
 
-**Lite mode applies to Step 5 only.** Step 7 (finalise + PR DoD comment + issue close + board Done) runs in full in every mode. Do NOT inline `/finalise` by writing the DoD file directly — invoke the skill. See the Step 7 Completion Checklist before marking the row ✅.
+**Lite mode applies to Step 5 only** (and degrades Step 5c to `--effort low` without skipping it). Step 7 (finalise + PR DoD comment + issue close + board Done) runs in full in every mode. Do NOT inline `/finalise` by writing the DoD file directly — invoke the skill. See the Step 7 Completion Checklist before marking the row ✅.
 
 ### Step 8: Commit Changes
 
@@ -235,7 +245,7 @@ See `references/develop-pipeline-autonomous-defaults.md` for the full shared aut
 | Situation | Default |
 |-----------|---------|
 | review-task Step 8.5 (implement fixes?) | Auto-answer "Yes, apply all critical + important fixes" — pipeline needs the task fully corrected before Step 3 runs `/develop` |
-| review-task Step 9 (update status?) when outcome is READY TO IMPLEMENT | Auto-answer "Yes, fixes complete" — pipeline needs `Ready for Development` before Step 3 |
+| review-task Step 9 (update status?) when outcome is READY TO IMPLEMENT | Auto-answer "Yes, fixes complete" — the pipeline wants `Ready for Development` before Step 3. **But promotion is not the only route past Step 2**: a task left at `Planned` with a *current* review report proceeds on the report, per the Step 2 tables. Two supported configs withhold promotion even on a READY outcome — `sign-off.enforcement: blocking` and `change-log.enforcement: blocking` — so a `Planned` status here is not by itself a failed review |
 | review-task Step 9 (update status?) when outcome is NEEDS REVISION or REQUIRES REWORK | HALT — task is not ready; surface review findings to user before proceeding |
 
 If a situation arises that is not in this table or the shared defaults table and the stakes are non-trivial, **HALT and ask the user**. Log the question and the user's answer in the Decisions Log.
@@ -294,5 +304,6 @@ If a situation arises that is not in this table or the shared defaults table and
 - `/create-pr` — Step 4
 - `/qa-task` — Step 5
 - `/qa-fix` — Step 6
+- `/review-pr` — Step 5c (the QA loop's exit gate; advisory — the orchestrator acts on its verdict)
 - `/finalise` — Step 7
 - `/commit-changes` — Step 8

@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.82.security-gate-evidence-field'
+task_title: 'Feed the measured security verdict into the QA gate'
+gate: PASS
+status_reason: 'Cycle 1 findings verified fixed. The cycle-2 refute pass found one further defect — the probe could not distinguish a broken reader from a gate with no security axis, so a corrupted awk program silently disabled the carve-out — fixed, mutation-proven, and pinned by three tests. Maintainability CONCERNS resolved: the triplicated snippet shrank and its reasoning moved to the single-source file. 58/58 tests, npm run ci green.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T16:05:00Z'
+
+top_issues:
+  - id: 'TASK82-003'
+    severity: medium
+    file: 'shared/resources/qa-re-review-scope.md'
+    finding: 'An empty reading from the probe was treated identically to `absent`. `absent` is a deliberate answer meaning the gate has no security block; the empty string means awk died, is missing, or had its program corrupted in transit — which is exactly what the cycle-1 whole-record-variable defect produced. A security FAIL gate therefore did not fire when the reader broke, silently. Found by the cycle-2 refute pass by executing the probe with a PATH whose awk exits 127.'
+    suggested_action: 'Add an exhaustive case over the emitted vocabulary with a catch-all that fails open, listing the clean readings before it.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-09'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 58
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 24
+    notes: 'Cycle 2 was an unscoped refute pass over the whole branch diff, executing rather than reading. 24 probes: the 15 from cycle 1 re-run against the amended probe, plus 9 new — a broken reader (awk exiting 127) against both a FAIL gate and a clean gate, the exhaustiveness of the case over each emitted reading, and four mutations including two targeting the new branch itself. It found TASK82-003, and then found a defect in the first fix for it: the catch-all as first written swallowed every clean reading and made all seven passing-gate fixtures fire. Both are closed. Still not covered: execution under zsh — the suite spawns bash only.'
+  performance:
+    status: PASS
+    notes: 'One awk invocation per evaluation, unchanged. Suite 0.42s for 58 tests.'
+  reliability:
+    status: PASS
+    notes: 'Improved this cycle. The probe now fails open when the instrument is broken and closed only when the gate is genuinely readable and clean — the two are distinct branches, asserted structurally so the distinction cannot be tidied into one wildcard.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-1 CONCERNS resolved. The triplicated snippet lost its ~10-line constraint comment for a 3-line pointer, and the reasoning now lives once in a "Transit constraints" section of the shared rule, outside the code block, together with the threshold for abandoning the copy-paste approach entirely (a fourth constraint).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Exercise clause 1 under zsh as well as bash. Named in both gates; the suite spawns bash only.'
+      refs: ['evals/shared/tests/qa-re-review-scope-parity.test.mjs']
+    - action: 'If a fourth transit constraint appears, extract the probe to a script both skills invoke. The threshold is now written into the rule file itself.'
+      refs: ['shared/resources/qa-re-review-scope.md']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-09'
+  total_iterations: 2
+  verification_method: 'Executed probes against adversarial and broken-instrument fixtures; 7 mutations, each confirmed to redden'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

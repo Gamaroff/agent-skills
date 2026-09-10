@@ -1,0 +1,68 @@
+schema: 1
+task: "task.83.platform-aware-skill-exclusion"
+task_title: "Platform-aware skill exclusion in setup-consumer.sh"
+gate: FAIL
+status_reason: "All four phases delivered and the full suite is green, but the install-time tracker resolver re-derives the config parse instead of mirroring resolve-platform.sh — quoted and CRLF `tracker:` values resolve to the wrong platform and invert the filter, pruning every Jira skill from a Jira repo."
+reviewer: "QA Engineer"
+updated: "2026-09-04T19:55:00Z"
+
+top_issues:
+  - id: "CR-001"
+    severity: high
+    file: "scripts/setup-consumer.sh"
+    finding: "_resolve_install_tracker extracts the config value with awk '{print $2}', which strips neither surrounding quotes nor a trailing CR. `tracker: \"jira\"`, `tracker: 'jira'` and a CRLF `tracker: jira` all miss the case arm and resolve to the `github` default, while resolve-platform.sh resolves all three to `jira` — so a Jira repo silently installs without any of its 11 Jira skills. Reproduced end-to-end against a fixture tarball."
+    suggested_action: "Normalise the token before the case: strip a trailing $'\\r' and a surrounding single/double quote pair. Extend the resolution-order tests with the quoted and CRLF shapes, ideally as a table asserting installer and runtime agree."
+    suggested_owner: dev
+    status: open
+  - id: "CR-002"
+    severity: medium
+    file: "scripts/setup-consumer.sh"
+    finding: "The installer probes .env for JIRA_URL (setup-consumer.sh:819-820); resolve-platform.sh reads only the environment and never opens .env. A repo with no `tracker:` key and JIRA_URL in .env only resolves jira at install and github at runtime, pruning the 6 GitHub-only skills from a repo that resolves github."
+    suggested_action: "Make the two agree — drop the .env probe, or keep it and correct the 'MIRRORS … cannot disagree' comment to state the asymmetry deliberately. Pin the chosen direction with a resolver-differential test."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 2343
+  phases_verified: "4/4 complete; 3/4 PASS, 1 CONCERNS"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No new network calls or credential handling. The resolver reads two local files and one env var; the .env read is a presence-only grep that never captures the value. grep -qxF (whole-line, fixed-string) means a skill name cannot be interpreted as a pattern — tested in both directions. The filter can only reduce what reaches disk."
+  performance:
+    status: PASS
+    notes: "Two fixed-string greps per skill over lists of 11 and 6 lines; entirely local. Tarball still downloaded once as a whole archive, and --dry-run still returns before any network call."
+  reliability:
+    status: CONCERNS
+    notes: "The grandfather rule is the centrepiece and it holds under two independent mutations — an existing install loses nothing on either tracker, directories are left untouched rather than replaced. --all-skills is a working escape hatch reachable from --help. The concern is CR-001/CR-002: a fresh install can silently receive the wrong skill set for a legal config, with no error at install and no error until a pipeline step reaches for a skill that is not there — the one direction grandfathering cannot cover."
+  maintainability:
+    status: PASS
+    notes: "The hand-maintained classification lists are the obvious rot risk and are guarded: the drift test fails CI until a new tracker skill is classified (mutation-proven), and a second test keeps the test's mirrors and the script's constants from drifting apart. Comments explain why the ordering is what it is. set -e interactions ((( x++ )) || true, && assignment lists) verified correct."
+
+recommendations:
+  immediate:
+    - action: "Normalise quotes and CR in _resolve_install_tracker so a quoted or CRLF tracker: resolves as it does at runtime; add the three shapes to the resolver tests (CR-001)."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Reconcile the .env probe with resolve-platform.sh, which does not read .env; pin the chosen direction with a test (CR-002)."
+      refs: ["scripts/setup-consumer.sh"]
+  future:
+    - action: "Refuse an unrecognised tracker: scalar at install time rather than silently defaulting to github, matching the runtime resolver's halt (CR-003, advisory)."
+      refs: ["scripts/setup-consumer.sh"]
+    - action: "Run shellcheck scripts/setup-consumer.sh on a host or CI lane that has it, and tick the outstanding Code Quality criterion."
+      refs: ["scripts/setup-consumer.sh"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "CR-001 fixed, with a test that fails without the fix"
+    - "CR-002 fixed or explicitly documented, with a test pinning the chosen direction"

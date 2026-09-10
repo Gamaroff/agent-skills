@@ -217,3 +217,122 @@ test("§4 no allowlisted artifact belongs to a task that is still in flight", ()
       `Rename these rather than exempting them — the artifact is being written now.`,
   );
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §5 — the Change Log / `updated:` pairing.
+//
+// `shared/resources/document-change-log.md` states it as a hard rule: "Every
+// entry bumps frontmatter `updated:` in the same edit" (`updated` is this repo's
+// OKF `timestamp`). `change-log.js` exposes `bumpUpdated()` and case G tests it,
+// so every skill that writes a row THROUGH THE ENGINE gets the pairing for free.
+//
+// The uncovered path is the hand-edit. A person or an external agent editing a
+// document directly appends a row and never calls the engine — and nothing
+// noticed, because the rule was documented and unenforced. Observed 2026-09-09
+// on docs/tasks/task.100…: a row dated 2026-09-09 above `updated: 2026-09-08`.
+//
+// The failure is quiet in a way worth naming: `updated` is what OKF consumers
+// and the freshness comparisons in review-task's gate read. A document whose
+// frontmatter is older than its own log looks LESS recently touched than it is,
+// so a staleness check answers "nothing has changed here" about a document that
+// changed.
+//
+// Asserts one direction only. `updated` NEWER than the newest row is fine and
+// common — an edit that adds no row (a typo fix, a status correction) still
+// bumps it. The violation is a row the frontmatter does not account for.
+
+/** Every `.md` under docs/ that carries a frontmatter block. */
+function collectDocumentsWithFrontmatter() {
+  const out = [];
+  const skip =
+    /\.(qa|gate|bug|implementation|review|dod|plan|handover|pr-review)\./;
+  (function walk(dir) {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (e.name.endsWith(".md") && !skip.test(e.name)) out.push(full);
+    }
+  })(path.join(REPO_ROOT, "docs"));
+  return out;
+}
+
+/**
+ * The dates of the rows in a document's Change Log, or null when it has none.
+ *
+ * Scoped to the Change Log SECTION and stripped of fenced blocks before the rows
+ * are read. Both matter: documents carry other dated tables, and the change-log
+ * engine's own corpus includes documents with a fenced EXAMPLE log beside a real
+ * one (its test F covers exactly that). A naive scan for `| YYYY-MM-DD |` across
+ * the whole file would read an illustration as history.
+ */
+function changeLogRowDates(text) {
+  const heading = text.match(/^(#{2,3})\s+.*Change Log.*$/m);
+  if (!heading) return null;
+  const level = heading[1].length;
+  const start = heading.index + heading[0].length;
+  const rest = text.slice(start);
+  // Stop at the next heading of the same or higher level.
+  const next = rest.search(new RegExp(`^#{1,${level}}\\s`, "m"));
+  const section = (next === -1 ? rest : rest.slice(0, next)).replace(
+    /```[\s\S]*?```/g,
+    "",
+  );
+  return [...section.matchAll(/^\|\s*(\d{4}-\d{2}-\d{2})\s*\|/gm)].map(
+    (m) => m[1],
+  );
+}
+
+test("§5 no Change Log row is dated after its document's frontmatter `updated:`", () => {
+  const docs = collectDocumentsWithFrontmatter();
+  const offenders = [];
+  let checked = 0;
+
+  for (const file of docs) {
+    const text = fs.readFileSync(file, "utf8");
+    const fm = text.match(/^---\n([\s\S]*?)\n---\n/);
+    if (!fm) continue;
+    const rows = changeLogRowDates(text);
+    if (!rows || rows.length === 0) continue;
+    const updated = (fm[1].match(/^updated:\s*['"]?(\d{4}-\d{2}-\d{2})/m) ||
+      [])[1];
+    // A log with no `updated:` at all is an OKF gap the review-* skills already
+    // enforce as Critical; not this guard's job, and flagging it here would
+    // report one defect as another.
+    if (!updated) continue;
+    checked++;
+    const newest = rows.slice().sort().pop();
+    if (newest > updated) {
+      offenders.push(
+        `${path.relative(REPO_ROOT, file)} — newest row ${newest} > updated: ${updated}`,
+      );
+    }
+  }
+
+  // Non-vacuity floor. A regex that stops matching, or a walk that stops
+  // descending, would otherwise report a clean corpus — the shape this repo
+  // names "an empty result is a claim about the instrument". 83 documents
+  // carried a Change Log when this was written; the floor is set well below
+  // that so ordinary churn does not trip it, but a broken scan does.
+  assert.ok(
+    checked >= 40,
+    `only ${checked} documents with a Change Log AND an \`updated:\` were ` +
+      `examined (of ${docs.length} documents scanned) — the scan is broken, ` +
+      "not the corpus clean",
+  );
+
+  assert.deepEqual(
+    offenders,
+    [],
+    "a Change Log row is dated after its document's `updated:`, so the " +
+      "frontmatter does not account for its own newest entry. " +
+      "`document-change-log.md`: every entry bumps `updated:` in the same " +
+      "edit. Use `bumpUpdated()` in change-log.js rather than editing by " +
+      `hand.\n  ${offenders.join("\n  ")}`,
+  );
+});

@@ -1,6 +1,7 @@
 ---
 name: create-epic
 description: Create single epic for medium-sized brownfield enhancements (1-3 stories). Use when enhancement follows existing patterns, has minimal architectural changes, and manageable integration complexity.
+invokes: [epic-registry-manager, mermaid-architect]
 ---
 
 # Brownfield Epic Creation
@@ -339,6 +340,27 @@ Invoke the `ensure-epic-github-issue` sub-routine with the epic file path. On re
 On failure it logs a warning and returns empty — never halts.
 
 > **Why delegate?** `ensure-epic-github-issue` is the same primitive `/review-epic`, `/create-story`, `/review-story`, and `/sync-github-epic` all call. Routing every entry point through it means the epic issue (title, body, milestone, board membership) is byte-identical no matter which skill creates it first, so the four paths converge on one issue with no diff churn when they cross.
+
+## Card Preflight (offline, advisory)
+
+Run the tracker-card preflight on the document just written, **before** reporting completion:
+
+```bash
+node references/card-preflight.js --file "${PRD_ROOT}/[domain]/[feature]/epics/epic.[N].[name]/epic.[N].[name].md"
+```
+
+Offline — no auth, no network, no writes. It reports whether this document will publish a complete
+tracker card or a thin one, printing the exact heading to add or rename beside each finding.
+
+- **No findings** → say nothing. A clean preflight is not news.
+- **Findings** → print the tool's output verbatim and tell the user it is **advisory**: the document
+  is not blocked, and `/review-epic` is the gate that will block it.
+
+Do not paraphrase a finding or re-derive its fix, and **never restate the list of required sections
+in this skill**. The list lives once, in `CARD_SECTIONS_BY_KIND` in `references/jira-sync.js`;
+a second copy here would drift, and it would drift silently in the direction that matters — this
+check passing a document the sync then publishes thin. Full contract:
+[`references/authoring-card-preflight.md`](references/authoring-card-preflight.md).
 
 ## Post-Creation Validation
 

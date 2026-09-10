@@ -1,3 +1,4 @@
+// AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/spawn-budget.mjs. Regenerate via `npm run bundle`.
 /**
  * Spawn budget for test suites that fork a child per assertion — bug.2.
  *
@@ -49,8 +50,13 @@ const DEFAULT_RETRIES = 2;
  *
  * `min` differs by knob on purpose: a timeout of 0 means "no timeout" to spawnSync and is not a
  * budget, but 0 retries is the only way to say "do not retry" and must stay expressible.
+ *
+ * Exported for task.80: `security-probe.mjs` validates its `--timeout` flag with the same rule
+ * rather than restating it. An operator typing a timeout on a CLI and an operator setting one in
+ * an env var are the same operator making the same mistakes, and `0` is the dangerous one in both
+ * places — it reads as "be quick" and means "never give up".
  */
-function readInt(value, min) {
+export function readInt(value, min) {
   if (value === undefined || value === null) return undefined;
   const raw = String(value).trim();
   // A plain decimal integer, and nothing else. `Number()` is far too permissive for a knob an

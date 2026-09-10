@@ -1,6 +1,7 @@
 ---
 name: review-bug
 description: 'Bug report review with two modes. Interactive mode (default): asks batched clarifying questions to resolve missing reproduction detail, wrong severity/priority, and linkage gaps — use when a bug report needs tightening before anyone fixes it. Validate mode (--validate flag or "is this bug ready to fix?"): automated non-interactive GO/NO-GO gate with a 1–10 fix-readiness score — use for pre-fix gates, batch triage, or CI. Checks template/frontmatter compliance, reproducibility-from-the-report, severity/priority correctness, and mode/linkage correctness; runs two read-only pre-pass scans — a duplicate scan (sibling bugs + bug-registry) and an already-fixed/stale scan of the root-cause area. Handles all three bug modes (story / task / general). Bug-side sibling of review-story / review-task; slots into develop-bug as Step 2. Invoke with `/review-bug [bug-file-path]` or "review this bug report".'
+invokes: [create-branch]
 ---
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md). Note: review-bug reports on fix-readiness but **never mutates the bug lifecycle `status`** (`new → in-progress → …`) — a ready bug stays `new`; `develop-bug` Step 3 is what moves it to `in-progress`.
@@ -161,8 +162,22 @@ EOF
 
 node .agents/skills/review-bug/references/tracker-comment.js \
   --issue "${TRACKER_ISSUE}" --body-file .claude/state/comment-body.md \
-  --stage review-bug --json
+  --stage review-bug \
+  --slot outcome="{plain-language outcome — see below}" \
+  --slot blocking="${CRITICAL}" \
+  --json
 ```
+
+> **`review-bug` reads `outcome` and `blocking`.** `outcome` is a **text** slot interpolated verbatim,
+> so do **not** pass `${RECOMMENDATION}` raw — `GO` / `NO-GO` are internal vocabulary, and
+> [`references/stakeholder-summary.md`](references/stakeholder-summary.md) requires internal tokens to
+> be mapped rather than passed through. Map at the call site: GO → `ready to fix`, NEEDS DETAIL →
+> `needs more detail`, NO-GO → `not ready to fix`. `blocking` is a **boolean** slot whose two
+> renderings are opposites; `${CRITICAL}` is safe because the engine reads `"0"` as *absent*, which
+> renders "Nothing is blocking a fix from starting" — the right sentence for a clean review.
+>
+> The fix-readiness score stays in the body: a number on an unexplained scale is what the standard
+> forbids in a lead.
 
 Read `reason` per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md). Failure logs a warning and does not halt.
 

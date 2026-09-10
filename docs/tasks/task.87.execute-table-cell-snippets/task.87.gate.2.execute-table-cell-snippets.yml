@@ -1,0 +1,75 @@
+schema: 1
+task: 'task.87.execute-table-cell-snippets'
+task_title: 'Shell commands in table cells escape the snippet-execution gate'
+gate: PASS
+status_reason: 'Cycle 1 findings fixed and verified. The refute pass found and closed TASK87-002 — a regression introduced by cycle 1 own fix — and caught a vacuous test that had passed under the exact mutation it claimed to guard. Seven mutations now red, 127/127 tests, fast gate green, corpus surface unchanged.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T20:45:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 127
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 14
+    notes: >-
+      Seven probes in cycle 1 plus seven refute-pass probes in cycle 2, all EXECUTED. Cycle 2 covered
+      the four transition classes the refute directive names, translated to a pure text extractor:
+      end-of-input (a span left open at end of line), in-flight state (spanLen carried across
+      characters and never leaking between rows), the error path (six pathological inputs including a
+      2000-backtick string and a bare pipe — none threw, none hung), and re-entrancy (two calls
+      byte-identical). Also probed for scale: 5000 rows extracted in 22ms. The safety boundary itself
+      is still untouched by this diff; SAFE_COMMANDS, COMMAND_RUNNERS, the deny-list and the sandbox
+      sentinel are unchanged and their pre-existing tests all pass.
+  performance:
+    status: PASS
+    notes: >-
+      5000-row document extracted in 22ms; 182 corpus files scanned in under a second in one process.
+      The code-span tracking adds one integer of state and consumes each character once.
+  reliability:
+    status: PASS
+    notes: >-
+      Six pathological inputs probed for throw and hang: a bare pipe, four consecutive pipes, fifty
+      repetitions of a pipe-backtick pair, a 2000-character backtick run, a 999-backtick cell, and a
+      row of bare backslashes. None threw; the longest took 4ms. Two independent fallbacks are in
+      place — the unclosed-span fallback in the splitter and the naive-split path behind it — and
+      both are mutation-proven.
+  maintainability:
+    status: PASS
+    notes: >-
+      Both cleanups from gate 1 were done rather than deferred. Every rule that diverges from GFM
+      carries the incident that produced it. The rule doc now documents the code-span rule, the
+      escaped-backtick guard, the fallback, and the two accepted limitations.
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Consider recognising blockquoted tables (`> | … |`) — documented limitation, no corpus instance'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'Consider the unequal-backtick-run truncation — documented limitation, no corpus instance'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-09'
+  total_iterations: 2
+  verification_method: 'Seven-mutation matrix (each revert red, restore green) + 127 automated tests + fast gate + corpus re-measurement'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

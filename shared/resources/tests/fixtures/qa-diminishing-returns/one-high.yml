@@ -1,0 +1,24 @@
+schema: 1
+task: "task.RECON.one-high"
+gate: CONCERNS
+status_reason: "Zero-HIGH stretch broken by a single remaining HIGH."
+reviewer: "QA Engineer"
+updated: "2026-09-09T11:05:00Z"
+
+top_issues:
+  - id: "ONE-001"
+    severity: high
+    file: "src/pipeline/guard.spec.ts"
+    finding: "One HIGH remains."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

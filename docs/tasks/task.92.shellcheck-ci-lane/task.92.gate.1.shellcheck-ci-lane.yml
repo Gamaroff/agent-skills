@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.92.shellcheck-ci-lane'
+task_title: "Add a shellcheck CI lane for the repo's shell scripts"
+gate: CONCERNS
+status_reason: 'All 11 success criteria met and verified in real CI (5/5 jobs green, including the new shellcheck job). Two MEDIUM findings, both in code this task introduced: the new empty-list guard in tracker-access.test.sh is vacuous — it falls through — and three pre-existing bare disables leave criterion 6 unmet repo-wide.'
+reviewer: 'QA Engineer'
+updated: '2026-09-05T13:20:00Z'
+
+top_issues:
+  - id: 'TASK-92-001'
+    severity: medium
+    file: 'shared/resources/tracker-access.test.sh'
+    finding: >-
+      The empty-list guard added at :1496-1499 does not guard. `return` at the top level of a script
+      executed with `bash file.sh` is illegal ("can only return from a function or sourced script");
+      the `2>/dev/null || true` written after it swallows both the error message and the non-zero
+      status, so execution FALLS THROUGH into the `sed "${READER_SOURCES[@]}"` on the next line —
+      which, with an empty array, takes no file operands and reads STDIN. That is precisely the hang
+      the guard's own comment claims to prevent. Section 44 sits inside a top-level `if [ -d "$HERE" ]`
+      block, not inside a function. Proven with a minimal repro: the line after the guard executes.
+    suggested_action: >-
+      Drop the `return` and make the sed conditional instead — `if [ ${#READER_SOURCES[@]} -eq 0 ];
+      then bad ...; else READER_CALLS=$(sed ...); fi`. Then mutation-prove it: force the array empty
+      and confirm the suite reports the failure and does not hang.
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-92-002'
+    severity: medium
+    file: 'shared/resources/jira-sprint-lib.sh'
+    finding: >-
+      Success criterion 6 ("Every `# shellcheck disable` carries a stated reason. No bare
+      suppressions.") is not met repo-wide. Three pre-existing directives carry no reason at all:
+      :133 (SC2034) and :328/:365 (SC2064). The criterion is written about the repo, not only about
+      newly added disables, and the new lane is what makes the rule enforceable — leaving three
+      unexplained suppressions inside the first change that states the rule is the weakest possible
+      precedent for it.
+    suggested_action: >-
+      Add a one-line reason to each of the three, or amend criterion 6 to scope it to newly added
+      disables and say why the pre-existing three are out of scope. Either is defensible; silence is not.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 7
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No security surface touched. The lane adds a linter; the pinned tarball is fetched over HTTPS from the official koalaman release (URL verified, HTTP 200). No secrets, no new permissions — the workflow declares none and needs none.'
+  performance:
+    status: PASS
+    notes: 'Lane is a separate ~15s job, so it adds no wall-clock to test.yml. Local gate duration unchanged: no npm script was added to `ci` or `ci:fast`, which is also what keeps ci-gate-parity.test.mjs green.'
+  reliability:
+    status: PASS
+    notes: 'Gate proven to fail on a real finding, on a widened glob, and on an empty list — three mutation proofs, all reverted. Version pinned so a runner-image bump cannot turn the lane red unattended.'
+  maintainability:
+    status: CONCERNS
+    notes: 'TASK-92-001: a guard that reports a failure and then continues is worse than no guard, and its comment asserts it works. TASK-92-002: three unexplained suppressions remain in a change whose own criterion forbids them.'
+
+recommendations:
+  immediate:
+    - action: 'Fix the vacuous empty-list guard so it actually skips the sed (TASK-92-001).'
+      refs: ['shared/resources/tracker-access.test.sh']
+    - action: 'Give the three pre-existing bare disables a reason, or scope criterion 6 explicitly (TASK-92-002).'
+      refs: ['shared/resources/jira-sprint-lib.sh']
+  future:
+    - action: 'Consider gating at `info` once the warning lane has been green for a while — 53 further findings, dominated by deliberate SC2016/SC2015. Task 92 §4 already scopes this out; file it separately.'
+      refs: ['.github/workflows/shellcheck.yml']
+    - action: 'The 8 new SC2034 disables state their reason in a block comment above the directives rather than inline. A `grep "# shellcheck disable"` audit shows them as bare. Consider a short inline tag on each.'
+      refs: ['skills/jira-sprint-manager/scripts/manage-sprint-state.sh', 'skills/jira-sprint-manager/scripts/move-sprint-issues.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-92-001 fixed — the guard must actually guard.'
+    - 'TASK-92-002 resolved either by annotating or by scoping the criterion.'

@@ -256,7 +256,7 @@ mode `0644` and dry-run-by-default so nobody runs it by accident.
 
 ---
 
-## The 23 kinds
+## The 24 kinds
 
 Every row is one mutation kind. `Consequence` is the default a record inherits; a caller may harden
 it (`state-drift` → `irreversible`) but never soften it. `Produces` names the symbol an operator's
@@ -310,7 +310,19 @@ knows what the call would have done — a confirm gate is the only honest defaul
 system cannot describe. A record of this kind is also a signal: it means a `gh` mutation path exists
 that nobody has annotated yet.
 
-**Total: 23.**
+**Bitbucket — 1** (the inline PR comment)
+
+| `kind` | Consequence | Produces | Underlying call |
+| ------ | ----------- | -------- | --------------- |
+| `bitbucket.pr.comment` | communication | — | `POST /2.0/repositories/{ws}/{repo}/pullrequests/{n}/comments` |
+
+Bitbucket's first kind, and for a long while its only one. Every other Bitbucket call in this
+repository is a read, or is authored prose that predates the interception layers; `pr-inline-comment.js`
+is the first Bitbucket **mutation** written as code, so it is the first that can be gated. Its GitHub
+twin is `github.pr.comment` — the same consequence, because an unposted comment costs a record nobody
+reads and breaks nothing.
+
+**Total: 24.**
 
 `github.milestone.create` is a **create**, not an edit, and that distinction is the reason it is its
 own kind rather than a case of `github.issue.edit`. The four call sites that reach it

@@ -35,8 +35,11 @@ const {
   parseRegistry,
   parseFrontmatterStatus,
   registryFrontier,
+  parseDepCell,
   TASK_ELIGIBLE_STATUSES,
   BUG_ELIGIBLE_STATUSES,
+  TASK_LIFECYCLE_STATUSES,
+  BUG_LIFECYCLE_STATUSES,
 } = await import(pathToFileURL(SCRIPT).href);
 
 function fixture(name) {
@@ -1195,8 +1198,8 @@ function taskRegistry(rows) {
 const bugRow = (n, name, status, sev = "Major", pri = "High") =>
   `| ${n} | [Bug ${n}](bug.${n}.${name}/bug.${n}.${name}.md) | ${status} | ${sev} | ${pri} | 2026-08-29 | area |`;
 
-const taskRow = (n, name, status, pri = "Medium") =>
-  `| ${n} | [Task ${n}](task.${n}.${name}/task.${n}.${name}.md) | ${status} | infrastructure | ${pri} | 2026-08-29 | — | — |`;
+const taskRow = (n, name, status, pri = "Medium", deps = "—") =>
+  `| ${n} | [Task ${n}](task.${n}.${name}/task.${n}.${name}.md) | ${status} | infrastructure | ${pri} | 2026-08-29 | — | ${deps} |`;
 
 // ── SC9: the four deliberate stops are never scanned past ────────────────────
 //
@@ -2420,4 +2423,433 @@ test("17/N1: the real registries parse clean — no spurious malformed rows", ()
     );
     assert.deepEqual(p.warnings, [], `${rel} produced header warnings`);
   }
+});
+
+// ── Registry `Depends on` is honoured ────────────────────────────────────────
+//
+// `compareCandidates` orders tasks by priority then ascending number and
+// consults nothing about dependencies. Before this, a dependent row ranked above
+// its own prerequisite was nominated with that prerequisite unbuilt — and the
+// ascending-number tie-break hid it whenever the dependency happened to carry
+// the lower number, which is the common case. Every fixture below therefore
+// inverts the numbering or the priority, so a passing test cannot be explained
+// by the tie-break alone.
+
+test("deps: a dependent row is not selected while its dependency is unaccepted", () => {
+  const rows = [
+    taskRow(83, "base", "planned", "Medium"),
+    taskRow(84, "dependent", "planned", "High", "task.83"),
+  ];
+  const docs = {
+    "docs/tasks/task.83.base/task.83.base.md": "planned",
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  // T84 is High and would outrank Medium T83 on priority alone. It must lose to
+  // its own dependency instead — this is the whole defect.
+  assert.equal(f.selected.id, "T83");
+
+  const blocked = f.passedOver.find((p) => p.n === 84);
+  assert.ok(blocked, "T84 must be recorded, never silently dropped");
+  assert.equal(blocked.eligible, false);
+  assert.match(
+    blocked.reason,
+    /blocked on unaccepted dependency: task\.83 \(planned\)/,
+  );
+});
+
+test("deps: an accepted dependency does not block", () => {
+  const rows = [
+    taskRow(83, "base", "accepted", "Medium"),
+    taskRow(84, "dependent", "planned", "High", "task.83"),
+  ];
+  const docs = {
+    "docs/tasks/task.83.base/task.83.base.md": "accepted",
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(f.selected.id, "T84");
+  assert.equal(f.warnings.length, 0);
+});
+
+test("deps: a blocked row reports the dependency, not that it was outranked", () => {
+  // T84 is blocked AND lower-ranked than the eventual winner. The reason must
+  // name the nearer cause, or the operator is told to wait for the wrong thing.
+  const rows = [
+    taskRow(83, "base", "planned", "Medium"),
+    taskRow(84, "dependent", "planned", "Low", "task.83"),
+  ];
+  const docs = {
+    "docs/tasks/task.83.base/task.83.base.md": "planned",
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  const blocked = f.passedOver.find((p) => p.n === 84);
+  assert.match(blocked.reason, /blocked on unaccepted dependency/);
+  assert.doesNotMatch(blocked.reason, /ranked higher/);
+});
+
+test("deps: multiple dependencies are all reported, and any one blocks", () => {
+  const rows = [
+    taskRow(79, "a", "accepted", "Medium"),
+    taskRow(80, "b", "planned", "Medium"),
+    taskRow(81, "c", "planned", "High", "task.79, task.80"),
+  ];
+  const docs = {
+    "docs/tasks/task.79.a/task.79.a.md": "accepted",
+    "docs/tasks/task.80.b/task.80.b.md": "planned",
+    "docs/tasks/task.81.c/task.81.c.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(f.selected.id, "T80");
+  const blocked = f.passedOver.find((p) => p.n === 81);
+  // Only the unaccepted one is named — an accepted dep is not noise.
+  assert.match(blocked.reason, /task\.80 \(planned\)/);
+  assert.doesNotMatch(blocked.reason, /task\.79/);
+});
+
+// The three satisfied-with-a-warning cases. Each asserts BOTH halves: the row is
+// selectable, and the condition is warned about. A silent pass here would be the
+// invisibility failure this mechanism exists to remove.
+
+test("deps: an unresolvable dependency is satisfied, with a warning", () => {
+  const rows = [taskRow(84, "dependent", "planned", "High", "task.999")];
+  const docs = {
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(
+    f.selected.id,
+    "T84",
+    "an unresolvable dep must not hide the row",
+  );
+  assert.match(
+    f.warnings.join("\n"),
+    /task\.999, which is not a row in either registry/,
+  );
+});
+
+test("deps: a cancelled dependency is satisfied, with a warning", () => {
+  const rows = [
+    taskRow(83, "base", "cancelled", "Medium"),
+    taskRow(84, "dependent", "planned", "High", "task.83"),
+  ];
+  const docs = {
+    "docs/tasks/task.83.base/task.83.base.md": "cancelled",
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(f.selected.id, "T84");
+  assert.match(f.warnings.join("\n"), /task\.83, which is cancelled/);
+});
+
+test("deps: a dependency whose document is unreadable is satisfied, with a warning", () => {
+  const rows = [
+    taskRow(83, "base", "planned", "Medium"),
+    taskRow(84, "dependent", "planned", "High", "task.83"),
+  ];
+  // task.83's document is absent from `docs`, so readStatus returns null.
+  const docs = {
+    "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(f.selected.id, "T84");
+  assert.match(
+    f.warnings.join("\n"),
+    /whose document is missing or unreadable/,
+  );
+});
+
+test("deps: a task may depend on a bug, resolved across registries", () => {
+  const { opts } = registryOpts({
+    bugs: bugRegistry([bugRow(4, "leak", "new", "Major", "High")]),
+    tasks: taskRegistry([taskRow(84, "dependent", "planned", "High", "bug.4")]),
+    docs: {
+      "docs/bugs/bug.4.leak/bug.4.leak.md": "new",
+      "docs/tasks/task.84.dependent/task.84.dependent.md": "planned",
+    },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  // The bug outranks the task anyway; the point is that T84 is recorded as
+  // dependency-blocked rather than merely outranked.
+  const blocked = f.passedOver.find((p) => p.n === 84 && p.kind === "task");
+  assert.match(
+    blocked.reason,
+    /blocked on unaccepted dependency: bug\.4 \(new\)/,
+  );
+});
+
+test("deps: an empty cell places no constraint", () => {
+  for (const cell of ["—", "-", "", "none", "N/A", "TBD"]) {
+    const rows = [taskRow(84, "free", "planned", "High", cell)];
+    const docs = { "docs/tasks/task.84.free/task.84.free.md": "planned" };
+    const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+    const f = registryFrontier(opts.registries, { evaluateAll: true });
+    assert.equal(
+      f.selected?.id,
+      "T84",
+      `cell ${JSON.stringify(cell)} must not block`,
+    );
+    assert.equal(
+      f.warnings.length,
+      0,
+      `cell ${JSON.stringify(cell)} must not warn`,
+    );
+  }
+});
+
+test("parseDepCell: accepts the spellings a hand-maintained table carries", () => {
+  assert.deepEqual(parseDepCell("task.83", "task"), [{ kind: "task", n: 83 }]);
+  assert.deepEqual(parseDepCell("T83", "task"), [{ kind: "task", n: 83 }]);
+  assert.deepEqual(parseDepCell("#83", "task"), [{ kind: "task", n: 83 }]);
+  assert.deepEqual(parseDepCell("83", "task"), [{ kind: "task", n: 83 }]);
+  assert.deepEqual(parseDepCell("bug.4", "task"), [{ kind: "bug", n: 4 }]);
+  assert.deepEqual(parseDepCell("B4", "task"), [{ kind: "bug", n: 4 }]);
+  // A bare number in the bug registry means a bug, not a task.
+  assert.deepEqual(parseDepCell("4", "bug"), [{ kind: "bug", n: 4 }]);
+  // Deduped, order preserved.
+  assert.deepEqual(parseDepCell("task.79, task.80, task.79", "task"), [
+    { kind: "task", n: 79 },
+    { kind: "task", n: 80 },
+  ]);
+  // Stories are not registry rows.
+  assert.deepEqual(parseDepCell("story.2.3", "task"), []);
+});
+
+test("deps: the column is found by header name, not only by position", () => {
+  // A consumer registry with the column in a different place and a synonym
+  // heading still resolves — mapHeader wins over DEFAULT_COLUMNS.
+  const text = [
+    "| # | Title | Status | Depends on | Priority |",
+    "| - | ----- | ------ | ---------- | -------- |",
+    "| 84 | [Task 84](task.84.d/task.84.d.md) | planned | task.83 | High |",
+    "| 83 | [Task 83](task.83.b/task.83.b.md) | planned | — | Medium |",
+  ].join("\n");
+  const { opts } = registryOpts({
+    tasks: text,
+    docs: {
+      "docs/tasks/task.83.b/task.83.b.md": "planned",
+      "docs/tasks/task.84.d/task.84.d.md": "planned",
+    },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  assert.equal(f.selected.id, "T83");
+  assert.match(
+    f.passedOver.find((p) => p.n === 84).reason,
+    /blocked on unaccepted dependency/,
+  );
+});
+
+test("deps: a headerless registry falls back to the documented column position", () => {
+  // No recognisable header row → DEFAULT_COLUMNS supplies the positions, so the
+  // documented `| # | Title | Status | Category | Priority | Created | Issue |
+  // Deps |` shape must locate Deps at index 7. Without that entry the column is
+  // invisible and every row reads as dependency-free.
+  const text = [
+    "| 83 | [Task 83](task.83.b/task.83.b.md) | planned | infra | Medium | 2026-09-02 | — | — |",
+    "| 84 | [Task 84](task.84.d/task.84.d.md) | planned | infra | High | 2026-09-02 | — | task.83 |",
+  ].join("\n");
+  const { opts } = registryOpts({
+    tasks: text,
+    docs: {
+      "docs/tasks/task.83.b/task.83.b.md": "planned",
+      "docs/tasks/task.84.d/task.84.d.md": "planned",
+    },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  assert.equal(f.selected.id, "T83");
+  assert.match(
+    f.passedOver.find((p) => p.n === 84).reason,
+    /blocked on unaccepted dependency: task\.83 \(planned\)/,
+  );
+});
+
+// ── B8: a status outside the LIFECYCLE is distinguishable from a terminal one ─
+//
+// bug.8. `registryFrontier` knew exactly one status vocabulary — the eligibility
+// FLOOR — so its single `!ELIGIBLE_FOR[kind].has(docStatus)` branch gave
+// `closed` (a valid terminal status: nothing to do) and `open` (not a status at
+// all: a filing typo) the same sentence. On the live corpus that put a real typo
+// among 8 closed bugs and ~90 accepted tasks wearing identical prose.
+//
+// The floor is NOT widened — `{new, reopened}` stays, and §16/H1 above pins why
+// the floor and the lifecycle are deliberately different sets. What is added is
+// a SECOND vocabulary: membership of the lifecycle, which separates "outside the
+// floor" from "not a status".
+
+test("B8: an off-lifecycle bug status gets its own reason, not the terminal one", () => {
+  const { opts } = registryOpts({
+    bugs: bugRegistry([bugRow(7, "typo", "open")]),
+    docs: { "docs/bugs/bug.7.typo/bug.7.typo.md": "open" },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+
+  assert.equal(
+    f.selected,
+    null,
+    "an unrecognised status is still not selected",
+  );
+
+  const row = f.passedOver.find((p) => p.n === 7);
+  assert.match(
+    row.reason,
+    /not a member of the bug lifecycle/i,
+    `an unrecognised status must not reuse the eligibility-floor sentence.\n  got: ${row.reason}`,
+  );
+  assert.match(
+    row.reason,
+    /new, in-progress, ready-for-qa, closed, reopened/,
+    "the reason must name the lifecycle so the typo is fixable from the message alone",
+  );
+  assert.equal(row.offLifecycle, true);
+});
+
+test("B8: an off-lifecycle status raises a warning; a terminal one does not", () => {
+  const off = registryOpts({
+    bugs: bugRegistry([bugRow(7, "typo", "open")]),
+    docs: { "docs/bugs/bug.7.typo/bug.7.typo.md": "open" },
+  });
+  const offWarnings = registryFrontier(off.opts.registries, {
+    evaluateAll: true,
+  }).warnings;
+  assert.equal(
+    offWarnings.filter((w) => /not a member of the bug lifecycle/i.test(w))
+      .length,
+    1,
+    `expected exactly one lifecycle warning, got: ${JSON.stringify(offWarnings)}`,
+  );
+  assert.match(offWarnings[0], /docs\/bugs\/bug\.7\.typo\/bug\.7\.typo\.md/);
+
+  // Anti-vacuity: the warning must fire on the typo and NOT on every rejection.
+  // Without this half, `warnings.push` on the shared branch would pass above.
+  const terminal = registryOpts({
+    bugs: bugRegistry([bugRow(7, "done", "closed")]),
+    docs: { "docs/bugs/bug.7.done/bug.7.done.md": "closed" },
+  });
+  const termFrontier = registryFrontier(terminal.opts.registries, {
+    evaluateAll: true,
+  });
+  assert.deepEqual(
+    termFrontier.warnings.filter((w) => /lifecycle/i.test(w)),
+    [],
+    "a correctly-closed bug is not a filing error and must stay quiet",
+  );
+  assert.match(
+    termFrontier.passedOver.find((p) => p.n === 7).reason,
+    /outside the bug eligibility floor/,
+    "terminal rows keep the floor sentence — this change adds a case, it does not rewrite the old one",
+  );
+  assert.equal(
+    termFrontier.passedOver.find((p) => p.n === 7).offLifecycle,
+    false,
+  );
+});
+
+test("B8: the task axis gets the same treatment", () => {
+  const { opts } = registryOpts({
+    tasks: taskRegistry([taskRow(9, "typo", "open")]),
+    docs: { "docs/tasks/task.9.typo/task.9.typo.md": "open" },
+  });
+  const f = registryFrontier(opts.registries, { evaluateAll: true });
+  const row = f.passedOver.find((p) => p.n === 9);
+  assert.match(row.reason, /not a member of the task lifecycle/i);
+  assert.match(
+    row.reason,
+    /draft, planned, ready-for-development, in-progress, ready-for-review, accepted, cancelled/,
+  );
+  assert.equal(f.warnings.filter((w) => /lifecycle/i.test(w)).length, 1);
+});
+
+test("B8: selectNext surfaces frontier warnings on the stop path", () => {
+  // The warning existed nowhere an operator would see it: `--lint` returned
+  // `frontier.warnings`, but the normal selection path returned
+  // `registryFrontier: { passedOver }` and dropped them. `/develop-next` runs the
+  // normal path, so the loop that reports `roadmap-complete` was exactly the
+  // caller that could not see why.
+  const { r } = fallback({
+    bugs: [bugRow(7, "typo", "open")],
+    docs: { "docs/bugs/bug.7.typo/bug.7.typo.md": "open" },
+  });
+  assert.equal(r.status, "stop");
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.ok(
+    Array.isArray(r.registryFrontier.warnings),
+    "warnings must be present on the normal path, not only under --lint",
+  );
+  assert.equal(
+    r.registryFrontier.warnings.filter((w) =>
+      /not a member of the bug lifecycle/i.test(w),
+    ).length,
+    1,
+  );
+  assert.match(
+    r.detail,
+    /1 row\(s\) carry a status outside their lifecycle/,
+    "the one-line stop detail must say it — passedOver[] is not read by a human scanning a loop log",
+  );
+});
+
+test("B8: a clean stop says nothing about lifecycles", () => {
+  // Anti-vacuity for the `detail` assertion above.
+  const { r } = fallback({
+    bugs: [bugRow(7, "done", "closed")],
+    docs: { "docs/bugs/bug.7.done/bug.7.done.md": "closed" },
+  });
+  assert.equal(r.stopReason, "roadmap-complete");
+  assert.doesNotMatch(r.detail, /lifecycle/);
+  assert.deepEqual(r.registryFrontier.warnings, []);
+});
+
+test("B8: the lifecycles are supersets of the floors, and are exported", () => {
+  // The floor must remain a subset of the lifecycle — a status can be
+  // ineligible-but-valid, never eligible-but-invalid. If this fails, one of the
+  // two sets was edited without the other.
+  for (const [name, floor, lifecycle] of [
+    ["bug", BUG_ELIGIBLE_STATUSES, BUG_LIFECYCLE_STATUSES],
+    ["task", TASK_ELIGIBLE_STATUSES, TASK_LIFECYCLE_STATUSES],
+  ]) {
+    const stray = [...floor].filter((s) => !lifecycle.has(s));
+    assert.deepEqual(
+      stray,
+      [],
+      `${name}: the eligibility floor admits ${stray.join(", ")}, which the lifecycle does not define`,
+    );
+  }
+});
+
+test("B8: the code lifecycles match docs/standards/bug-documents.md", () => {
+  // The lifecycle now exists in code AND in prose. Two copies drift, so the
+  // prose is parsed and compared rather than trusted — the same technique
+  // §16/H1 uses on develop-bug's proceed table.
+  const doc = readFileSync(
+    path.join(REPO_ROOT, "docs", "standards", "bug-documents.md"),
+    "utf-8",
+  );
+  const row = doc.split("\n").find((l) => /^\|\s*`status`\s*\|/.test(l));
+  assert.ok(row, "bug-documents.md no longer has a `status` frontmatter row");
+  const parsed = [...row.matchAll(/`([a-z-]+)`/g)]
+    .map((m) => m[1])
+    .filter((v) => v !== "status");
+  assert.deepEqual(
+    parsed.sort(),
+    [...BUG_LIFECYCLE_STATUSES].sort(),
+    `the documented bug lifecycle and BUG_LIFECYCLE_STATUSES disagree.\n` +
+      `  doc:  ${parsed.sort().join(", ")}\n` +
+      `  code: ${[...BUG_LIFECYCLE_STATUSES].sort().join(", ")}`,
+  );
 });

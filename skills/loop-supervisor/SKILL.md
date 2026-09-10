@@ -1,6 +1,7 @@
 ---
 name: loop-supervisor
 description: Run an unattended sequential loop where every iteration gets a fresh Claude process and a fresh context, and each outcome is classified from filesystem post-conditions rather than from the assistant's prose. Use when a roadmap loop must run for hours or overnight without quality decaying — the built-in /loop re-invokes the same conversation each time, so late iterations work through a context consumed by the early ones, and a skill cannot clear its own context. Spawns one `claude -p` per iteration with a pinned session id, probes for work before spending a model invocation, writes a per-iteration ledger and log, and stops on an empty frontier, a halt, a budget cap, or repeated no-progress. Triggers — run the roadmap overnight, fresh context each iteration, unattended loop, why does the loop get worse over time.
+invokes: [develop-next]
 ---
 
 # loop-supervisor

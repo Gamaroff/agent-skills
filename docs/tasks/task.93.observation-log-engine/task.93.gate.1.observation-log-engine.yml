@@ -1,0 +1,130 @@
+schema: 1
+task: "task.93.observation-log-engine"
+task_title: "Observation-log engine, workspace resolver and contract"
+gate: FAIL
+status_reason: "Three defects found by executing the code rather than reading it. One HIGH: the resolver derives a different workspace per linked git worktree, producing exactly the silent fork `doctor` exists to catch — and this repo dispatches work into linked worktrees. Everything else is strong: 41 tests, 19 guards mutation-proven, full CI green."
+reviewer: "QA Engineer"
+updated: "2026-09-08T09:05:00Z"
+
+top_issues:
+  - id: "TASK-93-001"
+    severity: high
+    file: "shared/resources/resolve-observation-workspace.sh"
+    finding: >-
+      `_ow_project_root` uses `git rev-parse --show-toplevel`, which in a LINKED git worktree
+      returns the worktree path, not the main checkout. The project-identity default therefore
+      encodes a different path per worktree and resolves a DIFFERENT workspace for the same
+      project. Demonstrated: the main checkout resolves
+      `~/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills`, while a linked
+      worktree of the same repo resolves
+      `~/.claude/projects/-private-tmp-...-scratchpad-probe`. This is the silent-fork failure
+      `doctor` exists to detect, produced by the resolver itself — and it is not hypothetical
+      here: `/develop-batch` dispatches every parallel story into a linked worktree, so each
+      would write observations to its own throwaway-path workspace.
+    suggested_action: >-
+      Derive the project root from the MAIN worktree:
+      `dirname "$(git rev-parse --path-format=absolute --git-common-dir)"`. Verified to return
+      the main checkout from both the main tree and a linked worktree. Add a test that asserts
+      the two agree — it must create a real linked worktree, because that is the only thing
+      that reproduces the defect.
+    suggested_owner: dev
+    status: open
+
+  - id: "TASK-93-002"
+    severity: medium
+    file: "shared/resources/observation-log.js"
+    finding: >-
+      `forkCandidates()` scans `<cwd>/skill-observations`, `~/skill-observations` and
+      `~/.claude/skill-observations` — but NOT `~/.claude/projects/*/skill-observations`, which
+      is where the project-identity default actually puts workspaces, and therefore where the
+      forks created by TASK-93-001 land. `doctor` cannot detect the fork the resolver produces.
+      The two findings compound: one creates a silent fork, the other guarantees it stays silent.
+    suggested_action: >-
+      Add a glob over `~/.claude/projects/*/skill-observations` to `forkCandidates()`, excluding
+      the resolved workspace's own path. Assert it with a test that plants a second workspace
+      under a sibling project directory.
+    suggested_owner: dev
+    status: open
+
+  - id: "TASK-93-003"
+    severity: medium
+    file: "shared/resources/observation-log.js"
+    finding: >-
+      `readFrontmatterBounded()` accumulates chunks with `buf.toString("utf8", 0, n)`. A
+      multi-byte UTF-8 character straddling the 8192-byte chunk boundary is decoded as two
+      partial sequences and corrupts to U+FFFD. Reproduced at ALL EIGHT byte alignments tested
+      (frontmatter >8 KB containing `é`): the parsed title came back 5001 characters instead of
+      5000, containing a replacement character. Silent — the header still parses, so nothing
+      reports an error. A first single-offset test passed by alignment luck, which is worth
+      recording: this defect hides from a spot check.
+    suggested_action: >-
+      Use `StringDecoder` from `node:string_decoder`, which buffers an incomplete multi-byte
+      sequence across chunk boundaries: `const dec = new StringDecoder("utf8")`, then
+      `acc += dec.write(buf.subarray(0, n))` in the loop and `acc += dec.end()` after it.
+      Verified to eliminate the corruption. Add a test that sweeps several byte alignments —
+      a single fixture can pass by luck.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 41
+  code_review_subagent: "dispatched, did not complete (stopped after 5 min); findings below were produced by the reviewer directly, by execution"
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: >-
+      The engine shells out to nothing, evaluates nothing, and makes no network call — its only
+      requires are `fs`, `path`, `os` and the local `yaml-subset.js`, asserted by a test. The
+      resolver refuses ephemeral anchors. No secrets or credentials anywhere in the change set.
+  performance:
+    status: PASS
+    notes: >-
+      `scan` reads only to the closing `---`; cost is flat in body size (a 5,000,029-byte file
+      costs 8,192 bytes read) and asserted in bytes rather than seconds. Baselines recorded:
+      90.3 / 108.0 / 152.7 ms for 1 / 100 / 1000 observations.
+  reliability:
+    status: CONCERNS
+    notes: >-
+      Guards are thorough and mutation-proven, and the archival gate is correct in all four
+      cases tested. But TASK-93-001 makes the workspace itself non-deterministic across
+      worktrees, and TASK-93-003 silently corrupts data on a boundary — both are reliability
+      properties, and both are silent when they fail.
+  maintainability:
+    status: PASS
+    notes: >-
+      Every non-obvious rule carries the reason it exists and the failure it prevents. The test
+      file names the mutation that catches each guard, so the proofs are repeatable rather than
+      claimed. The contract and engine header agree on the `reason` vocabulary (a drift found and
+      closed during development).
+
+recommendations:
+  immediate:
+    - action: "Derive the project root from the main worktree via --git-common-dir"
+      refs: ["shared/resources/resolve-observation-workspace.sh"]
+    - action: "Scan ~/.claude/projects/*/skill-observations in forkCandidates()"
+      refs: ["shared/resources/observation-log.js"]
+    - action: "Use StringDecoder in readFrontmatterBounded()"
+      refs: ["shared/resources/observation-log.js"]
+  future:
+    - action: >-
+        Consider documenting the observations.workspace schema alongside the resolver rather than
+        deferring the whole block to task 95 — the resolver reads a key nothing describes yet.
+      refs: ["shared/resources/observation-log-contract.md"]
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - "TASK-93-001 fixed and covered by a real-linked-worktree test"
+    - "TASK-93-002 fixed so doctor can see project-path forks"
+    - "TASK-93-003 fixed with a multi-alignment test"

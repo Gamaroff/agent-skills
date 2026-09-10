@@ -79,6 +79,7 @@ flowchart TD
     DS --> CPR[create-pr]
     DS --> QS[qa-story]
     DS --> QF[qa-fix]
+    DS --> RPR[review-pr]
     DS --> FN[finalise]
     DS --> CC[commit-changes]
 
@@ -88,6 +89,7 @@ flowchart TD
     DT --> CPR
     DT --> QT[qa-task]
     DT --> QF
+    DT --> RPR
     DT --> FN
     DT --> CC
 
@@ -120,6 +122,7 @@ sequenceDiagram
     participant CPR as create-pr
     participant QS as qa-story
     participant QF as qa-fix
+    participant RPR as review-pr
     participant FN as finalise
     participant CC as commit-changes
 
@@ -131,17 +134,30 @@ sequenceDiagram
     DS->>DEV: Step 3 — develop loop (MAX_ITER=5)
     DEV-->>DS: status: ready-for-review
     DS->>CPR: Step 4 — create PR (--base epic branch)
-    DS->>QS: Step 5 — QA review → gate file
+    DS->>QS: Step 5a — QA review → gate file
     alt gate CONCERNS / FAIL
-        DS->>QF: Step 6 — qa-fix (up to 5 cycles)
+        DS->>QF: Step 5b — qa-fix (shared 5-cycle budget)
         QF-->>QS: re-run QA
     end
+    DS->>RPR: Step 5c — PR conformance review (clean gate only)
+    alt verdict REQUEST CHANGES
+        RPR-->>DS: findings
+        DS->>QF: back to 5b — consumes a cycle
+    end
+    RPR-->>DS: APPROVE / CONCERNS → signal ready-for-merge
     DS->>FN: Step 7 — finalise (DoD, PR, tracker)
     DS->>CC: Step 8 — commit final artifacts
     DS-->>U: status: accepted
 ```
 
-Reference: [`skills/develop-story/README.md`](../../skills/develop-story/README.md).
+**A clean QA gate no longer exits the loop on its own.** `PASS`/`WAIVED` hands to **Step 5c**, the
+PR conformance review, which is the only way out to Step 7: `REQUEST CHANGES` routes back to
+`qa-fix` and consumes a cycle from the same 5-cycle budget, while `APPROVE`/`CONCERNS` exit and
+signal `ready-for-merge`. 5c is a third member of a loop that already had two — the pipeline is
+still eight steps.
+
+Reference: [`skills/develop-story/README.md`](../../skills/develop-story/README.md) and
+[`shared/resources/develop-pipeline-step-5-6-qa-loop.md`](../../shared/resources/develop-pipeline-step-5-6-qa-loop.md).
 
 ## Packaging flow
 

@@ -448,11 +448,55 @@ Perform a comprehensive test architecture review with quality assessment. This a
    # LATEST_GATE is EMPTY on a first review. `awk 'prog' ""` passes no filename, falls back to
    # reading stdin, and hangs indefinitely — a hang, not an error. Guard it, and close stdin so the
    # fallback is unreachable even if the guard is ever removed.
+   # Clause 1 has TWO halves and they fail in opposite directions: the status half
+   # fails CLOSED (an unreadable gate is not evidence of a failure), the evidence half
+   # fails OPEN (a missing `evidence:` key reads as `unverified` and FIRES). See the
+   # shared rule — writing the second half closed makes every pre-existing gate silent.
    SAFETY_REPROBE=false
    if [ -n "$LATEST_GATE" ] && [ -r "$LATEST_GATE" ]; then
-     awk '/^[[:space:]]*security:[[:space:]]*$/{f=1; next}
-          f && /^[[:space:]]*status:/ {print; exit}' "$LATEST_GATE" </dev/null \
-       | grep -qE '[[:space:]]FAIL[[:space:]]*$' && SAFETY_REPROBE=true
+     SECURITY_AXIS=$(awk '
+       # Three transit constraints govern every line below — no whole-record
+       # variable, no apostrophe, no GNU-only escape. See "Transit constraints"
+       # in the shared rule for why each one fails silently. Each has a test.
+       !f && /^[[:space:]]*security:[[:space:]]*$/ {
+         n = length; sub(/^[[:space:]]*/, ""); ind = n - length; f = 1; next
+       }
+       f {
+         # A key at or left of the indent of security: ends the block, so keys
+         # belonging to a later NFR axis can never be read as this one.
+         n = length; sub(/^[[:space:]]*/, ""); lead = n - length
+         if (length > 0 && lead <= ind) exit
+         if (st == "" && /^status:/) {
+           st = (/[[:space:]]FAIL[[:space:]]*$/) ? "FAIL" : "OK"
+         }
+         if (ev == "" && /^evidence:/) {
+           ev = "unverified"
+           if (/evidence:[^[:alpha:]]*measured/) ev = "measured"
+           else if (/evidence:[^[:alpha:]]*reasoned/) ev = "reasoned"
+         }
+       }
+       END {
+         if (!f) { print "absent"; exit }
+         printf "%s %s\n", (st == "" ? "OK" : st), (ev == "" ? "unverified" : ev)
+       }
+     ' "$LATEST_GATE" </dev/null)
+     case "$SECURITY_AXIS" in
+       absent)                     : ;;
+       *FAIL*)                     SAFETY_REPROBE=true ;;
+       *unverified*)               SAFETY_REPROBE=true ;;
+       "OK measured"|"OK reasoned") : ;;
+       # The branches above are EXHAUSTIVE over what the program can emit, so
+       # reaching here means the reader produced something it cannot produce —
+       # in practice the EMPTY string, from an awk that died, is missing, or had
+       # its program corrupted in transit. That is a claim about the instrument,
+       # not about the gate, so it fires: nothing has established the axis is
+       # fine. `absent` is a deliberate answer; empty is not an answer at all.
+       #
+       # The clean readings must be listed BEFORE this. Leaving them to the
+       # catch-all makes every passing gate fire — which is what happened when
+       # this branch was first added.
+       *)                          SAFETY_REPROBE=true ;;
+     esac
    fi
    ```
 
@@ -940,9 +984,19 @@ Record in the QA report:
    execution failure and `medium` for a shell disagreement. They feed `top_issues[]` under
    `code_review_blocking` on the same terms as any other Phase 1.6 finding — no new schema.
 
-> **A run where zero blocks executed is a finding, not a pass.** The engine raises
-> `zero-blocks-executed`; do not suppress it. `zsh` being absent is not that case — it never reduces the
-> runnable count, so record it as information and continue.
+> **A run where zero blocks executed is never a pass — but it is two states, and the engine tells them
+> apart for you.** Report whichever it emits; do not suppress either.
+>
+> - **`zero-blocks-executed`** (finding, `medium`) — `placeholder > 0`: the run was under-configured,
+>   and `--bind` / `--copy` is the fix.
+> - **`no-executable-blocks`** (information, in `notes[]`, exit `0`) — `placeholder === 0` and every
+>   block refused as `mutating`: the file documents side-effecting commands that are deny-listed by
+>   design, so **no configuration will ever make them runnable**. Still recorded, with a per-reason
+>   refusal breakdown, so the step is never a silent no-op; not a finding, so it does not accumulate as
+>   noise on most of the library (`bug.7`).
+>
+> `zsh` being absent is not either case — it never reduces the runnable count, so record it as
+> information and continue.
 
 **Lite mode**: this phase still runs, but only over blocks in the changed file.
 
@@ -1284,6 +1338,14 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 ### Security ✅
 
 - Status: PASS/CONCERNS/FAIL
+- Evidence: measured/reasoned/unverified — **how** the verdict was reached. `measured` only when
+  hostile candidates were actually executed, and then `probes_executed` must be > 0; a verdict
+  reached by reading is `reasoned`, which is accurate rather than a failing grade. Values, the
+  placement constraint and the fail-open rule for a missing key:
+  [`references/qa-gate-security-evidence.md`](references/qa-gate-security-evidence.md).
+  `/review-security` emits a liftable block with the same key names — consuming it is optional;
+  this skill owns the field
+- Probes executed: [count — required when Evidence is `measured`]
 - Notes: [Findings]
 
 ### Maintainability ✅
@@ -1347,6 +1409,14 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 #### Output 2: Quality Gate File
 
+> **`top_issues[]` holds THIS cycle's findings only.** Do not copy a previous cycle's entries
+> forward, even annotated `status: closed`, and even though carrying the history reads as helpful.
+> The develop pipeline's **third-strike rule** reads the `file:` of every HIGH entry across the last
+> three gates and deliberately ignores `status: closed`, so a copied-forward HIGH makes one finding
+> look like a file struck twice — and a third cycle then refuses to let `/qa-fix` patch a file that
+> was never the problem. The history belongs in `bug_resolution`, in the QA report's Re-Review
+> Context table, and in the bug reports.
+
 **CRITICAL: Gate files MUST be co-located with story/task files (Updated 2025-12-09)**
 
 **Gate File Location and Naming:**
@@ -1395,6 +1465,12 @@ evidence:
 nfr_validation:
   security:
     status: PASS|CONCERNS|FAIL
+    # `evidence:` goes BELOW `status:`, never between `security:` and `status:` —
+    # the re-review probe reads the first `status:` after `security:` and fails
+    # closed and silently if a key reaches that slot first. Values and the
+    # probes_executed rule: references/qa-gate-security-evidence.md
+    evidence: measured|reasoned|unverified
+    probes_executed: 0 # REQUIRED when evidence: measured; `measured` with 0 is a schema error
     notes: 'Specific findings'
   performance:
     status: PASS|CONCERNS|FAIL
@@ -1651,6 +1727,27 @@ cat > "$BODY_FILE" <<'EOF'
 ---
 EOF
 
+# The plain-language lead, obtained ONCE and folded into $BODY_FILE — ABOVE the
+# arm split below, so the GitHub and Bitbucket arms post the same bytes and
+# cannot drift. `qa-gate` is the same stage the tracker comment for this moment
+# uses; a pull-request comment about a moment that also exists on the tracker
+# reuses that stage rather than inventing a second vocabulary.
+#
+# GATE_DECISION is bound HERE, deliberately. The heredoc above is quoted
+# (`<<'EOF'`), so its [GATE_DECISION] placeholder is filled in textually when
+# the body is written — it never becomes a shell variable. Set this to the same
+# verdict you wrote into the body: PASS, CONCERNS, FAIL or WAIVED.
+GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the body above}"
+
+# The verdict is MAPPED, never passed through: `CONCERNS` tells an outside reader
+# nothing about whether to worry. Pass the raw token and let the catalogue map
+# it — an unknown verdict renders "the results are recorded below" rather than
+# defaulting to reassurance.
+LEAD=$(node references/stakeholder-summary-cli.js --stage qa-gate \
+  --slot verdict="$GATE_DECISION") || exit 1
+printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
+  && mv "${BODY_FILE}.tmp" "$BODY_FILE"
+
 if [ "$VCS" = "github" ]; then
   tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE"
   COMMENT_RC=$?
@@ -1679,35 +1776,73 @@ fi
 
 Branch on the tracker resolved by `source references/resolve-platform.sh || exit 1` (which sets `TRACKER=github|jira`). Keep the `|| exit 1` — the resolver returns non-zero on an unrecognised `tracker:`, `vcs:` or `access:` value, and sourcing it bare would continue past the rejection with a default.
 
-**GitHub path** (when `TRACKER=github`) — extract `github_issue` from the story/task document YAML frontmatter (read in Prerequisites). If present, post a summary comment to the linked Issue (also wrapped in `tracker_call_with_retry`):
+**One call, both trackers.** `tracker-comment.js` resolves `TRACKER` itself, so the issue identifier
+is the only thing that differs between the two arms. Resolve it, then make the single call:
 
 ```bash
-if [ -n "$GITHUB_ISSUE_QA" ]; then
-  tracker_call_with_retry gh issue comment "$GITHUB_ISSUE_QA" \
-    --body "QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}" \
-    || echo "⚠️  Issue comment failed after 3 retries — continuing"
+# The issue identifier — whichever tracker this project uses.
+if [ "$TRACKER" = "jira" ]; then
+  QA_ISSUE=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
+  [ "$QA_ISSUE" = "null" ] && QA_ISSUE=""
+else
+  QA_ISSUE="$GITHUB_ISSUE_QA"
 fi
 ```
 
-If `github_issue` is absent from the frontmatter, skip silently. Failure does NOT halt the skill.
-
-**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the story/task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue:
+If `QA_ISSUE` is empty, skip this step silently — the story has no linked tracker issue.
 
 ```bash
-JIRA_KEY=$(grep -E '^jira_key:' "$STORY_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
+if [ -n "$QA_ISSUE" ]; then
+  mkdir -p .claude/state
+  printf 'QA %s (%s/100) — PR #%s: %s\n' \
+    "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
+
+  # blocking_count — the high-severity entries in the gate this run just wrote.
+  # Derived here, at the call, rather than carried from earlier: the gate file is
+  # the authority on what blocks, and it is complete by this point.
+  #
+  # Re-resolve the gate path rather than reusing LATEST_GATE from Phase 0 — that
+  # one names the PREVIOUS run's gate (it is read to decide whether to re-review),
+  # and this run has written a newer one since.
+  THIS_GATE=$(ls -t "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | head -1)
+  # `|| true`, NOT `|| echo 0`. `grep -c` PRINTS "0" and EXITS 1 when it matches
+  # nothing, so `|| echo 0` appends a second zero and the variable becomes the
+  # two-line string "0\n0" — which the engine's numeric coercion then reads as
+  # NaN and drops. The slot would vanish on exactly the clean gates where saying
+  # "no blocking issues" matters most, and nothing would report it.
+  BLOCKING_COUNT=$(grep -c '^ *severity: high' "$THIS_GATE" 2>/dev/null || true)
+  BLOCKING_COUNT=${BLOCKING_COUNT:-0}
+
+  node .agents/skills/qa-story/references/tracker-comment.js \
+    --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
+    --stage qa-gate \
+    --slot verdict="$GATE_DECISION" \
+    --slot blocking_count="$BLOCKING_COUNT" \
+    --json \
+    || echo "⚠️  Tracker issue comment failed — continuing"
+fi
 ```
 
-If `TRACKER=jira` and `JIRA_KEY` is non-empty and not `null`:
-
-```bash
-mkdir -p .claude/state
-printf 'QA %s (%s/100) — PR #%s: %s\n' \
-  "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
-
-node .agents/skills/qa-story/references/tracker-comment.js \
-  --issue "$JIRA_KEY" --body-file .claude/state/comment-body.md \
-  --stage qa-gate --json
-```
+> **This replaced a bare `gh issue comment` on the GitHub arm.** That call carried no idempotency
+> marker, so a resumed QA cycle posted a second copy; it was `gh`-only, so a Jira consumer got the Jira
+> arm's comment and GitHub consumers got an unmarked one; and after task.104 it would have been one of
+> the last tracker comments in the pipeline with no plain-language lead. Collapsing the two arms is
+> what makes the same QA outcome read the same way on either tracker.
+>
+> **It also gave up the `tracker_call_with_retry` 3× backoff.** The engine owns the `ACCESS_TRACKER`
+> deferral gate but has no retry of its own, and re-wrapping it would double-defer — so the retry is
+> genuinely given up, and the `|| echo … continuing` above is what stands in its place. That matches
+> `review-task`, the reference implementation for a converted site.
+>
+> **The two slots `qa-gate` reads are `verdict` and `blocking_count` — not `pr`.** `pr` is a real slot
+> name on `in-review` and `done`, which is exactly what makes it look right here; the `qa-gate`
+> template never reads it, and the engine validates no slot names, so passing it would be silently
+> dropped. The PR stays in the body, where it already is.
+>
+> **`verdict` is passed as the raw gate token, and that is correct here** — it is the one slot the
+> engine *maps* rather than prints, turning `PASS`/`CONCERNS`/`FAIL`/`WAIVED` into a plain sentence.
+> The score deliberately does **not** reach the lead: a number on an unexplained scale is precisely
+> what the standard forbids. It stays in the body.
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
@@ -2202,6 +2337,7 @@ nfr_validation:
   _assessed: [security, performance, reliability, maintainability]
   security:
     status: CONCERNS
+    evidence: reasoned # measured|reasoned|unverified — below status:, always
     notes: "No rate limiting on auth endpoints"
   performance:
     status: PASS

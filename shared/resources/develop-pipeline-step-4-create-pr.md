@@ -230,8 +230,15 @@ EOF
 
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
      --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-     --stage in-review --json
+     --stage in-review \
+     --slot pr="{PR_URL}" \
+     --json
    ```
+
+   > **`pr` is the only slot `in-review` reads.** Pass the full PR **URL**, not the number: the lead
+   > renders it parenthetically ("submitted for review (…)") for a reader who is not going to look up
+   > `#412` in a repository they may not have open. `PR_URL` is bound by `/create-pr` immediately above
+   > this call, which is the earliest point at which it exists.
 
 > Engine source: `shared/resources/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `shared/resources/tracker-comment-contract.md`.
 

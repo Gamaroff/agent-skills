@@ -342,8 +342,21 @@ EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage work-started --json
+  --stage work-started \
+  --slot title="{the document's bare title, from Phase 0c}" \
+  --json
 ```
+
+> **`title` is the only slot `work-started` reads**, and it is a **text** slot — passed through
+> verbatim. Give it the work item's own title, not its id and not the branch name: the lead is written
+> for a reader who cannot look either of those up. Quote it — an unquoted `--slot` with a space in the
+> value makes the next word a stray argument. Omit the slot entirely if the title is not resolved at
+> this point rather than passing a placeholder; the template is grammatical without it.
+
+**Which slots each stage reads** is fixed by the lead catalogue in
+[`references/stakeholder-summary.md`](stakeholder-summary.md) — the engine validates slot names
+against nothing, so a name no template reads is silently dropped and the comment posts looking exactly
+as it would have with no slot at all.
 
 Read `reason` from the JSON:
 
@@ -674,7 +687,7 @@ Create `story.{epic}.{story}.implementation.{N}.{descriptive-name}.md` in the st
 | 2. review-story             | ⏳ Pending | `story.{epic}.{story}.review.{N}.{name}.md` exists (or skip logged)                          |       | —                    |
 | 3. develop                  | ⏳ Pending | Story status == `Ready for Review`                                                           |       | —                    |
 | 4. create-pr                | ⏳ Pending | PR URL targets `develop` (or chosen base); issue/tracker comment posted                      |       | —                    |
-| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; PR comment posted |       | —                    |
+| 5–6. qa-story / qa-fix loop | ⏳ Pending | `story.{epic}.{story}.qa.{N}.*.md`; `story.{epic}.{story}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                 | ⏳ Pending | `story.{epic}.{story}.dod.{N}.*.md`; story `status: accepted`                                |       | —                    |
 | 8. commit-changes           | ⏳ Pending | All artifacts committed and pushed                                                           |       | —                    |
 
@@ -768,7 +781,7 @@ Create `task.{id}.implementation.{N}.{descriptive-name}.md` in the task director
 | 2. review-task             | ⏳ Pending | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               |       | —                    |
 | 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 

@@ -29,7 +29,9 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Validate story 2.3" / "Is story 2.3 ready?" | `review-story --validate` |
 | "Review this bug report" / "Is this bug ready to fix?" | `review-bug` (the second phrasing picks `--validate`) |
 | "Review my changes" / "Review this diff" / "Review PR 123" | `review-code` |
-| "Review this PR" / "Does this PR match the task?" / "Is the evidence there for this PR?" | `review-pr` |
+| "Review this PR" / "Does this PR match the task?" / "Is the evidence there for this PR?" | `review-pr` (also runs automatically as Step 5c of `/develop-story` and `/develop-task`) |
+| "Does this control actually work?" / "Prove the TLS is really on" / "Probe this validator" | `review-security` (the repo skill — distinct from the built-in `/security-review`, which reads the diff rather than executing the control) |
+| "Double check that" / "Verify your work" / "Are you sure?" / "Did you actually do that?" | `double-check` |
 
 ## Development
 
@@ -62,9 +64,11 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Sync this epic to Jira" / "Publish epic to Jira" | `sync-jira-epic` |
 | "Sync this story to Jira" | `sync-jira-story` |
 | "Sync this task to Jira" | `sync-jira-task` |
+| "Sync this bug to Jira" | `sync-jira-bug` |
 | "Sync this epic to GitHub" / "Publish epic to GitHub" | `sync-github-epic` |
 | "Sync this story to GitHub" | `sync-github-story` |
 | "Sync this task to GitHub" | `sync-github-task` |
+| "Sync this bug to GitHub" | `sync-github-bug` |
 | "File an issue for this" / "Create a ticket" | `create-issue` (platform auto-detected) |
 | "Reconcile the tracker handover" / "Work the deferred checklist" / "Did anyone do the handover actions?" | `tracker-reconcile` |
 
@@ -95,6 +99,9 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Create a new skill for X" | `create-skill` |
 | "Document this existing project" | `document-existing-project` |
 | "Remember this — we use NX for testing" | `remember-insight` |
+| "Any observations logged?" / "What did you learn this session?" | `observe-work` |
+| "Review the observation log" / "Run the skill review" | `observe-work` (the second phrasing picks `--review`) |
+| "One skill to rule them all" | `observe-work` (the upstream methodology's name) |
 
 ## Architecture
 

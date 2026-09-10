@@ -61,6 +61,9 @@ for (const skill of PIPELINES) {
       text.includes("═══ REMAINING WORK STATUS ═══"),
       `${skill}: SKILL.md must show the literal status block header`,
     );
+    // relationship-assertion-lint: allow — "point at the canonical spec" means "names the spec
+    // path", and containment of that path is the honest and complete test of it. There is no
+    // stronger mapping to assert: the claim is presence, not routing.
     assert.ok(
       text.includes(CANON),
       `${skill}: SKILL.md must point at the canonical spec (${CANON})`,

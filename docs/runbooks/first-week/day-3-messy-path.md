@@ -75,7 +75,7 @@ Run these checks before calling Day 3 done:
 ## What you learned
 
 - `qa-gate` is mechanical — it checks ACs literally, including line counts via `wc -l`
-- `qa-fix` loops up to 5 iterations; usually 1 is enough
+- `qa-fix` loops up to 5 iterations; usually 1 is enough. A clean gate then hands to `review-pr` (Step 5c), which can send the run back into `qa-fix` on the same budget
 - The messy path is just normal engineering: read the failure, change the code, re-run
 - A FAIL gate is not a sign something is broken — it is the pipeline doing its job
 

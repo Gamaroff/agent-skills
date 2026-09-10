@@ -1,0 +1,89 @@
+schema: 1
+task: 'task.94.observe-work-skill'
+task_title: 'Add the observe-work meta-skill'
+gate: CONCERNS
+status_reason: >-
+  TASK-94-006 is closed by replacement rather than correction, and the replacement was probed on
+  every input from all three prior cycles plus three new edges. One MEDIUM remains: environments.md
+  still documents the mechanism cycle 3 removed, in the voice of hard-won guidance — instructions
+  for reimplementing the exact thing that produced three defects.
+reviewer: 'QA Engineer'
+updated: '2026-09-08T15:20:00Z'
+
+top_issues:
+  - id: 'TASK-94-007'
+    severity: medium
+    file: 'skills/observe-work/references/environments.md'
+    finding: >-
+      Two of the section's four "details that decide whether it works" describe removed code — the
+      file-counting rule and the `grep -c` exit-code caveat. It omits the two properties that now
+      matter (the count comes from the engine; the fallback is silence), and still points at the
+      pre-bundle path.
+    suggested_action: >-
+      Rewrite against the current mechanism. Keep the ISO-date and prove-the-branches bullets, which
+      are still true and still earned. Correct the path to references/observe-work-session-start.sh.
+    suggested_owner: dev
+    bug_ref: 'task.94.bug.7.environments-documents-removed-mechanism.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2885
+  phases_verified: '6/6'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5, 6]
+    phases_with_issues: [6]
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 1
+  fix_date: '2026-09-08'
+  total_iterations: 3
+  verification_method: >-
+    The replacement was re-probed on all nine inputs from cycles 1-3 (trailing space, exact,
+    statusless, actioned, parked, body-quote, empty value, quoted value, no frontmatter) plus three
+    new edges — an empty `open` array, a fresh review with an empty queue, and filenames carrying
+    dots and hyphens. Hook and engine agree on every one. The three degradation paths (no engine,
+    no node, ephemeral anchor) each emit nothing.
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged. shellcheck --severity=warning clean across all tracked sources.'
+  performance:
+    status: PASS
+    notes: >-
+      Body 283 lines against a 500 ceiling. The hook now spawns node once per session start; that is
+      a real cost and the right one, since the alternative was three cycles of wrong answers.
+  reliability:
+    status: PASS
+    notes: >-
+      Raised from CONCERNS. The duplication that caused three cycles of defects is gone — the queue
+      rule lives in one place. Every degradation path is silence rather than a guess, which is the
+      correct direction for a component whose only justification is an accurate number.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The shipped code is right and the reference describing it is wrong, in a way that reads as
+      authoritative. That is a trap for the next editor rather than a defect today, but it is the
+      one axis where this change made things worse.
+
+recommendations:
+  immediate:
+    - action: 'Rewrite the SessionStart hook section against the mechanism that now ships'
+      refs: ['skills/observe-work/references/environments.md']
+  future:
+    - action: 'qa-execute-snippets cannot execute `command node`, so Step 4b is inert for compliant skills'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+    - action: 'docs-link-check is path-filtered to docs/**; skills/** ships unchecked markdown'
+      refs: ['.github/workflows/docs-link-check.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'TASK-94-007 corrected — the reference must not describe the removed mechanism'

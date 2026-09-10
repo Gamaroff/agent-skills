@@ -1,0 +1,73 @@
+schema: 1
+task: 'task.85.review-pr-machine-readable-findings'
+task_title: 'Give /review-pr a machine-readable findings block'
+gate: FAIL
+status_reason: 'The block emitter and the contract test are sound, but the ingester''s block-to-output mapping — the consumer half this task exists to make deterministic — is self-contradictory and incomplete, so the new path is not deterministic yet.'
+reviewer: 'QA Engineer'
+updated: '2026-09-09T00:00:00Z'
+
+top_issues:
+  - id: 'TASK85-001'
+    severity: high
+    file: 'shared/resources/qa-findings-ingester-prompt.md'
+    finding: 'The block-to-output mapping contradicts itself and is incomplete. One sentence says `severity` and `suggested_action` "carry across by name" and then says `suggested_action` "becomes `suggested_fix_path`" — both cannot hold, and the output schema defines no `suggested_action` key at all. Three further block fields (`id`, `category`, `confidence`) are given no destination, and the output schema''s `id` is `F{n}` while the block''s are `PC-*`/`CR-*`.'
+    suggested_action: 'Replace the prose sentence with an explicit field-by-field mapping table covering all seven block fields, naming a destination or an explicit drop for each, including how `PC-1`/`CR-1` become `F{n}`.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK85-002'
+    severity: medium
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'The new yaml block inside the Step 7 report template uses literal example values (`id: PC-1`, `category: coverage`, `ref: "AC-3"`) while every other section of the same template uses brace placeholders (`{rendered PC-* findings, or "None."}`, `{AC-1 text}`, `{highest-priority action}`). The template is introduced with "ALWAYS use this exact template structure", so the literals invite verbatim copying into real reports.'
+    suggested_action: 'Convert the block''s example entries to the template''s brace-placeholder convention, or label the block explicitly as illustrative rather than literal.'
+    suggested_owner: dev
+    status: open
+  - id: 'TASK85-003'
+    severity: low
+    file: 'shared/resources/qa-findings-ingester-prompt.md'
+    finding: '"Add the block''s `truncated_count` to your own" conflicts with the output schema''s own comment for that field ("set >0 if raw findings exceeded 20"), which describes the ingester''s own 20-finding cap. Summing the two silently redefines the field as "total findings dropped anywhere".'
+    suggested_action: 'State the intended meaning at the field, or keep the two counts distinct.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 2965
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Documentation and contract-test change only. No executable code, no new inputs, no auth or data surface; the one shell block executed in Step 4b is a read-only `find` over a local directory. Verdict reached by reading, not by executing hostile candidates — hence `reasoned`, which is the accurate value here rather than a failing grade.'
+  performance:
+    status: PASS
+    notes: 'No runtime code. `npm run ci:fast` completed in the usual envelope; 3 assertions added to an existing test file.'
+  reliability:
+    status: PASS
+    notes: 'The change is additive and the rollback is a single revert plus `npm run bundle` — no migration, no state. The legacy fallback is preserved and pinned against a real pre-block report.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The emitter half is well documented and mutation-proven. The ingester half (TASK85-001) currently states a mapping a careful reader cannot follow, which is the maintainability failure mode this task was filed to remove.'
+
+recommendations:
+  immediate:
+    - action: 'Rewrite the block-to-output mapping as an explicit per-field table (TASK85-001)'
+      refs: ['shared/resources/qa-findings-ingester-prompt.md']
+    - action: 'Make the template yaml block''s placeholder convention match the rest of the template (TASK85-002)'
+      refs: ['skills/review-pr/SKILL.md']
+  future:
+    - action: 'Clarify truncated_count semantics at the field (TASK85-003)'
+      refs: ['shared/resources/qa-findings-ingester-prompt.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK85-001 resolved — the consumer mapping must be unambiguous before the deterministic path can be claimed'

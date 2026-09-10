@@ -91,9 +91,9 @@ You will be prompted by Phase 0 for:
 | PR target | `main` |
 | Epic branch | No (single-task work) |
 
-The agent then chains: **review-task → create-branch → develop → create-pr → qa-task → qa-fix → finalise**. You don't need to drive it — sit back. The chain stops automatically when the QA gate is PASS and DoD is complete.
+The agent then chains: **review-task → create-branch → develop → create-pr → qa-task → qa-fix → review-pr → finalise**. You don't need to drive it — sit back.
 
-If QA fails, the chain loops back into `qa-fix` (max 5 iterations). For a one-line README footnote, expect zero iterations.
+If QA fails, the chain loops back into `qa-fix` (max 5 iterations). A PASS gate then hands to `review-pr` (Step 5c), which checks the PR against the task; `REQUEST CHANGES` re-enters `qa-fix` on the same 5-iteration budget. For a one-line README footnote, expect zero iterations.
 
 ---
 

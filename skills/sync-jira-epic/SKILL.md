@@ -145,7 +145,7 @@ Flow:
 7. Build a Jira ADF description: Summary → Metadata → Stories Breakdown overview table → Source links.
 8. Resolve cached `Epic` issue type id (or fetch + cache).
 9. **Create** (POST, with Epic-Name-field auto-retry on 400) or **Update** (atomic PUT with `returnIssue=true`).
-10. **No-change fast path:** on update, if no fields changed, skip the PUT. The status transition still runs on this path — an epic whose frontmatter status moved while its card body did not must still reach the board, and a transition here is the one thing that earns a Change Log row. If nothing transitioned either, the run writes no row and no file at all. Use `--force` to push the PUT anyway.
+10. **No-change fast path:** on update, if no fields changed, skip the PUT. The status transition still runs on this path (unless `--no-transition` is passed) — an epic whose frontmatter status moved while its card body did not must still reach the board, and a transition here is the one thing that earns a Change Log row. If nothing transitioned either, the run writes no row and no file at all. Use `--force` to push the PUT anyway.
 11. On create: detect board type. If Scrum, move to backlog via Agile API. If Kanban, skip with a warning.
 12. If frontmatter `status` differs from current Jira status, fetch transitions and POST a status transition.
 13. Update local file: in-place frontmatter for `jira_key`, `jira_url`, `jira_last_synced_at`, `jira_last_body_hash`, `jira_last_meta_hash`. Inline `**Jira Epic**` / `**Parent PRD**` / `**Epic File**` links — the document links are **relative**, not absolute Bitbucket URLs. `epic_bitbucket_url` / `prd_bitbucket_url` are no longer written; `prd_bitbucket_url` is still READ as the `prd_source` fallback in step 3. Append a Change Log row only for issue creation or a status transition — never for a body update.
@@ -323,6 +323,7 @@ guidance, not information for a card reader.
 | `--priority` | `-p` | Override priority |
 | `--labels` | `-l` | Comma-separated labels |
 | `--doc-branch` | | Pin the Bitbucket Document links to this branch verbatim, overriding the current-branch/default-branch auto-resolution. Lets a post-merge re-sync point links at the durable integration branch instead of a deleted feature branch. |
+| `--no-transition` | | Re-point links / refresh the description **without** driving the issue's status. The sync normally resolves frontmatter `status:` through its own `loadStatusMap` and transitions the card; with this flag it issues no status request at all. Passed by `finalise` Step 7's Document-link re-point, so the re-link cannot overrule the terminal status the tracker-workflow ladder just set (bug.11). Composes with `--fail-on-status-skip` — a suppressed transition is a run behaving as configured, and exits 0. |
 | `--check-card` | | **Offline preflight** — check the document against the card spec and exit. No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 = findings, each printed with its fix. Add `--json` for `{ok, findings, blocks}`. Used by `review-epic` to catch a heading mismatch before it publishes a thin card. |
 | `--dry-run` | | Preview only — no Jira calls, no file writes |
 | `--force` | | Override the concurrent-edit guard AND the no-change fast path |

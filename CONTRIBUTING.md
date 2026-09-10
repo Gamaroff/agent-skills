@@ -65,6 +65,47 @@ npm test                              # required — must be green (L1 unit + L2
 npm run format                        # required — CI fails on unformatted JavaScript
 ```
 
+**If you touched `shared/resources/` or any `SKILL.md`**, the pre-commit hook re-bundles for you, but
+one file it cannot: verify with the check CI runs, which is a per-file comparison rather than a
+regenerate-and-diff.
+
+```bash
+npm run bundle -- --check             # or: npm run bundle:check
+```
+
+An `AMBIGUOUS` verdict is almost always `skills/create-skill/references/skill-dependencies.json` —
+JSON carries no provenance banner, so the bundler cannot tell a stale copy from an authored file and
+leaves it alone. Copy it across by hand and re-check. Details:
+[`docs/contributing/packaging.md`](./docs/contributing/packaging.md).
+
+**If you added or changed an `invokes:` key** in a `SKILL.md`, regenerate the call graph and commit
+it — CI fails on drift:
+
+```bash
+npm run generate-skill-deps           # writes shared/resources/skill-dependencies.json
+npm run skill-deps:candidates         # advisory — skills your prose mentions but `invokes:` does not
+```
+
+**If you touched a shell script**, run ShellCheck too — the `ShellCheck` workflow gates every PR at
+`--severity=warning` and will reject a new warning-tier finding:
+
+```bash
+# The lane lints SOURCES ONLY — 56 files, not the 247 `git ls-files '*.sh'` returns.
+# The other 191 are bundled copies under skills/*/references/, written by `npm run bundle`;
+# linting them reports every shared finding once per copy — a ~9x inflation.
+shellcheck --severity=warning $(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
+
+# No `shellcheck` binary? Most contributors will not have one. The container is the reference form:
+docker run --rm -v "$PWD:/mnt" -w /mnt koalaman/shellcheck:stable \
+  --severity=warning $(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
+```
+
+CI pins **v0.11.0** (see `.github/workflows/shellcheck.yml`), so `koalaman/shellcheck:stable` may drift
+ahead of it and report findings CI does not. If a finding is a genuine false positive, add
+`# shellcheck disable=SCxxxx` **with a one-line reason on the same line** — a bare disable is a
+suppression, and a directive covers only the command immediately after it, so a block of assignments
+needs one each.
+
 `prettier` is already a devDependency, so `npm ci` provides it. Prettier covers **JavaScript only** — Markdown, YAML and JSON are excluded on purpose in `.prettierignore`, because this repo's documents are hand-wrapped.
 
 **Keep reformatting out of your functional commits.** If your editor formats on save, this is the one to watch. A commit that mixes a whole-file reformat with a 40-line change is unreviewable, walls off `git bisect` and `git log -L`, and attributes the churn to a bugfix in `git blame`. It has happened here twice — the second time while [#179](https://github.com/Gamaroff/agent-skills/issues/179), describing the first, was still open. Run `npm run format` as its own `style:` commit and add that commit's full sha to [`.git-blame-ignore-revs`](./.git-blame-ignore-revs).

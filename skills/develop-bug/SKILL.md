@@ -1,6 +1,7 @@
 ---
 name: develop-bug
 description: 'Automates the full end-to-end bug-fix lifecycle: takes an existing bug report and runs it from open to closed — create-branch → review-bug → investigate & fix → create-pr → verify & fix loop (up to 5 cycles) → finalise → commit-changes. Gates on a review-bug fix-readiness check (halts on a duplicate, already-fixed, or under-specified bug), then researches the root cause, reproduces, implements the fix plus a regression test, and writes the fix record (Investigation, Fix Implementation, QA Verification, Resolution Summary) back into the bug report file, closing the bug. Handles all three bug modes (story / task / general) and both branch models — a regular bugfix (off `develop`) or a production hotfix (off `main`). Crash-safe with resume; lite mode for low-severity bugs. Invoke with `/develop-bug [bug-file-path]` or "research and fix this bug end to end".'
+invokes: [create-branch, review-bug, ensure-bug-jira-issue, ensure-bug-github-issue, develop, create-pr, qa-fix, finalise, commit-changes]
 ---
 
 # Develop Bug — Automated Bug-Fix Lifecycle Orchestrator
@@ -162,8 +163,15 @@ Follow the generic mechanics in [`references/develop-pipeline-step-1-create-bran
 - **Branch base and type** come from Phase 0d:
   - **Bugfix** (default) → invoke `/create-branch` with the bug file; select `develop` as the base when asked (Q2 answer).
   - **Hotfix** (Q1 = production hotfix) → invoke `/create-branch --hotfix v{X.Y.Z}` (branch off `main`). The version is the Q-derived next patch; if unknown, ask once during Step 1.
-- **Lock file**: write `"skill": "develop-bug"`, `"task_or_story_id": "{bug-prefix}"`, `"task_or_story_directory": "{bug-directory}"`, `"tracker_issue": "{bug github_issue or jira_key, empty if none}"`. The lock is read by `.agents/skills/develop-bug/scripts/on-precompact.sh`.
-- **Signal Work Started**: only if the bug has a linked tracker issue (`github_issue`/`jira_key` in frontmatter). Most general/story/task bugs will not — skip silently when empty.
+- **Ensure a tracker issue** (runs *before* the lock is written, so the lock records a real issue rather than an empty field it then contradicts). Branch on `TRACKER`:
+  - `TRACKER=jira` → invoke `ensure-bug-jira-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_JIRA_KEY` is a key or empty.
+  - `TRACKER=github` → invoke `ensure-bug-github-issue` with `BUG_FILE_PATH={bug file}`. On return `BUG_ISSUE_NUM` is a number or empty.
+
+  Set `TRACKER_ISSUE` to whichever came back. **Non-blocking**: an empty return is a degraded run, not a halt — the create may have failed, or been *deferred* by a restricted `access.tracker`, in which case the handover checklist carries the action and the next run converges. Never invent a placeholder key or number: a wrong one defeats the dedup search that stops the next run creating a duplicate.
+
+  This used to read *"most general/story/task bugs will not [have a tracker issue] — skip silently when empty"*. That described the gap rather than a design choice: there was no bug equivalent of `sync-jira-*`/`sync-github-*`, so bug cards were only ever created by hand through the generic `/create-issue` path — with no link embedding and no parent linkage. The sub-routines above close it.
+- **Lock file**: write `"skill": "develop-bug"`, `"task_or_story_id": "{bug-prefix}"`, `"task_or_story_directory": "{bug-directory}"`, `"tracker_issue": "{TRACKER_ISSUE}"`. The lock is read by `.agents/skills/develop-bug/scripts/on-precompact.sh`.
+- **Signal Work Started**: runs when `TRACKER_ISSUE` is non-empty, which is now the normal case rather than the exception. Skip silently when empty.
 
 ### Step 2: Review Bug
 
@@ -184,7 +192,7 @@ See [`references/develop-bug-step-3-investigate-fix.md`](references/develop-bug-
 Follow the generic mechanics in [`references/develop-pipeline-step-4-create-pr.md`](references/develop-pipeline-step-4-create-pr.md) (**develop-task variant**: scope staging, pre-flight guard, leak check), with these **bug substitutions**:
 
 - `--base {Q3_answer}`: `develop` for a bugfix; `main` for a hotfix.
-- `--issue`: pass only if the bug has a `github_issue` in frontmatter (`TRACKER=github`); omit otherwise. Most general/story/task bugs have no dedicated tracker issue — that is normal.
+- `--issue`: pass `${TRACKER_ISSUE}` when it is non-empty and `TRACKER=github`; omit otherwise. Step 1 ensures the issue, so a bug normally has one — an empty value means the create failed or was deferred, not that bugs do not get issues.
 - **Hotfix note**: a hotfix PR targets `main`. After merge, the fix must also land on `develop` — record this in the implementation report's Issues Log as a follow-up (`hotfix: merge-back to develop required`) so it is not lost. The version tag is created by the human/release process on merge to `main`.
 
 ### Step 5–6: Verify & Fix Loop

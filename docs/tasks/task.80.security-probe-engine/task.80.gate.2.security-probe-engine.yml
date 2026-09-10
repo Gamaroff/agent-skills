@@ -1,0 +1,75 @@
+schema: 1
+task: "task.80.security-probe-engine"
+task_title: "Make a security probe runnable without widening the snippet allow-list"
+gate: CONCERNS
+status_reason: "All four gate-1 findings verified fixed and mutation-proved. The cycle-2 refute pass found two new MEDIUM issues, both latent and both aimed at the declared consumer: the timeout fix closed the CLI path but left the runProbeSpec API path open, and the new relative import into tests/ will crash npm run bundle the moment any skill references this module."
+reviewer: "QA Engineer"
+updated: "2026-09-07T10:05:00Z"
+
+top_issues:
+  - id: "TASK80-005"
+    severity: medium
+    file: "shared/resources/security-probe.mjs"
+    finding: "TASK80-001 was fixed at the CLI only. `runProbeSpec({timeoutMs})` is still unvalidated, so the mechanism the finding named survives on the API path — demonstrated: `runProbeSpec({..., timeoutMs: NaN})` with a non-empty case list still throws the same uncaught `RangeError [ERR_OUT_OF_RANGE]`, and `timeoutMs: 0` still reaches spawnSync as 'no timeout'. This is the path that matters most: `task.81` is the declared consumer and will call the function, not the CLI."
+    suggested_action: "Move the validation from `main()` into `runProbeSpec` — apply `readInt(timeoutMs, 1)` where `perCaseTimeout` is resolved (:294) and fall back to the budget when it does not parse, or throw a typed error. Keep the CLI's `return 2` on top for the argument-shaped report. Validating at the boundary the caller actually crosses is what makes the fix general rather than flag-specific."
+    suggested_owner: dev
+    status: open
+  - id: "TASK80-006"
+    severity: medium
+    file: "shared/resources/security-probe.mjs"
+    finding: "`import { spawnBudget, neverRan, readInt } from \"./tests/spawn-budget.mjs\"` (:46) is a production module importing from a `tests/` directory, and it breaks bundling. `bundle_skill.py`'s `JS_ESM_SIBLING_RE` captures the nested path `tests/spawn-budget.mjs` as a transitive dep, then writes it to `refs_dir / name` — i.e. `references/tests/spawn-budget.mjs` — while only `references/` is ever created. Reproduced deterministically: the write raises FileNotFoundError. It does not fire today only because no skill references this module yet; `task.81` is exactly the change that will trigger it."
+    suggested_action: "Preferred: stop importing from `tests/` — move `spawnBudget`/`neverRan`/`readInt` (or just the budget resolution this module needs) into a non-test shared module, so a production file does not depend on a test helper. Alternative, and worth doing regardless because it fixes the class: `dst.parent.mkdir(parents=True, exist_ok=True)` before the write in `bundle_skill.py`. Note the second is outside task.80's scope, so if only one is taken here it should be the first."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 153
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged from cycle 1 and re-verified on the current tree: no interpreter on SAFE_COMMANDS; out-of-root entry rejected before import (re-proved with the top-level-sentinel fixture); inputs never reach a shell; unverifiable exits 1; declined distinct from executed-zero; timeout from spawnBudget. The cycle-1 fixes strengthened this axis rather than weakening it — an escape now forces a non-zero exit even on `engages`, closing a route by which a contained-but-escaping probe could report success."
+  performance:
+    status: PASS
+    notes: "No change. ~35-90ms per case, ~1.0s for the 12-case corpus. The added validation is a regex on one argument."
+  reliability:
+    status: CONCERNS
+    notes: "Improved but not closed. The CLI can no longer crash on a bad --timeout and the result shape is now uniform across all five paths (both re-verified). The residual is TASK80-005: the same crash is still reachable through the public function, which is the entry point the declared consumer uses. TASK80-006 is a build-time reliability issue rather than a runtime one, but it fails the consumer's first integration rather than this task's own tests."
+  maintainability:
+    status: PASS
+    notes: "The cycle-1 fixes improved it. probe-boundary-rule.md §6 now records the escape and --timeout rules with their reasons; the parity block's scope claim is narrowed to what it pins and backed by a new allow-list test; the COMMAND_RUNNERS assertion is correctly re-justified. The import direction flagged in TASK80-006 is the one maintainability regression, and it is captured there rather than double-counted here."
+
+recommendations:
+  immediate:
+    - action: "Validate timeoutMs inside runProbeSpec, not only in main()"
+      refs: ["shared/resources/security-probe.mjs:294"]
+    - action: "Remove the production→tests import, or make the bundler create nested parents"
+      refs: ["shared/resources/security-probe.mjs:46", "skills/create-skill/scripts/bundle_skill.py"]
+  future:
+    - action: "The exit-after-write guard is proximity-based (LOOKBACK_CHARS = 1200). A write and a distant exit in the same file are not detected. Not a task.80 defect and not in scope here, but worth a note where the guard is documented."
+      refs: ["shared/resources/tests/stdout-drain-on-exit.test.mjs:319"]
+    - action: "Link task.80 to a tracker issue — carried from the Step 2 review, consent-gated"
+      refs: ["docs/tasks/task.80.security-probe-engine/task.80.security-probe-engine.md"]
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: "2026-09-07"
+  total_iterations: 1
+  verification_method: "Independent re-execution of each fix plus a four-mutation spot check"
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - "TASK80-005 — the consumer calls the API, and the API can still crash on a bad timeout"
+    - "TASK80-006 — npm run bundle will fail on the first skill that references this module"

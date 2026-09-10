@@ -40,7 +40,7 @@ CATEGORIES = [
     ("Quality Assurance", [
         "qa-fix", "qa-gate", "qa-planning", "qa-story", "qa-task",
         "finalise", "validate-story", "review-story", "review-task",
-        "review-epic", "review-prd",
+        "review-epic", "review-prd", "review-security", "double-check",
     ]),
     ("Architecture & Design", [
         "architect", "create-architecture-doc", "execute-architect-checklist",
@@ -94,7 +94,7 @@ CATEGORIES = [
     ]),
     ("Skill Tooling", [
         "create-skill", "find-skills", "autoskill", "agent-md-refactor",
-        "execute-checklist", "generate-ui-prompt",
+        "execute-checklist", "generate-ui-prompt", "observe-work",
     ]),
     ("User Experience", [
         "ux-expert", "building-components", "browser-use", "markdown-wireframe",
@@ -175,7 +175,7 @@ def generate_catalog(skills_dir: Path, output_file: Path) -> None:
         "",
         "- **Orchestrators:** `develop-story`, `develop-task` — full lifecycle for a story or task",
         "- **Authoring:** `create-prd`, `create-epic`, `create-story`, `create-task`",
-        "- **Review:** `review-prd`, `review-epic`, `review-story`, `review-task`, `review-pr`",
+        "- **Review:** `review-prd`, `review-epic`, `review-story`, `review-task`, `review-pr`, `review-security`",
         "- **QA:** `qa-story`, `qa-task`, `qa-fix`, `qa-gate`",
         "- **Git / PR:** `create-branch`, `commit-changes`, `create-pr`",
         "- **Meta:** `create-skill`, `find-skills`, `document-existing-project`",

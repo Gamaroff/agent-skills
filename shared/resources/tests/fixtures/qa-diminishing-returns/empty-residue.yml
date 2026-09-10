@@ -1,0 +1,18 @@
+schema: 1
+task: "task.RECON.empty-residue"
+gate: PASS
+status_reason: "A clean gate. Condition 2 is vacuously true of no findings, so this fixture pins that the exit does NOT fire on an empty residue — a clean gate leaves through 5c on the ordinary path."
+reviewer: "QA Engineer"
+updated: "2026-09-09T11:30:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

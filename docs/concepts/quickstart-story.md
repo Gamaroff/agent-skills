@@ -128,7 +128,7 @@ Both prompts also offer an epic integration branch (`epic/{N}.footer-link`) as a
 
 > **What is lite mode?** A shorter pipeline mode that trades QA depth for speed on low-risk stories (single-file changes, docs edits, trivial refactors). It skips the parallel QA agents and the traceability matrix step, but **still runs every Step 7 side-effect** — PR comment, tracker update, board move, DoD post — so the audit trail is unchanged. See [`develop-pipeline-lite-mode.md`](../../shared/resources/develop-pipeline-lite-mode.md) for trigger conditions and exact behaviour. Pick `No` for anything with cross-file impact, security implications, or unclear acceptance criteria.
 
-The agent then chains: **create-branch → review-story → develop → create-pr → qa-story → qa-fix → finalise → commit**. Sit back — the chain completes automatically when the QA gate is PASS and DoD is done.
+The agent then chains: **create-branch → review-story → develop → create-pr → qa-story → qa-fix → review-pr → finalise → commit**. Sit back — the chain completes automatically. A PASS gate is not the end of the QA loop: it hands to `review-pr` (Step 5c), which checks the PR against the story and can send the run back into `qa-fix` before `finalise` runs.
 
 If QA loops more than once it is working as intended; a one-line README change should pass first try.
 

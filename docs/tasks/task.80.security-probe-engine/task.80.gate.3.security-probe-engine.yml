@@ -1,0 +1,57 @@
+schema: 1
+task: "task.80.security-probe-engine"
+task_title: "Make a security probe runnable without widening the snippet allow-list"
+gate: PASS
+status_reason: "Both cycle-2 findings verified fixed and mutation-proved, with both halves of each checked — the timeout fallback handles nine bad values without crashing AND a good value still bites, and the module move left no stale reference in code, docs links or bundled copies. No new findings. All seven §9 safety criteria hold."
+reviewer: "QA Engineer"
+updated: "2026-09-07T10:45:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 276
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "All seven §9 criteria hold, verified across three cycles. Cycle 2's fixes strengthened the axis further: timeout validation now sits at the API boundary rather than only the CLI, so a programmatic caller can no longer disable per-case containment with `timeoutMs: 0`. No interpreter on SAFE_COMMANDS; out-of-root rejected before import; inputs never reach a shell; unverifiable exits 1; declined distinct from executed-zero; escape forces non-zero exit."
+  performance:
+    status: PASS
+    notes: "Unchanged. ~35-90ms per case; a 1ms budget was confirmed to bite (executed 0, declined 1), which is also the evidence that the fallback does not swallow a legitimate value."
+  reliability:
+    status: PASS
+    notes: "Upgraded from CONCERNS. The two residuals that held it there are closed: the crash is no longer reachable through any entry point (nine bad programmatic values handled, verdict preserved), and the bundler no longer fails on a nested transitive dep. The result shape is uniform across all five paths and every early return carries `escapes` as an array."
+  maintainability:
+    status: PASS
+    notes: "Improved again. The inverted dependency is gone — `spawn-budget.mjs` sits in `shared/resources/` rather than under `tests/`, with all seven import sites updated and no shim, so there is one path to the module rather than two. The bundler defect the import exposed was fixed as a class and guarded by a regression test in a file that is actually in the `npm test` glob. Both non-obvious decisions of this cycle — the fallback-not-throw choice and the per-case `escapes` shape — are documented at the code with their reasons."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Link task.80 to a tracker issue. Carried from the Step 2 review across all three cycles; consent-gated, so the autonomous run never actioned it. Run /sync-github-task."
+      refs: ["docs/tasks/task.80.security-probe-engine/task.80.security-probe-engine.md"]
+    - action: "The exit-after-write guard is proximity-based (LOOKBACK_CHARS = 1200); a write and a distant exit in one file go undetected. Not a task.80 defect — noted for whoever next touches that guard."
+      refs: ["shared/resources/tests/stdout-drain-on-exit.test.mjs:319"]
+    - action: "`runProbeSpec` silently falls back to the budget on an unparseable `timeoutMs`. Deliberate and documented, but it means a caller computing a timeout from broken config gets a working probe rather than a loud failure. If that ever matters, surface the fallback in the result rather than changing the contract."
+      refs: ["shared/resources/security-probe.mjs"]
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: "2026-09-07"
+  total_iterations: 2
+  verification_method: "Independent re-execution of every finding across three cycles, plus a mutation spot check per cycle with faithful reversions"
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

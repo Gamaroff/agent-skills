@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.76.mutation-proof-limits'
+task_title: 'State what a mutation proof does not tell you'
+gate: PASS
+status_reason: 'TASK-76-001 verified fixed and closed. Cycle-2 refute pass over the whole branch diff found no false claim in the original change; the one candidate — the boundary paragraph closing on "nothing above asks you to keep one" — reads correctly on inspection and is deliberate. Links verified in the tracked tree, not the working tree.'
+reviewer: 'QA Engineer'
+updated: '2026-09-02T14:05:00Z'
+
+top_issues:
+  - id: 'TASK-76-001'
+    severity: medium
+    file: 'shared/resources/mutation-proving.md'
+    finding: 'Frontmatter `description` described a one-question document after the change made it a three-question one.'
+    suggested_action: 'Rewrite the description to name all three questions; re-bundle.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-02'
+    bug_ref: 'task.76.bug.1.stale-frontmatter-description.md'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 0
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from cycle 1. No executable surface; the one fenced bash block is still correctly refused by the fail-closed allow-list.'
+  performance:
+    status: PASS
+    notes: 'The fix added no lines — 1 insertion, 1 deletion. Document remains 194 lines, inside the ~195 budget.'
+  reliability:
+    status: PASS
+    notes: 'Re-verified after the fix: all three generated copies carry the new description and their AUTO-GENERATED banners are intact. Rollback remains a revert plus re-bundle.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-1 CONCERNS resolved. The description now reaches all three questions in 60 words, against a ~100-word cap, and keeps the original procedure sentence first so existing matches are preserved.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Consider allowing `cp` inside Step 4b''s temp working copy, so a documented block that copies a file before mutating it can actually be executed. Today the mutation-proving procedure''s own worked example is the one snippet the runnable-prose step cannot verify.'
+      refs: ['shared/resources/qa-runnable-prose-detection.md', 'shared/resources/mutation-proving.md']
+    - action: '`skills/develop/SKILL.md` points at this document with "the four shapes this takes" against a five-shape file. Pre-existing drift; out of scope for task 76 by its own §4. One-line follow-up.'
+      refs: ['skills/develop/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

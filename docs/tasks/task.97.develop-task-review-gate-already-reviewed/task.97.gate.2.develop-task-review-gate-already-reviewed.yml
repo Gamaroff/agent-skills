@@ -1,0 +1,118 @@
+schema: 1
+task: 'task.97.develop-task-review-gate-already-reviewed'
+task_title: '/develop-task Step 2 has no recovery path when review-task Step 9 does not promote'
+gate: FAIL
+status_reason: 'Cycle-2 refute pass found that two of cycle 1''s own fixes cancel each other out — comment-stripping ran inside fenced blocks and its output was re-tested as a fence delimiter, so a fenced example could close its own block and leak an illustrative date as the report''s. Still defeatable. Two further routes and a false prose claim that contradicted four table rows.'
+reviewer: 'QA Engineer (refute pass)'
+updated: '2026-09-08T00:10:00Z'
+
+top_issues:
+  - id: 'TASK97-011'
+    severity: high
+    file: 'shared/resources/review-report-freshness.js'
+    finding: 'Fix 1 and fix 3 cancel each other out. `blankNonProse` stripped HTML comments from every line — including lines inside an open fence — and the stripped remainder was then re-tested as a fence delimiter. A line reading `<!-- template -->` followed by a backtick run became a bare closer, ended the block, and released the fenced example as live prose. Defeats the run-length fix as thoroughly as the run-length fix defeats a bare character comparison, and it fails toward `fresh`. Verified: a report whose real date is 2020-01-01 classified `fresh` with `reportDate: 2030-12-31` read out of a `markdown` code fence.'
+    suggested_action: 'Resolve fences from the RAW line before any comment handling, and never run comment handling inside a fence — which is also what the format says, since no markdown processor parses HTML comments inside a fenced block.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+  - id: 'TASK97-012'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-2-review.md'
+    finding: 'The new sentence "Only `fresh` skips. `stale` and `absent` both run the review" is false of four of the six skip rows, and false in the unsafe direction. The `Ready for Development` and `In Progress` rows in BOTH tables still skip on a report''s mere presence with no freshness computation. The sentence sits between the two tables, unqualified, so it reads as governing all of them — a direct contradiction 26 lines apart in a document a reader executes, with the table being the side that authorises the skip.'
+    suggested_action: 'Scope the sentence to the `Planned` row and state why the two promoted statuses are exempt (reaching either required passing this gate, so the status is itself an assertion that a review completed).'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+  - id: 'TASK97-013'
+    severity: medium
+    file: 'shared/resources/review-report-freshness.js'
+    finding: 'The frontmatter discriminator rejected legal YAML beyond the two shapes already fixed: a dotted key (`jira.key:`) and a quoted key (`"updated":`) each voided the whole block, returning no date. Safe direction, but it kills the escape hatch this change set exists to add — the "permanently unstartable card" in another guise.'
+    suggested_action: 'Widen the key pattern to permit quoted and dotted keys, and normalise a quoted key to its bare name.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+  - id: 'TASK97-014'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-2-review.md'
+    finding: 'The documented `require()` path offered `{develop-story|develop-task|develop-bug}`, but the engine is bundled into two skills only — `skills/develop-bug/references/review-report-freshness.js` does not exist, so a develop-bug run following that line gets MODULE_NOT_FOUND. develop-bug also keeps its own step-2 document, which this change set never touched, so it still has the presence-only gate.'
+    suggested_action: 'Narrow the placeholder to the two skills that bundle the engine, and say so explicitly.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+  - id: 'TASK97-015'
+    severity: medium
+    file: 'shared/resources/tests/review-report-freshness.test.mjs'
+    finding: 'Two of the 44 tests passed with the behaviour they name reverted. "a CRLF review report still yields its reviewed date" passes with `splitLines` reverted, because the matcher carries `m` and stops at the captured date. "`__proto__` in frontmatter does not reach the prototype" passes with `Object.create(null)` reverted, because assigning a string through the prototype setter is a silent no-op.'
+    suggested_action: 'Add the load-bearing sibling for each: a CRLF *fenced* example (which only survives if lines are split on \r\n), and a genuine prototype-inheritance probe.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+  - id: 'TASK97-016'
+    severity: medium
+    file: 'evals/develop-task/step-isolation/02-review-task/scenario.json'
+    finding: 'Cycle 1 rewrote the description to claim the scenario covers the new behaviour while every assertion remained on input fixtures the pipeline never writes. Strengthening the claim without strengthening the assertion is worse than leaving it — it converts a visibly weak test into an invisibly weak one.'
+    suggested_action: 'Since replay executes no skill and no available assertion can distinguish a skip from a run, make the description state that limitation explicitly and name where the real net is.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+  - id: 'TASK97-017'
+    severity: low
+    file: 'shared/resources/review-report-freshness.js'
+    finding: 'The year field was never range-checked, so `0000-01-01` parsed. As a task date it orders below every real date, making any report `fresh`.'
+    suggested_action: 'Bound the year at >= 1000.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+  - id: 'TASK97-018'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-2-review.md'
+    finding: 'The snippet''s `process.argv[1]` is correct only under `node -e`, where there is no script path in argv. The surrounding prose calls the block "the engine" and gives its source path, inviting a reader to lift the body into a `.js` file — where `argv[1]` becomes the script path and it silently reads the wrong file.'
+    suggested_action: 'State that the indexing is `-e`-specific.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-08'
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 2781
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'Unchanged from cycle 1 and re-verified: zero `require` calls, no filesystem/network/process API.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. The fence-first restructure removes work rather than adding it — lines inside a fence now short-circuit before comment processing.'
+  reliability:
+    status: FAIL
+    notes: 'At the time of review the module was still defeatable: a fenced example containing an HTML comment yielded `fresh` for a report six years older than the task. Two independent secondary routes (year 0 as a task date; dotted/quoted keys voiding the block). All closed in the fix round below, but the gate records the state at review.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two tests were vacuous. One code path (`inComment` reset on fence open) was unreachable under the new ordering and has been deleted. The two prototype guards are redundant with each other — neither is individually mutation-provable, though the pair holds the behaviour.'
+
+recommendations:
+  immediate:
+    - action: 'Resolve fences before comments and never parse comments inside a fence (TASK97-011).'
+      refs: ['shared/resources/review-report-freshness.js']
+    - action: 'Scope the "Only `fresh` skips" claim to the row it governs (TASK97-012).'
+      refs: ['shared/resources/develop-pipeline-step-2-review.md']
+  future:
+    - action: 'Consider a CI check that each bundled `references/*.js` matches its `shared/resources/` source, the drift class this file''s own header worries about.'
+      refs: ['.github/workflows/validate.yml']
+    - action: 'develop-bug still has the presence-only Step 2 gate in its own step-2 document. Porting the freshness rule there is a separate card.'
+      refs: ['skills/develop-bug/references/develop-bug-step-2-review.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK97-011 fixed and mutation-proved — the module must not be defeatable'
+    - 'TASK97-012 fixed — the prose must not contradict the tables it sits between'

@@ -131,17 +131,31 @@ After the DoD file is written, post its **full content** as a PR comment so revi
 ```bash
 DOD_FILE=$(ls {story-or-task-directory}/{story-or-task-prefix}.dod.*.md 2>/dev/null | sort | tail -1)
 DOD_BODY=$(cat "$DOD_FILE")
+
+# The plain-language lead, obtained ONCE, above the arm split. Anyone following
+# the link from the tracker comment lands here, on a five-row table of AC / PR
+# Review / Security / Compliance / Documentation — the exact experience the lead
+# exists to spare them. `done` is the same stage the tracker comment uses; there
+# is one vocabulary, not a second one for pull requests.
+LEAD=$(node references/stakeholder-summary-cli.js --stage done) || exit 1
+PR_COMMENT_BODY=$(printf '## ✅ Definition of Done\n\n%s\n\n---\n\n%s' "$LEAD" "$DOD_BODY")
+
 # Wrap in tracker_call_with_retry for transient GitHub/API failures (3× exponential backoff).
 # Source the helper from references/resolve-platform.sh first.
-tracker_call_with_retry gh pr comment {PR_NUMBER} --body "$(cat <<EOF
-## ✅ Definition of Done
-
-$DOD_BODY
-EOF
-)"
+tracker_call_with_retry gh pr comment {PR_NUMBER} --body "$PR_COMMENT_BODY"
 ```
 
-For Bitbucket, attach the DoD body to the PR via the equivalent Bitbucket PR-comment API. This is a **PR** comment, which is a VCS concern — `tracker-comment.js` covers issue comments only, and the DoD also reaches the Jira issue through the tracker comment below.
+For Bitbucket, attach `$PR_COMMENT_BODY` to the PR via the equivalent Bitbucket PR-comment API. This is a **PR** comment, which is a VCS concern — `tracker-comment.js` covers issue comments only, and the DoD also reaches the Jira issue through the tracker comment below.
+
+> **One insertion point, above the arm split — and that is the design constraint, not a style note.**
+> Eleven sites × two arms is twenty-two places a lead could be added, and the arms are separately
+> maintained prose. Building `$PR_COMMENT_BODY` once and handing the same bytes to both arms makes the
+> arms structurally unable to drift; reviewing for that is easier than reviewing twenty-two additions
+> for equality. The `|| exit 1` is required: `stakeholder-summary-cli.js` exits 2 on an unknown stage,
+> and an unguarded `$(…)` would leave `LEAD` empty and post a comment opening with a bare horizontal
+> rule — which reads as a formatting slip rather than as a missing paragraph.
+
+> Engine source: `references/stakeholder-summary-cli.js` (bundled into each skill as `references/stakeholder-summary-cli.js`). Standard: `references/stakeholder-summary.md`.
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
@@ -154,7 +168,7 @@ This step runs in **both lite and standard modes**. Lite mode skips QA agents (S
 
 ## Tracker Issue Update
 
-> **Note — Document-link re-point (owned by `/finalise`).** As part of acceptance, the `/finalise` skill re-points the tracker issue's `## Document` link to the durable branch (`$DURABLE_BRANCH`) **before** closing/transitioning the issue, so the link survives the feature branch being deleted after merge (GitHub: surgical body rewrite; Jira: re-sync with `--doc-branch`). The close/comment/board-move actions below are the orchestrator-visible effects layered on top — they do not replace the re-point. (`review-story` performs the same re-point on sync; see `finalise/SKILL.md`.)
+> **Note — Document-link re-point (owned by `/finalise`).** As part of acceptance, the `/finalise` skill re-points the tracker issue's `## Document` link to the durable branch (`$DURABLE_BRANCH`) **before** closing/transitioning the issue, so the link survives the feature branch being deleted after merge (GitHub: surgical body rewrite; Jira: re-sync with `--doc-branch --no-transition`, the flag making the re-sync link-only so it cannot overrule the status the ladder already set — bug.11). The close/comment/board-move actions below are the orchestrator-visible effects layered on top — they do not replace the re-point. (`review-story` performs the same re-point on sync; see `finalise/SKILL.md`.)
 
 Branch on `TRACKER`:
 
@@ -162,27 +176,86 @@ Branch on `TRACKER`:
 
 If `TRACKER_ISSUE` is set, explicitly close the issue and move the project board to Done:
 
-All `gh issue comment`/`gh issue close` calls below MUST be wrapped in `tracker_call_with_retry` (3× exponential backoff — see `references/resolve-platform.sh`). Source the helper at the top of the step.
+**Comment first, close second — and the comment goes through `tracker-comment.js`, never `gh`.**
+
+Both actions used to be bare `gh` calls, and the close carried its own `--comment`. Three things were
+wrong with that. The comment carried no idempotency marker, so a resumed run posted it again. It was
+`gh`-only, so a Jira consumer silently got nothing from it. And after task.104 it would have been one
+of the last tracker comments in the pipeline with no plain-language lead — worse than the uniform
+state it started from.
+
+**Ordering is a rule, not an accident.** A failed close leaves an open issue that carries its own
+explanation; a failed comment after a close leaves a closed issue with none. The recoverable failure
+is the first one, so the comment goes first and its `reason` is read before the close runs.
+
+**One comment, not two.** The completion note and the closing note were near-duplicate texts, and both
+would carry `--stage done` — the second of which returns `already` and never posts. They are merged
+into a single `done` comment carrying the PR, the status, the DoD verdict and the report path. The
+close then carries no `--comment` at all: a `--comment` on the close is an *unmarked* second comment
+the marker cannot see, so it recurs on every resume. This is the same shape as `skills/finalise/SKILL.md`,
+which is the worked example.
+
+> **What this trades away: the 3× exponential backoff.** These calls used to be wrapped in
+> `tracker_call_with_retry`, and the engine does **not** replace it — `tracker-comment.js` owns the
+> `ACCESS_TRACKER` deferral gate (via `defer-mutation.js`) but contains no retry of any kind. Wrapping
+> the engine call would double-defer, so the retry is genuinely given up rather than relocated.
+> **After this conversion nothing owns the retry**, and the graceful-continue below is what stands in
+> its place — matching `review-task` SKILL.md, the reference implementation for a converted site.
+> `tracker-issue.js` keeps its own wrapper, because it is still a `gh` mutation.
 
 #### develop-story
 
 ```bash
-# 1. Post completion comment
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Story development complete — PR: {PR_URL}. Story status: accepted. All DoD criteria verified."
+# 1. Post the completion comment — marked, idempotent, and rendered with a lead
+#    on both trackers. Always --body-file: the body carries backticks and newlines.
+#
+#    The heredoc terminator sits at COLUMN 0. Bash does not accept an indented
+#    terminator for an unquoted heredoc — it swallows everything after it into
+#    the body, so the close below would never run and the issue would be neither
+#    commented nor closed, silently.
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<EOF
+Story development complete. PR: {PR_URL}. Story status: accepted. All DoD criteria verified.
+Implementation report: {report-path}
+EOF
 
-# 2. Close the issue
-tracker_call_with_retry gh issue close {TRACKER_ISSUE} --comment "Closing — story accepted. PR: {PR_URL} (pending merge). Implementation report: {report-path}"
+node .agents/skills/develop-story/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage done \
+  --slot pr="{PR_URL}" \
+  --json \
+  || echo "⚠️  Tracker issue comment failed — continuing"
+
+# 2. Close the issue — no --comment; step 1 owns the comment.
+#    Read step 1's `reason` first: on `unverifiable`, do not post again, and do
+#    not close — an unreadable comment list means the state is unknown.
+tracker_call_with_retry node .agents/skills/develop-story/references/tracker-issue.js \
+  --kind close --issue {TRACKER_ISSUE} --reason completed --json
 ```
 
 #### develop-task
 
 ```bash
-# 1. Post completion comment
-tracker_call_with_retry gh issue comment {TRACKER_ISSUE} --body "Task development complete — PR: {PR_URL}. Task status: accepted. All DoD criteria verified."
+mkdir -p .claude/state
+cat > .claude/state/comment-body.md <<EOF
+Task development complete. PR: {PR_URL}. Task status: accepted. All DoD criteria verified.
+Implementation report: {report-path}
+EOF
 
-# 2. Close the issue
-tracker_call_with_retry gh issue close {TRACKER_ISSUE} --comment "Closing — task accepted. PR: {PR_URL} (pending merge). Implementation report: {report-path}"
+node .agents/skills/develop-task/references/tracker-comment.js \
+  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
+  --stage done \
+  --slot pr="{PR_URL}" \
+  --json \
+  || echo "⚠️  Tracker issue comment failed — continuing"
+
+tracker_call_with_retry node .agents/skills/develop-task/references/tracker-issue.js \
+  --kind close --issue {TRACKER_ISSUE} --reason completed --json
 ```
+
+Engine sources: `references/tracker-comment.js` and `references/tracker-issue.js` (each bundled into every skill as `references/<name>`). Contracts: `references/tracker-comment-contract.md` and `references/tracker-issue-cli.md`.
+
+Read each `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and **never** posted over, and `no-credentials` is the one case that may fall back to MCP.
 
 #### Shared (both orchestrators)
 
@@ -192,7 +265,7 @@ After closing, verify the issue is actually closed using the tracker state polle
 - Any other state → log "⚠️ GitHub Issue #{TRACKER_ISSUE} still {state}" — `tracker_call_with_retry` already retried 3× during close; if still not CLOSED, post PR comment warning
 - `result.errors | length > 0` → log each error in Issues Log; proceed (non-blocking)
 
-On any `gh issue close` failure: `tracker_call_with_retry` retries 3× (1s, 2s, 4s) automatically. If all retries fail, log the error in the Decisions Log and Issues Log and post a PR comment: "⚠️ Issue #{TRACKER_ISSUE} could not be closed automatically — please close manually."
+On any close failure: the `tracker_call_with_retry` wrapper around `tracker-issue.js --kind close` retries 3× (1s, 2s, 4s) automatically. If all retries fail, log the error in the Decisions Log and Issues Log and post a PR comment: "⚠️ Issue #{TRACKER_ISSUE} could not be closed automatically — please close manually."
 
 Log in Decisions Log: "Post-close state check (poller): issue #{TRACKER_ISSUE} state = {state}. errors = {error_count}."
 Log in Decisions Log: "GitHub Issue #{TRACKER_ISSUE} — close: {CLOSED ✅ / OPEN ⚠️ (manual action required)}."
@@ -241,7 +314,9 @@ EOF
 
    node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
      --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-     --stage done --json
+     --stage done \
+     --slot pr="{PR_URL}" \
+     --json
    ```
 
    Story variant shown; substitute "Task" for develop-task. If `DOD_PATH` is empty (finalise was not run via develop-story — rare), omit the DoD Summary line.
@@ -391,7 +466,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] Full DoD body posted as PR comment (verify URL captured in Decisions Log)
 - [ ] Tracker issue `## Document` link re-pointed to the durable branch by `/finalise` (before close/transition)
 - [ ] Tracker issue commented via `tracker-comment.js` (`reason` was `posted`, `already` or `deferred`)
-- [ ] Tracker issue closed (GitHub `gh issue close` confirmed CLOSED) — N/A for Jira (handled by transition)
+- [ ] Tracker issue closed (GitHub: `tracker-issue.js --kind close` confirmed CLOSED) — N/A for Jira (handled by transition)
 - [ ] Project board / Jira board moved to Done (verify via tracker state poller — `result.issue.state` or `result.issue.column`; see `references/tracker-state-poller-subagent.md`)
 - [ ] All five Decisions Log lines written: "DoD summary", "DoD body posted to PR", "issue close" (GitHub), "board transition", and the success log entry ("Story accepted" / "Task completed")
 - [ ] **Accept gap**: journal checked; if non-empty — the mode's handover artifacts committed (`full` commits none, by selection — its summary-only path satisfies this item), `## Tracker Actions Required` populated, `**Tracker debt:**` line written in the Completion block, PR comment posted. If empty — `**Tracker debt**: none` written. `status: accepted` was written **either way** — the debt record and the local acceptance are both-or-red, never one without the other

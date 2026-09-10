@@ -1,7 +1,7 @@
 "use strict";
 /**
- * Shared library for Jira sync skills (sync-jira-task at present;
- * sync-jira-epic / sync-jira-story can adopt next).
+ * Shared library for the Jira sync skills — sync-jira-task, sync-jira-epic,
+ * sync-jira-story and sync-jira-bug all use it.
  *
  * Pure functions where possible. I/O paths accept an injected `fetch`
  * for testing. No top-level side effects beyond `loadDotEnv()` if called.
@@ -591,7 +591,7 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * @param {string}  o.issueKey        e.g. "PROJ-42"
  * @param {object}  [o.statusOutcome] result of `syncDocumentStatus`
  * @param {string}  o.author          the calling skill, e.g. "sync-jira-task"
- * @param {string}  o.docNoun         "story" | "task" | "epic" — for the prose
+ * @param {string}  o.docNoun         "story" | "task" | "epic" | "bug" — for the prose
  * @param {string}  [o.date]          ISO date; defaults to today
  * @returns {Array<{date, description, author}>} zero, one or two entries
  */
@@ -1437,6 +1437,137 @@ function summaryBlockNodes(opts = {}) {
   return nodes;
 }
 
+// ---------------------------------------------------------------------------
+// Card section specs — the ONE definition (task.102)
+// ---------------------------------------------------------------------------
+// These four lists say what a *document* must contain for its tracker card to be
+// usable. They live here, beside `buildCardSections` and `checkCardSections`,
+// because that is the only place all of their consumers can reach: the four
+// `sync-jira-*` scripts re-export them, and the `create-*` authoring skills run
+// the preflight against them without having a Jira sync skill installed at all.
+//
+// They were previously defined one apiece inside the four `sync-jira-*` scripts.
+// Duplicating them into the authoring skills instead of moving them would have
+// been the enumeration trap in docs/reference/anti-patterns.md: two definitions
+// of "what sections a card needs" drift silently, with the authoring check
+// passing a document the sync then publishes thin — the exact failure the
+// authoring check exists to prevent, one layer earlier.
+//
+// Sibling files are named WITHOUT their `shared/resources/` prefix on purpose.
+// The bundler's shared-reference matcher scans for that literal path anywhere in
+// a file — comments included — and treats every hit as a dependency to copy. This
+// module is bundled into twenty-odd skills, so one path written in a comment here
+// pulls that file into all of them: restoring the prefix on the four lines below
+// added ~16k lines of generated `references/` across 20 skills that do not use
+// them. Refer to siblings by bare filename.
+//
+// The names keep the `*_CARD_SECTIONS` form and the module keeps its Jira name,
+// but the requirement is TRACKER-AGNOSTIC: the corpus preflight in
+// the corpus preflight in tests/jira-sync-card-summary.test.mjs applies them to
+// every document in a repository that syncs to GitHub. Nothing here may be made
+// to depend on a Jira client, a Jira credential, or a Jira-only skill being
+// installed.
+
+// What the CARD carries — a summary, not a copy. The task file is the source of
+// truth and every card links to it; see tracker-card-summary.md.
+//
+// This list used to name ELEVEN sections — Overview, Motivation, Technical
+// Background, Scope, Breaking Changes, Implementation Plan, Files Summary,
+// Testing Strategy, Success Criteria, Risk Assessment, Rollback Plan — i.e. the
+// whole task document, republished onto the card verbatim on every sync.
+//
+// `Breaking Changes` survives the cut because it is the one piece of detail a
+// board reader must not have to open a file to discover. It is capped harder
+// than the rest and omitted entirely when the section is absent, which is the
+// common case.
+const TASK_CARD_SECTIONS = [
+  { heading: "Summary", names: ["Overview"] },
+  { heading: "Success Criteria", names: ["Success Criteria"] },
+  {
+    heading: "Breaking Changes",
+    names: ["Breaking Changes"],
+    maxItems: 3,
+    maxSentences: 2,
+    optional: true,
+  },
+];
+
+// What the CARD carries — a summary, not a copy. The story file is the source
+// of truth and every card links to it; see tracker-card-summary.md.
+//
+// `names` is an ALIAS ARRAY — three spellings of the story statement are in
+// active use and none is wrong. Measured across 426 story documents 2026-07-31:
+// `## Story` 234, `## Story Statement` 161, `## User Story` 7. The list once
+// named only `User Story`, so ~98% of stories published their acceptance
+// criteria and nothing else, silently.
+//
+// `Description` is the LAST alias, not its own section: a story that has a story
+// statement never shows it, and one that has only a Description still gets a
+// non-empty card instead of a heading with nothing under it.
+const STORY_CARD_SECTIONS = [
+  {
+    heading: "Summary",
+    names: ["User Story", "Story", "Story Statement", "Description"],
+  },
+  { heading: "Acceptance Criteria", names: ["Acceptance Criteria"] },
+];
+
+// What the CARD carries — a summary, not a copy. The epic file is the source of
+// truth and every card links to it; see tracker-card-summary.md.
+//
+// `Epic Description` is the LAST alias, not its own section: an epic with a goal
+// never shows it, and one that has only a description still gets a non-empty card.
+const EPIC_CARD_SECTIONS = [
+  {
+    heading: "Summary",
+    names: ["Epic Goal", "Epic Description"],
+    // Flatten any inline `**Label:**` heading (e.g. `**Existing System Context:**`)
+    // to plain `Label:`. ADF can't render mid-paragraph bold headings well, so
+    // this preserves the label as a leading text run that ADF renders cleanly.
+    transform: (t) => t.replace(/\*\*([^*\n]+):\*\*/g, "$1:"),
+  },
+];
+
+// What the CARD carries — a summary, not a copy. The bug file is the source of
+// truth and every card links to it; see tracker-card-summary.md.
+//
+// `Impact` uses an alias array because the section's heading is MODE-DEPENDENT:
+// create-bug-report emits `## Acceptance Criteria Violation` for a story bug,
+// `## Success Criteria Violation` for a task bug and `## Scope & Impact` for a
+// general one. One spec with three names handles all three, which is what keeps
+// mode out of the card builder.
+//
+// `## Evidence` is deliberately absent. Screenshots, log dumps and stack traces
+// are the largest section of a bug report and the fastest to go stale; the card
+// is a pointer, and this is exactly the material the pointer exists to avoid
+// copying.
+const BUG_CARD_SECTIONS = [
+  { heading: "Summary", names: ["Bug Description"], maxSentences: 4 },
+  { heading: "Reproduction", names: ["Reproduction Steps"], maxItems: 5 },
+  {
+    heading: "Impact",
+    names: [
+      "Scope & Impact",
+      "Scope and Impact",
+      "Acceptance Criteria Violation",
+      "Success Criteria Violation",
+    ],
+    maxItems: 5,
+    maxSentences: 3,
+    optional: true,
+  },
+];
+
+// The four specs by document kind. `create-*` and any other authoring-time
+// caller looks the spec up by kind rather than importing a name, so adding a
+// document kind is one entry here rather than a new import at every call site.
+const CARD_SECTIONS_BY_KIND = {
+  task: TASK_CARD_SECTIONS,
+  story: STORY_CARD_SECTIONS,
+  epic: EPIC_CARD_SECTIONS,
+  bug: BUG_CARD_SECTIONS,
+};
+
 /**
  * Build the card body for a set of section specs.
  *
@@ -2088,6 +2219,88 @@ function diffFields({
   return changed;
 }
 
+/**
+ * Diff the payload that is ACTUALLY being sent against what Jira holds.
+ *
+ * This exists because all four `sync-jira-*` scripts got the same thing wrong
+ * in the same place: they rebuilt `labels` from frontmatter to feed the diff,
+ * while the payload they sent had the `synced-from-*` idempotency label
+ * appended by `collectIssueFields`. The two sets could never match, so `labels`
+ * was reported changed on every run — a PUT every time on the scripts that gate
+ * on the diff, and a permanently wrong change summary on the ones that do not.
+ *
+ * The rule this encodes is the one the duplication kept losing: **diff the
+ * outgoing payload, never a separately-rebuilt field set.** Callers must
+ * therefore build `fields` FIRST and pass it here, not reconstruct its inputs.
+ *
+ * Deliberately takes the already-built `fields` rather than building it. The
+ * four builders genuinely differ — different parameter lists, and story derives
+ * `includeDescription` from this function's own result — so a helper that also
+ * built the payload would need discriminating parameters for each. Taking
+ * `fields` is the cut that leaves no parameter behind.
+ *
+ * @param {object}      args
+ * @param {object|null} args.current       what Jira holds. Null when creating,
+ *   and also on a `--dry-run` update — every caller fetches `current` only
+ *   under `if (!args.dryRun)`, so the dry-run update is the null state a reader
+ *   is most likely to hit.
+ * @param {object}      args.fields        the payload about to be sent
+ * @param {object}      args.frontmatter   for the stored hashes
+ * @param {string}      args.newBodyHash
+ * @param {string}      args.newMetaHash
+ * @returns {string[]}  changed field names
+ */
+/**
+ * Normalise a value the payload treats as a list, for hashing.
+ *
+ * The payload maps `api`, `[api]` and `["web","api"]` onto the same
+ * `components` array, so a hash that distinguishes them fires a spurious
+ * `Updated: metadata` — and that PUT republishes the whole description — on a
+ * cosmetic frontmatter reorder. `diffFields` already sorts labels for the same
+ * reason.
+ *
+ * Elements are keyed with `String(x)` — the SAME coercion the payload builders
+ * apply (`comps.map((name) => ({ name: String(name) }))`). Mirroring matters
+ * more than cleverness here, and in one direction only: if the hash
+ * distinguishes values the payload collapses, the cost is a spurious PUT; if it
+ * collapses values the payload distinguishes, an edit is silently lost. An
+ * earlier revision trimmed the key while the payload did not, which is exactly
+ * the losing direction — a whitespace-only edit changed what was sent and left
+ * the hash still. The rule is: key it the way the payload keys it.
+ *
+ * Lives here rather than in each script because four scripts sharing one
+ * methodology is exactly what this task is about — a copy per script is the
+ * drift it was written to stop.
+ */
+function normaliseListForHash(v) {
+  if (v === undefined || v === null || v === "") return "";
+  return JSON.stringify(
+    (Array.isArray(v) ? v : [v]).filter(Boolean).map(String).sort(),
+  );
+}
+
+function diffAgainstPayload({
+  current,
+  fields,
+  frontmatter,
+  newBodyHash,
+  newMetaHash,
+}) {
+  if (!current) return ["summary", "description", "priority", "labels"];
+  return diffFields({
+    prev: current,
+    next: {
+      summary: fields.summary,
+      priority: fields.priority ? fields.priority.name : null,
+      labels: fields.labels,
+    },
+    prevBodyHash: frontmatter.jira_last_body_hash,
+    newBodyHash,
+    prevMetaHash: frontmatter.jira_last_meta_hash,
+    newMetaHash,
+  });
+}
+
 function guardConcurrentEdit({ jiraUpdated, lastSyncedAt, force, output }) {
   if (!lastSyncedAt || !jiraUpdated) return;
   if (new Date(jiraUpdated) <= new Date(lastSyncedAt)) return;
@@ -2190,6 +2403,230 @@ async function getIssueTypeId({
   throw new Error(
     `Could not resolve Jira '${typeName}' issue type ID. Verify it is enabled for project ${projectKey}.`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Issue links
+// ---------------------------------------------------------------------------
+// A bug card is a SIBLING of the work item it was found in, never a child of it.
+// Jira has no way to make a Bug a child of a Story without switching it to a
+// sub-task type, which differs per board and costs the bug its own backlog
+// placement, sprint membership and independent transitions. So the relationship
+// travels as an issue link, which every project type supports and which JQL and
+// the board's link panel can both see.
+//
+// Link type names are per-board configuration, exactly like status names, so they
+// are resolved by introspection against a candidate list rather than hardcoded.
+// A board with none of them is a real outcome, reported as `no-link-type`, and
+// the caller degrades to description links alone.
+const LINK_TYPE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const LINK_TYPE_CANDIDATES = Object.freeze([
+  "Relates",
+  "Relates To",
+  "Related",
+  "Problem/Incident",
+  "Blocks",
+]);
+
+function linkTypeCachePath(repoRoot) {
+  return path.join(repoRoot, ".cache", "jira-linktypes.json");
+}
+
+function readLinkTypeCache(repoRoot) {
+  const p = linkTypeCachePath(repoRoot);
+  if (!fs.existsSync(p)) return null;
+  try {
+    const data = JSON.parse(fs.readFileSync(p, "utf-8"));
+    if (!data.ts || Date.now() - data.ts > LINK_TYPE_TTL_MS) return null;
+    return data.types || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeLinkTypeCache(repoRoot, types) {
+  const p = linkTypeCachePath(repoRoot);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify({ ts: Date.now(), types }, null, 2));
+}
+
+/** Every link type the project offers: `[{id, name, inward, outward}]`. */
+async function getIssueLinkTypes({ http, baseUrl, email, token, repoRoot }) {
+  const cache = repoRoot ? readLinkTypeCache(repoRoot) : null;
+  if (cache) return cache;
+  try {
+    const resp = await http(`${baseUrl}/rest/api/3/issueLinkType`, {
+      headers: {
+        Authorization: authHeader(email, token),
+        Accept: "application/json",
+      },
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const types = (data.issueLinkTypes || []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      inward: t.inward,
+      outward: t.outward,
+    }));
+    if (repoRoot && types.length) writeLinkTypeCache(repoRoot, types);
+    return types;
+  } catch (_) {
+    return [];
+  }
+}
+
+/**
+ * Pick a usable link type. Pure, so it is unit-testable without a board —
+ * the same split `resolveTransition` uses, and for the same reason.
+ *
+ * First candidate present wins; matching is case-insensitive on the type NAME,
+ * not on its inward/outward phrases, because those vary independently
+ * ("relates to" / "is related to") while the name is what the API accepts.
+ */
+function resolveLinkType(available, candidates = LINK_TYPE_CANDIDATES) {
+  const list = Array.isArray(available) ? available : [];
+  for (const want of candidates) {
+    const hit = list.find(
+      (t) => t.name && t.name.toLowerCase() === String(want).toLowerCase(),
+    );
+    if (hit) return { match: hit, rule: `name="${want}"` };
+  }
+  return { match: null, reason: "no-link-type" };
+}
+
+/**
+ * Link two issues, idempotently.
+ *
+ * The existing-link check is not an optimisation — it is what makes a second
+ * sync a no-op. Jira's issueLink endpoint happily creates a DUPLICATE link of
+ * the same type between the same pair, so a sync that posted unconditionally
+ * would add one more identical row to the card's link panel on every run.
+ *
+ * Returns one of:
+ *   { linked: true,  type }                        — created
+ *   { linked: false, reason: "already" }           — a link of this type exists
+ *   { linked: false, reason: "no-link-type" }      — board offers none of them
+ *   { linked: false, reason: "deferred", record }  — access.tracker refused it
+ *   { linked: false, reason: "http-<status>" | <message> }
+ *
+ * Never throws: a bug card that exists but is unlinked is a degraded success,
+ * not a failed sync.
+ */
+async function linkIssues({
+  http,
+  baseUrl,
+  email,
+  token,
+  fromKey,
+  toKey,
+  repoRoot,
+  candidates = LINK_TYPE_CANDIDATES,
+  output,
+  skill = undefined,
+}) {
+  if (!fromKey || !toKey) return { linked: false, reason: "no-target" };
+  if (fromKey === toKey) return { linked: false, reason: "self" };
+
+  const types = await getIssueLinkTypes({
+    http,
+    baseUrl,
+    email,
+    token,
+    repoRoot,
+  });
+  const chosen = resolveLinkType(types, candidates);
+  if (!chosen.match) {
+    if (output)
+      output.warn(
+        `⚠️  No usable issue link type on this project (tried: ${candidates.join(", ")}) — the card keeps its description links only.`,
+      );
+    return { linked: false, reason: "no-link-type" };
+  }
+  const typeName = chosen.match.name;
+
+  // Already linked? Read the FROM issue's own link list rather than searching:
+  // one GET, and it is the authoritative view of what the panel will show.
+  try {
+    const resp = await http(
+      `${baseUrl}/rest/api/3/issue/${fromKey}?fields=issuelinks`,
+      {
+        headers: {
+          Authorization: authHeader(email, token),
+          Accept: "application/json",
+        },
+      },
+    );
+    if (resp.ok) {
+      const data = await resp.json();
+      const links = data.fields?.issuelinks || [];
+      const exists = links.some((l) => {
+        const other = l.outwardIssue?.key || l.inwardIssue?.key;
+        return (
+          other === toKey &&
+          l.type?.name &&
+          l.type.name.toLowerCase() === typeName.toLowerCase()
+        );
+      });
+      if (exists) {
+        if (output)
+          output.info(`   🔗 Already linked: ${fromKey} ${typeName} ${toKey}`);
+        return { linked: false, reason: "already", type: typeName };
+      }
+    }
+  } catch (_) {
+    // An unreadable link list is not a reason to refuse the write — at worst
+    // the POST below is a no-op that Jira itself rejects.
+  }
+
+  try {
+    const resp = await http(`${baseUrl}/rest/api/3/issueLink`, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader(email, token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        type: { name: typeName },
+        inwardIssue: { key: fromKey },
+        outwardIssue: { key: toKey },
+      }),
+      // Layer 2 — what the gate records if this run may not write.
+      defer: {
+        kind: "jira.issue.link",
+        intent: `Link ${fromKey} to ${toKey} as "${typeName}"`,
+        target: {
+          issue: fromKey,
+          url: `${baseUrl}/rest/api/3/issue/${fromKey}`,
+          ui_url: `${baseUrl}/browse/${fromKey}`,
+        },
+        desired: { link: `${typeName} ${toKey}` },
+        skill,
+      },
+    });
+    if (resp.deferred) {
+      if (output)
+        output.info(
+          `   ⏸️  Issue link deferred (${fromKey} → ${toKey}) — recorded as ${resp.deferredRecord}`,
+        );
+      return { linked: false, reason: "deferred", record: resp.deferredRecord };
+    }
+    if (resp.ok || resp.status === 201 || resp.status === 204) {
+      if (output) output.info(`   🔗 Linked: ${fromKey} ${typeName} ${toKey}`);
+      return { linked: true, type: typeName };
+    }
+    const msg = await parseJiraError(resp);
+    if (output)
+      output.warn(
+        `⚠️  Issue link failed (non-fatal): HTTP ${resp.status}: ${msg}`,
+      );
+    return { linked: false, reason: `http-${resp.status}`, message: msg };
+  } catch (e) {
+    if (output) output.warn(`⚠️  Issue link failed (non-fatal): ${e.message}`);
+    return { linked: false, reason: e.message };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2416,6 +2853,22 @@ const QA_CANDIDATES = Object.freeze([
   "QA",
   "In QA",
 ]);
+// Bug-lifecycle stages. The bug enum (new -> in-progress -> ready-for-qa ->
+// closed | reopened) is deliberately distinct from the document lifecycle that
+// stories, tasks and epics use, and four of its five words had no entry in
+// DEFAULT_STATUS_MAP at all — so they fell through mapStatusCandidates' verbatim
+// pass-through and were offered to the board as a single literal candidate.
+//
+// "Closed" leads CLOSED_CANDIDATES because that is what a bug workflow calls the
+// terminal column; DONE_CANDIDATES follows for boards that do not have one.
+const CLOSED_CANDIDATES = Object.freeze([
+  ...new Set(["Closed", ...DONE_CANDIDATES]),
+]);
+// A reopened bug goes back to the TOP of the board, not into progress: reopening
+// says the fix did not hold, not that anyone has picked it up again.
+const REOPENED_CANDIDATES = Object.freeze([
+  ...new Set(["Reopened", "Reopen", ...NEW_CANDIDATES]),
+]);
 const MERGE_CANDIDATES = Object.freeze([
   "Waiting for merge",
   "Ready to Merge",
@@ -2579,6 +3032,13 @@ const DEFAULT_STATUS_MAP = {
   "wont do": WONT_DO_CANDIDATES,
   "won't fix": WONT_DO_CANDIDATES,
   wontfix: WONT_DO_CANDIDATES,
+  // bug lifecycle — see docs/standards/bug-documents.md. `in-progress` is
+  // already mapped above and is shared with the document lifecycle.
+  new: NEW_CANDIDATES,
+  "ready-for-qa": QA_CANDIDATES,
+  "ready for qa": QA_CANDIDATES,
+  closed: CLOSED_CANDIDATES,
+  reopened: REOPENED_CANDIDATES,
 };
 
 // Local statuses meaning "this work is finished". Only these may fall back to
@@ -2586,6 +3046,10 @@ const DEFAULT_STATUS_MAP = {
 // for why the fallback is unsafe for every other stage.
 const TERMINAL_LOCAL_STATUSES = new Set([
   "accepted",
+  // A bug's terminal word. Without it, a closing bug could not use
+  // resolveTransition's statusCategory=done fallback on a board whose done
+  // column is named something none of the candidate lists guess.
+  "closed",
   "cancelled",
   "canceled",
   "done",
@@ -4154,7 +4618,7 @@ async function walkLadder({
 
 // Drive an issue's Jira status from a local document's frontmatter status.
 // Shared by all three sync skills so they resolve, configure, and report
-// identically. `docKind` ("story" | "task" | "epic") selects the optional
+// identically. `docKind` ("story" | "task" | "epic" | "bug") selects the optional
 // per-issue-type layer of jira.statusMap.
 async function syncDocumentStatus({
   http,
@@ -4170,7 +4634,35 @@ async function syncDocumentStatus({
   // Named on a deferred transition record, so a refused status move is
   // attributed to the calling skill rather than to this library.
   skill = undefined,
+  // Opt out of driving status at all, for a caller that wants only the other
+  // half of a sync (re-pointing the Document link, refreshing the description).
+  //
+  // This exists because `sync-jira-*` previously had no way to be status-neutral
+  // — `syncDocumentStatus` ran whenever frontmatter carried a `status:` — so
+  // finalise's Document-link re-point was unavoidably also a status decision,
+  // resolved by a SECOND resolver (`loadStatusMap`) after the ladder had already
+  // made the call. On a consumer mapping `accepted` to a non-terminal column,
+  // that second resolver walked the card back OUT of the status the ladder had
+  // just set, stranding its resolution (bug.11).
+  //
+  // The gate lives here rather than at the four call sites so it holds for every
+  // caller and can be asserted without a live Jira: with `noTransition`, not one
+  // HTTP request is issued.
+  noTransition = false,
 }) {
+  // NB the reason is `transition-suppressed`, NOT `no-transition`. That name is
+  // already taken, by the opposite condition: `no-transition` means the workflow
+  // offers no matching transition from here — a genuine skip that must still
+  // fail under --fail-on-status-skip. Reusing it would have made every real skip
+  // start exiting 0 the moment the suppressed case was added to the pass list.
+  if (noTransition)
+    return {
+      transitioned: false,
+      reason: "transition-suppressed",
+      issueKey,
+      localStatus,
+    };
+
   const root =
     repoRoot ||
     (() => {
@@ -4216,7 +4708,20 @@ function summariseStatusOutcome(
 ) {
   if (!outcome) return 0;
   const { transitioned, reason } = outcome;
-  if (transitioned || reason === "already" || reason === "no-target") return 0;
+  // `transition-suppressed` is the caller having ASKED for no status move, so it
+  // is a run behaving exactly as configured — never a skip to warn about, and
+  // never a reason to fail under --fail-on-status-skip. Omitting it here would
+  // make `--no-transition --fail-on-status-skip` fail every run that used both.
+  //
+  // `no-transition` is deliberately NOT in this list: it is the board offering
+  // no matching transition, which is a real skip and must keep failing.
+  if (
+    transitioned ||
+    reason === "already" ||
+    reason === "no-target" ||
+    reason === "transition-suppressed"
+  )
+    return 0;
 
   // CR-1 — a deferral is not a skip. The move was refused by policy and WRITTEN
   // DOWN, so there is a record to act on; treating it as a skip would both
@@ -4849,6 +5354,13 @@ async function addComment({
   token,
   issueKey,
   body,
+  // The one-line label a human reads in the handover checklist to tell one
+  // pending action from another. The caller passes it when `body` is not what
+  // should be labelled — tracker-comment.js composes a plain-language lead above
+  // the body, and the lead is near-identical for every comment of a given stage,
+  // so labelling with it stops the label labelling. Defaults to the old
+  // behaviour, so every other caller is unaffected.
+  desired = undefined,
   momentId = "",
   linkResolver = undefined,
 }) {
@@ -4875,7 +5387,7 @@ async function addComment({
           url: `${baseUrl}/rest/api/3/issue/${issueKey}/comment`,
           ui_url: `${baseUrl}/browse/${issueKey}`,
         },
-        desired: firstLineOf(body),
+        desired: desired || firstLineOf(body),
         manual: {
           deepLink: `${baseUrl}/browse/${issueKey}`,
           ui: "Open the issue → Comment → Paste → Save",
@@ -5050,6 +5562,12 @@ module.exports = {
   JIRA_TEXT_LIMIT,
   adfTextLength,
   capDescriptionAdf,
+  // card section specs — the one definition (task.102)
+  TASK_CARD_SECTIONS,
+  STORY_CARD_SECTIONS,
+  EPIC_CARD_SECTIONS,
+  BUG_CARD_SECTIONS,
+  CARD_SECTIONS_BY_KIND,
   // card summarisation
   CARD_MAX_LIST_ITEMS,
   CARD_MAX_SENTENCES,
@@ -5081,6 +5599,8 @@ module.exports = {
   describeAuthFail,
   // diff / guard / hash
   diffFields,
+  diffAgainstPayload,
+  normaliseListForHash,
   guardConcurrentEdit,
   hashStable,
   // comments
@@ -5099,6 +5619,11 @@ module.exports = {
   fetchUpdatedTimestampStrict,
   fetchUpdatedTimestamp,
   getIssueTypeId,
+  // issue links (the bug card's sibling relationship)
+  LINK_TYPE_CANDIDATES,
+  getIssueLinkTypes,
+  resolveLinkType,
+  linkIssues,
   getBoardType,
   moveToBacklog,
   putIssueAtomic,
@@ -5112,6 +5637,8 @@ module.exports = {
   CANONICAL_LOCAL_STATUSES,
   getTransitions,
   resolveTransition,
+  CLOSED_CANDIDATES,
+  REOPENED_CANDIDATES,
   buildTransitionFields,
   buildTransitionUpdate,
   buildWorkflowRecord,

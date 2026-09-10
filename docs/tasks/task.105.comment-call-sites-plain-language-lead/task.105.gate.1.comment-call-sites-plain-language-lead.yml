@@ -1,0 +1,56 @@
+schema: 1
+task: 'task.105.comment-call-sites-plain-language-lead'
+task_title: 'Every tracker-comment call site feeds the plain-language lead, and the seven that bypass the engine stop bypassing it'
+gate: CONCERNS
+status_reason: 'All success criteria met and verified by execution; 7 mutation proofs each turn exactly their own assertion red. CONCERNS on two honest counts: the seven converted sites knowingly give up the 3x backoff (Reliability), and the independent code-review subagent hung and was killed, so the diff review was performed in-line by the agent that wrote the code.'
+reviewer: 'QA Engineer'
+updated: '2026-09-10T13:05:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3132
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  call_sites_verified: 24
+  bypass_sites_converted: 7
+  mutation_proofs: 7
+  security_probes: 8
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    notes: '8 hostile slot values executed against tracker-comment.js with a fake gh on PATH, capturing what reached the transport. 0 of 8 exploitable. Marker injection through `verdict` is impossible because verdict is MAPPED through GATE_MEANING rather than interpolated. No shell-injection surface: the engine spawns gh with argv and passes the body via --body-file, so `$(rm -rf /)` in a text slot renders literally. An unknown verdict renders "the results are recorded below" rather than unearned reassurance. Recorded not-a-finding: text slots are unsanitised by design; safe today because every call site supplies pipeline-controlled values.'
+  performance:
+    status: PASS
+    notes: 'No runtime surface. Slots are argv on calls that already happen. The only added round-trips are the two closes that necessarily become two calls, as breaking change 5.2 documents.'
+  reliability:
+    status: CONCERNS
+    notes: 'The seven converted sites give up the 3x exponential backoff of tracker_call_with_retry. The trade is correct — the engine owns the ACCESS_TRACKER deferral gate, so re-wrapping would double-defer — and it matches review-task, the reference implementation. It is documented at every converted site, in breaking change 5.1 and in the implementation report, and failure degrades to a logged warning rather than a silent drop. But it is a knowingly-accepted reduction in resilience on a network call. A retry that does not also defer would close it; recorded as future work.'
+  maintainability:
+    status: PASS
+    notes: 'Reduces the ways a tracker comment can be posted from two to one, which the comment contract has claimed since task 55 and which was untrue until now. Guard B derives its expectations from stakeholder-summary.js rather than restating them, so "which slots does this stage read?" has exactly one answer in the repository.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Add a retry that does not also defer, so converted comment sites regain backoff without double-deferring under a restricted ACCESS_TRACKER'
+      refs: ['shared/resources/tracker-comment.js', 'shared/resources/resolve-platform.sh']
+    - action: 'Move the outcome-token mapping into stakeholder-summary.js beside GATE_MEANING, so review sites stop mapping it at each call site'
+      refs: ['shared/resources/stakeholder-summary.js']
+    - action: 'summariseSection publishes a 14-character Success Criteria card block on 15 of 106 task documents — the preflight reports ok because the block is non-empty. Needs a heading-only finding kind. Logged as observation #49; out of scope here.'
+      refs: ['shared/resources/jira-sync.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
