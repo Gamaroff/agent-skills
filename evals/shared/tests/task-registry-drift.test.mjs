@@ -28,7 +28,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -57,6 +57,19 @@ const { parseRegistry, parseFrontmatterStatus, DEFAULT_TASK_REGISTRY } =
  * asserts the instrument saw a plausible amount of input.
  */
 const MIN_ROWS = 90;
+
+/**
+ * The same floor for the document-driven direction below. `docs/tasks/` held 106
+ * task directories when this was written, and it only grows. It is a SEPARATE
+ * constant rather than a reuse of MIN_ROWS because the two walks fail
+ * independently: the registry table can stop parsing while the directory listing
+ * is fine, and vice versa. One shared constant would let a reader think one floor
+ * guards both.
+ */
+const MIN_DOCS = 90;
+
+/** Where task documents live, relative to the repo root. */
+const TASKS_DIR = "docs/tasks";
 
 const REGISTRY_REL = DEFAULT_TASK_REGISTRY;
 const REGISTRY_ABS = path.join(REPO_ROOT, REGISTRY_REL);
@@ -169,5 +182,84 @@ test("document `accepted` and registry row `accepted` agree in both directions",
       `${ahead.join("\n")}\n` +
       `The row claims work is finished that the document says is not. Either the task ` +
       `was reopened and the row was left behind, or the row was ticked early.`,
+  );
+});
+
+/**
+ * The direction the three tests above structurally cannot see.
+ *
+ * They all iterate registry ROWS, so a task document with no row at all is never
+ * visited — it is not a mismatch, it is an absence. That gap mattered because
+ * three shipped statements promised the opposite: `finalise`'s reason table tells
+ * a reader that a `no-row` result will be caught by "CI's drift check", its DoD
+ * line says the same, and `docs/standards/task-registry.md` claims a write that
+ * does not happen is "loud rather than silent". None of that was true of a
+ * row-driven check, and a backstop that is trusted for a case it does not cover
+ * is worse than no backstop.
+ *
+ * It was not hypothetical either. When this test was first run it found
+ * **task 97** — accepted, merged under PR #350, and entirely absent from the
+ * registry since creation. The row-driven walk had no way to notice.
+ *
+ * Keyed on the DIRECTORY name rather than on a glob of markdown files: a task
+ * directory accumulates review, QA, gate, bug, DoD, plan and implementation
+ * artifacts that all begin `task.{N}.`, and the primary document is the one whose
+ * basename matches its directory. That convention holds for all 106 directories
+ * and is checked here rather than assumed.
+ */
+test("every task document has a registry row", () => {
+  const { rows } = loadRows();
+  const byId = new Map(rows.map((r) => [r.n, r]));
+
+  const tasksAbs = path.join(REPO_ROOT, TASKS_DIR);
+  assert.ok(existsSync(tasksAbs), `${TASKS_DIR} does not exist`);
+
+  const orphans = [];
+  const noPrimary = [];
+  let examined = 0;
+
+  for (const entry of readdirSync(tasksAbs, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const m = entry.name.match(/^task\.(\d+)\./);
+    if (!m) continue; // not a task directory
+    examined++;
+
+    const primary = path.join(tasksAbs, entry.name, `${entry.name}.md`);
+    if (!existsSync(primary)) {
+      noPrimary.push(
+        `  ${TASKS_DIR}/${entry.name} — expected ${entry.name}.md`,
+      );
+      continue;
+    }
+    const n = Number(m[1]);
+    if (byId.has(n)) continue;
+
+    const status = parseFrontmatterStatus(readFileSync(primary, "utf8"));
+    orphans.push(
+      `  task ${n} — \`${status ?? "(no status)"}\` at ${TASKS_DIR}/${entry.name}/${entry.name}.md`,
+    );
+  }
+
+  assert.ok(
+    examined >= MIN_DOCS,
+    `examined only ${examined} task directories under ${TASKS_DIR}, expected at least ` +
+      `${MIN_DOCS}. The directory walk matched almost nothing, so the absence check below ` +
+      `proves nothing. Do NOT lower MIN_DOCS to make this pass.`,
+  );
+
+  assert.deepEqual(
+    noPrimary,
+    [],
+    `${noPrimary.length} task director(ies) have no primary document:\n${noPrimary.join("\n")}\n` +
+      `The convention is that the primary document's basename matches its directory. A directory ` +
+      `that breaks it cannot be checked against the registry at all.`,
+  );
+
+  assert.deepEqual(
+    orphans,
+    [],
+    `${orphans.length} task document(s) have no row in ${REGISTRY_REL}:\n${orphans.join("\n")}\n` +
+      `Add the row. A task absent from the registry is invisible to every reader of it and to ` +
+      `\`registry-tick.js\`, which reports \`no-row\` and — by design — does not block acceptance.`,
   );
 });

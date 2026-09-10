@@ -147,12 +147,19 @@ async function main() {
   const docText = fs.readFileSync(opts.file, "utf8");
   const docType = (frontmatterField(docText, "type") || "").toLowerCase();
 
-  // The story-run guard. Two independent signals must both say "task": the
-  // filename's `task.{N}.` stem, which is what carries the id the row is keyed
-  // on, and OKF's `type`. A story, epic or bug run reaching this call is a
-  // no-op, not an error — `finalise` is shared across document kinds and calls
-  // this unconditionally, which is precisely why the refusal lives here rather
-  // than in a prose condition the caller has to remember.
+  // The story-run guard, and the asymmetry between its two signals is deliberate.
+  //
+  // The filename's `task.{N}.` stem is REQUIRED — it carries the id the registry
+  // row is keyed on, so without it there is nothing to look up. OKF's `type` may
+  // only CONTRADICT that stem, never be missing: a document predating the `type`
+  // field is still a task, and refusing to tick it would punish the oldest
+  // documents in the corpus for a convention added after they were written. So
+  // an absent `type` passes and a `type: story` does not.
+  //
+  // A story, epic or bug run reaching this call is a no-op, not an error —
+  // `finalise` is shared across document kinds and calls this unconditionally,
+  // which is precisely why the refusal lives here rather than in a prose
+  // condition the caller has to remember.
   if (!idMatch || (docType && docType !== "task")) {
     return emit(opts, {
       reason: "not-a-task",
@@ -230,10 +237,15 @@ async function main() {
   // more than one cell carries that value the column is genuinely ambiguous —
   // refuse rather than guess, because guessing here corrupts the registry, and a
   // wrong row is worse than a stale one.
+  // Preserve the file's own line endings. `split(/\r?\n/).join("\n")` silently
+  // rewrites a CRLF registry as LF — every line changes, which is the same
+  // whole-file diff the width preservation below exists to avoid, in the other
+  // dimension. Found by probing the rewrite path rather than by reading it.
+  const eol = registryText.includes("\r\n") ? "\r\n" : "\n";
   const lines = registryText.split(/\r?\n/);
   const idx = row.line - 1;
   const original = lines[idx];
-  const cells = original.replace(/^(\s*)\|/, "$1|").split("|");
+  const cells = original.split("|");
   const hits = [];
   for (let i = 0; i < cells.length; i++) {
     if (cells[i].trim().toLowerCase() === row.registryStatus) hits.push(i);
@@ -251,15 +263,28 @@ async function main() {
     });
   }
 
-  // Preserve the cell's existing padding so a column-aligned table stays aligned.
+  // Preserve the cell's total WIDTH, not merely its padding, so a column-aligned
+  // table keeps its alignment and the diff stays one visible change rather than a
+  // whole reflowed row. The length delta is absorbed by the TRAILING padding —
+  // the leading run is kept verbatim because it is what separates the value from
+  // the pipe.
+  //
+  // Two boundaries, both deliberate:
+  //   - a cell with no trailing whitespace at all (`|planned|`) gets none back,
+  //     rather than acquiring a space it never had;
+  //   - a cell too narrow to hold `accepted` keeps one separating space and the
+  //     row widens. Alignment is worth preserving, never worth corrupting a value
+  //     to achieve.
   const cell = cells[hits[0]];
   const lead = cell.match(/^\s*/)[0];
-  const trail = cell.match(/\s*$/)[0];
-  cells[hits[0]] = `${lead}accepted${trail}`;
+  const trailLen = cell.match(/\s*$/)[0].length;
+  const core = `${lead}accepted`;
+  const pad = trailLen === 0 ? 0 : Math.max(1, cell.length - core.length);
+  cells[hits[0]] = core + " ".repeat(pad);
   lines[idx] = cells.join("|");
 
   if (!opts.dryRun) {
-    fs.writeFileSync(registryRel, lines.join("\n"), "utf8");
+    fs.writeFileSync(registryRel, lines.join(eol), "utf8");
   }
 
   return emit(opts, {

@@ -163,6 +163,7 @@ None if a check. If `finalise` gains the write, it gains a side effect on a file
 | `docs/standards/task-registry.md` | Phase 5 — names `/finalise` as the owner, explains why a pre-merge tick is correct for the Status column, and points at the drift check as the backstop. Replaces the interim "tick it by hand" step. |
 | `docs/tasks/task-registry.md` | Row 103's own tick (by `registry-tick.js` at Step 7 — the mechanism's first live use). |
 | `docs/development/epic-registry.md` | Epic 3's Status corrected `📋 Planned` → `✅ Accepted`. Found by the Phase 2 measurement; the document and all three of its stories read `accepted`. |
+| `docs/tasks/task-registry.md` (row 97) | **Added a row that never existed.** Task 97 is `accepted` and merged under PR #350 but was absent from the registry entirely — found by the document-driven check added in QA cycle 1, which is the direction the row-driven walk structurally could not see. |
 
 ### Delete
 
@@ -183,7 +184,8 @@ None.
 
 ## 9. Success Criteria
 
-1. [x] A check fails when a document is `accepted` and its registry row is not, and vice versa.
+1. [x] A check fails when a document is `accepted` and its registry row is not, and vice versa —
+       **and when it has no row at all** (added in QA cycle 1; found task 97 on its first run).
 2. [x] That check is mutation-proven — reverting a row makes it go red.
 3. [x] The check carries a non-vacuity floor and cannot pass by matching nothing.
 4. [x] `cancelled` and in-flight tasks do not trip it.
@@ -213,6 +215,33 @@ None.
 Remove the write; keep the check. The check is independently valuable — with it and no automation,
 the repository is still strictly better off than before this task, because the omission becomes loud.
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.103.qa.1.pipeline-owns-the-registry-tick.md](./task.103.qa.1.pipeline-owns-the-registry-tick.md)
+- **Gate File**: [task.103.gate.1.pipeline-owns-the-registry-tick.yml](./task.103.gate.1.pipeline-owns-the-registry-tick.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3063 (full suite) + 8 mutations + 3 negative controls
+- **Phases Verified**: 5/5
+- **Critical Issues**: 1 HIGH
+- **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+The drift check is **row-driven only** — an `accepted` task document with no registry row passes it,
+while `finalise`'s reason table, its DoD line and the standard all promise CI will fail on exactly
+that case. Proven by probe. This is the defect this task was filed about, reintroduced one level up:
+a backstop named for a case it does not back up.
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -221,6 +250,8 @@ the repository is still strictly better off than before this task, because the o
 | 2026-09-10 | 0.2 | Review passed (9/10, READY TO IMPLEMENT) — 0 critical, 4 important fixed. Added the missing mandatory § 3 Technical Background (current-vs-target, absorbing the former § 4 decision table) and § 7 Files Summary; renumbered to the 11-section template contract and repaired every § cross-reference. Named file paths and report destinations in every Implementation Plan phase, and added success criterion 9 (the check must be in a glob `npm test` executes). Linked GitHub issue #374. | review-task |
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Implemented — 6 files, 14 tests (3 drift-check + 11 registry-tick). `finalise` chosen as the § 3 owner; check landed first and retained. Epic registry measured: 1 stale row of 4, corrected. Bug registry measured: 0 of 12. | develop |
+| 2026-09-10 |  | QA gate FAIL (80/100) — 1 high, 1 medium, 2 low. The check covers rows but not documents, contradicting three shipped claims | qa-task |
+| 2026-09-10 |  | QA findings fixed — 1 iteration. Added the document-driven direction to the drift check (found task 97, accepted and absent from the registry since creation), preserved cell width and line endings in the tick, corrected the guard comment and removed a no-op. Two further tests added after mutations survived. | qa-fix |
 
 ## Progress Tracking
 
