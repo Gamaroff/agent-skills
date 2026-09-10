@@ -86,8 +86,16 @@ EOF
 
 node .agents/skills/develop-bug/references/tracker-comment.js \
   --issue "${TRACKER_ISSUE}" --body-file .claude/state/comment-body.md \
-  --stage qa-cycle-{N} --json
+  --stage qa-cycle-{N} \
+  --slot verdict="{PASS / FAIL}" \
+  --slot cycle="{N}" \
+  --json
 ```
+
+> **`qa-cycle` reads `verdict` and `cycle`, and nothing else.** `verdict` is mapped by the engine
+> rather than printed — `PASS` and `FAIL` become plain sentences — so pass the raw token here. A
+> verdict the catalogue does not recognise renders "The results are recorded below" rather than
+> defaulting to reassurance, which is the safe direction for a bug's verification comment.
 
 Non-blocking. Read `reason` per [`shared/resources/tracker-comment-contract.md`](tracker-comment-contract.md).
 

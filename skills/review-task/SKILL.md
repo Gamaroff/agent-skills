@@ -1673,7 +1673,10 @@ EOF
 
    node .agents/skills/review-task/references/tracker-comment.js \
      --issue "{jira_key from frontmatter}" --body-file .claude/state/comment-body.md \
-     --stage review-task --json
+     --stage review-task \
+     --slot outcome="{plain-language outcome — see the GitHub arm's note}" \
+     --slot blocking="${CRITICAL}" \
+     --json
    ```
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
@@ -1741,12 +1744,36 @@ ${CHANGES_SECTION}
 EOF
 
    node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
-     --body-file .claude/state/comment-body.md --stage review-task --json \
+     --body-file .claude/state/comment-body.md --stage review-task \
+     --slot outcome="{plain-language outcome — see below}" \
+     --slot blocking="${CRITICAL}" \
+     --json \
      || echo "⚠️  GitHub issue comment failed — continuing"
    ```
 
    This is the same call the Jira path above makes — `tracker-comment.js` resolves
    `TRACKER` itself, so the two branches differ only in the issue identifier.
+
+   > **`review-task` reads `outcome` and `blocking`, and both arms pass the same values** — the lead is
+   > a property of the moment, not of the tracker.
+   >
+   > `outcome` is a **text** slot interpolated verbatim into "— the result was …", so do **not** pass
+   > `${RECOMMENDATION}` raw. `READY TO IMPLEMENT`, `NEEDS REVISION` and `REQUIRES REWORK` are internal
+   > vocabulary, and [`references/stakeholder-summary.md`](references/stakeholder-summary.md) requires
+   > internal tokens to be mapped rather than passed through. Map at the call site:
+   >
+   > | Recommendation | `outcome` value |
+   > | :--- | :--- |
+   > | `READY TO IMPLEMENT` | `ready to build` |
+   > | `NEEDS REVISION` | `needs more detail` |
+   > | `REQUIRES REWORK` | `needs rework` |
+   >
+   > `blocking` is a **boolean** slot whose two renderings are opposites, so a wrong value says the
+   > wrong thing rather than saying nothing. `${CRITICAL}` is safe: the engine reads `"0"` as *absent*,
+   > which renders "Nothing is blocking the work from starting".
+   >
+   > The readiness score stays in the body — a number on an unexplained scale is what the standard
+   > forbids in a lead.
    Always `--body-file`: the body carries backticks and newlines.
 
 4. **Verify**: read `reason` from the JSON and act per [`references/tracker-comment-contract.md`](references/tracker-comment-contract.md). On `posted`, confirm: "✅ Review summary posted to GitHub issue #${GITHUB_ISSUE}." If it fails, report the error but do NOT halt the skill.

@@ -105,9 +105,51 @@ const MUTATING_SHAPES = [
   },
 ];
 
-/** A line is already routed when the chokepoint appears on it. */
-const ROUTED =
-  /tracker_write|tracker_call_with_retry|tracker-issue\.js|tracker-comment\.js/;
+/**
+ * A line is already routed when the chokepoint appears on it.
+ *
+ * **Routing is per-shape, and it has to be.** This was one global alternation
+ * until task 105, which meant `tracker_write` satisfied *every* shape — so
+ * `tracker_call_with_retry gh issue comment …` read as routed and was skipped.
+ * Seven such sites shipped for months, in a repository whose guard already named
+ * `gh issue comment` as a watched shape. The guard passed on the exact
+ * regression it was written to catch.
+ *
+ * The two wrappers are not interchangeable with the CLIs, and conflating them is
+ * what hid the gap. `tracker_write` buys interception and retry — it is the
+ * right answer for a mutation no CLI owns. It does **not** buy an idempotency
+ * marker, and it does not make a `gh` call work on a Jira project. A comment
+ * needs both, so only `tracker-comment.js` satisfies the comment shape.
+ */
+const CHOKEPOINTS = {
+  trackerWrite: /tracker_write|tracker_call_with_retry/,
+  trackerIssue: /tracker-issue\.js/,
+  trackerComment: /tracker-comment\.js/,
+};
+
+/** Shapes whose only acceptable chokepoint is a specific CLI, and why. */
+const CLI_ONLY = new Map([
+  [
+    "github.issue.comment",
+    {
+      re: CHOKEPOINTS.trackerComment,
+      why:
+        "A comment needs the idempotency marker (so a resumed run does not " +
+        "post twice) and tracker-agnostic dispatch (so a Jira project gets it " +
+        "at all). tracker_write gives neither.",
+    },
+  ],
+]);
+
+function isRouted(line, shape) {
+  const cliOnly = CLI_ONLY.get(shape.kind);
+  if (cliOnly) return cliOnly.re.test(line);
+  return (
+    CHOKEPOINTS.trackerWrite.test(line) ||
+    CHOKEPOINTS.trackerIssue.test(line) ||
+    CHOKEPOINTS.trackerComment.test(line)
+  );
+}
 
 /**
  * Files whose mutating lines are NOT call sites, each with the reason.
@@ -174,12 +216,28 @@ function isInvocation(line, shape) {
   const m = shape.re.exec(line);
   if (!m) return false;
 
-  const before = line.slice(0, m.index);
+  let before = line.slice(0, m.index);
 
   // Inline mention inside prose: preceded by a backtick, or by sentence text.
   // `--reason ${REASON}` style continuations still count as invocations because
   // the command itself starts the line.
   if (/`\s*$/.test(before)) return false;
+
+  // A chokepoint WRAPPER may precede the command, and the wrapped line is still
+  // an invocation — whether that particular wrapper is *sufficient* is
+  // isRouted's question, not this one.
+  //
+  // Splitting the two questions is what closes the gap task 105 found. This
+  // predicate used to reject a wrapped line outright, so
+  // `tracker_call_with_retry gh issue comment …` was not classified as a call
+  // site at all — and the routing check above it never ran. Two independent
+  // reasons to skip the same line, and removing only one of them left the guard
+  // exactly as blind as before: the fix to isRouted alone did not turn the
+  // mutation red, which is how this second half was found.
+  before = before.replace(
+    /^(\s*)(?:tracker_write|tracker_call_with_retry)\s+/,
+    "$1",
+  );
 
   // Only leading whitespace, a capture, or a shell connective may precede it.
   return /^[\s]*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$?\(?\s*(?:&&|\|\||;|then\s+|do\s+)?\s*$/.test(
@@ -196,8 +254,8 @@ test("§1 no bare mutating tracker call in canonical prose", () => {
 
     const lines = fs.readFileSync(file, "utf8").split("\n");
     lines.forEach((line, i) => {
-      if (ROUTED.test(line)) return;
       for (const shape of MUTATING_SHAPES) {
+        if (isRouted(line, shape)) continue;
         if (isInvocation(line, shape)) {
           failures.push(
             `${rel}:${i + 1} — bare \`${shape.what}\`. Route it through ${shape.via}.\n` +

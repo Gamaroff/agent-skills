@@ -49,11 +49,11 @@ at that point — check each one; this is the highest-risk part of the task (tas
 | :--- | :--- |
 | step-0 `work-started` | `title="{STORY_TITLE\|TASK_TITLE}"` |
 | step-2 `review` (skipped arm) | `outcome="already reviewed"` |
-| step-2 `review` (story arm) | `outcome="{RECOMMENDATION}"`, `blocking="{CRITICAL_COUNT}"` |
+| step-2 `review` (story arm) | `outcome="{plain-language RECOMMENDATION — see below}"`, `blocking="{CRITICAL_COUNT}"` |
 | step-2 `review` (task arm) | same |
 | step-3 `develop-complete` ×2 | `count="{TASK_COUNT\|PHASE_COUNT}"` |
 | step-4 `in-review` | `pr="{PR_URL}"` |
-| step-5-6 `qa-cycle-{N}` | `verdict="{GATE_DECISION}"`, `count="{ISSUE_COUNT}"`, `cycle="{N}"` |
+| step-5-6 `qa-cycle-{N}` | `verdict="{GATE_DECISION}"`, `cycle="{N}"` |
 | step-5-6 `qa-fix-{N}` | `cycle="{N}"` |
 | step-7 `done` | `pr="{PR_URL}"` |
 | develop-bug verify-loop | `verdict="{PASS\|FAIL}"`, `cycle="{N}"` |
@@ -63,6 +63,27 @@ same step file* or is documented as caller-supplied in that step's inputs sectio
 variable is bound in a different step renders literally and posts. Where a value genuinely is not
 available, **omit that slot** — task.104's templates are grammatical with `{}` precisely so a missing
 slot degrades instead of breaking.
+
+**The name check — the other half, and the one that already went wrong.** Before adding a slot,
+confirm the *name* is one that stage's template reads. The authoritative table is in the task document
+§3 ("Which slots each stage actually reads"), transcribed from `stakeholder-summary.js` L58–141 and
+L178–180. `tracker-comment.js` validates **no** slot name: L332–342 stores any `k=v`, and an
+unrecognised key reaches a template that never reads it. Nothing errors and nothing warns; the comment
+posts and reads as though the slot were omitted. Three rows of the table above were wrong on first
+authoring for precisely this reason — `pr` on `qa-gate` and `count` on `qa-cycle` are real slot names
+belonging to *other* stages, which is what made them look right.
+
+Note in particular that `qa-gate` reads **`blocking_count`**, not `count` and not `pr`; it is the slot
+that makes the lead say how many problems must be dealt with before the item can finish.
+
+**`outcome` is passed through verbatim, so pass plain language.** `outcome` is a TEXT slot
+(`stakeholder-summary.js` L180) interpolated straight into "— the result was ${s.outcome}".
+`stakeholder-summary.md` L80–83 requires internal tokens to be mapped, never passed through, and the
+only mapping that exists today is `GATE_MEANING`, which covers `verdict` alone. So do **not** pass
+`RECOMMENDATION` raw: map it at the call site — `READY TO IMPLEMENT` → `"ready to build"`,
+`NEEDS REVISION` → `"needs more detail"`, `REQUIRES REWORK` → `"needs rework"`. Moving that mapping
+into the engine beside `GATE_MEANING` is the better long-term fix and belongs to whoever next touches
+`stakeholder-summary.js`; it is not in this task's scope.
 
 Quoting: always `--slot k="value"`, quoted. A title with a space, an unquoted `--slot`, and the next
 word becomes a stray argument.
@@ -122,10 +143,21 @@ one-liners already handled in Phase 2 — check whether Phase 2 removed them bef
 +  --stage done --slot pr="{PR_URL}" --json
 ```
 
-Note what this drops: `tracker_call_with_retry`. The engine has its own retry and its own
-`ACCESS_TRACKER` deferral gate — wrapping it again would double-defer. Confirm against
-`resolve-platform.sh` L546–593 before removing the wrapper, and say in the implementation report
-which mechanism now owns the retry.
+Note what this drops: `tracker_call_with_retry` — and be honest about what that costs, because an
+earlier draft of this plan was not.
+
+The engine owns the **deferral gate** but **not** the retry. `tracker-comment.js` requires
+`defer-mutation.js` (L68) and returns `reason: "deferred"` under a restricted `ACCESS_TRACKER`
+(L663, L704), so re-wrapping it in `tracker_write` genuinely would double-defer. But
+`tracker-comment.js` contains **no retry at all** — `grep -ci 'retry\|backoff\|sleep'` over it returns
+0. The 3× exponential backoff lives in `tracker_write` (`resolve-platform.sh` L588), of which
+`tracker_call_with_retry` is a straight alias (L721–731), and `develop-pipeline-step-7-finalise.md`
+L164 currently says these calls MUST be wrapped in it.
+
+So the conversion trades the retry away to get correct single-deferral and idempotency. That is the
+right trade and it is what the reference implementation already does — `review-task` SKILL.md L1743
+carries no wrapper and degrades with `|| echo "⚠️ … — continuing"`. Match that shape, and write the
+trade into the implementation report in as many words: **after conversion, nothing owns the retry.**
 
 **The two `gh issue close --comment` sites** (L173, L183) split into comment-then-close:
 
@@ -140,18 +172,29 @@ node …/tracker-comment.js --issue {TRACKER_ISSUE} \
   --body-file .claude/state/comment-body.md --stage done --slot pr="{PR_URL}" --json
 # read reason; on unverifiable, do not post again and do not proceed to close
 
-node …/tracker-issue.js --issue {TRACKER_ISSUE} --close --json
+node …/tracker-issue.js --kind close --issue {TRACKER_ISSUE} --reason completed --json
 ```
 
-The comment above the close is a real comment, not a marker artefact — do not let the `done` stage
-marker suppress it if the `done` comment at L241 already fired in the same run. **Check this**: two
-`--stage done` comments on one issue collapse to one under the idempotency marker, which may be the
-desired outcome (one closing summary) or a silent loss (the completion note and the closing note are
-different texts). Decide deliberately and record the decision; if they must both post, one needs its
-own stage, and a new stage needs a new lead template in task.104's catalogue.
+**The marker collision — resolved during review; do not re-open it.** Two `--stage done` comments on
+one issue *do* collapse: `tracker-comment.js` L751–786 returns `already` on a single marker match and
+does not post. Two independent facts close the question:
 
-> This is the one place where this task can require a change back in task.104's module. Resolve it
-> early in Phase 3, not at the end.
+1. The existing `--stage done` call at `develop-pipeline-step-7-finalise.md` L241 is in the **Jira**
+   arm; the four bare-`gh` sites are in the **GitHub** arm. The file branches on `TRACKER`, so the two
+   never execute in the same run and cannot collide.
+2. Within the GitHub arm the two comments (completion, then close) *would* collide with each other. The
+   fix is to merge them into **one** `--stage done` comment carrying PR, status, DoD verdict and report
+   path, and then close with no `--comment`. The two existing texts are near-duplicates; nothing is
+   lost.
+
+**No new stage and no new lead template are required, so this task needs no change to task.104's
+module.**
+
+**Copy the prior art rather than re-deriving it.** `skills/finalise/SKILL.md` L1325–1347 is exactly
+this pattern already in the tree — `tracker-comment.js --stage done`, then
+`tracker-issue.js --kind close --reason completed`, with a note at L1345–1347 explaining why
+`--comment` on the close is wrong (it is an unmarked second comment the marker cannot see, so it
+recurs on every resume). Lift the shape from there.
 
 **`review-story` L2313–2325.** Diff the GitHub inline body against the Jira heredoc at L2257–2272
 before collapsing:

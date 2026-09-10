@@ -5,18 +5,22 @@ type: task
 description: "Task 104's catalogue renders a generic lead from --stage alone. This task feeds it real values at all 22 call sites so the lead says something specific, converts the seven bare `gh issue comment` sites onto the engine so they get a lead at all, and updates the 16 test files that assert on comment shape."
 tags: [tracker-comment, stakeholder-communication, develop-pipeline, migration]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: medium
 created: 2026-09-09
-updated: 2026-09-09
+updated: 2026-09-10
 assignee:
 estimated_effort_hours: 12
+github_issue: 378
 ---
 
 # Technical Task: feed the lead, and close the bypass
 
-**Status:** Planned
+**GitHub Issue**: [#378](https://github.com/Gamaroff/agent-skills/issues/378)
+
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.105.review.1.comment-call-sites-plain-language-lead.md` implemented 2026-09-10
 
 ---
 
@@ -26,6 +30,9 @@ estimated_effort_hours: 12
 makes `tracker-comment.js` render a plain-language paragraph from the `--stage` it is already given.
 That paragraph is correct but generic — it cannot name the branch, the pull request, the verdict or
 the number of problems found, because no call site tells it any of those things.
+
+Task 104 merged on 2026-09-09 (PR #377), so `--slot` and the lead catalogue both ship today — this
+task supplies values to a flag that already exists, and can start immediately.
 
 This task does two things:
 
@@ -97,7 +104,7 @@ brought in line.
 | 5 | `shared/resources/develop-pipeline-step-3-develop-loop.md` | 207 | `develop-complete` | `count` |
 | 6 | same | 230 | `develop-complete` | `count` |
 | 7 | `shared/resources/develop-pipeline-step-4-create-pr.md` | 231 | `in-review` | `pr` |
-| 8 | `shared/resources/develop-pipeline-step-5-6-qa-loop.md` | 312 | `qa-cycle-{N}` | `verdict`, `count`, `cycle` |
+| 8 | `shared/resources/develop-pipeline-step-5-6-qa-loop.md` | 312 | `qa-cycle-{N}` | `verdict`, `cycle` |
 | 9 | same | 794 | `qa-fix-{N}` | `cycle` |
 | 10 | `shared/resources/develop-pipeline-step-7-finalise.md` | 241 | `done` | `pr` |
 | 11 | `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md` | 87 | `qa-cycle-{N}` | `verdict`, `cycle` |
@@ -105,8 +112,8 @@ brought in line.
 | 14 | `skills/finalise/SKILL.md` | 1196 | `done` | `pr` |
 | 15 | `skills/finalise/SKILL.md` | 1292 | `done` | `pr` |
 | 16 | `skills/qa-fix/SKILL.md` | 807 | `qa-fix` | `cycle` |
-| 17 | `skills/qa-story/SKILL.md` | 1783 | `qa-gate` | `verdict`, `pr` |
-| 18 | `skills/qa-task/SKILL.md` | 1190 | `qa-gate` | `verdict`, `pr` |
+| 17 | `skills/qa-story/SKILL.md` | 1783 | `qa-gate` | `verdict`, `blocking_count` |
+| 18 | `skills/qa-task/SKILL.md` | 1190 | `qa-gate` | `verdict`, `blocking_count` |
 | 19 | `skills/review-bug/SKILL.md` | 163 | `review-bug` | `outcome`, `blocking` |
 | 20 | `skills/review-story/SKILL.md` | 2274 | `review-story` | `outcome`, `blocking` |
 | 21–22 | `skills/review-task/SKILL.md` | 1674, 1743 | `review-task` | `outcome`, `blocking` |
@@ -115,6 +122,37 @@ brought in line.
 > grepping for `tracker-comment.js` before editing — see `project_tracked_tree_link_verification`
 > and observation #22 on decaying line citations. The table's value is the **inventory and the slot
 > mapping**, not the coordinates.
+
+### Which slots each stage actually reads — the authoritative list
+
+The slot column above is only useful if every name in it is one the stage's template reads. **The
+engine validates nothing here**: `tracker-comment.js` L332–342 splits `--slot k=v` on the first `=`
+and stores any key, and `normaliseSlots` (`stakeholder-summary.js` L190–233) passes an unrecognised
+name through to a template that never reads it. A wrong slot name posts a comment that succeeds and
+reads exactly as though the slot had been omitted — no exit code, no warning, nothing in the log.
+
+So this table, not intuition, is the source of truth. It is transcribed from
+`shared/resources/stakeholder-summary.js` L58–141 (templates) and L178–180 (classification):
+
+| Stage | Slots the template reads | Type |
+| :--- | :--- | :--- |
+| `work-started` | `title` | text |
+| `review`, `review-story`, `review-task`, `review-bug` | `outcome`, `blocking` | text, boolean |
+| `develop-complete` | `count` | numeric |
+| `in-review` | `pr` | text |
+| `qa-gate` | `verdict`, `blocking_count` | text, numeric |
+| `qa-cycle` | `verdict`, `cycle` | text, numeric |
+| `qa-fix` | `cycle` | numeric |
+| `done` | `pr` | text |
+
+Type matters, because coercion is per-type: a **boolean** slot treats `""`/`0`/`false`/`no`/`none`/
+`null`/`undefined`/`off` as *absent* (so the template's negative branch renders), a **numeric** slot
+accepts positive integers only and drops anything else, and a **text** slot is passed through verbatim
+with only `""` dropped. Do not pass a count to `blocking`, or a word to `cycle`.
+
+**Do not copy a slot name from a neighbouring row.** Three of the rows in the table above were wrong in
+the first draft of this document for exactly that reason — `pr` on `qa-gate` and `count` on `qa-cycle`
+are real slot names on other stages, which is what made them look right.
 
 ### The seven bypass sites
 
@@ -134,7 +172,7 @@ two calls where there was one, and the two can now fail independently.
 
 ### The hook path is deliberately excluded
 
-`shared/resources/develop-pipeline-on-precompact.sh` L133/L140 posts pause notices from a shell hook
+`shared/resources/develop-pipeline-on-precompact.sh` L140 posts pause notices from a shell hook
 that must run without Node available and must never block compaction. It stays as-is; the exclusion
 is recorded in §4 so a future sweep does not read it as an oversight.
 
@@ -175,6 +213,13 @@ today, so a Jira consumer silently gets nothing from them).
 **Impact**: a resumed run that previously posted a second copy now posts none. That is the intended
 fix, but a reader watching a re-run will see one fewer comment than before.
 
+They also **lose the 3× exponential backoff**. `tracker_call_with_retry` is an alias of `tracker_write`
+(`resolve-platform.sh` L721–731), and `tracker-comment.js` has no retry of its own — the engine owns
+the `ACCESS_TRACKER` deferral gate, not the retry. Re-wrapping the engine call would double-defer, so
+the retry is genuinely given up rather than relocated. The established convention accepts this:
+`review-task` SKILL.md L1743, the reference implementation for a converted site, carries no wrapper and
+degrades with `|| echo "⚠️ …  — continuing"`. Match it, and say so in the implementation report.
+
 **Migration**: none for the user. `tests/mutation-call-site-coverage.test.js` (L77–80, L110,
 L142–143) already asserts every `gh issue comment` site routes through `tracker_write` or
 `tracker-comment.js`; extend it to assert **zero** bare sites outside the allowlist.
@@ -182,7 +227,9 @@ L142–143) already asserts every `gh issue comment` site routes through `tracke
 ### 5.2 `gh issue close --comment` becomes two calls
 
 **Before**: `gh issue close {N} --comment "Closing — story accepted. PR: …"`
-**After**: `tracker-comment.js --stage done --slot pr=…` then `tracker-issue.js --close`.
+**After**: `tracker-comment.js --stage done --slot pr=…` then
+`tracker-issue.js --kind close --issue {N} --reason completed`. (`--kind close` — `tracker-issue.js`
+has no `--close` flag; closing is a kind, per its usage at L158.)
 
 **Impact**: the two can now fail independently — an issue can be commented and left open, or closed
 without its closing comment.
@@ -190,6 +237,22 @@ without its closing comment.
 **Migration**: comment first, close second, and read each `reason`. Comment-then-close leaves the
 recoverable state (an open issue carrying its summary) rather than the misleading one (a closed
 issue with no explanation). State this ordering in the step doc as a rule, not an accident.
+
+**Prior art — copy it, do not re-derive it.** `skills/finalise/SKILL.md` L1325–1347 already implements
+exactly this: one `tracker-comment.js --stage done` comment, then `tracker-issue.js --kind close
+--reason completed`, with a note explaining that `--comment` on the close is an *unmarked* second
+comment the marker cannot see, so it recurs on every resume. Phase 3 should end up looking like it.
+
+**The `--stage done` marker collision is resolved, and does not reach back into task.104.** Two
+`--stage done` comments on one issue do collapse — `tracker-comment.js` L751–786 returns `already` on a
+single marker match and does not post — but that does not bite here, for two independent reasons.
+First, the existing `--stage done` call at `develop-pipeline-step-7-finalise.md` L241 is in the **Jira**
+arm while the four bare-`gh` sites are in the **GitHub** arm, and the file branches on `TRACKER`, so
+they are mutually exclusive within a run. Second, the two GitHub-arm comments (completion, then close)
+*would* collide with each other, and the prior art above is the fix: merge them into **one** `done`
+comment carrying PR, status, DoD verdict and report path, then close with no `--comment`. The two
+existing texts are near-duplicates and nothing is lost. **No new stage and no new lead template are
+needed**, so this task requires no change to task.104's module.
 
 ### 5.3 `qa-fix`'s shared body splits in two
 
@@ -213,41 +276,60 @@ duplicating the text. Duplicated prose in this repository drifts within weeks
 
 **Files**: `shared/resources/develop-pipeline-step-{0,2,3,4,5-6,7}*.md`, `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`
 
-- [ ] Add `--slot` values to sites 1–11.
-- [ ] Verify each slot value is a variable the step doc has already resolved at that point — a slot
+- [x] Add `--slot` values to sites 1–11.
+- [x] Verify each slot value is a variable the step doc has already resolved at that point — a slot
       referencing a value bound three steps later renders as a literal.
 
 ### Phase 2 — Skill call sites (risk: Low)
 
 **Files**: `skills/{create-pr,finalise,qa-fix,qa-story,qa-task,review-bug,review-story,review-task}/SKILL.md`
 
-- [ ] Add `--slot` values to sites 12–22.
-- [ ] Split `qa-fix`'s `$COMMENT_BODY` per §5.3.
+- [x] Add `--slot` values to sites 12–22.
+- [x] Split `qa-fix`'s `$COMMENT_BODY` per §5.3.
 
 ### Phase 3 — Close the bypass (risk: Medium)
 
 **Files**: `shared/resources/develop-pipeline-step-7-finalise.md`, `skills/{qa-story,qa-task,review-story}/SKILL.md`
 
-- [ ] Convert the three `gh issue comment` sites to `tracker-comment.js`.
-- [ ] Convert the two `gh issue close --comment` sites to comment-then-close, in that order, each
+- [x] Convert the three `gh issue comment` sites to `tracker-comment.js`.
+- [x] Convert the two `gh issue close --comment` sites to comment-then-close, in that order, each
       `reason` read.
-- [ ] `review-story`'s GitHub arm: collapse to the single CLI call, matching `review-task` L1743.
+- [x] `review-story`'s GitHub arm: collapse to the single CLI call, matching `review-task` L1743.
 
 ### Phase 4 — Tests and the anti-regression guard (risk: Medium)
 
-**Files**: the 16 files in §8
+**Files**: the files in §8
 
-- [ ] Update body-shape assertions to match the caller's body as a substring.
-- [ ] New guard in `tests/mutation-call-site-coverage.test.js`: zero bare `gh issue comment` in
-      shipped `.md` outside a named allowlist (the precompact hook, and the contract's own prose).
-- [ ] `evals/shared/tests/transition-protocol-parity.test.mjs`: extend the `--stage` literal check so
+- [x] Update body-shape assertions to match the caller's body as a substring.
+- [x] **Guard A — zero bypass.** In `tests/mutation-call-site-coverage.test.js`: no bare
+      `gh issue comment` / `gh issue close --comment` **invocation** in shipped source outside a named
+      allowlist. Match **invocation shape**, not the bare literal: a line whose command position is the
+      call, optionally preceded by `tracker_call_with_retry` or `tracker_write`. A literal match fails
+      on prose — `develop-pipeline-step-0-resolve-and-prepare.md` L401,
+      `develop-pipeline-step-4-create-pr.md` L196/L215 and `create-pr/SKILL.md` L386 all contain the
+      string inside sentences *prohibiting* the call, and widening the allowlist to swallow them is the
+      "allowlist widens silently" failure `docs/reference/anti-patterns.md` names. Assert the allowlist
+      is non-empty and every entry exists on disk.
+- [x] **Guard B — every site feeds the lead.** The population check for the slot half, and the more
+      important of the two. For every `tracker-comment.js` invocation in shipped source, assert (i) it
+      passes at least one `--slot`, and (ii) every slot name it passes is in the set that stage's
+      template reads. Derive that set by **importing** `LEAD_TEMPLATES` / `TEXT_SLOTS` / `BOOLEAN_SLOTS`
+      / `NUMERIC_SLOTS` from `stakeholder-summary.js` — never by restating the mapping in the test, which
+      would be a second enumeration of the thing §3 already enumerates once. Assert a non-vacuity floor
+      (the walk found ≥ 20 sites), because a guard that silently matches nothing passes forever.
+- [x] `evals/shared/tests/transition-protocol-parity.test.mjs`: extend the `--stage` literal check so
       every literal also resolves to a lead template.
+
+> **Guard B is the deliverable of Phases 1–2, not an afterthought.** `anti-patterns.md` L129: *"when a
+> fix is the same edit applied at more than one call site … the deliverable is the check that finds site
+> N+1 — not the N edits."* Three of the slot mappings in §3's table were wrong on first authoring and
+> nothing could have caught them; Guard B is the mechanical form of the review that did.
 
 ### Phase 5 — Bundle and sweep (risk: Low)
 
-- [ ] `npm run bundle`; confirm only `references/` copies changed.
-- [ ] `npm run generate-catalog`.
-- [ ] Sweep the consumer-facing docs that restate pipeline comment behaviour
+- [x] `npm run bundle`; confirm only `references/` copies changed.
+- [x] `npm run generate-catalog`.
+- [x] Sweep the consumer-facing docs that restate pipeline comment behaviour
       (`docs/development/project-completion-roadmap.md`, `docs/reference/pipeline-artifacts.md`,
       the runbooks) — see `project_behaviour_change_doc_sweep`.
 
@@ -278,19 +360,29 @@ duplicating the text. Duplicated prose in this repository drifts within weeks
 
 ## 8. Testing Strategy
 
-**Files whose assertions must be revisited** (16):
+**Files whose assertions must be revisited** — the verified set, not an estimate:
 
 | File | Why |
 | :--- | :--- |
-| `shared/resources/tests/tracker-comment.test.mjs` | body composition, marker position |
-| `shared/resources/tests/handover-verify.test.mjs` | replay argv + `command.stdin` |
-| `shared/resources/tests/handover-render.test.mjs` | hostile-body round-trip |
-| `shared/resources/tests/jira-interception.test.mjs` | the stale-claim guard about `gh issue comment` gating (L990) — its wording becomes true here and must be re-checked, not deleted |
-| `shared/resources/tests/qa-execute-snippets.test.mjs` | mutating-snippet classification |
+| `shared/resources/tests/tracker-comment.test.mjs` | body composition, marker position, `--slot` parsing |
+| `shared/resources/tests/stakeholder-summary.test.mjs` | per-stage lead content once slots are supplied |
 | `shared/resources/tests/tracker-issue.test.mjs` | close-path argv, now preceded by a comment |
+| `shared/resources/tests/jira-interception.test.mjs` | the stale-claim guard about `gh issue comment` gating (L990) — its wording becomes true here and must be re-checked, not deleted |
+| `shared/resources/tests/qa-execute-snippets.test.mjs` | mutating-snippet classification; the harness for the behavioural assertions below |
+| `shared/resources/tracker-access.test.sh` | `tracker_write` gating assertions (L504, L1651, L1678) |
 | `evals/shared/tests/transition-protocol-parity.test.mjs` | `--stage` literals; the positive "step docs still contain `tracker-comment.js`" guard at L669–692 |
-| `tests/mutation-call-site-coverage.test.js` | the new zero-bypass guard |
-| `skills/{qa-story,qa-task,qa-fix,review-story,review-task,review-bug,finalise,create-pr}/tests/*` | per-skill call-shape assertions |
+| `tests/mutation-call-site-coverage.test.js` | the existing `gh issue comment` entries (L79, L143) and both new guards |
+| `skills/qa-story/tests/qa-story.test.js` | call-shape assertions on the converted QA one-liner |
+| `skills/qa-task/tests/qa-task.test.js` | same |
+
+> **Two corrections to an earlier draft of this section, both worth keeping.** It listed
+> `skills/{qa-fix,review-story,review-task,finalise,create-pr}/tests/*` — **none of those five
+> directories exists**. Only `qa-story`, `qa-task` and `review-bug` have a `tests/` directory at all,
+> and `review-bug`'s holds no comment assertions. It also named `handover-verify.test.mjs` and
+> `handover-render.test.mjs`, which contain no `tracker-comment` reference. Creating a new per-skill
+> suite is a legitimate choice here, but it must be a **deliberate** one: `package.json` lists per-skill
+> test globs by hand, so a new `skills/*/tests/` directory runs nowhere until it is added
+> (`project_npm_test_glob_orphans_suites`).
 
 **Behavioural, not textual.** Several of these assert that a SKILL.md *contains a string*. Per
 `feedback_assert_behaviour_not_source_text`, where a site is converted, add an assertion that
@@ -315,8 +407,10 @@ before believing a failure in it — it is load-flaky (`project_qa_execute_snipp
 
 **Functional**
 
-- [ ] All 22 call sites pass at least one `--slot`, and each slot value is bound at that point in the
-      step.
+- [ ] All 22 call sites pass at least one `--slot`; each slot value is bound at that point in the step;
+      and **each slot name is one that stage's template actually reads** — proven by Phase 4's Guard B
+      importing the mapping from `stakeholder-summary.js`, not by a count in the report. A slot name no
+      template reads is silently inert, so the count alone cannot establish this criterion.
 - [ ] Zero bare `gh issue comment` / `gh issue close --comment` in shipped `.md` outside the named
       allowlist, proven by a test rather than a grep in the report.
 - [ ] The five converted sites post a marker and are idempotent across a re-run.
@@ -353,6 +447,13 @@ fails — the comment posts, just wrong.
 *Impact*: high, and invisible; this is precisely the class of defect that reaches a live board.
 *Mitigation*: Phase 1's second checkbox is a per-site binding check. The
 `qa-execute-snippets` harness executes snippets and can assert the rendered lead contains no `${`.
+
+> **The binding check covers only half the risk, and the other half is the half that already bit.** A
+> *bound* variable passed under a slot name no template reads is equally silent — the comment posts and
+> reads as though the slot were omitted — and the binding check cannot see it, because the variable is
+> bound. Three such names were in this document's own §3 table before review. Phase 4's **Guard B** is
+> the mitigation for that axis; the per-site binding check is the mitigation for this one. Both are
+> required, and neither substitutes for the other.
 
 **MEDIUM — comment-then-close leaves an issue open.** §5.2.
 *Mitigation*: ordering is asserted; a failed close is a reported `reason`, not a silent skip.
@@ -395,16 +496,20 @@ than breaking the comment. That property was designed for exactly this rollback.
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-09-09 | 1.0 | Initial draft | create-task |
+| 2026-09-10 | 1.1 | Review passed (8/10) — corrected the slot-to-stage mapping at 3 sites and added the missing `blocking_count`; pinned the authoritative per-stage slot table; fixed the `tracker-issue.js` close invocation; corrected the false "engine owns the retry" claim; added Guard B (the population check for the slot half); replaced the inflated test inventory with the verified set | review-task |
+| 2026-09-10 |  | Status → ready-for-development | review-task |
+| 2026-09-10 |  | Implemented — 24 call sites fed slots, 7 bypass sites converted, 2 anti-regression guards (one repaired, one added), 5 mutation proofs; 20 source files + 47 bundled copies | develop |
+| 2026-09-10 |  | Status → ready-for-review | develop |
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1 — Pipeline step docs
-- [ ] Phase 2 — Skill call sites
-- [ ] Phase 3 — Close the bypass
-- [ ] Phase 4 — Tests and the anti-regression guard
-- [ ] Phase 5 — Bundle and sweep
+- [x] Phase 1 — Pipeline step docs (7 files, 13 sites)
+- [x] Phase 2 — Skill call sites (9 SKILL.md, 11 sites; `qa-fix`'s body split per §5.3)
+- [x] Phase 3 — Close the bypass (all 7 bypass sites converted; `review-story`'s arms collapsed)
+- [x] Phase 4 — Tests and the anti-regression guards (Guard A repaired, Guard B added, parity extended)
+- [x] Phase 5 — Bundle and sweep (`npm run bundle`, catalogue, `AGENTS.md` claim corrected)
 - [ ] QA review
 - [ ] Quality gate
 

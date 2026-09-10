@@ -1162,35 +1162,65 @@ Bitbucket *transport* is borrowed from it.
 
 Branch on the tracker resolved by `source references/resolve-platform.sh || exit 1` (which sets `TRACKER=github|jira`). Keep the `|| exit 1` — the resolver returns non-zero on an unrecognised `tracker:`, `vcs:` or `access:` value, and sourcing it bare would continue past the rejection with a default.
 
-**GitHub path** (when `TRACKER=github`) — extract `github_issue` from the task document YAML frontmatter (read in Step 2). If present, post a summary comment to the linked Issue:
+**One call, both trackers.** `tracker-comment.js` resolves `TRACKER` itself, so the issue identifier
+is the only thing that differs between the two arms. Resolve it, then make the single call:
 
 ```bash
-if [ -n "$GITHUB_ISSUE_QA" ]; then
-  tracker_call_with_retry gh issue comment "$GITHUB_ISSUE_QA" \
-    --body "QA ${GATE_DECISION} (${score}/100) — PR #${PR_NUMBER}: ${PR_URL}" \
-    || echo "⚠️  Issue comment failed after 3 retries — continuing"
+if [ "$TRACKER" = "jira" ]; then
+  QA_ISSUE=$(grep -E '^jira_key:' "$TASK_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
+  [ "$QA_ISSUE" = "null" ] && QA_ISSUE=""
+else
+  QA_ISSUE="$GITHUB_ISSUE_QA"
 fi
 ```
 
-If `github_issue` is absent from the frontmatter, skip silently. Failure does NOT halt the skill.
-
-**Jira path** (when `TRACKER=jira`) — extract `jira_key` from the task document YAML frontmatter. If present and non-null, post the same summary to the linked Jira issue:
+If `QA_ISSUE` is empty, skip this step silently — the task has no linked tracker issue.
 
 ```bash
-JIRA_KEY=$(grep -E '^jira_key:' "$TASK_FILE" | head -1 | sed -E 's/jira_key:[[:space:]]*//' | tr -d '"'"'"' ')
+if [ -n "$QA_ISSUE" ]; then
+  mkdir -p .claude/state
+  printf 'QA %s (%s/100) — PR #%s: %s\n' \
+    "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
+
+  # blocking_count — the high-severity entries in the gate this run just wrote.
+  # Re-resolve rather than reusing LATEST_GATE from Step 2: that one names the
+  # PREVIOUS run's gate (read to decide whether to re-review), and this run has
+  # written a newer one since.
+  THIS_GATE=$(ls -t "$TASK_DIR"/task.*.gate.*.yml 2>/dev/null | head -1)
+  # `|| true`, NOT `|| echo 0`. `grep -c` PRINTS "0" and EXITS 1 when it matches
+  # nothing, so `|| echo 0` appends a second zero and the variable becomes the
+  # two-line string "0\n0" — which the engine's numeric coercion then reads as
+  # NaN and drops. The slot would vanish on exactly the clean gates where saying
+  # "no blocking issues" matters most, and nothing would report it.
+  BLOCKING_COUNT=$(grep -c '^ *severity: high' "$THIS_GATE" 2>/dev/null || true)
+  BLOCKING_COUNT=${BLOCKING_COUNT:-0}
+
+  node .agents/skills/qa-task/references/tracker-comment.js \
+    --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
+    --stage qa-gate \
+    --slot verdict="$GATE_DECISION" \
+    --slot blocking_count="$BLOCKING_COUNT" \
+    --json \
+    || echo "⚠️  Tracker issue comment failed — continuing"
+fi
 ```
 
-If `TRACKER=jira` and `JIRA_KEY` is non-empty and not `null`:
-
-```bash
-mkdir -p .claude/state
-printf 'QA %s (%s/100) — PR #%s: %s\n' \
-  "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
-
-node .agents/skills/qa-task/references/tracker-comment.js \
-  --issue "$JIRA_KEY" --body-file .claude/state/comment-body.md \
-  --stage qa-gate --json
-```
+> **This replaced a bare `gh issue comment` on the GitHub arm** — unmarked, so a resumed QA cycle
+> posted a second copy, `gh`-only, so a Jira consumer never saw it, and after task.104 it would have
+> been one of the last tracker comments in the pipeline with no plain-language lead. Collapsing the
+> arms is what makes the same QA outcome read the same way on either tracker.
+>
+> **It also gave up the `tracker_call_with_retry` 3× backoff.** The engine owns the `ACCESS_TRACKER`
+> deferral gate but has no retry of its own, and re-wrapping it would double-defer — so the retry is
+> genuinely given up, and `|| echo … continuing` stands in its place, matching `review-task`.
+>
+> **`qa-gate` reads `verdict` and `blocking_count` — not `pr`.** `pr` is a real slot name on
+> `in-review` and `done`, which is what makes it look right here; this template never reads it and the
+> engine validates no slot names, so it would be silently dropped. The PR stays in the body.
+>
+> **`verdict` takes the raw gate token deliberately** — it is the one slot the engine *maps* rather
+> than prints. The score stays out of the lead: a number on an unexplained scale is what the standard
+> forbids.
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 

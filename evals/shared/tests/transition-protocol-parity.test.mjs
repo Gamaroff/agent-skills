@@ -79,6 +79,7 @@ test("every --stage literal in shipped markdown names a real stage", () => {
   const boardStages = new Set(lib.STAGE_NAMES);
   const commentCli = require(join(sharedDir, "tracker-comment.js"));
   const commentStages = new Set(commentCli.COMMENT_STAGES);
+  const leadCatalogue = require(join(sharedDir, "stakeholder-summary.js"));
   const offenders = [];
   const scan = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -120,6 +121,24 @@ test("every --stage literal in shipped markdown names a real stage", () => {
         if (!known.has(name)) {
           offenders.push(
             `${p}: --stage ${m[1]} (${isComment ? "comment" : "board"} stage)`,
+          );
+          continue;
+        }
+        // A comment stage must also RESOLVE TO A LEAD. Being a known stage and
+        // having a lead template are two different facts, and the gap between
+        // them is silent in the direction that matters: tracker-comment.js
+        // exits 2 with nothing sent when no lead can be produced, so a stage
+        // added to COMMENT_STAGES without a catalogue entry makes every call
+        // site using it stop posting — at runtime, on a live board, with the
+        // comment simply absent rather than wrong.
+        //
+        // `hasTemplate` is IMPORTED, not reimplemented: it owns the cycle-suffix
+        // normalisation, and a second copy of that rule here would drift from
+        // the one the engine actually consults.
+        if (isComment && !leadCatalogue.hasTemplate(name)) {
+          offenders.push(
+            `${p}: --stage ${m[1]} is a known comment stage but has no lead ` +
+              `template — tracker-comment.js exits 2 and posts nothing.`,
           );
         }
       }

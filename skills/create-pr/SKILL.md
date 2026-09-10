@@ -376,7 +376,9 @@ if [ -n "$GITHUB_ISSUE" ]; then
 PR opened — #${PR_NUMBER}: ${PR_URL}
 EOF
   node references/tracker-comment.js --issue "$GITHUB_ISSUE" \
-    --body-file .claude/state/comment-body.md --stage in-review --json \
+    --body-file .claude/state/comment-body.md --stage in-review \
+    --slot pr="$PR_URL" \
+    --json \
     || echo "⚠️  Issue comment failed — continuing"
 fi
 ```
@@ -385,6 +387,11 @@ Read `reason` and act per [`references/tracker-comment-contract.md`](references/
 The `--stage` marker is what makes this idempotent across a resume — a bare
 `gh issue comment` posts an unmarked duplicate every time the pipeline re-enters
 Step 4.
+
+> **`pr` is the only slot `in-review` reads**, and it takes the **URL**, not the number. The lead
+> renders it parenthetically for a reader who will not look up `#412` in a repository they may not
+> have open. Both arms above pass the same slot, because the lead is a property of the moment, not of
+> the tracker.
 
 If `GITHUB_ISSUE` is not set, skip silently.
 
@@ -412,7 +419,9 @@ EOF
 
    node .agents/skills/create-pr/references/tracker-comment.js \
      --issue {jira_key} --body-file .claude/state/comment-body.md \
-     --stage in-review --json
+     --stage in-review \
+     --slot pr="{PR_URL}" \
+     --json
    ```
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.

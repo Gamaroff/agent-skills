@@ -168,13 +168,40 @@ EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage review --json
+  --stage review \
+  --slot outcome="already reviewed" \
+  --json
 ```
+
+> No `blocking` slot here, and its absence is the point: `blocking` is a **boolean** slot, and leaving
+> it off makes the lead render "Nothing is blocking the work from starting" — which is exactly what a
+> skip means. Passing `blocking=0` or `blocking=false` reaches the same rendering (the engine reads
+> those strings as *absent*, not as false), but omission says it once instead of twice.
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 
 
 Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
+
+> **The two slots the `review` lead reads, and how to fill them.**
+>
+> **`outcome` is a text slot, interpolated verbatim into "— the result was …". Do not pass the review's
+> raw verdict token.** `READY TO IMPLEMENT`, `NEEDS REVISION` and `REQUIRES REWORK` are internal
+> vocabulary, and [`references/stakeholder-summary.md`](stakeholder-summary.md) requires internal
+> tokens to be *mapped*, never passed through — the one paragraph written for a reader with no
+> technical background is the last place a raw token belongs. Map at the call site:
+>
+> | Review verdict | `outcome` value |
+> | :--- | :--- |
+> | `READY TO IMPLEMENT` / GO | `ready to build` |
+> | `NEEDS REVISION` | `needs more detail` |
+> | `REQUIRES REWORK` / NO-GO | `needs rework` |
+>
+> **`blocking` is a boolean slot and its two renderings are opposites**, so getting it wrong says the
+> wrong thing rather than saying nothing. A present, truthy value renders "Some things need answering
+> before work can start"; absent renders "Nothing is blocking the work from starting". The engine reads
+> `""`, `0`, `false`, `no`, `none`, `null`, `undefined` and `off` as **absent**, so passing a count of
+> zero is safe — but omitting the flag when there are no blocking findings is clearer.
 
 On failure: log warning in Issues Log and continue.
 
@@ -331,7 +358,10 @@ EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage review --json
+  --stage review \
+  --slot outcome="{plain-language outcome — see below}" \
+  --slot blocking="{blocking issue count, or omit the flag when there are none}" \
+  --json
 ```
 
 Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
@@ -350,10 +380,33 @@ EOF
 
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage review --json
+  --stage review \
+  --slot outcome="{plain-language outcome — see below}" \
+  --slot blocking="{blocking issue count, or omit the flag when there are none}" \
+  --json
 ```
 
 Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
+
+> **The two slots the `review` lead reads, and how to fill them.**
+>
+> **`outcome` is a text slot, interpolated verbatim into "— the result was …". Do not pass the review's
+> raw verdict token.** `READY TO IMPLEMENT`, `NEEDS REVISION` and `REQUIRES REWORK` are internal
+> vocabulary, and [`references/stakeholder-summary.md`](stakeholder-summary.md) requires internal
+> tokens to be *mapped*, never passed through — the one paragraph written for a reader with no
+> technical background is the last place a raw token belongs. Map at the call site:
+>
+> | Review verdict | `outcome` value |
+> | :--- | :--- |
+> | `READY TO IMPLEMENT` / GO | `ready to build` |
+> | `NEEDS REVISION` | `needs more detail` |
+> | `REQUIRES REWORK` / NO-GO | `needs rework` |
+>
+> **`blocking` is a boolean slot and its two renderings are opposites**, so getting it wrong says the
+> wrong thing rather than saying nothing. A present, truthy value renders "Some things need answering
+> before work can start"; absent renders "Nothing is blocking the work from starting". The engine reads
+> `""`, `0`, `false`, `no`, `none`, `null`, `undefined` and `off` as **absent**, so passing a count of
+> zero is safe — but omitting the flag when there are no blocking findings is clearer.
 
 On failure: log warning in Issues Log and continue.
 
