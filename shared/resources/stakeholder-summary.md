@@ -15,6 +15,12 @@ description: The plain-language lead every tracker comment opens with — what a
 Nothing below the rule is removed or rewritten. A stakeholder gets the gist from the first paragraph;
 a developer keeps every table, path and score they had.
 
+> **The `---` is GitHub-only, and that is accepted rather than a defect.** Jira comments are built as
+> ADF, and the converter emits no rule node, so on Jira the lead arrives as its own paragraph and the
+> body follows directly — delimited by the paragraph boundary alone. Teaching the converter to emit
+> rules would change every Jira description this repository has ever rendered, which is a far larger
+> change than a comment lead warrants.
+
 **The lead is rendered by the engine, not written by the caller.** `tracker-comment.js` looks up the
 `--stage` it is already given, renders the matching template, and prepends it. That is what makes this
 a property of the system rather than a convention: a call site cannot forget the lead, because it never

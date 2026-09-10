@@ -277,8 +277,6 @@ test("no marker match → posts, with the marker prepended as the first line", a
       "--body-file",
       f,
       "--stage",
-      "done",
-      "--stage",
       "in-review",
       "--quiet",
     ],
@@ -317,8 +315,6 @@ test("exactly one marker match → reason 'already', nothing posted twice", asyn
       f,
       "--stage",
       "done",
-      "--stage",
-      "done",
       "--quiet",
     ],
     execImpl: gh.execImpl,
@@ -352,8 +348,6 @@ test("two marker matches → 'unverifiable', never 'already', and nothing posted
       f,
       "--stage",
       "done",
-      "--stage",
-      "done",
       "--quiet",
     ],
     execImpl: gh.execImpl,
@@ -380,8 +374,6 @@ test("an unreadable comment list → 'unverifiable', not a blind post", async ()
       "42",
       "--body-file",
       f,
-      "--stage",
-      "done",
       "--stage",
       "done",
       "--quiet",
@@ -517,8 +509,6 @@ test("--strict turns a skip into exit 1, but never turns 'already' into one", as
       f,
       "--stage",
       "done",
-      "--stage",
-      "done",
       "--quiet",
       "--strict",
     ],
@@ -540,8 +530,6 @@ test("--dry-run reads nothing and writes nothing", async () => {
       "42",
       "--body-file",
       f,
-      "--stage",
-      "done",
       "--stage",
       "done",
       "--dry-run",
@@ -568,8 +556,6 @@ test("--dry-run is exempt from the access gate (it mutates nothing)", async () =
       "42",
       "--body-file",
       f,
-      "--stage",
-      "done",
       "--stage",
       "done",
       "--dry-run",
@@ -763,8 +749,6 @@ test("a stage that PREFIXES another stage does not match its marker", async () =
       "--body-file",
       f,
       "--stage",
-      "done",
-      "--stage",
       "review",
       "--quiet",
     ],
@@ -794,8 +778,6 @@ test("qa-cycle does not match qa-cycle-2", async () => {
       "42",
       "--body-file",
       f,
-      "--stage",
-      "done",
       "--stage",
       "qa-cycle",
       "--quiet",
@@ -906,8 +888,6 @@ test("an unknown --stage is a usage error", async () => {
       "42",
       "--body-file",
       f,
-      "--stage",
-      "done",
       "--stage",
       "totally-made-up",
       "--quiet",
@@ -1461,8 +1441,6 @@ test("github: the comment read is paginated, and a partial read is unverifiable 
       f,
       "--stage",
       "done",
-      "--stage",
-      "done",
       "--quiet",
     ],
     execImpl,
@@ -1503,8 +1481,6 @@ test("github: the paginated read finds a marker across pages (NEW-3)", async () 
       "42",
       "--body-file",
       f,
-      "--stage",
-      "done",
       "--stage",
       "done",
       "--quiet",
@@ -1713,21 +1689,172 @@ test("--json reports which route produced the lead", async () => {
   }
 });
 
-test("jira: the lead is its own ADF paragraph node, above the body", () => {
-  // The HIGH risk this task names: a markdown string appended into an ADF
-  // document renders as literal text or is dropped outright. Assert on the NODE
-  // TREE, never on a serialised string — a string match would pass on exactly
-  // the malformed document this is guarding against.
-  const lead = renderLead("done", {});
-  const doc = jira.buildCommentAdf(
-    `${lead}\n\n---\n\n## Accepted\n\n| AC | 7/7 |`,
-    "done",
+test("jira: the lead reaches the ADF document as its own paragraph node", async () => {
+  // THE HIGH RISK THIS TASK NAMES, and it must be tested through the composition
+  // path, not the renderer. The first version of this test hand-built the string
+  // `${lead}\n\n---\n\n${body}` and passed it to buildCommentAdf — so it asserted
+  // on its own construction and would have passed unchanged if tracker-comment.js
+  // never composed a lead for Jira at all, or composed it AFTER the body. The
+  // reviewer's own independent check made the identical mistake. Drive it through
+  // cli.run and assert on the document the transport actually receives.
+  const dir = withRepo();
+  const f = bodyFile(
+    dir,
+    "## Accepted\n\n| AC | 7/7 |\n| --- | --- |\n| a | b |",
   );
+  const j = stubJira({ comments: [] });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: explode("gh"),
+    fetchImpl: j.fetchImpl,
+    repoRoot: dir,
+    env: { ...JIRA_ENV },
+  });
+  assert.equal(r.reason, "posted");
+
+  const post = j.calls.find((c) => c.method === "POST");
+  const doc = JSON.parse(post.body).body;
+  assert.equal(doc.type, "doc", "ADF document, not a plain string");
+
+  // Node tree, never a serialised string: a string match would pass on exactly
+  // the malformed document this risk is about (a lead rendered as literal text).
+  const lead = renderLead("done", {});
   assert.equal(doc.content[0].type, "paragraph", "the lead leads");
-  assert.equal(doc.content[0].content[0].text, lead);
-  assert.equal(doc.content[1].type, "heading", "the caller's body follows");
-  // The identity marker stays the last node — the lead is unshifted at the
+  assert.equal(
+    doc.content[0].content.map((n) => n.text || "").join(""),
+    lead,
+    "the lead arrives verbatim, not markdown-mangled",
+  );
+  assert.equal(
+    doc.content[1].type,
+    "heading",
+    "the caller's body follows the lead",
+  );
+  // The identity marker stays the LAST node — the lead is unshifted at the
   // front, never appended, so it cannot displace the footer.
-  assert.equal(doc.content.at(-1).type, "paragraph");
-  assert.ok(doc.content.at(-1).content[0].marks.some((m) => m.type === "em"));
+  assert.ok(
+    (doc.content.at(-1).content || []).some((n) =>
+      (n.marks || []).some((m) => m.type === "em"),
+    ),
+    "the italic identity footer is still last",
+  );
+});
+
+test("jira: every stage's lead survives the composition path intact", async () => {
+  // The per-stage sweep the renderer-only check was standing in for. Driven
+  // through cli.run so it covers composition, for all eleven stages.
+  for (const stage of cli.COMMENT_STAGES) {
+    const dir = withRepo();
+    const f = bodyFile(dir, "## Heading\n\nprose");
+    const j = stubJira({ comments: [] });
+    const r = await cli.run({
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "PROJ-1",
+        "--body-file",
+        f,
+        "--stage",
+        stage,
+        "--quiet",
+      ],
+      execImpl: explode("gh"),
+      fetchImpl: j.fetchImpl,
+      repoRoot: dir,
+      env: { ...JIRA_ENV },
+    });
+    assert.equal(r.reason, "posted", `${stage} did not post`);
+    const doc = JSON.parse(j.calls.find((c) => c.method === "POST").body).body;
+    assert.equal(
+      doc.content[0].type,
+      "paragraph",
+      `${stage}: first node is ${doc.content[0].type}, not the lead`,
+    );
+    assert.equal(
+      doc.content[0].content.map((n) => n.text || "").join(""),
+      renderLead(stage, {}),
+      `${stage}: lead did not survive composition`,
+    );
+  }
+});
+
+// ── QA cycle 1 fixes (T104-003, T104-004) ──────────────────────────────────
+
+test("an empty --summary-file is a usage error, not a silently absent lead", async () => {
+  // T104-003. It used to post with no lead while --json still reported
+  // `lead: "summary-file"` — so the JSON contract lied, and
+  // `--summary-file /dev/null` was a one-flag bypass of the whole standard.
+  // Same rule as --body-file, which has always been exit 2 when empty.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  for (const content of ["", "   \n  \n"]) {
+    const empty = join(dir, "empty.md");
+    writeFileSync(empty, content, "utf8");
+    const gh = stubGh();
+    const r = await cli.run({
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--summary-file",
+        empty,
+        "--quiet",
+      ],
+      execImpl: gh.execImpl,
+      repoRoot: dir,
+      env: { ...baseEnv },
+    });
+    assert.equal(r.exitCode, 2);
+    assert.equal(
+      gh.calls.filter((c) => c.argv[1] === "comment").length,
+      0,
+      "nothing may be posted for an empty lead",
+    );
+  }
+});
+
+test("the deferred record's `desired` label names the comment, not the lead", async () => {
+  // T104-004. `desired` is what a human reads in the handover checklist to tell
+  // one pending action from another. Merging the lead into `body` made it
+  // near-identical for every comment sharing a stage — the label stopped
+  // labelling. command.stdin still carries the composed body, since that is what
+  // actually gets posted.
+  const dir = withRepo();
+  const f = bodyFile(dir, "## QA Gate: FAIL — story 4.2 cache\n\ndetail");
+  await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "qa-gate",
+      "--quiet",
+    ],
+    execImpl: explode("gh"),
+    repoRoot: dir,
+    env: { ...baseEnv, ACCESS_TRACKER: "manual" },
+  });
+  const rec = readJournal(dir)[0];
+  assert.equal(rec.desired, "QA Gate: FAIL — story 4.2 cache");
+  assert.ok(
+    rec.command.stdin.startsWith(renderLead("qa-gate", {})),
+    "the composed body, lead included, is still what would be posted",
+  );
 });

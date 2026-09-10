@@ -18,7 +18,7 @@
  *      makes no network call.
  *
  * Usage:
- *   tracker-comment.js --issue <key|N> --body-file <path> [--stage <name>]
+ *   tracker-comment.js --issue <key|N> --body-file <path> --stage <name>
  *                      [--json] [--quiet] [--dry-run] [--strict]
  *                      [--tracker jira|github]
  *
@@ -116,7 +116,7 @@ const COMMENT_STAGES = Object.freeze([
 const USAGE = `tracker-comment — post one comment to a tracker issue
 
 Usage:
-  tracker-comment.js --issue <key|N> --body-file <path> [--stage <name>]
+  tracker-comment.js --issue <key|N> --body-file <path> --stage <name>
                      [--json] [--quiet] [--dry-run] [--strict]
                      [--tracker jira|github]
 
@@ -126,13 +126,17 @@ Options:
   --slot k=v      Fill a slot in the stage's plain-language lead. Repeatable.
   --summary-file, -S
                   Path to a hand-written plain-language lead, overriding the
-                  stage's template. Required when --stage has no template.
+                  stage's template. REQUIRED when --stage is omitted — every
+                  known stage has a template, so that is the only case where a
+                  lead cannot otherwise be produced. Must not be empty.
                   A file, never an inline string: bodies contain backticks,
                   $(…) and newlines, and an interpolated body is a shell
                   injection waiting for the first comment that contains one.
-  --stage, -s     Moment identity, used to build the idempotency marker
-                  (e.g. work-started, in-review, done). Omit for an
-                  unmarked comment that is posted every time.
+  --stage, -s     The comment's identity — builds the idempotency marker AND
+                  selects the plain-language lead. REQUIRED unless --summary-file
+                  is given: a comment for which no lead can be produced does not
+                  post. Omitting it yields an unmarked comment, posted on every
+                  run, and then --summary-file must supply the lead.
   --tracker       Force the tracker instead of detecting it.
   --json          Emit a JSON result object on stdout.
   --quiet         Suppress informational output.
@@ -561,6 +565,14 @@ async function run({
       );
       return { exitCode: 2 };
     }
+    // Same rule as --body-file: an empty file is a usage error, not an empty
+    // lead. Silently posting without one made --summary-file /dev/null a
+    // one-flag bypass of the standard this module exists to enforce, while
+    // --json still reported `lead: "summary-file"` — a contract that lied.
+    if (!leadSource) {
+      output.err(`Error: --summary-file "${args.summaryFile}" is empty`);
+      return { exitCode: 2 };
+    }
   } else {
     leadSource = renderLead(args.stage, args.slots || {});
   }
@@ -580,13 +592,16 @@ async function run({
   }
 
   leadKind = args.summaryFile ? "summary-file" : "template";
-  // An empty --summary-file must not emit a bare horizontal rule with nothing
-  // above it. This branch is reachable even though the guard rejects `null`:
-  // null means "no lead could be produced", "" means "a lead was supplied and
-  // is empty", and only the first is an error.
-  if (leadSource) {
-    body = `${leadSource}\n\n---\n\n${body}`;
-  }
+
+  // Captured BEFORE the merge below. `desired:` is the label a human reads in
+  // the deferred/handover checklist to tell one pending action from another,
+  // and the lead is by design near-identical across every comment of a given
+  // stage — exactly the wrong thing to label them with. command.stdin still
+  // carries the composed body, because that is what gets posted.
+  const desiredLine = firstLineOf(body);
+  // Unconditional: `null` is rejected by the guard above and `""` by the
+  // empty-file check, so every path reaching here has a real lead.
+  body = `${leadSource}\n\n---\n\n${body}`;
 
   const skipCode = args.strict ? 1 : 0;
 
@@ -629,7 +644,7 @@ async function run({
               : `issue #${issue}`,
             ui_url: uiUrl,
           },
-          desired: firstLineOf(body),
+          desired: desiredLine,
           manual: {
             deepLink: uiUrl,
             ui: "Open the issue → Comment → Paste → Save",

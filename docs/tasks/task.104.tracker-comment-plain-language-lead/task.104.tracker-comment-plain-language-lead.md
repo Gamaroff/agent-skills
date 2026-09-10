@@ -5,7 +5,7 @@ type: task
 description: "Stakeholders reading Jira cards and GitHub issues cannot follow the pipeline's comments — they open with gate verdicts, file paths and step numbers. Build the primitive: a per-stage catalogue of non-technical lead paragraphs, rendered by tracker-comment.js and prepended above every body, with a guard that refuses to post a comment for which no lead can be produced."
 tags: [tracker-comment, stakeholder-communication, shared-resources, engine]
 category: infrastructure
-status: in-progress
+status: ready-for-review
 priority: Medium
 risk_level: medium
 created: 2026-09-09
@@ -17,7 +17,7 @@ github_issue: 376
 
 # Technical Task: the plain-language lead, as an engine primitive
 
-**Status:** In Progress
+**Status:** Ready for Review
 **GitHub Issue**: [#376](https://github.com/Gamaroff/agent-skills/issues/376)
 **Review**: ✅ All review recommendations from `task.104.review.1.tracker-comment-plain-language-lead.md` implemented 2026-09-10
 
@@ -471,6 +471,7 @@ composition path.
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Status → ready-for-review — all four phases implemented; ci:fast 3106 pass / 0 fail and eval:all green; three mutation proofs recorded | develop |
 | 2026-09-10 |  | QA gate FAIL (30/100) — 7 findings; slot values are strings consumed by truthiness, so `blocking=false` renders the blocking sentence | qa-task |
+| 2026-09-10 |  | qa-fix cycle 1 — all 7 findings closed; slot coercion at the boundary, hasOwnProperty lookup guard, empty --summary-file rejected, `desired:` label preserved, help text reconciled, Jira ADF test driven through the composition path, 12 duplicate flags removed. Each fix mutation-proven | qa-fix |
 
 ---
 

@@ -148,6 +148,49 @@ const LEAD_TEMPLATES = Object.freeze({
  * Kept deliberately consistent with the same strip in
  * evals/shared/tests/transition-protocol-parity.test.mjs.
  */
+/**
+ * Slot values arrive from `--slot k=v` as STRINGS, always — the CLI has no type
+ * information to give them. Templates then consume them by truthiness, so the
+ * string "false" is truthy and `--slot blocking=false` rendered "Some things
+ * need answering before work can start": the opposite of what the caller said,
+ * in the one paragraph aimed at a reader who cannot check the body underneath
+ * it. `blocking_count=0` and `count=0` failed the same way.
+ *
+ * Coerce at the boundary, so a template can go on being written the obvious way.
+ * A missing lead is a gap; a confidently wrong one is misinformation.
+ */
+const FALSEY_SLOT_VALUES = Object.freeze([
+  "",
+  "0",
+  "false",
+  "no",
+  "none",
+  "null",
+  "undefined",
+]);
+
+function normaliseSlots(slots) {
+  if (!slots || typeof slots !== "object") return {};
+  const out = Object.create(null);
+  // OWN properties only. An inherited slot is never something the caller meant
+  // to pass, and reading one lets a caller-constructed prototype reach the lead.
+  for (const key of Object.keys(slots)) {
+    const raw = slots[key];
+    if (raw === null || raw === undefined) continue;
+    const value = typeof raw === "string" ? raw.trim() : raw;
+    if (
+      typeof value === "string" &&
+      FALSEY_SLOT_VALUES.includes(value.toLowerCase())
+    ) {
+      continue; // absent, not false — the template's own `? :` then reads correctly
+    }
+    if (typeof value === "number" && !Number.isFinite(value)) continue;
+    if (value === false) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
 const CYCLE_SUFFIX = /-\d+$/;
 
 const LEAD_STAGES = Object.freeze(Object.keys(LEAD_TEMPLATES));
@@ -162,9 +205,16 @@ const LEAD_STAGES = Object.freeze(Object.keys(LEAD_TEMPLATES));
 function renderLead(stage, slots = {}) {
   if (typeof stage !== "string" || stage === "") return null;
   const key = stage.replace(CYCLE_SUFFIX, "");
+  // hasOwnProperty, not a bare bracket lookup: `LEAD_TEMPLATES["__proto__"]`
+  // resolves up the prototype chain and is then CALLED, so renderLead threw for
+  // `__proto__`/`valueOf` and returned a non-string for `constructor`/`toString`
+  // — contradicting this function's own "returns null, never throws" contract,
+  // which tracker-comment.js's exit-2 guard depends on. hasTemplate below always
+  // guarded correctly; the two disagreed on the same input.
+  if (!Object.prototype.hasOwnProperty.call(LEAD_TEMPLATES, key)) return null;
   const template = LEAD_TEMPLATES[key];
-  if (!template) return null;
-  return template(slots && typeof slots === "object" ? slots : {});
+  if (typeof template !== "function") return null;
+  return template(normaliseSlots(slots));
 }
 
 /** Whether the catalogue can render this stage. Same normalisation as renderLead. */

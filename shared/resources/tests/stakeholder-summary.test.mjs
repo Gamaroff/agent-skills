@@ -177,3 +177,88 @@ test("every catalogue key is a stage the engine knows", () => {
     );
   }
 });
+
+// ── Slot coercion and lookup safety (QA cycle 1: T104-001, T104-005) ────────
+
+test("a string slot that means 'no' is treated as absent, not as truthy", () => {
+  // T104-001, the cycle-1 HIGH. Slot values arrive from `--slot k=v` as STRINGS
+  // and templates consume them by truthiness, so "false" rendered the BLOCKING
+  // sentence — the opposite of what the caller said, in the one paragraph a
+  // non-technical reader cannot check against the body underneath it.
+  for (const falsey of [
+    "false",
+    "no",
+    "0",
+    "none",
+    "null",
+    "undefined",
+    "",
+    "  ",
+  ]) {
+    const lead = renderLead("review", { blocking: falsey });
+    assert.ok(
+      !lead.includes("Some things need answering"),
+      `blocking=${JSON.stringify(falsey)} rendered the blocking sentence`,
+    );
+    assert.ok(lead.includes("Nothing is blocking"));
+  }
+});
+
+test("a slot that means 'yes' still renders", () => {
+  // The other direction: coercion must not swallow real values.
+  assert.ok(
+    renderLead("review", { blocking: "true" }).includes(
+      "Some things need answering",
+    ),
+  );
+  assert.ok(
+    renderLead("develop-complete", { count: "3" }).includes(
+      "(3 separate pieces of work)",
+    ),
+  );
+  assert.ok(
+    renderLead("qa-gate", { blocking_count: "2" }).includes("2 of them"),
+  );
+  assert.ok(renderLead("qa-cycle", { cycle: "4" }).includes("round 4"));
+});
+
+test("a numeric-zero slot reads as absent, not as the number nought", () => {
+  assert.ok(
+    !renderLead("develop-complete", { count: "0" }).includes("separate pieces"),
+    "count=0 rendered '(0 separate pieces of work)'",
+  );
+  assert.ok(
+    !renderLead("qa-gate", { blocking_count: "0" }).includes("0 of them"),
+    "blocking_count=0 rendered '0 of them must be dealt with'",
+  );
+});
+
+test("a prototype-chain key returns null rather than throwing or leaking", () => {
+  // T104-005. `LEAD_TEMPLATES[key]` walked the prototype chain and CALLED what it
+  // found: __proto__ and valueOf threw, constructor returned an object, toString
+  // returned "[object Undefined]". The docblock promises null and never throws,
+  // and tracker-comment.js's exit-2 guard depends on it. "nonsense" cannot catch
+  // this class, which is why it is enumerated.
+  for (const key of [
+    "__proto__",
+    "constructor",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "propertyIsEnumerable",
+  ]) {
+    let result;
+    assert.doesNotThrow(() => {
+      result = renderLead(key, {});
+    }, `renderLead(${key}) threw`);
+    assert.equal(result, null, `renderLead(${key}) returned ${typeof result}`);
+    assert.equal(hasTemplate(key), false);
+  }
+});
+
+test("slots are read as own properties, never through the prototype chain", () => {
+  const hostile = Object.create({ title: "PWNED", pr: "PWNED" });
+  assert.ok(!renderLead("work-started", hostile).includes("PWNED"));
+  assert.ok(!renderLead("done", hostile).includes("PWNED"));
+});
