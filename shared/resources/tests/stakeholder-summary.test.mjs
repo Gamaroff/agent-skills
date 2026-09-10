@@ -20,6 +20,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
 const { COMMENT_STAGES } = require("../tracker-comment.js");
@@ -27,6 +28,9 @@ const {
   LEAD_TEMPLATES,
   LEAD_STAGES,
   GATE_MEANING,
+  BOOLEAN_SLOTS,
+  NUMERIC_SLOTS,
+  TEXT_SLOTS,
   renderLead,
   hasTemplate,
 } = require("../stakeholder-summary.js");
@@ -308,4 +312,52 @@ test("an unknown verdict reaches the mapper and gets the safe fallback", () => {
   const lead = renderLead("qa-gate", { verdict: "none" });
   assert.ok(lead.includes("recorded below"));
   assert.ok(!lead.includes("no problems"), "must not read as reassurance");
+});
+
+test("every slot a template reads is classified as boolean, numeric or text", () => {
+  // Enumeration drift, the class this repository keeps paying for. The coercion
+  // lists live apart from the templates that consume them, so a new template
+  // introducing a boolean slot would get TEXT semantics by default — which
+  // re-opens the cycle-1 HIGH for that slot, because `--slot newflag=false` is a
+  // truthy string. Scanning the source for `s.<name>` reads is what makes the
+  // lists unable to fall quietly behind the templates.
+  const src = readFileSync(
+    new URL("../stakeholder-summary.js", import.meta.url),
+    "utf8",
+  );
+  // Only the template bodies — everything from LEAD_TEMPLATES to its close.
+  const from = src.indexOf("const LEAD_TEMPLATES");
+  const to = src.indexOf("const CYCLE_SUFFIX");
+  assert.ok(from > 0 && to > from, "could not locate the template block");
+  const names = new Set(
+    [...src.slice(from, to).matchAll(/\bs\.([A-Za-z_][A-Za-z0-9_]*)/g)].map(
+      (m) => m[1],
+    ),
+  );
+  // Non-vacuity: a regex that matched nothing would pass this test silently.
+  assert.ok(
+    names.size >= 4,
+    `only found ${names.size} slot reads — scan broke`,
+  );
+
+  const classified = new Set([
+    ...BOOLEAN_SLOTS,
+    ...NUMERIC_SLOTS,
+    ...TEXT_SLOTS,
+  ]);
+  for (const name of names) {
+    assert.ok(
+      classified.has(name),
+      `template slot "${name}" is not in BOOLEAN_SLOTS, NUMERIC_SLOTS or TEXT_SLOTS — ` +
+        `it would silently get text semantics, and a boolean slot then renders its ` +
+        `affirmative branch for --slot ${name}=false`,
+    );
+  }
+  // And the converse: a classified name no template reads is dead weight.
+  for (const name of classified) {
+    assert.ok(
+      names.has(name),
+      `"${name}" is classified but no template reads it`,
+    );
+  }
 });

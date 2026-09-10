@@ -433,32 +433,34 @@ one named arm outstanding rather than reopening the whole task.
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-10
-**Quality Score**: 30/100
-**Gate Decision**: FAIL
+**Quality Score**: 92/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.104.qa.1.tracker-comment-plain-language-lead.md](./task.104.qa.1.tracker-comment-plain-language-lead.md)
-- **Gate File**: [task.104.gate.1.tracker-comment-plain-language-lead.yml](./task.104.gate.1.tracker-comment-plain-language-lead.yml)
+- **Cycle 2 (current)**: [task.104.qa.2.*.md](./task.104.qa.2.tracker-comment-plain-language-lead.md) · [task.104.gate.2.*.yml](./task.104.gate.2.tracker-comment-plain-language-lead.yml)
+- **Cycle 1**: [task.104.qa.1.*.md](./task.104.qa.1.tracker-comment-plain-language-lead.md) · [task.104.gate.1.*.yml](./task.104.gate.1.tracker-comment-plain-language-lead.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3107 (`ci:fast`), `eval:all` exit 0
-- **Phases Verified**: 4/4 implemented; 2/4 carry findings
-- **Critical Issues**: 1 HIGH, 6 MEDIUM
-- **NFR Status**: Security: PASS (measured, 16 probes), Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Tests Executed**: 3124 (`ci:fast` 3123 pass / 0 fail), `eval:all` exit 0
+- **Phases Verified**: 4/4
+- **Findings**: 13 across two cycles — all closed, all mutation-proven. 0 open
+- **NFR Status**: Security: PASS (measured, 16 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Slot values arrive from the CLI as strings and the templates consume them by truthiness, so
-`--slot blocking=false` renders "Some things need answering before work can start" — the opposite of
-what the caller said, in the one paragraph written for a reader who cannot check the body underneath
-it. Six MEDIUM findings accompany it, including help text that still documents the behaviour the new
-guard rejects, and a Jira ADF test that asserts on its own construction rather than on the
-composition path.
+Two cycles, thirteen findings, all closed. Cycle 1's blocking defect: slot values arrive from the
+CLI as strings and the templates consumed them by truthiness, so `--slot blocking=false` rendered the
+opposite of what the caller said, in the one paragraph aimed at a reader who cannot check the body
+underneath it.
+
+Cycle 2 was a refute pass, and every defect it found was **inside cycle 1's own fixes** — including
+one where a finding had been closed on the GitHub arm while the identical regression survived on the
+Jira arm, with a `status: closed` sitting on top of it. That is the case the refute rule exists for.
 
 ---
 
@@ -472,7 +474,7 @@ composition path.
 | 2026-09-10 |  | Status → ready-for-review — all four phases implemented; ci:fast 3106 pass / 0 fail and eval:all green; three mutation proofs recorded | develop |
 | 2026-09-10 |  | QA gate FAIL (30/100) — 7 findings; slot values are strings consumed by truthiness, so `blocking=false` renders the blocking sentence | qa-task |
 | 2026-09-10 |  | qa-fix cycle 1 — all 7 findings closed; slot coercion at the boundary, hasOwnProperty lookup guard, empty --summary-file rejected, `desired:` label preserved, help text reconciled, Jira ADF test driven through the composition path, 12 duplicate flags removed. Each fix mutation-proven | qa-fix |
-| 2026-09-10 |  | QA cycle 2 (refute pass) — 2 new findings, both defects in cycle 1's own fixes: slot coercion was swallowing legitimate text values, and a zero-width-only summary file bypassed the empty check. Both closed and mutation-proven within the cycle | qa-task |
+| 2026-09-10 |  | QA cycle 2 (refute pass) — gate PASS 92/100, zero open findings. 4 new findings + 2 cleanups, both defects in cycle 1's own fixes: slot coercion was swallowing legitimate text values, and a zero-width-only summary file bypassed the empty check. all in cycle 1's own fixes, all closed and mutation-proven within the cycle | qa-task |
 
 ---
 

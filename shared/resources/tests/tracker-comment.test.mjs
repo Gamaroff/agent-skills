@@ -1889,3 +1889,143 @@ test("a zero-width-only --summary-file is empty, not an invisible lead", async (
     assert.equal(gh.calls.filter((c) => c.argv[1] === "comment").length, 0);
   }
 });
+
+test("jira: the PRE-GATE deferred record labels with the comment, not the lead", async () => {
+  // Named for what it actually covers. ACCESS_TRACKER=manual reaches run()'s
+  // pre-gate defer (skill: "tracker-comment") on the Jira arm — NOT
+  // jira.addComment's in-flight defer, which needs jira-sync's own
+  // ACCESS_ENV_AT_LOAD snapshot to disagree with run()'s. This test passed with
+  // the addComment fix reverted, so it was renamed rather than left claiming
+  // coverage it does not give; the contract itself is held by
+  // "jira addComment labels its deferred record with `desired`" below.
+  const dir = withRepo();
+  const f = bodyFile(dir, "## QA Gate: FAIL — story 4.2 cache\n\ndetail");
+  await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "PROJ-1",
+      "--body-file",
+      f,
+      "--stage",
+      "qa-gate",
+      "--quiet",
+    ],
+    execImpl: explode("gh"),
+    fetchImpl: explode("fetch"),
+    repoRoot: dir,
+    env: { ...JIRA_ENV, ACCESS_TRACKER: "manual" },
+  });
+  const rec = readJournal(dir)[0];
+  assert.equal(rec.desired, "QA Gate: FAIL — story 4.2 cache");
+  assert.ok(
+    rec.command.stdin.startsWith(renderLead("qa-gate", {})),
+    "the composed body, lead included, is still what would be posted",
+  );
+});
+
+test("a lead's zero-width characters are tested against, never stripped from, what posts", async () => {
+  // The cycle-2 refute pass caught this in the cycle-2 fix: stripping the
+  // zero-width set from the CONTENT deleted U+200D — the joiner inside every
+  // ZWJ emoji sequence, and load-bearing for Indic and Arabic shaping. Closing
+  // an emptiness hole is no licence to rewrite a human's text.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  const lead = join(dir, "zwj.md");
+  writeFileSync(lead, "Shipped by 👩‍💻 today", "utf8");
+  const gh = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--summary-file",
+      lead,
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.reason, "posted");
+  const posted = gh.calls.find((c) => c.argv[1] === "comment").input;
+  assert.ok(
+    posted.includes("👩‍💻"),
+    "the ZWJ emoji sequence must survive verbatim",
+  );
+  assert.ok(posted.startsWith("Shipped by 👩‍💻 today"));
+});
+
+test("a zero-width-only --body-file is empty too, so the two flags agree", async () => {
+  const dir = withRepo();
+  const f = join(dir, "invisible-body.md");
+  writeFileSync(f, "​​﻿", "utf8");
+  const gh = stubGh();
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv },
+  });
+  assert.equal(r.exitCode, 2);
+  assert.equal(gh.calls.filter((c) => c.argv[1] === "comment").length, 0);
+});
+
+test("jira addComment labels its deferred record with `desired`, not the body's first line", async () => {
+  // WHY THIS IS A UNIT TEST AND NOT AN END-TO-END ONE. The first attempt drove
+  // cli.run with ACCESS_TRACKER=manual and asserted on the journal — and it
+  // PASSED with the fix reverted, because that env reaches the PRE-GATE defer in
+  // run() (skill: "tracker-comment"), never addComment's in-flight defer, which
+  // fires only when jira-sync's own ACCESS_ENV_AT_LOAD snapshot disagrees with
+  // run()'s. The mutation proof is what exposed it: reverting the fix turned no
+  // test red. Injecting `http` and asserting on the descriptor addComment builds
+  // tests the contract directly, without depending on a module-load race.
+  const captured = [];
+  const http = async (url, opts) => {
+    captured.push(opts);
+    return { ok: true, status: 201, json: async () => ({ id: "1" }) };
+  };
+  const common = {
+    http,
+    baseUrl: "https://x.atlassian.net",
+    email: "a@b.c",
+    token: "t",
+    issueKey: "PROJ-1",
+  };
+  const body =
+    "The lead sentence.\n\n---\n\n## QA Gate: FAIL — story 4.2 cache";
+
+  await jira.addComment({
+    ...common,
+    body,
+    desired: "QA Gate: FAIL — story 4.2 cache",
+    momentId: "qa-gate",
+  });
+  assert.equal(
+    captured.at(-1).defer.desired,
+    "QA Gate: FAIL — story 4.2 cache",
+    "the caller's label must win",
+  );
+
+  // And without it, the old behaviour — so every other caller is unaffected.
+  await jira.addComment({ ...common, body, momentId: "qa-gate" });
+  assert.equal(
+    captured.at(-1).defer.desired,
+    jira.firstLineOf(body),
+    "absent `desired` falls back to the body's first line",
+  );
+});

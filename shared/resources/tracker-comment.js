@@ -246,6 +246,22 @@ function isKnownStage(stage) {
 }
 
 /** GitHub/Bitbucket: an HTML comment, invisible when rendered. */
+/**
+ * Is there anything a human would SEE in this text?
+ *
+ * `.trim()` removes whitespace but not the zero-width set (U+200B–U+200D,
+ * U+FEFF, U+2060), so a file holding only those passes a bare `!text` check and
+ * posts something invisible. Used for emptiness TESTS only — never to transform
+ * the text that ships, because U+200D is meaningful inside emoji sequences and
+ * in Indic/Arabic shaping.
+ */
+function isVisiblyNonEmpty(text) {
+  return (
+    typeof text === "string" &&
+    text.replace(/[\u200B-\u200D\uFEFF\u2060]/g, "").trim() !== ""
+  );
+}
+
 function markerHtml(stage) {
   return `<!-- ${COMMENT_MARKER_PREFIX}${stage} -->`;
 }
@@ -508,7 +524,9 @@ async function run({
   // CRLF is normalised once, here, so neither branch has to think about it and
   // the marker match cannot fail on a stray \r.
   body = body.replace(/\r\n/g, "\n").trim();
-  if (!body) {
+  // Same visibility rule as --summary-file below: a body of only zero-width
+  // characters is empty, and the two flags must agree about what "empty" means.
+  if (!isVisiblyNonEmpty(body)) {
     output.err(`Error: --body-file "${args.bodyFile}" is empty`);
     return { exitCode: 2 };
   }
@@ -558,11 +576,6 @@ async function run({
       leadSource = fs
         .readFileSync(args.summaryFile, "utf-8")
         .replace(/\r\n/g, "\n")
-        // `.trim()` alone leaves zero-width and word-joiner characters, so a
-        // file holding only U+200B passed the empty check below and posted an
-        // INVISIBLE lead — the same bypass the check exists to close, wearing a
-        // different character. Strip the zero-width set before trimming.
-        .replace(/[\u200B-\u200D\uFEFF\u2060]/g, "")
         .trim();
     } catch (e) {
       output.err(
@@ -574,7 +587,14 @@ async function run({
     // lead. Silently posting without one made --summary-file /dev/null a
     // one-flag bypass of the standard this module exists to enforce, while
     // --json still reported `lead: "summary-file"` — a contract that lied.
-    if (!leadSource) {
+    //
+    // Emptiness is tested against a STRIPPED COPY and the ORIGINAL is posted.
+    // The first version of this check stripped the zero-width set from the
+    // content itself, which deleted U+200D from what actually shipped — the
+    // joiner inside every ZWJ emoji sequence, and load-bearing for Indic and
+    // Arabic shaping. "Shipped by 👩‍💻" posted as "Shipped by 👩💻". Closing an
+    // emptiness hole is no licence to rewrite a human's text.
+    if (!isVisiblyNonEmpty(leadSource)) {
       output.err(`Error: --summary-file "${args.summaryFile}" is empty`);
       return { exitCode: 2 };
     }
@@ -698,6 +718,7 @@ async function run({
         args,
         issue,
         body,
+        desiredLine,
         output,
         emit,
         env,
@@ -784,6 +805,7 @@ async function runJira({
   args,
   issue,
   body,
+  desiredLine,
   output,
   emit,
   env,
@@ -872,6 +894,7 @@ async function runJira({
       skill: "tracker-comment",
       ...common,
       body,
+      desired: desiredLine,
       momentId: args.stage,
     });
   } catch (e) {

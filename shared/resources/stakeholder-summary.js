@@ -168,6 +168,16 @@ const LEAD_TEMPLATES = Object.freeze({
  */
 const BOOLEAN_SLOTS = Object.freeze(["blocking"]);
 const NUMERIC_SLOTS = Object.freeze(["count", "blocking_count", "cycle"]);
+/**
+ * Text slots are listed too, even though they are the default branch, so that
+ * "which slots exist" is answerable from one place. A new template that reads a
+ * slot named nowhere here gets TEXT semantics silently — which for a BOOLEAN
+ * slot re-opens the exact defect this coercion was written to close, since
+ * `--slot newflag=false` is a truthy string. The test
+ * `every slot a template reads is classified` scans the template sources and
+ * fails on an unclassified name, so the list cannot quietly fall behind.
+ */
+const TEXT_SLOTS = Object.freeze(["title", "pr", "verdict", "outcome"]);
 const BOOLEAN_FALSE_WORDS = Object.freeze([
   "",
   "0",
@@ -240,7 +250,6 @@ function renderLead(stage, slots = {}) {
   // guarded correctly; the two disagreed on the same input.
   if (!Object.prototype.hasOwnProperty.call(LEAD_TEMPLATES, key)) return null;
   const template = LEAD_TEMPLATES[key];
-  if (typeof template !== "function") return null;
   return template(normaliseSlots(slots));
 }
 
@@ -255,6 +264,9 @@ function hasTemplate(stage) {
 
 module.exports = {
   LEAD_TEMPLATES,
+  BOOLEAN_SLOTS,
+  NUMERIC_SLOTS,
+  TEXT_SLOTS,
   LEAD_STAGES,
   GATE_MEANING,
   renderLead,

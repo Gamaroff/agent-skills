@@ -1,0 +1,157 @@
+schema: 1
+task: "task.104.tracker-comment-plain-language-lead"
+task_title: "Every tracker comment opens with a plain-language summary — the engine primitive"
+gate: PASS
+status_reason: "Cycle 1's seven findings are closed and mutation-proven. The cycle-2 refute pass found four further defects — all of them in cycle 1's own fixes, three of them mine — and all are now closed and mutation-proven. Zero open findings; ci:fast 3123 pass / 0 fail; eval:all green."
+reviewer: "QA Engineer"
+updated: "2026-09-10T13:05:00Z"
+
+top_issues:
+  - id: "C2-001"
+    severity: medium
+    file: "shared/resources/stakeholder-summary.js:169"
+    finding: >-
+      The cycle-1 slot-coercion fix applied ONE falsey-string list to every slot, so a TEXT slot
+      legitimately valued "No", "None" or "0" was silently dropped — `--slot title=None` rendered as
+      though no title were given. This is the failure that fix's own commit message named ("coercion
+      that swallowed real values would be the worse bug") and then shipped, and it is worse than the
+      defect it replaced because it fails silently in the opposite direction.
+    suggested_action: "Coerce per slot TYPE — done."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+
+  - id: "C2-002"
+    severity: low
+    file: "shared/resources/tracker-comment.js:258"
+    finding: >-
+      `.trim()` leaves U+200B/U+FEFF/U+2060, so a --summary-file holding only zero-width characters
+      passed the empty check and posted an invisible lead — the same bypass T104-003 closed, wearing
+      a different character. The identical hole was also still open on --body-file.
+    suggested_action: "Shared isVisiblyNonEmpty() predicate applied to both flags — done."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+
+  - id: "C2-003"
+    severity: medium
+    file: "shared/resources/jira-sync.js:5383"
+    finding: >-
+      T104-004 was fixed on ONE ARM ONLY, and the gate that closed it did not notice. `desiredLine`
+      is captured in run(), which feeds the pre-gate defer; the Jira arm's in-flight defer is built
+      inside jira.addComment and still derived the label from the already-composed body. So the
+      regression survived on the Jira path with a closed finding sitting on top of it. Found by the
+      cycle-2 refute pass, which reproduced both arms and showed them disagreeing.
+    suggested_action: "Thread `desired` through runJira into addComment, defaulting to firstLineOf(body) — done."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+
+  - id: "C2-004"
+    severity: medium
+    file: "shared/resources/tracker-comment.js:597"
+    finding: >-
+      The C2-002 fix stripped the zero-width set from the lead's CONTENT rather than only for the
+      emptiness test, so U+200D was deleted from what actually posted — the joiner inside every ZWJ
+      emoji sequence and load-bearing for Indic and Arabic shaping. "Shipped by 👩‍💻" posted as
+      "Shipped by 👩💻". Closing an emptiness hole is no licence to rewrite a human's text.
+    suggested_action: "Test emptiness against a stripped copy; post the original — done."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+
+  - id: "C2-005"
+    severity: low
+    file: "shared/resources/stakeholder-summary.js:243"
+    finding: >-
+      `typeof template !== "function"` was dead: the hasOwnProperty guard excludes every prototype
+      key and the frozen catalogue admits no non-function own value. Harmless, but permanently
+      uncoverable code that reads as a guard.
+    suggested_action: "Deleted."
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+
+  - id: "C2-006"
+    severity: low
+    file: "shared/resources/stakeholder-summary.js:169"
+    finding: >-
+      BOOLEAN_SLOTS / NUMERIC_SLOTS were hand-maintained key lists living apart from the templates
+      that consume them, with nothing asserting they agree. A new template introducing a boolean slot
+      would get text semantics by default — re-opening the cycle-1 HIGH for that slot. The
+      enumeration-drift class this repository keeps paying for.
+    suggested_action: >-
+      TEXT_SLOTS added and a test now scans the template sources for `s.<name>` reads, asserting each
+      is classified in exactly one list and that no classified name is unread — with a non-vacuity
+      floor so a broken scan cannot pass silently. Done.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 3124
+  phases_verified: "4/4"
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 16
+    notes: >-
+      Cycle-1 probes stand; the prototype-lookup finding they produced is closed and its regression
+      test enumerates seven prototype keys rather than relying on "nonsense". No new surface was
+      introduced in cycle 2 — the changes narrow input handling rather than widen it.
+  performance:
+    status: PASS
+    notes: "Still pure string work. The per-type coercion adds two array membership tests per slot."
+  reliability:
+    status: PASS
+    notes: >-
+      Both empty-lead doors closed and the two file flags now agree about what "empty" means, via one
+      shared predicate rather than two hand-kept checks. The emptiness test no longer mutates content.
+  maintainability:
+    status: PASS
+    notes: >-
+      The cycle-1 CONCERNS are resolved: help text reconciled, the vacuous Jira test replaced by one
+      that drives the composition path, duplicate flags removed. C2-006 adds a structural guard
+      against the enumeration drift that would otherwise have re-opened the cycle-1 HIGH silently.
+
+bug_resolution:
+  bugs_fixed: 13
+  bugs_remaining: 0
+  fix_date: "2026-09-10"
+  total_iterations: 2
+  verification_method: >-
+    Mutation proof per fix — the behaviour reverted and a NAMED test confirmed red — plus ci:fast
+    (3123 pass / 0 fail) and eval:all (exit 0). Each mutation script asserts that the mutation
+    actually applied before running the suite, after one attempt silently failed to apply and left
+    the suite green, which would have recorded a false "no test caught this".
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Pre-existing and deliberately not filed against this task — the deferred record's
+        command.stdin carries the body WITHOUT the idempotency marker on both arms, so replaying a
+        deferred comment posts an unmarked comment the next run will not suppress. Predates this
+        change set; worth its own bug.
+      refs: ["shared/resources/tracker-comment.js"]
+    - action: "One stripCycleSuffix() honouring CYCLE_SCOPED_STAGES; renderLead('done-1') renders while isKnownStage('done-1') is false"
+      refs: ["shared/resources/stakeholder-summary.js"]
+    - action: "Run the jargon and sentence-count assertions over slot-filled renderings, not only the slot-free path"
+      refs: ["shared/resources/tests/stakeholder-summary.test.mjs"]
+    - action: "Reconcile the task's Files Summary, which lists jira-sync.js as modified for an ADF change; it is now modified, but for the `desired` parameter instead"
+      refs: ["docs/tasks/task.104.tracker-comment-plain-language-lead/task.104.tracker-comment-plain-language-lead.md"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
