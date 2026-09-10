@@ -36,7 +36,7 @@ Give the eleven pull-request conversation templates a plain-language lead drawn 
 | 2. review-task             | ✅ Done    | `task.106.review.1.pr-comment-plain-language-lead.md` exists                | READY TO IMPLEMENT, 9/10. 0 Critical / 2 Important / 3 Optional — all applied. Status promoted `planned → ready-for-development` | PREPASS_B `aligned`; PREPASS_C `not-started` |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 5 phases; 3 test suites extended (52+53+10); 8 mutation proofs (4 re-run after a bad restore method); `npm run ci:fast` green, 0 failures | Pre-develop surface map (Explore) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #381](https://github.com/Gamaroff/agent-skills/pull/381) ← `develop`. Commit `44eacbe3`, 65 files, 65/65 in scope (no leak). Issue #380 commented (`in-review`, posted) | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.106.qa.{N}.*.md`; `task.106.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.106.qa.{N}.*.md`; `task.106.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Cycle 1 CONCERNS 80/100 (2 findings) → qa-fix → cycle 2 PASS 95/100, 0 open. Both PR and issue commented; the cycle-1 PASS was corrected publicly. Step 5c in flight | Step 3b code review (Explore) |
 | 7. finalise                | ⏳ Pending | `task.106.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -223,7 +223,42 @@ it.
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — CONCERNS (80/100)
+
+**Gate**: `task.106.gate.1.pr-comment-plain-language-lead.yml`
+
+Two findings, both from the Step 3b adversarial code review, both confirmed independently before
+being accepted:
+
+| id | severity | file | finding |
+| :-- | :--- | :--- | :--- |
+| T106-001 | high | `skills/finalise/SKILL.md` | Site 6 interpolated `${GAP_COUNT}` and `$GAP_REPORT_BODY`, neither bound anywhere in the file. Both expand to empty, so the gaps comment posts as a heading, a lead and a bare horizontal rule — nothing errors, because the numeric slot is dropped silently by design. |
+| T106-002 | medium | `shared/resources/tests/comment-slot-coverage.test.mjs` | The stage capture absorbed shell punctuation, so `$(node … --stage done)` captured `done)`. Not a catalogue key, so both Guard C content assertions skipped the site. 4 of 11 sites found but never checked, while the non-vacuity floor passed — it counts sites found. |
+
+**PROCESS DEFECT, recorded because it caused both to nearly ship.** Gate 1 was written `PASS` (95)
+and **published to PR #381 and issue #380** while the Step 3b review was still running. `qa-task`
+Step 3b ends at *dispatch*; Step 10 has no precondition requiring the result. A late gate costs
+minutes; an early one is broadcast and Steps 5c and 7 both key off it. Gate 1 was corrected in place
+to CONCERNS rather than rewritten clean, and a correction comment was posted to both surfaces.
+Logged as observation #56 against `qa-task` and `qa-story`.
+
+### QA Cycle 2 — PASS (95/100)
+
+**Gate**: `task.106.gate.2.pr-comment-plain-language-lead.yml`. Both findings fixed, 0 open.
+
+Fixes mutation-proved with **snapshot restore**, never `git checkout --`:
+
+| Mutation | Result |
+| :--- | :--- |
+| Revert the capture regex | 1 fail — the new resolvability assertion catches it |
+| Plant a wrong slot name at a site the **old** regex used to skip | 1 fail |
+
+The second is the decisive one: it proves the hole is closed rather than the symptom masked. Fixing
+the regex alone would have left the guard skipping silently on the next punctuation shape nobody
+anticipated, which is why the separate "every collected stage resolves to a real catalogue key"
+assertion was added.
+
+`npm run ci:fast` green, 0 failures. Committed as `284325a1`.
 
 ---
 

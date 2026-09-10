@@ -1620,7 +1620,12 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
    # and a bare horizontal rule with no gaps under it. That is the silent shape
    # this whole page keeps warning about, so the binding is not optional tidiness.
    DOC_FILE="{story-or-task-file}"
-   GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1} f' "$DOC_FILE")
+   # Bounded to the section: set the flag AFTER the heading (`next`), and clear it
+   # at the NEXT `## ` heading. Without the stop condition this captures to
+   # end-of-file — dragging Change Log, Progress Tracking, References and Notes
+   # into the comment, and counting THEIR checkboxes as gaps. Measured on a
+   # two-gap fixture: 5 counted instead of 2, four unrelated sections pasted in.
+   GAP_REPORT_BODY=$(awk '/^## Definition of Done - Gaps Identified/{f=1;next} /^## /{f=0} f' "$DOC_FILE")
    # Unmet criteria across every section of the gap report — an unchecked box.
    # `grep -c` prints 0 and EXITS 1 when it matches nothing, so `|| true` (never
    # `|| echo 0`, which would append a second zero and make the value "0\n0").

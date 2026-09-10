@@ -129,8 +129,9 @@ comment stops being idempotent — which shows up as duplicate comments on a re-
 - New catalogue entries for the pull-request moments that have no tracker equivalent: `pr-summary`,
   `board-warning`, `dod-gaps`.
 - The three board-warning notices rewritten to lead with consequence.
-- Tests: `pr-inline-comment.test.mjs`, `review-pr.test.js`, `review-code.test.js`,
-  `finalise-dod-prompt-contract.test.mjs`, `qa-execute-snippets.test.mjs`.
+- Tests: `pr-inline-comment.test.mjs`, `stakeholder-summary.test.mjs`,
+  `comment-slot-coverage.test.mjs`, `transition-protocol-parity.test.mjs`.
+  (§4 as authored named five different files; §7 records which were actually needed and why.)
 - `npm run bundle`.
 
 **Out of scope**
@@ -277,10 +278,11 @@ new stages are rendered via `renderLead(...)`, not passed as `--stage`, so that 
 | `shared/resources/tests/stakeholder-summary.test.mjs` | §5.4 — catalogue-key assertion widened to the union |
 | `shared/resources/tests/comment-slot-coverage.test.mjs` | iterates `LEAD_TEMPLATES` keys; the 3 new templates inherit its slot-name and no-slot-rendering guards |
 | `shared/resources/tests/pr-inline-comment.test.mjs` | §5.2 |
-| `skills/review-pr/tests/review-pr.test.js` | body-shape assertions |
-| `skills/review-code/tests/review-code.test.js` | body-shape assertions |
+| ~~`skills/review-pr/tests/review-pr.test.js`~~ | **not modified** — its assertions are generic over the body file and did not need changing |
+| ~~`skills/review-code/tests/review-code.test.js`~~ | **not modified** — same reason |
 | `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` | the de-escaping assertion at L211 |
-| `shared/resources/tests/qa-execute-snippets.test.mjs` | executed-snippet assertions |
+| ~~`shared/resources/tests/qa-execute-snippets.test.mjs`~~ | **not modified** — the converted blocks are refused as `mutating` (`node` is fail-closed in the engine's allow-list), so there is no executed snippet to assert on. See the cycle-1 Step 4b finding |
+| `evals/shared/tests/transition-protocol-parity.test.mjs` | **added to this list** — taught the third `--stage` engine; without it twenty literals were misattributed |
 
 **Regenerated**: `references/` copies across 14 skills, by `npm run bundle`. `review-code` gained
 `stakeholder-summary.js` **transitively** — `bundle_skill.py`'s `JS_SIBLING_RE` follows
@@ -467,6 +469,7 @@ detached worktree — `runnable=0` there too. Belongs to `qa-execute-snippets.mj
 | 2026-09-10 |  | Implemented — 5 phases, 12 files, 3 test suites (52 + 53 + 10 tests), 8 mutation proofs | develop |
 | 2026-09-10 |  | QA cycle 1 CONCERNS (80/100) — 2 findings: unbound GAP_COUNT/GAP_REPORT_BODY (high), Guard C capture bug skipping 4 of 11 sites (medium) | qa-task |
 | 2026-09-10 |  | QA cycle 2 PASS (95/100) — both findings fixed and mutation-proved, 0 open | qa-task |
+| 2026-09-10 |  | QA cycle 3 PASS (90/100) — CR-1/PC-1: the cycle-2 awk fix over-captured to end-of-file (5 gaps counted where 2); bounded to the section. PC-2: §7 corrected to match the diff | qa-task |
 
 ---
 

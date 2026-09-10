@@ -1,0 +1,105 @@
+schema: 1
+task: "task.106.pr-comment-plain-language-lead"
+task_title: "Pull-request summary comments open with a plain-language lead"
+gate: PASS
+status_reason: >-
+  Cycle 3. The Step 5c code lens found CR-1 — a HIGH defect in the cycle-2 FIX itself: the
+  GAP_REPORT_BODY awk had no stop condition, capturing to end-of-file. Reproduced before
+  being accepted (a two-gap fixture counted 5 gaps and pasted four unrelated sections into
+  the comment), fixed, and proved behaviourally. Nothing else outstanding.
+reviewer: "QA Engineer"
+updated: "2026-09-10T17:25:00Z"
+
+top_issues:
+  - id: "T106-003"
+    severity: high
+    file: "skills/finalise/SKILL.md"
+    finding: >-
+      The GAP_REPORT_BODY extraction added in cycle 2 —
+      awk '/^## Definition of Done - Gaps Identified/{f=1} f' — has no stop condition, so it
+      captures from the Gaps heading to end-of-file. Change Log, Progress Tracking, References
+      and Notes are dragged into the posted comment, and their checkboxes are counted as gaps.
+      Measured on a two-gap fixture: GAP_COUNT=5, four unrelated sections included.
+    suggested_action: >-
+      Bound the match to the section: set the flag after the heading and clear it at the next
+      `## ` heading.
+    suggested_owner: dev
+    status: closed
+    fixed_date: "2026-09-10"
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 116
+  phases_verified: "5/5"
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: "2026-09-10"
+  total_iterations: 2
+  verification_method: >-
+    Behavioural: the fixed and mutant awk programs run against a fixture carrying two real gaps
+    plus unrelated trailing sections. Fixed yields gap_count=2 / unrelated_sections=0; mutant
+    yields 5 / 4.
+
+coverage_gap:
+  statement: >-
+    T106-003's fix is proved by reproduction, NOT by a committed regression test. No harness in
+    this repo executes finalise's shell blocks — Step 4b refuses them as mutating, and `node`
+    and `awk` invocations are fail-closed in the snippet engine's allow-list. So this defect
+    class can recur without any suite going red. Stated rather than implied: the proof is real
+    but it is not durable, and the next person to edit that block has no guard.
+  severity: medium
+  owner: "shared/resources/qa-execute-snippets.mjs"
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: "Unchanged from cycle 2. The fix narrows an awk range; no new surface."
+  performance:
+    status: PASS
+    notes: "The bounded awk reads strictly less than the unbounded one."
+  reliability:
+    status: PASS
+    notes: >-
+      Materially improved. The gaps comment now carries the gaps section and nothing else, and
+      the count is the count of real unmet criteria. Both prior failure modes on this block —
+      posting nothing (cycle 1) and posting too much with a wrong count (cycle 2) — are closed.
+  maintainability:
+    status: PASS
+    notes: "Unchanged from cycle 2."
+
+process_note: >-
+  Three defects, all of the same shape: the operation that fails by DOING NOTHING or doing
+  something plausible-but-wrong, with no error either way. T106-001 expanded to empty;
+  T106-002 skipped 4 of 11 sites while its floor passed; T106-003 over-captured and miscounted.
+  The last was introduced BY the fix for the first — a fix is new code, and the least reviewed
+  code in the change. This is why cycle 2 is a refute pass in this repo's qa-task doctrine, and
+  why the Step 5c lens was told to hunt the defect class rather than review the diff.
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        No harness executes finalise's shell blocks, so a regression in this awk cannot be
+        caught by any suite. Extending the snippet engine to run repo-local read-only commands
+        would close it; see also the Step 4b finding from cycle 1.
+      refs: ["shared/resources/qa-execute-snippets.mjs"]
+    - action: >-
+        Nothing checks that a shell variable a documented block interpolates is bound in that
+        block. Guard C covers slot NAMES; the variable half shipped T106-001.
+      refs: ["shared/resources/tests/comment-slot-coverage.test.mjs"]
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
