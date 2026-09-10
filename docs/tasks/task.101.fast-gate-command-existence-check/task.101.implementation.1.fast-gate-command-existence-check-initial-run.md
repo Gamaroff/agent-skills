@@ -34,7 +34,7 @@ Add a startup precondition to the develop loop's fast gate so a consumer whose `
 | 1. create-branch           | ✅ Done    | Branch `feature/task.101.*` exists in git                              | Branch created at `5291ea84`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.101.review.1.fast-gate-command-existence-check.md`                | READY TO IMPLEMENT, 8/10; 0 critical / 3 important (all applied) / 1 optional. Status Draft → Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 3 phases, 5/5 success criteria. 14 files touched, 11 tests added. Fast gate green (3033 pass / 0 fail) after 2 red cycles, both this run's own work | —                    |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #371 (4 commits, scoped staging, zero leaks). Issue #370 commented (`posted`). Board `in-review`: `stage-disabled` | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.101.qa.{N}.*.md`; `task.101.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.101.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -74,6 +74,15 @@ Add a startup precondition to the develop loop's fast gate so a consumer whose `
 - **Mutation-proved, four mutations**, each applied to the document, run, and reverted: no-HALT (6 red), dead `sed` pattern (5 red), guard removed (2 red — the skip cases only, isolating the fail-safe inversion), and `$fastGateCommand` restored (5 red — proving the review's binding fix is load-bearing).
 - CHANGELOG.md updated: the change is behavioural for consumers (startup HALT replaces a mid-loop death).
 
+### Step 4 — Create PR — 2026-09-10
+
+- SCOPE_PATHS: the task dir plus `shared/resources`, `docs/reference`, `evals/shared/tests`, `tests`, `skills/develop`, `skills/develop-next`, and the three `skills/*/references` dirs, plus `CHANGELOG.md`. Pre-flight guard held **nothing** — all three untracked files were already in scope. Post-commit leak check: clean.
+- Four logical commits rather than one: the behaviour change + doc sweep, the test, the guard fix, and the task documents. The guard fix is deliberately its own commit — it changes a test the rest of the repo depends on, and burying it in a feature commit would hide that.
+- The implementation report was committed **here**, not withheld to Step 8, per the step-4 rule: a report linked from a tracked document but itself untracked is a dangling link that passes locally and reddens CI.
+- PR #371 → `develop`. Issue #370 commented (`reason: posted`).
+- Board `in-review`: `reason: stage-disabled` — correct outcome, the moment is not mapped on this board.
+- Head-SHA parity confirmed: PR head `cc031708056a` == local HEAD.
+
 #### Fast-gate cycle 1 — RED (formatting), cycle 2 — RED (two repo guards), cycle 3 — see below
 
 The fast gate did its job twice, both times on this run's own work:
@@ -111,7 +120,19 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-10
+**Gate Result**: CONCERNS
+**Issues Found**: 1 MEDIUM — §8 Testing Strategy asserts `qa-task` Step 4b will execute the snippet in both shells; executed, Step 4b classifies the block `mutating` (`unrecognised-command: npm`, fail-closed) and skips it. The coverage is real and stronger than the claim (the dedicated eval test), so the defect is the recorded reason-to-believe, not a gap.
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+Notes:
+- All five success criteria verified **by execution**, not by reading.
+- 5/5 mutations proven, including one that re-introduces the pre-implementation defect and confirms the drafted snippet would have passed vacuously.
+- `zero-blocks-executed` on the changed prose files is **pre-existing**: baseline on `develop` is `blocks=5 {0/2/3}` with the identical finding; current is `blocks=6 {0/2/4}`. Not raised against this task.
+- Step 3b diff code review performed inline rather than via an Explore subagent (session Agent-tool constraint); the lens was applied, only the dispatch differs. Two candidate bugs probed and cleared.
 
 ---
 
@@ -120,7 +141,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.101.fast-gate-command-existence-check`
-**PR**: {populated after Step 4}
+**PR**: [#371](https://github.com/Gamaroff/agent-skills/pull/371)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

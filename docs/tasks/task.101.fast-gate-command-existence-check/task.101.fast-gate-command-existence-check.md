@@ -156,7 +156,23 @@ consequence — it decides what every iteration is checked against — and it be
 
 ## 8. Testing Strategy
 
-The snippet is runnable prose, so `qa-task` Step 4b will execute it under `bash` and `zsh`. Cases:
+The snippet is runnable prose, and it is covered by a dedicated executable test —
+**`evals/shared/tests/fast-gate-precondition.test.mjs`**. That test extracts the fenced block from
+`shared/resources/develop-pipeline-step-3-develop-loop.md` and **runs** it against throwaway fixture
+projects under both `bash` and `zsh`, so what is asserted is the behaviour a consumer gets rather
+than the presence of a string. It lands under the existing `evals/shared/tests/*.test.mjs` glob in
+`npm test`, so it runs in CI with no `package.json` change.
+
+> **It is NOT covered by `qa-task` Step 4b, and planning around Step 4b here would be a mistake.**
+> Step 4b's engine classifies this block `mutating` with reason
+> `unrecognised-command: npm (fail-closed)` and **skips** it — `npm` is deliberately absent from
+> `SAFE_COMMANDS`, which is an allow-list precisely so that anything nobody classified fails closed.
+> No amount of `--bind` or `--copy` changes that. This was measured, not assumed: running the engine
+> over this file reports `blocks=6, {runnable:0, placeholder:2, mutating:4}`, with the precondition
+> among the four. The document originally claimed Step 4b as the verification route; QA cycle 1
+> disproved it by execution, which is why the route is named explicitly here.
+
+Cases the dedicated test covers:
 
 - a script that **exists** → no HALT (anti-vacuity: without this the check could reject everything)
 - a script that **does not** → HALT, message naming the key
@@ -195,6 +211,35 @@ whereas a false skip returns to today's silent mid-loop death.
 
 Delete the check; `npm run bundle`.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.101.qa.1.fast-gate-command-existence-check.md](./task.101.qa.1.fast-gate-command-existence-check.md)
+- **Gate File**: [task.101.gate.1.fast-gate-command-existence-check.yml](./task.101.gate.1.fast-gate-command-existence-check.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3034 (hermetic suite); 10 dedicated to this change; 5 mutations proven
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+All five success criteria verified **by execution**, not by reading. One MEDIUM finding: §8 below
+asserted that `qa-task` Step 4b would execute the snippet in both shells; executed, Step 4b classifies
+the block `mutating` (`unrecognised-command: npm`) and skips it. The coverage itself is real and
+stronger than the claim — see the corrected §8.
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -203,6 +248,8 @@ Delete the check; `npm run bundle`.
 | 2026-09-10 | 0.2 | Review passed (8/10) — linked GitHub issue #370; bound `FAST_GATE_COMMAND` explicitly in the draft check (a bare `$fastGateCommand` is unset and skips vacuously); corrected §8, which claimed a compound command extracts nothing when one beginning `npm run` extracts its first script; made the check's placement in the step-3 document concrete. | review-task |
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Implemented — 12 files, 10 tests | develop |
+| 2026-09-10 |  | QA gate CONCERNS (90/100) — 1 finding: §8 asserts a Step 4b route execution disproves | qa-task |
+| 2026-09-10 |  | QA findings fixed — 1 MEDIUM (§8 verification route corrected), 1 iteration | qa-fix |
 
 ## Progress Tracking
 
