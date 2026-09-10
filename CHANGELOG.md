@@ -6,6 +6,35 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The develop loop's fast gate now refuses to start when its command names a script the project
+  does not define.** `develop.fastGateCommand` fell back to `npm run ci:fast`, which a consumer need
+  not have. Nothing checked that before use, so the mismatch surfaced *mid-iteration* as
+  `Missing script: ci:fast` — the point at which a substitute gets invented under time pressure. On
+  the run that produced this change the substitution was invented per-run, so the fast gate silently
+  differed between runs and nothing recorded that it had. A default cannot know a consumer's script
+  names; it can refuse to start when it is wrong.
+
+  A precondition now runs **once, before the loop's first iteration** (not in the per-iteration
+  capture block), extracts the script name from a command beginning `npm run <script>`, checks it
+  against `npm run`'s own listing, and HALTs naming both `develop.fastGateCommand` and
+  `skills-config.yaml`. It never substitutes: choosing a replacement gate decides what every
+  iteration is checked against, and that belongs in config where the next run reads the same value.
+
+  **Anything the extraction cannot parse is skipped, never failed** — `prettier --check . && jest`,
+  `make test`, `pnpm run ci:fast`, `npm test`, and an unset value all pass through untouched. The
+  fail-safe direction points at skipping deliberately, and is the opposite of the QA loop's exit
+  condition: a false HALT here would block correct consumers, while a false skip merely restores
+  today's silent mid-loop death. A compound command that *begins* `npm run <script>` is the one
+  exception — its first component is checked, because that component must exist for the command to
+  get off the ground.
+
+  `npm run ci:fast` is now documented as a **suggested value for required configuration** rather
+  than a default that works everywhere, in all six places that state it — the develop loop, the
+  qa-fix cycle, `develop-bug`'s verify cycle, `skills/develop/SKILL.md`,
+  `skills/develop-next/SKILL.md` and `docs/reference/configuration.md`. Behavioural and intended: a
+  consumer whose gate does not resolve now fails at startup with an instruction instead of mid-loop
+  without one.
+
 - **`mutation-proving.md` now covers the false RED, not only the false GREEN.** The document's
   procedure and its *"When the proof does not go red"* table were both organised around a green run
   that should have been red — the case that announces itself. Nothing addressed the mirror: a suite

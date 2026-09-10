@@ -40,6 +40,11 @@ const CONSUMER_PROVIDED_NPM_SCRIPTS = new Set([
   "build:libraries",
   "dev:api",
   "docker:setup",
+  // Named only as an illustrative second component of a consumer's own compound
+  // fast gate (`npm run ci:fast && npm run lint`) in the develop loop's
+  // fastGateCommand table. Its absence here is normal: linting is the consumer's
+  // script, and this repo lints shell with ShellCheck rather than an npm script.
+  "lint",
   "test:e2e:api",
   "test:e2e:setup",
   "test:local",
@@ -47,6 +52,30 @@ const CONSUMER_PROVIDED_NPM_SCRIPTS = new Set([
   "test:local:e2e",
   "test:specific",
 ]);
+
+/**
+ * True when the "script name" is really a file-descriptor redirect on a BARE
+ * `npm run` — `npm run 2>/dev/null`, which lists the project's scripts with
+ * stderr discarded and invokes nothing.
+ *
+ * Without this the scanner reads that idiom as an instruction to run a script
+ * named `2`, which is a claim about the prose that is simply false: no script
+ * named `2` is being invoked, so there is nothing for the repo to ship and
+ * nothing for the allowlist to classify. Both available workarounds were worse
+ * than fixing the instrument — adding `2` to CONSUMER_PROVIDED_NPM_SCRIPTS would
+ * assert that consumers provide a script called `2`, and rewording the prose
+ * would remove the very idiom the develop loop's fast-gate precondition depends
+ * on to enumerate a project's scripts.
+ *
+ * Kept deliberately narrow: only an ALL-DIGIT token IMMEDIATELY followed by `>`
+ * is excluded. That is exactly the shell fd-redirect shape (`2>`, `2>&1`, `1>`)
+ * and nothing else. A real script name is not all digits, and a redirect after a
+ * real script name (`npm run ci:fast > log`) carries a space and never reaches
+ * here — so this gives up no coverage.
+ */
+function isFdRedirect(script, content, endIndex) {
+  return /^\d+$/.test(script) && content[endIndex] === ">";
+}
 
 /** Illustrative paths — teaching syntax, not naming a shipped file. */
 function isIllustrative(p) {
@@ -258,6 +287,33 @@ test("every doc reference in skill prose resolves to a doc that ships", () => {
   );
 });
 
+test("an fd redirect on a bare `npm run` is not read as a script name", () => {
+  // Guards the narrowing above from widening. `npm run 2>/dev/null` invokes no
+  // script; a script whose name merely starts with a digit, or a redirect after
+  // a real script name, must still be seen. Asserting both directions is what
+  // stops "skip the false positive" from decaying into "skip anything numeric".
+  assert.equal(
+    isFdRedirect("2", "npm run 2>/dev/null", "npm run 2".length),
+    true,
+  );
+  assert.equal(isFdRedirect("2", "npm run 2>&1", "npm run 2".length), true);
+  assert.equal(
+    isFdRedirect("2fast", "npm run 2fast", "npm run 2fast".length),
+    false,
+    "a digit-leading script name is a real name, not a redirect",
+  );
+  assert.equal(
+    isFdRedirect("ci:fast", "npm run ci:fast > log", "npm run ci:fast".length),
+    false,
+    "a redirect after a real script name must not exempt that script",
+  );
+  assert.equal(
+    isFdRedirect("2", "npm run 2", "npm run 2".length),
+    false,
+    "a bare numeric token with no `>` is not a redirect",
+  );
+});
+
 test("every `npm run` instruction is either ours or a classified consumer script", () => {
   const pkg = JSON.parse(
     fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"),
@@ -271,6 +327,7 @@ test("every `npm run` instruction is either ours or a classified consumer script
     let m;
     while ((m = re.exec(content)) !== null) {
       const script = m[1];
+      if (isFdRedirect(script, content, m.index + m[0].length)) continue;
       if (ours.has(script) || CONSUMER_PROVIDED_NPM_SCRIPTS.has(script))
         continue;
       failures.push(`${path.relative(REPO_ROOT, doc)} → \`npm run ${script}\``);

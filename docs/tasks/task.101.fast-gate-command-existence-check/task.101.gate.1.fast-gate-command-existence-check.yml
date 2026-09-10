@@ -1,0 +1,82 @@
+schema: 1
+task: 'task.101.fast-gate-command-existence-check'
+task_title: 'fail fast on a missing fastGateCommand'
+gate: CONCERNS
+status_reason: 'Implementation is correct and verified by execution — all five success criteria hold and the precondition HALTs/skips exactly as documented. One MEDIUM finding: the task Testing Strategy asserts qa-task Step 4b will execute the snippet, which execution disproves — the engine deny-lists `npm` and skips the block.'
+reviewer: 'QA Engineer'
+updated: '2026-09-10T07:20:00Z'
+
+top_issues:
+  - id: 'T101-001'
+    severity: medium
+    file: 'docs/tasks/task.101.fast-gate-command-existence-check/task.101.fast-gate-command-existence-check.md'
+    finding: >-
+      Section 8 (Testing Strategy) states "The snippet is runnable prose, so `qa-task` Step 4b
+      will execute it under `bash` and `zsh`." Executed, Step 4b classifies the block
+      `mutating` with reason `unrecognised-command: npm (fail-closed)` and SKIPS it — `npm`
+      is deliberately absent from the engine's SAFE_COMMANDS allow-list. The stated
+      verification route does not exist. The coverage itself is real and stronger than the
+      claim (evals/shared/tests/fast-gate-precondition.test.mjs executes the block in both
+      shells against fixture projects, in CI), so this is a false statement about HOW the
+      deliverable is verified, not a coverage gap.
+    suggested_action: >-
+      Correct §8 to attribute the both-shells coverage to the dedicated test, and state that
+      Step 4b cannot execute this block because `npm` is not on the snippet engine's
+      allow-list — recording the reason so the next author does not re-plan around Step 4b.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3034
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: >-
+      No credential, network or authz surface is touched. The one new executable construct
+      interpolates ${GATE_SCRIPT} into a grep -E pattern; the extracting character class
+      excludes `.` and `/`, so no regex metacharacter can reach grep. Verdict reached by
+      reading the extraction and executing seven command shapes, not by hostile probing —
+      hence `reasoned`, which is the accurate value.
+  performance:
+    status: PASS
+    notes: 'One `npm run` listing per pipeline run, before the loop starts — not per iteration. Verified by placement: the block precedes the Output Capture Pattern.'
+  reliability:
+    status: PASS
+    notes: >-
+      Fail-safe direction is explicit and tested: an unparseable command skips rather than
+      HALTs, so a mis-parse cannot block correct consumers. Four mutations each reddened the
+      expected subset, including one isolating the fail-safe inversion.
+  maintainability:
+    status: PASS
+    notes: >-
+      Six authoring sites swept, not the two the plan named; bundle and catalog verified in
+      sync; the guard narrowing carries its own both-directions unit test.
+
+recommendations:
+  immediate:
+    - action: 'Correct §8 Testing Strategy to name the real verification route and why Step 4b cannot be it.'
+      refs: ['docs/tasks/task.101.fast-gate-command-existence-check/task.101.fast-gate-command-existence-check.md']
+  future:
+    - action: >-
+        Consider whether the snippet engine should classify a bare `npm run` (no script
+        argument, a pure read) as runnable. Out of scope here — it is a change to a
+        safety allow-list and deserves its own task.
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'Correct the §8 Testing Strategy claim before acceptance.'

@@ -705,11 +705,13 @@ After fixes are applied:
    GATE_EXIT=$?
    ```
 
-   `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml`, defaulting to
-   **`npm run ci:fast`** — the same fast tier the develop loop runs (see
+   `<fastGateCommand>` is `develop.fastGateCommand` from `skills-config.yaml` — the same fast tier
+   the develop loop runs (see
    [`develop-pipeline-step-3-develop-loop.md`](develop-pipeline-step-3-develop-loop.md) §"What the
-   loop runs"). The slow tier stays out of this cycle by design; it runs once at `develop-next`'s
-   merge gate.
+   loop runs"). **`npm run ci:fast` is the suggested value, not a default that works everywhere**;
+   the develop loop checks the named script resolves before its first iteration, so by the time this
+   cycle runs the key has already been proven to name a real script. The slow tier stays out of this
+   cycle by design; it runs once at `develop-next`'s merge gate.
 
    **This is a gate on the commit, not a new halt.** On `GATE_EXIT != 0`, do **not** commit — a
    red tree is exactly what the cycle machinery is for. Triage per the step-3 pattern, feed the
