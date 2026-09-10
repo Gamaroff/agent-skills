@@ -27,6 +27,7 @@ const { COMMENT_STAGES } = require("../tracker-comment.js");
 const {
   LEAD_TEMPLATES,
   LEAD_STAGES,
+  PR_COMMENT_STAGES,
   GATE_MEANING,
   BOOLEAN_SLOTS,
   NUMERIC_SLOTS,
@@ -36,19 +37,38 @@ const {
 } = require("../stakeholder-summary.js");
 
 /**
- * Non-vacuity floor. Every assertion below iterates COMMENT_STAGES; an empty or
- * truncated import would make the whole file pass without testing anything, which
- * is the failure a coverage test is least able to notice about itself.
+ * Every stage that has an audience: tracker-issue moments plus pull-request
+ * moments. The per-stage tests below iterate THIS, not COMMENT_STAGES alone —
+ * iterating one namespace would leave the other's leads with no rendering test
+ * and no jargon check at all, which is the shape of coverage that reads as
+ * present and is not.
  */
-test("the imported stage list is populated", () => {
+const ALL_STAGES = [...COMMENT_STAGES, ...PR_COMMENT_STAGES];
+
+/**
+ * Non-vacuity floor. Every assertion below iterates ALL_STAGES; an empty or
+ * truncated import would make the whole file pass without testing anything, which
+ * is the failure a coverage test is least able to notice about itself. Both
+ * halves are floored separately — a floor on the total alone would pass with one
+ * namespace empty, which is precisely the import failure worth catching.
+ */
+test("the imported stage lists are populated", () => {
   assert.ok(Array.isArray(COMMENT_STAGES), "COMMENT_STAGES must be an array");
   assert.ok(
     COMMENT_STAGES.length >= 11,
-    `expected at least 11 stages, got ${COMMENT_STAGES.length}`,
+    `expected at least 11 tracker stages, got ${COMMENT_STAGES.length}`,
+  );
+  assert.ok(
+    Array.isArray(PR_COMMENT_STAGES),
+    "PR_COMMENT_STAGES must be an array",
+  );
+  assert.ok(
+    PR_COMMENT_STAGES.length >= 3,
+    `expected at least 3 pull-request stages, got ${PR_COMMENT_STAGES.length}`,
   );
 });
 
-for (const stage of COMMENT_STAGES) {
+for (const stage of ALL_STAGES) {
   test(`${stage} has a lead that renders with no slots`, () => {
     assert.ok(hasTemplate(stage), `no template for stage "${stage}"`);
     const lead = renderLead(stage, {});
@@ -97,7 +117,7 @@ const JARGON = [
   /\p{Extended_Pictographic}/u,
 ];
 
-for (const stage of COMMENT_STAGES) {
+for (const stage of ALL_STAGES) {
   test(`${stage} lead is free of jargon, paths and emoji`, () => {
     const lead = renderLead(stage, {});
     for (const pattern of JARGON) {
@@ -170,14 +190,55 @@ test("the catalogue is frozen and its stage list matches its keys", () => {
   assert.deepEqual([...LEAD_STAGES].sort(), Object.keys(LEAD_TEMPLATES).sort());
 });
 
-test("every catalogue key is a stage the engine knows", () => {
-  // The converse of the coverage test above: a lead for a stage the engine cannot
-  // produce is dead weight that reads as coverage.
-  const known = new Set(COMMENT_STAGES);
+test("every catalogue key belongs to exactly one audience", () => {
+  // The converse of the coverage test above: a lead for a stage nothing can
+  // produce is dead weight that reads as coverage. Since task 106 there are two
+  // audiences — a tracker issue and a pull request — so the check is membership
+  // in the UNION rather than in COMMENT_STAGES alone.
+  const known = new Set([...COMMENT_STAGES, ...PR_COMMENT_STAGES]);
   for (const stage of LEAD_STAGES) {
     assert.ok(
       known.has(stage),
-      `catalogue has "${stage}", which is not in COMMENT_STAGES`,
+      `catalogue has "${stage}", which is in neither COMMENT_STAGES nor PR_COMMENT_STAGES`,
+    );
+  }
+});
+
+test("the two audiences are disjoint", () => {
+  // A stage in both lists has an ambiguous audience, and the ambiguity resolves
+  // differently in each engine: tracker-comment.js would accept it as a --stage
+  // while the pull-request path would also claim it. The union check above is
+  // satisfied by such a stage, so it needs its own assertion.
+  const trackerStages = new Set(COMMENT_STAGES);
+  const overlap = PR_COMMENT_STAGES.filter((s) => trackerStages.has(s));
+  assert.deepEqual(
+    overlap,
+    [],
+    `stages claimed by both audiences: ${overlap.join(", ")}`,
+  );
+});
+
+test("every pull-request stage actually has a template", () => {
+  // PR_COMMENT_STAGES is hand-maintained beside the catalogue. A name listed
+  // there with no template renders null at the call site, and a null lead is an
+  // absent paragraph rather than an error — silent in the direction that matters.
+  for (const stage of PR_COMMENT_STAGES) {
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(LEAD_TEMPLATES, stage),
+      `PR_COMMENT_STAGES lists "${stage}", which has no template`,
+    );
+  }
+});
+
+test("a pull-request stage is refused by the tracker-comment engine", () => {
+  // The whole point of the split. If this ever passes a PR stage, a paragraph
+  // about unanchored review findings can be posted onto a board card — read by
+  // exactly the people the lead was written to spare.
+  const { COMMENT_STAGES: engineStages } = require("../tracker-comment.js");
+  for (const stage of PR_COMMENT_STAGES) {
+    assert.ok(
+      !engineStages.includes(stage),
+      `"${stage}" is a pull-request stage but tracker-comment.js would accept it as --stage`,
     );
   }
 });

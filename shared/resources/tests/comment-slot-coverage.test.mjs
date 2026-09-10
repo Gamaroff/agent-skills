@@ -126,13 +126,16 @@ function shippedDocs() {
  * command is reassembled before parsing — reading only the first line would
  * report every multi-line call as slotless.
  */
-function collectCallSites() {
+function collectCallSites(
+  engineRe = /^\s*node\s+.*tracker-comment\.js/,
+  engine = "tracker-comment.js",
+) {
   const sites = [];
   for (const file of shippedDocs()) {
     const rel = path.relative(REPO_ROOT, file);
     const lines = fs.readFileSync(file, "utf8").split("\n");
     for (let i = 0; i < lines.length; i++) {
-      if (!/^\s*node\s+.*tracker-comment\.js/.test(lines[i])) continue;
+      if (!engineRe.test(lines[i])) continue;
       let inv = lines[i];
       let j = i;
       while (inv.trimEnd().endsWith("\\") && j + 1 < lines.length) {
@@ -143,13 +146,32 @@ function collectCallSites() {
       const slots = [
         ...inv.matchAll(/--slot\s+([A-Za-z_][A-Za-z0-9_]*)=/g),
       ].map((m) => m[1]);
-      sites.push({ file: rel, line: i + 1, stage, slots, text: inv });
+      sites.push({ file: rel, line: i + 1, stage, slots, text: inv, engine });
     }
   }
   return sites;
 }
 
 const SITES = collectCallSites();
+
+/**
+ * Pull-request call sites, which reach the same catalogue through a different
+ * door. `stakeholder-summary-cli.js` renders a lead for a shell site to fold
+ * into a comment body it posts itself; `tracker-comment.js` renders AND posts.
+ * Two engines, one catalogue — so the slot-name guard below has to cover both,
+ * or half the call sites in the repository are unguarded against the exact
+ * defect it exists to catch.
+ *
+ * That is not hypothetical. Task 105 shipped three wrong slot names into review
+ * (`pr` on `qa-gate`, `count` on `qa-cycle`) precisely because each is a real
+ * slot name on a DIFFERENT stage, and neither engine validates slot names: an
+ * unrecognised key reaches a template that never reads it, and the comment
+ * posts reading exactly as it would have with no slot at all.
+ */
+const PR_SITES = collectCallSites(
+  /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$\(\s*node\s+.*stakeholder-summary-cli\.js|^\s*node\s+.*stakeholder-summary-cli\.js/,
+  "stakeholder-summary-cli.js",
+);
 
 /**
  * Sites that legitimately pass no slot, each with the reason. An entry is a
@@ -373,4 +395,111 @@ test("Guard B — where a block both comments and closes, the comment comes firs
       `develop-pipeline-step-7-finalise.md alone has two (story and task variants).`,
   );
   assert.deepEqual(violations, [], violations.join("\n"));
+});
+
+// ---------------------------------------------------------------------------
+// Guard C — the pull-request call sites (task 106).
+//
+// Same catalogue, same silent-drop failure mode, different engine. These three
+// mirror Guard B, and deliberately do NOT reuse its bodies: the no-slot rule
+// differs between the two audiences, and folding them together would mean
+// weakening one to fit the other.
+// ---------------------------------------------------------------------------
+
+test("Guard C — the walk found the pull-request call sites (non-vacuity floor)", () => {
+  // Eleven conversation templates is what task 106 converted. The floor sits
+  // just below that so ordinary churn does not trip it, and far enough above
+  // zero that a broken walk cannot masquerade as a clean repository — the same
+  // reasoning as Guard B's floor.
+  assert.ok(
+    PR_SITES.length >= 9,
+    `Only ${PR_SITES.length} stakeholder-summary-cli.js call sites found — the ` +
+      `walk is probably broken, not the repository clean. Expected at least 9.`,
+  );
+});
+
+test("Guard C — every pull-request slot name is one its stage's template reads", () => {
+  const wrong = [];
+  for (const site of PR_SITES) {
+    if (!site.stage) continue;
+    const stage = baseStage(site.stage);
+    if (!Object.prototype.hasOwnProperty.call(LEAD_TEMPLATES, stage)) continue;
+    const reads = slotsReadBy(stage);
+    for (const name of site.slots) {
+      if (!reads.has(name)) {
+        const owners = Object.keys(LEAD_TEMPLATES).filter((st) =>
+          slotsReadBy(st).has(name),
+        );
+        wrong.push(
+          `${site.file}:${site.line} — --stage ${site.stage} passes --slot ${name}=, ` +
+            `which that template never reads. ` +
+            (owners.length
+              ? `(${name} belongs to: ${owners.join(", ")}.) `
+              : `(${name} is read by no template at all.) `) +
+            `This stage reads: ${[...reads].join(", ") || "nothing"}.`,
+        );
+      }
+    }
+  }
+  assert.deepEqual(
+    wrong,
+    [],
+    `Pull-request slot names no template reads:\n${wrong.join("\n")}\n\n` +
+      `stakeholder-summary-cli.js validates no slot names either — it stores any ` +
+      `k=v and an unrecognised key reaches a template that never reads it. The ` +
+      `lead renders, the comment posts, and it says exactly what it would have ` +
+      `said with no slot at all.`,
+  );
+});
+
+test("Guard C — a pull-request site omits slots only when the sole slot is 'pr'", () => {
+  // Guard B requires every TRACKER site to pass a slot: a lead that says the
+  // same thing every time is one a reader learns to skip. On a PULL-REQUEST
+  // comment that rule has one principled exception — `pr` names the pull
+  // request, and the reader of this comment is already looking at it. Naming it
+  // back to them is noise, not variation.
+  //
+  // Stated as a checkable property rather than an allowlist: an allowlist grows
+  // an entry every time someone finds passing a slot inconvenient, and each
+  // entry looks locally reasonable.
+  const bare = [];
+  for (const site of PR_SITES) {
+    if (site.slots.length > 0) continue;
+    if (!site.stage) continue;
+    const stage = baseStage(site.stage);
+    if (!Object.prototype.hasOwnProperty.call(LEAD_TEMPLATES, stage)) continue;
+    const reads = [...slotsReadBy(stage)];
+    const onlyPr = reads.length === 1 && reads[0] === "pr";
+    if (!onlyPr) {
+      bare.push(
+        `${site.file}:${site.line} — --stage ${site.stage} passes no --slot, but ` +
+          `that template reads: ${reads.join(", ") || "nothing"}. Only a stage ` +
+          `whose sole slot is 'pr' may go slotless on a pull request.`,
+      );
+    }
+  }
+  assert.deepEqual(
+    bare,
+    [],
+    `Pull-request call sites feeding the lead nothing:\n${bare.join("\n")}`,
+  );
+});
+
+test("Guard C — a pull-request stage is never passed to the tracker engine", () => {
+  // The separation task 106 built, checked where it can actually be violated:
+  // in shipped prose. tracker-comment.js exits 2 on a PR stage, so this would
+  // surface at runtime as a step that posts nothing — but it would surface on
+  // someone's live board, not here.
+  const { PR_COMMENT_STAGES } = require(
+    path.join(REPO_ROOT, "shared/resources/stakeholder-summary.js"),
+  );
+  const prStages = new Set(PR_COMMENT_STAGES);
+  const offenders = SITES.filter(
+    (s) => s.stage && prStages.has(baseStage(s.stage)),
+  ).map(
+    (s) =>
+      `${s.file}:${s.line} — tracker-comment.js --stage ${s.stage} is a ` +
+      `pull-request stage; that call exits 2 and posts nothing.`,
+  );
+  assert.deepEqual(offenders, [], offenders.join("\n"));
 });

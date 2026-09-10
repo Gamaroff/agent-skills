@@ -767,9 +767,30 @@ FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 ---
 "
 
-# The pull-request wrapper — its own heading. Its plain-language lead is task.106's
-# concern, not this one's; do not add one here or the two tasks collide.
+# The cycle number, derived from the gate this fix cycle is answering. Gate files
+# are `*.gate.{N}.{name}.yml` and {N} IS the QA cycle, so the number is already on
+# disk — no caller has to pass it, and nothing invents it. `$STORY_FILE` is the
+# resolved story or task document, bound in Step 0 (locate-story).
+#
+# Derived HERE, once, because both comments need it: the pull-request lead below
+# and the tracker comment further down. Deriving it twice would let the two
+# comments disagree about which round this is.
+DOC_DIR=$(dirname "$STORY_FILE")
+FIX_CYCLE=$(ls -t "$DOC_DIR"/*.gate.*.yml 2>/dev/null | head -1 \
+  | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+
+# The pull-request wrapper — its own heading, then its own plain-language lead.
+# The lead is added HERE, once, above the arm split below, so both arms post the
+# same bytes. It must NOT be folded into $FIX_SUMMARY: that variable also feeds
+# $TRACKER_COMMENT_BODY, where tracker-comment.js renders the lead itself, and a
+# lead in the shared value would double-lead the tracker comment.
+QA_FIX_LEAD=$(node references/stakeholder-summary-cli.js --stage qa-fix \
+  --slot cycle="$FIX_CYCLE") || exit 1
 PR_COMMENT_BODY="## 🛠️ QA Fixes Applied
+
+${QA_FIX_LEAD}
+
+---
 
 ${FIX_SUMMARY}"
 
@@ -827,12 +848,11 @@ if [ -n "$FIX_ISSUE" ]; then
   mkdir -p .claude/state
   printf '%s' "$TRACKER_COMMENT_BODY" > .claude/state/comment-body.md
 
-  # The cycle number, derived from the gate this fix cycle is answering. Gate
-  # files are `*.gate.{N}.{name}.yml` and {N} IS the QA cycle, so the number is
-  # already on disk — no caller has to pass it, and nothing invents it.
-  DOC_DIR=$(dirname "$STORY_FILE")
-  FIX_CYCLE=$(ls -t "$DOC_DIR"/*.gate.*.yml 2>/dev/null | head -1 \
-    | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+  # $FIX_CYCLE was derived once, where $PR_COMMENT_BODY is built — from the gate
+  # filename, which is where the round number genuinely lives. Reused here so the
+  # pull-request comment and this tracker comment cannot disagree about which
+  # round they are reporting. Re-derive it only if you are running this block on
+  # its own.
 
   node .agents/skills/qa-fix/references/tracker-comment.js \
     --issue "$FIX_ISSUE" --body-file .claude/state/comment-body.md \

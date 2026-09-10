@@ -131,17 +131,31 @@ After the DoD file is written, post its **full content** as a PR comment so revi
 ```bash
 DOD_FILE=$(ls {story-or-task-directory}/{story-or-task-prefix}.dod.*.md 2>/dev/null | sort | tail -1)
 DOD_BODY=$(cat "$DOD_FILE")
+
+# The plain-language lead, obtained ONCE, above the arm split. Anyone following
+# the link from the tracker comment lands here, on a five-row table of AC / PR
+# Review / Security / Compliance / Documentation — the exact experience the lead
+# exists to spare them. `done` is the same stage the tracker comment uses; there
+# is one vocabulary, not a second one for pull requests.
+LEAD=$(node references/stakeholder-summary-cli.js --stage done) || exit 1
+PR_COMMENT_BODY=$(printf '## ✅ Definition of Done\n\n%s\n\n---\n\n%s' "$LEAD" "$DOD_BODY")
+
 # Wrap in tracker_call_with_retry for transient GitHub/API failures (3× exponential backoff).
 # Source the helper from references/resolve-platform.sh first.
-tracker_call_with_retry gh pr comment {PR_NUMBER} --body "$(cat <<EOF
-## ✅ Definition of Done
-
-$DOD_BODY
-EOF
-)"
+tracker_call_with_retry gh pr comment {PR_NUMBER} --body "$PR_COMMENT_BODY"
 ```
 
-For Bitbucket, attach the DoD body to the PR via the equivalent Bitbucket PR-comment API. This is a **PR** comment, which is a VCS concern — `tracker-comment.js` covers issue comments only, and the DoD also reaches the Jira issue through the tracker comment below.
+For Bitbucket, attach `$PR_COMMENT_BODY` to the PR via the equivalent Bitbucket PR-comment API. This is a **PR** comment, which is a VCS concern — `tracker-comment.js` covers issue comments only, and the DoD also reaches the Jira issue through the tracker comment below.
+
+> **One insertion point, above the arm split — and that is the design constraint, not a style note.**
+> Eleven sites × two arms is twenty-two places a lead could be added, and the arms are separately
+> maintained prose. Building `$PR_COMMENT_BODY` once and handing the same bytes to both arms makes the
+> arms structurally unable to drift; reviewing for that is easier than reviewing twenty-two additions
+> for equality. The `|| exit 1` is required: `stakeholder-summary-cli.js` exits 2 on an unknown stage,
+> and an unguarded `$(…)` would leave `LEAD` empty and post a comment opening with a bare horizontal
+> rule — which reads as a formatting slip rather than as a missing paragraph.
+
+> Engine source: `references/stakeholder-summary-cli.js` (bundled into each skill as `references/stakeholder-summary-cli.js`). Standard: `references/stakeholder-summary.md`.
 
 > Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
 

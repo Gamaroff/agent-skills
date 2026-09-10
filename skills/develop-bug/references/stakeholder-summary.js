@@ -137,6 +137,27 @@ const LEAD_TEMPLATES = Object.freeze({
     `This work is finished and has been accepted. Everything it set out to do was checked and ` +
     `confirmed working, and the change is now part of the product${s.pr ? ` (${s.pr})` : ""}. ` +
     `No further action is needed on this item.`,
+
+  // ── Pull-request stages ──────────────────────────────────────────────────
+  // These three open comments on a pull REQUEST, not on a tracker issue, and
+  // are listed in PR_COMMENT_STAGES below. They are never legal `--stage`
+  // values for tracker-comment.js; see the note on that constant for why that
+  // separation is enforced rather than merely intended.
+
+  "pr-summary": (s) =>
+    `Some of the review notes below could not be attached to the exact lines of code they ` +
+    `refer to${s.degraded ? ` (${s.degraded} of them)` : ""}, so they are collected here ` +
+    `instead. Nothing was lost — each one names the file and line it is about.`,
+
+  "board-warning": (s) =>
+    `This note is about the tracking board only, not about the work itself. ` +
+    `${s.what || "The card could not be moved to its new column automatically"}, so someone ` +
+    `will need to move it by hand. The change described in this pull request is unaffected.`,
+
+  "dod-gaps": (s) =>
+    `This work is not finished yet. Some of the checks it has to pass are still ` +
+    `outstanding${s.count ? ` (${s.count} of them)` : ""}, and they are listed below. ` +
+    `It will come back here once they have been dealt with.`,
 });
 
 /**
@@ -168,7 +189,12 @@ const LEAD_TEMPLATES = Object.freeze({
  * caller's string is the caller's business.
  */
 const BOOLEAN_SLOTS = Object.freeze(["blocking"]);
-const NUMERIC_SLOTS = Object.freeze(["count", "blocking_count", "cycle"]);
+const NUMERIC_SLOTS = Object.freeze([
+  "count",
+  "blocking_count",
+  "cycle",
+  "degraded",
+]);
 /**
  * Text slots are listed too, even though they are the default branch, so that
  * "which slots exist" is answerable from one place. A new template that reads a
@@ -178,7 +204,7 @@ const NUMERIC_SLOTS = Object.freeze(["count", "blocking_count", "cycle"]);
  * `every slot a template reads is classified` scans the template sources and
  * fails on an unclassified name, so the list cannot quietly fall behind.
  */
-const TEXT_SLOTS = Object.freeze(["title", "pr", "verdict", "outcome"]);
+const TEXT_SLOTS = Object.freeze(["title", "pr", "verdict", "outcome", "what"]);
 const BOOLEAN_FALSE_WORDS = Object.freeze([
   "",
   "0",
@@ -260,6 +286,27 @@ function stripCycleSuffix(stage) {
 const LEAD_STAGES = Object.freeze(Object.keys(LEAD_TEMPLATES));
 
 /**
+ * Which catalogue entries lead a comment on a pull REQUEST rather than on a
+ * tracker issue. The audience of a lead is a property of the lead, so the
+ * partition lives here with the templates rather than in either engine.
+ *
+ * WHY THIS IS A SECOND LIST AND NOT A LONGER FIRST ONE. tracker-comment.js
+ * validates `--stage` against its own COMMENT_STAGES and exits 2 on anything
+ * else. Adding these three there would make `tracker-comment.js --stage
+ * pr-summary` a legal TRACKER-ISSUE comment — a paragraph about unanchored
+ * review findings posted onto a board card, read by exactly the people it was
+ * written to spare. The two lists name two audiences; that is a real
+ * distinction, not a duplicated enumeration, and the tests below hold them
+ * jointly exhaustive over the catalogue and mutually disjoint, so neither can
+ * quietly drift from it.
+ */
+const PR_COMMENT_STAGES = Object.freeze([
+  "pr-summary",
+  "board-warning",
+  "dod-gaps",
+]);
+
+/**
  * Render the lead for a stage.
  *
  * Returns `null` — never throws, never exits — for a stage with no template, including
@@ -295,6 +342,7 @@ module.exports = {
   NUMERIC_SLOTS,
   TEXT_SLOTS,
   LEAD_STAGES,
+  PR_COMMENT_STAGES,
   GATE_MEANING,
   renderLead,
   hasTemplate,

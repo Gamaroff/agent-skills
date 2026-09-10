@@ -185,6 +185,89 @@ Slots: `{pr}`.
 
 ---
 
+## Pull-request comments
+
+The three stages below lead a comment on a pull **request** rather than on a tracker issue. They are
+listed in `PR_COMMENT_STAGES` in `stakeholder-summary.js`, and they are **not** in `COMMENT_STAGES` —
+passing any of them to `tracker-comment.js` as a stage exits 2, deliberately. A paragraph about
+unanchored review findings posted onto a board card would be read by exactly the people the lead
+exists to spare.
+
+> The sentence above deliberately does **not** spell that call out as a literal command line.
+> `transition-protocol-parity.test.mjs` scans shipped prose for stage literals and attributes each to
+> the nearest CLI named above it, so a written-out counter-example is indistinguishable from a real
+> call site — and the fix for that is to describe the refusal, not to teach the guard an exception.
+> An exception carved for a documented counter-example is the shape that made an earlier guard in
+> this repository vacuous: it allowed a prohibited call whenever an explanatory word appeared nearby,
+> every call site already carried that word, and the guard passed on the exact regression it named.
+> The absolute form of the rule is the one that holds — which is why this paragraph describes that
+> incident rather than quoting the identifier involved, since quoting it would trip the very guard
+> that replaced it.
+
+Everything else about them is identical: same catalogue, same slot coercion, same no-slots contract,
+same jargon deny-list. There is one vocabulary, not a second one invented for pull requests.
+
+**These three exist because those moments have no tracker equivalent — not because pull-request
+comments need their own dialect.** A pull-request comment about a moment that *does* exist on the
+tracker uses that same stage: `finalise`'s Definition of Done comment and its canonical summary both
+render `done`, and the QA review comments render `qa-gate`, exactly as the tracker comments for those
+moments do. Reaching for a new stage when an existing one names the same moment is how a second
+vocabulary starts.
+
+Obtain the lead with `stakeholder-summary-cli.js`, **once, above the GitHub/Bitbucket arm split**.
+Eleven sites times two arms is twenty-two places a lead could be added, and the arms are separately
+maintained prose; building the body once and handing the same bytes to both arms makes them
+structurally unable to drift. Guard the call with `|| exit 1` — the CLI exits 2 on an unknown stage,
+and an unguarded `$(…)` leaves the variable empty and posts a comment that opens with a bare
+horizontal rule, which reads as a formatting slip rather than as a missing paragraph.
+
+### `pr-summary`
+
+Slots: `{degraded}`.
+
+Rendered inside `pr-inline-comment.js` `buildSummaryBody()`, not passed in by a caller. A
+caller-supplied `--summary-file` **is** the lead and suppresses this one — see
+[The escape hatch](#the-escape-hatch).
+
+> Some of the review notes below could not be attached to the exact lines of code they refer to, so
+> they are collected here instead. Nothing was lost — each one names the file and line it is about.
+
+### `board-warning`
+
+Slots: `{what}`.
+
+One template for all three board notices, because they differ only in *why* the board did not move,
+and that difference is one clause. Pass it as `what`, without a trailing full stop — it is folded
+into the middle of a sentence.
+
+> This note is about the tracking board only, not about the work itself. The card could not be moved
+> to its new column automatically, so someone will need to move it by hand. The change described in
+> this pull request is unaffected.
+
+### `dod-gaps`
+
+Slots: `{count}`.
+
+> This work is not finished yet. Some of the checks it has to pass are still outstanding, and they
+> are listed below. It will come back here once they have been dealt with.
+
+---
+
+## Inline findings carry no lead, deliberately
+
+A comment anchored to line 47 of a diff is read by one person — the developer who wrote line 47. A
+non-technical paragraph on each of forty findings is noise for the only reader they have, and it
+would push the actual finding below the fold. The lead belongs on the **summary** comment, which is
+the one a non-technical reader reaches.
+
+This is a design decision, not an oversight, and it is stated here because a scope line in a task
+document disappears the moment the task is accepted. `pr-inline-comment.js` builds each inline body
+as `marker + finding.body` and nothing else; a test in `pr-inline-comment.test.mjs` asserts that no
+catalogue lead appears in an inline body, so "fixing" this would turn that test red rather than pass
+silently.
+
+---
+
 ## Worked examples
 
 Three real bodies, before and after. The body is unchanged in every case; only the lead and the rule
@@ -294,14 +377,21 @@ that closes a loop and one that opens a question.
 
 ## Adding a stage
 
-A new value in `COMMENT_STAGES` needs a template in `LEAD_TEMPLATES` and a subsection here. There is no
-optional path: the catalogue's unit test (`stakeholder-summary.test.mjs`) imports `COMMENT_STAGES` from the
-engine rather than restating it, so adding a stage without a lead turns that test red before the new
-stage can be used anywhere.
+A new value in `COMMENT_STAGES` — or in `PR_COMMENT_STAGES` — needs a template in `LEAD_TEMPLATES` and
+a subsection here. There is no optional path: the catalogue's unit test
+(`stakeholder-summary.test.mjs`) imports `COMMENT_STAGES` from the engine rather than restating it, so
+adding a stage without a lead turns that test red before the new stage can be used anywhere.
 
 That import is deliberate and should not be "simplified" into a local list. Two lists of stages drift
 silently and in the worst direction — the catalogue passing while the engine has a stage it cannot
 render — which is the enumeration class in [`../../docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md).
+
+**`PR_COMMENT_STAGES` is a second list, and it is not that anti-pattern.** The two name two
+*audiences*, which is a real distinction, not a duplicated enumeration of one thing. Three tests hold
+them honest: every catalogue key must be in the union of the two, the two must be disjoint, and every
+name in `PR_COMMENT_STAGES` must have a template. A fourth asserts the separation is load-bearing —
+that `tracker-comment.js` still refuses a pull-request stage. Decide which list a new stage belongs to
+by asking who reads the comment, not by which is more convenient.
 
 ## The escape hatch
 

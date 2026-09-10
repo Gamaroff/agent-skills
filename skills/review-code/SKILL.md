@@ -136,9 +136,32 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    Contract, `reason` vocabulary and the re-run rule (marker + update-in-place): [`references/pr-inline-comment-contract.md`](references/pr-inline-comment-contract.md).
 3. **Summary-only fallback** — when no finding carries a `file_line`, or the CLI reports `no-credentials`. This step still branches, because the two platforms have no common transport for a conversation comment.
 
-   **GitHub** (`VCS=github`): one summary comment via `tracker_call_with_retry gh pr comment "$PR_URL" --body-file -`, inheriting 3× exponential backoff and the `ACCESS_TRACKER` deferral gate for free.
+   Build the body **once**, with the lead above the branch, so the two arms post the same bytes.
+   `$SUMMARY_FILE` is the summary you wrote for the inline path; reuse it rather than composing a
+   second one:
 
-   **Bitbucket** (`VCS=bitbucket`): via the Bitbucket REST API. Resolve the credential with `source references/bitbucket-auth.sh` (Bearer or Basic, chosen by variable name; non-zero when neither is set), then `POST` a `{content: {raw: …}}` body to `${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}/comments`. Make it idempotent the way `/finalise` does: search the PR's existing comments for a leading HTML marker and `PUT` that comment id instead of posting a duplicate. The working dual-platform recipe is in [`skills/finalise/SKILL.md`](../finalise/SKILL.md) **Step 7 — "Mark as Accepted and Generate Artifacts"**, which carries both arms side by side; copy that shape rather than re-deriving it.
+   ```bash
+   # `in-review` — this comment says a review has been done and what it found.
+   # The findings body below it is unchanged; the lead is added, nothing removed.
+   LEAD=$(node references/stakeholder-summary-cli.js --stage in-review) || exit 1
+
+   PR_COMMENT_BODY_FILE="$(mktemp -t review-code-comment.XXXXXX.md)"
+   {
+     printf '%s\n\n---\n\n' "$LEAD"
+     cat "$SUMMARY_FILE"
+   } > "$PR_COMMENT_BODY_FILE"
+   ```
+
+   > This is the fallback path. The **inline** path above routes through `pr-inline-comment.js`,
+   > which renders its own `pr-summary` lead inside `buildSummaryBody()` when it has to degrade —
+   > and suppresses it when you pass `--summary-file`, because a caller-supplied summary already
+   > *is* the lead. So `$SUMMARY_FILE` must stay lead-free: the engine adds one on the path that
+   > needs it, and this block adds one on the path that does not go through the engine. Putting a
+   > lead in the file itself would double-lead whichever path ran.
+
+   **GitHub** (`VCS=github`): one summary comment via `tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$PR_COMMENT_BODY_FILE"`, inheriting 3× exponential backoff and the `ACCESS_TRACKER` deferral gate for free.
+
+   **Bitbucket** (`VCS=bitbucket`): via the Bitbucket REST API. Resolve the credential with `source references/bitbucket-auth.sh` (Bearer or Basic, chosen by variable name; non-zero when neither is set), then `POST` the contents of that same `$PR_COMMENT_BODY_FILE` as a `{content: {raw: …}}` body to `${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}/comments`. Make it idempotent the way `/finalise` does: search the PR's existing comments for a leading HTML marker and `PUT` that comment id instead of posting a duplicate. The working dual-platform recipe is in [`skills/finalise/SKILL.md`](../finalise/SKILL.md) **Step 7 — "Mark as Accepted and Generate Artifacts"**, which carries both arms side by side; copy that shape rather than re-deriving it.
 
    > Inline comments now work on **both** platforms (task 70) — Bitbucket via the `inline: {path, to}` key, with `from` for a deletion. The Bitbucket arm is fixture-tested rather than exercised, since this repo is GitHub-hosted; treat a first Bitbucket run as a smoke test.
    >

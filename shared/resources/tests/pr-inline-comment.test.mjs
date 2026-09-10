@@ -1331,3 +1331,130 @@ test("§9 the CLI sets process.exitCode rather than calling process.exit", () =>
     "use `process.exitCode = code` and let control flow return",
   );
 });
+
+// ---------------------------------------------------------------------------
+// §10 The plain-language lead (task 106).
+//
+// The summary comment is the one a non-technical reader reaches from the
+// tracker comment's link, so it opens with a lead. The per-line inline bodies
+// do NOT — that exclusion is a design decision, and the last test here is what
+// stops a later sweep "fixing" it.
+// ---------------------------------------------------------------------------
+const { renderLead, LEAD_STAGES } = require(
+  join(SHARED, "stakeholder-summary.js"),
+);
+
+const degradedFixture = (n) =>
+  Array.from({ length: n }, (_, i) => ({
+    finding: { path: `src/f${i}.js`, line: 10 + i, body: `finding body ${i}` },
+    why: "the line is outside this diff",
+  }));
+
+test("§10 the summary body opens with the lead, ABOVE the degraded heading", () => {
+  // Order, not presence. A build that appended the lead at the bottom would
+  // satisfy a `.includes()` assertion and be useless — the lead's whole job is
+  // to be the first thing read.
+  const body = cli.buildSummaryBody(degradedFixture(2), "");
+  const lead = renderLead("pr-summary", { degraded: 2 });
+  const iLead = body.indexOf(lead);
+  const iHeading = body.indexOf(cli.DEGRADED_HEADING);
+  assert.equal(iLead, 0, "the lead must be the first thing in the body");
+  assert.ok(iHeading > iLead, "the degraded heading must follow the lead");
+});
+
+test("§10 the lead names the degraded count", () => {
+  const body = cli.buildSummaryBody(degradedFixture(3), "");
+  assert.match(body, /\(3 of them\)/);
+});
+
+test("§10 a caller-supplied summary is not double-led", () => {
+  // `--summary-file` IS the lead; the review skills write one. Prepending a
+  // catalogue lead as well gives the reader two orienting paragraphs before any
+  // content, the second contradicting the first.
+  const caller = "## Code review\n\nTwo findings needed a closer look.";
+  const body = cli.buildSummaryBody(degradedFixture(2), caller);
+  assert.ok(body.startsWith(caller), "the caller summary must come first");
+
+  // MATCH ON THE OPENING PHRASE, NOT ON A WHOLE RENDERED LEAD. An earlier
+  // version of this test compared against `renderLead(stage, {})` — the
+  // NO-SLOT rendering — while the code path under test renders WITH slots
+  // (`{degraded: 2}`), which folds "(2 of them)" into the middle of the
+  // sentence. The two strings therefore share no full-substring relationship,
+  // so `!body.includes(lead)` was trivially true and the assertion could not
+  // fail: a mutation that double-led every comment passed this test green.
+  // Found by mutation, not by reading.
+  const openings = LEAD_STAGES.map((stage) => ({
+    stage,
+    opening: renderLead(stage, {}).split(/[.!?]/)[0].slice(0, 40),
+  }));
+  for (const { stage, opening } of openings) {
+    assert.ok(
+      !body.slice(caller.length).includes(opening),
+      `a caller-supplied summary must not also carry the "${stage}" lead ` +
+        `(found its opening phrase ${JSON.stringify(opening)} after the caller summary)`,
+    );
+  }
+});
+
+test("§10 a caller summary with no degraded findings gets no findings lead", () => {
+  // finishRun posts the summary comment when EITHER a caller summary or a
+  // degraded finding is present, so this combination is reachable. A
+  // `pr-summary` lead here would explain findings that do not exist.
+  const body = cli.buildSummaryBody([], "## Code review\n\nNothing to report.");
+  assert.equal(body, "## Code review\n\nNothing to report.");
+});
+
+test("§10 an inline finding body carries the marker and no lead", () => {
+  // THE EXCLUSION, held by a test rather than by a scope line in a task
+  // document that disappears when the task is accepted. A comment anchored to
+  // one line of a diff has one reader; a non-technical paragraph on each of
+  // forty findings is noise for the only person who will see it.
+  const key = cli.findingId({ path: "src/a.js", line: 12 });
+  const body = `${cli.markerHtml(key)}\nthe finding itself`;
+  assert.ok(
+    body.startsWith(`<!-- ${cli.INLINE_MARKER_PREFIX}`),
+    "an inline body starts with its marker",
+  );
+  for (const stage of LEAD_STAGES) {
+    const lead = renderLead(stage, {});
+    assert.ok(
+      !body.includes(lead),
+      `an inline finding body must not carry the "${stage}" lead`,
+    );
+  }
+});
+
+test("§10 the inline-body construction in source is marker + body and nothing else", () => {
+  // The test above asserts the SHAPE is lead-free; this one asserts the source
+  // still builds that shape. Without it, a change that inserted a lead into the
+  // real construction would leave the shape test passing on its own fixture —
+  // a test that proves its fixture rather than the code.
+  const src = readFileSync(join(SHARED, "pr-inline-comment.js"), "utf-8");
+  // Every place an inline body is built, on BOTH platforms. Counted exactly,
+  // not floored: a `>=` floor cannot detect one site acquiring a lead while the
+  // others stay bare, which is precisely how a partial regression would land.
+  // A mutation adding renderLead() to one of the five passed the floored
+  // version of this assertion.
+  const bare = [
+    ...src.matchAll(
+      /(?:body|raw):\s*`\$\{markerHtml\([^)]*\)\}\\n\$\{[^}]*\}`/g,
+    ),
+  ];
+  const anyMarkerBody = [
+    ...src.matchAll(/(?:body|raw):\s*`\$\{markerHtml\([^)]*\)\}[^`]*`/g),
+  ];
+  assert.equal(
+    bare.length,
+    anyMarkerBody.length,
+    `${anyMarkerBody.length - bare.length} inline-body construction(s) are no ` +
+      `longer exactly \`marker + \\n + body\`. An inline comment is read by one ` +
+      `person — the developer who wrote that line — so it carries no lead. If ` +
+      `the construction was legitimately refactored, re-point this assertion ` +
+      `rather than deleting it.`,
+  );
+  // Non-vacuity: a regex that matched nothing would satisfy the equality above.
+  assert.ok(
+    bare.length >= 4,
+    `expected the inline-body template in at least 4 places, found ${bare.length}`,
+  );
+});

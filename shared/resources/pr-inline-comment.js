@@ -53,6 +53,7 @@ const { execFileSync, execSync } = require("child_process");
 const crypto = require("crypto");
 
 const dm = require("./defer-mutation.js");
+const { renderLead } = require("./stakeholder-summary.js");
 
 const GIT_EXEC_OPTS = {
   encoding: "utf-8",
@@ -288,7 +289,24 @@ function parseFindings(raw) {
 // ---------------------------------------------------------------------------
 function buildSummaryBody(degraded, summaryPrefix) {
   const parts = [];
-  if (summaryPrefix && summaryPrefix.trim()) parts.push(summaryPrefix.trim());
+  if (summaryPrefix && summaryPrefix.trim()) {
+    // THE ESCAPE HATCH WINS OUTRIGHT, and this branch is why the lead is
+    // rendered here rather than unconditionally at the top. A caller-supplied
+    // summary IS the lead — the review skills write one — so prepending a
+    // catalogue lead as well double-leads the comment: two orienting paragraphs
+    // before any content, the second contradicting the first whenever the caller
+    // summary is about something other than anchoring.
+    parts.push(summaryPrefix.trim());
+  } else if (degraded.length) {
+    // No caller summary, so this comment exists only to carry findings that
+    // could not be anchored — which is exactly what `pr-summary` explains.
+    //
+    // The `else if` is load-bearing. A summary comment with a caller prefix and
+    // NO degraded findings must not acquire a paragraph about findings that do
+    // not exist; finishRun posts this comment when EITHER is present, so that
+    // combination is reachable and was the first thing to get this wrong.
+    parts.push(renderLead("pr-summary", { degraded: degraded.length }));
+  }
   if (degraded.length) {
     parts.push(DEGRADED_HEADING);
     parts.push(
