@@ -5,18 +5,23 @@ type: task
 description: "Stakeholders reading Jira cards and GitHub issues cannot follow the pipeline's comments — they open with gate verdicts, file paths and step numbers. Build the primitive: a per-stage catalogue of non-technical lead paragraphs, rendered by tracker-comment.js and prepended above every body, with a guard that refuses to post a comment for which no lead can be produced."
 tags: [tracker-comment, stakeholder-communication, shared-resources, engine]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-09
-updated: 2026-09-09
+updated: 2026-09-10
+completed_date: 2026-09-10
+pr_number: 377
 assignee:
 estimated_effort_hours: 8
+github_issue: 376
 ---
 
 # Technical Task: the plain-language lead, as an engine primitive
 
-**Status:** Planned
+**Status:** Accepted
+**GitHub Issue**: [#376](https://github.com/Gamaroff/agent-skills/issues/376)
+**Review**: ✅ All review recommendations from `task.104.review.1.tracker-comment-plain-language-lead.md` implemented 2026-09-10
 
 ---
 
@@ -51,7 +56,7 @@ pull-request comments are [task.106](../task.106.pr-comment-plain-language-lead/
    "AC / PR Review / Security / Compliance / Documentation" are has no sentence to fall back on —
    the whole comment is the detail.
 
-3. **37 distinct body templates, and no shared convention.** They were written independently across
+3. **Roughly 37 distinct body templates, and no shared convention.** They were written independently across
    8 `shared/resources/*.md` files and 10 `skills/*/SKILL.md` files. There is no place that says
    what a comment should open with, so there is nothing for a new call site to copy or a reviewer to
    check against.
@@ -93,7 +98,7 @@ idempotency marker — and concatenates it with a body it received whole:
 | The marker (GitHub/Bitbucket HTML) | `markerHtml()` | `L240–242` |
 | The marker (Jira plain text) | `markerText()` | `L245–247` |
 | Final GitHub body | `` finalBody = `${marker}\n${body}` `` | `L656` |
-| Final Jira body | `jira-sync.js` `buildCommentAdf()` / `addComment()` | `L5090–5099`, `L5218` |
+| Final Jira body | `jira-sync.js` `buildCommentAdf()` / `addComment()` | `L5237`, `L5349` |
 | Known stages | `COMMENT_STAGES` | `L100–112` |
 | Cycle-scoped stages | `CYCLE_SCOPED_STAGES` (`qa-cycle`, `qa-fix`) | `L98` |
 | Unknown stage | exit 2 | `L501–506` |
@@ -147,7 +152,7 @@ prefix, and the lead must be the first thing a human sees.
 - **Editing any call site's body or passing slot values** — task.105. This task must leave all 22
   call sites byte-identical, which is what makes it independently revertible.
 - **Pull-request comments** — task.106. `pr-inline-comment.js` is a separate engine on the `VCS`
-  axis, and its one engine-built template (`buildSummaryBody()`, `L288–305`) is not touched here.
+  axis, and its one engine-built template (`buildSummaryBody()`, `L289`) is not touched here.
 - **The seven bare `gh issue comment` sites.** They bypass this engine entirely, so no engine change
   can reach them. Task.105 converts them.
 - **Rewriting the technical portion of any body.** The lead is added above it; the detail below is
@@ -192,6 +197,10 @@ caller's first line, will fail.
 separate positive assertion that the lead is present. Do not weaken the marker-position assertions —
 the marker must still be first.
 
+> **Outcome:** only `tracker-comment.test.mjs` needed migrating. `handover-verify.test.mjs` and
+> `handover-render.test.mjs` build their `command.stdin` fixtures synthetically rather than reading a
+> composed body, so the predicted breakage did not materialise and neither file is touched.
+
 ### 5.2 A comment with no producible lead now fails
 
 An unknown `--stage` already exits 2. New: **omitting `--stage` entirely** — previously legal, and
@@ -225,54 +234,54 @@ old handover script against fresh output will see a diff.
 
 **Files**: `shared/resources/stakeholder-summary.md` (new)
 
-- [ ] Define the lead: 2–4 sentences, first thing a human reads, answers *what happened, what it
+- [x] Define the lead: 2–4 sentences, first thing a human reads, answers *what happened, what it
       means, what happens next* — in that order.
-- [ ] Writing rules: no file paths, no command names, no branch names in prose, no step numbers, no
+- [x] Writing rules: no file paths, no command names, no branch names in prose, no step numbers, no
       scores on unexplained scales, no emoji, no acronym unexpanded on first use, no jargon
       (`gate`, `AC`, `DoD`, `CI`, `PR` → "pull request" on first use, `regression`, `NFR`).
-- [ ] The **dumb-it-down rule**: where a fact resists non-technical phrasing, state its *consequence*
+- [x] The **dumb-it-down rule**: where a fact resists non-technical phrasing, state its *consequence*
       rather than its mechanism, and never omit it. Worked example required.
-- [ ] The full per-stage catalogue, one subsection per stage, with slots marked.
-- [ ] Before/after for three real bodies (`work-started`, `qa-cycle`, `done`).
+- [x] The full per-stage catalogue, one subsection per stage, with slots marked.
+- [x] Before/after for three real bodies (`work-started`, `qa-cycle`, `done`).
 
 ### Phase 2 — The catalogue module (risk: Low)
 
 **Files**: `shared/resources/stakeholder-summary.js` (new), `shared/resources/tests/stakeholder-summary.test.mjs` (new)
 
-- [ ] `LEAD_TEMPLATES` — frozen object, one entry per `COMMENT_STAGES` value.
-- [ ] Each template is a function `(slots) => string`; every slot is **optional** and every template
+- [x] `LEAD_TEMPLATES` — frozen object, one entry per `COMMENT_STAGES` value.
+- [x] Each template is a function `(slots) => string`; every slot is **optional** and every template
       must return a complete, grammatical paragraph when given `{}`.
-- [ ] `renderLead(stage, slots)` — strips a `-{N}` cycle suffix before lookup, returns `null` for an
+- [x] `renderLead(stage, slots)` — strips a `-{N}` cycle suffix before lookup, returns `null` for an
       unknown stage rather than throwing.
-- [ ] `hasTemplate(stage)`, `LEAD_STAGES` exported.
-- [ ] Test: every value in `COMMENT_STAGES` has a template — imported from `tracker-comment.js`, not
+- [x] `hasTemplate(stage)`, `LEAD_STAGES` exported.
+- [x] Test: every value in `COMMENT_STAGES` has a template — imported from `tracker-comment.js`, not
       restated, so adding a stage there fails here.
-- [ ] Test: every template renders non-empty and jargon-free under `{}` (a deny-list assertion over
+- [x] Test: every template renders non-empty and jargon-free under `{}` (a deny-list assertion over
       the rendered output).
 
 ### Phase 3 — Engine integration (risk: Medium)
 
 **Files**: `shared/resources/tracker-comment.js`, `shared/resources/tests/tracker-comment.test.mjs`
 
-- [ ] `--slot k=v` (repeatable) and `--summary-file <path>` parsing; `--summary-file` wins over the
+- [x] `--slot k=v` (repeatable) and `--summary-file <path>` parsing; `--summary-file` wins over the
       template when both are given.
-- [ ] Compose `marker + "\n" + lead + "\n\n---\n" + body` on the GitHub/Bitbucket arm.
-- [ ] Jira arm: pass the lead to `jira-sync.js` so it becomes its own ADF paragraph node **above**
+- [x] Compose `marker + "\n" + lead + "\n\n---\n" + body` on the GitHub/Bitbucket arm.
+- [x] Jira arm: pass the lead to `jira-sync.js` so it becomes its own ADF paragraph node **above**
       the rendered body, not concatenated markdown.
-- [ ] Guard: no template and no `--summary-file` → exit 2, message naming both routes.
-- [ ] `--json` gains `lead: "template" | "summary-file"`.
-- [ ] Update the existing body assertions per §5.1.
+- [x] Guard: no template and no `--summary-file` → exit 2, message naming both routes.
+- [x] `--json` gains `lead: "template" | "summary-file"`.
+- [x] Update the existing body assertions per §5.1.
 
 ### Phase 4 — Contract, docs, bundle (risk: Low)
 
 **Files**: `shared/resources/tracker-comment-contract.md`, `AGENTS.md`, all bundled `references/`
 
-- [ ] Contract: new section "The plain-language lead", the guard's exit-2 case, the `lead` JSON
+- [x] Contract: new section "The plain-language lead", the guard's exit-2 case, the `lead` JSON
       field, and the §5.3 note about record hashes.
-- [ ] `AGENTS.md`: a **Stakeholder Summaries** section pointing at the standard, in the style of the
+- [x] `AGENTS.md`: a **Stakeholder Summaries** section pointing at the standard, in the style of the
       existing Tracker Comments section.
-- [ ] `npm run bundle`; commit the regenerated `references/` copies.
-- [ ] `npm run generate-catalog` if any skill description changed (it should not).
+- [x] `npm run bundle`; commit the regenerated `references/` copies.
+- [x] `npm run generate-catalog` if any skill description changed (it should not).
 
 ---
 
@@ -291,11 +300,9 @@ old handover script against fresh output will see a diff.
 | File | Change |
 | :--- | :--- |
 | `shared/resources/tracker-comment.js` | `--slot`, `--summary-file`, compose, guard, `lead` in JSON |
-| `shared/resources/jira-sync.js` | `addComment()` / `buildCommentAdf()` accept a lead paragraph |
+| `shared/resources/jira-sync.js` | `addComment()` gains an optional `desired` parameter for the deferred-record label. The ADF paragraph-node property came free from prefixing the lead before `textToAdfNodes` — the converter was never touched |
 | `shared/resources/tracker-comment-contract.md` | New section; guard; JSON field |
 | `shared/resources/tests/tracker-comment.test.mjs` | Body assertions per §5.1; guard tests |
-| `shared/resources/tests/handover-verify.test.mjs` | `command.stdin` assertions per §5.1 |
-| `shared/resources/tests/handover-render.test.mjs` | Round-trip assertions per §5.1 |
 | `AGENTS.md` | Stakeholder Summaries section |
 | `skills/*/references/` (13 skills) | Regenerated by `npm run bundle` — never hand-edited |
 
@@ -341,32 +348,38 @@ old handover script against fresh output will see a diff.
 
 ## 9. Success Criteria
 
+This task is done when the engine renders a plain-language lead for every known stage, refuses to
+post a comment it cannot produce one for, and no existing call site has been edited to get one.
+
 **Functional**
 
-- [ ] `renderLead()` returns a non-empty paragraph for all eleven `COMMENT_STAGES` values with `{}`.
-- [ ] A `tracker-comment.js` call with a known `--stage` and no new flags posts a body whose first
+- [x] `renderLead()` returns a non-empty paragraph for all eleven `COMMENT_STAGES` values with `{}`.
+- [x] A `tracker-comment.js` call with a known `--stage` and no new flags posts a body whose first
       line after the marker is the lead.
-- [ ] A call with neither a known stage nor `--summary-file` exits 2 and posts nothing.
-- [ ] All 22 existing call sites are byte-identical to `develop`'s versions at merge.
+- [x] A call with neither a known stage nor `--summary-file` exits 2 and posts nothing.
+- [x] **No call site changes.** `git diff develop...HEAD --stat` touches only: the two new
+      `stakeholder-summary.*` files, `tracker-comment.js`, `jira-sync.js`, the four test files named
+      in §7, `tracker-comment-contract.md`, `AGENTS.md`, and regenerated `skills/*/references/`
+      copies. Any other path in that diff is a call-site edit and belongs to task.105.
 
 **Performance**
 
-- [ ] `renderLead()` is pure string work — no I/O, no new dependency; the module adds no measurable
+- [x] `renderLead()` is pure string work — no I/O, no new dependency; the module adds no measurable
       time to a `tracker-comment.js` invocation.
-- [ ] No additional network call: the lead travels in the same POST as the body.
+- [x] No additional network call: the lead travels in the same POST as the body.
 
 **Code quality**
 
-- [ ] `stakeholder-summary.js` has zero `require` of anything with I/O and zero `process.exit`.
-- [ ] Prettier and lint clean; `npm test` green.
-- [ ] Each of the three mutations in §8 is demonstrated to turn a test red, and which test, recorded
+- [x] `stakeholder-summary.js` has zero `require` of anything with I/O and zero `process.exit`.
+- [x] Prettier and lint clean; `npm test` green.
+- [x] Each of the three mutations in §8 is demonstrated to turn a test red, and which test, recorded
       in the implementation report.
 
 **Migration**
 
-- [ ] `tracker-comment-contract.md` documents the lead, the guard and the record-hash note.
-- [ ] `AGENTS.md` carries the Stakeholder Summaries section.
-- [ ] `npm run bundle` run and the regenerated copies committed; no `references/` file hand-edited.
+- [x] `tracker-comment-contract.md` documents the lead, the guard and the record-hash note.
+- [x] `AGENTS.md` carries the Stakeholder Summaries section.
+- [x] `npm run bundle` run and the regenerated copies committed; no `references/` file hand-edited.
 
 ---
 
@@ -422,22 +435,93 @@ one named arm outstanding rather than reopening the whole task.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS (cycle 2)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 92/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Cycle 2 (current)**: [task.104.qa.2.*.md](./task.104.qa.2.tracker-comment-plain-language-lead.md) · [task.104.gate.2.*.yml](./task.104.gate.2.tracker-comment-plain-language-lead.yml)
+- **Cycle 1**: [task.104.qa.1.*.md](./task.104.qa.1.tracker-comment-plain-language-lead.md) · [task.104.gate.1.*.yml](./task.104.gate.1.tracker-comment-plain-language-lead.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3124 (`ci:fast` 3123 pass / 0 fail), `eval:all` exit 0
+- **Phases Verified**: 4/4
+- **Findings**: 13 across two cycles — all closed, all mutation-proven. 0 open
+- **NFR Status**: Security: PASS (measured, 16 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Two cycles, thirteen findings, all closed. Cycle 1's blocking defect: slot values arrive from the
+CLI as strings and the templates consumed them by truthiness, so `--slot blocking=false` rendered the
+opposite of what the caller said, in the one paragraph aimed at a reader who cannot check the body
+underneath it.
+
+Cycle 2 was a refute pass, and every defect it found was **inside cycle 1's own fixes** — including
+one where a finding had been closed on the GitHub arm while the identical regression survived on the
+Jira arm, with a `status: closed` sitting on top of it. That is the case the refute rule exists for.
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-09-09 | 1.0 | Initial draft | create-task |
+| 2026-09-10 | 1.1 | Review passed (9/10) — zero critical. Linked GitHub issue #376; replaced the count-based "all 22 call sites" criterion with a `git diff`-decidable property; refreshed stale `jira-sync.js` / `pr-inline-comment.js` line citations; added a §9 prose lead so the tracker card's Success Criteria block renders 193 chars instead of 14 | review-task |
+| 2026-09-10 |  | Status → ready-for-development | review-task |
+| 2026-09-10 |  | Status → ready-for-review — all four phases implemented; ci:fast 3106 pass / 0 fail and eval:all green; three mutation proofs recorded | develop |
+| 2026-09-10 |  | QA gate FAIL (30/100) — 7 findings; slot values are strings consumed by truthiness, so `blocking=false` renders the blocking sentence | qa-task |
+| 2026-09-10 |  | qa-fix cycle 1 — all 7 findings closed; slot coercion at the boundary, hasOwnProperty lookup guard, empty --summary-file rejected, `desired:` label preserved, help text reconciled, Jira ADF test driven through the composition path, 12 duplicate flags removed. Each fix mutation-proven | qa-fix |
+| 2026-09-10 |  | QA cycle 2 (refute pass) — gate PASS 92/100, zero open findings. 4 new findings + 2 cleanups, both defects in cycle 1's own fixes: slot coercion was swallowing legitimate text values, and a zero-width-only summary file bypassed the empty check. all in cycle 1's own fixes, all closed and mutation-proven within the cycle | qa-task |
+| 2026-09-10 |  | Step 5c PR review — CONCERNS, 11 findings all resolved. The head commit was missing a full cycle of work gate 2 had certified; also three low-severity slot-coercion bugs, and contract/report/document accuracy corrections | review-pr |
+| 2026-09-10 | 1.2 | DoD verified 13/13 — accepted (PR #377). Security measured with 45 boundary probes, 0 reproduced; CI green on acd0dcd4 | finalise |
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+| Artifact | Result |
+| :--- | :--- |
+| Gate 1 | ❌ FAIL 30/100 — 7 findings |
+| Gate 2 | ✅ **PASS 92/100** — 6 further findings, zero open |
+| Step 5c PR review | ⚠️ CONCERNS — 11 findings, all resolved |
+| CI on PR head `acd0dcd4` | ✅ SUCCESS (5/5 checks) |
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 13/13 — functional, performance, code quality and migration
+✅ **Tests:** `ci:fast` 3127 pass / 0 fail; `eval:all` exit 0; **13 mutation proofs**, each naming the test it turns red
+✅ **PR Review:** Step 5c conformance + code lenses; every finding closed
+✅ **Documentation:** new canonical spec, contract section, `AGENTS.md` register entry, 13 skills re-bundled
+✅ **Security:** `measured` — **45 boundary probes executed against the shipped commit, 0 reproduced**
+⚠️ **Compliance:** NOT_APPLICABLE — internal developer tooling; no personal, payment, health or user-facing surface
+
+**The result the task set out to produce:** every comment the pipeline posts to a tracker issue now opens with a paragraph written for a reader with no technical background, and **no call site was edited to get one**. The engine renders it from the stage value each caller already passes, and a comment for which no lead can be produced does not post.
+
+**Detailed Verification Log:** see [`task.104.dod.1.tracker-comment-plain-language-lead.md`](./task.104.dod.1.tracker-comment-plain-language-lead.md) for complete evidence, the probe inventory, and what the run cost.
+
+**Task marked as ACCEPTED on:** 2026-09-10
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1 — The standard
-- [ ] Phase 2 — The catalogue module
-- [ ] Phase 3 — Engine integration
-- [ ] Phase 4 — Contract, docs, bundle
-- [ ] QA review
-- [ ] Quality gate
+- [x] Phase 1 — The standard
+- [x] Phase 2 — The catalogue module
+- [x] Phase 3 — Engine integration
+- [x] Phase 4 — Contract, docs, bundle
+- [x] QA review
+- [x] Quality gate
 
 ---
 
@@ -445,7 +529,7 @@ one named arm outstanding rather than reopening the whole task.
 
 - Engine: [`shared/resources/tracker-comment.js`](../../../shared/resources/tracker-comment.js)
 - Contract: [`shared/resources/tracker-comment-contract.md`](../../../shared/resources/tracker-comment-contract.md)
-- Jira ADF: [`shared/resources/jira-sync.js`](../../../shared/resources/jira-sync.js) — `buildCommentAdf()`, `addComment()`
+- Jira ADF: [`shared/resources/jira-sync.js`](../../../shared/resources/jira-sync.js) — `buildCommentAdf()` (L5237), `addComment()` (L5349)
 - Follow-on: [task.105](../task.105.comment-call-sites-plain-language-lead/task.105.comment-call-sites-plain-language-lead.md), [task.106](../task.106.pr-comment-plain-language-lead/task.106.pr-comment-plain-language-lead.md)
 
 ---

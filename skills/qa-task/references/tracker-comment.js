@@ -19,7 +19,8 @@
  *      makes no network call.
  *
  * Usage:
- *   tracker-comment.js --issue <key|N> --body-file <path> [--stage <name>]
+ *   tracker-comment.js --issue <key|N> --body-file <path>
+ *                      (--stage <name> | --summary-file <path>) [--slot k=v ...]
  *                      [--json] [--quiet] [--dry-run] [--strict]
  *                      [--tracker jira|github]
  *
@@ -28,7 +29,8 @@
  *   0  posted, already, unverifiable, deferred, no-credentials, dry-run —
  *      and any unhandled throw
  *   1  a skip, but only under --strict
- *   2  usage error (missing --issue, missing/empty --body-file, unknown flag)
+ *   2  usage error (missing --issue, missing/empty --body-file, unknown flag,
+ *      no plain-language lead resolvable, missing/empty --summary-file)
  *
  * `reason` vocabulary:
  *   posted          the comment was created
@@ -44,7 +46,8 @@
  * there means "do not move the card". It does not mean "do not say anything" —
  * a project whose board has no review column still wants the PR-opened comment.
  * Coupling the two would silence comments as a side effect of board config, so
- * `--stage` here is only the comment's IDENTITY, used to build the marker.
+ * `--stage` here is the comment's IDENTITY — it builds the marker and selects
+ * the plain-language lead, and is required unless --summary-file supplies one.
  *
  * On requiring jira-sync.js: gh-stage.js states the rule this file has to bend
  * — that module depends on tracker-workflow.js and nothing else in shared/,
@@ -64,6 +67,7 @@ const path = require("path");
 const { execFileSync, execSync } = require("child_process");
 
 const dm = require("./defer-mutation.js");
+const { renderLead, LEAD_STAGES } = require("./stakeholder-summary.js");
 
 const GIT_EXEC_OPTS = {
   encoding: "utf-8",
@@ -116,7 +120,8 @@ const COMMENT_STAGES = Object.freeze([
 const USAGE = `tracker-comment — post one comment to a tracker issue
 
 Usage:
-  tracker-comment.js --issue <key|N> --body-file <path> [--stage <name>]
+  tracker-comment.js --issue <key|N> --body-file <path>
+                     (--stage <name> | --summary-file <path>) [--slot k=v ...]
                      [--json] [--quiet] [--dry-run] [--strict]
                      [--tracker jira|github]
 
@@ -126,9 +131,19 @@ Options:
                   A file, never an inline string: bodies contain backticks,
                   $(…) and newlines, and an interpolated body is a shell
                   injection waiting for the first comment that contains one.
-  --stage, -s     Moment identity, used to build the idempotency marker
-                  (e.g. work-started, in-review, done). Omit for an
-                  unmarked comment that is posted every time.
+  --slot k=v      Fill a slot in the stage's plain-language lead. Repeatable.
+                  Boolean slots read "false"/"no"/"none"/"0" as absent; numeric
+                  slots take a positive whole number.
+  --summary-file, -S
+                  Path to a hand-written plain-language lead, overriding the
+                  stage's template. REQUIRED when --stage is omitted — every
+                  known stage has a template, so that is the only case where a
+                  lead cannot otherwise be produced. Must not be empty.
+  --stage, -s     The comment's identity — builds the idempotency marker AND
+                  selects the plain-language lead. REQUIRED unless --summary-file
+                  is given: a comment for which no lead can be produced does not
+                  post. Omitting it yields an unmarked comment, posted on every
+                  run, and then --summary-file must supply the lead.
   --tracker       Force the tracker instead of detecting it.
   --json          Emit a JSON result object on stdout.
   --quiet         Suppress informational output.
@@ -238,6 +253,22 @@ function isKnownStage(stage) {
 }
 
 /** GitHub/Bitbucket: an HTML comment, invisible when rendered. */
+/**
+ * Is there anything a human would SEE in this text?
+ *
+ * `.trim()` removes whitespace but not the zero-width set (U+200B–U+200D,
+ * U+FEFF, U+2060), so a file holding only those passes a bare `!text` check and
+ * posts something invisible. Used for emptiness TESTS only — never to transform
+ * the text that ships, because U+200D is meaningful inside emoji sequences and
+ * in Indic/Arabic shaping.
+ */
+function isVisiblyNonEmpty(text) {
+  return (
+    typeof text === "string" &&
+    text.replace(/[\u200B-\u200D\uFEFF\u2060]/g, "").trim() !== ""
+  );
+}
+
 function markerHtml(stage) {
   return `<!-- ${COMMENT_MARKER_PREFIX}${stage} -->`;
 }
@@ -270,6 +301,8 @@ function parseArgs(argv) {
     bodyFile: "",
     stage: "",
     tracker: "",
+    summaryFile: "",
+    slots: {},
     json: false,
     quiet: false,
     dryRun: false,
@@ -293,6 +326,23 @@ function parseArgs(argv) {
       case "--tracker":
         opts.tracker = value(++i, "--tracker");
         break;
+      case "--summary-file":
+      case "-S":
+        opts.summaryFile = value(++i, "--summary-file");
+        break;
+      case "--slot": {
+        // k=v rather than a JSON blob: a slot value is a short human string,
+        // and a JSON argument would reintroduce the quoting problem
+        // --body-file exists to avoid. Repeatable — the first such flag here,
+        // so it assigns into an object rather than last-winning.
+        const kv = value(++i, "--slot");
+        const eq = kv.indexOf("=");
+        if (eq < 1) {
+          throw new Error(`--slot expects k=v, got "${kv}"`);
+        }
+        opts.slots[kv.slice(0, eq)] = kv.slice(eq + 1);
+        break;
+      }
       case "--json":
         opts.json = true;
         break;
@@ -443,8 +493,14 @@ async function run({
     return { exitCode: 0 };
   }
 
+  // Declared before `emit`, which closes over it. Stays null until the lead is
+  // resolved below, so an exit that emits before the guard reports "no lead
+  // resolved" rather than throwing on the temporal dead zone.
+  let leadKind = null;
+
   const emit = (payload, exitCode) => {
-    if (args.json) output.emit({ ...payload, stage: args.stage, exitCode });
+    if (args.json)
+      output.emit({ ...payload, stage: args.stage, lead: leadKind, exitCode });
     return { exitCode, ...payload };
   };
 
@@ -475,7 +531,9 @@ async function run({
   // CRLF is normalised once, here, so neither branch has to think about it and
   // the marker match cannot fail on a stray \r.
   body = body.replace(/\r\n/g, "\n").trim();
-  if (!body) {
+  // Same visibility rule as --summary-file below: a body of only zero-width
+  // characters is empty, and the two flags must agree about what "empty" means.
+  if (!isVisiblyNonEmpty(body)) {
     output.err(`Error: --body-file "${args.bodyFile}" is empty`);
     return { exitCode: 2 };
   }
@@ -506,6 +564,76 @@ async function run({
     );
     return { exitCode: 2 };
   }
+
+  // ── THE PLAIN-LANGUAGE LEAD ───────────────────────────────────────────────
+  // Standard and catalogue: stakeholder-summary.md. The engine renders the lead
+  // from the --stage the caller already passes, so a call site cannot forget one
+  // and a new stage cannot ship without one.
+  //
+  // The lead is merged into `body` HERE, above the access gate, and deliberately
+  // so. The deferred-mutation record below snapshots `body` into command.stdin
+  // and replays it through `gh issue comment --body-file -`, bypassing this file
+  // entirely — so a lead composed further downstream would be missing from every
+  // deferred comment, which is precisely the population that gets posted by hand
+  // and read by someone outside the pipeline. It also means the record's
+  // fingerprint changes, which the task documents as expected rather than a bug.
+  let leadSource = null;
+  if (args.summaryFile) {
+    try {
+      leadSource = fs
+        .readFileSync(args.summaryFile, "utf-8")
+        .replace(/\r\n/g, "\n")
+        .trim();
+    } catch (e) {
+      output.err(
+        `Error: cannot read --summary-file "${args.summaryFile}": ${e.message}`,
+      );
+      return { exitCode: 2 };
+    }
+    // Same rule as --body-file: an empty file is a usage error, not an empty
+    // lead. Silently posting without one made --summary-file /dev/null a
+    // one-flag bypass of the standard this module exists to enforce, while
+    // --json still reported `lead: "summary-file"` — a contract that lied.
+    //
+    // Emptiness is tested against a STRIPPED COPY and the ORIGINAL is posted.
+    // The first version of this check stripped the zero-width set from the
+    // content itself, which deleted U+200D from what actually shipped — the
+    // joiner inside every ZWJ emoji sequence, and load-bearing for Indic and
+    // Arabic shaping. "Shipped by 👩‍💻" posted as "Shipped by 👩💻". Closing an
+    // emptiness hole is no licence to rewrite a human's text.
+    if (!isVisiblyNonEmpty(leadSource)) {
+      output.err(`Error: --summary-file "${args.summaryFile}" is empty`);
+      return { exitCode: 2 };
+    }
+  } else {
+    leadSource = renderLead(args.stage, args.slots || {});
+  }
+
+  if (leadSource === null) {
+    // Name BOTH routes. The reader who hits this is almost always someone who
+    // omitted --stage deliberately for a repeat-every-run comment; a message
+    // that says only "missing summary" sends them looking for a flag they have
+    // never seen.
+    output.err(
+      `Error: no plain-language summary for --stage "${args.stage || "(omitted)"}". ` +
+        `Either pass a --stage that has one (${LEAD_STAGES.join(", ")}) ` +
+        `or pass --summary-file with a hand-written one. ` +
+        `See shared/resources/stakeholder-summary.md.`,
+    );
+    return { exitCode: 2 };
+  }
+
+  leadKind = args.summaryFile ? "summary-file" : "template";
+
+  // Captured BEFORE the merge below. `desired:` is the label a human reads in
+  // the deferred/handover checklist to tell one pending action from another,
+  // and the lead is by design near-identical across every comment of a given
+  // stage — exactly the wrong thing to label them with. command.stdin still
+  // carries the composed body, because that is what gets posted.
+  const desiredLine = firstLineOf(body);
+  // Unconditional: `null` is rejected by the guard above and `""` by the
+  // empty-file check, so every path reaching here has a real lead.
+  body = `${leadSource}\n\n---\n\n${body}`;
 
   const skipCode = args.strict ? 1 : 0;
 
@@ -548,7 +676,7 @@ async function run({
               : `issue #${issue}`,
             ui_url: uiUrl,
           },
-          desired: firstLineOf(body),
+          desired: desiredLine,
           manual: {
             deepLink: uiUrl,
             ui: "Open the issue → Comment → Paste → Save",
@@ -597,6 +725,7 @@ async function run({
         args,
         issue,
         body,
+        desiredLine,
         output,
         emit,
         env,
@@ -683,6 +812,7 @@ async function runJira({
   args,
   issue,
   body,
+  desiredLine,
   output,
   emit,
   env,
@@ -771,6 +901,7 @@ async function runJira({
       skill: "tracker-comment",
       ...common,
       body,
+      desired: desiredLine,
       momentId: args.stage,
     });
   } catch (e) {

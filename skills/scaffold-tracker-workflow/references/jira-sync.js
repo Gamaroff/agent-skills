@@ -5355,6 +5355,13 @@ async function addComment({
   token,
   issueKey,
   body,
+  // The one-line label a human reads in the handover checklist to tell one
+  // pending action from another. The caller passes it when `body` is not what
+  // should be labelled — tracker-comment.js composes a plain-language lead above
+  // the body, and the lead is near-identical for every comment of a given stage,
+  // so labelling with it stops the label labelling. Defaults to the old
+  // behaviour, so every other caller is unaffected.
+  desired = undefined,
   momentId = "",
   linkResolver = undefined,
 }) {
@@ -5381,7 +5388,7 @@ async function addComment({
           url: `${baseUrl}/rest/api/3/issue/${issueKey}/comment`,
           ui_url: `${baseUrl}/browse/${issueKey}`,
         },
-        desired: firstLineOf(body),
+        desired: desired || firstLineOf(body),
         manual: {
           deepLink: `${baseUrl}/browse/${issueKey}`,
           ui: "Open the issue → Comment → Paste → Save",
