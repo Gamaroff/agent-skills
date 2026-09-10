@@ -1,6 +1,6 @@
 ---
 name: mutation-proving
-description: How to establish that a test would actually fail if the behaviour it names regressed — revert the behaviour, re-run, confirm red, restore. Also what a held proof does NOT tell you (it is evidence about a test, not about coverage), and the three things an unheld proof can mean: a vacuous test, a redundant source, or a wrong premise.
+description: How to establish that a test would actually fail if the behaviour it names regressed — revert the behaviour, re-run, confirm red, restore. Also what a held proof does NOT tell you (it is evidence about a test, not about coverage), and the three things an unheld proof can mean: a vacuous test, a redundant source, or a wrong premise. And the mirror: the four things a RED run can mean — a real kill, an environmental refusal, an invocation error, or the wrong thing mutated — with the probe-validation checks that tell them apart.
 ---
 
 # Mutation-proving a test
@@ -81,6 +81,103 @@ mechanism was simply wrong. The real hole was `--timeout 0`.
 
 > Strengthening the test would have hard-coded a fiction. Measure the mechanism
 > first; the proof is what told you the story was false.
+
+## When the proof goes red for the WRONG reason
+
+The mirror of the section above, and the more dangerous half. A green run that
+should have been red *announces itself* — you predicted red, you got green, you
+go looking. A red run that should have been green announces nothing: red was the
+prediction, red is what arrived, and the reading is recorded as a kill.
+
+**A false RED is worse than a false GREEN, and the asymmetry is not about
+frequency.** A false GREEN leaves one invariant unproven and the matrix says so —
+the row is a survivor, and a survivor is a finding. A false RED writes `dead` into
+a row nothing ever executed, so the matrix certifies coverage that was never
+exercised, while looking exactly like diligence. The failure is silent on the side
+that reports success.
+
+> *"A red test isn't self-validating."*
+
+Four causes, and only the first is a kill:
+
+| The suite went red because | Signal | Response |
+| -------------------------- | ------ | -------- |
+| you broke the behaviour the named test observes | **a real kill** | the proof holds — restore, confirm green, record it |
+| the suite never ran — a guard refused it, the runner was missing, the wrong interpreter was picked up | **environmental refusal** | nothing was measured. Fix the environment and re-run; the row is not a survivor either |
+| the runner threw before or while loading the tests — a bad flag, an unresolvable import, a syntax error your edit introduced | **invocation error** | the red is about the harness, not the behaviour. Read the *first* error, not the summary line |
+| the edit landed, but changed something other than the value under test | **wrong thing mutated** | the hardest one — see the judgement below. Re-read the mutation before believing the red |
+
+Rows two and three are the ones that record a whole matrix as complete having
+executed **zero** tests. Both were measured: a harness driven from a `subprocess`
+inherited a different Node major and the repository's own node-major guard
+**refused the run** — the guard working exactly as designed is what made the
+reading convincing; and a `--reporter=basic` that did not exist in that Vitest made
+the runner throw while loading it. Four dead mutants each, none of them executed.
+
+### Validate the probe before you trust the matrix
+
+Three mechanical checks, then one judgement. **A matrix collected before them
+proves nothing in either direction** — not that the dead mutants died, and not
+that the survivors survived.
+
+1. **Baseline GREEN, with the exact command the matrix will use.** Not a similar
+   command, not the one in your shell history — the same string, from the same
+   working directory, through the same runner. This is what catches a refusing
+   guard and a bad flag, because both fail here before any mutation exists to
+   blame.
+2. **One known-bad mutation goes RED, and is killed by its named case.** Break
+   something you are certain is covered and confirm *that* test fails — not "some
+   test fails". A suite that cannot go red on a certainty will not go red on a
+   subtlety, and one that goes red in the wrong test is measuring something else.
+3. **The mutation is asserted applied** — the `diff` from step 2 of the procedure.
+
+```bash
+# 1. baseline — the exact command, unmutated
+<the matrix command>            # must be GREEN before anything is mutated
+
+# 2. a certainty — break it, confirm the NAMED test is the one that fails
+<the matrix command> 2>&1 | grep '<the test that names it>'
+
+# 3. applied — from step 2 of the procedure
+diff /tmp/pre-mutation.ts path/to/source.ts || echo "MUTATION APPLIED"
+```
+
+The three cost about twenty seconds. They are cheap on purpose: a validation step
+expensive enough to feel like a detour is one that gets skipped on the run where
+it mattered.
+
+4. **The judgement — the mutation must change the VALUE under test, not merely
+   produce a diff.** Re-read the edit and confirm it expresses the behaviour you
+   meant to break.
+
+**This fourth check is a judgement, and it is stated as one because nothing
+external can perform it.** It carries no time estimate and no command. Each of the
+three mechanical checks compares an observation against an expectation; this one
+compares an edit against an *intent*, which exists only in your head.
+
+Here is why it cannot be dropped. A mutation once mangled a shell variable rather
+than changing its value:
+
+```bash
+# intended: change the value the test asserts on
+-STATUS="ready"
++STATUS="blocked"
+
+# what actually landed: the variable is now broken, not different
+-STATUS="ready"
++STATU S="ready"
+```
+
+**That edit passes the applied-check.** There is a real diff, so step 2 is
+satisfied; the suite goes red, which is what was predicted; every mechanical signal
+agrees — and the proof is void, because the script broke rather than the behaviour
+changing. Step 2's `diff` closes the *"nothing happened"* case. It does not close
+this one, and a reader who takes "confirm it applied" as the whole rule will record
+this reading as a kill.
+
+That is what separates this from a mutation that never applied at all. **No diff and
+an unexpected green** is the false-GREEN case above. **A diff, an expected red, and
+the wrong thing changed** is this one, and only re-reading the mutation catches it.
 
 ## When to do it
 
