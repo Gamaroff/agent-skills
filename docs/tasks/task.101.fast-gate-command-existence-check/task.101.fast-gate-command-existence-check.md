@@ -134,7 +134,8 @@ consequence — it decides what every iteration is checked against — and it be
 **Added**
 
 - `evals/shared/tests/fast-gate-precondition.test.mjs` — extracts the fenced block from the loop
-  document and executes it against fixture projects in `bash` and `zsh`
+  document and executes it against fixture projects in `bash` and `zsh`; also asserts that the
+  Develop Loop section points forward to the precondition (QA cycle 2)
 
 **Modified — repo guards the new content tripped**
 
@@ -213,7 +214,7 @@ Delete the check; `npm run bundle`.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (cycle 2 — refute pass)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-10
 **Quality Score**: 90/100
@@ -221,8 +222,8 @@ Delete the check; `npm run bundle`.
 
 ### QA Report
 
-- **Full Report**: [task.101.qa.1.fast-gate-command-existence-check.md](./task.101.qa.1.fast-gate-command-existence-check.md)
-- **Gate File**: [task.101.gate.1.fast-gate-command-existence-check.yml](./task.101.gate.1.fast-gate-command-existence-check.yml)
+- **Cycle 1**: [task.101.qa.1.fast-gate-command-existence-check.md](./task.101.qa.1.fast-gate-command-existence-check.md) · [gate.1](./task.101.gate.1.fast-gate-command-existence-check.yml)
+- **Cycle 2 (refute pass)**: [task.101.qa.2.fast-gate-command-existence-check.md](./task.101.qa.2.fast-gate-command-existence-check.md) · [gate.2](./task.101.gate.2.fast-gate-command-existence-check.yml)
 
 ### Test Coverage Summary
 
@@ -233,10 +234,17 @@ Delete the check; `npm run bundle`.
 
 ### Key Findings
 
-All five success criteria verified **by execution**, not by reading. One MEDIUM finding: §8 below
-asserted that `qa-task` Step 4b would execute the snippet in both shells; executed, Step 4b classifies
-the block `mutating` (`unrecognised-command: npm`) and skips it. The coverage itself is real and
-stronger than the claim — see the corrected §8.
+All five success criteria verified **by execution**, not by reading. Two MEDIUM findings, both fixed:
+
+1. **Cycle 1** — §8 asserted `qa-task` Step 4b would execute the snippet; executed, Step 4b classifies
+   the block `mutating` (`unrecognised-command: npm`) and skips it. The coverage was real and stronger
+   than the claim; §8 now names the real route.
+2. **Cycle 2 (refute pass)** — the precondition was filed under `## Test Failure Triage`, a section a
+   reader reaches only *after* a failure, with nothing at the loop's entry directing them to it. Cycle 1
+   passed placement because it checked position relative to the Output Capture Pattern — true, and
+   satisfiable without the property it was meant to establish. A forward pointer now sits at the top of
+   `## Develop Loop — Run Until Complete (Bounded)`, and the test asserts it **section-scoped**, so a
+   pointer filed anywhere else in the file fails.
 
 ---
 
@@ -249,7 +257,8 @@ stronger than the claim — see the corrected §8.
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Implemented — 12 files, 10 tests | develop |
 | 2026-09-10 |  | QA gate CONCERNS (90/100) — 1 finding: §8 asserts a Step 4b route execution disproves | qa-task |
-| 2026-09-10 |  | QA findings fixed — 1 MEDIUM (§8 verification route corrected), 1 iteration | qa-fix |
+| 2026-09-10 |  | QA gate CONCERNS (90/100) cycle 2 refute pass — 1 finding: precondition filed where the loop reader does not reach it | qa-task |
+| 2026-09-10 |  | QA findings fixed — 2 MEDIUM (§8 route; loop-entry pointer + section-scoped regression assertion), 2 iterations | qa-fix |
 
 ## Progress Tracking
 

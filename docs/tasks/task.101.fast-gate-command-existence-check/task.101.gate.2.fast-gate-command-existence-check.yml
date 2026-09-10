@@ -1,0 +1,89 @@
+schema: 1
+task: 'task.101.fast-gate-command-existence-check'
+task_title: 'fail fast on a missing fastGateCommand'
+gate: CONCERNS
+status_reason: 'Cycle 1 finding verified fixed and its replacement claims survive refutation. The mandatory cycle-2 refute pass found one new MEDIUM in the ORIGINAL change, not in the fix: the precondition sits under `## Test Failure Triage`, a section a reader reaches only after a failure, while nothing at the loop entry point directs them to run it first. Cycle 1 passed this because its placement check used the wrong reference point.'
+reviewer: 'QA Engineer'
+updated: '2026-09-10T07:55:00Z'
+
+top_issues:
+  - id: 'T101-002'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+    finding: >-
+      The precondition is at line 153, under `## Test Failure Triage (both orchestrators —
+      applies inside /develop)`. The document's control flow reaches `## Develop Loop — Run
+      Until Complete (Bounded)` (line 88) and `### LOOP` (line 92) first, and nothing there
+      points forward to the precondition. A reader executing the loop therefore consults the
+      Test Failure Triage section only WHEN A TEST FAILS — by which point the loop has already
+      died mid-iteration, which is precisely the failure this task exists to remove. The block
+      is correct and its own text says "run this once, before the loop's first iteration"; what
+      is missing is anything at the loop's entry that makes that happen. The sibling documents
+      (qa-fix cycle, develop-bug verify cycle) now assert "the develop loop checks the named
+      script resolves before its first iteration", a claim that inherits the same weakness —
+      one root cause, not two findings.
+    suggested_action: >-
+      Add a forward pointer at the top of `## Develop Loop — Run Until Complete (Bounded)`,
+      before `### LOOP`, directing the reader to run the precondition once before iteration 1.
+      Then close the regression hole: extend
+      evals/shared/tests/fast-gate-precondition.test.mjs to assert the loop section references
+      the precondition, so this cannot silently revert.
+    suggested_owner: dev
+    status: open
+
+  - id: 'T101-001'
+    severity: medium
+    file: 'docs/tasks/task.101.fast-gate-command-existence-check/task.101.fast-gate-command-existence-check.md'
+    finding: 'Cycle 1: §8 asserted qa-task Step 4b as the verification route; execution disproved it.'
+    suggested_action: 'Corrected in cycle 1 — §8 now names the dedicated test and records why Step 4b cannot be the route.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-10'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3034
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged from cycle 1. No credential, network or authz surface; the grep interpolation cannot receive a metacharacter.'
+  performance:
+    status: PASS
+    notes: 'One `npm run` listing per pipeline run when the precondition fires.'
+  reliability:
+    status: CONCERNS
+    notes: >-
+      The check itself is reliable and its fail-safe direction is proven. What is not reliable
+      is that it FIRES: its position in the document makes a reader executing the loop likely to
+      reach iteration 1 without it. That is a reliability property of the deliverable, not of
+      the snippet.
+  maintainability:
+    status: PASS
+    notes: 'Six authoring sites swept; bundle and catalog verified in sync; guard narrowing carries a both-directions unit test.'
+
+recommendations:
+  immediate:
+    - action: 'Add a forward pointer from the Develop Loop section to the precondition, and assert that link in the test.'
+      refs:
+        - 'shared/resources/develop-pipeline-step-3-develop-loop.md'
+        - 'evals/shared/tests/fast-gate-precondition.test.mjs'
+  future:
+    - action: 'Consider whether the snippet engine should classify a bare `npm run` (a pure read) as runnable. Own task.'
+      refs: ['shared/resources/qa-execute-snippets.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions:
+    - 'Add the loop-entry pointer so the precondition is reached before iteration 1.'

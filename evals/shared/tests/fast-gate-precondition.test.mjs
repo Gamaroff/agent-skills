@@ -45,6 +45,7 @@ const repoRoot = join(__dirname, "..", "..", "..");
 const { timeoutMs: SPAWN_TIMEOUT_MS } = spawnBudget("FAST_GATE_PRECONDITION");
 
 const LOOP_DOC = "shared/resources/develop-pipeline-step-3-develop-loop.md";
+const LOOP_SECTION = "## Develop Loop — Run Until Complete (Bounded)";
 const HEADING =
   "### Precondition — the gate must resolve before the first iteration";
 /** The placeholder the surrounding document tells its reader to substitute. */
@@ -110,6 +111,50 @@ test("the precondition block is present and is a real conditional", () => {
       "an unset variable extracts nothing, which skips the check and passes vacuously",
   );
   assert.match(snippet, /\bexit 1\b/, "the block must be able to HALT");
+});
+
+test("the loop's entry point points at the precondition", () => {
+  // A correct block filed where nobody reads it in time is not a working check.
+  //
+  // The precondition lives under `## Test Failure Triage`, which a reader executing
+  // the loop reaches only AFTER something has failed — by which point the loop has
+  // already died mid-iteration, the exact failure it exists to prevent. So the loop
+  // section must carry a forward pointer to it.
+  //
+  // This assertion exists because the ORIGINAL placement check was satisfiable
+  // without the property it was meant to establish: it asserted the precondition
+  // precedes the Output Capture Pattern, which is true, and true for reasons
+  // unrelated to whether a reader reaches it in time. The reference point was wrong,
+  // not the assertion. QA cycle 2's refute pass caught it; this stops it reverting.
+  const doc = readFileSync(join(repoRoot, LOOP_DOC), "utf-8");
+  const loopAt = doc.indexOf(LOOP_SECTION);
+  assert.notEqual(loopAt, -1, `${LOOP_DOC} must contain "${LOOP_SECTION}"`);
+
+  const precondAt = doc.indexOf(HEADING);
+  assert.ok(
+    precondAt > loopAt,
+    "precondition is defined after the loop section (structure changed)",
+  );
+
+  // Only the text BETWEEN the loop heading and the next `## ` may satisfy this —
+  // a mention anywhere else in the file would pass a naive whole-file search while
+  // leaving the reader at the loop with no pointer.
+  const after = doc.slice(loopAt + LOOP_SECTION.length);
+  const nextH2 = after.search(/\n## /);
+  const loopSection = nextH2 === -1 ? after : after.slice(0, nextH2);
+
+  assert.match(
+    loopSection,
+    /Precondition — the gate must resolve before the first iteration/,
+    "the Develop Loop section must point forward to the precondition by name, so a " +
+      "reader executing the loop runs it before iteration 1 rather than meeting it " +
+      "only after a failure",
+  );
+  assert.match(
+    loopSection,
+    /before iteration 1/i,
+    "the pointer must say WHEN to run it, not merely that it exists",
+  );
 });
 
 for (const shell of SHELLS) {

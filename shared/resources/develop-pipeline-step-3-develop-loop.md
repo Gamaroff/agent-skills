@@ -87,6 +87,13 @@ If a prior plan file is being reused from a previous session, verify its freshne
 
 ## Develop Loop — Run Until Complete (Bounded)
 
+> **Before iteration 1, run the fast gate's precondition.** It is defined in
+> [§"Precondition — the gate must resolve before the first iteration"](#precondition--the-gate-must-resolve-before-the-first-iteration),
+> under Test Failure Triage with the rest of the fast-gate contract. It runs **once**, here, not per
+> iteration — and it is pointed at from this section deliberately: a reader executing the loop reaches
+> Test Failure Triage only *after* something has failed, by which time the loop has already died
+> mid-iteration, which is the exact failure the precondition exists to prevent.
+
 For the full develop loop setup (initial checkpoint variables, stall detection, progress conditions, and MAX_ITER halt rules), see `shared/resources/develop-pipeline-resume-contract.md`.
 
 ### LOOP (both orchestrators — execute identically)

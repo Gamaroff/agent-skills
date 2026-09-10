@@ -128,6 +128,20 @@ _Problems encountered and how they were resolved or escalated._
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 1 of 5)
 
+### QA Cycle 2 — 2026-09-10 (refute pass)
+**Gate Result**: CONCERNS
+**Issues Found**: 1 MEDIUM (new) — the precondition is filed under `## Test Failure Triage`, which a reader executing the loop reaches only *after* a failure; nothing at the loop's entry (L88/L92) points to it. Cycle 1's finding verified FIXED, and both of its replacement claims were refuted against the engine and survived.
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+Notes:
+- **The refute pass paid for itself.** The finding is in the *original* change, at a location cycle 1's fix never touched — exactly what the cycle-2 no-narrowing rule exists to surface.
+- **Cycle 1's placement check was vacuous in the precise sense.** It asserted the precondition precedes the Output Capture Pattern. True — and satisfiable without the property it was meant to establish, because the Output Capture Pattern was the wrong reference point. The right one is the loop's control flow.
+- One root cause, not two findings: the qa-fix and develop-bug verify-cycle documents now assert the loop has already validated the key, a claim conditional on the same placement.
+- Fix: forward pointer at the top of `## Develop Loop — Run Until Complete (Bounded)`, plus a **section-scoped** regression assertion. Mutation-proved twice — removing the pointer reddens it, and *relocating* the pointer elsewhere in the same file also reddens it, so a naive whole-file mention cannot satisfy it.
+
 Notes:
 - All five success criteria verified **by execution**, not by reading.
 - 5/5 mutations proven, including one that re-introduces the pre-implementation defect and confirms the drafted snippet would have passed vacuously.
