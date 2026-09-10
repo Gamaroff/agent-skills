@@ -1,72 +1,81 @@
-# Session Handoff — 2026-09-07
+# Session Handoff — 2026-09-10
 
 Read this first if you are picking up work in `agent-skills`. It records where things stand, what to
-pick up, the one standing decision, and the traps that cost time. Every figure below was measured in
-the session that wrote this file, not carried forward from the previous handoff.
+pick up, the standing decisions, and the traps that cost time.
 
-**State at handoff:** branch `develop` @ `0de616b0` · working tree clean · **zero open PRs** · **zero
-open issues**.
+**Figures below are measured or explicitly marked as carried.** Sections 1, 2, 4 and 6 were measured
+in the session that wrote this file. Section 3 is **carried forward unverified** and says so per item
+— re-measure before acting on any of it. Section 5 (traps) is durable and was not re-derived.
+
+**State at handoff:** branch `develop`, at the commit tagged **v0.46.0** · **zero open PRs** · **zero
+open issues**. `develop` was 407 commits ahead of `v0.45.0` (2026-09-02) when this release was cut.
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Hermetic suite | `npm test` | **exit 0** — 505 bash assertions + 2,538 node tests, **0 failures**, 1 skipped |
-| Replay evals | `npm run eval:all` | **exit 0** — 25 scenarios, all assertions passed |
-| Bundle idempotency | `npm run bundle` | clean no-op — 0 files changed |
-| Formatting | `npx prettier --check .` | clean |
+| Hermetic suite | `command npm test` | **exit 0** — 505 bash assertions + 3,155 node tests, **0 failures**, 1 skipped |
+| Replay evals | `command npm run eval:all` | **exit 0** — 51 replay scenarios, all assertions passed |
+| Bundle freshness | `command npm run bundle -- --check` | 126 skills checked, **0 problems** |
+| Skill catalog | `command npm run generate-catalog` | regenerates to no diff — 126 skills |
+| Dependency graph | `command npm run generate-skill-deps` | regenerates to no diff — 126 skills, **71 edges** by 22 skills |
+| Formatting | `command npx prettier --check .` | clean |
 | Roadmap lint | `select-next.mjs --lint` | **0 errors, 0 warnings** |
 
 ---
 
-## 1. What to pick up — T80
+## 1. What to pick up — T107
 
 The frontier is **not** empty. `select-next.mjs` returns:
 
 ```
-selected  T80  →  /develop-task
-docs/tasks/task.80.security-probe-engine/task.80.security-probe-engine.md
-ready-for-development · High · risk_level: medium · est. 6h · depends_on: task.79 (merged)
+selected  T107  →  /develop-task
+docs/tasks/task.107.bug-runbook-rewrite/task.107.bug-runbook-rewrite.md
+ready-for-development · Medium · risk_level: low · est. 3h · depends_on: —
 ```
 
-*Make a security probe runnable without widening the snippet allow-list.* task.73's probe mode is
-prose — it tells the agent to hand-write a script, run it, and then trusts the `probes_executed`
-count the agent types. T80 builds the engine that runs the probe and computes the verdict, without
-putting an interpreter on the snippet allow-list (which would make that boundary fail open).
+*Rewrite `docs/runbooks/bug-fix.md` against the pipeline that exists.* The page documents a
+four-step manual loop that predates `/develop-bug` and `/review-bug` entirely, mentions no tracker
+sync at all (`grep -c 'tracker\|jira\|github_issue'` returns 0, and v0.46.0 added four bug-sync
+skills), and lists two of the three bug modes. It is the page a reader reaches first, and it
+terminates before the capability starts. Filed during the v0.46.0 release doc sweep.
 
 `/develop-next` will dispatch this. There is no run-state file, so it starts clean rather than
 resuming.
 
 **Note how it was selected.** Phase 5 of the roadmap is fully ticked, so no phase held an actionable
 row and selection **fell through to the task-registry fallback**. That is the designed terminal
-behaviour of a closed phase, not a fault.
+behaviour of a closed phase, not a fault — and it is how every task since T99 has been selected.
 
 ---
 
-## 2. The standing decision — when to cut v0.46.0
+## 2. The standing decision — the release cadence, and what the last one found
 
-The previous handoff's "is this the moment for 1.0?" question was answered by practice: **eight tags
-shipped since**, all `0.x` minors.
+**v0.46.0 is the tag being cut from this state.** `develop` was 407 commits ahead of `v0.45.0`
+(2026-09-02) with a 1,260-line `## [Unreleased]`. Nine tags have shipped since the "is this 1.0?"
+question was first raised, all `0.x` minors; the cadence is established and **the timing is still a
+human call — ask before tagging.**
 
-| Fact | Value |
-| --- | --- |
-| Last tag | **v0.45.0**, cut 2026-09-02, on `main` @ `0d09860f` |
-| `develop` ahead of `v0.45.0` / `main` | **177 commits** |
-| `## [Unreleased]` in `CHANGELOG.md` | **399 lines** |
-| Release trigger | push a `v*.*.*` tag, or `workflow_dispatch` (`.github/workflows/release.yml`) |
+Two things the v0.46.0 prep found that will recur:
 
-So the release machinery works and the cadence is established — roughly a tag every few days through
-mid-August, then a 5-day gap since v0.45.0 while 177 commits accumulated. **The timing is still a
-human call. Ask before tagging.**
+**The CHANGELOG box on the release checklist is the one item with no mechanism, and it drifted.**
+Five merged tasks had no `[Unreleased]` entry — T70, T102, T104, T105, T106 — four of them the four
+most recent merges. Everything *generated* in this repo is machine-checked (catalog diff, `bundle
+--check`, task-registry drift test, roadmap linter) and all of it was clean; the hand-checked item is
+the one that failed. `docs/contributing/releases.md` now carries the one-liner that measures it
+rather than recalls it. **Write the entry at acceptance, not at release** — at acceptance the author
+knows what changed; at release time someone reconstructs it from commit subjects.
 
-One piece of advice from the previous handoff still applies: **separate mechanical churn from
-behavioural change in the release notes.** A large fraction of any diff this size is full-file
-rewrites produced by `npm run bundle`, not behaviour. Issue #179 (now closed) was a complaint about
-exactly that shape shipping unannounced.
+**Separate mechanical churn from behavioural change in the release notes.** A large fraction of any
+diff this size is full-file rewrites produced by `npm run bundle`, not behaviour. Issue #179 (closed)
+was a complaint about exactly that shape shipping unannounced.
 
 ---
 
-## 3. Carried follow-ups — status re-verified this session
+## 3. Carried follow-ups — CARRIED, NOT RE-MEASURED THIS SESSION
 
-The previous handoff listed four. Here is where each actually stands, checked rather than assumed.
+**Read this heading literally.** The previous handoff verified these on 2026-09-07 and this session
+did not re-run any of them — it was a release-prep session, not a follow-up sweep. Every item below
+is therefore a *claim as of 2026-09-07*, three days and 30 merges old. **Re-measure before acting.**
+The engine in 3a and the suites in 3c have both been touched since.
 
 ### 3a. `shared/resources/change-log.js` — one defect fixed, one still open
 
@@ -118,20 +127,30 @@ by design. Both need credentials or a scratch Projects v2 board this repo does n
 
 ## 4. Two kinds of bookkeeping drift — known, tolerated, recurring
 
-Neither blocks anything. Both will mislead you if you trust the wrong file.
+Neither blocks anything. Both will mislead you if you trust the wrong file. **Both re-measured
+2026-09-10.**
 
-**The task-registry status column goes stale; the document is the authority.** 16 of 103 evaluated
-rows disagree with their document's own frontmatter — 9 `ready-for-development`→`accepted`, 5
-`planned`→`accepted`, 2 `draft`→`accepted`. Every one is stale in the harmless direction, and
-`select-next` rejects on the **document** status, so selection is correct regardless. `--lint`
-reports 0 warnings for these; do not read that as agreement between the two.
+**The task-registry Status column goes stale; the document is the authority.** This one now has a
+guard: `evals/shared/tests/task-registry-drift.test.mjs` (T103) fails when a task document reads
+`accepted` and its row does not, or the reverse — and `/finalise` writes the row via
+`shared/resources/registry-tick.js` at the moment it sets `status: accepted`, so the two cannot
+disagree by construction on anything finalised since. The test is **green** as of this handoff. Only
+the `accepted` predicate is compared, so a task legitimately mid-flight does not trip it; a row that
+is stale in some *other* column is still unguarded, and `select-next` still rejects on the
+**document** status regardless.
 
-**Accepted items keep not getting a Phase 5 roadmap row.** B7, B11, B12 and T79 are all accepted with
-**no row at all**. This is the third recurrence — `bcf183b4` fixed it for B6/B9, PR #328 for B8/B10,
-and it has already returned. Nothing enforces the convention: a fix's own commit has no reason to
-touch the roadmap, and by merge time the pipeline is done with it. A *missing* row is harmless
-(selection reads the registries directly); an **unticked** row for an accepted item is what stalls
-the loop, and that is what `## Housekeeping` warns about. Different failure, don't conflate them.
+**Accepted items get a roadmap row late or never.** Measured across T99–T106: **only T106 has a
+roadmap Change Log row.** T99, T100, T101, T102, T103, T104 and T105 have none. This is the fourth
+recurrence of the class — `bcf183b4` fixed it for B6/B9, PR #328 for B8/B10, and B7/B11/B12 were
+caught and added since. Nothing enforces it: a fix's own commit has no reason to touch the roadmap,
+and by merge time the pipeline is done with the item.
+
+**Do not conflate the two failures.** A *missing* row is harmless — Phase 5 is closed, selection
+reads the registries directly, and every task since T99 was selected through the registry fallback
+with no phase row in existence. An **unticked phase row for an accepted item** is what stalls the
+loop, and that is what `## Housekeeping` warns about. There are currently four unticked rows in the
+roadmap and all four are deliberate: two `*-fixtures` rows under `## Deferred / human-gated`, and
+two housekeeping reminders.
 
 ---
 
@@ -208,6 +227,29 @@ prose *mention* of a heading name. The Change Log engine guards this (`fencedRan
 `insideProtected`); one-off edit scripts do not. **Locate both boundaries, assert both, cut by
 explicit line range**, then verify fence parity: `$(grep -c '^```' "$f") % 2` must be `0`.
 
+### `invokes:` in SKILL.md frontmatter must be ONE line, and a wrong shape is silent
+
+The skill call graph (`shared/resources/skill-dependencies.json`, consumed by the installer to
+expand a profile to its closure) is generated from an `invokes:` key in each SKILL.md's frontmatter.
+**Only `invokes: [a, b]` on a single line is read.** Both other spellings now throw —
+
+```yaml
+invokes:            # ← YAML block form: rejected
+  - create-branch
+invokes:            # ← wrapped flow form: rejected (this one shipped)
+  [create-branch]
+```
+
+— but before v0.46.0 the wrapped form parsed to **zero edges with no error**, and that failure is
+invisible to every check: the generator and the committed JSON agree on the empty list, so both drift
+guards stay green. `develop-bug` carried nine declared callees as zero edges for a cycle, and a
+`profile: pipeline` install shipped `/develop-bug` without `ensure-bug-{jira,github}-issue`.
+The consumer finds out hours later, at the step whose skill is missing.
+
+The tree-wide property is now asserted directly (*no SKILL.md declares `invokes:` and resolves to no
+edges*), which is what covers the shape nobody has thought of yet. Prettier does **not** reflow a long
+inline list, so nothing in the toolchain pushes you into the wrapped form — verified.
+
 ### Two tests to distrust differently
 
 - `qa-execute-snippets` is **load-flaky** — it asserts on multi-second timings and fails under
@@ -221,13 +263,17 @@ explicit line range**, then verify fence parity: `$(grep -c '^```' "$f") % 2` mu
 
 ```
 docs/development/project-completion-roadmap.md   live roadmap — Phase 5 closed, deferred rows only
-docs/development/roadmap-history.md              archived Phases 1–4
-docs/tasks/task-registry.md                      task numbering — next available: 93
+docs/development/roadmap-history.md              archived Phases 1-4
+docs/tasks/task-registry.md                      task numbering — next available: 108
 docs/bugs/bug-registry.md                        general-bug numbering — next available: 13
-docs/tasks/task.80.security-probe-engine/        the next item
-shared/resources/change-log.js                   3a(1)'s defect lives here
+docs/tasks/task.107.bug-runbook-rewrite/         the next item
+docs/contributing/releases.md                    the release procedure and its checklist
+shared/resources/change-log.js                   3a(1)'s defect lives here (unverified since 09-07)
 shared/resources/document-change-log.md          canonical Change Log spec
 ```
 
 Pipeline conventions: `AGENTS.md`. Anti-patterns: `docs/reference/anti-patterns.md`. Design
-rationale: `docs/reference/faq.md`.
+rationale: `docs/reference/faq.md`. Observation log: resolved by
+`shared/resources/resolve-observation-workspace.sh`, never from the cwd — **48 files on disk**,
+highest id **59** (ids are monotonic; resolved entries are swept to `archive/`). Ids 58 and 59 were
+written during the v0.46.0 prep.

@@ -97,10 +97,16 @@ missing.
 
 Rules:
 
-- **Inline flow form only** — `invokes: [a, b]`. The YAML block form (`invokes:` then `  - a`) is
-  **rejected with an error**, deliberately: it used to parse as an empty list, and a silently-empty
-  edge list is invisible to CI (the generator and the committed manifest agree on it, so the drift
-  check stays green) while breaking a consumer's pipeline.
+- **Inline flow form only, all on the key line** — `invokes: [a, b]`. Both other spellings are
+  **rejected with an error**, deliberately: the YAML block form (`invokes:` then `  - a`), and the
+  wrapped flow form (`invokes:` then `  [a, b]` on the next line). Each used to parse as an empty
+  list, and a silently-empty edge list is invisible to CI — the generator and the committed manifest
+  agree on it, so the drift check stays green — while breaking a consumer's pipeline. The wrapped
+  form is not hypothetical: `develop-bug` shipped nine declared callees as zero edges for a cycle,
+  and a `profile: pipeline` install lost `ensure-bug-{jira,github}-issue` with it.
+- **Keep it on one line even when it is long.** Prettier does not reflow a long inline flow sequence
+  in frontmatter, so nothing in the toolchain will wrap it for you. If your list feels too long to
+  read on one line, that is a signal about the skill, not about the formatting.
 - **Every name must be a real directory under `skills/`.** Unknown names fail the generator.
 - **Absent key = no edges**, which is the safe default. Only add it if your skill genuinely calls
   others.

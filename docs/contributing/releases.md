@@ -16,11 +16,30 @@ This repository is a **library of skills**, not a single versioned application. 
 
 Before cutting a repo release:
 
-- [ ] `test.yml` CI workflow is green on the release commit — covers `npm test` (L1–L4 hermetic) and `npm run eval:all` (L4 replay)
+- [ ] `test.yml` CI workflow is green on the release commit — covers `npm run format:check`, `npm test` (L1–L4 hermetic) and `npm run eval:all` (L4 replay)
+- [ ] `validate.yml` CI workflow is green on the release commit — per-skill `quick_validate.py` plus the bundle-freshness check
+- [ ] `ShellCheck` workflow (`shellcheck.yml`) is green on the release commit — lints the 56 tracked shell **sources**, not the 191 bundled copies. It is a separate lane rather than a step in the two above; the header comment explains why, and the short version is that neither could have fired for the change that motivated it
+- [ ] `Docs link check` workflow (`docs-link-check.yml`) is green — path-filtered to `docs/**/*.md`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, so **it does not run on every PR**. A release that touched none of those has no run to be green; check that it is absent-not-failing rather than ticking it blind
 - [ ] CHANGELOG `[Unreleased]` has entries for everything user-facing since last release
-- [ ] `validate.yml` CI workflow is green on the release commit
 
-> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed.
+> **This last box is the one with no mechanism, and it is the one that drifts.** Every generated
+> artefact here is machine-checked — the catalog diffs in CI, `bundle --check` is a lane, the task
+> registry has a drift test, the roadmap has a linter — and at the v0.46.0 prep five merged tasks had
+> no `[Unreleased]` entry at all, four of them the four most recent merges. The newest work is the
+> least likely to be remembered at release time and the most likely to be what the release is *for*.
+> Until a check exists, verify it rather than recall it:
+>
+> ```bash
+> # Every task accepted since the last tag, against what the CHANGELOG cites.
+> git log --oneline "$(git describe --tags --abbrev=0)"..HEAD --merges \
+>   | grep -oE 'task\.[0-9]+' | sort -u
+> ```
+>
+> Then read `[Unreleased]` for each. Write the entry when the work is *accepted*, not when the
+> release is cut — at acceptance the author knows what changed and why it matters; at release time
+> someone reconstructs it from commit subjects.
+
+> Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck`; those are CI's job, which is why the boxes above are about CI being green and not about a local run.
 
 ## Branch flow
 

@@ -65,6 +65,27 @@ npm test                              # required — must be green (L1 unit + L2
 npm run format                        # required — CI fails on unformatted JavaScript
 ```
 
+**If you touched `shared/resources/` or any `SKILL.md`**, the pre-commit hook re-bundles for you, but
+one file it cannot: verify with the check CI runs, which is a per-file comparison rather than a
+regenerate-and-diff.
+
+```bash
+npm run bundle -- --check             # or: npm run bundle:check
+```
+
+An `AMBIGUOUS` verdict is almost always `skills/create-skill/references/skill-dependencies.json` —
+JSON carries no provenance banner, so the bundler cannot tell a stale copy from an authored file and
+leaves it alone. Copy it across by hand and re-check. Details:
+[`docs/contributing/packaging.md`](./docs/contributing/packaging.md).
+
+**If you added or changed an `invokes:` key** in a `SKILL.md`, regenerate the call graph and commit
+it — CI fails on drift:
+
+```bash
+npm run generate-skill-deps           # writes shared/resources/skill-dependencies.json
+npm run skill-deps:candidates         # advisory — skills your prose mentions but `invokes:` does not
+```
+
 **If you touched a shell script**, run ShellCheck too — the `ShellCheck` workflow gates every PR at
 `--severity=warning` and will reject a new warning-tier finding:
 

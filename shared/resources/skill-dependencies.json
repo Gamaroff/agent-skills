@@ -61,7 +61,17 @@
     "develop-story",
     "develop-task"
   ],
-  "develop-bug": [],
+  "develop-bug": [
+    "commit-changes",
+    "create-branch",
+    "create-pr",
+    "develop",
+    "ensure-bug-github-issue",
+    "ensure-bug-jira-issue",
+    "finalise",
+    "qa-fix",
+    "review-bug"
+  ],
   "develop-next": [
     "develop-bug",
     "develop-story",

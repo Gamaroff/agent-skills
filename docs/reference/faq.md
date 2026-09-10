@@ -12,6 +12,16 @@ LLM-driven pipelines can spiral. A bug in the develop step might cause the agent
 
 If you hit the cap, the right move is usually to **stop and re-scope** rather than raise the cap.
 
+### Why does the QA loop have a second exit when it already has a cap?
+
+Because a cap and a stall guard both answer "when should this stop?" and neither answers "has it already finished?".
+
+The Convergence check watches HIGH findings that remain and stop falling — the loop *stopped working*, so it escalates. It says nothing about a run that reaches zero HIGH and then keeps producing MEDIUM and LOW findings **inside its own test machinery**. That run satisfies nothing the Convergence check looks at, so it burned to `MAX_ITER=5` refining pins while the product had been finished for two cycles. Measured on a real run: HIGH `2, 0, 0, 0` across four cycles, 21 findings, not one of them in the three fixes the task existed to make.
+
+So the **diminishing-returns exit** fires when HIGH is gone and the residue is machinery, and it *exits cleanly* rather than escalating — escalating finished work would misreport it as stalled. It requires two consecutive zero-HIGH gates, which is what stops it claiming a run the Convergence check should have.
+
+It hands to Step 5c exactly as a clean gate does. That is deliberate: a weaker exit than a `PASS` takes, on a run that by construction has stopped finding blockers, would be the wrong way round.
+
 ### Why are QA gate files owned exclusively by QA skills?
 
 If dev skills could write gate files, the pipeline guarantee — "merged code has a green gate" — would mean nothing. The gate is the firewall between "code that was written" and "code that's known to work." A gate file written by the same skill that wrote the code is just self-certification.

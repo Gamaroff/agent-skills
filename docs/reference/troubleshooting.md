@@ -191,6 +191,35 @@ See [Status lifecycle](../standards/status-lifecycle.md).
 
 **Fix:** Stop the orchestrator. Read the QA report, address the underlying issue manually, then run `/qa-story` or `/qa-task` to re-gate. Consider whether the failures warrant a `WAIVED` decision recorded via `/qa-gate`.
 
+**Note that reaching five cycles is no longer the only way out.** The loop has three exits and they mean different things:
+
+| Exit | Fires when | What it means |
+|---|---|---|
+| Clean gate | `PASS` / `WAIVED` | The work is done. Hands to Step 5c |
+| **Diminishing returns** | Two consecutive **zero-HIGH** gates and the remaining findings are entirely test machinery | The loop **finished working**. Exits cleanly and hands to Step 5c, exactly as a clean gate does |
+| Convergence check | HIGH findings **remain and stop falling** | The loop **stopped working**. Escalates |
+
+The two guards are opposites, and neither can claim the other's run: the diminishing-returns exit requires two consecutive zero-HIGH gates, so a flat non-zero sequence is never its business. If you are seeing cycle 4 and 5 spent refining test pins while the product has been finished since cycle 2, that is the case the exit was added for — check `qa.testArtifactGlobs` in `skills-config.yaml`, which is what tells it which paths count as machinery.
+
+Either way the only route to Step 7 is Step 5c, the PR conformance review. The diminishing-returns exit is deliberately not a path around it.
+
+## The develop loop HALTs before its first iteration, naming `develop.fastGateCommand`
+
+**Symptom:** the pipeline stops at startup with a message naming `develop.fastGateCommand` and `skills-config.yaml`, before any work happens.
+
+**Cause:** the configured fast gate begins `npm run <script>` and your project defines no such script. The default is `npm run ci:fast`, which a consumer need not have — it is a **suggested value for required configuration**, not a default that works everywhere.
+
+**Fix:** set `develop.fastGateCommand` in `skills-config.yaml` to the command your project actually uses:
+
+```yaml
+develop:
+  fastGateCommand: npm run test:unit # or: make test, pnpm run ci, npx jest …
+```
+
+The loop deliberately never substitutes a replacement gate for you. Choosing one decides what every iteration is checked against, and that belongs in config where the next run reads the same value — before this check existed, the mismatch surfaced *mid-iteration* as `Missing script: ci:fast`, and the substitute got invented per-run under time pressure, so the gate silently differed between runs.
+
+**Anything the check cannot parse is skipped, not failed** — `make test`, `pnpm run ci:fast`, `npm test`, a compound `prettier --check . && jest`, and an unset value all pass through untouched. If you are seeing this HALT, the command really does begin `npm run <script>` and that script really is absent.
+
 ## Resume picked up the wrong step
 
 **Symptom:** Re-invoking `/develop-story <path>` skipped a step you wanted to redo.

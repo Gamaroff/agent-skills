@@ -71,6 +71,35 @@ If the gate is `CONCERNS` or `FAIL`:
 `/develop-task` a clean gate hands to **Step 5c**, `review-pr` — see below. `qa-fix` also runs on
 that step's `REQUEST CHANGES` verdict, and those cycles come out of the same 5-cycle budget.
 
+### How the loop ends
+
+Three exits, and they are not interchangeable:
+
+| Exit | Fires when | Effect |
+|---|---|---|
+| Clean gate | `PASS` / `WAIVED` | Hands to Step 5c |
+| **Diminishing returns** | Two consecutive **zero-HIGH** gates, and the residue is entirely test machinery | Hands to Step 5c — the loop *finished working* |
+| Convergence check | HIGH findings **remain and stop falling** | Escalates — the loop *stopped working* |
+
+The last two are opposites and now say so. The Convergence check measures HIGH findings that persist;
+the diminishing-returns exit fires when they are gone and what is left is the run refining its own
+pins. A run can reach zero HIGH and keep producing MEDIUM and LOW findings inside its own test
+machinery, satisfying nothing the Convergence check looks at — that run used to burn to the
+five-cycle limit with the product finished two cycles earlier. Escalating it would misreport finished
+work as stalled.
+
+Neither guard can claim the other's run: the exit requires **two consecutive** zero-HIGH gates, so a
+flat non-zero sequence is never its business. The exit does not recount HIGH either — it reads the
+sequence the Convergence check already recorded, because two implementations of one count drift
+silently and would leave the two guards disagreeing about the same run while each looked right alone.
+
+Which paths count as machinery is `qa.testArtifactGlobs` in `skills-config.yaml`.
+
+**The exit hands to 5c exactly as a clean gate does.** Since 5c became the loop's exit gate, the only
+route to Step 7 is a PR conformance review, and this deliberately does not become the one path around
+it — that would make it a *weaker* exit than a `PASS` takes, on a run that by construction has
+stopped finding blockers.
+
 ## Phase 3b — PR conformance review (`review-pr`, Step 5c)
 
 The exit gate of the QA loop, and the only way out of it.

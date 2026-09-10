@@ -96,14 +96,66 @@ The wizard sets up:
 | Config        | Creates `skills-config.yaml` (PRD path, architecture path, coding-standards path) |
 | Registries    | Creates `docs/development/epic-registry.md` and `docs/tasks/task-registry.md`     |
 | Docs scaffold | Creates `docs/prd/` and `docs/architecture/concepts/` stub files                  |
+| Skill profile | Asks which install profile you want — `full`, `pipeline` or `minimal` (see below)  |
 | Skills        | Downloads latest tagged release → `.agents/skills/`                               |
 | Hooks         | Patches `PreCompact`, `Stop` into `.claude/settings.json`          |
+
+### Choosing an install profile
+
+The wizard asks which skills to install. **The motivation is context, not disk**: every installed
+skill's `description` sits in the agent's context on every request, before it reads a single
+instruction.
+
+| Profile    | Roughly | What it is                                                              |
+| ---------- | ------- | ----------------------------------------------------------------------- |
+| `full`     | ~113    | Every skill the tracker filter permits. The default when no `skills:` block is present |
+| `pipeline` | ~37     | The full story/task/bug lifecycle: create → review → develop → QA → finalise |
+| `minimal`  | ~5      | Branching, commits, PRs and ad-hoc code review. No document pipeline     |
+
+Counts vary with your tracker — see the filter note below.
+
+**A profile names *seed* skills only.** The installer resolves each seed's transitive callees from
+`shared/resources/skill-dependencies.json` and installs those too, so a profile can never produce a
+half-installed pipeline that fails mid-run at the step whose skill is missing.
+
+**The tracker filter runs *after* that closure.** A Jira-only skill reached via a dependency is still
+dropped on a GitHub repo, so the same profile yields a different count on different platforms. A
+skill excluded by the filter is **not** rescued by listing it in `include` — the filter is about
+applicability, not preference. Use `--all-skills` if you genuinely want everything.
+
+The answer is written to `skills-config.yaml`, which is what makes `--update` reproducible:
+
+```yaml
+skills:
+  profile: pipeline # full | pipeline | minimal
+  include: [] # extra skills on top of the profile, each with its own closure
+  exclude: [] # skills to leave out
+```
+
+An **absent `skills:` block means `full`** — exactly the pre-profile behaviour, so no existing config
+changes meaning.
+
+**Reaching the long tail.** Sprint ceremonies, deployment, Railway, UI design and the meta-skills
+(`observe-work`, `double-check`, `review-security`) are in no profile by design. That is a legitimate
+state, not an oversight — add what you want with `include`:
+
+```yaml
+skills:
+  profile: pipeline
+  include: [observe-work, review-security]
+```
+
+Full key reference: [`../reference/configuration.md`](../reference/configuration.md).
 
 ### Update skills only (skip wizard)
 
 ```bash
 bash <(curl -fsSL https://github.com/Gamaroff/agent-skills/raw/main/scripts/setup-consumer.sh) --update
 ```
+
+`--update` short-circuits before the wizard runs, so the profile is read from `skills-config.yaml`
+or not at all. If you installed before profiles existed and have no `skills:` block, `--update`
+keeps every skill you have — it does not silently prune to a default.
 
 ### Pin a specific version
 
