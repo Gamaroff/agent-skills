@@ -188,16 +188,17 @@ Delete the section; `npm run bundle`.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-10
-**Quality Score**: 80/100
+**Quality Score**: 85/100
 **Gate Decision**: CONCERNS
+**QA Cycles**: 2
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.100.qa.1.mutation-proving-false-red.md](./task.100.qa.1.mutation-proving-false-red.md)
-- **Gate File**: [task.100.gate.1.mutation-proving-false-red.yml](./task.100.gate.1.mutation-proving-false-red.yml)
+- **Cycle 2 (latest)**: [task.100.qa.2.mutation-proving-false-red.md](./task.100.qa.2.mutation-proving-false-red.md) · gate [task.100.gate.2.mutation-proving-false-red.yml](./task.100.gate.2.mutation-proving-false-red.yml)
+- **Cycle 1**: [task.100.qa.1.mutation-proving-false-red.md](./task.100.qa.1.mutation-proving-false-red.md) · gate [task.100.gate.1.mutation-proving-false-red.yml](./task.100.gate.1.mutation-proving-false-red.yml)
 
 ### Test Coverage Summary
 
@@ -213,6 +214,16 @@ Delete the section; `npm run bundle`.
 | `TASK-100-001` | MEDIUM | **Fixed.** The unmeasured "about twenty seconds" is replaced by a cost stated in **matrix-command runs** — "two more runs of the matrix command, plus a diff" — with the measured spread named (0.3 s scoped, 54 s whole-suite) as the reason a constant could not have been right. The cheapness argument is now the **ratio**: an N-mutation matrix already pays N runs, so validating the probe adds `2/N` (40% at five mutations, 10% at twenty). Check 4 still carries no time claim, per §8. |
 | LOW-1 | LOW | **Fixed.** Both bare `Step 2` references qualified — L181 now reads "step 2 of the procedure", and the second was rewritten to "That `diff`", removing the referent question entirely. All three mentions in the file now name the procedure explicitly. |
 | LOW-2 | LOW | **No action, by design.** `description` is 95 words against ~100 guidance — inside the limit. Recorded so the next editor knows the headroom is small. |
+
+### Bug Resolution Summary (QA cycle 2 → fixes applied 2026-09-10)
+
+Cycle 2 was a **refute pass** over the whole diff, not a re-read of the fix. All three findings are in text that cycle 1 introduced — which is the pattern the refute directive exists to catch.
+
+| ID | Severity | Resolution |
+| :-- | :--- | :--- |
+| `TASK-100-002` | MEDIUM | **Fixed.** Cycle 1 replaced an unmeasured constant with an unchecked ratio: it claimed an N-mutation matrix pays N runs, so validation adds `2/N` (40% at five, 10% at twenty). But `## The procedure` runs the suite **twice per invariant** — step 3 mutated, step 5 restore-and-confirm-green — so the matrix pays ~2N and the real overhead is ~`1/N`; every percentage was exactly 2× too high. The percentages are now gone rather than corrected: the text states the comparison directly ("the procedure already runs the suite twice per invariant … adding two more is roughly one extra mutation's worth, at any N"), which is true however the reader counts and needs no arithmetic. |
+| `TASK-100-003` | LOW | **Fixed.** The cycle-1 wording "That `diff`" could be read as the mangled edit's diff rather than step 2's applied-check, since the same paragraph says "There is a real diff" three sentences earlier. Now names the mechanism: "The applied-check closes the …". |
+| `TASK-100-004` | LOW | **Fixed.** The same rewrite had left a 96-column line in a file wrapped at ~83; `prettier` does not reflow prose so no gate caught it. Re-wrapped in the same edit. |
 
 ### Key Findings
 
@@ -230,6 +241,8 @@ All five success criteria met, including SC4 — the row-5 anti-vacuity check th
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Implemented — 7 files (1 source + 6 regenerated), 0 new tests (prose-only change; verified by review against the five recorded readings) | develop |
 | 2026-09-10 |  | QA gate CONCERNS (80/100) — 1 medium, 2 low; the section's ~20s cost claim does not hold | qa-task |
+| 2026-09-10 |  | QA cycle 2 (refute pass) CONCERNS (85/100) — cycle 1's finding closed; 3 new findings, all in text cycle 1 introduced | qa-task |
+| 2026-09-10 |  | QA findings fixed — 2 iterations; cost claim restated without arithmetic, referent named, line re-wrapped | qa-fix |
 
 ## Progress Tracking
 
