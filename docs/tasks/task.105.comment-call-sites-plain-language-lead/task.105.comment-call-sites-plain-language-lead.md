@@ -491,6 +491,43 @@ than breaking the comment. That property was designed for exactly this rollback.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.105.qa.1.comment-call-sites-plain-language-lead.md](./task.105.qa.1.comment-call-sites-plain-language-lead.md)
+- **Gate File**: [task.105.gate.1.comment-call-sites-plain-language-lead.yml](./task.105.gate.1.comment-call-sites-plain-language-lead.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3132 (`npm run ci:fast`, 0 failures)
+- **Phases Verified**: 5/5
+- **Call sites verified**: 24 — every slot demonstrably changes its lead, checked by rendering as well as by the guard
+- **Mutation proofs**: 7, each turning exactly its own assertion red
+- **Security probes**: 8 executed, 0 exploitable
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (`measured`), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+
+No open issues. One MEDIUM was found and fixed inside the cycle: Guard A still missed
+connective-chained invocations (`cmd && gh issue comment …`) after its first repair — found by
+probing the guard rather than reading it, which is the same lesson as the original defect applied to
+its own fix.
+
+The gate is CONCERNS rather than PASS on two counts, both recorded so Step 5c reads them as the
+things to check: the seven converted sites knowingly give up the 3× backoff, and the independent
+code-review subagent hung and was killed, so the diff review was performed in-line by the agent that
+wrote the code.
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -500,13 +537,14 @@ than breaking the comment. That property was designed for exactly this rollback.
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Implemented — 24 call sites fed slots, 7 bypass sites converted, 2 anti-regression guards (one repaired, one added), 5 mutation proofs; 20 source files + 47 bundled copies | develop |
 | 2026-09-10 |  | Status → ready-for-review | develop |
+| 2026-09-10 |  | QA gate CONCERNS (90/100) — 0 open findings; 1 MEDIUM found and fixed in-cycle; Reliability CONCERNS (backoff traded away), independent review did not run | qa-task |
 
 ---
 
 ## Progress Tracking
 
 - [x] Phase 1 — Pipeline step docs (7 files, 13 sites)
-- [x] Phase 2 — Skill call sites (9 SKILL.md, 11 sites; `qa-fix`'s body split per §5.3)
+- [x] Phase 2 — Skill call sites (8 SKILL.md, 11 sites; `qa-fix`'s body split per §5.3)
 - [x] Phase 3 — Close the bypass (all 7 bypass sites converted; `review-story`'s arms collapsed)
 - [x] Phase 4 — Tests and the anti-regression guards (Guard A repaired, Guard B added, parity extended)
 - [x] Phase 5 — Bundle and sweep (`npm run bundle`, catalogue, `AGENTS.md` claim corrected)

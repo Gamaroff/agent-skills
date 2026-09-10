@@ -34,7 +34,7 @@ Feed `--slot` values to all 22 `tracker-comment.js` call sites, convert the seve
 | 1. create-branch           | ✅ Done    | Branch `feature/task.105.*` exists in git                              | `feature/task.105.comment-call-sites-plain-language-lead` created at `fbfc400c`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.105.review.{N}.{name}.md` exists (or skip logged)                | `task.105.review.1.comment-call-sites-plain-language-lead.md` — READY TO IMPLEMENT, 8/10, 1 Critical + 6 Important + 5 Optional, all Critical + Important applied; Planned → Ready for Development | 2 pre-pass Explore agents (inline) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Phases 1–5 complete. `npm run ci:fast` green (3132 pass / 0 fail, exit 0). 24 shipped call sites carry slots (was 22 + 2 created by the finalise split); 7 bypass sites converted; Guard A repaired, Guard B added, parity extended; bundle + catalogue regenerated | — (pre-pass maps reused) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #379](https://github.com/Gamaroff/agent-skills/pull/379) ← `develop`; commit `3babd7a4`; issue #378 commented (`in-review`, lead rendered); board `in-review` stage-disabled (correct — not in this board's pipeline map) | — |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.105.qa.{N}.*.md`; `task.105.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.105.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -288,7 +288,42 @@ which is exactly the boundary §4 draws.
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-10
+
+**Gate**: CONCERNS (90/100) · **HIGH findings**: 0 · **Open findings**: 0
+**Artifacts**: [`task.105.qa.1.*.md`](./task.105.qa.1.comment-call-sites-plain-language-lead.md), [`task.105.gate.1.*.yml`](./task.105.gate.1.comment-call-sites-plain-language-lead.yml)
+
+Verified by execution rather than inspection throughout: 24 call sites, 7 mutation proofs, 8 hostile
+security probes, bundle idempotency by content hash, and `zero-blocks-executed` shown identical on the
+base branch so it is not charged against this change.
+
+**One MEDIUM found and fixed inside the cycle**: Guard A still missed connective-chained invocations
+(`cmd && gh issue comment …`) after its repair — found by *probing* the guard with eight shell forms
+rather than by reading it. All eight are now caught, with a false-positive check confirming prose in
+backticks is still ignored.
+
+**Guard B gained a sixth assertion**: its slot-name derivation regex-scans template source for
+`s.NAME`, so a template written with destructuring would make it reject *correct* call sites. The scan
+is now cross-checked against rendering, and the disagreement is mutation-proved.
+
+#### Routing decision — the gate is CONCERNS with an empty `top_issues[]`, and that route is undefined
+
+`develop-pipeline-step-5-6-qa-loop.md` §5c admits exactly two routes to the loop's exit gate: a
+`PASS`/`WAIVED` gate, and the Diminishing-returns exit — whose own condition requires a **non-empty**
+`top_issues[]`. It adds that a gate routing to 5b never reaches 5c. This gate is neither: it is
+`CONCERNS` because two **NFR** judgements say so (Reliability, and the independent review not having
+run), and NFR concerns produce no `top_issues[]` entry because there is no defect at a `file:line`.
+
+Routing it to 5b would hand `/qa-fix` a gate with nothing in it, and 5b's **no-code-change HALT** would
+then fire — halting the run on a gate whose content is "this is fine, with reservations".
+
+**Resolved by routing to 5c, deliberately and recorded rather than assumed.** There is nothing for a
+fix cycle to do, and the two concerns are precisely what a PR conformance review should examine — an
+NFR-driven CONCERNS is *more* useful to 5c than a clean PASS, because it hands the reviewer a named
+list of what to be suspicious of. The pipeline document was **not** edited to add the route: §5c states
+that the accepting set is defined in one place, and quietly adding a third route from inside an
+unrelated task is how one runnable document comes to hold two rules. Logged as observation **#51** for
+the pipeline's own backlog.
 
 ---
 
@@ -297,7 +332,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.105.comment-call-sites-plain-language-lead`
-**PR**: {populated after Step 4}
+**PR**: [#379](https://github.com/Gamaroff/agent-skills/pull/379)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

@@ -234,15 +234,24 @@ function isInvocation(line, shape) {
   // reasons to skip the same line, and removing only one of them left the guard
   // exactly as blind as before: the fix to isRouted alone did not turn the
   // mutation red, which is how this second half was found.
+  // A command CHAINED after another one still starts a command: `foo && gh issue
+  // comment …` is as much a call site as a line beginning with it. Keep only the
+  // text after the last connective, so the check below sees that segment's start.
+  //
+  // Found by probing the repaired guard rather than by reading it — the same
+  // lesson as the two defects above: one sufficient explanation for a miss is not
+  // evidence it was the only one. `true && gh issue comment …` slipped through a
+  // guard that had just been fixed twice.
+  const segments = before.split(/&&|\|\||[;|]|\bthen\b|\bdo\b/);
+  before = segments[segments.length - 1];
+
   before = before.replace(
     /^(\s*)(?:tracker_write|tracker_call_with_retry)\s+/,
     "$1",
   );
 
-  // Only leading whitespace, a capture, or a shell connective may precede it.
-  return /^[\s]*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$?\(?\s*(?:&&|\|\||;|then\s+|do\s+)?\s*$/.test(
-    before,
-  );
+  // Only leading whitespace or a capture may now precede it.
+  return /^[\s]*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$?\(?\s*$/.test(before);
 }
 
 test("§1 no bare mutating tracker call in canonical prose", () => {

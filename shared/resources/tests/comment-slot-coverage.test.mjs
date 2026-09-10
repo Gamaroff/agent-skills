@@ -40,7 +40,13 @@ const REPO_ROOT = path.resolve(
   "..",
 );
 
-const { LEAD_TEMPLATES, TEXT_SLOTS, BOOLEAN_SLOTS, NUMERIC_SLOTS } = require(
+const {
+  LEAD_TEMPLATES,
+  TEXT_SLOTS,
+  BOOLEAN_SLOTS,
+  NUMERIC_SLOTS,
+  renderLead,
+} = require(
   path.join(REPO_ROOT, "shared", "resources", "stakeholder-summary.js"),
 );
 
@@ -230,6 +236,61 @@ test("Guard B — every slot name passed is one its stage's template reads", () 
       `with no slot at all. A name borrowed from a neighbouring stage is the ` +
       `common way in, because it is a real slot name somewhere else.`,
   );
+});
+
+/**
+ * slotsReadBy() scans the template FUNCTION SOURCE for `s.NAME`, which works only
+ * because every template is written `(s) => … s.foo …`. A template written with
+ * destructuring — `({verdict, cycle}) => …` — or bracket access would read a slot
+ * this scan cannot see, and the "is this name real?" assertion above would then
+ * reject a CORRECT call site. That failure is worse than the one it guards, because
+ * it argues against a true statement and the obvious remedy is to delete the slot.
+ *
+ * So the scan is checked against a method that shares none of its assumptions:
+ * render the lead with the slot and without it, and see whether the output moves.
+ * If the two ever disagree, the regex has fallen behind the templates.
+ */
+test("Guard B — the source scan agrees with what rendering actually does", () => {
+  const PROBE = {
+    title: "T",
+    pr: "P",
+    verdict: "PASS",
+    outcome: "O",
+    blocking: "1",
+    count: "7",
+    blocking_count: "9",
+    cycle: "3",
+  };
+  const disagreements = [];
+
+  for (const stage of Object.keys(LEAD_TEMPLATES)) {
+    const scanned = slotsReadBy(stage);
+    const base = renderLead(stage, {});
+    const rendered = new Set(
+      Object.keys(PROBE).filter(
+        (k) => renderLead(stage, { [k]: PROBE[k] }) !== base,
+      ),
+    );
+    for (const name of rendered) {
+      if (!scanned.has(name)) {
+        disagreements.push(
+          `${stage}: rendering shows '${name}' IS read, but the source scan missed it ` +
+            `— slotsReadBy's /s\\.NAME/ pattern has fallen behind the template style ` +
+            `(destructuring or bracket access?). Correct call sites will now be rejected.`,
+        );
+      }
+    }
+    for (const name of scanned) {
+      if (!rendered.has(name) && name in PROBE) {
+        disagreements.push(
+          `${stage}: the source scan says '${name}' is read, but supplying it changes ` +
+            `nothing in the rendered lead — the scan is over-matching.`,
+        );
+      }
+    }
+  }
+
+  assert.deepEqual(disagreements, [], disagreements.join("\n"));
 });
 
 test("Guard B — every slot a template reads is classified, so coercion is per-type", () => {
