@@ -39,7 +39,9 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **NFR**          | Non-Functional Requirement. Performance, security, reliability, maintainability checks. Produced by `qa-story` / `qa-task`.                                                                                                       |
 | **Traceability** | Requirements-to-implementation mapping. Produced by `qa-story`.                                                                                                                                                                   |
 | **Risk profile** | Pre-implementation risk score (probability × impact) produced by `qa-planning`. Score ≥9 → gate FAIL, ≥6 → CONCERNS.                                                                                                              |
-| **Test design**  | Pre-implementation test plan produced by `qa-planning`.                                                                                                                                                                           |
+| **Test design**  | Pre-implementation test plan produced by `qa-planning`. |
+| **Diminishing-returns exit** | The QA loop's third exit, beside a clean gate and `MAX_ITER`. Fires on **two consecutive zero-HIGH gates** whose remaining findings are entirely test machinery, and **exits cleanly** — the loop finished working. The opposite of the Convergence check, which fires when HIGH findings remain and stop falling and **escalates**. Hands to Step 5c exactly as a `PASS` does. Which paths count as machinery is `qa.testArtifactGlobs`. |
+| **Convergence check** | The QA loop's stall guard: HIGH findings remain and stop falling, so the loop stopped working and the run escalates. Never fires on a zero-HIGH sequence — that is the diminishing-returns exit's business.                                                                                                                                                                           |
 
 ## Registries & numbering
 
@@ -69,6 +71,14 @@ Quick reference. Where a term has a full standards doc or runbook, the entry lin
 | **tracker-reconcile**      | Skill (`/tracker-reconcile`): re-reads a committed handover against the live board, ticks `satisfied`, flags `divergent`, marks `unverifiable`, sets checklist `status:`. Refuses `--apply` under every non-`full` access mode. |
 | **Packaged skill**         | `.zip` distributable produced by `package_skill.py`. Self-contained: shared resources bundled in.                                                                                             |
 | **Skill catalog**          | Auto-generated index of all skills at [`docs/reference/skill-catalog.md`](./skill-catalog.md). Regenerate with `npm run generate-catalog`.                                                    |
+
+| **Install profile** | Which skills `setup-consumer.sh` installs: `full` (~113) / `pipeline` (~37) / `minimal` (~5). Names **seed** skills only — each seed's transitive callees are resolved from `skill-dependencies.json` and installed too, so a profile cannot yield a half-installed pipeline. The tracker filter runs after that closure, so counts differ per platform. Absent `skills:` block means `full`. |
+| **`invokes:`** | Frontmatter key declaring which skills a skill calls — the source of the install-profile closure. **Single-line inline flow form only** (`invokes: [a, b]`); every other spelling is rejected loudly, because a silently-empty edge list is invisible to CI. |
+| **Plain-language lead** | The two-to-four-sentence opening every tracker and pull-request comment carries, answering *what happened, what it means, what happens next* for a reader with no technical background. Rendered by the engine from the caller's `--stage`, never written at the call site — **a comment for which no lead can be produced does not post**. |
+| **Slot** | A named value a call site feeds the lead (`--slot verdict=CONCERNS`). Which slots a stage reads is fixed by its template; an unrecognised name is stored, never read, and posts silently — which is why a test derives the mapping from the templates. |
+| **anchor-failed** | Inline-PR-comment outcome: the finding could not be anchored to a line of the diff, so it **degraded to the summary comment**. Never reported as `posted` — a degraded finding reported as posted is, from the reader's side, a dropped one. |
+| **Card preflight** | Offline check (`card-preflight.js`) that a document will publish a complete tracker card rather than a thin one. **Advisory at authoring** (`create-*`, exit 0 even with findings), **blocking at review** (`review-*`). |
+| **Observation log** | Durable backlog of skill-improvement signals written by `/observe-work` — one Markdown file per observation, in a workspace resolved by `resolve-observation-workspace.sh` and **never derived from the cwd**. Lives outside the repo; not a pipeline artifact. |
 
 ## Status
 

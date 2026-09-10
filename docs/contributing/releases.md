@@ -18,7 +18,7 @@ Before cutting a repo release:
 
 - [ ] `test.yml` CI workflow is green on the release commit — covers `npm run format:check`, `npm test` (L1–L4 hermetic) and `npm run eval:all` (L4 replay)
 - [ ] `validate.yml` CI workflow is green on the release commit — per-skill `quick_validate.py` plus the bundle-freshness check
-- [ ] `ShellCheck` workflow (`shellcheck.yml`) is green on the release commit — lints the 56 tracked shell **sources**, not the 191 bundled copies. It is a separate lane rather than a step in the two above; the header comment explains why, and the short version is that neither could have fired for the change that motivated it
+- [ ] `ShellCheck` workflow (`shellcheck.yml`) is green on the release commit — lints tracked shell **sources** only, i.e. `git ls-files '*.sh'` minus `skills/*/references/`, which is roughly a fifth of the files and excludes every bundled copy. It is a separate lane rather than a step in the two above; the header comment explains why, and the short version is that neither could have fired for the change that motivated it
 - [ ] `Docs link check` workflow (`docs-link-check.yml`) is green — path-filtered to `docs/**/*.md`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, so **it does not run on every PR**. A release that touched none of those has no run to be green; check that it is absent-not-failing rather than ticking it blind
 - [ ] CHANGELOG `[Unreleased]` has entries for everything user-facing since last release
 

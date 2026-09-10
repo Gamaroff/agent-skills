@@ -93,6 +93,13 @@ npm run package
 npm run bundle
 # or a single skill
 npm run bundle:skill -- skills/<skill-name>
+# verify freshness without writing — this is what CI runs
+npm run bundle -- --check
+
+# Regenerate the skill call graph after changing an `invokes:` key (CI fails on drift)
+npm run generate-skill-deps
+# advisory: skills your prose mentions that `invokes:` does not declare
+npm run skill-deps:candidates
 ```
 
 Packaged `.zip` files are build artifacts (gitignored). Regenerate them any time with `package_skill.py`. The packager auto-bundles shared resources and rewrites paths so installed skills are fully self-contained.

@@ -90,9 +90,12 @@ npm run skill-deps:candidates         # advisory — skills your prose mentions 
 `--severity=warning` and will reject a new warning-tier finding:
 
 ```bash
-# The lane lints SOURCES ONLY — 56 files, not the 247 `git ls-files '*.sh'` returns.
-# The other 191 are bundled copies under skills/*/references/, written by `npm run bundle`;
-# linting them reports every shared finding once per copy — a ~9x inflation.
+# The lane lints SOURCES ONLY — the grep is what makes it a source list, so do not
+# drop it. The great majority of what `git ls-files '*.sh'` returns is bundled copies
+# under skills/*/references/, written by `npm run bundle`; linting those reports every
+# shared finding once per copy, a several-fold inflation whose only available "fix" is
+# to edit a generated file. (Counts move every time a skill is added — run the two
+# `git ls-files` forms if you want today's.)
 shellcheck --severity=warning $(git ls-files '*.sh' | grep -v '^skills/[^/]*/references/')
 
 # No `shellcheck` binary? Most contributors will not have one. The container is the reference form:

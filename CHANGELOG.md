@@ -8,6 +8,34 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A CI lint for assertions that claim a relationship but test only co-occurrence.** Task 77 hit the
+  same bug **six times across eleven independent gates**: an assertion claiming *X routes to Y*, *X
+  fires at Y*, *X owns Y*, while establishing only that both names appear somewhere in the same slice
+  of prose. Every one passed against the mutation it was written to catch. **Two of the six were
+  written inside the fix for the previous one** — widening the regex is the natural repair and is also
+  the defect. Each was found by a human reviewer, one at a time, over roughly a dozen cycles.
+
+  `tests/lib/relationship-assertion-lint.js` makes the class a CI failure instead of a reviewer's
+  lucky catch. Four rules, **structural rather than textual** — it scans with a state machine that
+  understands strings, regex literals and comments, then reasons about each assertion's *pattern* and
+  its *message* separately. A lint against co-occurrence matching, implemented as a co-occurrence
+  match, would be self-defeating. Every rule requires a **conjunction** — the defective shape *and* a
+  message claiming placement or a mapping — which is what makes it usable rather than noisy; the
+  false-positive rate was driven from 61 to 0 across three measured narrowings.
+
+  All six historical instances are fixtures, reconstructed with `git show` from the commits that
+  closed them, plus two negative controls that survived adversarial attack. A **reachability guard**
+  appends a bait assertion to every corpus file, so the analyser cannot go blind quietly — that guard
+  is what M13 of the nine mutation proofs exists to prove can fail at all.
+
+  **It found six live instances of its own bug class on its first run**, on a tree everyone considered
+  finished. Three were residual copies of the very assertions task 77 spent eleven gates fixing, still
+  standing beside their replacements.
+
+  **Known limitation, stated where it will be read**: the lint models the six shapes that happened. A
+  seventh in an unmodelled shape passes, and `mutation-proving.md` says so beside the lint it points
+  at. (task 89)
+
 - **The plain-language lead now reaches the pull request, not only the tracker card.** Tasks 104 and
   105 gave every *tracker* comment an opening paragraph a non-technical reader can follow. Anyone
   who then clicked through to the PR landed on the most technical text this pipeline writes — a

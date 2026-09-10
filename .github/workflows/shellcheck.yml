@@ -53,12 +53,16 @@ jobs:
 
           # SOURCES ONLY — do not widen this to `**/*.sh` or drop the grep.
           #
-          # `git ls-files '*.sh'` returns 247 files, but only 56 are sources. The
-          # other 191 are bundled copies written by `npm run bundle` from
-          # shared/resources/, and each shared script is bundled into four or five
-          # skills. Linting all of them reports every shared finding once per copy —
-          # a ~9x inflation, and a red lane whose "fix" is to edit a file the bundler
-          # will overwrite on the next run.
+          # Most of what `git ls-files '*.sh'` returns is NOT a source: the bulk are
+          # bundled copies written by `npm run bundle` from shared/resources/, and each
+          # shared script is bundled into four or five skills. Linting all of them
+          # reports every shared finding once per copy — a several-fold inflation, and
+          # a red lane whose "fix" is to edit a file the bundler will overwrite on the
+          # next run.
+          #
+          # Shape, measured 2026-09-05: 247 files total, 56 of them sources. By
+          # 2026-09-10 that was 266 and 58. The counts move every time a skill is
+          # added, so treat them as illustration; the grep below is the definition.
           #
           # Measured at the `style` tier on 2026-09-05, after this change: 515
           # findings across all 247 files versus 55 across the 56 sources. (The

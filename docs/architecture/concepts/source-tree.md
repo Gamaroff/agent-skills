@@ -83,7 +83,15 @@ status: draft
 ## Do not touch without a reason
 
 - `package-lock.json` — only changes when `package.json` dependencies change.
-- `shared/resources/resolve-platform.sh` — used by many skills; small change has wide blast radius. Run `npm run test:platform` after.
+- `shared/resources/resolve-platform.sh` — used by many skills; small change has wide blast radius. It resolves **two independent axes**: which platform (`TRACKER` / `VCS`) and how much access (`ACCESS_TRACKER` / `ACCESS_VCS`), and each axis has its own suite. Run both after a change — `npm test` includes them, but these are the fast targeted ones:
+
+  ```bash
+  npm run test:platform         # resolve-platform.test.sh — tracker/vcs resolution order
+  npm run test:tracker-access   # tracker-access.test.sh — access levels, strict enum validation,
+                                #   most-restrictive-wins, and the shared read-config.sh reader
+  ```
+
+- `shared/resources/bitbucket-auth.sh` — a separate script, not part of the resolver. Its suite is `npm run test:bitbucket-auth`.
 - Bundled `skills/*/references/` files when the corresponding `shared/resources/` source has not changed — running the bundler is the safe path.
 
 ## See also
