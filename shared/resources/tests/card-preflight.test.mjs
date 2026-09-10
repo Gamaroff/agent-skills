@@ -312,6 +312,83 @@ test("B: CARD_SECTIONS_BY_KIND covers every kind the CLI can infer", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 2b. One parser, not two (T102-001)
+// ---------------------------------------------------------------------------
+
+test("B: the authoring path and the sync path read the SAME body", () => {
+  // The first draft of card-preflight.js hand-rolled its own frontmatter strip.
+  // It diverged from lib.parseFrontmatter on exactly the two inputs below, and
+  // no real document disagreed — which is how a latent parse divergence stays
+  // invisible right up until the authoring check passes a body the sync then
+  // reads differently. These two shapes are the ones that actually differed;
+  // keep them literal rather than generalising them away.
+  const shapes = {
+    "body opens with a blank line":
+      "---\nid: t\n---\n\n## 1. Overview\n\nx y z.\n\n## Success Criteria\n\n1. [ ] a\n",
+    "CRLF line endings":
+      "---\r\nid: t\r\n---\r\n\r\n## 1. Overview\r\n\r\nx y z.\r\n\r\n## Success Criteria\r\n\r\n1. [ ] a\r\n",
+    "body opens with a horizontal rule":
+      "---\nid: t\n---\n\n---\n\n## 1. Overview\n\nx y z.\n\n## Success Criteria\n\n1. [ ] a\n",
+    "no frontmatter at all": "## 1. Overview\n\nx y z.\n",
+  };
+
+  let compared = 0;
+  for (const [name, text] of Object.entries(shapes)) {
+    withTempDoc("task.998.parity.md", text, (file) => {
+      // What the authoring path produces...
+      const authoring = pf.preflight(file, "task");
+      // ...against the body the sync path resolves, through the same checker.
+      const syncBody = lib.parseFrontmatter(readFileSync(file, "utf8")).body;
+      const sync = lib.checkCardSections(
+        syncBody,
+        lib.CARD_SECTIONS_BY_KIND.task,
+      );
+
+      // Compare the BODY, not only the verdict. The original divergence
+      // produced identical verdicts on every real document — a verdict-only
+      // assertion passes while the two paths read different text, which is the
+      // state this test exists to forbid. `body` is exposed on the result for
+      // exactly this comparison; nothing else reads it.
+      assert.equal(
+        authoring.body,
+        syncBody,
+        `${name}: the two paths resolved DIFFERENT bodies — a verdict that happens to match is not parity`,
+      );
+      assert.equal(authoring.ok, sync.ok, `${name}: ok differs`);
+      assert.deepEqual(
+        authoring.findings.map((f) => `${f.section}:${f.severity}`),
+        sync.findings.map((f) => `${f.section}:${f.severity}`),
+        `${name}: findings differ`,
+      );
+      assert.deepEqual(
+        authoring.blocks.map((b) => `${b.heading}:${b.status}:${b.chars}`),
+        sync.blocks.map((b) => `${b.heading}:${b.status}:${b.chars}`),
+        `${name}: block resolution differs — the two paths are reading different bodies`,
+      );
+      compared++;
+    });
+  }
+  assert.equal(compared, 4, "non-vacuity: every shape must have been compared");
+});
+
+test("B: card-preflight does not implement its own frontmatter parse", () => {
+  const src = readFileSync(CLI, "utf8");
+  assert.match(
+    src,
+    /lib\.parseFrontmatter\(/,
+    "it must use the library's parser",
+  );
+  // A local `---` slicer is the shape the divergence came in. Catch the
+  // reimplementation, not just its old name.
+  assert.equal(
+    /indexOf\(\s*["\'`]\\n---/.test(src) ||
+      /startsWith\(\s*["\'`]---/.test(src),
+    false,
+    "card-preflight.js appears to slice frontmatter itself again",
+  );
+});
+
+// ---------------------------------------------------------------------------
 // 3. The authoring path must not need a Jira sync skill installed
 // ---------------------------------------------------------------------------
 

@@ -229,6 +229,45 @@ the same point they do today.
 | 2026-09-10 | 0.2 | Review passed (8/10) — READY TO IMPLEMENT. Four Important findings applied: § 3 claim 1 corrected (`create-epic` does not bundle `jira-sync.js`); § 4's `create-bug-report` rationale replaced (bug reports are not barred from cards — `sync-jira-bug` publishes them); scope widened to all **four** section specs so Success Criterion 4 is satisfiable; the unrecorded bug-layer gap (no preflight at authoring, review or CI) filed as a deferred follow-up. | review-task |
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Implemented: four card section specs consolidated into `shared/resources/jira-sync.js`; new tracker-neutral `card-preflight.js` called from all three `create-*` skills; 11 new tests, all mutation-proved. Status → ready-for-review | develop |
+| 2026-09-10 |  | QA gate CONCERNS (90/100) — 9/9 success criteria verified by execution, 0 HIGH; 1 MEDIUM: `card-preflight.js` duplicates a frontmatter parse `jira-sync.js` already exports | qa-task |
+| 2026-09-10 |  | qa-fix cycle 1: T102-001 + the LOW both fixed and mutation-proved; regression test corrected to compare resolved bodies, not verdicts. Gate CONCERNS → PASS (100/100) | qa-fix |
+
+## QA Testing Results
+
+**QA Status**: PASS (CONCERNS → PASS after one fix cycle)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.102.qa.1.authoring-time-card-preflight.md](./task.102.qa.1.authoring-time-card-preflight.md)
+- **Gate File**: [task.102.gate.1.authoring-time-card-preflight.yml](./task.102.gate.1.authoring-time-card-preflight.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3049 (0 failures, 1 skipped)
+- **Phases Verified**: 4/4
+- **Success Criteria Verified**: 9/9 — each by execution, not by reading
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Cycle 1 found one MEDIUM (`T102-001`) and one LOW; **both fixed and mutation-proved in one cycle**.
+
+`card-preflight.js` had hand-rolled a frontmatter parse that `jira-sync.js` already exports, and the
+two diverged on leading whitespace and CRLF — the duplication class this task exists to remove, one
+function down, in the file whose header says it defines nothing of its own for exactly that reason.
+It now uses `lib.parseFrontmatter`.
+
+Worth reading in the QA report: the regression test's **first version asserted the wrong invariant**.
+It compared the two paths' verdicts, and the divergence produces identical verdicts on every shape
+tested — so it would have passed while the two paths read different text. It now compares the
+resolved body.
+
+---
 
 ## Progress Tracking
 

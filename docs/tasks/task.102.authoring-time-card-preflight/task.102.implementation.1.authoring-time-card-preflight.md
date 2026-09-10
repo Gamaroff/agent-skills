@@ -37,7 +37,7 @@ trip.
 | 1. create-branch           | ✅ Done    | Branch `feature/task.102.*` exists in git                              | `feature/task.102.authoring-time-card-preflight` created at `927ffe35`, pushed with tracking. Tracker signal skipped — no linked issue. | —                    |
 | 2. review-task             | ✅ Done    | `task.102.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT, 8/10. 0 Critical, 4 Important (all applied), 2 Optional. Report: `task.102.review.1.authoring-time-card-preflight.md`. Status Draft → Ready for Development. | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 4 phases. 11 new tests, 4 mutations proved red. `npm run ci:fast` green (3047 tests, 0 fail). 1 develop iteration; 2 fast-gate runs (first red on prettier only). | —                    |
-| 4. create-pr               | 🔄 In progress | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #373 → develop. Commit `8f7c9983`, 46 files, +12,714/−112. Issue #372 commented (`in-review`). Scope leak check: clean. | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.102.qa.{N}.*.md`; `task.102.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.102.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -240,7 +240,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.102.authoring-time-card-preflight`
-**PR**: {populated after Step 4}
+**PR**: [#373](https://github.com/Gamaroff/agent-skills/pull/373)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

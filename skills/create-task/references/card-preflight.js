@@ -57,14 +57,6 @@ function inferKind(file) {
   return m ? m[1] : null;
 }
 
-function stripFrontmatter(text) {
-  if (!text.startsWith("---")) return text;
-  const end = text.indexOf("\n---", 3);
-  if (end === -1) return text;
-  const nl = text.indexOf("\n", end + 1);
-  return nl === -1 ? "" : text.slice(nl + 1);
-}
-
 function parseArgs(argv) {
   const out = { file: "", kind: "", json: false, strict: false, quiet: false };
   for (let i = 0; i < argv.length; i++) {
@@ -97,6 +89,14 @@ function parseArgs(argv) {
  * `checkCardSections` does, plus the resolved `kind` and `file`.
  */
 function preflight(file, kind) {
+  if (!fs.existsSync(file)) {
+    // `preflight` is exported, so a library caller reaches this without passing
+    // through main()'s checks. Raise the CLI's named error rather than a bare
+    // ENOENT from readFileSync.
+    const err = new Error(`no such file: ${file}`);
+    err.reason = "no-such-file";
+    throw err;
+  }
   const specs = lib.CARD_SECTIONS_BY_KIND[kind];
   if (!specs) {
     const err = new Error(
@@ -105,8 +105,19 @@ function preflight(file, kind) {
     err.reason = "unknown-kind";
     throw err;
   }
-  const body = stripFrontmatter(fs.readFileSync(file, "utf8"));
-  return { file, kind, ...lib.checkCardSections(body, specs) };
+  // The body comes from lib.parseFrontmatter — the SAME parser every sync path
+  // uses — and not from a local reimplementation. A second parse here would be
+  // this file's own version of the defect it exists to catch: the authoring
+  // check and the sync reading different bodies from one document, silently.
+  // An earlier draft did hand-roll one, and the two diverged on a body opening
+  // with a blank line and on CRLF documents. No real document disagreed yet,
+  // which is exactly how a latent parse divergence stays invisible until it
+  // is not.
+  const { body } = lib.parseFrontmatter(fs.readFileSync(file, "utf8"));
+  // `body` is returned so the parity test can assert the authoring path and the
+  // sync path resolved the SAME text, not merely the same verdict — the original
+  // divergence matched on every verdict it was tested against.
+  return { file, kind, body, ...lib.checkCardSections(body, specs) };
 }
 
 function main(argv) {
@@ -164,7 +175,7 @@ function main(argv) {
   return result.ok || !args.strict ? 0 : 1;
 }
 
-module.exports = { preflight, inferKind, stripFrontmatter, KINDS, main };
+module.exports = { preflight, inferKind, KINDS, main };
 
 if (require.main === module) {
   // No `process.exit()` after writing to stdout — on a pipe that truncates the
