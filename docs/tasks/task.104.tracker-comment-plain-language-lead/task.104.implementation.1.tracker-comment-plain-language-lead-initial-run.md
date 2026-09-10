@@ -34,8 +34,8 @@ Build the plain-language lead as an engine primitive: a per-stage catalogue of n
 | 1. create-branch           | ✅ Done    | Branch `feature/task.104.*` exists in git                              | `feature/task.104.tracker-comment-plain-language-lead` created from `develop` at `18839d09`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.104.review.1.tracker-comment-plain-language-lead.md`              | READY TO IMPLEMENT, 9/10, 0 critical / 2 important / 3 optional — all fixed. Issue #376 created + linked. Status promoted to Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 4 phases implemented. `ci:fast` 3106 pass / 0 fail; `eval:all` green. 3 mutation proofs recorded | `ab561e9` surface map (in-context) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.104.qa.{N}.*.md`; `task.104.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #377](https://github.com/Gamaroff/agent-skills/pull/377) → `develop`. `in-review` comment posted (`reason: posted`, `lead: template`). Board: `stage-disabled` (non-blocking) | —                    |
+| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 FAIL | `task.104.qa.{N}.*.md`; `task.104.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.104.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -54,6 +54,12 @@ Build the plain-language lead as an engine primitive: a per-stage catalogue of n
 - `PIPELINE_MODE = standard`, computed from the three inputs: `risk_level: medium` → `risk_ok = false` (set membership against {low, absent}); `phase_count = 4` (Phases 1–4 in §6) → not < 3; `single_module = false` (touches `shared/resources/` and multiple skills). All three fail, so the AND is false.
 - Always-load files: 3 files resolved from `skills-config.yaml:devLoadAlwaysFiles`; all three verified present on disk.
 - Tracker: `TRACKER=github` (no `JIRA_URL`). `TRACKER_ISSUE` empty — the task document carries no `github_issue:` yet.
+
+### Step 4 — 2026-09-10
+
+- Commit `7971a864`, PR [#377](https://github.com/Gamaroff/agent-skills/pull/377) → `develop`, closing #376.
+- **The feature went live on its own pipeline at this step.** The `in-review` comment posted to #376 came back `lead: "template"` — the engine rendered the plain-language lead for this task's own PR-opened comment, which is the first real proof that a call site gains one without being edited. The `--slot pr=…` was supplied by hand here only to exercise the slot path; no shipped call site passes slots yet (that is task.105).
+- Board move: `gh-stage.js --stage in-review` → `stage-disabled`. Correct and non-blocking — this project's `pipeline:` map does not name a column for that moment.
 
 ### Step 3 — 2026-09-10
 
@@ -105,7 +111,20 @@ _Problems encountered and how they were resolved or escalated._
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### Cycle 1 — 2026-09-10 — gate **FAIL** (30/100)
+
+Artifacts: [`task.104.qa.1.*.md`](./task.104.qa.1.tracker-comment-plain-language-lead.md) · [`task.104.gate.1.*.yml`](./task.104.gate.1.tracker-comment-plain-language-lead.yml)
+
+1 HIGH, 6 MEDIUM, 3 LOW advisory. The implementation was complete and the whole suite green — the defect was invisible to it.
+
+**T104-001 (HIGH)** — slot values arrive from `--slot k=v` as strings and every template consumes them by truthiness, so `--slot blocking=false` renders "Some things need answering before work can start". The opposite of the caller's intent, in the one paragraph aimed at a reader who cannot check the body underneath it.
+
+**Two errors of my own that this cycle exposed, both worth keeping:**
+
+1. **My Jira ADF verification was vacuous, and I reported it as a pass.** I ran 33 stage × body-shape cases against `buildCommentAdf` on a hand-composed string — exercising the renderer, never the composition path. It would have passed identically had `tracker-comment.js` composed nothing for Jira. The subagent independently found the shipped test (T104-006) making the same mistake. The task's highest-ranked risk was **uncovered**, and I had announced it as held down. This is the `feedback_assert_behaviour_not_source_text` failure in a new costume: I asserted against a value I constructed rather than one the system produced.
+2. **The bulk argv migration in Step 3 was worse than I found.** I noticed one test whose premise it corrupted because that test failed. Twelve others absorbed a duplicate `--stage` silently and stayed green (T104-007). A mechanical edit across a test file needs a mechanical check afterwards, not the test runner's opinion.
+
+**What the subagent caught that I did not:** T104-001 entirely, plus T104-002/003/004 and both test-quality findings. My own 16-probe security pass found only T104-005. The lesson is not "use a subagent" — it is that I probed the surface I had just written **for the failure modes I had already thought about**, which is the one thing an author cannot do adversarially.
 
 ---
 
@@ -114,7 +133,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: `feature/task.104.tracker-comment-plain-language-lead`
-**PR**: {populated after Step 4}
+**PR**: [#377](https://github.com/Gamaroff/agent-skills/pull/377)
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

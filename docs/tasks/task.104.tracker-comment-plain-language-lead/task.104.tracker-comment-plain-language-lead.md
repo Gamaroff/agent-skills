@@ -5,7 +5,7 @@ type: task
 description: "Stakeholders reading Jira cards and GitHub issues cannot follow the pipeline's comments — they open with gate verdicts, file paths and step numbers. Build the primitive: a per-stage catalogue of non-technical lead paragraphs, rendered by tracker-comment.js and prepended above every body, with a guard that refuses to post a comment for which no lead can be produced."
 tags: [tracker-comment, stakeholder-communication, shared-resources, engine]
 category: infrastructure
-status: ready-for-review
+status: in-progress
 priority: Medium
 risk_level: medium
 created: 2026-09-09
@@ -17,7 +17,7 @@ github_issue: 376
 
 # Technical Task: the plain-language lead, as an engine primitive
 
-**Status:** Ready for Review
+**Status:** In Progress
 **GitHub Issue**: [#376](https://github.com/Gamaroff/agent-skills/issues/376)
 **Review**: ✅ All review recommendations from `task.104.review.1.tracker-comment-plain-language-lead.md` implemented 2026-09-10
 
@@ -431,6 +431,37 @@ one named arm outstanding rather than reopening the whole task.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 30/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.104.qa.1.tracker-comment-plain-language-lead.md](./task.104.qa.1.tracker-comment-plain-language-lead.md)
+- **Gate File**: [task.104.gate.1.tracker-comment-plain-language-lead.yml](./task.104.gate.1.tracker-comment-plain-language-lead.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3107 (`ci:fast`), `eval:all` exit 0
+- **Phases Verified**: 4/4 implemented; 2/4 carry findings
+- **Critical Issues**: 1 HIGH, 6 MEDIUM
+- **NFR Status**: Security: PASS (measured, 16 probes), Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Key Findings
+
+Slot values arrive from the CLI as strings and the templates consume them by truthiness, so
+`--slot blocking=false` renders "Some things need answering before work can start" — the opposite of
+what the caller said, in the one paragraph written for a reader who cannot check the body underneath
+it. Six MEDIUM findings accompany it, including help text that still documents the behaviour the new
+guard rejects, and a Jira ADF test that asserts on its own construction rather than on the
+composition path.
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -439,6 +470,7 @@ one named arm outstanding rather than reopening the whole task.
 | 2026-09-10 | 1.1 | Review passed (9/10) — zero critical. Linked GitHub issue #376; replaced the count-based "all 22 call sites" criterion with a `git diff`-decidable property; refreshed stale `jira-sync.js` / `pr-inline-comment.js` line citations; added a §9 prose lead so the tracker card's Success Criteria block renders 193 chars instead of 14 | review-task |
 | 2026-09-10 |  | Status → ready-for-development | review-task |
 | 2026-09-10 |  | Status → ready-for-review — all four phases implemented; ci:fast 3106 pass / 0 fail and eval:all green; three mutation proofs recorded | develop |
+| 2026-09-10 |  | QA gate FAIL (30/100) — 7 findings; slot values are strings consumed by truthiness, so `blocking=false` renders the blocking sentence | qa-task |
 
 ---
 
