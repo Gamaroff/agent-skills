@@ -361,3 +361,69 @@ test("every slot a template reads is classified as boolean, numeric or text", ()
     );
   }
 });
+
+// ── Step 5c PR-review findings (CR-1, CR-2, CR-6) ──────────────────────────
+
+test("a numeric slot renders its COERCED value, not the source text", () => {
+  // CR-1: the numeric branch validated with Number() and then stored the raw
+  // string, throwing the coercion away — so "0x10" and "1e3" reached a sentence
+  // written for a non-technical reader in source form.
+  assert.ok(
+    renderLead("develop-complete", { count: "0x10" }).includes("(16 separate"),
+    "0x10 must render as 16",
+  );
+  assert.ok(
+    renderLead("develop-complete", { count: "1e3" }).includes("(1000 separate"),
+  );
+  assert.ok(renderLead("qa-cycle", { cycle: "0x2" }).includes("round 2"));
+});
+
+test("a numeric slot rejects values that are not positive whole numbers", () => {
+  // A negative or fractional count is a caller error, not a fact worth printing.
+  for (const bad of ["-3", "2.5", "Infinity", "-1"]) {
+    assert.equal(
+      renderLead("develop-complete", { count: bad }),
+      renderLead("develop-complete", {}),
+      `count=${bad} should be dropped`,
+    );
+  }
+  assert.ok(
+    renderLead("develop-complete", { count: 16 }).includes("(16 separate"),
+  );
+});
+
+test("a non-scalar slot value never reaches the sentence", () => {
+  // CR-2: an object interpolated as "[object Object]", and `[]` is truthy so an
+  // empty array fired a boolean slot's affirmative branch.
+  assert.ok(
+    !renderLead("work-started", { title: { a: 1 } }).includes("[object"),
+  );
+  assert.equal(
+    renderLead("work-started", { title: { a: 1 } }),
+    renderLead("work-started", {}),
+  );
+  assert.ok(
+    !renderLead("review", { blocking: [] }).includes(
+      "Some things need answering",
+    ),
+    "an empty array must not fire the affirmative branch",
+  );
+  assert.ok(
+    renderLead("review", { blocking: true }).includes(
+      "Some things need answering",
+    ),
+    "a real boolean must still fire it",
+  );
+});
+
+test("the cycle suffix is legal only for cycle-scoped stages", () => {
+  // CR-6: the strip applied to every stage, so hasTemplate("done-3") was true
+  // while tracker-comment's isKnownStage rejects it — two enumerations of one
+  // rule, disagreeing, kept apart only by call order.
+  assert.ok(hasTemplate("qa-cycle-3"));
+  assert.ok(hasTemplate("qa-fix-11"));
+  assert.equal(hasTemplate("done-3"), false);
+  assert.equal(hasTemplate("review-1"), false);
+  assert.equal(renderLead("done-3", {}), null);
+  assert.equal(renderLead("qa-cycle-3", {}), renderLead("qa-cycle", {}));
+});

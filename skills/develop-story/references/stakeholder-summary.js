@@ -198,6 +198,11 @@ function normaliseSlots(slots) {
   for (const key of Object.keys(slots)) {
     const raw = slots[key];
     if (raw === null || raw === undefined) continue;
+    // Scalars only. A programmatic caller passing an object or array otherwise
+    // gets it interpolated verbatim — "[object Object]" in the one paragraph
+    // written for a non-technical reader — and `[]` is truthy, so an empty
+    // array fired a boolean slot's affirmative branch.
+    if (!["string", "number", "boolean"].includes(typeof raw)) continue;
     const value = typeof raw === "string" ? raw.trim() : raw;
 
     if (BOOLEAN_SLOTS.includes(key)) {
@@ -216,8 +221,12 @@ function normaliseSlots(slots) {
       const n = typeof value === "number" ? value : Number(value);
       // A non-numeric string in a numeric slot is a caller error, not a zero.
       // Dropping it renders the shorter true sentence rather than "(NaN pieces)".
-      if (!Number.isFinite(n) || n === 0) continue;
-      out[key] = value;
+      // The COERCED value is what gets stored: validating with Number() and then
+      // storing the raw string threw the coercion away, so "0x10" and "1e3"
+      // reached the sentence in source form. Counts and round numbers are
+      // positive whole numbers; anything else is a caller error, not a fact.
+      if (!Number.isInteger(n) || n <= 0) continue;
+      out[key] = n;
       continue;
     }
 
@@ -231,6 +240,23 @@ function normaliseSlots(slots) {
 
 const CYCLE_SUFFIX = /-\d+$/;
 
+/**
+ * The numeric suffix is legal ONLY for the cycle-scoped stages, matching
+ * tracker-comment.js's isKnownStage. Stripping it from every stage made the two
+ * disagree on the same input — hasTemplate("done-3") was true while
+ * isKnownStage("done-3") is false — which is unreachable through the CLI today
+ * only because the stage gate runs first. Two enumerations of the same rule
+ * drifting apart is the class this module's header argues against, so it is
+ * closed rather than left resting on call order.
+ */
+const CYCLE_SCOPED_LEAD_STAGES = Object.freeze(["qa-cycle", "qa-fix"]);
+
+function stripCycleSuffix(stage) {
+  if (!CYCLE_SUFFIX.test(stage)) return stage;
+  const base = stage.replace(CYCLE_SUFFIX, "");
+  return CYCLE_SCOPED_LEAD_STAGES.includes(base) ? base : stage;
+}
+
 const LEAD_STAGES = Object.freeze(Object.keys(LEAD_TEMPLATES));
 
 /**
@@ -242,7 +268,7 @@ const LEAD_STAGES = Object.freeze(Object.keys(LEAD_TEMPLATES));
  */
 function renderLead(stage, slots = {}) {
   if (typeof stage !== "string" || stage === "") return null;
-  const key = stage.replace(CYCLE_SUFFIX, "");
+  const key = stripCycleSuffix(stage);
   // hasOwnProperty, not a bare bracket lookup: `LEAD_TEMPLATES["__proto__"]`
   // resolves up the prototype chain and is then CALLED, so renderLead threw for
   // `__proto__`/`valueOf` and returned a non-string for `constructor`/`toString`
@@ -259,7 +285,7 @@ function hasTemplate(stage) {
   if (typeof stage !== "string" || stage === "") return false;
   return Object.prototype.hasOwnProperty.call(
     LEAD_TEMPLATES,
-    stage.replace(CYCLE_SUFFIX, ""),
+    stripCycleSuffix(stage),
   );
 }
 

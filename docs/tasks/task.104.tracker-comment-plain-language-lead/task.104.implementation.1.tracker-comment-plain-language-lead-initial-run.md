@@ -35,7 +35,7 @@ Build the plain-language lead as an engine primitive: a per-stage catalogue of n
 | 2. review-task             | ✅ Done    | `task.104.review.1.tracker-comment-plain-language-lead.md`              | READY TO IMPLEMENT, 9/10, 0 critical / 2 important / 3 optional — all fixed. Issue #376 created + linked. Status promoted to Ready for Development | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 4 phases implemented. `ci:fast` 3106 pass / 0 fail; `eval:all` green. 3 mutation proofs recorded | `ab561e9` surface map (in-context) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [PR #377](https://github.com/Gamaroff/agent-skills/pull/377) → `develop`. `in-review` comment posted (`reason: posted`, `lead: template`). Board: `stage-disabled` (non-blocking) | —                    |
-| 5–6. qa-task / qa-fix loop | 🔄 Cycle 1 FAIL | `task.104.qa.{N}.*.md`; `task.104.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.104.qa.{N}.*.md`; `task.104.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.104.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -134,7 +134,26 @@ Per the re-review rule, cycle 2 is a full refute pass over the whole branch diff
 
 **C2-001 (MEDIUM) — my slot-coercion fix swallowed legitimate values.** `normaliseSlots` applied one falsey-string list to *every* slot, so a **text** slot legitimately valued `"No"`, `"None"` or `"0"` was silently dropped: `--slot title=None` rendered as though no title were given. This is precisely the failure I named in that fix's own commit message — "coercion that swallowed real values would be the worse bug" — and then shipped. It is worse than the bug it replaced, because it fails silently in the *other* direction and nothing in the output hints at it. Fixed by making coercion **per slot type**: `"false"`/`"no"`/`"none"` are negations only for a boolean slot, `"0"` only for a numeric one, and a text slot passes through untouched.
 
-**C2-002 (LOW) — the empty-`--summary-file` check had a second door.** `.trim()` does not remove U+200B, U+FEFF or U+2060, so a summary file holding only zero-width characters passed the check and posted an **invisible** lead — the same bypass T104-003 closed, wearing a different character. Fixed by stripping the zero-width set before trimming.
+**C2-002 (LOW) — the empty-`--summary-file` check had a second door.** `.trim()` does not remove U+200B, U+FEFF or U+2060, so a summary file holding only zero-width characters passed the check and posted an **invisible** lead — the same bypass T104-003 closed, wearing a different character.
+
+The refute pass then found four more, three of them in the fixes above:
+
+**C2-003 (MEDIUM) — T104-004 was fixed on one arm, and cycle 1's gate closed it anyway.** `desiredLine` is captured in `run()`, which feeds the *pre-gate* defer; the Jira arm's *in-flight* defer is built inside `jira-sync.js`'s `addComment` and still derived the label from the composed body. Run side by side the two arms disagreed. Fixed by threading `desired` through `runJira` into `addComment`, defaulting to `firstLineOf(body)` so no other caller changes.
+
+**C2-004 (MEDIUM) — the C2-002 fix rewrote human text.** Stripping the zero-width set from the *content* rather than only for the emptiness test deleted U+200D — the joiner inside every ZWJ emoji sequence, and load-bearing for Indic and Arabic shaping. `"Shipped by 👩‍💻"` posted as `"Shipped by 👩💻"`. **This is the final shape of the C2-002 fix**: one shared `isVisiblyNonEmpty()` predicate tests emptiness against a stripped *copy* and the *original* posts, and the same predicate now also governs `--body-file`, which had the identical hole open.
+
+### QA Cycle 2 — Step 5c
+
+| Field | Value |
+| :--- | :--- |
+| **PR Review** | ⚠️ **CONCERNS** — 11 findings, all resolved during the review |
+| Report | [`task.104.pr-review.1.*.md`](./task.104.pr-review.1.tracker-comment-plain-language-lead.md) |
+
+**Step 5c justified itself on its first run here.** PC-1: the PR's head commit did not contain a full cycle of the work gate 2 had certified — a `git commit` was rejected by the pre-commit hook, its output suppressed by a `>/dev/null 2>&1` in my own invoking command, and the *following* commands' success read as the commit's. Merging on gate 2's PASS would have shipped both the ZWJ-stripping bug and the Jira-arm `desired` regression the gate said were closed.
+
+The lesson generalises past this task: **a QA gate is a statement about a working tree; a PR is a statement about a branch**, and nothing before Step 5c compares the two. Related and cheaper: never suppress the output of a command whose success you are about to chain on.
+
+**C2-005 / C2-006 (LOW, cleanups)** — a dead `typeof template` check removed; a slot-classification drift guard added, since an unclassified boolean slot would silently re-open the cycle-1 HIGH.
 
 **A third thing, about the proof rather than the code.** My first attempt to mutation-prove C2-002 used a regex substitution with a `2>/dev/null ||` fallback. It silently failed to apply, the suite stayed green, and I was one step from recording "no test caught this" — a false negative in the very mechanism that exists to prevent false confidence. Re-run as a deterministic line-based deletion, the test went red correctly. **A mutation proof needs its own check that the mutation applied**; a green suite after a mutation that never happened is indistinguishable from a vacuous test.
 

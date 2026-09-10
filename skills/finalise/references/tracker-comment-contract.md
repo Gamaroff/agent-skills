@@ -105,12 +105,18 @@ catalogued and tested; a summary file is a paragraph one call site knows about.
 ### Two consequences worth stating
 
 **Deferred records changed shape.** The lead is composed *above* the access gate,
-so it reaches `command.stdin` and the record's `desired:` line. That is deliberate
-— a deferred comment is the one a human pastes by hand, so it is the last one that
-should arrive without its lead — but it means the record's identity hash differs
-from one written before this change, and a `desired:` line now shows the lead's
-first sentence rather than the body's. A replayed old record re-posts the old body,
-which is correct: the record is a verbatim snapshot of an intended call.
+so it reaches `command.stdin`. That is deliberate — a deferred comment is the one a
+human pastes by hand, so it is the last one that should arrive without its lead —
+but it means the record's identity hash differs from one written before this change.
+A replayed old record re-posts the old body, which is correct: the record is a
+verbatim snapshot of an intended call.
+
+**The `desired:` label is deliberately *not* the lead.** It is the one line a human
+reads in the handover checklist to tell one pending action from another, and the lead
+is by design near-identical across every comment of a given stage — so labelling with
+it would stop the label labelling. The caller's own first line is captured before the
+merge and threaded to both arms, GitHub's pre-gate record and Jira's in-flight one
+alike. `command.stdin` still carries the composed body, because that is what posts.
 
 **On Jira the `---` does not render.** `textToAdfNodes` emits no `rule` node, so the
 lead arrives as its own ADF paragraph followed directly by the body's first node.

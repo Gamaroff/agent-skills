@@ -18,7 +18,8 @@
  *      makes no network call.
  *
  * Usage:
- *   tracker-comment.js --issue <key|N> --body-file <path> --stage <name>
+ *   tracker-comment.js --issue <key|N> --body-file <path>
+ *                      (--stage <name> | --summary-file <path>) [--slot k=v ...]
  *                      [--json] [--quiet] [--dry-run] [--strict]
  *                      [--tracker jira|github]
  *
@@ -27,7 +28,8 @@
  *   0  posted, already, unverifiable, deferred, no-credentials, dry-run —
  *      and any unhandled throw
  *   1  a skip, but only under --strict
- *   2  usage error (missing --issue, missing/empty --body-file, unknown flag)
+ *   2  usage error (missing --issue, missing/empty --body-file, unknown flag,
+ *      no plain-language lead resolvable, missing/empty --summary-file)
  *
  * `reason` vocabulary:
  *   posted          the comment was created
@@ -43,7 +45,8 @@
  * there means "do not move the card". It does not mean "do not say anything" —
  * a project whose board has no review column still wants the PR-opened comment.
  * Coupling the two would silence comments as a side effect of board config, so
- * `--stage` here is only the comment's IDENTITY, used to build the marker.
+ * `--stage` here is the comment's IDENTITY — it builds the marker and selects
+ * the plain-language lead, and is required unless --summary-file supplies one.
  *
  * On requiring jira-sync.js: gh-stage.js states the rule this file has to bend
  * — that module depends on tracker-workflow.js and nothing else in shared/,
@@ -116,22 +119,25 @@ const COMMENT_STAGES = Object.freeze([
 const USAGE = `tracker-comment — post one comment to a tracker issue
 
 Usage:
-  tracker-comment.js --issue <key|N> --body-file <path> --stage <name>
+  tracker-comment.js --issue <key|N> --body-file <path>
+                     (--stage <name> | --summary-file <path>) [--slot k=v ...]
                      [--json] [--quiet] [--dry-run] [--strict]
                      [--tracker jira|github]
 
 Options:
   --issue, -i     Issue key (PROJ-1) or number (42). Required.
   --body-file, -f Path to a file holding the comment body (markdown). Required.
+                  A file, never an inline string: bodies contain backticks,
+                  $(…) and newlines, and an interpolated body is a shell
+                  injection waiting for the first comment that contains one.
   --slot k=v      Fill a slot in the stage's plain-language lead. Repeatable.
+                  Boolean slots read "false"/"no"/"none"/"0" as absent; numeric
+                  slots take a positive whole number.
   --summary-file, -S
                   Path to a hand-written plain-language lead, overriding the
                   stage's template. REQUIRED when --stage is omitted — every
                   known stage has a template, so that is the only case where a
                   lead cannot otherwise be produced. Must not be empty.
-                  A file, never an inline string: bodies contain backticks,
-                  $(…) and newlines, and an interpolated body is a shell
-                  injection waiting for the first comment that contains one.
   --stage, -s     The comment's identity — builds the idempotency marker AND
                   selects the plain-language lead. REQUIRED unless --summary-file
                   is given: a comment for which no lead can be produced does not
