@@ -39,8 +39,8 @@ trip.
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | All 4 phases. 11 new tests, 4 mutations proved red. `npm run ci:fast` green (3047 tests, 0 fail). 1 develop iteration; 2 fast-gate runs (first red on prettier only). | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #373 → develop. Commit `8f7c9983`, 46 files, +12,714/−112. Issue #372 commented (`in-review`). Scope leak check: clean. | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.102.qa.{N}.*.md`; `task.102.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle. QA CONCERNS(90) → qa-fix → PASS(100). Step 5c `/review-pr` **CONCERNS**, 3 of 4 findings fixed in-review; PC-2 left for Step 7. | —                    |
-| 7. finalise                | ⏳ Pending | `task.102.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.102.dod.{N}.*.md`; task `status: accepted`                       | DoD 9/9 verified against code. CI verified TWICE — green on `b97e84cd`, then re-verified on the final head `3fe061ed` after finalise's own writes. Issue #372 commented + closed; board `already` Done; canonical PR comment posted. | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 4 commits: `8f7c9983` (feat), `438f675e` (qa-fix), `b97e84cd` (5c fixes), `3fe061ed` (finalise). Branch pushed; CI green on the final head. | —                    |
 
 ---
 
@@ -265,10 +265,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-10 08:55
+**Final Status**: Completed
 **Branch**: `feature/task.102.authoring-time-card-preflight`
 **PR**: [#373](https://github.com/Gamaroff/agent-skills/pull/373)
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 1 (CONCERNS 90 → PASS 100), plus Step 5c CONCERNS with 3 of 4 findings fixed in-review
+**DoD Summary**: `task.102.dod.1.authoring-time-card-preflight.md` — 9/9, accepted
+**Tracker debt**: none — `access.tracker` is `full`; issue #372 closed, board already Done, all comments posted

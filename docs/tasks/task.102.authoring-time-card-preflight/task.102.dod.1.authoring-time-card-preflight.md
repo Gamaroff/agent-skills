@@ -258,7 +258,18 @@ the new AGENTS.md section adds four links. **A green on an ancestor is not a gre
 being accepted.** The final head is therefore committed and re-verified before the tracker
 side-effects fire, and the result is recorded below.
 
-Final-head rollup: **see the "Final-head CI" line under Verification Complete.**
+**Final-head rollup: ✅ SUCCESS on `3fe061ed`** — the commit carrying this acceptance, not an
+ancestor of it. Polled to a decision again rather than sampled once:
+
+```
+08:49:57 attempt=1 head=3fe061edf089 rollup=PENDING
+...
+08:52:02 attempt=5 head=3fe061edf089 rollup=SUCCESS
+```
+
+All five jobs COMPLETED SUCCESS on that head: `validate`, `test`, `link-check`, `shellcheck`, and the
+allowed-branch check. `link-check` matters specifically — the AGENTS.md section written in this step
+adds four links, so the delta between the two heads was not inert documentation.
 
 ---
 
@@ -284,3 +295,26 @@ is empty, and the one finding this step inherited (PC-2) is closed.
 **Outcome:** the task meets every Definition of Done criterion.
 
 ---
+## Verification Complete
+
+**Final Status:** ✅ **ACCEPTED**
+**Completion Time:** 2026-09-10 08:53
+**Final-head CI:** ✅ SUCCESS on `3fe061ed` — 5/5 jobs, on the commit carrying this acceptance
+
+**Artifacts Generated:**
+
+- ✅ Task document updated — `status: accepted`, `completed_date`, `pr_number: 373`, DoD PASSED
+  section, nine success criteria ticked
+- ✅ Sprint Review summary — `sprint-review-summary.md`
+- ✅ This verification log
+- ✅ AGENTS.md `## Authoring-Time Card Preflight` section (doc sweep)
+- ✅ Canonical PR comment posted to #373
+- ✅ GitHub issue #372 commented and closed
+- ✅ Project board moved to Done
+
+**Next Steps:**
+
+- Ready for merge. `/develop-next` Step 3 merges the PR; Step 4 ticks the **task registry** — note
+  this item's `source` is `task-registry`, not the roadmap, which is the develop-next gap already
+  recorded as observations #13, #30, #31, #34 and #35.
+- Follow-up filed in the task's § 4: bug reports have no card preflight at any layer.
