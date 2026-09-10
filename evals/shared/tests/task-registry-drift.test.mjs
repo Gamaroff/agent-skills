@@ -71,6 +71,27 @@ const MIN_DOCS = 90;
 /** Where task documents live, relative to the repo root. */
 const TASKS_DIR = "docs/tasks";
 
+/**
+ * Does a document status and a registry status DISAGREE about acceptance?
+ *
+ * Defined once, here, and used by both the corpus test and the synthetic-fixture
+ * test below. That is the whole point of it existing as a function: a fixture test
+ * that re-implemented this comparison would assert the RULE while leaving the
+ * IMPLEMENTATION free to drift away from it — a mutation to the comparison would
+ * red the corpus test and leave the fixture test green, which is precisely the
+ * shape of coverage-that-is-not-coverage this file was written about.
+ *
+ * Only the `accepted` predicate is compared, never the whole string. A task is
+ * legitimately mid-flight for days — document `in-progress`, row still
+ * `ready-for-development` — and `cancelled` is terminal and legitimately not
+ * `accepted` on either side. Comparing whole strings would fire on both,
+ * constantly, on a correct registry; a check that fires on healthy states is one
+ * that gets muted, which returns the repository to exactly where it started.
+ */
+function disagreesOnAcceptance(docStatus, rowStatus) {
+  return (docStatus === "accepted") !== (rowStatus === "accepted");
+}
+
 const REGISTRY_REL = DEFAULT_TASK_REGISTRY;
 const REGISTRY_ABS = path.join(REPO_ROOT, REGISTRY_REL);
 
@@ -123,23 +144,8 @@ test("every registry row points at a readable task document", () => {
 test("document `accepted` and registry row `accepted` agree in both directions", () => {
   const { rows } = loadRows();
 
-  /**
-   * Only the `accepted` predicate is compared, deliberately — not the full
-   * status string.
-   *
-   * A task is legitimately mid-flight for days: its document reads
-   * `in-progress` or `ready-for-review` while the row still reads
-   * `ready-for-development`, and that is not drift, it is work in progress. And
-   * `cancelled` is terminal and legitimately not `accepted` on either side.
-   * Comparing whole strings would fire on both, constantly, on a correct
-   * registry — and a check that cries wolf on healthy states is one that gets
-   * muted, which returns the repository to exactly where it started.
-   *
-   * `accepted` is the one value that is terminal, unambiguous, and the answer to
-   * the question the registry is read for. Both directions matter: a row behind
-   * its document is the seventeen-row drift; a row AHEAD of its document is
-   * worse, because it reports work as finished that is not.
-   */
+  // The comparison itself lives in `disagreesOnAcceptance` above, so the
+  // fixture test below can exercise it rather than restate it.
   const stale = [];
   const ahead = [];
   let compared = 0;
@@ -150,9 +156,8 @@ test("document `accepted` and registry row `accepted` agree in both directions",
     const docStatus = parseFrontmatterStatus(readFileSync(docFile, "utf8"));
     compared++;
 
+    if (!disagreesOnAcceptance(docStatus, row.registryStatus)) continue;
     const docAccepted = docStatus === "accepted";
-    const rowAccepted = row.registryStatus === "accepted";
-    if (docAccepted === rowAccepted) continue;
 
     const entry =
       `  task ${row.n} — document reads \`${docStatus ?? "(no status)"}\`, ` +
@@ -280,5 +285,64 @@ test("every task document has a registry row", () => {
     `${orphans.length} task document(s) have no row in ${REGISTRY_REL}:\n${orphans.join("\n")}\n` +
       `Add the row. A task absent from the registry is invisible to every reader of it and to ` +
       `\`registry-tick.js\`, which reports \`no-row\` and — by design — does not block acceptance.`,
+  );
+});
+
+/**
+ * Criterion 4 — `cancelled` and in-flight tasks must not trip the check — against a
+ * SYNTHETIC registry, not the live corpus.
+ *
+ * This was previously "verified" by the corpus happening to contain a disagreeing
+ * pair, and by ad-hoc mutations during development that were never committed. Both
+ * are coincidence, not coverage. `/review-pr` proved the coincidence expires: with
+ * task 103 accepted and its own row ticked, the corpus becomes entirely
+ * self-consistent on full strings ({accepted/accepted: 102, cancelled/cancelled: 1,
+ * planned/planned: 3}), and a regression from the `accepted` PREDICATE to full-string
+ * equality then passes 4/4 undetected.
+ *
+ * That regression is not benign. Comparing whole strings fires on every task whose
+ * row lags its document — which is every task, for the days it is in flight — and a
+ * check that fires on healthy states is one that gets muted. The design comment on
+ * the agreement test argues exactly this; the argument now has a test.
+ *
+ * Deliberately built from strings rather than from `docs/`: a fixture that reads the
+ * real registry would inherit the same coincidence it exists to escape.
+ */
+test("cancelled and in-flight rows do not trip the agreement check", () => {
+  const fixture = [
+    "| #  | Title | Status | Category | Priority | Created | Issue | Depends on |",
+    "|----|-------|--------|----------|----------|---------|-------|------------|",
+    // cancelled document, row says something else — both non-accepted, must not trip.
+    "| 1 | [a](task.1.a/task.1.a.md) | planned | infra | Medium | 2026-01-01 | — | — |",
+    // in-flight: document ahead of its row, the normal state for days at a time.
+    "| 2 | [b](task.2.b/task.2.b.md) | ready-for-development | infra | Medium | 2026-01-01 | — | — |",
+    // the control: this one MUST trip, so a fixture that matched nothing cannot pass.
+    "| 3 | [c](task.3.c/task.3.c.md) | planned | infra | Medium | 2026-01-01 | — | — |",
+    "",
+  ].join("\n");
+
+  const { rows } = parseRegistry(
+    fixture,
+    "task",
+    "docs/tasks/task-registry.md",
+  );
+  assert.equal(
+    rows.length,
+    3,
+    "the fixture itself must parse — otherwise this proves nothing",
+  );
+
+  const docStatus = { 1: "cancelled", 2: "ready-for-review", 3: "accepted" };
+
+  // Calls the SAME predicate the corpus test uses — see disagreesOnAcceptance.
+  const drifted = rows
+    .filter((r) => disagreesOnAcceptance(docStatus[r.n], r.registryStatus))
+    .map((r) => r.n);
+
+  assert.deepEqual(
+    drifted,
+    [3],
+    "only the accepted-document-with-unticked-row should trip: a cancelled task and an " +
+      "in-flight task both legitimately disagree on the literal string and neither is drift",
   );
 });

@@ -163,6 +163,7 @@ None if a check. If `finalise` gains the write, it gains a side effect on a file
 | `docs/standards/task-registry.md` | Phase 5 — names `/finalise` as the owner, explains why a pre-merge tick is correct for the Status column, and points at the drift check as the backstop. Replaces the interim "tick it by hand" step. |
 | `docs/tasks/task-registry.md` | Row 103's own tick (by `registry-tick.js` at Step 7 — the mechanism's first live use). |
 | `docs/development/epic-registry.md` | Epic 3's Status corrected `📋 Planned` → `✅ Accepted`. Found by the Phase 2 measurement; the document and all three of its stories read `accepted`. |
+| `CHANGELOG.md` | Unreleased entry covering both halves — the check and the writer. |
 | `docs/tasks/task-registry.md` (row 97) | **Added a row that never existed.** Task 97 is `accepted` and merged under PR #350 but was absent from the registry entirely — found by the document-driven check added in QA cycle 1, which is the direction the row-driven walk structurally could not see. |
 
 ### Delete
@@ -188,7 +189,9 @@ None.
        **and when it has no row at all** (added in QA cycle 1; found task 97 on its first run).
 2. [x] That check is mutation-proven — reverting a row makes it go red.
 3. [x] The check carries a non-vacuity floor and cannot pass by matching nothing.
-4. [x] `cancelled` and in-flight tasks do not trip it.
+4. [x] `cancelled` and in-flight tasks do not trip it — pinned by a **synthetic-fixture** test
+       calling the same predicate the corpus test uses, after `/review-pr` proved the previous
+       coverage was incidental corpus state that this run's own Step 7 removes.
 5. [x] The § 3 decision is recorded with its reasoning, not just its outcome.
 6. [x] If a write is implemented: lite mode ticks the row, and a story run does not attempt one.
 7. [x] `docs/standards/task-registry.md` names the real owner and no longer says "by hand" if that
@@ -261,6 +264,7 @@ away.
 | 2026-09-10 |  | QA gate FAIL (80/100) — 1 high, 1 medium, 2 low. The check covers rows but not documents, contradicting three shipped claims | qa-task |
 | 2026-09-10 |  | QA findings fixed — 1 iteration. Added the document-driven direction to the drift check (found task 97, accepted and absent from the registry since creation), preserved cell width and line endings in the tick, corrected the guard comment and removed a no-op. Two further tests added after mutations survived. | qa-fix |
 | 2026-09-10 |  | QA gate PASS (95/100) — cycle 2 refute pass found 3 issues inside cycle 1's own fixes, all closed in-cycle; 0 open findings | qa-task |
+| 2026-09-10 |  | PR conformance review (Step 5c): REQUEST CHANGES — criterion 4 had no committed test, only incidental corpus coverage that Step 7 would have removed. Fixed with a synthetic fixture exercising the shared predicate; Files Summary completed. | qa-fix |
 
 ## Progress Tracking
 
