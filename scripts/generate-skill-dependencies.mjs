@@ -84,10 +84,15 @@ export function skillNames(skillsDir = SKILLS_DIR) {
  * Parsed with a narrow regex rather than a YAML library on purpose: this runs
  * in the release path and in the installer's orbit, and adding a dependency
  * for one flow-sequence line is not worth it. Only the inline form
- * `invokes: [a, b, c]` is supported. The block form IS rejected loudly (see the
- * check below) — a silently-empty edge list is exactly the under-collection
- * failure this file exists to avoid, and it went undetected for one cycle
- * because the guard asserted only that parsing did not throw.
+ * `invokes: [a, b, c]` is supported. Every other spelling of a list IS rejected
+ * loudly — the YAML block form and the wrapped flow form both (see the checks
+ * below) — because a silently-empty edge list is exactly the under-collection
+ * failure this file exists to avoid, and it is invisible to CI: the generator
+ * and the committed JSON agree on the empty list, so both drift checks stay
+ * green. Each of those two shapes went undetected for a cycle, the first
+ * because the guard asserted only that parsing did not throw, the second
+ * because the table that replaced that guard enumerated the block form's space
+ * and a wrapped `[` is not in it.
  */
 export function parseInvokes(text, skill = "<unknown>") {
   const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -121,6 +126,34 @@ export function parseInvokes(text, skill = "<unknown>") {
     );
   }
 
+  // WRAPPED FLOW FORM — `invokes:` with the `[` on a LATER line:
+  //
+  //     invokes:
+  //       [
+  //         create-branch,
+  //       ]
+  //
+  // Valid YAML, and the one shape the block-form table above does not reach: it
+  // enumerated {comment} x {blank lines} x {indent} for a `-` sequence, and a
+  // wrapped `[` is none of those. So it fell straight through to the empty
+  // return, and `develop-bug` shipped nine declared callees as zero edges for a
+  // cycle. Nothing failed: the generator and the committed JSON agreed on the
+  // empty list, so both drift checks stayed green, and a `pipeline` install
+  // silently dropped `ensure-bug-{jira,github}-issue` — a bug pipeline that
+  // cannot reach the tracker, discovered in the consumer's repo, at the step
+  // whose skill is missing.
+  //
+  // Rejected rather than parsed, for the same reason the block form is: one
+  // supported spelling that every skill uses, and everything else loud. Prettier
+  // leaves a long inline list alone (verified), so nothing in the toolchain
+  // pushes an author into this shape.
+  if (!raw && /^\r?\n(?:[ \t]*(?:#[^\n]*)?\r?\n)*[ \t]*\[/.test(afterKey)) {
+    throw new Error(
+      `${skill}: 'invokes:' must use the inline form 'invokes: [a, b]'. ` +
+        `Found the list wrapped onto the following line(s); put it on the key line.`,
+    );
+  }
+
   if (!raw) return [];
   if (!raw.startsWith("[")) {
     throw new Error(
@@ -129,7 +162,14 @@ export function parseInvokes(text, skill = "<unknown>") {
     );
   }
   if (!raw.endsWith("]")) {
-    throw new Error(`${skill}: unterminated 'invokes:' list — missing ']'.`);
+    // Covers both a genuinely unterminated list and one that OPENS on the key
+    // line and wraps (`invokes: [a,` / `  b]`) — the same defect as the wrapped
+    // form above, reached by a different route. Loud either way; the message
+    // names the fix rather than only the symptom.
+    throw new Error(
+      `${skill}: unterminated 'invokes:' list — missing ']'. ` +
+        `The whole list must sit on the key line: 'invokes: [a, b]'.`,
+    );
   }
   return raw
     .slice(1, -1)

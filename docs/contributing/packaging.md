@@ -18,9 +18,26 @@ Run after any change to `shared/resources/` or a skill's `SKILL.md`:
 ```bash
 npm run bundle          # all skills
 npm run bundle:skill skills/<skill-name>   # one skill
+npm run bundle -- --check # verify freshness, write nothing
 ```
 
 Then commit the `references/` changes alongside your other edits. The bundled files are committed to git — this is intentional.
+
+**`--check` is what CI runs** (`validate.yml`), and it is a **per-file** comparison rather than a regenerate-and-diff. That distinction is load-bearing: regenerating and diffing can only see files the bundler chose to write, so a copy the bundler declines to touch is invisible to it. `--check` classifies each file and reports three outcomes:
+
+| Verdict | Meaning |
+| :--- | :--- |
+| `in sync` | The copy matches its rewritten source |
+| `STALE` | Bundler output, behind its source — `npm run bundle` fixes it |
+| `AMBIGUOUS` | Differs from the source, and nothing proves whether it is bundler output or an authored file |
+
+**`AMBIGUOUS` mostly means a `.json`.** Bundled `.md` and `.js` copies carry a provenance banner; `.json` cannot, so a stale bundled JSON and a hand-authored one are indistinguishable and **the bundler leaves it alone** — `npm run bundle` reports `in sync` while `--check` reports a problem. Today the only such file is `skills/create-skill/references/skill-dependencies.json`. If you change `shared/resources/skill-dependencies.json` (i.e. you ran `npm run generate-skill-deps`), copy it across by hand:
+
+```bash
+cp shared/resources/skill-dependencies.json skills/create-skill/references/skill-dependencies.json
+```
+
+Miss this and `npm test` fails on *the real repository is clean under `--check`*, several thousand assertions after the change that caused it.
 
 **Pre-commit hook (automatic):** the hook lives at `.githooks/pre-commit` (committed to git) and runs `npm run bundle` whenever `shared/resources/` or a `SKILL.md` is staged, then stages the `references/` files **that run changed**. It is wired up automatically via the `prepare` npm script — no manual step needed after a fresh clone:
 

@@ -142,6 +142,80 @@ test("`invokes:` uses the inline flow form everywhere it appears", () => {
   }
 });
 
+test("the WRAPPED flow form of `invokes:` is REJECTED, not silently read as empty", () => {
+  // The shape the table below does not reach, and therefore the one that got
+  // through: `invokes:` with the `[` on a later line. The block-form table
+  // enumerates {comment} x {blank lines} x {indent} for a `-` sequence, which is
+  // exhaustive over ITS space and blind to a wrapped `[` — the same
+  // one-shape-per-cycle pattern its own comment describes, one level up.
+  //
+  // `develop-bug` carried nine declared callees in this shape and the graph read
+  // zero. Nothing failed: generator and committed JSON agreed on the empty list,
+  // so both drift checks stayed green, and a `pipeline` install shipped
+  // `/develop-bug` without `ensure-bug-{jira,github}-issue`.
+  for (const [shape, body] of [
+    ["wrapped, two-space indent", "invokes:\n  [a, b]\n"],
+    ["wrapped, zero indent", "invokes:\n[a, b]\n"],
+    ["wrapped, tab indent", "invokes:\n\t[a, b]\n"],
+    ["one item per line", "invokes:\n  [\n    a,\n    b,\n  ]\n"],
+    ["comment on the key line", "invokes:  # why\n  [a, b]\n"],
+    ["comment on the key line, no space", "invokes:# why\n  [a, b]\n"],
+    ["blank line first", "invokes:\n\n  [a, b]\n"],
+    ["comment line between", "invokes:\n  # note\n  [a, b]\n"],
+    ["CRLF", "invokes:\r\n  [a, b]\r\n"],
+    ["empty list, wrapped", "invokes:\n  []\n"],
+  ]) {
+    assert.throws(
+      () => parseInvokes("---\n" + body + "---\n", "x"),
+      /must use the inline form/,
+      `wrapped flow list (${shape}) must be rejected loudly, not returned as []`,
+    );
+  }
+
+  // A list that OPENS on the key line and wraps reaches the same defect by the
+  // other route, and must also be loud rather than truncated.
+  assert.throws(
+    () => parseInvokes("---\ninvokes: [a,\n  b]\n---\n", "x"),
+    /unterminated/,
+    "a list opening on the key line and wrapping must throw, not truncate",
+  );
+});
+
+test("no SKILL.md in the tree declares `invokes:` and resolves to no edges", () => {
+  // The property, stated once, independent of which spellings the two tables
+  // above happen to enumerate. A shape nobody has thought of yet fails HERE the
+  // moment a skill adopts it — the parse tables cannot cover a space they do not
+  // know about, and this does not have to.
+  //
+  // `invokes: []` is a real declaration ("deliberately none") and is excluded by
+  // matching the literal empty list, not by trusting the parse to agree.
+  let checked = 0;
+  for (const skill of names) {
+    const text = readFileSync(
+      path.join(REPO, "skills", skill, "SKILL.md"),
+      "utf8",
+    );
+    const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!fm) continue;
+    const line = fm[1].match(/^invokes:[ \t]*(.*)$/m);
+    if (!line) continue;
+    checked++;
+    if (/^\[\s*\]/.test(line[1].replace(/\s*#.*$/, "").trim())) continue;
+    assert.ok(
+      parseInvokes(text, skill).length > 0,
+      `${skill}: declares 'invokes:' but the graph reads no edges from it — ` +
+        `an unparsed spelling, not an empty declaration`,
+    );
+  }
+  // Non-vacuity floor: a regex that stopped matching would iterate nothing and
+  // report a clean, reassuring pass. 22 skills declare the key today.
+  assert.ok(
+    checked >= 20,
+    `expected ≥20 skills declaring 'invokes:', scanned ${checked} — the ` +
+      `frontmatter match is broken, not the tree`,
+  );
+});
+
 test("the block form of `invokes:` is REJECTED, not silently read as empty", () => {
   // EXHAUSTIVE BY DESIGN. This function was patched four times, one YAML shape
   // per QA cycle — `\\s+#` missed the no-space comment, then a blank line slipped

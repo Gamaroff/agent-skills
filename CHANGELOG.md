@@ -6,6 +6,102 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The plain-language lead now reaches the pull request, not only the tracker card.** Tasks 104 and
+  105 gave every *tracker* comment an opening paragraph a non-technical reader can follow. Anyone
+  who then clicked through to the PR landed on the most technical text this pipeline writes — a
+  five-row Definition of Done table, a QA review of findings, a code review of file-and-line
+  references. The chain a stakeholder actually walks is board comment → pull request → detail, and
+  it was readable at the first step only.
+
+  **Eleven pull-request conversation templates** now lead: the DoD comment, `finalise`'s canonical
+  summary, the three board-warning notices, the DoD-gaps comment, both QA reviews, the `qa-fix`
+  summary and the two review-skill summaries. The one engine-built body —
+  `pr-inline-comment.js`'s `buildSummaryBody()` — leads too, while a caller-supplied
+  `--summary-file` still wins outright and is never double-led.
+
+  **Per-line inline findings deliberately carry no lead.** A comment anchored to line 47 of a diff
+  has exactly one reader, and that reader is reading the diff. The exclusion is held by two tests
+  rather than by a sentence in a task document that disappears on acceptance.
+
+  New `shared/resources/stakeholder-summary-cli.js` so a shell call site obtains its lead **once**,
+  above the GitHub/Bitbucket arm split — eleven sites × two arms is twenty-two places one lead could
+  drift into two. The PR stages come from the same catalogue as the tracker stages, so where a
+  moment exists on both, one stage renders both and there is a single vocabulary.
+
+  Demonstrated on itself: this task's own QA gate decision and review comments were posted to
+  PR #381 by the feature the task adds. Three QA cycles (CONCERNS 80 → PASS 95 → PASS 90), Step 5c
+  APPROVE, 15 adversarial probes with 0 reproduced. **Residual, deliberate**: the eleven new call
+  sites have no automated shell coverage — `shellcheck` lints tracked `*.sh` and this change adds
+  none, and Step 4b refuses the blocks as `mutating` because `node` is fail-closed in the snippet
+  allow-list. They were linted by hand, which is a one-off and not a guard. (task 106)
+
+- **Every tracker-comment call site now feeds the lead real values, and the seven that bypassed the
+  engine stopped bypassing it.** Task 104's lead worked and said the same thing every cycle, because
+  no call site told it anything specific. **24 call sites** now pass `--slot` values, up from zero —
+  the comment names the pull request, the verdict, the round number and the count. `review-story` was
+  the last `review-*` skill whose GitHub arm sat off the CLI; its two arms are now literally one
+  call, so one review outcome reads the same way on either tracker.
+
+  The **seven bare `gh issue comment` sites** are the more consequential half. Unmarked, so a resumed
+  run posted a second copy; `gh`-only, so a Jira project silently received nothing at all. They now
+  take the same path as everything else, gaining an idempotency marker and becoming postable on Jira.
+
+  **A guard already existed for this, named the exact bug, and passed all seven sites.**
+  `mutation-call-site-coverage` has watched `gh issue comment` since tasks 51–56 with
+  `tracker-comment.js` listed as its required chokepoint. Two independent defects blinded it, and
+  **fixing the first changed nothing** — the mutation proof stayed green, which is how the second was
+  found. A third hole (`cmd && gh issue comment …`) turned up afterwards by *probing* the repaired
+  guard with eight shell forms rather than reading it. One sufficient explanation for a miss is not
+  evidence it was the only one.
+
+  The durable output is **Guard B** (`shared/resources/tests/comment-slot-coverage.test.mjs`): every
+  call site must pass a slot, *and* every slot name must be one its stage's template actually reads —
+  importing the mapping from `stakeholder-summary.js` rather than restating it. The engine validates
+  no slot names, so a wrong one posts successfully, reports `posted: true`, and is discarded in
+  silence; this task shipped three such names into review precisely because each is a real slot on a
+  *different* stage.
+
+  **Residual, deliberate**: the seven converted sites give up the 3× exponential backoff they had.
+  The engine owns the `ACCESS_TRACKER` deferral gate but has no retry, and re-wrapping would
+  double-defer. A real reduction in resilience, traded knowingly. (task 105)
+
+- **Every comment this repository posts to a tracker issue now opens with a plain-language lead.**
+  Stakeholders who read the board — and only the board — reported the pipeline's comments as
+  unreadable, and they were right: they opened with gate verdicts, step numbers, file paths and
+  scores on scales nobody outside the pipeline knows. A comment now begins with two to four sentences
+  answering *what happened, what it means, what happens next*, then a `---`, then everything the
+  comment used to say, **unchanged**. Nothing was taken from the developer; something was added for
+  everyone else.
+
+  **No call site was edited.** `tracker-comment.js` renders the lead from the `--stage` every caller
+  already passes, so every existing site gained one the moment this merged — and **a comment for
+  which no lead can be produced does not post**: no template and no `--summary-file` is exit 2, with
+  nothing sent. That is the whole design. A call site cannot forget a lead it never supplies, and a
+  new stage cannot ship without one. This repository supplied the counter-example itself: a comment
+  convention that was documented, not enforced, and that seven sites still bypassed months later.
+
+  Two rules carry the weight. **A verdict token is mapped, never passed through** — `CONCERNS` tells
+  an outside reader nothing about whether to worry, and an unknown verdict renders "the results are
+  recorded below" rather than defaulting to reassurance, which is the one direction this must not
+  fail in. And **every template must read correctly with no slots filled**, because the slot-free
+  rendering is what shipped first and is therefore the most visible and least exercised.
+
+  Engine: `shared/resources/stakeholder-summary.js` (pure — a frozen per-stage catalogue and
+  `renderLead(stage, slots)`; no I/O, no `process.exit`), specified in
+  `shared/resources/stakeholder-summary.md`. The catalogue is keyed by `COMMENT_STAGES`, which its
+  test **imports from the engine rather than restating**, so adding a stage without a lead turns that
+  test red before the stage can be used anywhere.
+
+  The blocking defect found in review is worth recording: slot values arrive from the CLI as strings
+  and were consumed by truthiness, so `--slot blocking=false` rendered *"Some things need answering
+  before work can start"* — the exact opposite of the caller's intent, in the one paragraph aimed at a
+  reader who cannot check the body underneath it. **A missing lead is a gap; a confidently wrong one
+  is misinformation.**
+
+  **Known limitation**: the `---` separator renders on GitHub and is dropped on Jira, whose ADF
+  converter emits no rule node. Accepted and documented rather than fixed — teaching the converter
+  would change every Jira description this repo renders. (task 104)
+
 - **The task-registry row now has an owner: `/finalise` ticks it, and CI fails when it drifts.**
   `docs/tasks/task-registry.md` carries a Status column per task and *nothing wrote it after
   creation*. `create-task` appended the row, `develop-next` only read it as a selection fallback, and
@@ -49,6 +145,44 @@ All notable changes to this project will be documented in this file. Format foll
   registry was measured too and is clean; neither gained a check, because the epic documents carry
   `status: "✅ Accepted"` against a lifecycle spec that says `lowercase-kebab-case`, and settling
   that is its own change.
+
+- **The card preflight now runs where the defect is created, not one step after it.** `--check-card`
+  is offline — no auth, no network, no writes — and it reports whether a document will publish a
+  complete tracker card or a thin one. All three `review-*` skills ran it. None of the three
+  `create-*` skills did, so the check sat one step *after* the moment the defect it catches is
+  introduced.
+
+  The cost was measured, not hypothetical: `task.99` was authored without a `## Success Criteria`
+  block, and the first thing to notice was a zero-tolerance corpus assertion on PR #355 — a full
+  push–CI round trip for something an offline call catches in under a second. Second known occurrence
+  of the class. The failure is **silent by construction**: a heading the spec does not recognise
+  raises no error, the sync succeeds, reports success, and publishes a thin card. There was nothing
+  for an author to notice.
+
+  `create-task`, `create-story` and `create-epic` now each run the preflight on the document they
+  just wrote, via the new tracker-neutral `shared/resources/card-preflight.js`, specified in
+  `shared/resources/authoring-card-preflight.md`. **Advisory at authoring, blocking at review** — the
+  CLI exits 0 even with findings, because a gate at authoring pushes an author toward writing filler,
+  and filler is worse than a thin card since it looks deliberate. The advise-then-gate split in
+  `review-*` is unchanged.
+
+  **The section specs now live in exactly one place**, as `CARD_SECTIONS_BY_KIND` in
+  `shared/resources/jira-sync.js` beside the `checkCardSections` that consumes them; all four
+  `sync-jira-*` scripts re-export from there. There turned out to be **four** specs, not the three the
+  task assumed, and "exactly one place" was unsatisfiable until the fourth moved too. A test asserts
+  the one-definition property with a non-vacuity floor, and a second asserts every generated
+  `references/` copy still matches its source — one *authored* definition is only one *effective*
+  definition while the copies match.
+
+  Two findings from the run generalise. The new CLI hand-rolled a frontmatter parse the library
+  already exported, and the two diverged — latent across all 177 documents in the repo, which is how a
+  parse divergence stays invisible. And the *fix* for that leaked the whole document body into the
+  `--json` payload (17.3 KB of 18.3 KB), a regression introduced by a fix and invisible to a gate that
+  had already passed. That is the case for a lens that runs *after* the gate.
+
+  **Known gap, filed rather than forgotten**: bug reports have no card preflight at any layer — not at
+  authoring, not in `review-bug`, not in the CI corpus. The spec move already lands the bug spec in
+  the shared definition, so the follow-up is a call site and a test, not another move. (task 102)
 
 - **The develop loop's fast gate now refuses to start when its command names a script the project
   does not define.** `develop.fastGateCommand` fell back to `npm run ci:fast`, which a consumer need
@@ -984,6 +1118,39 @@ All notable changes to this project will be documented in this file. Format foll
   (which need a tracked work item and write a gate file). `/double-check` audits a *deliverable*
   against its *contract* — prose, a plan, a calculation, or a config as readily as code — and
   needs neither.
+
+- **Inline pull-request comments, on GitHub and Bitbucket** (`shared/resources/pr-inline-comment.js`,
+  specified in `shared/resources/pr-inline-comment-contract.md`). `/review-code --comment` had
+  documented "post each finding as an inline review comment at its `file_line`" since it was written,
+  and no code implemented it — there was no `pulls/*/comments` or `pulls/*/reviews` call anywhere in
+  the repository. `/review-pr` scoped the behaviour out and named it as its own task.
+
+  The CLI is the peer of `tracker-comment.js` one axis over: that one comments on a tracker **issue**
+  and resolves `$TRACKER`; this one comments on a pull **request** and resolves `$VCS`. **That is the
+  `VCS` axis deliberately** — where a PR lives is a property of the remote, and a Bitbucket repo
+  tracking work in Jira must not take a `gh` path that cannot address it. Same exit codes, same
+  `--json` `reason` vocabulary, `--findings-file` only.
+
+  **A finding is never dropped — that is the one invariant.** Line anchoring fails routinely (a line
+  outside the diff hunk is a 422), so six paths degrade rather than drop: 422, duplicate marker,
+  unreadable comment list, stale anchor, update failure, non-anchor batch failure. Each reports
+  `anchor-failed`, never `posted`, because reporting a degraded finding as posted makes the failure
+  invisible — which from the reader's side is the same outcome as dropping it. Read the per-finding
+  `reason`s, not just the top-level one. Re-runs are marker + update-in-place; resolving and replying
+  to threads is out of scope, and the rule was chosen so it needs neither.
+
+  QA cycle 1 gated **FAIL (50/100)**: the module whose sole purpose is *"a finding is never dropped"*
+  dropped findings on two reachable paths, and the `jq` wiring it into both review skills could not
+  execute at all — while its own suite was 40/40 green. **Three of the four worst defects came from
+  the independent reviewer, not the self-check.** Cycle 2 ran as a refute pass over the whole diff and
+  found eight more, two of them in the original commit and invisible to cycle 1. The durable outcome
+  is a guard rather than two corrections: both skill test suites now **extract the documented `jq`
+  from `SKILL.md` and execute it** against a schema-shaped fixture, because a snippet that is only
+  read will drift again.
+
+  **Known limitation**: the Bitbucket arm has never run against Bitbucket. Payloads and re-run
+  behaviour are fixture-tested; the transport is not. Treat a first Bitbucket run as a smoke test.
+  (task 70)
 
 ### Fixed
 
