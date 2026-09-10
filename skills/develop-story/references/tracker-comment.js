@@ -64,6 +64,7 @@ const path = require("path");
 const { execFileSync, execSync } = require("child_process");
 
 const dm = require("./defer-mutation.js");
+const { renderLead, LEAD_STAGES } = require("./stakeholder-summary.js");
 
 const GIT_EXEC_OPTS = {
   encoding: "utf-8",
@@ -123,6 +124,10 @@ Usage:
 Options:
   --issue, -i     Issue key (PROJ-1) or number (42). Required.
   --body-file, -f Path to a file holding the comment body (markdown). Required.
+  --slot k=v      Fill a slot in the stage's plain-language lead. Repeatable.
+  --summary-file, -S
+                  Path to a hand-written plain-language lead, overriding the
+                  stage's template. Required when --stage has no template.
                   A file, never an inline string: bodies contain backticks,
                   $(…) and newlines, and an interpolated body is a shell
                   injection waiting for the first comment that contains one.
@@ -270,6 +275,8 @@ function parseArgs(argv) {
     bodyFile: "",
     stage: "",
     tracker: "",
+    summaryFile: "",
+    slots: {},
     json: false,
     quiet: false,
     dryRun: false,
@@ -293,6 +300,23 @@ function parseArgs(argv) {
       case "--tracker":
         opts.tracker = value(++i, "--tracker");
         break;
+      case "--summary-file":
+      case "-S":
+        opts.summaryFile = value(++i, "--summary-file");
+        break;
+      case "--slot": {
+        // k=v rather than a JSON blob: a slot value is a short human string,
+        // and a JSON argument would reintroduce the quoting problem
+        // --body-file exists to avoid. Repeatable — the first such flag here,
+        // so it assigns into an object rather than last-winning.
+        const kv = value(++i, "--slot");
+        const eq = kv.indexOf("=");
+        if (eq < 1) {
+          throw new Error(`--slot expects k=v, got "${kv}"`);
+        }
+        opts.slots[kv.slice(0, eq)] = kv.slice(eq + 1);
+        break;
+      }
       case "--json":
         opts.json = true;
         break;
@@ -443,8 +467,14 @@ async function run({
     return { exitCode: 0 };
   }
 
+  // Declared before `emit`, which closes over it. Stays null until the lead is
+  // resolved below, so an exit that emits before the guard reports "no lead
+  // resolved" rather than throwing on the temporal dead zone.
+  let leadKind = null;
+
   const emit = (payload, exitCode) => {
-    if (args.json) output.emit({ ...payload, stage: args.stage, exitCode });
+    if (args.json)
+      output.emit({ ...payload, stage: args.stage, lead: leadKind, exitCode });
     return { exitCode, ...payload };
   };
 
@@ -505,6 +535,58 @@ async function run({
         `(cycle-scoped stages may take a numeric suffix, e.g. qa-cycle-2)`,
     );
     return { exitCode: 2 };
+  }
+
+  // ── THE PLAIN-LANGUAGE LEAD ───────────────────────────────────────────────
+  // Standard and catalogue: stakeholder-summary.md. The engine renders the lead
+  // from the --stage the caller already passes, so a call site cannot forget one
+  // and a new stage cannot ship without one.
+  //
+  // The lead is merged into `body` HERE, above the access gate, and deliberately
+  // so. The deferred-mutation record below snapshots `body` into command.stdin
+  // and replays it through `gh issue comment --body-file -`, bypassing this file
+  // entirely — so a lead composed further downstream would be missing from every
+  // deferred comment, which is precisely the population that gets posted by hand
+  // and read by someone outside the pipeline. It also means the record's
+  // fingerprint changes, which the task documents as expected rather than a bug.
+  let leadSource = null;
+  if (args.summaryFile) {
+    try {
+      leadSource = fs
+        .readFileSync(args.summaryFile, "utf-8")
+        .replace(/\r\n/g, "\n")
+        .trim();
+    } catch (e) {
+      output.err(
+        `Error: cannot read --summary-file "${args.summaryFile}": ${e.message}`,
+      );
+      return { exitCode: 2 };
+    }
+  } else {
+    leadSource = renderLead(args.stage, args.slots || {});
+  }
+
+  if (leadSource === null) {
+    // Name BOTH routes. The reader who hits this is almost always someone who
+    // omitted --stage deliberately for a repeat-every-run comment; a message
+    // that says only "missing summary" sends them looking for a flag they have
+    // never seen.
+    output.err(
+      `Error: no plain-language summary for --stage "${args.stage || "(omitted)"}". ` +
+        `Either pass a --stage that has one (${LEAD_STAGES.join(", ")}) ` +
+        `or pass --summary-file with a hand-written one. ` +
+        `See shared/resources/stakeholder-summary.md.`,
+    );
+    return { exitCode: 2 };
+  }
+
+  leadKind = args.summaryFile ? "summary-file" : "template";
+  // An empty --summary-file must not emit a bare horizontal rule with nothing
+  // above it. This branch is reachable even though the guard rejects `null`:
+  // null means "no lead could be produced", "" means "a lead was supplied and
+  // is empty", and only the first is an error.
+  if (leadSource) {
+    body = `${leadSource}\n\n---\n\n${body}`;
   }
 
   const skipCode = args.strict ? 1 : 0;
