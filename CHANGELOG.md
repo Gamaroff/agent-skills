@@ -6,6 +6,35 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`mutation-proving.md` now covers the false RED, not only the false GREEN.** The document's
+  procedure and its *"When the proof does not go red"* table were both organised around a green run
+  that should have been red — the case that announces itself. Nothing addressed the mirror: a suite
+  that goes red for a reason other than the behaviour you broke reads exactly like a dead mutant,
+  and is *more* persuasive, because red was the prediction. Five invalid probe readings across two
+  independent runs and two repositories drove this; three of them were false REDs.
+
+  The new `## When the proof goes red for the WRONG reason` states the asymmetry plainly — a false
+  GREEN leaves a survivor, which is a finding, while a false RED writes `dead` into a row nothing
+  executed, certifying coverage that was never exercised — and gives a four-row table keyed on why
+  a suite went red: *a real kill*, *environmental refusal*, *invocation error*, *wrong thing
+  mutated*. Rows two and three each recorded four dead mutants having run **zero** tests; in one,
+  the reading was convincing precisely because the repository's own node-major guard was working as
+  designed and refusing the run.
+
+  Probe validation is **three mechanical checks plus one judgement**, and the split is the point.
+  The three — baseline GREEN with the *exact* command the matrix will use, one known-bad mutation
+  red and killed by its **named** case, and the existing applied-check `diff` — cost about twenty
+  seconds and are stated as cheap on purpose. The fourth is that the mutation must change the
+  *value* under test rather than merely produce a diff, and it carries no command and no time claim
+  because nothing external can perform it: a mutation that mangled a shell variable
+  (`STATU S="ready"`) landed a real diff, turned the suite red as predicted, satisfied every
+  mechanical signal, and proved nothing. **A matrix collected before these four checks proves
+  nothing in either direction.**
+
+  Ships into `develop`, `double-check`, `finalise`, `qa-story`, `qa-task` and `review-security`.
+  Purely additive — the false-GREEN material, the six shapes and `## Do not claim it unless you did
+  it` are unchanged. (task 100)
+
 - **The snippet-execution gate now sees commands written in markdown table cells, not only fenced
   ` ```bash ` blocks.** The places table-cell commands appear are disproportionately *verification*
   commands, where a false pass is the worst available failure — and task 77 shipped one: a predicate

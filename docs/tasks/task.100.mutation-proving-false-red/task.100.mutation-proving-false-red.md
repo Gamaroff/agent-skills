@@ -5,18 +5,23 @@ type: task
 description: "The mutation-proving reference tells you to confirm a mutation applied before believing a survival — and that check works. It says nothing about the mirror: a suite that goes red because the runner never executed it, or executed the wrong change, reads exactly like a dead mutant, and is more convincing because red was the prediction. Five invalid probe readings across two independent runs, three of them false REDs that would have certified coverage never exercised — and one of those defeats the existing applied-check too."
 tags: [mutation-proving, testing, evidence, shared-resources]
 category: documentation
-status: draft
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-08
-updated: 2026-09-09
+updated: 2026-09-10
+completed_date: 2026-09-10
+pr_number: 369
 assignee:
 estimated_effort_hours: 2
+github_issue: 368
 ---
 
 # Technical Task: the false-RED mirror in mutation-proving
 
-**Status:** Draft
+**Status:** Accepted
+**GitHub Issue**: [#368](https://github.com/Gamaroff/agent-skills/issues/368)
+**Review**: ✅ All review recommendations from `task.100.review.1.mutation-proving-false-red.md` implemented 2026-09-10
 
 ---
 
@@ -70,7 +75,34 @@ The operator who found it put it in one line worth quoting in the finished secti
 
 > *"a red test isn't self-validating."*
 
-## 3. Scope
+## 3. Technical Background
+
+**Current state.** `shared/resources/mutation-proving.md` is 220 lines across seven H2 sections. Two
+of them carry the whole verdict apparatus:
+
+- *"The procedure"* — five numbered steps. Step 2 is the **applied-check**: `cp` the source, make the
+  edit, `diff`, and refuse to believe a green run when the diff is empty.
+- *"When the proof does not go red"* — a three-row table keyed on why a mutant **survived**
+  (vacuous test, redundant source, wrong premise), feeding into
+  *"The six shapes vacuity takes"*.
+
+Both are organised around a **green** run that should have been red. The document has no section,
+table or check keyed on a **red** run, so every red reading is treated as self-evidently a kill.
+
+**Target state.** One additional H2 immediately after *"When the proof does not go red"*, mirroring
+its shape: a four-row table keyed on why a suite went red, plus a probe-validation procedure of three
+mechanical checks and one judgement. Nothing above it changes — the false-GREEN material, the six
+shapes and `## Do not claim it unless you did it` are untouched, and the new section reuses their
+vocabulary rather than introducing its own.
+
+**Distribution.** The file is a shared resource, bundled verbatim into six skills
+(`develop`, `double-check`, `finalise`, `qa-story`, `qa-task`, `review-security`) as
+`references/mutation-proving.md`. The source is the only editable copy; `npm run bundle` regenerates
+the rest, and editing a bundled copy is silently reverted on the next bundle.
+
+---
+
+## 4. Scope
 
 **In scope**
 
@@ -87,27 +119,42 @@ The operator who found it put it in one line worth quoting in the finished secti
   section — all unchanged.
 - Any tooling. This is a reference document; the fix is a rule, not a script.
 
-## 4. Breaking Changes
+## 5. Breaking Changes
 
 None — additive prose.
 
-## 5. Implementation Plan
+## 6. Implementation Plan
 
-- [ ] **Phase 1** — add the section and its table (mirror of the existing one).
-- [ ] **Phase 2** — add the three MECHANICAL checks: baseline GREEN with the *exact* command
+- [x] **Phase 1** — add the section and its table (mirror of the existing one).
+- [x] **Phase 2** — add the three MECHANICAL checks: baseline GREEN with the *exact* command
       the matrix will use; one known-bad mutation RED **killed by its named case**; the mutation
       asserted applied.
-- [ ] **Phase 2b** — add the row-5 check: the mutation must change the VALUE under test, not merely
+- [x] **Phase 2b** — add the row-5 check: the mutation must change the VALUE under test, not merely
       produce a diff. Include the shell-variable example, since a mangled substitution is the
       everyday way this happens and it satisfies every other check.
-- [ ] **Phase 3** — `npm run bundle`, commit the regenerated `references/`.
+- [x] **Phase 3** — `npm run bundle`, commit the regenerated `references/`.
 
-## 6. Files Summary
+## 7. Files Summary
 
-- `shared/resources/mutation-proving.md`
-- `skills/*/references/mutation-proving.md` — regenerated
+**Modified**
 
-## 7. Testing Strategy
+- `shared/resources/mutation-proving.md` — **+109 lines, −1** (final, after two QA fix cycles).
+  New H2 `## When the proof goes red for the WRONG reason` inserted between `## When the proof
+  does not go red` and `## When to do it`; frontmatter `description` extended by one clause naming
+  the false-RED half (the description is the auto-activation signal, and a reader matching on it
+  would otherwise not know the new material exists). **220 → 328 lines**, 7 → 8 H2 sections.
+- `CHANGELOG.md` — +29 lines. Entry under Unreleased → Added: the change alters guidance that
+  ships into six skills, which is consumer-visible rather than an internal refactor.
+- `skills/develop/references/mutation-proving.md` — regenerated by `npm run bundle`
+- `skills/double-check/references/mutation-proving.md` — regenerated
+- `skills/finalise/references/mutation-proving.md` — regenerated
+- `skills/qa-story/references/mutation-proving.md` — regenerated
+- `skills/qa-task/references/mutation-proving.md` — regenerated
+- `skills/review-security/references/mutation-proving.md` — regenerated
+
+**Added / deleted**: none.
+
+## 8. Testing Strategy
 
 Prose, so the test is a **review against the five recorded readings**: each must be identifiable from
 the finished section — three as the new class, two as already-covered — and a reader who follows the
@@ -121,27 +168,99 @@ The section's own claim to check: that the three **mechanical** checks cost ~20 
 materially more, the rule will be skipped and is worth restating cheaper. The fourth is a judgement
 and carries no time claim — do not give it one.
 
-## 8. Success Criteria
+## 9. Success Criteria
 
-1. [ ] A reader can classify a red run as *a real kill* / *environmental refusal* / *invocation
+1. [x] A reader can classify a red run as *a real kill* / *environmental refusal* / *invocation
        error* / *wrong thing mutated* from the table alone.
-2. [ ] The probe-validation procedure states all four checks, and states that a matrix collected
+2. [x] The probe-validation procedure states all four checks, and states that a matrix collected
        before them proves nothing **in either direction**.
-3. [ ] The document says plainly that a **false RED is worse than a false GREEN**, and why: it
+3. [x] The document says plainly that a **false RED is worse than a false GREEN**, and why: it
        certifies coverage that was never exercised.
-4. [ ] Row 5 is covered explicitly, **and the document states that it passes the applied-check** —
+4. [x] Row 5 is covered explicitly, **and the document states that it passes the applied-check** —
        a reader must not come away thinking step 2's `diff` closes it.
-5. [ ] The existing false-GREEN material is unchanged.
+5. [x] The existing false-GREEN material is unchanged.
 
-## 9. Risk Assessment
+## 10. Risk Assessment
 
 **Low.** The failure mode of the change itself is that the section is ignored. The mitigation is
 placement — directly beside the question it mirrors, so a reader asking "why did my mutant survive?"
 meets "and why did it die?" in the same breath.
 
-## 10. Rollback Plan
+## 11. Rollback Plan
 
 Delete the section; `npm run bundle`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final gate**: `task.100.gate.3.mutation-proving-false-red.yml` — ✅ **PASS**, 95/100, `top_issues: []`
+**QA cycles**: 3 (CONCERNS 80 → CONCERNS 85 → PASS 95)
+**PR review (Step 5c)**: `task.100.pr-review.1.mutation-proving-false-red.md` — CONCERNS; its one medium finding applied before acceptance
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 5 of 5 met, including SC4 — the row-5 case is covered explicitly *and* the document states that it passes the applied-check, which is the falsification test this task set for itself
+✅ **CI:** 5/5 checks green on the final head `eac101f1` (`test`, `validate`, `link-check`, `shellcheck`, branch-policy). The first sample read PENDING; acceptance was held until it resolved
+✅ **Local gates:** `npm run ci:fast` exit 0 — 3023 tests, 3022 pass, 0 fail, 1 pre-existing skip; `npm run eval:all` exit 0; `prettier --check` clean
+✅ **Documentation:** CHANGELOG entry under Unreleased → Added; §7 Files Summary refreshed against `git diff --numstat`; all six bundled copies regenerated and verified as clean regenerations
+✅ **Security Review:** NOT_APPLICABLE, recorded with evidence basis `reasoned` (0 probes) — the change ships no code, no credentials and no newly executable command
+✅ **Compliance Review:** NOT_APPLICABLE — no user-data, auth or payment surface
+✅ **Additive:** 109 insertions, 1 deletion on the source; the sole deletion is the frontmatter `description`, extended not truncated. The false-GREEN material is byte-identical across all three QA cycles
+
+**Detailed Verification Log:** See [`task.100.dod.1.mutation-proving-false-red.md`](./task.100.dod.1.mutation-proving-false-red.md) for complete verification evidence.
+
+**Task marked as ACCEPTED on:** 2026-09-10
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-10
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+**QA Cycles**: 3
+
+### QA Reports
+
+- **Cycle 3 (latest)**: [task.100.qa.3.mutation-proving-false-red.md](./task.100.qa.3.mutation-proving-false-red.md) · gate [task.100.gate.3.mutation-proving-false-red.yml](./task.100.gate.3.mutation-proving-false-red.yml) — **PASS, 0 open issues**
+- **Cycle 2**: [task.100.qa.2.mutation-proving-false-red.md](./task.100.qa.2.mutation-proving-false-red.md) · gate [task.100.gate.2.mutation-proving-false-red.yml](./task.100.gate.2.mutation-proving-false-red.yml)
+- **Cycle 1**: [task.100.qa.1.mutation-proving-false-red.md](./task.100.qa.1.mutation-proving-false-red.md) · gate [task.100.gate.1.mutation-proving-false-red.yml](./task.100.gate.1.mutation-proving-false-red.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3023 (3022 pass, 0 fail, 1 pre-existing skip) + full `eval:all` tier, exit 0
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Bug Resolution Summary (QA cycle 1 → fixes applied 2026-09-10)
+
+| ID | Severity | Resolution |
+| :-- | :--- | :--- |
+| `TASK-100-001` | MEDIUM | **Fixed.** The unmeasured "about twenty seconds" is replaced by a cost stated in **matrix-command runs** — "two more runs of the matrix command, plus a diff" — with the measured spread named (0.3 s scoped, 54 s whole-suite) as the reason a constant could not have been right. The cheapness argument is now the **ratio**: an N-mutation matrix already pays N runs, so validating the probe adds `2/N` (40% at five mutations, 10% at twenty). Check 4 still carries no time claim, per §8. |
+| LOW-1 | LOW | **Fixed.** Both bare `Step 2` references qualified — L181 now reads "step 2 of the procedure", and the second was rewritten to "That `diff`", removing the referent question entirely. All three mentions in the file now name the procedure explicitly. |
+| LOW-2 | LOW | **No action, by design.** `description` is 95 words against ~100 guidance — inside the limit. Recorded so the next editor knows the headroom is small. |
+
+### Bug Resolution Summary (QA cycle 2 → fixes applied 2026-09-10)
+
+Cycle 2 was a **refute pass** over the whole diff, not a re-read of the fix. All three findings are in text that cycle 1 introduced — which is the pattern the refute directive exists to catch.
+
+| ID | Severity | Resolution |
+| :-- | :--- | :--- |
+| `TASK-100-002` | MEDIUM | **Fixed.** Cycle 1 replaced an unmeasured constant with an unchecked ratio: it claimed an N-mutation matrix pays N runs, so validation adds `2/N` (40% at five, 10% at twenty). But `## The procedure` runs the suite **twice per invariant** — step 3 mutated, step 5 restore-and-confirm-green — so the matrix pays ~2N and the real overhead is ~`1/N`; every percentage was exactly 2× too high. The percentages are now gone rather than corrected: the text states the comparison directly ("the procedure already runs the suite twice per invariant … adding two more is roughly one extra mutation's worth, at any N"), which is true however the reader counts and needs no arithmetic. |
+| `TASK-100-003` | LOW | **Fixed.** The cycle-1 wording "That `diff`" could be read as the mangled edit's diff rather than step 2's applied-check, since the same paragraph says "There is a real diff" three sentences earlier. Now names the mechanism: "The applied-check closes the …". |
+| `TASK-100-004` | LOW | **Fixed.** The same rewrite had left a 96-column line in a file wrapped at ~83; `prettier` does not reflow prose so no gate caught it. Re-wrapped in the same edit. |
+
+### Key Findings
+
+All five success criteria met, including SC4 — the row-5 anti-vacuity check this task named as its own falsification test. One medium finding (`TASK-100-001`): the section states *"The three cost about twenty seconds"*, which is an unmeasured constant. The three mechanical checks are two runs of the matrix command plus a diff, so the cost scales with that command — measured at 53,966 ms per whole-suite run (claim ~5× too fast) and 294 ms per scoped run (claim ~33× too slow). §8 of this task nominated that exact claim for checking, and the document ends with `## Do not claim it unless you did it`.
+
+---
 
 ## Change Log
 
@@ -149,10 +268,28 @@ Delete the section; `npm run bundle`.
 | :--- | :--- | :--- | :--- |
 | 2026-09-08 | 0.1 | Filed from four invalid probe readings measured in one consumer run — two false REDs the reference does not cover, one of which was the repository's own guard correctly refusing to run. | Claude |
 | 2026-09-09 | 0.2 | Added a **fifth** reading, found independently during agent-skills task.95 — a mutation that mangled a shell variable rather than changing its value. It is the hardest of the five: the edit lands, so the applied-check passes, and the suite goes red as predicted, yet the proof is void. Promotes the evidence base from one run to **two independent runs** and makes row 5 the anti-vacuity test for this task's own deliverable. | Claude |
+| 2026-09-10 | 0.3 | Review passed (9/10) — READY TO IMPLEMENT. Added the missing `## 3. Technical Background` section and renumbered §4–§11 to restore the 11-section template contract; linked GitHub issue #368. | review-task |
+| 2026-09-10 |  | Status → ready-for-development | review-task |
+| 2026-09-10 |  | Implemented — 7 files (1 source + 6 regenerated), 0 new tests (prose-only change; verified by review against the five recorded readings) | develop |
+| 2026-09-10 |  | QA gate CONCERNS (80/100) — 1 medium, 2 low; the section's ~20s cost claim does not hold | qa-task |
+| 2026-09-10 |  | QA cycle 2 (refute pass) CONCERNS (85/100) — cycle 1's finding closed; 3 new findings, all in text cycle 1 introduced | qa-task |
+| 2026-09-10 |  | QA findings fixed — 2 iterations; cost claim restated without arithmetic, referent named, line re-wrapped | qa-fix |
+| 2026-09-10 |  | QA cycle 3 PASS (95/100) — all 3 cycle-2 findings closed, no new findings | qa-task |
+| 2026-09-10 |  | PR review (Step 5c) CONCERNS — §7 Files Summary refreshed against the final diff (PC-1) | review-pr |
+| 2026-09-10 | 0.4 | DoD verified 7/7 — accepted (PR #369); CI green on final head | finalise |
 
 ## Progress Tracking
 
-Not started.
+All four phases complete (2026-09-10).
+
+| Phase | Outcome |
+| :--- | :--- |
+| 1 — section + table | `## When the proof goes red for the WRONG reason` added between `## When the proof does not go red` and `## When to do it`. Four-row table keyed on why a suite went **red**, mirroring the existing three-row green table's `cause / signal / response` shape. Signals are the four criterion-1 labels verbatim: *a real kill*, *environmental refusal*, *invocation error*, *wrong thing mutated*. |
+| 2 — three mechanical checks | Numbered 1–3 under **Validate the probe before you trust the matrix**, with a copyable bash block. Baseline GREEN insists on the *exact* command string (this is what catches rows 1 and 2 — a refusing guard and a bad flag both fail here, before any mutation exists to blame). Check 2 requires the **named** case to be the one that fails. Check 3 is the existing step-2 `diff`. The ~20s cost claim is stated, with the reason it must stay cheap. |
+| 2b — the row-5 judgement | Numbered 4, and labelled a judgement rather than a command, with no time claim. Carries the mangled-shell-variable diff (`STATU S="ready"`) and states explicitly that **it passes the applied-check** — a real diff, an expected red, every mechanical signal agreeing, and the proof still void. Closes with the discriminator: *no diff + unexpected green* is the false-GREEN case; *a diff + an expected red + the wrong thing changed* is this one. |
+| 3 — bundle | `npm run bundle` run; all six `skills/*/references/mutation-proving.md` copies regenerated and verified to carry the new heading. No `references/` copy was hand-edited. |
+
+**Anti-vacuity check (§8).** Each of the five recorded readings is identifiable from the finished section: row 1 (node-major guard refused the run) and row 2 (`--reporter=basic` threw on load) are the *environmental refusal* and *invocation error* rows, both named in the paragraph beneath the table with the "zero tests executed" consequence; row 5 is the *wrong thing mutated* row and the whole fourth check. Rows 3 and 4 remain covered where they already were — the six shapes and step 2 — and the section says so rather than re-litigating them. A reader who runs the four checks cannot record any of the five as evidence.
 
 ## References
 
