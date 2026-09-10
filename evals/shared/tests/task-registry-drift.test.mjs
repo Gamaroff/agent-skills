@@ -216,12 +216,22 @@ test("every task document has a registry row", () => {
 
   const orphans = [];
   const noPrimary = [];
+  const unparseable = [];
   let examined = 0;
 
   for (const entry of readdirSync(tasksAbs, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const m = entry.name.match(/^task\.(\d+)\./);
-    if (!m) continue; // not a task directory
+    if (!m) {
+      // COLLECTED, never silently skipped. A `continue` here is how the defect
+      // this whole test exists for happened one level up: the row walk dropped
+      // what it did not iterate, and nothing said so. A directory under
+      // `docs/tasks/` that does not name a task number is either a naming-standard
+      // violation or a task this check cannot see — both worth failing on, and
+      // neither worth discovering later.
+      unparseable.push(`  ${TASKS_DIR}/${entry.name}`);
+      continue;
+    }
     examined++;
 
     const primary = path.join(tasksAbs, entry.name, `${entry.name}.md`);
@@ -245,6 +255,15 @@ test("every task document has a registry row", () => {
     `examined only ${examined} task directories under ${TASKS_DIR}, expected at least ` +
       `${MIN_DOCS}. The directory walk matched almost nothing, so the absence check below ` +
       `proves nothing. Do NOT lower MIN_DOCS to make this pass.`,
+  );
+
+  assert.deepEqual(
+    unparseable,
+    [],
+    `${unparseable.length} director(ies) under ${TASKS_DIR} do not name a task number:\n` +
+      `${unparseable.join("\n")}\n` +
+      `Expected \`task.{N}.{name}\` per docs/standards/file-naming.md. A directory this walk ` +
+      `cannot parse is a task it cannot check — the same blindness, one level down.`,
   );
 
   assert.deepEqual(

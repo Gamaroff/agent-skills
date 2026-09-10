@@ -238,14 +238,22 @@ async function main() {
   // more than one cell carries that value the column is genuinely ambiguous —
   // refuse rather than guess, because guessing here corrupts the registry, and a
   // wrong row is worse than a stale one.
-  // Preserve the file's own line endings. `split(/\r?\n/).join("\n")` silently
-  // rewrites a CRLF registry as LF — every line changes, which is the same
-  // whole-file diff the width preservation below exists to avoid, in the other
-  // dimension. Found by probing the rewrite path rather than by reading it.
-  const eol = registryText.includes("\r\n") ? "\r\n" : "\n";
-  const lines = registryText.split(/\r?\n/);
-  const idx = row.line - 1;
-  const original = lines[idx];
+  // Split KEEPING the separators, so every byte this call does not deliberately
+  // change survives untouched.
+  //
+  // The obvious form — `split(/\r?\n/)` then `join("\n")` — silently rewrites a
+  // CRLF registry as LF: every line changes, turning a one-cell tick into a
+  // whole-file diff, and invisible in a rendered diff view. Guessing the file's
+  // ending instead (`includes("\r\n") ? … : …`) fixes the common case and gets a
+  // MIXED-ending file exactly backwards, converting its LF lines to CRLF.
+  //
+  // Keeping the separators removes the question rather than answering it: only
+  // one line is ever rewritten, so nothing else can be reflowed by accident.
+  // `parts[i * 2]` is line `i`; `parts[i * 2 + 1]` is the separator that followed
+  // it.
+  const parts = registryText.split(/(\r?\n)/);
+  const idx = (row.line - 1) * 2;
+  const original = parts[idx];
   const cells = original.split("|");
   const hits = [];
   for (let i = 0; i < cells.length; i++) {
@@ -282,10 +290,10 @@ async function main() {
   const core = `${lead}accepted`;
   const pad = trailLen === 0 ? 0 : Math.max(1, cell.length - core.length);
   cells[hits[0]] = core + " ".repeat(pad);
-  lines[idx] = cells.join("|");
+  parts[idx] = cells.join("|");
 
   if (!opts.dryRun) {
-    fs.writeFileSync(registryRel, lines.join(eol), "utf8");
+    fs.writeFileSync(registryRel, parts.join(""), "utf8");
   }
 
   return emit(opts, {

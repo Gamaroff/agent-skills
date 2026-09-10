@@ -36,6 +36,15 @@ whenever a task document reads `accepted` and its row does not — or the revers
 is finished that the document says is not. So a write that does not happen, or happens wrong, is
 loud rather than silent. If it fires, tick the row by hand; do not disable the check.
 
+> **A consequence for `/develop-batch`, stated because it is not obvious.** The batch orchestrator
+> selects a **write-disjoint** frontier — no two items in a batch touch the same paths — from
+> `touches:` annotations on the items themselves. It cannot see the *pipeline's* own writes, and
+> every task in a batch now writes this file at Step 7. In practice most batches still merge
+> cleanly, because each task edits its own row and git merges edits to distant lines without help;
+> the case that does conflict is **adjacent row numbers in one batch**, which a frontier of
+> consecutive tasks makes likely. The resolution is always "keep both rows". This is a known cost of
+> giving the tick an owner, not a defect in the disjointness check.
+
 Engine: [`shared/resources/registry-tick.js`](../../shared/resources/registry-tick.js), called from
 [`finalise`](../../skills/finalise/SKILL.md). A **story** run calls the same CLI and it returns
 `not-a-task` without touching any registry — the guard lives in the writer, not in a condition the

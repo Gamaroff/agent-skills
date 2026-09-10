@@ -217,30 +217,38 @@ the repository is still strictly better off than before this task, because the o
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-10
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100
+**Gate Decision**: PASS (cycle 2)
+**QA Cycles**: 2
 
-### QA Report
+### QA Reports
 
-- **Full Report**: [task.103.qa.1.pipeline-owns-the-registry-tick.md](./task.103.qa.1.pipeline-owns-the-registry-tick.md)
-- **Gate File**: [task.103.gate.1.pipeline-owns-the-registry-tick.yml](./task.103.gate.1.pipeline-owns-the-registry-tick.yml)
+| Cycle | Gate | Score | Report | Gate file |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | FAIL | 80/100 | [qa.1](./task.103.qa.1.pipeline-owns-the-registry-tick.md) | [gate.1](./task.103.gate.1.pipeline-owns-the-registry-tick.yml) |
+| 2 | **PASS** | 95/100 | [qa.2](./task.103.qa.2.pipeline-owns-the-registry-tick.md) | [gate.2](./task.103.gate.2.pipeline-owns-the-registry-tick.yml) |
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 3063 (full suite) + 8 mutations + 3 negative controls
+- **Tests Executed**: full hermetic suite + 19 tests specific to this task
 - **Phases Verified**: 5/5
-- **Critical Issues**: 1 HIGH
-- **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Open Issues**: 0
+- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-The drift check is **row-driven only** — an `accepted` task document with no registry row passes it,
-while `finalise`'s reason table, its DoD line and the standard all promise CI will fail on exactly
-that case. Proven by probe. This is the defect this task was filed about, reintroduced one level up:
-a backstop named for a case it does not back up.
+Cycle 1 found the check was **row-driven only** — blind to a task document with no registry row,
+while three shipped statements promised CI would catch exactly that. Fixing it found **task 97**:
+accepted, merged under PR #350, and absent from the registry since creation. 106 directories, 105
+rows; nothing in the repository could see it.
+
+Cycle 2's refute pass then found three issues **inside cycle 1's fixes** — including the same
+single-sided blindness reintroduced one level down, and a documented rule that nothing checked. All
+closed in-cycle. Two mutants survived during the loop and both were closed rather than explained
+away.
 
 ## Change Log
 
@@ -252,6 +260,7 @@ a backstop named for a case it does not back up.
 | 2026-09-10 |  | Implemented — 6 files, 14 tests (3 drift-check + 11 registry-tick). `finalise` chosen as the § 3 owner; check landed first and retained. Epic registry measured: 1 stale row of 4, corrected. Bug registry measured: 0 of 12. | develop |
 | 2026-09-10 |  | QA gate FAIL (80/100) — 1 high, 1 medium, 2 low. The check covers rows but not documents, contradicting three shipped claims | qa-task |
 | 2026-09-10 |  | QA findings fixed — 1 iteration. Added the document-driven direction to the drift check (found task 97, accepted and absent from the registry since creation), preserved cell width and line endings in the tick, corrected the guard comment and removed a no-op. Two further tests added after mutations survived. | qa-fix |
+| 2026-09-10 |  | QA gate PASS (95/100) — cycle 2 refute pass found 3 issues inside cycle 1's own fixes, all closed in-cycle; 0 open findings | qa-task |
 
 ## Progress Tracking
 

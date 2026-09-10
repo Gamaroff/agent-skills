@@ -401,6 +401,47 @@ test("the registry's line endings survive the rewrite", () => {
   }
 });
 
+/**
+ * A MIXED-ending file must come back exactly as it went in, apart from the one
+ * cell.
+ *
+ * This is the case an "is the file CRLF?" heuristic gets backwards: it sees one
+ * CRLF, decides the whole file is CRLF, and converts every LF line. Such a file
+ * is already pathological — but a tool that makes it *more* inconsistent while
+ * claiming to preserve line endings is worse than one that never claimed to.
+ *
+ * Keeping the separators through the split is what makes this hold without a
+ * rule: only the target line is ever rewritten.
+ */
+test("a mixed-ending registry is preserved byte-for-byte apart from the cell", () => {
+  const { dir, registry } = sandbox([row(24, "pi2", "planned")]);
+  try {
+    const lf = readFileSync(registry, "utf8");
+    // Make exactly the header line CRLF, leave the rest LF.
+    const mixed = lf.replace("# Task Registry\n", "# Task Registry\r\n");
+    writeFileSync(registry, mixed);
+
+    const f = writeDoc(dir, 24, "pi2", { status: "accepted" });
+    assert.equal(run(dir, ["--file", path.relative(dir, f)]).reason, "ticked");
+
+    const after = readFileSync(registry, "utf8");
+    assert.equal(
+      (after.match(/\r\n/g) || []).length,
+      1,
+      "the single CRLF must stay one CRLF — not spread to every line, not removed",
+    );
+    // Everything except the ticked line is byte-identical.
+    const strip = (t) =>
+      t
+        .split("\n")
+        .filter((l) => !l.startsWith("| 24 |"))
+        .join("\n");
+    assert.equal(strip(after), strip(mixed), "no other byte should change");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("an unknown flag is a usage error, not a silent no-op", () => {
   const { dir } = sandbox([row(21, "mu", "planned")]);
   try {
