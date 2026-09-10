@@ -26,21 +26,11 @@ const CL = require("../references/change-log.js");
 // ---------------------------------------------------------------------------
 const VERSION = "1.2.0";
 
-// What the CARD carries — a summary, not a copy. The epic file is the source of
-// truth and every card links to it; see shared/resources/tracker-card-summary.md.
-//
-// `Epic Description` is the LAST alias, not its own section: an epic with a goal
-// never shows it, and one that has only a description still gets a non-empty card.
-const EPIC_CARD_SECTIONS = [
-  {
-    heading: "Summary",
-    names: ["Epic Goal", "Epic Description"],
-    // Flatten any inline `**Label:**` heading (e.g. `**Existing System Context:**`)
-    // to plain `Label:`. ADF can't render mid-paragraph bold headings well, so
-    // this preserves the label as a leading text run that ADF renders cleanly.
-    transform: (t) => t.replace(/\*\*([^*\n]+):\*\*/g, "$1:"),
-  },
-];
+// The card section spec is defined ONCE, in the shared library beside the
+// checker that consumes it (task.102). It is re-exported below so existing
+// callers and their tests are unchanged, and so the `create-*` authoring
+// skills can run the same preflight without this skill being installed.
+const EPIC_CARD_SECTIONS = lib.EPIC_CARD_SECTIONS;
 
 const ISSUE_TYPE = "Epic";
 

@@ -5,18 +5,21 @@ type: task
 description: "`--check-card` is an offline preflight — no auth, no network, no writes — that reports whether a document will publish a complete tracker card or a thin one. All three review-* skills run it; none of the three create-* skills do. So a free check runs one step after the moment the defect is introduced, and a document that is filed but not yet reviewed reaches CI unchecked. Move the section specs into the shared library and call the checker at authoring time."
 tags: [authoring-skills, tracker-cards, fail-fast, shared-resources]
 category: infrastructure
-status: draft
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-09
-updated: 2026-09-09
+updated: 2026-09-10
 assignee:
 estimated_effort_hours: 3
+github_issue: 372
 ---
 
 # Technical Task: run the card preflight where the defect is created
 
-**Status:** Draft
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.102.review.1.authoring-time-card-preflight.md` implemented 2026-09-10
+**GitHub Issue**: [#372](https://github.com/Gamaroff/agent-skills/issues/372)
 
 ---
 
@@ -32,6 +35,7 @@ All three `review-*` skills run it. **None of the three `create-*` skills do.**
 | :--- | :--- |
 | `review-task` / `review-story` / `review-epic` | 1 each |
 | `create-task` / `create-story` / `create-epic` | **0 each** |
+| `review-bug` / `create-bug-report` | **0 each** — a wider gap, deferred; see § 4 |
 
 So the check that costs nothing runs one step *after* the moment the defect is introduced, and a
 document that is filed but not yet reviewed reaches CI unchecked.
@@ -65,9 +69,12 @@ nearly free, is what justifies touching three skills.
 
 Three facts constrain the shape of the fix, and all three were verified rather than assumed:
 
-1. **The checker is already available at authoring time.** `create-task` bundles
-   `references/jira-sync.js`, which exports `checkCardSections` and `buildCardSections`. No new
-   dependency and no new install surface.
+1. **The checker is already available at authoring time — in two of the three skills.**
+   `create-task` and `create-story` both bundle `references/jira-sync.js`, which exports
+   `checkCardSections` and `buildCardSections`. **`create-epic` does not**, so adding the call there
+   makes the bundler pull that module (5,538 lines) into `skills/create-epic/references/`. That is
+   automatic rather than manual work — but it *is* a new install-surface entry for one of the three,
+   and the claim "no new install surface" holds only for the other two. Verified by inspection.
 2. **The spec is not.** `TASK_CARD_SECTIONS` is eleven lines defined inside
    `skills/sync-jira-task/scripts/sync-jira-task.js`; `shared/resources/jira-sync.js` contains zero
    references to it. The checker travels; the thing it checks against does not.
@@ -83,8 +90,16 @@ holds — an authoring-time check would have caught it, and nothing ran one.
 
 **In scope**
 
-- Move `TASK_CARD_SECTIONS`, and the story and epic equivalents, into `shared/resources/jira-sync.js`
-  as the single definition; `sync-jira-*` import from there.
+- Move **all four** section specs — `TASK_CARD_SECTIONS`, `STORY_CARD_SECTIONS`,
+  `EPIC_CARD_SECTIONS` **and `BUG_CARD_SECTIONS`** — into `shared/resources/jira-sync.js` as the
+  single definition; `sync-jira-*` import from there.
+
+  > **Four, not three, and the fourth is what makes Success Criterion 4 mean anything.**
+  > `BUG_CARD_SECTIONS` is defined at `skills/sync-jira-bug/scripts/sync-jira-bug.js:53`, in exactly
+  > the same shape as the other three. Moving three of four and then asserting "the specs live in one
+  > place" would force the test to enumerate *which* three — the enumeration trap of § 7,
+  > reintroduced inside the assertion meant to prevent it. Moving the bug spec costs one more import
+  > and removes the ambiguity.
 - Call `checkCardSections` at the end of `create-task`, `create-story` and `create-epic`, on the
   document just written, printing findings inline with their fixes.
 - **Advisory at authoring, blocking at review.** That split already exists in the family and should
@@ -94,8 +109,20 @@ holds — an authoring-time check would have caught it, and nothing ran one.
 
 - The corpus CI tests in `shared/resources/tests/jira-sync-card-summary.test.mjs`. They stay as the
   backstop; this task keeps them from being the *first* line of defence.
-- `create-bug-report`. Bug reports are barred from tracker cards by the comment contract, so no
-  preflight applies.
+- **The authoring call in `create-bug-report`** — deferred, and the reason originally given here was
+  wrong. Bug reports are **not** barred from tracker cards: `sync-jira-bug` publishes them from
+  `BUG_CARD_SECTIONS` and supports `--check-card` (`sync-jira-bug.js:476`). The rule that bars bug
+  reports concerns the **Change Log** — they carry `## Status History` instead — and says nothing
+  about cards.
+
+  The real reason to defer is that the bug gap is **wider** than this task, not narrower:
+  `create-bug-report` does not run the preflight, `review-bug` does not run it either (0 references,
+  where the other three `review-*` skills have 1 each), and the corpus preflight in
+  `jira-sync-card-summary.test.mjs` covers task, story and epic only. Bug reports therefore have no
+  preflight at **any** of the three layers, and closing that needs a `review-bug` change plus a
+  corpus test whose fallout across existing bug documents is unmeasured. File it as a follow-up — the
+  spec move above still lands the bug spec in the shared definition, so the follow-up is a call site
+  and a test, not another move.
 - Changing which sections are required. Any change to the spec's content is a separate decision.
 
 ## 5. Breaking Changes
@@ -105,12 +132,13 @@ risk to watch is import-cycle or bundling fallout — see § 10.
 
 ## 6. Implementation Plan
 
-- [ ] **Phase 1 — one definition.** Move the three section specs into `shared/resources/jira-sync.js`
-      and re-export from `sync-jira-{task,story,epic}.js` so existing callers and their tests are
-      unchanged. **Do not duplicate the spec into `create-*`** — see § 7.
-- [ ] **Phase 2 — the authoring call.** Add the preflight step to the three `create-*` skills.
-- [ ] **Phase 3 — decide the naming question** in § 8 and apply whichever answer is chosen.
-- [ ] **Phase 4 — `npm run bundle`** and commit the regenerated `references/`.
+- [x] **Phase 1 — one definition.** Move the **four** section specs into
+      `shared/resources/jira-sync.js` and re-export from `sync-jira-{task,story,epic,bug}.js` so
+      existing callers and their tests are unchanged. **Do not duplicate the spec into `create-*`** —
+      see § 7.
+- [x] **Phase 2 — the authoring call.** Add the preflight step to the three `create-*` skills.
+- [x] **Phase 3 — decide the naming question** in § 8 and apply whichever answer is chosen.
+- [x] **Phase 4 — `npm run bundle`** and commit the regenerated `references/`.
 
 ## 7. The trap this task must avoid
 
@@ -138,8 +166,8 @@ tracker-agnostic, its definition cannot live behind a Jira-only skill.
 
 ## 9. Files Summary
 
-- `shared/resources/jira-sync.js` — the three section specs, moved here
-- `skills/sync-jira-{task,story,epic}/scripts/sync-jira-*.js` — import instead of define
+- `shared/resources/jira-sync.js` — the four section specs, moved here
+- `skills/sync-jira-{task,story,epic,bug}/scripts/sync-jira-*.js` — import instead of define
 - `skills/create-{task,story,epic}/SKILL.md` — the authoring-time preflight step
 - `skills/*/references/jira-sync.js` — regenerated by `npm run bundle`
 
@@ -148,9 +176,9 @@ tracker-agnostic, its definition cannot live behind a Jira-only skill.
 - **Anti-vacuity, and the point of the task:** a fixture document missing `Success Criteria` must
   make the authoring check report a finding. If it does not, the call is present and inert — the
   `present-but-inert` verdict, which is worse than absent because it looks guarded.
-- The spec move is behaviour-preserving: `sync-jira-{task,story,epic}` test suites must be green
-  **unchanged**, and `TASK_CARD_SECTIONS` must still be exported from each `sync-jira-*` module (an
-  existing test asserts its shape directly).
+- The spec move is behaviour-preserving: `sync-jira-{task,story,epic,bug}` test suites must be green
+  **unchanged**, and each `sync-jira-*` module must still export its own `*_CARD_SECTIONS` (an
+  existing test asserts the task spec's shape directly).
 - **One definition, asserted:** a check that the section specs are defined in exactly one place, with
   a non-vacuity floor so it fails rather than passing on zero matches if the pattern drifts.
 - The corpus preflight tests for task, story and epic cards stay green.
@@ -164,12 +192,13 @@ tracker-agnostic, its definition cannot live behind a Jira-only skill.
 2. [ ] The check is **advisory** at authoring — a document legitimately in progress is not blocked,
        and no author is pushed toward writing filler to satisfy a gate.
 3. [ ] `review-*` remains the blocking gate; the family's advise-then-gate split is unchanged.
-4. [ ] The section specs are defined in **exactly one** place, and a test asserts that, with a
-       non-vacuity floor.
+4. [ ] All **four** section specs (task, story, epic, bug) are defined in **exactly one** place, and
+       a test asserts that, with a non-vacuity floor.
 5. [ ] A document missing `Success Criteria` produces a finding at authoring time — demonstrated on a
        fixture, not asserted in prose.
-6. [ ] `sync-jira-{task,story,epic}` suites pass **unchanged**; `TASK_CARD_SECTIONS` is still
-       exported from each.
+6. [ ] `sync-jira-{task,story,epic,bug}` suites pass **unchanged**; each module still exports its own
+       `*_CARD_SECTIONS` (`jira-sync-card-summary.test.mjs:469` asserts
+       `TASK_CARD_SECTIONS.length === 3` directly).
 7. [ ] The authoring check works for a consumer that does not have `sync-jira-*` installed.
 8. [ ] The § 8 naming question is answered in the implementation report, and the module placement
        follows the answer.
@@ -197,10 +226,23 @@ the same point they do today.
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-09-09 | 0.1 | Filed from a measured failure on PR #355: `task.99` reached CI without a Success Criteria block; the offline preflight that would have caught it runs in all three `review-*` skills and none of the three `create-*` skills. Second known occurrence of the class (task.2 was the first). | Claude |
+| 2026-09-10 | 0.2 | Review passed (8/10) — READY TO IMPLEMENT. Four Important findings applied: § 3 claim 1 corrected (`create-epic` does not bundle `jira-sync.js`); § 4's `create-bug-report` rationale replaced (bug reports are not barred from cards — `sync-jira-bug` publishes them); scope widened to all **four** section specs so Success Criterion 4 is satisfiable; the unrecorded bug-layer gap (no preflight at authoring, review or CI) filed as a deferred follow-up. | review-task |
+| 2026-09-10 |  | Status → ready-for-development | review-task |
+| 2026-09-10 |  | Implemented: four card section specs consolidated into `shared/resources/jira-sync.js`; new tracker-neutral `card-preflight.js` called from all three `create-*` skills; 11 new tests, all mutation-proved. Status → ready-for-review | develop |
 
 ## Progress Tracking
 
-Not started.
+All four phases complete — see `task.102.implementation.1.authoring-time-card-preflight.md`.
+
+| Phase | Status | Landed |
+| :--- | :--- | :--- |
+| 1 — one definition | ✅ | Four specs + `CARD_SECTIONS_BY_KIND` moved into `shared/resources/jira-sync.js`; all four `sync-jira-*` scripts re-export. |
+| 2 — the authoring call | ✅ | `shared/resources/card-preflight.js` (new, tracker-neutral CLI) called from `create-task` 4.6, `create-story` 6.2a, `create-epic`. Contract in `shared/resources/authoring-card-preflight.md`. |
+| 3 — naming question | ✅ | Answered **tracker-agnostic**; see the implementation report § "The § 8 decision". |
+| 4 — bundle | ✅ | `npm run bundle` run; regenerated `references/` committed. `create-epic` gained `jira-sync.js` for the first time, as predicted by the review. |
+
+Tests: `shared/resources/tests/card-preflight.test.mjs` — 11 assertions, all four mutation-proved.
+Fast gate (`npm run ci:fast`) green: 3047 tests, 0 failures.
 
 ## References
 

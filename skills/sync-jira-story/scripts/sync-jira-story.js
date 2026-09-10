@@ -24,25 +24,11 @@ const CL = require("../references/change-log.js");
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-// What the CARD carries — a summary, not a copy. The story file is the source
-// of truth and every card links to it; see shared/resources/tracker-card-summary.md.
-//
-// `names` is an ALIAS ARRAY — three spellings of the story statement are in
-// active use and none is wrong. Measured across 426 story documents 2026-07-31:
-// `## Story` 234, `## Story Statement` 161, `## User Story` 7. The list once
-// named only `User Story`, so ~98% of stories published their acceptance
-// criteria and nothing else, silently.
-//
-// `Description` is the LAST alias, not its own section: a story that has a story
-// statement never shows it, and one that has only a Description still gets a
-// non-empty card instead of a heading with nothing under it.
-const STORY_CARD_SECTIONS = [
-  {
-    heading: "Summary",
-    names: ["User Story", "Story", "Story Statement", "Description"],
-  },
-  { heading: "Acceptance Criteria", names: ["Acceptance Criteria"] },
-];
+// The card section spec is defined ONCE, in the shared library beside the
+// checker that consumes it (task.102). It is re-exported below so existing
+// callers and their tests are unchanged, and so the `create-*` authoring
+// skills can run the same preflight without this skill being installed.
+const STORY_CARD_SECTIONS = lib.STORY_CARD_SECTIONS;
 
 const ISSUE_TYPE = "Story";
 

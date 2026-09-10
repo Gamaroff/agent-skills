@@ -37,35 +37,11 @@ const SH = require("../references/status-history.js");
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-// What the CARD carries — a summary, not a copy. The bug file is the source of
-// truth and every card links to it; see shared/resources/tracker-card-summary.md.
-//
-// `Impact` uses an alias array because the section's heading is MODE-DEPENDENT:
-// create-bug-report emits `## Acceptance Criteria Violation` for a story bug,
-// `## Success Criteria Violation` for a task bug and `## Scope & Impact` for a
-// general one. One spec with three names handles all three, which is what keeps
-// mode out of the card builder.
-//
-// `## Evidence` is deliberately absent. Screenshots, log dumps and stack traces
-// are the largest section of a bug report and the fastest to go stale; the card
-// is a pointer, and this is exactly the material the pointer exists to avoid
-// copying.
-const BUG_CARD_SECTIONS = [
-  { heading: "Summary", names: ["Bug Description"], maxSentences: 4 },
-  { heading: "Reproduction", names: ["Reproduction Steps"], maxItems: 5 },
-  {
-    heading: "Impact",
-    names: [
-      "Scope & Impact",
-      "Scope and Impact",
-      "Acceptance Criteria Violation",
-      "Success Criteria Violation",
-    ],
-    maxItems: 5,
-    maxSentences: 3,
-    optional: true,
-  },
-];
+// The card section spec is defined ONCE, in the shared library beside the
+// checker that consumes it (task.102). It is re-exported below so existing
+// callers and their tests are unchanged, and so the `create-*` authoring
+// skills can run the same preflight without this skill being installed.
+const BUG_CARD_SECTIONS = lib.BUG_CARD_SECTIONS;
 
 const ISSUE_TYPE = "Bug";
 const SYNC_LABEL_PREFIX = "synced-from-";

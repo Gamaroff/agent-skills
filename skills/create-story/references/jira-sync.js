@@ -1438,6 +1438,137 @@ function summaryBlockNodes(opts = {}) {
   return nodes;
 }
 
+// ---------------------------------------------------------------------------
+// Card section specs — the ONE definition (task.102)
+// ---------------------------------------------------------------------------
+// These four lists say what a *document* must contain for its tracker card to be
+// usable. They live here, beside `buildCardSections` and `checkCardSections`,
+// because that is the only place all of their consumers can reach: the four
+// `sync-jira-*` scripts re-export them, and the `create-*` authoring skills run
+// the preflight against them without having a Jira sync skill installed at all.
+//
+// They were previously defined one apiece inside the four `sync-jira-*` scripts.
+// Duplicating them into the authoring skills instead of moving them would have
+// been the enumeration trap in docs/reference/anti-patterns.md: two definitions
+// of "what sections a card needs" drift silently, with the authoring check
+// passing a document the sync then publishes thin — the exact failure the
+// authoring check exists to prevent, one layer earlier.
+//
+// Sibling files are named WITHOUT their `shared/resources/` prefix on purpose.
+// The bundler's shared-reference matcher scans for that literal path anywhere in
+// a file — comments included — and treats every hit as a dependency to copy. This
+// module is bundled into twenty-odd skills, so one path written in a comment here
+// pulls that file into all of them: restoring the prefix on the four lines below
+// added ~16k lines of generated `references/` across 20 skills that do not use
+// them. Refer to siblings by bare filename.
+//
+// The names keep the `*_CARD_SECTIONS` form and the module keeps its Jira name,
+// but the requirement is TRACKER-AGNOSTIC: the corpus preflight in
+// the corpus preflight in tests/jira-sync-card-summary.test.mjs applies them to
+// every document in a repository that syncs to GitHub. Nothing here may be made
+// to depend on a Jira client, a Jira credential, or a Jira-only skill being
+// installed.
+
+// What the CARD carries — a summary, not a copy. The task file is the source of
+// truth and every card links to it; see tracker-card-summary.md.
+//
+// This list used to name ELEVEN sections — Overview, Motivation, Technical
+// Background, Scope, Breaking Changes, Implementation Plan, Files Summary,
+// Testing Strategy, Success Criteria, Risk Assessment, Rollback Plan — i.e. the
+// whole task document, republished onto the card verbatim on every sync.
+//
+// `Breaking Changes` survives the cut because it is the one piece of detail a
+// board reader must not have to open a file to discover. It is capped harder
+// than the rest and omitted entirely when the section is absent, which is the
+// common case.
+const TASK_CARD_SECTIONS = [
+  { heading: "Summary", names: ["Overview"] },
+  { heading: "Success Criteria", names: ["Success Criteria"] },
+  {
+    heading: "Breaking Changes",
+    names: ["Breaking Changes"],
+    maxItems: 3,
+    maxSentences: 2,
+    optional: true,
+  },
+];
+
+// What the CARD carries — a summary, not a copy. The story file is the source
+// of truth and every card links to it; see tracker-card-summary.md.
+//
+// `names` is an ALIAS ARRAY — three spellings of the story statement are in
+// active use and none is wrong. Measured across 426 story documents 2026-07-31:
+// `## Story` 234, `## Story Statement` 161, `## User Story` 7. The list once
+// named only `User Story`, so ~98% of stories published their acceptance
+// criteria and nothing else, silently.
+//
+// `Description` is the LAST alias, not its own section: a story that has a story
+// statement never shows it, and one that has only a Description still gets a
+// non-empty card instead of a heading with nothing under it.
+const STORY_CARD_SECTIONS = [
+  {
+    heading: "Summary",
+    names: ["User Story", "Story", "Story Statement", "Description"],
+  },
+  { heading: "Acceptance Criteria", names: ["Acceptance Criteria"] },
+];
+
+// What the CARD carries — a summary, not a copy. The epic file is the source of
+// truth and every card links to it; see tracker-card-summary.md.
+//
+// `Epic Description` is the LAST alias, not its own section: an epic with a goal
+// never shows it, and one that has only a description still gets a non-empty card.
+const EPIC_CARD_SECTIONS = [
+  {
+    heading: "Summary",
+    names: ["Epic Goal", "Epic Description"],
+    // Flatten any inline `**Label:**` heading (e.g. `**Existing System Context:**`)
+    // to plain `Label:`. ADF can't render mid-paragraph bold headings well, so
+    // this preserves the label as a leading text run that ADF renders cleanly.
+    transform: (t) => t.replace(/\*\*([^*\n]+):\*\*/g, "$1:"),
+  },
+];
+
+// What the CARD carries — a summary, not a copy. The bug file is the source of
+// truth and every card links to it; see tracker-card-summary.md.
+//
+// `Impact` uses an alias array because the section's heading is MODE-DEPENDENT:
+// create-bug-report emits `## Acceptance Criteria Violation` for a story bug,
+// `## Success Criteria Violation` for a task bug and `## Scope & Impact` for a
+// general one. One spec with three names handles all three, which is what keeps
+// mode out of the card builder.
+//
+// `## Evidence` is deliberately absent. Screenshots, log dumps and stack traces
+// are the largest section of a bug report and the fastest to go stale; the card
+// is a pointer, and this is exactly the material the pointer exists to avoid
+// copying.
+const BUG_CARD_SECTIONS = [
+  { heading: "Summary", names: ["Bug Description"], maxSentences: 4 },
+  { heading: "Reproduction", names: ["Reproduction Steps"], maxItems: 5 },
+  {
+    heading: "Impact",
+    names: [
+      "Scope & Impact",
+      "Scope and Impact",
+      "Acceptance Criteria Violation",
+      "Success Criteria Violation",
+    ],
+    maxItems: 5,
+    maxSentences: 3,
+    optional: true,
+  },
+];
+
+// The four specs by document kind. `create-*` and any other authoring-time
+// caller looks the spec up by kind rather than importing a name, so adding a
+// document kind is one entry here rather than a new import at every call site.
+const CARD_SECTIONS_BY_KIND = {
+  task: TASK_CARD_SECTIONS,
+  story: STORY_CARD_SECTIONS,
+  epic: EPIC_CARD_SECTIONS,
+  bug: BUG_CARD_SECTIONS,
+};
+
 /**
  * Build the card body for a set of section specs.
  *
@@ -5425,6 +5556,12 @@ module.exports = {
   JIRA_TEXT_LIMIT,
   adfTextLength,
   capDescriptionAdf,
+  // card section specs — the one definition (task.102)
+  TASK_CARD_SECTIONS,
+  STORY_CARD_SECTIONS,
+  EPIC_CARD_SECTIONS,
+  BUG_CARD_SECTIONS,
+  CARD_SECTIONS_BY_KIND,
   // card summarisation
   CARD_MAX_LIST_ITEMS,
   CARD_MAX_SENTENCES,

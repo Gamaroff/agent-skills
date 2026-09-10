@@ -839,6 +839,27 @@ Review all sections for:
    - Confirm: all required YAML frontmatter fields present and ISO-formatted dates
    - Fix any violations before proceeding to adversarial review (6.3)
 
+### 6.2a Card Preflight (offline, advisory)
+
+Run the tracker-card preflight on the document just written, **before** reporting completion:
+
+```bash
+node references/card-preflight.js --file "{epic-directory}/stories/story.{E}.{S}.{name}/story.{E}.{S}.{name}.md"
+```
+
+Offline — no auth, no network, no writes. It reports whether this document will publish a complete
+tracker card or a thin one, printing the exact heading to add or rename beside each finding.
+
+- **No findings** → say nothing. A clean preflight is not news.
+- **Findings** → print the tool's output verbatim and tell the user it is **advisory**: the document
+  is not blocked, and `/review-story` is the gate that will block it.
+
+Do not paraphrase a finding or re-derive its fix, and **never restate the list of required sections
+in this skill**. The list lives once, in `CARD_SECTIONS_BY_KIND` in `references/jira-sync.js`;
+a second copy here would drift, and it would drift silently in the direction that matters — this
+check passing a document the sync then publishes thin. Full contract:
+[`references/authoring-card-preflight.md`](references/authoring-card-preflight.md).
+
 ### 6.3 Execute Adversarial Quality Review
 
 **CRITICAL / BLOCKING**: This step is mandatory and must not be skipped. Do not proceed to 6.4 or present the story to the user until this review is complete. Perform a full adversarial re-analysis of the completed story, treating it as if reviewing someone else's work. The goal is to make developer mistakes **impossible**.

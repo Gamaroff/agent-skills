@@ -569,6 +569,29 @@ On return, `TASK_ISSUE_NUM` is set (integer) or empty (on failure).
 
 **On failure**: the sub-routine logs a warning and returns empty. `create-task` leaves `github_issue:` unwritten and continues. Never halt.
 
+### 4.6 Card Preflight (offline, advisory)
+
+Run the tracker-card preflight on the document just written, **before** reporting completion:
+
+```bash
+node references/card-preflight.js --file "docs/tasks/task.[ID].[name]/task.[ID].[name].md"
+```
+
+Offline — no auth, no network, no writes. It reports whether this document will publish a complete
+tracker card or a thin one, printing the exact heading to add or rename beside each finding.
+
+- **No findings** → say nothing. A clean preflight is not news.
+- **Findings** → print the tool's output verbatim and tell the user it is **advisory**: the document
+  is not blocked, and `/review-task` is the gate that will block it.
+
+Do not paraphrase a finding or re-derive its fix, and **never restate the list of required sections
+in this skill**. The list lives once, in `CARD_SECTIONS_BY_KIND` in `references/jira-sync.js`;
+a second copy here would drift, and it would drift silently in the direction that matters — this
+check passing a document the sync then publishes thin. Full contract:
+[`references/authoring-card-preflight.md`](references/authoring-card-preflight.md).
+
+---
+
 ### 5. Post-Generation Steps — STOP HERE
 
 This is the terminal step of the skill. After completing it, **end the session and return control to the user**. Do not begin implementation, do not auto-invoke `develop-task`, do not start Phase 1 work.
@@ -577,6 +600,7 @@ Actions:
 
 1. Task document created at `docs/tasks/task.[ID].[name]/task.[ID].[name].md`
 2. Plan file created at `docs/tasks/task.[ID].[name]/task.[ID].plan.[name].md`
+2a. Card preflight run (step 4.6) — report any findings verbatim, as advisory
 3. If `${PRD_ROOT}/sprint-status.yaml` exists, update it:
    - Load the full file, preserving all comments and structure
    - Find the entry matching this task's ID/key
