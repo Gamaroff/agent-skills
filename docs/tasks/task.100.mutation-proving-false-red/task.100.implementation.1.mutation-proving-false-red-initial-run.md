@@ -3,7 +3,7 @@
 **Task**: `task.100.mutation-proving-false-red.md`
 **Run Number**: 1
 **Started**: 2026-09-10 05:20
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -37,7 +37,7 @@ Add a *"When the proof goes red for the WRONG reason"* section to `shared/resour
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #369: https://github.com/Gamaroff/agent-skills/pull/369 — commit `c31e9756`, 11 files, +1080/−30 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.100.qa.{N}.*.md`; `task.100.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: CONCERNS 80 → CONCERNS 85 (refute pass) → **PASS 95**. Step 5c `/review-pr`: CONCERNS, 1 medium applied | —                    |
 | 7. finalise                | ✅ Done    | `task.100.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | 6 commits on the branch; working tree clean | —                    |
 
 ---
 
