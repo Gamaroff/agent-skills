@@ -36,7 +36,7 @@ Add a startup precondition to the develop loop's fast gate so a consumer whose `
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 3 phases, 5/5 success criteria. 14 files touched, 11 tests added. Fast gate green (3033 pass / 0 fail) after 2 red cycles, both this run's own work | —                    |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #371 (4 commits, scoped staging, zero leaks). Issue #370 commented (`posted`). Board `in-review`: `stage-disabled` | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | qa.{1,2,3}, gate.{1,2,3} (gate 3 PASS 100/100), pr-review.1 | 3 cycles: CONCERNS → CONCERNS (refute) → PASS. HIGH=0 throughout. 5c: CONCERNS, all 3 findings applied. PR comments posted each cycle | —                    |
-| 7. finalise                | ⏳ Pending | `task.101.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 7. finalise                | ✅ Done    | `task.101.dod.1.*.md`; task `status: accepted`                          | DoD 7/7. **CI red on first attempt** (hardcoded zsh matrix, no zsh on ubuntu-latest) — fixed and re-verified green on head `bf6262cbe259` == HEAD. Issue #370 closed; board `already` Done | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
 ---
@@ -144,6 +144,24 @@ _Problems encountered and how they were resolved or escalated._
 **Loop exit**: clean gate → handed to 5c
 **Action**: Proceeding to finalise
 
+### Step 7 — Finalise — 2026-09-10
+
+**CI was the DoD gate that earned its place.** The first rollup on the final head came back
+**FAILURE** with four `[zsh]` failures, while three QA cycles, Step 5c and four local `npm run
+ci:fast` runs had all been green. `SHELLS` was hardcoded to `["bash", "zsh"]` and `ubuntu-latest`
+has no zsh — every local gate had run on a machine that does.
+
+This is the same local-green-does-not-predict-CI-green failure the task exists to remove, met by the
+task's own deliverable. Recorded rather than quietly fixed.
+
+The Step 5c CR-1 spawn guard, added an hour earlier, is what made the diagnosis immediate: the four
+failures read *"child never produced an answer … this is a claim about the machine, not about the
+check"* rather than presenting as behavioural divergences between shells.
+
+Fix verified against the real CI shape, not assumed: with zsh off PATH, `zshAvailable()` returns
+`false` (control: `true`) and the suite goes 8/8 green while printing the `zsh-unavailable` note.
+Second CI run: **SUCCESS**, all five jobs, head `bf6262cbe259` == local HEAD.
+
 ### Step 5c — PR conformance review — 2026-09-10
 **Verdict**: ⚠️ CONCERNS → exits to Step 7 (only REQUEST CHANGES routes back to 5b), no QA cycle consumed.
 **Report**: `task.101.pr-review.1.fast-gate-command-existence-check.md`
@@ -169,10 +187,10 @@ Notes:
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-10
+**Final Status**: Completed
 **Branch**: `feature/task.101.fast-gate-command-existence-check`
 **PR**: [#371](https://github.com/Gamaroff/agent-skills/pull/371)
 **QA Iterations**: 3 (cycle 2 = mandatory refute pass) + Step 5c
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**DoD Summary**: `task.101.dod.1.fast-gate-command-existence-check.md` — 7/7 PASSED
+**Tracker debt**: none — `access.tracker` is `full`; issue commented and closed, board move reported `already`.

@@ -5,19 +5,21 @@ type: task
 description: "The develop loop's fast gate defaults to `npm run ci:fast`. A consumer without that script does not find out at startup — it finds out at the first gate invocation, mid-iteration, at which point a substitute gets invented under time pressure and the gate silently stops being reproducible between runs. Observed on a consumer where neither `ci:fast` nor prettier exists."
 tags: [develop-pipeline, configuration, fail-fast]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-08
 updated: 2026-09-10
+completed_date: 2026-09-10
 github_issue: 370
+pr_number: 371
 assignee:
 estimated_effort_hours: 2
 ---
 
 # Technical Task: fail fast on a missing `fastGateCommand`
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#370](https://github.com/Gamaroff/agent-skills/issues/370)
 **Review**: ✅ All review recommendations from `task.101.review.1.fast-gate-command-existence-check.md` implemented 2026-09-10
 
@@ -267,6 +269,43 @@ rediscovered as a mystery).
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Final Gate**: `task.101.gate.3.fast-gate-command-existence-check.yml` — ✅ PASS, 100/100
+**QA Cycles**: 3 (cycle 2 was the mandatory refute pass)
+**PR Review (Step 5c)**: ⚠️ CONCERNS — 1 medium, 2 low; all three applied before acceptance
+**CI**: ✅ SUCCESS on head `bf6262cbe259` (== local HEAD)
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 5/5, each verified **by execution** rather than by reading
+✅ **Tests:** `evals/shared/tests/fast-gate-precondition.test.mjs` — 12/12 with zsh, 8/8 without; runs inside `npm test`
+✅ **Mutation proof:** 7 mutations applied and reverted, every one red in the predicted place
+✅ **PR:** [#371](https://github.com/Gamaroff/agent-skills/pull/371), CI green on the final head
+✅ **Documentation:** CHANGELOG, `docs/reference/configuration.md`, six authoring sites; bundle and catalog verified in sync
+✅ **Security:** PASS — `boundary: false`; no credential, network or authz surface, and the `grep` interpolation cannot receive a metacharacter
+⚠️ **Compliance:** NOT_APPLICABLE — internal developer tooling; no personal, payment or health data and no UI
+
+### What CI caught that every local gate had passed
+
+The first CI run was **red**: `SHELLS` was hardcoded to `["bash", "zsh"]`, and `ubuntu-latest` has no
+zsh. Three QA cycles, Step 5c and four local fast-gate runs were all green — every one of them on a
+machine that has zsh. That is the same local-green-does-not-predict-CI-green failure this task
+exists to remove, met by the task's own deliverable, and it is recorded rather than quietly fixed.
+
+The matrix is now derived from the snippet engine's `zshAvailable()`, and the suite prints
+`zsh-unavailable` when zsh is missing so cross-shell agreement is never inferred from silence.
+
+**Detailed Verification Log:** See [`task.101.dod.1.fast-gate-command-existence-check.md`](./task.101.dod.1.fast-gate-command-existence-check.md).
+
+**Task marked as ACCEPTED on:** 2026-09-10
+
+---
+
 ## Change Log
 
 | Date | Version | Description | Author |
@@ -280,6 +319,7 @@ rediscovered as a mystery).
 | 2026-09-10 |  | QA findings fixed — 2 MEDIUM (§8 route; loop-entry pointer + section-scoped regression assertion), 2 iterations | qa-fix |
 | 2026-09-10 |  | QA gate PASS (100/100) cycle 3 — both findings verified fixed and mutation-proved; 1 LOW recorded | qa-task |
 | 2026-09-10 |  | CI red on the final head — the zsh matrix was hardcoded and ubuntu-latest has no zsh; matrix now derived from `zshAvailable()` with a visible `zsh-unavailable` note | finalise |
+| 2026-09-10 | 1.0 | DoD verified 7/7 — accepted (PR #371), CI green on the final head | finalise |
 
 ## Progress Tracking
 
