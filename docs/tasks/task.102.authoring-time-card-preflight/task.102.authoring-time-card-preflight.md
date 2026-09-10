@@ -5,11 +5,13 @@ type: task
 description: "`--check-card` is an offline preflight — no auth, no network, no writes — that reports whether a document will publish a complete tracker card or a thin one. All three review-* skills run it; none of the three create-* skills do. So a free check runs one step after the moment the defect is introduced, and a document that is filed but not yet reviewed reaches CI unchecked. Move the section specs into the shared library and call the checker at authoring time."
 tags: [authoring-skills, tracker-cards, fail-fast, shared-resources]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-09
 updated: 2026-09-10
+completed_date: 2026-09-10
+pr_number: 373
 assignee:
 estimated_effort_hours: 3
 github_issue: 372
@@ -17,7 +19,7 @@ github_issue: 372
 
 # Technical Task: run the card preflight where the defect is created
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.102.review.1.authoring-time-card-preflight.md` implemented 2026-09-10
 **GitHub Issue**: [#372](https://github.com/Gamaroff/agent-skills/issues/372)
 
@@ -205,22 +207,22 @@ tracker-agnostic, its definition cannot live behind a Jira-only skill.
 
 ## 11. Success Criteria
 
-1. [ ] `create-task`, `create-story` and `create-epic` each run the preflight on the document just
+1. [x] `create-task`, `create-story` and `create-epic` each run the preflight on the document just
        written and print findings with their fixes.
-2. [ ] The check is **advisory** at authoring — a document legitimately in progress is not blocked,
+2. [x] The check is **advisory** at authoring — a document legitimately in progress is not blocked,
        and no author is pushed toward writing filler to satisfy a gate.
-3. [ ] `review-*` remains the blocking gate; the family's advise-then-gate split is unchanged.
-4. [ ] All **four** section specs (task, story, epic, bug) are defined in **exactly one** place, and
+3. [x] `review-*` remains the blocking gate; the family's advise-then-gate split is unchanged.
+4. [x] All **four** section specs (task, story, epic, bug) are defined in **exactly one** place, and
        a test asserts that, with a non-vacuity floor.
-5. [ ] A document missing `Success Criteria` produces a finding at authoring time — demonstrated on a
+5. [x] A document missing `Success Criteria` produces a finding at authoring time — demonstrated on a
        fixture, not asserted in prose.
-6. [ ] `sync-jira-{task,story,epic,bug}` suites pass **unchanged**; each module still exports its own
+6. [x] `sync-jira-{task,story,epic,bug}` suites pass **unchanged**; each module still exports its own
        `*_CARD_SECTIONS` (`jira-sync-card-summary.test.mjs:469` asserts
        `TASK_CARD_SECTIONS.length === 3` directly).
-7. [ ] The authoring check works for a consumer that does not have `sync-jira-*` installed.
-8. [ ] The § 8 naming question is answered in the implementation report, and the module placement
+7. [x] The authoring check works for a consumer that does not have `sync-jira-*` installed.
+8. [x] The § 8 naming question is answered in the implementation report, and the module placement
        follows the answer.
-9. [ ] `npm run bundle` has been run and the regenerated `references/` copies are committed.
+9. [x] `npm run bundle` has been run and the regenerated `references/` copies are committed.
 
 ## 12. Risk Assessment
 
@@ -255,6 +257,52 @@ continue to catch the defect at the same point they do today.
 | 2026-09-10 |  | QA gate CONCERNS (90/100) — 9/9 success criteria verified by execution, 0 HIGH; 1 MEDIUM: `card-preflight.js` duplicates a frontmatter parse `jira-sync.js` already exports | qa-task |
 | 2026-09-10 |  | qa-fix cycle 1: T102-001 + the LOW both fixed and mutation-proved; regression test corrected to compare resolved bodies, not verdicts. Gate CONCERNS → PASS (100/100) | qa-fix |
 | 2026-09-10 |  | Step 5c `/review-pr` CONCERNS: 3 medium + 1 low. PC-1 (Files Summary omitted the deliverable), PC-3 (rollback stranded the new CLI) and CR-1 (the parity fix leaked the document body into `--json` — 94% of an 18.3 KB payload) all fixed; PC-2 (unticked success criteria) left for finalise | review-pr |
+| 2026-09-10 | 0.3 | DoD verified 9/9 against code — accepted (PR #373). CI green on the final head; AGENTS.md gained an `## Authoring-Time Card Preflight` section indexing the new shared contract and engine | finalise |
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**QA Report**: `task.102.qa.1.authoring-time-card-preflight.md`
+**Gate File**: `task.102.gate.1.authoring-time-card-preflight.yml` — ✅ **PASS**, 100/100
+**PR Review** (Step 5c): `task.102.pr-review.1.authoring-time-card-preflight.md` — ⚠️ CONCERNS, 0 HIGH
+
+Every Definition of Done criterion was verified in this step **against the code**, not inherited from
+the QA report:
+
+✅ **Success Criteria:** 9 of 9, each traced to a named file and a named test
+✅ **Tests:** 14 assertions in `card-preflight.test.mjs` + 420 in the four `sync-jira-*` suites + the
+   37-test corpus preflight. Fast gate: 3050 tests, 0 failures.
+✅ **CI:** rollup **SUCCESS** — 5 of 5 jobs, polled to a decision rather than sampled once, and
+   re-verified on the head that carries this acceptance rather than on an ancestor
+✅ **PR:** #373 → `develop`, one QA cycle, three findings fixed in-review at Step 5c
+✅ **Documentation:** new shared contract, AGENTS.md index section, Change Log current, § 9 and § 13
+   rewritten to match what actually shipped
+✅ **Security:** no new credential, network or auth surface. Evidence `reasoned`; probe mode did not
+   fire because the deliverable is a reporter, not a boundary — a deliberate answer, not a skip.
+⚠️ **Compliance:** NOT_APPLICABLE — internal tooling, no personal data, no user-facing surface. Every
+   repository convention that *does* apply was checked and holds.
+
+**What this run found that the task itself had wrong**, recorded because it is the useful part:
+
+1. The task's § 3 claimed the checker was "already available at authoring time" with "no new install
+   surface". `create-epic` did not bundle `jira-sync.js` — true for two of three skills.
+2. § 4 excluded `create-bug-report` because "bug reports are barred from tracker cards". They are not;
+   `sync-jira-bug` publishes them. The barred rule concerns the Change Log. Bug reports in fact have
+   **no** preflight at authoring, in `review-bug`, or in CI — a wider gap, filed as a follow-up.
+3. There were **four** section specs, not three. Success Criterion 4 was unsatisfiable without
+   enumeration until the fourth moved too.
+4. The QA fix for the duplicated frontmatter parse introduced a second defect — the parity field
+   leaked the whole document into `--json` — caught by the post-gate review lens, not by the gate.
+
+**Detailed Verification Log:** see `task.102.dod.1.authoring-time-card-preflight.md` for complete
+evidence and citations.
+
+**Task marked as ACCEPTED on:** 2026-09-10
+
+---
 
 ## QA Testing Results
 
