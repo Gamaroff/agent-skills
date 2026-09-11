@@ -35,7 +35,7 @@ three bug modes, tracker sync on both arms), and add the bug branch to `docs/con
 | 1. create-branch           | ✅ Done    | Branch `feature/task.107.*` exists in git                              | `feature/task.107.bug-runbook-rewrite` created at `38f20587`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.107.review.{N}.{name}.md` exists (or skip logged)                | `task.107.review.1.bug-runbook-rewrite.md` — READY TO IMPLEMENT, 8/10, 0 critical / 4 important / 2 optional; all 4 important + 1 optional applied | —                    |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. 4 files changed; fast gate 3155/3155 pass, 0 fail; 52 links checked, 0 dead; both mermaid diagrams validate | — (see Issues Log: surface-map subagent killed) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #387: https://github.com/Gamaroff/agent-skills/pull/387 — base `develop`, head `64e7dc1102f1` (= local HEAD), state OPEN. Issue #386 commented (`reason: posted`) | —                    |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.107.qa.{N}.*.md`; `task.107.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.107.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -73,6 +73,14 @@ three bug modes, tracker sync on both arms), and add the bug branch to `docs/con
   correctly too, in all three representations (flowchart, prose fallback, quick-reference table);
   `docs/runbooks/README.md` one-line description re-checked; `CHANGELOG.md` gained two
   `[Unreleased] → Changed` entries. All 8 success criteria verified individually.
+- **Step 4**: `SCOPE_PATHS` = `docs/tasks/task.107.bug-runbook-rewrite`, `docs/runbooks`,
+  `docs/concepts`, `CHANGELOG.md`. Pre-flight guard held nothing — both untracked files were inside the
+  work-item dir. Leak check after commit: nothing staged outside scope. One commit (`64e7dc11`), 7
+  files. The implementation report is committed **here**, per the Step 4 rule.
+- **Step 4 board**: `gh-stage.js --stage in-review` → `stage-disabled` (exit 0). Correct outcome — this
+  repo's workflow record does not enable that moment; non-blocking.
+- **Step 4 post-PR check**: queried `gh pr view` directly rather than via the tracker-poller subagent,
+  after the Step 3 hang. PR #387 state = OPEN, head SHA matches local HEAD, 0 errors.
 - **Step 3 gates**: `npm run ci:fast` → 3155 pass / 0 fail / 1 skipped. `prettier --check` clean.
   `markdown-link-check` → 52 links across the 3 changed docs, 0 dead, plus an independent
   tracked-tree resolver (`git ls-files`) because the working tree misses gitignored targets. Both
@@ -114,7 +122,27 @@ three bug modes, tracker sync on both arms), and add the bug branch to `docs/con
 
 ## QA Iteration History
 
-_Track each QA review/fix cycle._
+### QA Cycle 1 — 2026-09-11
+
+**Gate Result**: FAIL
+**Issues Found**: 4 — TASK-107-001 (high, the page named `sync-github-bug` as the GitHub arm's
+mechanism; it is not), TASK-107-002 (medium, the page's own verification block did not produce the
+results its comments claimed), TASK-107-003 and TASK-107-004 (low)
+**HIGH findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Ran qa-fix (cycle 1 of 5) — all four findings resolved, commit `fbfe27be`
+
+### QA Cycle 2 — 2026-09-11
+
+**Gate Result**: PASS
+**Issues Found**: 1 — TASK-107-005 (low): the page asserted a companion-artifact filename shape for
+story/task bugs that no standard specifies and that has zero instances in the corpus (0 of 62).
+Corrected within the cycle.
+**HIGH findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
@@ -123,7 +151,7 @@ _Track each QA review/fix cycle._
 **Finished**: _pending_
 **Final Status**: _pending_
 **Branch**: `feature/task.107.bug-runbook-rewrite`
-**PR**: _pending_
+**PR**: [#387](https://github.com/Gamaroff/agent-skills/pull/387)
 **QA Iterations**: _pending_
 **DoD Summary**: _pending_
 **Tracker debt**: _pending_

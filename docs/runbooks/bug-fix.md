@@ -153,8 +153,10 @@ docs/bugs/bug.12.some-name/
 └── bug.12.dod.1.some-name.md             # Step 7 Definition of Done
 ```
 
-Story and task bugs produce the same set, prefixed `story.{e}.{s}.bug.{n}.` / `task.{id}.bug.{n}.`, in
-**the parent's** directory rather than one of their own.
+A **story** or **task** bug's report sits in its parent's directory instead
+([`file-naming.md`](../standards/file-naming.md)). No story or task bug in this repo has yet been
+through `/develop-bug`, so the naming of its companion artifacts is not established by example —
+`/develop-bug` picks it; do not infer a shape from the tree above.
 
 ## Pitfalls
 

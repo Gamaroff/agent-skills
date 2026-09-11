@@ -79,23 +79,23 @@ Sources of truth to write against, none of which the runbook currently cites:
 
 Note the last row: bug reports are the one document type barred from the `## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS (cycle 2) — cycle 1 was FAIL
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-11
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 95/100 (cycle 2); 70/100 (cycle 1)
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.107.qa.1.bug-runbook-rewrite.md](./task.107.qa.1.bug-runbook-rewrite.md)
-- **Gate File**: [task.107.gate.1.bug-runbook-rewrite.yml](./task.107.gate.1.bug-runbook-rewrite.yml)
+- **Cycle 2 (final)**: [task.107.qa.2.bug-runbook-rewrite.md](./task.107.qa.2.bug-runbook-rewrite.md) · [task.107.gate.2.bug-runbook-rewrite.yml](./task.107.gate.2.bug-runbook-rewrite.yml)
+- **Cycle 1**: [task.107.qa.1.bug-runbook-rewrite.md](./task.107.qa.1.bug-runbook-rewrite.md) · [task.107.gate.1.bug-runbook-rewrite.yml](./task.107.gate.1.bug-runbook-rewrite.yml)
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 3156 (3155 pass, 0 fail, 1 skipped)
 - **Phases Verified**: 4/4 (phase 2 with concerns)
-- **Critical Issues**: 1 HIGH, 1 MEDIUM, 2 LOW
-- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 open — cycle 1 found 1 HIGH / 1 MEDIUM / 2 LOW, cycle 2 found 1 LOW; all 5 resolved
+- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Fix Cycle 1 — all four findings resolved (2026-09-11)
 
@@ -105,6 +105,7 @@ Note the last row: bug reports are the one document type barred from the `## QA 
 | TASK-107-002 (medium) | Verification block corrected — scoped to `REPORT="$BUG/$(basename "$BUG").md"` and the pattern changed to `^\*\*Status\*\*:`. **Re-run verbatim: prints `status: closed` + `**Status**: ✅ Closed`, then `1`, then `0`** — exactly what the comments claim. |
 | TASK-107-003 (low) | The artifacts-directory claim now says the own-directory shape is the **general**-bug case, and that story/task bug artifacts sit in the parent's directory. |
 | TASK-107-004 (low) | Trimmed 200 → **198** lines by linking rather than restating `develop-bug` content (Phase 0 block, delegation paragraph, pitfalls). |
+| TASK-107-005 (low, found in cycle 2) | The page asserted a companion-artifact filename shape for story/task bugs that no standard specifies and the corpus has **zero** instances of (0 of 62). Replaced with what is established, plus an explicit statement that the shape is not established by example. |
 
 ### Key Findings
 
@@ -204,6 +205,7 @@ exists for that specific mistake.
 | 2026-09-11 |         | Implemented — bug-fix.md rewritten (68 → 200 lines), which-path.md bug branch added in 3 places, README description re-checked, CHANGELOG entry; 4 files, fast gate 3155/3155, 52 links checked | develop |
 | 2026-09-11 |         | QA gate FAIL (70/100) — 4 findings: wrong skill named on the GitHub tracker arm (SC3), verification block does not run as documented, 2 low | qa-task |
 | 2026-09-11 |         | QA findings fixed — all 4 resolved, 1 iteration; verification block re-run verbatim and now matches its comments | qa-fix |
+| 2026-09-11 |         | QA gate PASS (95/100) — cycle-2 refute pass re-verified all 4 fixes against source; 1 new low finding corrected in-cycle; 8/8 success criteria | qa-task |
 
 ## Progress Tracking
 
