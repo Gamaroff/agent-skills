@@ -32,8 +32,8 @@ the mechanism that will re-measure it on read.
 ## 1. What to pick up — the frontier is live again
 
 At session start `select-next.mjs` returned **`roadmap-complete`**: no actionable row in any phase or
-registry. This session filed **3 general bugs and 5 tasks** from a repo sweep, so the loop now has
-work. Selection order (bugs at `new` outrank tasks; then priority):
+registry. This session filed **3 general bugs and 12 tasks** — five from a repo sweep, seven from the
+observation review — so the loop now has work. Selection order (bugs at `new` outrank tasks; then priority):
 
 | Id | Title | Why it is first |
 | --- | --- | --- |
@@ -45,8 +45,15 @@ work. Selection order (bugs at `new` outrank tasks; then priority):
 | T110 | `session-handoff` skill — write + re-measure | From the 09-08 staged proposal; this file is its first customer |
 | T111 | `npm run ci` runs every CI lane; two coverage gaps | Local/CI parity |
 | T112 | `hotfix.md` rewrite against `/develop-bug`'s hotfix model | task.107's deliberately-excluded sibling |
+| T113 | develop-next Step 4 / merge gate / Step 1→2 signal for registry-sourced, CONCERNS-gated items | obs review: 8 observations, re-scoped after task.103 |
+| T114 | `mutation-proving.md` rewritten around what a mutation run can tell you | obs review: 12 observations, one document |
+| T115 | finalise publish-time checks (status header, CI on the acceptance head, remote refs, CHANGELOG test) | obs review: 4 observations |
+| T116 | QA loop routes + preconditions (5c third route, Step 3b/10/13, boundary probe, subagent rows) | obs review: 6 observations |
+| T117 | card preflight `heading-only` (15/106 task docs publish a bare label) | obs review: 2 observations |
+| T118 | `probes_executed` emitted by the engine, not typed | obs review: #10 |
+| T119 | create-skill authoring guards (positional tokens, shell matrix, comment paths, one-or-several) | obs review: 4 observations |
 
-`/develop-next` will dispatch B13. There is no run-state file. **None of the eight has a GitHub
+`/develop-next` will dispatch B13. There is no run-state file. **None of the fifteen has a GitHub
 issue yet** — `create-*` tracker sync is opt-in and was not taken; `develop-bug` Step 2 /
 `develop-task` Step 2 create the issue on pickup via `ensure-*-github-issue`.
 
@@ -73,16 +80,14 @@ nothing else. Stated in the roadmap's `## Housekeeping`. **Do not backfill.**
 **Phase 5 is archived; no phase is open.** The registries are the whole frontier, which is the
 roadmap's designed terminal state. Author a phase only to express sequencing the registries cannot.
 
-**The 50-entry observation backlog is a separate session** (`/observe-work --review`). All 50 were
-logged 09-08 → 09-11 and none actioned; the last review was 09-08. Clusters visible from the titles:
-develop-next Step 4 registry tick (#13, #30, #31, #34, #35, #46 — #46 says the remedy is stale,
-task.103 closed it from `finalise`), mutation-proving guidance (#32, #37, #41, #45, #47, #50, #55 →
-one reference doc), finalise (#40, #48, #57, #59), card preflight (#43, #49 — 15/106 task docs),
-QA vacuity (#19, #26, #29). Two un-installed items from the 09-08 staging also belong there:
-`code-review-prompt.md` categories C/D (obs #3/#4) and the review-security guarantees note
-(obs #5/#10). Three other staged items were superseded by later tasks; the `session-handoff`
-proposal became T110. This session added obs **#63** (guard scope vs scanned scope) and **#64**
-(bundler link depth).
+**The observation backlog was reviewed 2026-09-12** (`/observe-work --review`, 52 entries): **13
+actioned** (11 staged as prose edits in `~/.claude/projects/…/skill-updates/` — see its
+`PENDING.md` for the one-block install; 2 already closed by v0.46.0 / #384) and **39 parked**, each on
+the task or bug that carries its remedy (T108, T113–T119, B14, B15). The queue is empty; parked
+entries unpark when their task merges, and only the review re-checks them. **The staged edits are
+not installed** — that is the user's step, and the previous staging (09-08) shows what happens when
+it is skipped: 3 of 6 items landed only because later tasks happened to cover them. `last-review-date`
+is 2026-09-12.
 
 ---
 
@@ -153,10 +158,10 @@ trap there when it has cost a session twice.**
 ```
 docs/development/project-completion-roadmap.md   live roadmap — no phase open; Deferred + Housekeeping only
 docs/development/roadmap-history.md              archived Phases 1-5
-docs/tasks/task-registry.md                      task numbering — next available: 113
+docs/tasks/task-registry.md                      task numbering — next available: 120
 docs/bugs/bug-registry.md                        general-bug numbering — next available: 16
 docs/bugs/bug.13.* / bug.14.* / bug.15.*         the three bugs filed this session
-docs/tasks/task.108.* … task.112.*               the five tasks filed this session
+docs/tasks/task.108.* … task.119.*               the twelve tasks filed this session (108–112 sweep, 113–119 obs review)
 docs/contributing/traps.md                       the durable traps
 docs/contributing/releases.md                    the release procedure and its checklist
 shared/resources/change-log.js                   B13's defect lives here (untouched since 2026-08-17)
@@ -165,4 +170,5 @@ shared/resources/change-log.js                   B13's defect lives here (untouc
 Pipeline conventions: `AGENTS.md`. Anti-patterns (consumer-facing): `docs/reference/anti-patterns.md`.
 Design rationale: `docs/reference/faq.md`. Observation log: resolved by
 `shared/resources/resolve-observation-workspace.sh`, never from the cwd — **52 files on disk**,
-highest id **64**, 52 open (ids are monotonic; resolved entries are swept to `archive/`).
+highest id **64**, **0 open / 39 parked / 13 actioned** (the 13 sweep to `archive/` on the next
+run; ids are monotonic). Staged skill edits: `~/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills/skill-updates/PENDING.md`.

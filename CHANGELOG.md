@@ -25,6 +25,14 @@ All notable changes to this project will be documented in this file. Format foll
   §5, beside a state section that decays in days. The half that decayed discredited the half that did
   not. Moved verbatim with their measurement dates; the handoff now points here.
 
+- **Seven tasks filed from the 2026-09-12 observation review** — 52 open observations worked to an
+  empty queue: 13 actioned (prose edits staged for install; two already closed by earlier merges) and
+  39 parked on the task or bug that carries their remedy. Tasks 113–119: develop-next's registry
+  bookkeeping and merge gate; `mutation-proving.md` rewritten around what a mutation run can tell
+  you (twelve observations, one document); finalise publish-time checks; QA-loop routes and
+  preconditions; card-preflight `heading-only`; `probes_executed` from the engine; create-skill
+  authoring guards.
+
 - **Three general bugs and five tasks filed from a repo sweep** (2026-09-12), giving `/develop-next` a
   frontier again — it had returned `roadmap-complete`. Bugs 13–15: `change-log.js` drops prose and
   nested `###` on the un-migrated path (confirmed by execution, untested); the PreCompact hook posts

@@ -82,9 +82,21 @@ re-derived against the live engine, not installed.
 
 Measured 2026-09-12 — see the two transcripts under *Actual Behavior*.
 
+**Second site, found 2026-09-12 during the observation review**: `families --audit` anchors the same
+way (`const root = args.auditRoot || process.cwd()`, ≈957) and looks for
+`<root>/skills/<member>/SKILL.md`. From `skills/observe-work/` it reports **every** member of the
+meta-skills family as `member-not-found`, with `reason: ok` — a family audit that cannot find its
+members and does not say the instrument is wrong. From the repo root: `gaps: []`. So the fix is a
+population check over every `process.cwd()` anchor in the engine, not one edit:
+
+```
+$ grep -n 'auditRoot || process.cwd()' shared/resources/observation-log.js
+```
+
 **Related Files**:
 
 - `shared/resources/observation-log.js` ≈1119 (`const cwd = args.auditRoot || process.cwd()`),
+  ≈957 (`families --audit`, same anchor),
   ≈1149-1159 (`["AGENTS.md","CLAUDE.md"].map(f => path.join(cwd, f))`, `/observation log/i`)
 - `skills/observe-work/SKILL.md` — Session Start step 1 and the `activation-configured` row
 - `shared/resources/observe-work-session-start.sh` — the opt-in hook takes its count from the same
@@ -111,7 +123,7 @@ assumption.
    `repoWorktrees()`); keep `--audit-root` as the override.
 2. Emit a `state` field (`configured` / `not-configured` / `no-agent-file`) so the SKILL.md row can
    branch on it rather than on `ok`.
-3. Add a test that runs `doctor` from a subdirectory of a fixture repo whose root `AGENTS.md` mentions
+3. Add a test that runs `doctor` **and** `families --audit` from a subdirectory of a fixture repo whose root `AGENTS.md` mentions
    the observation log, and asserts `ok: true`; mutation-prove by reverting the anchor.
 4. Close obs #14 with the resolution.
 
