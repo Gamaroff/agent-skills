@@ -1,0 +1,134 @@
+schema: 1
+task: 'task.107.bug-runbook-rewrite'
+task_title: 'The bug-fix runbook documents a pipeline that has been superseded twice'
+gate: FAIL
+status_reason: 'The rewritten page states that both tracker arms delegate to the full sync skill; only the Jira arm does, so Success Criterion 3 ("names which skill does it") is not met on the GitHub arm. The page''s own verification block also does not produce the results its comments claim.'
+reviewer: 'QA Engineer'
+updated: '2026-09-11T03:45:00Z'
+
+top_issues:
+  - id: 'TASK-107-001'
+    severity: high
+    file: 'docs/runbooks/bug-fix.md'
+    finding: >-
+      "Both delegate to the full sync skill — sync-github-bug / sync-jira-bug" is false for the
+      GitHub arm. ensure-bug-jira-issue declares invokes: [sync-jira-bug] and its Step BJ4 is
+      "Create via sync-jira-bug Delegation"; ensure-bug-github-issue has no invokes: key, contains
+      zero references to sync-github-bug, and creates the issue itself across Steps B4-B8 (dedup
+      search, gh issue create via tracker-issue.js, sub-issue link + board + Priority, frontmatter
+      write-back, Status History). The trailing clause inherits the error - open/closed
+      reconciliation lives in the full sync skills, which Step 1 of the pipeline never reaches on
+      the GitHub arm.
+    suggested_action: >-
+      Split the sentence by arm. The Jira arm delegates to sync-jira-bug; the GitHub arm creates
+      the issue itself. Both write Status History on creation and transition only. State that
+      open/closed reconciliation lives in the full sync skills, which the pipeline does not run at
+      Step 1.
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-107-002'
+    severity: medium
+    file: 'docs/runbooks/bug-fix.md'
+    finding: >-
+      The page's own Verification block does not produce the results its comments claim - confirmed
+      by running it. Two defects in one block. (a) The glob "$BUG"/bug.*.md matches all four
+      artifacts in the directory, so `grep -c '## Resolution Summary'` prints four file:count lines
+      (0, 1, 0, 0) rather than the `1` the comment promises, and the Change Log check prints four
+      lines rather than `0`. (b) The pattern ^\*\*Status:\*\* never matches a bug report: bug
+      reports write `**Status**: ✅ Closed` with the colon OUTSIDE the bold, unlike tasks and
+      stories. The only `**Status:**` hit is the DoD artifact's, a different document. This is the
+      task's own §6 step 2 requirement - "verify every command in it by running it" - failing on
+      the one block that was meant to satisfy it.
+    suggested_action: >-
+      Scope to the report (REPORT="$BUG/$(basename "$BUG").md" - the self-named-subdirectory rule
+      guarantees this resolves) and fix the pattern to ^\*\*Status\*\*:. Verified: the exact form
+      prints `status: closed`, `1` and `0` as the comments claim.
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-107-003'
+    severity: low
+    file: 'docs/runbooks/bug-fix.md'
+    finding: >-
+      "All co-located with the bug document, in its own directory" is true only of general bugs.
+      Per docs/standards/bug-documents.md and create-bug-report/SKILL.md, a story bug is co-located
+      with the story file and a task bug lives in docs/tasks/task.{id}.{name}/ - neither gets a
+      directory of its own. The following sentence ("Story and task bugs produce the same set,
+      prefixed ...") compounds the impression.
+    suggested_action: >-
+      Qualify it - for a general bug the directory is its own; a story or task bug's artifacts sit
+      alongside the parent story/task.
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-107-004'
+    severity: low
+    file: 'docs/runbooks/bug-fix.md'
+    finding: >-
+      The page is exactly 200 lines. docs/runbooks/README.md names bug-fix as a satellite runbook
+      with a ~80-150 line depth target, and says a satellite outgrowing ~200 lines should be
+      promoted or split. The rewrite satisfies the task's own Success Criterion 8 (<= 200) but
+      lands on the split threshold, 33% above the top of the stated band.
+    suggested_action: >-
+      Trim toward the band where content is restated rather than linked - the Phase 0 branch-model
+      block and parts of the tracker-sync table repeat develop-bug content the See-also already
+      points at.
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 3156
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: >-
+      Documentation-only change - every file in the diff is markdown, no executable surface
+      touched (verified: `git diff --name-only origin/develop...HEAD | grep -v '\.md$'` returns
+      nothing). No auth, crypto or sensitive-data handling. Verdict reached by reading the diff,
+      not by executing hostile input, so evidence is `reasoned` rather than `measured`.
+  performance:
+    status: PASS
+    notes: 'No runtime surface. npm run ci:fast 3155 pass / 0 fail, duration unchanged.'
+  reliability:
+    status: PASS
+    notes: >-
+      Rollback is `git revert`; no state, no migration. CI on PR #387 fully green - link-check,
+      shellcheck, test and branch-policy all pass.
+  maintainability:
+    status: CONCERNS
+    notes: >-
+      The page restates develop-bug content that the See-also already links (TASK-107-004), which
+      is the drift surface that produced this task in the first place. The false delegation claim
+      (TASK-107-001) is an instance of exactly that risk materialising during authoring.
+
+recommendations:
+  immediate:
+    - action: 'Correct the tracker-sync delegation claim - split it by arm'
+      refs: ['docs/runbooks/bug-fix.md']
+    - action: 'Fix the verification block: scope the glob to the report, correct the Status pattern'
+      refs: ['docs/runbooks/bug-fix.md']
+  future:
+    - action: 'Qualify the artifacts-directory claim for story and task bugs'
+      refs: ['docs/runbooks/bug-fix.md']
+    - action: 'Trim toward the ~80-150 satellite band by linking rather than restating'
+      refs: ['docs/runbooks/bug-fix.md']
+    - action: >-
+        docs/reference/pipeline-artifacts.md has zero bug rows - the artifacts a develop-bug run
+        writes are documented only in this runbook. Out of task 107's scope; worth a follow-up.
+      refs: ['docs/reference/pipeline-artifacts.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions:
+    - 'TASK-107-001 must be corrected - the page names the wrong skill on the GitHub arm'
+    - 'TASK-107-002 must be corrected - the shipped verification block does not work as documented'

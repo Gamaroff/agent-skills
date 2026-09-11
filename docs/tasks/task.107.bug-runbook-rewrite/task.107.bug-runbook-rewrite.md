@@ -77,7 +77,46 @@ Sources of truth to write against, none of which the runbook currently cites:
 | Tracker sync | `skills/sync-{jira,github}-bug/SKILL.md`, `shared/resources/status-history.js` |
 | Bug reports carry Status History, never a Change Log | `shared/resources/document-change-log.md` |
 
-Note the last row: bug reports are the one document type barred from the `## Change Log`, and a
+Note the last row: bug reports are the one document type barred from the `## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-11
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
+
+### QA Report
+
+- **Full Report**: [task.107.qa.1.bug-runbook-rewrite.md](./task.107.qa.1.bug-runbook-rewrite.md)
+- **Gate File**: [task.107.gate.1.bug-runbook-rewrite.yml](./task.107.gate.1.bug-runbook-rewrite.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3156 (3155 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 4/4 (phase 2 with concerns)
+- **Critical Issues**: 1 HIGH, 1 MEDIUM, 2 LOW
+- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Fix Cycle 1 — all four findings resolved (2026-09-11)
+
+| Finding | Resolution |
+| :--- | :--- |
+| TASK-107-001 (high) | The delegation sentence is split by arm. The Jira sub-routine delegates (`invokes: [sync-jira-bug]`); the GitHub one creates the issue itself and never references `sync-github-bug`. Open/closed reconciliation is attributed to the full sync skills, with the note that Step 1 never runs them on the GitHub arm. **SC3 now met.** |
+| TASK-107-002 (medium) | Verification block corrected — scoped to `REPORT="$BUG/$(basename "$BUG").md"` and the pattern changed to `^\*\*Status\*\*:`. **Re-run verbatim: prints `status: closed` + `**Status**: ✅ Closed`, then `1`, then `0`** — exactly what the comments claim. |
+| TASK-107-003 (low) | The artifacts-directory claim now says the own-directory shape is the **general**-bug case, and that story/task bug artifacts sit in the parent's directory. |
+| TASK-107-004 (low) | Trimmed 200 → **198** lines by linking rather than restating `develop-bug` content (Phase 0 block, delegation paragraph, pitfalls). |
+
+### Key Findings
+
+Six of eight success criteria clean, one marginal, one failed. **SC3 failed**: the page states both
+tracker arms delegate to the full sync skill, but only the Jira arm does — `ensure-bug-github-issue`
+creates the issue itself and never references `sync-github-bug`. Separately, the page's own
+verification block does not produce the results its comments claim, on the one block the task required
+to be verified by running it.
+
+---
+
+## Change Log`, and a
 rewrite is exactly where that rule gets broken by copying the story runbook's shape.
 
 ## 4. Scope
@@ -163,6 +202,8 @@ exists for that specific mistake.
 | 2026-09-10 | 1.0     | Filed during v0.46.0 release doc sweep   | Claude |
 | 2026-09-11 | 1.1     | Review passed (8/10) — corrected §1's inbound-link claim, bound the rewrite to the ≤200-line satellite budget (§4 + criterion 8), linked tracker issue #386, added Progress Tracking | review-task |
 | 2026-09-11 |         | Implemented — bug-fix.md rewritten (68 → 200 lines), which-path.md bug branch added in 3 places, README description re-checked, CHANGELOG entry; 4 files, fast gate 3155/3155, 52 links checked | develop |
+| 2026-09-11 |         | QA gate FAIL (70/100) — 4 findings: wrong skill named on the GitHub tracker arm (SC3), verification block does not run as documented, 2 low | qa-task |
+| 2026-09-11 |         | QA findings fixed — all 4 resolved, 1 iteration; verification block re-run verbatim and now matches its comments | qa-fix |
 
 ## Progress Tracking
 
