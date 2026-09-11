@@ -4,7 +4,7 @@
 **PR:** [#387](https://github.com/Gamaroff/agent-skills/pull/387) — `feature/task.107.bug-runbook-rewrite` → `develop` (OPEN)
 **Work item:** [`task.107.bug-runbook-rewrite.md`](./task.107.bug-runbook-rewrite.md) — resolved via `branch stem`
 **Tracker:** [#386](https://github.com/Gamaroff/agent-skills/issues/386) — OPEN
-**Verdict:** 🚨 **REQUEST CHANGES**
+**Verdict:** ✅ **APPROVE** (re-run 2026-09-11) — the first pass returned 🚨 REQUEST CHANGES; see *Re-run* below
 
 > **Scope:** 11 files, +1377/−59. No paths excluded — this change touches no generated
 > `references/` copies.
@@ -151,3 +151,68 @@ truncated_count: 0
 > the *record of the work*, which no QA gate reads. PC-1 in particular was invisible to `prettier`,
 > `markdown-link-check`, `ci:fast` and both QA cycles — the file is structurally valid markdown, it
 > just says something other than what it means.
+
+---
+
+## Re-run — 2026-09-11 (after qa-fix cycle 2)
+
+**Verdict: ✅ APPROVE.** All four new findings are `severity: low`, which the deterministic table in
+Step 6 maps to APPROVE.
+
+### The five original findings — independently re-verified
+
+| Finding | State | Evidence |
+|---|---|---|
+| PC-1 (high) | **FIXED** | §3 reads as one whole sentence; `grep -c '^## Change Log'` → **1**; no `## Change Log\`, and a` remains; `## QA Testing Results` is a real heading; all eleven numbered sections present, in order, uncorrupted |
+| PC-2 (medium) | **FIXED** | Key Findings opens "All eight success criteria met after two QA cycles and a PR conformance review"; the cycle-1 SC3 failure is stated in the past tense as history |
+| PC-3 (medium) | **FIXED** | Row 5–6 reads ✅ Done and its content matches the QA Iteration History and both gates |
+| PC-4 (low) | **FIXED** | Doc states the shipped figure; `wc -l docs/runbooks/bug-fix.md` → **200** |
+| PC-5 (low) | **FIXED** | "4/4 — gate 2 records `phases_with_issues: []` (cycle 1 had flagged phase 2)" |
+
+**The deliverable was untouched by the fix cycle** — `git diff 6cb237a9 f40e59d3 --name-only` returns
+only the three task-trail files.
+
+### Four further findings, all `low`, all fixed
+
+```
+[PC-6] trail · low · confidence: high — task.107.implementation.1.*.md:39
+  Pipeline Progress pointed the reader at the Issues Log for the process errors, but both entries
+  sat in the Decisions Log — the cross-reference dangled.
+  → Entries moved into the Issues Log, where a failure belongs and where the pointer aims.
+
+[PC-7] consistency · low · confidence: high — implementation report vs qa.2
+  The implementation report said "three genuine hangs" and "3 subagent hangs"; qa.2 said "the second
+  subagent hang" and "the two subagent hangs". The files disagreed 3 vs 2.
+  → Corrected to **2**. The true count: the Step 3 surface-map agent and the cycle-2 refute agent
+    genuinely hung; the 5c code lens did not — it was killed on a stale output-size read. The
+    loop-audit agent was never dispatched. Worth naming plainly: the overstated figure made my own
+    premature kill look better justified than it was.
+
+[PC-8] consistency · low · confidence: medium — task.107.implementation.1.*.md:39
+  Row 5–6 claimed ✅ Done while its own Required Artifacts cell names an APPROVE/CONCERNS PR Review
+  as the exit condition, and QA Cycle 2's PR Review row still read REQUEST CHANGES.
+  → QA Cycle 2's PR Review row now records this re-run's APPROVE, so the claim and its condition agree.
+
+[PC-9] trail · low · confidence: high — task.107.bug-runbook-rewrite.md:182
+  "Fix Cycle 1 — all four findings resolved" headed a five-row table spanning two cycles.
+  → Retitled "Fix Cycles 1–2 — all five findings resolved".
+```
+
+### Whole-trail checks that passed on the re-run
+
+- Every Change Log row dated on or before frontmatter `updated: 2026-09-11`.
+- The 5c Change Log row agrees with this report's verdict, count and severity split.
+- `status: ready-for-review` / `**Status:** Ready for Review` paired; Step 7 artifacts correctly absent.
+- Task document, `qa.2`, `gate.2`, this report and the implementation report all tell the same story:
+  2 QA cycles, cycle 1 FAIL 70/100 (4 findings), cycle 2 PASS 95/100 (1 new low, fixed in-cycle),
+  5 findings resolved, 8/8 success criteria, 5c REQUEST CHANGES → fixed → APPROVE.
+- CI green on the final commit: `test`, `link-check`, `shellcheck`, branch-policy.
+
+### Machine-Readable Findings (re-run)
+
+```yaml
+findings: []
+truncated_count: 0
+```
+
+All nine findings raised across both 5c passes are resolved.

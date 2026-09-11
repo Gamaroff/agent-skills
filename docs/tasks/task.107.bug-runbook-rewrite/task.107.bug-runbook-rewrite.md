@@ -178,7 +178,7 @@ exists for that specific mistake.
 - **Critical Issues**: 0 open — cycle 1 found 1 HIGH / 1 MEDIUM / 2 LOW, cycle 2 found 1 LOW; all 5 resolved
 - **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
-### Fix Cycle 1 — all four findings resolved (2026-09-11)
+### Fix Cycles 1–2 — all five findings resolved (2026-09-11)
 
 | Finding | Resolution |
 | :--- | :--- |
@@ -217,6 +217,7 @@ unanchored string replace spliced this section into the middle of §3. See
 | 2026-09-11 |         | QA findings fixed — all 4 resolved, 1 iteration; verification block re-run verbatim and now matches its comments | qa-fix |
 | 2026-09-11 |         | QA gate PASS (95/100) — cycle-2 refute pass re-verified all 4 fixes against source; 1 new low finding corrected in-cycle; 8/8 success criteria | qa-task |
 | 2026-09-11 |         | PR conformance review (Step 5c) REQUEST CHANGES — 5 findings, all in the paper trail; the QA section had been spliced into §3 by an unanchored replace. All 5 fixed | qa-fix |
+| 2026-09-11 |         | PR conformance review re-run APPROVE — all 5 prior findings independently re-verified fixed; 4 further low trail findings (PC-6…PC-9) raised and fixed | qa-fix |
 
 ## Progress Tracking
 

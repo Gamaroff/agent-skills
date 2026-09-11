@@ -34,9 +34,9 @@ three bug modes, tracker sync on both arms), and add the bug branch to `docs/con
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.107.*` exists in git                              | `feature/task.107.bug-runbook-rewrite` created at `38f20587`, pushed with upstream tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.107.review.{N}.{name}.md` exists (or skip logged)                | `task.107.review.1.bug-runbook-rewrite.md` — READY TO IMPLEMENT, 8/10, 0 critical / 4 important / 2 optional; all 4 important + 1 optional applied | —                    |
-| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. 4 files changed; fast gate 3155/3155 pass, 0 fail; 52 links checked, 0 dead; both mermaid diagrams validate | — (see Issues Log: surface-map subagent killed) |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. 4 files changed; fast gate 3155/3155 pass, 0 fail; 52 links checked, 0 dead; both mermaid diagrams validate | — (see Issues Log: surface-map subagent hung and was killed) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #387: https://github.com/Gamaroff/agent-skills/pull/387 — base `develop`, head `64e7dc1102f1` (= local HEAD), state OPEN. Issue #386 commented (`reason: posted`) | —                    |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.107.qa.{N}.*.md`; `task.107.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles. Cycle 1 gate FAIL (70/100, 1 HIGH) → qa-fix `fbfe27be`. Cycle 2 gate PASS (95/100), 8/8 SCs. Step 5c `/review-pr` → **REQUEST CHANGES** (5 findings, all in the paper trail) → qa-fix cycle 2 → re-run 5c. | — (see Issues Log: 3 subagent hangs + 1 premature kill) |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.107.qa.{N}.*.md`; `task.107.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles. Cycle 1 gate FAIL (70/100, 1 HIGH) → qa-fix `fbfe27be`. Cycle 2 gate PASS (95/100), 8/8 SCs. Step 5c `/review-pr` → **REQUEST CHANGES** (5 findings, all in the paper trail) → qa-fix cycle 2 → 5c re-run → **APPROVE**. | — (see Issues Log: 2 genuine subagent hangs + 1 premature kill) |
 | 7. finalise                | ⏳ Pending | `task.107.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -79,17 +79,6 @@ three bug modes, tracker sync on both arms), and add the bug branch to `docs/con
   files. The implementation report is committed **here**, per the Step 4 rule.
 - **Step 4 board**: `gh-stage.js --stage in-review` → `stage-disabled` (exit 0). Correct outcome — this
   repo's workflow record does not enable that moment; non-blocking.
-- **Step 5c — the code lens was killed prematurely, and that was my error.** I read its output file at
-  159 bytes, judged it stalled on the pattern set by three genuine hangs earlier in the run, and
-  stopped it — the file had in fact grown to ~712 KB and it was mid-verification. The conformance
-  lens did complete and produced all five findings. The code pass was redone in-line (verification
-  block executed from the shipped file, 38 added links resolved against the tracked tree, both
-  mermaid diagrams validated, both gate YAMLs parsed and schema-checked) and came back clean.
-- **Step 5b cycle 2 — the same defect was committed twice.** The first repair of PC-1 used
-  `s.index("## Change Log")` to place the QA block, which matched the inline code span in §3 again
-  and re-spliced it. Repaired properly with **line-anchored** matching (`l == "## Change Log"`),
-  which is the form that cannot hit a code span. Recorded because PC-1 *was* the lesson and it did
-  not take on the first reading.
 - **Step 4 post-PR check**: queried `gh pr view` directly rather than via the tracker-poller subagent,
   after the Step 3 hang. PR #387 state = OPEN, head SHA matches local HEAD, 0 errors.
 - **Step 3 gates**: `npm run ci:fast` → 3155 pass / 0 fail / 1 skipped. `prettier --check` clean.
@@ -116,6 +105,17 @@ three bug modes, tracker sync on both arms), and add the bug branch to `docs/con
 - **Step 3 — loop-audit subagent not dispatched.** After the hang above, the loop's exit condition was
   verified deterministically instead (`grep '^status:'` → `ready-for-review`, one iteration, no stall).
   A single grep does not need an agent; recorded so the substitution is visible rather than assumed.
+- **Step 5c — the code lens was killed prematurely, and that was my error.** I read its output file at
+  159 bytes, judged it stalled on the pattern set by two genuine hangs earlier in the run, and
+  stopped it — the file had in fact grown to ~712 KB and it was mid-verification. The conformance
+  lens did complete and produced all five findings. The code pass was redone in-line (verification
+  block executed from the shipped file, 38 added links resolved against the tracked tree, both
+  mermaid diagrams validated, both gate YAMLs parsed and schema-checked) and came back clean.
+- **Step 5b cycle 2 — the same defect was committed twice.** The first repair of PC-1 used
+  `s.index("## Change Log")` to place the QA block, which matched the inline code span in §3 again
+  and re-spliced it. Repaired properly with **line-anchored** matching (`l == "## Change Log"`),
+  which is the form that cannot hit a code span. Recorded because PC-1 *was* the lesson and it did
+  not take on the first reading.
 - **Deferred follow-up (out of scope):** `docs/reference/pipeline-artifacts.md` contains **zero**
   mentions of bugs (`grep -c 'bug'` → 0), so the artifacts a `/develop-bug` run writes are documented
   nowhere but in the new runbook section. Task 107 §4 scopes the file list to three pages, so this was
@@ -151,12 +151,14 @@ results its comments claimed), TASK-107-003 and TASK-107-004 (low)
 story/task bugs that no standard specifies and that has zero instances in the corpus (0 of 62).
 Corrected within the cycle.
 **HIGH findings**: 0
-**PR Review**: REQUEST CHANGES — 1 high, 2 medium, 2 low, **all in the paper trail, none in the
-deliverable**. PC-1: the QA Testing Results block had been spliced into the middle of §3 of the task
-document by an unanchored string replace that matched an inline code span instead of the heading.
+**PR Review**: **APPROVE** (re-run). The first 5c pass returned REQUEST CHANGES — 1 high, 2 medium,
+2 low, **all in the paper trail, none in the deliverable**; chief among them PC-1, where the QA
+Testing Results block had been spliced into the middle of §3 by an unanchored string replace that
+matched an inline code span instead of the heading. qa-fix cycle 2 resolved all five; the 5c re-run
+independently confirmed each and raised four further `low` trail findings (PC-6…PC-9), also fixed.
 Report: `task.107.pr-review.1.bug-runbook-rewrite.md`
 **Loop exit**: n/a — this exit not taken
-**Action**: Routed back to qa-fix (cycle 2 of 5) for the five 5c findings, then re-run 5c
+**Action**: Proceeding to Step 7 (finalise)
 
 ---
 
