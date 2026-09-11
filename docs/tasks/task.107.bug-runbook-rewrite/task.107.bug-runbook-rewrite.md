@@ -77,47 +77,7 @@ Sources of truth to write against, none of which the runbook currently cites:
 | Tracker sync | `skills/sync-{jira,github}-bug/SKILL.md`, `shared/resources/status-history.js` |
 | Bug reports carry Status History, never a Change Log | `shared/resources/document-change-log.md` |
 
-Note the last row: bug reports are the one document type barred from the `## QA Testing Results
-
-**QA Status**: PASS (cycle 2) — cycle 1 was FAIL
-**QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-11
-**Quality Score**: 95/100 (cycle 2); 70/100 (cycle 1)
-**Gate Decision**: PASS
-
-### QA Report
-
-- **Cycle 2 (final)**: [task.107.qa.2.bug-runbook-rewrite.md](./task.107.qa.2.bug-runbook-rewrite.md) · [task.107.gate.2.bug-runbook-rewrite.yml](./task.107.gate.2.bug-runbook-rewrite.yml)
-- **Cycle 1**: [task.107.qa.1.bug-runbook-rewrite.md](./task.107.qa.1.bug-runbook-rewrite.md) · [task.107.gate.1.bug-runbook-rewrite.yml](./task.107.gate.1.bug-runbook-rewrite.yml)
-
-### Test Coverage Summary
-
-- **Tests Executed**: 3156 (3155 pass, 0 fail, 1 skipped)
-- **Phases Verified**: 4/4 (phase 2 with concerns)
-- **Critical Issues**: 0 open — cycle 1 found 1 HIGH / 1 MEDIUM / 2 LOW, cycle 2 found 1 LOW; all 5 resolved
-- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: PASS
-
-### Fix Cycle 1 — all four findings resolved (2026-09-11)
-
-| Finding | Resolution |
-| :--- | :--- |
-| TASK-107-001 (high) | The delegation sentence is split by arm. The Jira sub-routine delegates (`invokes: [sync-jira-bug]`); the GitHub one creates the issue itself and never references `sync-github-bug`. Open/closed reconciliation is attributed to the full sync skills, with the note that Step 1 never runs them on the GitHub arm. **SC3 now met.** |
-| TASK-107-002 (medium) | Verification block corrected — scoped to `REPORT="$BUG/$(basename "$BUG").md"` and the pattern changed to `^\*\*Status\*\*:`. **Re-run verbatim: prints `status: closed` + `**Status**: ✅ Closed`, then `1`, then `0`** — exactly what the comments claim. |
-| TASK-107-003 (low) | The artifacts-directory claim now says the own-directory shape is the **general**-bug case, and that story/task bug artifacts sit in the parent's directory. |
-| TASK-107-004 (low) | Trimmed 200 → **198** lines by linking rather than restating `develop-bug` content (Phase 0 block, delegation paragraph, pitfalls). |
-| TASK-107-005 (low, found in cycle 2) | The page asserted a companion-artifact filename shape for story/task bugs that no standard specifies and the corpus has **zero** instances of (0 of 62). Replaced with what is established, plus an explicit statement that the shape is not established by example. |
-
-### Key Findings
-
-Six of eight success criteria clean, one marginal, one failed. **SC3 failed**: the page states both
-tracker arms delegate to the full sync skill, but only the Jira arm does — `ensure-bug-github-issue`
-creates the issue itself and never references `sync-github-bug`. Separately, the page's own
-verification block does not produce the results its comments claim, on the one block the task required
-to be verified by running it.
-
----
-
-## Change Log`, and a
+Note the last row: bug reports are the one document type barred from the `## Change Log`, and a
 rewrite is exactly where that rule gets broken by copying the story runbook's shape.
 
 ## 4. Scope
@@ -196,6 +156,56 @@ exists for that specific mistake.
 
 `git revert` the commit. No state, no migration.
 
+---
+
+## QA Testing Results
+
+**QA Status**: PASS (cycle 2) — cycle 1 was FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-11
+**Quality Score**: 95/100 (cycle 2); 70/100 (cycle 1)
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Cycle 2 (final)**: [task.107.qa.2.bug-runbook-rewrite.md](./task.107.qa.2.bug-runbook-rewrite.md) · [task.107.gate.2.bug-runbook-rewrite.yml](./task.107.gate.2.bug-runbook-rewrite.yml)
+- **Cycle 1**: [task.107.qa.1.bug-runbook-rewrite.md](./task.107.qa.1.bug-runbook-rewrite.md) · [task.107.gate.1.bug-runbook-rewrite.yml](./task.107.gate.1.bug-runbook-rewrite.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 3156 (3155 pass, 0 fail, 1 skipped)
+- **Phases Verified**: 4/4 — gate 2 records `phases_with_issues: []` (cycle 1 had flagged phase 2)
+- **Critical Issues**: 0 open — cycle 1 found 1 HIGH / 1 MEDIUM / 2 LOW, cycle 2 found 1 LOW; all 5 resolved
+- **NFR Status**: Security: PASS (`reasoned`), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Fix Cycle 1 — all four findings resolved (2026-09-11)
+
+| Finding | Resolution |
+| :--- | :--- |
+| TASK-107-001 (high) | The delegation sentence is split by arm. The Jira sub-routine delegates (`invokes: [sync-jira-bug]`); the GitHub one creates the issue itself and never references `sync-github-bug`. Open/closed reconciliation is attributed to the full sync skills, with the note that Step 1 never runs them on the GitHub arm. **SC3 now met.** |
+| TASK-107-002 (medium) | Verification block corrected — scoped to `REPORT="$BUG/$(basename "$BUG").md"` and the pattern changed to `^\*\*Status\*\*:`. **Re-run verbatim: prints `status: closed` + `**Status**: ✅ Closed`, then `1`, then `0`** — exactly what the comments claim. |
+| TASK-107-003 (low) | The artifacts-directory claim now says the own-directory shape is the **general**-bug case, and that story/task bug artifacts sit in the parent's directory. |
+| TASK-107-004 (low) | Trimmed 200 → 198 lines by linking rather than restating `develop-bug` content (Phase 0 block, delegation paragraph, pitfalls). The cycle-2 correction to TASK-107-005 returned it to **200**, which is the shipped figure and still inside Success Criterion 8. |
+| TASK-107-005 (low, found in cycle 2) | The page asserted a companion-artifact filename shape for story/task bugs that no standard specifies and the corpus has **zero** instances of (0 of 62). Replaced with what is established, plus an explicit statement that the shape is not established by example. |
+
+### Key Findings
+
+**All eight success criteria met** after two QA cycles and a PR conformance review.
+
+Cycle 1 (gate FAIL, 70/100) found the page claiming both tracker arms delegate to a sync skill when
+only Jira does — Success Criterion 3 failing — and found the page's own verification block not
+producing the results its comments claimed, on the one block the task required to be verified by
+running it. Both fixed. Cycle 2's refute pass (gate PASS, 95/100) found one more of the same class:
+an artifact-naming shape asserted from inference, with zero instances in a 62-file corpus. Fixed
+in-cycle.
+
+Step 5c (`/review-pr`) then returned **REQUEST CHANGES** on five findings, **all in the paper trail
+and none in the deliverable** — chief among them a structural corruption of this document, where an
+unanchored string replace spliced this section into the middle of §3. See
+[`task.107.pr-review.1.bug-runbook-rewrite.md`](./task.107.pr-review.1.bug-runbook-rewrite.md).
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                              | Author |
@@ -206,6 +216,7 @@ exists for that specific mistake.
 | 2026-09-11 |         | QA gate FAIL (70/100) — 4 findings: wrong skill named on the GitHub tracker arm (SC3), verification block does not run as documented, 2 low | qa-task |
 | 2026-09-11 |         | QA findings fixed — all 4 resolved, 1 iteration; verification block re-run verbatim and now matches its comments | qa-fix |
 | 2026-09-11 |         | QA gate PASS (95/100) — cycle-2 refute pass re-verified all 4 fixes against source; 1 new low finding corrected in-cycle; 8/8 success criteria | qa-task |
+| 2026-09-11 |         | PR conformance review (Step 5c) REQUEST CHANGES — 5 findings, all in the paper trail; the QA section had been spliced into §3 by an unanchored replace. All 5 fixed | qa-fix |
 
 ## Progress Tracking
 
