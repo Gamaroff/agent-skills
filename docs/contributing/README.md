@@ -11,6 +11,7 @@ How to author, package, validate, and release skills for this library.
 - [Packaging](./packaging.md) — distribution, validation, shared resources
 - [Evals](./evals/README.md) — four-layer test suite, drivers, live tracker scenarios
 - [Releases](./releases.md) — versioning, release checklist, publishing
+- [Traps](./traps.md) — repo-specific things that cost time: shell functions, symlinks, generated trees, CI quirks
 
 ## See also
 
