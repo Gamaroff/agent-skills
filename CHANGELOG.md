@@ -85,6 +85,14 @@ All notable changes to this project will be documented in this file. Format foll
   drift (fifth recurrence; T99–T105, T107) is settled by rule rather than backfill: the registry row
   and the document, both written by `/finalise`, are the record; a roadmap row is for phase-row items.
 
+- **`select-next.mjs --batch` says why it is empty on a registry-only frontier.** The registry
+  fallback is single-select by design (registry rows carry no `touches:` annotation, so
+  write-disjointness cannot be established for a parallel batch), but the empty-batch `detail` read
+  "no ready rows in any phase" and `develop-batch`'s STOP branch said "only blocked/gated/manual
+  rows remain" — false in what is now the normal state, with `/develop-next` selecting B13 at the
+  same moment. Both now name the single-select fallback and route the operator to `/develop-next`;
+  the SC10 unit test asserts the message.
+
 - **`AGENTS.md` states the call-site coverage test's real scope.** It claimed the test "fails on a
   bare `gh issue comment` invocation in shipped source"; the test scans `SKILL.md` and
   `shared/resources/*.md` only, and a shipped shell hook carries exactly that call (bug 14). The
