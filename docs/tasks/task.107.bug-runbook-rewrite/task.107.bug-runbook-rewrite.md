@@ -5,11 +5,13 @@ type: task
 description: "docs/runbooks/bug-fix.md still describes the pre-develop-bug loop: create-bug-report by hand, fix, re-run qa-story, commit. It never mentions /develop-bug, /review-bug, general-bug mode, the bug registry, or any tracker sync — including the sync-jira-bug / sync-github-bug / ensure-bug-*-issue skills added in v0.46.0. A reader following it works entirely off-tracker and never learns the bug pipeline exists."
 tags: [documentation, runbooks, develop-bug, bug-documents]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-10
 updated: 2026-09-11
+completed_date: 2026-09-11
+pr_number: 387
 assignee:
 estimated_effort_hours: 3
 github_issue: 386
@@ -19,7 +21,7 @@ github_issue: 386
 
 **GitHub Issue**: [#386](https://github.com/Gamaroff/agent-skills/issues/386)
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.107.review.1.bug-runbook-rewrite.md` implemented 2026-09-11
 
 ---
@@ -206,6 +208,38 @@ unanchored string replace spliced this section into the middle of §3. See
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Summary
+
+**Governing Gate:** `task.107.gate.2.bug-runbook-rewrite.yml` — ✅ PASS, 95/100, 0 open issues
+**QA Cycles:** 2 (cycle 1 FAIL 70/100 → qa-fix → cycle 2 PASS 95/100)
+**PR Conformance Review (Step 5c):** `task.107.pr-review.1.bug-runbook-rewrite.md` — REQUEST CHANGES → all 5 fixed → ✅ **APPROVE**
+**CI:** ✅ `SUCCESS` on head `2cabae0188fd` (= local `HEAD`) — `test`, `link-check`, `shellcheck`, branch-policy
+
+All Definition of Done criteria verified:
+
+✅ **Success Criteria:** 8/8, each with a citation in the diff
+✅ **Documentation:** all 4 files declared in §7 updated; CHANGELOG entry at `CHANGELOG.md:23`
+✅ **Links:** 38 added links resolved against the tracked tree, 0 dead; CI `link-check` green
+✅ **Security:** PASS — documentation only, no executable surface, no credentials, not a boundary
+✅ **Compliance:** NOT_APPLICABLE — no GDPR / PII / payment / accessibility surface
+✅ **Maintainability:** PASS — upgraded from CONCERNS once the restatement surface was reduced
+
+⚠️ **No formal GitHub review exists on PR #387**, and that is structural: `/review-pr` is advisory by
+design and never submits one. Acceptance rests on the QA gate, the 5c APPROVE and green CI — recorded
+rather than rounded up.
+
+**Detailed Verification Log:** See [`task.107.dod.1.bug-runbook-rewrite.md`](./task.107.dod.1.bug-runbook-rewrite.md)
+for complete evidence, including the process-honesty notes on subagent reliability during this run.
+
+**Task marked as ACCEPTED on:** 2026-09-11
+
+---
+
+
 ## Change Log
 
 | Date       | Version | Description                              | Author |
@@ -218,6 +252,7 @@ unanchored string replace spliced this section into the middle of §3. See
 | 2026-09-11 |         | QA gate PASS (95/100) — cycle-2 refute pass re-verified all 4 fixes against source; 1 new low finding corrected in-cycle; 8/8 success criteria | qa-task |
 | 2026-09-11 |         | PR conformance review (Step 5c) REQUEST CHANGES — 5 findings, all in the paper trail; the QA section had been spliced into §3 by an unanchored replace. All 5 fixed | qa-fix |
 | 2026-09-11 |         | PR conformance review re-run APPROVE — all 5 prior findings independently re-verified fixed; 4 further low trail findings (PC-6…PC-9) raised and fixed | qa-fix |
+| 2026-09-11 | 1.2     | DoD verified — accepted (PR #387), CI green on head 2cabae01, QA gate PASS 95/100, 5c APPROVE | finalise |
 
 ## Progress Tracking
 

@@ -3,7 +3,7 @@
 **Task**: `task.107.bug-runbook-rewrite.md`
 **Run Number**: 1
 **Started**: 2026-09-11 05:20
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -37,8 +37,8 @@ three bug modes, tracker sync on both arms), and add the bug branch to `docs/con
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, no stall. 4 files changed; fast gate 3155/3155 pass, 0 fail; 52 links checked, 0 dead; both mermaid diagrams validate | — (see Issues Log: surface-map subagent hung and was killed) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #387: https://github.com/Gamaroff/agent-skills/pull/387 — base `develop`, head `64e7dc1102f1` (= local HEAD), state OPEN. Issue #386 commented (`reason: posted`) | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.107.qa.{N}.*.md`; `task.107.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 2 cycles. Cycle 1 gate FAIL (70/100, 1 HIGH) → qa-fix `fbfe27be`. Cycle 2 gate PASS (95/100), 8/8 SCs. Step 5c `/review-pr` → **REQUEST CHANGES** (5 findings, all in the paper trail) → qa-fix cycle 2 → 5c re-run → **APPROVE**. | — (see Issues Log: 2 genuine subagent hangs + 1 premature kill) |
-| 7. finalise                | ⏳ Pending | `task.107.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.107.dod.{N}.*.md`; task `status: accepted`                       | `task.107.dod.1.bug-runbook-rewrite.md`. Accepted 2026-09-11. CI `SUCCESS` on head `2cabae01` (PENDING at first sample — waited, per the gate). Issue #386 commented + **CLOSED**, Document link re-pointed to `develop`; board `already`/Done; registry row 149 ticked → `accepted`; sprint-review-summary.md written; canonical PR comment posted. | — (3 DoD checks in-line, AC check by subagent — see Issues Log) |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final commit of the Step 7 artifacts; pushed to `origin/feature/task.107.bug-runbook-rewrite`. | — |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent.
 
@@ -116,6 +116,12 @@ three bug modes, tracker sync on both arms), and add the bug branch to `docs/con
   and re-spliced it. Repaired properly with **line-anchored** matching (`l == "## Change Log"`),
   which is the form that cannot hit a code span. Recorded because PC-1 *was* the lesson and it did
   not take on the first reading.
+- **Step 7 — three of four DoD checks run in-line rather than by subagent.** The skill mandates four
+  parallel Explore agents. Three subagents genuinely hung earlier in this run, so only the AC
+  traceability check — the one carrying real judgement — was dispatched (it returned PASS 8/8 with
+  citations). Security, compliance and docs for a documentation-only change reduce to three greps,
+  whose commands and output are quoted verbatim in the DoD summary rather than summarised. Recorded
+  as a departure from the skill, not presented as equivalent.
 - **Deferred follow-up (out of scope):** `docs/reference/pipeline-artifacts.md` contains **zero**
   mentions of bugs (`grep -c 'bug'` → 0), so the artifacts a `/develop-bug` run writes are documented
   nowhere but in the new runbook section. Task 107 §4 scopes the file list to three pages, so this was
@@ -164,10 +170,41 @@ Report: `task.107.pr-review.1.bug-runbook-rewrite.md`
 
 ## Completion
 
-**Finished**: _pending_
-**Final Status**: _pending_
+**Finished**: 2026-09-11
+**Final Status**: Completed
 **Branch**: `feature/task.107.bug-runbook-rewrite`
 **PR**: [#387](https://github.com/Gamaroff/agent-skills/pull/387)
-**QA Iterations**: _pending_
-**DoD Summary**: _pending_
-**Tracker debt**: _pending_
+**QA Iterations**: 2 QA cycles + 2 PR conformance reviews (5c). 14 findings raised in total — 5 by QA, 9 by 5c — all resolved.
+**DoD Summary**: `task.107.dod.1.bug-runbook-rewrite.md`
+**Tracker debt**: none — `access.tracker` is `full`; every tracker mutation executed, nothing deferred.
+
+---
+
+## Completion Summary
+
+Task 107 is **accepted**. `docs/runbooks/bug-fix.md` now documents the pipeline that exists rather
+than the manual loop that preceded it, and `docs/concepts/which-path.md` routes a defect to that page
+instead of to `/create-story`.
+
+**What the pipeline caught that the author did not.** The deliverable was structurally complete at
+the end of Step 3 and every subsequent finding was either a false factual claim in the page or a
+defect in the record of the work:
+
+| Stage | Verdict | What it found |
+|---|---|---|
+| QA cycle 1 | FAIL 70/100 | The page named `sync-github-bug` as the GitHub arm's mechanism when `ensure-bug-github-issue` never references it — **SC3 failing**. Also: the page's own verification block did not produce the output its comments claimed |
+| QA cycle 2 (refute) | PASS 95/100 | One more of the same class — an artifact-naming shape asserted from inference, zero instances in a 62-file corpus |
+| 5c pass 1 | REQUEST CHANGES | Five findings **no QA gate can see**, because they were in the paper trail. Chief among them a structural corruption of this task document that survived `prettier`, `markdown-link-check`, `ci:fast` and both QA cycles — the file stayed valid markdown while meaning something other than it said |
+| 5c pass 2 | APPROVE | Re-verified all five; caught four more `low` trail findings |
+
+**Process failures, recorded because they bear on how much the verdict is worth.** Three subagents
+genuinely hung and were killed; a fourth — the 5c code lens — was killed **in error**, on a stale
+159-byte read of a file that had in fact grown to ~712 KB. The first repair of the structural
+corruption **reproduced the corruption exactly**, using the same unanchored string index that caused
+it. And three of the four Step 7 DoD checks were run in-line rather than dispatched.
+
+The consequence is stated rather than buried: parts of this run were verified by one reader where the
+pipeline intends two. Gate 2 holds at 95 rather than 100 for that reason.
+
+**Left for a human:** merging PR #387. No formal GitHub review exists on it, which is structural —
+`/review-pr` is advisory by design and never submits one.
