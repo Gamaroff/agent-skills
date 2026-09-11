@@ -20,6 +20,31 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The bug-fix runbook is rewritten against the pipeline that exists**
+  ([`docs/runbooks/bug-fix.md`](docs/runbooks/bug-fix.md), task 107). The page had been overtaken
+  twice without being revisited. Its "Steps" block was
+  `qa-story → create-bug-report → [developer fixes] → qa-story → commit-changes` — the pre-`/develop-bug`
+  manual loop — so a reader did the orchestrator's job by hand and never learned it was there. It also
+  mentioned no tracker at all (`grep -c 'tracker\|jira\|github_issue'` returned **0**, five releases
+  after `sync-{jira,github}-bug` and `ensure-bug-{jira,github}-issue` shipped), and listed two of the
+  three bug modes, leaving a reader with a cross-cutting defect no route at all.
+
+  The page now carries the mode table with all three filename patterns and numbering rules, the
+  `/develop-bug` 8-step pipeline with its `/review-bug` fix-readiness gate and both branch models, the
+  tracker-sync step on both `TRACKER` arms with their differing parent linkage (GitHub sub-issue vs
+  Jira sibling-plus-issue-link), the artifacts a run leaves on disk, and a runnable verification block.
+  It stays inside the ~200-line satellite budget that
+  [`docs/runbooks/README.md`](docs/runbooks/README.md) sets for it, borrowing the anchor runbooks'
+  section shape rather than their length.
+
+- **`docs/concepts/which-path.md` routes a defect to the bug path.** The decision tree offered no bug
+  branch: a reported bug reached `/create-story` through the "user-facing" arm, and a cross-cutting one
+  reached `/create-task` through the "internal" arm. Neither produces a bug document, so the
+  reproduction record, the Status History and the registry row were all lost at the first question.
+  A defect check is now Question 1 — ahead of user-facing, so non-user-facing defects are caught too —
+  with the hotfix boundary preserved as its follow-up. Added to all three representations the page
+  keeps in sync: the flowchart, the prose fallback and the quick-reference table.
+
 - **The diminishing-returns exit is documented as the three-condition guard it is.** Every page
   describing it — the runbook, troubleshooting, the FAQ, the glossary — stated *two consecutive
   zero-HIGH gates plus test-only findings*, which is the short form and **more permissive than the
