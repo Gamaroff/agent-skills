@@ -18,6 +18,22 @@ All notable changes to this project will be documented in this file. Format foll
   *anchor-failed*, *card preflight*, *observation log*. The glossary gained nothing across v0.46.0
   while the vocabulary it exists to define roughly doubled.
 
+- **A durable home for the repo's traps: [`docs/contributing/traps.md`](docs/contributing/traps.md).**
+  The nine "things that cost time" entries — `command node`, the `.agents/skills` symlink, never edit
+  `references/`, CI check counts, `mergeable` lies, the hand-maintained suite list, the `.gitignore`
+  negation block, the next-heading lookahead, one-line `invokes:` — lived only in `.agents/handoff.md`
+  §5, beside a state section that decays in days. The half that decayed discredited the half that did
+  not. Moved verbatim with their measurement dates; the handoff now points here.
+
+- **Three general bugs and five tasks filed from a repo sweep** (2026-09-12), giving `/develop-next` a
+  frontier again — it had returned `roadmap-complete`. Bugs 13–15: `change-log.js` drops prose and
+  nested `###` on the un-migrated path (confirmed by execution, untested); the PreCompact hook posts
+  bare `gh issue comment` / `gh pr comment` outside the comment contract and the `access.tracker`
+  gate; `observation-log doctor`'s activation check is cwd-relative. Tasks 108–112: the bundler
+  copies depth-relative links verbatim (864 broken links in 229 bundled files); a `run()` test for
+  `sync-jira-story`'s transition-only write; a `session-handoff` skill; local/CI lane parity; the
+  `hotfix.md` runbook rewrite.
+
 ### Changed
 
 - **The bug-fix runbook is rewritten against the pipeline that exists**
@@ -62,6 +78,18 @@ All notable changes to this project will be documented in this file. Format foll
   column via `registry-tick.js`; the always-loaded summary still described only the create-time half,
   so an agent reading it would hand-tick a row it no longer owns.
 
+- **Roadmap Phase 5 archived; roadmap rows declared optional for registry-selected items**
+  ([`docs/development/project-completion-roadmap.md`](docs/development/project-completion-roadmap.md)).
+  All 25 Phase 5 rows were ticked and the phase was still on the live page; no phase is open now and
+  the registries are the whole frontier. The recurring "accepted task has no roadmap Change Log row"
+  drift (fifth recurrence; T99–T105, T107) is settled by rule rather than backfill: the registry row
+  and the document, both written by `/finalise`, are the record; a roadmap row is for phase-row items.
+
+- **`AGENTS.md` states the call-site coverage test's real scope.** It claimed the test "fails on a
+  bare `gh issue comment` invocation in shipped source"; the test scans `SKILL.md` and
+  `shared/resources/*.md` only, and a shipped shell hook carries exactly that call (bug 14). The
+  sentence now says "canonical Markdown" and names the gap.
+
 ### Fixed
 
 - **Tree-derived counts stated as standing fact, in three places.** The ShellCheck lane's input size
@@ -84,6 +112,24 @@ All notable changes to this project will be documented in this file. Format foll
   `AMBIGUOUS` verdict on `skills/create-skill/references/skill-dependencies.json`, where
   `npm run bundle` reports `in sync` and `--check` reports a problem, because `.json` carries no
   provenance banner and the bundler will not overwrite a file it cannot prove it wrote.
+
+- **Six broken links in `SKILL.md` files.** `docs/placeholders.md` (deleted in the docs restructure,
+  content now in `docs/reference/configuration.md`) from `deploy-remote`, `docker`, `nestjs-debug`,
+  `qa-task`; `docs/development/documentation-conventions.md` from `create-parallel-stories` and
+  `documentation-standards-validator`, now pointing at the standards pages that replaced it. CI's
+  link check is path-filtered to `docs/**` and never saw them.
+
+- **The onboarding PRD and its shipped example linked to `~/.claude/plans/…`**
+  ([`docs/prd/onboarding/prd.onboarding.md`](docs/prd/onboarding/prd.onboarding.md),
+  [`examples/prd-example/prd.onboarding.md`](examples/prd-example/prd.onboarding.md)) — a live link to an
+  agent scratch file, in the example that teaches the plan-location rule forbidding it. Replaced with
+  a note that the pre-flight plan is not retained.
+
+- **`docs/reference/configuration.md` used the `.claude/skills/` path** in the `--probe-workflow`
+  example; every other reference is `.agents/skills/`.
+
+- **`setup-consumer.sh` said "same candidate order as install-hooks.sh" and was missing the two
+  `develop-bug` entries** that `develop-pipeline-install-hooks.sh` has. Added, in the same order.
 
 ## [v0.46.0] - 2026-09-10
 

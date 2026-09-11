@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-09-09
-**Next Available Task Number:** **108**
+**Last Updated:** 2026-09-12
+**Next Available Task Number:** **113**
 
 ## How to use
 
@@ -147,6 +147,11 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 105 | [Every tracker-comment call site feeds the plain-language lead, and the seven that bypass the engine stop bypassing it](task.105.comment-call-sites-plain-language-lead/task.105.comment-call-sites-plain-language-lead.md) | accepted | refactoring | Medium | 2026-09-09 | [#378](https://github.com/Gamaroff/agent-skills/issues/378) | task.104 |
 | 106 | [Pull-request summary comments open with a plain-language lead](task.106.pr-comment-plain-language-lead/task.106.pr-comment-plain-language-lead.md) | accepted | refactoring | Low | 2026-09-09 | [#380](https://github.com/Gamaroff/agent-skills/issues/380) | task.104 · PR #381. Eleven PR templates gained the task.104 lead; inline findings stay technical by design. 3 QA cycles (80 → 95 → 90), 4 defects closed, one of them introduced by another's fix |
 | 107 | [The bug-fix runbook documents a pipeline that has been superseded twice](task.107.bug-runbook-rewrite/task.107.bug-runbook-rewrite.md) | accepted              | documentation | Medium | 2026-09-10 | — | — |
+| 108 | [The bundler copies depth-relative links verbatim, so every bundled references/ file carries broken links](task.108.bundler-rewrites-relative-links/task.108.bundler-rewrites-relative-links.md) | planned | infrastructure | High | 2026-09-12 | — | — |
+| 109 | [sync-jira-story's skipped-but-transitioned write gate has no run()-level test](task.109.sync-jira-story-transition-only-write-test/task.109.sync-jira-story-transition-only-write-test.md) | planned | testing | Medium | 2026-09-12 | — | — |
+| 110 | [A session-handoff skill that writes the handoff and re-measures it on read](task.110.session-handoff-skill/task.110.session-handoff-skill.md) | planned | other | Medium | 2026-09-12 | — | — |
+| 111 | [One local command that runs every CI lane, and two coverage gaps the sweep found](task.111.local-ci-parity/task.111.local-ci-parity.md) | planned | infrastructure | Medium | 2026-09-12 | — | — |
+| 112 | [The hotfix runbook predates /develop-bug's hotfix model and never mentions it](task.112.hotfix-runbook-rewrite/task.112.hotfix-runbook-rewrite.md) | planned | documentation | Medium | 2026-09-12 | — | — |
 
 - **Tasks 104-106 close the stakeholder-readability gap in tracker comments**, filed 2026-09-09 after stakeholders reported that Jira and GitHub issue comments are unreadable to a non-technical reader. One shippable unit each, in dependency order: **104** builds the primitive (a per-stage catalogue of plain-language lead paragraphs, rendered by `tracker-comment.js` from the `--stage` every call site already passes — so all 22 sites gain a lead with no call-site edit); **105** feeds real values into the lead's slots and converts the seven sites that post a bare `gh issue comment` and never reach the engine at all; **106** carries the same lead onto the eleven pull-request conversation templates. 105 and 106 both depend on 104 and are independent of each other. Per-line inline PR findings are deliberately excluded — see task.106 §4. None has a tracker issue yet.
 

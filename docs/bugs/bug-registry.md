@@ -1,8 +1,8 @@
 # Bug Registry
 
 **Purpose:** Central tracking for all general (cross-cutting) bug numbers in this repo.
-**Last Updated:** 2026-09-06
-**Next Available Bug Number:** **13**
+**Last Updated:** 2026-09-12
+**Next Available Bug Number:** **16**
 
 ## How to use
 
@@ -39,6 +39,9 @@
 | 10 | [sed's `w` write flag is only caught when a space follows it, leaving seven glued forms fail-open](bug.10.sed-w-glued-filename/bug.10.sed-w-glued-filename.md) | closed | Major | High | 2026-09-05 | qa-execute-snippets / classifier |
 | 11 | [finalise's Document-link re-point regresses a card out of the terminal status it just set, stranding the resolution](bug.11.finalise-relink-regresses-terminal-status/bug.11.finalise-relink-regresses-terminal-status.md) | closed | Major | High | 2026-09-06 | finalise Step 7 / sync-jira status drive |
 | 12 | [Three review-* body/link-only syncs still re-resolve status after the ladder has moved the card](bug.12.review-syncs-relink-without-no-transition/bug.12.review-syncs-relink-without-no-transition.md) | closed | Major | Medium | 2026-09-06 | review-story 9.6 / review-task 8.6 / review-epic |
+| 13 | [change-log.js drops prose and nested `###` on the un-migrated (`hasMarkers:false`) path](bug.13.change-log-unmigrated-path-drops-prose/bug.13.change-log-unmigrated-path-drops-prose.md) | new | Major | High | 2026-09-12 | change-log engine |
+| 14 | [PreCompact hook posts bare `gh issue comment` / `gh pr comment`, bypassing the comment contract and the access gate](bug.14.precompact-hook-bare-tracker-comment/bug.14.precompact-hook-bare-tracker-comment.md) | new | Major | High | 2026-09-12 | pipeline hooks / tracker comments |
+| 15 | [`observation-log doctor`'s activation check is cwd-relative and false-negatives silently](bug.15.doctor-activation-check-cwd-relative/bug.15.doctor-activation-check-cwd-relative.md) | new | Minor | Medium | 2026-09-12 | observation log |
 
 ---
 
