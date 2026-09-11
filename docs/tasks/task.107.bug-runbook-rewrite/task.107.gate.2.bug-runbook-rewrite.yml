@@ -1,0 +1,88 @@
+schema: 1
+task: 'task.107.bug-runbook-rewrite'
+task_title: 'The bug-fix runbook documents a pipeline that has been superseded twice'
+gate: PASS
+status_reason: 'All four cycle-1 findings verified fixed, each against source rather than against the fix description. One new finding this cycle — an artifact-naming shape the page asserted that no standard specifies and the corpus has zero instances of — corrected within the cycle. All 8 success criteria now met.'
+reviewer: 'QA Engineer'
+updated: '2026-09-11T04:00:00Z'
+
+top_issues:
+  - id: 'TASK-107-005'
+    severity: low
+    file: 'docs/runbooks/bug-fix.md'
+    finding: >-
+      New this cycle. The page asserted "Story and task bugs produce the same set, prefixed
+      story.{e}.{s}.bug.{n}. / task.{id}.bug.{n}., in the parent's directory rather than one of their
+      own" - a filename shape that docs/standards/file-naming.md does not specify (it gives
+      story/task bug REPORTS but no bug-run companion artifacts), that docs/standards/bug-documents.md
+      does not specify, and that has ZERO instances in the corpus - 62 story/task bug files exist and
+      none carries a .review./.implementation./.dod. companion. The page was asserting a
+      specification it had inferred. That is the same defect class this task exists to fix.
+    suggested_action: >-
+      State what is established and name what is not - the report sits in the parent's directory per
+      file-naming.md, and no story or task bug has yet been through /develop-bug, so its companion
+      naming is not established by example.
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-11'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 3156
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: >-
+      Unchanged from cycle 1 - documentation only, no executable surface in the diff. Verdict reached
+      by reading, so `reasoned` rather than `measured`.
+  performance:
+    status: PASS
+    notes: 'No runtime surface. npm run ci:fast 3155 pass / 0 fail.'
+  reliability:
+    status: PASS
+    notes: 'git revert; no state, no migration. CI green on both commits.'
+  maintainability:
+    status: PASS
+    notes: >-
+      Upgraded from CONCERNS. The restatement surface that produced both TASK-107-001 and
+      TASK-107-005 has been reduced - the page now links file-naming.md and the sync skills rather
+      than paraphrasing them, and names the one place where nothing is established rather than
+      filling the gap with an inference.
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 0
+  fix_date: '2026-09-11'
+  total_iterations: 1
+  verification_method: >-
+    Each cycle-1 fix re-verified against its source of truth, not against the fix description -
+    invokes: keys and step titles read from both ensure-bug-*-issue skills, the corrected verification
+    block executed against a DIFFERENT bug directory (bug.11) than the one it names, and the
+    self-named-subdirectory assumption tested against all 12 general bugs (12/12 resolve).
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        docs/reference/pipeline-artifacts.md has zero bug rows, so a develop-bug run's artifacts are
+        documented only in this runbook. Out of task 107's scope.
+      refs: ['docs/reference/pipeline-artifacts.md']
+    - action: >-
+        Neither file-naming.md nor bug-documents.md specifies the companion artifacts a general bug
+        accumulates, though bugs 1, 2, 3, 11 and 12 all carry them. The standard trails the corpus.
+      refs: ['docs/standards/file-naming.md', 'docs/standards/bug-documents.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

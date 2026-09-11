@@ -28,7 +28,7 @@ After those, pick a runbook from the table below as the work in front of you dem
 | [Story Development](./story-development.md) | Shipping a user-facing feature that fits inside a PRD → epic → story hierarchy. Covers `create-prd` → `review-prd` → `create-epic` → `review-epic` → `create-story` → `review-story` → `develop-story`. |
 | [Task Development](./task-development.md) | Standalone technical work (refactor, infra, cleanup, tooling) that doesn't need a PRD or epic. Covers `create-task` → `review-task` → `develop-task`. |
 | [QA Flow](./qa-flow.md) | Running QA without the full develop-story / develop-task orchestrator — pre-implementation planning, manual review, or rework on findings. |
-| [Bug Fix](./bug-fix.md) | Responding to a QA finding or reported bug inside the normal pipeline. |
+| [Bug Fix](./bug-fix.md) | Filing and fixing a defect inside the normal pipeline — all three bug modes, `create-bug-report` → `review-bug` → `develop-bug`. |
 | [Hotfix](./hotfix.md) | Emergency production fix branched from `main` and propagated back to `develop`. |
 | [Sprint Cycle](./sprint-cycle.md) | Coordinating sprint planning → development → review → completion using these skills. |
 | [PM Workflows](./pm-workflows.md) | Framing work before development — greenfield PRD, brownfield enhancement, change management. |
