@@ -113,7 +113,7 @@ target_completion: 2026-01-15
 
 ### Story Frontmatter
 
-> **Canonical schema:** see [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md) §4 + Appendix B. Story `status` is **kebab-case** (kebab-case for every document type — see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)), effort is `estimated_effort_hours`, and both `created` and `updated` are required.
+> **Canonical schema:** see [`docs/standards/story-documents.md`](../../docs/standards/story-documents.md) §Frontmatter schema. Story `status` is **kebab-case** (kebab-case for every document type — see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)), effort is `estimated_effort_hours`, and both `created` and `updated` are required.
 
 ## \`\`\`yaml
 

@@ -609,7 +609,7 @@ per issue type, the live transitions from a sampled issue, and exactly which tra
 status would take and by which rule. Read-only; it transitions nothing:
 
 ```bash
-node .claude/skills/sync-jira-task/scripts/sync-jira-task.js --probe-workflow
+node .agents/skills/sync-jira-task/scripts/sync-jira-task.js --probe-workflow
 ```
 
 Notes:

@@ -232,7 +232,7 @@ For every split, in one commit, update the parent epic's:
 
 **Verify before committing:** count the active (non-superseded) story directories under the epic's `stories/` folder and confirm the epic's `estimated_stories` frontmatter value matches exactly. If the repo has a docs gate that covers this check, run it too.
 
-Reference example: Epic 14's 14.7 split. Canon: [`docs/development/documentation-conventions.md`](../../../docs/development/documentation-conventions.md) §2.
+Reference example: Epic 14's 14.7 split. Canon: [`docs/standards/file-naming.md`](../../docs/standards/file-naming.md) §Patterns.
 
 ---
 

@@ -8,7 +8,7 @@ type: project
 
 Expert Docker administration for multi-environment infrastructure (development, test, production).
 
-> **Placeholders**: this skill uses `{project}`, `{api-service}`, `{db-service}`, `{cache-service}` as templates — replace with your own service names. See [`docs/placeholders.md`](../../docs/placeholders.md).
+> **Placeholders**: this skill uses `{project}`, `{api-service}`, `{db-service}`, `{cache-service}` as templates — replace with your own service names. See [`docs/reference/configuration.md`](../../docs/reference/configuration.md).
 
 ## Quick Reference
 
