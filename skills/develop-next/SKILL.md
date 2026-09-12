@@ -365,7 +365,6 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
      git diff --quiet HEAD -- docs/tasks/task-registry.md || {
        git add docs/tasks/task-registry.md
        git commit -m "docs(registry): record <id> — PR #<n> merged"
-       git push origin <baseBranch>
      }
      ```
      A clean tree means the earlier commit exists locally — not that it was pushed: a crash between

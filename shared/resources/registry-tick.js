@@ -99,26 +99,32 @@ function parseArgs(argv) {
     pr: null,
     issue: null,
   };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--file") out.file = argv[++i];
-    else if (a === "--registry") out.registry = argv[++i];
-    else if (a === "--annotate") out.annotate = true;
-    else if (a === "--pr" || a === "--issue") {
-      // A value-taking flag whose next token is missing or is itself a flag
-      // has no value. Without this, `--issue --json` would take `--json` as the
-      // issue reference AND drop the JSON output — two silent errors from one.
-      const v = argv[i + 1];
-      if (v === undefined || /^--/.test(v)) {
-        return { error: `${a} requires a value` };
-      }
-      i++;
-      if (a === "--pr") out.pr = v;
-      else out.issue = v;
-    } else if (a === "--dry-run") out.dryRun = true;
-    else if (a === "--json") out.json = true;
-    else if (a === "--help" || a === "-h") out.help = true;
-    else return { error: `unknown argument ${JSON.stringify(a)}` };
+  // A value-taking flag whose next token is missing or is itself a flag has no
+  // value. Without this, `--issue --json` would take `--json` as the issue
+  // reference AND drop the JSON output — two silent errors from one — and
+  // `--registry --json` the same for the path. One helper, all four flags.
+  const takeValue = (flag, i) => {
+    const v = argv[i + 1];
+    if (v === undefined || /^--/.test(v)) {
+      throw new Error(`${flag} requires a value`);
+    }
+    return v;
+  };
+  try {
+    for (let i = 0; i < argv.length; i++) {
+      const a = argv[i];
+      if (a === "--file") out.file = takeValue(a, i++);
+      else if (a === "--registry") out.registry = takeValue(a, i++);
+      else if (a === "--annotate") out.annotate = true;
+      else if (a === "--pr") out.pr = takeValue(a, i++);
+      else if (a === "--issue") out.issue = takeValue(a, i++);
+      else if (a === "--dry-run") out.dryRun = true;
+      else if (a === "--json") out.json = true;
+      else if (a === "--help" || a === "-h") out.help = true;
+      else return { error: `unknown argument ${JSON.stringify(a)}` };
+    }
+  } catch (e) {
+    return { error: e.message };
   }
   return out;
 }

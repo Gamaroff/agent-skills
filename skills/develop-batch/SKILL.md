@@ -92,6 +92,7 @@ project's own `CLAUDE.md`/`AGENTS.md` when running these (e.g. a required prefix
   "items": [
     {
       "id": "T40",
+      "source": "roadmap",
       "command": "/develop-task",
       "commandArg": "<path>",
       "dir": "../wt-t40",
@@ -471,7 +472,8 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
 5. **Record the acceptance immediately**, on `<baseBranch>` in the **main tree** (`git pull`
    first — the merge just advanced the remote). **Branch on the item's `source`** exactly as
    `develop-next` Step 4 does — `--batch` selects from the roadmap only today, so every batch
-   item is `roadmap`-sourced, but the arm is named so a registry-aware batch cannot fall
+   item is `roadmap`-sourced — recorded as `source` on each `batch[]` item at selection, which is
+   what a resume into this lane reads — but the arm is named so a registry-aware batch cannot fall
    into the roadmap arm by default:
    - **`source: roadmap`** — tick the item `[x]` and rewrite its row in the roadmap's
      accepted-row convention (copy an existing ✅ row's format; if none exists yet, use
@@ -489,10 +491,11 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      `node .agents/skills/develop-batch/references/registry-tick.js --annotate --file <doc>
      --pr <PR#> [--issue "<[#N](url)>"] --json` — additive (notes cell + `Issue` cell), never a
      second Status writer. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
-     and push; `already` → `git diff --quiet HEAD -- docs/tasks/task-registry.md` first and commit/push
+     and push; `already` → `git diff --quiet HEAD -- docs/tasks/task-registry.md` first and commit
      when dirty (a crash between the write and its commit leaves the row edited; the resume path
-     skips the dirty-tree check), then `git push origin <baseBranch>` regardless (a crash between
-     commit and push leaves the record local-only; the push is idempotent), then `ticked: true`; every other exit-0 reason (`no-row`,
+     skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash
+     between commit and push leaves the record local-only; the push is idempotent), then
+     `ticked: true`; every other exit-0 reason (`no-row`,
      `no-registry`, `no-cell`, `not-accepted`, `not-a-task`, `engine-unavailable`) → log, no commit.
    - **`source: bug-registry`** — the bug registry has no Issue or notes cell and
      `develop-bug` already closed the row: log `bug-registry: nothing to write`, no commit.

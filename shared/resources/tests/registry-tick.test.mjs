@@ -926,6 +926,33 @@ test("annotate: `none` / `n/a` / `TBD` count as empty, as the selector reads the
   }
 });
 
+test("every value-taking flag rejects a missing or flag-shaped value (CR-2, PR review)", () => {
+  const { dir } = sandbox([row(50, "phi", "accepted")]);
+  try {
+    const f = writeDoc(dir, 50, "phi", { status: "accepted" });
+    for (const args of [
+      ["--file"],
+      ["--file", "--json"],
+      ["--file", path.relative(dir, f), "--registry"],
+      ["--file", path.relative(dir, f), "--registry", "--json"],
+    ]) {
+      let code = 0;
+      try {
+        execFileSync(process.execPath, [CLI, ...args], {
+          cwd: dir,
+          encoding: "utf8",
+          stdio: "pipe",
+        });
+      } catch (e) {
+        code = e.status;
+      }
+      assert.equal(code, 2, `${args.join(" ")} must be a usage error`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("annotate: `--issue` rejects a missing value, an empty value, a pipe and a newline — exit 2, nothing written (QA-2)", () => {
   const { dir, registry } = sandbox([row(43, "xi", "accepted")]);
   try {

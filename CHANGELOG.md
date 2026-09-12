@@ -52,7 +52,7 @@ All notable changes to this project will be documented in this file. Format foll
   branches on `item.source`: the roadmap arm is unchanged; the `task-registry` arm — the default path
   now that no phase is open, and improvised by hand on five consecutive runs — calls a new
   **`registry-tick.js --annotate --pr <n> [--issue <ref>]`** mode that appends `· PR #n merged` to the
-  row's notes cell and fills `Issue` only when it reads `—`, and **never** writes Status (finalise
+  row's notes cell and fills `Issue` only when it reads as empty, and **never** writes Status (finalise
   owns that; two writers is what task.103 removed); the `bug-registry` arm states that there is no
   cell to write. **Step 3's** merge gate is now `accepted` ∧ gate ≠ `FAIL` ∧ no open `top_issues[]`
   entry, carried as a seven-row matrix — an `accepted` document with a `CONCERNS` or `WAIVED` gate and

@@ -31,7 +31,7 @@ Two things follow from that, and both matter more than they look:
 6. **`/develop-next` annotates the row after the merge** — the second, *additive* writer. Once the
    PR has landed, its Step 4 runs `registry-tick.js --annotate --pr <n> [--issue <ref>]`, which
    appends `· PR #<n> merged` to the row's last cell (the notes cell — `Depends on` in the header
-   above, used as free text since task 100) and fills the `Issue` cell only when it still reads `—`.
+   above, used as free text since task 100) and fills the `Issue` cell only when it still reads as empty (`—`, `none`, `n/a`, `tbd` …).
    It never touches Status: two Status writers are what task.103 removed, and this mode was put in
    the same file precisely so the two writes share one row locator rather than drifting apart. A
    re-run answers `already`; a bug document answers `not-a-task` — the bug registry has no such
