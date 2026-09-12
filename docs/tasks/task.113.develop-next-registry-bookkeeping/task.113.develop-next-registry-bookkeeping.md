@@ -5,7 +5,7 @@ type: task
 description: "Six observations (#13, #30, #31, #34, #35, #46) record that develop-next Step 4 'Tick the roadmap' has no branch for a registry-sourced selection — now the default path, since no phase is open. task.103 closed most of it from finalise (registry-tick.js writes the Status cell), so the remedy the early observations propose is stale: what remains is the notes/PR and issue cells, the step's title and commit convention, and the empty-tick case. Two adjacent gaps ride along: the merge gate blocks on the literal PASS token when finalise has already accepted a CONCERNS gate with no findings (#52), and the work-started signal skipped at Step 1 for a fresh item is never re-fired after Step 2 creates the issue (#53)."
 tags: [develop-next, develop-batch, pipeline, tracker]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-12
@@ -13,11 +13,13 @@ updated: 2026-09-12
 assignee:
 estimated_effort_hours: 5
 github_issue: 397
+pr_number: 398
+completed_date: 2026-09-12
 ---
 
 # Technical Task: develop-next's Step 4, merge gate and Step 1→2 signal still assume a roadmap-sourced, PASS-gated item
 
-**Status:** Ready for Review
+**Status:** Accepted
 **GitHub Issue**: [#397](https://github.com/Gamaroff/agent-skills/issues/397)
 **Review**: ✅ All review recommendations from `task.113.review.1.develop-next-registry-bookkeeping.md` implemented 2026-09-12
 
@@ -183,6 +185,37 @@ more information, and `FAIL` still halts.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.113.qa.1…4.develop-next-registry-bookkeeping.md` (four cycles)
+**Gate File**: `task.113.gate.4.develop-next-registry-bookkeeping.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100 (cycles 1–3: 70, 80, 85)
+**PR Review (5c)**: `task.113.pr-review.1.develop-next-registry-bookkeeping.md` — CONCERNS (advisory), all six findings applied
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 5/5 — SC1–SC4 traced to code and per-PR tests; SC5 is a documented post-merge observation-log action
+✅ **Tests & CI:** 3230 tests on the fast gate; CI rollup SUCCESS on `ab2d939f` (5/5 jobs); 22 mutations proven across the QA loop
+✅ **PR Review:** PR #398 — `/review-pr` advisory CONCERNS, findings applied; no human review required on this repo
+✅ **Documentation:** CHANGELOG entry; develop-next / develop-batch SKILLs, step-2 doc, task-registry standard, engine header; bundled copies in sync
+✅ **Security Review:** ✅ PASS — boundary deliverable probed with 89 candidates; held on every table-breaking or shape-invalid input; no secrets, unsafe patterns or dependency changes
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling, no data/UI/payment/health surface
+
+**Bug reports:** 6 filed across the QA loop, all closed.
+
+**Deployment Readiness:** staging APPROVED · production APPROVED
+
+**Task marked as ACCEPTED on:** 2026-09-12
+
+**Detailed Verification Log:** See `task.113.dod.1.develop-next-registry-bookkeeping.md` for complete verification evidence and timestamps.
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
   Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
@@ -206,6 +239,7 @@ more information, and `FAIL` still halts.
 | 2026-09-12 |         | QA gate CONCERNS (85/100) — cycle 3: 5/5 fixed, 1 medium (staged-edit half of the crash window) + 2 low new | qa-task |
 | 2026-09-12 |         | QA findings fixed — QA-12…QA-14, 3 iterations total; 4 mutations proven | qa-fix |
 | 2026-09-12 |         | QA gate PASS (95/100) — cycle 4: 3/3 fixed, 2 low closed in place; bugs 1–6 closed | qa-task |
+| 2026-09-12 | 1.2     | DoD passed — accepted (PR #398) | finalise |
 
 ---
 
@@ -321,7 +355,7 @@ Cycle 1: QA-1 zsh word-split in the Step 4 `--issue` expansion; QA-2 `--issue` u
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.113.develop-next-registry-bookkeeping/task.113.develop-next-registry-bookkeeping.md`
