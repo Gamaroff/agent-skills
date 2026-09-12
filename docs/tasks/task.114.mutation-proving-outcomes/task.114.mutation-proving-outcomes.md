@@ -159,6 +159,8 @@ bundle. No test greps the doc's headings (verified at review).
 | 2026-09-12 | 1.1     | Review passed (9/10) — bundle count 5→6, phantom "doc lint" replaced by the bundled-copy parity guard, consumer line refs, bundled copies in Files Summary; GitHub issue #399 linked | review-task |
 | 2026-09-12 |         | Status → ready-for-development | review-task |
 | 2026-09-12 |         | Implemented — 12 files (1 source doc, 3 skill bodies, 6 bundled copies, 1 new test, CHANGELOG), 2 tests (mutation-proved 4 ways) | develop |
+| 2026-09-12 |         | QA gate CONCERNS (80/100) — 2 medium (count guard evadable; applied-check lies on missing snapshot), 2 low | qa-task |
+| 2026-09-12 |         | QA findings fixed — CR-1/CR-2/CR-3 (parity guard: joined emphasis-stripped window, dedupe, heading.index) and QA-1 (applied-check reads the diff exit code), 1 iteration | qa-fix |
 
 ---
 
@@ -172,6 +174,29 @@ bundle. No test greps the doc's headings (verified at review).
 - [x] Seventh shape (no instance of the input class); absorbed-by-fallback → search, don't reason; a check is blind to what it doesn't iterate; committed test vs development-time proof
 ### Phase 4: consumers
 - [x] `qa-task`/`qa-story` Step 3c point at the table and record outcome per proof; the three "four shapes" pointers drop their count; parity test added and mutation-proved; `npm run bundle` run
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-12
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.114.qa.1.mutation-proving-outcomes.md](./task.114.qa.1.mutation-proving-outcomes.md)
+- **Gate File**: [task.114.gate.1.mutation-proving-outcomes.yml](./task.114.gate.1.mutation-proving-outcomes.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3233 (3232 pass, 1 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (2 medium)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Two MEDIUM: the parity guard is evadable by an emphasised or hard-wrapped count word (CR-1); the document's own applied-check prints `MUTATION APPLIED` on a missing snapshot (QA-1). Two LOW test-file cleanups.
 
 ---
 

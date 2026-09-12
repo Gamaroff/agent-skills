@@ -1,0 +1,69 @@
+schema: 1
+task: 'task.114.mutation-proving-outcomes'
+task_title: 'mutation-proving.md documents the false green and the false red, and none of the other seven things a mutation run can tell you'
+gate: CONCERNS
+status_reason: 'All four phases implemented and green (3232/0, parity test mutation-proved 2/2 by QA on the committed test); two MEDIUM defects — the parity guard misses an emphasised or line-wrapped count word, and the document'"'"'s own applied-check snippet prints MUTATION APPLIED when its snapshot file is missing — both bounded.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T20:22:12Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'evals/shared/tests/mutation-proving-pointers-parity.test.mjs'
+    finding: 'COUNTED_SHAPES is applied per physical line with a bare \s+ between the count word and "shapes", so the defect class it guards evades it when the count is emphasised (the **four** shapes) or hard-wrapped across a line break (four\nshapes) — verified: both spellings pass silently, the reassuring-zero failure the file header warns about.'
+    suggested_action: 'Match against the joined window text (lines lo..hi joined with a space) after stripping Markdown emphasis runs (* _ backtick), then test \b<count>\s+shapes\b; add the bold and line-wrapped spellings to the mutation set.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-1'
+    severity: medium
+    file: 'shared/resources/mutation-proving.md'
+    finding: 'The procedure'"'"'s own applied-check snippet (step 4, ≈line 35: diff <snapshot> <file> || echo "MUTATION APPLIED") prints MUTATION APPLIED when the snapshot file does not exist — diff exits 2 on a missing operand and || fires — so the instrument that rule 3 relies on reports "applied" on exactly the run where nothing was snapshotted (verified under bash and zsh by the 4b engine: stderr "No such file or directory", stdout "MUTATION APPLIED", status 0).'
+    suggested_action: 'Discriminate the diff exit code: 1 → MUTATION APPLIED, 0 → NOT APPLIED, anything else → snapshot missing / diff error (a HALT, not a pass); apply the same shape to the Validate-the-probe block that repeats the snippet, and cite it as the worked example of rule 5.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3233
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Documentation and a hermetic test; no auth, crypto, network or secret surface touched. The 4b engine executed the runnable fenced blocks in all four changed files under bash and zsh with no disagreement.'
+  performance:
+    status: PASS
+    notes: 'New test runs in ~165 ms; ci:fast wall-clock unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Parity test carries non-vacuity floors on both scans (scan-broken rather than a clean zero); bundle --check idempotent (126 skills, 0 problems). Rollback is git revert + npm run bundle.'
+  maintainability:
+    status: PASS
+    notes: 'One authored definition (the source doc), six generated copies guarded byte-for-byte by finalise-dod-prompt-contract.test.mjs; the outcome vocabulary is stated once (table last column) and quoted, not restated, in Step 3c.'
+
+recommendations:
+  immediate:
+    - action: 'Make the count guard robust to emphasis and hard wraps (CR-1)'
+      refs: ['evals/shared/tests/mutation-proving-pointers-parity.test.mjs']
+    - action: 'Make the applied-check snippet fail loudly on a missing snapshot (QA-1)'
+      refs: ['shared/resources/mutation-proving.md']
+  future:
+    - action: 'Dedupe overlapping-window violations so an offending line is listed once (CR-2)'
+      refs: ['evals/shared/tests/mutation-proving-pointers-parity.test.mjs']
+    - action: 'Use heading.index and drop the \s*$ newline capture from the heading regex (CR-3)'
+      refs: ['evals/shared/tests/mutation-proving-pointers-parity.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 and QA-1 fixed and re-reviewed'

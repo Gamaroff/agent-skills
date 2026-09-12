@@ -35,7 +35,9 @@
  *
  * Mutation-proved at authoring by restoring "the four shapes" in one consumer
  * (assertion 1 red, names the file and line) and by changing the heading to
- * "six" with seven entries (assertion 2 red).
+ * "six" with seven entries (assertion 2 red); and at QA cycle 1 by the two
+ * spellings the per-line version missed — `the **four** shapes` and a hard wrap
+ * between `four` and `shapes` — both red after CR-1.
  *
  * Run via: node --test evals/shared/tests/mutation-proving-pointers-parity.test.mjs
  */
@@ -74,8 +76,17 @@ function sourceFiles() {
 
 const COUNT_WORD =
   "(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\d+)";
-/** A count word immediately qualifying "shapes" — "the four shapes", "six shapes". */
+/** A count word immediately qualifying "shapes" — "the four shapes", "six shapes".
+ *  Applied to the WINDOW joined into one line with Markdown emphasis stripped, never
+ *  to a single physical line: this repo hard-wraps prose at ~90 columns and puts
+ *  emphasis on the load-bearing word, so `the **four** shapes` and `four` / newline /
+ *  `shapes` are the spellings the defect actually takes (task.114 QA cycle 1, CR-1). */
 const COUNTED_SHAPES = new RegExp(`\\b${COUNT_WORD}\\s+shapes\\b`, "i");
+/** Markdown emphasis and code-span markers, removed before matching so `**four**`
+ *  reads as `four`. Only the markers go; the words between them stay. */
+const EMPHASIS = /[*_`]+/g;
+/** Join a window's lines into one string the regex can see across a wrap. */
+const flatten = (lines) => lines.join(" ").replace(EMPHASIS, "");
 const POINTER = /mutation-proving\.md/;
 /** Lines on either side of a pointer that count as "beside" it. The three
  *  historical defects sat 0–1 lines from the link; 3 is generous without
@@ -98,17 +109,30 @@ test("no source pointer to mutation-proving.md states a count of its shapes", ()
     });
     if (pointerLines.length === 0) continue;
     withPointer.push(file);
+    // One window per pointer, matched on the joined, emphasis-stripped text so a
+    // count word split from "shapes" by a hard wrap, or wrapped in `**`, is still
+    // seen (CR-1). Windows of pointers WINDOW lines apart overlap; a Set keyed on
+    // the offending text and its line range reports a shared hit once (CR-2).
+    const seen = new Set();
     for (const i of pointerLines) {
       const lo = Math.max(0, i - WINDOW);
       const hi = Math.min(lines.length - 1, i + WINDOW);
+      const m = flatten(lines.slice(lo, hi + 1)).match(COUNTED_SHAPES);
+      if (!m) continue;
+      // The physical line the count word sits on — the match was made on the
+      // joined window, so it is located again against the stripped single lines.
+      const countWord = new RegExp(`\\b${m[0].split(/\s+/)[0]}\\b`, "i");
+      let at = lo;
       for (let j = lo; j <= hi; j++) {
-        const m = lines[j].match(COUNTED_SHAPES);
-        if (m) {
-          violations.push(
-            `${path.relative(REPO_ROOT, file)}:${j + 1}: "${m[0]}" beside a pointer at line ${i + 1}`,
-          );
+        if (countWord.test(lines[j].replace(EMPHASIS, ""))) {
+          at = j;
+          break;
         }
       }
+      const key = `${path.relative(REPO_ROOT, file)}:${at + 1}: "${m[0]}"`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      violations.push(`${key} beside the pointer at line ${i + 1}`);
     }
   }
   assert.ok(
@@ -139,7 +163,7 @@ const WORD_TO_N = {
 
 test("the document's counted heading agrees with the entries under it", () => {
   const text = readFileSync(DOC, "utf8");
-  const heading = text.match(/^## The (\w+) shapes vacuity takes\s*$/m);
+  const heading = text.match(/^## The (\w+) shapes vacuity takes[ \t]*$/m);
   assert.ok(
     heading,
     "scan-broken: no '## The <N> shapes vacuity takes' heading found",
@@ -151,8 +175,9 @@ test("the document's counted heading agrees with the entries under it", () => {
     `unreadable count word "${heading[1]}"`,
   );
 
-  // The section runs from the heading to the next H2.
-  const start = text.indexOf(heading[0]) + heading[0].length;
+  // The section runs from the heading to the next H2. `heading.index` is where the
+  // match sits; re-searching with indexOf would find the same place only by luck (CR-3).
+  const start = heading.index + heading[0].length;
   const rest = text.slice(start);
   const nextH2 = rest.search(/^## /m);
   const section = nextH2 === -1 ? rest : rest.slice(0, nextH2);

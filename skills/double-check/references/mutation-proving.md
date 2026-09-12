@@ -33,9 +33,19 @@ For each invariant a test claims to hold:
    not apply produces a green run that reads exactly like a passing proof:
 
    ```bash
-   diff /tmp/pre-mutation.ts path/to/source.ts || echo "MUTATION APPLIED"
-   # No diff output ⇒ the mutation never applied ⇒ the green below proves nothing.
+   diff -q /tmp/pre-mutation.ts path/to/source.ts >/dev/null 2>&1
+   case $? in
+     1) echo "MUTATION APPLIED" ;;
+     0) echo "NOT APPLIED — the edit never landed; the green below proves nothing" ;;
+     *) echo "NO SNAPSHOT or diff error — step 1 was skipped; stop" ;;
+   esac
    ```
+
+   **Read the exit code, not the `||`.** `diff` exits 1 when the files differ and 2
+   when an operand is missing, and `diff a b || echo APPLIED` fires on both — so the
+   one-liner this snippet replaced printed `MUTATION APPLIED` on the run where no
+   snapshot had been taken, which is the run it exists to catch. Found by executing
+   the block (rule 5 below, applied to rule 3's own instrument).
 
    Make the edit itself fail loudly: a Python `assert new != old` after
    `str.replace`, a `grep -c` before and after, a line count that must change.
@@ -82,7 +92,9 @@ output is shaped exactly like a reading about the code.
    not yet evidence. A pattern that matches nothing and a subject that contains
    nothing are the same output; show one positive control before trusting a zero.
    Three probes in one QA cycle lied this way, and two would have been false
-   findings.
+   findings. The shortest example is in this document: the applied-check in step
+   4 was once `diff a b || echo APPLIED`, which prints APPLIED when the snapshot
+   file does not exist — a probe that answers "yes" whether or not it ran.
 6. **A helper that runs a process returns `{ ok, value }`, never one value.** A
    helper that returns `null` for both "the process refused" and "the process
    resolved to empty" has collapsed exit status and output into one signal, and
@@ -277,8 +289,9 @@ that the survivors survived.
 # 2. a certainty — break it, confirm the NAMED test is the one that fails
 <the matrix command> 2>&1 | grep '<the test that names it>'
 
-# 3. applied — from step 4 of the procedure
-diff /tmp/pre-mutation.ts path/to/source.ts || echo "MUTATION APPLIED"
+# 3. applied — from step 4 of the procedure: exit 1 is the only "applied"
+diff -q /tmp/pre-mutation.ts path/to/source.ts >/dev/null 2>&1
+case $? in 1) echo "MUTATION APPLIED" ;; 0) echo "NOT APPLIED" ;; *) echo "NO SNAPSHOT — stop" ;; esac
 ```
 
 **The three cost two more runs of the matrix command, plus a diff.** Not a fixed
