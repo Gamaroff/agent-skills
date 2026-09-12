@@ -305,6 +305,18 @@ test("Step 3: the merge gate is finalise's verdict + no open finding, not the PA
   for (const [re, name] of GATE_MATRIX_ROWS) {
     assert.match(step3, re, `gate matrix row missing: ${name}`);
   }
+  // QA-4 (task.113 cycle 1): qa-gate keeps waived findings in top_issues[] with
+  // no status:, so without this clause the WAIVED→merge row is unreachable.
+  assert.match(
+    step3,
+    /`waiver\.active: true`/,
+    "the waiver clause names the field it keys on",
+  );
+  assert.match(
+    step3,
+    /count as\s+waived, not open/,
+    "entries under an active waiver are not open",
+  );
   // The two commit-bound clauses survive — they cannot be inferred from `accepted`.
   assert.match(step3, /Head-SHA check/);
   assert.match(step3, /<qualityGateCommand>/);
@@ -358,6 +370,18 @@ test("Step 4 registry arm: calls registry-tick.js --annotate, never writes Statu
     "commit convention",
   );
   assert.doesNotMatch(arm, /sed -i/, "no hand-rolled cell edit");
+  // QA-1 (task.113 cycle 1): `${X:+--issue "$X"}` is one word under zsh.
+  assert.doesNotMatch(
+    arm,
+    /\$\{ISSUE_REF:\+/,
+    "the :+ expansion form breaks under zsh — use the array form",
+  );
+  assert.match(
+    arm,
+    /ISSUE_ARGS=\(--issue "\$ISSUE_REF"\)/,
+    "optional --issue is built as an array",
+  );
+  assert.match(arm, /"\$\{ISSUE_ARGS\[@\]\}"/, "and expanded per element");
 });
 
 test("Step 4 bug-registry arm: states there is no cell to write and makes no commit", () => {

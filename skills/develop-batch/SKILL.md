@@ -392,6 +392,10 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      | `accepted`        | `FAIL`                 | any                                | **HALT**                                                  |
      | not `accepted`    | any                    | any                                | **HALT** — finalise did not accept                        |
      | `accepted`        | missing / unparseable  | —                                  | **HALT** — cannot establish the no-open-finding condition |
+
+     An entry is open when its `status:` is absent or reads `open` — **except** under `gate: WAIVED`
+     with `waiver.active: true`, where the listed entries are the waived findings (qa-gate keeps them
+     with no `status:`) and count as waived, not open. Same clause as `develop-next` Step 3.
    - **Head-SHA check:** `gh pr view <PR#> --json headRefOid,state` must match
      `git rev-parse HEAD` on the item's local PR branch after the rebase (never gate one
      commit and merge another).

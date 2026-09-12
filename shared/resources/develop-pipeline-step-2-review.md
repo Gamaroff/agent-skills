@@ -258,9 +258,11 @@ if [ "$TRACKER" = "jira" ]; then
   TRACKER_ISSUE=$(grep '^jira_key:' {document-file} | awk '{print $2}')
 else
   TRACKER_ISSUE=$(grep '^github_issue:' {document-file} | awk '{print $2}')
-  GITHUB_ISSUE="$TRACKER_ISSUE"
 fi
 [ "$TRACKER_ISSUE" = "null" ] && TRACKER_ISSUE=""
+# The compatibility variable is set AFTER the null reset, as Phase 0c does —
+# otherwise `github_issue: null` leaves it holding the literal string "null".
+[ "$TRACKER" = "github" ] && GITHUB_ISSUE="$TRACKER_ISSUE"
 
 if [ -z "$TRACKER_ISSUE_AT_STEP_1" ] && [ -n "$TRACKER_ISSUE" ]; then
   # 1. The lock is what the hooks read — update it before anything else posts.

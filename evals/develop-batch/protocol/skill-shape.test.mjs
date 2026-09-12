@@ -360,6 +360,9 @@ test("Step 3 lane: verify-green carries the gate matrix, not the PASS token", as
   assert.ok(rows.length >= 6, "matrix floor");
   for (const [re, name] of rows)
     assert.match(lane, re, `gate matrix row missing: ${name}`);
+  // QA-4 mirror: the waiver clause must travel with the matrix.
+  assert.match(lane, /`waiver\.active: true`/, "waiver clause mirrored");
+  assert.match(lane, /count as waived, not open/);
 });
 
 test("Step 3 lane: the acceptance record branches on source with all three arms", async () => {

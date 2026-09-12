@@ -1,0 +1,104 @@
+schema: 1
+task: 'task.113.develop-next-registry-bookkeeping'
+task_title: "develop-next's Step 4, merge gate and Step 1→2 signal still assume a roadmap-sourced, PASS-gated item"
+gate: CONCERNS
+status_reason: 'All phases implemented and green (3221/0, 9 mutations proven); four MEDIUM defects — a zsh word-split in the Step 4 snippet, unvalidated --issue input, an unreachable no-cell guard, and an unreachable WAIVED→merge matrix row — each with a bounded fix.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T17:52:37Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'Step 4 registry arm passes the optional --issue via ${ISSUE_REF:+--issue "$ISSUE_REF"}, which zsh expands as ONE word — registry-tick.js exits 2 (unknown argument) on exactly the case the Issue cell exists for.'
+    suggested_action: 'Build ISSUE_ARGS=() / ISSUE_ARGS=(--issue "$ISSUE_REF") and expand "${ISSUE_ARGS[@]}"; shape-assert the :+ form absent.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'shared/resources/registry-tick.js'
+    finding: '--issue is written verbatim: a missing value writes the literal "undefined", an empty value blanks the cell, "|" adds a cell and a newline splits the row — all reported as written.'
+    suggested_action: 'Reject missing/empty --issue and any value containing "|", CR or LF as a usage error (exit 2, nothing written); fixture each case.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-3'
+    severity: medium
+    file: 'shared/resources/registry-tick.js'
+    finding: 'The no-cell guard (dataCells < 5) is unreachable — parseRegistry already drops such rows — and a 6-column registry with no notes column gets its last DATA cell annotated (verified: Created cell rewritten).'
+    suggested_action: 'Resolve the notes cell from the header the walk already finds; answer no-cell when the last header names a known data column; fixture a 6-column registry → no-cell, byte-identical.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-4'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The matrix row "accepted | WAIVED | no → merge" is unreachable: qa-gate keeps waived findings in top_issues[] with no status field and the new open-entry rule reads an absent status as open, so every WAIVED gate HALTs.'
+    suggested_action: 'State that under gate: WAIVED with waiver.active: true, entries without a status are waived, not open — in both develop-next and develop-batch; shape-assert the clause.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-5'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-2-review.md'
+    finding: 'GITHUB_ISSUE is assigned before the null normalisation on the re-read, so github_issue: null leaves the compatibility variable holding the literal "null" (Phase 0c resets both).'
+    suggested_action: 'Move the GITHUB_ISSUE assignment after the null reset.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-6'
+    severity: low
+    file: 'shared/resources/registry-tick.js'
+    finding: 'The header walk uses a private separator regex that diverges from the selector TABLE_SEPARATOR_RE, matches a bare --- rule, and does not stop at prose — it can read an earlier unrelated table header (cleanup, advisory).'
+    suggested_action: 'Export TABLE_SEPARATOR_RE / a findHeader() helper from select-next.mjs and reuse it, stopping at the first non-table line.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 93
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 4
+    notes: 'New CLI writes a caller string into a git-tracked index without validating the two characters that break the table (QA-2); no secret exposure, no shell evaluation.'
+  performance:
+    status: PASS
+    notes: 'One extra node invocation per registry-sourced run; single-line rewrite.'
+  reliability:
+    status: PASS
+    notes: 'Every annotate outcome exits 0 except usage errors; re-fire idempotent (verified live: already); rollback is git revert.'
+  maintainability:
+    status: PASS
+    notes: 'One writer file, one row locator; reasons documented; shape tests with per-row floors. QA-6 notes a private regex that should reuse the selector.'
+
+code_review:
+  findings: 5
+  promoted: ['QA-3 (CR-1)', 'QA-4 (CR-3)', 'QA-5 (CR-4)', 'QA-6 (CR-5)', 'QA-2 widened by CR-2']
+
+recommendations:
+  immediate:
+    - action: 'QA-1 array expansion for --issue in Step 4'
+      refs: ['skills/develop-next/SKILL.md']
+    - action: 'QA-2 validate --issue (missing/empty/|/CR/LF → exit 2)'
+      refs: ['shared/resources/registry-tick.js', 'shared/resources/tests/registry-tick.test.mjs']
+    - action: 'QA-3 header-resolved notes cell; real no-cell'
+      refs: ['shared/resources/registry-tick.js', 'shared/resources/tests/registry-tick.test.mjs']
+    - action: 'QA-4 waiver.active ⇒ entries waived, in both matrices'
+      refs: ['skills/develop-next/SKILL.md', 'skills/develop-batch/SKILL.md']
+  future:
+    - action: 'QA-5 GITHUB_ISSUE null-reset order'
+      refs: ['shared/resources/develop-pipeline-step-2-review.md']
+    - action: 'QA-6 reuse selector separator regex'
+      refs: ['shared/resources/registry-tick.js', 'skills/develop-next/scripts/select-next.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-1..QA-4 fixed and re-verified']

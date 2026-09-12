@@ -151,8 +151,13 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
      | `accepted`        | missing / unparseable  | —                                  | **HALT** — cannot establish the no-open-finding condition |
 
      An entry is open when its `status:` is absent or reads `open`; `resolved`, `fixed`, `closed`,
-     `waived` and `deferred` (with a named owner) are not open. The two clauses below are about *this
-     commit* and cannot be inferred from `accepted` — they stay regardless of the row matched here.
+     `waived` and `deferred` (with a named owner) are not open. **One exception, and it is what makes
+     the `WAIVED` row reachable:** under `gate: WAIVED` with `waiver.active: true`, the entries in
+     `top_issues[]` *are* the waived findings — `qa-gate`'s own schema keeps them there with no
+     `status:` field, and no skill stamps `status: waived` — so entries without a `status:` count as
+     waived, not open. Without this clause every waived gate matched the HALT row and the waiver row
+     could never fire. The two clauses below are about *this commit* and cannot be inferred from
+     `accepted` — they stay regardless of the row matched here.
    - **Head-SHA check** — the PR's source commit must equal `git rev-parse HEAD` on the local PR branch. Mismatch means the branch moved since it was tested → **HALT** (never gate one commit and merge another).
 
      ```bash
@@ -334,8 +339,13 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
 1. Record the merge with the engine — one call, never a hand-rolled sed:
    ```bash
    ISSUE_REF=""   # `[#N](url)` when the document now carries github_issue:/jira_key:, else leave empty
+   # An ARRAY, not a `:+` parameter expansion: zsh does not word-split an
+   # expansion, so that form hands the engine `--issue [#N](url)` as ONE
+   # argument and it exits 2 — on exactly the case the Issue cell exists for.
+   ISSUE_ARGS=()
+   [ -n "$ISSUE_REF" ] && ISSUE_ARGS=(--issue "$ISSUE_REF")
    node .agents/skills/develop-next/references/registry-tick.js --annotate \
-     --file <item.commandArg> --pr <PR#> ${ISSUE_REF:+--issue "$ISSUE_REF"} --json
+     --file <item.commandArg> --pr <PR#> "${ISSUE_ARGS[@]}" --json
    ```
    It appends `· PR #<n> merged` to the row's last cell (the registry's notes cell — `Depends on` in
    the documented header; rows 100–106 already carry it there), fills `Issue` only when that cell

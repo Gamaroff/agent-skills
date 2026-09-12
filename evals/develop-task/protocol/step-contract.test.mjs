@@ -140,6 +140,15 @@ test("Step 2 re-reads the tracker key after the review and re-fires work-started
     /\.tracker_issue = \$i/,
     "the lock's tracker_issue is updated",
   );
+  // QA-5 (task.113 cycle 1): the compatibility variable must be assigned AFTER the null reset.
+  const reset = sec.indexOf(
+    '[ "$TRACKER_ISSUE" = "null" ] && TRACKER_ISSUE=""',
+  );
+  const compat = sec.indexOf('GITHUB_ISSUE="$TRACKER_ISSUE"');
+  assert.ok(
+    reset >= 0 && compat > reset,
+    "GITHUB_ISSUE is set after the null normalisation, never before",
+  );
   assert.match(sec, /0c-reg/, "the signal procedure is invoked, not restated");
   assert.match(sec, /`already`/, "idempotence on re-run is stated");
   // The re-read must not be gated on the review having RUN — a skip path with a

@@ -349,9 +349,12 @@ test("width preservation degrades correctly at both boundaries", () => {
  */
 test("no argument can make the tick conditional on pipeline mode", () => {
   const source = readFileSync(CLI, "utf8");
-  const flags = [...source.matchAll(/a === "(--[a-z-]+)"/g)]
-    .map((m) => m[1])
-    .sort();
+  // Every accepted flag appears as `a === "--x"` in parseArgs — value-taking
+  // flags may share one comparison (`a === "--pr" || a === "--issue"`), which
+  // this pattern still catches one flag at a time.
+  const flags = [
+    ...new Set([...source.matchAll(/a === "(--[a-z-]+)"/g)].map((m) => m[1])),
+  ].sort();
   // `--annotate` (task.113) selects the SECOND write — the post-merge notes /
   // Issue cell — and `--pr` / `--issue` are its operands. None of the three
   // gates the Status tick: the default invocation still ticks unconditionally,
@@ -672,11 +675,29 @@ test("annotate: does not require the document to be `accepted` — a merge is a 
   }
 });
 
-test("annotate: a row too short to hold a notes cell reports `no-cell` and writes nothing", () => {
-  const { dir, registry } = sandbox([
-    `| 39 | [T39](task.39.kap/task.39.kap.md) | accepted | Medium |`,
-  ]);
+test("annotate: a registry whose last column is a data column answers `no-cell` and writes nothing (QA-3)", () => {
+  // Six columns, ending in Created — no notes column. The earlier numeric
+  // guard passed this and rewrote the Created cell.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "registry-tick-"));
   try {
+    mkdirSync(path.join(dir, "skills", "develop-next", "scripts"), {
+      recursive: true,
+    });
+    symlinkSync(
+      path.join(REPO_ROOT, SELECTOR_REL),
+      path.join(dir, SELECTOR_REL),
+    );
+    mkdirSync(path.join(dir, "docs", "tasks"), { recursive: true });
+    const registry = path.join(dir, "docs", "tasks", "task-registry.md");
+    writeFileSync(
+      registry,
+      [
+        "| # | Title | Status | Category | Priority | Created |",
+        "|---|-------|--------|----------|----------|---------|",
+        "| 39 | [T39](task.39.kap/task.39.kap.md) | accepted | infra | Medium | 2026-01-01 |",
+        "",
+      ].join("\n"),
+    );
     const f = writeDoc(dir, 39, "kap", { status: "accepted" });
     const before = readFileSync(registry, "utf8");
     const res = run(dir, [
@@ -686,10 +707,154 @@ test("annotate: a row too short to hold a notes cell reports `no-cell` and write
       "--pr",
       "418",
     ]);
-    // The parser may reject the row as malformed (< 5 cells) → no-row, or the
-    // annotate guard may catch it → no-cell. Either way: nothing written.
-    assert.ok(["no-cell", "no-row"].includes(res.reason), res.reason);
+    assert.equal(res.reason, "no-cell");
+    assert.equal(res.lastColumn, "created");
+    assert.equal(
+      readFileSync(registry, "utf8"),
+      before,
+      "a data cell must never be annotated",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: the header is the row's OWN table's — an earlier legend table cannot supply it (QA-6)", () => {
+  const { dir, registry } = sandbox([row(42, "nu", "accepted")]);
+  try {
+    // Prepend an unrelated two-column table whose first data column is named
+    // `Issue`, separated from the registry by prose and a bare `---` rule.
+    const text = readFileSync(registry, "utf8");
+    writeFileSync(
+      registry,
+      [
+        "| Issue | Meaning |",
+        "|-------|---------|",
+        "| x | y |",
+        "",
+        "Some prose.",
+        "",
+        "---",
+        "",
+        text,
+      ].join("\n"),
+    );
+    const f = writeDoc(dir, 42, "nu", { status: "accepted" });
+    const link = "[#9](https://example.com/issues/9)";
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "420",
+      "--issue",
+      link,
+    ]);
+    assert.equal(res.reason, "annotated");
+    assert.equal(
+      res.issue,
+      "written",
+      "the Issue cell comes from the registry's own header, column 7",
+    );
+    const cells = annotatedRow(dir, "docs/tasks/task-registry.md", 42).split(
+      "|",
+    );
+    assert.equal(cells[7].trim(), link);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: a headerless table answers `no-cell` — the walk never reaches an earlier table's header (QA-6)", () => {
+  // The registry table below has NO header of its own; a legend table sits
+  // above it, separated by prose. An unbounded walk would adopt the legend's
+  // header (`| Issue | Meaning |`), read `Meaning` as a notes column and
+  // annotate the headerless row. The parser accepts a headerless table by
+  // documented column positions, so the row IS found — the refusal has to
+  // come from the header resolution.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "registry-tick-"));
+  try {
+    mkdirSync(path.join(dir, "skills", "develop-next", "scripts"), {
+      recursive: true,
+    });
+    symlinkSync(
+      path.join(REPO_ROOT, SELECTOR_REL),
+      path.join(dir, SELECTOR_REL),
+    );
+    mkdirSync(path.join(dir, "docs", "tasks"), { recursive: true });
+    const registry = path.join(dir, "docs", "tasks", "task-registry.md");
+    writeFileSync(
+      registry,
+      [
+        "| Issue | Meaning |",
+        "|-------|---------|",
+        "| x | y |",
+        "",
+        "Some prose between the tables.",
+        "",
+        row(44, "omi", "accepted"),
+        "",
+      ].join("\n"),
+    );
+    const f = writeDoc(dir, 44, "omi", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "422",
+      "--issue",
+      "[#1](x)",
+    ]);
+    assert.equal(res.reason, "no-cell");
+    assert.match(res.message, /no table header/);
     assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: `--issue` rejects a missing value, an empty value, a pipe and a newline — exit 2, nothing written (QA-2)", () => {
+  const { dir, registry } = sandbox([row(43, "xi", "accepted")]);
+  try {
+    const f = writeDoc(dir, 43, "xi", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const cases = [
+      ["--issue"], // missing value (last argument)
+      ["--issue", ""], // empty
+      ["--issue", "   "], // whitespace only
+      ["--issue", "x | y"], // pipe adds a cell
+      ["--issue", "a\nb"], // newline splits the row
+      ["--issue", "a\rb"], // CR
+    ];
+    for (const extra of cases) {
+      let code = 0;
+      try {
+        execFileSync(
+          process.execPath,
+          [
+            CLI,
+            "--annotate",
+            "--file",
+            path.relative(dir, f),
+            "--pr",
+            "421",
+            ...extra,
+            "--json",
+          ],
+          { cwd: dir, encoding: "utf8", stdio: "pipe" },
+        );
+      } catch (e) {
+        code = e.status;
+      }
+      assert.equal(code, 2, `${JSON.stringify(extra)} must be a usage error`);
+      assert.equal(
+        readFileSync(registry, "utf8"),
+        before,
+        `${JSON.stringify(extra)} must write nothing`,
+      );
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

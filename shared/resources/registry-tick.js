@@ -102,9 +102,18 @@ function parseArgs(argv) {
     if (a === "--file") out.file = argv[++i];
     else if (a === "--registry") out.registry = argv[++i];
     else if (a === "--annotate") out.annotate = true;
-    else if (a === "--pr") out.pr = argv[++i];
-    else if (a === "--issue") out.issue = argv[++i];
-    else if (a === "--dry-run") out.dryRun = true;
+    else if (a === "--pr" || a === "--issue") {
+      // A value-taking flag whose next token is missing or is itself a flag
+      // has no value. Without this, `--issue --json` would take `--json` as the
+      // issue reference AND drop the JSON output — two silent errors from one.
+      const v = argv[i + 1];
+      if (v === undefined || /^--/.test(v)) {
+        return { error: `${a} requires a value` };
+      }
+      i++;
+      if (a === "--pr") out.pr = v;
+      else out.issue = v;
+    } else if (a === "--dry-run") out.dryRun = true;
     else if (a === "--json") out.json = true;
     else if (a === "--help" || a === "-h") out.help = true;
     else return { error: `unknown argument ${JSON.stringify(a)}` };
@@ -187,6 +196,21 @@ async function main() {
       return usage("--annotate requires --pr <n> (a pull request number)");
     }
     opts.pr = String(opts.pr).replace(/^#/, "");
+    // `--issue` is written into a markdown table cell verbatim, so the two
+    // characters that break a table are refused here, once, rather than
+    // trusted to every caller. A missing value (`--issue` as the last argument)
+    // reads as `undefined` and would otherwise be written as that literal
+    // string; an empty value would blank the cell and report `written`.
+    if (opts.issue !== null) {
+      const v = opts.issue === undefined ? "" : String(opts.issue);
+      if (v.trim() === "") return usage("--issue requires a value");
+      if (/[|\r\n]/.test(v)) {
+        return usage(
+          '--issue must not contain "|", CR or LF — it is written into a table cell',
+        );
+      }
+      opts.issue = v;
+    }
   } else if (opts.pr !== null || opts.issue !== null) {
     return usage("--pr and --issue are only meaningful with --annotate");
   }
@@ -384,16 +408,75 @@ function setCell(cells, i, value) {
 }
 
 /**
- * The `--annotate` write. Column resolution is deliberately narrow:
+ * Header cells that name a DATA column. A table whose LAST header cell is one
+ * of these has no notes cell, and the annotate write must refuse rather than
+ * append prose to a date or a priority. `depends on` is deliberately absent:
+ * it is the documented last column of the task registry and the cell every
+ * accepted row since task 100 has used as free text.
+ */
+const DATA_COLUMN_NAMES = new Set([
+  "#",
+  "no",
+  "num",
+  "number",
+  "id",
+  "title",
+  "name",
+  "status",
+  "category",
+  "type",
+  "kind",
+  "priority",
+  "severity",
+  "created",
+  "filed",
+  "date",
+  "updated",
+  "issue",
+  "area",
+  "owner",
+  "assignee",
+]);
+
+/**
+ * Locate the header of the table that CONTAINS `rowLine`: walk up from the row
+ * over table lines only, and take the line above the first separator met.
  *
- *   - the NOTES cell is the row's last cell. The documented task-registry
- *     header ends in `Depends on`, and every accepted row since task 100 has
- *     used it as the free-text cell (`task.104 · PR #381. …`). Reading it by
- *     position rather than by name is what keeps this working on a consumer
- *     registry that renamed the column, and the `no-cell` guard below is what
- *     stops it landing on a data cell when a row is too short.
- *   - the ISSUE cell is found by header NAME (`Issue`, case-insensitive), from
- *     the header line the parser identified above the row's separator. There
+ * Two bounds, both from QA on task.113: the walk stops at the first line that
+ * is not a table row, so an earlier, unrelated table (a `| Key | Meaning |`
+ * legend above the registry) can never supply the header; and the separator
+ * must itself be a table row (`|---|`), so a bare `---` horizontal rule or a
+ * frontmatter fence is not mistaken for one. The selector keeps its own
+ * separator regex for parsing whole files; this one answers a narrower
+ * question — "is this the separator of the row's own table?" — and is bounded
+ * by the table rather than by the file, which is why it is not the same regex.
+ * Returns the header cells, or null when the row's table has no header.
+ */
+function findHeader(parts, rowLine) {
+  for (let li = rowLine - 2; li >= 0; li--) {
+    const line = parts[li * 2] || "";
+    if (!/^\s*\|/.test(line)) return null; // left the table without a separator
+    if (/^\s*\|\s*:?-{3,}/.test(line)) {
+      const above = parts[(li - 1) * 2] || "";
+      return /^\s*\|/.test(above) ? above.split("|") : null;
+    }
+  }
+  return null;
+}
+
+/**
+ * The `--annotate` write. Column resolution is deliberately narrow, and both
+ * cells are resolved from the row's OWN table header:
+ *
+ *   - the NOTES cell is the row's last cell — but only when the header names
+ *     that column as something other than a data column. The documented
+ *     task-registry header ends in `Depends on`, and every accepted row since
+ *     task 100 has used it as the free-text cell (`task.104 · PR #381. …`).
+ *     A registry whose last column is `Created` or `Area` answers `no-cell`
+ *     and is left alone: the earlier numeric guard (`< 5 cells`) was
+ *     unreachable — the parser already drops such rows — and let a six-column
+ *     consumer registry have its Created cell rewritten.
+ *   - the ISSUE cell is found by header NAME (`Issue`, case-insensitive). There
  *     is no positional fallback: a wrong Issue cell is a corrupted link, and
  *     nothing about a position says "this holds a tracker link".
  *
@@ -410,32 +493,36 @@ function annotate(opts, { registryRel, registryText, row, taskId }) {
   // closing pipe. A row without a closing pipe has no such element.
   const closed = cells.length > 0 && cells[cells.length - 1].trim() === "";
   const last = closed ? cells.length - 2 : cells.length - 1;
-  // Documented task registry: # | Title | Status | Category | Priority |
-  // Created | Issue | Depends on — eight data cells. Anything shorter than the
-  // five the parser itself requires has no free-text cell this call can trust.
-  const dataCells = last; // cells[1..last] — cells[0] is the opening pipe
-  if (dataCells < 5) {
+
+  const header = findHeader(parts, row.line);
+  const headerClosed = header && header[header.length - 1].trim() === "";
+  const headerLast = header
+    ? headerClosed
+      ? header.length - 2
+      : header.length - 1
+    : -1;
+  const lastName = header ? header[headerLast].trim().toLowerCase() : null;
+  if (
+    !header ||
+    last < 1 ||
+    headerLast !== last ||
+    DATA_COLUMN_NAMES.has(lastName)
+  ) {
     return emit(opts, {
       reason: "no-cell",
-      message: `task ${taskId} row (line ${row.line}) has ${dataCells} cells — no notes cell to annotate`,
+      message: !header
+        ? `task ${taskId} row (line ${row.line}) has no table header above it — cannot tell which cell is the notes cell`
+        : headerLast !== last
+          ? `task ${taskId} row (line ${row.line}) has ${last} cells but its header has ${headerLast} — cannot align the notes cell`
+          : `task ${taskId} row (line ${row.line}): last column is \`${header[headerLast].trim()}\`, a data column — no notes cell to annotate`,
       taskId,
       line: row.line,
+      lastColumn: lastName,
       annotated: false,
       exitCode: 0,
     });
   }
-
-  // Header line: walk up from the row to the nearest `| --- |` separator and
-  // take the line above it. The parser made the same walk to find `cols`.
-  let issueCol = -1;
-  for (let li = row.line - 2; li >= 0; li--) {
-    const line = parts[li * 2] || "";
-    if (/^\s*\|?\s*:?-{3,}/.test(line)) {
-      const header = (parts[(li - 1) * 2] || "").split("|");
-      issueCol = header.findIndex((c) => c.trim().toLowerCase() === "issue");
-      break;
-    }
-  }
+  const issueCol = header.findIndex((c) => c.trim().toLowerCase() === "issue");
 
   const prText = `PR #${opts.pr} merged`;
   const notesHas = new RegExp(`PR #${opts.pr}\\b`).test(cells[last]);
