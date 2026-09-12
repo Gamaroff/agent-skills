@@ -283,7 +283,7 @@ docs/prd/{domain}/{feature}/epics/epic.[N].[name]/stories/
 - Numbers are assigned system-wide, NOT per-feature
 - Check `/docs/development/epic-registry.md` for next available number
 - Update registry when creating new epics
-- See [Epic Numbering System in CLAUDE.md](../../CLAUDE.md#epic-numbering-system)
+- See [Epic Registry standard](../../../docs/standards/epic-registry.md)
 
 **Numbering Rules**:
 
@@ -693,4 +693,3 @@ docs/prd/ui-domain/example-component/
 ---
 
 **Last Updated**: YYYY-MM-DD
-**Related Guides**: [Template Usage Guide](./TEMPLATE-USAGE-GUIDE.md) | [PRD Reference](./prd-epic-story-reference.md) | [Code Examples](./code-examples-guide.md)

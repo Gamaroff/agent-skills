@@ -2,9 +2,9 @@
 
 Comprehensive guide to database optimization, indexing strategies, and query patterns for optimal performance in your platform.
 
-> **For schema details**, see [Schema Catalog](./schema-catalog.md)  
-> **For relationships**, see [Relationship Mapping](./relationship-mapping.md)  
-> **For query examples**, see [Data Patterns](./data-patterns.md)
+> **For schema details**, see your project's schema catalog  
+> **For relationships**, see your project's relationship mapping  
+> **For query examples**, see your project's data-patterns guide
 
 ## Current Index Strategy
 
@@ -817,11 +817,13 @@ CREATE UNIQUE INDEX idx_user_financial_summary_user ON user_financial_summary(us
 
 ## Cross-References
 
-- **Query Examples**: [Data Patterns](./data-patterns.md) - Practical query implementations
-- **Schema Structure**: [Schema Catalog](./schema-catalog.md) - Complete field documentation  
-- **Relationships**: [Relationship Mapping](./relationship-mapping.md) - Foreign key optimization
-- **Migration Planning**: [Migration History](./migration-history.md) - Schema evolution tracking
-- **Setup Guide**: [Database Guide](../database-guide.md) - Development environment optimization
+These are the companion documents a project typically keeps beside this guide; none ship with the skill.
+
+- **Query Examples**: your project's data-patterns guide - Practical query implementations
+- **Schema Structure**: your project's schema catalog - Complete field documentation
+- **Relationships**: your project's relationship mapping - Foreign key optimization
+- **Migration Planning**: your project's migration history - Schema evolution tracking
+- **Setup Guide**: your project's database guide - Development environment optimization
 
 ---
 

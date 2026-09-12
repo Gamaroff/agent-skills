@@ -4,7 +4,7 @@
 **Epic:** [epic.XXX.epic-name] _(if applicable)_
 **Completed Date:** [YYYY-MM-DD]
 **Completed By:** [Developer Name]
-**Pull Request:** [#PR_NUMBER](link-to-pr)
+**Pull Request:** [#PR_NUMBER]({pr-url})
 
 ---
 

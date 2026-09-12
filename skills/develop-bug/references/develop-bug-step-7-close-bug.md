@@ -76,7 +76,7 @@ Update the row for this bug in `docs/bugs/bug-registry.md` — set the `Status` 
 
 ### B4. Tracker close (only if linked)
 
-If the bug has `github_issue`/`jira_key` (`TRACKER_ISSUE` non-empty): post a completion comment and close/transition the issue, following the GitHub close / Jira Done-transition mechanics in [`references/develop-pipeline-step-7-finalise.md`](references/develop-pipeline-step-7-finalise.md) (Tracker Issue Update), substituting bug terminology.
+If the bug has `github_issue`/`jira_key` (`TRACKER_ISSUE` non-empty): post a completion comment and close/transition the issue, following the GitHub close / Jira Done-transition mechanics in [`references/develop-pipeline-step-7-finalise.md`](develop-pipeline-step-7-finalise.md) (Tracker Issue Update), substituting bug terminology.
 
 Step 1 ensures the issue via `ensure-bug-{jira,github}-issue`, so a bug normally **has** one — an empty `TRACKER_ISSUE` here means that create failed or was deferred, not that bugs go untracked. Skip the close when it is empty, and say so in the report rather than silently: a deferred create leaves the card uncreated *and* unclosed, and the handover checklist is what carries both actions.
 
