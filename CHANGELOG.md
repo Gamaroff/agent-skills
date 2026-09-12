@@ -70,8 +70,9 @@ All notable changes to this project will be documented in this file. Format foll
   pointers that said "the four shapes" of a document that had six no longer state a count, and
   [`evals/shared/tests/mutation-proving-pointers-parity.test.mjs`](evals/shared/tests/mutation-proving-pointers-parity.test.mjs)
   fails on any pointer that does, and on the document's own heading disagreeing with its body —
-  mutation-proved per the procedure it guards: two ways at authoring, and two more at QA cycle 1
-  with the spellings the first version missed.
+  mutation-proved per the procedure it guards — the test's header carries the running tally: two at
+  authoring, two at QA cycle 1 with the spellings the first version missed, two at QA cycle 2 with an
+  overlapping-window decoy and a counted authored reference.
 
 - **`/develop-next` records the acceptance for what it actually selected, and merges what
   `/finalise` actually accepted** (task 113 — observations #13, #30, #31, #34, #35, #46, #52, #53).

@@ -474,7 +474,7 @@ as coverage for a defect this cycle fixed, **revert the behaviour it names and
 confirm that test goes red** — full procedure, the outcomes table, and the shapes
 vacuity takes: [`references/mutation-proving.md`](references/mutation-proving.md).
 
-Run it as the procedure says, not from memory — four of its steps exist because a
+Run it as the procedure says, not from memory — the steps below exist because a
 QA cycle skipped them and wrote a false finding: **snapshot the file with `cp` and
 restore from the snapshot** (never `git checkout --`, which restores committed
 state and deletes the uncommitted fix with the mutant); **name the test you expect
