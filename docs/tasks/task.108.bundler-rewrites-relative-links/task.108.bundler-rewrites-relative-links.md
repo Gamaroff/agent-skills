@@ -5,7 +5,7 @@ type: task
 description: "bundle_skill.py rewrites shared/resources/X → references/X but leaves the other relative links in those files untouched; authored for shared/resources/ depth, they resolve one level wrong from skills/<x>/references/. Measured 2026-09-12: 864 broken links across 229 bundled files. The bundle-freshness check compares copy to source so it certifies the breakage, and docs-link-check.yml is path-filtered to docs/** so nothing trips. Fix in the bundler, guard with a link check over skills/**."
 tags: [bundling, create-skill, docs-links, ci]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-12
@@ -13,11 +13,13 @@ updated: 2026-09-12
 assignee:
 estimated_effort_hours: 6
 github_issue: 395
+pr_number: 396
+completed_date: 2026-09-12
 ---
 
 # Technical Task: The bundler copies depth-relative links verbatim, so every bundled references/ file carries broken links
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.108.review.1.bundler-rewrites-relative-links.md` implemented 2026-09-12
 
@@ -230,6 +232,7 @@ and make it one constant so a tagged-release variant is a one-line change later.
 | 2026-09-12 |         | QA gate CONCERNS (90/100) — cycle 3: guard pathspec skipped the 57 top-level shared sources (C3-CR-1); corpus itself clean | qa-task |
 | 2026-09-12 |         | QA findings fixed — fail-closed parity helper (ran/ok split); references-root relpath for nested shared sources; guard now walks shared/resources/*.md with a per-half floor; twin agreement on absolute targets; hygiene; 3 iterations | qa-fix |
 | 2026-09-12 |         | QA gate PASS (100/100) — cycle 4 clean; 2 advisory cleanups | qa-task |
+| 2026-09-12 | 1.2     | DoD passed — accepted (PR #396) | finalise |
 
 ---
 
@@ -269,6 +272,36 @@ Cycle 1 found one medium (the parity helper failed open when the bundler could n
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.108.qa.1` … `task.108.qa.4.bundler-rewrites-relative-links.md` (4 cycles)
+**Gate File**: `task.108.gate.4.bundler-rewrites-relative-links.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: ✅ APPROVE — `task.108.pr-review.1.bundler-rewrites-relative-links.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** All 6 met — checker 0 broken over 663 files / 2,098 links; bundle idempotent; zips clean; guard under `npm test`; mutation proofs recorded; audit note closed
+✅ **Tests:** 16 new tests (`tests/bundled-links.test.js`, `tests/bundle-link-rewrite.test.js`, `evals/shared/tests/bundled-parity.test.mjs`); `ci:fast` 3,202/0; CI green on `f587c357`
+✅ **PR Review:** PR #396 — 7 commits, 241 files (+3,306/−930; 205 of them regenerated bundle copies)
+✅ **Documentation:** `docs/contributing/packaging.md` §Link re-relativisation, `AGENTS.md`, `CHANGELOG.md` `[Unreleased]`, audit Theme F close-out
+✅ **Security Review:** PASS — boundary probed (54 candidates executed, 0 reproduced); no secrets, no shell spawns, no filesystem access keyed on link targets
+✅ **Compliance Review:** NOT_APPLICABLE — build tooling only
+✅ **Performance / Reliability / Maintainability:** PASS (QA cycles 1–4)
+
+**Follow-ups carried (all low, none affecting the corpus today):** packager `bundled_names` vs skill-native names; `git ls-files -z`; banner window parity; zip-listing filter clauses; helper parameter name; README pointer to the packaging doc.
+
+**Detailed Verification Log:** See `task.108.dod.1.bundler-rewrites-relative-links.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-09-12
+
+---
+
 ## References
 
 - **Plan**: [`task.108.plan.bundler-rewrites-relative-links.md`](task.108.plan.bundler-rewrites-relative-links.md)
@@ -279,7 +312,7 @@ Cycle 1 found one medium (the parity helper failed open when the bundler could n
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.108.bundler-rewrites-relative-links/task.108.bundler-rewrites-relative-links.md`
