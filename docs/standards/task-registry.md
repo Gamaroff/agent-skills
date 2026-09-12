@@ -27,6 +27,15 @@ Two things follow from that, and both matter more than they look:
   *document's* status, which `/finalise` also sets pre-merge. The row's `Issue`/notes column may
   cite a merge PR that does not exist yet — that column is prose, nothing reads it, and it is not
   what "how much is left?" is answered from.
+
+6. **`/develop-next` annotates the row after the merge** — the second, *additive* writer. Once the
+   PR has landed, its Step 4 runs `registry-tick.js --annotate --pr <n> [--issue <ref>]`, which
+   appends `· PR #<n> merged` to the row's last cell (the notes cell — `Depends on` in the header
+   above, used as free text since task 100) and fills the `Issue` cell only when it still reads `—`.
+   It never touches Status: two Status writers are what task.103 removed, and this mode was put in
+   the same file precisely so the two writes share one row locator rather than drifting apart. A
+   re-run answers `already`; a bug document answers `not-a-task` — the bug registry has no such
+   cells and `develop-bug` closes its row itself.
 - **The tick never blocks acceptance.** `registry-tick.js` exits 0 on every outcome, including
   "no row found". A registry row is a human-readable index; refusing to finalise finished work over
   one would trade a cosmetic defect for a stuck pipeline.
