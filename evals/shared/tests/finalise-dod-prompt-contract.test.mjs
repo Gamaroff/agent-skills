@@ -21,6 +21,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { allCases } from "../../../shared/resources/security-input-corpus.mjs";
+import { bundleCheck } from "../lib/bundled-parity.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -743,8 +744,6 @@ test("finalise bundles the security prompt under references/", () => {
     `run \`npm run bundle\` — skills/finalise/references/${PROMPT} is missing`,
   );
 });
-
-import { bundleCheck } from "../lib/bundled-parity.mjs";
 
 /**
  * Every shared resource the prompt drags into skills/finalise/references/.

@@ -18,6 +18,7 @@ Usage:
 Exit codes: 0 success; 1 a skill failed to bundle; 2 usage error.
 """
 
+import functools
 import os
 import re
 import sys
@@ -198,7 +199,10 @@ def is_external_target(target):
     """A target the rewriter must leave alone: a URL or other scheme, an in-page
     anchor, or a template placeholder (`url`, `path`, `…`, or any `{…}`, `[…]`,
     `<…>` segment)."""
-    if SCHEME_RE.match(target) or target.startswith('#'):
+    if SCHEME_RE.match(target) or target.startswith('#') or target.startswith('/'):
+        # A root-absolute target has no repo-relative meaning on either side:
+        # os.path.join would discard src_dir and the JS twin's posix.join would
+        # not, so the twins must agree to leave it alone.
         return True
     if target in PLACEHOLDER_LITERALS:
         return True
@@ -297,15 +301,28 @@ def expected_bytes(src, name, refs_dir, bundled_names):
     except UnicodeDecodeError:
         return src.read_bytes()
     if suffix == '.md':
-        repo_root = find_repo_root(refs_dir)
-        if repo_root is not None:
-            src_dir = src.parent.resolve().relative_to(repo_root.resolve()).as_posix()
-            dst_dir = (refs_dir.resolve() / name).parent.relative_to(repo_root.resolve()).as_posix()
-            skill_dir = refs_dir.resolve().parent.relative_to(repo_root.resolve()).as_posix()
+        located = _skill_dirs(str(refs_dir))
+        if located is not None:
+            repo_root, skill_dir = located
+            src_dir = src.parent.resolve().relative_to(repo_root).as_posix()
+            dst_dir = (refs_dir.resolve() / name).parent.relative_to(repo_root).as_posix()
             content = rewrite_md_links(
                 content, src_dir, dst_dir, skill_dir, set(bundled_names)
             )
     return inject_header(content, name, suffix).encode('utf-8')
+
+
+@functools.lru_cache(maxsize=None)
+def _skill_dirs(refs_dir_str):
+    """(resolved repo root, repo-relative skill dir) for a `references/` path —
+    memoised, because `expected_bytes` is called once per bundled file per pass
+    and the repo-root walk is the same answer every time."""
+    refs_dir = Path(refs_dir_str).resolve()
+    repo_root = find_repo_root(refs_dir)
+    if repo_root is None:
+        return None
+    repo_root = repo_root.resolve()
+    return repo_root, refs_dir.parent.relative_to(repo_root).as_posix()
 
 
 def _within(root, candidate):

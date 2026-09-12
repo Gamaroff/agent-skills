@@ -1,0 +1,68 @@
+schema: 1
+task: 'task.108.bundler-rewrites-relative-links'
+task_title: 'The bundler copies depth-relative links verbatim, so every bundled references/ file carries broken links'
+gate: CONCERNS
+status_reason: 'All 5 phases and 6 success criteria verified independently (checker 845→0, bundle idempotent, zips clean, CI green, 3 fresh QA mutants caught). One high-confidence medium correctness bug from the diff code review (CR-1: the eval parity helper fails open when the bundler cannot run) enters top_issues under code_review_blocking → CONCERNS.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T15:09:22Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'evals/shared/lib/bundled-parity.mjs'
+    finding: 'isFreshBundledCopy() returns true whenever problems is empty and never consults ok, so if bundle_skill.py --check cannot run (python3 missing, ENOENT) or cannot resolve the skill, every banner-carrying copy is certified fresh and the MCP-comment allowlist in transition-protocol-parity.test.mjs fails open — the opposite of what bundleCheck() documents.'
+    suggested_action: 'Destructure ok as well and return ok && !problems.has(rel) so a failed check reads as not-fresh; add a test that a non-executable bundler yields false.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 10
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Build tooling only. No new network calls, no secrets, no eval of untrusted input; the one new subprocess (python3 bundle_skill.py --check) takes a fixed argv. Verdict reached by reading, not by executing hostile probes.'
+  performance:
+    status: PASS
+    notes: 'Full bundle of 126 skills stays within seconds; checker ~1s over 606 files. CR-5/CR-6 note avoidable repeated work (double corpus scan; per-file repo-root walk) — advisory.'
+  reliability:
+    status: PASS
+    notes: 'Idempotent bundle proven (two runs, identical status/diff); --check --all 0 problems; non-vacuity floor mutation-proved; bundled-sibling decision taken from the same population as the checker so runs cannot flip. CR-3 (URIError on a literal % in a target) would abort the scan rather than mis-report — advisory.'
+  maintainability:
+    status: PASS
+    notes: 'One rule, one constant, twin extractor documented on both sides. package_skill.py imports the pass rather than copying it. CR-4/CR-7/CR-8 are hygiene (fixture cleanup, import placement, an overstated comment).'
+
+recommendations:
+  immediate:
+    - action: 'CR-1 — make isFreshBundledCopy() honour ok (fail closed when the bundler cannot run) and add a test for the unrunnable-bundler case'
+      refs: ['evals/shared/lib/bundled-parity.mjs']
+  future:
+    - action: 'CR-2 — treat a root-absolute target (/docs/x.md) identically in both twins (external, or resolve from repo root)'
+      refs: ['skills/create-skill/scripts/bundle_skill.py', 'tests/lib/markdown-links.js']
+    - action: 'CR-3 — guard decodeURIComponent so a malformed % escape is reported as a broken link, not a crash'
+      refs: ['tests/bundled-links.test.js']
+    - action: 'CR-4 — register t.after fixture cleanup as the sibling bundler tests do'
+      refs: ['tests/bundle-link-rewrite.test.js']
+    - action: 'CR-5 — memoise scan() across the two corpus tests'
+      refs: ['tests/bundled-links.test.js']
+    - action: 'CR-6 — resolve repo-relative dirs once per caller rather than per file in expected_bytes'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'CR-7 — move the bundled-parity import into the import block'
+      refs: ['evals/shared/tests/finalise-dod-prompt-contract.test.mjs']
+    - action: 'CR-8 — reword the bundled_names comment: the zip relies on an up-to-date in-tree bundle'
+      refs: ['skills/create-skill/scripts/package_skill.py']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed and mutation-proved']

@@ -54,6 +54,16 @@ function gitLsFiles(...patterns) {
     .filter(Boolean);
 }
 
+// A `%` that is not a valid escape makes decodeURIComponent throw; a link like
+// that is broken, not a reason to abort the whole scan.
+function decodeURIComponentSafe(s) {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 /**
  * Walk the corpus and return { files, links, broken } where `broken` is
  * [{ file, line, target, resolved }].
@@ -79,15 +89,13 @@ function scan() {
       relative += 1;
       const noFragment = target.split("#")[0];
       if (noFragment === "") continue; // "#anchor" is filtered upstream; belt and braces
+      // A `%` that is not a valid escape makes decodeURIComponent throw; a
+      // link like that is broken, not a reason to abort the whole scan.
+      const decoded = decodeURIComponentSafe(noFragment);
       // A trailing slash names a directory; normalize() keeps it, the tracked
       // set has no such entry, so strip it before the lookup.
       const resolved = path.posix
-        .normalize(
-          path.posix.join(
-            path.posix.dirname(file),
-            decodeURIComponent(noFragment),
-          ),
-        )
+        .normalize(path.posix.join(path.posix.dirname(file), decoded))
         .replace(/\/$/, "");
       if (!tracked.has(resolved) && !trackedDirs.has(resolved)) {
         broken.push({ file, line, target, resolved });
@@ -96,6 +104,10 @@ function scan() {
   }
   return { files: files.length, links, relative, broken };
 }
+
+// The two corpus tests below read the same walk; parse it once.
+let _scanned;
+const scanned = () => (_scanned ??= scan());
 
 test("extractor: line-based fences — an inline ``` mention does not flip parity", () => {
   const text = [
@@ -130,12 +142,20 @@ test("extractor: placeholders and externals are skipped by pattern", () => {
   const text = [
     "[a](url) [b](path) [c](…) [d](#anchor) [e](https://example.com/x.md) [f](mailto:x@y)",
     "[g](./task.{id}.{name}.md) [h](../../prd.[name].md) [i]({jira_url}) [j](<relative/path/to/x.md>)",
-    "[keep](../real.md#section) ![img](assets/pic.png)",
+    "[keep](../real.md#section) ![img](assets/pic.png) [abs](/docs/x.md)",
   ].join("\n");
   assert.deepEqual(
     extractRelativeLinks(text).map((l) => l.target),
     ["../real.md#section", "assets/pic.png"],
   );
+});
+
+test("scan: a malformed % escape is a broken link, not a crash", () => {
+  // decodeURIComponent throws on "100%.md"; the resolver must fall back to the
+  // raw target and let the resolution test report the file/line.
+  assert.doesNotThrow(() => decodeURIComponentSafe("100%.md"));
+  assert.equal(decodeURIComponentSafe("100%.md"), "100%.md");
+  assert.equal(decodeURIComponentSafe("a%20b.md"), "a b.md");
 });
 
 test("extractor: proseOnly preserves line numbers", () => {
@@ -145,7 +165,7 @@ test("extractor: proseOnly preserves line numbers", () => {
 });
 
 test("non-vacuity floor: the walk visited a corpus, not nothing", () => {
-  const { files, links } = scan();
+  const { files, links } = scanned();
   assert.ok(
     files >= FLOOR_FILES && links >= FLOOR_LINKS,
     `scan-broken: visited ${files} files / ${links} links, floor is ${FLOOR_FILES} / ${FLOOR_LINKS} — ` +
@@ -154,7 +174,7 @@ test("non-vacuity floor: the walk visited a corpus, not nothing", () => {
 });
 
 test("every relative link under skills/** and shared/resources/** resolves to a tracked file", () => {
-  const { broken, files, links, relative } = scan();
+  const { broken, files, links, relative } = scanned();
   const byTarget = new Map();
   for (const b of broken)
     byTarget.set(b.target, (byTarget.get(b.target) || 0) + 1);

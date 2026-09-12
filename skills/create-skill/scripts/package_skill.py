@@ -112,10 +112,12 @@ def package_skill(skill_path, output_dir=None):
         EXCLUDE_SUFFIXES = {'.pyc', '.pyo', '.map'}
         refs_dir = skill_path / 'references'
         # The names this zip will ship under references/: what the skill's own
-        # files reach, plus whatever an in-tree `npm run bundle` already placed
-        # there. The link pass decides "bundled sibling → relative, else upstream
-        # URL" against this set, and it is the same population the in-tree
-        # bundler uses, so the zip's copies and the tree's copies are identical.
+        # files reach (non-transitively), plus whatever is already on disk under
+        # references/ — bundled copies and skill-native files alike. The link
+        # pass decides "bundled sibling → relative, else upstream URL" against
+        # this set. It matches the in-tree bundler's `needed ∪ reconcilable`
+        # only when the tree was bundled first, which is the packager's real
+        # precondition: package from a tree where `npm run bundle` is a no-op.
         bundled_names = set(shared_to_bundle)
         if refs_dir.is_dir():
             bundled_names |= {

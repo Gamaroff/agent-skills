@@ -42,8 +42,14 @@ function isPlaceholder(target) {
  * absolute URL or other scheme, an in-page anchor, or a template placeholder.
  */
 function isExternal(target) {
+  // A root-absolute target (`/docs/x.md`) is left alone on both sides: the
+  // Python twin's os.path.join would discard the source dir where posix.join
+  // here would not, so neither claims it.
   return (
-    SCHEME_RE.test(target) || target.startsWith("#") || isPlaceholder(target)
+    SCHEME_RE.test(target) ||
+    target.startsWith("#") ||
+    target.startsWith("/") ||
+    isPlaceholder(target)
   );
 }
 

@@ -55,7 +55,7 @@ const GUIDE_MD = [
   "Inside the skill: [native](../../skills/fixture-skill/references/native.md).",
   "Directory: [examples](../../docs/examples/).",
   "Placeholders: [p1]({jira_url}) [p2](./task.[n].md) [p3](<path/to/x.md>) [p4](url).",
-  "External: [ext](https://example.com/x.md) [anchor](#top).",
+  "External: [ext](https://example.com/x.md) [anchor](#top) [abs](/docs/x.md).",
   "Code span: `[not](a-link.md)` stays.",
   "",
   "```markdown",
@@ -64,8 +64,9 @@ const GUIDE_MD = [
   "",
 ].join("\n");
 
-function makeFixture() {
+function makeFixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "bundle-links-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, "shared", "resources"), { recursive: true });
   fs.mkdirSync(path.join(root, "docs", "reference"), { recursive: true });
   fs.writeFileSync(path.join(root, "package.json"), '{"name":"fixture"}\n');
@@ -95,8 +96,8 @@ function run(script, args) {
   return execFileSync("python3", [script, ...args], { encoding: "utf-8" });
 }
 
-test("bundled copy: one rule — inside the skill relative, everything else upstream", () => {
-  const { skillDir } = makeFixture();
+test("bundled copy: one rule — inside the skill relative, everything else upstream", (t) => {
+  const { skillDir } = makeFixture(t);
   run(BUNDLER, [skillDir]);
   const copy = fs.readFileSync(
     path.join(skillDir, "references", "guide.md"),
@@ -142,6 +143,11 @@ test("bundled copy: one rule — inside the skill relative, everything else upst
     copy,
     /\[ext\]\(https:\/\/example\.com\/x\.md\) \[anchor\]\(#top\)/,
   );
+  assert.match(
+    copy,
+    /\[abs\]\(\/docs\/x\.md\)/,
+    "root-absolute target untouched",
+  );
   assert.match(copy, /`\[not\]\(a-link\.md\)`/, "inline code span untouched");
   assert.match(
     copy,
@@ -150,8 +156,8 @@ test("bundled copy: one rule — inside the skill relative, everything else upst
   );
 });
 
-test("the skill's own files are not re-relativised in-tree", () => {
-  const { skillDir } = makeFixture();
+test("the skill's own files are not re-relativised in-tree", (t) => {
+  const { skillDir } = makeFixture(t);
   run(BUNDLER, [skillDir]);
   const own = fs.readFileSync(path.join(skillDir, "SKILL.md"), "utf-8");
   assert.match(
@@ -161,8 +167,8 @@ test("the skill's own files are not re-relativised in-tree", () => {
   assert.match(own, /\[ref\]\(references\/native\.md\)/);
 });
 
-test("idempotent: second run is a no-op and --check reports 0 problems", () => {
-  const { skillDir } = makeFixture();
+test("idempotent: second run is a no-op and --check reports 0 problems", (t) => {
+  const { skillDir } = makeFixture(t);
   run(BUNDLER, [skillDir]);
   const before = fs.readFileSync(
     path.join(skillDir, "references", "guide.md"),
@@ -177,8 +183,8 @@ test("idempotent: second run is a no-op and --check reports 0 problems", () => {
   assert.match(run(BUNDLER, ["--check", skillDir]), /0 problems/);
 });
 
-test("package path: same bytes as in-tree for a bundled copy; own files get the outside rule", () => {
-  const { root, skillDir } = makeFixture();
+test("package path: same bytes as in-tree for a bundled copy; own files get the outside rule", (t) => {
+  const { root, skillDir } = makeFixture(t);
   run(BUNDLER, [skillDir]);
   const inTree = fs.readFileSync(
     path.join(skillDir, "references", "guide.md"),

@@ -36,13 +36,13 @@ const cache = new Map();
  * `ok` is false when the bundler reported any problem OR could not resolve the
  * skill — an unresolvable skill is not "clean".
  */
-export function bundleCheck(skillDir) {
-  const key = resolve(skillDir);
+export function bundleCheck(skillDir, { python = "python3" } = {}) {
+  const key = `${python}\u0000${resolve(skillDir)}`;
   if (cache.has(key)) return cache.get(key);
   let stdout = "";
   let ok = true;
   try {
-    stdout = execFileSync("python3", [BUNDLER, "--check", key], {
+    stdout = execFileSync(python, [BUNDLER, "--check", resolve(skillDir)], {
       encoding: "utf-8",
       cwd: repoRoot,
     });
@@ -80,8 +80,15 @@ export function declaredSource(file) {
  * True when `file` is a bundled copy of `shared/resources/<source>` that the
  * bundler certifies as in sync — by CONTENT (its banner names the source and
  * `--check` finds nothing wrong with it), never by filename alone.
+ *
+ * Fails CLOSED. `ok` is consulted, not only `problems`: when the bundler could
+ * not run at all (no `python3`, ENOENT) or could not resolve the skill,
+ * `problems` is empty for the wrong reason, and a copy nobody could look at is
+ * not fresh. The first cut of this helper returned `!problems.has(rel)` alone,
+ * which certified every banner-carrying copy on exactly the runner that could
+ * not check any of them (task.108 QA cycle 1, CR-1).
  */
-export function isFreshBundledCopy(file, source) {
+export function isFreshBundledCopy(file, source, opts = {}) {
   const abs = resolve(file);
   const parts = abs.split(sep);
   const i = parts.lastIndexOf("references");
@@ -89,6 +96,6 @@ export function isFreshBundledCopy(file, source) {
   const skillDir = parts.slice(0, i).join(sep);
   const rel = parts.slice(i + 1).join("/");
   if (declaredSource(abs) !== source) return false;
-  const { problems } = bundleCheck(skillDir);
-  return !problems.has(rel);
+  const { ok, problems } = bundleCheck(skillDir, opts);
+  return ok && !problems.has(rel);
 }
