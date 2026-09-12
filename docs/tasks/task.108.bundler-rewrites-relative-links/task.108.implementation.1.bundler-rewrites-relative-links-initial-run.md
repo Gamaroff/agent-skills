@@ -37,7 +37,7 @@ Fix `bundle_skill.py` / `package_skill.py` so depth-relative links in bundled `r
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #396: https://github.com/Gamaroff/agent-skills/pull/396 — 4 commits (feat / docs / fix / chore); in-review comment posted on #395 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.108.qa.{N}.*.md`; `task.108.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 4 cycles: CONCERNS 90 → PASS 100 (+1 low) → CONCERNS 90 → PASS 100; 3 fix commits; 5c APPROVE | code-review subagents ×6 (transcripts in scratch; findings in the gates/reports) |
 | 7. finalise                | ✅ Done    | `task.108.dod.{N}.*.md`; task `status: accepted`                       | `task.108.dod.1.bundler-rewrites-relative-links.md` ACCEPTED; AC 6/6, security PASS (54 probes, 0 reproduced), compliance N/A, docs PASS, CI SUCCESS | 4 DoD agents (findings folded into the DoD file) |
-| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Committed in `{hash}` (see Completion Summary), pushed to PR #396 | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Committed in `c1e31af4`, pushed to PR #396 | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
