@@ -1,7 +1,7 @@
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/platform-detection.md. Regenerate via `npm run bundle`. -->
 # Platform Detection (canonical)
 
-> **Setting up a project? Skip this doc.** Run the [setup wizard](../../docs/concepts/getting-started.md#quick-setup-wizard) — it picks the platform interactively and writes the right `skills-config.yaml` for you. This document is the resolver-internals reference for skill authors and for cases where you need to override auto-detection.
+> **Setting up a project? Skip this doc.** Run the [setup wizard](https://github.com/Gamaroff/agent-skills/blob/develop/docs/concepts/getting-started.md#quick-setup-wizard) — it picks the platform interactively and writes the right `skills-config.yaml` for you. This document is the resolver-internals reference for skill authors and for cases where you need to override auto-detection.
 
 This file is the single source of truth for how skills determine the active tracker and VCS platform, and how much access the agent has to each. Skills reference this via the explicit path `references/platform-detection.md`. At package time, `skills/create-skill/scripts/package_skill.py` (zip) and `bundle_skill.py` (in-tree) bundle this file under `references/` and rewrite the path so installed skills are self-contained.
 
@@ -123,7 +123,7 @@ One shared set across `tracker` and `vcs` would accept `tracker: bitbucket` and 
 misconfigurations of exactly the class this closes. `tracker: jria` used to resolve silently to
 `github`; it now halts.
 
-A **mapping-valued** `tracker:` is the documented [`tracker.workflowFile`](../../docs/reference/tracker-workflow.md)
+A **mapping-valued** `tracker:` is the documented [`tracker.workflowFile`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/tracker-workflow.md)
 form, not a typo. It resolves to `auto` (i.e. detect) rather than being graded as a scalar override.
 
 ### Malformed or unreachable `skills-config.yaml`
@@ -236,7 +236,7 @@ silently lies. It can be honest about not having a value: under a deferring mode
 stdout (every notice goes to stderr, so a capture cannot see it), records the mutation with `produces`
 set, and marks a value-producing kind `blocking: true`. The checklist then opens with a banner naming
 the **two-run convergence**: perform the action, write the value into the document, re-run. Contract:
-[`tracker-issue-cli.md`](tracker-issue-cli.md).
+[`tracker-issue-cli.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/tracker-issue-cli.md).
 
 No placeholder is ever written. `github_issue: 0` would defeat the idempotent search that stops the
 next run creating a duplicate, so a wrong key is worse than no key.
@@ -296,7 +296,7 @@ key set — a grammar, rather than one more spelling patched shut each cycle.
 
 Nesting depth, sequences and flow sequences are **deliberately** on this list. A shape-based subset
 ("nothing deeper than two levels") was drafted first and would have refused
-[`docs/reference/configuration.md`](../../docs/reference/configuration.md)'s own canonical example
+[`docs/reference/configuration.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/configuration.md)'s own canonical example
 config, which carries three- and four-level nesting, a flow sequence and a sequence of mappings.
 An over-narrow subset is not the safer failure — every refusal is loud, so it is a locked door on a
 config that was always legal.

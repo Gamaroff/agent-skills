@@ -1,0 +1,66 @@
+schema: 1
+task: 'task.108.bundler-rewrites-relative-links'
+task_title: 'The bundler copies depth-relative links verbatim, so every bundled references/ file carries broken links'
+gate: CONCERNS
+status_reason: 'Cycle-2 fixes verified (C2-CR-1..5, probes + tests). Scoped review of the changed files found one medium, high-confidence defect in the guard itself: the git pathspec shared/resources/**/*.md matches only nested files, so the 57 top-level shared sources were never walked (606 = 605 skills files + 1 fixture README). The sources hide no broken link (0/103 checked by hand), so this is a coverage hole in the checker, not corpus breakage — it enters top_issues under code_review_blocking.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T15:43:59Z'
+
+top_issues:
+  - id: 'C3-CR-1'
+    severity: medium
+    file: 'tests/bundled-links.test.js'
+    finding: 'The pathspec shared/resources/**/*.md is a default (non-:(glob)) git pattern: ** is just * and the following / must match a literal slash, so it selects only nested files — 1 of 58 tracked shared/resources Markdown files is walked; the 57 top-level shared sources the header claims are covered are not.'
+    suggested_action: 'Use shared/resources/*.md (default globs already cross slashes) and add a floor asserting that at least one top-level shared source was visited, so the walk cannot silently narrow again.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-12'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 16
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'C3-CR-2 (advisory): the package-path test depends on an external unzip binary; python3 -m zipfile is already a hard dependency and portable. CI runner has unzip today.'
+  maintainability:
+    status: PASS
+    notes: 'C3-CR-3 (advisory): the new eval test recomputes BUNDLER/repoRoot that the helper already defines — export and import.'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 1
+  verification_method: 'Cycle-4 scoped review + per-half floor mutation (narrowed pathspec → red) + ci:fast 3,202/0'
+
+recommendations:
+  immediate:
+    - action: 'C3-CR-1 — fix the shared/resources pathspec; add a top-level-shared-source floor'
+      refs: ['tests/bundled-links.test.js']
+  future:
+    - action: 'C3-CR-2 — replace unzip with python3 -m zipfile in the package-path test'
+      refs: ['tests/bundle-link-rewrite.test.js']
+    - action: 'C3-CR-3 — export BUNDLER from bundled-parity.mjs and import it in its test'
+      refs: ['evals/shared/lib/bundled-parity.mjs', 'evals/shared/tests/bundled-parity.test.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['C3-CR-1 fixed — the guard must actually walk the shared sources it claims to cover']

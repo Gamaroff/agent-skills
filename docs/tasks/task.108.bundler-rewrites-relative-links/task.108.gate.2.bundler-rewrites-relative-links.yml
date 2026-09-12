@@ -1,0 +1,71 @@
+schema: 1
+task: 'task.108.bundler-rewrites-relative-links'
+task_title: 'The bundler copies depth-relative links verbatim, so every bundled references/ file carries broken links'
+gate: PASS
+status_reason: 'Cycle-2 refute pass over the whole branch diff: all eight cycle-1 findings verified fixed (CR-1 fail-closed mutation-proven). One new low-severity, high-confidence latent bug in the bundled-sibling branch for a nested shared source (none exists in the corpus today) enters top_issues under code_review_blocking; no medium or high finding, so the gate reads PASS and the entry routes one more fix cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T15:29:55Z'
+
+top_issues:
+  - id: 'C2-CR-1'
+    severity: low
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: 'The bundled-sibling branch of _relocate_target() joins the references-relative bundled name onto dst_dir rather than onto the skill references/ root, so a shared source in a subdirectory (dst_dir = skills/s/references/sub) emits sub/y.md → references/sub/sub/y.md and ../x.md → x.md. Latent: no bundled shared .md lives in a subdirectory today; the first one would ship broken links that --check certifies.'
+    suggested_action: 'Relpath from the references root (the ancestor of dst_dir named references, or pass it in) joined with the bundled name; add a nested-source case to tests/bundle-link-rewrite.test.js.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-12'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 13
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Unchanged from cycle 1: build tooling, fixed-argv subprocess, no network. The python override in bundleCheck is test-only, threaded through the memo key, and never read from the environment.'
+  performance:
+    status: PASS
+    notes: 'CR-5/CR-6 from cycle 1 landed (single corpus scan; repo-root walk memoised per references dir).'
+  reliability:
+    status: PASS
+    notes: 'bundleCheck memo hides a tamper-after-check within one process — documented, and no caller mutates a real skill mid-run. C2-CR-2 (advisory): ok folds sibling staleness, so a stale sibling de-allowlists a fresh copy with a misleading message — conservative, but worth a separate ran flag. C2-CR-3 (advisory): a link to the skill directory itself becomes an upstream URL.'
+  maintainability:
+    status: PASS
+    notes: 'Two hygiene items: rm -rf via execFileSync in the new eval test where fs.rmSync is the idiom; a duplicated comment at the decode call site.'
+
+bug_resolution:
+  cycle_2_entry_fixed: 'C2-CR-1 closed by 5bdb7011 (nested-source test, mutation-proved); C2-CR-2..5 also applied'
+  bugs_fixed: 8
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 1
+  verification_method: 'Refute pass (Explore subagent, whole-branch diff, 16 files) + affected suites 131/131 + ci:fast 3,200/0 + bundled-parity fail-closed mutation'
+
+recommendations:
+  immediate:
+    - action: 'C2-CR-1 — relpath from the references root for bundled siblings; nested-source test'
+      refs: ['skills/create-skill/scripts/bundle_skill.py', 'tests/bundle-link-rewrite.test.js']
+  future:
+    - action: 'C2-CR-2 — expose a ran flag from bundleCheck and use it in isFreshBundledCopy; keep whole-skill ok for the finalise test'
+      refs: ['evals/shared/lib/bundled-parity.mjs']
+    - action: 'C2-CR-3 — treat resolved == skill_dir as inside the skill'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'C2-CR-4 — fs.rmSync instead of execFileSync(rm) in bundled-parity.test.mjs'
+      refs: ['evals/shared/tests/bundled-parity.test.mjs']
+    - action: 'C2-CR-5 — drop the duplicated comment at the decode call site'
+      refs: ['tests/bundled-links.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

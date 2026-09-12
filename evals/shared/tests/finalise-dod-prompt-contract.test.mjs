@@ -21,6 +21,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { allCases } from "../../../shared/resources/security-input-corpus.mjs";
+import { bundleCheck } from "../lib/bundled-parity.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..", "..");
@@ -745,20 +746,6 @@ test("finalise bundles the security prompt under references/", () => {
 });
 
 /**
- * Normalise a bundled copy back to its source form: drop the AUTO-GENERATED
- * banner and undo the `shared/resources/` → `references/` path rewrite. Same
- * helper shape as transition-protocol-parity.test.mjs, for the same reason.
- */
-function normaliseBundled(text) {
-  return text
-    .split("\n")
-    .filter((l) => !l.includes("AUTO-GENERATED — DO NOT EDIT"))
-    .join("\n")
-    .split("references/")
-    .join("shared/resources/");
-}
-
-/**
  * Every shared resource the prompt drags into skills/finalise/references/.
  *
  * `bundle_skill.py` walks shared refs TRANSITIVELY, so this is not just the
@@ -779,9 +766,10 @@ const BUNDLED_REFS = readdirSync(bundledDir).filter(
 );
 
 /**
- * The rewrite can CORRUPT a path as easily as it can fix one, and byte-parity
- * cannot see it: `normaliseBundled` deliberately undoes the rewrite, so a source
- * and a bundled copy that differ only by a broken rewrite compare equal.
+ * The rewrite can CORRUPT a path as easily as it can fix one, and a freshness
+ * check cannot see it: `bundle --check` asks whether the copy is what the
+ * bundler would write, so a source and a bundled copy that differ only by a
+ * faithfully-applied but wrong rewrite compare equal.
  *
  * Found the hard way during task.79's own qa-fix cycle. A fix for an
  * unresolvable import wrote `join(repoRoot, "shared/resources/…")` into the
@@ -810,12 +798,21 @@ test("no bundled reference builds a repo-root path out of the rewritten director
   }
 });
 
-test("every transitively-bundled reference is byte-identical to its source", () => {
-  // Byte parity, not marker presence. The previous version of this test checked
-  // that five strings survived into the bundled copy, which a stale copy passes
-  // trivially — it passed on an edited-but-unbundled prompt during task.79's own
-  // development. `npm run ci:fast` never runs the bundler, so nothing else here
-  // would have caught it either.
+test("every transitively-bundled reference is in sync with its source", () => {
+  // Freshness as the BUNDLER defines it, not marker presence and not a
+  // test-local byte comparison. The first version of this test checked that
+  // five strings survived into the bundled copy, which a stale copy passes
+  // trivially — it passed on an edited-but-unbundled prompt during task.79's
+  // own development. The second undid the `shared/resources/` → `references/`
+  // rewrite by hand and compared bytes, which stopped being a faithful inverse
+  // when task.108 taught the bundler to re-relativise every other prose link.
+  // `bundle_skill.py --check` is the one definition of "in sync"; asking it is
+  // what keeps this test from drifting the next time the rewrite grows.
+  // `npm run ci:fast` never runs the bundler's WRITE path, so nothing else
+  // here would catch a stale copy.
+  const { ok, problems, stdout } = bundleCheck(
+    join(repoRoot, "skills", "finalise"),
+  );
   for (const ref of BUNDLED_REFS) {
     const src = join(repoRoot, "shared", "resources", ref);
     const bun = join(repoRoot, "skills", "finalise", "references", ref);
@@ -825,13 +822,17 @@ test("every transitively-bundled reference is byte-identical to its source", () 
       `skills/finalise/references/${ref} is missing — the prompt pulls it in ` +
         `transitively. Run \`npm run bundle\` and commit the result.`,
     );
-    assert.equal(
-      normaliseBundled(readFileSync(bun, "utf-8")),
-      normaliseBundled(readFileSync(src, "utf-8")),
-      `skills/finalise/references/${ref} is STALE — it differs from ` +
-        `shared/resources/${ref}. Run \`npm run bundle\` and commit it. An ` +
+    assert.ok(
+      !problems.has(ref),
+      `skills/finalise/references/${ref} is ${problems.get(ref)} — it differs ` +
+        `from shared/resources/${ref}. Run \`npm run bundle\` and commit it. An ` +
         `agent reads the bundled copy, so a stale one is a wrong answer ` +
         `delivered confidently.`,
     );
   }
+  assert.ok(
+    ok,
+    `bundle_skill.py --check skills/finalise reported problems outside the ` +
+      `prompt's own references:\n${stdout}`,
+  );
 });

@@ -174,10 +174,10 @@ Default mapping (vanilla Jira workflow):
 > workflow record. They are a superset, not a replacement: `in-qa` and `ready-for-merge` name board
 > columns no document status has ever named, and `draft` / `planned` name document states the
 > pipeline never signals. Nothing here changes when a stage is enabled. See
-> [Pipeline stages](../../docs/reference/configuration.md#pipeline-stages).
+> [Pipeline stages](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/configuration.md#pipeline-stages).
 
 Projects whose Jira workflow uses different status names (e.g. "Selected for Development") override the
-mapping under `jira.statusMap` in `skills-config.yaml`. See [Jira status mapping](../../docs/reference/configuration.md#jira-status-mapping) for the full reference. Matching is by name only — see [`jira-transition-protocol.md`](jira-transition-protocol.md).
+mapping under `jira.statusMap` in `skills-config.yaml`. See [Jira status mapping](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/configuration.md#jira-status-mapping) for the full reference. Matching is by name only — see [`jira-transition-protocol.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/jira-transition-protocol.md).
 
 ---
 

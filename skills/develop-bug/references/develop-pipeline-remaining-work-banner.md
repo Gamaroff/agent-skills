@@ -32,7 +32,7 @@ in the same way a missing step banner is.
 † **The two Step 5c rows are `develop-story` / `develop-task` only.** `develop-bug`'s
 Steps 5–6 verify-and-fix loop has no 5c, so neither moment ever arrives on that pipeline and
 its absence is not a protocol violation. Both rows are **instructed in §5c** of
-[`develop-pipeline-step-5-6-qa-loop.md`](develop-pipeline-step-5-6-qa-loop.md) — that section
+[`develop-pipeline-step-5-6-qa-loop.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/develop-pipeline-step-5-6-qa-loop.md) — that section
 owns them, and a firing point declared mandatory here with nothing instructing it there is a
 defect in this table, not a licence to improvise.
 

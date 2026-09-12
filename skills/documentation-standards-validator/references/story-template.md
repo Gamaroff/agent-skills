@@ -607,14 +607,14 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 
 ### Technical Documentation
 
-- [Technical Implementation](../technical-implementation.md) - Architecture
-- [Developer Quick Start](../DEVELOPER-QUICK-START.md) - Dev guide
-- [API Specification](../api-specification.md) - API contracts
+- [Technical Implementation]({DOCS_ROOT}/technical-implementation.md) - Architecture
+- [Developer Quick Start]({DOCS_ROOT}/DEVELOPER-QUICK-START.md) - Dev guide
+- [API Specification]({DOCS_ROOT}/api-specification.md) - API contracts
 
 ### Project Resources
 
-- [Implementation Status](../IMPLEMENTATION-STATUS.md) - Current status
-- [Cross-Reference Guide](../CROSS-REFERENCE-GUIDE.md) - Navigation
+- [Implementation Status]({DOCS_ROOT}/IMPLEMENTATION-STATUS.md) - Current status
+- [Cross-Reference Guide]({DOCS_ROOT}/CROSS-REFERENCE-GUIDE.md) - Navigation
 
 ---
 
@@ -622,7 +622,7 @@ const data = jsonString ? JSON.parse(jsonString) : defaults;
 
 **Status**: ⚠️ Not Yet Ready for QA
 
-> **For Developers**: When your implementation is complete, update this section before changing the story status to "Ready for QA". See [Developer QA Handoff Process](../../development/development-guide.md#developer-to-qa-handoff-process) for complete instructions.
+> **For Developers**: When your implementation is complete, update this section before changing the story status to "Ready for QA". See [Developer QA Handoff Process]({DOCS_ROOT}/development/development-guide.md#developer-to-qa-handoff-process) for complete instructions.
 
 ### Implementation Summary
 
@@ -754,8 +754,8 @@ Before marking this story as "Ready for QA", verify:
 
 | Bug ID                                                    | Title                     | Status   | Priority | Created    | Closed     |
 | --------------------------------------------------------- | ------------------------- | -------- | -------- | ---------- | ---------- |
-| [bug.8.5.3.1](./bug.8.5.3.1.cache-cleanup-memory-leak.md) | Cache cleanup memory leak | Closed   | High     | 2025-10-18 | 2025-10-19 |
-| [bug.8.5.3.2](./bug.8.5.3.2.offline-mode-regression.md)   | Offline mode regression   | Reopened | Medium   | 2025-10-18 | -          |
+| [bug.8.5.3.1](./bug.{epic}.{story}.1.cache-cleanup-memory-leak.md) | Cache cleanup memory leak | Closed   | High     | 2025-10-18 | 2025-10-19 |
+| [bug.8.5.3.2](./bug.{epic}.{story}.2.offline-mode-regression.md)   | Offline mode regression   | Reopened | Medium   | 2025-10-18 | -          |
 
 #### QA Testing Notes
 
@@ -764,8 +764,8 @@ Before marking this story as "Ready for QA", verify:
 
 **Issues Found**:
 
-1. [Brief description of issue 1] - See [bug.8.5.3.1](./bug.8.5.3.1.cache-cleanup-memory-leak.md)
-2. [Brief description of issue 2] - See [bug.8.5.3.2](./bug.8.5.3.2.offline-mode-regression.md)
+1. [Brief description of issue 1] - See [bug.8.5.3.1](./bug.{epic}.{story}.1.cache-cleanup-memory-leak.md)
+2. [Brief description of issue 2] - See [bug.8.5.3.2](./bug.{epic}.{story}.2.offline-mode-regression.md)
 
 **Story Status History**:
 

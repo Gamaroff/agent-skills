@@ -5,7 +5,7 @@ description: Step 3 (investigate & fix) for the develop-bug pipeline. Implements
 
 # Develop Bug Pipeline — Step 3: Investigate & Fix
 
-Loaded by `/develop-bug` during Step 3. This is the bug-specific develop step. It reuses the **bounded develop loop, stall detection, and test-failure triage** from [`references/develop-pipeline-step-3-develop-loop.md`](references/develop-pipeline-step-3-develop-loop.md); this document adds the bug-specific reproduce + fix + fix-record behaviour on top.
+Loaded by `/develop-bug` during Step 3. This is the bug-specific develop step. It reuses the **bounded develop loop, stall detection, and test-failure triage** from [`references/develop-pipeline-step-3-develop-loop.md`](develop-pipeline-step-3-develop-loop.md); this document adds the bug-specific reproduce + fix + fix-record behaviour on top.
 
 Step 2 (`/review-bug`) already confirmed the report is fix-ready (complete, not a duplicate, not already fixed). Step 3 now *executes*: reproduce, localise, fix, and record.
 
@@ -15,7 +15,7 @@ Step 2 (`/review-bug`) already confirmed the report is fix-ready (complete, not 
 
 1. **Move the bug into the fix cycle**: set bug status `new → in-progress` (frontmatter `status: in-progress`; body `**Status:** 🔄 In Progress`). If the bug arrived `reopened`, keep it and open the next iteration instead of Iteration 1.
 2. **Reproduce the failure** using the most deterministic available signal (in order): a **failing automated test** that encodes the bug (preferred — it becomes the regression test below); a **reproducing command** (capture stdout/stderr/exit); or, when neither is possible (env-specific/timing/external), a **precise code-path trace**. Record the reproduction evidence.
-3. **Localise the root cause** via a read-only Explore subagent (breadth: medium; "very thorough" for `Blocker`/`Critical`): start from the bug's Related Files / Evidence and the reproduction signal, trace to the function/line where Expected and Actual diverge, and return candidate root-cause file:line + the module's conventions (error handling, DI, naming). Persist the summary per [`references/subagent-summary-artifact.md`](references/subagent-summary-artifact.md); consume only the summary.
+3. **Localise the root cause** via a read-only Explore subagent (breadth: medium; "very thorough" for `Blocker`/`Critical`): start from the bug's Related Files / Evidence and the reproduction signal, trace to the function/line where Expected and Actual diverge, and return candidate root-cause file:line + the module's conventions (error handling, DI, naming). Persist the summary per [`references/subagent-summary-artifact.md`](subagent-summary-artifact.md); consume only the summary.
 4. Fill the **Investigation** subsection of the current `### Iteration {N}` under `## Developer Fix Cycle`:
 
 ```markdown
@@ -48,7 +48,7 @@ With the root cause localised, now:
 
 Run the project's lint + tests after the change (the exact commands come from the codebase; e.g. `npx nx lint <project> && npx nx test <project>` or `deno lint && deno test -A`). Iterate until zero lint errors and all tests pass, including the new regression test.
 
-Apply the shared develop-loop's **stall detection** and **test-failure triage** verbatim: on a failing run, capture output to `.claude/state/test-output-${ITER}-*.log`, dispatch an Explore subagent with [`references/test-failure-triage-prompt.md`](references/test-failure-triage-prompt.md), and consume only its summary. Honour the shared loop's iteration bound; on HALT, follow the shared halt protocol (commit report, snapshot+remove lock, surface to user).
+Apply the shared develop-loop's **stall detection** and **test-failure triage** verbatim: on a failing run, capture output to `.claude/state/test-output-${ITER}-*.log`, dispatch an Explore subagent with [`references/test-failure-triage-prompt.md`](test-failure-triage-prompt.md), and consume only its summary. Honour the shared loop's iteration bound; on HALT, follow the shared halt protocol (commit report, snapshot+remove lock, surface to user).
 
 ---
 

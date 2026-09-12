@@ -658,8 +658,8 @@ Epic [N] is complete when all criteria below are met:
 ### Related Documentation
 
 - [Product Requirements](../../prd.[name].md) - Source PRD this epic decomposes
-- [Architecture](../../../../architecture/index.md) - Architecture index for the project
-- [Coding standards](../../../../architecture/concepts/coding-standards.md) - Loaded into every pipeline run
+- [Architecture]({ARCH_ROOT}/index.md) - Architecture index for the project
+- [Coding standards]({ARCH_ROOT}/concepts/coding-standards.md) - Loaded into every pipeline run
 - [[Specification]](../../[spec-name].md) - Feature specification
 
 ### Related Epics
@@ -669,9 +669,9 @@ Epic [N] is complete when all criteria below are met:
 
 ### Project Resources
 
-- [Project completion roadmap](../../../../development/project-completion-roadmap.md) - Ordered backlog `develop-next` selects from
-- [Epic registry](../../../../development/epic-registry.md) - Global epic numbering
-- [Task registry](../../../../tasks/task-registry.md) - Global task numbering
+- [Project completion roadmap]({REPO_ROOT}/docs/development/project-completion-roadmap.md) - Ordered backlog `develop-next` selects from
+- [Epic registry]({REPO_ROOT}/docs/development/epic-registry.md) - Global epic numbering
+- [Task registry]({REPO_ROOT}/docs/tasks/task-registry.md) - Global task numbering
 
 ---
 

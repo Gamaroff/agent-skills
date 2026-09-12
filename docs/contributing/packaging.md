@@ -6,7 +6,7 @@ Skills ship via two distribution paths:
 
 | Path | How it works | When to use |
 |---|---|---|
-| **In-tree bundle** (`npm run bundle`) | Copies `shared/resources/*` into each skill's `references/` dir in place and rewrites paths. Committed to git. | Tarball install — `setup-consumer.sh` downloads the tagged GitHub release and copies skill dirs verbatim |
+| **In-tree bundle** (`npm run bundle`) | Copies `shared/resources/*` into each skill's `references/` dir in place, rewrites paths and re-relativises every other link. Committed to git. | Tarball install — `setup-consumer.sh` downloads the tagged GitHub release and copies skill dirs verbatim |
 | **Zip package** (`npm run package`) | Same bundling + path rewrite, but inside a `.zip` artefact. Never committed. | Manual installs, release artefacts |
 
 ## In-Tree Bundling (required before push)
@@ -84,9 +84,14 @@ Output location depends on how you invoke the packager:
 1. **Validates** the skill (frontmatter, naming, shared resource refs) — aborts on failure
 2. **Detects** any `shared/resources/<file>` references across all `.md` and `.js` files in the skill
 3. **Bundles** those files into `references/` inside the zip
-4. **Rewrites** paths in zipped content:
-   - `.md` files: `shared/resources/<file>` → `references/<file>`
-   - `.js` files: `require("...path.../shared/resources/<file>")` → `require("../references/<file>")`
+4. **Rewrites** paths in zipped content — the same pass `bundle_skill.py` applies in-tree, imported
+   from it rather than re-declared, so the zip and the tree cannot drift:
+   - `.md` files: `shared/resources/<file>` → `references/<file>`, then every other relative link is
+     re-relativised (see [Link re-relativisation](#link-re-relativisation) below)
+   - `.js` / `.mjs` / `.sh` files: `require("...path.../shared/resources/<file>")` → `require("../references/<file>")`
+     (and the ESM / `source` equivalents)
+   - the skill's **own** `.md` files also get the outside-the-skill rule: a `../../docs/…` link in a
+     README is valid in this repo and a 404 in a zip that ships nothing outside the skill directory
 5. **Excludes** `__pycache__`, `.git`, `node_modules`, `.DS_Store` directories and `.pyc`, `.pyo`, `.map` files
 
 The source files in your working tree are never modified.
@@ -100,6 +105,46 @@ See `shared/resources/code-vs-test-validation.md` for the full framework.
 ```
 
 The packager detects this pattern and bundles the file automatically. **Do not use symlinks or relative paths** to reference shared resources — the packager won't detect them.
+
+## Link re-relativisation
+
+A shared resource is authored at `shared/resources/` depth; its bundled copy lives at
+`skills/<skill>/references/`. The `shared/resources/X` spelling was always rewritten, but every
+*other* relative link — a bare sibling `open-knowledge-format.md`, a `../../docs/…` path,
+`../../AGENTS.md` — was copied verbatim and resolved one level wrong from the copy. Measured on
+2026-09-12: **845 broken links in 215 bundled files**, certified clean by `--check` because it
+compares copy to source.
+
+The bundler now resolves each prose link against the source's directory and applies **one rule**:
+
+| Resolved target | Emitted as |
+| :--- | :--- |
+| inside `skills/<skill>/` — a file the bundle ships (a bundled sibling, a skill-native reference) | relative to the copy |
+| anything else — `docs/…`, `AGENTS.md`, a `shared/resources/` sibling this skill does **not** bundle | `https://github.com/Gamaroff/agent-skills/blob/develop/<repo-relative path>` |
+
+"Bundled sibling" is decided from the same population the write and check passes use (`needed` ∪
+`reconcilable`), never from what happens to be on disk mid-run — otherwise the first bundle would
+emit URLs for siblings written a moment later and the second run would flip them back.
+
+Three things the pass leaves alone, and the checker skips for the same reason: **fenced blocks and
+inline code spans** (tracked line by line — a whole-text regex flips parity on an inline
+```` ``` ```` mention), **absolute URLs and `#anchors`**, and **placeholders** — `url`, `path`, `…`,
+or any target carrying `{…}`, `[…]` or `<…>`. That last rule is a pattern, not a list of files: a
+template's `./task.{id}.{name}.md` is not a link. An illustrative link with a realistic-looking
+target (`./bug.8.5.3.1.cache-cleanup-memory-leak.md`) is indistinguishable by pattern — put it in a
+code span, or give it a `{…}` segment, at the source.
+
+The guard is `tests/bundled-links.test.js` (under `npm test`, hence `npm run ci` and `test.yml`):
+every relative link under `skills/**/*.md` and `shared/resources/**/*.md` must resolve to a tracked
+file, and the walk must have visited ≥ 200 files and ≥ 1,000 links — an empty walk is a broken
+reader, not a clean corpus. Its extractor (`tests/lib/markdown-links.js`) is the deliberate twin of
+`rewrite_md_links()` in `bundle_skill.py`; the two must agree on fences, code spans and placeholders,
+because a link one side sees and the other does not is either rewritten and never verified, or
+verified and never rewritten.
+
+The upstream URL pins `blob/develop` in one constant (`UPSTREAM_BASE`). Tarball installs come from
+`develop`, so that is the branch a consumer's link should land on; a tagged-release variant is a
+one-line change.
 
 ## Validation
 

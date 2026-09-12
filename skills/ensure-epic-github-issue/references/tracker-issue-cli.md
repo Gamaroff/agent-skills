@@ -10,7 +10,7 @@ description: Contract for tracker-issue.js — the CLI that performs GitHub issu
 
 The fourth peer of [`jira-stage.js`](platform-detection.md),
 [`gh-stage.js`](platform-detection.md) and
-[`tracker-comment.js`](tracker-comment-contract.md), and the one that exists for a
+[`tracker-comment.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/tracker-comment-contract.md), and the one that exists for a
 reason none of them had: **its callers read its stdout.**
 
 ---

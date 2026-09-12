@@ -180,4 +180,4 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 ## See also
 
 - [`document-status-lifecycle.md`](document-status-lifecycle.md) — the status states sign-off gates
-- [`docs/reference/configuration.md`](../../docs/reference/configuration.md) — full `skills-config.yaml` schema
+- [`docs/reference/configuration.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/configuration.md) — full `skills-config.yaml` schema

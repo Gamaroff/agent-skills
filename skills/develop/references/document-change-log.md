@@ -4,7 +4,7 @@
 > **Canonical spec.** Consumed by `create-{prd,epic,story,task}`, `review-{prd,epic,story,task}`,
 > `edit-{epic,story}`, `correct-course`, `develop`, `qa-{story,task}`, `finalise`, and the six
 > `sync-{jira,github}-{epic,story,task}` skills. Implemented by
-> [`change-log.js`](change-log.js).
+> [`change-log.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/change-log.js).
 
 A PRD, epic, story, or task document carries a **Change Log** section: an append-only table
 recording what changed about the document, when, and who changed it. It is the document's own
@@ -55,7 +55,7 @@ Rules:
   removed. The one exception is *widening* a legacy two-column row during migration, which
   preserves its content exactly and only adds the two missing cells.
 - **Every entry bumps frontmatter `updated:` in the same edit.** `updated` is this repo's OKF
-  `timestamp` (see [`open-knowledge-format.md`](open-knowledge-format.md)); a Change Log row
+  `timestamp` (see [`open-knowledge-format.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/open-knowledge-format.md)); a Change Log row
   that does not move it leaves the document claiming it was last touched before its own most
   recent recorded change. `bumpUpdated()` exists so no caller has to remember.
 
@@ -64,7 +64,7 @@ Rules:
 The heading is `## Change Log` at top level for epic, story, and task documents.
 
 **PRDs keep `### Change Log` nested under §1** — the PRD section contract is asserted in
-[`docs/standards/prd-documents.md`](../../docs/standards/prd-documents.md) and the `create-doc`
+[`docs/standards/prd-documents.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/standards/prd-documents.md) and the `create-doc`
 engine owns section nesting. Rather than force PRDs to restructure, readers accept:
 
 - **H2 or H3** — `## Change Log` or `### Change Log`
@@ -174,18 +174,18 @@ automatic.
 ## Exclusions
 
 **Bug reports carry no Change Log.** `## Status History` in
-[`bug-report-template.md`](../../skills/create-bug-report/assets/bug-report-template.md) is
+[`bug-report-template.md`](https://github.com/Gamaroff/agent-skills/blob/develop/skills/create-bug-report/assets/bug-report-template.md) is
 already the bug-type equivalent, and it is richer — it carries a `Status` column, which is the
 thing a bug's history is actually about. Do not add a second table to bug reports.
 
-That table has its own engine — [`status-history.js`](status-history.js), the peer of
+That table has its own engine — [`status-history.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/status-history.js), the peer of
 `change-log.js` — so a writer that needs to record a moment on a bug has somewhere correct to go.
 Reaching for `upsertChangeLog(content, entry, { docType: "bug" })` instead does **not** fail: there
 is no `bug` anchor, so it falls through to the end-of-file path and appends the one table this
 exclusion forbids, silently. Use the engine, not the `docType`.
 
 **Tracker cards never carry the Change Log.**
-[`tracker-card-summary.md`](tracker-card-summary.md) is explicit about why: *"Jira and GitHub
+[`tracker-card-summary.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/tracker-card-summary.md) is explicit about why: *"Jira and GitHub
 both keep their own issue history, and the local file holds the authoritative log. A third copy
 grew on every sync and told a reader nothing new."*
 
@@ -222,9 +222,9 @@ anchor.
 
 ## See also
 
-- [`change-log.js`](change-log.js) — the engine implementing this spec
-- [`open-knowledge-format.md`](open-knowledge-format.md) — `updated` ≡ OKF `timestamp`
-- [`tracker-card-summary.md`](tracker-card-summary.md) — why cards never carry the log
-- [`sign-off.md`](sign-off.md) — the structural precedent for a config-gated document section
+- [`change-log.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/change-log.js) — the engine implementing this spec
+- [`open-knowledge-format.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/open-knowledge-format.md) — `updated` ≡ OKF `timestamp`
+- [`tracker-card-summary.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/tracker-card-summary.md) — why cards never carry the log
+- [`sign-off.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/sign-off.md) — the structural precedent for a config-gated document section
 - [`document-status-lifecycle.md`](document-status-lifecycle.md) — the status transitions the log records
-- [`docs/reference/configuration.md`](../../docs/reference/configuration.md) — full `skills-config.yaml` schema
+- [`docs/reference/configuration.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/configuration.md) — full `skills-config.yaml` schema

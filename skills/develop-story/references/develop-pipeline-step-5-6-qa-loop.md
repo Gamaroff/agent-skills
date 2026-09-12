@@ -226,7 +226,7 @@ Skill(qa-task, args="code_review_blocking=true")
 
 Two skills write rows across this loop, and **this step document writes none**. It states the
 contract; the skills perform the writes. Canonical format:
-[document-change-log.md](document-change-log.md).
+[document-change-log.md](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/document-change-log.md).
 
 | Writer     | When                          | Row                                                     |
 | ---------- | ----------------------------- | ------------------------------------------------------- |
@@ -241,7 +241,7 @@ Three rules make this loop's history readable rather than a churn log:
   of the implementation report, which is its proper home.
 - **`qa-gate` writes nothing to the document — ever.** It owns the `.yml` and only the `.yml`.
   The verdict row is written by `qa-story` / `qa-task`, which already own document sections. See
-  [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md).
+  [`docs/reference/anti-patterns.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/anti-patterns.md).
 
 A QA cycle that finds nothing still writes its verdict row: the verdict is the event being
 recorded, not the findings.
@@ -515,7 +515,7 @@ broken. A clean gate is a clean gate: it leaves through 5c on the ordinary `PASS
 
 **`qa.testArtifactGlobs` defaults to `[]`**, which matches nothing, so a consumer who has not
 configured it keeps today's behaviour exactly. That is the fail-safe direction expressed as the
-default rather than as an opt-out. See [`configuration.md`](../../docs/reference/configuration.md).
+default rather than as an opt-out. See [`configuration.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/configuration.md).
 
 #### On exit
 

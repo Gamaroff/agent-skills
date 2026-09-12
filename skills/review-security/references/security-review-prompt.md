@@ -6,7 +6,7 @@ description: The reviewer prompt for /review-security. Establishes, per security
 
 # Security review prompt
 
-> Passed verbatim to the reviewing agent by [`review-security`](../../skills/review-security/SKILL.md).
+> Passed verbatim to the reviewing agent by [`review-security`](../SKILL.md).
 > **You are not asked to judge whether the code looks secure.** You are asked to produce probe
 > specifications that a deterministic engine will execute, and to report what it found.
 
@@ -204,7 +204,7 @@ over-read a clean result.
 ## See also
 
 - [`security-input-corpus.md`](security-input-corpus.md) — the inputs and the method ordering
-- [`probe-boundary-rule.md`](probe-boundary-rule.md) — why a probe is not a snippet, and how the
+- [`probe-boundary-rule.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/probe-boundary-rule.md) — why a probe is not a snippet, and how the
   verdict is derived
-- [`finalise-dod-security-prompt.md`](finalise-dod-security-prompt.md) — the DoD gate's probe mode,
+- [`finalise-dod-security-prompt.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/finalise-dod-security-prompt.md) — the DoD gate's probe mode,
   whose subject this widens

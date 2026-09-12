@@ -13,9 +13,9 @@ description: The canonical storage format for the observation log — the direct
 > **Changes were made.** The methodology is kept; the mechanism is a rewrite.
 > Upstream expresses its correctness guards as POSIX shell snippets embedded in
 > prose, which the agent must retype correctly before every write — here those
-> guards live inside [`observation-log.js`](./observation-log.js), where they
+> guards live inside [`observation-log.js`](observation-log.js), where they
 > cannot be skipped. Upstream's `[ABSOLUTE PATH]` placeholder substitution is
-> replaced by [`resolve-observation-workspace.sh`](./resolve-observation-workspace.sh).
+> replaced by [`resolve-observation-workspace.sh`](resolve-observation-workspace.sh).
 > Upstream's pre-3.0 single-file log migration path is omitted — no such log can
 > exist in a fresh install.**
 
@@ -61,7 +61,7 @@ the first review forever — the log accumulates, the "days since review" figure
 stays plausible, and nothing ever surfaces.
 
 The workspace root is resolved once by
-[`resolve-observation-workspace.sh`](./resolve-observation-workspace.sh) and
+[`resolve-observation-workspace.sh`](resolve-observation-workspace.sh) and
 never derived from the current working directory. See **Resolving the
 workspace** below.
 
@@ -437,7 +437,7 @@ body file for comments.
 
 ## See also
 
-- [`observation-log.js`](./observation-log.js) — the engine
-- [`resolve-observation-workspace.sh`](./resolve-observation-workspace.sh) — the resolver
+- [`observation-log.js`](observation-log.js) — the engine
+- [`resolve-observation-workspace.sh`](resolve-observation-workspace.sh) — the resolver
 - `tracker-comment.js` — the exit-code and `reason` idiom this transcribes
 - `resolve-platform.sh` — the guarded-source resolver idiom

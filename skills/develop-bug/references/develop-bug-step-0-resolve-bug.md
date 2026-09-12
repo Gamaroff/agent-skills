@@ -38,7 +38,7 @@ Check for an active pipeline lock (single-path lock, shared across develop-story
 
 - **Active lock for THIS bug** (`task_or_story_id` matches `{bug-prefix}`) → this is a resume. Enter the Context Compression Recovery path in `SKILL.md` (Phase 0a/0b resume-detector) and continue from the recommended step. Do NOT re-run Phase 0d prompts.
 - **Active lock for a DIFFERENT work item** → **HALT**: another pipeline is active; show the lock and instruct the user to finish/abort it first.
-- **`last-halt.json` snapshot for this bug, no active lock** → offer "Resume from {halt_step}" or "Start fresh" (fresh deletes the snapshot). See [`references/develop-pipeline-resume-contract.md`](references/develop-pipeline-resume-contract.md).
+- **`last-halt.json` snapshot for this bug, no active lock** → offer "Resume from {halt_step}" or "Start fresh" (fresh deletes the snapshot). See [`references/develop-pipeline-resume-contract.md`](develop-pipeline-resume-contract.md).
 - **No lock, no snapshot** → fresh run; proceed to 0c.
 
 The lock is created at the end of Step 1 (after the branch exists), not here.
@@ -63,9 +63,9 @@ Read the bug file frontmatter and body. Extract and record in the implementation
 | `ready-for-qa` | Proceed directly toward Steps 5–6 verification if a fix already exists; else re-verify the fix record. |
 | `closed` | **HALT** — nothing to do. Report the existing `## Resolution Summary` to the user. |
 
-**Lite-mode detection** (see [`references/develop-pipeline-lite-mode.md`](references/develop-pipeline-lite-mode.md) for the shared heuristic). For bugs, lite mode is allowed **only** when severity is `Minor`/`Trivial` AND priority is `Low`/`Medium`. `Blocker`/`Critical`/`Major` bugs always run full QA in Steps 5–6. Record the decision: `Lite mode: {on/off} — severity={severity}, priority={priority}`.
+**Lite-mode detection** (see [`references/develop-pipeline-lite-mode.md`](develop-pipeline-lite-mode.md) for the shared heuristic). For bugs, lite mode is allowed **only** when severity is `Minor`/`Trivial` AND priority is `Low`/`Medium`. `Blocker`/`Critical`/`Major` bugs always run full QA in Steps 5–6. Record the decision: `Lite mode: {on/off} — severity={severity}, priority={priority}`.
 
-`TRACKER`/`VCS` are resolved via [`references/resolve-platform.sh`](references/resolve-platform.sh) (source it before any tracker branch).
+`TRACKER`/`VCS` are resolved via [`references/resolve-platform.sh`](resolve-platform.sh) (source it before any tracker branch).
 
 ---
 

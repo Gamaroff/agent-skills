@@ -17,6 +17,11 @@ import sys
 import zipfile
 from pathlib import Path
 from quick_validate import validate_skill, find_repo_root, collect_shared_refs
+# The rewrite pass is defined ONCE, in bundle_skill.py. This script used to
+# re-declare its three regexes inline and would have needed a fourth copy for
+# the link re-relativisation (task.108); importing is what keeps the zip and the
+# in-tree bundle from drifting.
+from bundle_skill import rewrite_text, rewrite_md_links, expected_bytes
 
 MANAGED_BY = "agent-skills"
 SOURCE_URL = "https://github.com/Gamaroff/agent-skills"
@@ -105,11 +110,20 @@ def package_skill(skill_path, output_dir=None):
     try:
         EXCLUDE_DIRS = {'__pycache__', '.git', 'node_modules', '.DS_Store'}
         EXCLUDE_SUFFIXES = {'.pyc', '.pyo', '.map'}
-        SHARED_REF_RE = re.compile(r'(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')
-        # Matches require("...path.../shared/resources/file") and rewrites to require("../references/file")
-        JS_SHARED_RE = re.compile(r'(require\(["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])\)')
-        # Shell scripts under <skill>/scripts/ — rewrite ../…/shared/resources/<name> → ../references/<name>
-        SH_SHARED_RE = re.compile(r'(?:\.\./)+shared/resources/([A-Za-z0-9._-]+)')
+        refs_dir = skill_path / 'references'
+        # The names this zip will ship under references/: what the skill's own
+        # files reach (non-transitively), plus whatever is already on disk under
+        # references/ — bundled copies and skill-native files alike. The link
+        # pass decides "bundled sibling → relative, else upstream URL" against
+        # this set. It matches the in-tree bundler's `needed ∪ reconcilable`
+        # only when the tree was bundled first, which is the packager's real
+        # precondition: package from a tree where `npm run bundle` is a no-op.
+        bundled_names = set(shared_to_bundle)
+        if refs_dir.is_dir():
+            bundled_names |= {
+                p.relative_to(refs_dir).as_posix()
+                for p in refs_dir.rglob('*') if p.is_file()
+            }
 
         with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
             # Walk through the skill directory; rewrite shared/resources/ paths in .md and .js files
@@ -119,29 +133,47 @@ def package_skill(skill_path, output_dir=None):
                 if not file_path.is_file() or file_path.suffix in EXCLUDE_SUFFIXES:
                     continue
                 arcname = file_path.relative_to(skill_path.parent)
+                # An in-tree bundled copy is written ONCE, from its shared source,
+                # in the loop below — writing it here too produced a duplicate
+                # arcname whose second (raw, un-rewritten) copy won on extraction.
+                if (
+                    file_path.is_relative_to(refs_dir)
+                    and file_path.relative_to(refs_dir).as_posix() in shared_to_bundle
+                ):
+                    continue
                 if file_path.suffix == '.md':
                     content = file_path.read_text()
                     if file_path.name == 'SKILL.md':
                         content = inject_origin_metadata(content, MANAGED_BY, SOURCE_URL)
                     if shared_to_bundle:
-                        content = SHARED_REF_RE.sub(lambda m: f"references/{m.group(1)}", content)
+                        content = rewrite_text(content, '.md')
+                    if repo_root:
+                        # A skill's own `../../docs/…` link is valid in this repo
+                        # and a 404 in the zip, which ships nothing outside the
+                        # skill directory. Same rule as the bundled copies: inside
+                        # the skill → relative, anything else → upstream URL.
+                        rel_dir = file_path.parent.relative_to(repo_root).as_posix()
+                        content = rewrite_md_links(
+                            content, rel_dir, rel_dir,
+                            skill_path.relative_to(repo_root).as_posix(), bundled_names,
+                        )
                     zipf.writestr(str(arcname), content)
-                elif file_path.suffix == '.js' and shared_to_bundle:
-                    content = file_path.read_text()
-                    rewritten = JS_SHARED_RE.sub(lambda m: f'{m.group(1)}../references/{m.group(2)}{m.group(3)})', content)
-                    zipf.writestr(str(arcname), rewritten)
-                elif file_path.suffix == '.sh' and shared_to_bundle:
-                    content = file_path.read_text()
-                    rewritten = SH_SHARED_RE.sub(lambda m: f"../references/{m.group(1)}", content)
-                    zipf.writestr(str(arcname), rewritten)
+                elif file_path.suffix in ('.js', '.mjs', '.sh') and shared_to_bundle:
+                    zipf.writestr(
+                        str(arcname), rewrite_text(file_path.read_text(), file_path.suffix)
+                    )
                 else:
                     zipf.write(file_path, arcname)
                 print(f"  Added: {arcname}")
 
-            # Bundle shared resources under references/
+            # Bundle shared resources under references/ — the same bytes
+            # `npm run bundle` writes in-tree: banner + reference rewrite + link
+            # re-relativisation. Never the raw source.
             for filename, src_path in shared_to_bundle.items():
                 arcname = Path(skill_path.name) / 'references' / filename
-                zipf.write(src_path, arcname)
+                zipf.writestr(
+                    str(arcname), expected_bytes(src_path, filename, refs_dir, bundled_names)
+                )
                 print(f"  Bundled shared: {arcname}")
 
         print(f"\n✅ Successfully packaged skill to: {zip_filename}")
