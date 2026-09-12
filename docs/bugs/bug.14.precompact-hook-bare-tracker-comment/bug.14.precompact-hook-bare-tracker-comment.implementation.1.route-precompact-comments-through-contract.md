@@ -26,7 +26,7 @@ started: '2026-09-12T10:13:15Z'
 | 4 | create-pr | ✅ Done | PR #392: https://github.com/Gamaroff/agent-skills/pull/392 (commit `1138b9c8`, 80 files) | — |
 | 5–6 | verify-fix loop | ✅ Done | 3 verify cycles, 2 qa-fix cycles; PASS at cycle 3 (commits `5bcb0ff2`, `0c62dd44`, `f10526a8`) | review-code subagents ×3 (results in QA Iteration History) |
 | 7 | finalise-close | ✅ Done | DoD ACCEPTED (bug.14.dod.1, CI SUCCESS on f10526a8); Resolution Summary written; status closed; registry row 14 → closed; #391 commented + closed; board already Done | inline DoD (bug fallback) |
-| 8 | commit-changes | ⏳ Pending | | |
+| 8 | commit-changes | ✅ Done | Committed in `8dfdef42`, pushed; PR #392 open for the develop-next merge gate | — |
 
 ## Decisions Log
 
