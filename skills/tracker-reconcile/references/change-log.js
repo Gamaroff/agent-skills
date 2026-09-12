@@ -204,14 +204,83 @@ function fmtEntry({ date, version = "", description = "", author = "" }) {
   return `| ${date} | ${version} | ${description} | ${author} |`;
 }
 
-function buildChangeLogBlock(entries, { level = 2 } = {}) {
+// `before` / `after` are lines the section already held that are not part of
+// the table — an authoring note, a nested `###` and its body — carried through
+// verbatim on either side of the regenerated table. Both default to empty, so a
+// block that was only ever a table is emitted exactly as it always was.
+function buildChangeLogBlock(
+  entries,
+  { level = 2, before = [], after = [] } = {},
+) {
+  const pre = before.length ? `${before.join("\n")}\n\n` : "";
+  const post = after.length ? `\n\n${after.join("\n")}` : "";
   return (
     `${CL_START}\n${"#".repeat(level)} Change Log\n\n` +
+    pre +
     `| Date | Version | Description | Author |\n` +
     `|------|---------|-------------|--------|\n` +
     entries.join("\n") +
+    post +
     `\n${CL_END}`
   );
+}
+
+// Everything in the located section that the rebuild does NOT regenerate —
+// prose, blank lines, a nested subsection — split by where it sat relative to
+// the table, so it is put back on the same side. Markers and the `Change Log`
+// heading are regenerated; pipe-lines are the table and are handled by the
+// caller. Non-pipe lines that sat BETWEEN two table fragments are carried too,
+// emitted after the table: the rows must be one contiguous table, and moving
+// a line below it loses nothing where dropping it lost text (bug.13).
+//
+// This used to be dropped by design — "regenerating a block replaces everything
+// between its bounds" — and the drop was invisible: rows survived, the next
+// `##` survived, the document still read as well-formed. Every un-migrated
+// document hits this once, on its first write, at a moment nobody is reading
+// the diff. A machine writer's edit is additive; it never deletes text a human
+// wrote.
+function splitCarriedLines(blockLines) {
+  const markers = SWEEP_PAIRS.flatMap((p) => [p.start, p.end]);
+  const isTable = (l) => /^\s*\|/.test(l);
+
+  let headingSeen = false;
+  const lines = [];
+  for (const raw of blockLines) {
+    let line = raw;
+    for (const m of markers) line = line.split(m).join("");
+    // A marker on a line of its own leaves nothing behind; one sharing a line
+    // with text leaves the text.
+    if (line !== raw && !line.trim()) continue;
+    if (!headingSeen && RE_HEADING.test(line)) {
+      headingSeen = true;
+      continue;
+    }
+    lines.push(line);
+  }
+
+  const trimBlank = (arr) => {
+    let a = 0;
+    let b = arr.length;
+    while (a < b && !arr[a].trim()) a++;
+    while (b > a && !arr[b - 1].trim()) b--;
+    return arr.slice(a, b);
+  };
+
+  const first = lines.findIndex(isTable);
+  if (first === -1) return { before: trimBlank(lines), after: [] };
+  let last = lines.length - 1;
+  while (last > first && !isTable(lines[last])) last--;
+
+  const before = trimBlank(lines.slice(0, first));
+  const between = lines
+    .slice(first, last + 1)
+    .filter((l) => !isTable(l) && l.trim());
+  const tail = trimBlank(lines.slice(last + 1));
+  const after =
+    between.length && tail.length
+      ? [...between, "", ...tail]
+      : [...between, ...tail];
+  return { before, after };
 }
 
 // Split a table row into trimmed cells, dropping the empty strings that a leading
@@ -458,8 +527,14 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     // Unparsed rows lead: they are older history the parser could not read, and
     // the log is append-only, so nothing may be emitted above them that would
     // reorder them relative to what follows.
+    //
+    // Everything else the section held is carried through on the side of the
+    // table it came from — see `splitCarriedLines`.
+    const { before, after } = splitCarriedLines(blockLines);
     const block = buildChangeLogBlock([...unparsed, ...history, newRow], {
       level: found.level,
+      before,
+      after,
     });
     // Normalise both seams: the head may now end in blank lines where a swept
     // block used to be, and the tail may begin with them. Without this the
