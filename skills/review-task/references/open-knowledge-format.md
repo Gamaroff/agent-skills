@@ -70,6 +70,6 @@ A future OKF version bump (past v0.1) is a separate follow-up task; conformance 
 
 ## See also
 
-- [`AGENTS.md`](../../AGENTS.md) — top-level repo guidance (links this doc)
-- [`docs/standards/epic-documents.md`](../../docs/standards/epic-documents.md), [`story-documents.md`](../../docs/standards/story-documents.md), [`task-documents.md`](../../docs/standards/task-documents.md), [`prd-documents.md`](../../docs/standards/prd-documents.md)
-- [`references/document-status-lifecycle.md`](./document-status-lifecycle.md)
+- [`AGENTS.md`](https://github.com/Gamaroff/agent-skills/blob/develop/AGENTS.md) — top-level repo guidance (links this doc)
+- [`docs/standards/epic-documents.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/standards/epic-documents.md), [`story-documents.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/standards/story-documents.md), [`task-documents.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/standards/task-documents.md), [`prd-documents.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/standards/prd-documents.md)
+- [`references/document-status-lifecycle.md`](document-status-lifecycle.md)

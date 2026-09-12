@@ -97,7 +97,7 @@ Log "Task completed" in Decisions Log.
 `completed_date` and `pr_number` — acceptance is the single most important event in a document's
 life, and splitting the two writes is how one lands without the other. This step document states
 the contract; `/finalise` performs the write. Canonical format:
-[document-change-log.md](document-change-log.md).
+[document-change-log.md](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/document-change-log.md).
 
 | 2026-05-15 | 1.2 | DoD passed — accepted (PR #204) | finalise |
 

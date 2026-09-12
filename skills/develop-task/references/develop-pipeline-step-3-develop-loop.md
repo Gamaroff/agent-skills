@@ -246,7 +246,7 @@ keeps a five-iteration loop from producing five rows.
 
 The write belongs to `/develop`, not to this step document. This step states the contract; the
 skill performs it. Duplicating the write in both places is how a document ends up with two rows
-for one event. Canonical format: [document-change-log.md](document-change-log.md).
+for one event. Canonical format: [document-change-log.md](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/document-change-log.md).
 
 **Post development completion to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty). Execute this before the lock-advance Bash call — it is a tool call, not prose, and does not violate the no-prose-before-lock-advance rule:
 

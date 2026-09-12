@@ -34,7 +34,7 @@ A mode is a **selection over renderers**, never a renderer itself:
 | Mode | Renderers selected | Rationale |
 | ---- | ------------------ | --------- |
 | `full` | `summary` (only when a `retry_of` record exists) | Nothing is deferred by policy; a record here means something *failed*. |
-| `read-only` | `json` + `summary` | The JSON is [task.57](../../docs/tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md)'s reconcile input. |
+| `read-only` | `json` + `summary` | The JSON is [task.57](https://github.com/Gamaroff/agent-skills/blob/develop/docs/tasks/task.57.readonly-verification-and-reconcile/task.57.readonly-verification-and-reconcile.md)'s reconcile input. |
 | `approve` | `md` + `sh` + `summary` | A consent manifest: read the checklist, then run the script. |
 | `command` | `sh` + `summary` | The operator holds the credential and runs the script. |
 | `manual` | `md` + `summary` | The operator clicks through the UI. |

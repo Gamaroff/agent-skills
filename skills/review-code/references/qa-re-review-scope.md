@@ -41,7 +41,7 @@ fix cycle changes the behaviour of code its own diff never touched.
 
 1. `nfr_validation.security.status: FAIL`, **or** `nfr_validation.security.evidence` that is
    `unverified` — including a gate whose `security:` block carries **no** `evidence:` key at all.
-   Values: [`qa-gate-security-evidence.md`](qa-gate-security-evidence.md)
+   Values: [`qa-gate-security-evidence.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/qa-gate-security-evidence.md)
 2. a `top_issues[]` entry with `severity: high` whose `finding` concerns a **boundary** — a
    classifier, validator, parser, sanitiser, allow-list, deny-list, or authorisation check
 3. `gate: FAIL` **and** the work item's own Success Criteria contain any of the words

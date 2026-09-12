@@ -295,7 +295,7 @@ This shape is the one that is mechanically checkable, and **`tests/relationship-
 now checks it** — four rules over every test file in the repository, validated against all six
 historical instances and against the two mechanisms that survived adversarial attack. It runs in
 `npm run ci`. Its corpus, its measured false-positive rate and its own mutation proofs are in
-[`tests/fixtures/relationship-assertion/README.md`](../../tests/fixtures/relationship-assertion/README.md).
+[`tests/fixtures/relationship-assertion/README.md`](https://github.com/Gamaroff/agent-skills/blob/develop/tests/fixtures/relationship-assertion/README.md).
 
 Do not read the lint as coverage of the class. It models the six shapes that
 happened; a seventh in a shape none of its rules models will pass, and shape 5's

@@ -398,7 +398,7 @@ adding a stage without a lead turns that test red before the new stage can be us
 
 That import is deliberate and should not be "simplified" into a local list. Two lists of stages drift
 silently and in the worst direction — the catalogue passing while the engine has a stage it cannot
-render — which is the enumeration class in [`../../docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md).
+render — which is the enumeration class in [`../../docs/reference/anti-patterns.md`](https://github.com/Gamaroff/agent-skills/blob/develop/docs/reference/anti-patterns.md).
 
 **`PR_COMMENT_STAGES` is a second list, and it is not that anti-pattern.** The two name two
 *audiences*, which is a real distinction, not a duplicated enumeration of one thing. Three tests hold

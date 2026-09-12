@@ -321,5 +321,5 @@ refuses to be the thing that hides it.
   security probe, which consumes this corpus as its candidate set
 - [`mutation-proving.md`](mutation-proving.md) — method 3 above, and its measured
   limits
-- [`qa-runnable-prose-detection.md`](qa-runnable-prose-detection.md) — the
+- [`qa-runnable-prose-detection.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/qa-runnable-prose-detection.md) — the
   prose-beside-mechanism precedent this pair follows
