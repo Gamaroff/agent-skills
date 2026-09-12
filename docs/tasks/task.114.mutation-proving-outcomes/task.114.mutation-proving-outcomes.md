@@ -5,11 +5,13 @@ type: task
 description: "Twelve observations from three days of QA cycles record outcomes mutation-proving.md has no branch for: a mutation that reds the wrong test (#41), reds nothing on dead vs load-bearing code (#32), survives because the wrong line was mutated (#37), stays green because the edit never applied (#47), reds only because of current corpus data (#45), is absorbed by a downstream fallback (#29), or was reverted with git checkout -- and deleted the uncommitted fix with it (#55). Plus three instrument rules (#16, #26, #19) and one stale count copied into three consumers (#18). One reference doc owns all of it; rewrite it as an outcomes table with a rule per outcome, then point the consumers at it."
 tags: [mutation-proving, qa-task, qa-story, testing]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: low
 created: 2026-09-12
 updated: 2026-09-12
+completed_date: 2026-09-12
+pr_number: 400
 assignee:
 estimated_effort_hours: 6
 github_issue: 399
@@ -17,7 +19,7 @@ github_issue: 399
 
 # Technical Task: mutation-proving.md documents the false green and the false red, and none of the other seven things a mutation run can tell you
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.114.review.1.mutation-proving-outcomes.md` implemented 2026-09-12
 **GitHub Issue**: [#399](https://github.com/Gamaroff/agent-skills/issues/399)
 
@@ -164,6 +166,7 @@ bundle. No test greps the doc's headings (verified at review).
 | 2026-09-12 |         | QA gate CONCERNS (70/100) — cycle 2 refute pass: 2/2 fixed, 3 medium in the fixes (set -e, locator/dedupe, -q hides the diff), 2 low | qa-task |
 | 2026-09-12 |         | QA findings fixed — cycle 2: set -e-safe applied-check that prints the diff, offset-based locator with pointer-independent dedupe, matchAll, scan widened to authored references, CHANGELOG wording; 2 iterations so far | qa-fix |
 | 2026-09-12 |         | QA gate PASS (95/100) — cycle 3: 3/3 fixed, no medium/high; 1 low + 2 cleanups advisory | qa-task |
+| 2026-09-12 | 1.2     | DoD passed — accepted (PR #400); AC3 closed with a token-parity test at finalise; criterion 4 carried as a post-merge operator action | finalise |
 
 ---
 
@@ -203,6 +206,39 @@ Three cycles, all findings closed. Cycle 1: parity guard evadable by emphasis/wr
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.114.qa.1…md`, `task.114.qa.2…md`, `task.114.qa.3.mutation-proving-outcomes.md` (3 cycles)
+**Gate File**: `task.114.gate.3.mutation-proving-outcomes.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR Review (5c)**: ✅ APPROVE — `task.114.pr-review.1.mutation-proving-outcomes.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 3/3 code criteria met with per-PR tests (criteria 1–3); criterion 4 (observations close naming the PR) is a post-merge operator action, carried forward explicitly
+✅ **Unit Tests:** 3 tests in `evals/shared/tests/mutation-proving-pointers-parity.test.mjs`, 14 mutation proofs across the run; suite 3234 / 0 fail
+✅ **PR Review:** PR #400, 7 commits, CI green on the accepted head `cd2b88fc` (test, validate, shellcheck, link-check, branch-policy)
+✅ **Documentation:** CHANGELOG Changed entry; canonical doc, three consumers and six bundled copies in sync
+✅ **Security Review:** ✅ PASS — no secrets, no unsafe patterns, no dependency change; `boundary: false` recorded explicitly
+✅ **Compliance Review:** NOT_APPLICABLE — no data, payment, UI or healthcare surface
+✅ **Reliability / Maintainability:** ✅ PASS (QA cycle 3) — applied-check survives `set -e` on all paths in bash and zsh; one authored definition, six generated copies
+
+**Deployment Readiness:**
+
+- Staging: ✅ APPROVED
+- Production: ✅ APPROVED
+
+**Task marked as ACCEPTED on:** 2026-09-12
+
+**Detailed Verification Log:** See `task.114.dod.1.mutation-proving-outcomes.md` for complete verification evidence and timestamps.
+
+---
+
 ## References
 
 - **Plan**: [`task.114.plan.mutation-proving-outcomes.md`](task.114.plan.mutation-proving-outcomes.md)
@@ -213,7 +249,7 @@ Three cycles, all findings closed. Cycle 1: parity guard evadable by emphasis/wr
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.114.mutation-proving-outcomes/task.114.mutation-proving-outcomes.md`
