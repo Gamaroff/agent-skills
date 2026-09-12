@@ -699,18 +699,25 @@ test("F: a fenced heading INSIDE the Change Log does not end the block (TASK-42-
     0,
     "fences stay balanced — no orphaned closing fence",
   );
-  assert.doesNotMatch(
+  // The fence is carried through (bug.13 — non-row content inside the section
+  // is preserved, not dropped) and it stays a fence: the heading line is still
+  // fenced on both sides, so a re-read does not see a heading there.
+  assert.match(
     out,
-    /^## Example heading in a fence$/m,
+    /^```markdown\n## Example heading in a fence\n```$/m,
+    "the fenced heading is preserved inside its fence",
+  );
+  const headingAt = out.indexOf("## Example heading in a fence");
+  assert.ok(
+    CL.insideProtected(CL.protectedRanges(out), headingAt),
     "the fenced line is not promoted to a real heading",
   );
 
-  // Residual, and correct: non-row content that sits INSIDE the section is not
-  // preserved, because regenerating a block has always replaced everything
-  // between its bounds with markers + heading + table. That is what a Change Log
-  // section is. The defect was never "the fence is rewritten" — it was that the
-  // block ENDED at the fence, which stranded the rows below it outside the log
-  // and left the closing fence orphaned. Both are asserted above.
+  // Until bug.13 the comment here read "residual, and correct: non-row content
+  // that sits INSIDE the section is not preserved". It was residual; it was not
+  // correct. The defect this test was written for — the block ENDING at the
+  // fence, stranding the rows below it and orphaning the closing fence — is
+  // still what the extractEntries / balanced-fence assertions above guard.
 });
 
 test("F: an H3 log with a fenced heading inside still ends at the next real sibling", () => {
@@ -1242,4 +1249,636 @@ test("H: preserved rows keep their original relative order, ahead of the new row
     out.indexOf("second") < out.indexOf("Review passed"),
     "the new row must land last",
   );
+});
+
+// ---------------------------------------------------------------------------
+// I — prose and nested subsections inside the section survive a write (bug.13)
+// ---------------------------------------------------------------------------
+//
+// The block was regenerated from pipe-lines alone, so on the un-migrated path —
+// the path EVERY legacy document takes exactly once, on its first write — an
+// authoring note above the table and a nested `###` after it were silently
+// deleted. Table rows and the following `##` survived, so the document still
+// read as well-formed and nobody saw the diff. A machine writer's edit is
+// additive; it never deletes text a human wrote.
+
+// The document from the bug report, verbatim — once bare, once already marked.
+const PROSE_BODY = [
+  "",
+  "AUTHORING NOTE prose.",
+  "",
+  "| Date | Version | Description | Author |",
+  "| --- | --- | --- | --- |",
+  "| 2026-09-01 | 1.0 | Initial | a |",
+  "| 2026-09-02 | 1.1 | Edit | b |",
+  "",
+  "### Nested",
+  "",
+  "Nested body.",
+  "",
+];
+
+const PROSE_DOC_BARE = [
+  "---",
+  "type: story",
+  "---",
+  "",
+  "# Probe",
+  "",
+  "## Overview",
+  "",
+  "Overview body.",
+  "",
+  "## Change Log",
+  ...PROSE_BODY,
+  "## Next Section",
+  "",
+  "Next section body.",
+  "",
+].join("\n");
+
+const PROSE_DOC_MARKED = [
+  "---",
+  "type: story",
+  "---",
+  "",
+  "# Probe",
+  "",
+  "## Overview",
+  "",
+  "Overview body.",
+  "",
+  "<!-- change-log-start -->",
+  "## Change Log",
+  ...PROSE_BODY,
+  "<!-- change-log-end -->",
+  "",
+  "## Next Section",
+  "",
+  "Next section body.",
+  "",
+].join("\n");
+
+const PROBE_ENTRY = {
+  date: "2026-09-12",
+  version: "1.2",
+  description: "Probe append",
+  author: "probe",
+};
+
+// Every line the writer must carry, asserted individually so a failure names
+// the line that went missing rather than reporting "output differs".
+const CARRIED = [
+  "AUTHORING NOTE prose.",
+  "| 2026-09-01 | 1.0 | Initial | a |",
+  "| 2026-09-02 | 1.1 | Edit | b |",
+  "### Nested",
+  "Nested body.",
+  "## Next Section",
+  "Next section body.",
+];
+
+for (const [label, doc, markers] of [
+  ["un-migrated (hasMarkers:false)", PROSE_DOC_BARE, false],
+  ["already marked (hasMarkers:true) — control", PROSE_DOC_MARKED, true],
+]) {
+  test(`I: prose and a nested ### inside the section survive the write — ${label}`, () => {
+    assert.equal(CL.findChangeLog(doc).hasMarkers, markers, "fixture premise");
+
+    const out = CL.upsertChangeLog(doc, PROBE_ENTRY, { docType: "story" });
+
+    for (const line of CARRIED) {
+      assert.ok(out.includes(line), `dropped by the write: ${line}`);
+    }
+    assert.match(out, /\| 2026-09-12 \| 1\.2 \| Probe append \| probe \|/);
+    assert.equal(
+      (out.match(/^## Change Log$/gm) || []).length,
+      1,
+      "exactly one Change Log heading",
+    );
+    assert.equal(
+      (out.match(/<!-- change-log-start -->/g) || []).length,
+      1,
+      "exactly one start marker",
+    );
+    assert.equal(
+      CL.extractEntries(out).length,
+      3,
+      "two old rows + the new one",
+    );
+  });
+
+  test(`I: carried lines keep their position relative to the table — ${label}`, () => {
+    const out = CL.upsertChangeLog(doc, PROBE_ENTRY, { docType: "story" });
+    const at = (s) => {
+      const i = out.indexOf(s);
+      assert.notEqual(i, -1, `missing: ${s}`);
+      return i;
+    };
+
+    // Prose that was above the table stays above it; the nested subsection
+    // that followed the table follows the NEW row — and sits inside the
+    // markers, because the marker pair delimits the whole section.
+    assert.ok(
+      at("## Change Log") < at("AUTHORING NOTE prose."),
+      "prose below heading",
+    );
+    assert.ok(
+      at("AUTHORING NOTE prose.") < at("| Date | Version"),
+      "prose above table",
+    );
+    assert.ok(
+      at("| 2026-09-02 |") < at("| 2026-09-12 |"),
+      "new row appended last",
+    );
+    assert.ok(
+      at("| 2026-09-12 |") < at("### Nested"),
+      "nested block after the new row",
+    );
+    assert.ok(
+      at("### Nested") < at("Nested body."),
+      "nested body under its heading",
+    );
+    assert.ok(
+      at("Nested body.") < at("<!-- change-log-end -->"),
+      "nested block inside the markers",
+    );
+    assert.ok(
+      at("<!-- change-log-end -->") < at("## Next Section"),
+      "next section outside",
+    );
+  });
+}
+
+test("I: a second write on the migrated output is stable — nothing duplicates, nothing drops", () => {
+  const once = CL.upsertChangeLog(PROSE_DOC_BARE, PROBE_ENTRY, {
+    docType: "story",
+  });
+  const twice = CL.upsertChangeLog(once, ENTRY, { docType: "story" });
+
+  for (const line of CARRIED) {
+    assert.equal(
+      twice.split(line).length - 1,
+      1,
+      `carried line must appear exactly once after two writes: ${line}`,
+    );
+  }
+  assert.equal(CL.extractEntries(twice).length, 4);
+  assert.equal((twice.match(/<!-- change-log-end -->/g) || []).length, 1);
+  assert.doesNotMatch(
+    twice,
+    /\n{3,}/,
+    "no blank-line accumulation across writes",
+  );
+});
+
+test("I: an H3 log keeps its prose and its level", () => {
+  const doc = [
+    "## Notes & Updates",
+    "",
+    "### Change Log",
+    "",
+    "Why 1.1 happened: the reviewer asked for it.",
+    "",
+    "| 2026-01-01 |  | First | create-epic |",
+    "",
+    "### Real Sibling",
+    "",
+    "Kept.",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "epic" });
+  assert.match(out, /^### Change Log$/m, "level preserved");
+  assert.match(
+    out,
+    /Why 1\.1 happened: the reviewer asked for it\./,
+    "prose dropped",
+  );
+  assert.match(out, /^### Real Sibling$/m);
+  assert.match(out, /Kept\./);
+  assert.equal(CL.extractEntries(out).length, 2);
+});
+
+test("I: a marked block with nothing but the table is regenerated byte-for-byte as before", () => {
+  // The common case — an engine-written block — must not grow stray blank
+  // lines or carried nothing-lines from the preservation path.
+  const doc = [
+    "# Doc",
+    "",
+    "<!-- change-log-start -->",
+    "## Change Log",
+    "",
+    "| Date | Version | Description | Author |",
+    "|------|---------|-------------|--------|",
+    "| 2026-01-01 | 1.0 | First | create-task |",
+    "<!-- change-log-end -->",
+    "",
+    "## After",
+    "",
+  ].join("\n");
+
+  // (The blank line between `# Doc` and the start marker is not in the expected
+  // output: the write has always tightened the head seam to a single newline.
+  // Pre-existing and cosmetic — this test pins the engine, not the ideal.)
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal(
+    out,
+    [
+      "# Doc",
+      "<!-- change-log-start -->",
+      "## Change Log",
+      "",
+      "| Date | Version | Description | Author |",
+      "|------|---------|-------------|--------|",
+      "| 2026-01-01 | 1.0 | First | create-task |",
+      "| 2026-08-12 |  | Review passed | review-epic |",
+      "<!-- change-log-end -->",
+      "",
+      "## After",
+      "",
+    ].join("\n"),
+  );
+});
+
+// bug.13, verify cycle 1 — the first fix carried prose but classified it
+// without the module's protected ranges and without regard to nesting.
+
+test("I: a marker mentioned in inline code or shown in a fence inside the section is carried verbatim (CR-1)", () => {
+  // The first fix stripped marker text from every carried line by substring,
+  // so a prose mention became `` `` `` and a fenced marker line vanished — the
+  // exact class guard 4 in the module header exists for.
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "Wrapped by `<!-- change-log-start -->` markers.",
+    "",
+    "```md",
+    "<!-- change-log-start -->",
+    "```",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.match(out, /^Wrapped by `<!-- change-log-start -->` markers\.$/m);
+  assert.match(out, /^```md\n<!-- change-log-start -->\n```$/m);
+  assert.equal(CL.extractEntries(out).length, 2);
+
+  // And the output is still a well-formed single block on the next write:
+  // the fenced marker must not be mistaken for the block's boundary.
+  const again = CL.upsertChangeLog(out, ENTRY, { docType: "task" });
+  assert.equal(CL.extractEntries(again).length, 3);
+  assert.equal((again.match(/^## Change Log$/gm) || []).length, 1);
+  assert.equal(
+    (again.match(/^```md\n<!-- change-log-start -->\n```$/gm) || []).length,
+    1,
+  );
+});
+
+test("I: a fenced example with rows inside the section is carried, not absorbed as history (CR-2)", () => {
+  // The first fix classified every `|`-leading line as the table, so a fenced
+  // example's entry row was promoted into real history and the fence hollowed
+  // out around it.
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "```markdown",
+    "## Change Log",
+    "| Date | Version | Description | Author |",
+    "| 2026-05-05 | | Example | ex |",
+    "```",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.match(
+    out,
+    /^```markdown\n## Change Log\n\| Date \| Version \| Description \| Author \|\n\| 2026-05-05 \| \| Example \| ex \|\n```$/m,
+    "the fence is carried intact, rows and all",
+  );
+  // The example row is NOT in the live table: it appears exactly once, inside
+  // the fence, and the live table holds the real row + the new one only.
+  assert.equal(out.split("| 2026-05-05 | | Example | ex |").length - 1, 1);
+  const live = out.slice(out.indexOf("|------|"), out.indexOf("```markdown"));
+  assert.doesNotMatch(live, /Example/);
+  assert.match(live, /First/);
+  assert.match(live, /Review passed/);
+  assert.equal((out.match(/^```/gm) || []).length % 2, 0, "fences balanced");
+});
+
+test("I: a nested subsection keeps its own table (CR-2)", () => {
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "### Nested",
+    "",
+    "| Col | Val |",
+    "|---|---|",
+    "| k | v |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.match(
+    out,
+    /^### Nested\n\n\| Col \| Val \|\n\|---\|---\|\n\| k \| v \|$/m,
+    "the nested table stays under its heading, untouched",
+  );
+  const live = out.slice(out.indexOf("|------|"), out.indexOf("### Nested"));
+  assert.doesNotMatch(
+    live,
+    /\| k \| v \|/,
+    "nested rows not merged into the log",
+  );
+  assert.doesNotMatch(live, /\| Col \| Val \|/);
+  assert.ok(out.indexOf("Review passed") < out.indexOf("### Nested"));
+});
+
+test("I: paragraphs between two table fragments keep their blank lines when moved below (CR-3)", () => {
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "Para one.",
+    "",
+    "Para two.",
+    "",
+    "| 2026-02-02 | | Second | b |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal(CL.extractEntries(out).length, 3, "both fragments merged");
+  assert.match(
+    out,
+    /Review passed \| review-epic \|\n\nPara one\.\n\nPara two\.\n<!-- change-log-end -->/,
+  );
+});
+
+test("I: a section with prose and a nested subsection but no table keeps the subsection below the new table", () => {
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "Note only.",
+    "",
+    "### Nested",
+    "",
+    "Body.",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.ok(out.indexOf("Note only.") < out.indexOf("| Date |"));
+  assert.ok(out.indexOf("Review passed") < out.indexOf("### Nested"));
+  assert.ok(out.indexOf("### Nested") < out.indexOf("Body."));
+  assert.ok(out.indexOf("Body.") < out.indexOf("<!-- change-log-end -->"));
+});
+
+test("I: markers that share a line with the heading or the last row are stripped by position, not by substring", () => {
+  const doc = [
+    "# D",
+    "",
+    "<!-- change-log-start -->## Change Log",
+    "",
+    "| 2026-01-01 | | First | a |<!-- change-log-end -->",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal((out.match(/<!-- change-log-start -->/g) || []).length, 1);
+  assert.equal((out.match(/<!-- change-log-end -->/g) || []).length, 1);
+  assert.equal(CL.extractEntries(out).length, 2);
+  assert.equal((out.match(/^## Change Log$/gm) || []).length, 1);
+});
+
+test("I: extractEntries does not read a fenced example row as history", () => {
+  const doc = [
+    "# D",
+    "",
+    "<!-- change-log-start -->",
+    "## Change Log",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "```markdown",
+    "| 2026-05-05 | | Example | ex |",
+    "```",
+    "<!-- change-log-end -->",
+    "",
+  ].join("\n");
+  assert.equal(CL.extractEntries(doc).length, 1);
+});
+
+// bug.13, verify cycle 2 — the refute pass over the cycle-1 fix.
+
+test("I: a fenced END marker inside the section does not close the block on the next write (cycle 2, CR-1)", () => {
+  // findMarkerBlock guarded only the START index; once fenced content
+  // survived write 1, write 2 ended the block at the fenced end marker,
+  // stranded the real table outside it, and added an end marker per write.
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "```md",
+    "<!-- change-log-start -->",
+    "<!-- change-log-end -->",
+    "```",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+  const ends = (s) => (s.match(/<!-- change-log-end -->/g) || []).length;
+
+  const w1 = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  const w2 = CL.upsertChangeLog(w1, ENTRY, { docType: "task" });
+  const w3 = CL.upsertChangeLog(w2, ENTRY, { docType: "task" });
+
+  // One real end marker plus the one in the fence — on every write.
+  assert.equal(ends(w1), 2);
+  assert.equal(ends(w2), 2);
+  assert.equal(ends(w3), 2);
+  assert.equal(
+    CL.extractEntries(w1).length,
+    2,
+    "the real row is inside the block",
+  );
+  assert.equal(CL.extractEntries(w2).length, 3);
+  assert.equal(CL.extractEntries(w3).length, 4);
+  assert.equal((w3.match(/^## Change Log$/gm) || []).length, 1);
+  assert.match(
+    w3,
+    /^```md\n<!-- change-log-start -->\n<!-- change-log-end -->\n```$/m,
+  );
+});
+
+test("I: findMarkerBlock ignores a protected end marker and takes the next real one", () => {
+  const doc = [
+    "<!-- change-log-start -->",
+    "## Change Log",
+    "```",
+    "<!-- change-log-end -->",
+    "```",
+    "| 2026-01-01 | | First | a |",
+    "<!-- change-log-end -->",
+    "",
+  ].join("\n");
+  const found = CL.findChangeLog(doc);
+  assert.equal(found.hasMarkers, true);
+  assert.equal(
+    doc.slice(found.start, found.end).split("\n").pop(),
+    "<!-- change-log-end -->",
+  );
+  assert.equal(
+    CL.extractEntries(doc).length,
+    1,
+    "the row is inside the located block",
+  );
+});
+
+test("I: a boundary line that opens with an inline code span still has its end marker stripped (cycle 2, CR-2)", () => {
+  const doc = [
+    "# D",
+    "",
+    "<!-- change-log-start -->",
+    "## Change Log",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "`note`<!-- change-log-end -->",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal((out.match(/<!-- change-log-end -->/g) || []).length, 1);
+  assert.match(
+    out,
+    /^`note`$/m,
+    "the inline code is carried, the marker is not",
+  );
+  assert.equal(CL.extractEntries(out).length, 2);
+});
+
+test("I: a nested heading BEFORE the table does not demote the rows below it (cycle 2, CR-3)", () => {
+  // Rows below a heading that merely precedes the table were history before
+  // bug.13 and must stay history; only a heading AFTER the table closes it.
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "### Notes",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+  assert.equal(CL.extractEntries(doc).length, 1);
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal(CL.extractEntries(out).length, 2);
+  assert.ok(
+    out.indexOf("### Notes") < out.indexOf("| Date |"),
+    "the heading is carried above the table",
+  );
+  assert.ok(out.indexOf("First") < out.indexOf("Review passed"));
+});
+
+test("I: a fenced example row inside a stray legacy block is not absorbed when the block is collapsed (cycle 2, CR-4)", () => {
+  const doc = [
+    "# D",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "| 2026-01-01 10:00 | Legacy row |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+    "<!-- github-sync-changelog-start -->",
+    "## Change Log",
+    "```",
+    "| 2026-05-05 | | Example | ex |",
+    "```",
+    "| 2026-02-02 11:00 | Other row |",
+    "<!-- github-sync-changelog-end -->",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal(CL.extractEntries(out).length, 3, "legacy + other + new");
+  assert.doesNotMatch(out, /Example/, "the fenced picture row is not history");
+  assert.match(out, /Legacy row/);
+  assert.match(out, /Other row/);
+});
+
+// bug.13, verify cycle 3 — the narrowed review of the cycle-2 diff.
+
+test("I: sweeping a stray block harvests a row that sits after a nested heading inside it (cycle 3, CR-1)", () => {
+  // The block is removed wholesale, so every real row in it must be taken —
+  // nesting is irrelevant there. Cycle 2 read only the table-classified rows,
+  // so a row under a nested heading was erased with the block.
+  const doc = [
+    "# D",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "| 2026-01-01 10:00 | Row J |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+    "<!-- github-sync-changelog-start -->",
+    "## Change Log",
+    "| 2026-02-02 11:00 | Row A |",
+    "### Notes",
+    "| 2026-03-03 12:00 | Row B |",
+    "```",
+    "| 2026-04-04 13:00 | Fenced |",
+    "```",
+    "<!-- github-sync-changelog-end -->",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal(CL.extractEntries(out).length, 4, "J + A + B + new");
+  assert.match(out, /Row B/, "the nested row is history, not erased");
+  assert.doesNotMatch(out, /Fenced/, "the fenced picture row is still not");
+});
+
+test("I: a start and end marker on ONE line with an inline span between them are both stripped (cycle 3, CR-2)", () => {
+  const span = "`" + "a".repeat(35) + "`";
+  const doc = [
+    "# D",
+    "",
+    `<!-- change-log-start -->${span}<!-- change-log-end -->`,
+    "",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal((out.match(/<!-- change-log-start -->/g) || []).length, 1);
+  assert.equal((out.match(/<!-- change-log-end -->/g) || []).length, 1);
+  assert.ok(out.includes(span), "the span is carried");
+  assert.equal(CL.extractEntries(out).length, 1);
 });
