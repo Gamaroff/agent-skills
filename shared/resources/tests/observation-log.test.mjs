@@ -1681,3 +1681,163 @@ test("the engine takes no dependency on resolve-platform.sh or any tracker modul
     );
   }
 });
+
+// ── project-root anchoring (bug 15) ─────────────────────────────────────────
+//
+// `doctor`'s activation check and `families --audit` used to resolve the
+// agent-instruction file and `skills/<member>/SKILL.md` against
+// `process.cwd()`. The documented invocation is `command node
+// references/observation-log.js …` from INSIDE `skills/observe-work/`, where no
+// AGENTS.md lives — so the reference repo itself answered "not configured",
+// silently, with `reason: ok` and exit 0, and the audit reported every member
+// of every family as `member-not-found`. Same repo, same engine, opposite
+// answers; the only difference was the working directory.
+//
+// Each fixture is a fake repository: a `.git` DIRECTORY marks its root, which
+// also stops the upward walk before it reaches THIS repository's `.git` (the
+// scratch base lives inside it). No `--audit-root` is passed — that is the
+// whole point — and the CLI runs with `cwd` set to a nested subdirectory.
+
+function fixtureRepo(
+  label,
+  { agents, skillBody = "the shared sentence\n" } = {},
+) {
+  const root = ws(label);
+  mkdirSync(join(root, ".git"));
+  mkdirSync(join(root, "skills", "alpha"), { recursive: true });
+  writeFileSync(
+    join(root, "skills", "alpha", "SKILL.md"),
+    `# alpha\n\n${skillBody}`,
+  );
+  mkdirSync(join(root, "sub", "dir"), { recursive: true });
+  if (agents !== undefined) writeFileSync(join(root, "AGENTS.md"), agents);
+  return root;
+}
+
+function activationCheck(r) {
+  return r.json.checks.find((c) => c.check === "activation-configured");
+}
+
+test("doctor finds AGENTS.md at the repo root when run from a subdirectory", () => {
+  // MUTATION: restore `const cwd = args.auditRoot || process.cwd()` as the
+  // anchor for the agent-file lookup.
+  const { dir } = initWs("anchor-doctor");
+  const home = tempHome("anchor-doctor");
+  const repo = fixtureRepo("anchor-doctor-repo", {
+    agents: "# Agents\n\nRun the observation log protocol first.\n",
+  });
+  try {
+    const r = cli(["doctor", "--workspace", dir, "--json"], {
+      env: isolatedEnv(home),
+      cwd: join(repo, "sub", "dir"),
+    });
+    assert.equal(r.code, 0);
+    const check = activationCheck(r);
+    assert.equal(check.ok, true, JSON.stringify(check));
+    assert.equal(check.state, "configured");
+    assert.match(check.detail, /AGENTS\.md/);
+    assert.equal(
+      realpathSync(r.json.root),
+      realpathSync(repo),
+      "doctor must report the root it resolved, so a wrong answer is checkable",
+    );
+  } finally {
+    cleanup(home);
+    cleanup(dir);
+    cleanup(repo);
+  }
+});
+
+test("doctor's activation check names WHICH way it failed", () => {
+  // `ok: false` covered two different situations — "the file is there and
+  // does not mention the log" (add the instruction) and "there is no file at
+  // all" (the project has never been set up, or the root is wrong). A caller
+  // that cannot tell them apart cannot act on either.
+  const { dir } = initWs("anchor-state");
+  const home = tempHome("anchor-state");
+  const silent = fixtureRepo("anchor-state-silent", {
+    agents: "# Agents\n\nNothing about it here.\n",
+  });
+  const bare = fixtureRepo("anchor-state-bare");
+  try {
+    const a = activationCheck(
+      cli(["doctor", "--workspace", dir, "--json"], {
+        env: isolatedEnv(home),
+        cwd: join(silent, "sub", "dir"),
+      }),
+    );
+    assert.equal(a.ok, false);
+    assert.equal(a.state, "not-configured");
+    assert.match(a.detail, /AGENTS\.md/);
+
+    const b = activationCheck(
+      cli(["doctor", "--workspace", dir, "--json"], {
+        env: isolatedEnv(home),
+        cwd: join(bare, "sub", "dir"),
+      }),
+    );
+    assert.equal(b.ok, false);
+    assert.equal(b.state, "no-agent-file");
+  } finally {
+    cleanup(home);
+    cleanup(dir);
+    cleanup(silent);
+    cleanup(bare);
+  }
+});
+
+test("families --audit finds skills/<member>/SKILL.md from a subdirectory", () => {
+  // MUTATION: restore `const root = args.auditRoot || process.cwd()` in
+  // cmdFamilies. The second site of bug 15: from inside the skill directory
+  // the audit reported every member as `member-not-found` with `reason: ok` —
+  // a family audit that cannot find its members and does not say the
+  // instrument is wrong.
+  const { dir, P } = initWs("anchor-audit");
+  const repo = fixtureRepo("anchor-audit-repo");
+  try {
+    writeFileSync(
+      P.families,
+      "# Skill families\n\n| Family | Members | Shared | Member-specific |\n|---|---|---|---|\n| fam | `alpha` | the shared sentence | |\n",
+    );
+    const r = cli(["families", "--audit", "--workspace", dir, "--json"], {
+      cwd: join(repo, "sub", "dir"),
+    });
+    assert.equal(r.code, 0);
+    assert.deepEqual(r.json.gaps, [], JSON.stringify(r.json.gaps));
+    assert.equal(realpathSync(r.json.root), realpathSync(repo));
+  } finally {
+    cleanup(dir);
+    cleanup(repo);
+  }
+});
+
+test("--audit-root is still the override, taken verbatim", () => {
+  // An explicit root is an instruction, not a hint: passing a subdirectory
+  // that holds no AGENTS.md must NOT be rescued by the walk, or the flag
+  // would no longer mean what it says.
+  const { dir } = initWs("anchor-override");
+  const home = tempHome("anchor-override");
+  const repo = fixtureRepo("anchor-override-repo", {
+    agents: "# Agents\n\nobservation log\n",
+  });
+  try {
+    const r = cli(
+      [
+        "doctor",
+        "--workspace",
+        dir,
+        "--audit-root",
+        join(repo, "sub", "dir"),
+        "--json",
+      ],
+      { env: isolatedEnv(home), cwd: repo },
+    );
+    const check = activationCheck(r);
+    assert.equal(check.ok, false);
+    assert.equal(check.state, "no-agent-file");
+  } finally {
+    cleanup(home);
+    cleanup(dir);
+    cleanup(repo);
+  }
+});

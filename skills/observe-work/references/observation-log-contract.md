@@ -352,6 +352,32 @@ work.
 written to a checkout that is about to be torn down is state that will be torn
 down with it. This is `reason: ephemeral-workspace`, not a warning.
 
+### The project root is resolved the same way
+
+Two commands read the **project**, not the workspace: `doctor` looks for the
+agent-instruction file (`AGENTS.md` / `CLAUDE.md`) and `families --audit` looks
+for `skills/<member>/SKILL.md`. Both anchor at the project root — `--audit-root`
+when given, taken verbatim; otherwise the nearest enclosing repository root
+(the first ancestor holding a `.git` entry); and the cwd itself only outside any
+repository. Both report the `root` they resolved so a wrong answer is checkable.
+
+Neither anchors at the bare cwd, and that is not a stylistic choice. The
+documented invocation is `command node references/observation-log.js …` from
+inside the skill directory, where no `AGENTS.md` lives, so a cwd-anchored
+lookup answered "not configured" for a repository whose `AGENTS.md` says
+otherwise — silently, with `reason: ok` and exit 0 — and the family audit
+reported every member as `member-not-found` (bug 15). A wrong answer with a
+clean exit code is the one nobody questions.
+
+`doctor`'s `activation-configured` check carries a `state` that separates the
+two ways it fails, because they call for different actions:
+
+| `state` | Meaning | Do this |
+|---|---|---|
+| `configured` | an agent-instruction file at `root` mentions the observation log | nothing |
+| `not-configured` | the file is there and does not mention it | add the activation instruction to that file |
+| `no-agent-file` | no `AGENTS.md` or `CLAUDE.md` at `root` | check `root` first — a wrong root looks exactly like a project that was never set up |
+
 ---
 
 ## Exit codes and `reason`

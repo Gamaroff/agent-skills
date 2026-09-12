@@ -954,7 +954,7 @@ function cmdFamilies(P, args) {
     };
   }
 
-  const root = args.auditRoot || process.cwd();
+  const root = projectRoot(args);
   const gaps = [];
   for (const f of families) {
     for (const member of f.members) {
@@ -988,6 +988,7 @@ function cmdFamilies(P, args) {
   }
   return {
     reason: gaps.length ? "ok" : "already",
+    root,
     count: families.length,
     families,
     gaps,
@@ -1017,6 +1018,45 @@ function encodeProjectPath(p) {
 }
 
 /**
+ * The first ancestor of `from` (inclusive) holding a `.git` entry — a
+ * directory in a main worktree, a file in a linked one — as
+ * `{ dir, gitPath }`, or `null` outside any repository. Pure `fs`, no
+ * shell-out, for the reason given on `repoWorktrees()`.
+ */
+function nearestGitEntry(from) {
+  let dir = path.resolve(from);
+  for (;;) {
+    const candidate = path.join(dir, ".git");
+    if (fs.existsSync(candidate)) return { dir, gitPath: candidate };
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/**
+ * The directory the project's agent-instruction file and `skills/` tree hang
+ * off: `--audit-root` when given, verbatim; otherwise the nearest enclosing
+ * repository root; and the cwd itself only outside any repository.
+ *
+ * NOT the bare cwd. The documented invocation is `command node
+ * references/observation-log.js …` from INSIDE `skills/observe-work/`, where
+ * no AGENTS.md lives, so a cwd-anchored lookup answered "not configured" for
+ * a repository whose AGENTS.md says otherwise — silently, with `reason: ok`
+ * and exit 0 — and `families --audit` reported every member of every family
+ * as `member-not-found` (bug 15). The workspace resolver already refuses to
+ * derive from the cwd for exactly this reason; this brings the two lookups
+ * into agreement. The explicit flag stays verbatim: it is an instruction, not
+ * a hint, and rescuing a wrong one with the walk would make it mean nothing.
+ */
+function projectRoot(args) {
+  if (args.auditRoot) return path.resolve(args.auditRoot);
+  const cwd = process.cwd();
+  const entry = nearestGitEntry(cwd);
+  return entry ? entry.dir : cwd;
+}
+
+/**
  * Every worktree of the repository containing `cwd` — the main one, plus any
  * linked ones. Empty outside a repository.
  *
@@ -1030,18 +1070,10 @@ function encodeProjectPath(p) {
  *   - `<main>/.git/worktrees/<name>/gitdir` holds `<worktree>/.git`.
  */
 function repoWorktrees(cwd) {
-  let dir = path.resolve(cwd);
-  let gitPath = null;
-  for (;;) {
-    const candidate = path.join(dir, ".git");
-    if (fs.existsSync(candidate)) {
-      gitPath = candidate;
-      break;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) return [];
-    dir = parent;
-  }
+  const entry = nearestGitEntry(cwd);
+  if (!entry) return [];
+  let { dir } = entry;
+  const { gitPath } = entry;
 
   let mainRoot;
   try {
@@ -1116,7 +1148,7 @@ function forkCandidates(workspace, cwd) {
 
 function cmdDoctor(P, args) {
   const checks = [];
-  const cwd = args.auditRoot || process.cwd();
+  const root = projectRoot(args);
 
   const exists = fs.existsSync(P.root);
   checks.push({
@@ -1132,7 +1164,7 @@ function cmdDoctor(P, args) {
     detail: eph ? `${P.workspace} is ${eph}` : P.workspace,
   });
 
-  const forks = forkCandidates(P.workspace, cwd).filter((c) =>
+  const forks = forkCandidates(P.workspace, root).filter((c) =>
     fs.existsSync(c),
   );
   checks.push({
@@ -1145,18 +1177,34 @@ function cmdDoctor(P, args) {
 
   // Activation: without an instruction in the project's agent-instruction file,
   // nothing ever tells an agent this log exists, and a healthy-looking empty
-  // log is the result.
-  const agentFiles = ["AGENTS.md", "CLAUDE.md"].map((f) => path.join(cwd, f));
-  const activation = agentFiles.find(
-    (f) =>
-      fs.existsSync(f) && /observation log/i.test(fs.readFileSync(f, "utf8")),
+  // log is the result. Looked up at the PROJECT root (see projectRoot), never
+  // the cwd. `state` separates the two ways this fails, because they call for
+  // different actions: `not-configured` means add the instruction to the file
+  // that is there; `no-agent-file` means either the project was never set up
+  // or the root is wrong — and `root` is reported so that can be checked.
+  const agentFiles = ["AGENTS.md", "CLAUDE.md"]
+    .map((f) => path.join(root, f))
+    .filter((f) => fs.existsSync(f));
+  const activation = agentFiles.find((f) =>
+    /observation log/i.test(fs.readFileSync(f, "utf8")),
   );
+  const activationState = activation
+    ? "configured"
+    : agentFiles.length
+      ? "not-configured"
+      : "no-agent-file";
+  const activationDetail = {
+    configured: () => `referenced in ${path.basename(activation)} (${root})`,
+    "not-configured": () =>
+      `${agentFiles.map((f) => path.basename(f)).join(" and ")} at ${root} ` +
+      "does not mention the observation log",
+    "no-agent-file": () => `no AGENTS.md or CLAUDE.md at ${root}`,
+  }[activationState]();
   checks.push({
     check: "activation-configured",
     ok: !!activation,
-    detail: activation
-      ? `referenced in ${path.basename(activation)}`
-      : "no agent-instruction file mentions the observation log",
+    state: activationState,
+    detail: activationDetail,
   });
 
   const failed = checks.filter((c) => !c.ok);
@@ -1176,6 +1224,7 @@ function cmdDoctor(P, args) {
   return {
     reason,
     workspace: P.workspace,
+    root,
     healthy: failed.length === 0,
     checks,
     exitCode,
