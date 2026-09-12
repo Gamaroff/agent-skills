@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.108.bundler-rewrites-relative-links'
+task_title: 'The bundler copies depth-relative links verbatim, so every bundled references/ file carries broken links'
+gate: PASS
+status_reason: 'Cycle-3 fixes verified (pathspec now walks all 58 shared sources — 663-file corpus, 0 broken; per-half floor mutation-proved; zipfile extraction; BUNDLER export). Scoped review of the four changed files found no correctness bug — two low cleanups in the zip-listing filter, advisory. Clean gate; hands to the PR conformance review.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T15:54:08Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 16
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Unchanged across four cycles: build tooling, fixed-argv subprocesses, no network.'
+  performance:
+    status: PASS
+    notes: 'Checker ~1.5 s over 663 files; bundle idempotent.'
+  reliability:
+    status: PASS
+    notes: 'Floors: files ≥ 200, links ≥ 1,000, top-level shared sources ≥ 20 — each mutation-proved.'
+  maintainability:
+    status: PASS
+    notes: 'Two advisory cleanups: dead unzip-format filter clauses in the zip listing; the python helper parameter name reads oddly for -m zipfile.'
+
+bug_resolution:
+  history: 'C1: CR-1 fail-open parity helper (medium) + 7 advisory → fixed 1d18e0e3. C2: nested-source sibling path (low, latent) + 4 → fixed 5bdb7011. C3: guard pathspec skipped 57 shared sources (medium) + 2 → fixed 0dbdd72c. C4: clean.'
+  bugs_fixed: 16
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 3
+  verification_method: 'Per-cycle scoped/refute code review + mutation proofs + ci:fast + CI'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Drop the unzip-format filter clauses from the zip listing (dead with python3 -m zipfile -l)'
+      refs: ['tests/bundle-link-rewrite.test.js']
+    - action: 'Give the python helper a neutral parameter name or a small unzip wrapper'
+      refs: ['tests/bundle-link-rewrite.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -13,7 +13,8 @@ top_issues:
     finding: 'The pathspec shared/resources/**/*.md is a default (non-:(glob)) git pattern: ** is just * and the following / must match a literal slash, so it selects only nested files — 1 of 58 tracked shared/resources Markdown files is walked; the 57 top-level shared sources the header claims are covered are not.'
     suggested_action: 'Use shared/resources/*.md (default globs already cross slashes) and add a floor asserting that at least one top-level shared source was visited, so the walk cannot silently narrow again.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
 
 waiver:
   active: false
@@ -41,6 +42,13 @@ nfr_validation:
   maintainability:
     status: PASS
     notes: 'C3-CR-3 (advisory): the new eval test recomputes BUNDLER/repoRoot that the helper already defines — export and import.'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 1
+  verification_method: 'Cycle-4 scoped review + per-half floor mutation (narrowed pathspec → red) + ci:fast 3,202/0'
 
 recommendations:
   immediate:

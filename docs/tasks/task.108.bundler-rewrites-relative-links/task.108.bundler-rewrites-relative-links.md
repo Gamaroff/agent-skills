@@ -229,6 +229,7 @@ and make it one constant so a tagged-release variant is a one-line change later.
 | 2026-09-12 |         | QA gate PASS (100/100) — cycle 2 refute pass; 1 low latent (C2-CR-1), 2 low advisory, 2 cleanups | qa-task |
 | 2026-09-12 |         | QA gate CONCERNS (90/100) — cycle 3: guard pathspec skipped the 57 top-level shared sources (C3-CR-1); corpus itself clean | qa-task |
 | 2026-09-12 |         | QA findings fixed — fail-closed parity helper (ran/ok split); references-root relpath for nested shared sources; guard now walks shared/resources/*.md with a per-half floor; twin agreement on absolute targets; hygiene; 3 iterations | qa-fix |
+| 2026-09-12 |         | QA gate PASS (100/100) — cycle 4 clean; 2 advisory cleanups | qa-task |
 
 ---
 
@@ -247,24 +248,24 @@ and make it one constant so a tagged-release variant is a one-line change later.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-12
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS (cycle 3; cycle 1 CONCERNS 90, cycle 2 PASS 100)
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 4; cycles 1–3: CONCERNS 90 / PASS 100 with a gated low / CONCERNS 90)
 
 ### QA Report
-- **Full Report**: [task.108.qa.3.bundler-rewrites-relative-links.md](./task.108.qa.3.bundler-rewrites-relative-links.md) (cycles 1–2: [qa.1](./task.108.qa.1.bundler-rewrites-relative-links.md), [qa.2](./task.108.qa.2.bundler-rewrites-relative-links.md))
-- **Gate File**: [task.108.gate.3.bundler-rewrites-relative-links.yml](./task.108.gate.3.bundler-rewrites-relative-links.yml) (cycles 1–2: [gate.1](./task.108.gate.1.bundler-rewrites-relative-links.yml), [gate.2](./task.108.gate.2.bundler-rewrites-relative-links.yml))
+- **Full Report**: [task.108.qa.4.bundler-rewrites-relative-links.md](./task.108.qa.4.bundler-rewrites-relative-links.md) (cycles 1–3: [qa.1](./task.108.qa.1.bundler-rewrites-relative-links.md), [qa.2](./task.108.qa.2.bundler-rewrites-relative-links.md), [qa.3](./task.108.qa.3.bundler-rewrites-relative-links.md))
+- **Gate File**: [task.108.gate.4.bundler-rewrites-relative-links.yml](./task.108.gate.4.bundler-rewrites-relative-links.yml) (cycles 1–3: [gate.1](./task.108.gate.1.bundler-rewrites-relative-links.yml), [gate.2](./task.108.gate.2.bundler-rewrites-relative-links.yml), [gate.3](./task.108.gate.3.bundler-rewrites-relative-links.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3,201 (`ci:fast`) — 3,200 pass, 0 fail; 13 new tests across this task
+- **Tests Executed**: 3,203 (`ci:fast`) — 3,202 pass, 0 fail; 16 new tests across this task
 - **Phases Verified**: 3/3 (5/5 checkboxes)
-- **Critical Issues**: 0
+- **Critical Issues**: 0 (three fix cycles: 16 findings fixed, 0 remaining)
 - **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1 found one medium (the parity helper failed open when the bundler could not run) plus seven advisory items; all fixed and the fail-closed case mutation-proven. Cycle 2's refute pass found one latent low bug (nested shared source mis-relativised — fixed and mutation-proven in cycle 2). Cycle 3 found that the guard's `shared/resources/**/*.md` pathspec walked only nested files, skipping the 57 top-level shared sources; QA scanned them by hand (0/103 broken) — a coverage hole in the checker, routed to a fix cycle.
+Cycle 1 found one medium (the parity helper failed open when the bundler could not run) plus seven advisory items; all fixed and the fail-closed case mutation-proven. Cycle 2's refute pass found one latent low bug (nested shared source mis-relativised — fixed and mutation-proven in cycle 2). Cycle 3 found that the guard's `shared/resources/**/*.md` pathspec walked only nested files, skipping the 57 top-level shared sources; QA scanned them by hand (0/103 broken) — a coverage hole in the checker, fixed in cycle 3 with a per-half floor (mutation-proved). Cycle 4 clean: PASS 100/100.
 
 ---
 
