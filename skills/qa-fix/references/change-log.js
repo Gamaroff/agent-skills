@@ -225,13 +225,30 @@ function buildChangeLogBlock(
   );
 }
 
-// Everything in the located section that the rebuild does NOT regenerate —
-// prose, blank lines, a nested subsection — split by where it sat relative to
-// the table, so it is put back on the same side. Markers and the `Change Log`
-// heading are regenerated; pipe-lines are the table and are handled by the
-// caller. Non-pipe lines that sat BETWEEN two table fragments are carried too,
-// emitted after the table: the rows must be one contiguous table, and moving
-// a line below it loses nothing where dropping it lost text (bug.13).
+// A line that opens with a pipe — the one predicate for "is this a table
+// line", shared by `splitCarriedLines` and the `unparsed` filter in
+// `upsertChangeLog` so the two classifications of the same line cannot drift.
+const isTableLine = (l) => /^\s*\|/.test(l);
+
+// Partition the located section into what the rebuild regenerates and what it
+// carries through verbatim (bug.13).
+//
+// Walks the span with ABSOLUTE offsets so the module's protected ranges apply
+// line by line. A line inside a fence or an inline code span is carried as-is
+// and is never a marker, never the heading, never a table line — the same rule
+// `findChangeLog` already applies to its start- and end-scans, because a fenced
+// `<!-- change-log-start -->` or a fenced `| 2026-… |` is a PICTURE of a Change
+// Log, not part of one.
+//
+// Of the unprotected lines: a marker on a line of its own is dropped (the
+// rebuild supplies its own); the first `Change Log` heading is dropped (same);
+// pipe-lines up to the first nested heading are the table; everything else is
+// carried, split by where it sat relative to the table so it goes back on the
+// same side. A nested `###` ends table classification — a subsection's own
+// table belongs to the subsection and is carried with it, not torn out into
+// the log. Non-pipe lines that sat BETWEEN two fragments of the log's table are
+// carried after it, blank lines intact: the rows must be one contiguous table,
+// and moving a paragraph loses nothing where dropping it lost text.
 //
 // This used to be dropped by design — "regenerating a block replaces everything
 // between its bounds" — and the drop was invisible: rows survived, the next
@@ -239,24 +256,58 @@ function buildChangeLogBlock(
 // document hits this once, on its first write, at a moment nobody is reading
 // the diff. A machine writer's edit is additive; it never deletes text a human
 // wrote.
-function splitCarriedLines(blockLines) {
-  const markers = SWEEP_PAIRS.flatMap((p) => [p.start, p.end]);
-  const isTable = (l) => /^\s*\|/.test(l);
+//
+// Returns `{ before, after, tableLines }`; `tableLines` is the ONLY source the
+// caller reads rows from, so a protected pipe-line cannot be carried here and
+// absorbed as history there.
+function splitCarriedLines(content, found) {
+  const ranges = protectedRanges(content);
+  const markers = new Set(SWEEP_PAIRS.flatMap((p) => [p.start, p.end]));
+  const isNestedHeading = (l) => /^#{1,6}[ \t]/.test(l);
 
-  let headingSeen = false;
+  // [line, protected?] with the marker and heading lines already removed.
+  const raw = content.slice(found.start, found.end).split("\n");
   const lines = [];
-  for (const raw of blockLines) {
-    let line = raw;
-    for (const m of markers) line = line.split(m).join("");
-    // A marker on a line of its own leaves nothing behind; one sharing a line
-    // with text leaves the text.
-    if (line !== raw && !line.trim()) continue;
+  let headingSeen = false;
+  let offset = found.start;
+  for (let i = 0; i < raw.length; i++) {
+    let line = raw[i];
+    const at = offset;
+    offset += line.length + 1;
+    if (insideProtected(ranges, at)) {
+      lines.push([line, true]);
+      continue;
+    }
+    // The span's boundary lines BEGIN with the start marker and END with the
+    // end marker by construction. Strip those by position — never by
+    // substring across every line, which is how cycle 1 mangled a prose
+    // mention of a marker.
+    if (found.hasMarkers && i === 0) {
+      for (const m of markers)
+        if (line.startsWith(m)) line = line.slice(m.length);
+    }
+    if (found.hasMarkers && i === raw.length - 1) {
+      for (const m of markers)
+        if (line.endsWith(m)) line = line.slice(0, -m.length);
+    }
+    if (!line.trim() && line !== raw[i]) continue;
+    if (markers.has(line.trim())) continue;
     if (!headingSeen && RE_HEADING.test(line)) {
       headingSeen = true;
       continue;
     }
-    lines.push(line);
+    lines.push([line, false]);
   }
+
+  // A table line is an unprotected pipe-line that comes before any nested
+  // heading. Nothing after a nested heading is the log's table.
+  let nested = false;
+  const isTable = ([line, prot]) => {
+    if (prot) return false;
+    if (isNestedHeading(line)) nested = true;
+    return !nested && isTableLine(line);
+  };
+  const flags = lines.map(isTable);
 
   const trimBlank = (arr) => {
     let a = 0;
@@ -265,22 +316,35 @@ function splitCarriedLines(blockLines) {
     while (b > a && !arr[b - 1].trim()) b--;
     return arr.slice(a, b);
   };
+  const text = (pairs) => pairs.map(([l]) => l);
 
-  const first = lines.findIndex(isTable);
-  if (first === -1) return { before: trimBlank(lines), after: [] };
-  let last = lines.length - 1;
-  while (last > first && !isTable(lines[last])) last--;
+  const first = flags.indexOf(true);
+  if (first === -1) {
+    // No table at all: prose goes above the new table, and anything from the
+    // first nested heading on goes below it — a subsection is never hoisted
+    // above the log it sits under.
+    const cut = lines.findIndex(([l, prot]) => !prot && isNestedHeading(l));
+    const head = cut === -1 ? lines : lines.slice(0, cut);
+    const rest = cut === -1 ? [] : lines.slice(cut);
+    return {
+      before: trimBlank(text(head)),
+      after: trimBlank(text(rest)),
+      tableLines: [],
+    };
+  }
+  const last = flags.lastIndexOf(true);
 
-  const before = trimBlank(lines.slice(0, first));
-  const between = lines
-    .slice(first, last + 1)
-    .filter((l) => !isTable(l) && l.trim());
-  const tail = trimBlank(lines.slice(last + 1));
+  const tableLines = text(lines.filter((_, i) => flags[i]));
+  const before = trimBlank(text(lines.slice(0, first)));
+  const between = trimBlank(
+    text(lines.slice(first, last + 1).filter((_, i) => !flags[first + i])),
+  );
+  const tail = trimBlank(text(lines.slice(last + 1)));
   const after =
     between.length && tail.length
       ? [...between, "", ...tail]
       : [...between, ...tail];
-  return { before, after };
+  return { before, after, tableLines };
 }
 
 // Split a table row into trimmed cells, dropping the empty strings that a leading
@@ -428,11 +492,17 @@ function headingLevelWithin(content, { start, end }) {
   return m ? m[1].length : 2;
 }
 
-/** Entry rows currently recorded in the document, in document order. */
+/**
+ * Entry rows currently recorded in the document, in document order.
+ *
+ * Reads through the same classifier the write path uses, so a fenced example
+ * row inside the section is a picture on both sides: never written as history,
+ * never read back as it either.
+ */
 function extractEntries(content) {
   const found = findChangeLog(content);
   if (!found) return [];
-  return content.slice(found.start, found.end).split("\n").filter(isEntryRow);
+  return splitCarriedLines(content, found).tableLines.filter(isEntryRow);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,8 +536,11 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
   const found = findChangeLog(content);
 
   if (found) {
-    const blockLines = content.slice(found.start, found.end).split("\n");
-    const existing = blockLines.filter(isEntryRow);
+    // One classifier for the whole span: rows, unparsed pipe-lines and carried
+    // prose are all read from the same partition, so a fenced example row
+    // cannot be carried as prose AND absorbed as history (bug.13, cycle 1).
+    const { before, after, tableLines } = splitCarriedLines(content, found);
+    const existing = tableLines.filter(isEntryRow);
 
     // Rows the parser does not recognise are PRESERVED, not dropped.
     //
@@ -481,9 +554,8 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     //
     // Header and separator lines are excluded because the regenerated block
     // supplies its own.
-    const unparsed = blockLines.filter(
+    const unparsed = tableLines.filter(
       (l) =>
-        /^\s*\|/.test(l) &&
         !isEntryRow(l) &&
         !/^\s*\|[\s\-:|]+\|\s*$/.test(l) &&
         !/^\s*\|\s*(Date|Version|Description|Author|Change)\b/i.test(l),
@@ -530,7 +602,6 @@ function upsertChangeLog(content, entry, { docType = "" } = {}) {
     //
     // Everything else the section held is carried through on the side of the
     // table it came from — see `splitCarriedLines`.
-    const { before, after } = splitCarriedLines(blockLines);
     const block = buildChangeLogBlock([...unparsed, ...history, newRow], {
       level: found.level,
       before,
