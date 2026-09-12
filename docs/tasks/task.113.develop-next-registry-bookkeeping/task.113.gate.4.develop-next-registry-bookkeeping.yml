@@ -1,0 +1,75 @@
+schema: 1
+task: 'task.113.develop-next-registry-bookkeeping'
+task_title: "develop-next's Step 4, merge gate and Step 1→2 signal still assume a roadmap-sourced, PASS-gated item"
+gate: PASS
+status_reason: 'Cycle-3 findings 3/3 FIXED by execution; bugs 1–6 closed. The scoped review found one LOW (a clean tree proves the record commit exists, not that it was pushed) and one wording cleanup; both closed in place before 5c and mutation-proven. No HIGH or MEDIUM remain; every NFR PASS.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T18:37:38Z'
+
+top_issues:
+  - id: 'QA-15'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The already branch treated a clean git diff HEAD as proof the record commit landed, but a crash between git commit and git push leaves it local-only (mirrored in develop-batch).'
+    suggested_action: 'Push unconditionally (idempotent) after the dirty check, before ticked: true; mirror in develop-batch.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-12'
+  - id: 'QA-16'
+    severity: low
+    file: 'shared/resources/registry-tick.js'
+    finding: 'Header comments and develop-next Step 4 still said the Issue cell is filled only when it reads —, after QA-14 widened empty to none / n/a / na / tbd; the EMPTY_CELL_RE comment gave an inverted rationale.'
+    suggested_action: 'Reword the three spots; state the real reason (an empty-spelled cell is replaced, not appended to, so the selector never parses PR #n as a dependency).'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-12'
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 2
+    notes: 'Annotate against a missing registry (no-registry, payload shape held); n/a and tbd cells replaced, not appended. 10 probes across the loop, all refusals held.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'The annotate → commit → push window is covered on resume at every point: unstaged edit (QA-7), staged edit (QA-12), unpushed commit (QA-15).'
+  maintainability:
+    status: PASS
+    notes: 'One payload shape per mode; one width rule; empty-cell spellings mirror the selector; wording consistent with the code.'
+
+code_review:
+  findings: 2
+  promoted: ['QA-15 (CR-1, low)', 'QA-16 (CR-2, cleanup)']
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 3
+  verification_method: 'Every reproduction re-executed post-fix (bash + zsh where prose; sandbox registries and scratch git clones where engine/git); 22 mutations proven across the loop'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'The qa-gate tracker comment marker is per-stage, so only cycle 1 reached the issue — an observation, not a task defect'
+      refs: ['shared/resources/tracker-comment.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -1,0 +1,97 @@
+schema: 1
+task: 'task.113.develop-next-registry-bookkeeping'
+task_title: "develop-next's Step 4, merge gate and Step 1→2 signal still assume a roadmap-sourced, PASS-gated item"
+gate: CONCERNS
+status_reason: 'All six cycle-1 findings verified FIXED by execution. The refute pass found one new MEDIUM — the registry arm's already-branch skips the commit and strands a registry edited before a crash — plus four LOW and three cleanups, all bounded.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T18:10:41Z'
+
+top_issues:
+  - id: 'QA-7'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'Registry arm: on already the step skips the commit and marks ticked: true, so a crash between the annotate write and git commit strands the edited registry; the resume path skips the dirty-tree check and the NEXT run halts on it with no pointer to the cause (mirrored in develop-batch).'
+    suggested_action: 'On already, run git diff --quiet -- docs/tasks/task-registry.md and commit/push when dirty before marking ticked: true; mirror in develop-batch; shape-assert the dirty check.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-8'
+    severity: low
+    file: 'shared/resources/registry-tick.js'
+    finding: 'The notes cell IS the Depends on cell the selector parses: parseDepCell("… · PR #381 merged") yields a dependency on task 381 (verified on rows 100 and 106), so an annotate on a NOT-accepted row would inject a phantom dependency that can block its selection; accepted rows are inert only because eligibility skips them first.'
+    suggested_action: 'Refuse annotate unless the ROW already reads accepted (finalise has ticked it before Step 4 runs) — reason not-accepted; keep the document-status independence.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-9'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'Step 4 branches on item.source "recorded at Step 1", but the run-state schema carries no source field, so a resume into Step 4 has nothing to branch on.'
+    suggested_action: 'Add source to the run-state JSON written at selection and name it as what Step 4 reads on resume.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-10'
+    severity: low
+    file: 'shared/resources/registry-tick.js'
+    finding: 'findHeader requires -{3,} in the separator while the selector accepts any GFM delimiter row (| - |, |:--|), so a registry the parser reads fine answers no-cell with "no table header above it".'
+    suggested_action: 'Accept hyphens with optional colons, any count, when walking up to the header.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-11'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The registry arm enumerates annotated/already/no-row/no-registry/no-cell but not engine-unavailable or not-accepted/not-a-task, leaving the orchestrator to improvise on those exit-0 reasons.'
+    suggested_action: 'State that every other exit-0 reason is logged, uncommitted, and marks ticked: true.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 90
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 6
+    notes: 'QA-2 re-probed post-fix: missing, empty, flag-shaped, |, LF, CR all exit 2 with the registry byte-identical. No new input surface.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA-7 — the crash window between the annotate write and its commit is not covered by the resume path.'
+  maintainability:
+    status: PASS
+    notes: 'Cleanups CR-6/7/8 recorded as advisory (dead undefined branch; tick path can reuse setCell; CHANGELOG count stale).'
+
+code_review:
+  findings: 8
+  promoted: ['QA-7 (CR-1)', 'QA-8 (CR-2)', 'QA-9 (CR-3)', 'QA-10 (CR-4)', 'QA-11 (CR-5)']
+  advisory: ['CR-6 dead undefined branch', 'CR-7 tick path duplicate of setCell', 'CR-8 CHANGELOG fixture count']
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 1
+  fix_date: '2026-09-12'
+  total_iterations: 1
+  verification_method: 'Re-executed each reproduction (bash + zsh; sandbox registries); fixtures + mutations'
+
+recommendations:
+  immediate:
+    - action: 'QA-7 dirty-registry check on the already branch (both orchestrators)'
+      refs: ['skills/develop-next/SKILL.md', 'skills/develop-batch/SKILL.md']
+  future:
+    - action: 'QA-8..QA-11 and CR-6/7/8 — all one-clause; take in the same cycle'
+      refs: ['shared/resources/registry-tick.js', 'skills/develop-next/SKILL.md', 'CHANGELOG.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-7 fixed and re-verified']

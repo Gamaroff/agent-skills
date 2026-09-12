@@ -349,13 +349,31 @@ test("width preservation degrades correctly at both boundaries", () => {
  */
 test("no argument can make the tick conditional on pipeline mode", () => {
   const source = readFileSync(CLI, "utf8");
-  const flags = [...source.matchAll(/a === "(--[a-z-]+)"/g)]
-    .map((m) => m[1])
-    .sort();
+  // Every accepted flag appears as `a === "--x"` in parseArgs — value-taking
+  // flags may share one comparison (`a === "--pr" || a === "--issue"`), which
+  // this pattern still catches one flag at a time.
+  const flags = [
+    ...new Set([...source.matchAll(/a === "(--[a-z-]+)"/g)].map((m) => m[1])),
+  ].sort();
+  // `--annotate` (task.113) selects the SECOND write — the post-merge notes /
+  // Issue cell — and `--pr` / `--issue` are its operands. None of the three
+  // gates the Status tick: the default invocation still ticks unconditionally,
+  // which the run below proves. What this list forbids is a flag that makes
+  // the tick itself skippable (a `--lite`, a `--mode`), and a new entry here
+  // needs the same argument made for it.
   assert.deepEqual(
     flags,
-    ["--dry-run", "--file", "--help", "--json", "--registry"],
-    "registry-tick accepts no mode flag; adding one would let lite mode skip the tick",
+    [
+      "--annotate",
+      "--dry-run",
+      "--file",
+      "--help",
+      "--issue",
+      "--json",
+      "--pr",
+      "--registry",
+    ],
+    "registry-tick accepts no flag that makes the Status tick conditional; --annotate selects a different write, it does not skip this one",
   );
   const { dir, registry } = sandbox([row(20, "lam", "planned")]);
   try {
@@ -461,6 +479,567 @@ test("an unknown flag is a usage error, not a silent no-op", () => {
       code = e.status;
     }
     assert.equal(code, 2, "an unrecognised flag must exit 2");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// `--annotate` — the second, additive write (task.113).
+//
+// Same discipline as above: every test RUNS the CLI against a throwaway
+// registry and asserts the bytes. The mode exists so that develop-next Step 4
+// calls a command a test has already exercised, instead of describing a sed.
+// ---------------------------------------------------------------------------
+
+function annotatedRow(dir, registry, n) {
+  return readFileSync(path.join(dir, registry), "utf8")
+    .split("\n")
+    .find((l) => l.startsWith(`| ${n} |`));
+}
+
+test("annotate: appends `PR #n merged` to the last cell, replacing a lone `—`", () => {
+  const { dir } = sandbox([row(30, "alpha", "accepted")]);
+  try {
+    const f = writeDoc(dir, 30, "alpha", { status: "accepted" });
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "410",
+    ]);
+    assert.equal(res.reason, "annotated");
+    assert.equal(res.notes, "written");
+    assert.equal(res.issue, "not-requested");
+    const cells = annotatedRow(dir, "docs/tasks/task-registry.md", 30).split(
+      "|",
+    );
+    assert.equal(cells[8].trim(), "PR #410 merged");
+    // Status untouched — finalise owns it.
+    assert.equal(cells[3].trim(), "accepted");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: an existing note is kept and the PR is appended with ` · `", () => {
+  const { dir } = sandbox([
+    `| 31 | [T31](task.31.beta/task.31.beta.md) | accepted | infrastructure | Medium | 2026-01-01 | — | task.30 |`,
+  ]);
+  try {
+    const f = writeDoc(dir, 31, "beta", { status: "accepted" });
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "411",
+    ]);
+    assert.equal(res.reason, "annotated");
+    const cells = annotatedRow(dir, "docs/tasks/task-registry.md", 31).split(
+      "|",
+    );
+    assert.equal(cells[8].trim(), "task.30 · PR #411 merged");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: a second run reports `already` and writes nothing", () => {
+  const { dir, registry } = sandbox([row(32, "gamma", "accepted")]);
+  try {
+    const f = writeDoc(dir, 32, "gamma", { status: "accepted" });
+    run(dir, ["--annotate", "--file", path.relative(dir, f), "--pr", "412"]);
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "412",
+    ]);
+    assert.equal(res.reason, "already");
+    assert.equal(res.annotated, false);
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: `--issue` fills an empty Issue cell, found by header name", () => {
+  const { dir } = sandbox([row(33, "delta", "accepted")]);
+  try {
+    const f = writeDoc(dir, 33, "delta", { status: "accepted" });
+    const link = "[#500](https://example.com/issues/500)";
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "413",
+      "--issue",
+      link,
+    ]);
+    assert.equal(res.reason, "annotated");
+    assert.equal(res.issue, "written");
+    const cells = annotatedRow(dir, "docs/tasks/task-registry.md", 33).split(
+      "|",
+    );
+    assert.equal(cells[7].trim(), link);
+    assert.equal(cells[8].trim(), "PR #413 merged");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: `--issue` never overwrites a filled Issue cell — a human may have linked it", () => {
+  const { dir } = sandbox([
+    `| 34 | [T34](task.34.eps/task.34.eps.md) | accepted | infrastructure | Medium | 2026-01-01 | [#7](https://example.com/issues/7) | — |`,
+  ]);
+  try {
+    const f = writeDoc(dir, 34, "eps", { status: "accepted" });
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "414",
+      "--issue",
+      "[#8](x)",
+    ]);
+    assert.equal(res.reason, "annotated"); // the notes cell was still written
+    assert.equal(res.issue, "kept");
+    const cells = annotatedRow(dir, "docs/tasks/task-registry.md", 34).split(
+      "|",
+    );
+    assert.equal(cells[7].trim(), "[#7](https://example.com/issues/7)");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: a bug document answers `not-a-task` — the bug registry has no cell to write", () => {
+  const { dir, registry } = sandbox([row(35, "zeta", "accepted")]);
+  try {
+    const d = path.join(dir, "docs", "bugs", "bug.9.slug");
+    mkdirSync(d, { recursive: true });
+    const f = path.join(d, "bug.9.slug.md");
+    writeFileSync(f, doc({ type: "bug", status: "closed" }));
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "415",
+    ]);
+    assert.equal(res.reason, "not-a-task");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: a task with no row reports `no-row` and exits 0", () => {
+  const { dir } = sandbox([row(36, "eta", "accepted")]);
+  try {
+    const f = writeDoc(dir, 37, "theta", { status: "accepted" });
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "416",
+    ]);
+    assert.equal(res.reason, "no-row");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: does not require the document to be `accepted` — a merge is a fact about the PR", () => {
+  const { dir } = sandbox([row(38, "iota", "accepted")]);
+  try {
+    const f = writeDoc(dir, 38, "iota", { status: "ready-for-review" });
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "417",
+    ]);
+    assert.equal(res.reason, "annotated");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: a registry whose last column is a data column answers `no-cell` and writes nothing (QA-3)", () => {
+  // Six columns, ending in Created — no notes column. The earlier numeric
+  // guard passed this and rewrote the Created cell.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "registry-tick-"));
+  try {
+    mkdirSync(path.join(dir, "skills", "develop-next", "scripts"), {
+      recursive: true,
+    });
+    symlinkSync(
+      path.join(REPO_ROOT, SELECTOR_REL),
+      path.join(dir, SELECTOR_REL),
+    );
+    mkdirSync(path.join(dir, "docs", "tasks"), { recursive: true });
+    const registry = path.join(dir, "docs", "tasks", "task-registry.md");
+    writeFileSync(
+      registry,
+      [
+        "| # | Title | Status | Category | Priority | Created |",
+        "|---|-------|--------|----------|----------|---------|",
+        "| 39 | [T39](task.39.kap/task.39.kap.md) | accepted | infra | Medium | 2026-01-01 |",
+        "",
+      ].join("\n"),
+    );
+    const f = writeDoc(dir, 39, "kap", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "418",
+    ]);
+    assert.equal(res.reason, "no-cell");
+    assert.equal(res.lastColumn, "created");
+    assert.equal(
+      readFileSync(registry, "utf8"),
+      before,
+      "a data cell must never be annotated",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: the header is the row's OWN table's — an earlier legend table cannot supply it (QA-6)", () => {
+  const { dir, registry } = sandbox([row(42, "nu", "accepted")]);
+  try {
+    // Prepend an unrelated two-column table whose first data column is named
+    // `Issue`, separated from the registry by prose and a bare `---` rule.
+    const text = readFileSync(registry, "utf8");
+    writeFileSync(
+      registry,
+      [
+        "| Issue | Meaning |",
+        "|-------|---------|",
+        "| x | y |",
+        "",
+        "Some prose.",
+        "",
+        "---",
+        "",
+        text,
+      ].join("\n"),
+    );
+    const f = writeDoc(dir, 42, "nu", { status: "accepted" });
+    const link = "[#9](https://example.com/issues/9)";
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "420",
+      "--issue",
+      link,
+    ]);
+    assert.equal(res.reason, "annotated");
+    assert.equal(
+      res.issue,
+      "written",
+      "the Issue cell comes from the registry's own header, column 7",
+    );
+    const cells = annotatedRow(dir, "docs/tasks/task-registry.md", 42).split(
+      "|",
+    );
+    assert.equal(cells[7].trim(), link);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: a headerless table answers `no-cell` — the walk never reaches an earlier table's header (QA-6)", () => {
+  // The registry table below has NO header of its own; a legend table sits
+  // above it, separated by prose. An unbounded walk would adopt the legend's
+  // header (`| Issue | Meaning |`), read `Meaning` as a notes column and
+  // annotate the headerless row. The parser accepts a headerless table by
+  // documented column positions, so the row IS found — the refusal has to
+  // come from the header resolution.
+  const dir = mkdtempSync(path.join(os.tmpdir(), "registry-tick-"));
+  try {
+    mkdirSync(path.join(dir, "skills", "develop-next", "scripts"), {
+      recursive: true,
+    });
+    symlinkSync(
+      path.join(REPO_ROOT, SELECTOR_REL),
+      path.join(dir, SELECTOR_REL),
+    );
+    mkdirSync(path.join(dir, "docs", "tasks"), { recursive: true });
+    const registry = path.join(dir, "docs", "tasks", "task-registry.md");
+    writeFileSync(
+      registry,
+      [
+        "| Issue | Meaning |",
+        "|-------|---------|",
+        "| x | y |",
+        "",
+        "Some prose between the tables.",
+        "",
+        row(44, "omi", "accepted"),
+        "",
+      ].join("\n"),
+    );
+    const f = writeDoc(dir, 44, "omi", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "422",
+      "--issue",
+      "[#1](x)",
+    ]);
+    assert.equal(res.reason, "no-cell");
+    assert.match(res.message, /no table header/);
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: refuses a row that does not read `accepted` — the note would be a phantom dependency (QA-8)", () => {
+  const { dir, registry } = sandbox([row(45, "pi", "ready-for-review")]);
+  try {
+    const f = writeDoc(dir, 45, "pi", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "423",
+    ]);
+    assert.equal(res.reason, "not-accepted");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: a GFM delimiter row of any shape is a separator (QA-10)", () => {
+  for (const sep of [
+    "| - | - | - | - | - | - | - | - |",
+    "|:--|:--|:--|:--|:--|:--|:--|--:|",
+  ]) {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "registry-tick-"));
+    try {
+      mkdirSync(path.join(dir, "skills", "develop-next", "scripts"), {
+        recursive: true,
+      });
+      symlinkSync(
+        path.join(REPO_ROOT, SELECTOR_REL),
+        path.join(dir, SELECTOR_REL),
+      );
+      mkdirSync(path.join(dir, "docs", "tasks"), { recursive: true });
+      const registry = path.join(dir, "docs", "tasks", "task-registry.md");
+      writeFileSync(
+        registry,
+        [REGISTRY_HEADER[4], sep, row(46, "rho", "accepted"), ""].join("\n"),
+      );
+      const f = writeDoc(dir, 46, "rho", { status: "accepted" });
+      const res = run(dir, [
+        "--annotate",
+        "--file",
+        path.relative(dir, f),
+        "--pr",
+        "424",
+        "--issue",
+        "[#2](y)",
+      ]);
+      assert.equal(res.reason, "annotated", `separator ${sep}`);
+      assert.equal(res.issue, "written", `separator ${sep}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("annotate: every annotate-mode outcome carries `annotated`, never `ticked` (QA-13)", () => {
+  const { dir } = sandbox([row(47, "sig", "accepted")]);
+  try {
+    const f = writeDoc(dir, 48, "tau", { status: "accepted" }); // no row 48 → no-row, a shared early exit
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "425",
+    ]);
+    assert.equal(res.reason, "no-row");
+    assert.equal(res.annotated, false);
+    assert.equal("ticked" in res, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: `none` / `n/a` / `TBD` count as empty, as the selector reads them (QA-14)", () => {
+  const { dir } = sandbox([
+    `| 49 | [T49](task.49.ups/task.49.ups.md) | accepted | infrastructure | Medium | 2026-01-01 | TBD | none |`,
+  ]);
+  try {
+    const f = writeDoc(dir, 49, "ups", { status: "accepted" });
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "426",
+      "--issue",
+      "[#3](z)",
+    ]);
+    assert.equal(res.reason, "annotated");
+    assert.equal(
+      res.issue,
+      "written",
+      "a TBD Issue cell is empty and gets filled",
+    );
+    const cells = annotatedRow(dir, "docs/tasks/task-registry.md", 49).split(
+      "|",
+    );
+    assert.equal(cells[7].trim(), "[#3](z)");
+    assert.equal(
+      cells[8].trim(),
+      "PR #426 merged",
+      "a `none` notes cell is replaced, not appended to",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("every value-taking flag rejects a missing or flag-shaped value (CR-2, PR review)", () => {
+  const { dir } = sandbox([row(50, "phi", "accepted")]);
+  try {
+    const f = writeDoc(dir, 50, "phi", { status: "accepted" });
+    for (const args of [
+      ["--file"],
+      ["--file", "--json"],
+      ["--file", path.relative(dir, f), "--registry"],
+      ["--file", path.relative(dir, f), "--registry", "--json"],
+    ]) {
+      let code = 0;
+      try {
+        execFileSync(process.execPath, [CLI, ...args], {
+          cwd: dir,
+          encoding: "utf8",
+          stdio: "pipe",
+        });
+      } catch (e) {
+        code = e.status;
+      }
+      assert.equal(code, 2, `${args.join(" ")} must be a usage error`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: `--issue` rejects a missing value, an empty value, a pipe and a newline — exit 2, nothing written (QA-2)", () => {
+  const { dir, registry } = sandbox([row(43, "xi", "accepted")]);
+  try {
+    const f = writeDoc(dir, 43, "xi", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const cases = [
+      ["--issue"], // missing value (last argument)
+      ["--issue", ""], // empty
+      ["--issue", "   "], // whitespace only
+      ["--issue", "x | y"], // pipe adds a cell
+      ["--issue", "a\nb"], // newline splits the row
+      ["--issue", "a\rb"], // CR
+    ];
+    for (const extra of cases) {
+      let code = 0;
+      try {
+        execFileSync(
+          process.execPath,
+          [
+            CLI,
+            "--annotate",
+            "--file",
+            path.relative(dir, f),
+            "--pr",
+            "421",
+            ...extra,
+            "--json",
+          ],
+          { cwd: dir, encoding: "utf8", stdio: "pipe" },
+        );
+      } catch (e) {
+        code = e.status;
+      }
+      assert.equal(code, 2, `${JSON.stringify(extra)} must be a usage error`);
+      assert.equal(
+        readFileSync(registry, "utf8"),
+        before,
+        `${JSON.stringify(extra)} must write nothing`,
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: `--dry-run` reports what it would write and writes nothing", () => {
+  const { dir, registry } = sandbox([row(40, "lam", "accepted")]);
+  try {
+    const f = writeDoc(dir, 40, "lam", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "419",
+      "--dry-run",
+    ]);
+    assert.equal(res.reason, "dry-run");
+    assert.equal(res.notes, "written");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: `--annotate` without `--pr` is a usage error (exit 2), and `--pr` without `--annotate` too", () => {
+  const { dir } = sandbox([row(41, "mu", "accepted")]);
+  try {
+    const f = writeDoc(dir, 41, "mu", { status: "accepted" });
+    for (const args of [["--annotate"], ["--pr", "1"]]) {
+      let code = 0;
+      try {
+        execFileSync(
+          process.execPath,
+          [CLI, "--file", path.relative(dir, f), ...args],
+          {
+            cwd: dir,
+            encoding: "utf8",
+            stdio: "pipe",
+          },
+        );
+      } catch (e) {
+        code = e.status;
+      }
+      assert.equal(code, 2, `${args.join(" ")} must exit 2`);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

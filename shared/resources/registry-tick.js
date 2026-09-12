@@ -33,17 +33,46 @@
  *
  * Usage:
  *   node registry-tick.js --file <document.md> [--registry <path>] [--dry-run] [--json]
+ *   node registry-tick.js --annotate --file <document.md> --pr <n> [--issue <ref>]
+ *                         [--registry <path>] [--dry-run] [--json]
+ *
+ * ## Two modes, one owner of the row
+ *
+ * The default mode is the Status tick above. `--annotate` is the SECOND,
+ * additive write the row receives, after the merge: it appends `PR #<n> merged`
+ * to the row's last cell (the registry's de-facto notes cell — `Depends on` in
+ * the documented task-registry header, which rows have carried `… · PR #M
+ * merged` in since task 100) and, when `--issue` is given, fills the `Issue`
+ * cell if it still reads as empty (`—`, `none`, `n/a`, `tbd` …). It never touches Status — `finalise` owns that,
+ * and a post-merge writer that also wrote Status would be the second Status
+ * writer task.103 was written to remove (observation #46). task.113 put the
+ * annotate write HERE rather than in `develop-next` Step 4's prose because a
+ * prose sed admits no test but a grep, and because two files each holding a
+ * "which cell is which" mapping drift in the worst direction — the tick
+ * matching a row the annotate cannot find.
+ *
+ * `--issue` never overwrites a filled cell: a human may have linked a
+ * different issue by hand, and the row is theirs. The payload says `kept`.
  *
  * Reasons (all exit 0):
  *   ticked             the row was rewritten to `accepted`
  *   already            the row already read `accepted` — idempotent no-op
- *   not-a-task         the document is not a task (a story/epic/bug run) — no registry applies
- *   not-accepted       the document's own status is not `accepted`, so there is nothing to mirror
+ *                      (annotate: the notes cell already names this PR and the
+ *                      Issue cell needs nothing)
+ *   annotated          (annotate) the notes and/or Issue cell were written
+ *   no-cell            (annotate) the row has no cell to write — fewer than the
+ *                      documented columns, so the notes cell would be a data cell
+ *   not-a-task         the document is not a task (a story/epic/bug run) — no registry applies.
+ *                      For annotate this is also the bug-registry answer: that
+ *                      registry has neither an Issue nor a notes cell.
+ *   not-accepted       (tick) the document's own status is not `accepted`, so there is nothing to mirror;
+ *                      (annotate) the ROW does not read `accepted` — annotating it would plant a
+ *                      phantom dependency, since the notes cell is parsed for `task.N` references
  *   no-registry        the registry file does not exist in this project
  *   no-row             the registry has no row for this task id
- *   ambiguous-row      the row's status cell could not be identified unambiguously
+ *   ambiguous-row      (tick) the row's status cell could not be identified unambiguously
  *   engine-unavailable the shared registry parser could not be located
- * Exit 2: usage error.
+ * Exit 2: usage error (including `--annotate` without `--pr`).
  */
 
 "use strict";
@@ -55,21 +84,47 @@ const DEFAULT_REGISTRY = "docs/tasks/task-registry.md";
 
 function usage(msg) {
   process.stderr.write(
-    `registry-tick: ${msg}\n\nUsage:\n  node registry-tick.js --file <document.md> [--registry <path>] [--dry-run] [--json]\n`,
+    `registry-tick: ${msg}\n\nUsage:\n  node registry-tick.js --file <document.md> [--registry <path>] [--dry-run] [--json]\n  node registry-tick.js --annotate --file <document.md> --pr <n> [--issue <ref>] [--registry <path>] [--dry-run] [--json]\n`,
   );
   process.exitCode = 2;
 }
 
 function parseArgs(argv) {
-  const out = { file: null, registry: null, dryRun: false, json: false };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--file") out.file = argv[++i];
-    else if (a === "--registry") out.registry = argv[++i];
-    else if (a === "--dry-run") out.dryRun = true;
-    else if (a === "--json") out.json = true;
-    else if (a === "--help" || a === "-h") out.help = true;
-    else return { error: `unknown argument ${JSON.stringify(a)}` };
+  const out = {
+    file: null,
+    registry: null,
+    dryRun: false,
+    json: false,
+    annotate: false,
+    pr: null,
+    issue: null,
+  };
+  // A value-taking flag whose next token is missing or is itself a flag has no
+  // value. Without this, `--issue --json` would take `--json` as the issue
+  // reference AND drop the JSON output — two silent errors from one — and
+  // `--registry --json` the same for the path. One helper, all four flags.
+  const takeValue = (flag, i) => {
+    const v = argv[i + 1];
+    if (v === undefined || /^--/.test(v)) {
+      throw new Error(`${flag} requires a value`);
+    }
+    return v;
+  };
+  try {
+    for (let i = 0; i < argv.length; i++) {
+      const a = argv[i];
+      if (a === "--file") out.file = takeValue(a, i++);
+      else if (a === "--registry") out.registry = takeValue(a, i++);
+      else if (a === "--annotate") out.annotate = true;
+      else if (a === "--pr") out.pr = takeValue(a, i++);
+      else if (a === "--issue") out.issue = takeValue(a, i++);
+      else if (a === "--dry-run") out.dryRun = true;
+      else if (a === "--json") out.json = true;
+      else if (a === "--help" || a === "-h") out.help = true;
+      else return { error: `unknown argument ${JSON.stringify(a)}` };
+    }
+  } catch (e) {
+    return { error: e.message };
   }
   return out;
 }
@@ -130,6 +185,16 @@ function locateSelector(start) {
 }
 
 function emit(opts, payload) {
+  // One payload shape per mode: every annotate-mode outcome carries
+  // `annotated`, every tick-mode outcome carries `ticked` — including the early
+  // exits shared by both modes, which would otherwise report the other mode's
+  // key and leave a `--json` consumer reading `undefined`.
+  if (opts.annotate) {
+    if (payload.annotated === undefined) payload.annotated = false;
+    delete payload.ticked;
+  } else if (payload.ticked === undefined) {
+    payload.ticked = false;
+  }
   if (opts.json) process.stdout.write(JSON.stringify(payload, null, 2) + "\n");
   else process.stdout.write(`${payload.reason}: ${payload.message}\n`);
   process.exitCode = payload.exitCode;
@@ -141,6 +206,32 @@ async function main() {
   if (opts.help) return usage("help");
   if (!opts.file) return usage("--file is required");
   if (!fs.existsSync(opts.file)) return usage(`--file not found: ${opts.file}`);
+  if (opts.annotate) {
+    // The PR number is the one fact the annotate write exists to record; an
+    // annotate call without it has nothing to write and is a caller bug, not a
+    // registry state — so it is the usage family, not an exit-0 reason.
+    if (!opts.pr || !/^\d+$/.test(String(opts.pr).replace(/^#/, ""))) {
+      return usage("--annotate requires --pr <n> (a pull request number)");
+    }
+    opts.pr = String(opts.pr).replace(/^#/, "");
+    // `--issue` is written into a markdown table cell verbatim, so the two
+    // characters that break a table are refused here, once, rather than
+    // trusted to every caller. (A MISSING value is already a parseArgs error;
+    // this is the empty/whitespace case, which would blank the cell and still
+    // report `written`.)
+    if (opts.issue !== null) {
+      const v = String(opts.issue);
+      if (v.trim() === "") return usage("--issue requires a value");
+      if (/[|\r\n]/.test(v)) {
+        return usage(
+          '--issue must not contain "|", CR or LF — it is written into a table cell',
+        );
+      }
+      opts.issue = v;
+    }
+  } else if (opts.pr !== null || opts.issue !== null) {
+    return usage("--pr and --issue are only meaningful with --annotate");
+  }
 
   const base = path.basename(opts.file);
   const idMatch = base.match(/^task\.(\d+)\./);
@@ -171,7 +262,11 @@ async function main() {
   const taskId = Number(idMatch[1]);
 
   const docStatus = (frontmatterField(docText, "status") || "").toLowerCase();
-  if (docStatus !== "accepted") {
+  // The annotate write records a MERGE, which is a fact about the PR rather
+  // than about the document's status — and it runs after `finalise` has set
+  // `accepted` anyway. Gating it on the status would make a manual
+  // re-annotation of an older row impossible for no protective gain.
+  if (!opts.annotate && docStatus !== "accepted") {
     return emit(opts, {
       reason: "not-accepted",
       message: `task ${taskId} reads \`${docStatus || "(no status)"}\` — the row mirrors \`accepted\` and nothing else`,
@@ -218,6 +313,27 @@ async function main() {
       ticked: false,
       exitCode: 0,
     });
+  }
+
+  if (opts.annotate) {
+    // The notes cell is the `Depends on` cell the selector's dependency parser
+    // reads, and `PR #381 merged` parses as a dependency on task 381. On an
+    // accepted row that is inert — eligibility skips the row before its
+    // dependencies are evaluated — but on any other row it would inject a
+    // phantom dependency that can block the row's selection. So the ROW must
+    // already read `accepted`, which by Step 4 it does: `finalise` ticked it.
+    // The DOCUMENT's status is deliberately not consulted (see above).
+    if (row.registryStatus !== "accepted") {
+      return emit(opts, {
+        reason: "not-accepted",
+        message: `task ${taskId} row (line ${row.line}) reads \`${row.registryStatus}\` — annotate only an accepted row, or the note becomes a phantom dependency`,
+        taskId,
+        line: row.line,
+        annotated: false,
+        exitCode: 0,
+      });
+    }
+    return annotate(opts, { registryRel, registryText, row, taskId });
   }
 
   if (row.registryStatus === "accepted") {
@@ -283,12 +399,7 @@ async function main() {
   //   - a cell too narrow to hold `accepted` keeps one separating space and the
   //     row widens. Alignment is worth preserving, never worth corrupting a value
   //     to achieve.
-  const cell = cells[hits[0]];
-  const lead = cell.match(/^\s*/)[0];
-  const trailLen = cell.match(/\s*$/)[0].length;
-  const core = `${lead}accepted`;
-  const pad = trailLen === 0 ? 0 : Math.max(1, cell.length - core.length);
-  cells[hits[0]] = core + " ".repeat(pad);
+  setCell(cells, hits[0], "accepted");
   parts[idx] = cells.join("|");
 
   if (!opts.dryRun) {
@@ -303,6 +414,212 @@ async function main() {
     from: row.registryStatus,
     to: "accepted",
     ticked: !opts.dryRun,
+    exitCode: 0,
+  });
+}
+
+/**
+ * A cell that says "nothing here yet". The spellings mirror the selector's
+ * `DEP_EMPTY_RE` (select-next.mjs), which reads the same `Depends on` cell:
+ * the two readers must agree on what empty means, so that a cell the selector
+ * treats as empty is REPLACED here rather than appended to — `none · PR #n
+ * merged` would no longer be empty to the selector, which would then parse
+ * `#n` as a dependency reference.
+ */
+const EMPTY_CELL_RE = /^(?:[—–-]|none|n\/a|na|tbd)?$/i;
+function isEmptyCell(cell) {
+  return EMPTY_CELL_RE.test(String(cell).trim());
+}
+
+/**
+ * Rewrite one cell of `cells` in place, keeping the leading whitespace and —
+ * where the new value fits — the cell's total width. The one implementation of
+ * the width rule: the tick path and the annotate path both call it.
+ * A cell that grows keeps one trailing space so the pipe stays separated.
+ */
+function setCell(cells, i, value) {
+  const cell = cells[i];
+  const lead = cell.match(/^\s*/)[0];
+  const trailLen = cell.match(/\s*$/)[0].length;
+  const core = `${lead}${value}`;
+  const pad = trailLen === 0 ? 0 : Math.max(1, cell.length - core.length);
+  cells[i] = core + " ".repeat(pad);
+}
+
+/**
+ * Header cells that name a DATA column. A table whose LAST header cell is one
+ * of these has no notes cell, and the annotate write must refuse rather than
+ * append prose to a date or a priority. `depends on` is deliberately absent:
+ * it is the documented last column of the task registry and the cell every
+ * accepted row since task 100 has used as free text.
+ */
+const DATA_COLUMN_NAMES = new Set([
+  "#",
+  "no",
+  "num",
+  "number",
+  "id",
+  "title",
+  "name",
+  "status",
+  "category",
+  "type",
+  "kind",
+  "priority",
+  "severity",
+  "created",
+  "filed",
+  "date",
+  "updated",
+  "issue",
+  "area",
+  "owner",
+  "assignee",
+]);
+
+/**
+ * Locate the header of the table that CONTAINS `rowLine`: walk up from the row
+ * over table lines only, and take the line above the first separator met.
+ *
+ * Two bounds, both from QA on task.113: the walk stops at the first line that
+ * is not a table row, so an earlier, unrelated table (a `| Key | Meaning |`
+ * legend above the registry) can never supply the header; and the separator
+ * must itself be a table row (`|---|`), so a bare `---` horizontal rule or a
+ * frontmatter fence is not mistaken for one. The selector keeps its own
+ * separator regex for parsing whole files; this one answers a narrower
+ * question — "is this the separator of the row's own table?" — and is bounded
+ * by the table rather than by the file, which is why it is not the same regex.
+ * Returns the header cells, or null when the row's table has no header.
+ */
+function findHeader(parts, rowLine) {
+  for (let li = rowLine - 2; li >= 0; li--) {
+    const line = parts[li * 2] || "";
+    if (!/^\s*\|/.test(line)) return null; // left the table without a separator
+    // Any GFM delimiter row the selector accepts: hyphens with optional
+    // colons, any count (`| - |`, `|:--|`, `|---|`).
+    if (/^\s*\|\s*:?-+:?\s*\|/.test(line)) {
+      const above = parts[(li - 1) * 2] || "";
+      return /^\s*\|/.test(above) ? above.split("|") : null;
+    }
+  }
+  return null;
+}
+
+/**
+ * The `--annotate` write. Column resolution is deliberately narrow, and both
+ * cells are resolved from the row's OWN table header:
+ *
+ *   - the NOTES cell is the row's last cell — but only when the header names
+ *     that column as something other than a data column. The documented
+ *     task-registry header ends in `Depends on`, and every accepted row since
+ *     task 100 has used it as the free-text cell (`task.104 · PR #381. …`).
+ *     A registry whose last column is `Created` or `Area` answers `no-cell`
+ *     and is left alone: the earlier numeric guard (`< 5 cells`) was
+ *     unreachable — the parser already drops such rows — and let a six-column
+ *     consumer registry have its Created cell rewritten.
+ *   - the ISSUE cell is found by header NAME (`Issue`, case-insensitive). There
+ *     is no positional fallback: a wrong Issue cell is a corrupted link, and
+ *     nothing about a position says "this holds a tracker link".
+ *
+ * The header is read here, not added to the selector's `COLUMN_ALIASES`,
+ * because the selector reads the registry to SELECT and has no use for an
+ * Issue column; adding one there would be a selector change the task rules out.
+ */
+function annotate(opts, { registryRel, registryText, row, taskId }) {
+  const parts = registryText.split(/(\r?\n)/);
+  const idx = (row.line - 1) * 2;
+  const original = parts[idx];
+  const cells = original.split("|");
+  // `| a | b |` splits to ["", " a ", " b ", ""]; the trailing "" is the
+  // closing pipe. A row without a closing pipe has no such element.
+  const closed = cells.length > 0 && cells[cells.length - 1].trim() === "";
+  const last = closed ? cells.length - 2 : cells.length - 1;
+
+  const header = findHeader(parts, row.line);
+  const headerClosed = header && header[header.length - 1].trim() === "";
+  const headerLast = header
+    ? headerClosed
+      ? header.length - 2
+      : header.length - 1
+    : -1;
+  const lastName = header ? header[headerLast].trim().toLowerCase() : null;
+  if (
+    !header ||
+    last < 1 ||
+    headerLast !== last ||
+    DATA_COLUMN_NAMES.has(lastName)
+  ) {
+    return emit(opts, {
+      reason: "no-cell",
+      message: !header
+        ? `task ${taskId} row (line ${row.line}) has no table header above it — cannot tell which cell is the notes cell`
+        : headerLast !== last
+          ? `task ${taskId} row (line ${row.line}) has ${last} cells but its header has ${headerLast} — cannot align the notes cell`
+          : `task ${taskId} row (line ${row.line}): last column is \`${header[headerLast].trim()}\`, a data column — no notes cell to annotate`,
+      taskId,
+      line: row.line,
+      lastColumn: lastName,
+      annotated: false,
+      exitCode: 0,
+    });
+  }
+  const issueCol = header.findIndex((c) => c.trim().toLowerCase() === "issue");
+
+  const prText = `PR #${opts.pr} merged`;
+  const notesHas = new RegExp(`PR #${opts.pr}\\b`).test(cells[last]);
+  let notes = "unchanged";
+  if (!notesHas) {
+    const existing = cells[last].trim();
+    setCell(
+      cells,
+      last,
+      isEmptyCell(existing) ? prText : `${existing} · ${prText}`,
+    );
+    notes = "written";
+  }
+
+  let issue = "not-requested";
+  if (opts.issue !== null) {
+    if (issueCol === -1 || issueCol > last) issue = "no-column";
+    else if (!isEmptyCell(cells[issueCol])) issue = "kept";
+    else {
+      setCell(cells, issueCol, opts.issue);
+      issue = "written";
+    }
+  }
+
+  const wrote = notes === "written" || issue === "written";
+  if (!wrote) {
+    return emit(opts, {
+      reason: "already",
+      message:
+        `task ${taskId} row (line ${row.line}) already names PR #${opts.pr}` +
+        (issue === "kept"
+          ? "; Issue cell already filled"
+          : issue === "no-column"
+            ? "; registry has no Issue column"
+            : ""),
+      taskId,
+      line: row.line,
+      notes,
+      issue,
+      annotated: false,
+      exitCode: 0,
+    });
+  }
+
+  parts[idx] = cells.join("|");
+  if (!opts.dryRun) {
+    fs.writeFileSync(registryRel, parts.join(""), "utf8");
+  }
+  return emit(opts, {
+    reason: opts.dryRun ? "dry-run" : "annotated",
+    message: `task ${taskId} row (line ${row.line}): notes ${notes}, issue ${issue}${opts.dryRun ? " (dry run — not written)" : ""}`,
+    taskId,
+    line: row.line,
+    notes,
+    issue,
+    annotated: !opts.dryRun,
     exitCode: 0,
   });
 }
