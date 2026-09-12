@@ -163,6 +163,7 @@ bundle. No test greps the doc's headings (verified at review).
 | 2026-09-12 |         | QA findings fixed — CR-1/CR-2/CR-3 (parity guard: joined emphasis-stripped window, dedupe, heading.index) and QA-1 (applied-check reads the diff exit code), 1 iteration | qa-fix |
 | 2026-09-12 |         | QA gate CONCERNS (70/100) — cycle 2 refute pass: 2/2 fixed, 3 medium in the fixes (set -e, locator/dedupe, -q hides the diff), 2 low | qa-task |
 | 2026-09-12 |         | QA findings fixed — cycle 2: set -e-safe applied-check that prints the diff, offset-based locator with pointer-independent dedupe, matchAll, scan widened to authored references, CHANGELOG wording; 2 iterations so far | qa-fix |
+| 2026-09-12 |         | QA gate PASS (95/100) — cycle 3: 3/3 fixed, no medium/high; 1 low + 2 cleanups advisory | qa-task |
 
 ---
 
@@ -181,24 +182,24 @@ bundle. No test greps the doc's headings (verified at review).
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-12
-**Quality Score**: 70/100
-**Gate Decision**: CONCERNS (cycle 2)
+**Quality Score**: 95/100
+**Gate Decision**: PASS (cycle 3)
 
 ### QA Report
-- **Full Report**: [task.114.qa.2.mutation-proving-outcomes.md](./task.114.qa.2.mutation-proving-outcomes.md) (cycle 1: [qa.1](./task.114.qa.1.mutation-proving-outcomes.md))
-- **Gate File**: [task.114.gate.2.mutation-proving-outcomes.yml](./task.114.gate.2.mutation-proving-outcomes.yml) (cycle 1: [gate.1](./task.114.gate.1.mutation-proving-outcomes.yml))
+- **Full Report**: [task.114.qa.3.mutation-proving-outcomes.md](./task.114.qa.3.mutation-proving-outcomes.md) (cycles 1–2: [qa.1](./task.114.qa.1.mutation-proving-outcomes.md), [qa.2](./task.114.qa.2.mutation-proving-outcomes.md))
+- **Gate File**: [task.114.gate.3.mutation-proving-outcomes.yml](./task.114.gate.3.mutation-proving-outcomes.yml) (cycles 1–2: [gate.1](./task.114.gate.1.mutation-proving-outcomes.yml), [gate.2](./task.114.gate.2.mutation-proving-outcomes.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 3233 (3232 pass, 1 skipped)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (2 medium)
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1 (closed): parity guard evadable by emphasis/wrap; applied-check lied on a missing snapshot. Cycle 2 (refute pass, open): the `case $?` snippet dies under `set -e` on APPLIED; the line locator + dedupe key re-duplicate; the `-q` snippet no longer shows the edit the prose asks for. Two LOW, one cleanup.
+Three cycles, all findings closed. Cycle 1: parity guard evadable by emphasis/wrap; applied-check lied on a missing snapshot. Cycle 2 (refute pass): the `case $?` snippet died under `set -e`; locator + dedupe re-duplicated; `-q` hid the edit. Cycle 3: nothing gate-affecting — one low (pooled non-vacuity floor) and two cleanups recorded in the gate's `recommendations.future`.
 
 ---
 

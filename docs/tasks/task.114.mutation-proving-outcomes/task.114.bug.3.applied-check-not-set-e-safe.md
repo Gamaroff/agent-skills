@@ -4,7 +4,7 @@
 **Bug ID**: TASK-114-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 refute pass, CR-1)
 **Date Found**: 2026-09-12
 
@@ -62,3 +62,4 @@ A cycle-1 fix that is correct in the steady state and wrong in a transition — 
 | 2026-09-12 | New          | QA         | Found (cycle 2 refute)    |
 | 2026-09-12 | In Progress  | qa-fix     | Investigation started     |
 | 2026-09-12 | Ready for QA | qa-fix     | Fix implemented           |
+| 2026-09-12 | Closed       | QA         | Verified in cycle 3       |

@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.114.mutation-proving-outcomes'
+task_title: 'mutation-proving.md documents the false green and the false red, and none of the other seven things a mutation run can tell you'
+gate: PASS
+status_reason: 'Cycle-2 fixes verified by independent probes (bugs 3–5 closed; 3232/0; bundle in sync). Narrowed review of the three files changed since gate 2 found no MEDIUM or HIGH — one LOW design refinement (per-collection non-vacuity floor) and two cleanups, recorded below as advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T20:48:24Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 3233
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Documentation plus a hermetic test; 4b executed the runnable block under bash and zsh; no auth, crypto, network or secret surface.'
+  performance:
+    status: PASS
+    notes: 'Parity test ~170 ms; ci:fast unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Applied-check survives set -e on all three exit paths in bash and zsh (cycle-2 CONCERNS resolved); non-vacuity floor present; bundle idempotent.'
+  maintainability:
+    status: PASS
+    notes: 'One authored definition, six generated copies byte-for-byte; outcome vocabulary stated once.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Per-collection non-vacuity floors (SKILL.md bodies ≥3 / references / shared) instead of one pooled MIN_POINTER_FILES, per the doc'"'"'s own blind-iteration rule (cycle-3 CR-1, low)'
+      refs: ['evals/shared/tests/mutation-proving-pointers-parity.test.mjs']
+    - action: 'Skip AUTO-GENERATED bundled copies of other shared resources, or map hits back to the shared source, so a defect is reported once at the editable path (cycle-3 CR-2, cleanup)'
+      refs: ['evals/shared/tests/mutation-proving-pointers-parity.test.mjs']
+    - action: 'Re-wrap the ~115-column CHANGELOG line to the entry'"'"'s width (cycle-3 CR-3, cleanup)'
+      refs: ['CHANGELOG.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

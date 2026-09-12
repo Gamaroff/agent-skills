@@ -13,35 +13,40 @@ top_issues:
     finding: 'The cycle-1 replacement (diff -q … >/dev/null 2>&1; case $?) aborts the shell under set -e on exactly the APPLIED case — diff exits 1, nothing prints, the script exits 1 (verified) — where the || echo one-liner it replaced was set -e safe; repeated in the Validate-the-probe block.'
     suggested_action: 'Capture the status set -e-safely (rc=0; diff … || rc=$?; case $rc in …) in both snippets.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
   - id: 'CR-2'
     severity: medium
     file: 'evals/shared/tests/mutation-proving-pointers-parity.test.mjs'
     finding: 'The locator (first window line whose stripped text contains the bare count word) and the dedupe key (which embeds that line) combine so two overlapping windows locate the same violation at different lines whenever an earlier line holds the same word — the "four of five" sentence this change adds to both SKILL.md files — so one violation is reported twice, once at the wrong line (reproduced with the test'"'"'s own constants).'
     suggested_action: 'Locate the physical line from the match offset (map m.index through cumulative stripped-line lengths) and key the dedupe on that pointer-independent location.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
   - id: 'CR-3'
     severity: medium
     file: 'shared/resources/mutation-proving.md'
     finding: 'Step 4 prose ("see the edit in the output") and row 3'"'"'s question ("does the diff show the edit?") contradict the snippet beneath them, which uses -q and redirects all output, so a reader running the block as written never sees the edit and cannot perform the row-10 re-read the document says only a visible diff enables.'
     suggested_action: 'Keep the exit-code branch but print the diff on the APPLIED branch (a second plain diff), in both snippets.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
   - id: 'CR-4'
     severity: low
     file: 'evals/shared/tests/mutation-proving-pointers-parity.test.mjs'
     finding: 'The header says every source file that references the doc is scanned, but sourceFiles() reads only skills/*/SKILL.md and shared/resources/*.md — an authored skills/*/references/*.md (e.g. double-check/references/gate-playbooks.md points at the doc) can carry a stale count unguarded.'
     suggested_action: 'Also walk skills/*/references/*.md excluding files named mutation-proving.md; raise MIN_POINTER_FILES to the new floor.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
   - id: 'CR-5'
     severity: low
     file: 'CHANGELOG.md'
     finding: 'The entry says "qa-task and qa-story Step 3c" (qa-story'"'"'s section is the unlabelled "Mutation-Proof Spot Check") and "mutation-proved four ways at authoring" (the test header records two at authoring, two at QA cycle 1).'
     suggested_action: 'Name qa-story'"'"'s section by its heading; say two at authoring and two at QA cycle 1.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
 
 waiver:
   active: false
@@ -88,3 +93,10 @@ deployment_readiness:
   production: CONDITIONAL
   conditions:
     - 'CR-1, CR-2, CR-3 fixed and re-reviewed'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 1
+  verification_method: 'QA cycle 3 — literal step-4 block under set -e (bash+zsh) prints the hunk and continues; decoy-below overlapping-window layout reports once at the right line; 4b re-executed'
