@@ -384,6 +384,13 @@ test("Step 4 registry arm: calls registry-tick.js --annotate, never writes Statu
     /git diff --quiet HEAD -- docs\/tasks\/task-registry\.md \|\| \{/,
     "already checks for a dirty registry before marking ticked",
   );
+  // QA-15 (cycle 4): a clean tree proves the commit exists, not that it was pushed.
+  const alreadyArm = arm.slice(arm.indexOf("`already`"));
+  assert.match(
+    alreadyArm,
+    /git push origin <baseBranch>\n\s*```\n\s*Then log `already`/,
+    "already pushes unconditionally before marking ticked",
+  );
   // QA-11: every exit-0 reason the engine can emit is named.
   for (const r of ["`not-accepted`", "`not-a-task`", "`engine-unavailable`"]) {
     assert.ok(arm.includes(r), `exit-0 reason unnamed: ${r}`);

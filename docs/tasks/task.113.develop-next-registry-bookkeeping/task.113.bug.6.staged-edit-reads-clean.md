@@ -4,7 +4,7 @@
 **Bug ID**: TASK-113-BUG-6
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 3b, cycle 3 — CR-1)
 **Date Found**: 2026-09-12
 
@@ -52,3 +52,4 @@ A staged edit is treated as clean.
 | 2026-09-12 | New          | QA         | Filed (QA cycle 3)    |
 | 2026-09-12 | In Progress  | qa-fix     | Investigation started |
 | 2026-09-12 | Ready for QA | qa-fix     | Fix implemented       |
+| 2026-09-12 | Closed       | QA         | Verified with a staged edit in a scratch clone under bash + zsh (QA cycle 4) |

@@ -44,7 +44,7 @@
  * to the row's last cell (the registry's de-facto notes cell — `Depends on` in
  * the documented task-registry header, which rows have carried `… · PR #M
  * merged` in since task 100) and, when `--issue` is given, fills the `Issue`
- * cell if it still reads `—`. It never touches Status — `finalise` owns that,
+ * cell if it still reads as empty (`—`, `none`, `n/a`, `tbd` …). It never touches Status — `finalise` owns that,
  * and a post-merge writer that also wrote Status would be the second Status
  * writer task.103 was written to remove (observation #46). task.113 put the
  * annotate write HERE rather than in `develop-next` Step 4's prose because a
@@ -52,7 +52,7 @@
  * "which cell is which" mapping drift in the worst direction — the tick
  * matching a row the annotate cannot find.
  *
- * `--issue` never overwrites a non-`—` cell: a human may have linked a
+ * `--issue` never overwrites a filled cell: a human may have linked a
  * different issue by hand, and the row is theirs. The payload says `kept`.
  *
  * Reasons (all exit 0):
@@ -416,8 +416,10 @@ async function main() {
 /**
  * A cell that says "nothing here yet". The spellings mirror the selector's
  * `DEP_EMPTY_RE` (select-next.mjs), which reads the same `Depends on` cell:
- * the two readers must agree on what empty means, or a `none` here becomes
- * `none · PR #n merged` while the selector still reads it as empty.
+ * the two readers must agree on what empty means, so that a cell the selector
+ * treats as empty is REPLACED here rather than appended to — `none · PR #n
+ * merged` would no longer be empty to the selector, which would then parse
+ * `#n` as a dependency reference.
  */
 const EMPTY_CELL_RE = /^(?:[—–-]|none|n\/a|na|tbd)?$/i;
 function isEmptyCell(cell) {

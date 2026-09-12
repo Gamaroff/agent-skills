@@ -353,7 +353,7 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
    ```
    It appends `· PR #<n> merged` to the row's last cell (the registry's notes cell — `Depends on` in
    the documented header; rows 100–106 already carry it there), fills `Issue` only when that cell
-   reads `—`, and leaves Status alone. Read `reason`:
+   reads as empty (`—`, `none`, `n/a`, `tbd` …), and leaves Status alone. Read `reason`:
    - `annotated` → commit below.
    - `already` → the row already names this PR. **Idempotent on the row, not on the commit**: a
      resume after a crash *between the annotate write and the `git commit`* arrives here with the
@@ -368,7 +368,13 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
        git push origin <baseBranch>
      }
      ```
-     A clean tree here means the earlier commit landed; log `already` and mark `ticked: true`.
+     A clean tree means the earlier commit exists locally — not that it was pushed: a crash between
+     `git commit` and `git push` leaves it local-only. So push unconditionally (idempotent when
+     nothing is ahead) before marking ticked:
+     ```bash
+     git push origin <baseBranch>
+     ```
+     Then log `already` and mark `ticked: true`.
    - every other exit-0 reason — `no-row`, `no-registry`, `no-cell`, `not-accepted`, `not-a-task`,
      `engine-unavailable` — log it verbatim, make no commit, mark `ticked: true`. The drift test is
      the backstop, and a missing or unannotatable index line never blocks a merge that has already
