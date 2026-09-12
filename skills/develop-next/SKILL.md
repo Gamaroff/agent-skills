@@ -41,6 +41,7 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 ```json
 {
   "item": "17.4",
+  "source": "roadmap",
   "command": "/develop-story",
   "commandArg": "<path>",
   "dispatched": false,
@@ -50,7 +51,9 @@ Apply any project-wide command conventions from the consumer project's own CLAUD
 }
 ```
 
-Written at selection, updated after each of Steps 2–4, **deleted only in Step 5**. This makes the merge→tick sequence recoverable (a crash between merge and tick can never cause the item to be re-selected and re-dispatched) and acts as develop-next's own single-flight lock.
+Written at selection, updated after each of Steps 2–4, **deleted only in Step 5**. `source` is
+`item.source` from the selector (`roadmap` | `bug-registry` | `task-registry`) and is what Step 4
+reads on a resume — the work-item path alone cannot say which arm applies. This makes the merge→tick sequence recoverable (a crash between merge and tick can never cause the item to be re-selected and re-dispatched) and acts as develop-next's own single-flight lock.
 
 ## Step 0 — Preflight
 
@@ -309,9 +312,10 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
 
 ## Step 4 — Record the acceptance
 
-On `<baseBranch>` (pull first if Step 3 merged into it). **Branch on `item.source`** (recorded at
-Step 1) — the roadmap and the registries are different documents with different owners, and the
-step used to know only the first. Five registry-sourced runs each improvised the second (#30, #31,
+On `<baseBranch>` (pull first if Step 3 merged into it). **Branch on `item.source`** — the `source`
+field of the run-state file, written at Step 1 so a resume into this step (`merged: true, ticked:
+false`) has it without re-deriving anything — the roadmap and the registries are different documents
+with different owners, and the step used to know only the first. Five registry-sourced runs each improvised the second (#30, #31,
 #34, #35) before this branch existed.
 
 ### `item.source` = `roadmap`
@@ -349,11 +353,25 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
    ```
    It appends `· PR #<n> merged` to the row's last cell (the registry's notes cell — `Depends on` in
    the documented header; rows 100–106 already carry it there), fills `Issue` only when that cell
-   reads `—`, and leaves Status alone. Read `reason`: `annotated` → commit below; `already` → the row
-   already names this PR (a re-run after a crash between merge and tick) — log it, skip the commit,
-   mark `ticked: true`; `no-row` / `no-registry` / `no-cell` → log it, skip the commit, mark `ticked:
-   true` — the drift test is the backstop, and a missing index line never blocks a merge that has
-   already happened.
+   reads `—`, and leaves Status alone. Read `reason`:
+   - `annotated` → commit below.
+   - `already` → the row already names this PR. **Idempotent on the row, not on the commit**: a
+     resume after a crash *between the annotate write and the `git commit`* arrives here with the
+     registry edited and uncommitted, and the resume path skips Step 0's dirty-tree check. So before
+     marking ticked, check and commit what may already be on disk:
+     ```bash
+     git diff --quiet -- docs/tasks/task-registry.md || {
+       git add docs/tasks/task-registry.md
+       git commit -m "docs(registry): record <id> — PR #<n> merged"
+       git push origin <baseBranch>
+     }
+     ```
+     A clean tree here means the earlier commit landed; log `already` and mark `ticked: true`.
+   - every other exit-0 reason — `no-row`, `no-registry`, `no-cell`, `not-accepted`, `not-a-task`,
+     `engine-unavailable` — log it verbatim, make no commit, mark `ticked: true`. The drift test is
+     the backstop, and a missing or unannotatable index line never blocks a merge that has already
+     happened. (Exit 2 is a usage error in this step's own invocation — fix the call, do not mark
+     ticked.)
 2. Commit and push (only on `annotated`):
    ```bash
    git add docs/tasks/task-registry.md

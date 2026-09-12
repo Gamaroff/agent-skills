@@ -61,8 +61,12 @@ All notable changes to this project will be documented in this file. Format foll
   serial lane mirrors both. **Step 2** of the develop pipelines now re-reads the tracker key after the
   review returns — the review is what creates the issue for a fresh item — updates the lock's
   `tracker_issue`, and fires `work-started` once when the key went from empty to set, so a new card
-  moves off the first column without a hand fix. 11 fixture tests on the annotate mode (four
-  mutations proven), shape tests with per-row floors on both orchestrators and the step-2 contract.
+  moves off the first column without a hand fix. Fixture tests on the annotate mode (mutation-proven),
+  shape tests with per-row floors on both orchestrators and the step-2 contract. Two QA refute cycles
+  then hardened the edges: `--issue` is validated (no `|`, CR, LF, empty or flag-shaped values), the
+  notes cell is resolved from the row's own table header and refused on a data column, only an
+  `accepted` row is annotated (the notes cell is parsed for dependencies), and the `already` branch
+  commits a registry edit left on disk by a crash.
 
 - **The bug-fix runbook is rewritten against the pipeline that exists**
   ([`docs/runbooks/bug-fix.md`](docs/runbooks/bug-fix.md), task 107). The page had been overtaken

@@ -489,7 +489,10 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      `node .agents/skills/develop-batch/references/registry-tick.js --annotate --file <doc>
      --pr <PR#> [--issue "<[#N](url)>"] --json` — additive (notes cell + `Issue` cell), never a
      second Status writer. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
-     and push; `already` / `no-row` / `no-registry` / `no-cell` → log, no commit.
+     and push; `already` → `git diff --quiet -- docs/tasks/task-registry.md` first and commit/push
+     when dirty (a crash between the write and its commit leaves the row edited; the resume path
+     skips the dirty-tree check), then `ticked: true`; every other exit-0 reason (`no-row`,
+     `no-registry`, `no-cell`, `not-accepted`, `not-a-task`, `engine-unavailable`) → log, no commit.
    - **`source: bug-registry`** — the bug registry has no Issue or notes cell and
      `develop-bug` already closed the row: log `bug-registry: nothing to write`, no commit.
 

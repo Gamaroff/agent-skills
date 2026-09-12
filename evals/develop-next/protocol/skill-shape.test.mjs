@@ -322,6 +322,20 @@ test("Step 3: the merge gate is finalise's verdict + no open finding, not the PA
   assert.match(step3, /<qualityGateCommand>/);
 });
 
+test("run state carries `source`, which Step 4 reads on resume (QA-9)", () => {
+  const state = section(skill, "## Run state", "## Step 0");
+  assert.match(
+    state,
+    /"source": "roadmap"/,
+    "the schema example carries source",
+  );
+  assert.match(
+    state,
+    /`source` is\s+`item\.source`/,
+    "and says where it comes from",
+  );
+});
+
 test("Step 4: branches on item.source with a roadmap arm, a registry arm and a bug-registry arm", () => {
   const step4 = section(skill, "## Step 4", "## Step 5");
   assert.match(
@@ -364,6 +378,16 @@ test("Step 4 registry arm: calls registry-tick.js --annotate, never writes Statu
   );
   assert.match(arm, /`already`/, "the re-run case is named");
   assert.match(arm, /`no-row`/, "the empty case is named and does not block");
+  // QA-7 (task.113 cycle 2): `already` is idempotent on the row, not on the commit.
+  assert.match(
+    arm,
+    /git diff --quiet -- docs\/tasks\/task-registry\.md \|\| \{/,
+    "already checks for a dirty registry before marking ticked",
+  );
+  // QA-11: every exit-0 reason the engine can emit is named.
+  for (const r of ["`not-accepted`", "`not-a-task`", "`engine-unavailable`"]) {
+    assert.ok(arm.includes(r), `exit-0 reason unnamed: ${r}`);
+  }
   assert.match(
     arm,
     /docs\(registry\): record <id> — PR #<n> merged/,

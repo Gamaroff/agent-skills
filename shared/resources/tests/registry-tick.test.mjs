@@ -815,6 +815,63 @@ test("annotate: a headerless table answers `no-cell` — the walk never reaches 
   }
 });
 
+test("annotate: refuses a row that does not read `accepted` — the note would be a phantom dependency (QA-8)", () => {
+  const { dir, registry } = sandbox([row(45, "pi", "ready-for-review")]);
+  try {
+    const f = writeDoc(dir, 45, "pi", { status: "accepted" });
+    const before = readFileSync(registry, "utf8");
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "423",
+    ]);
+    assert.equal(res.reason, "not-accepted");
+    assert.equal(readFileSync(registry, "utf8"), before);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: a GFM delimiter row of any shape is a separator (QA-10)", () => {
+  for (const sep of [
+    "| - | - | - | - | - | - | - | - |",
+    "|:--|:--|:--|:--|:--|:--|:--|--:|",
+  ]) {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "registry-tick-"));
+    try {
+      mkdirSync(path.join(dir, "skills", "develop-next", "scripts"), {
+        recursive: true,
+      });
+      symlinkSync(
+        path.join(REPO_ROOT, SELECTOR_REL),
+        path.join(dir, SELECTOR_REL),
+      );
+      mkdirSync(path.join(dir, "docs", "tasks"), { recursive: true });
+      const registry = path.join(dir, "docs", "tasks", "task-registry.md");
+      writeFileSync(
+        registry,
+        [REGISTRY_HEADER[4], sep, row(46, "rho", "accepted"), ""].join("\n"),
+      );
+      const f = writeDoc(dir, 46, "rho", { status: "accepted" });
+      const res = run(dir, [
+        "--annotate",
+        "--file",
+        path.relative(dir, f),
+        "--pr",
+        "424",
+        "--issue",
+        "[#2](y)",
+      ]);
+      assert.equal(res.reason, "annotated", `separator ${sep}`);
+      assert.equal(res.issue, "written", `separator ${sep}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 test("annotate: `--issue` rejects a missing value, an empty value, a pipe and a newline — exit 2, nothing written (QA-2)", () => {
   const { dir, registry } = sandbox([row(43, "xi", "accepted")]);
   try {

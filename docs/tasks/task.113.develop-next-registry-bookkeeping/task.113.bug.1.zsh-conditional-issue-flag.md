@@ -4,7 +4,7 @@
 **Bug ID**: TASK-113-BUG-1
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-12
 
@@ -79,3 +79,4 @@ Add a shape assertion that the `:+` form is absent from the step and that the ar
 | 2026-09-12 | New          | QA         | Filed (QA cycle 1)    |
 | 2026-09-12 | In Progress  | qa-fix     | Investigation started |
 | 2026-09-12 | Ready for QA | qa-fix     | Fix implemented       |
+| 2026-09-12 | Closed       | QA         | Verified by re-executing the reproduction (QA cycle 2) |

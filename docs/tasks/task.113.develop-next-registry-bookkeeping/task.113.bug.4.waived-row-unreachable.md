@@ -4,7 +4,7 @@
 **Bug ID**: TASK-113-BUG-4
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 3b code review, CR-3)
 **Date Found**: 2026-09-12
 
@@ -58,3 +58,4 @@ assertion for the clause in both suites.
 | 2026-09-12 | New          | QA         | Filed (QA cycle 1)    |
 | 2026-09-12 | In Progress  | qa-fix     | Investigation started |
 | 2026-09-12 | Ready for QA | qa-fix     | Fix implemented       |
+| 2026-09-12 | Closed       | QA         | Verified by re-executing the reproduction (QA cycle 2) |

@@ -65,7 +65,9 @@
  *   not-a-task         the document is not a task (a story/epic/bug run) — no registry applies.
  *                      For annotate this is also the bug-registry answer: that
  *                      registry has neither an Issue nor a notes cell.
- *   not-accepted       (tick) the document's own status is not `accepted`, so there is nothing to mirror
+ *   not-accepted       (tick) the document's own status is not `accepted`, so there is nothing to mirror;
+ *                      (annotate) the ROW does not read `accepted` — annotating it would plant a
+ *                      phantom dependency, since the notes cell is parsed for `task.N` references
  *   no-registry        the registry file does not exist in this project
  *   no-row             the registry has no row for this task id
  *   ambiguous-row      (tick) the row's status cell could not be identified unambiguously
@@ -198,11 +200,11 @@ async function main() {
     opts.pr = String(opts.pr).replace(/^#/, "");
     // `--issue` is written into a markdown table cell verbatim, so the two
     // characters that break a table are refused here, once, rather than
-    // trusted to every caller. A missing value (`--issue` as the last argument)
-    // reads as `undefined` and would otherwise be written as that literal
-    // string; an empty value would blank the cell and report `written`.
+    // trusted to every caller. (A MISSING value is already a parseArgs error;
+    // this is the empty/whitespace case, which would blank the cell and still
+    // report `written`.)
     if (opts.issue !== null) {
-      const v = opts.issue === undefined ? "" : String(opts.issue);
+      const v = String(opts.issue);
       if (v.trim() === "") return usage("--issue requires a value");
       if (/[|\r\n]/.test(v)) {
         return usage(
@@ -297,8 +299,26 @@ async function main() {
     });
   }
 
-  if (opts.annotate)
+  if (opts.annotate) {
+    // The notes cell is the `Depends on` cell the selector's dependency parser
+    // reads, and `PR #381 merged` parses as a dependency on task 381. On an
+    // accepted row that is inert — eligibility skips the row before its
+    // dependencies are evaluated — but on any other row it would inject a
+    // phantom dependency that can block the row's selection. So the ROW must
+    // already read `accepted`, which by Step 4 it does: `finalise` ticked it.
+    // The DOCUMENT's status is deliberately not consulted (see above).
+    if (row.registryStatus !== "accepted") {
+      return emit(opts, {
+        reason: "not-accepted",
+        message: `task ${taskId} row (line ${row.line}) reads \`${row.registryStatus}\` — annotate only an accepted row, or the note becomes a phantom dependency`,
+        taskId,
+        line: row.line,
+        annotated: false,
+        exitCode: 0,
+      });
+    }
     return annotate(opts, { registryRel, registryText, row, taskId });
+  }
 
   if (row.registryStatus === "accepted") {
     return emit(opts, {
@@ -363,12 +383,7 @@ async function main() {
   //   - a cell too narrow to hold `accepted` keeps one separating space and the
   //     row widens. Alignment is worth preserving, never worth corrupting a value
   //     to achieve.
-  const cell = cells[hits[0]];
-  const lead = cell.match(/^\s*/)[0];
-  const trailLen = cell.match(/\s*$/)[0].length;
-  const core = `${lead}accepted`;
-  const pad = trailLen === 0 ? 0 : Math.max(1, cell.length - core.length);
-  cells[hits[0]] = core + " ".repeat(pad);
+  setCell(cells, hits[0], "accepted");
   parts[idx] = cells.join("|");
 
   if (!opts.dryRun) {
@@ -395,7 +410,8 @@ function isEmptyCell(cell) {
 
 /**
  * Rewrite one cell of `cells` in place, keeping the leading whitespace and —
- * where the new value fits — the cell's total width, exactly as the tick does.
+ * where the new value fits — the cell's total width. The one implementation of
+ * the width rule: the tick path and the annotate path both call it.
  * A cell that grows keeps one trailing space so the pipe stays separated.
  */
 function setCell(cells, i, value) {
@@ -456,7 +472,9 @@ function findHeader(parts, rowLine) {
   for (let li = rowLine - 2; li >= 0; li--) {
     const line = parts[li * 2] || "";
     if (!/^\s*\|/.test(line)) return null; // left the table without a separator
-    if (/^\s*\|\s*:?-{3,}/.test(line)) {
+    // Any GFM delimiter row the selector accepts: hyphens with optional
+    // colons, any count (`| - |`, `|:--|`, `|---|`).
+    if (/^\s*\|\s*:?-+:?\s*\|/.test(line)) {
       const above = parts[(li - 1) * 2] || "";
       return /^\s*\|/.test(above) ? above.split("|") : null;
     }
