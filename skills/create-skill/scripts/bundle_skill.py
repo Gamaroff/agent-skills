@@ -271,12 +271,18 @@ def _relocate_target(target, src_dir, dst_dir, skill_dir, bundled_names):
     resolved = resolved.rstrip('/')
     if resolved.startswith('..'):
         return target  # escapes the repo — not ours to decide
-    if resolved.startswith(skill_dir + '/'):
+    if resolved == skill_dir or resolved.startswith(skill_dir + '/'):
+        # `== skill_dir` — a link to the skill directory itself is inside it.
         new = os.path.relpath(resolved, dst_dir)
     elif resolved.startswith('shared/resources/') and \
             resolved[len('shared/resources/'):] in bundled_names:
+        # A bundled name is relative to the skill's references/ ROOT, not to
+        # dst_dir — for a source in a shared subdirectory the two differ
+        # (dst_dir = skills/s/references/sub), and joining onto dst_dir emitted
+        # `sub/y.md` for a sibling that lives at `references/sub/y.md`.
         new = os.path.relpath(
-            os.path.join(dst_dir, resolved[len('shared/resources/'):]), dst_dir
+            os.path.join(f"{skill_dir}/references", resolved[len('shared/resources/'):]),
+            dst_dir,
         )
     else:
         new = UPSTREAM_BASE + resolved

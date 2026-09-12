@@ -32,22 +32,33 @@ const cache = new Map();
 
 /**
  * Run `bundle_skill.py --check <skillDir>`. Returns
- * `{ ok, problems: Map<referencesRelativePath, "KLASS: detail"> , stdout }`.
- * `ok` is false when the bundler reported any problem OR could not resolve the
- * skill — an unresolvable skill is not "clean".
+ * `{ ran, ok, problems: Map<referencesRelativePath, "KLASS: detail">, stdout }`.
+ *
+ * Two different questions, two flags:
+ *   - `ran`  — the bundler executed AND resolved the skill (it printed its
+ *              freshness summary line). False when python3 is missing, the
+ *              spawn failed, or the skill could not be resolved.
+ *   - `ok`   — `ran` AND it reported zero problems for the whole skill.
+ *
+ * A per-copy question (`isFreshBundledCopy`) reads `ran` and then its own
+ * entry in `problems`; a whole-skill question (the finalise prompt test) reads
+ * `ok`. Conflating the two made one stale sibling de-allowlist a fresh copy
+ * with a message that pointed at the MCP rule rather than the stale file.
  */
 export function bundleCheck(skillDir, { python = "python3" } = {}) {
   const key = `${python}\u0000${resolve(skillDir)}`;
   if (cache.has(key)) return cache.get(key);
   let stdout = "";
-  let ok = true;
+  let spawned = true;
   try {
     stdout = execFileSync(python, [BUNDLER, "--check", resolve(skillDir)], {
       encoding: "utf-8",
       cwd: repoRoot,
     });
   } catch (err) {
-    ok = false;
+    // A non-zero exit still means the bundler RAN (it exits 1 on problems);
+    // a missing binary or an unresolvable skill prints no summary line.
+    spawned = err.code !== "ENOENT";
     stdout = `${err.stdout || ""}${err.stderr || ""}`;
   }
   // Problem lines are printed as `  KLASS        references/<rel> — detail`.
@@ -56,7 +67,14 @@ export function bundleCheck(skillDir, { python = "python3" } = {}) {
     const m = /^\s+([A-Z][A-Z ]*?)\s+references\/(\S+) — (.*)$/.exec(line);
     if (m) problems.set(m[2], `${m[1]}: ${m[3]}`);
   }
-  const result = { ok: ok && problems.size === 0, problems, stdout };
+  // Both the clean and the problems form print a `bundle freshness:` summary;
+  // an unresolvable target prints it too, with a `could not be resolved`
+  // trailer — so that trailer is what distinguishes "ran" from "could not".
+  const ran =
+    spawned &&
+    /bundle freshness: /.test(stdout) &&
+    !/could not be resolved as skills/.test(stdout);
+  const result = { ran, ok: ran && problems.size === 0, problems, stdout };
   cache.set(key, result);
   return result;
 }
@@ -81,12 +99,15 @@ export function declaredSource(file) {
  * bundler certifies as in sync — by CONTENT (its banner names the source and
  * `--check` finds nothing wrong with it), never by filename alone.
  *
- * Fails CLOSED. `ok` is consulted, not only `problems`: when the bundler could
+ * Fails CLOSED. `ran` is consulted, not only `problems`: when the bundler could
  * not run at all (no `python3`, ENOENT) or could not resolve the skill,
  * `problems` is empty for the wrong reason, and a copy nobody could look at is
- * not fresh. The first cut of this helper returned `!problems.has(rel)` alone,
- * which certified every banner-carrying copy on exactly the runner that could
- * not check any of them (task.108 QA cycle 1, CR-1).
+ * not fresh. It reads `ran` rather than `ok` so that a stale UNRELATED sibling
+ * does not de-allowlist a fresh copy (that whole-skill question belongs to
+ * `ok`, which the finalise prompt test asserts separately). The first cut of
+ * this helper returned `!problems.has(rel)` alone, which certified every
+ * banner-carrying copy on exactly the runner that could not check any of them
+ * (task.108 QA cycle 1, CR-1).
  */
 export function isFreshBundledCopy(file, source, opts = {}) {
   const abs = resolve(file);
@@ -96,6 +117,6 @@ export function isFreshBundledCopy(file, source, opts = {}) {
   const skillDir = parts.slice(0, i).join(sep);
   const rel = parts.slice(i + 1).join("/");
   if (declaredSource(abs) !== source) return false;
-  const { ok, problems } = bundleCheck(skillDir, opts);
-  return ok && !problems.has(rel);
+  const { ran, problems } = bundleCheck(skillDir, opts);
+  return ran && !problems.has(rel);
 }

@@ -52,7 +52,7 @@ const GUIDE_MD = [
   "Bundled sibling: [b](bundled-sibling.md) and with fragment [b2](bundled-sibling.md#part).",
   "Unbundled sibling: [u](unbundled.md).",
   "Docs: [cfg](../../docs/reference/configuration.md#keys) and [agents](../../AGENTS.md).",
-  "Inside the skill: [native](../../skills/fixture-skill/references/native.md).",
+  "Inside the skill: [native](../../skills/fixture-skill/references/native.md) [self](../../skills/fixture-skill/).",
   "Directory: [examples](../../docs/examples/).",
   "Placeholders: [p1]({jira_url}) [p2](./task.[n].md) [p3](<path/to/x.md>) [p4](url).",
   "External: [ext](https://example.com/x.md) [anchor](#top) [abs](/docs/x.md).",
@@ -129,6 +129,11 @@ test("bundled copy: one rule — inside the skill relative, everything else upst
     copy,
     /\[native\]\(native\.md\)/,
     "inside-the-skill target is relative to the copy",
+  );
+  assert.match(
+    copy,
+    /\[self\]\(\.\.\/\)/,
+    "the skill directory itself is inside the skill",
   );
   assert.match(
     copy,
@@ -232,4 +237,51 @@ test("package path: same bytes as in-tree for a bundled copy; own files get the 
     listing.length,
     "zip has no duplicate entries",
   );
+});
+
+test("nested shared source: bundled siblings resolve from the references root", (t) => {
+  // shared/resources/sub/inner.md → skills/fixture-skill/references/sub/inner.md.
+  // A sibling link `y.md` (bundled as sub/y.md) must stay `y.md`; a parent link
+  // `../guide.md` (bundled as guide.md) must become `../guide.md` — not `guide.md`.
+  const { root, skillDir } = makeFixture(t);
+  fs.mkdirSync(path.join(root, "shared", "resources", "sub"), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    path.join(root, "shared", "resources", "sub", "inner.md"),
+    "# inner\n[sib](y.md) [up](../guide.md) [unb](z.md)\n",
+  );
+  fs.writeFileSync(
+    path.join(root, "shared", "resources", "sub", "y.md"),
+    "# y\n",
+  );
+  fs.writeFileSync(
+    path.join(root, "shared", "resources", "sub", "z.md"),
+    "# z\n",
+  );
+  fs.appendFileSync(
+    path.join(skillDir, "SKILL.md"),
+    "Also shared/resources/sub/inner.md and shared/resources/sub/y.md.\n",
+  );
+  run(BUNDLER, [skillDir]);
+  const copy = fs.readFileSync(
+    path.join(skillDir, "references", "sub", "inner.md"),
+    "utf-8",
+  );
+  assert.match(
+    copy,
+    /\[sib\]\(y\.md\)/,
+    "sibling in the same subdirectory stays a sibling",
+  );
+  assert.match(
+    copy,
+    /\[up\]\(\.\.\/guide\.md\)/,
+    "bundled parent-dir file is one level up",
+  );
+  assert.match(
+    copy,
+    new RegExp(`\\[unb\\]\\(${UPSTREAM}shared/resources/sub/z\\.md\\)`),
+    "unbundled sibling → upstream",
+  );
+  assert.match(run(BUNDLER, ["--check", skillDir]), /0 problems/);
 });

@@ -13,7 +13,8 @@ top_issues:
     finding: 'isFreshBundledCopy() returns true whenever problems is empty and never consults ok, so if bundle_skill.py --check cannot run (python3 missing, ENOENT) or cannot resolve the skill, every banner-carrying copy is certified fresh and the MCP-comment allowlist in transition-protocol-parity.test.mjs fails open — the opposite of what bundleCheck() documents.'
     suggested_action: 'Destructure ok as well and return ok && !problems.has(rel) so a failed check reads as not-fresh; add a test that a non-executable bundler yields false.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
 
 waiver:
   active: false
@@ -41,6 +42,13 @@ nfr_validation:
   maintainability:
     status: PASS
     notes: 'One rule, one constant, twin extractor documented on both sides. package_skill.py imports the pass rather than copying it. CR-4/CR-7/CR-8 are hygiene (fixture cleanup, import placement, an overstated comment).'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 1
+  verification_method: 'Cycle-2 refute pass + bundled-parity.test.mjs fail-closed case (mutation-proven) + npm run ci:fast 3,200/0'
 
 recommendations:
   immediate:

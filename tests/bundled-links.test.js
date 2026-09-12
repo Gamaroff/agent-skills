@@ -89,8 +89,6 @@ function scan() {
       relative += 1;
       const noFragment = target.split("#")[0];
       if (noFragment === "") continue; // "#anchor" is filtered upstream; belt and braces
-      // A `%` that is not a valid escape makes decodeURIComponent throw; a
-      // link like that is broken, not a reason to abort the whole scan.
       const decoded = decodeURIComponentSafe(noFragment);
       // A trailing slash names a directory; normalize() keeps it, the tracked
       // set has no such entry, so strip it before the lookup.

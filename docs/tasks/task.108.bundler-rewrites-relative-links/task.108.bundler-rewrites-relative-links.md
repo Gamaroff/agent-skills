@@ -226,7 +226,8 @@ and make it one constant so a tagged-release variant is a one-line change later.
 | 2026-09-12 |         | Status → ready-for-development | review-task |
 | 2026-09-12 |         | Implemented — 8 source files + ~210 regenerated bundles, 10 tests | develop |
 | 2026-09-12 |         | QA gate CONCERNS (90/100) — 1 medium (CR-1), 2 low, 5 cleanups | qa-task |
-| 2026-09-12 |         | QA findings fixed — CR-1 fail-closed parity helper (+ regression test), CR-2..8 applied, 1 iteration | qa-fix |
+| 2026-09-12 |         | QA gate PASS (100/100) — cycle 2 refute pass; 1 low latent (C2-CR-1), 2 low advisory, 2 cleanups | qa-task |
+| 2026-09-12 |         | QA findings fixed — fail-closed parity helper (ran/ok split), references-root relpath for nested shared sources, twin agreement on absolute targets, hygiene; 2 iterations | qa-fix |
 
 ---
 
@@ -245,24 +246,24 @@ and make it one constant so a tagged-release variant is a one-line change later.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-12
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 90/100)
 
 ### QA Report
-- **Full Report**: [task.108.qa.1.bundler-rewrites-relative-links.md](./task.108.qa.1.bundler-rewrites-relative-links.md)
-- **Gate File**: [task.108.gate.1.bundler-rewrites-relative-links.yml](./task.108.gate.1.bundler-rewrites-relative-links.yml)
+- **Full Report**: [task.108.qa.2.bundler-rewrites-relative-links.md](./task.108.qa.2.bundler-rewrites-relative-links.md) (cycle 1: [task.108.qa.1.bundler-rewrites-relative-links.md](./task.108.qa.1.bundler-rewrites-relative-links.md))
+- **Gate File**: [task.108.gate.2.bundler-rewrites-relative-links.yml](./task.108.gate.2.bundler-rewrites-relative-links.yml) (cycle 1: [task.108.gate.1.bundler-rewrites-relative-links.yml](./task.108.gate.1.bundler-rewrites-relative-links.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 127 (targeted suites) + CI `test` job green; 10 new tests
+- **Tests Executed**: 3,201 (`ci:fast`) — 3,200 pass, 0 fail; 13 new tests across this task
 - **Phases Verified**: 3/3 (5/5 checkboxes)
-- **Critical Issues**: 0 (1 medium: CR-1)
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All six success criteria hold under independent re-verification (845 → 0 broken; idempotent; zips clean; CI green; five mutants caught). One high-confidence medium bug: `isFreshBundledCopy()` in the new eval parity helper ignores `ok` and certifies every copy fresh when the bundler cannot run — fails open. Two low bugs and five cleanups advisory.
+Cycle 1 found one medium (the parity helper failed open when the bundler could not run) plus seven advisory items; all fixed and the fail-closed case mutation-proven. Cycle 2's refute pass found one latent low bug (nested shared source mis-relativised in the bundled-sibling branch — no such source exists today), routed to a final fix cycle, and two advisory edge cases.
 
 ---
 

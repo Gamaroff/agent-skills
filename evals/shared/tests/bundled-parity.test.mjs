@@ -12,7 +12,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  appendFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,7 +40,7 @@ const BUNDLER = join(
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "bundled-parity-"));
-  t.after(() => execFileSync("rm", ["-rf", root]));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, "shared", "resources"), { recursive: true });
   const skill = join(root, "skills", "x");
   mkdirSync(skill, { recursive: true });
@@ -60,6 +66,11 @@ test("a tampered copy is not fresh, and the problem names it", (t) => {
   const { skill, copy } = fixture(t);
   appendFileSync(copy, "tampered\n");
   const r = bundleCheck(skill);
+  assert.equal(
+    r.ran,
+    true,
+    "the bundler ran — the problem is real, not a crash",
+  );
   assert.equal(r.ok, false);
   assert.match(r.problems.get("a.md") ?? "", /STALE/);
   assert.equal(isFreshBundledCopy(copy, "a.md"), false);
@@ -69,6 +80,7 @@ test("fails CLOSED: a bundler that cannot run certifies nothing", (t) => {
   const { skill, copy } = fixture(t);
   const opts = { python: join(skill, "no-such-python-binary") };
   const r = bundleCheck(skill, opts);
+  assert.equal(r.ran, false, "ran must be false when the check could not run");
   assert.equal(r.ok, false, "ok must be false when the check could not run");
   assert.equal(
     r.problems.size,
@@ -79,5 +91,26 @@ test("fails CLOSED: a bundler that cannot run certifies nothing", (t) => {
     isFreshBundledCopy(copy, "a.md", opts),
     false,
     "a copy nobody could look at is not fresh",
+  );
+});
+
+test("a stale UNRELATED sibling does not de-allowlist a fresh copy", (t) => {
+  const { root, skill, copy } = fixture(t);
+  // Bundle a second shared file, then tamper only that one.
+  writeFileSync(join(root, "shared", "resources", "b.md"), "# B\n");
+  appendFileSync(join(skill, "SKILL.md"), "and shared/resources/b.md\n");
+  execFileSync("python3", [BUNDLER, skill], { encoding: "utf-8" });
+  appendFileSync(join(skill, "references", "b.md"), "tampered\n");
+  const r = bundleCheck(skill);
+  assert.equal(r.ran, true);
+  assert.equal(r.ok, false, "the skill as a whole is not clean");
+  assert.equal(
+    isFreshBundledCopy(copy, "a.md"),
+    true,
+    "but a.md itself is fresh",
+  );
+  assert.equal(
+    isFreshBundledCopy(join(skill, "references", "b.md"), "b.md"),
+    false,
   );
 });
