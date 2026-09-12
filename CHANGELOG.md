@@ -108,6 +108,23 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The bundler copied depth-relative links verbatim, so every bundled `references/` file carried
+  broken links** ([task 108](docs/tasks/task.108.bundler-rewrites-relative-links/task.108.bundler-rewrites-relative-links.md)).
+  `bundle_skill.py` rewrote the explicit `shared/resources/X` spelling and nothing else; a bare
+  sibling `open-knowledge-format.md` or a `../../docs/…` path, authored at `shared/resources/` depth,
+  resolved one level wrong from `skills/<skill>/references/`. **845 broken links in 215 files**,
+  measured 2026-09-12 — and both guards certified them: `--check` compares copy to source, and
+  `docs-link-check.yml` never reads `skills/**`. The bundler now resolves each prose link against its
+  source and applies one rule — inside the skill → relative, anything else → the upstream
+  `blob/develop` URL — with fenced blocks, code spans and `{…}`/`[…]`/`<…>` placeholders left alone.
+  `package_skill.py` imports that pass instead of re-declaring its regexes, writes the bundled bytes
+  (not the raw source) into the zip, no longer produces duplicate zip entries, and applies the
+  outside-the-skill rule to a skill's own `README.md`. Guard: `tests/bundled-links.test.js` under
+  `npm test`, with a non-vacuity floor (≥ 200 files, ≥ 1,000 links). **Mechanical churn:** the
+  first `npm run bundle` after this rewrites ~210 bundled `.md` files; that diff is the fix landing,
+  not authored change. Eight skill-native reference files and three template copies carried links
+  wrong at the source and were fixed as found.
+
 - **Tree-derived counts stated as standing fact, in three places.** The ShellCheck lane's input size
   was written as "247 files, 56 sources, 191 copies" in the workflow comment, `CONTRIBUTING.md` and —
   added during the v0.46.0 release sweep — `docs/contributing/releases.md`. Measured five days later:

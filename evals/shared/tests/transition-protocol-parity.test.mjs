@@ -28,6 +28,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isFreshBundledCopy } from "../lib/bundled-parity.mjs";
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -604,17 +605,6 @@ const MCP_COMMENT_ALLOWLIST = [
   "shared/resources/jira-transition-protocol.md",
 ];
 
-/** Strip the bundler's banner and its path rewrites, so a bundled copy can be
- *  compared byte-for-byte against the shared source it came from. */
-function normaliseBundled(text) {
-  return text
-    .split("\n")
-    .filter((l) => !l.includes("AUTO-GENERATED — DO NOT EDIT"))
-    .join("\n")
-    .split("references/")
-    .join("shared/resources/");
-}
-
 function isAllowlisted(file) {
   const rel = file
     .slice(repoRoot.length + 1)
@@ -626,14 +616,15 @@ function isAllowlisted(file) {
   // skill mint an exemption just by naming a file `jira-transition-protocol.md`
   // and putting whatever it liked inside. Nineteen files were exempt on that
   // basis with nothing tying them to the shared source.
+  // "By content" is the bundler's own verdict: the copy's banner must declare
+  // the allowlisted source AND `bundle_skill.py --check` must find it in sync.
+  // A test-local byte comparison that undid the rewrite by hand stopped being a
+  // faithful inverse when task.108 added link re-relativisation to the copies.
   const base = rel.split("/").pop();
   const source = MCP_COMMENT_ALLOWLIST.find((a) => a.endsWith(`/${base}`));
   if (!source || !rel.includes("/references/")) return false;
   try {
-    return (
-      normaliseBundled(readFileSync(file, "utf-8")) ===
-      normaliseBundled(readFileSync(join(repoRoot, source), "utf-8"))
-    );
+    return isFreshBundledCopy(file, source.slice("shared/resources/".length));
   } catch {
     return false;
   }

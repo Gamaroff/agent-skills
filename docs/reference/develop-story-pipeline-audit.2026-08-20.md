@@ -202,6 +202,13 @@ to absolute repo URLs), or make the shared sources use the explicit `shared/reso
 bundler already understands. The second is smaller and matches the documented convention in
 `AGENTS.md`.
 
+> **Closed by [task 108](../tasks/task.108.bundler-rewrites-relative-links/task.108.bundler-rewrites-relative-links.md)
+> (2026-09-12).** The first option, generalised: the bundler now resolves every prose link in a
+> bundled copy against its source directory and applies one rule — a target inside the skill
+> directory is emitted relative to the copy, anything else becomes the upstream URL. Measured before
+> the fix by the new checker (`tests/bundled-links.test.js`, run under `npm test`): 845 broken links
+> in 215 files across `skills/**` — the seven above were the visible corner of it.
+
 ### Theme G — Question-count and Q3 drift — Medium
 
 | ID | Claim | Contradicted by |

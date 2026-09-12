@@ -41,7 +41,15 @@ def collect_shared_refs(content):
     Filters out empty matches (e.g. when the regex captures only a trailing
     sentence punctuation like 'shared/resources/.' which strips to '').
     """
-    refs = [f.rstrip('.,;:') for f in re.findall(r'shared/resources/([^\s`\'")\]*]+)', content)]
+    # `(?<![\w-]/)` — never match inside an absolute URL such as
+    # `https://…/blob/develop/shared/resources/x.md`, which the bundler now
+    # writes into bundled copies for targets a skill does not ship. Without the
+    # guard the packager's walk over references/ rediscovered every such URL as
+    # a reference and vendored the file it deliberately did not bundle.
+    refs = [
+        f.rstrip('.,;:')
+        for f in re.findall(r'(?<![\w-]/)shared/resources/([^\s`\'")\]*]+)', content)
+    ]
     return [r for r in refs if r]
 
 

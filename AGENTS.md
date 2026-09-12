@@ -61,7 +61,7 @@ npm run bundle              # all skills
 npm run bundle:skill skills/<skill-name>
 ```
 
-Bundling copies referenced `shared/resources/*` into each skill's `references/` directory and rewrites `shared/resources/X` → `references/X` in `.md` and `.js` files. This makes each skill directory self-contained, so installers that copy a skill verbatim (e.g. the tarball extracted by `setup-consumer.sh`) produce a working install without needing the rest of the repo. Idempotent — safe to re-run.
+Bundling copies referenced `shared/resources/*` into each skill's `references/` directory, rewrites `shared/resources/X` → `references/X` in `.md` and `.js` files, and re-relativises every other prose link in the copy — inside the skill → relative, anything else → the upstream `blob/develop` URL (task 108; guard: `tests/bundled-links.test.js`). This makes each skill directory self-contained, so installers that copy a skill verbatim (e.g. the tarball extracted by `setup-consumer.sh`) produce a working install without needing the rest of the repo. Idempotent — safe to re-run.
 
 **Validate a skill:**
 

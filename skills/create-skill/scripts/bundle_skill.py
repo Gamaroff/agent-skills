@@ -25,7 +25,13 @@ from pathlib import Path
 
 from quick_validate import collect_shared_refs, find_repo_root
 
-SHARED_REF_RE = re.compile(r'(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')
+# `(?<![\w-]/)` — never match inside an absolute URL: the link pass below writes
+# `https://…/blob/develop/shared/resources/x.md` into bundled copies for targets
+# a skill does not ship, and a README may quote such a URL. Rewriting that to
+# `…/blob/develop/references/x.md` would break the one link that was correct.
+# `../shared/resources/` is preceded by `./`, which the class does not include,
+# so relative spellings still match.
+SHARED_REF_RE = re.compile(r'(?<![\w-]/)(?:\.\./)*shared/resources/([^\s`\'")\]*]+)')
 JS_SHARED_RE = re.compile(
     r'(require\(["\'])(?:\.\./)+shared/resources/([^"\']+)(["\'])\)'
 )
@@ -154,19 +160,152 @@ def rewrite_text(content, suffix):
     return content
 
 
-def expected_bytes(src, name):
+# ---------------------------------------------------------------------------
+# Link re-relativisation (task.108).
+#
+# A shared resource is authored at `shared/resources/` depth, but its bundled
+# copy lives at `skills/<skill>/references/`. `rewrite_text` above handles the
+# explicit `shared/resources/X` spelling; every OTHER relative link — a bare
+# sibling `open-knowledge-format.md`, a `../../docs/…` path, `../../AGENTS.md` —
+# was copied verbatim and resolved one level wrong from the copy. 845 broken
+# links in 215 bundled files, measured 2026-09-12, and `--check` certified them
+# because it compares copy to source.
+#
+# One rule, applied to each resolved target:
+#   * lands inside THIS skill's directory (a file the bundle ships)  → relative
+#   * anything else (docs/, AGENTS.md, an unbundled shared sibling…) → upstream URL
+#
+# "Inside this skill" for a `shared/resources/X` target means "X is in the set
+# of names this skill bundles" — decided from the same population the write and
+# check passes use, never from what happens to be on disk mid-run, or the first
+# bundle would emit URLs for siblings written a moment later and the second run
+# would flip them back.
+#
+# Twin: `tests/lib/markdown-links.js` — the checker half. The two are
+# deliberately duplicated across languages and MUST agree on fence tracking
+# (line-based), code-span skipping (per line) and the placeholder pattern.
+# ---------------------------------------------------------------------------
+UPSTREAM_BASE = "https://github.com/Gamaroff/agent-skills/blob/develop/"
+
+FENCE_RE = re.compile(r'^\s{0,3}(`{3,}|~{3,})')
+CODE_SPAN_RE = re.compile(r'(`+)[^`]*?[^`]\1(?!`)|(`+)\2')
+LINK_RE = re.compile(r'(!?\[[^\]]*\]\()([^)\s]+)((?:\s+"[^"]*")?\))')
+SCHEME_RE = re.compile(r'^[a-zA-Z][a-zA-Z0-9+.-]*:')
+PLACEHOLDER_LITERALS = {'url', 'path', '…', '...'}
+
+
+def is_external_target(target):
+    """A target the rewriter must leave alone: a URL or other scheme, an in-page
+    anchor, or a template placeholder (`url`, `path`, `…`, or any `{…}`, `[…]`,
+    `<…>` segment)."""
+    if SCHEME_RE.match(target) or target.startswith('#'):
+        return True
+    if target in PLACEHOLDER_LITERALS:
+        return True
+    return any(ch in target for ch in '{}[]<>')
+
+
+def _code_spans(line):
+    """Half-open (start, end) ranges of inline code spans on one line."""
+    return [(m.start(), m.end()) for m in CODE_SPAN_RE.finditer(line)]
+
+
+def rewrite_md_links(content, src_dir, dst_dir, skill_dir, bundled_names):
+    """Re-relativise every prose Markdown link in `content`.
+
+    `src_dir`, `dst_dir`, `skill_dir` are repo-relative POSIX directories —
+    `shared/resources`, `skills/<s>/references`, `skills/<s>`. `bundled_names`
+    is the set of `references/`-relative names this skill ships. Fenced blocks
+    and inline code spans are untouched.
+
+    Runs AFTER `rewrite_text`, so a `shared/resources/X` target has already
+    become `references/X` — which, read from a shared source, means "the
+    skill's references/X" rather than a real relative path, and is mapped as if
+    it were `shared/resources/X`.
+    """
+    out = []
+    fence = None
+    for line in content.split('\n'):
+        m = FENCE_RE.match(line)
+        if fence is not None:
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= fence[1]:
+                fence = None
+            out.append(line)
+            continue
+        if m:
+            fence = (m.group(1)[0], len(m.group(1)))
+            out.append(line)
+            continue
+        spans = _code_spans(line)
+
+        def sub(match):
+            if any(a <= match.start() < b for a, b in spans):
+                return match.group(0)
+            new = _relocate_target(
+                match.group(2), src_dir, dst_dir, skill_dir, bundled_names
+            )
+            return f"{match.group(1)}{new}{match.group(3)}"
+
+        out.append(LINK_RE.sub(sub, line))
+    return '\n'.join(out)
+
+
+def _relocate_target(target, src_dir, dst_dir, skill_dir, bundled_names):
+    if is_external_target(target):
+        return target
+    path_part, sep, fragment = target.partition('#')
+    if not path_part:
+        return target
+    trailing = '/' if path_part.endswith('/') else ''
+    if path_part.startswith('references/') and src_dir.startswith('shared/resources'):
+        # Authored in a SHARED source as "the skill's references/X" (see
+        # docstring). From a skill's own file the same spelling is an ordinary
+        # relative path and resolves below.
+        resolved = f"shared/resources/{path_part[len('references/'):]}"
+    else:
+        resolved = os.path.normpath(os.path.join(src_dir, path_part))
+    resolved = resolved.rstrip('/')
+    if resolved.startswith('..'):
+        return target  # escapes the repo — not ours to decide
+    if resolved.startswith(skill_dir + '/'):
+        new = os.path.relpath(resolved, dst_dir)
+    elif resolved.startswith('shared/resources/') and \
+            resolved[len('shared/resources/'):] in bundled_names:
+        new = os.path.relpath(
+            os.path.join(dst_dir, resolved[len('shared/resources/'):]), dst_dir
+        )
+    else:
+        new = UPSTREAM_BASE + resolved
+    return f"{new}{trailing}{sep}{fragment}"
+
+
+def expected_bytes(src, name, refs_dir, bundled_names):
     """The exact bytes `<skill>/references/<name>` must hold for source `src`.
 
-    This is the single definition of "in sync". Undecodable sources bypass both
+    This is the single definition of "in sync". Undecodable sources bypass all
     transforms and are copied verbatim, matching the historical behaviour.
+
+    `refs_dir` is the skill's `references/` directory and `bundled_names` the
+    set of names it ships — both required, because the link pass needs to know
+    where the copy will live and which siblings will live beside it. Every
+    caller passes the same population (`needed` ∪ `reconcilable`), so the writer
+    and the checker cannot disagree about what "in sync" means.
     """
     suffix = Path(name).suffix
     try:
-        return inject_header(
-            rewrite_text(src.read_text(), suffix), name, suffix
-        ).encode('utf-8')
+        content = rewrite_text(src.read_text(), suffix)
     except UnicodeDecodeError:
         return src.read_bytes()
+    if suffix == '.md':
+        repo_root = find_repo_root(refs_dir)
+        if repo_root is not None:
+            src_dir = src.parent.resolve().relative_to(repo_root.resolve()).as_posix()
+            dst_dir = (refs_dir.resolve() / name).parent.relative_to(repo_root.resolve()).as_posix()
+            skill_dir = refs_dir.resolve().parent.relative_to(repo_root.resolve()).as_posix()
+            content = rewrite_md_links(
+                content, src_dir, dst_dir, skill_dir, set(bundled_names)
+            )
+    return inject_header(content, name, suffix).encode('utf-8')
 
 
 def _within(root, candidate):
@@ -667,6 +806,7 @@ def check_skill(skill_path):
     # the check's population is the writer's population.
     expected = dict(needed)
     expected.update(reconcilable)
+    bundled_names = set(expected)
 
     for rel in sorted(expected):
         src = expected[rel]
@@ -730,7 +870,7 @@ def check_skill(skill_path):
             report(rel, 'AMBIGUOUS', f'unreadable: {exc.__class__.__name__}')
             continue
 
-        if actual != expected_bytes(src, rel):
+        if actual != expected_bytes(src, rel, refs_dir, bundled_names):
             report(rel, 'STALE', 'content differs from the rewritten source')
             continue
 
@@ -892,6 +1032,10 @@ def bundle_skill(skill_path):
 
     # Pass 1b: add on-disk copies discovery could not reach but which have a source.
     reconcilable = source_backed_on_disk(refs_dir, shared_dir, needed)
+    # The population the link pass decides "bundled sibling" against — the same
+    # union `check_skill` uses, so a copy the writer emits is the copy the checker
+    # expects.
+    bundled_names = set(needed) | set(reconcilable)
 
     if not needed and not reconcilable:
         # Nothing shared reaches this skill and nothing on disk mirrors a shared
@@ -917,7 +1061,7 @@ def bundle_skill(skill_path):
             why = "symlink" if (refs_dir / name).is_symlink() else "not bundler output"
             print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
-        if write_if_changed(dst, src, name, expected_bytes(src, name)):
+        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):
             bundled += 1
             print(f"  bundled references/{name}")
 
@@ -936,7 +1080,7 @@ def bundle_skill(skill_path):
             why = "symlink" if (refs_dir / name).is_symlink() else "not bundler output"
             print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
-        if write_if_changed(dst, src, name, expected_bytes(src, name)):
+        if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):
             reconciled += 1
             print(f"  reconciled references/{name} (not reached by discovery)")
 
