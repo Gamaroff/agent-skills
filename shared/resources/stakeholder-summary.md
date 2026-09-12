@@ -175,6 +175,20 @@ Slots: `{cycle}`.
 > The problems found in testing have been fixed. The work now goes back for testing again, to confirm
 > the fixes hold and that nothing else broke. This item is not finished until that testing passes.
 
+### `pipeline-paused`
+
+Slots: none.
+
+> Work on this item has paused automatically, because the automated assistant was about to run out
+> of working memory. Nothing has been lost: progress so far has been saved, and the work will carry
+> on from that point once it is restarted. No action is needed from anyone reading this.
+
+Posted by the PreCompact hook — a shell script with no agent behind it — on both the pull request
+(via `stakeholder-summary-cli.js`) and the tracker issue (via `tracker-comment.js`). Deliberately
+slot-free: the hook holds only what the lock file holds, and a step number is jargon to this reader.
+A stage of the form `pipeline-paused-4` resolves to this template, the same way `qa-cycle-3` does;
+the suffix is the step the pipeline paused at, so each distinct pause point posts its own comment.
+
 ### `done`
 
 Slots: `{pr}`.

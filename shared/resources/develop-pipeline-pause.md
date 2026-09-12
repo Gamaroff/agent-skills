@@ -25,7 +25,7 @@ When compaction fires mid-pipeline:
 
 The agent has no token-count introspection, so the orchestrator cannot detect "compaction is about to fire" from inside its own turn. The only reliable signal is the Claude Code **`PreCompact` hook**, which executes a shell script before the harness summarises the conversation.
 
-The pause flow is therefore: a shell hook (independent execution budget, runs even when the agent is out of room) does the durable work — appends a pause entry to the report, commits and pushes, posts a PR comment — and then injects a system-reminder back to the agent telling it to halt cleanly.
+The pause flow is therefore: a shell hook (independent execution budget, runs even when the agent is out of room) does the durable work — appends a pause entry to the report, commits and pushes, posts the PR and tracker-issue comments through the comment contract — and then injects a system-reminder back to the agent telling it to halt cleanly.
 
 ## Architecture overview
 
@@ -47,8 +47,8 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
 │ Hook reads lock file:                                            │
 │   1. Append "Paused — Context Compaction" to implementation report│
 │   2. git commit + git push (best-effort)                         │
-│   3. gh pr comment (best-effort, if PR exists)                   │
-│   4. gh issue comment (best-effort, GitHub tracker only)         │
+│   3. PR comment via tracker_write (lead + --body-file)           │
+│   4. Issue comment via tracker-comment.js (lead, marker, gate)   │
 │   5. rm lock file                                                │
 │   6. Emit additionalContext: 🛑 PIPELINE-PAUSE-SIGNAL            │
 └──────────────────────────────────────────────────────────────────┘
@@ -103,7 +103,7 @@ The pause flow is therefore: a shell hook (independent execution budget, runs ev
 | `branch` | Feature branch name (used in pause summary) |
 | `pr_url` | Empty until Step 4 succeeds, then the PR URL |
 | `tracker` | `github` or `jira` — controls whether the hook posts a tracker-issue comment |
-| `tracker_issue` | Issue number / Jira key — only used when `tracker=github` |
+| `tracker_issue` | GitHub issue number or Jira key — passed to `tracker-comment.js` with `--tracker <tracker>`, so it is used for both trackers |
 | `current_step` | 1–8. Set to 1 at end of Step 1, updated at every banner thereafter. |
 | `started_at` | UTC ISO-8601 timestamp |
 
@@ -130,8 +130,8 @@ If no lock file exists, `additionalContext` is `""` (empty). If a lock exists, `
 0. **Snapshot-before-removal (resume guarantee).** As soon as the lock is confirmed present — *before* the `trap 'rm -f "$LOCK"' EXIT` is armed and before any explicit `rm` — write `develop-pipeline.last-halt.json` (co-located with the lock). It is a **superset of the lock** with `paused_at`, `pause_reason: "precompact"`, and `halt_step` (= the lock's `current_step`). When `jq` is unavailable this degrades to a verbatim `cp` of the lock (still preserving `current_step`). This single guarantee is what makes a *killed* hook recoverable: every exit path — clean finish OR harness SIGTERM/timeout mid-flow — leaves the snapshot on disk, so the pipeline can never end up both unlocked **and** un-resumable. Phase 0b's resume detector consumes this snapshot when no active lock is present.
 1. Append a "Pipeline Paused — {timestamp}" block to `report_path` with skill, branch, last step boundary, PR URL, tracker info, and resume instructions.
 2. `git add <report> && git commit -m "docs(<skill>): pipeline paused at step <N> — context compaction imminent" && git push origin HEAD`.
-3. `gh pr comment <pr_url> --body "<paused notice>"` if `pr_url` is non-empty and `gh` is on PATH.
-4. `gh issue comment <tracker_issue> --body "<paused notice>"` if `tracker=github`, `tracker_issue` is set, and `gh` is on PATH.
+3. `tracker_write gh pr comment <pr_url> --body-file .claude/state/precompact-pr-comment.step-<N>.md` if `pr_url` is non-empty and both `gh` and `node` are on PATH. The body opens with the `pipeline-paused` lead (rendered by `stakeholder-summary-cli.js`), then `---`, then the paused notice. `tracker_write` comes from sourcing `resolve-platform.sh` beside the hook, so a declared `access.tracker` restriction is honoured — the comment is recorded in the deferred-mutation journal instead of posted. If the resolver or the lead cannot be loaded the arm fails closed: nothing is posted and the signal says so.
+4. `tracker-comment.js --issue <tracker_issue> --stage pipeline-paused-<step> --body-file .claude/state/precompact-issue-comment.step-<N>.md` if `tracker_issue` is set and `node` is on PATH. One call: the engine resolves the tracker, renders the lead, adds the idempotency marker (scoped by step — a second pause at a later step posts again; a repeat at the same step reports `already`) and applies the access gate. Its `reason` is surfaced in the signal.
 5. `rm -f .claude/state/develop-pipeline.lock`.
 
 > The snapshot is a **superset** of the lock — it differs from the orchestrator's terminal-HALT snapshot (SKILL.md) only in the reason fields: PreCompact writes `pause_reason: "precompact"` + `paused_at`, the terminal path writes `halt_reason` + `halted_at`. Both write `halt_step`, so the resume detector locates the resume point identically. The `LOCK` path is `PIPELINE_LOCK`-overridable (default `.claude/state/develop-pipeline.lock`) so the hook can be sandboxed in regression tests; the snapshot path is derived from it.
@@ -140,7 +140,7 @@ If no lock file exists, `additionalContext` is `""` (empty). If a lock exists, `
 
 **Dependencies**: `jq` (required for safe JSON parsing — degrades to noop if missing); `git` and `gh` (used best-effort).
 
-**Jira limitation**: the hook does NOT comment on Jira issues. Jira posting requires authenticated MCP calls, which are not available from a shell context. For Jira-tracked work, pause is visible only via the PR comment + implementation report; the agent surfaces this in the user-facing summary.
+**Jira**: the issue comment reaches Jira over REST when `JIRA_URL` / `JIRA_API_TOKEN` / `JIRA_USER_EMAIL` are in the hook's environment (or a `.env` the engine reads); otherwise `tracker-comment.js` reports `no-credentials` and the Jira side stays silent. The signal names the outcome and the agent repeats it in the user-facing summary. There is no MCP path from a shell hook.
 
 ## Setup (per project)
 
@@ -204,7 +204,7 @@ The hook fires regardless of pipeline position. The lock's `current_step` record
 ### Window B — Step 2–7, between sub-skill invocations
 
 - **State**: sub-skill returned, orchestrator updating Pipeline Progress / writing decisions / about to invoke next sub-skill.
-- **Hook**: lock present, `current_step` = step that just finished or about to start. Hook commits report, posts PR comment, signals agent.
+- **Hook**: lock present, `current_step` = step that just finished or about to start. Hook commits report, posts the PR and issue comments through the contract, signals agent.
 - **Resume**: agent halts cleanly. Phase 0b reads report → artifact verification → ✅ steps skipped, in-progress step re-run from start. Idempotent.
 - **Common case**: most compactions fire on the orchestrator's turn, not deep inside a sub-skill.
 

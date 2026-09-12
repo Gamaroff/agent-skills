@@ -100,7 +100,15 @@ const COMMENT_MARKER_PREFIX = "agent-skills-comment:";
  * because each cycle must post its own comment rather than being suppressed by
  * the previous cycle's marker. Every other stage fires at most once per run.
  */
-const CYCLE_SCOPED_STAGES = Object.freeze(["qa-cycle", "qa-fix"]);
+// `pipeline-paused` takes the STEP it paused at as its suffix (`pipeline-paused-4`),
+// for the same reason: one pipeline can pause more than once, and each pause is
+// its own event. Kept in step with CYCLE_SCOPED_LEAD_STAGES in
+// stakeholder-summary.js, which a test holds equal to this list.
+const CYCLE_SCOPED_STAGES = Object.freeze([
+  "qa-cycle",
+  "qa-fix",
+  "pipeline-paused",
+]);
 
 const COMMENT_STAGES = Object.freeze([
   "work-started",
@@ -113,6 +121,7 @@ const COMMENT_STAGES = Object.freeze([
   "qa-gate",
   "qa-cycle",
   "qa-fix",
+  "pipeline-paused",
   "done",
 ]);
 

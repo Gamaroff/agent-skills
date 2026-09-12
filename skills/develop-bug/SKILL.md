@@ -83,7 +83,7 @@ This complements the recovery above. **Pre**-compaction graceful pause requires 
 
 1. **Stop everything.** Do not invoke any sub-skill. Do not edit the report (the hook already did).
 2. **Output the pause banner**: `═══ DEVELOP-BUG PIPELINE: PAUSED — CONTEXT COMPACTION IMMINENT ═══`
-3. **Output the user-facing summary** using the template in the signal's `additionalContext`. If `tracker=jira`, add a one-line note that the Jira issue was not commented on (Jira pause is silent by design).
+3. **Output the user-facing summary** using the template in the signal's `additionalContext`. Repeat the two comment outcomes the signal reports (`PR comment:` / `Tracker issue comment:`) verbatim — `deferred` means the consumer's `access.tracker` held, `no-credentials` on a Jira issue means the Jira side was not commented on.
 4. **HALT.** On next `/develop-bug <path>`, Phase 0b detects the existing run and resumes cleanly.
 
 For the full lock-file format, hook contract, and half-done step recovery semantics, see [`references/develop-pipeline-pause.md`](references/develop-pipeline-pause.md).

@@ -488,3 +488,34 @@ test("the cycle suffix is legal only for cycle-scoped stages", () => {
   assert.equal(renderLead("done-3", {}), null);
   assert.equal(renderLead("qa-cycle-3", {}), renderLead("qa-cycle", {}));
 });
+
+test("the catalogue and the comment engine agree on which stages take a suffix", () => {
+  // Two lists, one rule — CYCLE_SCOPED_STAGES in tracker-comment.js and the
+  // catalogue's own strip list. Held equal BEHAVIOURALLY: every engine stage
+  // that accepts a suffix must resolve to a template with one, and every stage
+  // that does not must not. bug.14 added `pipeline-paused` to both; a later
+  // addition to only one would make the engine accept a stage the catalogue
+  // cannot lead, which is exit 2 with nothing posted.
+  const {
+    COMMENT_STAGES,
+    CYCLE_SCOPED_STAGES,
+    isKnownStage,
+  } = require("../tracker-comment.js");
+  assert.ok(
+    CYCLE_SCOPED_STAGES.length >= 3,
+    "non-vacuity: expected ≥3 suffixed stages",
+  );
+  for (const stage of COMMENT_STAGES) {
+    const suffixed = `${stage}-2`;
+    assert.equal(
+      hasTemplate(suffixed),
+      isKnownStage(suffixed),
+      `"${suffixed}": catalogue says ${hasTemplate(suffixed)}, engine says ${isKnownStage(suffixed)}`,
+    );
+  }
+  assert.ok(hasTemplate("pipeline-paused-4"));
+  assert.equal(
+    renderLead("pipeline-paused-4", {}),
+    renderLead("pipeline-paused", {}),
+  );
+});
