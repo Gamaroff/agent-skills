@@ -1835,3 +1835,50 @@ test("I: a fenced example row inside a stray legacy block is not absorbed when t
   assert.match(out, /Legacy row/);
   assert.match(out, /Other row/);
 });
+
+// bug.13, verify cycle 3 — the narrowed review of the cycle-2 diff.
+
+test("I: sweeping a stray block harvests a row that sits after a nested heading inside it (cycle 3, CR-1)", () => {
+  // The block is removed wholesale, so every real row in it must be taken —
+  // nesting is irrelevant there. Cycle 2 read only the table-classified rows,
+  // so a row under a nested heading was erased with the block.
+  const doc = [
+    "# D",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "| 2026-01-01 10:00 | Row J |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+    "<!-- github-sync-changelog-start -->",
+    "## Change Log",
+    "| 2026-02-02 11:00 | Row A |",
+    "### Notes",
+    "| 2026-03-03 12:00 | Row B |",
+    "```",
+    "| 2026-04-04 13:00 | Fenced |",
+    "```",
+    "<!-- github-sync-changelog-end -->",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal(CL.extractEntries(out).length, 4, "J + A + B + new");
+  assert.match(out, /Row B/, "the nested row is history, not erased");
+  assert.doesNotMatch(out, /Fenced/, "the fenced picture row is still not");
+});
+
+test("I: a start and end marker on ONE line with an inline span between them are both stripped (cycle 3, CR-2)", () => {
+  const span = "`" + "a".repeat(35) + "`";
+  const doc = [
+    "# D",
+    "",
+    `<!-- change-log-start -->${span}<!-- change-log-end -->`,
+    "",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal((out.match(/<!-- change-log-start -->/g) || []).length, 1);
+  assert.equal((out.match(/<!-- change-log-end -->/g) || []).length, 1);
+  assert.ok(out.includes(span), "the span is carried");
+  assert.equal(CL.extractEntries(out).length, 1);
+});

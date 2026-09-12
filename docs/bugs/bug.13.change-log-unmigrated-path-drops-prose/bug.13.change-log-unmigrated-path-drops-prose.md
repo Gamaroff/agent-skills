@@ -328,6 +328,49 @@ document not yet migrated" — no single story or task owns the documents that w
 1. `command node --test shared/resources/tests/change-log.test.mjs` — 72 pass.
 2. `git show db3ec482:shared/resources/change-log.js > shared/resources/change-log.js && command node --test shared/resources/tests/change-log.test.mjs; git checkout shared/resources/change-log.js` — the five cycle-2 tests red, then green.
 
+### Iteration 4
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-12
+**Developer**: Claude (develop-bug verify cycle 3 — narrowed review of the cycle-2 diff)
+
+**Why reopened**: two defects in the cycle-2 change, both confirmed by probe:
+
+- **CR-1 (medium)** — `collapseOtherLegacyBlocks` now reads a stray block's rows through `splitCarriedLines(...).tableLines`. The classifier stops the table at a nested heading, so an entry row *after* a nested heading inside that stray block is returned as carried prose — and the sweep discards `before`/`after` and deletes the whole block, so the row is erased (`Row B` absent; 3 entries where cycle 1 gave 4). The sweep's job is to harvest every real row from a block it is about to remove; nesting is irrelevant there.
+- **CR-2 (low)** — when the start and end markers share one line, `idx` for the end-marker check is computed on the line *after* the start marker was sliced off, so `at + idx` is short by `start.length` and can land inside an inline span; the end marker then survives as prose (2 end markers after one write).
+- **CR-3 (cleanup)** — the `insideProtected` guards on the exact-marker line, the heading line and the start-marker strip can never be true: inline spans begin with a backtick, so a line whose trimmed content is a marker or a `#` heading cannot start inside one, and `found.start` is already known to be unprotected.
+
+**Proposed Fix**: have `splitCarriedLines` also return the block's unfenced lines in order, and let the sweep harvest `isEntryRow` from *those* — every real row, wherever it sat, never a fenced one; track the characters stripped from the front of a boundary line and add them to the end-marker offset; drop the three unreachable guards and say why in a comment.
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-12
+
+**Root Cause**: the cycle-2 sweep change reused the primary path's *table* classification for a block that is discarded wholesale, so rows the classifier files as prose (after a nested heading) had nowhere to go; and the boundary-marker offset ignored characters already stripped from the front of the line.
+
+**Fix Description**:
+
+- `splitCarriedLines` also returns `unfencedLines` — every unfenced line in order, markers and heading removed. `collapseOtherLegacyBlocks` harvests `isEntryRow` from *that*, so a stray block gives up every real row wherever it sat and still never a fenced one (CR-1).
+- A `shift` accumulator records what the start-marker strip removed from the front of a boundary line; the end-marker protection check uses `at + shift + idx` (CR-2).
+- The three unreachable `insideProtected` guards (start-marker strip, exact-marker line, heading line) are removed, with a comment stating why they cannot fire (CR-3).
+
+**Files Modified**:
+
+- `shared/resources/change-log.js` — `splitCarriedLines` (`unfencedLines`, `shift`, guards removed), `collapseOtherLegacyBlocks` (harvests from `unfencedLines`)
+- `shared/resources/tests/change-log.test.mjs` — 2 more block-I tests: nested row in a swept stray block (with a fenced decoy still excluded); single-line marker pair around an inline span
+- 25 × `skills/*/references/change-log.js` — regenerated
+
+**Testing**:
+
+- 74 / 74. **Mutation-proved** against the cycle-2 engine (`9de8b6cd`): exactly the two new tests go red (2 fail / 72 pass); restored → green.
+- `npm run ci:fast` — result in the implementation report (Verify Cycle 3, Fast gate).
+
+**Verification Steps for QA**:
+
+1. `command node --test shared/resources/tests/change-log.test.mjs` — 74 pass.
+2. `git show 9de8b6cd:shared/resources/change-log.js > shared/resources/change-log.js && command node --test shared/resources/tests/change-log.test.mjs; git checkout shared/resources/change-log.js` — the two cycle-3 tests red, then green.
+
 ---
 
 ## Status History
@@ -342,6 +385,8 @@ document not yet migrated" — no single story or task owns the documents that w
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 2 fix — CR-1/2/3/4 addressed, 67/67, mutation-proved against a5d18f67 |
 | 2026-09-12 | Reopened | develop-bug | Verify cycle 2 FAIL — refute pass CR-1/2/3 confirmed by probe; Iteration 3 opened |
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 3 fix — cycle-2 CR-1/2/3/4 addressed (CR-5 declined), 72/72, mutation-proved against db3ec482 |
+| 2026-09-12 | Reopened | develop-bug | Verify cycle 3 FAIL — CR-1 (sweep drops nested rows) and CR-2 (one-line marker pair) confirmed; Iteration 4 opened |
+| 2026-09-12 | Ready for QA | qa-fix | Iteration 4 fix — cycle-3 CR-1/2/3 addressed, 74/74, mutation-proved against 9de8b6cd |
 
 ---
 

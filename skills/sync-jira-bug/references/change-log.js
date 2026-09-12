@@ -287,31 +287,35 @@ function splitCarriedLines(content, found) {
     // substring across every line, which is how cycle 1 mangled a prose
     // mention of a marker. Each marker is checked at its own index, so one
     // sitting in an inline code span on that line is left alone.
+    // `found.start` is already known to be unprotected (findMarkerBlock
+    // checked it), so the start marker needs no guard. The END marker does:
+    // it can sit after an inline span on the same line, and when both markers
+    // share one line its offset must account for what was stripped from the
+    // front — `shift` — or the check lands `start.length` too early.
+    let shift = 0;
     if (found.hasMarkers && i === 0) {
       for (const m of markers) {
-        if (line.startsWith(m) && !insideProtected(ranges, at)) {
+        if (line.startsWith(m)) {
           line = line.slice(m.length);
+          shift += m.length;
         }
       }
     }
     if (found.hasMarkers && i === raw.length - 1) {
       for (const m of markers) {
         const idx = line.length - m.length;
-        if (line.endsWith(m) && !insideProtected(ranges, at + idx)) {
+        if (line.endsWith(m) && !insideProtected(ranges, at + shift + idx)) {
           line = line.slice(0, idx);
         }
       }
     }
     if (!line.trim() && line !== raw[i]) continue;
-    const lead = line.length - line.trimStart().length;
-    if (markers.has(line.trim()) && !insideProtected(ranges, at + lead)) {
-      continue;
-    }
-    if (
-      !headingSeen &&
-      RE_HEADING.test(line) &&
-      !insideProtected(ranges, at + lead)
-    ) {
+    // Neither an exact-marker line nor a heading line needs an inline-span
+    // guard: a span begins with a backtick, so a line whose first non-blank
+    // character is `<` or `#` cannot start inside one, and fenced lines were
+    // carried above.
+    if (markers.has(line.trim())) continue;
+    if (!headingSeen && RE_HEADING.test(line)) {
       headingSeen = true;
       continue;
     }
@@ -336,6 +340,11 @@ function splitCarriedLines(content, found) {
   };
   const flags = lines.map(isTable);
 
+  // Every unfenced line, markers and heading removed, in order — for a caller
+  // that is about to DISCARD the whole block and must therefore harvest every
+  // real row from it wherever it sat, nesting included (verify cycle 3).
+  const unfencedLines = lines.filter(([, prot]) => !prot).map(([l]) => l);
+
   const trimBlank = (arr) => {
     let a = 0;
     let b = arr.length;
@@ -357,6 +366,7 @@ function splitCarriedLines(content, found) {
       before: trimBlank(text(head)),
       after: trimBlank(text(rest)),
       tableLines: [],
+      unfencedLines,
     };
   }
   const last = flags.lastIndexOf(true);
@@ -371,7 +381,7 @@ function splitCarriedLines(content, found) {
     between.length && tail.length
       ? [...between, "", ...tail]
       : [...between, ...tail];
-  return { before, after, tableLines };
+  return { before, after, tableLines, unfencedLines };
 }
 
 // Split a table row into trimmed cells, dropping the empty strings that a leading
@@ -715,11 +725,14 @@ function collapseOtherLegacyBlocks(rest, docType, alreadyMigrated) {
       );
       if (!found) break;
       // Through the same classifier as the primary block, so a fenced example
-      // row inside a stray block is a picture here too (verify cycle 2).
+      // row inside a stray block is a picture here too (verify cycle 2) — but
+      // from EVERY unfenced line, not just the table-classified ones: this
+      // block is about to be removed wholesale, so a row after a nested
+      // heading inside it would otherwise be erased (verify cycle 3).
       const rows = splitCarriedLines(out, {
         ...found,
         hasMarkers: true,
-      }).tableLines.filter(isEntryRow);
+      }).unfencedLines.filter(isEntryRow);
       // Rows from a current-format block are already canonical, so
       // migrateLegacyEntries returns them untouched via its `>= 4 cells` guard.
       entries.push(
