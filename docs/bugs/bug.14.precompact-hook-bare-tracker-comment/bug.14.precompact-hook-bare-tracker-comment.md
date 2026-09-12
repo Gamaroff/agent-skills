@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-12'
@@ -13,7 +13,7 @@ github_issue: 391
 **Bug ID**: bug.14
 **GitHub**: [#391](https://github.com/Gamaroff/agent-skills/issues/391)
 **Related**: none — cross-cutting (`shared/resources/develop-pipeline-on-precompact.sh`, bundled into `develop-story`, `develop-task`, `develop-bug`; `shared/resources/tracker-comment-contract.md`; `resolve-platform.sh` `tracker_write`; `tests/mutation-call-site-coverage.test.js`)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-12
@@ -264,14 +264,14 @@ Markdown-only call-site guard.
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-09-12
+**Verified by**: develop-bug (Verify Cycle 1)
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ⚠️ Still Failing
 
-**Notes**: [Testing notes]
+**Notes**: Regression scenarios S4–S6 and the suites were green, but the adversarial diff review found that the issue comment's tracker routing depended on whether the PR arm had sourced the resolver (CR-1, high confidence) — a GitHub project with an ambient `JIRA_URL` and no PR yet would post to Jira. Three further low-severity defects and one cleanup recorded in Iteration 2.
 
-**Decision**: Closed | Reopened
+**Decision**: Reopened
 
 ### Iteration 2
 
@@ -324,6 +324,17 @@ Markdown-only call-site guard.
 1. `bash shared/resources/develop-pipeline-on-precompact.test.sh` → 9 passed; `HOOK_TEST_BASH=/bin/bash bash …` → 9 passed.
 2. `grep -n -- '--tracker\|LOCK_TRACKER' shared/resources/develop-pipeline-on-precompact.sh` → the flag is built from the lock, not from `TRACKER`.
 3. `node --test tests/mutation-call-site-coverage.test.js` → §0b passes.
+
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-09-12
+**Verified by**: develop-bug (Verify Cycle 2, full-branch refute pass)
+
+**Verification Result**: ⚠️ Still Failing
+
+**Notes**: All Iteration 2 fixes held under execution (bash 3.2 expansion, env-prefix function semantics, `--tracker` honoured). The refute pass found two further high-confidence defects in the Iteration 1 design: the PR arm's deferral record id was identical for every pause, and the slot-coverage guard could not see `$(command node …)` call sites. Recorded in Iteration 3.
+
+**Decision**: Reopened
 
 ### Iteration 3
 
@@ -400,15 +411,14 @@ Markdown-only call-site guard.
 | 2026-09-12 | Reopened | develop-bug | Verify Cycle 2 FAIL — refute pass: deferral-id collapse + slot-guard blind spot; Iteration 3 opened |
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 3: distinct deferral ids per pause; slot-guard sees command-node sites; S10/S11 |
 | 2026-09-12 | Ready for QA | develop-bug | Fix verified — bug scenario gone (Verify Cycle 3 PASS) |
+| 2026-09-12 | Closed | develop-bug | Fix verified and accepted — PR #392, DoD bug.14.dod.1 |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 3
+**Time to Resolution**: same day (filed 2026-09-12, closed 2026-09-12)
+**Final Fix Details**: The PreCompact hook's two tracker writes were bare `gh … comment --body` calls outside both the comment contract and the access gate. The issue comment is now one `tracker-comment.js` call (`--stage pipeline-paused-<step>`, `--body-file`, `--tracker` taken from the lock) — lead, idempotency marker and access gate all come from the engine; the PR comment sources `resolve-platform.sh` beside the hook, renders the same lead and posts through `tracker_write gh pr comment --body-file` with a per-step body file so each deferred pause is its own record. Both arms fail closed when a sibling engine is missing or the config is rejected, and the pause signal carries each outcome verbatim. `tests/mutation-call-site-coverage.test.js` now scans tracked shell (with a non-vacuity floor and a comment guard) and `comment-slot-coverage.test.mjs` sees `$(command node …)` call sites, so the guards' stated scope matches what they scan. PR #392.
+**Lessons Learned**: (1) A guard's stated scope and its scanned scope must be held equal by a test that names the file the guard was written for — "canonical prose only" was a reasonable narrowing that made the one non-prose caller invisible, and the sentence in AGENTS.md claimed otherwise for months. (2) A shell hook must not let its *environment* decide what its *lock* already knows: routing the tracker from whatever the previous arm exported reproduced the bug in a subtler form (cycle-1 CR-1). (3) An outcome string is a claim; "recorded in the journal" and "not found beside the hook" both had to be made true by checking rather than asserted. (4) `"${arr[@]}"` on an empty array is an unbound-variable error under `set -u` on bash 3.2 — a hook that a consumer's `/bin/bash` may run needs the `${arr[@]+"${arr[@]}"}` form, and its test suite now runs under both bashes. (5) The verify loop's per-cycle adversarial review earned its cost: three of the five cycle-2/3 findings were in the cycle-1 fixes themselves.
