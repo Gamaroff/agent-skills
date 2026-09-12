@@ -198,13 +198,9 @@ test("package path: same bytes as in-tree for a bundled copy; own files get the 
   const out = path.join(root, "dist");
   fs.mkdirSync(out);
   run(PACKAGER, [skillDir, out]);
-  execFileSync("unzip", [
-    "-q",
-    "-o",
-    path.join(out, "fixture-skill.zip"),
-    "-d",
-    out,
-  ]);
+  // python3 is already a hard dependency of this test; an external `unzip`
+  // binary is not, and a runner without one would fail here with ENOENT.
+  run("-m", ["zipfile", "-e", path.join(out, "fixture-skill.zip"), out]);
   const zipped = path.join(out, "fixture-skill");
   assert.equal(
     fs.readFileSync(path.join(zipped, "references", "guide.md"), "utf-8"),
@@ -223,15 +219,15 @@ test("package path: same bytes as in-tree for a bundled copy; own files get the 
     "inside-the-skill link unchanged",
   );
   // No duplicate arcnames: the in-tree copy and the bundled source are one entry.
-  const listing = execFileSync(
-    "unzip",
-    ["-Z1", path.join(out, "fixture-skill.zip")],
-    {
-      encoding: "utf-8",
-    },
-  )
+  const listing = run("-m", [
+    "zipfile",
+    "-l",
+    path.join(out, "fixture-skill.zip"),
+  ])
     .split("\n")
-    .filter(Boolean);
+    .slice(1) // header row
+    .map((l) => l.trim().split(/\s+/)[0])
+    .filter((n) => n && !n.startsWith("File") && !/^\d+\s*files?$/.test(n));
   assert.equal(
     new Set(listing).size,
     listing.length,

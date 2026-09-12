@@ -187,7 +187,7 @@ v0.46.0 release lesson about separating churn from behaviour).
 
 ## 9. Success Criteria
 
-1. ✅ Checker reports **0** broken links over `skills/**/*.md` + `shared/resources/**/*.md`, with ≥ 200 files and ≥ 1,000 links visited — 606 files, 1,985 links parsed (855 relative), 0 broken
+1. ✅ Checker reports **0** broken links over `skills/**/*.md` + `shared/resources/**/*.md`, with ≥ 200 files and ≥ 1,000 links visited — 663 files (605 under `skills/`, 58 shared sources), 2,098 links parsed (958 relative), 0 broken; per-half floor on top-level shared sources (QA cycle 3 found the original pathspec walked only nested shared files)
 2. ✅ `npm run bundle` is idempotent after the change (second run: no diff) — status and diff hashes equal across two runs; `--check --all`: 126 skills, 0 problems
 3. ✅ A zip produced by `package_skill.py` contains no broken relative links (checked inside the extracted tree) — 3 skills packaged and extracted: 57 md files, 100 relative links, 0 broken
 4. ✅ The checker runs under `npm test` — and therefore `npm run ci:fast`, `npm run ci` and `.github/workflows/test.yml` — with no workflow edit (`tests/*.test.js` glob, verified by the fast gate run)
@@ -227,7 +227,8 @@ and make it one constant so a tagged-release variant is a one-line change later.
 | 2026-09-12 |         | Implemented — 8 source files + ~210 regenerated bundles, 10 tests | develop |
 | 2026-09-12 |         | QA gate CONCERNS (90/100) — 1 medium (CR-1), 2 low, 5 cleanups | qa-task |
 | 2026-09-12 |         | QA gate PASS (100/100) — cycle 2 refute pass; 1 low latent (C2-CR-1), 2 low advisory, 2 cleanups | qa-task |
-| 2026-09-12 |         | QA findings fixed — fail-closed parity helper (ran/ok split), references-root relpath for nested shared sources, twin agreement on absolute targets, hygiene; 2 iterations | qa-fix |
+| 2026-09-12 |         | QA gate CONCERNS (90/100) — cycle 3: guard pathspec skipped the 57 top-level shared sources (C3-CR-1); corpus itself clean | qa-task |
+| 2026-09-12 |         | QA findings fixed — fail-closed parity helper (ran/ok split); references-root relpath for nested shared sources; guard now walks shared/resources/*.md with a per-half floor; twin agreement on absolute targets; hygiene; 3 iterations | qa-fix |
 
 ---
 
@@ -246,15 +247,15 @@ and make it one constant so a tagged-release variant is a one-line change later.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-12
-**Quality Score**: 100/100
-**Gate Decision**: PASS (cycle 2; cycle 1 was CONCERNS 90/100)
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS (cycle 3; cycle 1 CONCERNS 90, cycle 2 PASS 100)
 
 ### QA Report
-- **Full Report**: [task.108.qa.2.bundler-rewrites-relative-links.md](./task.108.qa.2.bundler-rewrites-relative-links.md) (cycle 1: [task.108.qa.1.bundler-rewrites-relative-links.md](./task.108.qa.1.bundler-rewrites-relative-links.md))
-- **Gate File**: [task.108.gate.2.bundler-rewrites-relative-links.yml](./task.108.gate.2.bundler-rewrites-relative-links.yml) (cycle 1: [task.108.gate.1.bundler-rewrites-relative-links.yml](./task.108.gate.1.bundler-rewrites-relative-links.yml))
+- **Full Report**: [task.108.qa.3.bundler-rewrites-relative-links.md](./task.108.qa.3.bundler-rewrites-relative-links.md) (cycles 1–2: [qa.1](./task.108.qa.1.bundler-rewrites-relative-links.md), [qa.2](./task.108.qa.2.bundler-rewrites-relative-links.md))
+- **Gate File**: [task.108.gate.3.bundler-rewrites-relative-links.yml](./task.108.gate.3.bundler-rewrites-relative-links.yml) (cycles 1–2: [gate.1](./task.108.gate.1.bundler-rewrites-relative-links.yml), [gate.2](./task.108.gate.2.bundler-rewrites-relative-links.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 3,201 (`ci:fast`) — 3,200 pass, 0 fail; 13 new tests across this task
@@ -263,7 +264,7 @@ and make it one constant so a tagged-release variant is a one-line change later.
 - **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1 found one medium (the parity helper failed open when the bundler could not run) plus seven advisory items; all fixed and the fail-closed case mutation-proven. Cycle 2's refute pass found one latent low bug (nested shared source mis-relativised in the bundled-sibling branch — no such source exists today), routed to a final fix cycle, and two advisory edge cases.
+Cycle 1 found one medium (the parity helper failed open when the bundler could not run) plus seven advisory items; all fixed and the fail-closed case mutation-proven. Cycle 2's refute pass found one latent low bug (nested shared source mis-relativised — fixed and mutation-proven in cycle 2). Cycle 3 found that the guard's `shared/resources/**/*.md` pathspec walked only nested files, skipping the 57 top-level shared sources; QA scanned them by hand (0/103 broken) — a coverage hole in the checker, routed to a fix cycle.
 
 ---
 

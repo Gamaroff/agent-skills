@@ -20,23 +20,13 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import {
+  BUNDLER,
   bundleCheck,
   declaredSource,
   isFreshBundledCopy,
 } from "../lib/bundled-parity.mjs";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(__dirname, "..", "..", "..");
-const BUNDLER = join(
-  repoRoot,
-  "skills",
-  "create-skill",
-  "scripts",
-  "bundle_skill.py",
-);
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "bundled-parity-"));

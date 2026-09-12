@@ -13,7 +13,8 @@ top_issues:
     finding: 'The bundled-sibling branch of _relocate_target() joins the references-relative bundled name onto dst_dir rather than onto the skill references/ root, so a shared source in a subdirectory (dst_dir = skills/s/references/sub) emits sub/y.md → references/sub/sub/y.md and ../x.md → x.md. Latent: no bundled shared .md lives in a subdirectory today; the first one would ship broken links that --check certifies.'
     suggested_action: 'Relpath from the references root (the ancestor of dst_dir named references, or pass it in) joined with the bundled name; add a nested-source case to tests/bundle-link-rewrite.test.js.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
 
 waiver:
   active: false
@@ -43,6 +44,7 @@ nfr_validation:
     notes: 'Two hygiene items: rm -rf via execFileSync in the new eval test where fs.rmSync is the idiom; a duplicated comment at the decode call site.'
 
 bug_resolution:
+  cycle_2_entry_fixed: 'C2-CR-1 closed by 5bdb7011 (nested-source test, mutation-proved); C2-CR-2..5 also applied'
   bugs_fixed: 8
   bugs_remaining: 0
   fix_date: '2026-09-12'

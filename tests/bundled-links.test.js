@@ -14,9 +14,12 @@
  * WHAT THIS ASSERTS:
  *   1. Zero unresolved relative links across the walked corpus (the corpus is
  *      `git ls-files`, so an untracked stray cannot satisfy a link).
- *   2. A non-vacuity floor: the walk must have visited >= FLOOR_FILES files and
- *      >= FLOOR_LINKS links. An empty walk reports `scan-broken`, not clean —
- *      a checker that opened nothing has proved nothing.
+ *   2. A non-vacuity floor: the walk must have visited >= FLOOR_FILES files,
+ *      >= FLOOR_LINKS links and >= FLOOR_SHARED_SOURCES top-level shared
+ *      sources. An empty walk reports `scan-broken`, not clean — a checker
+ *      that opened nothing has proved nothing — and the per-half floor exists
+ *      because a pathspec once narrowed the shared half to one file while the
+ *      total stayed comfortably above the floor.
  *   3. The extractor itself: fence tracking is line-based and an inline ```
  *      mention does not flip parity; placeholder targets are skipped by pattern.
  *
@@ -36,7 +39,7 @@ const {
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 
-// Floors are a fraction of the measured corpus (606 files / ~1,900 inline links
+// Floors are a fraction of the measured corpus (663 files / ~2,100 inline links
 // on 2026-09-12 — the count is of every link the reader parsed, external ones
 // included, because after the bundler's rewrite most cross-repo links ARE
 // external and a floor on relative links alone would drift with the fix), not
@@ -44,6 +47,8 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 // the count.
 const FLOOR_FILES = 200;
 const FLOOR_LINKS = 1000;
+// Top-level shared/resources/*.md actually walked (58 on 2026-09-12).
+const FLOOR_SHARED_SOURCES = 20;
 
 function gitLsFiles(...patterns) {
   return execFileSync("git", ["ls-files", "--", ...patterns], {
@@ -78,7 +83,12 @@ function scan() {
       d = path.posix.dirname(d);
     }
   }
-  const files = gitLsFiles("skills/**/*.md", "shared/resources/**/*.md");
+  // Default (non-`:(glob)`) git pathspecs: `*` already crosses `/`, and `**`
+  // is just `*` — so `shared/resources/**/*.md` demanded a literal slash
+  // after the first segment and matched ONLY nested files (1 of 58). The
+  // 57 top-level shared sources were never walked until QA cycle 3 of
+  // task.108 noticed the corpus count was 605 skills files + 1 fixture.
+  const files = gitLsFiles("skills/*.md", "shared/resources/*.md");
   let links = 0; // every inline link the reader parsed — external ones included
   let relative = 0; // the subset the rule applies to
   const broken = [];
@@ -100,7 +110,14 @@ function scan() {
       }
     }
   }
-  return { files: files.length, links, relative, broken };
+  // Per-half counts, so a pathspec that silently narrows one half again is
+  // caught by the floor rather than hidden inside a still-large total.
+  const sharedSources = files.filter(
+    (f) =>
+      f.startsWith("shared/resources/") &&
+      !f.slice("shared/resources/".length).includes("/"),
+  ).length;
+  return { files: files.length, links, relative, broken, sharedSources };
 }
 
 // The two corpus tests below read the same walk; parse it once.
@@ -163,11 +180,16 @@ test("extractor: proseOnly preserves line numbers", () => {
 });
 
 test("non-vacuity floor: the walk visited a corpus, not nothing", () => {
-  const { files, links } = scanned();
+  const { files, links, sharedSources } = scanned();
   assert.ok(
     files >= FLOOR_FILES && links >= FLOOR_LINKS,
     `scan-broken: visited ${files} files / ${links} links, floor is ${FLOOR_FILES} / ${FLOOR_LINKS} — ` +
       "an empty walk is a broken reader, not a clean corpus",
+  );
+  assert.ok(
+    sharedSources >= FLOOR_SHARED_SOURCES,
+    `scan-broken: only ${sharedSources} top-level shared/resources/*.md visited (floor ${FLOOR_SHARED_SOURCES}) — ` +
+      "the shared half of the corpus is not being walked",
   );
 });
 

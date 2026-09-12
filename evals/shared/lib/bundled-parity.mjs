@@ -19,8 +19,8 @@ import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(__dirname, "..", "..", "..");
-const BUNDLER = join(
+export const repoRoot = resolve(__dirname, "..", "..", "..");
+export const BUNDLER = join(
   repoRoot,
   "skills",
   "create-skill",
