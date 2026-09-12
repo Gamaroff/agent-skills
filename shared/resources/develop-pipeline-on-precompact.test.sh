@@ -29,6 +29,10 @@
 #      arm reports "failed to load", not "not found", and posts nothing.
 #   9. (bug.14 / CR-4) deferred but the journal cannot be written → the outcome says
 #      the record was NOT written rather than asserting one that does not exist.
+#  10. (bug.14 / cycle-2 CR-1) two deferred pauses at different steps → two journal
+#      records with DISTINCT ids, and both body files still on disk.
+#  11. (bug.14 / cycle-2 CR-3) resolve-platform.sh present but read-config.sh absent
+#      → "not found beside the hook" (a bundling problem), not "failed to load".
 
 PASS=0
 FAIL=0
@@ -160,7 +164,7 @@ run_hook_in_consumer() {
   local dir="$1" access="$2" pr_url="${3-https://github.com/o/r/pull/7}" journal="${4-}"
   mkdir -p "$dir/.claude/state" "$dir/stdin"
   [ -n "$access" ] && printf 'access:\n  tracker: %s\n' "$access" > "$dir/skills-config.yaml"
-  printf '{"skill":"develop-task","current_step":4,"branch":"feature/x","report_path":"","pr_url":"%s","tracker":"github","tracker_issue":"42"}\n' "$pr_url" \
+  printf '{"skill":"develop-task","current_step":%s,"branch":"feature/x","report_path":"","pr_url":"%s","tracker":"github","tracker_issue":"42"}\n' "${HOOK_TEST_STEP:-4}" "$pr_url" \
     > "$dir/.claude/state/develop-pipeline.lock"
   : > "$dir/gh.log"
   (cd "$dir" && PATH="$SHIM_BIN:$PATH" GH_LOG="$dir/gh.log" GH_STDIN_DIR="$dir/stdin" \
@@ -293,6 +297,45 @@ elif ! grep -qF 'PR comment: deferred — access.tracker=read-only, but the defe
   fail "journal unwritable: outcome does not claim a record that was not written" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
 else
   pass "journal unwritable: deferred outcome reports the record was NOT written"
+fi
+
+# ── Scenario 10 (cycle-2 CR-1): two pauses, two distinct deferred records ────
+S10="$TMPDIR_TEST/s10"
+OUT=$(HOOK_TEST_STEP=3 run_hook_in_consumer "$S10" "read-only")
+OUT=$(HOOK_TEST_STEP=6 run_hook_in_consumer "$S10" "read-only")
+J10="$S10/.claude/state/tracker-actions.jsonl"
+PR_IDS=$(grep '"github.pr.comment"' "$J10" 2>/dev/null | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | sort)
+N_PR=$(printf '%s\n' "$PR_IDS" | grep -c .)
+N_UNIQ=$(printf '%s\n' "$PR_IDS" | sort -u | grep -c .)
+if [ "$N_PR" -ne 2 ]; then
+  fail "two pauses: two PR-comment records journaled" "expected 2 github.pr.comment records, got $N_PR"
+elif [ "$N_UNIQ" -ne 2 ]; then
+  fail "two pauses: the two PR-comment records have distinct ids" "ids collapsed: $PR_IDS"
+elif [ "$(ls "$S10/.claude/state"/precompact-pr-comment*.md 2>/dev/null | wc -l | tr -d ' ')" -lt 2 ]; then
+  fail "two pauses: both PR body files kept on disk" "$(ls "$S10/.claude/state")"
+else
+  pass "two pauses (Step 3, Step 6): two deferred PR-comment records with distinct ids; both bodies kept"
+fi
+
+# ── Scenario 11 (cycle-2 CR-3): resolver present, its reader absent → "not found"
+S11="$TMPDIR_TEST/s11"
+mkdir -p "$S11/hook-partial"
+cp "$HOOK" "$S11/hook-partial/develop-pipeline-on-precompact.sh"
+cp "$(dirname "$HOOK")/resolve-platform.sh" "$S11/hook-partial/resolve-platform.sh"
+HOOK_SAVED="$HOOK"; HOOK="$S11/hook-partial/develop-pipeline-on-precompact.sh"
+OUT=$(run_hook_in_consumer "$S11" "")
+RC=$?
+HOOK="$HOOK_SAVED"
+if [ "$RC" -ne 0 ]; then
+  fail "partial bundle: hook exits 0" "rc=$RC"
+elif grep -qE '^pr comment' "$S11/gh.log"; then
+  fail "partial bundle: PR comment not posted" "$(grep -E '^pr comment' "$S11/gh.log")"
+elif ! grep -qF 'PR comment: skipped — ' <<<"$OUT" || grep -qF 'failed to load' <<<"$OUT"; then
+  fail "partial bundle: outcome names a missing sibling, not a rejected config" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
+elif ! grep -qF 'not found beside the hook' <<<"$OUT"; then
+  fail "partial bundle: outcome says 'not found beside the hook'" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
+else
+  pass "partial bundle (resolver present, read-config.sh absent): 'not found beside the hook', nothing posted"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

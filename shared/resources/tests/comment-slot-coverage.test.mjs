@@ -76,7 +76,10 @@ const ALL_CLASSIFIED = new Set([
 
 /** Cycle-scoped stages carry a numeric suffix; strip it for catalogue lookup. */
 function baseStage(stage) {
-  const m = /^(qa-cycle|qa-fix)-/.exec(stage);
+  // Kept in step with CYCLE_SCOPED_STAGES in tracker-comment.js; the
+  // stakeholder-summary suite holds the two engines' suffix rules equal, and
+  // this guard would otherwise see `pipeline-paused-N` as an unknown stage.
+  const m = /^(qa-cycle|qa-fix|pipeline-paused)-/.exec(stage);
   return m ? m[1] : stage;
 }
 
@@ -126,8 +129,11 @@ function shippedDocs() {
  * command is reassembled before parsing — reading only the first line would
  * report every multi-line call as slotless.
  */
+// `command node` as well as bare `node`, and a `VAR=$(…)` capture before it: the
+// PreCompact hook is shell, not prose, and writes both engine calls that way —
+// a regex anchored on a bare `node` never saw them (bug.14 / cycle-2 CR-2).
 function collectCallSites(
-  engineRe = /^\s*node\s+.*tracker-comment\.js/,
+  engineRe = /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$?\(?\s*(?:command\s+)?node\s+.*tracker-comment\.js/,
   engine = "tracker-comment.js",
 ) {
   const sites = [];
@@ -149,7 +155,10 @@ function collectCallSites(
       // and validated nothing. The non-vacuity floor still passed, because the
       // site was FOUND; it was just never CHECKED. Found by adversarial review,
       // not by the guard itself.
-      const stage = /--stage\s+([A-Za-z0-9_-]+)/.exec(inv)?.[1] ?? null;
+      // An optional opening quote: a shell site writes --stage "pipeline-paused-${N}",
+      // and the match stops at the dollar sign — leaving the base stage with its
+      // trailing hyphen, which baseStage strips.
+      const stage = /--stage\s+"?([A-Za-z0-9_-]+)/.exec(inv)?.[1] ?? null;
       const slots = [
         ...inv.matchAll(/--slot\s+([A-Za-z_][A-Za-z0-9_]*)=/g),
       ].map((m) => m[1]);
@@ -176,7 +185,7 @@ const SITES = collectCallSites();
  * posts reading exactly as it would have with no slot at all.
  */
 const PR_SITES = collectCallSites(
-  /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$\(\s*node\s+.*stakeholder-summary-cli\.js|^\s*node\s+.*stakeholder-summary-cli\.js/,
+  /^\s*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$\(\s*(?:command\s+)?node\s+.*stakeholder-summary-cli\.js|^\s*(?:command\s+)?node\s+.*stakeholder-summary-cli\.js/,
   "stakeholder-summary-cli.js",
 );
 
@@ -185,6 +194,13 @@ const PR_SITES = collectCallSites(
  * classification act, not a silencer.
  */
 const NO_SLOT_ALLOWED = new Map([
+  [
+    "shared/resources/develop-pipeline-on-precompact.sh",
+    "The PreCompact hook. Its `pipeline-paused` lead is slot-free BY DESIGN — " +
+      "the hook holds only what the lock file holds, and a step number is jargon " +
+      "to the reader the lead is written for; the template reads no slot, so " +
+      "there is nothing to pass. The step travels in the stage suffix instead.",
+  ],
   [
     "shared/resources/tracker-comment-contract.md",
     "The CLI's own contract. Its example is the canonical call SHAPE with " +
@@ -206,6 +222,27 @@ test("Guard B — the walk found the call sites (non-vacuity floor)", () => {
     `Only ${SITES.length} tracker-comment.js call sites found — the walk is ` +
       `probably broken, not the repository clean. Expected at least 20.`,
   );
+});
+
+test("Guard B — the walk sees a `$(command node …)` call site (bug.14 / cycle-2 CR-2)", () => {
+  // The PreCompact hook invokes both engines as `$(command node …)` — the form
+  // that survives an nvm shell function shadowing `node`. A regex anchored on a
+  // bare `node` never saw it, so the one call site written by a shell script
+  // rather than by prose was invisible to the guard AGENTS.md says catches a
+  // slot-free site. Name the file, so the walk cannot narrow back silently.
+  const hook = "shared/resources/develop-pipeline-on-precompact.sh";
+  const seen = SITES.filter((s) => s.file === hook);
+  assert.ok(
+    seen.length >= 1,
+    "the PreCompact hook's tracker-comment.js call was not collected",
+  );
+  assert.equal(seen[0].stage && baseStage(seen[0].stage), "pipeline-paused");
+  const pr = PR_SITES.filter((s) => s.file === hook);
+  assert.ok(
+    pr.length >= 1,
+    "the PreCompact hook's stakeholder-summary-cli.js call was not collected",
+  );
+  assert.equal(pr[0].stage, "pipeline-paused");
 });
 
 test("Guard B — every call site passes at least one --slot", () => {
@@ -483,7 +520,7 @@ test("Guard C — every pull-request slot name is one its stage's template reads
   );
 });
 
-test("Guard C — a pull-request site omits slots only when the sole slot is 'pr'", () => {
+test("Guard C — a pull-request site omits slots only when the sole slot is 'pr' or the template reads none", () => {
   // Guard B requires every TRACKER site to pass a slot: a lead that says the
   // same thing every time is one a reader learns to skip. On a PULL-REQUEST
   // comment that rule has one principled exception — `pr` names the pull
@@ -501,11 +538,17 @@ test("Guard C — a pull-request site omits slots only when the sole slot is 'pr
     if (!Object.prototype.hasOwnProperty.call(LEAD_TEMPLATES, stage)) continue;
     const reads = [...slotsReadBy(stage)];
     const onlyPr = reads.length === 1 && reads[0] === "pr";
-    if (!onlyPr) {
+    // A template that reads NO slot has nothing to be fed: the slot-free call
+    // is the only correct one, and Guard C's sibling above would reject any
+    // name passed to it. `pipeline-paused` is the first such stage (bug.14) —
+    // still a property, not an allowlist: it is read off the template.
+    const slotFree = reads.length === 0;
+    if (!onlyPr && !slotFree) {
       bare.push(
         `${site.file}:${site.line} — --stage ${site.stage} passes no --slot, but ` +
-          `that template reads: ${reads.join(", ") || "nothing"}. Only a stage ` +
-          `whose sole slot is 'pr' may go slotless on a pull request.`,
+          `that template reads: ${reads.join(", ")}. Only a stage whose sole ` +
+          `slot is 'pr', or one that reads no slot at all, may go slotless on a ` +
+          `pull request.`,
       );
     }
   }

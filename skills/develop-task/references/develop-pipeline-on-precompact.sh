@@ -168,16 +168,22 @@ PR_COMMENT_OUTCOME="(no PR yet)"
 if [ -n "$PR_URL" ]; then
   PR_COMMENT_OUTCOME="skipped — gh not on PATH"
   if command -v gh >/dev/null 2>&1; then
-    # Two different failures, two different outcomes: a missing file means the
-    # hook was copied without its siblings (re-run the bundler); a file that
-    # loads and returns non-zero means the resolver REJECTED the config
-    # (malformed access: block, unsupported access.vcs) — sending the operator
-    # to the bundler for a config problem is the wrong troubleshooting row.
-    PR_COMMENT_OUTCOME="skipped — resolve-platform.sh not found beside the hook (nothing posted)"
+    PR_COMMENT_OUTCOME="skipped — node not on PATH (nothing posted)"
     RESOLVER_OK=false
-    if [ -f "$HOOK_DIR/resolve-platform.sh" ]; then
-      PR_COMMENT_OUTCOME="skipped — resolve-platform.sh failed to load: it rejected the config (nothing posted)"
-      source "$HOOK_DIR/resolve-platform.sh" 2>/dev/null && RESOLVER_OK=true
+    if command -v node >/dev/null 2>&1; then
+      # Three different failures, three different outcomes. A missing sibling
+      # means the hook was copied without its bundle (re-run the bundler) —
+      # and resolve-platform.sh itself returns 1 before reading any config when
+      # read-config.sh is absent beside it, so that file is checked here too, or
+      # a partial bundle would be reported as a rejected config. A resolver that
+      # is present and returns non-zero has REJECTED the config (malformed
+      # access: block, unsupported access.vcs); sending that operator to the
+      # bundler is the wrong troubleshooting row.
+      PR_COMMENT_OUTCOME="skipped — resolve-platform.sh or read-config.sh not found beside the hook (nothing posted)"
+      if [ -f "$HOOK_DIR/resolve-platform.sh" ] && [ -f "$HOOK_DIR/read-config.sh" ]; then
+        PR_COMMENT_OUTCOME="skipped — resolve-platform.sh failed to load: it rejected the config (nothing posted)"
+        source "$HOOK_DIR/resolve-platform.sh" 2>/dev/null && RESOLVER_OK=true
+      fi
     fi
     if [ "$RESOLVER_OK" = true ]; then
       PR_COMMENT_OUTCOME="skipped — stakeholder-summary-cli.js could not render the lead (nothing posted)"
@@ -185,17 +191,24 @@ if [ -n "$PR_URL" ]; then
       if [ -n "$LEAD" ]; then
         PR_BODY=$(printf '⏸️ **Pipeline paused — context compaction imminent**\n\nThe `/%s` orchestrator paused at Step %s because Claude'\''s context window approached its limit.\n\n**State saved in**: `%s`\n\n**To resume**: re-invoke `/%s <path>` (same path) and choose **Resume from last completed step** when prompted.' \
           "$SKILL" "$CURRENT_STEP" "$REPORT" "$SKILL")
-        PR_BODY_FILE="$STATE_DIR/precompact-pr-comment.md"
+        # Step-suffixed, and the step is in the intent too. A deferred record's
+        # id is derived from intent + argv + target + stdin; with one body path
+        # and no step, a pause at Step 3 and a pause at Step 6 produced two
+        # records with ONE id — the handover kept the first and the hook had
+        # overwritten the body with the second. Each pause now names its own
+        # body file, so each record is distinct and points at the text that
+        # belongs to it.
+        PR_BODY_FILE="$STATE_DIR/precompact-pr-comment.step-${CURRENT_STEP}.md"
         printf '%s\n\n---\n\n%s\n' "$LEAD" "$PR_BODY" > "$PR_BODY_FILE"
         # tracker_write returns 0 on EVERY deferral branch, including "the record
         # could not be written" — it says so only on stderr. Capture that and
         # read it, so the signal never asserts a journal record that does not
         # exist; an audit trail that claims more than it holds is the failure
         # the journal exists to prevent.
-        TW_ERR="$STATE_DIR/precompact-pr-comment.stderr"
+        TW_ERR="$STATE_DIR/precompact-pr-comment.step-${CURRENT_STEP}.stderr"
         TRACKER_WRITE_KIND=github.pr.comment \
         TRACKER_WRITE_SKILL="$SKILL" \
-        TRACKER_WRITE_INTENT="Post the pipeline-paused notice on the pull request (body: $PR_BODY_FILE)" \
+        TRACKER_WRITE_INTENT="Post the pipeline-paused notice (Step ${CURRENT_STEP}) on the pull request (body: $PR_BODY_FILE)" \
           tracker_write gh pr comment "$PR_URL" --body-file "$PR_BODY_FILE" >/dev/null 2>"$TW_ERR"
         TW_RC=$?
         if [ "${ACCESS_TRACKER:-full}" != "full" ]; then
@@ -225,7 +238,7 @@ ISSUE_COMMENT_OUTCOME="(no tracker issue)"
 if [ -n "$TRACKER_ISSUE" ]; then
   ISSUE_COMMENT_OUTCOME="skipped — node or tracker-comment.js not found beside the hook (nothing posted)"
   if command -v node >/dev/null 2>&1 && [ -f "$HOOK_DIR/tracker-comment.js" ]; then
-    ISSUE_BODY_FILE="$STATE_DIR/precompact-issue-comment.md"
+    ISSUE_BODY_FILE="$STATE_DIR/precompact-issue-comment.step-${CURRENT_STEP}.md"
     printf '⏸️ Pipeline paused at Step %s — context compaction imminent. State saved in `%s`. Resume with `/%s <path>`.\n' \
       "$CURRENT_STEP" "$REPORT" "$SKILL" > "$ISSUE_BODY_FILE"
     # --tracker from the LOCK, explicitly. Left to itself the engine resolves the

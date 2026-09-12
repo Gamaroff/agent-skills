@@ -325,6 +325,55 @@ Markdown-only call-site guard.
 2. `grep -n -- '--tracker\|LOCK_TRACKER' shared/resources/develop-pipeline-on-precompact.sh` → the flag is built from the lock, not from `TRACKER`.
 3. `node --test tests/mutation-call-site-coverage.test.js` → §0b passes.
 
+### Iteration 3
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-12
+**Trigger**: Verify Cycle 2 — full-branch refute pass over the Iteration 2 fixes. All Iteration 2 fixes held; the pass found two further correctness defects and two cleanups, all in the Iteration 1 design that Iteration 2 did not touch:
+
+- **CR-1** `develop-pipeline-on-precompact.sh:197` — under a restricted `access.tracker`, the PR arm's deferred record id is derived from intent + argv + target + stdin, and all four are identical for every pause (no step in the intent, the same body-file path in argv, target `{}` because the fourth argv word is a URL, no stdin). A pipeline pausing at Step 3 and again at Step 6 produces two records with one id; the handover renderer keeps the first, while the hook has overwritten the body file with the Step 6 text — one checklist row pointing at the other pause's body. The issue arm is immune (its body travels in `stdin`).
+- **CR-2** `:244` — both engine call sites are `$(command node …)`; `comment-slot-coverage.test.mjs`'s regexes match a bare `node`, and its `baseStage` strips only `qa-cycle-N`/`qa-fix-N`, so the hook's slot-free `tracker-comment.js` call is invisible to the guard AGENTS.md says "fails on a call site that feeds the lead nothing".
+- **CR-3 (cleanup)** `:178` — "failed to load: it rejected the config" also fires when `resolve-platform.sh` returns 1 because `read-config.sh` is missing beside it, and `:182` blames the lead CLI when `node` itself is off PATH (the issue arm checks `command -v node`; the PR arm does not).
+- **CR-4 (cleanup)** `develop-pipeline-pause.md:106` — the lock-field table still says `tracker_issue` is used only when `tracker=github`.
+
+**Re-Investigation Notes**: reproduced each: S10 (two deferred pauses at Steps 3 and 6 → one journal id), S11 (resolver present, `read-config.sh` absent → "failed to load"), and a guard-side test asserting the hook's `$(command node …)` sites are collected (red: neither site collected). Probed the transitions the suite cannot see: a second pause at the *same* step reports `already` (marker holds); a later step posts again; no `.stderr` leftovers; lock removed on every path.
+
+**Revised Approach**: make each pause a distinct, self-describing event — the step in the body-file name and in the deferral intent — and make the guard read the call shape the hook actually uses.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-09-12
+
+**Root Cause**: (CR-1) the PR arm's deferral inputs carried nothing pause-specific, so the record fingerprint was constant; (CR-2) the slot-coverage guard's call-site regexes were written for prose (`node …`) and its suffix-strip list predated `pipeline-paused`; (CR-3) one outcome string covered two causes; (CR-4) a doc row predating the fix.
+
+**Fix Description**:
+
+- **CR-1** — body files are `precompact-pr-comment.step-<N>.md` / `precompact-issue-comment.step-<N>.md` and the deferral intent names the step, so each pause yields a distinct record whose argv points at its own body. Verified: two deferred pauses → two ids, both bodies on disk.
+- **CR-2** — `comment-slot-coverage.test.mjs` accepts `command node` (and a `VAR=$(…)` capture) on both engine regexes, tolerates a quoted `--stage "…"`, strips `pipeline-paused-N` in `baseStage`, classifies the hook in `NO_SLOT_ALLOWED` with its slot-free rationale, and pins the hook's two sites with a named non-vacuity test (mutation-proved: reverting to the bare-`node` regex turns it red). Guard C's "slotless only when the sole slot is `pr`" property gained the case it lacked — a template that reads no slot at all — read off the template rather than allowlisted.
+- **CR-3** — the PR arm checks `command -v node` and the presence of *both* `resolve-platform.sh` and `read-config.sh` before sourcing; "not found beside the hook" now names a bundling problem and "failed to load: it rejected the config" a config one.
+- **CR-4** — `develop-pipeline-pause.md` lock-field row: `tracker_issue` is used for both trackers via `--tracker`.
+
+**Files Modified**:
+
+- `shared/resources/develop-pipeline-on-precompact.sh` — step-suffixed body/stderr files; step in the intent; `node` + `read-config.sh` gates
+- `shared/resources/develop-pipeline-on-precompact.test.sh` — S10, S11; `HOOK_TEST_STEP` override
+- `shared/resources/tests/comment-slot-coverage.test.mjs` — regexes, `baseStage`, allowlist entry, non-vacuity test, Guard C property
+- `shared/resources/develop-pipeline-pause.md`, `develop-pipeline-hooks.md` — file names, lock-field row
+- `skills/*/references/` — bundle output
+
+**Testing**:
+
+- Hook suite 11/11 under bash 5.3 and `/bin/bash` 3.2; guards 102/102 (slot-coverage, call-site coverage, stakeholder-summary, parity); shellcheck clean.
+- All new tests red before the fix; slot-guard regex mutation-proved.
+- `npm run ci:fast` per the implementation report.
+
+**Verification Steps for QA**:
+
+1. `bash shared/resources/develop-pipeline-on-precompact.test.sh` → 11 passed (S10 two distinct ids; S11 "not found").
+2. `node --test shared/resources/tests/comment-slot-coverage.test.mjs` → the `$(command node …)` visibility test passes.
+3. Fire the hook twice at the same step with a GitHub tracker: the second issue comment reports `already`.
+
 ---
 
 ## Status History
@@ -337,6 +386,8 @@ Markdown-only call-site guard.
 | 2026-09-12 | Ready for QA | develop-bug | Fix implemented + regression test (S4–S6 in the hook test) |
 | 2026-09-12 | Reopened | develop-bug | Verify Cycle 1 FAIL — review-code CR-1 (tracker routing) blocking; Iteration 2 opened |
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 2: CR-1..CR-5 fixed + bash 3.2 array expansion; S7–S9 regression scenarios |
+| 2026-09-12 | Reopened | develop-bug | Verify Cycle 2 FAIL — refute pass: deferral-id collapse + slot-guard blind spot; Iteration 3 opened |
+| 2026-09-12 | Ready for QA | qa-fix | Iteration 3: distinct deferral ids per pause; slot-guard sees command-node sites; S10/S11 |
 
 ---
 
