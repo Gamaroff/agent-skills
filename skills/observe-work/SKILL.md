@@ -67,7 +67,7 @@ Act on the check, never on `healthy` alone:
 | Failing check | Do this |
 |---|---|
 | `workspace-exists` | `command node references/observation-log.js init --json`, then re-run `doctor` |
-| `activation-configured` | **Note it and continue.** Step 4 owns this. It must never stop a write |
+| `activation-configured` | **Note it and continue.** Step 4 owns this. It must never stop a write. Read its `state`: `not-configured` means the file at `root` lacks the instruction; `no-agent-file` means check the reported `root` before assuming the project was never set up |
 | `anchor-durable` | Also reported as `reason` `ephemeral-workspace` — see below |
 | `no-fork` | Also reported as `reason` `fork-detected` — see below |
 
@@ -85,6 +85,12 @@ Then act on `reason`:
 > to fix. Treating `healthy: false` as a blanket stop would refuse to capture in exactly the
 > projects this skill most needs to work in, and it would do so **before** reaching the step that
 > resolves it. Only `workspace-exists` demands an action here; only `reason` demands a halt.
+
+> **The agent-file lookup is anchored at the project root, not the cwd.** `doctor` and
+> `families --audit` walk up to the nearest `.git` (or take `--audit-root` verbatim) and report the
+> `root` they used, so the documented `cd`-into-the-skill invocation answers the same as one from the
+> repo root. Before bug 15 it did not: from `skills/observe-work/` the check false-negatived with
+> `reason: ok` and exit 0, every session, in the reference repo itself.
 
 > **`reason` is `"ok"` on a workspace that does not exist yet, and `exitCode` is `0`.** A missing log
 > is not an error — it is the normal state of a project that has never run this skill — so the engine
