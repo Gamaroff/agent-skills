@@ -370,18 +370,41 @@ Action: Perform re-review to verify if issues were addressed.
 
 A green suite says the tests ran, not that they can fail. Before crediting a test
 as coverage for a defect this cycle fixed, **revert the behaviour it names and
-confirm that test goes red** — full procedure and the four shapes vacuity takes:
-[`references/mutation-proving.md`](references/mutation-proving.md).
+confirm that test goes red** — full procedure, the outcomes table, and the shapes
+vacuity takes: [`references/mutation-proving.md`](references/mutation-proving.md).
+
+Run it as the procedure says, not from memory — four of its steps exist because a
+QA cycle skipped them and wrote a false finding: **snapshot the file with `cp` and
+restore from the snapshot** (never `git checkout --`, which restores committed
+state and deletes the uncommitted fix with the mutant); **name the test you expect
+to go red before running**; **assert the mutation applied** (a before/after count,
+never a silent `|| true` on the edit); **baseline green between mutations**.
 
 Scope it: not every assertion, but **every test guarding a fix made this cycle**,
-plus any guard whose failure mode is silence. If the suite stays green with the
-behaviour reverted, record the test as **not** covering that criterion — a
-vacuous test is worse than a missing one, because it reports coverage that is not
-there.
+plus any guard whose failure mode is silence.
 
-Record `mutation-proven: yes/no` per fixed defect in the QA report's Code Review
-section. Do **not** write "every invariant mutation-proven" unless every one was
-actually reverted; if you proved four of five, say four of five.
+Read each result against the outcomes table, not as red/green. A mutation that
+reds nothing is a measurement of the tests, and the table's rows tell dead code
+from a load-bearing branch no fixture reaches — the same reading, opposite
+responses. A mutation that reds a *different* test than predicted is a finding
+about the predicted test. A mutation that reds only because of today's corpus, or
+only in an ad-hoc assertion that was never committed, is not coverage.
+
+Record one line per proof in the QA report's Code Review section, carrying the
+test that went red and the **outcome token** from the table —
+`covered` · `wrong-test-red` · `mutation-void` · `no-red-dead` · `no-red-untested`
+· `absorbed` · `not-run` · `data-dependent` · `dev-only`:
+
+```markdown
+mutation-proven: <what you reverted> → <test that went red> → <outcome>
+```
+
+**Only `covered` means covered**, and it means a *committed* test went red. A
+criterion whose only evidence is a development-time mutation is `dev-only` — a
+different claim from covered, and it must be written differently. A proof that
+reached `covered` only after a fixture was added says so. Do **not** write "every
+invariant mutation-proven" unless every one was actually reverted; if you proved
+four of five, say four of five.
 
 ## Story Review Process
 
