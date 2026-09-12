@@ -367,7 +367,7 @@ alternative — rolling merges" before re-litigating this under time pressure.
 
 The discipline that makes soft overlaps harmless: **merge one PR at a time.** For each item
 with `pipelineDone: true` and not `halted`, in `batch[]` order, reusing `develop-next`'s
-merge gate (Step 3) and roadmap tick (Step 4) verbatim per item:
+merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
 
 1. **Rebase on the current tip** (for the 2nd and later merges): in the item's worktree,
    `git fetch origin && git rebase origin/<baseBranch>` onto its `feature/…` branch. This
@@ -376,7 +376,22 @@ merge gate (Step 3) and roadmap tick (Step 4) verbatim per item:
    A non-trivial rebase conflict → mark the item `halted`, report it, and continue with the
    remaining items.
 2. **Verify green** (all must hold, else HALT this item and continue):
-   - QA gate file decision `PASS` and document frontmatter `accepted` (finalise output).
+   - Document frontmatter `accepted` **and** the QA gate is not `FAIL` **and** the gate's
+     `top_issues[]` holds no entry still `open`. `accepted` is `/finalise`'s verdict and it
+     has already weighed the gate token — a `CONCERNS` gate with no open finding and a
+     documented `WAIVED` gate both pass; `FAIL`, an open finding, a non-`accepted` document
+     or a missing/unparseable gate all HALT. The full row-by-row matrix is in `develop-next`
+     Step 3 and applies here unchanged:
+
+     | Document `status` | Gate decision          | `top_issues[]` has an `open` entry | Action                                                    |
+     | :---------------- | :--------------------- | :--------------------------------- | :-------------------------------------------------------- |
+     | `accepted`        | `PASS`                 | — (none)                           | merge                                                     |
+     | `accepted`        | `CONCERNS`             | no                                 | merge                                                     |
+     | `accepted`        | `WAIVED`               | no                                 | merge (the waiver is a recorded human decision)           |
+     | `accepted`        | `CONCERNS` / `WAIVED`  | **yes**                            | **HALT** — an open finding survived finalise              |
+     | `accepted`        | `FAIL`                 | any                                | **HALT**                                                  |
+     | not `accepted`    | any                    | any                                | **HALT** — finalise did not accept                        |
+     | `accepted`        | missing / unparseable  | —                                  | **HALT** — cannot establish the no-open-finding condition |
    - **Head-SHA check:** `gh pr view <PR#> --json headRefOid,state` must match
      `git rev-parse HEAD` on the item's local PR branch after the rebase (never gate one
      commit and merge another).
@@ -449,23 +464,34 @@ merge gate (Step 3) and roadmap tick (Step 4) verbatim per item:
    Off by default and non-blocking, exactly as in `develop-next` — `stage-disabled`,
    `no-option` and `no-transition` all exit 0 and the tick proceeds. See
    `develop-next` Step 3 for the `done` / `pr-merged` ordering note.
-5. **Tick the roadmap immediately**, on `<baseBranch>` in the **main tree** (`git pull`
-   first — the merge just advanced the remote):
-   - Tick the item `[x]` and rewrite its row in the roadmap's accepted-row convention
-     (copy an existing ✅ row's format; if none exists yet, use
-     `✅ **accepted + merged** ([PR #N](url), QA PASS S/100)`).
-   - Add a Change Log row (next version, same table format, author `Claude`).
-   - If an epic completed, update the roadmap's status-snapshot table and the epic's
-     section header the way prior completed epics are recorded.
-   - Commit and push:
+5. **Record the acceptance immediately**, on `<baseBranch>` in the **main tree** (`git pull`
+   first — the merge just advanced the remote). **Branch on the item's `source`** exactly as
+   `develop-next` Step 4 does — `--batch` selects from the roadmap only today, so every batch
+   item is `roadmap`-sourced, but the arm is named so a registry-aware batch cannot fall
+   into the roadmap arm by default:
+   - **`source: roadmap`** — tick the item `[x]` and rewrite its row in the roadmap's
+     accepted-row convention (copy an existing ✅ row's format; if none exists yet, use
+     `✅ **accepted + merged** ([PR #N](url), QA PASS S/100)`); add a Change Log row (next
+     version, same table format, author `Claude`); if an epic completed, update the
+     roadmap's status-snapshot table and the epic's section header the way prior completed
+     epics are recorded. Commit and push:
      ```bash
      git add <roadmapPath>
      git commit -m "docs(roadmap): tick <id> [x] — <short summary>"
      git push origin <baseBranch>
      ```
+   - **`source: task-registry`** — no roadmap row, no roadmap Change Log row; Status is
+     already `accepted` (finalise wrote it via `registry-tick.js`). Record the merge with
+     `node .agents/skills/develop-batch/references/registry-tick.js --annotate --file <doc>
+     --pr <PR#> [--issue "<[#N](url)>"] --json` — additive (notes cell + `Issue` cell), never a
+     second Status writer. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
+     and push; `already` / `no-row` / `no-registry` / `no-cell` → log, no commit.
+   - **`source: bug-registry`** — the bug registry has no Issue or notes cell and
+     `develop-bug` already closed the row: log `bug-registry: nothing to write`, no commit.
+
      On non-ff rejection: `git pull --rebase origin <baseBranch>` once and retry; still
      rejected → **HALT** (the run state preserves `merged: true, ticked: false` for
-     recovery). Mark `ticked: true`.
+     recovery). Mark `ticked: true` on every arm.
 
 The next item's rebase (step 1) then picks up this item's code **and** its tick. Merge +
 tick is serial by nature — the roadmap/Change Log edit is a guaranteed conflict point.

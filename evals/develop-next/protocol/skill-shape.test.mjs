@@ -242,3 +242,140 @@ test("reference worked examples are backed by unit fixtures", async () => {
   );
   assert.match(reference, /evals\/develop-next\/unit\/fixtures/);
 });
+
+// ---------------------------------------------------------------------------
+// task.113 — Step 3 gate matrix and Step 4 `item.source` arms.
+//
+// Each assertion below names the clause it pins, so a later edit that drops one
+// fails with that clause's name rather than a generic "shape changed". The
+// matrix rows are asserted individually with a floor: a test that only checked
+// "a table exists" would pass a table with the HALT rows deleted.
+// ---------------------------------------------------------------------------
+
+function section(text, startHeading, endHeading) {
+  const a = text.indexOf(startHeading);
+  const b = text.indexOf(endHeading, a + 1);
+  assert.ok(a >= 0, `${startHeading} missing`);
+  assert.ok(b > a, `${endHeading} missing after ${startHeading}`);
+  return text.slice(a, b);
+}
+
+const GATE_MATRIX_ROWS = [
+  // [status, gate, open-finding, action] — one regex per row, order-free.
+  [/`accepted`\s*\|\s*`PASS`\s*\|[^|]*\|\s*merge/, "accepted + PASS → merge"],
+  [
+    /`accepted`\s*\|\s*`CONCERNS`\s*\|\s*no\s*\|\s*merge/,
+    "accepted + CONCERNS, no open → merge",
+  ],
+  [
+    /`accepted`\s*\|\s*`WAIVED`\s*\|\s*no\s*\|\s*merge/,
+    "accepted + WAIVED, no open → merge",
+  ],
+  [
+    /`CONCERNS` \/ `WAIVED`\s*\|\s*\*\*yes\*\*\s*\|\s*\*\*HALT\*\*/,
+    "open finding → HALT",
+  ],
+  [/`accepted`\s*\|\s*`FAIL`\s*\|\s*any\s*\|\s*\*\*HALT\*\*/, "FAIL → HALT"],
+  [
+    /not `accepted`\s*\|\s*any\s*\|\s*any\s*\|\s*\*\*HALT\*\*/,
+    "not accepted → HALT",
+  ],
+  [/missing \/ unparseable\s*\|[^|]*\|\s*\*\*HALT\*\*/, "missing gate → HALT"],
+];
+
+test("Step 3: the merge gate is finalise's verdict + no open finding, not the PASS token", () => {
+  const step3 = section(skill, "## Step 3", "## Step 4");
+  assert.match(
+    step3,
+    /frontmatter is `accepted`/,
+    "accepted is the load-bearing condition",
+  );
+  assert.match(step3, /top_issues\[\]/, "the open-finding check is named");
+  assert.match(
+    step3,
+    /`WAIVED`/,
+    "WAIVED is named — a waiver is a human decision, not a block",
+  );
+  assert.doesNotMatch(
+    step3,
+    /QA gate file decision is `PASS` and the document frontmatter/,
+    "the old PASS-token clause must be gone, not merely joined by the matrix",
+  );
+  assert.ok(GATE_MATRIX_ROWS.length >= 7, "matrix floor");
+  for (const [re, name] of GATE_MATRIX_ROWS) {
+    assert.match(step3, re, `gate matrix row missing: ${name}`);
+  }
+  // The two commit-bound clauses survive — they cannot be inferred from `accepted`.
+  assert.match(step3, /Head-SHA check/);
+  assert.match(step3, /<qualityGateCommand>/);
+});
+
+test("Step 4: branches on item.source with a roadmap arm, a registry arm and a bug-registry arm", () => {
+  const step4 = section(skill, "## Step 4", "## Step 5");
+  assert.match(
+    step4,
+    /## Step 4 — Record the acceptance/,
+    "Step 4 is titled source-neutrally",
+  );
+  assert.match(step4, /Branch on `item\.source`/);
+  for (const arm of ["`roadmap`", "`task-registry`", "`bug-registry`"]) {
+    assert.match(
+      step4,
+      new RegExp(`### \`item\\.source\` = ${arm}`),
+      `arm missing: ${arm}`,
+    );
+  }
+});
+
+test("Step 4 registry arm: calls registry-tick.js --annotate, never writes Status, names already and the empty case", () => {
+  const arm = section(
+    skill,
+    "### `item.source` = `task-registry`",
+    "### `item.source` = `bug-registry`",
+  );
+  assert.match(
+    arm,
+    /registry-tick\.js --annotate/,
+    "the write is the engine, not a sed",
+  );
+  assert.match(arm, /--pr <PR#>/);
+  assert.match(arm, /--issue/);
+  assert.match(
+    arm,
+    /never a second Status writer/,
+    "additive — finalise owns Status",
+  );
+  assert.match(
+    arm,
+    /no roadmap row and gets none/,
+    "registry items get no roadmap row",
+  );
+  assert.match(arm, /`already`/, "the re-run case is named");
+  assert.match(arm, /`no-row`/, "the empty case is named and does not block");
+  assert.match(
+    arm,
+    /docs\(registry\): record <id> — PR #<n> merged/,
+    "commit convention",
+  );
+  assert.doesNotMatch(arm, /sed -i/, "no hand-rolled cell edit");
+});
+
+test("Step 4 bug-registry arm: states there is no cell to write and makes no commit", () => {
+  const arm = section(skill, "### `item.source` = `bug-registry`", "## Step 5");
+  assert.match(arm, /no Issue cell and\s+no notes cell/);
+  assert.match(arm, /make\s+no commit/);
+  assert.match(arm, /`ticked: true`/);
+});
+
+test("registry-tick.js is bundled beside develop-next so Step 4's call resolves", async () => {
+  await access(
+    path.join(
+      REPO_ROOT,
+      "skills",
+      "develop-next",
+      "references",
+      "registry-tick.js",
+    ),
+    constants.R_OK,
+  );
+});

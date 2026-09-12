@@ -239,6 +239,57 @@ Record the path in the Decisions Log: "Review report: {path}". If no review repo
 
 ---
 
+## Re-read the Tracker Key — the Review May Have Created the Issue
+
+Runs **after the review skill returns and before outcome detection**, on both the run and the skip
+path (a skip changes nothing and the check answers `unchanged` in one read).
+
+`TRACKER_ISSUE` was captured at Phase 0c, and for a freshly authored item it was **empty**: the
+tracker-linkage check that creates the issue lives *inside* `/review-story` / `/review-task` (Step 2
+check 5 → `ensure-*-github-issue` / `ensure-*-jira-issue`), which is this step's callee — so the
+key becomes true one step after Step 1 tested it. Step 1's `work-started` signal was skipped on
+the empty key, and nothing fired it later: the card sat in the first column and the pipeline-start
+comment never posted (task.106, fixed by hand; observation #53). The pipeline lock's `tracker_issue`
+— which the PreCompact and Stop hooks read — went stale the same way.
+
+```bash
+TRACKER_ISSUE_AT_STEP_1="$TRACKER_ISSUE"
+if [ "$TRACKER" = "jira" ]; then
+  TRACKER_ISSUE=$(grep '^jira_key:' {document-file} | awk '{print $2}')
+else
+  TRACKER_ISSUE=$(grep '^github_issue:' {document-file} | awk '{print $2}')
+  GITHUB_ISSUE="$TRACKER_ISSUE"
+fi
+[ "$TRACKER_ISSUE" = "null" ] && TRACKER_ISSUE=""
+
+if [ -z "$TRACKER_ISSUE_AT_STEP_1" ] && [ -n "$TRACKER_ISSUE" ]; then
+  # 1. The lock is what the hooks read — update it before anything else posts.
+  jq --arg i "$TRACKER_ISSUE" '.tracker_issue = $i' .claude/state/develop-pipeline.lock \
+    > .claude/state/develop-pipeline.lock.tmp \
+    && mv .claude/state/develop-pipeline.lock.tmp .claude/state/develop-pipeline.lock
+  # 2. Fire the signal Step 1 skipped — the full 0c-reg procedure, once.
+  #    (comment via tracker-comment.js --stage work-started; then the board/Jira
+  #    move via gh-stage.js / jira-stage.js --stage work-started; then the
+  #    GitHub Priority default). See step-0 §0c-reg for the calls.
+fi
+```
+
+Then execute **0c-reg** from `shared/resources/develop-pipeline-step-0-resolve-and-prepare.md` exactly as
+Step 1 would have — the procedure is unchanged, only its moment has moved. Log in the Decisions Log:
+"work-started re-fired at Step 2 — issue {TRACKER_ISSUE} created by the review; lock updated."
+
+**Idempotent by construction, so a second run is safe.** The comment carries a marker and reports
+`already`; `gh-stage.js` / `jira-stage.js` report `already` (or `no-transition`) and exit 0. A run
+that finds the key already set at Step 1 never enters the branch at all. Do not widen this into
+"signal at every step that has a key" — the narrower rule is enough, and it lives where the fact
+(the review creates the issue) lives.
+
+> **`TRACKER_ISSUE` from here on is the re-read value.** Every later step — the Step 3
+> develop-complete comment, Step 4's `--issue`, the QA-cycle comments, `/finalise`'s close — reads
+> the variable, and each of them would silently skip on the Phase 0c value.
+
+---
+
 ## Detecting Outcomes
 
 Re-read the document file and check the `Status:` field. Apply these autonomous rules:

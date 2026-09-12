@@ -100,3 +100,49 @@ test("develop-pipeline-resume-contract.md exists and has per-step table", async 
     "resume-contract.md missing step/artifact table",
   );
 });
+
+/**
+ * task.113 — the review may create the tracker issue, so Step 2 re-reads the key.
+ *
+ * Step 1 signals `work-started` only when `TRACKER_ISSUE` is set, and for a fresh
+ * item it is empty until `/review-task` creates the issue one step later. The
+ * step-2 document must (a) re-read the key from the document after the review
+ * returns, (b) update the lock's `tracker_issue` — the hooks read it — and
+ * (c) run 0c-reg once when the key went from empty to set. Each clause is
+ * asserted by name; the section is bounded so a paragraph elsewhere that merely
+ * mentions 0c-reg cannot satisfy it.
+ */
+test("Step 2 re-reads the tracker key after the review and re-fires work-started when it was empty at Step 1", async () => {
+  const content = await readFile(path.join(STEP_DIR, STEP_FILES[2]), "utf-8");
+  const a = content.indexOf("## Re-read the Tracker Key");
+  const b = content.indexOf("## Detecting Outcomes", a + 1);
+  assert.ok(a >= 0, "the re-read section exists");
+  assert.ok(b > a, "the re-read section sits before outcome detection");
+  const sec = content.slice(a, b);
+  assert.match(
+    sec,
+    /TRACKER_ISSUE_AT_STEP_1="\$TRACKER_ISSUE"/,
+    "the Step 1 value is captured before the re-read",
+  );
+  assert.match(
+    sec,
+    /grep '\^github_issue:'/,
+    "GitHub key re-read from the document",
+  );
+  assert.match(sec, /grep '\^jira_key:'/, "Jira key re-read from the document");
+  assert.match(
+    sec,
+    /\[ -z "\$TRACKER_ISSUE_AT_STEP_1" \] && \[ -n "\$TRACKER_ISSUE" \]/,
+    "the empty→set conditional",
+  );
+  assert.match(
+    sec,
+    /\.tracker_issue = \$i/,
+    "the lock's tracker_issue is updated",
+  );
+  assert.match(sec, /0c-reg/, "the signal procedure is invoked, not restated");
+  assert.match(sec, /`already`/, "idempotence on re-run is stated");
+  // The re-read must not be gated on the review having RUN — a skip path with a
+  // pre-existing key still needs the same read to reach the same answer.
+  assert.match(sec, /on both the run and the skip\s+path/);
+});

@@ -316,3 +316,71 @@ test("execution-resources reference exists and documents the probe contract", as
   assert.match(ref, /Rejected alternative/i);
   assert.match(ref, /rolling merges/i);
 });
+
+// ---------------------------------------------------------------------------
+// task.113 — the serial lane mirrors develop-next's gate matrix and Step 4 arms.
+// ---------------------------------------------------------------------------
+
+test("Step 3 lane: verify-green carries the gate matrix, not the PASS token", async () => {
+  const skill = await readFile(SKILL_PATH, "utf-8");
+  const a = skill.indexOf("## Step 3 — Serial finalize lane");
+  const b = skill.indexOf("## Step 4", a + 1);
+  assert.ok(a >= 0 && b > a, "Step 3 lane section missing");
+  const lane = skill.slice(a, b);
+  assert.doesNotMatch(
+    lane,
+    /QA gate file decision `PASS` and document frontmatter/,
+    "old PASS clause gone",
+  );
+  assert.match(lane, /top_issues\[\]/);
+  assert.match(lane, /`WAIVED`/);
+  const rows = [
+    [
+      /`accepted`\s*\|\s*`CONCERNS`\s*\|\s*no\s*\|\s*merge/,
+      "CONCERNS no-open → merge",
+    ],
+    [
+      /`accepted`\s*\|\s*`WAIVED`\s*\|\s*no\s*\|\s*merge/,
+      "WAIVED no-open → merge",
+    ],
+    [
+      /`CONCERNS` \/ `WAIVED`\s*\|\s*\*\*yes\*\*\s*\|\s*\*\*HALT\*\*/,
+      "open finding → HALT",
+    ],
+    [/`accepted`\s*\|\s*`FAIL`\s*\|\s*any\s*\|\s*\*\*HALT\*\*/, "FAIL → HALT"],
+    [
+      /not `accepted`\s*\|\s*any\s*\|\s*any\s*\|\s*\*\*HALT\*\*/,
+      "not accepted → HALT",
+    ],
+    [
+      /missing \/ unparseable\s*\|[^|]*\|\s*\*\*HALT\*\*/,
+      "missing gate → HALT",
+    ],
+  ];
+  assert.ok(rows.length >= 6, "matrix floor");
+  for (const [re, name] of rows)
+    assert.match(lane, re, `gate matrix row missing: ${name}`);
+});
+
+test("Step 3 lane: the acceptance record branches on source with all three arms", async () => {
+  const skill = await readFile(SKILL_PATH, "utf-8");
+  const a = skill.indexOf("**Record the acceptance immediately**");
+  assert.ok(a >= 0, "step 5 of the lane is titled source-neutrally");
+  const rec = skill.slice(a, skill.indexOf("## Step 4", a));
+  assert.match(rec, /Branch on the item's `source`/);
+  assert.match(rec, /\*\*`source: roadmap`\*\*/);
+  assert.match(rec, /\*\*`source: task-registry`\*\*/);
+  assert.match(rec, /\*\*`source: bug-registry`\*\*/);
+  assert.match(
+    rec,
+    /registry-tick\.js --annotate/,
+    "registry arm uses the engine",
+  );
+  assert.match(rec, /never a\s+second Status writer/);
+  assert.match(rec, /docs\(registry\): record <id> — PR #<n> merged/);
+  assert.match(
+    rec,
+    /nothing to write/,
+    "bug-registry arm names the no-cell case",
+  );
+});

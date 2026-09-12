@@ -44,6 +44,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`/develop-next` records the acceptance for what it actually selected, and merges what
+  `/finalise` actually accepted** (task 113 — observations #13, #30, #31, #34, #35, #46, #52, #53).
+  Three orchestrator steps were written when the only input was a roadmap row and the only good gate
+  was `PASS`, and never revisited when selection widened to the registries and `/finalise` learned to
+  accept a `CONCERNS` gate with no open finding. **Step 4** is now "Record the acceptance" and
+  branches on `item.source`: the roadmap arm is unchanged; the `task-registry` arm — the default path
+  now that no phase is open, and improvised by hand on five consecutive runs — calls a new
+  **`registry-tick.js --annotate --pr <n> [--issue <ref>]`** mode that appends `· PR #n merged` to the
+  row's notes cell and fills `Issue` only when it reads `—`, and **never** writes Status (finalise
+  owns that; two writers is what task.103 removed); the `bug-registry` arm states that there is no
+  cell to write. **Step 3's** merge gate is now `accepted` ∧ gate ≠ `FAIL` ∧ no open `top_issues[]`
+  entry, carried as a seven-row matrix — an `accepted` document with a `CONCERNS` or `WAIVED` gate and
+  no open finding **merges** (task.105 was halted at 90/100, accepted, CI green, on the literal token);
+  `FAIL`, an open finding, a non-`accepted` document or a missing gate still halt. `develop-batch`'s
+  serial lane mirrors both. **Step 2** of the develop pipelines now re-reads the tracker key after the
+  review returns — the review is what creates the issue for a fresh item — updates the lock's
+  `tracker_issue`, and fires `work-started` once when the key went from empty to set, so a new card
+  moves off the first column without a hand fix. 11 fixture tests on the annotate mode (four
+  mutations proven), shape tests with per-row floors on both orchestrators and the step-2 contract.
+
 - **The bug-fix runbook is rewritten against the pipeline that exists**
   ([`docs/runbooks/bug-fix.md`](docs/runbooks/bug-fix.md), task 107). The page had been overtaken
   twice without being revisited. Its "Steps" block was

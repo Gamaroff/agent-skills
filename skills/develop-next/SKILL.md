@@ -131,7 +131,28 @@ Runs only after the pipeline completes Step 8 with the PR open and the item `acc
 Every command below branches on `VCS` (resolved in Step 0). The GitHub path is unchanged; the Bitbucket path uses the REST API because `gh` cannot address a Bitbucket remote at all (`gh repo view` fails outright — it is not a fallback, it is inoperable).
 
 1. **Verify green:**
-   - QA gate file decision is `PASS` and the document frontmatter is `accepted` (finalise output).
+   - **The document frontmatter is `accepted`, the QA gate is not `FAIL`, and the gate's `top_issues[]`
+     holds no entry still `open`.** `accepted` is the load-bearing condition: it is `/finalise`'s verdict,
+     and `/finalise` has already weighed the gate through its DoD matrix — which accepts a `CONCERNS`
+     gate with no open findings, and a `WAIVED` gate whose waiver is documented. Re-checking the gate's
+     *token* here would second-guess that verdict with less information than `/finalise` had (task.105
+     was halted at 90/100, accepted, CI 5/5, on the literal `PASS`). Re-checking for **open findings**
+     does not — that is a fact the token can hide in either direction, and it is the one thing this
+     gate adds. Read the newest `*.gate.{N}.*.yml` beside the document:
+
+     | Document `status` | Gate decision          | `top_issues[]` has an `open` entry | Action                                                    |
+     | :---------------- | :--------------------- | :--------------------------------- | :-------------------------------------------------------- |
+     | `accepted`        | `PASS`                 | — (none)                           | merge                                                     |
+     | `accepted`        | `CONCERNS`             | no                                 | merge                                                     |
+     | `accepted`        | `WAIVED`               | no                                 | merge (the waiver is a recorded human decision)           |
+     | `accepted`        | `CONCERNS` / `WAIVED`  | **yes**                            | **HALT** — an open finding survived finalise              |
+     | `accepted`        | `FAIL`                 | any                                | **HALT**                                                  |
+     | not `accepted`    | any                    | any                                | **HALT** — finalise did not accept                        |
+     | `accepted`        | missing / unparseable  | —                                  | **HALT** — cannot establish the no-open-finding condition |
+
+     An entry is open when its `status:` is absent or reads `open`; `resolved`, `fixed`, `closed`,
+     `waived` and `deferred` (with a named owner) are not open. The two clauses below are about *this
+     commit* and cannot be inferred from `accepted` — they stay regardless of the row matched here.
    - **Head-SHA check** — the PR's source commit must equal `git rev-parse HEAD` on the local PR branch. Mismatch means the branch moved since it was tested → **HALT** (never gate one commit and merge another).
 
      ```bash
@@ -281,9 +302,14 @@ Every command below branches on `VCS` (resolved in Step 0). The GitHub path is u
    >   `epic/{n}.{name}` → `<baseBranch>` PR **by hand** once every story is in.
    > - Do not read "all this epic's rows are ticked" as "the epic has landed on `<baseBranch>`". It has not.
 
-## Step 4 — Tick the roadmap
+## Step 4 — Record the acceptance
 
-On `<baseBranch>` (pull first if Step 3 merged into it):
+On `<baseBranch>` (pull first if Step 3 merged into it). **Branch on `item.source`** (recorded at
+Step 1) — the roadmap and the registries are different documents with different owners, and the
+step used to know only the first. Five registry-sourced runs each improvised the second (#30, #31,
+#34, #35) before this branch existed.
+
+### `item.source` = `roadmap`
 
 1. Tick the item `[x]` and rewrite its row in the roadmap's own accepted-row convention — copy the format of an existing ✅ row; if none exists yet, use `✅ **accepted + merged** ([PR #N](url), QA PASS S/100)`.
 2. Add a Change Log row (next version number, same table format, author `Claude`) describing what landed.
@@ -296,6 +322,48 @@ On `<baseBranch>` (pull first if Step 3 merged into it):
    ```
    If the push is rejected (non-ff): `git pull --rebase origin <baseBranch>` once and retry; if it is still rejected (e.g. branch protection): **HALT** with the git output — the run state preserves `merged: true, ticked: false` for manual recovery.
 5. Mark `ticked: true` in the run state.
+
+### `item.source` = `task-registry`
+
+A registry item has **no roadmap row and gets none** — and no roadmap Change Log row either; both
+are for phase-row items only (roadmap Housekeeping, 2026-09-12). Its Status cell is **already
+`accepted`**: `/finalise` wrote it at pipeline Step 7 through `registry-tick.js`, in the same moment
+it wrote the document's `status: accepted`. This step must therefore be **additive** — the notes cell
+and, when the run created a tracker issue, the `Issue` cell — and never a second Status writer (#46).
+
+1. Record the merge with the engine — one call, never a hand-rolled sed:
+   ```bash
+   ISSUE_REF=""   # `[#N](url)` when the document now carries github_issue:/jira_key:, else leave empty
+   node .agents/skills/develop-next/references/registry-tick.js --annotate \
+     --file <item.commandArg> --pr <PR#> ${ISSUE_REF:+--issue "$ISSUE_REF"} --json
+   ```
+   It appends `· PR #<n> merged` to the row's last cell (the registry's notes cell — `Depends on` in
+   the documented header; rows 100–106 already carry it there), fills `Issue` only when that cell
+   reads `—`, and leaves Status alone. Read `reason`: `annotated` → commit below; `already` → the row
+   already names this PR (a re-run after a crash between merge and tick) — log it, skip the commit,
+   mark `ticked: true`; `no-row` / `no-registry` / `no-cell` → log it, skip the commit, mark `ticked:
+   true` — the drift test is the backstop, and a missing index line never blocks a merge that has
+   already happened.
+2. Commit and push (only on `annotated`):
+   ```bash
+   git add docs/tasks/task-registry.md
+   git commit -m "docs(registry): record <id> — PR #<n> merged"
+   git push origin <baseBranch>
+   ```
+   Same non-ff rule as the roadmap arm.
+3. Mark `ticked: true` in the run state.
+
+### `item.source` = `bug-registry`
+
+The bug registry (`# | Title | Status | Severity | Priority | Created | Area`) has **no Issue cell and
+no notes cell**, and `develop-bug` has already flipped Status to `closed`. There is nothing for this
+step to write: log `registry: bug-registry has no cell to record PR #<n> — nothing to write`, make
+no commit, and mark `ticked: true`. (`registry-tick.js --annotate` answers `not-a-task` for a bug
+document, which is the same fact from the engine's side.)
+
+> **Whichever arm ran, the run report names it** — "roadmap ticked", "registry annotated (line N)",
+> "registry: already", or "bug-registry: nothing to write". A run that says nothing about Step 4 is
+> indistinguishable from one that skipped it.
 
 ## Step 5 — Report + continue/stop
 
