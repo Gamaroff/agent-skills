@@ -1,20 +1,22 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: '2026-09-12'
 updated: '2026-09-12'
 related: 'none — cross-cutting (observation-log engine; observe-work Session Start Protocol; the opt-in SessionStart hook)'
 description: "observation-log.js doctor's activation-configured check reads <process.cwd()>/AGENTS.md, so at the invocation observe-work's own SKILL.md documents (cd into the skill, run references/observation-log.js) it reports 'no agent-instruction file mentions the observation log' for a repo whose AGENTS.md does — silently, with reason: ok and exit 0."
+github_issue: 393
 ---
 
 **Bug ID**: bug.15
 **Related**: none — cross-cutting (`shared/resources/observation-log.js` `doctor`; `skills/observe-work/SKILL.md` Session Start step 1; `shared/resources/observe-work-session-start.sh`)
-**Status**: 🆕 New
+**Status**: ✅ Ready for QA
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-09-12
+**GitHub**: [#393](https://github.com/Gamaroff/agent-skills/issues/393)
 **Assigned To**: —
 **QA Engineer**: —
 
@@ -137,24 +139,47 @@ assumption.
 
 #### Investigation (New → In Progress)
 
-**Date**: [Date]
-**Developer**: [Name]
+**Date**: 2026-09-12
+**Developer**: Claude (develop-bug, autonomous run from `/develop-next`)
 
-[Investigation notes, root cause analysis]
+**Reproduction**: the report's five steps, verbatim, on `develop` @ `ce472992`:
+`(cd skills/observe-work && source references/resolve-observation-workspace.sh && command node references/observation-log.js doctor --json)` →
+`activation-configured: ok: false, "no agent-instruction file mentions the observation log"`, `reason: ok`, exit 0. The same command with `shared/resources/observation-log.js` from the repo root → `ok: true`. `families --audit` from `skills/observe-work/` → every meta-skills member `member-not-found`, `reason: ok`. Then encoded as four tests in `shared/resources/tests/observation-log.test.mjs` (§"project-root anchoring (bug 15)"), which failed 4/4 on the unfixed engine (48/52).
+
+**Root Cause Analysis**: two independent `args.auditRoot || process.cwd()` anchors — `cmdFamilies` (≈957) and `cmdDoctor` (≈1119, feeding the `["AGENTS.md","CLAUDE.md"].map(f => path.join(cwd, f))` lookup at ≈1149). The engine already refuses to derive the *workspace* from the cwd (`resolve-observation-workspace.sh`) and already has a pure-`fs` upward `.git` walk (`repoWorktrees`), but the two *project* lookups never used it. A failed lookup also collapsed two situations into one `ok: false` — "file present, no mention" and "no file at this path" — so a wrong root was indistinguishable from an un-set-up project, and nothing reported which root had been used. The opt-in `SessionStart` hook is **not** affected: it calls only `queue`, which is workspace-anchored.
+
+**Proposed Fix**: one `projectRoot(args)` — `--audit-root` verbatim, else nearest enclosing repo root, else cwd — used by both sites; report `root`; add `state` to the activation check; regression tests from a nested cwd, mutation-proved.
 
 #### Fix Implementation (In Progress → Ready for QA)
 
-**Date**: [Date]
+**Date**: 2026-09-12
 
-**Root Cause**: [Explanation]
+**Root Cause**: `doctor` and `families --audit` anchored the project lookups at `process.cwd()` instead of the repository root, and the activation check could not say which of two different failures it was reporting.
 
-**Fix Description**: [What was changed]
+**Fix Description**:
+- Factored the upward `.git` walk out of `repoWorktrees()` into `nearestGitEntry(from)` (pure `fs`, no shell-out — the engine's standing rule) and added `projectRoot(args)`: `--audit-root` taken verbatim (an instruction, not a hint — a wrong one is not rescued by the walk), otherwise the nearest enclosing repository root, otherwise the cwd. Both `cmdDoctor` and `cmdFamilies --audit` now anchor there, so the documented cd-into-the-skill invocation answers the same as one from the repo root.
+- `doctor` and `families --audit` both report the `root` they resolved, so a wrong answer is checkable rather than merely believable.
+- The `activation-configured` check gains `state: configured | not-configured | no-agent-file` and a detail that names the root; `ok` is unchanged, so every existing reader keeps working. `forkCandidates` now receives the same resolved root (its `<dir>/skill-observations` candidate was cwd-relative for the same reason).
+- `observation-log-contract.md` §"Resolving the workspace" gains a sub-section on project-root resolution and the `state` table; `observe-work/SKILL.md` step 1's `activation-configured` row branches on `state` and a callout records why the lookup is root-anchored. Bundled copies regenerated with `npm run bundle`.
 
 **Files Modified**:
+- `shared/resources/observation-log.js` — `nearestGitEntry()`, `projectRoot()`; `cmdFamilies` and `cmdDoctor` anchor at the project root and report `root`; activation `state`
+- `shared/resources/tests/observation-log.test.mjs` — added regression tests: `doctor finds AGENTS.md at the repo root when run from a subdirectory`, `doctor's activation check names WHICH way it failed`, `families --audit finds skills/<member>/SKILL.md from a subdirectory`, `--audit-root is still the override, taken verbatim`
+- `shared/resources/observation-log-contract.md` — §"The project root is resolved the same way"
+- `skills/observe-work/SKILL.md` — step 1 `activation-configured` row + root-anchoring callout
+- `skills/observe-work/references/observation-log.js`, `skills/observe-work/references/observation-log-contract.md` — bundled copies (mechanical)
 
-- [file]
+**Testing**:
+- The four regression tests fail on the pre-fix engine (48/52) and pass after the fix (52/52).
+- **Mutation-proved**: restoring `args.auditRoot || process.cwd()` inside `projectRoot()` turns three of them red (the `--audit-root` override test stays green, as it guards a different property); restoring the fix returns 52/52.
+- The report's exact reproduction (bundled path, cwd `skills/observe-work/`) now returns `ok: true, state: configured, detail: "referenced in AGENTS.md (<repo root>)"`; `families --audit` from the same cwd returns `gaps: []` with the repo root in `root`.
+- `npm run ci:fast` (format check + full test suite) — see QA Verification.
 
-**Testing**: [How the fix was tested]
+**Verification Steps for QA**:
+1. `cd skills/observe-work && source references/resolve-observation-workspace.sh && command node references/observation-log.js doctor --json` → `activation-configured` has `ok: true`, `state: "configured"`, and `root` is the repository root.
+2. Same cwd, `command node references/observation-log.js families --audit --json` → `gaps: []`, `root` is the repository root.
+3. `command node --test shared/resources/tests/observation-log.test.mjs` → 52 pass, including the four under "project-root anchoring (bug 15)".
+4. `grep -n 'process.cwd()' shared/resources/observation-log.js` → exactly one hit, inside `projectRoot()`.
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
@@ -174,6 +199,9 @@ assumption.
 | Date       | Status | Changed By          | Notes                                              |
 | ---------- | ------ | ------------------- | -------------------------------------------------- |
 | 2026-09-12 | New    | repo sweep (Claude) | Filed from the 2026-09-12 sweep; obs #14 (2026-09-09) |
+| 2026-09-12 | new | ensure-bug-github-issue | GitHub issue created (#393) |
+| 2026-09-12 | In Progress | develop-bug | Reproduced; investigation started |
+| 2026-09-12 | Ready for QA | develop-bug | Fix implemented + regression test (4 tests, mutation-proved) |
 
 ---
 
