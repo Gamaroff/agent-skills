@@ -44,6 +44,36 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **[`mutation-proving.md`](shared/resources/mutation-proving.md) is organised around what a
+  mutation run can tell you, not around the two readings first noticed** (task 114 — observations
+  #16, #18, #19, #26, #29, #32, #37, #41, #42, #45, #47, #55). The document covered the false GREEN
+  and, since task 100, the false RED. Twelve observations from three days of QA cycles recorded
+  readings it had no row for, each of which produced a false finding or a false "coverage gap" live:
+  a mutation that reds the **wrong** test (a structural test fired while the parity test named for
+  the property passed); one that reds **nothing** on a load-bearing branch no fixture reaches (same
+  reading as dead code, opposite response, and the tempting move for both is deletion); a survivor
+  because the mutated line **never fed the assertion**; a green because the edit **never applied**
+  behind a `2>/dev/null ||`; a red that held **only because of today's corpus** and was scheduled to
+  expire inside the same run; a guard **absorbed by a downstream fallback** that reasoning could not
+  get past and enumeration found eight inputs for in a second; and a `git checkout --` restore that
+  **deleted the uncommitted fix with the mutant**, after which four proofs measured the fix's
+  absence. The document now leads with a **thirteen-row outcomes table** — what you saw, what it may
+  mean, the discriminating question, what to do, and an outcome token — preceded by six **instrument
+  rules** (snapshot with `cp`, baseline green between mutations, assert applied, predict the red
+  test, ask what a broken probe would print, helpers return `{ ok, value }`) and one rule about
+  checks (blind to what they do not iterate). The vacuity section gains a **seventh shape**, the one
+  no mutation can reveal: no fixture instantiates the input class. **`qa-task` Step 3c and
+  `qa-story`'s Mutation-Proof Spot Check** now record one line per proof carrying the test that went red and the outcome token —
+  `covered` · `wrong-test-red` · `mutation-void` · `no-red-dead` · `no-red-untested` · `absorbed` ·
+  `not-run` · `data-dependent` · `dev-only` — so "reds a committed test" and "development-time only"
+  are written differently, where before both were `mutation-proven: yes`. The three consumer
+  pointers that said "the four shapes" of a document that had six no longer state a count, and
+  [`evals/shared/tests/mutation-proving-pointers-parity.test.mjs`](evals/shared/tests/mutation-proving-pointers-parity.test.mjs)
+  fails on any pointer that does, and on the document's own heading disagreeing with its body —
+  mutation-proved per the procedure it guards — the test's header carries the running tally: two at
+  authoring, two at QA cycle 1 with the spellings the first version missed, two at QA cycle 2 with an
+  overlapping-window decoy and a counted authored reference.
+
 - **`/develop-next` records the acceptance for what it actually selected, and merges what
   `/finalise` actually accepted** (task 113 — observations #13, #30, #31, #34, #35, #46, #52, #53).
   Three orchestrator steps were written when the only input was a roadmap row and the only good gate

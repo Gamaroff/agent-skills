@@ -653,7 +653,10 @@ Three-strikes escalation (applied to the triage summary, not the raw log):
 **And a passing test is not yet evidence.** For each invariant a new test claims to
 hold, revert that behaviour in the source, re-run, and confirm *that* test goes
 red before restoring. A test that passes whether or not the behaviour is present
-reports coverage that does not exist. Procedure and the four shapes this takes:
+reports coverage that does not exist. Snapshot the file with `cp` first and
+restore from that snapshot — never `git checkout --`, which restores committed
+state and deletes the uncommitted fix along with the mutant. Procedure, the
+outcomes a run can produce, and the shapes vacuity takes:
 [`references/mutation-proving.md`](references/mutation-proving.md).
 
 **Blocking Conditions** (HALT and ask user):
