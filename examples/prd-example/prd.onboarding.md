@@ -8,7 +8,7 @@ status: draft
 version: 0.1.0
 created: 2026-05-11
 author: dogfood-pipeline-run
-source_plan: ~/.claude/plans/i-want-to-dogfood-concurrent-sparkle.md
+source_plan: none — pre-flight plan was an agent scratch file and is not retained
 stepsCompleted:
   [
     intro-analysis,
@@ -28,7 +28,7 @@ source_sha: ea106b1521706dc2c710e93996c0554c80a4c528
 
 ### 1.1 Existing Project Overview
 
-**Analysis Source:** IDE-based fresh analysis (no prior `document-existing-project` run). Pre-flight exploration recorded in [`~/.claude/plans/i-want-to-dogfood-concurrent-sparkle.md`](../../../.claude/plans/i-want-to-dogfood-concurrent-sparkle.md).
+**Analysis Source:** IDE-based fresh analysis (no prior `document-existing-project` run). Pre-flight exploration was an agent scratch plan and is not retained (plans must live in-repo — see `docs/standards/plan-file-locations.md`).
 
 **Current Project State:** `agent-skills` is a library of modular agent skills — self-contained packages (SKILL.md + scripts + references + assets) that extend AI coding agents with domain workflows. Skills are distributed via tagged GitHub release tarballs (consumed by `setup-consumer.sh`) and optional `.zip` packages. The repo dogfoods its own **task** pipeline (`create-task` → `develop-task` → `qa-task` → `finalise`) against itself — see `docs/tasks/` (34 task directories). The **story** pipeline (`create-prd` → `create-epic` → `create-story` → `develop-story`) has never been exercised against this repo.
 

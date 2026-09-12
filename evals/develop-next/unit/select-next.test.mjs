@@ -1784,6 +1784,19 @@ test("15/SC10: --batch is unchanged — registry items carry no touches: data", 
   assert.deepEqual(withLoader.batch, []);
   const empty = selectBatch(parseRoadmap(EMPTY_ROADMAP));
   assert.deepEqual(empty.batch, [], "an exhausted roadmap batches nothing");
+  // The operator sees this detail as the reason for a STOP. On a registry-only
+  // frontier — the normal state while no phase is open — "no ready rows" alone
+  // reads as "nothing to do", while /develop-next would select. Name the route.
+  assert.match(
+    empty.detail,
+    /single-select only/,
+    "the empty-batch detail must say the registry fallback is single-select",
+  );
+  assert.match(
+    empty.detail,
+    /develop-next(?![-\w])/,
+    "…and name /develop-next as the route",
+  );
 });
 
 // ── frontmatter reading ─────────────────────────────────────────────────────

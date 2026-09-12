@@ -5,7 +5,7 @@ description: Autonomous NestJS debugging for any NestJS application. Systematica
 
 # NestJS Autonomous Debugging Skill
 
-> **Placeholders**: `{api-service}` is a template name for your NestJS app — substitute the actual project name (NX project, package name, etc.). See [`docs/placeholders.md`](../../docs/placeholders.md).
+> **Placeholders**: `{api-service}` is a template name for your NestJS app — substitute the actual project name (NX project, package name, etc.). See [`docs/reference/configuration.md`](../../docs/reference/configuration.md).
 
 ## When to Use This Skill
 

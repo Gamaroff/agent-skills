@@ -1699,8 +1699,10 @@ install_hooks() {
   local _candidates=(
     ".agents/skills/develop-story/scripts"
     ".agents/skills/develop-task/scripts"
+    ".agents/skills/develop-bug/scripts"
     ".claude/skills/develop-story/scripts"
     ".claude/skills/develop-task/scripts"
+    ".claude/skills/develop-bug/scripts"
   )
   for _c in "${_candidates[@]}"; do
     if [[ -f "$_c/on-stop.sh" ]] && [[ -f "$_c/on-precompact.sh" ]]; then

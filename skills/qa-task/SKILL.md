@@ -5,7 +5,7 @@ description: Comprehensive quality assurance review for technical tasks. Focuses
 
 > **Status lifecycle**: see [`references/document-status-lifecycle.md`](references/document-status-lifecycle.md)
 >
-> **Placeholders**: `{project}` in NX commands is a template — substitute your project name. See [`docs/placeholders.md`](../../docs/placeholders.md).
+> **Placeholders**: `{project}` in NX commands is a template — substitute your project name. See [`docs/reference/configuration.md`](../../docs/reference/configuration.md).
 
 # QA Task Review Skill
 

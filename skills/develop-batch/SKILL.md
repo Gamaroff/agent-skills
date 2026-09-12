@@ -195,9 +195,15 @@ Selection rules, the two batching axes, and marker vocabulary:
   annotating those rows (or enabling `developBatch.requireTouches`). Under `requireTouches`
   the selector has already deferred the extras, so `unannotated[]` holds at most one and no
   warning fires.
-- **`batch` with an empty `batch[]`** → the frontier has no dependency-ready,
-  conflict-free rows right now (only blocked/gated/manual rows remain). **STOP**: report
-  `excluded[]` + `skippedPhases[]` so the operator sees why, send a push notification.
+- **`batch` with an empty `batch[]`** → no phase holds a dependency-ready, conflict-free
+  row right now. **This is the normal state while no phase is open**: the registry fallback
+  that `/develop-next` uses is **single-select only** (registry rows carry no `touches:`
+  annotation, so write-disjointness cannot be established for them — see
+  [`roadmap-selection.md`](../develop-next/references/roadmap-selection.md) §"Registry
+  fallback frontier"), so an empty batch does **not** mean the registries are empty.
+  **STOP**: report `excluded[]` + `skippedPhases[]` so the operator sees why, tell them to
+  run `/develop-next` for the registry frontier (or author a phase with `touches:` tags if
+  the items should run in parallel), send a push notification.
 - **`halt`** (no parseable roadmap content, exit 1) → **HALT**: surface `lint.errors`
   verbatim. The selector is deliberately tolerant; a halt means the file could not be
   parsed as a roadmap at all.

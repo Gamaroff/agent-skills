@@ -8,7 +8,7 @@ type: project
 
 Operate Docker stacks on a LAN deploy server. Wraps SSH + `docker context` + local registry so the laptop builds and the server runs.
 
-> **Placeholders**: `{project}`, `{api-service}`, `<your-server>`, `<registry-host>` are templates — substitute your own values. See [`docs/placeholders.md`](../../docs/placeholders.md).
+> **Placeholders**: `{project}`, `{api-service}`, `<your-server>`, `<registry-host>` are templates — substitute your own values. See [`docs/reference/configuration.md`](../../docs/reference/configuration.md).
 
 ## When to Use This Skill
 

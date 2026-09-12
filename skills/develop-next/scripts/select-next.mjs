@@ -1582,7 +1582,10 @@ export function selectBatch(model, opts = {}) {
   return {
     status: "batch",
     phase: null,
-    detail: "no ready rows in any phase",
+    detail:
+      "no ready rows in any phase — the registry fallback (bug-registry / task-registry) " +
+      "is single-select only, because registry rows carry no touches: annotation; " +
+      "run select-next.mjs without --batch, or /develop-next",
     skippedPhases,
     batch: [],
     excluded: [],
