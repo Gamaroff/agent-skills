@@ -1695,3 +1695,143 @@ test("I: extractEntries does not read a fenced example row as history", () => {
   ].join("\n");
   assert.equal(CL.extractEntries(doc).length, 1);
 });
+
+// bug.13, verify cycle 2 — the refute pass over the cycle-1 fix.
+
+test("I: a fenced END marker inside the section does not close the block on the next write (cycle 2, CR-1)", () => {
+  // findMarkerBlock guarded only the START index; once fenced content
+  // survived write 1, write 2 ended the block at the fenced end marker,
+  // stranded the real table outside it, and added an end marker per write.
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "```md",
+    "<!-- change-log-start -->",
+    "<!-- change-log-end -->",
+    "```",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+  const ends = (s) => (s.match(/<!-- change-log-end -->/g) || []).length;
+
+  const w1 = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  const w2 = CL.upsertChangeLog(w1, ENTRY, { docType: "task" });
+  const w3 = CL.upsertChangeLog(w2, ENTRY, { docType: "task" });
+
+  // One real end marker plus the one in the fence — on every write.
+  assert.equal(ends(w1), 2);
+  assert.equal(ends(w2), 2);
+  assert.equal(ends(w3), 2);
+  assert.equal(
+    CL.extractEntries(w1).length,
+    2,
+    "the real row is inside the block",
+  );
+  assert.equal(CL.extractEntries(w2).length, 3);
+  assert.equal(CL.extractEntries(w3).length, 4);
+  assert.equal((w3.match(/^## Change Log$/gm) || []).length, 1);
+  assert.match(
+    w3,
+    /^```md\n<!-- change-log-start -->\n<!-- change-log-end -->\n```$/m,
+  );
+});
+
+test("I: findMarkerBlock ignores a protected end marker and takes the next real one", () => {
+  const doc = [
+    "<!-- change-log-start -->",
+    "## Change Log",
+    "```",
+    "<!-- change-log-end -->",
+    "```",
+    "| 2026-01-01 | | First | a |",
+    "<!-- change-log-end -->",
+    "",
+  ].join("\n");
+  const found = CL.findChangeLog(doc);
+  assert.equal(found.hasMarkers, true);
+  assert.equal(
+    doc.slice(found.start, found.end).split("\n").pop(),
+    "<!-- change-log-end -->",
+  );
+  assert.equal(
+    CL.extractEntries(doc).length,
+    1,
+    "the row is inside the located block",
+  );
+});
+
+test("I: a boundary line that opens with an inline code span still has its end marker stripped (cycle 2, CR-2)", () => {
+  const doc = [
+    "# D",
+    "",
+    "<!-- change-log-start -->",
+    "## Change Log",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "`note`<!-- change-log-end -->",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal((out.match(/<!-- change-log-end -->/g) || []).length, 1);
+  assert.match(
+    out,
+    /^`note`$/m,
+    "the inline code is carried, the marker is not",
+  );
+  assert.equal(CL.extractEntries(out).length, 2);
+});
+
+test("I: a nested heading BEFORE the table does not demote the rows below it (cycle 2, CR-3)", () => {
+  // Rows below a heading that merely precedes the table were history before
+  // bug.13 and must stay history; only a heading AFTER the table closes it.
+  const doc = [
+    "# D",
+    "",
+    "## Change Log",
+    "",
+    "### Notes",
+    "",
+    "| 2026-01-01 | | First | a |",
+    "",
+    "## Next",
+    "",
+  ].join("\n");
+  assert.equal(CL.extractEntries(doc).length, 1);
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal(CL.extractEntries(out).length, 2);
+  assert.ok(
+    out.indexOf("### Notes") < out.indexOf("| Date |"),
+    "the heading is carried above the table",
+  );
+  assert.ok(out.indexOf("First") < out.indexOf("Review passed"));
+});
+
+test("I: a fenced example row inside a stray legacy block is not absorbed when the block is collapsed (cycle 2, CR-4)", () => {
+  const doc = [
+    "# D",
+    "",
+    "<!-- jira-sync-changelog-start -->",
+    "## Change Log",
+    "| 2026-01-01 10:00 | Legacy row |",
+    "<!-- jira-sync-changelog-end -->",
+    "",
+    "<!-- github-sync-changelog-start -->",
+    "## Change Log",
+    "```",
+    "| 2026-05-05 | | Example | ex |",
+    "```",
+    "| 2026-02-02 11:00 | Other row |",
+    "<!-- github-sync-changelog-end -->",
+    "",
+  ].join("\n");
+  const out = CL.upsertChangeLog(doc, ENTRY, { docType: "task" });
+  assert.equal(CL.extractEntries(out).length, 3, "legacy + other + new");
+  assert.doesNotMatch(out, /Example/, "the fenced picture row is not history");
+  assert.match(out, /Legacy row/);
+  assert.match(out, /Other row/);
+});

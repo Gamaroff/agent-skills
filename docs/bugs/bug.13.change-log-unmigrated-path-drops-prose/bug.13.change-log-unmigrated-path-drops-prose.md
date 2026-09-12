@@ -280,6 +280,54 @@ document not yet migrated" — no single story or task owns the documents that w
 1. `command node --test shared/resources/tests/change-log.test.mjs` — 67 pass.
 2. `git show a5d18f67:shared/resources/change-log.js > shared/resources/change-log.js && command node --test shared/resources/tests/change-log.test.mjs; git checkout shared/resources/change-log.js` — the CR-1/2/3 tests red, then green.
 
+### Iteration 3
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-12
+**Developer**: Claude (develop-bug verify cycle 2 — full-branch refute pass)
+
+**Why reopened**: three defects, each confirmed by a probe:
+
+- **CR-1 (high)** — now that a fenced `<!-- change-log-end -->` inside the section survives write 1, write 2's `findMarkerBlock` matches it: its lazy `start[\s\S]*?end` regex checks only the *start* index against `protectedRanges`, so the block ends inside the fence. The real table and end marker are stranded outside the block (`extractEntries` → 0 after write 1), and each write emits one more end marker (2 → 3). The unguarded end-scan pre-dates this bug but was unreachable while fenced content was dropped.
+- **CR-2 (low)** — `splitCarriedLines` tests protection at the *line start*, but inline-code ranges begin mid-line, so a boundary line like `` `note`<!-- change-log-end --> `` counts as protected and its end marker is never stripped by position (two end markers after one write).
+- **CR-3 (low)** — a nested heading that *precedes* the table (`## Change Log` → `### Notes` → rows) sets the cut-off before any row is classified, demoting every existing row from history to carried prose (`extractEntries` N → 0) — a silent semantic change from pre-diff behaviour, where those rows were absorbed as history.
+- **CR-4 (cleanup)** — `collapseOtherLegacyBlocks` still harvests rows from other blocks with a bare `isEntryRow` filter, so a fenced example row in a *second* block is absorbed while the same row in the primary block is not.
+- **CR-5 (cleanup)** — `protectedRanges` is recomputed in `splitCarriedLines` after `findChangeLog` computed it. Declined: the engine runs on single documents of a few KB, and exposing `ranges` on `findChangeLog`'s return would widen a public shape for a negligible saving.
+
+**Proposed Fix**: guard the *end* of the marker scan the way the start already is; make whole-line protection come from `fencedRanges` only and test markers/headings at their own offsets against the full `protectedRanges`; let a nested heading close table classification only once a table line has been seen; route `collapseOtherLegacyBlocks` through the classifier; two-write tests for each.
+
+#### Fix Implementation (Reopened → Ready for QA)
+
+**Date**: 2026-09-12
+
+**Root Cause**: the Iteration 2 classifier applied protection at the wrong grain (whole-line, at line start, against fences *and* inline spans) and closed table classification on any nested heading; and the marker *locator* — untouched since before this bug — guarded only the start of a marker pair, which became reachable the moment fenced content survived a write.
+
+**Fix Description**:
+
+- `findMarkerBlock` guards **both** ends: after an unprotected start it takes the first *unprotected* end; an unprotected start with no unprotected end is not a block. Rewritten with `indexOf` — the lazy-regex helpers `blockRe` / `escapeRe` are removed (CR-1).
+- `splitCarriedLines` uses two grains: `fencedRanges` decides whole-line carry; markers and the heading are each checked at their **own offset** against the full `protectedRanges`, so a boundary line that opens with an inline span still has its marker stripped, and a marker inside an inline span is left alone (CR-2).
+- A nested heading closes table classification **only after** the first table line has been seen; a heading that merely precedes the table is carried above it and the rows below it stay history (CR-3).
+- `collapseOtherLegacyBlocks` harvests rows through the same classifier (`splitCarriedLines(out, {...found, hasMarkers: true}).tableLines`), so a fenced picture row in a stray block is not absorbed (CR-4).
+- CR-5 (recompute `protectedRanges`) declined — negligible cost on single documents; would widen `findChangeLog`'s public return shape.
+
+**Files Modified**:
+
+- `shared/resources/change-log.js` — `findMarkerBlock` (both ends guarded), `splitCarriedLines` (two-grain protection, offset-exact marker/heading checks, seen-table cut-off), `collapseOtherLegacyBlocks` (through the classifier); `blockRe` / `escapeRe` removed
+- `shared/resources/tests/change-log.test.mjs` — 5 more block-I tests: fenced end marker over three writes (fixed point), `findMarkerBlock` skips a protected end, inline-code boundary line, nested heading before the table, fenced row in a stray legacy block
+- 25 × `skills/*/references/change-log.js` — regenerated
+
+**Testing**:
+
+- 72 / 72. **Mutation-proved** against the cycle-1 engine (`db3ec482`): exactly the five new tests go red (5 fail / 67 pass); restored → green.
+- Adversarial pass (qa-fix 3.5) — transitions probed and held: CRLF document; span with no trailing newline; a legacy-marked H3 log with a note under it migrates to current markers, keeps the note, keeps its level and its sibling, and is a fixed point on the third write.
+- `npm run ci:fast` — result in the implementation report (Verify Cycle 2, Fast gate).
+
+**Verification Steps for QA**:
+
+1. `command node --test shared/resources/tests/change-log.test.mjs` — 72 pass.
+2. `git show db3ec482:shared/resources/change-log.js > shared/resources/change-log.js && command node --test shared/resources/tests/change-log.test.mjs; git checkout shared/resources/change-log.js` — the five cycle-2 tests red, then green.
+
 ---
 
 ## Status History
@@ -292,6 +340,8 @@ document not yet migrated" — no single story or task owns the documents that w
 | 2026-09-12 | Ready for QA | develop-bug | Fix implemented + regression test (block I, mutation-proved); ci:fast 3162/0 |
 | 2026-09-12 | Reopened | develop-bug | Verify cycle 1 FAIL — review-code CR-1/2/3 confirmed by probe; Iteration 2 opened |
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 2 fix — CR-1/2/3/4 addressed, 67/67, mutation-proved against a5d18f67 |
+| 2026-09-12 | Reopened | develop-bug | Verify cycle 2 FAIL — refute pass CR-1/2/3 confirmed by probe; Iteration 3 opened |
+| 2026-09-12 | Ready for QA | qa-fix | Iteration 3 fix — cycle-2 CR-1/2/3/4 addressed (CR-5 declined), 72/72, mutation-proved against db3ec482 |
 
 ---
 
