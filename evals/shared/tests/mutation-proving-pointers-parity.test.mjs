@@ -230,3 +230,82 @@ test("the document's counted heading agrees with the entries under it", () => {
     );
   });
 });
+
+/**
+ * The outcome vocabulary is defined ONCE — the last column of the doc's
+ * outcomes table — and restated in two consumers (qa-task Step 3c, qa-story's
+ * Mutation-Proof Spot Check) so a reviewer under QA-cycle pressure has it in
+ * front of them. Two restatements of one list is the enumeration class
+ * docs/reference/anti-patterns.md warns about, so this asserts each consumer's
+ * list equals the set of tokens the table actually uses, and that the doc's own
+ * prose list ("The tokens are …") agrees with its table. The table is the
+ * source: a token is whatever appears backticked in the table's last column.
+ * (task.114 finalise — AC3 had no asserting test.)
+ */
+const CONSUMERS_WITH_TOKENS = [
+  "skills/qa-task/SKILL.md",
+  "skills/qa-story/SKILL.md",
+];
+
+/** Backticked tokens in the last cell of every data row of the outcomes table. */
+function tableTokens(text) {
+  const start = text.indexOf("## What a mutation run can tell you");
+  assert.ok(start >= 0, "scan-broken: outcomes section heading not found");
+  const rest = text.slice(start);
+  const end =
+    rest.search(/^## /m) === 0 ? rest.slice(3).search(/^## /m) + 3 : -1;
+  const section = end > 0 ? rest.slice(0, end) : rest;
+  const tokens = new Set();
+  for (const line of section.split("\n")) {
+    const m = line.match(/^\|\s*\d+\s*\|(.*)\|\s*$/);
+    if (!m) continue;
+    const cells = m[1].split("|");
+    const last = cells[cells.length - 1];
+    for (const t of last.matchAll(/`([a-z-]+)`/g)) tokens.add(t[1]);
+  }
+  return tokens;
+}
+
+/** The backticked `a-b` tokens of a " · "-separated list: the paragraph that
+ *  starts at `anchorRe` and ends at the next blank line. Bounded by the
+ *  paragraph, NOT by a closing token — a lazy match to `dev-only` ran on to the
+ *  next mention of that word in the prose when the list was shortened, so
+ *  dropping a token from a consumer left this test green (found by mutating it). */
+function listedTokens(text, anchorRe) {
+  const m = text.match(anchorRe);
+  assert.ok(m, `scan-broken: token list not found via ${anchorRe}`);
+  const from = m.index;
+  const blank = text.indexOf("\n\n", from);
+  const para = text.slice(from, blank === -1 ? undefined : blank);
+  const tokens = new Set();
+  for (const t of para.matchAll(/`([a-z-]+)`/g)) tokens.add(t[1]);
+  return tokens;
+}
+
+test("the outcome tokens restated in the consumers equal the table's tokens", () => {
+  const doc = readFileSync(DOC, "utf8");
+  const table = tableTokens(doc);
+  assert.ok(
+    table.size >= 8,
+    `scan-broken: only ${table.size} tokens read from the table`,
+  );
+  // The doc's own prose list.
+  const docList = listedTokens(
+    doc,
+    /The tokens are the last column of the table:/,
+  );
+  assert.deepEqual(
+    [...docList].sort(),
+    [...table].sort(),
+    "the doc's prose list disagrees with its table",
+  );
+  for (const rel of CONSUMERS_WITH_TOKENS) {
+    const text = readFileSync(path.join(REPO_ROOT, rel), "utf8");
+    const listed = listedTokens(text, /`covered` · `/);
+    assert.deepEqual(
+      [...listed].sort(),
+      [...table].sort(),
+      `${rel} restates a token list that differs from the table`,
+    );
+  }
+});
