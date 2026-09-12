@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-12'
@@ -13,7 +13,7 @@ github_issue: 389
 **Bug ID**: bug.13
 **GitHub**: [#389](https://github.com/Gamaroff/agent-skills/issues/389)
 **Related**: none — cross-cutting (`shared/resources/change-log.js`; every writer that calls `upsertChangeLog` — the four `sync-jira-*`, four `sync-github-*`, `qa-*`, `finalise`, `develop`)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-12
@@ -223,14 +223,14 @@ document not yet migrated" — no single story or task owns the documents that w
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-09-12
+**QA Engineer**: develop-bug (verify cycle 1)
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ⚠️ Still Failing
 
-**Notes**: [Testing notes]
+**Notes**: Regression block and suites green, but the diff review found three defects in the fix itself (CR-1 marker text substring-stripped without a fence guard; CR-2 table membership ignoring `protectedRanges` and nesting; CR-3 blank lines dropped), each confirmed by probe. The bug's *reported* scenario was gone; the fix introduced adjacent ones.
 
-**Decision**: Closed | Reopened
+**Decision**: Reopened → Iteration 2
 
 ### Iteration 2
 
@@ -371,6 +371,17 @@ document not yet migrated" — no single story or task owns the documents that w
 1. `command node --test shared/resources/tests/change-log.test.mjs` — 74 pass.
 2. `git show 9de8b6cd:shared/resources/change-log.js > shared/resources/change-log.js && command node --test shared/resources/tests/change-log.test.mjs; git checkout shared/resources/change-log.js` — the two cycle-3 tests red, then green.
 
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-09-12
+**Verified by**: develop-bug (verify cycle 4 of 5)
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: Regression block I (21 tests) passes — each sub-block was mutation-proved against the engine it corrects (Iteration 1 vs `develop`, 2 vs `a5d18f67`, 3 vs `db3ec482`, 4 vs `9de8b6cd`). Affected suites + lint green (2101 / 0; prettier clean). Diff review clean: no bugs; two cleanups, CR-1 (stale contract comment) applied as `aed6306e`, CR-2 (drop an unreachable guard) declined — no behaviour change, not worth a fifth cycle. The reported failure no longer reproduces: the bug report's own probe yields a diff of markers + separator + new row and nothing removed.
+
+**Decision**: Closed (finalised in Step 7)
+
 ---
 
 ## Status History
@@ -387,15 +398,15 @@ document not yet migrated" — no single story or task owns the documents that w
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 3 fix — cycle-2 CR-1/2/3/4 addressed (CR-5 declined), 72/72, mutation-proved against db3ec482 |
 | 2026-09-12 | Reopened | develop-bug | Verify cycle 3 FAIL — CR-1 (sweep drops nested rows) and CR-2 (one-line marker pair) confirmed; Iteration 4 opened |
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 4 fix — cycle-3 CR-1/2/3 addressed, 74/74, mutation-proved against 9de8b6cd |
+| 2026-09-12 | Ready for QA | develop-bug | Fix verified — bug scenario gone (verify cycle 4 PASS) |
+| 2026-09-12 | Closed | develop-bug | Fix verified and accepted — PR #390, DoD bug.13.dod.1, CI green on aed6306e |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 4 (one initial fix + three verify-loop corrections)
+**Time to Resolution**: same day — filed 2026-09-12, closed 2026-09-12 (PR [#390](https://github.com/Gamaroff/agent-skills/pull/390))
+**Final Fix Details**: `upsertChangeLog` rebuilt the Change Log section from pipe-lines only, so on a document's first (un-migrated) write every other line of the section — an authoring note, a nested `###` and its body — was silently deleted. The engine now partitions the section through the module's own protected ranges: fenced content and inline spans are carried verbatim, the table is regenerated in place with prose kept on the side of the table it came from, a nested subsection keeps its own table, and a swept duplicate block gives up every real row before it is removed. `findMarkerBlock` now guards both ends of a marker pair, which became reachable the moment fenced content survived a write.
+**Lessons Learned**: (1) The first fix was correct in the steady state and wrong in three transitions the suite could not see — fenced content, nested tables, and a *second* write on its own output. Every one was found by the verify loop's adversarial review, not by the tests; the refute pass on cycle 2 (full diff, "find the claim that is false") caught the highest-severity one. (2) A guard that is unreachable today can become reachable when a neighbouring behaviour changes: the unguarded end-scan pre-dated this bug by months and was harmless only because the write dropped the very content that would trigger it. (3) A classifier must be applied at the grain its input has — fences protect lines, inline spans protect characters — and one classifier must feed every reader of the same span, or the readers disagree (cycle 1's "carried as prose *and* absorbed as history").
