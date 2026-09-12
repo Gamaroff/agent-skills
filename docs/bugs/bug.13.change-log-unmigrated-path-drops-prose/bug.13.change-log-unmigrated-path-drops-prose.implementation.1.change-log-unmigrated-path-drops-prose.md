@@ -26,7 +26,7 @@ started: '2026-09-12T06:31:03Z'
 | 4 | create-pr | ✅ Done | PR #390: https://github.com/Gamaroff/agent-skills/pull/390 (commits a5d18f67 fix, 7be49747 docs) | |
 | 5–6 | verify-fix loop | ✅ Done | 4 cycles: FAIL (3 bugs) → FAIL (3 bugs, refute pass) → FAIL (2 bugs) → PASS; commits db3ec482, 9de8b6cd, a972f3d6, aed6306e | review-code Explore subagents ×4 |
 | 7 | finalise-close | ✅ Done | DoD bug.13.dod.1 ACCEPTED (inline bug checklist; CI SUCCESS on aed6306e after a 45 s-interval poll); Resolution Summary written; status closed; registry row 13 → closed; #389 closed, board Done | |
-| 8 | commit-changes | ⏳ Pending | | |
+| 8 | commit-changes | ✅ Done | Committed in `60ed15af`, pushed; PR #390 open for the develop-next merge gate | |
 
 ## Decisions Log
 
