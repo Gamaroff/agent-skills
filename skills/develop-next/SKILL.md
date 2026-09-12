@@ -357,10 +357,12 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
    - `annotated` → commit below.
    - `already` → the row already names this PR. **Idempotent on the row, not on the commit**: a
      resume after a crash *between the annotate write and the `git commit`* arrives here with the
-     registry edited and uncommitted, and the resume path skips Step 0's dirty-tree check. So before
-     marking ticked, check and commit what may already be on disk:
+     registry edited and uncommitted — **staged or not**: `git diff` without `HEAD` compares the
+     working tree to the index and reads a staged-but-uncommitted edit as clean, which is the other
+     half of the same window — and the resume path skips Step 0's dirty-tree check. So before
+     marking ticked, compare against `HEAD` and commit what may already be on disk:
      ```bash
-     git diff --quiet -- docs/tasks/task-registry.md || {
+     git diff --quiet HEAD -- docs/tasks/task-registry.md || {
        git add docs/tasks/task-registry.md
        git commit -m "docs(registry): record <id> — PR #<n> merged"
        git push origin <baseBranch>

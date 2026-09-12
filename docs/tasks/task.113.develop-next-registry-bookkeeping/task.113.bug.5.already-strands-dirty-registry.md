@@ -4,7 +4,7 @@
 **Bug ID**: TASK-113-BUG-5
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 3b refute pass, cycle 2 — CR-1)
 **Date Found**: 2026-09-12
 
@@ -63,3 +63,4 @@ then `ticked: true`. Mirror in develop-batch. Shape-assert the dirty check on th
 | 2026-09-12 | New          | QA         | Filed (QA cycle 2)    |
 | 2026-09-12 | In Progress  | qa-fix     | Investigation started |
 | 2026-09-12 | Ready for QA | qa-fix     | Fix implemented       |
+| 2026-09-12 | Closed       | QA         | Verified in a scratch clone under bash + zsh (QA cycle 3); the staged-edit half is bug 6 |

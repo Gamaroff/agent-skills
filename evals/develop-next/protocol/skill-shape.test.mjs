@@ -381,7 +381,7 @@ test("Step 4 registry arm: calls registry-tick.js --annotate, never writes Statu
   // QA-7 (task.113 cycle 2): `already` is idempotent on the row, not on the commit.
   assert.match(
     arm,
-    /git diff --quiet -- docs\/tasks\/task-registry\.md \|\| \{/,
+    /git diff --quiet HEAD -- docs\/tasks\/task-registry\.md \|\| \{/,
     "already checks for a dirty registry before marking ticked",
   );
   // QA-11: every exit-0 reason the engine can emit is named.

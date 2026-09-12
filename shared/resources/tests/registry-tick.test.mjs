@@ -872,6 +872,60 @@ test("annotate: a GFM delimiter row of any shape is a separator (QA-10)", () => 
   }
 });
 
+test("annotate: every annotate-mode outcome carries `annotated`, never `ticked` (QA-13)", () => {
+  const { dir } = sandbox([row(47, "sig", "accepted")]);
+  try {
+    const f = writeDoc(dir, 48, "tau", { status: "accepted" }); // no row 48 → no-row, a shared early exit
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "425",
+    ]);
+    assert.equal(res.reason, "no-row");
+    assert.equal(res.annotated, false);
+    assert.equal("ticked" in res, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("annotate: `none` / `n/a` / `TBD` count as empty, as the selector reads them (QA-14)", () => {
+  const { dir } = sandbox([
+    `| 49 | [T49](task.49.ups/task.49.ups.md) | accepted | infrastructure | Medium | 2026-01-01 | TBD | none |`,
+  ]);
+  try {
+    const f = writeDoc(dir, 49, "ups", { status: "accepted" });
+    const res = run(dir, [
+      "--annotate",
+      "--file",
+      path.relative(dir, f),
+      "--pr",
+      "426",
+      "--issue",
+      "[#3](z)",
+    ]);
+    assert.equal(res.reason, "annotated");
+    assert.equal(
+      res.issue,
+      "written",
+      "a TBD Issue cell is empty and gets filled",
+    );
+    const cells = annotatedRow(dir, "docs/tasks/task-registry.md", 49).split(
+      "|",
+    );
+    assert.equal(cells[7].trim(), "[#3](z)");
+    assert.equal(
+      cells[8].trim(),
+      "PR #426 merged",
+      "a `none` notes cell is replaced, not appended to",
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("annotate: `--issue` rejects a missing value, an empty value, a pipe and a newline — exit 2, nothing written (QA-2)", () => {
   const { dir, registry } = sandbox([row(43, "xi", "accepted")]);
   try {

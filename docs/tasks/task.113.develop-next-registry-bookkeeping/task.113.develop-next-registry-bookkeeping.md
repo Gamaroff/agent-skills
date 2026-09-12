@@ -203,6 +203,8 @@ more information, and `FAIL` still halts.
 | 2026-09-12 |         | QA findings fixed — QA-1…QA-6 all addressed, 1 iteration; 6 mutations proven | qa-fix |
 | 2026-09-12 |         | QA gate CONCERNS (80/100) — cycle 2 refute pass: 6/6 fixed, 1 medium + 4 low new | qa-task |
 | 2026-09-12 |         | QA findings fixed — QA-7…QA-11 + 3 cleanups, 2 iterations total; 7 mutations proven | qa-fix |
+| 2026-09-12 |         | QA gate CONCERNS (85/100) — cycle 3: 5/5 fixed, 1 medium (staged-edit half of the crash window) + 2 low new | qa-task |
+| 2026-09-12 |         | QA findings fixed — QA-12…QA-14, 3 iterations total; 4 mutations proven | qa-fix |
 
 ---
 
@@ -242,6 +244,8 @@ it stands after the review — instead of on the shape of the first run that exe
 
 **QA fix cycle 2** (2026-09-12): QA-7 `already` now checks `git diff --quiet` on the registry and commits a pre-crash edit before `ticked: true` (both orchestrators); QA-8 annotate refuses a row that does not read `accepted` (`not-accepted`) — the notes cell is the `Depends on` cell `parseDepCell` reads, so a note on a non-accepted row is a phantom dependency; QA-9 run-state schema gains `source`, named as what Step 4 reads on resume; QA-10 `findHeader` accepts any GFM delimiter row; QA-11 every exit-0 reason enumerated; CR-6 dead `undefined` branch removed; CR-7 the tick path calls `setCell()`; CR-8 CHANGELOG count replaced with the cycle summary. Seven mutations proven.
 
+**QA fix cycle 3** (2026-09-12): QA-12 `git diff --quiet HEAD -- …` in both orchestrators (a staged edit was invisible to the index diff); QA-13 `emit()` normalises the payload key per mode; QA-14 `EMPTY_CELL_RE` mirrors the selector's `DEP_EMPTY_RE`. Four mutations proven.
+
 **Mutations proven (9)**: engine — Issue overwrite guard removed, `already` guard removed, append
 replaced by overwrite, annotate routed into the tick path; prose — registry arm deleted, `FAIL`
 matrix row deleted, old PASS clause restored beside the matrix, step-2 conditional replaced with
@@ -262,12 +266,12 @@ for real after merge; its output belongs in the implementation report.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-12
-**Quality Score**: 80/100 (cycle 2; cycle 1: 70)
+**Quality Score**: 85/100 (cycle 3; cycles 1–2: 70, 80)
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.113.qa.2.develop-next-registry-bookkeeping.md](./task.113.qa.2.develop-next-registry-bookkeeping.md) (cycle 1: [qa.1](./task.113.qa.1.develop-next-registry-bookkeeping.md))
-- **Gate File**: [task.113.gate.2.develop-next-registry-bookkeeping.yml](./task.113.gate.2.develop-next-registry-bookkeeping.yml) (cycle 1: [gate.1](./task.113.gate.1.develop-next-registry-bookkeeping.yml))
+- **Full Report**: [task.113.qa.3.develop-next-registry-bookkeeping.md](./task.113.qa.3.develop-next-registry-bookkeeping.md) (earlier: [qa.1](./task.113.qa.1.develop-next-registry-bookkeeping.md), [qa.2](./task.113.qa.2.develop-next-registry-bookkeeping.md))
+- **Gate File**: [task.113.gate.3.develop-next-registry-bookkeeping.yml](./task.113.gate.3.develop-next-registry-bookkeeping.yml) (earlier: [gate.1](./task.113.gate.1.develop-next-registry-bookkeeping.yml), [gate.2](./task.113.gate.2.develop-next-registry-bookkeeping.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 93 targeted (3221 full fast gate)
@@ -280,9 +284,11 @@ for real after merge; its output belongs in the implementation report.
 - [Bug 2: `--issue` unvalidated](./task.113.bug.2.annotate-issue-cell-injection.md) — ✅ Closed (verified QA cycle 2)
 - [Bug 3: `no-cell` guard unreachable](./task.113.bug.3.no-cell-guard-ineffective.md) — ✅ Closed (verified QA cycle 2)
 - [Bug 4: `WAIVED → merge` unreachable](./task.113.bug.4.waived-row-unreachable.md) — ✅ Closed (verified QA cycle 2)
-- [Bug 5: `already` strands an uncommitted registry edit](./task.113.bug.5.already-strands-dirty-registry.md) — ✅ Ready for QA (fixed 2026-09-12)
+- [Bug 5: `already` strands an uncommitted registry edit](./task.113.bug.5.already-strands-dirty-registry.md) — ✅ Closed (verified QA cycle 3)
+- [Bug 6: the dirty check misses a staged edit](./task.113.bug.6.staged-edit-reads-clean.md) — ✅ Ready for QA (fixed 2026-09-12)
 
 ### Key Findings
+Cycle 3: QA-7…QA-11 FIXED; new QA-12 — `git diff --quiet` without `HEAD` misses a staged edit (the other half of bug 5's window), QA-13 payload shape, QA-14 empty-cell spellings.
 Cycle 2: QA-1…QA-6 all FIXED (verified by execution); new QA-7 `already` strands a pre-crash registry edit (medium), QA-8 phantom dependency via the notes cell on a non-accepted row, QA-9 run-state `source`, QA-10 GFM separator, QA-11 reason enumeration.
 Cycle 1: QA-1 zsh word-split in the Step 4 `--issue` expansion; QA-2 `--issue` unvalidated (missing/empty/`|`/newline); QA-3 `no-cell` guard unreachable — a 6-column registry gets a data cell annotated; QA-4 the `WAIVED → merge` matrix row is unreachable under qa-gate's schema. Bug reports 1–4 co-located.
 

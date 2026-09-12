@@ -180,6 +180,16 @@ function locateSelector(start) {
 }
 
 function emit(opts, payload) {
+  // One payload shape per mode: every annotate-mode outcome carries
+  // `annotated`, every tick-mode outcome carries `ticked` — including the early
+  // exits shared by both modes, which would otherwise report the other mode's
+  // key and leave a `--json` consumer reading `undefined`.
+  if (opts.annotate) {
+    if (payload.annotated === undefined) payload.annotated = false;
+    delete payload.ticked;
+  } else if (payload.ticked === undefined) {
+    payload.ticked = false;
+  }
   if (opts.json) process.stdout.write(JSON.stringify(payload, null, 2) + "\n");
   else process.stdout.write(`${payload.reason}: ${payload.message}\n`);
   process.exitCode = payload.exitCode;
@@ -403,10 +413,15 @@ async function main() {
   });
 }
 
-/** A cell that says "nothing here yet": `—`, `-`, or blank. */
+/**
+ * A cell that says "nothing here yet". The spellings mirror the selector's
+ * `DEP_EMPTY_RE` (select-next.mjs), which reads the same `Depends on` cell:
+ * the two readers must agree on what empty means, or a `none` here becomes
+ * `none · PR #n merged` while the selector still reads it as empty.
+ */
+const EMPTY_CELL_RE = /^(?:[—–-]|none|n\/a|na|tbd)?$/i;
 function isEmptyCell(cell) {
-  const v = String(cell).trim();
-  return v === "" || v === "—" || v === "-" || v === "–";
+  return EMPTY_CELL_RE.test(String(cell).trim());
 }
 
 /**

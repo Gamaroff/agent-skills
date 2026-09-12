@@ -389,7 +389,7 @@ test("Step 3 lane: the acceptance record branches on source with all three arms"
   // QA-7 mirror: the dirty-registry check on `already`.
   assert.match(
     rec,
-    /git diff --quiet -- docs\/tasks\/task-registry\.md/,
+    /git diff --quiet HEAD -- docs\/tasks\/task-registry\.md/,
     "already checks for a dirty registry",
   );
 });

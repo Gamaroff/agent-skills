@@ -1,0 +1,82 @@
+schema: 1
+task: 'task.113.develop-next-registry-bookkeeping'
+task_title: "develop-next's Step 4, merge gate and Step 1→2 signal still assume a roadmap-sourced, PASS-gated item"
+gate: CONCERNS
+status_reason: 'Cycle-2 findings 5/5 FIXED by execution. One new MEDIUM in the QA-7 fix itself: git diff --quiet compares worktree to index, so a crash after git add and before git commit still reads clean and strands the staged edit. Two cleanups.'
+reviewer: 'QA Engineer'
+updated: '2026-09-12T18:24:34Z'
+
+top_issues:
+  - id: 'QA-12'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The QA-7 recovery uses git diff --quiet -- <registry>, which compares the working tree to the INDEX only; a crash after git add but before git commit leaves the edit staged, the check reads clean, ticked: true is written and the edit is never committed — the exact window the branch exists to close (mirrored in develop-batch). Verified in a scratch clone.'
+    suggested_action: 'Use git diff --quiet HEAD -- docs/tasks/task-registry.md in both skills so staged and unstaged edits are both caught; update the two pinned shape regexes.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-13'
+    severity: low
+    file: 'shared/resources/registry-tick.js'
+    finding: 'In --annotate mode the shared early exits (no-registry, engine-unavailable, no-row, not-a-task) emit ticked: false and no annotated field, so a --json consumer branching on annotated sees undefined for four documented annotate reasons.'
+    suggested_action: 'Emit the mode-appropriate key uniformly from one place (annotated: false whenever opts.annotate is set).'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-14'
+    severity: low
+    file: 'shared/resources/registry-tick.js'
+    finding: 'isEmptyCell accepts blank/—/-/– while the selector DEP_EMPTY_RE reading the same cell also treats none, n/a, na, tbd as empty — a notes cell reading none becomes "none · PR #n merged" and an Issue cell reading TBD is kept rather than filled.'
+    suggested_action: 'Align isEmptyCell with the selector spellings (mirror DEP_EMPTY_RE) so both readers of the cell agree on empty.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 94
+  phases_verified: 5/5
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 2
+    notes: 'Non-accepted row refused; GFM-separator table annotated where intended. No new input surface.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'QA-12 — the staged-edit half of the crash window is still open.'
+  maintainability:
+    status: PASS
+    notes: 'QA-13/14 are consistency cleanups.'
+
+code_review:
+  findings: 3
+  promoted: ['QA-12 (CR-1)', 'QA-13 (CR-2)', 'QA-14 (CR-3)']
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 2
+  verification_method: 'Re-executed each reproduction; QA-7 snippet run under bash + zsh in a scratch clone'
+
+recommendations:
+  immediate:
+    - action: 'QA-12 compare against HEAD in both orchestrators'
+      refs: ['skills/develop-next/SKILL.md', 'skills/develop-batch/SKILL.md']
+  future:
+    - action: 'QA-13/QA-14 engine consistency'
+      refs: ['shared/resources/registry-tick.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['QA-12 fixed and re-verified']
