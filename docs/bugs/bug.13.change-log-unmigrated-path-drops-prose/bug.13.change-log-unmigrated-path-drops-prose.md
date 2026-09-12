@@ -1,17 +1,19 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-12'
 updated: '2026-09-12'
 related: 'none — cross-cutting (change-log engine; every sync/QA/finalise writer that appends a Change Log row)'
 description: "On the un-migrated (hasMarkers:false) path — the path every not-yet-migrated document takes on its first Change Log write — change-log.js regenerates the section from table rows alone, silently discarding prose and any nested ### subsection under the H2 heading."
+github_issue: 389
 ---
 
 **Bug ID**: bug.13
+**GitHub**: [#389](https://github.com/Gamaroff/agent-skills/issues/389)
 **Related**: none — cross-cutting (`shared/resources/change-log.js`; every writer that calls `upsertChangeLog` — the four `sync-jira-*`, four `sync-github-*`, `qa-*`, `finalise`, `develop`)
-**Status**: 🆕 New
+**Status**: ✅ Ready for QA
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-12
@@ -179,24 +181,45 @@ document not yet migrated" — no single story or task owns the documents that w
 
 #### Investigation (New → In Progress)
 
-**Date**: [Date]
-**Developer**: [Name]
+**Date**: 2026-09-12
+**Developer**: Claude (develop-bug, autonomous via develop-next)
 
-[Investigation notes, root cause analysis]
+**Reproduction**: ran the report's recipe verbatim against `develop` @ `f8e12200` — `findChangeLog` returns `{"start":72,"end":272,"level":2,"hasMarkers":false}`; the diff drops `AUTHORING NOTE prose.`, `### Nested` and `Nested body.` while keeping both rows, the new row and `## Next Section`. Matches the Evidence section line for line.
+
+**Root Cause Analysis**: `upsertChangeLog` (`shared/resources/change-log.js` ≈399–465) takes the located span `content.slice(found.start, found.end)`, keeps `blockLines.filter(isEntryRow)` plus `unparsed` (lines starting with `|`), and hands only those to `buildChangeLogBlock`, which emits markers + heading + a four-column table. Every line of the span that is not a pipe-line — prose, blank lines, a nested `###` heading and its body — is never read again. On the `hasMarkers:false` path the span is defined by `findChangeLog` as heading → next heading of the same-or-shallower level (≈339–350), so a nested `###` and its body are inside it. The marked path has the same regeneration, but an engine-written block never contains prose, so it only bites when a human adds text between the markers. The test at `change-log.test.mjs:657` (`TASK-42-BUG-1`) documents the drop as a "residual, and correct" — that is the design decision this bug overturns.
+
+**Proposed Fix**: partition the span into regenerated lines (markers, the `Change Log` heading, pipe-lines) and carried lines (everything else); emit carried lines above the table if they preceded it and below the new row if they followed it, inside the markers. Regression tests for both marker states; re-state the TASK-42-BUG-1 assertion to "the fenced heading is preserved *inside its fence*".
 
 #### Fix Implementation (In Progress → Ready for QA)
 
-**Date**: [Date]
+**Date**: 2026-09-12
 
-**Root Cause**: [Explanation]
+**Root Cause**: `upsertChangeLog` regenerated the located span from pipe-lines only (`isEntryRow` rows + `unparsed` pipe-lines), so every non-pipe line in the span — prose, blank lines, a nested `###` heading and its body — was never read again. On the un-migrated path the span is heading → next same-or-shallower heading, so nested content is inside it. The old test for TASK-42-BUG-1 documented the drop as "residual, and correct".
 
-**Fix Description**: [What was changed]
+**Fix Description**:
+
+- New `splitCarriedLines(blockLines)` in `shared/resources/change-log.js` partitions the span into lines the rebuild regenerates (any `SWEEP_PAIRS` marker, the first `Change Log` heading, pipe-lines) and lines it carries verbatim (everything else), split by where they sat relative to the table: `before` (above the first pipe-line) and `after` (below the last). Non-pipe lines that sat *between* two table fragments are carried too and emitted after the table, since the rows must be one contiguous table — moving a line loses nothing where dropping it lost text.
+- `buildChangeLogBlock` gains optional `before` / `after` line arrays, emitted inside the markers on either side of the table. Both default to empty, so an engine-written block that only ever held a table is emitted exactly as before.
+- Behaviour is identical on both marker states — the marked path was regenerating the same way, so a human note added between the markers was equally lost.
 
 **Files Modified**:
 
-- [file]
+- `shared/resources/change-log.js` — `splitCarriedLines` (new), `buildChangeLogBlock` (`before`/`after` options), `upsertChangeLog` (passes the partition through)
+- `shared/resources/tests/change-log.test.mjs` — block **I** (bug.13): 7 tests — prose + nested `###` survive on `hasMarkers:false` and `true`; carried lines keep their side of the table and sit inside the markers; a second write neither duplicates nor drops; an H3 log keeps prose and level; a table-only marked block is regenerated byte-for-byte. The `F: … TASK-42-BUG-1` assertion re-stated: the fenced heading is now *preserved inside its fence* (checked via `insideProtected`) rather than dropped.
+- 25 × `skills/*/references/change-log.js` — regenerated by `npm run bundle` (byte-identical copies; the copy-parity test requires it).
 
-**Testing**: [How the fix was tested]
+**Testing**:
+
+- Regression block I fails on the pre-fix engine and passes after the fix — **mutation-proved** by stashing `change-log.js` alone: exactly the 6 block-I tests + the re-stated F test go red (7 fail / 53 pass); restored → 60 / 60.
+- The bug report's own probe re-run on the fixed engine: the diff is now only the marker pair, the separator normalisation and the appended row — no `LOST` lines.
+- `npm run ci:fast` (prettier + full unit suite incl. the four `sync-jira-*` and four `sync-github-*` suites, which exercise the marked path) — result recorded in the implementation report.
+
+**Verification Steps for QA**:
+
+1. `command node --test shared/resources/tests/change-log.test.mjs` — 60 pass, block I present.
+2. Run the report's Reproduction Steps 1–3 against the branch: `diff probe.md after.md` shows no deleted lines (only `>` additions and the `| --- |` → `|------|` separator rewrite).
+3. `git stash push -- shared/resources/change-log.js && command node --test shared/resources/tests/change-log.test.mjs; git stash pop` — block I red, then green.
+4. `diff -q shared/resources/change-log.js skills/develop-bug/references/change-log.js` — no output (bundled copy matches).
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
@@ -216,6 +239,9 @@ document not yet migrated" — no single story or task owns the documents that w
 | Date       | Status | Changed By        | Notes                                                                    |
 | ---------- | ------ | ----------------- | ------------------------------------------------------------------------ |
 | 2026-09-12 | New    | repo sweep (Claude) | Filed from the 2026-09-12 sweep; carried as handoff follow-up 3a(1) since 2026-09-07 |
+| 2026-09-12 | new | ensure-bug-github-issue | GitHub issue created (#389) |
+| 2026-09-12 | In Progress | develop-bug | Reproduced; investigation started |
+| 2026-09-12 | Ready for QA | develop-bug | Fix implemented + regression test (block I, mutation-proved); ci:fast 3162/0 |
 
 ---
 
