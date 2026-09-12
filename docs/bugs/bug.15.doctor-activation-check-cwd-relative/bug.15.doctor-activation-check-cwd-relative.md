@@ -1,6 +1,6 @@
 ---
 type: bug
-status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: closed # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Minor'
 priority: 'Medium'
 created: '2026-09-12'
@@ -12,7 +12,7 @@ github_issue: 393
 
 **Bug ID**: bug.15
 **Related**: none — cross-cutting (`shared/resources/observation-log.js` `doctor`; `skills/observe-work/SKILL.md` Session Start step 1; `shared/resources/observe-work-session-start.sh`)
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Priority**: Medium
 **Severity**: Minor
 **Created**: 2026-09-12
@@ -183,14 +183,14 @@ assumption.
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
-**Date**: [Date]
-**QA Engineer**: [Name]
+**Date**: 2026-09-12
+**Verified by**: develop-bug (lite mode — signals 1 + 2)
 
-**Verification Result**: ✅ Fixed | ⚠️ Still Failing
+**Verification Result**: ✅ Fixed
 
-**Notes**: [Testing notes]
+**Notes**: The four regression tests under "project-root anchoring (bug 15)" pass (all four failed pre-fix; three go red when the anchor is reverted). The report's exact reproduction — `doctor` from `skills/observe-work/` via the bundled path — returns `healthy: true`, `activation-configured: state: "configured"`, and `families --audit` from the same cwd returns `gaps: []`. Full `observation-log.test.mjs` 52/52; `prettier --check` clean; `npm run ci:fast` green on this exact code (3187 tests, 3186 pass, 1 skipped, exit 0). The reported failure no longer reproduces.
 
-**Decision**: Closed | Reopened
+**Decision**: Closed (finalised in Step 7)
 
 ---
 
@@ -202,15 +202,15 @@ assumption.
 | 2026-09-12 | new | ensure-bug-github-issue | GitHub issue created (#393) |
 | 2026-09-12 | In Progress | develop-bug | Reproduced; investigation started |
 | 2026-09-12 | Ready for QA | develop-bug | Fix implemented + regression test (4 tests, mutation-proved) |
+| 2026-09-12 | Ready for QA | develop-bug | Fix verified — bug scenario gone (verify cycle 1 PASS) |
+| 2026-09-12 | Closed | develop-bug | Fix verified and accepted — DoD passed, PR #394 |
 
 ---
 
 ## Resolution Summary
 
-[Will be completed when bug is closed]
-
-**Final Status**: [Closed status]
-**Total Iterations**: [Number]
-**Time to Resolution**: [Duration]
-**Final Fix Details**: [Summary]
-**Lessons Learned**: [Key takeaways]
+**Final Status**: Closed — Fixed
+**Total Iterations**: 1
+**Time to Resolution**: same day (filed 2026-09-12, closed 2026-09-12)
+**Final Fix Details**: `doctor` and `families --audit` resolved the agent-instruction file and `skills/<member>/SKILL.md` against `process.cwd()`, so the documented cd-into-the-skill invocation false-negatived with `reason: ok`. Both now anchor at `projectRoot(args)` — `--audit-root` verbatim, else the nearest enclosing repository root (the `.git` walk `repoWorktrees` already had, factored into `nearestGitEntry`), else the cwd — and report the `root` they used; the activation check carries `state: configured | not-configured | no-agent-file` so a wrong root is no longer indistinguishable from a project that was never set up. Four regression tests from a nested cwd, mutation-proved; PR #394.
+**Lessons Learned**: when an engine already refuses to derive one thing from the cwd (the workspace), grep it for every *other* `process.cwd()` — the second anchor had the same defect for the same reason and was found only by the population check the report asked for. And a clean answer that cannot be checked is a claim about the instrument: report the root you used, and separate "file present, no mention" from "no file here", because they call for different actions and `ok: false` collapsed them.
