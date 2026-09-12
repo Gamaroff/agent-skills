@@ -252,9 +252,13 @@ const isTableLine = (l) => /^\s*\|/.test(l);
 // the diff. A machine writer's edit is additive; it never deletes text a human
 // wrote.
 //
-// Returns `{ before, after, tableLines }`; `tableLines` is the ONLY source the
-// caller reads rows from, so a protected pipe-line cannot be carried here and
-// absorbed as history there.
+// Returns `{ before, after, tableLines, unfencedLines }`. Two sources, by
+// what the caller does with the block: the PRIMARY block is rebuilt, so it
+// reads rows from `tableLines` and everything else is carried (a nested
+// subsection's rows stay with the subsection); a block being DISCARDED by the
+// sweep reads rows from `unfencedLines`, so every real row in it is harvested
+// wherever it sat. Neither includes a fenced line, so a fenced pipe-line
+// cannot be carried on one path and absorbed as history on the other.
 function splitCarriedLines(content, found) {
   // Two grains of protection. A FENCE protects whole lines — everything
   // inside it is carried verbatim. An INLINE code span protects only its own
