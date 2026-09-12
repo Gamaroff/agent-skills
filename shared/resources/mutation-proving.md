@@ -32,9 +32,9 @@ For each invariant a test claims to hold:
    not apply produces a green run that reads exactly like a passing proof:
 
    ```bash
-   diff -q /tmp/pre-mutation.ts path/to/source.ts >/dev/null 2>&1
-   case $? in
-     1) echo "MUTATION APPLIED" ;;
+   rc=0; diff /tmp/pre-mutation.ts path/to/source.ts || rc=$?
+   case $rc in
+     1) echo "MUTATION APPLIED — the edit is printed above; re-read it (row 10)" ;;
      0) echo "NOT APPLIED — the edit never landed; the green below proves nothing" ;;
      *) echo "NO SNAPSHOT or diff error — step 1 was skipped; stop" ;;
    esac
@@ -44,7 +44,11 @@ For each invariant a test claims to hold:
    when an operand is missing, and `diff a b || echo APPLIED` fires on both — so the
    one-liner this snippet replaced printed `MUTATION APPLIED` on the run where no
    snapshot had been taken, which is the run it exists to catch. Found by executing
-   the block (rule 5 below, applied to rule 3's own instrument).
+   the block (rule 5 below, applied to rule 3's own instrument). Two details of the
+   replacement are load-bearing too: the status is captured with `|| rc=$?` so the
+   block survives `set -e` on the one exit that means "applied" (a bare `diff` then
+   `case $?` died there — found by executing *that* block); and the diff is printed,
+   not `-q`, because the row-10 re-read needs to see the edit.
 
    Make the edit itself fail loudly: a Python `assert new != old` after
    `str.replace`, a `grep -c` before and after, a line count that must change.
@@ -288,9 +292,10 @@ that the survivors survived.
 # 2. a certainty — break it, confirm the NAMED test is the one that fails
 <the matrix command> 2>&1 | grep '<the test that names it>'
 
-# 3. applied — from step 4 of the procedure: exit 1 is the only "applied"
-diff -q /tmp/pre-mutation.ts path/to/source.ts >/dev/null 2>&1
-case $? in 1) echo "MUTATION APPLIED" ;; 0) echo "NOT APPLIED" ;; *) echo "NO SNAPSHOT — stop" ;; esac
+# 3. applied — from step 4 of the procedure: exit 1 is the only "applied", and
+#    the status is captured so the block survives `set -e` on that exit
+rc=0; diff /tmp/pre-mutation.ts path/to/source.ts || rc=$?
+case $rc in 1) echo "MUTATION APPLIED" ;; 0) echo "NOT APPLIED" ;; *) echo "NO SNAPSHOT — stop" ;; esac
 ```
 
 **The three cost two more runs of the matrix command, plus a diff.** Not a fixed

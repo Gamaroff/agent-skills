@@ -4,7 +4,7 @@
 **Bug ID**: TASK-114-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 4b snippet execution, QA-1)
 **Date Found**: 2026-09-12
 
@@ -93,3 +93,4 @@ rule 5 — it is the shortest one the repository has.
 | 2026-09-12 | New          | QA         | Found (QA-1, via 4b)  |
 | 2026-09-12 | In Progress  | qa-fix     | Investigation started |
 | 2026-09-12 | Ready for QA | qa-fix     | Fix implemented       |
+| 2026-09-12 | Closed       | QA         | Verified in cycle 2 — independent mutation red / 4b executed the new snippet |

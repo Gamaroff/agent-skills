@@ -13,14 +13,16 @@ top_issues:
     finding: 'COUNTED_SHAPES is applied per physical line with a bare \s+ between the count word and "shapes", so the defect class it guards evades it when the count is emphasised (the **four** shapes) or hard-wrapped across a line break (four\nshapes) — verified: both spellings pass silently, the reassuring-zero failure the file header warns about.'
     suggested_action: 'Match against the joined window text (lines lo..hi joined with a space) after stripping Markdown emphasis runs (* _ backtick), then test \b<count>\s+shapes\b; add the bold and line-wrapped spellings to the mutation set.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
   - id: 'QA-1'
     severity: medium
     file: 'shared/resources/mutation-proving.md'
     finding: 'The procedure'"'"'s own applied-check snippet (step 4, ≈line 35: diff <snapshot> <file> || echo "MUTATION APPLIED") prints MUTATION APPLIED when the snapshot file does not exist — diff exits 2 on a missing operand and || fires — so the instrument that rule 3 relies on reports "applied" on exactly the run where nothing was snapshotted (verified under bash and zsh by the 4b engine: stderr "No such file or directory", stdout "MUTATION APPLIED", status 0).'
     suggested_action: 'Discriminate the diff exit code: 1 → MUTATION APPLIED, 0 → NOT APPLIED, anything else → snapshot missing / diff error (a HALT, not a pass); apply the same shape to the Validate-the-probe block that repeats the snippet, and cite it as the worked example of rule 5.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-12'
 
 waiver:
   active: false
@@ -67,3 +69,10 @@ deployment_readiness:
   production: CONDITIONAL
   conditions:
     - 'CR-1 and QA-1 fixed and re-reviewed'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-12'
+  total_iterations: 1
+  verification_method: 'QA cycle 2 — independent mutations (*four*, **four**+wrap) red on test 1; 4b executed the new snippet under bash+zsh'

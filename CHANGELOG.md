@@ -62,15 +62,16 @@ All notable changes to this project will be documented in this file. Format foll
   rules** (snapshot with `cp`, baseline green between mutations, assert applied, predict the red
   test, ask what a broken probe would print, helpers return `{ ok, value }`) and one rule about
   checks (blind to what they do not iterate). The vacuity section gains a **seventh shape**, the one
-  no mutation can reveal: no fixture instantiates the input class. **`qa-task` and `qa-story` Step
-  3c** now record one line per proof carrying the test that went red and the outcome token —
+  no mutation can reveal: no fixture instantiates the input class. **`qa-task` Step 3c and
+  `qa-story`'s Mutation-Proof Spot Check** now record one line per proof carrying the test that went red and the outcome token —
   `covered` · `wrong-test-red` · `mutation-void` · `no-red-dead` · `no-red-untested` · `absorbed` ·
   `not-run` · `data-dependent` · `dev-only` — so "reds a committed test" and "development-time only"
   are written differently, where before both were `mutation-proven: yes`. The three consumer
   pointers that said "the four shapes" of a document that had six no longer state a count, and
   [`evals/shared/tests/mutation-proving-pointers-parity.test.mjs`](evals/shared/tests/mutation-proving-pointers-parity.test.mjs)
   fails on any pointer that does, and on the document's own heading disagreeing with its body —
-  mutation-proved four ways at authoring, per the procedure it guards.
+  mutation-proved per the procedure it guards: two ways at authoring, and two more at QA cycle 1
+  with the spellings the first version missed.
 
 - **`/develop-next` records the acceptance for what it actually selected, and merges what
   `/finalise` actually accepted** (task 113 — observations #13, #30, #31, #34, #35, #46, #52, #53).

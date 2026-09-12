@@ -161,6 +161,8 @@ bundle. No test greps the doc's headings (verified at review).
 | 2026-09-12 |         | Implemented — 12 files (1 source doc, 3 skill bodies, 6 bundled copies, 1 new test, CHANGELOG), 2 tests (mutation-proved 4 ways) | develop |
 | 2026-09-12 |         | QA gate CONCERNS (80/100) — 2 medium (count guard evadable; applied-check lies on missing snapshot), 2 low | qa-task |
 | 2026-09-12 |         | QA findings fixed — CR-1/CR-2/CR-3 (parity guard: joined emphasis-stripped window, dedupe, heading.index) and QA-1 (applied-check reads the diff exit code), 1 iteration | qa-fix |
+| 2026-09-12 |         | QA gate CONCERNS (70/100) — cycle 2 refute pass: 2/2 fixed, 3 medium in the fixes (set -e, locator/dedupe, -q hides the diff), 2 low | qa-task |
+| 2026-09-12 |         | QA findings fixed — cycle 2: set -e-safe applied-check that prints the diff, offset-based locator with pointer-independent dedupe, matchAll, scan widened to authored references, CHANGELOG wording; 2 iterations so far | qa-fix |
 
 ---
 
@@ -182,12 +184,12 @@ bundle. No test greps the doc's headings (verified at review).
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-12
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS (cycle 2)
 
 ### QA Report
-- **Full Report**: [task.114.qa.1.mutation-proving-outcomes.md](./task.114.qa.1.mutation-proving-outcomes.md)
-- **Gate File**: [task.114.gate.1.mutation-proving-outcomes.yml](./task.114.gate.1.mutation-proving-outcomes.yml)
+- **Full Report**: [task.114.qa.2.mutation-proving-outcomes.md](./task.114.qa.2.mutation-proving-outcomes.md) (cycle 1: [qa.1](./task.114.qa.1.mutation-proving-outcomes.md))
+- **Gate File**: [task.114.gate.2.mutation-proving-outcomes.yml](./task.114.gate.2.mutation-proving-outcomes.yml) (cycle 1: [gate.1](./task.114.gate.1.mutation-proving-outcomes.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 3233 (3232 pass, 1 skipped)
@@ -196,7 +198,7 @@ bundle. No test greps the doc's headings (verified at review).
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Two MEDIUM: the parity guard is evadable by an emphasised or hard-wrapped count word (CR-1); the document's own applied-check prints `MUTATION APPLIED` on a missing snapshot (QA-1). Two LOW test-file cleanups.
+Cycle 1 (closed): parity guard evadable by emphasis/wrap; applied-check lied on a missing snapshot. Cycle 2 (refute pass, open): the `case $?` snippet dies under `set -e` on APPLIED; the line locator + dedupe key re-duplicate; the `-q` snippet no longer shows the edit the prose asks for. Two LOW, one cleanup.
 
 ---
 
