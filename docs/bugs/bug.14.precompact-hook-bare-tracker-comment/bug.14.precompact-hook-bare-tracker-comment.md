@@ -374,6 +374,17 @@ Markdown-only call-site guard.
 2. `node --test shared/resources/tests/comment-slot-coverage.test.mjs` → the `$(command node …)` visibility test passes.
 3. Fire the hook twice at the same step with a GitHub tracker: the second issue comment reports `already`.
 
+#### QA Verification (Ready for QA → Closed/Reopened)
+
+**Date**: 2026-09-12
+**Verified by**: develop-bug (Verify Cycle 3)
+
+**Verification Result**: ✅ Fixed
+
+**Notes**: Regression scenarios S4–S11 in `develop-pipeline-on-precompact.test.sh` pass (11/11 under bash 5.3 and `/bin/bash` 3.2; each was red before its fix). Under `access.tracker: read-only` neither `gh issue comment` nor `gh pr comment` is executed and both writes are journaled with distinct ids; under `full` the issue comment is one `tracker-comment.js` call (marker + lead, `--body-file -`, `--tracker` from the lock) and the PR comment opens with the lead via `--body-file`. Guards: `mutation-call-site-coverage` 8/8 (scans tracked shell; bare call → red), `comment-slot-coverage` 12/12 (sees the hook's `$(command node …)` sites), stakeholder-summary / tracker-comment / parity suites green; shellcheck clean. Cycle-3 code review (scoped): no blocking findings; one medium-confidence test-assertion weakness and two cleanups applied before finalise (S11 anchored on the PR line; `baseStage` derived from the engine's `CYCLE_SCOPED_STAGES`; docs name `node` as a PR-arm precondition). The reported failure no longer reproduces.
+
+**Decision**: Closed (finalised in Step 7)
+
 ---
 
 ## Status History
@@ -388,6 +399,7 @@ Markdown-only call-site guard.
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 2: CR-1..CR-5 fixed + bash 3.2 array expansion; S7–S9 regression scenarios |
 | 2026-09-12 | Reopened | develop-bug | Verify Cycle 2 FAIL — refute pass: deferral-id collapse + slot-guard blind spot; Iteration 3 opened |
 | 2026-09-12 | Ready for QA | qa-fix | Iteration 3: distinct deferral ids per pause; slot-guard sees command-node sites; S10/S11 |
+| 2026-09-12 | Ready for QA | develop-bug | Fix verified — bug scenario gone (Verify Cycle 3 PASS) |
 
 ---
 

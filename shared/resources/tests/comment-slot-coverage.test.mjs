@@ -75,11 +75,16 @@ const ALL_CLASSIFIED = new Set([
 ]);
 
 /** Cycle-scoped stages carry a numeric suffix; strip it for catalogue lookup. */
+// Built from the engine's own list rather than restated: a third copy of
+// "which stages take a suffix" is the enumeration class this repository keeps
+// paying for, and the engine exports it (require-safe — run() is guarded by
+// require.main === module).
+const { CYCLE_SCOPED_STAGES } = require(
+  path.join(REPO_ROOT, "shared/resources/tracker-comment.js"),
+);
+const CYCLE_RE = new RegExp(`^(${CYCLE_SCOPED_STAGES.join("|")})-`);
 function baseStage(stage) {
-  // Kept in step with CYCLE_SCOPED_STAGES in tracker-comment.js; the
-  // stakeholder-summary suite holds the two engines' suffix rules equal, and
-  // this guard would otherwise see `pipeline-paused-N` as an unknown stage.
-  const m = /^(qa-cycle|qa-fix|pipeline-paused)-/.exec(stage);
+  const m = CYCLE_RE.exec(stage);
   return m ? m[1] : stage;
 }
 

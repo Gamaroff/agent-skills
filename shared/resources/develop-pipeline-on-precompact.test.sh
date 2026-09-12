@@ -332,8 +332,10 @@ elif grep -qE '^pr comment' "$S11/gh.log"; then
   fail "partial bundle: PR comment not posted" "$(grep -E '^pr comment' "$S11/gh.log")"
 elif ! grep -qF 'PR comment: skipped — ' <<<"$OUT" || grep -qF 'failed to load' <<<"$OUT"; then
   fail "partial bundle: outcome names a missing sibling, not a rejected config" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
-elif ! grep -qF 'not found beside the hook' <<<"$OUT"; then
-  fail "partial bundle: outcome says 'not found beside the hook'" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
+elif ! grep -qF 'PR comment: skipped — resolve-platform.sh or read-config.sh not found beside the hook' <<<"$OUT"; then
+  # Anchored on the PR line: the issue arm's own "not found beside the hook"
+  # is always present in this partial dir and would satisfy a bare grep.
+  fail "partial bundle: PR outcome says 'not found beside the hook'" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
 else
   pass "partial bundle (resolver present, read-config.sh absent): 'not found beside the hook', nothing posted"
 fi
