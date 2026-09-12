@@ -110,7 +110,11 @@ SKILL=$(jq -r '.skill // ""' "$LOCK" 2>/dev/null)
 REPORT=$(jq -r '.report_path // ""' "$LOCK" 2>/dev/null)
 BRANCH=$(jq -r '.branch // ""' "$LOCK" 2>/dev/null)
 PR_URL=$(jq -r '.pr_url // ""' "$LOCK" 2>/dev/null)
-TRACKER=$(jq -r '.tracker // ""' "$LOCK" 2>/dev/null)
+# Hook-private name, deliberately not TRACKER: sourcing resolve-platform.sh below
+# unsets and re-resolves TRACKER (and leaves it unset when it returns 1 part-way),
+# so a shared name would have the signal report whatever the resolver decided —
+# or nothing — instead of what the lock said.
+LOCK_TRACKER=$(jq -r '.tracker // ""' "$LOCK" 2>/dev/null)
 TRACKER_ISSUE=$(jq -r '.tracker_issue // ""' "$LOCK" 2>/dev/null)
 CURRENT_STEP=$(jq -r '.current_step // 0' "$LOCK" 2>/dev/null)
 # NOW is set once near the top (used by both write_pause_snapshot and the report entry).
@@ -138,7 +142,7 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
     echo "- Branch: \`${BRANCH}\`"
     echo "- Last step boundary: Step ${CURRENT_STEP}"
     echo "- PR: ${PR_URL:-not yet created}"
-    echo "- Tracker: ${TRACKER:-none} ${TRACKER_ISSUE:+#${TRACKER_ISSUE}}"
+    echo "- Tracker: ${LOCK_TRACKER:-none} ${TRACKER_ISSUE:+#${TRACKER_ISSUE}}"
     echo ""
     echo "**Resume**: re-invoke \`/${SKILL} <path>\` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step ${CURRENT_STEP}."
     echo ""
@@ -163,8 +167,18 @@ PR_COMMENT_OUTCOME="(no PR yet)"
 if [ -n "$PR_URL" ]; then
   PR_COMMENT_OUTCOME="skipped — gh not on PATH"
   if command -v gh >/dev/null 2>&1; then
+    # Two different failures, two different outcomes: a missing file means the
+    # hook was copied without its siblings (re-run the bundler); a file that
+    # loads and returns non-zero means the resolver REJECTED the config
+    # (malformed access: block, unsupported access.vcs) — sending the operator
+    # to the bundler for a config problem is the wrong troubleshooting row.
     PR_COMMENT_OUTCOME="skipped — resolve-platform.sh not found beside the hook (nothing posted)"
-    if [ -f "$HOOK_DIR/resolve-platform.sh" ] && source "$HOOK_DIR/resolve-platform.sh" 2>/dev/null; then
+    RESOLVER_OK=false
+    if [ -f "$HOOK_DIR/resolve-platform.sh" ]; then
+      PR_COMMENT_OUTCOME="skipped — resolve-platform.sh failed to load: it rejected the config (nothing posted)"
+      source "$HOOK_DIR/resolve-platform.sh" 2>/dev/null && RESOLVER_OK=true
+    fi
+    if [ "$RESOLVER_OK" = true ]; then
       PR_COMMENT_OUTCOME="skipped — stakeholder-summary-cli.js could not render the lead (nothing posted)"
       LEAD=$(command node "$HOOK_DIR/stakeholder-summary-cli.js" --stage pipeline-paused 2>/dev/null) || LEAD=""
       if [ -n "$LEAD" ]; then
@@ -172,16 +186,29 @@ if [ -n "$PR_URL" ]; then
           "$SKILL" "$CURRENT_STEP" "$REPORT" "$SKILL")
         PR_BODY_FILE="$STATE_DIR/precompact-pr-comment.md"
         printf '%s\n\n---\n\n%s\n' "$LEAD" "$PR_BODY" > "$PR_BODY_FILE"
-        if [ "${ACCESS_TRACKER:-full}" != "full" ]; then
-          PR_COMMENT_OUTCOME="deferred — access.tracker=${ACCESS_TRACKER} (recorded in the deferred-mutation journal, not posted)"
-        else
-          PR_COMMENT_OUTCOME="posted: $PR_URL"
-        fi
+        # tracker_write returns 0 on EVERY deferral branch, including "the record
+        # could not be written" — it says so only on stderr. Capture that and
+        # read it, so the signal never asserts a journal record that does not
+        # exist; an audit trail that claims more than it holds is the failure
+        # the journal exists to prevent.
+        TW_ERR="$STATE_DIR/precompact-pr-comment.stderr"
         TRACKER_WRITE_KIND=github.pr.comment \
         TRACKER_WRITE_SKILL="$SKILL" \
         TRACKER_WRITE_INTENT="Post the pipeline-paused notice on the pull request (body: $PR_BODY_FILE)" \
-          tracker_write gh pr comment "$PR_URL" --body-file "$PR_BODY_FILE" >/dev/null 2>&1 \
-          || PR_COMMENT_OUTCOME="failed — gh pr comment returned non-zero (body kept at $PR_BODY_FILE)"
+          tracker_write gh pr comment "$PR_URL" --body-file "$PR_BODY_FILE" >/dev/null 2>"$TW_ERR"
+        TW_RC=$?
+        if [ "${ACCESS_TRACKER:-full}" != "full" ]; then
+          if grep -q 'recorded as' "$TW_ERR" 2>/dev/null; then
+            PR_COMMENT_OUTCOME="deferred — access.tracker=${ACCESS_TRACKER} (recorded in the deferred-mutation journal, not posted)"
+          else
+            PR_COMMENT_OUTCOME="deferred — access.tracker=${ACCESS_TRACKER}, but the deferred record was NOT written (not posted; body kept at $PR_BODY_FILE)"
+          fi
+        elif [ "$TW_RC" -eq 0 ]; then
+          PR_COMMENT_OUTCOME="posted: $PR_URL"
+        else
+          PR_COMMENT_OUTCOME="failed — gh pr comment returned non-zero (body kept at $PR_BODY_FILE)"
+        fi
+        rm -f "$TW_ERR"
       fi
     fi
   fi
@@ -200,11 +227,25 @@ if [ -n "$TRACKER_ISSUE" ]; then
     ISSUE_BODY_FILE="$STATE_DIR/precompact-issue-comment.md"
     printf '⏸️ Pipeline paused at Step %s — context compaction imminent. State saved in `%s`. Resume with `/%s <path>`.\n' \
       "$CURRENT_STEP" "$REPORT" "$SKILL" > "$ISSUE_BODY_FILE"
+    # --tracker from the LOCK, explicitly. Left to itself the engine resolves the
+    # tracker from its environment, and this hook's environment is whatever the
+    # PR arm happened to leave: TRACKER exported when resolve-platform.sh was
+    # sourced, nothing when there was no PR yet. With nothing, the engine falls
+    # back to JIRA_URL presence — and a GitHub project whose shell carries a
+    # JIRA_URL would post issue #42 to Jira. The lock knows which tracker the
+    # pipeline is on; routing must not depend on which arms ran before this one.
+    # Expanded below as ${arr[@]+"${arr[@]}"}: under `set -u` a bare "${arr[@]}"
+    # on an EMPTY array is "unbound variable" in bash 3.2 (macOS /bin/bash),
+    # which is a bash `#!/usr/bin/env bash` can resolve to on a consumer machine.
+    case "$LOCK_TRACKER" in
+      jira|github) TRACKER_FLAG=(--tracker "$LOCK_TRACKER") ;;
+      *)           TRACKER_FLAG=() ;;
+    esac
     ISSUE_COMMENT_JSON=$(command node "$HOOK_DIR/tracker-comment.js" \
       --issue "$TRACKER_ISSUE" --stage "pipeline-paused-${CURRENT_STEP}" \
-      --body-file "$ISSUE_BODY_FILE" --quiet --json 2>/dev/null) || true
+      --body-file "$ISSUE_BODY_FILE" ${TRACKER_FLAG[@]+"${TRACKER_FLAG[@]}"} --quiet --json 2>/dev/null) || true
     ISSUE_COMMENT_REASON=$(printf '%s' "$ISSUE_COMMENT_JSON" | jq -r '.reason // "unknown"' 2>/dev/null)
-    ISSUE_COMMENT_OUTCOME="${ISSUE_COMMENT_REASON:-unknown} — #${TRACKER_ISSUE}${TRACKER:+ (${TRACKER})}"
+    ISSUE_COMMENT_OUTCOME="${ISSUE_COMMENT_REASON:-unknown} — #${TRACKER_ISSUE}${LOCK_TRACKER:+ (${LOCK_TRACKER})}"
   fi
 fi
 

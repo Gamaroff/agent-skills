@@ -273,6 +273,58 @@ Markdown-only call-site guard.
 
 **Decision**: Closed | Reopened
 
+### Iteration 2
+
+#### Re-Investigation (Ready for QA → Reopened)
+
+**Date**: 2026-09-12
+**Trigger**: Verify Cycle 1 code review (`/review-code`, adversarial diff pass) — one blocking finding plus three low-severity correctness findings and one cleanup, all in the Iteration 1 fix itself:
+
+- **CR-1 (blocking)** `develop-pipeline-on-precompact.sh:203` — the `tracker-comment.js` call passes no `--tracker`, and the hook never exports the lock's tracker. Whenever the PR arm has *not* sourced `resolve-platform.sh` (no `pr_url` — every pause before Step 4 — or `gh` absent), the engine's own resolver falls back to `JIRA_URL` presence alone: a GitHub project whose hook environment or `.env` carries `JIRA_URL` posts issue `#42` to Jira; a Jira project without credentials is treated as GitHub and reports `unverifiable` instead of `no-credentials`.
+- **CR-2** `:167` — sourcing `resolve-platform.sh` unsets and re-resolves `TRACKER`, silently replacing the lock-derived value used in the outcome string, and leaving it unset when the resolver returns 1 part-way.
+- **CR-3** `:166` — "resolve-platform.sh not found beside the hook" is also reported when the file exists but failed to load (config rejected), and the troubleshooting row then sends the operator to re-run the bundler for a config problem.
+- **CR-4** `:176` — the `deferred — recorded in the deferred-mutation journal` outcome is asserted without checking; `tracker_write` returns 0 on every deferral branch including "record could not be written".
+- **CR-5 (cleanup)** `tests/mutation-call-site-coverage.test.js:298` — `isInvocation` splits on connectives before checking leading text, so a shell `#` comment containing `&& gh issue comment` would be flagged; no such line exists today, but the widened scan makes it a latent false positive.
+
+**Re-Investigation Notes**: all five findings verified against the tip (`1138b9c8`). CR-1 reproduced with a new shell scenario: lock with no `pr_url` and `JIRA_URL` in the environment → the shim log showed no `issue comment 42` on `gh` (the engine had routed to Jira). CR-3 and CR-4 reproduced the same way (S8: a rejected `access:` value reported "not found"; S9: an unwritable journal reported "recorded"). CR-5 reproduced as a unit test on `isInvocation`.
+
+**Revised Approach**: the Iteration 1 design stands (both arms through the contract, fail closed); Iteration 2 removes the places where the hook let the *environment* decide something the *lock* already knows, and where an outcome string asserted more than the hook had checked.
+
+#### Fix Implementation (In Progress → Ready for QA)
+
+**Date**: 2026-09-12
+
+**Root Cause**: the Iteration 1 hook (a) let `tracker-comment.js` infer the tracker from whatever environment the PR arm happened to leave behind, (b) reused the shell variable name `TRACKER` that `resolve-platform.sh` unsets and re-resolves, and (c) reported outcomes ("not found", "recorded") that it had not actually established. The coverage-test predicate inspected text *after* splitting on connectives, so a `#` comment could lose its `#`.
+
+**Fix Description**:
+
+- **CR-1** — the lock's tracker is passed explicitly as `--tracker jira|github` to `tracker-comment.js` (only when the lock value is one of the two; anything else lets the engine resolve). Routing no longer depends on whether the PR arm ran.
+- **CR-2** — the lock's tracker lives in `LOCK_TRACKER`; `TRACKER` is left to the resolver. The report entry and the signal's outcome string read `LOCK_TRACKER`.
+- **CR-3** — the `-f` existence check and the `source` result are separate outcomes: `not found beside the hook` (re-bundle) vs `failed to load: it rejected the config` (fix `skills-config.yaml`). Troubleshooting rows added for both.
+- **CR-4** — `tracker_write`'s stderr is captured and read; under a restricted mode the outcome says `recorded in the deferred-mutation journal` only when the `recorded as` line is present, and `the deferred record was NOT written (body kept at …)` otherwise.
+- **CR-5** — `isInvocation` returns `false` for any line whose first non-blank character is `#`, before the connective split.
+- **Adversarial pass finding (fixed in the same cycle)**: the CR-1 fix introduced `"${TRACKER_FLAG[@]}"` on a possibly-empty array, which is `unbound variable` under `set -u` on bash 3.2 — the `/bin/bash` that `#!/usr/bin/env bash` can resolve to on a consumer's macOS. Replaced with the portable `${arr[@]+"${arr[@]}"}` expansion; the hook suite now runs under both 5.3 and 3.2 (`HOOK_TEST_BASH=/bin/bash`).
+
+**Files Modified**:
+
+- `shared/resources/develop-pipeline-on-precompact.sh` — `LOCK_TRACKER`; `--tracker` flag; split resolver outcomes; stderr-verified deferral outcome; portable array expansion
+- `shared/resources/develop-pipeline-on-precompact.test.sh` — scenarios S7 (CR-1), S8 (CR-3), S9 (CR-4); `HOOK_TEST_BASH` override so every scenario can run under bash 3.2
+- `tests/mutation-call-site-coverage.test.js` — `#`-comment early return; §0b unit test (three comment shapes rejected, two real call sites still accepted)
+- `shared/resources/develop-pipeline-hooks.md` — two troubleshooting rows (`failed to load`, `record NOT written`)
+- `skills/develop-{bug,story,task}/references/` — bundle output
+
+**Testing**:
+
+- S7/S8/S9 and §0b all red before the fix (S7 showed the issue comment routed to Jira), green after: hook suite 9/9 under bash 5.3 **and** `/bin/bash` 3.2; coverage test 8/8.
+- Empty-`tracker` lock run under bash 3.2: no `unbound variable`.
+- shellcheck (warning level) clean; `npm run ci:fast` per the implementation report.
+
+**Verification Steps for QA**:
+
+1. `bash shared/resources/develop-pipeline-on-precompact.test.sh` → 9 passed; `HOOK_TEST_BASH=/bin/bash bash …` → 9 passed.
+2. `grep -n -- '--tracker\|LOCK_TRACKER' shared/resources/develop-pipeline-on-precompact.sh` → the flag is built from the lock, not from `TRACKER`.
+3. `node --test tests/mutation-call-site-coverage.test.js` → §0b passes.
+
 ---
 
 ## Status History
@@ -283,6 +335,8 @@ Markdown-only call-site guard.
 | 2026-09-12 | new | ensure-bug-github-issue | GitHub issue created (#391) |
 | 2026-09-12 | In Progress | develop-bug | Reproduced; investigation started |
 | 2026-09-12 | Ready for QA | develop-bug | Fix implemented + regression test (S4–S6 in the hook test) |
+| 2026-09-12 | Reopened | develop-bug | Verify Cycle 1 FAIL — review-code CR-1 (tracker routing) blocking; Iteration 2 opened |
+| 2026-09-12 | Ready for QA | qa-fix | Iteration 2: CR-1..CR-5 fixed + bash 3.2 array expansion; S7–S9 regression scenarios |
 
 ---
 

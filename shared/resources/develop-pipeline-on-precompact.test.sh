@@ -22,13 +22,20 @@
 #      PR comment opens with the lead and travels by `--body-file`, never inline.
 #   6. (bug.14) resolve-platform.sh cannot be sourced → the PR comment is SKIPPED
 #      (fail closed), the hook still exits 0 and still emits the signal.
+#   7. (bug.14 / CR-1) no pr_url, JIRA_URL in the environment → the issue comment
+#      still goes to the tracker the LOCK names (github), because the hook passes
+#      --tracker explicitly instead of letting the engine guess from the env.
+#   8. (bug.14 / CR-3) resolve-platform.sh present but REJECTS the config → the PR
+#      arm reports "failed to load", not "not found", and posts nothing.
+#   9. (bug.14 / CR-4) deferred but the journal cannot be written → the outcome says
+#      the record was NOT written rather than asserting one that does not exist.
 
 PASS=0
 FAIL=0
 HOOK="$(cd "$(dirname "$0")" && pwd)/develop-pipeline-on-precompact.sh"
 # Absolute bash path — Scenario 1 runs the hook under a restricted PATH (jq absent);
 # an inline `PATH=… bash` prefix would also strip `bash` itself from lookup (rc=127).
-BASH_BIN="$(command -v bash)"
+BASH_BIN="${HOOK_TEST_BASH:-$(command -v bash)}"
 
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
 fail() { echo "  FAIL  $1"; echo "        $2"; FAIL=$((FAIL + 1)); }
@@ -74,7 +81,7 @@ SNAP_FILE="$TMPDIR_TEST/s2/develop-pipeline.last-halt.json"
 mkdir -p "$TMPDIR_TEST/s2"
 printf '{"skill":"develop-task","current_step":4,"branch":"feature/x","report_path":"","pr_url":"","tracker":"","tracker_issue":""}\n' > "$LOCK_FILE"
 
-OUT=$(PIPELINE_LOCK="$LOCK_FILE" bash "$HOOK" 2>/dev/null)
+OUT=$(PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$HOOK" 2>/dev/null)
 RC=$?
 if [ -f "$LOCK_FILE" ]; then
   fail "success path removes lock" "lock file still exists"
@@ -104,7 +111,7 @@ mkdir -p "$TMPDIR_TEST/s3"
 printf '{"sentinel":"do-not-clobber","current_step":7}\n' > "$SNAP_FILE"
 SNAP_BEFORE=$(cat "$SNAP_FILE")
 
-OUT=$(PIPELINE_LOCK="$LOCK_FILE" bash "$HOOK" 2>/dev/null)
+OUT=$(PIPELINE_LOCK="$LOCK_FILE" "$BASH_BIN" "$HOOK" 2>/dev/null)
 RC=$?
 SNAP_AFTER=$(cat "$SNAP_FILE")
 if [ "$RC" -ne 0 ]; then
@@ -147,15 +154,18 @@ chmod +x "$SHIM_BIN/gh"
 
 run_hook_in_consumer() {
   # $1 = scenario dir, $2 = access line for skills-config.yaml ("" → no file)
-  local dir="$1" access="$2"
+  # $3 = pr_url for the lock (default: a GitHub PR; "" → no PR yet)
+  # $4 = journal path override (default: <dir>/.claude/state/tracker-actions.jsonl)
+  # Extra env for the hook can be passed by the caller as HOOK_ENV_* exports.
+  local dir="$1" access="$2" pr_url="${3-https://github.com/o/r/pull/7}" journal="${4-}"
   mkdir -p "$dir/.claude/state" "$dir/stdin"
   [ -n "$access" ] && printf 'access:\n  tracker: %s\n' "$access" > "$dir/skills-config.yaml"
-  printf '{"skill":"develop-task","current_step":4,"branch":"feature/x","report_path":"","pr_url":"https://github.com/o/r/pull/7","tracker":"github","tracker_issue":"42"}\n' \
+  printf '{"skill":"develop-task","current_step":4,"branch":"feature/x","report_path":"","pr_url":"%s","tracker":"github","tracker_issue":"42"}\n' "$pr_url" \
     > "$dir/.claude/state/develop-pipeline.lock"
   : > "$dir/gh.log"
   (cd "$dir" && PATH="$SHIM_BIN:$PATH" GH_LOG="$dir/gh.log" GH_STDIN_DIR="$dir/stdin" \
      PIPELINE_LOCK="$dir/.claude/state/develop-pipeline.lock" \
-     TRACKER_ACTIONS_JOURNAL="$dir/.claude/state/tracker-actions.jsonl" \
+     TRACKER_ACTIONS_JOURNAL="${journal:-$dir/.claude/state/tracker-actions.jsonl}" \
      "$BASH_BIN" "$HOOK" 2>"$dir/stderr.log")
 }
 
@@ -235,6 +245,54 @@ elif [ -f "$S6/.claude/state/develop-pipeline.lock" ]; then
   fail "resolver missing: lock still removed" "lock present"
 else
   pass "resolver missing: PR comment skipped (fail closed), lock removed, signal emitted"
+fi
+
+# ── Scenario 7 (CR-1): the lock's tracker wins over an ambient JIRA_URL ──────
+# No pr_url, so the PR arm never sources resolve-platform.sh and nothing exports
+# TRACKER into the engine's environment. Without an explicit --tracker the engine
+# resolves from JIRA_URL presence and posts a GitHub issue number to Jira.
+S7="$TMPDIR_TEST/s7"
+OUT=$(JIRA_URL="https://example.atlassian.net" run_hook_in_consumer "$S7" "" "")
+RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "lock tracker wins: hook exits 0" "rc=$RC"
+elif ! grep -qE '^issue comment 42 --body-file -' "$S7/gh.log"; then
+  fail "lock tracker wins: issue comment routed to GitHub (the lock's tracker), not Jira" "gh.log: $(cat "$S7/gh.log"); outcome: $(grep -o 'Tracker issue comment: .*' <<<"$OUT" | head -1)"
+elif ! grep -qF 'Tracker issue comment: posted' <<<"$OUT"; then
+  fail "lock tracker wins: signal reports the issue comment as posted" "$(grep -o 'Tracker issue comment: .*' <<<"$OUT" | head -1)"
+elif ! grep -qF 'PR comment: (no PR yet)' <<<"$OUT"; then
+  fail "lock tracker wins: PR arm reports no PR yet" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
+else
+  pass "lock tracker wins: with no PR and JIRA_URL in env, issue comment still goes to GitHub via --tracker"
+fi
+
+# ── Scenario 8 (CR-3): resolver present but rejects the config → "failed to load"
+S8="$TMPDIR_TEST/s8"
+OUT=$(run_hook_in_consumer "$S8" "bogus-mode")
+RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "resolver rejects config: hook exits 0" "rc=$RC"
+elif grep -qE '^pr comment' "$S8/gh.log"; then
+  fail "resolver rejects config: PR comment not posted" "$(grep -E '^pr comment' "$S8/gh.log")"
+elif ! grep -qF 'PR comment: skipped — resolve-platform.sh failed to load' <<<"$OUT"; then
+  fail "resolver rejects config: outcome distinguishes failed-to-load from not-found" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
+else
+  pass "resolver rejects config: PR arm skipped with a 'failed to load' outcome, not 'not found'"
+fi
+
+# ── Scenario 9 (CR-4): deferred, journal unwritable → outcome says NOT written ─
+S9="$TMPDIR_TEST/s9"
+mkdir -p "$S9/journal-is-a-dir"
+OUT=$(run_hook_in_consumer "$S9" "read-only" "https://github.com/o/r/pull/7" "$S9/journal-is-a-dir")
+RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "journal unwritable: hook exits 0" "rc=$RC"
+elif grep -qE '^pr comment' "$S9/gh.log"; then
+  fail "journal unwritable: PR comment still not posted" "$(grep -E '^pr comment' "$S9/gh.log")"
+elif ! grep -qF 'PR comment: deferred — access.tracker=read-only, but the deferred record was NOT written' <<<"$OUT"; then
+  fail "journal unwritable: outcome does not claim a record that was not written" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
+else
+  pass "journal unwritable: deferred outcome reports the record was NOT written"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

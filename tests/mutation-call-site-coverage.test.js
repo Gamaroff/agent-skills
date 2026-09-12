@@ -269,6 +269,12 @@ function isInvocation(line, shape) {
   const m = shape.re.exec(line);
   if (!m) return false;
 
+  // A comment is never a call site — in a shell source or inside a bash fence
+  // alike. Checked BEFORE the connective split below: that split keeps only the
+  // text after the last `&&`/`then`/…, so `# … && gh issue comment 42` would
+  // otherwise lose its `#` and read as an invocation (bug.14 / CR-5).
+  if (/^\s*#/.test(line)) return false;
+
   let before = line.slice(0, m.index);
 
   // Inline mention inside prose: preceded by a backtick, or by sentence text.
@@ -306,6 +312,32 @@ function isInvocation(line, shape) {
   // Only leading whitespace or a capture may now precede it.
   return /^[\s]*(?:[A-Za-z_][A-Za-z0-9_]*=)?\$?\(?\s*$/.test(before);
 }
+
+test("§0b a shell comment is never an invocation, even one containing a connective", () => {
+  // bug.14 / CR-5. isInvocation splits on connectives BEFORE it inspects what
+  // precedes the command, so `# … && gh issue comment 42` used to read as a call
+  // site — the widened shell scan makes every hook comment a latent false
+  // positive, and a guard that cries wolf gets disabled.
+  const shape = MUTATING_SHAPES.find((s) => s.kind === "github.issue.comment");
+  assert.equal(
+    isInvocation(
+      "# before bug.14 this was && gh issue comment 42 --body x",
+      shape,
+    ),
+    false,
+  );
+  assert.equal(
+    isInvocation("  #   if foo; then gh issue comment 42", shape),
+    false,
+  );
+  assert.equal(isInvocation("#gh issue comment 42", shape), false);
+  // Non-vacuity: the predicate still sees a real call site on the same shape.
+  assert.equal(
+    isInvocation("  gh issue comment 42 --body-file -", shape),
+    true,
+  );
+  assert.equal(isInvocation("true && gh issue comment 42", shape), true);
+});
 
 test("§1 no bare mutating tracker call in canonical prose", () => {
   const failures = [];
