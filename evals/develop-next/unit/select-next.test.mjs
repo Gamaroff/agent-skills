@@ -1794,7 +1794,7 @@ test("15/SC10: --batch is unchanged — registry items carry no touches: data", 
   );
   assert.match(
     empty.detail,
-    /develop-next/,
+    /develop-next(?![-\w])/,
     "…and name /develop-next as the route",
   );
 });
