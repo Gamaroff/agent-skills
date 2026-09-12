@@ -26,7 +26,7 @@ started: '2026-09-12T13:35:29Z'
 | 4 | create-pr | ✅ Done | PR #394: https://github.com/Gamaroff/agent-skills/pull/394 (commits 87facc8 fix, c47f7f0 docs) | — |
 | 5–6 | verify-fix loop | ✅ Done | Cycle 1 PASS (lite: regression 4/4 + suite 52/52 + ci:fast green); qa-cycle-1 comment posted | — |
 | 7 | finalise-close | ✅ Done | DoD ACCEPTED (bug.15.dod.1); CI rollup SUCCESS on c47f7f04; bug closed; registry row 15 → closed; issue #393 closed; board Done (already) | — |
-| 8 | commit-changes | ✅ Done | Step 8 close commit on PR #394 (hash recorded in the follow-up commit) | — |
+| 8 | commit-changes | ✅ Done | Committed in `5ce99c15` (PR #394) | — |
 
 ## Decisions Log
 
