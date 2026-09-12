@@ -188,7 +188,9 @@ the pipeline should never reach at runtime, and wants to hear about loudly if it
 does.
 
 **`--stage` is validated against a known list** (`COMMENT_STAGES`, plus a numeric
-suffix for the cycle-scoped `qa-cycle` / `qa-fix`). An unlisted stage is exit 2
+suffix for the cycle-scoped `qa-cycle` / `qa-fix`, and for `pipeline-paused`, whose
+suffix is the step the pipeline paused at — the PreCompact hook's comment, one per
+distinct pause point). An unlisted stage is exit 2
 rather than a silently unique marker that nothing could ever deduplicate against.
 
 ### Why `unverifiable` is not `already`

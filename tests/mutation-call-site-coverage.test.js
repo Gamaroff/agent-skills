@@ -11,7 +11,14 @@
  *
  * Scope is deliberately narrow — a guard that cries wolf gets disabled.
  *
- *   CANONICAL PROSE ONLY: `skills/*​/SKILL.md` plus `shared/resources/*.md`.
+ *   CANONICAL SOURCES ONLY: `skills/*​/SKILL.md` plus `shared/resources/*.md`,
+ *   and — since bug.14 — the tracked SHELL sources an agent does not read but
+ *   the harness runs: `shared/resources/*.sh`, `skills/*​/scripts/*.sh` and
+ *   `scripts/*.sh`. The PreCompact hook posted a bare `gh issue comment` for
+ *   months while this guard scanned Markdown only; the one caller with no prose
+ *   step behind it was exactly the one no guard saw, and AGENTS.md said the
+ *   guard caught "shipped source". A guard's stated scope and its scanned scope
+ *   must agree, so the scan now covers what the sentence claims.
  *   `skills/*​/references/` is EXCLUDED because it is `npm run bundle` output —
  *   the same ~30 copies of the same sources. Including it inflates every count
  *   ~30× and, worse, makes a real finding indistinguishable from its own echo.
@@ -184,15 +191,27 @@ const NOT_CALL_SITES = new Map([
     "shared/resources/tracker-comment-contract.md",
     "The comment CLI's contract; names `gh issue comment` to say what it wraps.",
   ],
+  [
+    "shared/resources/tracker-access.test.sh",
+    "The access gate's own test suite. It invokes `tracker_write gh issue " +
+      "comment` on purpose, to prove the wrapper refuses it under a restricted " +
+      "mode — the call is the thing under test, not a site that should be routed.",
+  ],
 ]);
 
-/** Canonical prose: skill bodies and the shared sources they are bundled from. */
+/**
+ * Canonical sources: skill bodies, the shared sources they are bundled from, and
+ * the shell that ships beside them. A `.sh` is scanned line-for-line — every
+ * line of a script is "inside a bash fence" — so the invocation predicate
+ * applies unchanged, and a `#` comment never starts an invocation.
+ */
 function collectCanonicalDocs() {
   const docs = [];
 
   const sharedDir = path.join(REPO_ROOT, "shared", "resources");
   for (const f of fs.readdirSync(sharedDir)) {
-    if (f.endsWith(".md")) docs.push(path.join(sharedDir, f));
+    if (f.endsWith(".md") || f.endsWith(".sh"))
+      docs.push(path.join(sharedDir, f));
   }
 
   const skillsDir = path.join(REPO_ROOT, "skills");
@@ -200,12 +219,46 @@ function collectCanonicalDocs() {
     const skillMd = path.join(skillsDir, skill, "SKILL.md");
     if (fs.existsSync(skillMd)) docs.push(skillMd);
     // skills/*/references/ is deliberately NOT walked — see the header.
+    const scriptsDir = path.join(skillsDir, skill, "scripts");
+    if (fs.existsSync(scriptsDir)) {
+      for (const f of fs.readdirSync(scriptsDir)) {
+        if (f.endsWith(".sh")) docs.push(path.join(scriptsDir, f));
+      }
+    }
+  }
+
+  const scriptsDir = path.join(REPO_ROOT, "scripts");
+  if (fs.existsSync(scriptsDir)) {
+    for (const f of fs.readdirSync(scriptsDir)) {
+      if (f.endsWith(".sh")) docs.push(path.join(scriptsDir, f));
+    }
   }
 
   return docs;
 }
 
 const DOCS = collectCanonicalDocs();
+
+test("§0 the scan set includes the shell hooks it claims to cover", () => {
+  // Non-vacuity for the bug.14 widening. A scan set is a claim about what the
+  // guard sees, and a readdir that silently matched no `.sh` would pass §1
+  // with the hook back to invisible. Name the file the bug was about, so the
+  // guard cannot narrow itself without this turning red.
+  const rel = DOCS.map((p) => path.relative(REPO_ROOT, p));
+  assert.ok(
+    rel.includes("shared/resources/develop-pipeline-on-precompact.sh"),
+    "the PreCompact hook must be in the scan set",
+  );
+  const shell = rel.filter((p) => p.endsWith(".sh"));
+  assert.ok(
+    shell.length >= 20,
+    `expected ≥20 shell sources in the scan set, got ${shell.length}`,
+  );
+  assert.ok(
+    !rel.some((p) => p.includes("/references/")),
+    "bundle output under skills/*/references/ must stay out of the scan set",
+  );
+});
 
 /**
  * A call site is a line that INVOKES the command: the line begins with it

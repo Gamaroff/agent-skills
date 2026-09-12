@@ -49,9 +49,11 @@ Both scripts are byte-identical across `develop-story` and `develop-task` instal
 0. **Write a resume snapshot first** — `develop-pipeline.last-halt.json` (co-located with the lock) as a **superset of the lock** plus `paused_at`, `pause_reason: "precompact"`, and `halt_step` (aliasing the lock's `current_step`). This is written **before the EXIT trap is armed and before any `rm`**, so even a hook run killed mid-flow (SIGTERM/timeout) leaves recoverable resume state. Degrades to a verbatim `cp` of the lock when `jq` is unavailable (`current_step` is still preserved). The Phase 0b resume detector reads this snapshot when no active lock is present.
 1. Append a `## Pipeline Paused — {timestamp}` block to the implementation report named in the lock
 2. `git add <report> && git commit -m "docs(<skill>): pipeline paused at step <N> — context compaction imminent" && git push origin HEAD`
-3. `gh pr comment <pr_url>` if `pr_url` is set and `gh` is on PATH
-4. `gh issue comment <tracker_issue>` if `tracker=github` and `tracker_issue` is set
+3. PR comment, if `pr_url` is set and `gh` is on PATH — `tracker_write gh pr comment <pr_url> --body-file .claude/state/precompact-pr-comment.md`, the body opening with the `pipeline-paused` plain-language lead from `stakeholder-summary-cli.js`. Sourcing `resolve-platform.sh` beside the hook is what supplies `tracker_write`; under any `access.tracker` other than `full` the comment is **recorded, not posted**, and if the resolver or the lead cannot be loaded the arm **fails closed** (nothing posted, outcome named in the signal).
+4. Tracker-issue comment, if `tracker_issue` is set — one `tracker-comment.js --issue <tracker_issue> --stage pipeline-paused-<step> --body-file …` call. The engine resolves the tracker itself (GitHub, or Jira when `JIRA_*` credentials are in the hook's environment), renders the same lead, adds the idempotency marker (scoped by the step, so a second pause at a later step is a second comment) and applies the access gate. `node` or the engine missing → skipped, never posted bare.
 5. `rm -f .claude/state/develop-pipeline.lock`
+
+> Both comment arms were bare `gh … comment --body "…"` calls until bug.14 — no lead, no marker, and no access gate, so a consumer with `access.tracker: read-only` still got a write from the one caller that runs with no prose step behind it. `tests/mutation-call-site-coverage.test.js` now scans tracked shell sources as well as Markdown, so the bare form cannot come back unnoticed.
 
 > **Operator note — `pause_reason` vs `halt_reason`.** A PreCompact snapshot is tagged `pause_reason: "precompact"` (with `paused_at`); the orchestrator's terminal-HALT path in SKILL.md instead writes `halt_reason` + `halted_at`. Inspect **`pause_reason`** to identify a snapshot left by an interrupted compaction. Both carry `halt_step`, so Phase 0b resumes from the same field either way.
 
@@ -68,7 +70,7 @@ The orchestrator sees the signal in its next turn, emits the user-facing pause b
 - `jq` missing → exit 0 with empty `additionalContext` (degrades to no-pause), but the cp-fallback resume snapshot is still written first, so resume works via Phase 0b
 - Hook timeout / SIGTERM → `trap 'rm -f "$LOCK"' EXIT` ensures the lock is removed regardless. The snapshot is written **before** this trap is armed, so a kill can never leave the pipeline both unlocked **and** un-resumable.
 
-**Jira limitation**: the hook does NOT post to Jira issues — Jira requires authenticated MCP calls unavailable from a shell context. Pause is visible via PR comment + implementation report; the orchestrator surfaces a "Jira not commented" note in the user-facing summary.
+**Jira**: the issue comment goes through `tracker-comment.js`, which posts to Jira over REST when `JIRA_URL` / `JIRA_API_TOKEN` / `JIRA_USER_EMAIL` are in the hook's environment (or a `.env` the engine reads). Without them the engine reports `no-credentials` and the Jira side stays silent; the signal carries that outcome and the orchestrator repeats it in the user-facing summary. There is no MCP path from a shell hook.
 
 For the full lock-file format, half-done step recovery semantics, and verification checklist, see [`develop-pipeline-pause.md`](develop-pipeline-pause.md).
 
@@ -180,6 +182,8 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | Hook fires but nothing happens | No lock file (correct noop) | Confirm a `/develop-*` pipeline is active — lock is created at end of Step 1 |
 | Stop hook blocks but orchestrator stops anyway | Hook returned invalid JSON, or Claude Code rejected the block | Check stderr of the hook; verify `jq` produces valid output |
 | PR comment / git commit missing after pause | PR not set in lock, or `gh`/`git` not on PATH | All side effects are best-effort — implementation report is the durable record |
+| Pause comment absent but signal says `deferred` | `access.tracker` is not `full` — the gate held | Intended. The comment is in `.claude/state/tracker-actions.jsonl` for the handover checklist |
+| Signal says a comment was `skipped — … not found beside the hook` | Hook copied without its sibling engines (`resolve-platform.sh`, `tracker-comment.js`, `stakeholder-summary-cli.js`) | Re-run `npm run bundle` / the installer; the hook fails closed rather than posting bare |
 | Hook crashes future pipeline runs | Stale lock file left over | `rm -f .claude/state/develop-pipeline.lock` |
 | Installer refuses to write | Existing `settings.json` is invalid JSON | Fix or back up, re-run installer |
 | Hook fails with `No such file or directory` though the script exists | Legacy bare-relative `command` from a pre-`${CLAUDE_PROJECT_DIR}` install — resolved against the shell's cwd at hook-fire time, which breaks after any `cd` into a subdirectory | Re-run `bash .agents/skills/develop-story/scripts/install-hooks.sh` — it migrates the old entry to the cwd-independent `${CLAUDE_PROJECT_DIR}` form automatically |

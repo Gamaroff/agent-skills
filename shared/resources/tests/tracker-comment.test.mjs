@@ -1499,7 +1499,13 @@ test("the numeric suffix is legal only for cycle-scoped stages (NEW-6)", () => {
   // message promised — a rule nobody can predict from its own message.
   assert.equal(cli.isKnownStage("done-1"), false);
   assert.equal(cli.isKnownStage("review-3"), false);
-  assert.deepEqual([...cli.CYCLE_SCOPED_STAGES], ["qa-cycle", "qa-fix"]);
+  // bug.14: the PreCompact hook scopes its notice by the step it paused at.
+  assert.equal(cli.isKnownStage("pipeline-paused-4"), true);
+  assert.equal(cli.isKnownStage("pipeline-paused"), true);
+  assert.deepEqual(
+    [...cli.CYCLE_SCOPED_STAGES],
+    ["qa-cycle", "qa-fix", "pipeline-paused"],
+  );
 });
 
 // ── The plain-language lead ────────────────────────────────────────────────

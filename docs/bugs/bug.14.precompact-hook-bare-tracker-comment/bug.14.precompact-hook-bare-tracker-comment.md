@@ -1,17 +1,19 @@
 ---
 type: bug
-status: new # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
+status: ready-for-qa # bug lifecycle: new → in-progress → ready-for-qa → closed | reopened
 severity: 'Major'
 priority: 'High'
 created: '2026-09-12'
 updated: '2026-09-12'
 related: 'none — cross-cutting (develop-story / develop-task / develop-bug PreCompact hook; tracker-comment contract; access gate; the call-site coverage test)'
 description: "The shared PreCompact hook posts a bare `gh issue comment … --body …` and a bare `gh pr comment`, outside the tracker-comment contract (no plain-language lead, no idempotency marker, inline body) and outside the tracker_write access gate — so a consumer with access.tracker: read-only still gets a tracker write. The coverage test that AGENTS.md says catches bare invocations scans Markdown only, so the hook is invisible to it."
+github_issue: 391
 ---
 
 **Bug ID**: bug.14
+**GitHub**: [#391](https://github.com/Gamaroff/agent-skills/issues/391)
 **Related**: none — cross-cutting (`shared/resources/develop-pipeline-on-precompact.sh`, bundled into `develop-story`, `develop-task`, `develop-bug`; `shared/resources/tracker-comment-contract.md`; `resolve-platform.sh` `tracker_write`; `tests/mutation-call-site-coverage.test.js`)
-**Status**: 🆕 New
+**Status**: ✅ Ready for QA
 **Priority**: High
 **Severity**: Major
 **Created**: 2026-09-12
@@ -156,24 +158,109 @@ hook that may run with a minimal environment) and the guard's scan set.
 
 #### Investigation (New → In Progress)
 
-**Date**: [Date]
-**Developer**: [Name]
+**Date**: 2026-09-12
+**Developer**: Claude (develop-bug, via /develop-next)
 
-[Investigation notes, root cause analysis]
+**Reproduction**: three new scenarios in `shared/resources/develop-pipeline-on-precompact.test.sh`
+(a `gh` shim on PATH logging argv + stdin; hook run with cwd = a temp consumer dir). On the
+pre-fix hook at `30865480`, all three failed as the report predicts:
+
+- **S4** `access.tracker: read-only` → shim log shows `pr comment … --body ⏸️ …` and
+  `issue comment 42 --body ⏸️ …` — both writes performed, nothing recorded.
+- **S5** full access → `issue comment 42 --body …` inline, no marker, no lead.
+- **S6** hook copied without its siblings → still posts bare (no fail-closed path existed).
+
+**Root Cause Analysis**: `shared/resources/develop-pipeline-on-precompact.sh:130-141` built two
+notice strings and called `gh pr comment … --body` / `gh issue comment … --body` directly. The hook
+never sourced `resolve-platform.sh` (so `tracker_write` and `ACCESS_TRACKER` did not exist in its
+shell) and never invoked `tracker-comment.js` (so no lead, no marker, no journal). The guard that
+AGENTS.md said would catch this — `tests/mutation-call-site-coverage.test.js` — walked
+`shared/resources/*.md` and `skills/*/SKILL.md` only; a `.sh` was outside its scan set, so the
+one caller that runs with no prose step behind it was the one no guard saw.
+
+**Proposed Fix**: route both arms through the contract (issue → one `tracker-comment.js` call with a
+new `pipeline-paused` stage; PR → `stakeholder-summary-cli.js` lead + `tracker_write gh pr comment
+--body-file`), fail closed when a sibling engine is missing, and widen the guard's scan set to
+tracked shell so the AGENTS.md sentence and the scan agree.
 
 #### Fix Implementation (In Progress → Ready for QA)
 
-**Date**: [Date]
+**Date**: 2026-09-12
 
-**Root Cause**: [Explanation]
+**Root Cause**: two bare `gh … comment --body` invocations in a shell hook, invisible to a
+Markdown-only call-site guard.
 
-**Fix Description**: [What was changed]
+**Fix Description**:
+
+- **Issue comment** is now one `tracker-comment.js --issue … --stage pipeline-paused-<step>
+  --body-file …` call. The engine resolves the tracker itself, renders the lead, prepends the
+  idempotency marker and applies the access gate (`deferred` under anything but `full`). The stage
+  is cycle-scoped by the step it paused at, so a pipeline that pauses at Step 3 and again at Step 6
+  posts twice, while a repeat at the same step reports `already`. Consequence: the hook no longer
+  branches on `tracker=github` — Jira issues get the comment when `JIRA_*` credentials are in the
+  hook's environment, and the engine reports `no-credentials` otherwise (the previous "Jira pause
+  is silent by design" was the absence of a path, not a choice; the docs now say what actually
+  happens).
+- **PR comment** sources `resolve-platform.sh` beside the hook, renders the same lead with
+  `stakeholder-summary-cli.js`, writes lead + `---` + notice to
+  `.claude/state/precompact-pr-comment.md` (a durable path, so the deferred record's argv names a
+  file a human can replay) and posts via `tracker_write gh pr comment … --body-file`.
+- **Fail closed**: if `resolve-platform.sh`, `stakeholder-summary-cli.js`, `tracker-comment.js`
+  or `node` cannot be found, that arm is skipped and the signal names why — never a bare call as a
+  fallback. The signal and the user-facing summary now carry both outcomes verbatim
+  (`posted` / `deferred` / `already` / `no-credentials` / `skipped — …`).
+- **Guard widened** (Recommendation item 3, first option): `collectCanonicalDocs()` now also walks
+  `shared/resources/*.sh`, `skills/*/scripts/*.sh` and `scripts/*.sh` (still not
+  `references/`). A new §0 pins the PreCompact hook in the scan set with a ≥20-file floor, so the
+  set cannot quietly narrow. `tracker-access.test.sh` joins `NOT_CALL_SITES` with its reason (it
+  invokes the wrapper on purpose, as the thing under test).
+- **Recommendation item 2 branch taken**: the hook *does* source `resolve-platform.sh` (guarded,
+  never `|| exit` — a hook must exit 0). Verified it sources cleanly under `set -u` from a
+  non-git cwd, reads the same `skills-config.yaml` tier as `defer-mutation.js`, and costs one
+  python spawn.
 
 **Files Modified**:
 
-- [file]
+- `shared/resources/develop-pipeline-on-precompact.sh` — both comment arms rewritten; `HOOK_DIR` /
+  `STATE_DIR`; outcome lines in the signal; header documents the contract, the fail-closed rule and
+  the sibling engines (spelled as `shared/resources/…` for the bundler)
+- `shared/resources/stakeholder-summary.js` — `pipeline-paused` lead template; added to
+  `CYCLE_SCOPED_LEAD_STAGES`
+- `shared/resources/tracker-comment.js` — `pipeline-paused` in `COMMENT_STAGES` and
+  `CYCLE_SCOPED_STAGES`
+- `shared/resources/develop-pipeline-on-precompact.test.sh` — regression scenarios S4–S6
+- `shared/resources/tests/tracker-comment.test.mjs` — cycle-scoped list + `pipeline-paused-4`
+- `shared/resources/tests/stakeholder-summary.test.mjs` — new test holding the catalogue's and the
+  engine's suffix rules equal behaviourally over every `COMMENT_STAGE`
+- `tests/mutation-call-site-coverage.test.js` — shell scan set, §0 non-vacuity, allowlist entry
+- `shared/resources/develop-pipeline-hooks.md`, `develop-pipeline-pause.md`,
+  `tracker-comment-contract.md`, `stakeholder-summary.md` — describe the new behaviour and stage
+- `skills/develop-{bug,story,task}/SKILL.md` — pause summary repeats the signal's two outcomes
+  instead of asserting Jira was not commented on
+- `AGENTS.md` — the coverage sentence now names the scanned scope, which matches the scan
+- `skills/*/references/*` — `npm run bundle` output for the above
 
-**Testing**: [How the fix was tested]
+**Testing**:
+
+- Regression scenarios S4/S5/S6 fail on the pre-fix hook (output captured above) and pass after
+  the fix; S1–S3 unchanged and green.
+- Mutation proofs of the widened guard: appending a bare `gh issue comment` to the hook turns
+  `mutation-call-site-coverage.test.js` §1 red naming the hook's line; dropping the `.sh` readdir
+  turns §0 red ("the PreCompact hook must be in the scan set"). Both reverted.
+- Bundled copy exercised through `skills/develop-bug/scripts/on-precompact.sh` (the installed
+  path): sibling lookup resolves in `references/`; marker `pipeline-paused-6` observed.
+- `stakeholder-summary`, `tracker-comment`, `comment-slot-coverage` and
+  `transition-protocol-parity` suites: 166/166.
+- `npm run ci:fast` (prettier + full `npm test`): see implementation report.
+
+**Verification Steps for QA**:
+
+1. `bash shared/resources/develop-pipeline-on-precompact.test.sh` → 6 passed.
+2. `grep -n 'gh issue comment\|gh pr comment' shared/resources/develop-pipeline-on-precompact.sh`
+   → only the `tracker_write gh pr comment … --body-file` line and comments.
+3. `grep -c 'resolve-platform\|tracker_write\|ACCESS_' shared/resources/develop-pipeline-on-precompact.sh`
+   → non-zero.
+4. Re-apply the bare call and confirm `node --test tests/mutation-call-site-coverage.test.js` fails.
 
 #### QA Verification (Ready for QA → Closed/Reopened)
 
@@ -193,6 +280,9 @@ hook that may run with a minimal environment) and the guard's scan set.
 | Date       | Status | Changed By          | Notes                                   |
 | ---------- | ------ | ------------------- | --------------------------------------- |
 | 2026-09-12 | New    | repo sweep (Claude) | Filed from the 2026-09-12 sweep; obs #63 |
+| 2026-09-12 | new | ensure-bug-github-issue | GitHub issue created (#391) |
+| 2026-09-12 | In Progress | develop-bug | Reproduced; investigation started |
+| 2026-09-12 | Ready for QA | develop-bug | Fix implemented + regression test (S4–S6 in the hook test) |
 
 ---
 

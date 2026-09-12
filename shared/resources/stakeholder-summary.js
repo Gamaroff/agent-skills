@@ -132,6 +132,16 @@ const LEAD_TEMPLATES = Object.freeze({
     `The work now goes back for testing again, to confirm the fixes hold and that nothing ` +
     `else broke. This item is not finished until that testing passes.`,
 
+  // Posted by the PreCompact hook, from a shell with no agent behind it — the
+  // one comment in the pipeline that a non-technical reader is most likely to
+  // see arrive with nothing else around it. Slot-free on purpose: the hook has
+  // only what the lock file holds, and a step number is jargon to this reader.
+  "pipeline-paused": () =>
+    `Work on this item has paused automatically, because the automated assistant was ` +
+    `about to run out of working memory. Nothing has been lost: progress so far has been ` +
+    `saved, and the work will carry on from that point once it is restarted. ` +
+    `No action is needed from anyone reading this.`,
+
   done: (s) =>
     `This work is finished and has been accepted. Everything it set out to do was checked and ` +
     `confirmed working, and the change is now part of the product${s.pr ? ` (${s.pr})` : ""}. ` +
@@ -274,7 +284,14 @@ const CYCLE_SUFFIX = /-\d+$/;
  * drifting apart is the class this module's header argues against, so it is
  * closed rather than left resting on call order.
  */
-const CYCLE_SCOPED_LEAD_STAGES = Object.freeze(["qa-cycle", "qa-fix"]);
+// `pipeline-paused` is scoped the same way, by the step it paused at: a pipeline
+// that pauses at Step 3, resumes, and pauses again at Step 6 has paused twice,
+// and the second notice must not be suppressed by the first one's marker.
+const CYCLE_SCOPED_LEAD_STAGES = Object.freeze([
+  "qa-cycle",
+  "qa-fix",
+  "pipeline-paused",
+]);
 
 function stripCycleSuffix(stage) {
   if (!CYCLE_SUFFIX.test(stage)) return stage;
