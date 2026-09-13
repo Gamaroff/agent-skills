@@ -1,0 +1,69 @@
+schema: 1
+task: 'task.115.finalise-publish-time-checks'
+task_title: 'finalise publishes before it verifies: a doubled status header, a CI reading on the wrong head, a working-tree gate, and a CHANGELOG box with no mechanism'
+gate: CONCERNS
+status_reason: 'All four phases implemented and green (3248/0; both new tests mutation-proved by the developer and re-run by QA); two MEDIUM defects in the new Step 7 prose, both found by executing it — 6d derives the task number with BASH_REMATCH, which is empty under zsh so the CHANGELOG check silently never warns there; 6c polls CI in a foreground while/sleep loop bounded at 1500s, which exceeds the tool timeout the note beneath it says to avoid.'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T04:05:48Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 7 action 6d extracts the task number with [[ "$STEM" =~ ^task\.([0-9]+)$ ]] and reads BASH_REMATCH[1]. Under zsh — the shell this pipeline runs in — BASH_REMATCH is unset (zsh populates $match), so N is empty and the grep pattern degenerates to "\(task \b|\btask[ .]\b", which matches any [Unreleased] section: the no-changelog-entry warning can never fire under zsh. Verified: bash prints N=115, zsh prints N=[] (match=[115]).'
+    suggested_action: 'Derive N without BASH_REMATCH — case "$STEM" in task.*) N=${STEM#task.};; esac — then guard [[ "$N" =~ ^[0-9]+$ ]] (a capture-free match works in both shells); verified equivalent under bash and zsh. Add the two-shell check to the publish-boundary shape test or note it in the 4b record.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 7 action 6c waits for the second CI reading with a foreground "while [ $WAITED -lt $MAX_WAIT ]; do … sleep 30 …" loop whose default bound is 1500s. The note directly beneath it — and develop-next Step 3 — forbid exactly this shape: a single tool call cannot outlive its timeout, so an agent executing the block as written burns one timeout per attempt and learns nothing (the gh pr checks --watch failure, observed three times on one PR). The block contradicts its own guidance.'
+    suggested_action: 'Write the poll as a background job: emit the loop to .claude/state/finalise-ci-poll.sh, run it with nohup … & writing a one-line result (STATE HEAD) to .claude/state/finalise-ci-result.txt, and read that file on a later turn; keep MAX_WAIT as the bound the script enforces. Have the shape test assert the 6c block contains no foreground sleep loop (a fenced "sleep" outside a backgrounded subshell).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 15
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Docs + tests only; no credential handling added. The new 6a commit reads exit codes rather than suppressing them, which removes a silent-failure path. No hostile inputs executed — verdict by reading.'
+  performance:
+    status: CONCERNS
+    notes: 'Second CI reading adds wall-clock to every finalise by design (task Risk Assessment); the bound is stated (1500s default). CONCERNS only because the wait is foreground as written (CR-2) — resolved by the same fix.'
+  reliability:
+    status: PASS
+    notes: 'HALT reasons named (ci-not-green-on-acceptance-head; no-changelog-entry advisory); exit codes of commit and push read; registry add split behind an existence check so one unmatched pathspec cannot abort the whole add; rollback is one git revert restoring Step 8 as the commit point.'
+  maintainability:
+    status: PASS
+    notes: 'Both mechanisms carry a test — 9 shape assertions mutation-proved 6 ways, the drift test mutation-proved once with a non-vacuity floor; releases.md carries the flip as a checklist line; bundled references regenerated and in sync (pre-commit hook).'
+
+recommendations:
+  immediate:
+    - action: 'CR-1 — replace BASH_REMATCH with a parameter expansion so 6d fires under zsh'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'CR-2 — background the 6c poll and read its result file; extend the shape test'
+      refs: ['skills/finalise/SKILL.md', 'evals/shared/tests/finalise-publish-boundary.test.mjs']
+  future:
+    - action: 'The 6a commit subject appends "; registry ticked" whenever docs/tasks/task-registry.md exists, including on a story run where it was not staged — test the staged diff (git diff --cached --quiet -- docs/tasks/task-registry.md) instead of the file'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'changelog-entry-drift.test.mjs detects merges by the "Merge pull request #N" subject; a squash-merge repository would see an empty window — state the merge-commit assumption in the header (develop-next mergeStrategy default is merge)'
+      refs: ['evals/shared/tests/changelog-entry-drift.test.mjs']
+    - action: 'Backfill (bug 13) and (bug 15) in [Unreleased], then widen the drift test to bugs (named follow-on)'
+      refs: ['CHANGELOG.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 and CR-2 fixed and the publish-boundary shape test extended for both']

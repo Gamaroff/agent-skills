@@ -1,0 +1,56 @@
+schema: 1
+task: 'task.115.finalise-publish-time-checks'
+task_title: 'finalise publishes before it verifies: a doubled status header, a CI reading on the wrong head, a working-tree gate, and a CHANGELOG box with no mechanism'
+gate: PASS
+status_reason: 'Cycle-2 refute pass over the whole branch diff: CR-1 and CR-2 verified fixed by execution (6d fires for an uncited task under bash and zsh, is silent for a cited one, and skips a story stem; 6c writes a parsing poll script and launches it backgrounded) and pinned by two new mutation-proved assertions; 99 targeted + 3250 full-suite tests green; no HIGH or MEDIUM remains. One LOW documented, not gated.'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T04:17:22Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Unchanged from cycle 1 — docs and tests only; 6a still reads exit codes rather than suppressing them.'
+  performance:
+    status: PASS
+    notes: 'Cycle-1 CONCERNS resolved: the second CI reading is a background job with a stated bound; no foreground wait remains in 6c (asserted on comment-stripped fenced code).'
+  reliability:
+    status: PASS
+    notes: 'HALT reasons named; later-turn read checks the result head against the pushed head; registry suffix keyed on the staged diff. LOW: an unsubstituted rollup() placeholder makes the poll wait the full bound before the read HALTs — fail-safe, but slow to say so.'
+  maintainability:
+    status: PASS
+    notes: '11 shape assertions (9 + 2), each mutation-proved; drift test with floor; bundle in sync; both new assertions scan comment-stripped fenced code so explanatory prose cannot trip them.'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-13'
+  total_iterations: 1
+  verification_method: 'Executed the fixed blocks under bash and zsh; mutation-proved the pinning assertions; full ci:fast'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Make the rollup() placeholder in the 6c poll script fail fast — emit a sentinel (e.g. UNSUBSTITUTED) and break the loop on it — so a copy that forgot to substitute the Step 6 query HALTs in seconds rather than after MAX_WAIT'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Backfill (bug 13) and (bug 15) in [Unreleased], then widen changelog-entry-drift.test.mjs to bugs (named follow-on)'
+      refs: ['CHANGELOG.md', 'evals/shared/tests/changelog-entry-drift.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

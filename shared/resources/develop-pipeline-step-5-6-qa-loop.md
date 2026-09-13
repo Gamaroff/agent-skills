@@ -888,6 +888,33 @@ line `Steps 5–6/8 — QA LOOP ⏳ PR conformance review, cycle {CYCLE}/5` imme
 and **this section owns it**: the review is a subagent dispatch that can run long, and without the
 block the user's last position marker is the QA cycle that has already finished.
 
+#### Assert the trail is on the branch, not in the working tree (before the review)
+
+5c reads the artifact trail **off the PR branch** — that is what makes its conformance lens
+independent of the session that wrote the trail. So the trail has to be there. Path 1 above
+committed the cycle's gate and QA report and pushed once; this assertion is what turns that
+instruction into a fact. A `-f` or `ls` check answers "is there a file here", which a
+suppressed `git commit` rejection satisfies perfectly: on one run a whole QA cycle sat staged and
+unpushed under a `PASS` gate, and only this step's lens — reading the PR head — caught it (obs #48,
+task.115).
+
+```bash
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+GATE_FILE="{the latest gate file — resolved per §Finding the Latest Gate File}"
+QA_FILE="{the cycle's QA report — the .qa.{N}. file with the same N}"
+for ARTIFACT in "$GATE_FILE" "$QA_FILE"; do
+  git ls-files --error-unmatch "$ARTIFACT" >/dev/null \
+    || { echo "HALT: $ARTIFACT is not tracked — the path-1 commit did not include it"; exit 1; }
+  git show "origin/${BRANCH}:${ARTIFACT}" 2>/dev/null | grep -q . \
+    || { echo "HALT: $ARTIFACT is not on origin/${BRANCH} — the cycle's push did not carry it"; exit 1; }
+done
+```
+
+> **Never suppress a `git commit`'s output or exit status in a chain.** `git commit … >/dev/null
+> 2>&1 || true` is how a pre-commit hook's refusal becomes an invisible no-op, and the assertion
+> above is the backstop for exactly that — it should never be the *first* thing to notice. Read the
+> exit code where the commit is made; the same rule holds at `/finalise` Step 7 action 6a.
+
 #### Invoke the review
 
 ```bash

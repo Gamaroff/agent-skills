@@ -1,0 +1,56 @@
+schema: 1
+task: 'task.115.finalise-publish-time-checks'
+task_title: 'finalise publishes before it verifies: a doubled status header, a CI reading on the wrong head, a working-tree gate, and a CHANGELOG box with no mechanism'
+gate: PASS
+status_reason: 'Cycle-4 re-review after the 5c pass-2 fix cycle (3b0d0d29), scoped to files changed since gate 3. All seven pass-2 findings verified fixed — CR-1 by running the add-failure path under bash and zsh (both HALT), CR-2/CR-3 by exercising the residue check on residue-only / bullet-only / staged-only cases, CR-4 by inspection of the poll and the re-derivation, PC-1..3 by reading — and pinned by three new mutation-proved assertions (17 total; 5/5 mutants caught this cycle). 105 targeted + 3256 full-suite tests green. No new findings; the cycle-2 LOW (unsubstituted rollup() placeholder) stands as a future recommendation.'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T04:48:03Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Unchanged — docs and tests only.'
+  performance:
+    status: PASS
+    notes: 'Background poll, bounded.'
+  reliability:
+    status: PASS
+    notes: 'A failed git add now HALTs before the idempotency guard; the residue check sees staged-only and bullet-only edits; the second reading is bound to the head CI actually sampled. Remaining LOW: unsubstituted rollup() placeholder waits MAX_WAIT before the HALT.'
+  maintainability:
+    status: PASS
+    notes: 'Every shape assertion mutation-proved; counts removed from prose so the test file is the only count; bundle in sync.'
+
+bug_resolution:
+  bugs_fixed: 7
+  bugs_remaining: 0
+  fix_date: '2026-09-13'
+  total_iterations: 3
+  verification_method: 'Executed the add-failure and residue-check paths in scratch repos under bash and zsh; mutation-proved pinning assertions; full ci:fast'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Make the rollup() placeholder in the 6c poll script fail fast (emit a sentinel and break on it)'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Backfill (bug 13) and (bug 15) in [Unreleased], then widen changelog-entry-drift.test.mjs to bugs'
+      refs: ['CHANGELOG.md', 'evals/shared/tests/changelog-entry-drift.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

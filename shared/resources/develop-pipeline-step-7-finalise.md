@@ -123,12 +123,63 @@ deliberately unchanged, so **no Version bump**:
 
 ---
 
+## The publish boundary — what `/finalise` has already done before it returns
+
+`/finalise` Step 7 actions 6a–6c (task.115) commit the acceptance artefacts — the document with
+`status: accepted`, the `*.dod.{N}.*.md` summary, `sprint-review-summary.md` and (tasks) the ticked
+registry — **push them, assert each is tracked and on `origin/<branch>`, and take a second CI
+reading on that pushed head**, all *before* its own PR comment, tracker comment, issue close and
+board move. Every side-effect in this document therefore runs against a pushed, CI-green acceptance
+commit. Two consequences for the orchestrator:
+
+- **Step 8 no longer carries the acceptance artefacts.** It commits the implementation report (and
+  nothing else new), so `git status` after `/finalise` returns should show only the report modified —
+  **plus, on a Jira project, a frontmatter-only change to the document.** Step 7 action 8's
+  Document-link re-point runs `sync-jira-{story,task} --doc-branch --no-transition` *after* the 6a
+  commit, and that script rewrites `jira_last_synced_at` / `jira_last_body_hash` /
+  `jira_last_meta_hash` on every run; that residue is expected and rides in Step 8's commit. Anything
+  else still dirty — a DoD file, a sprint review, the document's `status:` or body — means 6a did not
+  run: **HALT**, do not paper over it with Step 8's sweep. Tell the two apart mechanically rather than
+  by eye:
+
+  ```bash
+  # Dirty paths other than the implementation report.
+  OTHER=$(git status --porcelain | awk '{print $2}' | grep -v '\.implementation\.' || true)
+  for f in $OTHER; do
+    # The document is allowed ONLY a jira_last_* frontmatter residue. Every other changed
+    # line — status:, body, a DoD or sprint-review file — is a boundary that was not crossed.
+    if [ "$f" = "{document-path}" ]; then
+      # `git diff HEAD`, not `git diff`: a document 6a staged but never committed shows `M ` in
+      # porcelain and an EMPTY unstaged diff — the exact case this check targets. And filter only
+      # the two header lines (`+++ `/`--- `): `^[+-][^+-]` also drops every changed bullet
+      # (`+- item`, `-- item`), exempting bullet-only body edits (5c pass 2, CR-2/CR-3).
+      git diff HEAD -- "$f" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' \
+        | grep -vE '^[+-]jira_last_(synced_at|body_hash|meta_hash):' \
+        | grep -q . && { echo "HALT: $f carries changes beyond the Jira sync residue — 6a did not run"; exit 1; }
+    else
+      echo "HALT: $f is dirty after /finalise returned — the publish boundary was not crossed"; exit 1
+    fi
+  done
+  ```
+- **The second CI reading is recorded here, not in the DoD file.** `/finalise` cannot write it into
+  the summary without a further commit, so it hands back `CI reading 1: … @ …` and `CI reading 2:
+  … @ …`; write both into the Decisions Log verbatim, and confirm the PR canonical comment carries
+  them. A `/finalise` that returns with `status: accepted` but no reading 2 HALTed at 6c
+  (`ci-not-green-on-acceptance-head`) — treat that as the gaps path below, not as success.
+
 ## Post DoD Body to PR (REQUIRED — lite and standard modes alike)
 
 After the DoD file is written, post its **full content** as a PR comment so reviewers see the acceptance evidence on the PR itself (not only in the repo tree). A one-line "task/story accepted" comment is insufficient.
 
 ```bash
 DOD_FILE=$(ls {story-or-task-directory}/{story-or-task-prefix}.dod.*.md 2>/dev/null | sort | tail -1)
+
+# Tracked AND on the remote — not merely present. `ls` found a file in the working tree; the
+# reader of this comment sees the PR's branch. If these disagree the comment lies (obs #48).
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git ls-files --error-unmatch "$DOD_FILE" >/dev/null || { echo "HALT: $DOD_FILE is not tracked"; exit 1; }
+git show "origin/${BRANCH}:${DOD_FILE}" 2>/dev/null | grep -q . || { echo "HALT: $DOD_FILE is not on origin/${BRANCH}"; exit 1; }
+
 DOD_BODY=$(cat "$DOD_FILE")
 
 # The plain-language lead, obtained ONCE, above the arm split. Anyone following
@@ -459,7 +510,9 @@ days later, on any branch — ticks what someone already did, flags `divergent` 
 Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST verify every item below. If any item is missing, the row stays ⏳ and the orchestrator goes back and completes the missing action — do NOT mark ✅ with caveats in the Notes column.
 
 - [ ] `/finalise` skill was invoked (not inlined with `Write`)
-- [ ] `*.dod.{N}.*.md` file exists in the story/task directory
+- [ ] `*.dod.{N}.*.md` file is **tracked and on `origin/<branch>`** (`git ls-files --error-unmatch` + `git show origin/<branch>:<path>`), not merely present in the story/task directory
+- [ ] **Publish boundary crossed inside `/finalise`**: acceptance commit + push made at its 6a (the document, DoD summary, sprint review and — tasks — registry are clean in `git status`; only the implementation report is dirty); CI reading 2 read `SUCCESS` on that pushed head; both readings with their heads written to the Decisions Log and present on the PR canonical comment
+- [ ] DoD summary carries **one** status line — `**Final Status:**` in `## Verification Complete` — and no `**Status:** IN PROGRESS` header
 - [ ] Story/task `status:` (frontmatter) AND `Status:` (body) both read `accepted` / `Accepted`
 - [ ] Change Log carries the acceptance row with a bumped minor `Version`, written in the same edit as the frontmatter change
 - [ ] Full DoD body posted as PR comment (verify URL captured in Decisions Log)
@@ -467,7 +520,7 @@ Before updating the Pipeline Progress row to ✅ Done, the orchestrator MUST ver
 - [ ] Tracker issue commented via `tracker-comment.js` (`reason` was `posted`, `already` or `deferred`)
 - [ ] Tracker issue closed (GitHub: `tracker-issue.js --kind close` confirmed CLOSED) — N/A for Jira (handled by transition)
 - [ ] Project board / Jira board moved to Done (verify via tracker state poller — `result.issue.state` or `result.issue.column`; see `shared/resources/tracker-state-poller-subagent.md`)
-- [ ] All five Decisions Log lines written: "DoD summary", "DoD body posted to PR", "issue close" (GitHub), "board transition", and the success log entry ("Story accepted" / "Task completed")
+- [ ] All six Decisions Log lines written: "DoD summary", "CI reading 1 … / CI reading 2 …", "DoD body posted to PR", "issue close" (GitHub), "board transition", and the success log entry ("Story accepted" / "Task completed")
 - [ ] **Accept gap**: journal checked; if non-empty — the mode's handover artifacts committed (`full` commits none, by selection — its summary-only path satisfies this item), `## Tracker Actions Required` populated, `**Tracker debt:**` line written in the Completion block, PR comment posted. If empty — `**Tracker debt**: none` written. `status: accepted` was written **either way** — the debt record and the local acceptance are both-or-red, never one without the other
 
 This checklist applies in **both lite and standard modes**. Lite mode skips Steps 5–6; it never skips any item in this list.

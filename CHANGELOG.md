@@ -44,6 +44,29 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`/finalise` publishes after its last write, and verifies the head it publishes** (task 115 —
+  observations #40, #48, #57, #59). Step 7 now has a *publish boundary*: the acceptance artefacts
+  (document with `status: accepted`, DoD summary, sprint review, ticked registry) are **committed and
+  pushed inside Step 7** (action 6a), asserted **tracked and on `origin/<branch>`** rather than
+  merely present (6b), and the CI rollup is **read a second time on that pushed head** (6c) — HALT
+  `ci-not-green-on-acceptance-head` on anything but `SUCCESS` — all *before* the PR comment, tracker
+  comment, issue close and board move. Reading 1 (Step 6, the acceptance decision) stays in the DoD
+  summary with its head; reading 2 is recorded on the PR canonical comment and in the implementation
+  report, both outside the commit it verifies. The DoD running summary's header **no longer carries
+  `**Status:** IN PROGRESS`** — its status is written once, as `**Final Status:**`; on task.106 the
+  two disagreed and the file was posted to the PR verbatim. The orchestrator's Step 8 now commits the
+  implementation report only. Step 5c asserts the cycle's gate and QA report are tracked and pushed
+  before `/review-pr` reads the trail, and no step doc may suppress a `git commit`'s output or exit
+  status (a swallowed hook rejection is how a PASS gate once certified an unpushed tree). Guarded by
+  `evals/shared/tests/finalise-publish-boundary.test.mjs`, every assertion mutation-proved.
+
+- **The CHANGELOG checklist box has a mechanism** (task 115, obs #59). Citation convention `(task N)`
+  / `(bug N)` in `docs/contributing/releases.md`; `evals/shared/tests/changelog-entry-drift.test.mjs`
+  fails CI naming every accepted task merged since the last tag that `[Unreleased]` does not cite
+  (non-vacuity floor on the corpus read; tasks only until bugs 13 and 15 are backfilled); `/finalise`
+  Step 7 action 6d warns `no-changelog-entry` at acceptance — advisory in this release, with the
+  flip to blocking carried as a release-checklist line rather than a memory.
+
 - **[`mutation-proving.md`](shared/resources/mutation-proving.md) is organised around what a
   mutation run can tell you, not around the two readings first noticed** (task 114 — observations
   #16, #18, #19, #26, #29, #32, #37, #41, #42, #45, #47, #55). The document covered the false GREEN

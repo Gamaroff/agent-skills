@@ -1,0 +1,56 @@
+schema: 1
+task: 'task.115.finalise-publish-time-checks'
+task_title: 'finalise publishes before it verifies: a doubled status header, a CI reading on the wrong head, a working-tree gate, and a CHANGELOG box with no mechanism'
+gate: PASS
+status_reason: 'Cycle-3 re-review after the 5c review-driven fix cycle (88c372dc), scoped to files changed since gate 2. All six 5c findings verified fixed — CR-1 exercised on residue-only / status-changed / stray-DoD cases, CR-2/CR-3 by extracting and parsing the blocks under bash and zsh, CR-4 by regex probe, CR-5 in both shells — and pinned by three new mutation-proved assertions (14 total, 5/5 mutants caught). 102 targeted + 3253 full-suite tests green. No new findings; the one LOW from cycle 2 (unsubstituted rollup() placeholder waits MAX_WAIT) stands as a future recommendation.'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T04:34:35Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Unchanged — docs and tests only.'
+  performance:
+    status: PASS
+    notes: 'Background poll with a stated bound; nothing foreground.'
+  reliability:
+    status: PASS
+    notes: 'CR-1: the orchestrator dirty-document rule no longer false-fires on Jira projects (exempts exactly the three jira_last_* keys, HALTs on anything else). CR-2: 6a idempotent on re-run. CR-3: a dead poll HALTs instead of reporting progress forever. Remaining LOW: unsubstituted rollup() placeholder waits MAX_WAIT before the HALT.'
+  maintainability:
+    status: PASS
+    notes: '14 shape assertions, each mutation-proved; both new assertion groups scan comment-stripped fenced code; bundle in sync.'
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-09-13'
+  total_iterations: 2
+  verification_method: 'Executed fixed blocks under bash and zsh; exercised the CR-1 check in a scratch repo; mutation-proved pinning assertions; full ci:fast'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Make the rollup() placeholder in the 6c poll script fail fast (emit a sentinel and break on it) so an unsubstituted copy HALTs in seconds rather than after MAX_WAIT'
+      refs: ['skills/finalise/SKILL.md']
+    - action: 'Backfill (bug 13) and (bug 15) in [Unreleased], then widen changelog-entry-drift.test.mjs to bugs'
+      refs: ['CHANGELOG.md', 'evals/shared/tests/changelog-entry-drift.test.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

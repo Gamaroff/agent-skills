@@ -92,7 +92,6 @@ Before starting any verification, also create a co-located running summary file 
 
    **Story/Task:** {story-name}
    **Verification Started:** {current-date-time}
-   **Status:** IN PROGRESS
 
    ---
 
@@ -104,6 +103,15 @@ Before starting any verification, also create a co-located running summary file 
    ```
 
 4. **Use Write tool to create the file**
+
+> **The header carries no `**Status:**` line, and that is deliberate (task.115, obs #57).** This
+> file's status is written exactly once, as `**Final Status:**` in the `## Verification Complete`
+> section that Step 7 or Step 8 appends. It used to open `**Status:** IN PROGRESS` as well, with
+> the instruction to flip it sitting ~740 lines away at Step 7 — and on task.106 the header was
+> missed and the file was posted to the PR verbatim, reading `IN PROGRESS` above a lead that said
+> "no further action is needed". A status that lives in one place cannot contradict itself. The
+> both-locations rule in `references/document-status-lifecycle.md` is for the *work item's*
+> frontmatter and body; the DoD summary is a report and gets one status line, at the end.
 
 **Example:**
 
@@ -760,7 +768,7 @@ done
 **Actions:**
 
 1. **Use the aggregated results** from Step 3c (`AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, `DOCS_OVERALL`) — do not re-read the running summary file for this step
-2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable
+2. **Resolve `CI_ROLLUP`** using the command above, and record the raw per-job conclusions in the DoD running summary so the decision is auditable. **Record the head it was read on** in the same line — `CI_HEAD_1=$(git rev-parse HEAD)` — as `CI reading 1: {CI_ROLLUP} @ {CI_HEAD_1}`. This is the reading that gates the *decision*; it is structurally an ancestor of the commit that will carry the acceptance, and Step 7's publish boundary takes a second reading on that commit before anything leaves the repo (task.115, obs #40).
 3. **Determine pass/fail** for each decision matrix column using the mapping above
 4. **Write the acceptance decision to the running summary:**
 
@@ -826,8 +834,8 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 **Actions:**
 
 1. **Finalize Running Summary File:**
-   - Add final completion section to the running summary
-   - Update status from "IN PROGRESS" to "COMPLETED - ACCEPTED"
+   - Append the `## Verification Complete` section below — its `**Final Status:**` line is the
+     file's **only** status line (the header carries none; see Step 0)
    - Add timestamp
 
    **Example final append:**
@@ -838,6 +846,8 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    **Final Status:** ✅ ACCEPTED
    **Completion Time:** {current-date-time}
    **Total Duration:** {duration}
+   **CI reading 1:** {CI_ROLLUP} @ `{CI_HEAD_1}` (the acceptance decision — Step 6)
+   **CI reading 2:** taken on the acceptance commit after this file is committed and pushed; recorded on the PR canonical summary comment and in the implementation report (Step 7 publish boundary)
 
    **Artifacts Generated:**
 
@@ -1010,6 +1020,224 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - Fill in all sections with information from the story/task document and PR
    - Save summary as: `{story-directory}/sprint-review-summary.md`
 
+---
+
+**The publish boundary (task.115).** Actions 1–6 above are *local writes*. Actions 7–8 below are
+*outward side-effects* — a PR comment, a tracker comment, an issue close, a board move — each of
+which tells a reader that the work is accepted and points them at artefacts. Between the two sits
+one rule: **everything that leaves the repo happens after the last write, and after that write has
+been pushed and verified.** Three observations record what happens without it — a DoD posted
+under a `PENDING` head (#40), a PASS gate certifying a working tree whose commit had been rejected
+(#48), a status header contradicting its own verdict (#57). The three sub-steps below are the
+boundary. They are not optional in lite mode and they are not skipped when this skill runs
+standalone.
+
+6a. **Acceptance commit + push.** Stage exactly the artefacts actions 1–6 wrote and commit them.
+   Until task.115 this commit did not exist here — the artefacts rode to the remote in the
+   orchestrator's Step 8, *after* every side-effect below had already fired, so the commit carrying
+   `status: accepted` was structurally never the one CI had verified.
+
+   ```bash
+   BRANCH=$(git rev-parse --abbrev-ref HEAD)
+   STEM="{story.{epic}.{story} | task.{id}}"   # the work item's filename stem
+
+   # Exactly the acceptance artefacts. The implementation report is NOT staged here — the
+   # orchestrator's Step 8 owns its final commit, and staging it would split its history.
+   # One unmatched pathspec aborts the WHOLE `git add`, so the registry (tasks only; absent on a
+   # story or a project without one) is added on its own, behind an existence check — not folded
+   # into the list behind a `|| true` that would also swallow a real failure.
+   # Read the add's exit code. A failed add — bash: "pathspec did not match" (128); zsh: "no
+   # matches found" refuses the whole command — leaves the index clean, and the idempotency guard
+   # below would then read that as "already committed" and push nothing (task.115 5c pass 2, CR-1).
+   git add "{document-path}" "{document-directory}/${STEM}.dod."*.md \
+           "{document-directory}/sprint-review-summary.md"
+   ADD_EXIT=$?
+   [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the acceptance artefacts failed (exit $ADD_EXIT) — an artefact is missing or the DoD glob matched nothing"; exit 1; }
+   if [ -f docs/tasks/task-registry.md ]; then
+     git add docs/tasks/task-registry.md
+     ADD_EXIT=$?
+     [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the task registry failed (exit $ADD_EXIT)"; exit 1; }
+   fi
+
+   # NEVER suppress a commit's output or exit status in a chain. The rejection this rule exists
+   # for (obs #48) was a pre-commit hook refusing the commit — and `>/dev/null 2>&1 || true`
+   # turned that refusal into a PASS gate over an unpushed working tree. Read the exit code.
+   # The suffix is keyed on the registry being STAGED, not on the file existing — a story run in
+   # a repo that keeps a task registry would otherwise claim a tick it did not make.
+   REG_SUFFIX=$(git diff --cached --quiet -- docs/tasks/task-registry.md 2>/dev/null || echo '; registry ticked')
+   # Idempotent on re-run: when the artefacts are already committed there is nothing staged, and
+   # `git commit` would exit 1 for "nothing to commit" — indistinguishable from a hook rejection.
+   # Skip the COMMIT in that case (never the push, and never `--allow-empty`).
+   if git diff --cached --quiet; then
+     echo "acceptance artefacts already committed — skipping commit, pushing"
+   else
+     git commit -m "docs(${STEM}): accept — DoD, sprint review${REG_SUFFIX}"
+     COMMIT_EXIT=$?
+     [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
+   fi
+
+   git push origin "$BRANCH"
+   PUSH_EXIT=$?
+   [ "$PUSH_EXIT" -eq 0 ] || { echo "HALT: acceptance push rejected (exit $PUSH_EXIT)"; exit 1; }
+   CI_HEAD_2=$(git rev-parse HEAD)
+   ```
+
+   The `git diff --cached --quiet` guard is in the block, not beside it: the first version said
+   "skip the commit when clean" in prose two lines below an unconditional `git commit`, and the prose
+   lost (task.115 5c, CR-2). Never reach for `--allow-empty`.
+
+6b. **Tracked-and-pushed assertions.** A gate describes a working tree; a PR describes a branch.
+   Before anything below reads or posts an artefact, assert the artefact is *on the remote*, not
+   merely on disk:
+
+   ```bash
+   DOD_PATH=$(ls "{document-directory}/${STEM}.dod."*.md 2>/dev/null | sort | tail -1)
+   for ARTIFACT in "{document-path}" "$DOD_PATH" "{document-directory}/sprint-review-summary.md"; do
+     git ls-files --error-unmatch "$ARTIFACT" >/dev/null \
+       || { echo "HALT: $ARTIFACT is not tracked — the acceptance commit did not include it"; exit 1; }
+     git show "origin/${BRANCH}:${ARTIFACT}" 2>/dev/null | grep -q . \
+       || { echo "HALT: $ARTIFACT is not on origin/${BRANCH} — the push did not carry it"; exit 1; }
+   done
+   git show "origin/${BRANCH}:{document-path}" | grep -q '^status: accepted$' \
+     || { echo "HALT: the pushed document does not read status: accepted"; exit 1; }
+   ```
+
+   `-f` and `ls` answer "does a file exist here"; `git ls-files --error-unmatch` answers "is it
+   tracked" and `git show origin/<branch>:<path>` answers "is it on the branch the PR describes".
+   Only the last question is the one a reviewer's PR view will agree with. (These are per-artifact
+   on purpose: `references/verify-push-state.sh`, which the orchestrator's Step 8 runs, fails on
+   *any* dirty tree — and here the orchestrator's implementation report is legitimately uncommitted
+   until Step 8, so that script would refuse a correct state.)
+
+6c. **Second CI reading — on the head that carries the acceptance.** Re-run the Step 6 rollup query
+   (the GitHub `gh pr view … statusCheckRollup` form or the Bitbucket pipelines form — same code,
+   same `PENDING`/`NONE`/`CANCELLED`/`UNKNOWN` semantics) against the PR, whose head is now
+   `CI_HEAD_2`, and **resolve it before any side-effect below fires**:
+
+   ```bash
+   # Confirm the PR head IS the commit just pushed — never gate one commit and read another.
+   PR_HEAD=$(gh pr view "$PR_NUMBER" --json headRefOid -q '.headRefOid' 2>/dev/null)   # Bitbucket: .source.commit.hash
+   [ "${PR_HEAD:0:12}" = "${CI_HEAD_2:0:12}" ] \
+     || { echo "HALT: PR head ${PR_HEAD:0:12} ≠ pushed acceptance head ${CI_HEAD_2:0:12}"; exit 1; }
+
+   # Bounded poll, run in the BACKGROUND and read from a result file on a later turn. A push
+   # supersedes the previous run, so the first samples are legitimately NONE / CANCELLED /
+   # PENDING; `MAX_WAIT` bounds the wait, it does not round it up. The loop is never run in the
+   # foreground of a tool call: on a 23-minute serial lane a foreground wait simply outlives the
+   # host's timeout and reports nothing — the `gh pr checks --watch` failure, observed three times
+   # on one PR (task.115 QA cycle 1, CR-2).
+   mkdir -p .claude/state          # gitignored; absent in a fresh worktree or a standalone run
+   POLL=.claude/state/finalise-ci-poll.sh
+   RESULT=.claude/state/finalise-ci-result.txt
+   PIDFILE=.claude/state/finalise-ci-poll.pid
+   rm -f "$RESULT" "$PIDFILE"
+   # Terminator and body at COLUMN 0 — an indented terminator does not close the heredoc and
+   # bash swallows the nohup line below into the script, so the poll never starts.
+   cat > "$POLL" <<'POLLEOF'
+#!/usr/bin/env bash
+# usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE>
+# Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <WAITED>s".
+PR_NUMBER=$1; EXPECTED_HEAD=$2; MAX_WAIT=$3; RESULT=$4
+rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it, do not re-derive it...; }
+# The head CI was actually sampled on — read from the PR, never echoed back from the argument.
+# GitHub form shown; Bitbucket: the PR's .source.commit.hash. "unknown" on failure makes the
+# later-turn head check HALT rather than pass.
+sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev/null || echo unknown; }
+WAITED=0
+STATE=$(rollup)
+while [ "$WAITED" -lt "$MAX_WAIT" ]; do
+  case "$STATE" in SUCCESS|FAILURE) break ;; esac
+  sleep 30; WAITED=$((WAITED + 30)); STATE=$(rollup)
+done
+printf '%s %s %ss\n' "$STATE" "$(sampled_head)" "$WAITED" > "$RESULT"
+POLLEOF
+   nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" \
+     > .claude/state/finalise-ci-poll.log 2>&1 &
+   echo $! > "$PIDFILE"
+   echo "CI poll backgrounded (pid $(cat "$PIDFILE")) — read $RESULT on a later turn; absent means still polling"
+   ```
+
+   **On a later turn**, read the result — never `sleep` for it in the foreground:
+
+   ```bash
+   RESULT=.claude/state/finalise-ci-result.txt
+   PIDFILE=.claude/state/finalise-ci-poll.pid
+   # A later turn is a fresh shell: CI_HEAD_2 from 6a is gone. HEAD has not moved since the
+   # acceptance push (nothing between 6a and here commits), so re-derive it rather than compare
+   # against an empty string.
+   CI_HEAD_2=${CI_HEAD_2:-$(git rev-parse HEAD)}
+   if [ ! -f "$RESULT" ]; then
+     # No result yet. "Still polling" is only true while the poll is alive — a dead poll with no
+     # result (killed, never started, log will say) must HALT, not report progress forever.
+     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+       echo "still polling — check again on a later turn"      # do NOT sleep here
+     else
+       echo "HALT: the CI poll is not running and wrote no result — see .claude/state/finalise-ci-poll.log"; exit 1
+     fi
+   else
+     read -r CI_ROLLUP_2 CI_HEAD_READ WAITED < "$RESULT"
+     # CI_HEAD_READ is the head the poll SAMPLED from the PR, so this catches a push that landed
+     # mid-poll ("unknown" when the poll could not read it — a HALT, not a pass).
+     [ "${CI_HEAD_READ:0:12}" = "${CI_HEAD_2:0:12}" ] \
+       || { echo "HALT: CI was sampled on ${CI_HEAD_READ:0:12}, not the acceptance head ${CI_HEAD_2:0:12}"; exit 1; }
+     echo "CI reading 2: $CI_ROLLUP_2 @ ${CI_HEAD_2:0:12} after $WAITED"
+   fi
+   ```
+
+   | `CI_ROLLUP_2`                              | Action                                                                                                                                                                  |
+   | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `SUCCESS`                                  | Proceed to action 7. Record `CI reading 2: SUCCESS @ {CI_HEAD_2}`                                                                                                        |
+   | `FAILURE`                                  | **HALT `ci-not-green-on-acceptance-head`.** The acceptance commit is pushed and `status: accepted` is on the branch — do **not** revert it; report the failing job(s) and stop before any side-effect. The human decides whether the red is the docs commit or the code |
+   | `PENDING` / `NONE` / `CANCELLED` / `UNKNOWN` past `MAX_WAIT` | **HALT `ci-not-green-on-acceptance-head`** with the last sampled state. Waiting past the bound is a judgement for a human; assuming green is not a judgement at all |
+
+   > **The poll is a background job by construction, not by advice.** `gh pr checks --watch` is
+   > forbidden for the same reason (see `develop-next` Step 3): a wait that lives inside one tool
+   > call cannot outlast that call. The first version of this block was a foreground `while … sleep`
+   > loop with a note beneath it saying not to do that — the note was right and the block ignored it.
+   >
+   > **Why not one reading, after the push?** Because reading 1 gates the *decision* — `accepted`
+   > must never be written on a red or pending head — and reading 2 gates the *publication*. The
+   > final commit of any branch can be verified only after it exists, and recording that
+   > verification inside the commit would need a third commit; so reading 2 is recorded **off** the
+   > verified commit — on the PR canonical comment (action 7) and in the implementation report —
+   > and the DoD summary carries reading 1 with a pointer. The orchestrator's Step 8 commit
+   > (implementation report only, docs-only) is the residue this leaves unverified by a second
+   > reading; `develop-next` Step 3 re-verifies the final head (head-SHA equality, CI rollup, local
+   > `npm run ci`) before any merge it performs.
+
+   Reading 2 cannot be written into the running summary without a further commit, so it is
+   recorded in the implementation report's Decisions Log (`CI reading 1: … @ …; CI reading 2: … @
+   …`) and in the PR comment body below — both outside the verified commit.
+
+6d. **CHANGELOG citation check (advisory — warns, does not halt).** Every accepted work item
+   should be cited in `CHANGELOG.md` under `## [Unreleased]` as `(task N)` / `(bug N)` — the
+   convention in `docs/contributing/releases.md`. Until task.115 this was the one release-checklist
+   item with no mechanism behind it, and it drifted on five consecutive merges (obs #59).
+
+   ```bash
+   # Tasks only in this version; `(bug N)` is the documented follow-on once bugs 13 and 15 are
+   # backfilled. `STEM` is the work item's filename stem from 6a.
+   # Parameter expansion, NOT `[[ =~ ]]` + BASH_REMATCH: zsh — the shell this pipeline runs in —
+   # leaves BASH_REMATCH unset (it populates $match), so N was empty there and the grep pattern
+   # degenerated to one that matches any [Unreleased] text. The warning could never fire under
+   # zsh, and nothing said so (task.115 QA cycle 1, CR-1). A capture-free `=~` is fine in both.
+   N=""
+   case "$STEM" in task.*) N="${STEM#task.}" ;; esac
+   if [ -n "$N" ] && [[ "$N" =~ ^[0-9]+$ ]]; then
+     awk '/^## \[Unreleased\]/{p=1;next} /^## \[/{p=0} p' CHANGELOG.md \
+       | grep -qiE "\btask[ .]${N}\b" \
+       || echo "⚠️  no-changelog-entry: CHANGELOG.md [Unreleased] does not cite (task ${N}) — add the entry before release; evals/shared/tests/changelog-entry-drift.test.mjs fails CI on this once the PR merges"
+   fi
+   ```
+
+   **Advisory now, blocking later — and the flip is a release decision, not a memory.** This warns
+   in the release this ships in; `docs/contributing/releases.md` carries the checklist line that
+   flips it to a HALT (`no-changelog-entry`) in the release *after* that. A gate at authoring pushes
+   an author toward a filler entry, and a filler entry is worse than a missing one because it looks
+   deliberate; the drift test is the loud backstop in the meantime.
+
+---
+
 7. **Add Canonical PR Comment (idempotent via marker):**
 
    **PR-comment authorship contract**:
@@ -1059,6 +1287,8 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    **Final Gate**: ${FINAL_GATE}
    **Accepted**: $(date +%Y-%m-%d)
    **DoD Summary**: \`${DOD_PATH}\`
+   **CI reading 1**: ${CI_ROLLUP} @ \`${CI_HEAD_1:0:12}\` (acceptance decision)
+   **CI reading 2**: ${CI_ROLLUP_2} @ \`${CI_HEAD_2:0:12}\` (pushed acceptance head — the commit carrying \`status: accepted\`)
    $([ "$CYCLES" -gt 0 ] && echo "**QA Cycles**: ${CYCLES}" || true)
 
    All Definition of Done criteria verified. Story/task accepted."
@@ -1467,13 +1697,16 @@ EOF
 
 **Step 7 Completion Checklist — tick off each before moving on:**
 
-- [ ] Running summary file finalized (status = COMPLETED - ACCEPTED)
+- [ ] Running summary file finalized — `## Verification Complete` appended with `**Final Status:** ✅ ACCEPTED`, and that is the file's only status line (the header carries none)
 - [ ] Story frontmatter updated: `status: accepted`, `updated`, `completed_date`, `pr_number`
 - [ ] Task only: registry row ticked — `registry-tick.js` reported `ticked` / `already` / `no-registry` (a `no-row`, `ambiguous-row` or `engine-unavailable` needs a manual tick before merge, or CI's drift check fails)
 - [ ] DoD PASSED section added to story document body
 - [ ] Running summary referenced in DoD section
 - [ ] Sprint Review summary file created at `{story-directory}/sprint-review-summary.md`
-- [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API)
+- [ ] **Publish boundary (6a–6c) crossed before any side-effect**: acceptance commit made with output and exit status read (never suppressed), pushed; document, DoD summary and sprint review asserted **tracked and on `origin/<branch>`** (`git ls-files --error-unmatch` + `git show origin/<branch>:<path>`), not merely present; PR head equals the pushed head; **CI reading 2 read `SUCCESS` on that head** — anything else is HALT `ci-not-green-on-acceptance-head`, with no comment, close or board move issued
+- [ ] Both CI readings recorded with their heads — reading 1 in the running summary (Step 6), reading 2 on the PR canonical comment and in the implementation report
+- [ ] CHANGELOG citation checked (6d) — `(task N)` present under `[Unreleased]`, or the `no-changelog-entry` warning surfaced
+- [ ] PR comment posted (GitHub: `gh pr comment`, Bitbucket: REST API) — **after** 6a–6c
 - [ ] Tracker issue closed: Jira issue transitioned via MCP (`transitionJiraIssue`) **OR** GitHub issue closed via `gh issue close` + closure confirmed with `gh issue view --json state` **OR** warning comment posted (if close failed after retry)
 - [ ] **Jira only — terminal status RE-READ after the Document-link re-point**, and re-asserted if the
       sync walked it back (bug.11). A `204` from the close is evidence about the close, not about the
@@ -1489,8 +1722,8 @@ If any DoD criteria are not met, finalize the running summary with gaps, keep th
 **Actions:**
 
 1. **Finalize Running Summary File with Gaps:**
-   - Add final completion section to the running summary
-   - Update status from "IN PROGRESS" to "COMPLETED - GAPS IDENTIFIED"
+   - Append the `## Verification Complete` section below — its `**Final Status:**` line is the
+     file's **only** status line (the header carries none; see Step 0)
    - Summarize blocking issues and estimated effort
    - Add timestamp
 
