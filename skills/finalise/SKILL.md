@@ -1046,9 +1046,18 @@ standalone.
    # One unmatched pathspec aborts the WHOLE `git add`, so the registry (tasks only; absent on a
    # story or a project without one) is added on its own, behind an existence check — not folded
    # into the list behind a `|| true` that would also swallow a real failure.
+   # Read the add's exit code. A failed add — bash: "pathspec did not match" (128); zsh: "no
+   # matches found" refuses the whole command — leaves the index clean, and the idempotency guard
+   # below would then read that as "already committed" and push nothing (task.115 5c pass 2, CR-1).
    git add "{document-path}" "{document-directory}/${STEM}.dod."*.md \
            "{document-directory}/sprint-review-summary.md"
-   [ -f docs/tasks/task-registry.md ] && git add docs/tasks/task-registry.md
+   ADD_EXIT=$?
+   [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the acceptance artefacts failed (exit $ADD_EXIT) — an artefact is missing or the DoD glob matched nothing"; exit 1; }
+   if [ -f docs/tasks/task-registry.md ]; then
+     git add docs/tasks/task-registry.md
+     ADD_EXIT=$?
+     [ "$ADD_EXIT" -eq 0 ] || { echo "HALT: git add of the task registry failed (exit $ADD_EXIT)"; exit 1; }
+   fi
 
    # NEVER suppress a commit's output or exit status in a chain. The rejection this rule exists
    # for (obs #48) was a pre-commit hook refusing the commit — and `>/dev/null 2>&1 || true`
@@ -1130,13 +1139,17 @@ standalone.
 # Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <WAITED>s".
 PR_NUMBER=$1; EXPECTED_HEAD=$2; MAX_WAIT=$3; RESULT=$4
 rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it, do not re-derive it...; }
+# The head CI was actually sampled on — read from the PR, never echoed back from the argument.
+# GitHub form shown; Bitbucket: the PR's .source.commit.hash. "unknown" on failure makes the
+# later-turn head check HALT rather than pass.
+sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev/null || echo unknown; }
 WAITED=0
 STATE=$(rollup)
 while [ "$WAITED" -lt "$MAX_WAIT" ]; do
   case "$STATE" in SUCCESS|FAILURE) break ;; esac
   sleep 30; WAITED=$((WAITED + 30)); STATE=$(rollup)
 done
-printf '%s %s %ss\n' "$STATE" "$EXPECTED_HEAD" "$WAITED" > "$RESULT"
+printf '%s %s %ss\n' "$STATE" "$(sampled_head)" "$WAITED" > "$RESULT"
 POLLEOF
    nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" \
      > .claude/state/finalise-ci-poll.log 2>&1 &
@@ -1149,6 +1162,10 @@ POLLEOF
    ```bash
    RESULT=.claude/state/finalise-ci-result.txt
    PIDFILE=.claude/state/finalise-ci-poll.pid
+   # A later turn is a fresh shell: CI_HEAD_2 from 6a is gone. HEAD has not moved since the
+   # acceptance push (nothing between 6a and here commits), so re-derive it rather than compare
+   # against an empty string.
+   CI_HEAD_2=${CI_HEAD_2:-$(git rev-parse HEAD)}
    if [ ! -f "$RESULT" ]; then
      # No result yet. "Still polling" is only true while the poll is alive — a dead poll with no
      # result (killed, never started, log will say) must HALT, not report progress forever.
@@ -1159,8 +1176,10 @@ POLLEOF
      fi
    else
      read -r CI_ROLLUP_2 CI_HEAD_READ WAITED < "$RESULT"
+     # CI_HEAD_READ is the head the poll SAMPLED from the PR, so this catches a push that landed
+     # mid-poll ("unknown" when the poll could not read it — a HALT, not a pass).
      [ "${CI_HEAD_READ:0:12}" = "${CI_HEAD_2:0:12}" ] \
-       || { echo "HALT: result is for ${CI_HEAD_READ:0:12}, not ${CI_HEAD_2:0:12}"; exit 1; }
+       || { echo "HALT: CI was sampled on ${CI_HEAD_READ:0:12}, not the acceptance head ${CI_HEAD_2:0:12}"; exit 1; }
      echo "CI reading 2: $CI_ROLLUP_2 @ ${CI_HEAD_2:0:12} after $WAITED"
    fi
    ```

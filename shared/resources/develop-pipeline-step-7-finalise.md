@@ -149,7 +149,12 @@ commit. Two consequences for the orchestrator:
     # The document is allowed ONLY a jira_last_* frontmatter residue. Every other changed
     # line — status:, body, a DoD or sprint-review file — is a boundary that was not crossed.
     if [ "$f" = "{document-path}" ]; then
-      git diff -- "$f" | grep -E '^[+-][^+-]' | grep -vE '^[+-]jira_last_(synced_at|body_hash|meta_hash):' \
+      # `git diff HEAD`, not `git diff`: a document 6a staged but never committed shows `M ` in
+      # porcelain and an EMPTY unstaged diff — the exact case this check targets. And filter only
+      # the two header lines (`+++ `/`--- `): `^[+-][^+-]` also drops every changed bullet
+      # (`+- item`, `-- item`), exempting bullet-only body edits (5c pass 2, CR-2/CR-3).
+      git diff HEAD -- "$f" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' \
+        | grep -vE '^[+-]jira_last_(synced_at|body_hash|meta_hash):' \
         | grep -q . && { echo "HALT: $f carries changes beyond the Jira sync residue — 6a did not run"; exit 1; }
     else
       echo "HALT: $f is dirty after /finalise returned — the publish boundary was not crossed"; exit 1

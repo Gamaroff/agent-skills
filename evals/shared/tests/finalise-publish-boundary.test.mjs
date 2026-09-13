@@ -424,6 +424,86 @@ test("the orchestrator's dirty-document rule exempts the Jira sync's frontmatter
   );
 });
 
+test("6a reads the exit code of every `git add`, so a staging failure cannot pose as the idempotent path", () => {
+  const sixA = between(
+    finalise,
+    "6a. **Acceptance commit + push.**",
+    "6b. **Tracked-and-pushed assertions.**",
+    FINALISE,
+  );
+  const code = codeLines(sixA);
+  const adds = code.filter((l) => /^\s*git add\b/.test(l)).length;
+  const checks = code.filter((l) => /ADD_EXIT=\$\?/.test(l)).length;
+  assert.ok(
+    adds >= 2,
+    "6a stages the artefacts and (conditionally) the registry — two add sites expected",
+  );
+  assert.equal(
+    checks,
+    adds,
+    "every `git add` in 6a must be followed by an ADD_EXIT=$? capture (5c pass 2, CR-1)",
+  );
+  const firstAdd = code.findIndex((l) => /^\s*git add\b/.test(l));
+  const guard = code.findIndex((l) =>
+    /if git diff --cached --quiet; then/.test(l),
+  );
+  assert.ok(
+    firstAdd < guard,
+    "the adds (and their exit checks) precede the idempotency guard",
+  );
+});
+
+test("the residue check diffs against HEAD and filters only the two diff header lines", () => {
+  const boundary = between(
+    read(STEP7),
+    "## The publish boundary",
+    "## Post DoD Body to PR",
+    STEP7,
+  );
+  const code = codeLines(boundary);
+  const diffLine = code.find((l) => /git diff .*-- "\$f"/.test(l));
+  assert.ok(diffLine, `${STEP7}: the residue check must diff the document`);
+  assert.match(
+    diffLine,
+    /git diff HEAD -- "\$f"/,
+    "a staged-but-uncommitted document has an empty unstaged diff — diff against HEAD (5c pass 2, CR-3)",
+  );
+  assert.match(
+    diffLine,
+    /grep -vE '\^\(\\\+\\\+\\\+\|---\) '/,
+    "filter exactly the +++/--- header lines — `^[+-][^+-]` also drops changed bullets (5c pass 2, CR-2)",
+  );
+  assert.ok(
+    !code.some((l) => /\^\[\+-\]\[\^\+-\]/.test(l)),
+    "the bullet-dropping filter must not come back",
+  );
+});
+
+test("6c head-binds the second reading: the poll records the sampled PR head and the later turn re-derives CI_HEAD_2", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  assert.match(
+    sixC,
+    /sampled_head\(\) \{ gh pr view "\$PR_NUMBER" --json headRefOid/,
+    "the poll script must read the head CI was sampled on from the PR, not echo its argument (5c pass 2, CR-4)",
+  );
+  assert.match(
+    sixC,
+    /"\$\(sampled_head\)" "\$WAITED" > "\$RESULT"/,
+    "the result line carries the sampled head",
+  );
+  assert.ok(
+    codeLines(sixC).some((l) =>
+      /CI_HEAD_2=\$\{CI_HEAD_2:-\$\(git rev-parse HEAD\)\}/.test(l),
+    ),
+    "the later-turn read must re-derive CI_HEAD_2 — a fresh shell has no earlier variable",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // 4. The CHANGELOG box has a mechanism (obs #59)
 

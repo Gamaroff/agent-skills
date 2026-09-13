@@ -134,7 +134,7 @@ the skill.
 | `shared/resources/develop-pipeline-step-8-commit.md` | Step 8 commits the implementation report only |
 | `shared/resources/develop-pipeline-step-5-6-qa-loop.md` | tracked-and-pushed assertion at 5c; no-suppression rule |
 | `evals/shared/tests/changelog-entry-drift.test.mjs` (new) | backstop, tasks since last tag |
-| `evals/shared/tests/finalise-publish-boundary.test.mjs` (new) | 11 protocol-shape assertions: header absent; 6a→6b→6c→6d→7→8 order; both heads; tracked-and-pushed at 6b / DoD-post / 5c; no suppressed `git commit`; exit codes read; 6d + releases.md flip; 6c backgrounded (no foreground sleep); 6d without BASH_REMATCH — mutation-proved 9 ways (6 + 3 from QA cycle 1) |
+| `evals/shared/tests/finalise-publish-boundary.test.mjs` (new) | protocol-shape assertions, each mutation-proved: header absent; 6a→6b→6c→6d→7→8 order; both heads; tracked-and-pushed at 6b / DoD-post / 5c; no suppressed `git commit`; exit codes read; 6a add + commit guards; 6c backgrounded with mkdir/pid/liveness; 6d without BASH_REMATCH; Jira residue exemption in the step docs; 6d + releases.md flip (counts deliberately not stated — they drift; the test file is the count) |
 | `docs/contributing/releases.md` | citation convention; advisory→blocking flip as a checklist line |
 | `skills/*/references/` (generated) | `npm run bundle` after the shared edits |
 | `CHANGELOG.md` | Changed |
@@ -145,7 +145,8 @@ Protocol-shape tests: the DoD template in `finalise/SKILL.md` carries no `**Stat
 line and a DoD body carries exactly one status line; the Step 7 prose orders commit+push before the
 first outward side-effect and the second rollup read between them. The changelog drift test carries a
 non-vacuity floor (it must find ≥1 accepted task since the last tag on this repo) and is
-mutation-proved by deleting one citation. Existing `finalise` protocol tests updated for the reorder.
+mutation-proved by deleting one citation. The pre-existing `finalise` contract/parity suites needed
+no change for the reorder and stay green (CI confirms).
 
 ## 9. Success Criteria
 
@@ -191,6 +192,7 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 | 2026-09-13 |         | QA gate PASS (95/100) — cycle 2 refute pass, 0 findings gated, 1 LOW documented | qa-task |
 | 2026-09-13 |         | PR review (5c) findings fixed — CR-1 Jira `jira_last_*` residue exempted from the dirty-document HALT (step-7/8 docs), CR-2 idempotent 6a commit guard, CR-3 `mkdir -p` + pid-aware later-turn read, CR-4 `\|\| :` regex, CR-5 `-i` grep, PC-1 file map; shape test +3 assertions, mutation-proved 5 ways; 1 iteration | qa-fix |
 | 2026-09-13 |         | QA gate PASS (95/100) — cycle 3, all six 5c findings verified fixed, 0 new | qa-task |
+| 2026-09-13 |         | PR review pass-2 findings fixed — CR-1 exit-checked `git add` before the 6a guard, CR-2/3 residue check filters only diff headers and diffs against HEAD, CR-4 poll records the sampled PR head and the later turn re-derives CI_HEAD_2; PC-1..3 tree-derived counts dropped from prose; shape test +3 assertions, mutation-proved 5 ways; 1 iteration | qa-fix |
 
 ---
 
@@ -226,7 +228,7 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 - **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1 found two MEDIUMs by executing the new Step 7 prose under bash and zsh; cycle 2 (refute pass) verified both fixed; the 5c PR review found six more (one consumer-breaking on Jira), fixed in a review-driven cycle and verified in cycle 3 — 14 shape assertions, all mutation-proved. SC5 (observations close) is correctly deferred to merge (`parked_until: task.115 merged to develop`).
+Cycle 1 found two MEDIUMs by executing the new Step 7 prose under bash and zsh; cycle 2 (refute pass) verified both fixed; the 5c PR review found six more (one consumer-breaking on Jira), fixed in review-driven cycles and verified by re-review — every shape assertion mutation-proved. SC5 (observations close) is correctly deferred to merge (`parked_until: task.115 merged to develop`).
 
 ---
 

@@ -58,7 +58,7 @@ All notable changes to this project will be documented in this file. Format foll
   implementation report only. Step 5c asserts the cycle's gate and QA report are tracked and pushed
   before `/review-pr` reads the trail, and no step doc may suppress a `git commit`'s output or exit
   status (a swallowed hook rejection is how a PASS gate once certified an unpushed tree). Guarded by
-  `evals/shared/tests/finalise-publish-boundary.test.mjs`, mutation-proved six ways.
+  `evals/shared/tests/finalise-publish-boundary.test.mjs`, every assertion mutation-proved.
 
 - **The CHANGELOG checklist box has a mechanism** (task 115, obs #59). Citation convention `(task N)`
   / `(bug N)` in `docs/contributing/releases.md`; `evals/shared/tests/changelog-entry-drift.test.mjs`
