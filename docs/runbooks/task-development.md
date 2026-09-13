@@ -111,7 +111,7 @@ develop
 | 2 | `review-task` | Runs the interactive review (skipped if recently reviewed and `ready-for-development`). |
 | 3 | `develop` | Implements the task. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → success-criteria check. |
 | 4 | `create-pr` | Pushes the branch, opens a PR against the chosen base with `--base` pre-supplied. |
-| 5–6 | `qa-task` → `qa-fix` → `review-pr` | QA review produces a gate file. `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a non-`FAIL` gate with no open finding, or an active `WAIVED`, hands to `review-pr` (the accepting-route set, stated once in the QA loop's §5c). Up to 5 cycles. `qa-task` focuses on success-criteria validation, implementation-phase verification, and NFRs for infra/refactor work. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the task. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `task.{N}.pr-review.{n}.{name}.md`. |
+| 5–6 | `qa-task` → `qa-fix` → `review-pr` | QA review produces a gate file. `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a gate in the accepting-route set (any of the QA loop's §5c three routes) hands to `review-pr`. Up to 5 cycles. `qa-task` focuses on success-criteria validation, implementation-phase verification, and NFRs for infra/refactor work. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the task. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `task.{N}.pr-review.{n}.{name}.md`. |
 | 7 | `finalise` | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Full side-effects in lite mode too.** Also flips the task registry row to the final status. |
 | 8 | `commit-changes` | Final commit of artifacts and status updates. |
 
@@ -176,7 +176,7 @@ Everything else — `create-branch`, `develop`, `create-pr`, `qa-fix`, `finalise
 # PR open against chosen base, checks green
 gh pr view --json baseRefName,statusCheckRollup
 
-# Gate file exists and is PASS or WAIVED
+# Gate file exists; the last QA cycle's Action row reads 'Proceeding to 5c' (any of §5c's three routes)
 ls docs/tasks/task.{N}.{name}/*.gate.*.yml
 grep '^gate:' docs/tasks/task.{N}.{name}/*.gate.*.yml
 

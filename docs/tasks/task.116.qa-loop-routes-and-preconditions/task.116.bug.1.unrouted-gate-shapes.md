@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-1
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 3b diff reviewer, CR-1)
 **Date Found**: 2026-09-13
 
@@ -90,3 +90,4 @@ Add an explicit arm: any other gate with an open `top_issues[]` entry (a `PASS` 
 | 2026-09-13 | Ready for QA | qa-fix     | Fix implemented          |
 | 2026-09-13 | Reopened     | QA         | Cycle 2: partial — see Iteration 2 |
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 2: iteration 2 fix |
+| 2026-09-13 | Closed       | QA         | Cycle 3: verified — one definition of open; matrix test covers 8 cells |

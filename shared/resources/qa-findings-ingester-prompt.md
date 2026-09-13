@@ -25,8 +25,7 @@ Task mode (mode=<mode> where <mode>=task):
   Bug Reports: task.<id>.bug.*.md                   (all matches)
 
 The **PR Review** report is written by Step 5c (`/review-pr`) and is the ONLY carrier of findings on
-the review-driven path: 5c runs when the gate reached it (a non-`FAIL` gate with no open entry, or an
-active `WAIVED`), so a `REQUEST CHANGES`
+the review-driven path: 5c runs when the gate reached it (any of the QA loop's three accepting routes, §5c), so a `REQUEST CHANGES`
 verdict has no gate `top_issues[]` to travel in. Omitting this glob makes that path silently
 findings-free — qa-fix would change nothing and the loop would HALT reporting the issues as
 unfixable.

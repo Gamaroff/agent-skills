@@ -60,11 +60,14 @@ B. SCOPE (category: scope) — the change does something the work item never cla
 
 C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts itself:
    - no implementation report
-   - the highest-numbered gate did not reach 5c — it is FAIL, or it carries an OPEN top_issues[]
-     entry (status absent or `open`) that no active waiver covers. A CONCERNS gate whose entries are
-     all closed, or whose list is empty, is a reservation and a clean trail (the QA loop's route 3);
-     do NOT flag it for its token
-   - that gate's top_issues[] has an open entry — "non-empty" means open, not merely present
+   - the highest-numbered gate did not reach 5c. Read this from the implementation report, not from
+     the gate: the `### QA Cycle {N}` entry for that gate carries `**Action**: Proceeding to 5c` on
+     every accepting route (the QA loop's §5c routes 1–3 — no open finding; the Diminishing-returns
+     exit, whose open residue is test machinery; a CONCERNS with no open entry) and `Running qa-fix`
+     otherwise. Do NOT flag a gate for its token, and do NOT flag open entries on a gate whose entry
+     reads `Proceeding to 5c` — on route 2 they are the residue the exit declined to fix. Only when
+     no implementation report is available fall back to the gate itself: FAIL, or an open entry
+     (status absent or `open`) that no active waiver covers, is the trail defect
    - the document says status: accepted but no DoD file exists
    - QA report count does not match gate count
    - a handover file exists with outstanding (unticked) actions

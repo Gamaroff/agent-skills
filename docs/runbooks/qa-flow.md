@@ -67,17 +67,18 @@ If the gate is `CONCERNS` or `FAIL`:
 
 `qa-fix` ingests the gate file, prioritises findings risk-first, applies fixes, and updates the story/task. Re-run `qa-story` / `qa-task` after fixes land.
 
-**A `PASS` or `WAIVED` gate is no longer where this ends.** Inside `/develop-story` and
+**A gate that reaches 5c is no longer where this ends.** Inside `/develop-story` and
 `/develop-task` a clean gate hands to **Step 5c**, `review-pr` — see below. `qa-fix` also runs on
 that step's `REQUEST CHANGES` verdict, and those cycles come out of the same 5-cycle budget.
 
 ### How the loop ends
 
-Three exits, and they are not interchangeable:
+Four ways it ends, and they are not interchangeable — the first three hand to Step 5c (§5c's accepting-route set), the fourth escalates:
 
 | Exit | Fires when | Effect |
 |---|---|---|
-| Clean gate | `PASS` / `WAIVED` | Hands to Step 5c |
+| Clean gate | no open finding — `PASS`, or an active `WAIVED` | Hands to Step 5c |
+| **Reservation without a queue** | `CONCERNS` whose `top_issues[]` is empty or all closed (route 3) | Hands to Step 5c — nothing for `qa-fix` to act on |
 | **Diminishing returns** | All three conditions below hold | Hands to Step 5c — the loop *finished working* |
 | Convergence check | HIGH findings **remain and stop falling** | Escalates — the loop *stopped working* |
 
@@ -164,7 +165,7 @@ Tasks follow the same pattern under `docs/tasks/task.{N}.{name}/`. See [Story do
 - `qa-planning` → `qa-story`: risk profile and test design feed into review assessments.
 - `qa-story` → `qa-gate`: NFR validation, trace data, and issues feed into gate decisions.
 - `qa-planning` → `qa-gate`: risk summary directly influences gate status (≥9 → FAIL, ≥6 → CONCERNS).
-- `qa-story` / `qa-task` → `review-pr`: a gate in the accepting-route set (a non-`FAIL` gate with no open finding, or an active `WAIVED`) hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
+- `qa-story` / `qa-task` → `review-pr`: a gate in the accepting-route set (any of §5c's three routes) hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
 - `review-pr` → `qa-fix`: a `REQUEST CHANGES` verdict re-enters the fix cycle with the review's findings.
 
 ## See also

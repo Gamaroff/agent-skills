@@ -50,9 +50,27 @@ Rewrite the 5–6 rows and the 5c sub-state table to key on the accepting-route 
 
 **Verification Steps for QA**: `grep -n 'PASS\`/\`WAIVED' shared/resources/develop-pipeline-resume-contract.md` → 0; read :82/:92/:129/:130.
 
+### Iteration 2
+
+#### QA Verification (Ready for QA → Reopened)
+
+**Date**: 2026-09-13 (QA cycle 3)
+
+**Reopening reason** (cycle 3, CR-1): PARTIAL as a rule. The token pair is gone, but the parenthetical restatement — *a non-`FAIL` gate with no open entry, or an active `WAIVED`* — omits §5c route 2 (the Diminishing-returns exit hands a `CONCERNS` gate with open test-machinery entries to 5c). A run killed between that exit and the 5c verdict re-enters at 5a. **Re-fix**: define "reached 5c" mechanically — the cycle's `**Action**` row in QA Iteration History reads `Proceeding to 5c` (written by 5a on every accepting route) — and point at §5c's three routes instead of restating any.
+
+#### Fix Implementation — Iteration 2 (In Progress → Ready for QA)
+
+**Date**: 2026-09-13 (qa-fix, cycle 3)
+
+**Fix Description**: the 5–6 rows and both sub-state rows now read the **mechanical signal**: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` — 5a writes it on every one of §5c's three routes — with an explicit "do not re-derive the set from the gate". The 5b-side phrasing reads `Running qa-fix`. No paraphrase of the set remains in the file; the parity test forbids one.
+
+**Testing**: `pr-review-loop-parity` 29/29; `npm run ci:fast` 3269/3268/0.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-13 | New          | QA         | Cycle 2 refute reviewer (CR-1) |
 | 2026-09-13 | Ready for QA | qa-fix     | Five sites keyed on "reached 5c" |
+| 2026-09-13 | Reopened     | QA         | Cycle 3: partial — see Iteration 2 |
+| 2026-09-13 | Ready for QA | qa-fix     | Cycle 3: Iteration 2 fix |

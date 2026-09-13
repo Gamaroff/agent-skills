@@ -44,9 +44,27 @@ Amend the two TRAIL bullets to accept `CONCERNS` with no open entry and to read 
 
 **Testing**: "stated once" test asserts the prompt carries no "is not PASS or WAIVED" and does carry "did not reach 5c" and the non-empty-means-open sentence; mutation-proved.
 
+### Iteration 2
+
+#### QA Verification (Ready for QA → Reopened)
+
+**Date**: 2026-09-13 (QA cycle 3)
+
+**Reopening reason** (cycle 3, CR-2): PARTIAL as a rule. The rewritten bullets accept route 3 but flag route 2 — a `CONCERNS` gate whose open residue is test machinery after the Diminishing-returns exit — as a trail defect. **Re-fix**: exempt a gate whose cycle entry records the Diminishing-returns exit (`**Loop exit**` row not `n/a`), naming route 2 the way route 3 is named; better, key the bullet on the implementation report's `**Action**: Proceeding to 5c` row.
+
+#### Fix Implementation — Iteration 2 (In Progress → Ready for QA)
+
+**Date**: 2026-09-13 (qa-fix, cycle 3)
+
+**Fix Description**: the TRAIL bullet now reads "reached 5c" from the implementation report's cycle entry (`**Action**: Proceeding to 5c` / `Running qa-fix`), names all three §5c routes including route 2, forbids flagging open entries on a gate whose entry reads `Proceeding to 5c` (route 2's residue), and keeps the gate-only reading as a fallback used only when no implementation report is available. `review-pr` bundle regenerated.
+
+**Testing**: `pr-review-loop-parity` 29/29; `npm run ci:fast` 3269/3268/0.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-13 | New          | QA         | Cycle 2 refute reviewer (CR-2) |
 | 2026-09-13 | Ready for QA | qa-fix     | TRAIL bullets keyed on reaching 5c |
+| 2026-09-13 | Reopened     | QA         | Cycle 3: partial — see Iteration 2 |
+| 2026-09-13 | Ready for QA | qa-fix     | Cycle 3: Iteration 2 fix |

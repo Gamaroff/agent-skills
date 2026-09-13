@@ -15,13 +15,15 @@ Loaded by `/develop-story` and `/develop-task` during Steps 5–6. Story/task va
 
 This is the iterative heart of the pipeline. Maintain a **QA cycle counter** starting at 1. The loop limit is **5 complete cycles**.
 
-**A clean gate does not exit the loop — it hands to 5c.** `PASS` or `WAIVED` from the QA review
-means the work is ready to be *reviewed as a PR*, not that the loop is over. 5c
+**A gate in the accepting-route set does not exit the loop — it hands to 5c.** A gate that reaches
+5c (any of §5c's three routes) means the work is ready to be *reviewed as a PR*, not that the loop is over. 5c
 (`/review-pr`) is the loop's exit gate, and its verdict can send the run back to 5b.
 
-There are **two ways the loop reaches Step 7**, and both go through 5c: a gate that reads clean
-(`PASS` / `WAIVED`), and — from cycle 3 onward — the **Diminishing-returns exit**, which ends a loop
-whose HIGH findings are gone and whose residue is entirely test machinery. The second is still an
+There are **three routes by which the loop reaches Step 7**, and all go through 5c — they are
+§5c's accepting-route set: a gate with no open finding (route 1; `PASS`, or an active `WAIVED`, or —
+route 3 — a `CONCERNS` whose queue is empty or all closed), and — from cycle 3 onward — the
+**Diminishing-returns exit** (route 2), which ends a loop whose HIGH findings are gone and whose
+residue is entirely test machinery. The second is still an
 exit *to 5c*, not around it: `APPROVE` or `CONCERNS` from 5c remains the only thing that opens
 Step 7.
 
@@ -251,7 +253,11 @@ After completion, find and read the latest gate file. **One definition governs e
 entry in `top_issues[]` is **open** when its `status:` is absent or reads `open`; a gate has **no open
 entry** when the list is empty **or** every entry reads `status: closed`. The arms are the
 **accepting-route set** §5c enumerates, stated here as the router and there as the receiver; every
-other document that needs the set points at §5c rather than restating the tokens.
+other document that needs the set points at §5c rather than restating the tokens. **The mechanical
+record that a gate reached 5c** is the cycle's `### QA Cycle {N}` entry in QA Iteration History: 5a
+writes `**Action**: Proceeding to 5c (PR conformance review)` on every accepting route and
+`Running qa-fix` on the road to 5b, so a consumer that must decide "did gate N reach 5c?" reads that
+row rather than re-deriving the set from the gate.
 
 - `PASS` with **no open entry in `top_issues[]`** → **proceed to 5c** (the loop's exit gate), not straight to Step 7
 - `WAIVED` with `waiver.active: true` and a documented reason/approver → **proceed to 5c** (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
@@ -264,7 +270,7 @@ other document that needs the set points at §5c rather than restating the token
   or reads `open`) → run the **Convergence check** (below); if it does not trip, run the
   **Diminishing-returns exit** (below that). Proceed to 5b only when neither fires — the
   Convergence check escalates, the Diminishing-returns exit hands to 5c.
-- **Any other gate with an open entry in `top_issues[]`** — a `PASS` carrying open LOW entries
+- **Any other gate — read by its queue.** With an open entry in `top_issues[]` — a `PASS` carrying open LOW entries
   (legal under gate rule 5, which lets LOW findings ride on a passing verdict), or a `WAIVED` whose
   `waiver.active` is not `true` and whose queue has an open entry → the same road as the `FAIL` arm:
   Convergence check, then Diminishing-returns exit, then 5b. The queue is what `/qa-fix` consumes,
@@ -314,8 +320,8 @@ check** below compares across cycles, and the only place a resumed run can read 
 back from. Write it on every cycle, including one that found none (`0`).
 
 `**PR Review**` follows the same rule for the same reason, but note **who writes it and when**: 5a
-writes the row when it writes the entry, and at that moment no 5c verdict exists. On a clean gate 5a
-writes `pending — 5c not yet run`, and **5c overwrites it** with its verdict. A cycle whose gate never
+writes the row when it writes the entry, and at that moment no 5c verdict exists. On any gate that
+routes to 5c (any of §5c's three routes) 5a writes `pending — 5c not yet run`, and **5c overwrites it** with its verdict. A cycle whose gate never
 reached 5c keeps `not reached — gate did not exit the loop`. It is never omitted. An omitted row is
 indistinguishable from a review that was skipped, and on resume the two must not be confused.
 
@@ -381,8 +387,7 @@ Steps 5–6 emit.
 ### Convergence check (shared) — the QA loop's stall guard
 
 Perform this check **after the cycle's gate file has been written and read (5a), before entering
-5b**. A gate that hands to 5c (any arm of the accepting-route set above — a non-`FAIL` gate with no open
-entry, or an active `WAIVED`) skips it — the gate is accept-eligible, so there is
+5b**. A gate that hands to 5c (any arm of the accepting-route set above, §5c routes 1–3) skips it — the gate is accept-eligible, so there is
 nothing for a stall guard to act on. (Note this is *not* because the HIGH count is zero: a `WAIVED`
 gate carries its HIGH `top_issues[]` with `waiver.active: true`, so that cycle's
 `**HIGH findings**` line is still a real, usually non-zero, count.)
@@ -689,7 +694,7 @@ three together:
 | `…implementation.{name}.md`                 | **deferred to Step 8** (`docs(...)`)     |
 
 **There is exactly one `git push origin HEAD` per cycle** — at step 3 below on a cycle that enters 5b
-from 5a, or **before 5c** on a cycle whose gate read `PASS`/`WAIVED` (path 1 above), never both. Do not create a separate
+from 5a, or **before 5c** on a cycle whose gate reached 5c from 5a (path 1 above — §5c routes 1–3), never both. Do not create a separate
 `docs(...): QA cycle {N} gate + report` commit, and do not push twice in a cycle. The rule is about
 the **push**, not the commit: a review-driven cycle legitimately makes two commits (the pre-5c
 gate+report, then 5b's `fix(...)`), and still pushes once.
@@ -709,7 +714,7 @@ touches it. Nor does it move anything the resume contract reads — cycle recons
 gate and QA report — the evidence for a cycle that ran belongs on the branch, not only in the
 working tree, where a branch switch loses it and no reader of the PR ever sees it:**
 
-1. **`PASS` / `WAIVED` → 5c** (Outcome branching, above) — the cycle reaches 5c without entering
+1. **Any gate that reaches 5c from 5a — §5c routes 1–3** (Outcome branching, above) — the cycle reaches 5c without entering
    5b, so no `fix(...)` commit exists. Commit the gate `.yml` and QA report `.md` **before invoking
    `/review-pr` at 5c**, and push once. This is the single stated commit point for this path.
    Committing here rather than at the Step 7 transition is load-bearing twice over: 5c reads the
@@ -886,7 +891,9 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fi
 
 Perform this step **before Step 7**, on any of the **three routes out of 5a**:
 
-1. a gate that reads **`PASS` or `WAIVED`** — the ordinary route; or
+1. a gate with **no open finding** — `PASS` with no open `top_issues[]` entry, or `WAIVED` with
+   `waiver.active: true` (its HIGH entries are waived, not open); an inactive `WAIVED` with no open
+   entry is read by its queue and arrives here as a `PASS` does — the ordinary route; or
 2. a gate that took the **Diminishing-returns exit** above. That gate is `CONCERNS` by construction —
    the exit's own condition 2 requires a non-empty `top_issues[]`, and any MEDIUM makes the gate
    CONCERNS — so it must be named here explicitly. It arrives with a residue that is entirely test
@@ -999,7 +1006,7 @@ gate.
 | ✅ **APPROVE** | Signal `ready-for-merge`, exit the loop, proceed to Step 7. |
 | ❌ **Review failed** — `/review-pr` HALTed, could not resolve a PR, or errored | **Not a verdict, and not an exit.** Log it in the Issues Log, record `review failed` on the cycle's `**PR Review**` row, the gate and QA report are already committed by path 1 — do not commit again — and **HALT** naming the PR and the failure. Do **not** fall through to Step 7: 5c is the only exit, so a run that skips it silently finalises without the check this step exists to add. |
 
-> **Why the failure arm is spelled out.** The `PASS`/`WAIVED` path reaches 5c without entering 5b, so
+> **Why the failure arm is spelled out.** A gate that reaches 5c from 5a (routes 1–3) does so without entering 5b, so
 > it skips 5b step 5's mid-loop PR-state poll — which means a PR closed or merged underneath the run
 > is first discovered *by* `/review-pr`, and `/review-pr` HALTs with text addressed to a human. Without
 > this row the orchestrator has no arm for that state, and the likeliest improvisation is the one
@@ -1035,7 +1042,7 @@ when in fact they were never delivered.
 >
 > | Gate | `top_issues[]` | Is it the fix target? |
 > | :--- | :--- | :--- |
-> | `PASS` (route 1) | empty | — nothing to mistake |
+> | `PASS` (route 1) | no open entry — empty, or only `status: closed` entries | — nothing to mistake |
 > | `WAIVED` (route 1) | its HIGH entries, with `waiver.active: true` | **No.** They were waived on purpose; the outcome-branching list above says re-running qa-fix on them "would churn against an intentionally-waived gate" |
 > | `CONCERNS` (route 2, the Diminishing-returns exit) | the test-machinery residue that exit declined to fix | **No.** Leave it where the exit put it — the gate's `recommendations.future` and the work item |
 > | `CONCERNS` (route 3, no open entry) | empty, or only `status: closed` entries | — nothing to mistake; the reservation lives in `nfr_validation` and `status_reason` |

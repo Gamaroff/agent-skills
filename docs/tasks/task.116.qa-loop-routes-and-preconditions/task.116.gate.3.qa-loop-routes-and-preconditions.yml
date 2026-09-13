@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.116.qa-loop-routes-and-preconditions'
+task_title: 'The QA loop routes on the verdict token, gates before its own review returns, reads boundary deliverables it could execute, and has no vocabulary for a subagent that never ran'
+gate: CONCERNS
+status_reason: 'Both cycle-2 HIGHs are closed as HIGHs — no consumer keys 5c on the token pair any more — but the restatement the fix used ("non-FAIL with no open entry, or active WAIVED") omits §5c route 2, the Diminishing-returns exit, so the resume contract and the conformance prompt now mis-handle a route-2 gate; and the loop document disagrees with its own arms in four places. Four MEDIUMs, no HIGH → CONCERNS. HIGH sequence [0, 2, 0].'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T08:54:10Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The restated accepting-route set (":82, :92, :129, :130") omits §5c route 2 — a CONCERNS gate with open test-machinery entries handed to 5c by the Diminishing-returns exit — so a run killed between that exit and the 5c verdict re-enters at 5a, and "routed to 5b (FAIL, or any gate with an open entry not covered by an active waiver)" mislabels a route-2 gate.'
+    suggested_action: 'Define "reached 5c" mechanically from the implementation report — the cycle entry "**Action**" row reads "Proceeding to 5c" — and point at §5c three routes rather than restating two.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.3.resume-contract-keys-5c-on-token.md'
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/pr-conformance-prompt.md'
+    finding: 'The rewritten TRAIL bullets flag a route-2 gate (open test-machinery residue after the Diminishing-returns exit) as a trail defect, so every review following that exit reports a defect on a clean trail.'
+    suggested_action: 'Exempt a gate whose cycle entry records the Diminishing-returns exit (Loop exit row, or open entries all matching qa.testArtifactGlobs), naming it as route 2 the way route 3 is named.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.4.conformance-prompt-flags-route-3-gate.md'
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: '§5c route 1 (:889) reads an unqualified "PASS or WAIVED"; the shapes table (:1039) says PASS arrives "empty"; the commit-point section path 1 (:712, :692) reads "PASS / WAIVED → 5c" so routes 2–3 are told to commit where that section forbids it; arm 5 heading says "with an open entry" while its body routes a no-open cell (CR-3, CR-4, CR-5).'
+    suggested_action: 'Qualify route 1 as the arms do; PASS row → "no open entry"; path 1 → "any gate that reaches 5c from 5a (§5c routes 1–3)"; retitle arm 5 "Any other gate — read by its queue" and update the test prefix.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.5.loop-doc-disagrees-with-its-own-arms.md'
+    status: open
+  - id: 'CR-6'
+    severity: medium
+    file: 'docs/runbooks/qa-flow.md'
+    finding: 'Unchanged lines in changed files still state the two-route set: qa-flow.md:70-80 ("Clean gate | PASS / WAIVED"), loop doc :18-23 ("two ways the loop reaches Step 7"), :317-318 ("On a clean gate 5a writes pending" — undefined for route 3), :1002, and the verification snippets story-development.md:297 / task-development.md:179 ("Gate file exists and is PASS or WAIVED").'
+    suggested_action: 'Sweep to "a gate in §5c accepting-route set"; add route 3 as a row of the How-the-loop-ends table; state that 5a writes the pending placeholder on any gate that routes to 5c.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 3269
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered; unchanged. Re-review scope: since 2026-09-13T08:32:33Z (default narrowing; SAFETY_REPROBE=false).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-2 fixes verified in source + bundled copies; QA mutation proof on the conformance bullet → covered; ci:fast 3269/3268/0. Route-2 omission is carried in top_issues.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory: CR-7 — the "stated once" test asserts absence of the old phrasing, not presence of a pointer, so a two-of-three restatement stays green; CR-8 — §Subagents names "review-story Phase 1.5" but review-story pre-pass is Step 1. The pattern across three cycles: each fix restated the set; the durable fix is a pointer and a mechanical signal.'
+
+recommendations:
+  immediate:
+    - action: 'Resume contract + conformance prompt: reached-5c by the implementation report Action row / §5c three routes, route 2 named (CR-1, CR-2)'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md', 'shared/resources/pr-conformance-prompt.md']
+    - action: 'Loop doc internally consistent with its arms (CR-3 group)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'Sweep the remaining two-route lines (CR-6)'
+      refs: ['docs/runbooks/qa-flow.md', 'docs/runbooks/story-development.md', 'docs/runbooks/task-development.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+  future:
+    - action: 'Strengthen the stated-once test to require a pointer, not merely the absence of the old phrase (CR-7); fix the review-story site name (CR-8)'
+      refs: ['evals/shared/tests/pr-review-loop-parity.test.mjs', 'shared/resources/develop-pipeline-autonomous-defaults.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1', 'CR-2', 'CR-3', 'CR-6 closed']

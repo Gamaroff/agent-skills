@@ -73,6 +73,22 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 
 **Testing**: "stated once" test pins the ingester prompt, `qa-flow.md` and the Convergence preamble against the token-pair premise; mutation-proved (ingester revert → red).
 
+### Iteration 3
+
+#### QA Verification (Ready for QA → Reopened)
+
+**Date**: 2026-09-13 (QA cycle 3)
+
+**Reopening reason** (cycle 3, CR-6): six more two-route lines in unchanged parts of changed files — `qa-flow.md:70-80` ("Clean gate | PASS / WAIVED" in the How-the-loop-ends table), loop doc `:18-23` ("two ways the loop reaches Step 7"), `:317-318` ("On a clean gate 5a writes pending" — undefined for route 3), `:1002`, and the verification snippets `story-development.md:297` / `task-development.md:179` ("Gate file exists and is PASS or WAIVED"). **Re-fix**: sweep to "a gate in §5c's accepting-route set"; add route 3 as a row of the table; 5a writes the `pending` placeholder on any gate that routes to 5c.
+
+#### Fix Implementation — Iteration 3 (In Progress → Ready for QA)
+
+**Date**: 2026-09-13 (qa-fix, cycle 3)
+
+**Fix Description**: every consumer now carries a **pointer** ("any of §5c's three routes") and no paraphrase: loop doc :18–23 (three routes, all through 5c), :317 (`pending` placeholder on any gate that routes to 5c), :1002, Convergence preamble; `qa-flow.md` How-the-loop-ends table gains the route-3 row and its intro says four ways / three to 5c; `story-development.md:297` and `task-development.md:179` verification snippets read the cycle entry's Action row; the ingester prompt and both runbook rows point at §5c. The parity test now forbids six paraphrase shapes in six consumers and requires the `§5c` pointer in each.
+
+**Testing**: `pr-review-loop-parity` 29/29; `npm run ci:fast` 3269/3268/0.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes                          |
@@ -82,3 +98,5 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 | 2026-09-13 | Ready for QA | qa-fix     | Five lines reworded            |
 | 2026-09-13 | Reopened     | QA         | Cycle 2: partial — see Iteration 2 |
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 2: iteration 2 fix |
+| 2026-09-13 | Reopened     | QA         | Cycle 3: partial — see Iteration 3 |
+| 2026-09-13 | Ready for QA | qa-fix     | Cycle 3: Iteration 3 fix |

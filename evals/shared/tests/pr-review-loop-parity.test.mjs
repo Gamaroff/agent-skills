@@ -246,7 +246,7 @@ test("the outcome-branching arms are exhaustive: every gate × queue cell names 
     waivedActive: "- `WAIVED` with `waiver.active: true`",
     concernsNoOpen: "- `CONCERNS` with **no open entry",
     failOrOpen: "- `FAIL`, or `CONCERNS` with an **open entry",
-    anyOtherOpen: "- **Any other gate with an open entry in `top_issues[]`**",
+    anyOtherOpen: "- **Any other gate — read by its queue.**",
     malformed: "- A gate that matches **none** of the arms above",
   };
   const arms = Object.fromEntries(
@@ -333,61 +333,71 @@ test("the outcome-branching arms are exhaustive: every gate × queue cell names 
     /\*\*HALT\*\*/,
     "a gate matching no arm must HALT, not be routed by guesswork",
   );
+  // The receiver (§5c route 1) must be qualified the way the router is — an unqualified
+  // "PASS or WAIVED" is broader than arms 1, 2 and 5 (CR-3, cycle 3).
+  const s5c = section5c();
+  assert.doesNotMatch(
+    s5c,
+    /1\. a gate that reads \*\*`PASS` or `WAIVED`\*\*/,
+    "§5c route 1 must not be the unqualified token pair",
+  );
+  assert.match(
+    s5c,
+    /1\. a gate with \*\*no open finding\*\*/,
+    "§5c route 1 must be qualified as 'no open finding', matching the arms",
+  );
 });
 
-test("the accepting-route set is stated once: every consumer points at §5c instead of the PASS/WAIVED token pair (task.116 cycle 2)", () => {
-  // Cycle 2's refute pass found the set restated — and stale — in the resume contract and the PR
-  // conformance prompt. Both are load-bearing: one decides where a killed run re-enters, the other
-  // decides whether a route-3 gate is a trail defect. Pin the premise out of each consumer.
-  const resume = read("shared/resources/develop-pipeline-resume-contract.md");
-  const conformance = read("shared/resources/pr-conformance-prompt.md");
-  const ingester = read("shared/resources/qa-findings-ingester-prompt.md");
-  const qaFlow = read("docs/runbooks/qa-flow.md");
-  assert.doesNotMatch(
-    resume,
-    /gate reads `PASS`\/`WAIVED`/,
-    "the resume contract must not key 5c on the token pair",
-  );
-  assert.doesNotMatch(
-    resume,
-    /gate `\{N\}` reads `PASS`\/`WAIVED`/,
-    "the resume contract's 5c sub-state table must not key on the token pair",
-  );
-  assert.ok(
-    (resume.match(/reached 5c/g) || []).length >= 3,
-    "the resume contract keys the 5–6 rows and the sub-state table on 'reached 5c'",
-  );
-  assert.doesNotMatch(
-    conformance,
+test("the accepting-route set is stated once: consumers point at §5c and read the mechanical signal, never a paraphrase (task.116 cycles 2–3)", () => {
+  // Cycle 2 found the set restated (stale) in the resume contract and the conformance prompt;
+  // cycle 3 found the replacement paraphrase — "non-FAIL with no open entry, or active WAIVED" —
+  // was two of §5c's three routes. A test that only forbids the OLD phrase stays green on every
+  // new one. So this test forbids paraphrase in every consumer, requires the pointer, and
+  // requires the two load-bearing consumers (which must DECIDE whether a gate reached 5c) to
+  // read the mechanical record 5a writes — the cycle entry's `Action` row — rather than the gate.
+  const consumers = {
+    "resume contract": read(
+      "shared/resources/develop-pipeline-resume-contract.md",
+    ),
+    "conformance prompt": read("shared/resources/pr-conformance-prompt.md"),
+    "ingester prompt": read("shared/resources/qa-findings-ingester-prompt.md"),
+    "qa-flow runbook": read("docs/runbooks/qa-flow.md"),
+    "story-development runbook": read("docs/runbooks/story-development.md"),
+    "task-development runbook": read("docs/runbooks/task-development.md"),
+  };
+  const PARAPHRASES = [
+    /reads `PASS`\/`WAIVED`/,
     /gate is not PASS or WAIVED/,
-    "the conformance prompt must not flag a route-3 gate for its token",
-  );
-  assert.match(
-    conformance,
-    /did not reach 5c/,
-    "the conformance prompt's TRAIL bullet keys on reaching 5c",
-  );
-  assert.match(
-    conformance,
-    /"non-empty" means open, not merely present/,
-    "the conformance prompt reads non-empty as open",
-  );
-  assert.doesNotMatch(
-    ingester,
+    /a `PASS`\/`WAIVED` gate hands to/,
     /gate is already `PASS`\/`WAIVED`/,
-    "the ingester prompt must not carry the two-route premise",
+    /non-`?FAIL`? gate with no open (entry|finding)/,
+    /Gate file exists and is PASS or WAIVED/,
+  ];
+  for (const [name, text] of Object.entries(consumers)) {
+    for (const re of PARAPHRASES) {
+      assert.doesNotMatch(
+        text,
+        re,
+        `${name} must not restate the accepting-route set (${re})`,
+      );
+    }
+    assert.match(text, /§5c/, `${name} must point at §5c by name`);
+  }
+  for (const name of ["resume contract", "conformance prompt"]) {
+    assert.match(
+      consumers[name],
+      /`\*\*Action\*\*`[^\n]{0,40}`Proceeding to 5c`|\*\*Action\*\*: Proceeding to 5c/,
+      `${name} must decide "reached 5c" from the cycle entry's Action row, not from the gate`,
+    );
+  }
+  // And the set itself lives in exactly one enumerated list: §5c's "three routes out of 5a".
+  assert.match(
+    section5c(),
+    /three routes out of 5a/,
+    "§5c must be the one enumerated statement of the set",
   );
   assert.doesNotMatch(
-    qaFlow,
-    /a `PASS`\/`WAIVED` gate hands to Step 5c/,
-    "qa-flow.md must not carry the two-route premise",
-  );
-  const convergence = sectionBetween(
-    "### Convergence check",
-    "### Diminishing-returns exit",
-  );
-  assert.doesNotMatch(
-    convergence,
+    sectionBetween("### Convergence check", "### Diminishing-returns exit"),
     /hands to 5c \(`PASS` \/ `WAIVED`\)/,
     "the Convergence check preamble must not carry the two-route premise",
   );

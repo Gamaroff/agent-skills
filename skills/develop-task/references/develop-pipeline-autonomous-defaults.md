@@ -42,7 +42,7 @@ The rows below apply to both `develop-story` and `develop-task`. Where the two s
 ## Subagents — unavailable, failed, slow
 
 Every dispatch site in the pipeline — the pre-develop surface map (develop Step 3), `review-task` /
-`review-story` Phase 1.5, the QA diff reviewer (`qa-task` Step 3b / `qa-story` Phase 1.6) and the
+`review-story` Step 1 pre-pass, the QA diff reviewer (`qa-task` Step 3b / `qa-story` Phase 1.6) and the
 `qa-fix` findings ingester (Step 1a) — points **here** for what to do when the subagent it asked for
 does not come back the way it expected. Three states, and they are not the same state:
 
