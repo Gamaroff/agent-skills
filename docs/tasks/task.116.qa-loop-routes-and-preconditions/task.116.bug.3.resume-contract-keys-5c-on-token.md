@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-3
 **Severity**: HIGH
 **Priority**: P0
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 refute reviewer, CR-1)
 **Date Found**: 2026-09-13
 
@@ -74,3 +74,4 @@ Rewrite the 5–6 rows and the 5c sub-state table to key on the accepting-route 
 | 2026-09-13 | Ready for QA | qa-fix     | Five sites keyed on "reached 5c" |
 | 2026-09-13 | Reopened     | QA         | Cycle 3: partial — see Iteration 2 |
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 3: Iteration 2 fix |
+| 2026-09-13 | Closed       | QA         | Cycle 4: verified — Action-row signal, no paraphrase; the writer gap is bug 6 |

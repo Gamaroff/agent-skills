@@ -77,7 +77,7 @@ Four ways it ends, and they are not interchangeable — the first three hand to 
 
 | Exit | Fires when | Effect |
 |---|---|---|
-| Clean gate | no open finding — `PASS`, or an active `WAIVED` | Hands to Step 5c |
+| Clean gate | route 1 — no open finding, or an active `WAIVED` (see §5c) | Hands to Step 5c |
 | **Reservation without a queue** | `CONCERNS` whose `top_issues[]` is empty or all closed (route 3) | Hands to Step 5c — nothing for `qa-fix` to act on |
 | **Diminishing returns** | All three conditions below hold | Hands to Step 5c — the loop *finished working* |
 | Convergence check | HIGH findings **remain and stop falling** | Escalates — the loop *stopped working* |

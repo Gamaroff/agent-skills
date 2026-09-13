@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-5
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 3 reviewer, CR-3 / CR-4 / CR-5)
 **Date Found**: 2026-09-13
 
@@ -38,3 +38,4 @@ Qualify §5c route 1 as the arms do; shapes table `PASS` row → "no open entry"
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-13 | New          | QA         | Cycle 3 reviewer (CR-3/4/5) |
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 3: fix |
+| 2026-09-13 | Closed       | QA         | Cycle 4: verified — route 1 qualified, shapes table, commit-point paths, arm-5 heading; pinned |

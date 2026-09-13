@@ -176,9 +176,11 @@ Everything else — `create-branch`, `develop`, `create-pr`, `qa-fix`, `finalise
 # PR open against chosen base, checks green
 gh pr view --json baseRefName,statusCheckRollup
 
-# Gate file exists; the last QA cycle's Action row reads 'Proceeding to 5c' (any of §5c's three routes)
+# Gate file exists, and the last QA cycle's Action row (implementation report) reads
+# 'Proceeding to 5c' — the record that the gate took one of §5c's three routes
 ls docs/tasks/task.{N}.{name}/*.gate.*.yml
 grep '^gate:' docs/tasks/task.{N}.{name}/*.gate.*.yml
+grep -A8 '^### QA Cycle' docs/tasks/task.{N}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1   # expect: Proceeding to 5c
 
 # Task status is accepted
 grep -E '^status:|^Status:' docs/tasks/task.{N}.{name}.md

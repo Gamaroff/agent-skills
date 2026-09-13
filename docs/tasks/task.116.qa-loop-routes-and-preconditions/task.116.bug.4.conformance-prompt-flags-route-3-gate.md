@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-4
 **Severity**: HIGH
 **Priority**: P0
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 2 refute reviewer, CR-2; verified by QA)
 **Date Found**: 2026-09-13
 
@@ -68,3 +68,4 @@ Amend the two TRAIL bullets to accept `CONCERNS` with no open entry and to read 
 | 2026-09-13 | Ready for QA | qa-fix     | TRAIL bullets keyed on reaching 5c |
 | 2026-09-13 | Reopened     | QA         | Cycle 3: partial — see Iteration 2 |
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 3: Iteration 2 fix |
+| 2026-09-13 | Closed       | QA         | Cycle 4: verified — Action-row read, routes 1–3 named, no-report fallback; writer gap is bug 6 |

@@ -89,6 +89,22 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 
 **Testing**: `pr-review-loop-parity` 29/29; `npm run ci:fast` 3269/3268/0.
 
+### Iteration 4
+
+#### QA Verification (Ready for QA → Reopened)
+
+**Date**: 2026-09-13 (QA cycle 4, CR-2/3/4)
+
+**Reopening reason**: pointers landed, but (a) the runbook verification snippets' *commands* still grep the gate token while their new comment says to read the Action row (`story-development.md:297`, `task-development.md:179`); (b) `qa-findings-ingester-prompt.md:172` still says "the gate that sent the run to 5c reads `PASS`"; (c) `skills/review-pr/SKILL.md:194,546` still state the predicate as the token pair while the prompt they load forbids it. **Re-fix**: make the snippet check what the comment says (grep the implementation report's last `### QA Cycle` entry for `**Action**: Proceeding to 5c`); reword :172; point both review-pr sentences at §5c and the Action row.
+
+#### Fix Implementation — Iteration 4 (In Progress → Ready for QA)
+
+**Date**: 2026-09-13 (qa-fix, cycle 4)
+
+**Fix Description**: runbook verification snippets now grep the implementation report's last `### QA Cycle` entry for `**Action**: Proceeding to 5c` (the check matches its comment); `qa-findings-ingester-prompt.md:172` → "carries no open fix target on any of §5c's three routes"; `skills/review-pr/SKILL.md:194,546` point at §5c and the Action row; `qa-flow.md` Clean-gate row → "route 1 — … (see §5c)". `review-pr/SKILL.md` added to the parity test's paraphrase-forbidden consumers.
+
+**Testing**: `pr-review-loop-parity` 30/30; mutation (review-pr sentence reverted) → red.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes                          |
@@ -100,3 +116,5 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 2: iteration 2 fix |
 | 2026-09-13 | Reopened     | QA         | Cycle 3: partial — see Iteration 3 |
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 3: Iteration 3 fix |
+| 2026-09-13 | Reopened     | QA         | Cycle 4: three stale sentences + snippet commands |
+| 2026-09-13 | Ready for QA | qa-fix     | Cycle 4: iteration 4 fix |

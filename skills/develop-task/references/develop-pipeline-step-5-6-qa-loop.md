@@ -257,8 +257,16 @@ entry** when the list is empty **or** every entry reads `status: closed`. The ar
 other document that needs the set points at §5c rather than restating the tokens. **The mechanical
 record that a gate reached 5c** is the cycle's `### QA Cycle {N}` entry in QA Iteration History: 5a
 writes `**Action**: Proceeding to 5c (PR conformance review)` on every accepting route and
-`Running qa-fix` on the road to 5b, so a consumer that must decide "did gate N reach 5c?" reads that
-row rather than re-deriving the set from the gate.
+`Running qa-fix (cycle {N} of 5)` on the road to 5b, so a consumer that must decide "did gate N reach
+5c?" reads that row rather than re-deriving the set from the gate. **The row is written when the
+route is known, not when the entry is opened**: the entry is created as soon as the gate is read, but
+arms 4–5 run the Convergence check and the Diminishing-returns exit first, and only their outcome
+decides between 5c and 5b. So the rule is a **post-guard write**: once the arm resolves — directly for
+arms 1–3, after both guards for arms 4–5 — overwrite `**Action**` with the destination and `**PR
+Review**` with `pending — 5c not yet run` (for 5c) or `not reached — gate did not exit the loop` (for
+5b). The Diminishing-returns exit's own `On exit` list repeats this as its first step so a run that
+takes route 2 cannot leave the row at its 5b value. The row's value set is exactly `{Proceeding to 5c
+(PR conformance review), Running qa-fix (cycle {N} of 5), Escalating — loop not converging}`.
 
 - `PASS` with **no open entry in `top_issues[]`** → **proceed to 5c** (the loop's exit gate), not straight to Step 7
 - `WAIVED` with `waiver.active: true` and a documented reason/approver → **proceed to 5c** (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
@@ -313,7 +321,7 @@ Log the result in the QA Iteration History section:
 **HIGH findings**: {HIGH_N}
 **PR Review**: {pending — 5c not yet run / APPROVE / CONCERNS / REQUEST CHANGES / review failed / not reached — gate did not exit the loop}
 **Loop exit**: {n/a — this exit not taken / the `describeDiminishingReturns()` message verbatim}
-**Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of 5) / Proceeding to finalise / Escalating — loop not converging}
+**Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle N of 5) / Escalating — loop not converging}
 ```
 
 The `**HIGH findings**` line is not decoration: it is the persisted sequence the **Convergence
@@ -558,13 +566,18 @@ default rather than as an opt-out. See [`configuration.md`](https://github.com/G
 
 #### On exit
 
-1. **Do not run 5b.**
-2. **Hand to 5c**, exactly as a `PASS` gate does. Since 5c became the loop's exit gate the only route
+1. **Overwrite the cycle entry's routing rows first**: `**Action**: Proceeding to 5c (PR conformance
+   review)` and `**PR Review**: pending — 5c not yet run`. The entry was opened before the guards ran
+   and may still carry the 5b values; the resume contract and the PR conformance review both decide
+   "did this gate reach 5c?" from this row, so leaving it unwritten sends a route-2 run back to 5a on
+   resume and files a trail defect at 5c.
+2. **Do not run 5b.**
+3. **Hand to 5c**, exactly as a `PASS` gate does. Since 5c became the loop's exit gate the only route
    to Step 7 is 5c returning `APPROVE` or `CONCERNS`, and this must not become the one path that
    reaches Step 7 without a PR conformance review — that would make it a *weaker* exit than a clean
    gate takes, on a run that by construction has stopped finding blockers.
-3. Record the residual in the gate's `recommendations.future` **and** on the work item.
-4. Write `describeDiminishingReturns(r)` verbatim into this cycle's `### QA Cycle {N}` entry, on its
+4. Record the residual in the gate's `recommendations.future` **and** on the work item.
+5. Write `describeDiminishingReturns(r)` verbatim into this cycle's `### QA Cycle {N}` entry, on its
    own `**Loop exit**` row. A reader six months later must be able to tell this exit from a stall,
    and the message is a function rather than a sentence composed here precisely so it is assertable.
 

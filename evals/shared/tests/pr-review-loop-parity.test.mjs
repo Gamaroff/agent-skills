@@ -364,6 +364,7 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
     "qa-flow runbook": read("docs/runbooks/qa-flow.md"),
     "story-development runbook": read("docs/runbooks/story-development.md"),
     "task-development runbook": read("docs/runbooks/task-development.md"),
+    "review-pr skill": read("skills/review-pr/SKILL.md"),
   };
   const PARAPHRASES = [
     /reads `PASS`\/`WAIVED`/,
@@ -372,6 +373,8 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
     /gate is already `PASS`\/`WAIVED`/,
     /non-`?FAIL`? gate with no open (entry|finding)/,
     /Gate file exists and is PASS or WAIVED/,
+    /gate reads `PASS` or `WAIVED`/,
+    /reads `PASS` or `WAIVED`, a DoD/,
   ];
   for (const [name, text] of Object.entries(consumers)) {
     for (const re of PARAPHRASES) {
@@ -400,6 +403,50 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
     sectionBetween("### Convergence check", "### Diminishing-returns exit"),
     /hands to 5c \(`PASS` \/ `WAIVED`\)/,
     "the Convergence check preamble must not carry the two-route premise",
+  );
+});
+
+test("the Action row the consumers read has a writer on every route: post-guard write, On-exit step 1, closed value set (task.116 cycle 4)", () => {
+  // Cycle 3 made "reached 5c" the cycle entry's Action row. Cycle 4 found nothing told the
+  // Diminishing-returns exit to WRITE it — the entry is opened before the guards run, so a
+  // route-2 run could leave the 5b value in place and both consumers would then decide the gate
+  // never reached 5c. Pin the writer: the preamble states the post-guard write and the closed
+  // value set; the exit's On-exit list writes the row as its first step; the template offers no
+  // unreachable value.
+  const branching = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
+  ).replace(/\s+/g, " ");
+  assert.match(
+    branching,
+    /post-guard write/,
+    "the preamble must state that the Action row is written after the guards resolve",
+  );
+  assert.match(
+    branching,
+    /value set is exactly `\{Proceeding to 5c \(PR conformance review\), Running qa-fix \(cycle \{N\} of 5\), Escalating — loop not converging\}`/,
+    "the preamble must state the closed value set of the Action row",
+  );
+  assert.doesNotMatch(
+    loopDoc,
+    /Proceeding to finalise/,
+    "the entry template must not offer the unreachable value 'Proceeding to finalise'",
+  );
+  const onExit = sectionBetween("#### On exit", "> **This is not a licence");
+  assert.match(
+    onExit,
+    /^1\. \*\*Overwrite the cycle entry's routing rows first\*\*/m,
+    "the Diminishing-returns On-exit list must write the Action / PR Review rows as its FIRST step",
+  );
+  assert.match(
+    onExit,
+    /`\*\*Action\*\*: Proceeding to 5c \(PR conformance\s+review\)`/,
+    "On-exit step 1 must name the 5c value",
+  );
+  assert.match(
+    onExit,
+    /`\*\*PR Review\*\*: pending — 5c not yet run`/,
+    "On-exit step 1 must also reset the PR Review placeholder",
   );
 });
 

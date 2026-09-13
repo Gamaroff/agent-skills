@@ -152,34 +152,37 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 
 ## QA Testing Results
 
-**QA Status**: ⚠️ CONCERNS (cycle 3)
+**QA Status**: ❌ FAIL (cycle 4)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-13
-**Quality Score**: 60/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 70/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.116.qa.3.qa-loop-routes-and-preconditions.md](./task.116.qa.3.qa-loop-routes-and-preconditions.md) (earlier: [qa.2](./task.116.qa.2.qa-loop-routes-and-preconditions.md), [qa.1](./task.116.qa.1.qa-loop-routes-and-preconditions.md))
-- **Gate File**: [task.116.gate.3.qa-loop-routes-and-preconditions.yml](./task.116.gate.3.qa-loop-routes-and-preconditions.yml) (earlier: [gate.2](./task.116.gate.2.qa-loop-routes-and-preconditions.yml), [gate.1](./task.116.gate.1.qa-loop-routes-and-preconditions.yml))
+- **Full Report**: [task.116.qa.4.qa-loop-routes-and-preconditions.md](./task.116.qa.4.qa-loop-routes-and-preconditions.md) (earlier: [qa.3](./task.116.qa.3.qa-loop-routes-and-preconditions.md), [qa.2](./task.116.qa.2.qa-loop-routes-and-preconditions.md), [qa.1](./task.116.qa.1.qa-loop-routes-and-preconditions.md))
+- **Gate File**: [task.116.gate.4.qa-loop-routes-and-preconditions.yml](./task.116.gate.4.qa-loop-routes-and-preconditions.yml) (earlier: [gate.3](./task.116.gate.3.qa-loop-routes-and-preconditions.yml), [gate.2](./task.116.gate.2.qa-loop-routes-and-preconditions.yml), [gate.1](./task.116.gate.1.qa-loop-routes-and-preconditions.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 3269 (3268 pass, 1 skipped, 0 fail)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH (4 MEDIUM, 2 LOW)
+- **Critical Issues**: 1 HIGH (1 MEDIUM, 3 LOW)
 - **NFR Status**: Security: PASS (reasoned, no boundary), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Bug Reports
 
 #### In QA Verification
-- [Bug 116.5: The loop document disagrees with its own arms](./task.116.bug.5.loop-doc-disagrees-with-its-own-arms.md) - ✅ Ready for QA - Priority: P1 (Fixed 2026-09-13, cycle 3)
-- [Bug 116.3: Resume contract keys the 5c sub-state on PASS/WAIVED](./task.116.bug.3.resume-contract-keys-5c-on-token.md) - ✅ Ready for QA (iteration 2: Action-row signal) - Priority: P1
-- [Bug 116.4: Conformance prompt flags every route-3 gate as a TRAIL defect](./task.116.bug.4.conformance-prompt-flags-route-3-gate.md) - ✅ Ready for QA (iteration 2: Action-row signal) - Priority: P1
-- [Bug 116.2: Consumer docs still restate "CONCERNS → qa-fix"](./task.116.bug.2.consumer-docs-restate-old-route.md) - ✅ Ready for QA (iteration 3: pointers only) - Priority: P2
+- [Bug 116.6: The Diminishing-returns On-exit steps never write the Action row](./task.116.bug.6.on-exit-never-writes-the-action-row.md) - ✅ Ready for QA - Priority: P0 (Fixed 2026-09-13, cycle 4)
+- [Bug 116.2: Consumer docs still restate "CONCERNS → qa-fix"](./task.116.bug.2.consumer-docs-restate-old-route.md) - ✅ Ready for QA (iteration 4) - Priority: P2
 
 #### Closed Bugs
-- [Bug 116.1: Outcome branching leaves two gate shapes unrouted](./task.116.bug.1.unrouted-gate-shapes.md) - ✅ Closed (cycle 3: one definition of open; matrix test) - Priority: P1
+- [Bug 116.1: Outcome branching leaves two gate shapes unrouted](./task.116.bug.1.unrouted-gate-shapes.md) - ✅ Closed (cycle 3) - Priority: P1
+- [Bug 116.3: Resume contract keys the 5c sub-state on PASS/WAIVED](./task.116.bug.3.resume-contract-keys-5c-on-token.md) - ✅ Closed (cycle 4) - Priority: P1
+- [Bug 116.4: Conformance prompt flags every route-3 gate as a TRAIL defect](./task.116.bug.4.conformance-prompt-flags-route-3-gate.md) - ✅ Closed (cycle 4) - Priority: P1
+- [Bug 116.5: The loop document disagrees with its own arms](./task.116.bug.5.loop-doc-disagrees-with-its-own-arms.md) - ✅ Closed (cycle 4) - Priority: P1
 
 ### Key Findings
+**Cycle 4 (FAIL):** the `On exit` steps never write the `Action` row the consumers now read; one runbook snippet's commands disagree with its comment; three stale consumer sentences.
+
 **Cycle 3 (CONCERNS):** every consumer's restatement of the accepting-route set omits route 2 (the Diminishing-returns exit); the loop doc disagrees with its own arms in four places; six more two-route lines (CR-1..CR-6).
 
 **Cycle 2 (FAIL):** the accepting-route set is restated in the resume contract and the PR conformance prompt, both still on the `PASS`/`WAIVED` token (CR-1, CR-2 HIGH); arm definitions inconsistent (CR-4); runbook wording wrong for active `WAIVED` + three more stale sentences (CR-3, CR-5).
@@ -199,7 +202,8 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 | 2026-09-13 |         | QA gate CONCERNS (80/100) — 4 findings (2 MEDIUM: unrouted gate shapes; runbooks restate old route) | qa-task |
 | 2026-09-13 |         | QA gate FAIL (40/100) — 7 findings (2 HIGH: resume contract + conformance prompt still key 5c on PASS/WAIVED) | qa-task |
 | 2026-09-13 |         | QA gate CONCERNS (60/100) — 6 findings (4 MEDIUM: restated set omits route 2; loop doc vs its own arms) | qa-task |
-| 2026-09-13 |         | QA findings fixed — the accepting-route set lives once in §5c; every consumer points at it and the two load-bearing ones read the cycle entry's Action row instead of the gate; one definition of "open"; matrix-driven + paraphrase-forbidding tests; 3 iterations | qa-fix |
+| 2026-09-13 |         | QA gate FAIL (70/100) — 5 findings (1 HIGH: On-exit never writes the Action row the consumers read) | qa-task |
+| 2026-09-13 |         | QA findings fixed — the accepting-route set lives once in §5c and its mechanical record (the cycle entry's Action row) has a writer on every route (post-guard write; On-exit step 1); consumers point, never paraphrase; matrix-driven + paraphrase-forbidding + writer tests; 4 iterations | qa-fix |
 
 ---
 

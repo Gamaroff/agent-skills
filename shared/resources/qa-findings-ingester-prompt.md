@@ -169,7 +169,7 @@ findings_summary:
 - Sort findings by severity: high first, then medium, then low
 - Within same severity, sort by source: gate > pr-review > report > bug. (`pr-review` ranks above
   `report` because on the review-driven path it is the only source carrying this cycle's findings —
-  the gate that sent the run to 5c reads `PASS`.)
+  the gate that sent the run to 5c carries no open fix target on any of §5c's three routes.)
 - Cap at 20 findings total. If raw count exceeds 20:
   - Include the top 20 by severity
   - Set `truncated_count` to the number of findings dropped
