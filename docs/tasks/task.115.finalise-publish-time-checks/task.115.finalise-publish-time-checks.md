@@ -5,19 +5,21 @@ type: task
 description: "Four observations on finalise share one shape — the step checks something, then changes the thing it checked, then publishes. The DoD header said IN PROGRESS under a sentence saying accepted, posted verbatim to the PR (#57). The CI rollup is read before Step 7's own commits, so the accepted head is never the verified one (#40). A gate certified a working tree whose commit had been silently rejected by the pre-commit hook (#48). And the release checklist's CHANGELOG box is the one item with no mechanism; five merges had no entry (#59). Give the publish step the checks, in the order task.103 used: a check first, then an owner."
 tags: [finalise, pipeline, ci, changelog]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-12
 updated: 2026-09-13
+completed_date: 2026-09-13
 assignee:
 estimated_effort_hours: 6
 github_issue: 401
+pr_number: 402
 ---
 
 # Technical Task: finalise publishes before it verifies: a doubled status header, a CI reading on the wrong head, a working-tree gate, and a CHANGELOG box with no mechanism
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.115.review.1.finalise-publish-time-checks.md` implemented 2026-09-13
 **GitHub Issue**: [#401](https://github.com/Gamaroff/agent-skills/issues/401)
 
@@ -194,6 +196,7 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 | 2026-09-13 |         | QA gate PASS (95/100) — cycle 3, all six 5c findings verified fixed, 0 new | qa-task |
 | 2026-09-13 |         | PR review pass-2 findings fixed — CR-1 exit-checked `git add` before the 6a guard, CR-2/3 residue check filters only diff headers and diffs against HEAD, CR-4 poll records the sampled PR head and the later turn re-derives CI_HEAD_2; PC-1..3 tree-derived counts dropped from prose; shape test +3 assertions, mutation-proved 5 ways; 1 iteration | qa-fix |
 | 2026-09-13 |         | QA gate PASS (95/100) — cycle 4, all seven 5c pass-2 findings verified fixed, 0 new | qa-task |
+| 2026-09-13 | 1.2     | DoD passed — accepted (PR #402); 5c APPROVE; CI reading 1 SUCCESS @ 0f3ca4e1 | finalise |
 
 ---
 
@@ -233,6 +236,36 @@ Cycle 1 found two MEDIUMs by executing the new Step 7 prose under bash and zsh; 
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.115.qa.4.finalise-publish-time-checks.md` (cycles 1–3: `qa.1` CONCERNS 80, `qa.2`/`qa.3` PASS 95)
+**Gate File**: `task.115.gate.4.finalise-publish-time-checks.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+**PR Review (5c)**: ✅ APPROVE on pass 3 (`task.115.pr-review.3.finalise-publish-time-checks.md`)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** SC1–SC4 met with code and per-PR test citations; SC5 (observations close naming the PR) deferred by design to merge
+✅ **Tests:** two new `node:test` files in the `npm test` glob, every shape assertion mutation-proved; `ci:fast` green on every pushed head
+✅ **PR Review:** PR #402 — 5c advisory review APPROVE after two CONCERNS passes were fixed; 13 findings closed across three fix cycles
+✅ **Documentation:** `skills/finalise/SKILL.md`, three shared step docs, `releases.md`, `CHANGELOG.md` (`(task 115)` ×2); bundle in sync
+✅ **Security Review:** ✅ PASS — boundary probed with 113 executed candidates; six low-severity advisory-predicate evasions carried to follow-up
+⚠️ **Compliance Review:** NOT_APPLICABLE — no PII, payment, UI or health data
+✅ **CI:** reading 1 SUCCESS @ `0f3ca4e1` (decision); reading 2 taken on the acceptance commit at the publish boundary and recorded on the PR canonical comment
+
+**Follow-up (LOW, non-blocking):** 5c pass-3 CR-1..3 + PC-1; security probes (6b frontmatter-anchored grep, 6d warn on malformed stem, residue key filter scoped to frontmatter, suppression-regex shapes, drift-test parser CRLF/BOM); `(bug 13)`/`(bug 15)` backfill; obs #80.
+
+**Detailed Verification Log:** See `task.115.dod.1.finalise-publish-time-checks.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-09-13
+
+---
+
 ## References
 
 - **Plan**: [`task.115.plan.finalise-publish-time-checks.md`](task.115.plan.finalise-publish-time-checks.md)
@@ -245,7 +278,7 @@ Cycle 1 found two MEDIUMs by executing the new Step 7 prose under bash and zsh; 
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.115.finalise-publish-time-checks/task.115.finalise-publish-time-checks.md`
