@@ -212,6 +212,7 @@
   "sync-jira-task": [],
   "tech-debt-audit": [],
   "test-co-location-enforcer": [],
+  "test-it": [],
   "testing-setup-nestjs": [],
   "testing-setup-react-native": [],
   "testing-setup-shared": [],
