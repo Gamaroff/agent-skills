@@ -190,6 +190,7 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 | 2026-09-13 |         | QA findings fixed — CR-1 (6d parameter expansion), CR-2 (6c backgrounded poll + result file), 2 LOW cleanups; shape test +2 assertions, mutation-proved 3 ways; 1 iteration | qa-fix |
 | 2026-09-13 |         | QA gate PASS (95/100) — cycle 2 refute pass, 0 findings gated, 1 LOW documented | qa-task |
 | 2026-09-13 |         | PR review (5c) findings fixed — CR-1 Jira `jira_last_*` residue exempted from the dirty-document HALT (step-7/8 docs), CR-2 idempotent 6a commit guard, CR-3 `mkdir -p` + pid-aware later-turn read, CR-4 `\|\| :` regex, CR-5 `-i` grep, PC-1 file map; shape test +3 assertions, mutation-proved 5 ways; 1 iteration | qa-fix |
+| 2026-09-13 |         | QA gate PASS (95/100) — cycle 3, all six 5c findings verified fixed, 0 new | qa-task |
 
 ---
 
@@ -212,20 +213,20 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-13
 **Quality Score**: 95/100
-**Gate Decision**: PASS (cycle 2)
+**Gate Decision**: PASS (cycle 3)
 
 ### QA Report
-- **Full Report**: [task.115.qa.2.finalise-publish-time-checks.md](./task.115.qa.2.finalise-publish-time-checks.md) (cycle 1: [qa.1](./task.115.qa.1.finalise-publish-time-checks.md))
-- **Gate File**: [task.115.gate.2.finalise-publish-time-checks.yml](./task.115.gate.2.finalise-publish-time-checks.yml) (cycle 1: [gate.1](./task.115.gate.1.finalise-publish-time-checks.yml))
+- **Full Report**: [task.115.qa.3.finalise-publish-time-checks.md](./task.115.qa.3.finalise-publish-time-checks.md) (earlier: [qa.1](./task.115.qa.1.finalise-publish-time-checks.md), [qa.2](./task.115.qa.2.finalise-publish-time-checks.md))
+- **Gate File**: [task.115.gate.3.finalise-publish-time-checks.yml](./task.115.gate.3.finalise-publish-time-checks.yml) (earlier: [gate.1](./task.115.gate.1.finalise-publish-time-checks.yml), [gate.2](./task.115.gate.2.finalise-publish-time-checks.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3249 (full `ci:fast`) + 97 targeted re-run; 7 mutation proofs re-run
+- **Tests Executed**: 3254 (full `ci:fast`) + 102 targeted re-run; 15 mutation proofs across three cycles
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 0 MEDIUM (cycle-1 CR-1/CR-2 fixed and verified in both shells), 1 LOW documented
+- **Critical Issues**: 0 HIGH, 0 MEDIUM (cycle-1 CR-1/CR-2 and the six 5c findings fixed and verified), 1 LOW documented
 - **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1 found two MEDIUMs by executing the new Step 7 prose under bash and zsh; cycle 2 (refute pass) verified both fixed and pinned by mutation-proved assertions. SC5 (observations close) is correctly deferred to merge (`parked_until: task.115 merged to develop`).
+Cycle 1 found two MEDIUMs by executing the new Step 7 prose under bash and zsh; cycle 2 (refute pass) verified both fixed; the 5c PR review found six more (one consumer-breaking on Jira), fixed in a review-driven cycle and verified in cycle 3 — 14 shape assertions, all mutation-proved. SC5 (observations close) is correctly deferred to merge (`parked_until: task.115 merged to develop`).
 
 ---
 
