@@ -133,9 +133,29 @@ board move. Every side-effect in this document therefore runs against a pushed, 
 commit. Two consequences for the orchestrator:
 
 - **Step 8 no longer carries the acceptance artefacts.** It commits the implementation report (and
-  nothing else new), so `git status` after `/finalise` returns should show only the report modified.
-  A DoD file or the document itself still dirty here means 6a did not run — **HALT**, do not paper
-  over it with Step 8's sweep.
+  nothing else new), so `git status` after `/finalise` returns should show only the report modified —
+  **plus, on a Jira project, a frontmatter-only change to the document.** Step 7 action 8's
+  Document-link re-point runs `sync-jira-{story,task} --doc-branch --no-transition` *after* the 6a
+  commit, and that script rewrites `jira_last_synced_at` / `jira_last_body_hash` /
+  `jira_last_meta_hash` on every run; that residue is expected and rides in Step 8's commit. Anything
+  else still dirty — a DoD file, a sprint review, the document's `status:` or body — means 6a did not
+  run: **HALT**, do not paper over it with Step 8's sweep. Tell the two apart mechanically rather than
+  by eye:
+
+  ```bash
+  # Dirty paths other than the implementation report.
+  OTHER=$(git status --porcelain | awk '{print $2}' | grep -v '\.implementation\.' || true)
+  for f in $OTHER; do
+    # The document is allowed ONLY a jira_last_* frontmatter residue. Every other changed
+    # line — status:, body, a DoD or sprint-review file — is a boundary that was not crossed.
+    if [ "$f" = "{document-path}" ]; then
+      git diff -- "$f" | grep -E '^[+-][^+-]' | grep -vE '^[+-]jira_last_(synced_at|body_hash|meta_hash):' \
+        | grep -q . && { echo "HALT: $f carries changes beyond the Jira sync residue — 6a did not run"; exit 1; }
+    else
+      echo "HALT: $f is dirty after /finalise returned — the publish boundary was not crossed"; exit 1
+    fi
+  done
+  ```
 - **The second CI reading is recorded here, not in the DoD file.** `/finalise` cannot write it into
   the summary without a further commit, so it hands back `CI reading 1: … @ …` and `CI reading 2:
   … @ …`; write both into the Decisions Log verbatim, and confirm the PR canonical comment carries

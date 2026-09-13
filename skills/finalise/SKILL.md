@@ -1056,9 +1056,16 @@ standalone.
    # The suffix is keyed on the registry being STAGED, not on the file existing — a story run in
    # a repo that keeps a task registry would otherwise claim a tick it did not make.
    REG_SUFFIX=$(git diff --cached --quiet -- docs/tasks/task-registry.md 2>/dev/null || echo '; registry ticked')
-   git commit -m "docs(${STEM}): accept — DoD, sprint review${REG_SUFFIX}"
-   COMMIT_EXIT=$?
-   [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
+   # Idempotent on re-run: when the artefacts are already committed there is nothing staged, and
+   # `git commit` would exit 1 for "nothing to commit" — indistinguishable from a hook rejection.
+   # Skip the COMMIT in that case (never the push, and never `--allow-empty`).
+   if git diff --cached --quiet; then
+     echo "acceptance artefacts already committed — skipping commit, pushing"
+   else
+     git commit -m "docs(${STEM}): accept — DoD, sprint review${REG_SUFFIX}"
+     COMMIT_EXIT=$?
+     [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
+   fi
 
    git push origin "$BRANCH"
    PUSH_EXIT=$?
@@ -1066,9 +1073,9 @@ standalone.
    CI_HEAD_2=$(git rev-parse HEAD)
    ```
 
-   `git commit` with nothing staged exits 1 — on a genuine re-run where the artefacts are already
-   committed that is the expected state, so **check `git status --porcelain` on the staged paths
-   first** and skip the commit (not the push) when they are clean. Never reach for `--allow-empty`.
+   The `git diff --cached --quiet` guard is in the block, not beside it: the first version said
+   "skip the commit when clean" in prose two lines below an unconditional `git commit`, and the prose
+   lost (task.115 5c, CR-2). Never reach for `--allow-empty`.
 
 6b. **Tracked-and-pushed assertions.** A gate describes a working tree; a PR describes a branch.
    Before anything below reads or posts an artefact, assert the artefact is *on the remote*, not
@@ -1110,9 +1117,11 @@ standalone.
    # foreground of a tool call: on a 23-minute serial lane a foreground wait simply outlives the
    # host's timeout and reports nothing — the `gh pr checks --watch` failure, observed three times
    # on one PR (task.115 QA cycle 1, CR-2).
+   mkdir -p .claude/state          # gitignored; absent in a fresh worktree or a standalone run
    POLL=.claude/state/finalise-ci-poll.sh
    RESULT=.claude/state/finalise-ci-result.txt
-   rm -f "$RESULT"
+   PIDFILE=.claude/state/finalise-ci-poll.pid
+   rm -f "$RESULT" "$PIDFILE"
    # Terminator and body at COLUMN 0 — an indented terminator does not close the heredoc and
    # bash swallows the nohup line below into the script, so the poll never starts.
    cat > "$POLL" <<'POLLEOF'
@@ -1131,15 +1140,23 @@ printf '%s %s %ss\n' "$STATE" "$EXPECTED_HEAD" "$WAITED" > "$RESULT"
 POLLEOF
    nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" \
      > .claude/state/finalise-ci-poll.log 2>&1 &
-   echo "CI poll backgrounded (pid $!) — read $RESULT on a later turn; absent means still polling"
+   echo $! > "$PIDFILE"
+   echo "CI poll backgrounded (pid $(cat "$PIDFILE")) — read $RESULT on a later turn; absent means still polling"
    ```
 
    **On a later turn**, read the result — never `sleep` for it in the foreground:
 
    ```bash
    RESULT=.claude/state/finalise-ci-result.txt
+   PIDFILE=.claude/state/finalise-ci-poll.pid
    if [ ! -f "$RESULT" ]; then
-     echo "still polling — check again on a later turn"        # do NOT sleep here
+     # No result yet. "Still polling" is only true while the poll is alive — a dead poll with no
+     # result (killed, never started, log will say) must HALT, not report progress forever.
+     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+       echo "still polling — check again on a later turn"      # do NOT sleep here
+     else
+       echo "HALT: the CI poll is not running and wrote no result — see .claude/state/finalise-ci-poll.log"; exit 1
+     fi
    else
      read -r CI_ROLLUP_2 CI_HEAD_READ WAITED < "$RESULT"
      [ "${CI_HEAD_READ:0:12}" = "${CI_HEAD_2:0:12}" ] \
@@ -1189,7 +1206,7 @@ POLLEOF
    case "$STEM" in task.*) N="${STEM#task.}" ;; esac
    if [ -n "$N" ] && [[ "$N" =~ ^[0-9]+$ ]]; then
      awk '/^## \[Unreleased\]/{p=1;next} /^## \[/{p=0} p' CHANGELOG.md \
-       | grep -qE "\(task ${N}\b|\btask[ .]${N}\b" \
+       | grep -qiE "\btask[ .]${N}\b" \
        || echo "⚠️  no-changelog-entry: CHANGELOG.md [Unreleased] does not cite (task ${N}) — add the entry before release; evals/shared/tests/changelog-entry-drift.test.mjs fails CI on this once the PR merges"
    fi
    ```

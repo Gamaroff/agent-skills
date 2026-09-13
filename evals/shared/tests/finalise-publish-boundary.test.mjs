@@ -253,7 +253,7 @@ test("no fenced `git commit` line suppresses its output or exit status", () => {
   for (const file of [FINALISE, STEP7, STEP8, QA_LOOP]) {
     for (const line of fencedLines(read(file))) {
       if (!/^\s*git commit\b/.test(line)) continue;
-      if (/>\s*\/dev\/null|2>&1|\|\|\s*(true|:)\b/.test(line))
+      if (/>\s*\/dev\/null|2>&1|\|\|\s*(true\b|:(?=[\s;)&|]|$))/.test(line))
         offenders.push(`${file}: ${line.trim()}`);
     }
   }
@@ -286,7 +286,7 @@ test("6a reads the commit's and the push's exit codes", () => {
   );
   assert.match(sixA, /PUSH_EXIT=\$\?/, "the push's exit status is captured");
   assert.ok(
-    !/--allow-empty/.test(sixA.replace(/Never reach for `--allow-empty`/, "")),
+    !codeLines(sixA).some((l) => /--allow-empty/.test(l)),
     "`--allow-empty` is forbidden at the acceptance commit",
   );
 });
@@ -352,6 +352,75 @@ test("6d derives the task number without BASH_REMATCH, so it fires under zsh too
     sixD,
     /\[\[ "\$N" =~ \^\[0-9\]\+\$ \]\]/,
     "6d guards N with a capture-free numeric match",
+  );
+});
+
+test("6a's acceptance commit is guarded, so a re-run with nothing staged is not reported as a rejection", () => {
+  const sixA = between(
+    finalise,
+    "6a. **Acceptance commit + push.**",
+    "6b. **Tracked-and-pushed assertions.**",
+    FINALISE,
+  );
+  const code = codeLines(sixA);
+  const guardIdx = code.findIndex((l) =>
+    /if git diff --cached --quiet; then/.test(l),
+  );
+  const commitIdx = code.findIndex((l) => /^\s*git commit\b/.test(l));
+  assert.ok(
+    guardIdx !== -1,
+    "6a must test `git diff --cached --quiet` before committing (5c CR-2)",
+  );
+  assert.ok(
+    commitIdx > guardIdx,
+    "the guard must precede the commit, not follow it",
+  );
+});
+
+test("6c creates .claude/state, records the poll pid, and HALTs a dead poll with no result", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  const code = codeLines(sixC);
+  assert.ok(
+    code.some((l) => /^\s*mkdir -p \.claude\/state\b/.test(l)),
+    "6c must `mkdir -p .claude/state` — the directory is gitignored and absent in a fresh worktree (5c CR-3)",
+  );
+  assert.ok(
+    code.some((l) => /echo \$! > "\$PIDFILE"/.test(l)),
+    "6c must record the poll pid",
+  );
+  assert.ok(
+    code.some((l) => /kill -0 "\$\(cat "\$PIDFILE"\)"/.test(l)),
+    'the later-turn read must check the poll is alive before saying "still polling"',
+  );
+});
+
+test("the orchestrator's dirty-document rule exempts the Jira sync's frontmatter residue", () => {
+  const step7doc = read(STEP7);
+  const boundary = between(
+    step7doc,
+    "## The publish boundary",
+    "## Post DoD Body to PR",
+    STEP7,
+  );
+  assert.match(
+    boundary,
+    /jira_last_\(synced_at\|body_hash\|meta_hash\)/,
+    `${STEP7}: the mechanical check must exempt exactly the three jira_last_* keys sync-jira rewrites after the 6a commit (5c CR-1)`,
+  );
+  assert.match(
+    boundary,
+    /HALT: \$f carries changes beyond the Jira sync residue/,
+    `${STEP7}: any other change to the document must still HALT`,
+  );
+  assert.match(
+    read(STEP8),
+    /jira_last_\*/,
+    `${STEP8} must name the same residue so the two docs agree`,
   );
 });
 

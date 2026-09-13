@@ -134,7 +134,7 @@ the skill.
 | `shared/resources/develop-pipeline-step-8-commit.md` | Step 8 commits the implementation report only |
 | `shared/resources/develop-pipeline-step-5-6-qa-loop.md` | tracked-and-pushed assertion at 5c; no-suppression rule |
 | `evals/shared/tests/changelog-entry-drift.test.mjs` (new) | backstop, tasks since last tag |
-| `evals/shared/tests/finalise-publish-boundary.test.mjs` (new) | 9 protocol-shape assertions: header absent; 6a→6b→6c→6d→7→8 order; both heads; tracked-and-pushed at 6b / DoD-post / 5c; no suppressed `git commit`; exit codes read; 6d + releases.md flip — mutation-proved 6 ways |
+| `evals/shared/tests/finalise-publish-boundary.test.mjs` (new) | 11 protocol-shape assertions: header absent; 6a→6b→6c→6d→7→8 order; both heads; tracked-and-pushed at 6b / DoD-post / 5c; no suppressed `git commit`; exit codes read; 6d + releases.md flip; 6c backgrounded (no foreground sleep); 6d without BASH_REMATCH — mutation-proved 9 ways (6 + 3 from QA cycle 1) |
 | `docs/contributing/releases.md` | citation convention; advisory→blocking flip as a checklist line |
 | `skills/*/references/` (generated) | `npm run bundle` after the shared edits |
 | `CHANGELOG.md` | Changed |
@@ -189,6 +189,7 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 | 2026-09-13 |         | QA gate CONCERNS (80/100) — 2 MEDIUM findings (6d zsh BASH_REMATCH; 6c foreground poll) | qa-task |
 | 2026-09-13 |         | QA findings fixed — CR-1 (6d parameter expansion), CR-2 (6c backgrounded poll + result file), 2 LOW cleanups; shape test +2 assertions, mutation-proved 3 ways; 1 iteration | qa-fix |
 | 2026-09-13 |         | QA gate PASS (95/100) — cycle 2 refute pass, 0 findings gated, 1 LOW documented | qa-task |
+| 2026-09-13 |         | PR review (5c) findings fixed — CR-1 Jira `jira_last_*` residue exempted from the dirty-document HALT (step-7/8 docs), CR-2 idempotent 6a commit guard, CR-3 `mkdir -p` + pid-aware later-turn read, CR-4 `\|\| :` regex, CR-5 `-i` grep, PC-1 file map; shape test +3 assertions, mutation-proved 5 ways; 1 iteration | qa-fix |
 
 ---
 
