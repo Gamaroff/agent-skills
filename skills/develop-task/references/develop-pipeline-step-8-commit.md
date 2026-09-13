@@ -30,6 +30,17 @@ Before invoking `/commit-changes`, update the implementation report one final ti
 
 Then invoke the `/commit-changes` skill with `--scope {work-item-dir}`. This stages tracked modifications across the whole tree (`git add -u`) plus any remaining new artifacts inside the work-item dir (including the finalised implementation report), without sweeping unrelated untracked paths:
 
+> **What this commit carries changed with task.115.** The acceptance artefacts — the document with
+> `status: accepted`, the DoD summary, `sprint-review-summary.md` and (tasks) the ticked registry —
+> are committed and pushed by `/finalise` itself at its Step 7 action 6a, *before* any PR or tracker
+> side-effect, so that CI can be read on the head that carries the acceptance. This Step 8 commit is
+> therefore the **implementation report and nothing else new**. If `git status` shows the document or
+> a `*.dod.*` file still modified here, `/finalise` did not cross its publish boundary — that is a
+> Step 7 defect to surface, not something for this sweep to absorb silently. Note also that this
+> commit is docs-only and lands *after* the second CI reading; that residue is deliberate (recording
+> a verification inside the commit it verifies needs a third commit) and `develop-next` Step 3
+> re-verifies the final head before merging.
+
 ```
 /commit-changes --scope {work-item-dir}
 ```

@@ -20,24 +20,40 @@ Before cutting a repo release:
 - [ ] `validate.yml` CI workflow is green on the release commit — per-skill `quick_validate.py` plus the bundle-freshness check
 - [ ] `ShellCheck` workflow (`shellcheck.yml`) is green on the release commit — lints tracked shell **sources** only, i.e. `git ls-files '*.sh'` minus `skills/*/references/`, which is roughly a fifth of the files and excludes every bundled copy. It is a separate lane rather than a step in the two above; the header comment explains why, and the short version is that neither could have fired for the change that motivated it
 - [ ] `Docs link check` workflow (`docs-link-check.yml`) is green — path-filtered to `docs/**/*.md`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, so **it does not run on every PR**. A release that touched none of those has no run to be green; check that it is absent-not-failing rather than ticking it blind
-- [ ] CHANGELOG `[Unreleased]` has entries for everything user-facing since last release
+- [ ] CHANGELOG `[Unreleased]` has entries for everything user-facing since last release — and every accepted task merged since the last tag is **cited** there (see the convention below). `evals/shared/tests/changelog-entry-drift.test.mjs` fails CI on a missing task citation, so a green `test.yml` already covers the task half; bugs are still read by hand until the follow-on below lands
+- [ ] **Flip the CHANGELOG check from advisory to blocking** — *for the release after the one that ships task.115*: in `skills/finalise/SKILL.md` Step 7 action 6d, change the `no-changelog-entry` warning to a HALT, and delete this line. Until then `/finalise` warns and the drift test is the backstop
 
-> **This last box is the one with no mechanism, and it is the one that drifts.** Every generated
-> artefact here is machine-checked — the catalog diffs in CI, `bundle --check` is a lane, the task
-> registry has a drift test, the roadmap has a linter — and at the v0.46.0 prep five merged tasks had
-> no `[Unreleased]` entry at all, four of them the four most recent merges. The newest work is the
-> least likely to be remembered at release time and the most likely to be what the release is *for*.
-> Until a check exists, verify it rather than recall it:
+> **This box used to be the one with no mechanism, and it was the one that drifted.** Every
+> generated artefact here is machine-checked — the catalog diffs in CI, `bundle --check` is a lane,
+> the task registry has a drift test, the roadmap has a linter — and at the v0.46.0 prep five merged
+> tasks had no `[Unreleased]` entry at all, four of them the four most recent merges. The newest work
+> is the least likely to be remembered at release time and the most likely to be what the release is
+> *for*. task.115 gave it task.103's treatment — a test first, then an owner:
+>
+> - **The citation convention.** An `[Unreleased]` entry that lands a task or a bug names it in
+>   parentheses — `(task 115)`, `(bug 14)` — on the entry's opening line or in its body, with the
+>   number written plainly (`task 115`, not `T115` or `#115`, which is a PR or issue). Several items
+>   may share one entry (`(tasks 113–119)` is *not* mechanical — write each number: `(task 113,
+>   task 114)`). The drift test matches `(task N` or `task N` / `task.N` as a whole word.
+> - **The test** — `evals/shared/tests/changelog-entry-drift.test.mjs` — walks every accepted task
+>   document whose `pr_number` merge is an ancestor of `HEAD` and newer than the last tag, and fails
+>   naming each one `[Unreleased]` does not cite. It carries a non-vacuity floor (the corpus read must
+>   find accepted tasks at all) so a broken reader cannot report a clean zero. Tasks only in this
+>   version: `[Unreleased]` cites bug 14 but not bugs 13 and 15 (all three merged since v0.46.0), so a
+>   `(bug N)` walk would be red on work the test did not introduce — backfill those two lines, then
+>   widen the walk.
+> - **The owner** — `/finalise` Step 7 action 6d greps the same section at acceptance and warns
+>   `no-changelog-entry` when the task is not cited. Advisory in the release this ships in; the box
+>   above flips it. Write the entry when the work is *accepted*, not when the release is cut — at
+>   acceptance the author knows what changed and why it matters; at release time someone reconstructs
+>   it from commit subjects.
+>
+> The one-liner that used to sit here is what the test runs; keep it for a by-hand read of the bugs:
 >
 > ```bash
-> # Every task accepted since the last tag, against what the CHANGELOG cites.
 > git log --oneline "$(git describe --tags --abbrev=0)"..HEAD --merges \
->   | grep -oE 'task\.[0-9]+' | sort -u
+>   | grep -oE '(task|bug)\.[0-9]+' | sort -u
 > ```
->
-> Then read `[Unreleased]` for each. Write the entry when the work is *accepted*, not when the
-> release is cut — at acceptance the author knows what changed and why it matters; at release time
-> someone reconstructs it from commit subjects.
 
 > Skill catalog (`npm run generate-catalog`) and bundled references (`npm run bundle`) are checked and auto-committed by `release.sh` — no manual pre-check needed. `release.sh` does **not** run `format:check`, `eval:all` or `shellcheck`; those are CI's job, which is why the boxes above are about CI being green and not about a local run.
 
