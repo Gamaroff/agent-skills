@@ -69,6 +69,13 @@ function fencedLines(text) {
   return out;
 }
 
+/** Fenced lines with comments removed — a `#` comment that *mentions* a command is not a call. */
+function codeLines(text) {
+  return fencedLines(text)
+    .filter((l) => !/^\s*#/.test(l))
+    .map((l) => l.replace(/\s+#\s.*$/, ""));
+}
+
 // ---------------------------------------------------------------------------
 // 1. One status location (obs #57)
 
@@ -281,6 +288,70 @@ test("6a reads the commit's and the push's exit codes", () => {
   assert.ok(
     !/--allow-empty/.test(sixA.replace(/Never reach for `--allow-empty`/, "")),
     "`--allow-empty` is forbidden at the acceptance commit",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 2b/3b. The two defects QA cycle 1 found by executing the prose (CR-1, CR-2)
+
+test("6c never sleeps in the foreground — the poll is a backgrounded script read from a result file", () => {
+  const sixC = between(
+    finalise,
+    "6c. **Second CI reading",
+    "6d. **CHANGELOG citation check",
+    FINALISE,
+  );
+  // Strip the poll script's own body (the quoted heredoc) — a `sleep` INSIDE the background
+  // script is the design; a `sleep` OUTSIDE it is the foreground wait this test forbids.
+  const outsideHeredoc = sixC.replace(
+    /cat > "\$POLL" <<'POLLEOF'[\s\S]*?\nPOLLEOF\n/,
+    "",
+  );
+  assert.match(
+    sixC,
+    /<<'POLLEOF'[\s\S]*\nPOLLEOF\n/,
+    "6c must write the poll loop to a script via a heredoc",
+  );
+  assert.match(
+    sixC,
+    /nohup bash "\$POLL"[\s\S]*?&\s*$/m,
+    "6c must launch the poll with nohup … & (backgrounded)",
+  );
+  const foregroundSleeps = codeLines(outsideHeredoc).filter((l) =>
+    /\bsleep\b/.test(l),
+  );
+  assert.deepEqual(
+    foregroundSleeps,
+    [],
+    "a fenced `sleep` outside the backgrounded script is a foreground wait that outlives the tool call (QA cycle 1, CR-2)",
+  );
+  assert.match(
+    sixC,
+    /\[ ! -f "\$RESULT" \]/,
+    "6c must read the result file on a later turn rather than wait for it",
+  );
+});
+
+test("6d derives the task number without BASH_REMATCH, so it fires under zsh too", () => {
+  const sixD = between(
+    finalise,
+    "6d. **CHANGELOG citation check",
+    "7. **Add Canonical PR Comment",
+    FINALISE,
+  );
+  assert.ok(
+    !codeLines(sixD).some((l) => /BASH_REMATCH/.test(l)),
+    "BASH_REMATCH is unset under zsh — N was empty and the grep matched everything (QA cycle 1, CR-1)",
+  );
+  assert.match(
+    sixD,
+    /N="\$\{STEM#task\.\}"/,
+    "6d derives N by parameter expansion",
+  );
+  assert.match(
+    sixD,
+    /\[\[ "\$N" =~ \^\[0-9\]\+\$ \]\]/,
+    "6d guards N with a capture-free numeric match",
   );
 });
 

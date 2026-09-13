@@ -1053,7 +1053,10 @@ standalone.
    # NEVER suppress a commit's output or exit status in a chain. The rejection this rule exists
    # for (obs #48) was a pre-commit hook refusing the commit — and `>/dev/null 2>&1 || true`
    # turned that refusal into a PASS gate over an unpushed working tree. Read the exit code.
-   git commit -m "docs(${STEM}): accept — DoD, sprint review$([ -f docs/tasks/task-registry.md ] && echo '; registry ticked')"
+   # The suffix is keyed on the registry being STAGED, not on the file existing — a story run in
+   # a repo that keeps a task registry would otherwise claim a tick it did not make.
+   REG_SUFFIX=$(git diff --cached --quiet -- docs/tasks/task-registry.md 2>/dev/null || echo '; registry ticked')
+   git commit -m "docs(${STEM}): accept — DoD, sprint review${REG_SUFFIX}"
    COMMIT_EXIT=$?
    [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
 
@@ -1101,17 +1104,48 @@ standalone.
    [ "${PR_HEAD:0:12}" = "${CI_HEAD_2:0:12}" ] \
      || { echo "HALT: PR head ${PR_HEAD:0:12} ≠ pushed acceptance head ${CI_HEAD_2:0:12}"; exit 1; }
 
-   # Bounded poll. A push supersedes the previous run, so the first samples are legitimately
-   # NONE / CANCELLED / PENDING; `MAX_WAIT` bounds the wait, it does not round it up.
-   MAX_WAIT=${FINALISE_CI_MAX_WAIT:-1500}   # seconds; a 23-minute serial lane needs ~1400
-   WAITED=0
-   CI_ROLLUP_2=$( ...the Step 6 query... )
-   while [ "$WAITED" -lt "$MAX_WAIT" ]; do
-     case "$CI_ROLLUP_2" in
-       SUCCESS|FAILURE) break ;;
-       *) sleep 30; WAITED=$((WAITED + 30)); CI_ROLLUP_2=$( ...the Step 6 query... ) ;;
-     esac
-   done
+   # Bounded poll, run in the BACKGROUND and read from a result file on a later turn. A push
+   # supersedes the previous run, so the first samples are legitimately NONE / CANCELLED /
+   # PENDING; `MAX_WAIT` bounds the wait, it does not round it up. The loop is never run in the
+   # foreground of a tool call: on a 23-minute serial lane a foreground wait simply outlives the
+   # host's timeout and reports nothing — the `gh pr checks --watch` failure, observed three times
+   # on one PR (task.115 QA cycle 1, CR-2).
+   POLL=.claude/state/finalise-ci-poll.sh
+   RESULT=.claude/state/finalise-ci-result.txt
+   rm -f "$RESULT"
+   # Terminator and body at COLUMN 0 — an indented terminator does not close the heredoc and
+   # bash swallows the nohup line below into the script, so the poll never starts.
+   cat > "$POLL" <<'POLLEOF'
+#!/usr/bin/env bash
+# usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE>
+# Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <WAITED>s".
+PR_NUMBER=$1; EXPECTED_HEAD=$2; MAX_WAIT=$3; RESULT=$4
+rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it, do not re-derive it...; }
+WAITED=0
+STATE=$(rollup)
+while [ "$WAITED" -lt "$MAX_WAIT" ]; do
+  case "$STATE" in SUCCESS|FAILURE) break ;; esac
+  sleep 30; WAITED=$((WAITED + 30)); STATE=$(rollup)
+done
+printf '%s %s %ss\n' "$STATE" "$EXPECTED_HEAD" "$WAITED" > "$RESULT"
+POLLEOF
+   nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" \
+     > .claude/state/finalise-ci-poll.log 2>&1 &
+   echo "CI poll backgrounded (pid $!) — read $RESULT on a later turn; absent means still polling"
+   ```
+
+   **On a later turn**, read the result — never `sleep` for it in the foreground:
+
+   ```bash
+   RESULT=.claude/state/finalise-ci-result.txt
+   if [ ! -f "$RESULT" ]; then
+     echo "still polling — check again on a later turn"        # do NOT sleep here
+   else
+     read -r CI_ROLLUP_2 CI_HEAD_READ WAITED < "$RESULT"
+     [ "${CI_HEAD_READ:0:12}" = "${CI_HEAD_2:0:12}" ] \
+       || { echo "HALT: result is for ${CI_HEAD_READ:0:12}, not ${CI_HEAD_2:0:12}"; exit 1; }
+     echo "CI reading 2: $CI_ROLLUP_2 @ ${CI_HEAD_2:0:12} after $WAITED"
+   fi
    ```
 
    | `CI_ROLLUP_2`                              | Action                                                                                                                                                                  |
@@ -1120,9 +1154,10 @@ standalone.
    | `FAILURE`                                  | **HALT `ci-not-green-on-acceptance-head`.** The acceptance commit is pushed and `status: accepted` is on the branch — do **not** revert it; report the failing job(s) and stop before any side-effect. The human decides whether the red is the docs commit or the code |
    | `PENDING` / `NONE` / `CANCELLED` / `UNKNOWN` past `MAX_WAIT` | **HALT `ci-not-green-on-acceptance-head`** with the last sampled state. Waiting past the bound is a judgement for a human; assuming green is not a judgement at all |
 
-   > **Never poll in the foreground of a tool call that can time out** — `gh pr checks --watch` is
-   > forbidden for exactly this reason (see `develop-next` Step 3). Where the host bounds a single
-   > call below `MAX_WAIT`, background the loop to a file and read the file on a later turn.
+   > **The poll is a background job by construction, not by advice.** `gh pr checks --watch` is
+   > forbidden for the same reason (see `develop-next` Step 3): a wait that lives inside one tool
+   > call cannot outlast that call. The first version of this block was a foreground `while … sleep`
+   > loop with a note beneath it saying not to do that — the note was right and the block ignored it.
    >
    > **Why not one reading, after the push?** Because reading 1 gates the *decision* — `accepted`
    > must never be written on a red or pending head — and reading 2 gates the *publication*. The
@@ -1146,8 +1181,13 @@ standalone.
    ```bash
    # Tasks only in this version; `(bug N)` is the documented follow-on once bugs 13 and 15 are
    # backfilled. `STEM` is the work item's filename stem from 6a.
-   if [[ "$STEM" =~ ^task\.([0-9]+)$ ]]; then
-     N="${BASH_REMATCH[1]}"
+   # Parameter expansion, NOT `[[ =~ ]]` + BASH_REMATCH: zsh — the shell this pipeline runs in —
+   # leaves BASH_REMATCH unset (it populates $match), so N was empty there and the grep pattern
+   # degenerated to one that matches any [Unreleased] text. The warning could never fire under
+   # zsh, and nothing said so (task.115 QA cycle 1, CR-1). A capture-free `=~` is fine in both.
+   N=""
+   case "$STEM" in task.*) N="${STEM#task.}" ;; esac
+   if [ -n "$N" ] && [[ "$N" =~ ^[0-9]+$ ]]; then
      awk '/^## \[Unreleased\]/{p=1;next} /^## \[/{p=0} p' CHANGELOG.md \
        | grep -qE "\(task ${N}\b|\btask[ .]${N}\b" \
        || echo "⚠️  no-changelog-entry: CHANGELOG.md [Unreleased] does not cite (task ${N}) — add the entry before release; evals/shared/tests/changelog-entry-drift.test.mjs fails CI on this once the PR merges"

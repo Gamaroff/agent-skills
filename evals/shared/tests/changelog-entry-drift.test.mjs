@@ -38,6 +38,16 @@
  * floor is on the corpus, not on the window, so it does not fire on the
  * legitimately empty release-day case.
  *
+ * ONE ASSUMPTION, STATED
+ * ----------------------
+ * Merges are recognised by the `Merge pull request #N` subject that GitHub writes
+ * on a merge commit — which is what `develop-next`'s default `mergeStrategy:
+ * merge` produces. A repository that squash- or rebase-merges leaves no such
+ * subject, and this window would read as empty. The non-vacuity floor below is
+ * on the corpus, so it would NOT catch that; if this repo ever changes strategy,
+ * switch `mergedPrsSince` to read `pr_number` merges from `git log --grep '(#N)'`
+ * on the squashed subject instead.
+ *
  * And it refuses to skip when the window cannot be computed. A shallow clone with
  * no reachable tag cannot answer the question; answering "nothing required" would
  * be the one reassuring answer nobody questions. CI checks out with

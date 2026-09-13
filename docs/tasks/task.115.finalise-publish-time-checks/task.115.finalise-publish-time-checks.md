@@ -186,6 +186,8 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 | 2026-09-13 | 1.1     | Review passed (8/10, pre-fix 6/10) — Phase 2 made closable: acceptance commit+push moved into Step 7 before the side-effects, second CI read recorded off the verified commit; citations corrected; file map gains the pipeline step-7/8 docs; header removal chosen over a pre-post check; changelog drift test scoped to tasks | review-task |
 | 2026-09-13 |         | Status → ready-for-development                | review-task |
 | 2026-09-13 |         | Implemented — 8 files, 15 tests (+ 7 mutation proofs) | develop |
+| 2026-09-13 |         | QA gate CONCERNS (80/100) — 2 MEDIUM findings (6d zsh BASH_REMATCH; 6c foreground poll) | qa-task |
+| 2026-09-13 |         | QA findings fixed — CR-1 (6d parameter expansion), CR-2 (6c backgrounded poll + result file), 2 LOW cleanups; shape test +2 assertions, mutation-proved 3 ways; 1 iteration | qa-fix |
 
 ---
 
@@ -199,6 +201,29 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 - [x] Artifact-exists checks at Step 7 and 5c assert tracked-and-pushed (`git ls-files --error-unmatch`, `git show origin/<branch>:<path>`), not working-tree presence; the no-suppression rule stated beside them
 ### Phase 3: CHANGELOG mechanism
 - [x] Citation convention (`(task N)` / `(bug N)`) documented in `releases.md`; a test fails naming each `accepted` task merged since the last tag with no `[Unreleased]` citation (tasks only in this version; bugs 13 and 15 are the named follow-on); `/finalise` warns on accepting a task with no entry, with the advisory→blocking flip recorded as a release-checklist line
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-13
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS (cycle 1)
+
+### QA Report
+- **Full Report**: [task.115.qa.1.finalise-publish-time-checks.md](./task.115.qa.1.finalise-publish-time-checks.md)
+- **Gate File**: [task.115.gate.1.finalise-publish-time-checks.yml](./task.115.gate.1.finalise-publish-time-checks.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3249 (full `ci:fast`) + 97 targeted re-run; 7 mutation proofs re-run
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 HIGH, 2 MEDIUM (CR-1 zsh `BASH_REMATCH` in 6d; CR-2 foreground CI poll in 6c), 2 LOW
+- **NFR Status**: Security: PASS (reasoned), Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Both MEDIUMs are in the new Step 7 prose and were found by executing it under bash and zsh; both have verified fixes. SC5 (observations close) is correctly deferred to merge (`parked_until: task.115 merged to develop`).
 
 ---
 
