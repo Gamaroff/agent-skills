@@ -188,6 +188,7 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 | 2026-09-13 |         | Implemented — 8 files, 15 tests (+ 7 mutation proofs) | develop |
 | 2026-09-13 |         | QA gate CONCERNS (80/100) — 2 MEDIUM findings (6d zsh BASH_REMATCH; 6c foreground poll) | qa-task |
 | 2026-09-13 |         | QA findings fixed — CR-1 (6d parameter expansion), CR-2 (6c backgrounded poll + result file), 2 LOW cleanups; shape test +2 assertions, mutation-proved 3 ways; 1 iteration | qa-fix |
+| 2026-09-13 |         | QA gate PASS (95/100) — cycle 2 refute pass, 0 findings gated, 1 LOW documented | qa-task |
 
 ---
 
@@ -206,24 +207,24 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-13
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS (cycle 1)
+**Quality Score**: 95/100
+**Gate Decision**: PASS (cycle 2)
 
 ### QA Report
-- **Full Report**: [task.115.qa.1.finalise-publish-time-checks.md](./task.115.qa.1.finalise-publish-time-checks.md)
-- **Gate File**: [task.115.gate.1.finalise-publish-time-checks.yml](./task.115.gate.1.finalise-publish-time-checks.yml)
+- **Full Report**: [task.115.qa.2.finalise-publish-time-checks.md](./task.115.qa.2.finalise-publish-time-checks.md) (cycle 1: [qa.1](./task.115.qa.1.finalise-publish-time-checks.md))
+- **Gate File**: [task.115.gate.2.finalise-publish-time-checks.yml](./task.115.gate.2.finalise-publish-time-checks.yml) (cycle 1: [gate.1](./task.115.gate.1.finalise-publish-time-checks.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 3249 (full `ci:fast`) + 97 targeted re-run; 7 mutation proofs re-run
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 2 MEDIUM (CR-1 zsh `BASH_REMATCH` in 6d; CR-2 foreground CI poll in 6c), 2 LOW
-- **NFR Status**: Security: PASS (reasoned), Performance: CONCERNS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM (cycle-1 CR-1/CR-2 fixed and verified in both shells), 1 LOW documented
+- **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Both MEDIUMs are in the new Step 7 prose and were found by executing it under bash and zsh; both have verified fixes. SC5 (observations close) is correctly deferred to merge (`parked_until: task.115 merged to develop`).
+Cycle 1 found two MEDIUMs by executing the new Step 7 prose under bash and zsh; cycle 2 (refute pass) verified both fixed and pinned by mutation-proved assertions. SC5 (observations close) is correctly deferred to merge (`parked_until: task.115 merged to develop`).
 
 ---
 
