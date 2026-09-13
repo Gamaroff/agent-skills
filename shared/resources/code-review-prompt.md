@@ -40,6 +40,13 @@ A. CORRECTNESS BUGS (category: bug) — defects the change introduces:
    - API/contract misuse (wrong args, ignored return, broken invariant or schema)
    - security-relevant mistakes in the change (injection, unsafe input, secret exposure)
 
+   - PLATFORM VARIANCE (report as category: bug, prefix the finding with "platform-variance:"):
+     an environment-derived value (os.tmpdir(), $TMPDIR, $HOME, a resolved symlink) passed to a
+     VALIDATING consumer — a containment check, allow-list, path-prefix test. Such a test is
+     evidence about the machine it ran on and no other; on Linux CI os.tmpdir() is /tmp, which a
+     containment check may refuse. Name the value, the consumer, and the one-line reproduction
+     under the other value (e.g. `TMPDIR=/tmp node --test '<glob>'`) so the caller can run it.
+
 B. CLEANUPS (category: cleanup) — quality improvements, NEVER blocking:
    - REUSE: the change reimplements something an existing util/function already does
      (name the existing symbol + path)

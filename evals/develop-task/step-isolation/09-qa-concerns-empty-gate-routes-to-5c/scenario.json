@@ -1,0 +1,13 @@
+{
+  "name": "develop-task-step-05c-concerns-empty-gate-routes-to-5c",
+  "skill": "develop-task",
+  "description": "Steps 5–6, route 3 (task.116 / obs #51): a CONCERNS gate whose top_issues[] is empty — the shape gate rule 4 produces from an NFR-level reservation — hands to 5c (/review-pr), not to 5b (/qa-fix). Fixture records qa-task then review-pr with no qa-fix invocation; the gate carries CONCERNS with an empty queue.",
+  "prompt": "Run steps 5–6 (qa loop) of the develop-task pipeline for task.42.example. The gate reads CONCERNS with no open top_issues[] entry.",
+  "assertions": [
+    { "fn": "fileExists",       "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.1.example.yml"] },
+    { "fn": "fileMatches",      "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.1.example.yml", "gate: CONCERNS"] },
+    { "fn": "fileMatches",      "args": ["$SANDBOX/docs/tasks/task.42.example/task.42.gate.1.example.yml", "top_issues: \\[\\]"] },
+    { "fn": "pipelineStepsRan", "args": ["$SANDBOX/.eval/pipeline-events.json", ["qa-task", "review-pr"]] },
+    { "fn": "loopBoundedAt",    "args": ["$SANDBOX/.eval/pipeline-events.json", "qa-fix", 0] }
+  ]
+}

@@ -132,6 +132,94 @@ test("a clean QA gate routes to 5c, not straight to Step 7", () => {
   }
 });
 
+// ── 2b. Route 3: a CONCERNS gate with no open finding is a reservation, not a queue ──
+//
+// task.116 / obs #51. Gate rule 4 makes any NFR-level CONCERNS a CONCERNS gate with an
+// EMPTY top_issues[]. Before route 3 existed, the outcome branching keyed on the verdict
+// token ("CONCERNS, FAIL, or has top_issues → 5b"), so that gate went to 5b, whose
+// no-code-change HALT ended the run on a gate that said "fine, with reservations".
+// These assertions pin the router to the QUEUE: 5c admits the shape, and 5b's entry
+// condition names an open finding rather than the bare token.
+
+/**
+ * The full text of the outcome-branching bullet whose first line starts with `prefix` —
+ * the line itself plus its indented continuation lines. A wrapped arm is one arm; testing
+ * only its first line is how "proceed to 5c" on line two goes unasserted.
+ */
+function branchingArm(prefix, extra = () => true) {
+  const lines = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
+  ).split("\n");
+  const start = lines.findIndex((l) => l.startsWith(prefix) && extra(l));
+  if (start < 0) return null;
+  let end = start + 1;
+  while (end < lines.length && /^\s{2,}\S/.test(lines[end])) end++;
+  return lines.slice(start, end).join(" ");
+}
+
+test("a CONCERNS gate with no open top_issues[] entry routes to 5c (route 3)", () => {
+  // The route-3 arm begins with the CONCERNS token AND qualifies it with the empty /
+  // no-open-entry condition. Finding the token alone is not enough — the 5b arm may
+  // legitimately mention CONCERNS too.
+  const arm = branchingArm("- `CONCERNS`", (l) =>
+    /no open entry|empty/i.test(l),
+  );
+  assert.ok(
+    arm,
+    "outcome branching must carry a CONCERNS arm qualified by 'no open entry' / 'empty' — route 3",
+  );
+  assert.match(
+    arm,
+    /proceed to 5c/i,
+    "the CONCERNS-with-no-open-entry arm must hand to 5c",
+  );
+  assert.doesNotMatch(
+    arm,
+    /run the \*\*Convergence check\*\*|Proceed to 5b/,
+    "route 3 must not run the queue-reasoning guards or proceed to 5b — it has no queue to reason about",
+  );
+});
+
+test("5b is entered on an open finding, never on the verdict token", () => {
+  // The arm that runs the Convergence check is the road to 5b. It must key on an OPEN
+  // entry in top_issues[], not on the bare token.
+  const road = branchingArm("- ", (l) => /^- `FAIL`|Convergence check/.test(l));
+  assert.ok(
+    road,
+    "the arm that runs the Convergence check (the road to 5b) must exist",
+  );
+  assert.match(
+    road,
+    /Convergence check/,
+    "the road to 5b runs the Convergence check",
+  );
+  assert.match(
+    road,
+    /open entry in `top_issues\[\]`/,
+    "the road to 5b must be gated on an OPEN top_issues[] entry — the queue, not the token",
+  );
+  // The pre-task.116 shape must be gone: a bare "CONCERNS, FAIL, or has top_issues" arm routes
+  // a reservation into a fix loop.
+  assert.equal(
+    branchingArm("- `CONCERNS`, `FAIL`, or has `top_issues`"),
+    null,
+    "the verdict-token arm ('CONCERNS, FAIL, or has top_issues') must not be the road to 5b",
+  );
+  // And 5c's own accepting-route list names route 3 explicitly — the set is stated once, in 5c.
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /three routes out of 5a/,
+    "5c must state that three routes reach it — the accepting-route set is stated once, in 5c",
+  );
+  assert.match(
+    s5c,
+    /3\. a gate that reads \*\*`CONCERNS` with no open entry in `top_issues\[\]`\*\*/,
+    "5c must enumerate route 3 (CONCERNS with no open top_issues[] entry) in its numbered list",
+  );
+});
+
 // ── 3. Verdict routing — the graph, not just the vocabulary ──────────────────
 
 /**

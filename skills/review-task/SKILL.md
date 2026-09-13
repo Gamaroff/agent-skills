@@ -416,7 +416,7 @@ options:
 
 4. **Store summaries** as `PREPASS_B`, `PREPASS_C` in active context for use by the Q&A phase.
 
-**Failure handling**: if both agents fail, log a warning and proceed to Step 2 without pre-pass summaries — the Q&A phase handles all finding detection as a fallback.
+**Failure handling**: if both agents fail, log a warning and proceed to Step 2 without pre-pass summaries — the Q&A phase handles all finding detection as a fallback. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md` §Subagents — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
 
 **Output**: up to 2 YAML summaries (architecture alignment, implementation status) available for Steps 2–8
 

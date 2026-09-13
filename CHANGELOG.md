@@ -44,6 +44,40 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The QA loop routes on the queue, not the verdict token (task 116).** A `CONCERNS` gate with no
+  open entry in `top_issues[]` — the shape gate rule 4 produces from any NFR-level reservation — now
+  reaches §5c (`/review-pr`) as **route 3** instead of falling through to §5b, whose no-code-change
+  HALT ended task 105 on a gate that said "fine, with reservations" (obs #51). §5b is entered only on
+  an open finding; `FAIL` still always routes there. `evals/shared/tests/pr-review-loop-parity.test.mjs`
+  pins the third route and the entry condition, and reverting the router text turns it red.
+
+- **`qa-task` / `qa-story` cannot write or publish a gate while their own diff review is outstanding.**
+  Step 3b / Phase 1.6 now ends only when the dispatched reviewer's `code_review:` block is in hand;
+  the gate step and the PR-comment step carry a matching precondition. Task 106's gate 1 (`PASS` 95)
+  was posted minutes before its review returned a high and a medium (obs #56). Waiting is bounded by
+  the new wall-clock budget below.
+
+- **QA executes boundary deliverables instead of reading them.** After the diff reviewer returns,
+  Step 3b / Phase 1.6 applies `probe-boundary-rule.md`: when the change set delivers a predicate,
+  candidates from `security-input-corpus.mjs` are run against the entry point and reported on the
+  existing `code_review` finding shape with `probes_executed`. A 14-star glob compiled to `[^/]*` ×
+  14 had passed five green cycles and was found only at the finalise DoD probe (obs #20).
+
+- **Platform variance is a named check.** An environment-derived value (`os.tmpdir()`, `$TMPDIR`)
+  passed to a validating consumer is run once under the other value (`TMPDIR=/tmp node --test …`)
+  before a green suite is credited as coverage — in Step 3b / Phase 1.6, in the mutation-proof
+  spot check, and as a mandatory category in `code-review-prompt.md`. A macOS-green suite had been
+  reasoned "real and correct" and failed on Linux CI (obs #17).
+
+- **The pipeline has vocabulary for a subagent that never ran.**
+  `develop-pipeline-autonomous-defaults.md` gains a three-row **Subagents** table — *unavailable*,
+  *failed*, *slow* — each with its inline substitute and the record it must leave (`independence
+  lost`; `killed at N minutes`, never `stalled`), a ten-minute wall-clock budget
+  (`subagents.wallClockMinutes`), and the rule that **output-file size is not a liveness signal**
+  (a working reviewer was killed on a stale 159-byte reading — obs #62). The five dispatch sites
+  (develop Step 3, review-task and review-story Phase 1.5, qa-task 3b / qa-story 1.6, qa-fix 1a)
+  point at it rather than restating it (obs #44).
+
 - **`/finalise` publishes after its last write, and verifies the head it publishes** (task 115 —
   observations #40, #48, #57, #59). Step 7 now has a *publish boundary*: the acceptance artefacts
   (document with `status: accepted`, DoD summary, sprint review, ticked registry) are **committed and

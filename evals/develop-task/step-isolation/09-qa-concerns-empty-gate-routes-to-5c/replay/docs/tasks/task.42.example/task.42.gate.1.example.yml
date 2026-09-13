@@ -1,0 +1,35 @@
+schema: 1
+task: 'task.42.example'
+task_title: 'Example task'
+gate: CONCERNS
+status_reason: 'Implementation is correct; maintainability reservation on the test fixture layout. No open finding — nothing for qa-fix to act on (gate rule 4).'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T08:00:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary delivered'
+  performance:
+    status: PASS
+    notes: 'n/a'
+  reliability:
+    status: PASS
+    notes: 'n/a'
+  maintainability:
+    status: CONCERNS
+    notes: 'Fixture helpers duplicated across two test files — consolidate later'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Consolidate duplicated fixture helpers'
+      refs: ['tests/example.test.js']

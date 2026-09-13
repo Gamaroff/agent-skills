@@ -17,7 +17,7 @@ Loaded by `/develop-story` and `/develop-task` during Step 3. Story/task variant
 
 **Resume optimization:** If the Decisions Log already contains a "Pre-develop surface map:" entry (from a prior session), skip both the Explore subagent invocation AND the plan file discovery below — reuse the recorded surface map and plan-file decision. Log: "Resume — pre-develop surface map and plan-file decision reused from Decisions Log." Then proceed to the develop loop.
 
-Before invoking `/develop`, use the Agent tool with subagent_type="Explore" to map the codebase surface:
+Before invoking `/develop`, use the Agent tool with subagent_type="Explore" to map the codebase surface. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `shared/resources/develop-pipeline-autonomous-defaults.md` §Subagents — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
 
 #### develop-story
 Ask it to find: all files likely affected by the acceptance criteria, existing patterns in the same module/layer, test file conventions for the affected areas, any files explicitly named in the story's Dev Notes or Tasks.

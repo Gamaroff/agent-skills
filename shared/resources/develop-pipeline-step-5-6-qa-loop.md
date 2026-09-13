@@ -251,11 +251,25 @@ After completion, find and read the latest gate file:
 
 - `PASS` with no `top_issues` → **proceed to 5c** (the loop's exit gate), not straight to Step 7
 - `WAIVED` with `waiver.active: true` and a documented reason/approver → **proceed to 5c** (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
-- `CONCERNS`, `FAIL`, or has `top_issues` → run the **Convergence check** (below); if it does not
-  trip, run the **Diminishing-returns exit** (below that). Proceed to 5b only when neither fires —
-  the Convergence check escalates, the Diminishing-returns exit hands to 5c.
+- `CONCERNS` with **no open entry in `top_issues[]`** — the list is empty, or every entry reads
+  `status: closed` → **proceed to 5c** (the loop's exit gate). This is §5c's **route 3**, and it is
+  legitimate by construction: gate rule 4 makes any NFR-level `CONCERNS` a CONCERNS gate with an
+  empty queue. 5b would have nothing to act on — its no-code-change HALT fires on a gate that says
+  "fine, with reservations" (task.105, obs #51).
+- `FAIL`, or `CONCERNS` with an **open entry in `top_issues[]`** (an entry whose `status:` is absent
+  or reads `open`) → run the **Convergence check** (below); if it does not trip, run the
+  **Diminishing-returns exit** (below that). Proceed to 5b only when neither fires — the
+  Convergence check escalates, the Diminishing-returns exit hands to 5c.
 
-**On either gate that reaches 5c**, commit this cycle's gate `.yml` and QA report `.md` and push once
+> **5b is entered on an open finding, never on the verdict token.** The token says how worried QA
+> is; the queue says whether there is anything to fix; and `/qa-fix` consumes the queue. A router
+> that keys on the token sends a reservation to a fix loop, which then halts on "nothing to fix" —
+> the same substitution `develop-next`'s merge gate made in the other direction (task.113). `FAIL`
+> is the one token that always routes to 5b: gate rules 1 and 3 produce it only from a HIGH entry or
+> a failing NFR, so a `FAIL` gate is a fix queue by definition — and a `FAIL` whose `top_issues[]` is
+> empty names its failure in the QA report's NFR section, which the findings ingester also reads.
+
+**On any gate that reaches 5c**, commit this cycle's gate `.yml` and QA report `.md` and push once
 before invoking `/review-pr` — there is no `fix(...)` commit on this path to carry them, and 5c reads
 the artifact trail off the branch. See **Where the gate and QA report get committed** in 5b.
 
@@ -850,17 +864,24 @@ On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fi
 
 ### 5c. PR Conformance Review (shared)
 
-Perform this step **before Step 7**, on either of the **two routes out of 5a**:
+Perform this step **before Step 7**, on any of the **three routes out of 5a**:
 
 1. a gate that reads **`PASS` or `WAIVED`** — the ordinary route; or
 2. a gate that took the **Diminishing-returns exit** above. That gate is `CONCERNS` by construction —
    the exit's own condition 2 requires a non-empty `top_issues[]`, and any MEDIUM makes the gate
    CONCERNS — so it must be named here explicitly. It arrives with a residue that is entirely test
-   machinery and no HIGH finding across two consecutive cycles.
+   machinery and no HIGH finding across two consecutive cycles; or
+3. a gate that reads **`CONCERNS` with no open entry in `top_issues[]`** — empty, or every entry
+   `status: closed`. Gate rule 4 produces this shape from any NFR-level CONCERNS (an `nfr_validation`
+   axis at `CONCERNS` with nothing in the queue), so it is a reservation, not a fix list. It reaches
+   5c directly from the Outcome branching above without passing the Convergence check or the
+   Diminishing-returns exit, because both of those reason about a queue this gate does not have.
+   Before this route existed the gate fell through to 5b, whose no-code-change HALT then ended a
+   run on a gate that said "fine, with reservations" (task.105, obs #51).
 
-A gate that routes to **5b** never reaches this step, and neither route above routes to 5b. This is
-the loop's **exit gate**: 5a and 5b can cycle without it, but nothing leaves the loop except through
-here.
+A gate that routes to **5b** never reaches this step, and none of the three routes above routes to
+5b — 5b is entered only on an open finding (see the Outcome branching). This is the loop's **exit
+gate**: 5a and 5b can cycle without it, but nothing leaves the loop except through here.
 
 > **Route 2 is named rather than left implied, and that is not tidiness.** An earlier draft of the
 > Diminishing-returns exit said it hands to 5c "exactly as a `PASS` gate does" while this sentence
@@ -975,7 +996,7 @@ path already exists.
 position line `Steps 5–6/8 — QA LOOP ⏳ review requested changes, cycle {CYCLE}/5` before the
 invocation below — the second of the two firing points this section owns.
 
-The ordinary 5b invocation passes the latest **gate file**, and on neither route into 5c does that
+The ordinary 5b invocation passes the latest **gate file**, and on no route into 5c does that
 gate carry the review's findings. Pass the **PR review report** as well:
 
 ```
@@ -989,7 +1010,7 @@ ingester warns by name against searching for one. Without both halves of this �
 clean gate, finds nothing, changes nothing, and 5b step 0 HALTs reporting the issues as unfixable
 when in fact they were never delivered.
 
-> **What the gate carries differs by route, and on no route is it the work.** Three shapes arrive
+> **What the gate carries differs by route, and on no route is it the work.** Four shapes arrive
 > here:
 >
 > | Gate | `top_issues[]` | Is it the fix target? |
@@ -997,6 +1018,7 @@ when in fact they were never delivered.
 > | `PASS` (route 1) | empty | — nothing to mistake |
 > | `WAIVED` (route 1) | its HIGH entries, with `waiver.active: true` | **No.** They were waived on purpose; the outcome-branching list above says re-running qa-fix on them "would churn against an intentionally-waived gate" |
 > | `CONCERNS` (route 2, the Diminishing-returns exit) | the test-machinery residue that exit declined to fix | **No.** Leave it where the exit put it — the gate's `recommendations.future` and the work item |
+> | `CONCERNS` (route 3, no open entry) | empty, or only `status: closed` entries | — nothing to mistake; the reservation lives in `nfr_validation` and `status_reason` |
 >
 > **Only the review's findings are the work**, and they arrive in the `pr_review=` report, not in the
 > gate. Working a gate's carried entries instead re-does what was waived, or resumes refining the

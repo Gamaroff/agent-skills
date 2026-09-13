@@ -345,7 +345,7 @@ Raw QA artifacts contain more findings than the ingester cap (20).
 Pipeline paused. Review the full gate YAML and QA report manually, then re-invoke /qa-fix.
 ```
 
-**On subagent failure or error**: Log the failure and fall through to Step 1b.
+**On subagent failure or error**: Log the failure and fall through to Step 1b. Subagent **unavailable** (no dispatch in this session), **failed**, or **slow** past its wall-clock budget: follow the three-row table in `references/develop-pipeline-autonomous-defaults.md` §Subagents — perform the pass inline, record the independence loss, write `killed at N minutes` never `stalled`, and remember that **output-file size is not a liveness signal**.
 
 ---
 
