@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.47.0] - 2026-09-13
+
 ### Added
 
 - **A new anti-pattern: _Never claim a relationship in an assertion that tests only co-occurrence_**

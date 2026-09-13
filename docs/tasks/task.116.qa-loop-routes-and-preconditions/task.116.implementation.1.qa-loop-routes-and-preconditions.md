@@ -35,7 +35,7 @@ Run task.116 through the full develop-task pipeline: fix the §5b/§5c router's 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.116.*` exists in git                              | Branch created at `0c350eb0`, pushed with tracking | —                    |
 | 2. review-task             | ✅ Done    | `task.116.review.{N}.{name}.md` exists (or skip logged)                | `task.116.review.1.qa-loop-routes-and-preconditions.md` — READY TO IMPLEMENT 8/10; 3 Important fixes applied; Planned → Ready for Development; issue #403 created | — (pre-pass B/C inline in review report) |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 5/5 phases; ci:fast 3266/0; mutation-proved (10 reverts red + router revert red) | — (loop audit inline) |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #404: https://github.com/Gamaroff/agent-skills/pull/404 — 3 commits (feat / chore(bundle) / docs); issue #403 commented | — (PR-body summariser inline result) |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.116.qa.{N}.*.md`; `task.116.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
 | 7. finalise                | ⏳ Pending | `task.116.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
@@ -90,6 +90,28 @@ Run task.116 through the full develop-task pipeline: fix the §5b/§5c router's 
 - CHANGELOG.md: five `### Changed` entries under Unreleased.
 - Development completion comment posted to github issue 403 (`develop-complete`, count=5).
 
+### Step 4 — create-pr — 2026-09-13
+
+- SCOPE_PATHS: `docs/tasks/task.116.qa-loop-routes-and-preconditions`, `CHANGELOG.md`, `evals`, `shared`, `skills`. Pre-flight guard: no out-of-scope untracked files — nothing held.
+- `/create-pr --base develop --issue 403` → `/commit-changes --scope …` (scope mode; three logical commits: `8bc27dd8` feat(qa-loop), `b4cea4e3` chore(bundle) — the pre-commit hook re-bundled in-sync and left the 85 bundled files unstaged for an explicit commit, `508d3b32` docs(task.116)). Implementation report committed here, per Step 4 rule. Leak check: all committed paths in scope.
+- Branch pushed; PR body from the summariser subagent (returned in 35 s). **PR created: https://github.com/Gamaroff/agent-skills/pull/404** (`Closes #403`).
+- Issue #403 comment (`in-review` stage): `posted`. Post-PR state check (inline `gh pr view`): PR #404 state = OPEN, head `508d3b32`, base develop, errors = 0.
+- GitHub board: in-review → `stage-disabled` (no `pipeline.in-review` mapping in tracker-workflow.yaml; card stays In Progress — correct).
+
+### Steps 5–6 — QA loop — 2026-09-13
+
+- Loop setup: CYCLE=1, MAX=5, PIPELINE_MODE=standard. Traceability mapper skipped: Success Criteria is a numbered list, not a table (`HAS_SUCCESS_CRITERIA_TABLE=false`). GitHub board QA-start re-assert → `stage-disabled`.
+- `/qa-task` invoked with `code_review_blocking=true` (no lite directive). Step 3b reviewer dispatched 08:03:30 UTC, returned 08:06:44 (3 m 14 s; 10-min budget) — findings block in hand before Step 10 wrote the gate at 08:08:50 (the task's own precondition, dogfooded). Step 4b executed 2+2 runnable blocks in qa-task/qa-story under bash+zsh (exit 0); the new `TMPDIR=/tmp node --test` fence refused as `node` fail-closed. QA re-ran 3 mutation proofs (all `covered`). `npm run ci:fast` 3267/3266/0, exit 0.
+- **QA Cycle 1 gate: CONCERNS 80/100** — `top_issues[]` has 4 open entries (2 MEDIUM, 2 LOW). Outcome branching: open entries present → Convergence check (n/a before cycle 3) → Diminishing-returns exit (n/a before cycle 3) → **5b**. Route 3 does not apply (queue is not empty) — which is the correct reading of the arm the task added.
+- QA cycle result comment posted to PR #404 (with `qa-gate` lead) and to issue #403 (`posted`). Orchestrator's `qa-cycle-1` issue comment: `posted`. `changes-requested` board stage: `stage-disabled`.
+- QA Cycle 2 — 5a `/qa-task` re-review, **refute pass** (whole branch diff, 27 files; `SAFETY_REPROBE=false`, gate-1 security axis `OK reasoned`). Reviewer dispatched 08:20:32, returned 08:26:23 (5 m 51 s; waited without polling the transcript — the orchestrator blocked on the wall-clock boundary and the harness notification). Gate 2 written 08:32:33. Cycle-1 fixes verified in source + bundled copies; QA mutation proof on arm 5 → `covered`. Suite 3268/3267/0. **Gate 2: FAIL 40** — the accepting-route set turned out to be restated in the resume contract and the PR conformance prompt, both still on the token pair. Tracker comment from qa-task 13b returned `already` (cycle-less `qa-gate` stage marker — observation #84); PR comment posted.
+- QA Cycle 3 — 5a `/qa-task` re-review, scope since gate 2 (`SAFETY_REPROBE=false`; 8 files / 585 lines). Reviewer 08:42:53 → 08:47:16 (4 m 23 s); gate 3 08:54:10. Cycle-2 fixes verified; QA mutation proof on the conformance bullet → `covered`; suite 3269/3268/0. **Gate 3: CONCERNS 60** — every consumer's restatement of the accepting-route set omits route 2. Convergence check: HIGH `[0, 2, 0]` — did not trip (HIGH gone, not stalled). Diminishing-returns exit (engine, `qa.testArtifactGlobs` unset → `[]`): did not fire. → 5b.
+- QA Cycle 4 — 5a `/qa-task` re-review, scope since gate 3 (9 files / 704 lines; `SAFETY_REPROBE=false`). Reviewer 09:03:25 → 09:07:01 (3 m 36 s); gate 4 09:14:25. Cycle-3 fixes verified; QA mutation proof (resume `not reached` row) → `covered` on the second attempt (first mutant used a different spelling — `mutation-void`, recorded). Suite 3269/3268/0. **Gate 4: FAIL 70** — the Action-row signal has no writer on route 2. Convergence check on HIGH `[0, 2, 0, 1]`: `1 ≥ 0` but `0 ≥ 2` false → no trip. Diminishing-returns (engine): not taken. Third strike: none. → 5b.
+- QA Cycle 4 — 5b `/qa-fix` (gate 4): post-guard write rule + closed value set in the preamble; On-exit step 1 writes `Action`/`PR Review`; dead template value removed; runbook snippets check what they say; ingester :172, review-pr SKILL :194/:546, qa-flow row → pointers. New writer test + review-pr in the paraphrase guard; mutation-proved ×4. Fast gate 3270/3269/0. Committed `009f4587` (report excluded), pushed once; PR head = HEAD.
+- QA Cycle 3 — 5b `/qa-fix` (gate 3): the durable fix — "reached 5c" is now the cycle entry's `**Action**` row (a mechanical signal 5a already writes on every route) and every consumer points at §5c with no paraphrase; loop doc made consistent with its own arms; six more lines swept; stated-once test forbids six paraphrase shapes and requires the pointer + signal. Step 3.5 caught two residuals (`pending` row wording; §5c route 1 unpinned) — fixed and pinned. Mutation-proved ×6. Fast gate 3269/3268/0. Committed `db4be48a` (report excluded), pushed once; PR head = HEAD.
+- QA Cycle 2 — 5b `/qa-fix` (gate 2): ingester read inline (findings authored this session). Fixes: CR-1 resume contract → "reached 5c" (5 sites); CR-2 conformance TRAIL bullets; CR-4 one definition of *open* + inactive WAIVED read by its queue; CR-3/CR-5 runbooks, ingester prompt, Convergence preamble; CR-6 matrix-driven exhaustiveness test + "stated once" test; CR-7 `read_nested_config_key subagents wallClockMinutes`. Step 3.5 adversarial pass: consumer sentences omitted the inactive-WAIVED-no-open cell → the set is now stated everywhere as *non-`FAIL` with no open entry, or active `WAIVED`*. Mutation-proved against 6 reverts (each red). Fast gate 3269/3268/0. Committed `5d77e7e0` (report excluded), pushed once; PR head = HEAD. qa-fix PR comment posted; tracker `already` (obs #84).
+- QA Cycle 1 — 5b `/qa-fix` (gate 1): ingester not dispatched — the four entries were authored this session and read inline (reader, not reviewer; no independence at stake). Fixes: CR-1 arm 5 + malformed clause + exhaustiveness test (mutation-proved ×2); DOC-1 five runbook lines + mermaid; CR-2 step refs; CR-3 `subagents.wallClockMinutes` in configuration.md. Step 3.5 adversarial pass found the malformed clause's own example was caught by arm 5 — corrected. Fast gate (5b step 0a) `GATE_EXIT=0` 3268/3267/0. Committed `6df79fd7` (report excluded), pushed once. PR #404 OPEN, head = local HEAD. qa-fix PR comment + `qa-fix` issue comment `posted`; bugs 1–2 → Ready for QA.
+
 ---
 
 ## Issues Log
@@ -105,6 +127,38 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-09-13
+**Gate Result**: CONCERNS
+**Issues Found**: 4 — CR-1 MEDIUM (Outcome branching leaves PASS+open-LOW and WAIVED+inactive-waiver unrouted), DOC-1 MEDIUM (five runbook lines restate CONCERNS→qa-fix), CR-2 LOW (stale "step 4" cross-refs), CR-3 LOW (`subagents.wallClockMinutes` undocumented)
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5) → fixed 4/4 in `6df79fd7`; pushed; re-review (cycle 2, refute pass) next
+
+### QA Cycle 2 — 2026-09-13
+**Gate Result**: FAIL
+**Issues Found**: 7 — CR-1 HIGH (resume contract keys 5c on PASS/WAIVED), CR-2 HIGH (conformance prompt flags route-3 gates as TRAIL defects), CR-4 MEDIUM (arm definitions inconsistent; two cells unrouted), CR-3 MEDIUM (runbook wording wrong for active WAIVED), CR-5 LOW (3 more stale sentences), CR-6/CR-7 cleanups (matrix-driven test; wallClockMinutes reader). Cycle-1 bugs 1–2 reopened (partial); bugs 3–4 new.
+**HIGH findings**: 2
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5) → fixed 7/7 in `5d77e7e0`; pushed; re-review (cycle 3, convergence check active) next
+
+### QA Cycle 3 — 2026-09-13
+**Gate Result**: CONCERNS
+**Issues Found**: 6 — CR-1 MEDIUM (resume contract's restated set omits route 2), CR-2 MEDIUM (conformance prompt flags route-2 gates), CR-3 MEDIUM (loop doc: §5c route 1, shapes table, commit-point path 1, arm-5 heading disagree with the arms), CR-6 MEDIUM (six more two-route lines), CR-7/CR-8 cleanups. Bug 1 closed; bugs 2, 3, 4 reopened; bug 5 new.
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 3 of 5) → fixed 8/8 in `db4be48a`; pushed; re-review (cycle 4) next
+
+### QA Cycle 4 — 2026-09-13
+**Gate Result**: FAIL
+**Issues Found**: 5 — CR-1 HIGH (Diminishing-returns On-exit never writes the Action row the consumers read; template offers unreachable `Proceeding to finalise`), CR-2 MEDIUM (runbook snippet commands vs comment), CR-3 LOW (ingester :172), CR-4 LOW (review-pr SKILL :194/:546), CR-5 cleanup. Bugs 3–5 closed; bug 2 reopened; bug 6 new.
+**HIGH findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 4 of 5) → fixed 5/5 in `009f4587`; pushed; re-review (cycle 5 — last in budget) next
+
 ---
 
 ## Completion
@@ -112,7 +166,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.116.qa-loop-routes-and-preconditions
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/404
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
