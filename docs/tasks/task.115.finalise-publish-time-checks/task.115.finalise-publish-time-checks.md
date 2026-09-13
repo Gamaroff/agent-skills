@@ -193,6 +193,7 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 | 2026-09-13 |         | PR review (5c) findings fixed — CR-1 Jira `jira_last_*` residue exempted from the dirty-document HALT (step-7/8 docs), CR-2 idempotent 6a commit guard, CR-3 `mkdir -p` + pid-aware later-turn read, CR-4 `\|\| :` regex, CR-5 `-i` grep, PC-1 file map; shape test +3 assertions, mutation-proved 5 ways; 1 iteration | qa-fix |
 | 2026-09-13 |         | QA gate PASS (95/100) — cycle 3, all six 5c findings verified fixed, 0 new | qa-task |
 | 2026-09-13 |         | PR review pass-2 findings fixed — CR-1 exit-checked `git add` before the 6a guard, CR-2/3 residue check filters only diff headers and diffs against HEAD, CR-4 poll records the sampled PR head and the later turn re-derives CI_HEAD_2; PC-1..3 tree-derived counts dropped from prose; shape test +3 assertions, mutation-proved 5 ways; 1 iteration | qa-fix |
+| 2026-09-13 |         | QA gate PASS (95/100) — cycle 4, all seven 5c pass-2 findings verified fixed, 0 new | qa-task |
 
 ---
 
@@ -215,16 +216,16 @@ Reverting restores Step 8 as the commit point, which is today's behaviour.
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-13
 **Quality Score**: 95/100
-**Gate Decision**: PASS (cycle 3)
+**Gate Decision**: PASS (cycle 4)
 
 ### QA Report
-- **Full Report**: [task.115.qa.3.finalise-publish-time-checks.md](./task.115.qa.3.finalise-publish-time-checks.md) (earlier: [qa.1](./task.115.qa.1.finalise-publish-time-checks.md), [qa.2](./task.115.qa.2.finalise-publish-time-checks.md))
-- **Gate File**: [task.115.gate.3.finalise-publish-time-checks.yml](./task.115.gate.3.finalise-publish-time-checks.yml) (earlier: [gate.1](./task.115.gate.1.finalise-publish-time-checks.yml), [gate.2](./task.115.gate.2.finalise-publish-time-checks.yml))
+- **Full Report**: [task.115.qa.4.finalise-publish-time-checks.md](./task.115.qa.4.finalise-publish-time-checks.md) (earlier: [qa.1](./task.115.qa.1.finalise-publish-time-checks.md), [qa.2](./task.115.qa.2.finalise-publish-time-checks.md), [qa.3](./task.115.qa.3.finalise-publish-time-checks.md))
+- **Gate File**: [task.115.gate.4.finalise-publish-time-checks.yml](./task.115.gate.4.finalise-publish-time-checks.yml) (earlier: [gate.1](./task.115.gate.1.finalise-publish-time-checks.yml), [gate.2](./task.115.gate.2.finalise-publish-time-checks.yml), [gate.3](./task.115.gate.3.finalise-publish-time-checks.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3254 (full `ci:fast`) + 102 targeted re-run; 15 mutation proofs across three cycles
+- **Tests Executed**: 3257 (full `ci:fast`) + 105 targeted re-run; mutation proofs re-run each cycle
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 HIGH, 0 MEDIUM (cycle-1 CR-1/CR-2 and the six 5c findings fixed and verified), 1 LOW documented
+- **Critical Issues**: 0 HIGH, 0 MEDIUM (cycle-1 findings and both 5c passes' findings fixed and verified), 1 LOW documented
 - **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
