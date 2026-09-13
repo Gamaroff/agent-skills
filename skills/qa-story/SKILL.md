@@ -79,7 +79,7 @@ When invoked by the `develop-story` orchestrator (pipeline-wide default), the ca
 Skill(qa-story, args="traceability_matrix=<path> code_review_blocking=true")
 ```
 
-Set `CODE_REVIEW_BLOCKING_ARG` from the `code_review_blocking=` token in `args` (default empty when absent). It feeds the canonical resolution in **Phase 1.6 step 4** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-story frontmatter. A story still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the story opts in via frontmatter.
+Set `CODE_REVIEW_BLOCKING_ARG` from the `code_review_blocking=` token in `args` (default empty when absent). It feeds the canonical resolution in **Phase 1.6 step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-story frontmatter. A story still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the story opts in via frontmatter.
 
 **File Discovery Logic:**
 

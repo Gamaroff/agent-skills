@@ -155,7 +155,10 @@ function branchingArm(prefix, extra = () => true) {
   if (start < 0) return null;
   let end = start + 1;
   while (end < lines.length && /^\s{2,}\S/.test(lines[end])) end++;
-  return lines.slice(start, end).join(" ");
+  return lines
+    .slice(start, end)
+    .map((l) => l.trim())
+    .join(" ");
 }
 
 test("a CONCERNS gate with no open top_issues[] entry routes to 5c (route 3)", () => {
@@ -217,6 +220,54 @@ test("5b is entered on an open finding, never on the verdict token", () => {
     s5c,
     /3\. a gate that reads \*\*`CONCERNS` with no open entry in `top_issues\[\]`\*\*/,
     "5c must enumerate route 3 (CONCERNS with no open top_issues[] entry) in its numbered list",
+  );
+});
+
+test("the outcome-branching arms are exhaustive: every gate × queue shape has a route (CR-1, task.116)", () => {
+  // The first cut of route 3 dropped the old catch-all ("or has top_issues"), which left a PASS
+  // carrying open LOW entries and a WAIVED with an inactive waiver matching NO arm. An unrouted
+  // gate is an orchestrator improvising — the defect class task.116 exists to remove. So the arm
+  // set is pinned as a closed set: the four positive routes, the catch-all for any other open
+  // queue, and the malformed clause that turns "matches nothing" into a HALT rather than a guess.
+  const arms = {
+    passClean: branchingArm("- `PASS` with no `top_issues`"),
+    waivedActive: branchingArm("- `WAIVED` with `waiver.active: true`"),
+    concernsNoOpen: branchingArm("- `CONCERNS`", (l) =>
+      /no open entry|empty/i.test(l),
+    ),
+    failOrOpen: branchingArm("- `FAIL`, or `CONCERNS` with an **open entry"),
+    anyOtherOpen: branchingArm(
+      "- **Any other gate with an open entry in `top_issues[]`**",
+    ),
+    malformed: branchingArm("- A gate that matches **none** of the arms above"),
+  };
+  for (const [name, arm] of Object.entries(arms)) {
+    assert.ok(arm, `outcome branching must carry the '${name}' arm`);
+  }
+  assert.match(
+    arms.anyOtherOpen,
+    /`PASS` carrying open LOW entries/,
+    "the catch-all must name the PASS-with-open-LOW shape",
+  );
+  assert.match(
+    arms.anyOtherOpen,
+    /`WAIVED` whose `waiver\.active` is not `true`/,
+    "the catch-all must name the inactive-waiver shape",
+  );
+  assert.match(
+    arms.anyOtherOpen,
+    /same road as the `FAIL` arm/,
+    "the catch-all routes like FAIL — Convergence check, Diminishing-returns exit, then 5b",
+  );
+  assert.match(
+    arms.malformed,
+    /\*\*HALT\*\*/,
+    "a gate matching no arm must HALT, not be routed by guesswork",
+  );
+  assert.match(
+    arms.malformed,
+    /exhaustive over/,
+    "the malformed clause must state the set the arms are exhaustive over",
   );
 });
 

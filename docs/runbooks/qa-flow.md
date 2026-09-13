@@ -18,9 +18,9 @@ If you're shipping new work end-to-end, use [Story Development](./story-developm
 flowchart TD
     A[qa-planning] -->|risk profile + test design| B[qa-story / qa-task]
     B -->|gate file + NFR + traceability| C[qa-gate]
-    B -->|CONCERNS/FAIL| D[qa-fix]
+    B -->|FAIL, or any open finding| D[qa-fix]
     D --> B
-    B -->|PASS/WAIVED| E[review-pr]
+    B -->|PASS / WAIVED / CONCERNS with no open finding| E[review-pr]
     E -->|REQUEST CHANGES| D
     E -->|APPROVE/CONCERNS| F[finalise]
 ```

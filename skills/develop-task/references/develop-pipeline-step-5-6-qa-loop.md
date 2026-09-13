@@ -261,6 +261,18 @@ After completion, find and read the latest gate file:
   or reads `open`) → run the **Convergence check** (below); if it does not trip, run the
   **Diminishing-returns exit** (below that). Proceed to 5b only when neither fires — the
   Convergence check escalates, the Diminishing-returns exit hands to 5c.
+- **Any other gate with an open entry in `top_issues[]`** — a `PASS` carrying open LOW entries
+  (legal under gate rule 5, which lets LOW findings ride on a passing verdict), or a `WAIVED` whose
+  `waiver.active` is not `true` → the same road as the `FAIL` arm: Convergence check, then
+  Diminishing-returns exit, then 5b. The queue is what `/qa-fix` consumes, and an open LOW is still
+  open work; a waiver that is not active has waived nothing.
+- A gate that matches **none** of the arms above is malformed, not a route — a `gate:` that reads
+  none of the four tokens, or a `top_issues[]` that cannot be parsed well enough to say whether an
+  entry is open. **HALT** and surface the file rather than routing it anywhere. (A `PASS` with an
+  open HIGH entry is *not* this case: it is caught by the arm above and sent to 5b, where `/qa-fix`
+  reads the entry — the gate writer's mistake becomes a fix cycle, not a halt.) The five arms are meant to be exhaustive over `{PASS, WAIVED, CONCERNS,
+  FAIL} × {no open entry, open entry}`, and `evals/shared/tests/pr-review-loop-parity.test.mjs` pins
+  that; a gate this arm catches is a bug in the gate writer.
 
 > **5b is entered on an open finding, never on the verdict token.** The token says how worried QA
 > is; the queue says whether there is anything to fix; and `/qa-fix` consumes the queue. A router
