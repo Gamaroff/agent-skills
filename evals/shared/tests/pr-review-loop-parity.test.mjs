@@ -132,6 +132,324 @@ test("a clean QA gate routes to 5c, not straight to Step 7", () => {
   }
 });
 
+// ── 2b. Route 3: a CONCERNS gate with no open finding is a reservation, not a queue ──
+//
+// task.116 / obs #51. Gate rule 4 makes any NFR-level CONCERNS a CONCERNS gate with an
+// EMPTY top_issues[]. Before route 3 existed, the outcome branching keyed on the verdict
+// token ("CONCERNS, FAIL, or has top_issues → 5b"), so that gate went to 5b, whose
+// no-code-change HALT ended the run on a gate that said "fine, with reservations".
+// These assertions pin the router to the QUEUE: 5c admits the shape, and 5b's entry
+// condition names an open finding rather than the bare token.
+
+/**
+ * The full text of the outcome-branching bullet whose first line starts with `prefix` —
+ * the line itself plus its indented continuation lines. A wrapped arm is one arm; testing
+ * only its first line is how "proceed to 5c" on line two goes unasserted.
+ */
+function branchingArm(prefix, extra = () => true) {
+  const lines = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
+  ).split("\n");
+  const start = lines.findIndex((l) => l.startsWith(prefix) && extra(l));
+  if (start < 0) return null;
+  let end = start + 1;
+  while (end < lines.length && /^\s{2,}\S/.test(lines[end])) end++;
+  return lines
+    .slice(start, end)
+    .map((l) => l.trim())
+    .join(" ");
+}
+
+test("a CONCERNS gate with no open top_issues[] entry routes to 5c (route 3)", () => {
+  // The route-3 arm begins with the CONCERNS token AND qualifies it with the empty /
+  // no-open-entry condition. Finding the token alone is not enough — the 5b arm may
+  // legitimately mention CONCERNS too.
+  const arm = branchingArm("- `CONCERNS`", (l) =>
+    /no open entry|empty/i.test(l),
+  );
+  assert.ok(
+    arm,
+    "outcome branching must carry a CONCERNS arm qualified by 'no open entry' / 'empty' — route 3",
+  );
+  assert.match(
+    arm,
+    /proceed to 5c/i,
+    "the CONCERNS-with-no-open-entry arm must hand to 5c",
+  );
+  assert.doesNotMatch(
+    arm,
+    /run the \*\*Convergence check\*\*|Proceed to 5b/,
+    "route 3 must not run the queue-reasoning guards or proceed to 5b — it has no queue to reason about",
+  );
+});
+
+test("5b is entered on an open finding, never on the verdict token", () => {
+  // The arm that runs the Convergence check is the road to 5b. It must key on an OPEN
+  // entry in top_issues[], not on the bare token.
+  const road = branchingArm("- ", (l) => /^- `FAIL`|Convergence check/.test(l));
+  assert.ok(
+    road,
+    "the arm that runs the Convergence check (the road to 5b) must exist",
+  );
+  assert.match(
+    road,
+    /Convergence check/,
+    "the road to 5b runs the Convergence check",
+  );
+  assert.match(
+    road,
+    /open entry in `top_issues\[\]`/,
+    "the road to 5b must be gated on an OPEN top_issues[] entry — the queue, not the token",
+  );
+  // The pre-task.116 shape must be gone: a bare "CONCERNS, FAIL, or has top_issues" arm routes
+  // a reservation into a fix loop.
+  assert.equal(
+    branchingArm("- `CONCERNS`, `FAIL`, or has `top_issues`"),
+    null,
+    "the verdict-token arm ('CONCERNS, FAIL, or has top_issues') must not be the road to 5b",
+  );
+  // And 5c's own accepting-route list names route 3 explicitly — the set is stated once, in 5c.
+  const s5c = section5c();
+  assert.match(
+    s5c,
+    /three routes out of 5a/,
+    "5c must state that three routes reach it — the accepting-route set is stated once, in 5c",
+  );
+  assert.match(
+    s5c,
+    /3\. a gate that reads \*\*`CONCERNS` with no open entry in `top_issues\[\]`\*\*/,
+    "5c must enumerate route 3 (CONCERNS with no open top_issues[] entry) in its numbered list",
+  );
+});
+
+test("the outcome-branching arms are exhaustive: every gate × queue cell names exactly one route (CR-1/CR-4, task.116)", () => {
+  // The first cut of route 3 dropped the old catch-all, leaving PASS+open-LOW and inactive-WAIVED
+  // unrouted; the second cut restored a catch-all but used two definitions of "no queue" (arm 1
+  // "no top_issues" vs arm 3 "no open entry"), so PASS with all-closed entries HALTed as malformed.
+  // A presence-only test stayed green on both. So this test is driven from the MATRIX: each cell
+  // of {PASS, active WAIVED, inactive WAIVED, CONCERNS, FAIL} × {no open entry, open entry} names
+  // the arm that must route it and the phrase that arm must use to claim the cell, and the
+  // definition of "open" must be stated once above the arms and used — not restated — by arm 1.
+  // Collapse wrapped lines so a sentence spanning a line break is one sentence to the regex.
+  const branching = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
+  ).replace(/\s+/g, " ");
+  assert.match(
+    branching,
+    /an entry in `top_issues\[\]` is \*\*open\*\* when its `status:` is absent or reads `open`/,
+    "the definition of an OPEN entry must be stated once, above the arms",
+  );
+  const ARM = {
+    pass: "- `PASS` with **no open entry",
+    waivedActive: "- `WAIVED` with `waiver.active: true`",
+    concernsNoOpen: "- `CONCERNS` with **no open entry",
+    failOrOpen: "- `FAIL`, or `CONCERNS` with an **open entry",
+    anyOtherOpen: "- **Any other gate — read by its queue.**",
+    malformed: "- A gate that matches **none** of the arms above",
+  };
+  const arms = Object.fromEntries(
+    Object.entries(ARM).map(([k, p]) => [k, branchingArm(p)]),
+  );
+  for (const [name, arm] of Object.entries(arms))
+    assert.ok(arm, `arm '${name}' must exist`);
+  // Arm 1 must use the shared definition, not the empty-list reading the CR-4 mutant reintroduces.
+  assert.doesNotMatch(
+    arms.pass,
+    /with no `top_issues`/,
+    "arm 1 must say 'no open entry', not 'no top_issues' (an empty list)",
+  );
+
+  // cell → [arm that routes it, phrase the arm uses to claim it, destination]
+  const CELLS = [
+    [
+      "PASS × no open entry",
+      "pass",
+      /`PASS` with \*\*no open entry/,
+      /proceed to 5c/,
+    ],
+    [
+      "PASS × open entry",
+      "anyOtherOpen",
+      /`PASS` carrying open LOW entries/,
+      /same road as the `FAIL` arm/,
+    ],
+    [
+      "active WAIVED × any",
+      "waivedActive",
+      /`waiver\.active: true`/,
+      /proceed to 5c/,
+    ],
+    [
+      "inactive WAIVED × open entry",
+      "anyOtherOpen",
+      /`waiver\.active` is not `true` and whose queue has an open entry/,
+      /same road as the `FAIL` arm/,
+    ],
+    [
+      "inactive WAIVED × no open entry",
+      "anyOtherOpen",
+      /\*\*and\*\* whose queue has no open entry → \*\*proceed to 5c\*\*/,
+      /proceed to 5c/,
+    ],
+    [
+      "CONCERNS × no open entry",
+      "concernsNoOpen",
+      /`CONCERNS` with \*\*no open entry/,
+      /proceed to 5c/,
+    ],
+    [
+      "CONCERNS × open entry",
+      "failOrOpen",
+      /`CONCERNS` with an \*\*open entry/,
+      /Convergence check/,
+    ],
+    ["FAIL × any", "failOrOpen", /^- `FAIL`,/, /Convergence check/],
+  ];
+  for (const [cell, armKey, claim, dest] of CELLS) {
+    assert.match(
+      arms[armKey],
+      claim,
+      `cell '${cell}' must be claimed by arm '${armKey}'`,
+    );
+    assert.match(
+      arms[armKey],
+      dest,
+      `cell '${cell}' must route where the arm says`,
+    );
+    // Exactly one arm claims the cell: no other arm may carry the same claiming phrase.
+    const claimants = Object.entries(arms)
+      .filter(([k, a]) => k !== "malformed" && claim.test(a))
+      .map(([k]) => k);
+    assert.deepEqual(
+      claimants,
+      [armKey],
+      `cell '${cell}' must be claimed by exactly one arm (got ${claimants.join(", ")})`,
+    );
+  }
+  assert.match(
+    arms.malformed,
+    /\*\*HALT\*\*/,
+    "a gate matching no arm must HALT, not be routed by guesswork",
+  );
+  // The receiver (§5c route 1) must be qualified the way the router is — an unqualified
+  // "PASS or WAIVED" is broader than arms 1, 2 and 5 (CR-3, cycle 3).
+  const s5c = section5c();
+  assert.doesNotMatch(
+    s5c,
+    /1\. a gate that reads \*\*`PASS` or `WAIVED`\*\*/,
+    "§5c route 1 must not be the unqualified token pair",
+  );
+  assert.match(
+    s5c,
+    /1\. a gate with \*\*no open finding\*\*/,
+    "§5c route 1 must be qualified as 'no open finding', matching the arms",
+  );
+});
+
+test("the accepting-route set is stated once: consumers point at §5c and read the mechanical signal, never a paraphrase (task.116 cycles 2–3)", () => {
+  // Cycle 2 found the set restated (stale) in the resume contract and the conformance prompt;
+  // cycle 3 found the replacement paraphrase — "non-FAIL with no open entry, or active WAIVED" —
+  // was two of §5c's three routes. A test that only forbids the OLD phrase stays green on every
+  // new one. So this test forbids paraphrase in every consumer, requires the pointer, and
+  // requires the two load-bearing consumers (which must DECIDE whether a gate reached 5c) to
+  // read the mechanical record 5a writes — the cycle entry's `Action` row — rather than the gate.
+  const consumers = {
+    "resume contract": read(
+      "shared/resources/develop-pipeline-resume-contract.md",
+    ),
+    "conformance prompt": read("shared/resources/pr-conformance-prompt.md"),
+    "ingester prompt": read("shared/resources/qa-findings-ingester-prompt.md"),
+    "qa-flow runbook": read("docs/runbooks/qa-flow.md"),
+    "story-development runbook": read("docs/runbooks/story-development.md"),
+    "task-development runbook": read("docs/runbooks/task-development.md"),
+    "review-pr skill": read("skills/review-pr/SKILL.md"),
+  };
+  const PARAPHRASES = [
+    /reads `PASS`\/`WAIVED`/,
+    /gate is not PASS or WAIVED/,
+    /a `PASS`\/`WAIVED` gate hands to/,
+    /gate is already `PASS`\/`WAIVED`/,
+    /non-`?FAIL`? gate with no open (entry|finding)/,
+    /Gate file exists and is PASS or WAIVED/,
+    /gate reads `PASS` or `WAIVED`/,
+    /reads `PASS` or `WAIVED`, a DoD/,
+  ];
+  for (const [name, text] of Object.entries(consumers)) {
+    for (const re of PARAPHRASES) {
+      assert.doesNotMatch(
+        text,
+        re,
+        `${name} must not restate the accepting-route set (${re})`,
+      );
+    }
+    assert.match(text, /§5c/, `${name} must point at §5c by name`);
+  }
+  for (const name of ["resume contract", "conformance prompt"]) {
+    assert.match(
+      consumers[name],
+      /`\*\*Action\*\*`[^\n]{0,40}`Proceeding to 5c`|\*\*Action\*\*: Proceeding to 5c/,
+      `${name} must decide "reached 5c" from the cycle entry's Action row, not from the gate`,
+    );
+  }
+  // And the set itself lives in exactly one enumerated list: §5c's "three routes out of 5a".
+  assert.match(
+    section5c(),
+    /three routes out of 5a/,
+    "§5c must be the one enumerated statement of the set",
+  );
+  assert.doesNotMatch(
+    sectionBetween("### Convergence check", "### Diminishing-returns exit"),
+    /hands to 5c \(`PASS` \/ `WAIVED`\)/,
+    "the Convergence check preamble must not carry the two-route premise",
+  );
+});
+
+test("the Action row the consumers read has a writer on every route: post-guard write, On-exit step 1, closed value set (task.116 cycle 4)", () => {
+  // Cycle 3 made "reached 5c" the cycle entry's Action row. Cycle 4 found nothing told the
+  // Diminishing-returns exit to WRITE it — the entry is opened before the guards run, so a
+  // route-2 run could leave the 5b value in place and both consumers would then decide the gate
+  // never reached 5c. Pin the writer: the preamble states the post-guard write and the closed
+  // value set; the exit's On-exit list writes the row as its first step; the template offers no
+  // unreachable value.
+  const branching = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
+  ).replace(/\s+/g, " ");
+  assert.match(
+    branching,
+    /post-guard write/,
+    "the preamble must state that the Action row is written after the guards resolve",
+  );
+  assert.match(
+    branching,
+    /value set is exactly `\{Proceeding to 5c \(PR conformance review\), Running qa-fix \(cycle \{N\} of 5\), Escalating — loop not converging\}`/,
+    "the preamble must state the closed value set of the Action row",
+  );
+  assert.doesNotMatch(
+    loopDoc,
+    /Proceeding to finalise/,
+    "the entry template must not offer the unreachable value 'Proceeding to finalise'",
+  );
+  const onExit = sectionBetween("#### On exit", "> **This is not a licence");
+  assert.match(
+    onExit,
+    /^1\. \*\*Overwrite the cycle entry's routing rows first\*\*/m,
+    "the Diminishing-returns On-exit list must write the Action / PR Review rows as its FIRST step",
+  );
+  assert.match(
+    onExit,
+    /`\*\*Action\*\*: Proceeding to 5c \(PR conformance\s+review\)`/,
+    "On-exit step 1 must name the 5c value",
+  );
+  assert.match(
+    onExit,
+    /`\*\*PR Review\*\*: pending — 5c not yet run`/,
+    "On-exit step 1 must also reset the PR Review placeholder",
+  );
+});
+
 // ── 3. Verdict routing — the graph, not just the vocabulary ──────────────────
 
 /**

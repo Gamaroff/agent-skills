@@ -99,5 +99,5 @@ the block is **optional**: `qa-story` / `qa-task` own this field; `review-securi
 
 - [`qa-re-review-scope.md`](qa-re-review-scope.md) — the trigger that reads this field
 - [`security-review-prompt.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/security-review-prompt.md) — the producer's machine block
-- [`finalise-dod-security-prompt.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/finalise-dod-security-prompt.md) — the `probes_executed`
+- [`finalise-dod-security-prompt.md`](finalise-dod-security-prompt.md) — the `probes_executed`
   precedent, at the DoD layer

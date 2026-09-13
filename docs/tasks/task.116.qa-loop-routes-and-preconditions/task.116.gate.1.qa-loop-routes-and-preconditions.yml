@@ -1,0 +1,84 @@
+schema: 1
+task: 'task.116.qa-loop-routes-and-preconditions'
+task_title: 'The QA loop routes on the verdict token, gates before its own review returns, reads boundary deliverables it could execute, and has no vocabulary for a subagent that never ran'
+gate: CONCERNS
+status_reason: 'All five success criteria verified in the tree and the suite is green (3266/3266), but the rewritten Outcome branching leaves two legal gate shapes unrouted (PASS with open LOW entries; WAIVED with an inactive waiver), and five consumer-doc lines still restate the CONCERNS→qa-fix rule the task removed. Both are MEDIUM and fixable in one cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T08:08:50Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The rewritten Outcome branching drops the old catch-all arm, so a PASS gate carrying open LOW entries (legal under gate rule 5) or a WAIVED gate with an inactive waiver now matches no arm — the router has an unrouted gate shape it previously sent to the Convergence check.'
+    suggested_action: 'Add an explicit arm so every gate × queue combination has exactly one route (other gates with an open entry → Convergence check / Diminishing-returns exit like the FAIL arm; say explicitly what a PASS with only LOW open entries does), and extend the route-3 test to pin the closed set.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.1.unrouted-gate-shapes.md'
+    status: open
+  - id: 'DOC-1'
+    severity: medium
+    file: 'docs/runbooks/qa-flow.md'
+    finding: 'Five lines across docs/runbooks/story-development.md (:235, :272), docs/runbooks/task-development.md (:114, :149) and docs/runbooks/qa-flow.md (:21 mermaid) still state "CONCERNS/FAIL → qa-fix", the verdict-token rule this task removed.'
+    suggested_action: 'Reword the five lines to key on an open finding; split the qa-flow.md mermaid edge into FAIL / open finding → qa-fix and PASS / WAIVED / CONCERNS-no-open → review-pr.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'After renumbering Step 3b, the Pipeline Skill args text at skills/qa-task/SKILL.md:42 ("Step 3b step 4") and skills/qa-story/SKILL.md:82 ("Phase 1.6 step 4") point at the platform-variance item instead of the Gate mapping item (now step 6).'
+    suggested_action: 'Update both cross-references to step 6, or anchor them by name ("the Gate mapping item") so renumbering cannot break them.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'docs/reference/configuration.md'
+    finding: 'The new wall-clock budget is declared overridable via subagents.wallClockMinutes in skills-config.yaml, but the key is absent from docs/reference/configuration.md (the Full schema block and the Key reference table), which is the only documented config surface.'
+    suggested_action: 'Add a subagents: block with wallClockMinutes: 10 to the Full schema and a subagents.wallClockMinutes row to the Key reference table.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 3267
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false — prose, tests, one replay fixture; no predicate, allow/deny-list, parser or sanitiser in the change set). The new TMPDIR fence is correctly refused as node fail-closed by qa-execute-snippets.'
+  performance:
+    status: PASS
+    notes: 'Two new hermetic test files and one replay scenario; ci:fast wall time unchanged in practice. The new wall-clock wait in Step 3b bounds, rather than adds, latency.'
+  reliability:
+    status: PASS
+    notes: 'Route 3 + preconditions mutation-proved by QA (3 reverts, each predicted test red, baseline restored). Fast gate 3266/3266 exit 0. Replay fixture 5/5.'
+  maintainability:
+    status: PASS
+    notes: 'One-source rule held (Subagents table lives once; sites point). Cost: 15–16 transitive bundled files into qa-fix / review-task / review-story — the same closure qa-task already ships; logged as observation #83 for the bundler. Parity test pins verbatim prose, so future rewording must land in both QA skills.'
+
+recommendations:
+  immediate:
+    - action: 'Close the unrouted gate shapes in Outcome branching and pin the closed set in pr-review-loop-parity.test.mjs (CR-1)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'Doc sweep — reword the five runbook lines that restate CONCERNS→qa-fix (DOC-1)'
+      refs: ['docs/runbooks/story-development.md', 'docs/runbooks/task-development.md', 'docs/runbooks/qa-flow.md']
+  future:
+    - action: 'Fix the two stale "step 4" cross-references (CR-2)'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+    - action: 'Document subagents.wallClockMinutes in configuration.md (CR-3)'
+      refs: ['docs/reference/configuration.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 closed', 'DOC-1 closed']

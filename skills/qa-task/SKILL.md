@@ -39,7 +39,7 @@ Skill(qa-task, args="traceability_matrix=<path> code_review_blocking=true")
 ```
 
 - `traceability_matrix=<path>` — a pre-built traceability matrix (see Step 5 / traceability handling); absent → internal mapping.
-- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 4** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter.
+- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter.
 
 ## When to Use This Skill
 
@@ -446,9 +446,46 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    Why both, rather than one flag: refuting the fixes and re-probing the surface have different
    targets. Collapsing them would make cycle 3+ lose the refute, or cycle 2 lose the re-probe.
 
-3. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13).
+3. **Apply the boundary rule — execute, do not only read.** When the reviewer has returned, apply
+   `references/probe-boundary-rule.md`: decide whether the change set delivers a **boundary** — a
+   function whose purpose is to accept or reject (a classifier, validator, parser, sanitiser, or
+   any predicate whose `false` prevents an action). The signals and the
+   explicit negative case are stated once, in Step 1b of `references/finalise-dod-security-prompt.md`;
+   do not restate them here. When the rule fires, take the candidate inputs from
+   `references/security-input-corpus.mjs` (`corpusFor(<sink>)`), write a short script in a temporary
+   directory that imports the entry point and calls it on each candidate, **run it**, and report each
+   candidate whose `actual` differs from `expected` on the existing `code_review` finding shape
+   (`category: bug`, `file_line` = the entry point, `finding` naming the input verbatim). Record the
+   total executed as **`probes_executed: N`** beside the block: an empty findings list with
+   `probes_executed: 0` is a review that read the boundary and did not test it, which is the defect
+   this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
+   report's `## Code Review` section rather than leaving `probes_executed` absent. A boundary that is
+   read at QA and executed only at the Step 7 DoD probe lands its defect after the gate that should
+   have covered it: a 14-star glob compiled to `[^/]*` × 14 passed five green cycles and was found at
+   finalise (obs #20).
 
-4. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the task frontmatter flag; an explicit per-doc `false` is the escape hatch:
+4. **Platform variance — run the other value.** For every fixture path or environment-derived value
+   the diff passes to a **validating** consumer (a function that refuses some inputs — a containment
+   check, a path-prefix test, a deny-list), a green run on this machine is evidence about this
+   machine. When the value is derived from the environment (`os.tmpdir()`, `$HOME`, `$TMPDIR`, a
+   resolved symlink) and the consumer validates it, **run the affected tests once under the other
+   value** and record the command and its exit code in the QA report. The reproduction for the common
+   case is one line:
+
+   ```bash
+   TMPDIR=/tmp node --test 'skills/<skill>/tests/*.test.js'
+   ```
+
+   On macOS `os.tmpdir()` resolves under `/var/folders/…`; on Linux CI it is `/tmp`, which
+   `resolve-observation-workspace.sh` refuses as ephemeral — a suite that passed here and failed there
+   was reasoned "real and correct" from the wrong platform (obs #17). Inherit the environment fact
+   from the environment (the `zshAvailable()` precedent in `references/qa-execute-snippets.mjs`), never
+   assume the reviewing host is the CI host. The same rule is a mandatory check in
+   `references/code-review-prompt.md`, so the reviewer reports the candidate and this step runs it.
+
+5. **Record — always (advisory):** put every finding (bugs + cleanups, with `file:line`) into the QA report `## Code Review` section (Step 11) and the PR comment (Step 13).
+
+6. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the task frontmatter flag; an explicit per-doc `false` is the escape hatch:
 
    ```bash
    # CR_OVERRIDE=true when the develop-task pipeline passed code_review_blocking=true in Skill args
@@ -463,7 +500,10 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
 
    `$CODE_REVIEW_BLOCKING_ARG` comes from the `code_review_blocking=` token in Skill `args` (see **Pipeline Skill args**). When `CR_BLOCKING=true`, append each finding that is `category: bug` AND `confidence: high` to the gate `top_issues[]` as `{ id, severity, file, finding, suggested_action, suggested_owner: dev }` — `file` is the path from the finding's own `file:line`, which every code-review finding already carries (Step 10's deterministic rules then decide). Otherwise — resolved advisory, or every cleanup or non-high-confidence finding — the gate is **unaffected**.
 
-5. `rm -f "$DIFF_FILE"`.
+7. `rm -f "$DIFF_FILE"`.
+
+**Post-condition — the findings block is in hand.** This step ends when the dispatched reviewer's `code_review:` block is in hand and recorded. A dispatched review that has not returned is **outstanding**, and the pass is not complete: the gate step refuses to write a gate and the PR-comment step refuses to publish one while a review is outstanding. Waiting is bounded by the wall-clock budget in `references/develop-pipeline-autonomous-defaults.md` §Subagents; a reviewer past its budget is recorded as `killed at N minutes` (never `stalled`) and the pass is performed inline per that table, with the independence loss recorded. A reviewer that is **unavailable** (no subagent dispatch in this session) or **failed** (returned nothing usable) is handled by the same table — and **output-file size is not a liveness signal**: a small or stale output file says nothing about whether the reviewer is working. The reason this is written down: task.106's gate 1 (`PASS` 95) was written and posted while its diff review was still running; the review returned a high and a medium minutes later (obs #56).
+
 
 This keeps the QA→qa-fix loop safe: only a high-confidence correctness bug triggers a fix cycle; cleanups and uncertain findings stay advisory. Under the develop-task pipeline (which sets the run-level override) this *is* the code-review-and-fix loop; standalone, behaviour is unchanged unless the task opts in via frontmatter.
 
@@ -473,6 +513,8 @@ A green suite says the tests ran, not that they can fail. Before crediting a tes
 as coverage for a defect this cycle fixed, **revert the behaviour it names and
 confirm that test goes red** — full procedure, the outcomes table, and the shapes
 vacuity takes: [`references/mutation-proving.md`](references/mutation-proving.md).
+
+**A green suite is also evidence about the platform it ran on, and only that platform.** When the change set passes an environment-derived value (`os.tmpdir()`, `$TMPDIR`, `$HOME`) to a consumer that validates it, the platform-variance check in the diff-review step applies here too: run the affected tests once under the other value (`TMPDIR=/tmp node --test …`) before crediting them as coverage. A suite that is green on macOS and red on Linux CI is not a flake; it is the fixture path failing a containment check it never met locally (obs #17).
 
 Run it as the procedure says, not from memory — the steps below exist because a
 QA cycle skipped them and wrote a false finding: **snapshot the file with `cp` and
@@ -707,6 +749,8 @@ For each HIGH or MEDIUM severity issue found:
 ```
 
 ### Step 10: Create Quality Gate File
+
+> **Precondition — no dispatched review is outstanding.** Do not write a gate while a code review dispatched in this cycle has not returned its `code_review:` block. The gate is a verdict on all the evidence, and a review still running is evidence not yet in hand — a `PASS` written now can be contradicted minutes later by the reviewer it did not wait for (task.106, obs #56). If the diff-review step reports the review as outstanding, wait against its wall-clock budget or resolve it per `references/develop-pipeline-autonomous-defaults.md` §Subagents **before** this step; never write around it.
 
 > **`top_issues[]` holds THIS cycle's findings only.** Do not copy a previous cycle's entries
 > forward, even annotated `status: closed`, and even though carrying the history reads as helpful.
@@ -1068,6 +1112,8 @@ canonical columns. Canonical format:
 touches the document. See [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md).
 
 ### Step 13: Post PR Comment — Best-effort, non-blocking
+
+> **Precondition — no dispatched review is outstanding.** Do not publish a gate the gate step could not have written: if a code review dispatched in this cycle is still running, the gate does not exist yet and there is nothing to post. A gate published before its review returns is read as final by everyone downstream — the PR, the tracker card, the finalise DoD — and is not retracted when the review lands (task.106, obs #56).
 
 **PR-comment authorship contract**:
 
