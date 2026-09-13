@@ -114,6 +114,7 @@ None. A CONCERNS/empty gate now reaches 5c instead of halting — intended; CHAN
 | `evals/shared/tests/qa-gate-preconditions-parity.test.mjs` (new) | qa-task ↔ qa-story parity for the 3b/10/13 sentences |
 | `docs/runbooks/story-development.md`, `docs/runbooks/task-development.md`, `docs/runbooks/qa-flow.md` | doc sweep — qa-fix runs on an open finding (qa-fix cycle 1) |
 | `docs/reference/configuration.md` | `subagents.wallClockMinutes` (qa-fix cycle 1) |
+| `shared/resources/develop-pipeline-resume-contract.md`, `shared/resources/pr-conformance-prompt.md`, `shared/resources/qa-findings-ingester-prompt.md` | accepting-route set by reference to §5c (qa-fix cycle 2) |
 | `CHANGELOG.md` | Changed |
 
 ## 8. Testing Strategy
@@ -151,30 +152,34 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 
 ## QA Testing Results
 
-**QA Status**: ⚠️ CONCERNS
+**QA Status**: ❌ FAIL (cycle 2)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-13
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 40/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.116.qa.1.qa-loop-routes-and-preconditions.md](./task.116.qa.1.qa-loop-routes-and-preconditions.md)
-- **Gate File**: [task.116.gate.1.qa-loop-routes-and-preconditions.yml](./task.116.gate.1.qa-loop-routes-and-preconditions.yml)
+- **Full Report**: [task.116.qa.2.qa-loop-routes-and-preconditions.md](./task.116.qa.2.qa-loop-routes-and-preconditions.md) (cycle 1: [qa.1](./task.116.qa.1.qa-loop-routes-and-preconditions.md))
+- **Gate File**: [task.116.gate.2.qa-loop-routes-and-preconditions.yml](./task.116.gate.2.qa-loop-routes-and-preconditions.yml) (cycle 1: [gate.1](./task.116.gate.1.qa-loop-routes-and-preconditions.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3267 (3266 pass, 1 skipped, 0 fail)
+- **Tests Executed**: 3268 (3267 pass, 1 skipped, 0 fail)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (2 MEDIUM, 2 LOW)
+- **Critical Issues**: 2 HIGH (2 MEDIUM, 3 LOW)
 - **NFR Status**: Security: PASS (reasoned, no boundary), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Bug Reports
 
 #### In QA Verification
-- [Bug 116.1: Outcome branching leaves two gate shapes unrouted](./task.116.bug.1.unrouted-gate-shapes.md) - ✅ Ready for QA - Priority: P1 (Fixed 2026-09-13)
-- [Bug 116.2: Consumer docs still restate "CONCERNS → qa-fix"](./task.116.bug.2.consumer-docs-restate-old-route.md) - ✅ Ready for QA - Priority: P2 (Fixed 2026-09-13)
+- [Bug 116.3: Resume contract keys the 5c sub-state on PASS/WAIVED](./task.116.bug.3.resume-contract-keys-5c-on-token.md) - ✅ Ready for QA - Priority: P0 (Fixed 2026-09-13, cycle 2)
+- [Bug 116.4: Conformance prompt flags every route-3 gate as a TRAIL defect](./task.116.bug.4.conformance-prompt-flags-route-3-gate.md) - ✅ Ready for QA - Priority: P0 (Fixed 2026-09-13, cycle 2)
+- [Bug 116.1: Outcome branching leaves two gate shapes unrouted](./task.116.bug.1.unrouted-gate-shapes.md) - ✅ Ready for QA (iteration 2) - Priority: P1
+- [Bug 116.2: Consumer docs still restate "CONCERNS → qa-fix"](./task.116.bug.2.consumer-docs-restate-old-route.md) - ✅ Ready for QA (iteration 2) - Priority: P2
 
 ### Key Findings
-CR-1 — the rewritten Outcome branching leaves `PASS`+open LOW and `WAIVED`+inactive waiver unrouted ([bug 1](./task.116.bug.1.unrouted-gate-shapes.md)); DOC-1 — five runbook lines still say `CONCERNS → qa-fix` ([bug 2](./task.116.bug.2.consumer-docs-restate-old-route.md)); CR-2/CR-3 low (stale "step 4" refs; `subagents.wallClockMinutes` undocumented).
+**Cycle 2 (FAIL):** the accepting-route set is restated in the resume contract and the PR conformance prompt, both still on the `PASS`/`WAIVED` token (CR-1, CR-2 HIGH); arm definitions inconsistent (CR-4); runbook wording wrong for active `WAIVED` + three more stale sentences (CR-3, CR-5).
+
+**Cycle 1 (CONCERNS):** CR-1 — the rewritten Outcome branching leaves `PASS`+open LOW and `WAIVED`+inactive waiver unrouted ([bug 1](./task.116.bug.1.unrouted-gate-shapes.md)); DOC-1 — five runbook lines still say `CONCERNS → qa-fix` ([bug 2](./task.116.bug.2.consumer-docs-restate-old-route.md)); CR-2/CR-3 low (stale "step 4" refs; `subagents.wallClockMinutes` undocumented).
 
 ---
 
@@ -187,7 +192,8 @@ CR-1 — the rewritten Outcome branching leaves `PASS`+open LOW and `WAIVED`+ina
 | 2026-09-13 |         | Status → ready-for-development                | review-task |
 | 2026-09-13 |         | Implemented — 12 source files + bundled references, 2 test files (10 new assertions) + 1 replay fixture; ci:fast 3266/3266 | develop |
 | 2026-09-13 |         | QA gate CONCERNS (80/100) — 4 findings (2 MEDIUM: unrouted gate shapes; runbooks restate old route) | qa-task |
-| 2026-09-13 |         | QA findings fixed — CR-1 catch-all arm + exhaustiveness test, DOC-1 five runbook lines, CR-2 step refs, CR-3 `subagents.wallClockMinutes` documented; 1 iteration | qa-fix |
+| 2026-09-13 |         | QA gate FAIL (40/100) — 7 findings (2 HIGH: resume contract + conformance prompt still key 5c on PASS/WAIVED) | qa-task |
+| 2026-09-13 |         | QA findings fixed — accepting-route set stated once (resume contract, conformance prompt, ingester prompt, runbooks point at §5c); one definition of "open" across the arms; matrix-driven exhaustiveness test; `wallClockMinutes` reader; 2 iterations | qa-fix |
 
 ---
 

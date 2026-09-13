@@ -248,9 +248,13 @@ recorded, not the findings.
 
 ### Outcome branching (shared)
 
-After completion, find and read the latest gate file:
+After completion, find and read the latest gate file. **One definition governs every arm below:** an
+entry in `top_issues[]` is **open** when its `status:` is absent or reads `open`; a gate has **no open
+entry** when the list is empty **or** every entry reads `status: closed`. The arms are the
+**accepting-route set** §5c enumerates, stated here as the router and there as the receiver; every
+other document that needs the set points at §5c rather than restating the tokens.
 
-- `PASS` with no `top_issues` → **proceed to 5c** (the loop's exit gate), not straight to Step 7
+- `PASS` with **no open entry in `top_issues[]`** → **proceed to 5c** (the loop's exit gate), not straight to Step 7
 - `WAIVED` with `waiver.active: true` and a documented reason/approver → **proceed to 5c** (finalise treats `WAIVED` as accept-eligible; re-running qa-fix would churn against an intentionally-waived gate)
 - `CONCERNS` with **no open entry in `top_issues[]`** — the list is empty, or every entry reads
   `status: closed` → **proceed to 5c** (the loop's exit gate). This is §5c's **route 3**, and it is
@@ -263,9 +267,12 @@ After completion, find and read the latest gate file:
   Convergence check escalates, the Diminishing-returns exit hands to 5c.
 - **Any other gate with an open entry in `top_issues[]`** — a `PASS` carrying open LOW entries
   (legal under gate rule 5, which lets LOW findings ride on a passing verdict), or a `WAIVED` whose
-  `waiver.active` is not `true` → the same road as the `FAIL` arm: Convergence check, then
-  Diminishing-returns exit, then 5b. The queue is what `/qa-fix` consumes, and an open LOW is still
-  open work; a waiver that is not active has waived nothing.
+  `waiver.active` is not `true` and whose queue has an open entry → the same road as the `FAIL` arm:
+  Convergence check, then Diminishing-returns exit, then 5b. The queue is what `/qa-fix` consumes,
+  and an open LOW is still open work; a waiver that is not active has waived nothing, so its gate is
+  read by its queue like any other — which also means a `WAIVED` whose `waiver.active` is not `true`
+  **and** whose queue has no open entry → **proceed to 5c**, exactly as a `PASS` with no open entry
+  does.
 - A gate that matches **none** of the arms above is malformed, not a route — a `gate:` that reads
   none of the four tokens, or a `top_issues[]` that cannot be parsed well enough to say whether an
   entry is open. **HALT** and surface the file rather than routing it anywhere. (A `PASS` with an
@@ -375,7 +382,8 @@ Steps 5–6 emit.
 ### Convergence check (shared) — the QA loop's stall guard
 
 Perform this check **after the cycle's gate file has been written and read (5a), before entering
-5b**. A gate that hands to 5c (`PASS` / `WAIVED`) skips it — the gate is accept-eligible, so there is
+5b**. A gate that hands to 5c (any arm of the accepting-route set above — a non-`FAIL` gate with no open
+entry, or an active `WAIVED`) skips it — the gate is accept-eligible, so there is
 nothing for a stall guard to act on. (Note this is *not* because the HIGH count is zero: a `WAIVED`
 gate carries its HIGH `top_issues[]` with `waiver.active: true`, so that cycle's
 `**HIGH findings**` line is still a real, usually non-zero, count.)

@@ -53,7 +53,9 @@ does not come back the way it expected. Three states, and they are not the same 
 | **Slow** — the subagent is still running past its **wall-clock budget** | Nothing is known yet. A running agent is not a failed one | Wait until the budget elapses, then stop it and perform the pass inline | `subagent: killed at N minutes (budget M) — pass performed inline; independence lost`. Write `killed at N minutes`, **never** `stalled` — "stalled" is a diagnosis nobody made |
 
 **Wall-clock budget.** Ten minutes per dispatch by default (`subagents.wallClockMinutes` in
-`skills-config.yaml` overrides it); the QA diff reviewer's Step 3b post-condition and the pre-develop
+`skills-config.yaml` overrides it — read it once per run with
+`source references/read-config.sh && read_nested_config_key subagents wallClockMinutes`, and
+treat an empty result as `10`); the QA diff reviewer's Step 3b post-condition and the pre-develop
 surface map both wait against this number. Start the clock at dispatch and record it in the
 Decisions Log with the outcome: `dispatched HH:MM → returned HH:MM` or `→ killed at N minutes`.
 

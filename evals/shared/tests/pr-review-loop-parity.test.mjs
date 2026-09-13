@@ -223,51 +223,173 @@ test("5b is entered on an open finding, never on the verdict token", () => {
   );
 });
 
-test("the outcome-branching arms are exhaustive: every gate × queue shape has a route (CR-1, task.116)", () => {
-  // The first cut of route 3 dropped the old catch-all ("or has top_issues"), which left a PASS
-  // carrying open LOW entries and a WAIVED with an inactive waiver matching NO arm. An unrouted
-  // gate is an orchestrator improvising — the defect class task.116 exists to remove. So the arm
-  // set is pinned as a closed set: the four positive routes, the catch-all for any other open
-  // queue, and the malformed clause that turns "matches nothing" into a HALT rather than a guess.
-  const arms = {
-    passClean: branchingArm("- `PASS` with no `top_issues`"),
-    waivedActive: branchingArm("- `WAIVED` with `waiver.active: true`"),
-    concernsNoOpen: branchingArm("- `CONCERNS`", (l) =>
-      /no open entry|empty/i.test(l),
-    ),
-    failOrOpen: branchingArm("- `FAIL`, or `CONCERNS` with an **open entry"),
-    anyOtherOpen: branchingArm(
-      "- **Any other gate with an open entry in `top_issues[]`**",
-    ),
-    malformed: branchingArm("- A gate that matches **none** of the arms above"),
+test("the outcome-branching arms are exhaustive: every gate × queue cell names exactly one route (CR-1/CR-4, task.116)", () => {
+  // The first cut of route 3 dropped the old catch-all, leaving PASS+open-LOW and inactive-WAIVED
+  // unrouted; the second cut restored a catch-all but used two definitions of "no queue" (arm 1
+  // "no top_issues" vs arm 3 "no open entry"), so PASS with all-closed entries HALTed as malformed.
+  // A presence-only test stayed green on both. So this test is driven from the MATRIX: each cell
+  // of {PASS, active WAIVED, inactive WAIVED, CONCERNS, FAIL} × {no open entry, open entry} names
+  // the arm that must route it and the phrase that arm must use to claim the cell, and the
+  // definition of "open" must be stated once above the arms and used — not restated — by arm 1.
+  // Collapse wrapped lines so a sentence spanning a line break is one sentence to the regex.
+  const branching = sectionBetween(
+    "### Outcome branching (shared)",
+    "### Convergence check",
+  ).replace(/\s+/g, " ");
+  assert.match(
+    branching,
+    /an entry in `top_issues\[\]` is \*\*open\*\* when its `status:` is absent or reads `open`/,
+    "the definition of an OPEN entry must be stated once, above the arms",
+  );
+  const ARM = {
+    pass: "- `PASS` with **no open entry",
+    waivedActive: "- `WAIVED` with `waiver.active: true`",
+    concernsNoOpen: "- `CONCERNS` with **no open entry",
+    failOrOpen: "- `FAIL`, or `CONCERNS` with an **open entry",
+    anyOtherOpen: "- **Any other gate with an open entry in `top_issues[]`**",
+    malformed: "- A gate that matches **none** of the arms above",
   };
-  for (const [name, arm] of Object.entries(arms)) {
-    assert.ok(arm, `outcome branching must carry the '${name}' arm`);
+  const arms = Object.fromEntries(
+    Object.entries(ARM).map(([k, p]) => [k, branchingArm(p)]),
+  );
+  for (const [name, arm] of Object.entries(arms))
+    assert.ok(arm, `arm '${name}' must exist`);
+  // Arm 1 must use the shared definition, not the empty-list reading the CR-4 mutant reintroduces.
+  assert.doesNotMatch(
+    arms.pass,
+    /with no `top_issues`/,
+    "arm 1 must say 'no open entry', not 'no top_issues' (an empty list)",
+  );
+
+  // cell → [arm that routes it, phrase the arm uses to claim it, destination]
+  const CELLS = [
+    [
+      "PASS × no open entry",
+      "pass",
+      /`PASS` with \*\*no open entry/,
+      /proceed to 5c/,
+    ],
+    [
+      "PASS × open entry",
+      "anyOtherOpen",
+      /`PASS` carrying open LOW entries/,
+      /same road as the `FAIL` arm/,
+    ],
+    [
+      "active WAIVED × any",
+      "waivedActive",
+      /`waiver\.active: true`/,
+      /proceed to 5c/,
+    ],
+    [
+      "inactive WAIVED × open entry",
+      "anyOtherOpen",
+      /`waiver\.active` is not `true` and whose queue has an open entry/,
+      /same road as the `FAIL` arm/,
+    ],
+    [
+      "inactive WAIVED × no open entry",
+      "anyOtherOpen",
+      /\*\*and\*\* whose queue has no open entry → \*\*proceed to 5c\*\*/,
+      /proceed to 5c/,
+    ],
+    [
+      "CONCERNS × no open entry",
+      "concernsNoOpen",
+      /`CONCERNS` with \*\*no open entry/,
+      /proceed to 5c/,
+    ],
+    [
+      "CONCERNS × open entry",
+      "failOrOpen",
+      /`CONCERNS` with an \*\*open entry/,
+      /Convergence check/,
+    ],
+    ["FAIL × any", "failOrOpen", /^- `FAIL`,/, /Convergence check/],
+  ];
+  for (const [cell, armKey, claim, dest] of CELLS) {
+    assert.match(
+      arms[armKey],
+      claim,
+      `cell '${cell}' must be claimed by arm '${armKey}'`,
+    );
+    assert.match(
+      arms[armKey],
+      dest,
+      `cell '${cell}' must route where the arm says`,
+    );
+    // Exactly one arm claims the cell: no other arm may carry the same claiming phrase.
+    const claimants = Object.entries(arms)
+      .filter(([k, a]) => k !== "malformed" && claim.test(a))
+      .map(([k]) => k);
+    assert.deepEqual(
+      claimants,
+      [armKey],
+      `cell '${cell}' must be claimed by exactly one arm (got ${claimants.join(", ")})`,
+    );
   }
-  assert.match(
-    arms.anyOtherOpen,
-    /`PASS` carrying open LOW entries/,
-    "the catch-all must name the PASS-with-open-LOW shape",
-  );
-  assert.match(
-    arms.anyOtherOpen,
-    /`WAIVED` whose `waiver\.active` is not `true`/,
-    "the catch-all must name the inactive-waiver shape",
-  );
-  assert.match(
-    arms.anyOtherOpen,
-    /same road as the `FAIL` arm/,
-    "the catch-all routes like FAIL — Convergence check, Diminishing-returns exit, then 5b",
-  );
   assert.match(
     arms.malformed,
     /\*\*HALT\*\*/,
     "a gate matching no arm must HALT, not be routed by guesswork",
   );
+});
+
+test("the accepting-route set is stated once: every consumer points at §5c instead of the PASS/WAIVED token pair (task.116 cycle 2)", () => {
+  // Cycle 2's refute pass found the set restated — and stale — in the resume contract and the PR
+  // conformance prompt. Both are load-bearing: one decides where a killed run re-enters, the other
+  // decides whether a route-3 gate is a trail defect. Pin the premise out of each consumer.
+  const resume = read("shared/resources/develop-pipeline-resume-contract.md");
+  const conformance = read("shared/resources/pr-conformance-prompt.md");
+  const ingester = read("shared/resources/qa-findings-ingester-prompt.md");
+  const qaFlow = read("docs/runbooks/qa-flow.md");
+  assert.doesNotMatch(
+    resume,
+    /gate reads `PASS`\/`WAIVED`/,
+    "the resume contract must not key 5c on the token pair",
+  );
+  assert.doesNotMatch(
+    resume,
+    /gate `\{N\}` reads `PASS`\/`WAIVED`/,
+    "the resume contract's 5c sub-state table must not key on the token pair",
+  );
+  assert.ok(
+    (resume.match(/reached 5c/g) || []).length >= 3,
+    "the resume contract keys the 5–6 rows and the sub-state table on 'reached 5c'",
+  );
+  assert.doesNotMatch(
+    conformance,
+    /gate is not PASS or WAIVED/,
+    "the conformance prompt must not flag a route-3 gate for its token",
+  );
   assert.match(
-    arms.malformed,
-    /exhaustive over/,
-    "the malformed clause must state the set the arms are exhaustive over",
+    conformance,
+    /did not reach 5c/,
+    "the conformance prompt's TRAIL bullet keys on reaching 5c",
+  );
+  assert.match(
+    conformance,
+    /"non-empty" means open, not merely present/,
+    "the conformance prompt reads non-empty as open",
+  );
+  assert.doesNotMatch(
+    ingester,
+    /gate is already `PASS`\/`WAIVED`/,
+    "the ingester prompt must not carry the two-route premise",
+  );
+  assert.doesNotMatch(
+    qaFlow,
+    /a `PASS`\/`WAIVED` gate hands to Step 5c/,
+    "qa-flow.md must not carry the two-route premise",
+  );
+  const convergence = sectionBetween(
+    "### Convergence check",
+    "### Diminishing-returns exit",
+  );
+  assert.doesNotMatch(
+    convergence,
+    /hands to 5c \(`PASS` \/ `WAIVED`\)/,
+    "the Convergence check preamble must not carry the two-route premise",
   );
 });
 

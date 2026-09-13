@@ -20,7 +20,7 @@ flowchart TD
     B -->|gate file + NFR + traceability| C[qa-gate]
     B -->|FAIL, or any open finding| D[qa-fix]
     D --> B
-    B -->|PASS / WAIVED / CONCERNS with no open finding| E[review-pr]
+    B -->|no open finding, or active WAIVED| E[review-pr]
     E -->|REQUEST CHANGES| D
     E -->|APPROVE/CONCERNS| F[finalise]
 ```
@@ -164,7 +164,7 @@ Tasks follow the same pattern under `docs/tasks/task.{N}.{name}/`. See [Story do
 - `qa-planning` → `qa-story`: risk profile and test design feed into review assessments.
 - `qa-story` → `qa-gate`: NFR validation, trace data, and issues feed into gate decisions.
 - `qa-planning` → `qa-gate`: risk summary directly influences gate status (≥9 → FAIL, ≥6 → CONCERNS).
-- `qa-story` / `qa-task` → `review-pr`: a `PASS`/`WAIVED` gate hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
+- `qa-story` / `qa-task` → `review-pr`: a gate in the accepting-route set (a non-`FAIL` gate with no open finding, or an active `WAIVED`) hands to Step 5c, which reads the gate and the rest of the artifact trail as the evidence it audits.
 - `review-pr` → `qa-fix`: a `REQUEST CHANGES` verdict re-enters the fix cycle with the review's findings.
 
 ## See also

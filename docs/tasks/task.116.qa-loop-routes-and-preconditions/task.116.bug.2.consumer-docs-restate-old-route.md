@@ -55,6 +55,24 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 
 **Verification Steps for QA**: re-run the sweep grep; read the mermaid renders.
 
+### Iteration 2
+
+#### QA Verification (Ready for QA → Reopened)
+
+**Date**: 2026-09-13 (QA cycle 2, CR-3 and CR-5)
+
+**Reopening reason**: PARTIAL. The five lines were reworded, but (a) the new wording — "`qa-fix` runs on … any gate with an open `top_issues[]` entry" — is now *wrong* for an active `WAIVED` gate, which carries its HIGH entries open and hands to 5c, and the same rows still say "a `PASS`/`WAIVED` gate hands to `review-pr`" although arm 5 sends a `PASS` with an open LOW to 5b; (b) three more sentences carry the two-route premise: `docs/runbooks/qa-flow.md:167`, `shared/resources/qa-findings-ingester-prompt.md:28`, and the loop doc's own Convergence-check preamble (`develop-pipeline-step-5-6-qa-loop.md:377` "A gate that hands to 5c (`PASS` / `WAIVED`)").
+
+**Re-fix required**: state the accepting-route set once (§5c) and have every consumer sentence point at it or match it exactly — `qa-fix` runs on `FAIL` or an open entry not covered by an active waiver; `PASS`/`CONCERNS` with no open entry and active `WAIVED` hand to `review-pr`.
+
+#### Fix Implementation — Iteration 2 (In Progress → Ready for QA)
+
+**Date**: 2026-09-13
+
+**Fix Description**: the four runbook rows now say "`qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a non-`FAIL` gate with no open finding, or an active `WAIVED`, hands to `review-pr` (the accepting-route set, stated once in §5c)" and "a gate in the accepting-route set hands to `review-pr`"; the qa-fix rows read "`FAIL` gates and open entries no active waiver covers". The three further sentences — `qa-flow.md:167`, `qa-findings-ingester-prompt.md:28`, the Convergence-check preamble — name the set the same way; the mermaid edge reads `no open finding, or active WAIVED`.
+
+**Testing**: "stated once" test pins the ingester prompt, `qa-flow.md` and the Convergence preamble against the token-pair premise; mutation-proved (ingester revert → red).
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes                          |
@@ -62,3 +80,5 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 | 2026-09-13 | New          | QA         | Found in Step 6 breaking-change sweep (DOC-1) |
 | 2026-09-13 | In Progress  | qa-fix     | Investigation started          |
 | 2026-09-13 | Ready for QA | qa-fix     | Five lines reworded            |
+| 2026-09-13 | Reopened     | QA         | Cycle 2: partial — see Iteration 2 |
+| 2026-09-13 | Ready for QA | qa-fix     | Cycle 2: iteration 2 fix |

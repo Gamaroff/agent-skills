@@ -1,0 +1,96 @@
+schema: 1
+task: 'task.116.qa-loop-routes-and-preconditions'
+task_title: 'The QA loop routes on the verdict token, gates before its own review returns, reads boundary deliverables it could execute, and has no vocabulary for a subagent that never ran'
+gate: FAIL
+status_reason: 'Cycle-1 fixes verified in the tree, but the cycle-2 refute pass found the accepting-route set restated in two more places that still key on the PASS/WAIVED token — the resume contract (a run killed inside 5c on a route-3 gate can leave the loop without its exit gate) and the PR conformance prompt (which flags every route-3 gate as a TRAIL defect). Two HIGH findings → FAIL by rule 1. Both cycle-1 MEDIUMs were partial and are reopened.'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T08:32:33Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-resume-contract.md'
+    finding: 'The 5–6 artifact rows (:82, :92) and the 5c sub-state table (:129–130) key the 5c check on the latest gate reading PASS/WAIVED; a run killed inside 5c on a CONCERNS-no-open gate resumes at 5a (burning a cycle) or is scored Step 5–6 complete on artifacts + PR comment alone and proceeds to Step 7 without the exit gate.'
+    suggested_action: 'Key the rows and the sub-state table on "a gate that reached 5c" (the §5c accepting-route set, by reference), regenerate bundled copies, pin in pr-review-loop-parity.test.mjs.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.3.resume-contract-keys-5c-on-token.md'
+    status: open
+  - id: 'CR-2'
+    severity: high
+    file: 'shared/resources/pr-conformance-prompt.md'
+    finding: 'TRAIL bullets :62–63 ("the highest-numbered gate is not PASS or WAIVED"; "that gate top_issues[] is non-empty") flag every route-3 gate as a trail defect by construction — a spurious CONCERNS verdict at best, REQUEST CHANGES → 5b no-code-change HALT at worst, the HALT route 3 exists to remove.'
+    suggested_action: 'Accept a CONCERNS gate with no open entry and read "non-empty" as "has an open entry"; regenerate the review-pr bundled copy; pin in the parity test.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.4.conformance-prompt-flags-route-3-gate.md'
+    status: open
+  - id: 'CR-4'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'Arm 1 reads "PASS with no top_issues" (empty list) while arm 3 defines "no open entry" as empty-or-all-closed, so a PASS whose entries are all status: closed matches no arm and HALTs as malformed; WAIVED with waiver.active not true and no open entry is likewise unrouted. The stated 8-cell matrix is not covered.'
+    suggested_action: 'Use one definition of "no open entry" in every arm; route the inactive-WAIVED-with-no-open-entry cell explicitly; drive the exhaustiveness test from the matrix so an unrouted cell goes red.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.1.unrouted-gate-shapes.md'
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'docs/runbooks/story-development.md'
+    finding: 'The reworded runbook rows say qa-fix runs on "any gate with an open top_issues[] entry", which is wrong for an active WAIVED gate (open HIGH entries, hands to 5c), and the same rows still say "a PASS/WAIVED gate hands to review-pr" although arm 5 sends a PASS with an open LOW to 5b. Same in task-development.md :114/:149.'
+    suggested_action: 'Match the arms exactly: qa-fix runs on FAIL or an open entry not covered by an active waiver; PASS/CONCERNS with no open entry and active WAIVED hand to review-pr.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'docs/runbooks/qa-flow.md'
+    finding: 'Three more sentences carry the two-route premise: docs/runbooks/qa-flow.md:167, shared/resources/qa-findings-ingester-prompt.md:28, and the Convergence-check preamble at develop-pipeline-step-5-6-qa-loop.md:377 ("A gate that hands to 5c (PASS / WAIVED)").'
+    suggested_action: 'Name the accepting-route set in all three (by reference to §5c).'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 3268
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered (boundary: false); unchanged from cycle 1. Re-review scope: unscoped — cycle 2 is the refute pass over the whole branch diff (27 files).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-1 fixes mutation-proven by QA (arm-5 revert → red). ci:fast 3268/3267/0. But the exit invariant hole in CR-1 is a reliability defect in the LOOP, carried in top_issues rather than here to keep rule 1 the deciding rule.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory cleanups: CR-6 — the exhaustiveness test asserts bullet presence, not cell coverage (it stays green on the CR-4 mutant); CR-7 — subagents.wallClockMinutes has no named reader (prose-read key, like develop.fastGateCommand — add a read_nested_config_key line at the §Subagents section so the override has a consumer).'
+
+recommendations:
+  immediate:
+    - action: 'Rewrite the resume contract 5–6 rows and 5c sub-state table onto the accepting-route set (CR-1)'
+      refs: ['shared/resources/develop-pipeline-resume-contract.md']
+    - action: 'Amend the conformance prompt TRAIL bullets (CR-2)'
+      refs: ['shared/resources/pr-conformance-prompt.md']
+    - action: 'One definition of "no open entry" across the arms; route inactive WAIVED by its queue; matrix-driven test (CR-4, CR-6)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'Runbook rows match the arms; three more stale sentences (CR-3, CR-5)'
+      refs: ['docs/runbooks/story-development.md', 'docs/runbooks/task-development.md', 'docs/runbooks/qa-flow.md', 'shared/resources/qa-findings-ingester-prompt.md']
+  future:
+    - action: 'Name a reader for subagents.wallClockMinutes (CR-7)'
+      refs: ['shared/resources/develop-pipeline-autonomous-defaults.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 closed', 'CR-2 closed', 'CR-3 closed', 'CR-4 closed']

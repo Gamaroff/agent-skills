@@ -59,8 +59,11 @@ B. SCOPE (category: scope) — the change does something the work item never cla
 
 C. TRAIL (category: trail) — the evidence is missing, stale, or contradicts itself:
    - no implementation report
-   - the highest-numbered gate is not PASS or WAIVED
-   - that gate's top_issues[] is non-empty
+   - the highest-numbered gate did not reach 5c — it is FAIL, or it carries an OPEN top_issues[]
+     entry (status absent or `open`) that no active waiver covers. A CONCERNS gate whose entries are
+     all closed, or whose list is empty, is a reservation and a clean trail (the QA loop's route 3);
+     do NOT flag it for its token
+   - that gate's top_issues[] has an open entry — "non-empty" means open, not merely present
    - the document says status: accepted but no DoD file exists
    - QA report count does not match gate count
    - a handover file exists with outstanding (unticked) actions

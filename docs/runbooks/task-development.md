@@ -111,7 +111,7 @@ develop
 | 2 | `review-task` | Runs the interactive review (skipped if recently reviewed and `ready-for-development`). |
 | 3 | `develop` | Implements the task. Bounded loop, `MAX_ITER=5`. Each iteration: plan → code → test → success-criteria check. |
 | 4 | `create-pr` | Pushes the branch, opens a PR against the chosen base with `--base` pre-supplied. |
-| 5–6 | `qa-task` → `qa-fix` → `review-pr` | QA review produces a gate file. `qa-fix` runs on an **open finding** — `FAIL`, or any gate with an open `top_issues[]` entry; a `CONCERNS` with no open finding is a reservation, not a queue, and hands to `review-pr` like a `PASS`. Up to 5 cycles. `qa-task` focuses on success-criteria validation, implementation-phase verification, and NFRs for infra/refactor work. **Step 5c is the loop's exit gate**: a `PASS`/`WAIVED` gate hands to `review-pr`, which reviews the PR against the task. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `task.{N}.pr-review.{n}.{name}.md`. |
+| 5–6 | `qa-task` → `qa-fix` → `review-pr` | QA review produces a gate file. `qa-fix` runs on `FAIL`, or on an open `top_issues[]` entry that no active waiver covers; a non-`FAIL` gate with no open finding, or an active `WAIVED`, hands to `review-pr` (the accepting-route set, stated once in the QA loop's §5c). Up to 5 cycles. `qa-task` focuses on success-criteria validation, implementation-phase verification, and NFRs for infra/refactor work. **Step 5c is the loop's exit gate**: a gate in the accepting-route set hands to `review-pr`, which reviews the PR against the task. `REQUEST CHANGES` returns to `qa-fix` and consumes a cycle from the same 5-cycle budget; `APPROVE`/`CONCERNS` exit to Step 7. Leaves `task.{N}.pr-review.{n}.{name}.md`. |
 | 7 | `finalise` | Validates against the Definition of Done, posts DoD summary to the PR, comments the tracker issue, updates the board. **Full side-effects in lite mode too.** Also flips the task registry row to the final status. |
 | 8 | `commit-changes` | Final commit of artifacts and status updates. |
 
@@ -146,7 +146,7 @@ Re-invoke `/develop-task <same-path>` to resume. The skill verifies per-step art
 | [`develop`](../../skills/develop/SKILL.md) | Actual implementation loop. |
 | [`create-pr`](../../skills/create-pr/SKILL.md) | Pushes branch, opens PR with `--base` pre-supplied. |
 | [`qa-task`](../../skills/qa-task/SKILL.md) | Produces QA gate file. Dev skills must not edit gate files. |
-| [`qa-fix`](../../skills/qa-fix/SKILL.md) | Applies fixes for gates with an open finding (`FAIL`, or any gate with an open `top_issues[]` entry), and for `review-pr`'s `REQUEST CHANGES`. Up to 5 cycles. |
+| [`qa-fix`](../../skills/qa-fix/SKILL.md) | Applies fixes for `FAIL` gates and for open `top_issues[]` entries no active waiver covers, and for `review-pr`'s `REQUEST CHANGES`. Up to 5 cycles. |
 | [`review-pr`](../../skills/review-pr/SKILL.md) | Step 5c — the QA loop's exit gate. Reviews the PR against the task (conformance + code). Advisory: writes no gate file; the orchestrator acts on its verdict. |
 | [`finalise`](../../skills/finalise/SKILL.md) | DoD check, PR comment, tracker comment, board update, registry-row finalisation. |
 | [`commit-changes`](../../skills/commit-changes/SKILL.md) | Final commit of artifacts and status updates. |

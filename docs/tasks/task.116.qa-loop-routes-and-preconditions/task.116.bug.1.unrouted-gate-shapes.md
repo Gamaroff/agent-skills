@@ -63,6 +63,24 @@ Add an explicit arm: any other gate with an open `top_issues[]` entry (a `PASS` 
 
 **Verification Steps for QA**: read the six arms against `PASS`+open LOW, `WAIVED`+`waiver.active: false`, and a gate with `gate: MAYBE`; each has exactly one instruction.
 
+### Iteration 2
+
+#### QA Verification (Ready for QA → Reopened)
+
+**Date**: 2026-09-13 (QA cycle 2, CR-4)
+
+**Reopening reason**: PARTIAL. Arm 5 and the malformed clause closed the two shapes named, but the arms use two definitions of "no queue": arm 1 reads "`PASS` with no `top_issues`" (an empty list) while arm 3 reads "no open entry" (empty, or every entry `status: closed`). A `PASS` whose entries are all `status: closed` — the shape `qa-fix`'s in-place gate update and the Step 10 example both produce — matches no arm and HALTs as malformed. `WAIVED` with `waiver.active` not `true` and no open entry is likewise unrouted. The stated matrix is not yet covered.
+
+**Re-fix required**: arm 1 → "`PASS` with no open entry in `top_issues[]`" using arm 3's definition; route the inactive-`WAIVED`-with-no-open-entry cell explicitly (read an inactive waiver by its queue); drive the exhaustiveness test from the 8-cell matrix so a mutant that leaves a cell unrouted goes red (CR-6).
+
+#### Fix Implementation — Iteration 2 (In Progress → Ready for QA)
+
+**Date**: 2026-09-13
+
+**Fix Description**: one definition of *open* stated once above the arms ("an entry is **open** when its `status:` is absent or reads `open`; no open entry = empty or all `status: closed`"); arm 1 now reads "`PASS` with **no open entry**"; arm 5 routes an inactive `WAIVED` by its queue — open entry → the `FAIL` road, no open entry → 5c like a `PASS`. The arms are the accepting-route set, stated as *a non-`FAIL` gate with no open entry, or an active `WAIVED`*.
+
+**Testing**: the exhaustiveness test is now **matrix-driven** (CR-6): 8 cells × (claiming arm, claiming phrase, destination) with an exactly-one-claimant check, plus the shared definition and an arm-1 "not `no top_issues`" guard. Mutation-proved against: arm 1 → "no `top_issues`" (red), dropping the inactive-WAIVED-no-open cell (red), rewording the definition (red).
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes                    |
@@ -70,3 +88,5 @@ Add an explicit arm: any other gate with an open `top_issues[]` entry (a `PASS` 
 | 2026-09-13 | New          | QA         | Found by Step 3b reviewer (CR-1) |
 | 2026-09-13 | In Progress  | qa-fix     | Investigation started    |
 | 2026-09-13 | Ready for QA | qa-fix     | Fix implemented          |
+| 2026-09-13 | Reopened     | QA         | Cycle 2: partial — see Iteration 2 |
+| 2026-09-13 | Ready for QA | qa-fix     | Cycle 2: iteration 2 fix |
