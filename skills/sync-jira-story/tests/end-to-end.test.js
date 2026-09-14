@@ -264,6 +264,85 @@ test("a story whose card transitioned can be synced again without --force", asyn
 });
 
 // ===========================================================================
+// The skipped-but-transitioned write gate
+// ===========================================================================
+
+test("a status-only run skips the PUT but still writes the Status row and timestamp", async () => {
+  const { root, story } = repoWithStory();
+  const { state, fetchImpl } = fakeJira();
+
+  // Run 1 creates the card and deliberately leaves it in "To Do" while the
+  // document says `in-progress`. That is the precondition for the path under
+  // test, reached through the PRODUCT rather than by editing the fake's state:
+  // the document is unchanged (skip path entered) and the card still needs to
+  // move (transition fires). The epic suite reaches it the same way.
+  const first = await runSync(root, story, fetchImpl, [
+    "--quiet",
+    "--no-transition",
+  ]);
+  const key = first.result.issueKey;
+  assert.equal(
+    state.issues[key].status,
+    "To Do",
+    "--no-transition did not hold the card back — the precondition is gone",
+  );
+  const before = fs.readFileSync(story, "utf-8");
+  const putsBefore = putCount(state);
+
+  // Run 2: body unchanged → PUT skipped; status moved → transition fires. The
+  // gate at `shouldWriteFile` (sync-jira-story.js, the
+  // `changeLogEntries.length > 0` arm) must still write the file, because the
+  // `Status →` row and the refreshed timestamp are the only record that the
+  // transition happened.
+  const second = await runSync(root, story, fetchImpl, ["--quiet"]);
+
+  // The story engine has no `skipped` field in its return value (the epic's
+  // does); its skip-path signal is the change summary, as the test above uses.
+  assert.equal(
+    second.changeSummary,
+    "Sync (no field changes detected)",
+    "expected the skip path",
+  );
+  assert.equal(
+    second.statusOutcome?.transitioned,
+    true,
+    "the skip run did not transition — this test then proves nothing",
+  );
+  assert.equal(
+    putCount(state),
+    putsBefore,
+    "the skip path issued a PUT — the gate under test was not reached",
+  );
+
+  const after = fs.readFileSync(story, "utf-8");
+  assert.notEqual(
+    after,
+    before,
+    "the transition-only run did not write the file",
+  );
+
+  // The name is read from the run's own outcome, not hard-coded: the fake's
+  // ladder decides what "in-progress" resolves to.
+  const landed = second.statusOutcome.to;
+  assert.ok(landed, "statusOutcome.to is empty — cannot name the row");
+  assert.match(
+    after,
+    new RegExp(`\\| Status → ${landed} \\| sync-jira-story \\|`),
+    "the Status → row was not written on the transition-only run",
+  );
+  const stamp = /^jira_last_synced_at: "(.+)"$/m.exec(after);
+  assert.ok(
+    stamp,
+    "jira_last_synced_at was not written on the transition-only run",
+  );
+  assert.equal(
+    stamp[1],
+    state.issues[key].updated,
+    "the timestamp written is not the post-transition `updated`",
+  );
+});
+
+// ===========================================================================
 // The counterweight — the guard must still catch a REAL concurrent edit
 // ===========================================================================
 

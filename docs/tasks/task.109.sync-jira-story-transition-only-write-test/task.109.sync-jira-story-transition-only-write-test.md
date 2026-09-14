@@ -5,18 +5,21 @@ type: task
 description: "When a story's body is unchanged but its status has moved, sync-jira-story must still write the file (the Status → row and jira_last_synced_at). The gate at sync-jira-story.js ≈1265-1272 does this correctly — a 2026-09-12 probe shows transitioned:true, file changed, row written — but no test names the path: the story end-to-end suite uses --no-transition zero times, so run 2 is always the transitioned:false skip. The epic sibling gained exactly this test in task.96. Mirror it."
 tags: [testing, sync-jira-story, jira]
 category: testing
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-14
 assignee:
 estimated_effort_hours: 2
+github_issue: 405
 ---
 
 # Technical Task: sync-jira-story's skipped-but-transitioned write gate has no run()-level test
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.109.review.1.sync-jira-story-transition-only-write-test.md` implemented 2026-09-14
+**GitHub Issue**: [#405](https://github.com/Gamaroff/agent-skills/issues/405)
 
 ---
 
@@ -101,7 +104,7 @@ None. Test only.
 | File | Change |
 | :--- | :--- |
 | `skills/sync-jira-story/tests/end-to-end.test.js` | +1 test |
-| `.agents/handoff.md` | §3c closed |
+| `.agents/handoff.md` | §3c closed; T109 queue row removed |
 
 ## 8. Testing Strategy
 
@@ -137,16 +140,19 @@ Delete the test. Nothing else changes.
 | Date       | Version | Description                                   | Author      |
 | ---------- | ------- | --------------------------------------------- | ----------- |
 | 2026-09-12 | 1.0     | Initial draft — filed from the 2026-09-12 repo sweep | create-task |
+| 2026-09-14 | 1.1     | Review passed (9/10) — linked GitHub issue #405; ready for development | review-task |
+| 2026-09-14 |         | Status → ready-for-development | review-task |
+| 2026-09-14 |         | Implemented — 2 files, 1 test (mutation-proved) | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: the test
-- [ ] `--no-transition` run 1 + plain run 2 case added to `skills/sync-jira-story/tests/end-to-end.test.js`
-- [ ] Mutation-proved against the gate at `sync-jira-story.js` ≈1265-1272
+- [x] `--no-transition` run 1 + plain run 2 case added to `skills/sync-jira-story/tests/end-to-end.test.js`
+- [x] Mutation-proved against the gate at `sync-jira-story.js` ≈1265-1272
 ### Phase 2: close the loop
-- [ ] Handoff §3c and this task's registry row updated
+- [x] Handoff §3c and this task's registry row updated (§3c closed in develop; registry Status cell is ticked by `/finalise`)
 
 ---
 
@@ -159,7 +165,7 @@ Delete the test. Nothing else changes.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.109.sync-jira-story-transition-only-write-test/task.109.sync-jira-story-transition-only-write-test.md`
