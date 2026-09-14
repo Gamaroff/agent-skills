@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`sync-jira-story`'s skipped-but-transitioned write gate has a run()-level test (task 109).** A
+  status-only sync — body unchanged, card moved — skips the PUT but must still write the file, because
+  the `Status → …` Change Log row and the refreshed `jira_last_synced_at` are the only record of the
+  transition. The gate (`sync-jira-story.js`, the `changeLogEntries.length > 0` arm) had been correct
+  since task 96 and untested since: the story e2e suite used `--no-transition` zero times, so its
+  second run was always the `transitioned:false` skip. The new test mirrors the epic sibling's and is
+  mutation-proved — forcing the arm false fails it by name and no other. Closes handoff §3c.
+
 ### Changed
 
 - **The QA loop routes on the queue, not the verdict token (task 116).** A `CONCERNS` gate with no
