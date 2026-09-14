@@ -180,7 +180,10 @@ gh pr view --json baseRefName,statusCheckRollup
 # 'Proceeding to 5c' — the record that the gate took one of §5c's three routes
 ls docs/tasks/task.{N}.{name}/*.gate.*.yml
 grep '^gate:' docs/tasks/task.{N}.{name}/*.gate.*.yml
-grep -A8 '^### QA Cycle' docs/tasks/task.{N}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1   # expect: Proceeding to 5c
+# Expected output: exactly one line reading `**Action**: Proceeding to 5c (PR conformance review)`.
+# An empty result is a failure — `-h` is required: with more than one implementation report
+# matching the glob, grep prefixes each line with `filename-` and the `^` anchor matches nothing.
+grep -h -A8 '^### QA Cycle' docs/tasks/task.{N}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1
 
 # Task status is accepted
 grep -E '^status:|^Status:' docs/tasks/task.{N}.{name}.md

@@ -298,7 +298,10 @@ After the pipeline completes, confirm:
 # 'Proceeding to 5c' — the record that the gate took one of §5c's three routes
 ls docs/prd/.../story.{E}.{S}.{name}/*.gate.*.yml
 grep '^gate:' docs/prd/.../story.{E}.{S}.{name}/*.gate.*.yml
-grep -A8 '^### QA Cycle' docs/prd/.../story.{E}.{S}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1   # expect: Proceeding to 5c
+# Expected output: exactly one line reading `**Action**: Proceeding to 5c (PR conformance review)`.
+# An empty result is a failure — `-h` is required: with more than one implementation report
+# matching the glob, grep prefixes each line with `filename-` and the `^` anchor matches nothing.
+grep -h -A8 '^### QA Cycle' docs/prd/.../story.{E}.{S}.{name}/*.implementation.*.md | grep '^\*\*Action\*\*' | tail -1
 
 # Story status is accepted
 grep -E '^status:|^Status:' docs/prd/.../story.{E}.{S}.{name}.md
