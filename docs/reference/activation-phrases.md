@@ -103,6 +103,8 @@ For slash-command form, see [commands](./commands.md). For the three invocation 
 | "Any observations logged?" / "What did you learn this session?" | `observe-work` |
 | "Review the observation log" / "Run the skill review" | `observe-work` (the second phrasing picks `--review`) |
 | "One skill to rule them all" | `observe-work` (the upstream methodology's name) |
+| "Write a handoff" / "Refresh the handoff" / "What should I pick up?" | `session-handoff` (write mode) |
+| "Is the handoff still accurate?" / "Re-measure the handoff" / "Read the handoff first" | `session-handoff` (read mode — `handoff-verify.mjs`) |
 
 ## Architecture
 

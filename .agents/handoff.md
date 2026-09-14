@@ -1,119 +1,117 @@
-# Session Handoff — 2026-09-12
+# Session Handoff — 2026-09-15
 
 Read this first if you are picking up work in `agent-skills`. It records where things stand, what to
-pick up, the standing decisions, and the drift that is tolerated. The **traps** — the durable half —
-now live in [`docs/contributing/traps.md`](../docs/contributing/traps.md); read them before touching
-anything.
+pick up, the standing decisions, and the drift that is tolerated. The **traps** — the durable half — live
+in [`docs/contributing/traps.md`](../docs/contributing/traps.md); read them before touching anything.
 
-**Every figure below was measured in the session that wrote this file, on 2026-09-12, and carries
-the command that produced it.** Re-run the command; do not trust the date. The previous handoff
-(2026-09-10) went stale within a day — it named T107 as next and "frontier not empty"; T107 merged
-the next morning. That is the expected half-life of this section, not a lapse. task.110 (below) is
-the mechanism that will re-measure it on read.
+**Every figure below was measured in the session that wrote this file, on 2026-09-15, and carries
+the command that produced it.** Do not trust the date — re-measure:
+`command node .agents/skills/session-handoff/scripts/handoff-verify.mjs` reports every line below as
+`confirmed`, `stale` (with the new value) or `unverifiable` (with why). This file is the first one
+written by that skill's write mode (task.110); the 2026-09-10 file it replaces is kept, annotated, as
+`skills/session-handoff/tests/fixtures/handoff-2026-09-10.txt` — its whole value is that its figures
+are known to have moved.
 
-**State at handoff:** branch `develop` @ `6ce3280e` + this session's branch `docs/post-sweep-tie-ups`
-· tag **v0.46.0** (2026-09-10) is 8 commits behind `develop` · **zero open PRs** · **zero open issues**.
+**State at handoff:** branch `feature/task.110.session-handoff-skill` off `develop` @ `f15f5376` ·
+tag **v0.48.0** is 27 commits behind `origin/develop` · **0 open PRs** (this task's opens at Step 4) ·
+**1 open issue** (#407, this task).
+
+<!-- Half-life: hours to days. The FIRST backticked span in Command is what the verifier runs
+     (read-only whitelist; prose here is reported `unverifiable: no command`). The **bold** spans in
+     Result are what it compares — tokens that appear verbatim in the output; **exit 0** is compared
+     against the exit code. -->
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Hermetic suite | `command npm test` | **exit 0** — 505 bash assertions + 3,155 node tests, **0 failures**, 1 skipped |
-| Bundle freshness | `command npm run bundle -- --check` | 126 skills checked, **0 problems** |
-| Formatting | `command npx prettier --check .` | clean |
+| Hermetic suite | `command npm test` | **exit 0** — 513 bash assertions + 3,288 node tests, **0 failures**, 1 skipped (takes ~10 min; read mode reports it `unverifiable: timeout` at the default 60 s — run it yourself) |
+| Fast gate (format + suite) | `command npm run ci:fast` | **exit 0** |
+| Formatting | `command npx prettier --check .` | **exit 0** |
+| Bundle freshness | `command npm run bundle -- --check` | **128** skills checked, **0 problems** |
 | Roadmap lint | `command node skills/develop-next/scripts/select-next.mjs --lint` | **0 errors, 0 warnings** |
-| Frontier | `command node skills/develop-next/scripts/select-next.mjs` | **`selected B13`** (was `roadmap-complete` at session start) |
-| Skill validation | `quick_validate.py` over `skills/*/` | 126/126 pass |
-| Catalog / deps | inspect `docs/reference/skill-catalog.md`, `shared/resources/skill-dependencies.json` | 126 rows; 22 `invokes:` declarers, 0 mismatches |
-| Orphaned tests | every `*.test.{js,mjs,sh}` vs `package.json` globs | **0 orphaned** (128/128 invoked) |
-| ShellCheck | `shellcheck --severity=warning` over the 58 CI-linted sources | clean |
-| Replay evals | `command npm run eval:all` | **not re-run this session** — last green 2026-09-10 |
+| Frontier | `command node skills/develop-next/scripts/select-next.mjs` | **selected** — T110 at write time (this task; the next registry row once it merges — the id is deliberately not a bold figure) |
+| Skill validation | `python3 skills/create-skill/scripts/quick_validate.py skills/session-handoff` | **exit 0** — one skill; the loop over `skills/*/` measured 128/128 pass |
+| Catalog / deps | `command node scripts/generate-skill-dependencies.mjs` | **128 skills, 71 edges** declared by **22** skills; catalog 128 rows |
+| Orphaned tests | `grep -c skills/session-handoff/tests package.json` | **1** — the new glob is listed; the loop over every `*.test.{js,mjs,sh}` counted 136/136 invoked (excluding bundled `references/tests/` copies) |
+| ShellCheck | `shellcheck --version` | **version** 0.11.0 present; clean over the 58 CI-linted sources at write time (this row only proves the binary) |
+| Replay evals | `command npm run eval:all` | **exit 0** — runs in seconds in replay mode; not the reason the fast gate is fast |
+| Branch tip (develop) | `git rev-parse --short origin/develop` | **f15f5376** |
+| Next task number | `grep -m1 "Next Available Task Number" docs/tasks/task-registry.md` | **120** |
+| Next bug number | `grep -m1 "Next Available Bug Number" docs/bugs/bug-registry.md` | **16** |
 
 ---
 
-## 1. What to pick up — the frontier is live again
+## 1. What to pick up
 
-At session start `select-next.mjs` returned **`roadmap-complete`**: no actionable row in any phase or
-registry. This session filed **3 general bugs and 12 tasks** — five from a repo sweep, seven from the
-observation review — so the loop now has work. Selection order (bugs at `new` outrank tasks; then priority):
+<!-- Half-life: days. Re-verified at write time; nothing carried from the 2026-09-12 file. -->
 
-| Id | Title | Why it is first |
+**Task.110 is in flight on this branch** — `/develop-next` dispatched it 2026-09-15 as the first
+registry-fallback item; B13–B15, T108, T109 and T113–T116 merged between 09-12 and 09-14. After
+T110 merges, `select-next` falls through the task registry in priority order; the remaining `planned`
+rows are the ones below. <!-- cmd: grep -cw planned docs/tasks/task-registry.md; expect: 9 -->
+
+| Id | Title | Note |
 | --- | --- | --- |
-| **B13** | `change-log.js` drops prose and nested `###` on the un-migrated path | Confirmed by execution; silent content loss on every legacy doc's first write; carried since 09-07 as 3a(1) |
-| **B14** | PreCompact hook posts bare `gh issue comment` / `gh pr comment` | Bypasses the comment contract **and** the `access.tracker` gate; the coverage test scans Markdown only |
-| **B15** | `observation-log doctor` activation check is cwd-relative | Silent false-negative at the documented invocation; obs #14 |
-| T108 | Bundler copies depth-relative links verbatim — 864 broken links in 229 bundled files | Known since 08-20; the freshness check certifies the breakage |
-| T110 | `session-handoff` skill — write + re-measure | From the 09-08 staged proposal; this file is its first customer |
-| T111 | `npm run ci` runs every CI lane; two coverage gaps | Local/CI parity |
-| T112 | `hotfix.md` rewrite against `/develop-bug`'s hotfix model | task.107's deliberately-excluded sibling |
-| T113 | develop-next Step 4 / merge gate / Step 1→2 signal for registry-sourced, CONCERNS-gated items | obs review: 8 observations, re-scoped after task.103 |
-| T114 | `mutation-proving.md` rewritten around what a mutation run can tell you | obs review: 12 observations, one document |
-| T115 | finalise publish-time checks (status header, CI on the acceptance head, remote refs, CHANGELOG test) | obs review: 4 observations |
-| T116 | QA loop routes + preconditions (5c third route, Step 3b/10/13, boundary probe, subagent rows) | obs review: 6 observations |
-| T117 | card preflight `heading-only` (15/106 task docs publish a bare label) | obs review: 2 observations |
-| T118 | `probes_executed` emitted by the engine, not typed | obs review: #10 |
-| T119 | create-skill authoring guards (positional tokens, shell matrix, comment paths, one-or-several) | obs review: 4 observations |
+| T111 | `npm run ci` runs every CI lane; two coverage gaps | local/CI parity |
+| T112 | `hotfix.md` rewrite against `/develop-bug`'s hotfix model | task.107's excluded sibling |
+| T117 | card preflight `heading-only` (15/106 task docs publish a bare label) | obs review |
+| T118 | `probes_executed` emitted by the engine, not typed | obs #10; #10 and #17 are parked on it |
+| T119 | create-skill authoring guards | obs review: 4 observations |
 
-`/develop-next` will dispatch B13. There is no run-state file. **None of the fifteen has a GitHub
-issue yet** — `create-*` tracker sync is opt-in and was not taken; `develop-bug` Step 2 /
-`develop-task` Step 2 create the issue on pickup via `ensure-*-github-issue`.
+`/develop-next` picks the next one; there is no run-state file to clear once T110's Step 5 deletes
+its own. `--batch` still returns an empty batch on purpose — registry rows carry no `touches:`
+annotation, so use `/develop-next`, not `/develop-batch`, until a phase is authored.
 
-`--batch` returns an empty batch on purpose: registry rows carry no `touches:` annotation, so
-write-disjointness cannot be established and they never enter a parallel batch
-(`roadmap-selection.md` §143). Use `/develop-next`, not `/develop-batch`, until a phase is authored.
+**The 2026-09-12 staged skill edits are still not installed.** Every staged file under
+`~/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills/skill-updates/` differs from
+live (checked 2026-09-15 with `diff -rq`; superset classification not done). That is the user's step
+— see its `PENDING.md` for the one-block install.
 
 ---
 
 ## 2. Standing decisions
 
-**The release cadence is a human call — ask before tagging.** Nine `0.x` minors since the "is this
-1.0?" question was raised; v0.46.0 shipped 2026-09-10. `[Unreleased]` currently carries three merges
-(#384, #385, #387) plus this session's entries. Write the CHANGELOG entry **at acceptance**, not at
-release — the v0.46.0 prep found five merged tasks with no entry, and it was the one checklist box
-with no mechanism.
+<!-- Half-life: long. Re-read 2026-09-15; unchanged unless marked. -->
 
-**Roadmap rows are for phase-row items only — settled 2026-09-12.** Eight accepted tasks (T99–T105,
-T107) had no roadmap Change Log row; this was the fifth recurrence of the class. Decision: not a
-defect. Registry-selected items are recorded by the registry row + the document's frontmatter, both
-written by `/finalise`; a roadmap Change Log row records why a *phase row* was ticked or waived and
-nothing else. Stated in the roadmap's `## Housekeeping`. **Do not backfill.**
+**The release cadence is a human call — ask before tagging.** v0.48.0 is the current tag; write the
+CHANGELOG entry **at acceptance**, not at release — the v0.46.0 prep found five merged tasks with no
+entry, and it was the one checklist box with no mechanism. Task.110 wrote its entry at Step 3.
+
+**Roadmap rows are for phase-row items only — settled 2026-09-12.** Registry-selected items are
+recorded by the registry row + the document's frontmatter, both written by `/finalise`; a roadmap
+Change Log row records why a *phase row* was ticked or waived and nothing else. **Do not backfill.**
 
 **Phase 5 is archived; no phase is open.** The registries are the whole frontier, which is the
 roadmap's designed terminal state. Author a phase only to express sequencing the registries cannot.
 
-**The observation backlog was reviewed 2026-09-12** (`/observe-work --review`, 52 entries): **13
-actioned** (11 staged as prose edits in `~/.claude/projects/…/skill-updates/` — see its
-`PENDING.md` for the one-block install; 2 already closed by v0.46.0 / #384) and **39 parked**, each on
-the task or bug that carries its remedy (T108, T113–T119, B14, B15). The queue is empty; parked
-entries unpark when their task merges, and only the review re-checks them. **The staged edits are
-not installed** — that is the user's step, and the previous staging (09-08) shows what happens when
-it is skipped: 3 of 6 items landed only because later tasks happened to cover them. `last-review-date`
-is 2026-09-12.
+**The handoff is measured, never carried — and the traps live elsewhere.** New 2026-09-15: write
+mode is `skills/session-handoff/assets/handoff.template.md`, read mode is the verifier, and §5 of
+this file is a pointer by construction. A figure you did not re-measure is written as prose so read
+mode reports it `stale` rather than confirming it by accident.
+
+**The observation backlog was last reviewed 2026-09-12** (`last-review-date.txt`). Parked entries
+unpark when their task merges, and only the review re-checks them. <!-- cmd: cat /Users/gamaroff/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills/skill-observations/last-review-date.txt; expect: 2026-09-12 -->
 
 ---
 
-## 3. Carried follow-ups — RE-MEASURED 2026-09-12
+## 3. Carried follow-ups — RE-MEASURED 2026-09-15
 
-### 3a. `shared/resources/change-log.js` — content loss → **filed as B13**
+### 3a. `change-log.js` content loss — **closed (B13, merged 2026-09-12)**
 
-Re-run by execution, not by reading. `hasMarkers:false` + H2 log + nested `###`: prose and the
-nested block are lost, rows survive. The 2026-09-10 handoff said the engine had been "touched since"
-09-07 — **false**: `git log -1 --format=%ci -- shared/resources/change-log.js` → 2026-08-17. No
-test names the case. Full evidence and a verified repro recipe are in the bug.
+The engine has been touched since 09-12. <!-- cmd: git log -1 --format=%ci -- shared/resources/change-log.js; expect: /2026-09-1[2-9]/ -->
+The 2026-09-10 handoff's claim that it had been "touched since 09-07" was false at the time (last
+touch was 2026-08-17) — the regression fixture for the verifier is built on exactly that line.
 
 ### 3b. Live Jira verification (task.45) — still unrunnable here
 
-`JIRA_URL` unset; this repo is GitHub-tracked. The four-step check is unchanged at
+`JIRA_URL` unset; this repo is GitHub-tracked. <!-- cmd: git remote get-url origin; expect: github.com -->
+The four-step check is unchanged at
 `docs/tasks/task.45.change-log-pipeline-and-sync/task.45.plan.change-log-pipeline-and-sync.md`
-(§Phase 5, ≈209). Gate 2: staging APPROVED, production CONDITIONAL. Carry it openly.
+(§Phase 5). Gate 2: staging APPROVED, production CONDITIONAL. Carry it openly — read mode reports
+it `unverifiable` here, which is the correct verdict.
 
 ### 3c. Missing `run()`-level tests — **closed (task.109, 2026-09-14)**
 
-task.96 (PR #343, 2026-09-07) added `end-to-end.test.js` to both syncs and covered the epic fast-path
-transition (`skills/sync-jira-epic/tests/end-to-end.test.js:290`). task.109 covered the other half:
-the story skipped-but-transitioned write gate now has a mutation-proved test in
-`skills/sync-jira-story/tests/end-to-end.test.js` ("a status-only run skips the PUT but still writes
-the Status row and timestamp") — forcing the `changeLogEntries.length > 0` arm false fails that test
-by name and no other. Re-measure with `grep -c no-transition skills/sync-jira-story/tests/end-to-end.test.js`
-(expect ≥ 1).
+`skills/sync-jira-story/tests/end-to-end.test.js` covers the skipped-but-transitioned write gate. <!-- cmd: grep -c no-transition skills/sync-jira-story/tests/end-to-end.test.js; expect: /^[1-9]/ -->
 
 ### 3d. Deferred / human-gated roadmap rows — unchanged
 
@@ -124,52 +122,55 @@ by name and no other. Re-measure with `grep -c no-transition skills/sync-jira-st
 ## 4. Tolerated drift — known, recurring, not blocking
 
 **The task-registry Status column vs the document.** Guarded since T103
-(`evals/shared/tests/task-registry-drift.test.mjs`, green) on the `accepted` predicate only; a row
-stale in another column is unguarded, and `select-next` rejects on the **document** status regardless.
+(`evals/shared/tests/task-registry-drift.test.mjs`) on the `accepted` predicate only; a row stale in
+another column is unguarded, and `select-next` rejects on the **document** status regardless.
 
-**Roadmap rows for registry-selected items** — no longer drift; see §2.
+**`develop-pipeline-lite-mode.md` names a "production lite-mode CLI" that does not exist.** Phase 0
+reads the three inputs from the document instead (task.110's implementation report, Phase 0). Noted,
+not filed — the mechanical rule is the same either way.
 
-**Consumer docs restate pipeline behaviour independently.** The 2026-09-12 sweep found no runbook
-or `workflows.md` mention of the plain-language lead (user-visible since T104–106) and a bare
-"Step 5c" in `faq.md:25`; both are in T112's scope. `docs-link-check.yml` does **not** run on
-`skills/**` or `shared/resources/**` — the 864 broken bundled links (T108) are invisible to it.
+**The bundler scans `tests/` for `shared/resources/` mentions.** A fixture that quotes a real
+document (as the historical handoff does) makes `npm run bundle -- --check` demand six references
+that are not references. Task.110 sidestepped it with a `.txt` fixture and a path assembled from
+parts; a `tests/` exclusion in `bundle_skill.py` would be the real fix. Noted, not filed.
 
-**`.github/workflows/shellcheck.yml:63-68` hard-codes file counts** (247/266/58/55/56) after the
-Unreleased entry that claimed tree-derived counts. They are dated, so compliant; re-derive when next
-touched.
+**`invokes:` declarers: the generator says 22, `grep -l '^invokes:' skills/*/SKILL.md` says 23.** One
+SKILL.md declares an empty list. Harmless; the tree-wide "declares and resolves to no edges" guard is
+what matters and it is green.
 
-**Seven skills ship executable `scripts/` with no tests** (code-smell-validator, create-skill's
-`generate_catalog/init_skill/package_skill/skill_frontmatter.py`, develop-task wrappers → T111,
-jira-sprint-manager, jira-standup-auditor, mermaid-architect, use-railway). Mostly consumer-side
-tooling; noted, not filed.
+**`.github/workflows/shellcheck.yml` hard-codes file counts** (58 sources today). Dated, so
+compliant; re-derive when next touched.
 
 ---
 
 ## 5. Traps
 
-Moved to [`docs/contributing/traps.md`](../docs/contributing/traps.md) on 2026-09-12 — nine entries,
-verbatim, with their measurement dates. They were true for months while the state above was true
-for hours, and keeping them here let the half that decayed discredit the half that did not. **Add a
-trap there when it has cost a session twice.**
+Live in [`docs/contributing/traps.md`](../docs/contributing/traps.md) — durable, dated, re-verified.
+They are not restated here: the state above is true for hours and the traps for months, and keeping
+them together let the half that decayed discredit the half that did not. **Add a trap there when it
+has cost a session twice.** One candidate from this session, not yet added because it has cost one
+session once: the bundler's `tests/` scan (§4).
 
 ---
 
 ## 6. Where the artifacts are
+
+<!-- Half-life: medium. Paths, not descriptions. -->
 
 ```
 docs/development/project-completion-roadmap.md   live roadmap — no phase open; Deferred + Housekeeping only
 docs/development/roadmap-history.md              archived Phases 1-5
 docs/tasks/task-registry.md                      task numbering — next available: 120
 docs/bugs/bug-registry.md                        general-bug numbering — next available: 16
-docs/bugs/bug.13.* / bug.14.* / bug.15.*         the three bugs filed this session
-docs/tasks/task.108.* … task.119.*               the twelve tasks filed this session (108–112 sweep, 113–119 obs review)
+docs/tasks/task.110.session-handoff-skill/       this task: document, plan, review, implementation report
+skills/session-handoff/                          the skill: SKILL.md, scripts/handoff-verify.mjs, assets/handoff.template.md, tests/
 docs/contributing/traps.md                       the durable traps
 docs/contributing/releases.md                    the release procedure and its checklist
-shared/resources/change-log.js                   B13's defect lives here (untouched since 2026-08-17)
+.claude/state/develop-next.state.json            develop-next run state — exists only while a run is in flight
 ```
 
 Pipeline conventions: `AGENTS.md`. Anti-patterns (consumer-facing): `docs/reference/anti-patterns.md`.
 Design rationale: `docs/reference/faq.md`. Observation log: resolved by
-`shared/resources/resolve-observation-workspace.sh`, never from the cwd — **52 files on disk**,
-highest id **64**, **0 open / 39 parked / 13 actioned** (the 13 sweep to `archive/` on the next
-run; ids are monotonic). Staged skill edits: `~/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills/skill-updates/PENDING.md`.
+`shared/resources/resolve-observation-workspace.sh`, never from the cwd — **51 files on disk**,
+highest id **89**, **24 open** (ids 65+, written by sessions since the 09-12 review — the next `/observe-work --review` has work) and 27 parked. <!-- cmd: command node skills/observe-work/references/observation-log.js queue --workspace /Users/gamaroff/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills --json; expect: /"total": 51/ -->
+Staged skill edits: `~/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills/skill-updates/PENDING.md`.

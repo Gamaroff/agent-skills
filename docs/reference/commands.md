@@ -136,6 +136,8 @@ family that reads `assignee`.
 | `/remember-insight` | Save an insight to project memory | [`remember-insight`](../../skills/remember-insight/SKILL.md) |
 | `/observe-work` | Watch the session for skill-improvement signals and write each to the observation log | [`observe-work`](../../skills/observe-work/SKILL.md) |
 | `/observe-work --review` | Work the observation backlog and stage skill updates for you to install | [Review cycle](../../skills/observe-work/references/review-cycle.md) |
+| `/session-handoff` | Write `.agents/handoff.md` in the fixed section order — every state figure carries the command that produced it; §5 Traps is a pointer to `docs/contributing/traps.md`, never content | [`session-handoff`](../../skills/session-handoff/SKILL.md) |
+| `/session-handoff --read` (`command node .agents/skills/session-handoff/scripts/handoff-verify.mjs [path] [--json] [--timeout <s>]`) | Re-measure the handoff before trusting it: re-run each figure's command through a read-only whitelist and report every line as `confirmed` / `stale` (with the new value) / `unverifiable` (with why). Never writes | [`session-handoff`](../../skills/session-handoff/SKILL.md) |
 
 ## Checklists
 
