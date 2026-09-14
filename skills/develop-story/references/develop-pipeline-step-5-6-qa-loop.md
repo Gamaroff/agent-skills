@@ -264,8 +264,11 @@ arms 4–5 run the Convergence check and the Diminishing-returns exit first, and
 decides between 5c and 5b. So the rule is a **post-guard write**: once the arm resolves — directly for
 arms 1–3, after both guards for arms 4–5 — overwrite `**Action**` with the destination and `**PR
 Review**` with `pending — 5c not yet run` (for 5c) or `not reached — gate did not exit the loop` (for
-5b). The Diminishing-returns exit's own `On exit` list repeats this as its first step so a run that
-takes route 2 cannot leave the row at its 5b value. The row's value set is exactly `{Proceeding to 5c
+5b). The arm has a third resolution: when the Convergence check trips, the run leaves the loop
+without reaching 5c, and the same write puts `**Action**: Escalating — loop not converging` and
+`**PR Review**: not reached — gate did not exit the loop` on the row. The Diminishing-returns exit's
+own `On exit` list repeats this as its first step so a run that takes route 2 cannot leave the row at
+its 5b value. The row's value set is exactly `{Proceeding to 5c
 (PR conformance review), Running qa-fix (cycle {N} of 5), Escalating — loop not converging}`.
 
 - `PASS` with **no open entry in `top_issues[]`** → **proceed to 5c** (the loop's exit gate), not straight to Step 7

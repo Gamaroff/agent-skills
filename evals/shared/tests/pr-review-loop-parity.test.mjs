@@ -427,6 +427,14 @@ test("the Action row the consumers read has a writer on every route: post-guard 
     /value set is exactly `\{Proceeding to 5c \(PR conformance review\), Running qa-fix \(cycle \{N\} of 5\), Escalating — loop not converging\}`/,
     "the preamble must state the closed value set of the Action row",
   );
+  // Cycle 5: the rule named the 5c and 5b values only. The third resolution — the Convergence
+  // check trips and the run leaves the loop without reaching 5c — had a value in the closed set
+  // but no sentence telling the arm to write it, or what PR Review reads on that route.
+  assert.match(
+    branching,
+    /Convergence check trips[^.]*`\*\*Action\*\*: Escalating — loop not converging` and `\*\*PR Review\*\*: not reached — gate did not exit the loop`/,
+    "the post-guard write must name the Convergence-trip resolution: Action 'Escalating — loop not converging' and PR Review 'not reached — gate did not exit the loop'",
+  );
   assert.doesNotMatch(
     loopDoc,
     /Proceeding to finalise/,
