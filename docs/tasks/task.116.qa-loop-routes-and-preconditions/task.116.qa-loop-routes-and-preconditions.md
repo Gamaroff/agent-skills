@@ -5,11 +5,13 @@ type: task
 description: "Six observations on qa-task / qa-story and the 5b/5c router. A CONCERNS gate with empty top_issues[] — legitimate under gate rule 4 — has no route and halts the run on 'nothing to fix' (#51). Step 10 can write and publish a PASS gate while the Step 3b code review is still running; task.106's gate 1 was posted minutes before the review returned two confirmed defects (#56). A predicate deliverable is read at QA and only executed at the Step 7 DoD probe, so its defect lands after the gate that should have covered it (#20). A green suite on macOS was blessed as evidence about Linux (#17). And skills document an agent that failed but not one that was unavailable (#44) or one whose output file is small (#62)."
 tags: [qa-task, qa-story, pipeline, subagents]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: medium
 created: 2026-09-12
 updated: 2026-09-14
+completed_date: 2026-09-14
+pr_number: 404
 assignee:
 estimated_effort_hours: 6
 github_issue: 403
@@ -17,7 +19,7 @@ github_issue: 403
 
 # Technical Task: The QA loop routes on the verdict token, gates before its own review returns, reads boundary deliverables it could execute, and has no vocabulary for a subagent that never ran
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.116.review.1.qa-loop-routes-and-preconditions.md` implemented 2026-09-13
 **GitHub Issue**: [#403](https://github.com/Gamaroff/agent-skills/issues/403)
 
@@ -115,6 +117,7 @@ None. A CONCERNS/empty gate now reaches 5c instead of halting — intended; CHAN
 | `docs/runbooks/story-development.md`, `docs/runbooks/task-development.md`, `docs/runbooks/qa-flow.md` | doc sweep — qa-fix runs on an open finding (qa-fix cycle 1) |
 | `docs/reference/configuration.md` | `subagents.wallClockMinutes` (qa-fix cycle 1) |
 | `shared/resources/develop-pipeline-resume-contract.md`, `shared/resources/pr-conformance-prompt.md`, `shared/resources/qa-findings-ingester-prompt.md` | accepting-route set by reference to §5c (qa-fix cycle 2) |
+| `skills/review-pr/SKILL.md` | accepting-route set by reference to §5c and the cycle entry's Action row (qa-fix cycle 4) |
 | `CHANGELOG.md` | Changed |
 
 ## 8. Testing Strategy
@@ -129,7 +132,7 @@ fixture with a CONCERNS/empty gate routing to 5c.
 3. Step 3b executes candidates when the boundary rule fires, reporting `probes_executed`
 4. The platform-variance check and its command are in Step 3b/3c and the review prompt
 5. Autonomous-defaults names unavailable / failed / slow with the substitute and the record required; "output-file size is not a liveness signal" appears at every dispatch site
-6. Observations #17, #20, #44, #51, #56, #62 close naming this PR
+6. Observations #17, #20, #44, #51, #56, #62 close naming this PR — a post-merge operator step: the observation log lives outside the repository, so no hunk in this change set can satisfy it
 
 ## 10. Risk Assessment
 
@@ -199,6 +202,38 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.116.qa.6.qa-loop-routes-and-preconditions.md` (cycles 1–6; cycle 6 operator-authorised after the cycle-5 escalation)
+**Gate File**: `task.116.gate.6.qa-loop-routes-and-preconditions.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Conformance Review (5c)**: `task.116.pr-review.1.qa-loop-routes-and-preconditions.md` — ⚠️ CONCERNS (advisory; PC-2/PC-1/PC-3 corrected before acceptance, CR-1/CR-3 follow-ups)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** SC1–SC5 met with code and per-PR test citations (`pr-review-loop-parity` 30/30, `qa-gate-preconditions-parity` 8/8 in the `ci:fast` lane); SC6 (observations #17, #20, #44, #51, #56, #62 close naming this PR) deferred by design to the post-merge handover — the six are `parked_until: task.116 merged to develop`
+✅ **Tests:** `npm run ci:fast` 3270 tests, 3269 pass, 0 fail, 1 skipped on `f5b8d94b`; `bundle --check` 127 skills, 0 problems; QA mutation proofs `covered` on every fix cycle
+✅ **PR Review:** PR #404 — 6 QA cycles (4 qa-fix + 1 operator remediation), Step 5c `/review-pr` run; CI reading 1 SUCCESS @ `d5c79efb`
+✅ **Documentation:** CHANGELOG `[Unreleased]` → `### Changed` (5 bullets); qa-task / qa-story / qa-fix / review-* SKILL prose; shared router and prompts; three runbooks; `docs/reference/configuration.md` (`subagents.wallClockMinutes`)
+✅ **Security Review:** ✅ PASS — no boundary delivered (`boundary: false`), no secrets, no unsafe patterns, no dependency change
+✅ **Compliance Review:** NOT_APPLICABLE — no data, payment, UI or health scope
+
+**Deployment Readiness:**
+
+- Staging: ✅ APPROVED
+- Production: ✅ APPROVED
+
+**Post-merge handover:** close observations #17, #20, #44, #51, #56, #62 with `observation-log.js set-status --status actioned`, naming PR #404.
+
+**Task marked as ACCEPTED on:** 2026-09-14
+
+**Detailed Verification Log:** See `task.116.dod.1.qa-loop-routes-and-preconditions.md` for complete verification evidence and timestamps.
+
 ## Change Log
 
 | Date       | Version | Description                                   | Author      |
@@ -214,6 +249,7 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 | 2026-09-13 |         | QA findings fixed — the accepting-route set lives once in §5c and its mechanical record (the cycle entry's Action row) has a writer on every route (post-guard write; On-exit step 1); consumers point, never paraphrase; matrix-driven + paraphrase-forbidding + writer tests; 5 iterations (the fifth applied by the operator after the cycle-5 escalation: develop merged, changelog refiled, grep -h, Convergence-trip write, qa-flow lead/row/edge) | qa-fix |
 | 2026-09-14 |         | QA gate FAIL (50/100) — 5 findings (1 HIGH: housekeeping merge references an absent skill, suite red) | qa-task |
 | 2026-09-14 |         | QA gate PASS (100/100) — 0 blocking findings; cycle 6 authorised by the operator after the cycle-5 escalation; suite green after develop merge | qa-task |
+| 2026-09-14 | 1.2     | DoD passed — accepted (PR #404); SC6 (observation closure) deferred to the post-merge handover | finalise |
 
 ---
 
@@ -241,7 +277,7 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.116.qa-loop-routes-and-preconditions/task.116.qa-loop-routes-and-preconditions.md`
