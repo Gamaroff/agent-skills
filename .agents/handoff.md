@@ -41,7 +41,6 @@ observation review — so the loop now has work. Selection order (bugs at `new` 
 | **B14** | PreCompact hook posts bare `gh issue comment` / `gh pr comment` | Bypasses the comment contract **and** the `access.tracker` gate; the coverage test scans Markdown only |
 | **B15** | `observation-log doctor` activation check is cwd-relative | Silent false-negative at the documented invocation; obs #14 |
 | T108 | Bundler copies depth-relative links verbatim — 864 broken links in 229 bundled files | Known since 08-20; the freshness check certifies the breakage |
-| T109 | `sync-jira-story` transition-only write gate has no `run()` test | The half of 3c task.96 did not close |
 | T110 | `session-handoff` skill — write + re-measure | From the 09-08 staged proposal; this file is its first customer |
 | T111 | `npm run ci` runs every CI lane; two coverage gaps | Local/CI parity |
 | T112 | `hotfix.md` rewrite against `/develop-bug`'s hotfix model | task.107's deliberately-excluded sibling |
@@ -106,13 +105,15 @@ test names the case. Full evidence and a verified repro recipe are in the bug.
 `docs/tasks/task.45.change-log-pipeline-and-sync/task.45.plan.change-log-pipeline-and-sync.md`
 (§Phase 5, ≈209). Gate 2: staging APPROVED, production CONDITIONAL. Carry it openly.
 
-### 3c. Missing `run()`-level tests — **half closed, half filed as T109**
+### 3c. Missing `run()`-level tests — **closed (task.109, 2026-09-14)**
 
-task.96 (PR #343, 2026-09-07 — the same day the previous measurement was taken, which is why it was
-missed) added `end-to-end.test.js` to both syncs. **Epic fast-path transition: covered**
-(`skills/sync-jira-epic/tests/end-to-end.test.js:290`). **Story skipped-but-transitioned write gate:
-still uncovered** — `grep -c no-transition` → story e2e 0. A probe shows the gate is correct
-(`transitioned: true`, file changed, `Status → In Progress` row); only the test is missing.
+task.96 (PR #343, 2026-09-07) added `end-to-end.test.js` to both syncs and covered the epic fast-path
+transition (`skills/sync-jira-epic/tests/end-to-end.test.js:290`). task.109 covered the other half:
+the story skipped-but-transitioned write gate now has a mutation-proved test in
+`skills/sync-jira-story/tests/end-to-end.test.js` ("a status-only run skips the PUT but still writes
+the Status row and timestamp") — forcing the `changeLogEntries.length > 0` arm false fails that test
+by name and no other. Re-measure with `grep -c no-transition skills/sync-jira-story/tests/end-to-end.test.js`
+(expect ≥ 1).
 
 ### 3d. Deferred / human-gated roadmap rows — unchanged
 

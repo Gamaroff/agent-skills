@@ -5,18 +5,23 @@ type: task
 description: "When a story's body is unchanged but its status has moved, sync-jira-story must still write the file (the Status → row and jira_last_synced_at). The gate at sync-jira-story.js ≈1265-1272 does this correctly — a 2026-09-12 probe shows transitioned:true, file changed, row written — but no test names the path: the story end-to-end suite uses --no-transition zero times, so run 2 is always the transitioned:false skip. The epic sibling gained exactly this test in task.96. Mirror it."
 tags: [testing, sync-jira-story, jira]
 category: testing
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-14
 assignee:
 estimated_effort_hours: 2
+github_issue: 405
+completed_date: 2026-09-14
+pr_number: 406
 ---
 
 # Technical Task: sync-jira-story's skipped-but-transitioned write gate has no run()-level test
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.109.review.1.sync-jira-story-transition-only-write-test.md` implemented 2026-09-14
+**GitHub Issue**: [#405](https://github.com/Gamaroff/agent-skills/issues/405)
 
 ---
 
@@ -101,7 +106,7 @@ None. Test only.
 | File | Change |
 | :--- | :--- |
 | `skills/sync-jira-story/tests/end-to-end.test.js` | +1 test |
-| `.agents/handoff.md` | §3c closed |
+| `.agents/handoff.md` | §3c closed; T109 queue row removed |
 
 ## 8. Testing Strategy
 
@@ -137,16 +142,77 @@ Delete the test. Nothing else changes.
 | Date       | Version | Description                                   | Author      |
 | ---------- | ------- | --------------------------------------------- | ----------- |
 | 2026-09-12 | 1.0     | Initial draft — filed from the 2026-09-12 repo sweep | create-task |
+| 2026-09-14 | 1.1     | Review passed (9/10) — linked GitHub issue #405; ready for development | review-task |
+| 2026-09-14 |         | Status → ready-for-development | review-task |
+| 2026-09-14 |         | Implemented — 2 files, 1 test (mutation-proved) | develop |
+| 2026-09-14 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-09-14 | 1.2     | DoD passed — accepted (PR #406) | finalise |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: the test
-- [ ] `--no-transition` run 1 + plain run 2 case added to `skills/sync-jira-story/tests/end-to-end.test.js`
-- [ ] Mutation-proved against the gate at `sync-jira-story.js` ≈1265-1272
+- [x] `--no-transition` run 1 + plain run 2 case added to `skills/sync-jira-story/tests/end-to-end.test.js`
+- [x] Mutation-proved against the gate at `sync-jira-story.js` ≈1265-1272
 ### Phase 2: close the loop
-- [ ] Handoff §3c and this task's registry row updated
+- [x] Handoff §3c and this task's registry row updated (§3c closed in develop; registry Status cell is ticked by `/finalise`)
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-14
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.109.qa.1.sync-jira-story-transition-only-write-test.md](./task.109.qa.1.sync-jira-story-transition-only-write-test.md)
+- **Gate File**: [task.109.gate.1.sync-jira-story-transition-only-write-test.yml](./task.109.gate.1.sync-jira-story-transition-only-write-test.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3271 (`ci:fast`), 6 in the story e2e suite
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. Mutation proof independently reproduced at QA (`covered`). Two low advisory cleanups (CR-1, CR-2) and one LOW documentary note (criterion 1 names `skipped:true`, which the story engine does not return) recorded in the QA report.
+
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.109.qa.1.sync-jira-story-transition-only-write-test.md`
+**Gate File**: `task.109.gate.1.sync-jira-story-transition-only-write-test.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Conformance Review**: ✅ APPROVE — `task.109.pr-review.1.sync-jira-story-transition-only-write-test.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** All 3 met — named test at `end-to-end.test.js:270`; mutation proof (`covered`, reproduced at QA); `npm test` exit 0
+✅ **Tests:** 1 new e2e test (6/6 in suite); `ci:fast` 3270 pass / 0 fail; CI reading 1 SUCCESS @ `2c902e431a5d`
+✅ **PR Review:** PR #406, 5c APPROVE (5 low findings, none blocking)
+✅ **Documentation:** `.agents/handoff.md` §3c closed; CHANGELOG `(task 109)` entry added
+✅ **Security Review:** ✅ PASS — no secrets, no unsafe patterns, not a boundary
+✅ **Compliance Review:** N/A — test-only change
+✅ **Performance / Reliability / Maintainability:** ✅ PASS (QA NFR assessment)
+
+**Deployment Readiness:**
+
+- Staging: ✅ APPROVED
+- Production: ✅ APPROVED
+
+**Task marked as ACCEPTED on:** 2026-09-14
+
+**Detailed Verification Log:** See `task.109.dod.1.sync-jira-story-transition-only-write-test.md` for complete verification evidence and timestamps.
 
 ---
 
@@ -159,7 +225,7 @@ Delete the test. Nothing else changes.
 
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.109.sync-jira-story-transition-only-write-test/task.109.sync-jira-story-transition-only-write-test.md`

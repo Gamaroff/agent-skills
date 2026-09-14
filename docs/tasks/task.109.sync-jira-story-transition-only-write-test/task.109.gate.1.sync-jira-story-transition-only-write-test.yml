@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.109.sync-jira-story-transition-only-write-test'
+task_title: "sync-jira-story's skipped-but-transitioned write gate has no run()-level test"
+gate: PASS
+status_reason: 'One additive, mutation-proved end-to-end test naming the skipped-but-transitioned write gate; suite 6/6, ci:fast 3270/0, diff review found no correctness bugs (2 low advisory cleanups).'
+reviewer: 'QA Engineer'
+updated: '2026-09-14T19:44:21Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 6
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Test-only change against a fake Jira; no boundary delivered (boundary: false), no secrets, no network.'
+  performance:
+    status: PASS
+    notes: 'One extra e2e test, ~170 ms; suite duration unchanged within noise.'
+  reliability:
+    status: PASS
+    notes: 'Precondition reached through the product (--no-transition) and asserted; test fails loudly on each of the four claims it makes; independent mutation re-run at QA reproduced the develop result (covered).'
+  maintainability:
+    status: PASS
+    notes: 'Mirrors the epic sibling at end-to-end.test.js:290; landed status read from the run outcome rather than hard-coded. Two low advisory cleanups recorded (CR-1, CR-2).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 — assert the Status → row is absent from the pre-run-2 file so the proof that run 2 wrote it is self-contained'
+      refs: ['skills/sync-jira-story/tests/end-to-end.test.js']
+    - action: 'CR-2 — scope both putCount calls with the issue key for consistency with the sibling tests'
+      refs: ['skills/sync-jira-story/tests/end-to-end.test.js']
+    - action: 'Success criterion 1 says skipped:true — the epic engine field; the story engine has no skipped and the test asserts the equivalent (changeSummary + PUT count). Wording only.'
+      refs: ['docs/tasks/task.109.sync-jira-story-transition-only-write-test/task.109.sync-jira-story-transition-only-write-test.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
