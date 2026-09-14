@@ -5,18 +5,21 @@ type: task
 description: "`.agents/handoff.md` is the 'read this first' file, and it decays within a day — the 2026-09-10 version named T107 as next and 'frontier not empty'; T107 merged the next day and the frontier is empty. Every figure in it already carries the command that produced it, so the read end can re-run them. Build the skill the 2026-09-08 observe-work review proposed: write mode with a fixed section order and a per-figure command, read mode that re-measures and reports confirmed / stale / unverifiable per line. Traps live in docs/contributing/traps.md, not in the handoff."
 tags: [skill, handoff, observe-work, docs]
 category: other
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-15
 assignee:
 estimated_effort_hours: 8
+github_issue: 407
 ---
 
 # Technical Task: A session-handoff skill that writes the handoff and re-measures it on read
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.110.review.1.session-handoff-skill.md` implemented 2026-09-15
+**GitHub Issue**: [#407](https://github.com/Gamaroff/agent-skills/issues/407)
 
 ---
 
@@ -75,8 +78,11 @@ proposal is the starting point; it is a scaffold with a TODO list, not a deliver
   against the recorded one, prints a per-line verdict table and a JSON form (`--json`) with the
   standard `reason` contract. Never writes the handoff.
 - `skills/session-handoff/assets/handoff.template.md` — the section skeleton with half-life labels.
-- Tests under `skills/session-handoff/tests/` — **and the glob added to `package.json`** (traps:
-  "npm test's suite list is hand-maintained").
+- Tests under `skills/session-handoff/tests/*.test.js` — the same shape as the other 18 skill
+  suites (`node --test` globs in `package.json` `test`; coding-standards names `*.test.js`) — **and
+  the glob `'skills/session-handoff/tests/*.test.js'` added to `package.json`** (traps: "npm test's
+  suite list is hand-maintained"). Tests load the `.mjs` verifier via `require(esm)` (Node ≥ 22.12)
+  or spawn it as a CLI.
 
 ### Important Clarifications
 
@@ -103,11 +109,19 @@ None. New skill; the handoff file format gains structure but stays Markdown a hu
 
 ## 6. Implementation Plan
 
-1. **Contract.** Lift the section table and verdict table from the staged proposal into SKILL.md;
-   decide the per-figure command syntax (recommend: a `Command` column in the header table and a
-   trailing `<!-- cmd: … -->` on prose figures).
+1. **Contract.** Lift the section table and verdict table from the staged proposal into SKILL.md.
+   Per-figure command syntax (decided at review): in the header table, the **first backticked span**
+   in the `Command` cell is the command — a cell with no backticked span (e.g. `inspect …`) is
+   reported `unverifiable: no command`, never executed; on a prose figure, a trailing
+   `<!-- cmd: … -->` comment on the same line is its command. The whitelist applies to the first
+   token after an optional `command ` prefix.
 2. **Verifier.** `handoff-verify.mjs`: parse → run (with `command` prefix, per traps) → compare →
-   report. `--json` with `reason` ∈ `ok | stale | unverifiable | usage`.
+   report. `--json` with `reason` ∈ `ok | stale | unverifiable | usage`. Each command runs under a
+   timeout (default 60 s; `--timeout`); a command that exceeds it is `unverifiable: timeout` — the
+   read is a fast preflight, so `command npm test` landing there is expected, not a defect. Strip
+   Markdown emphasis (`**…**`, `` `…` ``) from the recorded `Result` cell before the substring
+   comparison. The command runner is **injectable** (a function argument on the exported API) so
+   tests never execute real commands.
 3. **Write mode.** Template + procedure; the traps section is a one-paragraph pointer to
    `docs/contributing/traps.md`.
 4. **Wire.** AGENTS.md pointer; `npm run generate-catalog`; `generate-skill-deps`; test glob.
@@ -118,11 +132,12 @@ None. New skill; the handoff file format gains structure but stays Markdown a hu
 
 | File | Change |
 | :--- | :--- |
-| `skills/session-handoff/SKILL.md`, `scripts/handoff-verify.mjs`, `assets/handoff.template.md`, `tests/*.test.mjs` | new |
-| `package.json` | test glob |
-| `AGENTS.md` | pointer |
-| `docs/reference/skill-catalog.md`, `shared/resources/skill-dependencies.json` | regenerated |
-| `.agents/handoff.md` | rewritten in the new shape by the skill's own write mode |
+| `skills/session-handoff/SKILL.md`, `scripts/handoff-verify.mjs`, `assets/handoff.template.md`, `tests/handoff-verify.test.js`, `tests/fixtures/handoff-2026-09-10.txt` | new (fixture is `.txt` because the bundler scans `tests/*.md` for `shared/resources/` mentions) |
+| `package.json` | test glob `'skills/session-handoff/tests/*.test.js'` |
+| `AGENTS.md` | pointer names read mode and its command |
+| `docs/reference/skill-catalog.md`, `shared/resources/skill-dependencies.json`, `skills/create-skill/references/skill-dependencies.json` | regenerated (128 skills; `generate_catalog.py` gained `session-handoff` under Skill Tooling) |
+| `.agents/handoff.md` | rewritten 2026-09-15 in the new shape by the skill's own write mode; read mode run on it before commit |
+| `CHANGELOG.md` | `[Unreleased]` → Added entry |
 
 ## 8. Testing Strategy
 
@@ -131,13 +146,19 @@ None. New skill; the handoff file format gains structure but stays Markdown a hu
 - **Integration**: read mode over a fixture repo with a known-stale figure → `stale` with the new
   value; over a Jira-only check with no credentials → `unverifiable`.
 - **Regression**: the historical 2026-09-10 handoff (from `git show 6ce3280e:.agents/handoff.md`)
-  → at least two `stale` lines, named.
+  copied to `tests/fixtures/handoff-2026-09-10.md` **with two `<!-- cmd: … -->` annotations added** —
+  on the "frontier is not empty" line (`command node skills/develop-next/scripts/select-next.mjs`)
+  and on §3's "touched since" claim (`git log -1 --format=%ci -- shared/resources/change-log.js`),
+  since both are prose with no command cell in the original. The test runs the verifier with an
+  injected runner returning present-day values → both lines report `stale`, named. Hermetic: no
+  real command runs.
 - **Mutation**: break the comparator (always `confirmed`) → the fixture test goes red.
 
 ## 9. Success Criteria
 
 1. `/session-handoff --read` (or the documented verb) prints one verdict per figure, and the
-   2026-09-10 handoff yields `stale` for the frontier line and for the `change-log.js` "touched since" claim
+   annotated 2026-09-10 fixture (§8) yields `stale` for the frontier line and for the `change-log.js`
+   "touched since" claim
 2. `--json` follows the repo's `reason` / exit-code contract
 3. Write mode emits the fixed section order; the traps section is a pointer, never content
 4. Tests run under `npm test` (glob present) and in CI
@@ -170,18 +191,21 @@ remains readable by hand.
 | Date       | Version | Description                                   | Author      |
 | ---------- | ------- | --------------------------------------------- | ----------- |
 | 2026-09-12 | 1.0     | Initial draft — filed from the 2026-09-12 repo sweep | create-task |
+| 2026-09-15 | 1.1     | Review passed (8/10) — tests → `*.test.js`, command-cell parse rule, annotated regression fixture, GitHub issue #407 linked | review-task |
+| 2026-09-15 |         | Status → ready-for-development | review-task |
+| 2026-09-15 |         | Implemented — 13 files, 17 tests (3 mutants killed by name) | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: contract
-- [ ] `SKILL.md` with write / read modes; per-figure command table; verdict vocabulary
+- [x] `SKILL.md` with write / read modes; per-figure command table; verdict vocabulary
 ### Phase 2: read mode is real
-- [ ] `scripts/handoff-verify.mjs` re-runs every `Command` cell and emits confirmed / stale / unverifiable per line
+- [x] `scripts/handoff-verify.mjs` re-runs every `Command` cell and emits confirmed / stale / unverifiable per line
 ### Phase 3: write mode + wiring
-- [ ] Write mode produces `.agents/handoff.md` in the fixed section order; traps section is a pointer only
-- [ ] AGENTS.md pointer, catalog, `invokes:`; tests; CHANGELOG
+- [x] Write mode produces `.agents/handoff.md` in the fixed section order; traps section is a pointer only
+- [x] AGENTS.md pointer, catalog, `invokes:` (none — the skill invokes no other skill); tests; CHANGELOG
 
 ---
 
@@ -195,7 +219,7 @@ remains readable by hand.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.110.session-handoff-skill/task.110.session-handoff-skill.md`
