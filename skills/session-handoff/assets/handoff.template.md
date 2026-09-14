@@ -2,7 +2,7 @@
 
 Read this first if you are picking up work in `{repo}`. It records where things stand, what to pick
 up, the standing decisions, and the drift that is tolerated. The **traps** — the durable half — live
-in [`docs/contributing/traps.md`](../docs/contributing/traps.md); read them before touching anything.
+in `docs/contributing/traps.md`; read them before touching anything.
 
 **Every figure below was measured in the session that wrote this file, on {YYYY-MM-DD}, and carries
 the command that produced it.** Do not trust the date — re-measure:
@@ -12,7 +12,9 @@ the command that produced it.** Do not trust the date — re-measure:
 **State at handoff:** branch `{branch}` @ `{short-sha}` · tag **{tag}** ({date}) is {N} commits behind
 `{branch}` · **{N} open PRs** · **{N} open issues**.
 
-<!-- Half-life: hours to days. One row per figure. The FIRST backticked span in Command is what the
+<!-- Paths in this template are plain code (the template lives under skills/, so a relative link
+     would not resolve from here); the rendered handoff links them relative to .agents/.
+     Half-life: hours to days. One row per figure. The FIRST backticked span in Command is what the
      verifier runs (read-only whitelist; prose here is reported `unverifiable: no command`). The
      **bold** spans in Result are what it compares — write them as tokens that appear verbatim in
      the command's output (`**exit 0**` is compared against the exit code). -->
@@ -66,7 +68,7 @@ the command that produced it.** Do not trust the date — re-measure:
 
 ## 5. Traps
 
-Live in [`docs/contributing/traps.md`](../docs/contributing/traps.md) — durable, dated, re-verified.
+Live in `docs/contributing/traps.md` — durable, dated, re-verified.
 They are not restated here: the state above is true for hours and the traps for months, and keeping
 them together let the half that decayed discredit the half that did not. **Add a trap there when it
 has cost a session twice.**

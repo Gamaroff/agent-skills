@@ -36,7 +36,8 @@ command node .agents/skills/session-handoff/scripts/handoff-verify.mjs path/to/h
 ```
 
 Always `command node`, never bare `node` — see `docs/contributing/traps.md`. The verifier itself
-runs every command through `command` for the same reason.
+needs no such prefix: it spawns each command **directly, with no shell**, so a shell-function `node`
+can never be interposed. A leading `command ` in a handoff cell is stripped and ignored.
 
 The script **never writes the handoff**. It parses the figures, re-runs each figure's command, and
 prints one verdict per line:
@@ -56,8 +57,10 @@ each is `unverifiable` with its reason, and none of them fails the run.
 | --------------------------- | -------------------------------------------------------------------------------------- |
 | `no command`                | the Command cell has no backticked span (prose such as "inspect the catalog")          |
 | `no figure`                 | a `cmd:` comment on a line with no bold span and no `expect:`                          |
-| `not on whitelist: <bin>`   | the first token is not a read-only shape (see below) — **not executed**                |
-| `shell operator`            | the command contains `;` `&&` `\|` `>` `<` `$(` or a backtick — **not executed**       |
+| `not on whitelist: <bin>`   | the first token, or a flag on it, is not a read-only shape (see below) — **not executed** |
+| `shell operator`            | the command contains `;` `&&` `\|` `>` `<` `$(` a backtick or a newline — **not executed** |
+| `shell expansion not supported` | a token carries `*`, `~` or `$` — nothing expands without a shell, so it would run literally and diverge from what the author saw — **not executed** |
+| `bad expect regex: …`       | an `expect:` written as `/…/` is not a valid regex (a path such as `/usr/bin/node` matches the shape) |
 | `timeout (Ns)`              | exceeded `--timeout` (default 60 s). Expected for `npm test`; the read is a preflight  |
 | `command failed (exit N)`   | non-zero exit on a line whose figure is not an `exit N` figure                         |
 | `could not run: …`          | the runner threw (binary missing, cwd unreadable)                                      |
@@ -74,7 +77,9 @@ each is `unverifiable` with its reason, and none of them fails the run.
 
 ### How a figure is compared
 
-- `**exit N**` is compared against the exit code.
+- `**exit N**` is compared against the exit code. A non-zero exit on any other figure is
+  `command failed (exit N)` — except for `grep` and `test`, whose exit 1 is a measurement (no match;
+  false), so `` `grep -c x file` `` against `**0**` is `confirmed`.
 - Any other figure is normalised (emphasis stripped, lower-cased, punctuation removed) and **every
   token must appear as a whole token in the command's output** — `b13` is not satisfied by `b130`.
   It is a token-subset match, not equality, because a recorded figure is a paraphrase of output.
@@ -86,22 +91,32 @@ command runs — which is the correct verdict for a figure nobody measured.
 
 ### The whitelist
 
-Commands run only through a read-only whitelist, fail-closed: a first token the list does not
-recognise is `unverifiable`, never run. The `command ` prefix is stripped before matching.
+Commands run only through a read-only whitelist, **fail-closed on every axis**: an unknown binary,
+an unknown flag on a binary whose flags are enumerated, a positional where a listing flag is required,
+an inline-code flag on an interpreter — each is `unverifiable`, never run. The `command ` prefix is
+stripped before matching; a path to a binary (`/bin/ls`) is refused. **No shell is involved**, so the
+argv the rule sees is the argv that runs, and there is no quoting to get wrong.
 
-| First token      | Allowed shapes                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------ |
-| `git`            | `log` `show` `status` `rev-parse` `branch` `tag` `describe` `ls-files` `ls-remote` `diff` `remote` `rev-list` `cat-file` `blame` `shortlog` |
-| `gh`             | `pr`/`issue`/`repo`/`run`/`release` + `list`/`view`/`status`/`checks`; `api` with no method or field flags (a GET) |
-| `node`           | any script — scripts under `skills/*/scripts/` are read-only by convention                      |
-| `npm`            | `test`; `run` of `ci`, `ci:fast`, `eval:*`, `validate:*`, `lint:*`, `format:check`, `bundle:check`, `test:*`; any `run` carrying `--check` (`npm run bundle -- --check`); `ls`, `view` |
-| `npx`            | only with `--check`, `--list-different` or `--dry-run`                                          |
-| `python3`, `shellcheck`, `grep`, `ls`, `wc`, `cat`, `head`, `tail`, `jq`, `stat`, `date`, `test` | any |
-| `find`           | without `-delete`, `-exec`, `-execdir`, `-ok`                                                    |
+| First token | Allowed shapes |
+| --- | --- |
+| `git` | `log` `show` `status` `rev-parse` `describe` `ls-files` `ls-remote` `diff` `rev-list` `cat-file` `blame` `shortlog` — never with `--output`/`-o`. `branch` and `tag` only in listing form (no positional unless `--list`/`-l`/`--contains`/`--merged`/`--points-at`/… is present; no `-d -D -m -M -c -C -f -a -s`). `remote` only bare, `-v`, `show`, `get-url` |
+| `gh` | `pr` / `issue` / `repo` / `run` / `release` / `workflow` + `list` / `view` / `status` / `checks` / `diff`; `api <path>` with only read-shaping flags (`--jq` `--paginate` `--cache` `--template` `-i` `-H` …) — any `-X`/`--method`/`-f`/`-F`/`--field`/`--input`, joined or not, is refused |
+| `node` | a **relative script path** (no leading `/`, no `..`) after at most known-harmless flags (`--test`, `--test-concurrency=`, `--enable-source-maps`, `--no-warnings` …). `-e` `--eval` `-p` `--print` `-r` `--require` `--import` `--loader` `--input-type` `-` are refused. Scripts in the repo are trusted by convention; the rule stops the handoff itself from carrying code |
+| `python3` | the same shape: a relative script; `-c`, `-m`, `-` refused |
+| `npm` | `test`; `run` of `ci`, `ci:fast`, `eval:*`, `validate:*`, `lint:*`, `format:check`, `bundle:check`, `test:*`; any `run` carrying `--check` (`npm run bundle -- --check`); `ls`, `view` |
+| `npx` | one of `prettier` `eslint` `tsc` `markdownlint` `markdownlint-cli2` `stylelint` `jest` `vitest` `mocha` `shellcheck`, never with `--write`/`-w`/`--fix`/`-u`, never with `-p`/`--package`/`-c`/`-y` |
+| `find` | without `-delete` `-exec` `-execdir` `-ok` `-okdir` `-fprint` `-fprint0` `-fprintf` `-fls` |
+| `date` | without `-s`/`--set` |
+| `shellcheck`, `grep`, `ls`, `wc`, `cat`, `head`, `tail`, `jq`, `stat`, `test` | any |
 
-`npm run generate-catalog`, `npm run bundle` (no `--check`), `npx prettier --write`, `git push`,
-`gh pr merge`, `rm` — refused. The whitelist lives in the script (`WHITELIST`) and its tests; change
-both together.
+`npm run generate-catalog`, `npm run generate-skill-deps`, `npm run bundle` (no `--check`), `npx prettier
+--write`, `git push`, `git branch -D`, `git tag v1`, `gh pr merge`, `gh api -XPOST`, `node -e`, `rm` —
+refused. The whitelist lives in the script (`WHITELIST`) and its tests, which include every shape
+gate 1 of task.110 found accepted and the `shell-exec` hostile corpus; change all three together.
+
+**Timeout kills the whole process group.** The command is spawned detached; on `--timeout` the
+verifier kills the group, so a ten-minute `npm test` does not keep running after `unverifiable:
+timeout` is reported.
 
 ### `--json`
 

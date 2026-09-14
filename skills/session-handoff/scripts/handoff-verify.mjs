@@ -72,61 +72,168 @@ import { fileURLToPath } from "node:url";
 // ---------------------------------------------------------------------------
 
 /**
- * Read-only command shapes. Each entry is [first-token, predicate over the
- * remaining tokens]. Fail-closed: a first token not listed here is refused.
+ * Read-only command shapes: a predicate per first token over the remaining
+ * argv. Fail-closed on every axis — an unknown binary, an unknown flag on a
+ * binary whose flags are enumerated, a positional where a listing flag is
+ * required, an inline-code flag on an interpreter — each is refused, never
+ * run. The command is spawned WITHOUT a shell (see defaultRunner), so nothing
+ * here relies on quoting: the argv the predicate sees is the argv that runs.
+ *
+ * QA cycle 1 (gate 1, 56 executed probes) found the first version porous —
+ * `gh api -XPOST`, `git branch -D`, `git tag`, `git remote add`, `--output=`,
+ * `node -e`, `python3 -c`, `npx <any> --check`, `find -fprint` — so every
+ * rule below is tested against a hostile list in handoff-verify.test.js, and
+ * the shell-exec corpus's hostile direction is asserted refused on every run.
  */
-const GIT_READ_ONLY = new Set([
+
+const GIT_INSPECT = new Set([
   "log",
   "show",
   "status",
   "rev-parse",
-  "branch",
-  "tag",
   "describe",
   "ls-files",
   "ls-remote",
   "diff",
-  "remote",
   "rev-list",
   "cat-file",
   "blame",
   "shortlog",
 ]);
+const GIT_LISTING_FLAG =
+  /^(--list|-l|--contains|--no-contains|--merged|--no-merged|--points-at|--show-current|-a|-r|-v|-vv|--all|--remotes)$/;
+const GIT_BRANCH_MUTATING =
+  /^(-[dDmMcCfu]|--delete|--move|--copy|--force|--set-upstream-to.*|--unset-upstream|--edit-description|--track|--no-track|--create-reflog)$/;
+const GIT_TAG_MUTATING =
+  /^(-[dasfmFu]|--delete|--annotate|--sign|--force|--message.*|--file.*|--local-user.*|--cleanup.*)$/;
 
-const GH_READ_ONLY = new Set(["list", "view", "status", "checks"]);
+function gitRule(rest) {
+  const [sub, ...args] = rest;
+  // `--output` writes a file from every diff-family command; refuse it everywhere.
+  if (args.some((a) => /^(--output|-o)(=|$)/.test(a))) return false;
+  if (GIT_INSPECT.has(sub)) return true;
+  if (sub === "branch" || sub === "tag") {
+    const mutating = sub === "branch" ? GIT_BRANCH_MUTATING : GIT_TAG_MUTATING;
+    if (args.some((a) => mutating.test(a))) return false;
+    const positional = args.filter((a) => !a.startsWith("-"));
+    // A bare positional creates a branch or a tag. It is a pattern only when a
+    // listing flag says so.
+    return (
+      positional.length === 0 || args.some((a) => GIT_LISTING_FLAG.test(a))
+    );
+  }
+  if (sub === "remote") {
+    const [verb, ...more] = args;
+    if (verb === undefined || verb === "-v" || verb === "--verbose")
+      return true;
+    if (verb === "show" || verb === "get-url") return true;
+    return false;
+  }
+  return false;
+}
+
+const GH_READ_ONLY = new Set(["list", "view", "status", "checks", "diff"]);
+// `gh api` flags that only shape a GET. Anything else with a leading dash —
+// `-X`, `--method`, `-f`, `-F`, `--field`, `--raw-field`, `--input`, joined or
+// not — is refused by not being here.
+const GH_API_READ_FLAG =
+  /^(--jq(=.*)?|-q|--paginate|--slurp|--cache(=.*)?|--template(=.*)?|-t|-i|--include|-H|--header(=.*)?|--hostname(=.*)?|--preview(=.*)?|-p|--silent|--verbose)$/;
+
+function ghRule(rest) {
+  const [group, ...args] = rest;
+  if (group === "api") {
+    if (!args.length) return false;
+    // A body via stdin (`--input -`) or a graphql document that mutates would
+    // both need a flag this list refuses.
+    return args.every((a) => !a.startsWith("-") || GH_API_READ_FLAG.test(a));
+  }
+  const verb = args[0];
+  return (
+    ["pr", "issue", "repo", "run", "release", "workflow"].includes(group) &&
+    GH_READ_ONLY.has(verb)
+  );
+}
 
 const NPM_READ_ONLY_SCRIPT =
   /^(test|ci|ci:fast|eval(:[a-z0-9:-]+)?|validate(:[a-z0-9-]+)?|lint(:[a-z0-9-]+)?|format:check|bundle:check|test:[a-z0-9-]+)$/;
 
-export const WHITELIST = Object.freeze({
-  git: (rest) => GIT_READ_ONLY.has(rest[0]),
-  gh: (rest) => {
-    const [group, verb] = rest;
-    if (group === "api")
-      return !rest.some((a) =>
-        /^(-X|--method|-f|-F|--field|--raw-field|--input)$/.test(a),
-      );
-    return (
-      ["pr", "issue", "repo", "run", "release"].includes(group) &&
-      GH_READ_ONLY.has(verb)
-    );
-  },
-  node: () => true,
-  npx: (rest) =>
-    rest.includes("--check") ||
-    rest.includes("--list-different") ||
-    rest.includes("--dry-run"),
-  npm: (rest) => {
-    if (rest[0] === "test") return true;
-    if (rest[0] === "run") {
-      if (!rest[1]) return false;
-      if (NPM_READ_ONLY_SCRIPT.test(rest[1])) return true;
-      // `npm run bundle -- --check` — a write script made read-only by flag.
-      return rest.includes("--check");
+function npmRule(rest) {
+  if (rest[0] === "test") return true;
+  if (rest[0] === "run") {
+    if (!rest[1]) return false;
+    if (NPM_READ_ONLY_SCRIPT.test(rest[1])) return true;
+    // `npm run bundle -- --check` — a write script made read-only by flag.
+    return rest.includes("--check");
+  }
+  return rest[0] === "ls" || rest[0] === "view";
+}
+
+// npx may only invoke a known read-only tool, and never with a write flag.
+const NPX_TOOLS = new Set([
+  "prettier",
+  "eslint",
+  "tsc",
+  "markdownlint",
+  "markdownlint-cli2",
+  "stylelint",
+  "jest",
+  "vitest",
+  "mocha",
+  "shellcheck",
+]);
+const NPX_WRITE_FLAG =
+  /^(--write|-w|--fix|--fix-dry-run|--fix-type.*|--init|-u|--updateSnapshot)$/;
+const NPX_INSTALL_FLAG = /^(-p|--package(=.*)?|-c|--call(=.*)?|-y|--yes)$/;
+
+function npxRule(rest) {
+  if (rest.some((a) => NPX_WRITE_FLAG.test(a) || NPX_INSTALL_FLAG.test(a)))
+    return false;
+  const tool = rest.find((a) => !a.startsWith("-"));
+  return tool !== undefined && NPX_TOOLS.has(tool);
+}
+
+/**
+ * An interpreter runs a SCRIPT — a relative path inside the cwd, never inline
+ * code, never stdin, never a preload — and only known-harmless leading flags.
+ * Scripts in the repo are trusted by convention (they are the repo's own
+ * read-only tooling); the rule's job is to stop the handoff itself from
+ * carrying the code.
+ */
+function interpreterRule(safeFlag, inlineFlag) {
+  return (rest) => {
+    let script = null;
+    for (const a of rest) {
+      if (script === null) {
+        if (a === "-" || inlineFlag.test(a)) return false;
+        if (a.startsWith("-")) {
+          if (!safeFlag.test(a)) return false;
+          continue;
+        }
+        script = a;
+      } else if (inlineFlag.test(a)) return false;
     }
-    return rest[0] === "ls" || rest[0] === "view";
-  },
-  python3: () => true,
+    if (script === null) return false; // REPL / stdin
+    if (path.isAbsolute(script)) return false;
+    return !script.split(/[\\/]/).includes("..");
+  };
+}
+
+const NODE_INLINE =
+  /^(-e|--eval(=.*)?|-p|--print(=.*)?|-r|--require(=.*)?|--import(=.*)?|--loader(=.*)?|--experimental-loader(=.*)?|-i|--interactive|--input-type(=.*)?|-c|--check|--inspect.*|--stack-trace-limit.*)$/;
+const NODE_SAFE_FLAG =
+  /^(--test|--test-concurrency=.*|--test-reporter=.*|--enable-source-maps|--no-warnings|--trace-warnings|--max-old-space-size=.*|--experimental-strip-types|--no-deprecation)$/;
+const PY_INLINE = /^(-c|-m|-)$/;
+const PY_SAFE_FLAG = /^(-u|-B|-O|-OO|-q|-s|-E|-I|-W.*|-X.*)$/;
+
+const FIND_WRITING = /^-(delete|exec|execdir|ok|okdir|fprint0?|fprintf|fls)$/;
+
+export const WHITELIST = Object.freeze({
+  git: gitRule,
+  gh: ghRule,
+  node: interpreterRule(NODE_SAFE_FLAG, NODE_INLINE),
+  npx: npxRule,
+  npm: npmRule,
+  python3: interpreterRule(PY_SAFE_FLAG, PY_INLINE),
   shellcheck: () => true,
   grep: () => true,
   ls: () => true,
@@ -134,18 +241,27 @@ export const WHITELIST = Object.freeze({
   cat: () => true,
   head: () => true,
   tail: () => true,
-  find: (rest) =>
-    !rest.some(
-      (a) =>
-        a === "-delete" || a === "-exec" || a === "-execdir" || a === "-ok",
-    ),
+  find: (rest) => !rest.some((a) => FIND_WRITING.test(a)),
   jq: () => true,
   test: () => true,
   stat: () => true,
-  date: () => true,
+  date: (rest) => !rest.some((a) => /^(-s|--set)(=|$)/.test(a)),
 });
 
-const SHELL_OPERATOR = /(;|&&|\|\||\||>|<|\$\(|`)/;
+/**
+ * Binaries for which exit 1 is a measurement, not a failure: grep exits 1 on
+ * "no match", test exits 1 on "false". A recorded `**0**` for a grep count is
+ * a real figure and must be comparable.
+ */
+export const EXIT_1_IS_A_RESULT = new Set(["grep", "test"]);
+
+const SHELL_OPERATOR = /(;|&&|\|\||\||>|<|\$\(|`|\n|\r)/;
+// No shell runs the command, so nothing expands: a token carrying a glob
+// star, a tilde or a variable would run LITERALLY and diverge from what the
+// author saw. Refuse it with its own reason rather than report a confusing
+// `command failed`. `?` and `[…]` are deliberately not here — they are the
+// bread and butter of jq filters and cannot expand without a shell either.
+const SHELL_EXPANSION = /(\*|~|\$)/;
 
 /** Split on whitespace, honouring simple single/double quotes. */
 export function tokenize(cmd) {
@@ -176,7 +292,13 @@ export function isAllowed(cmd, whitelist = WHITELIST) {
   const argv = tokenize(cmd.trim());
   if (argv[0] === "command") argv.shift();
   if (!argv.length) return { ok: false, detail: "no command" };
+  if (argv.some((a) => SHELL_EXPANSION.test(a)))
+    return {
+      ok: false,
+      detail: "shell expansion not supported (glob, ~ or $)",
+    };
   const bin = path.basename(argv[0]);
+  if (bin !== argv[0]) return { ok: false, detail: `not on whitelist: ${bin}` };
   const rule = whitelist[bin];
   if (!rule || !rule(argv.slice(1)))
     return { ok: false, detail: `not on whitelist: ${bin}` };
@@ -200,6 +322,22 @@ function splitCells(line) {
 function firstBacktick(s) {
   const m = s.match(/`([^`]+)`/);
   return m ? m[1] : null;
+}
+
+/**
+ * `expect:` is plain text, or `/regex/flags`. A slash-delimited value that is
+ * not a valid regex — `/usr/bin/node` has "flags" of `node` — becomes a figure
+ * the verifier marks `unverifiable: bad expect regex`, never a throw: one
+ * malformed line must cost one verdict, not the run.
+ */
+function parseExpect(expect) {
+  const rx = expect.match(/^\/(.+)\/([a-z]*)$/);
+  if (!rx) return expect;
+  try {
+    return { regex: new RegExp(rx[1], rx[2] || "") };
+  } catch (e) {
+    return { badRegex: expect, error: String(e.message || e) };
+  }
 }
 
 function boldSpans(s) {
@@ -261,20 +399,25 @@ export function parseHandoff(text) {
         const resCell = cells[headerCols.result] ?? "";
         const command = firstBacktick(cmdCell);
         const bold = boldSpans(resCell);
+        // A Result cell with nothing comparable in it is `no figure`, not a
+        // figure of "" that every output trivially fails to contain.
+        const figures = (bold.length ? bold : [stripEmphasis(resCell)]).filter(
+          (f) => normalise(f) !== "",
+        );
         out.push({
           line: i + 1,
           source: "table",
           check,
           command,
-          figures: bold.length ? bold : [stripEmphasis(resCell)],
+          figures,
           recorded: resCell,
         });
         continue;
       }
       continue;
     }
-    // A non-table line ends the table.
-    if (headerCols && sawHeaderSeparator && raw.trim() !== "") {
+    // Any non-table line — a blank one included, as in Markdown — ends the table.
+    if (headerCols) {
       headerCols = null;
       sawHeaderSeparator = false;
     }
@@ -292,8 +435,7 @@ export function parseHandoff(text) {
       const prose = raw.replace(CMD_COMMENT, "").trim();
       let figures;
       if (expect !== null) {
-        const rx = expect.match(/^\/(.+)\/([a-z]*)$/);
-        figures = [rx ? { regex: new RegExp(rx[1], rx[2] || "") } : expect];
+        figures = [parseExpect(expect)];
       } else {
         figures = boldSpans(prose);
       }
@@ -321,8 +463,7 @@ export function parseHandoff(text) {
 export function stripEmphasis(s) {
   return String(s)
     .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/_([^_]+)_/g, "$1");
+    .replace(/`([^`]+)`/g, "$1");
 }
 
 export function normalise(s) {
@@ -372,9 +513,7 @@ function firstLines(output, max = 160) {
   let s = null;
   if (text.startsWith("{")) {
     try {
-      const obj = JSON.parse(
-        text.split(/\r?\n(?=\S)/)[0] === text ? text : text,
-      );
+      const obj = JSON.parse(text);
       const parts = [];
       for (const [k, v] of Object.entries(obj)) {
         if (v === null || ["string", "number", "boolean"].includes(typeof v))
@@ -402,33 +541,44 @@ function firstLines(output, max = 160) {
 // ---------------------------------------------------------------------------
 
 /**
- * Default runner: `bash -c 'command <cmd>'` — `command` so that a shell-function
- * `node`/`npm`/`npx` (nvm) cannot inject its help banner into the captured
- * output (traps.md). Returns { status, stdout, stderr, timedOut, error }.
+ * Default runner: the argv is spawned DIRECTLY — no shell. That is what makes
+ * the whitelist meaningful (the argv the rule saw is the argv that runs), it
+ * is why no `command` prefix is needed (a shell-function `node` from nvm is
+ * only interposed by a shell, and there is none — traps.md), and it is what
+ * makes a timeout kill the command itself rather than a wrapper around it.
+ *
+ * The child is its own process group (`detached`), so on timeout the whole
+ * group is killed — `npm test` and every worker it forked — not just the pid
+ * spawnSync knows about. QA cycle 1 (CR-6) found the bash wrapper left a
+ * ten-minute suite running after `timeout` had been reported.
+ *
+ * Returns { status, stdout, stderr, timedOut, error }.
  */
 export function defaultRunner(argv, { cwd, timeoutMs }) {
-  const cmd = argv.map(shellQuote).join(" ");
-  const r = spawnSync("bash", ["-c", `command ${cmd}`], {
+  const r = spawnSync(argv[0], argv.slice(1), {
     cwd,
     encoding: "utf8",
     timeout: timeoutMs,
+    killSignal: "SIGKILL",
+    detached: true,
     maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, CI: process.env.CI ?? "1" },
   });
-  const timedOut = r.error && r.error.code === "ETIMEDOUT";
+  const timedOut = Boolean(r.error && r.error.code === "ETIMEDOUT");
+  if (timedOut && r.pid) {
+    try {
+      process.kill(-r.pid, "SIGKILL"); // the group, not the leader alone
+    } catch {
+      /* already gone */
+    }
+  }
   return {
     status: r.status,
     stdout: r.stdout ?? "",
     stderr: r.stderr ?? "",
-    timedOut: Boolean(timedOut),
+    timedOut,
     error: r.error && !timedOut ? String(r.error.message || r.error) : null,
   };
-}
-
-function shellQuote(a) {
-  return /^[A-Za-z0-9_./:=@%+,-]+$/.test(a)
-    ? a
-    : `'${a.replace(/'/g, `'\\''`)}'`;
 }
 
 /**
@@ -463,6 +613,18 @@ export function verify(figures, opts = {}) {
         ...base,
         verdict: "unverifiable",
         detail: "no figure",
+        measured: null,
+      });
+      continue;
+    }
+    const bad = fig.figures.find(
+      (f) => f && typeof f === "object" && f.badRegex,
+    );
+    if (bad) {
+      lines.push({
+        ...base,
+        verdict: "unverifiable",
+        detail: `bad expect regex: ${bad.error}`,
         measured: null,
       });
       continue;
@@ -510,7 +672,9 @@ export function verify(figures, opts = {}) {
     const isExitFigure = fig.figures.some(
       (f) => typeof f === "string" && EXIT_FIGURE.test(normalise(f)),
     );
-    if (run.status !== 0 && !isExitFigure) {
+    const exitIsResult =
+      run.status === 1 && EXIT_1_IS_A_RESULT.has(allowed.argv[0]);
+    if (run.status !== 0 && !isExitFigure && !exitIsResult) {
       lines.push({
         ...base,
         verdict: "unverifiable",

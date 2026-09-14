@@ -30,7 +30,7 @@ tag **v0.48.0** is 27 commits behind `origin/develop` · **0 open PRs** (this ta
 | Roadmap lint | `command node skills/develop-next/scripts/select-next.mjs --lint` | **0 errors, 0 warnings** |
 | Frontier | `command node skills/develop-next/scripts/select-next.mjs` | **selected** — T110 at write time (this task; the next registry row once it merges — the id is deliberately not a bold figure) |
 | Skill validation | `python3 skills/create-skill/scripts/quick_validate.py skills/session-handoff` | **exit 0** — one skill; the loop over `skills/*/` measured 128/128 pass |
-| Catalog / deps | `command node scripts/generate-skill-dependencies.mjs` | **128 skills, 71 edges** declared by **22** skills; catalog 128 rows |
+| Catalog / deps | `jq length shared/resources/skill-dependencies.json` | **128** skills in the graph (71 edges by 22 declarers); catalog 128 rows. The 09-15 draft of this row ran the *generator*, which writes — read mode refused it, which is the point |
 | Orphaned tests | `grep -c skills/session-handoff/tests package.json` | **1** — the new glob is listed; the loop over every `*.test.{js,mjs,sh}` counted 136/136 invoked (excluding bundled `references/tests/` copies) |
 | ShellCheck | `shellcheck --version` | **version** 0.11.0 present; clean over the 58 CI-linted sources at write time (this row only proves the binary) |
 | Replay evals | `command npm run eval:all` | **exit 0** — runs in seconds in replay mode; not the reason the fast gate is fast |
@@ -172,5 +172,5 @@ docs/contributing/releases.md                    the release procedure and its c
 Pipeline conventions: `AGENTS.md`. Anti-patterns (consumer-facing): `docs/reference/anti-patterns.md`.
 Design rationale: `docs/reference/faq.md`. Observation log: resolved by
 `shared/resources/resolve-observation-workspace.sh`, never from the cwd — **51 files on disk**,
-highest id **89**, **24 open** (ids 65+, written by sessions since the 09-12 review — the next `/observe-work --review` has work) and 27 parked. <!-- cmd: command node skills/observe-work/references/observation-log.js queue --workspace /Users/gamaroff/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills --json; expect: /"total": 51/ -->
+highest id **90**, **25 open** (ids 65+, written by sessions since the 09-12 review — the next `/observe-work --review` has work) and 27 parked. <!-- cmd: command node skills/observe-work/references/observation-log.js queue --workspace /Users/gamaroff/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills --json; expect: /"total": 52/ -->
 Staged skill edits: `~/.claude/projects/-Users-gamaroff-Development-Projects-agent-skills/skill-updates/PENDING.md`.

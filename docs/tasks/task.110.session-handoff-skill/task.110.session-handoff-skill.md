@@ -194,6 +194,8 @@ remains readable by hand.
 | 2026-09-15 | 1.1     | Review passed (8/10) — tests → `*.test.js`, command-cell parse rule, annotated regression fixture, GitHub issue #407 linked | review-task |
 | 2026-09-15 |         | Status → ready-for-development | review-task |
 | 2026-09-15 |         | Implemented — 13 files, 17 tests (3 mutants killed by name) | develop |
+| 2026-09-15 |         | QA gate FAIL (30/100) — 3 HIGH, 3 MEDIUM, 5 LOW; whitelist admits mutating shapes | qa-task |
+| 2026-09-15 |         | QA findings fixed — whitelist per-axis, no-shell spawn + group kill, guarded expect regex; 23 tests, 1 iteration | qa-fix |
 
 ---
 
@@ -206,6 +208,34 @@ remains readable by hand.
 ### Phase 3: write mode + wiring
 - [x] Write mode produces `.agents/handoff.md` in the fixed section order; traps section is a pointer only
 - [x] AGENTS.md pointer, catalog, `invokes:` (none — the skill invokes no other skill); tests; CHANGELOG
+
+---
+
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-15
+**Quality Score**: 30/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.110.qa.1.session-handoff-skill.md](./task.110.qa.1.session-handoff-skill.md)
+- **Gate File**: [task.110.gate.1.session-handoff-skill.yml](./task.110.gate.1.session-handoff-skill.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 17 (skill) + full hermetic suite (3288); 56 boundary probes
+- **Phases Verified**: 3/3 (1 with issues)
+- **Critical Issues**: 3 HIGH (whitelist admits mutating shapes — bug.1), 3 MEDIUM (bug.2, bug.3)
+- **NFR Status**: Security: FAIL (measured, 56 probes), Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+
+### Bug Reports
+- [bug.1 whitelist admits mutating shapes](./task.110.bug.1.whitelist-admits-mutating-shapes.md) — ✅ Ready for QA (fixed 2026-09-15)
+- [bug.2 parser aborts / table boundary](./task.110.bug.2.parser-aborts-and-table-boundary.md) — ✅ Ready for QA (fixed 2026-09-15)
+- [bug.3 timed-out child keeps running](./task.110.bug.3.timed-out-child-keeps-running.md) — ✅ Ready for QA (fixed 2026-09-15)
+
+### Key Findings
+The read-only whitelist — the risk §10 names — is porous: `gh api -XPOST`, `git branch -D` / `tag` / `remote add` / `--output=`, `node -e`, `npx --write --check`, `find -fprint` are accepted. Parser aborts on a malformed `expect:`; a blank line does not end the header table; a timed-out child is orphaned under bash 3.2.
 
 ---
 

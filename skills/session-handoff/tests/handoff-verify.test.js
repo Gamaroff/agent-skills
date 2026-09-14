@@ -42,9 +42,32 @@ const FIXTURE_2026_09_10 = path.join(
 );
 const CHANGE_LOG_JS = ["shared", "resources", "change-log.js"].join("/");
 
+const CORPUS = path.join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "shared",
+  "resources",
+  "security-input-corpus.mjs",
+);
+
 let mod;
+let corpusFor;
 test.before(async () => {
   mod = await import(pathToFileURL(SCRIPT).href);
+  ({ corpusFor } = await import(pathToFileURL(CORPUS).href));
+});
+
+/** Every mkdtemp is registered here and removed after the run (CR-13). */
+const TEMP_DIRS = [];
+function tempDir() {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-verify-"));
+  TEMP_DIRS.push(d);
+  return d;
+}
+test.after(() => {
+  for (const d of TEMP_DIRS) fs.rmSync(d, { recursive: true, force: true });
 });
 
 /**
@@ -153,6 +176,15 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "gh api repos/x/y/milestones",
     "grep -c no-transition some/file.js",
     "shellcheck --severity=warning a.sh",
+    "git branch --list feature/x",
+    "git tag --list v0.4",
+    "git remote get-url origin",
+    "git remote -v",
+    "node --test skills/x/tests/y.test.js",
+    "python3 skills/create-skill/scripts/quick_validate.py skills/x",
+    "npx eslint .",
+    "gh api repos/x/y/milestones --jq .[0].title",
+    "find docs -name x.md",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -176,13 +208,75 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "git status && rm x": /shell operator/,
     "echo $(whoami)": /shell operator/,
     "git status > out.txt": /shell operator/,
+    "git log\nrm -rf /": /shell operator/,
     "": /no command/,
     "   ": /no command/,
+    // QA cycle 1 — the shapes gate 1 found accepted (bug.1). Each is a rule.
+    "gh api -XPOST repos/x/y/issues": /not on whitelist: gh/,
+    "gh api --method=DELETE repos/x/y/issues/1": /not on whitelist: gh/,
+    "gh api --field=title=x repos/x/y/issues": /not on whitelist: gh/,
+    "gh api": /not on whitelist: gh/,
+    "git branch -D develop": /not on whitelist: git/,
+    "git branch newname": /not on whitelist: git/,
+    "git tag v9": /not on whitelist: git/,
+    "git tag -d v1.0.0": /not on whitelist: git/,
+    "git remote add evil x": /not on whitelist: git/,
+    "git remote set-url origin x": /not on whitelist: git/,
+    "git remote remove origin": /not on whitelist: git/,
+    "git diff --output=/tmp/x": /not on whitelist: git/,
+    "git log --output=/tmp/x": /not on whitelist: git/,
+    "node -e process.exit(1)": /not on whitelist: node/,
+    "node --eval=1": /not on whitelist: node/,
+    "node -p 1": /not on whitelist: node/,
+    "node -r ./evil.js x.js": /not on whitelist: node/,
+    "node --import ./evil.mjs x.js": /not on whitelist: node/,
+    node: /not on whitelist: node/,
+    "node -": /not on whitelist: node/,
+    "node /abs/path/x.js": /not on whitelist: node/,
+    "node ../outside.js": /not on whitelist: node/,
+    "python3 -c print(1)": /not on whitelist: python3/,
+    "python3 -m pip install x": /not on whitelist: python3/,
+    "python3 -": /not on whitelist: python3/,
+    "npx prettier --write --check .": /not on whitelist: npx/,
+    "npx eslint --fix .": /not on whitelist: npx/,
+    "npx evil-pkg --dry-run": /not on whitelist: npx/,
+    "npx -p evil-pkg prettier --check .": /not on whitelist: npx/,
+    "npx -y evil": /not on whitelist: npx/,
+    "find . -fprint /tmp/out": /not on whitelist: find/,
+    "find . -fprintf /tmp/out %p": /not on whitelist: find/,
+    "find . -fls /tmp/out": /not on whitelist: find/,
+    "find . -okdir rm {} ;": /shell operator|not on whitelist: find/,
+    "date -s now": /not on whitelist: date/,
+    "/bin/ls": /not on whitelist: ls/,
+    "ls docs/tasks/*.md": /shell expansion/,
+    "cat ~/.ssh/id_rsa": /shell expansion/,
+    "test -z $JIRA_URL": /shell expansion/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, false, `${JSON.stringify(cmd)} must be refused`);
     assert.match(r.detail, why, cmd);
+  }
+});
+
+test("whitelist: the shell-exec corpus's hostile direction is refused in full (the probe that found bug.1, made permanent)", () => {
+  const cases = corpusFor("shell-exec");
+  assert.ok(cases.length >= 20, `corpus has ${cases.length} cases`);
+  const hostile = cases.filter((c) => c.direction === "hostile");
+  const accepted = hostile
+    .filter((c) => mod.isAllowed(c.input).ok)
+    .map((c) => `${c.id}: ${JSON.stringify(c.input)}`);
+  assert.deepEqual(accepted, [], "a hostile input was accepted");
+  // The legitimate direction may be refused — fail-closed is the design — but
+  // the reason must always be one the caller can act on.
+  for (const c of cases) {
+    const r = mod.isAllowed(c.input);
+    if (!r.ok)
+      assert.match(
+        r.detail,
+        /no command|shell operator|shell expansion|not on whitelist/,
+        c.id,
+      );
   }
 });
 
@@ -303,6 +397,84 @@ test("verify: an empty document is no-figures, exit 1", () => {
   assert.equal(r.exitCode, 1);
 });
 
+test("parse: a malformed or path-shaped expect: is one unverifiable line, never a throw (CR-3)", () => {
+  const doc = [
+    "path **x** <!-- cmd: git status; expect: /usr/bin/node -->",
+    "broken **x** <!-- cmd: git status; expect: /2026-09-(0[8-9]/ -->",
+    "fine **x** <!-- cmd: git status; expect: /clean/ -->",
+  ].join("\n");
+  const figures = mod.parseHandoff(doc);
+  assert.equal(figures.length, 3);
+  const r = mod.verify(figures, {
+    runner: stubRunner({ "git status": { stdout: "clean" } }),
+  });
+  assert.equal(r.lines[0].verdict, "unverifiable");
+  assert.match(r.lines[0].detail, /bad expect regex/);
+  assert.equal(r.lines[1].verdict, "unverifiable");
+  assert.match(r.lines[1].detail, /bad expect regex/);
+  assert.equal(r.lines[2].verdict, "confirmed");
+});
+
+test("parse: a blank line ends the header table, so a following table is not read as figures (CR-4)", () => {
+  const doc =
+    TABLE_HEADER +
+    "| A | `git status` | **clean** |\n" +
+    "\n" +
+    "| Id | Title | Note |\n" +
+    "| --- | --- | --- |\n" +
+    "| T111 | something | note |\n";
+  const figures = mod.parseHandoff(doc);
+  assert.equal(figures.length, 1);
+  assert.equal(figures[0].check, "A");
+});
+
+test("parse: an empty or punctuation-only Result cell is `no figure`, not a figure of nothing (CR-9)", () => {
+  const doc =
+    TABLE_HEADER + "| A | `git status` |  |\n| B | `git status` | — |\n";
+  const runner = stubRunner({ "git status": { stdout: "clean" } });
+  const r = mod.verify(mod.parseHandoff(doc), { runner });
+  assert.deepEqual(
+    r.lines.map((l) => [l.verdict, l.detail]),
+    [
+      ["unverifiable", "no figure"],
+      ["unverifiable", "no figure"],
+    ],
+  );
+  assert.deepEqual(runner.calls, [], "nothing to compare → nothing runs");
+});
+
+test("compare: snake_case is not emphasis — probes_executed matches probes_executed (CR-8)", () => {
+  const doc = TABLE_HEADER + "| A | `git status` | **probes_executed** 3 |\n";
+  const r = mod.verify(mod.parseHandoff(doc), {
+    runner: stubRunner({
+      "git status": { stdout: "probes_executed: 3 verdict_kind: x" },
+    }),
+  });
+  assert.equal(r.lines[0].verdict, "confirmed");
+});
+
+test("verify: grep exit 1 (no match) and test exit 1 (false) are measurements, not failures (CR-11)", () => {
+  const doc =
+    TABLE_HEADER +
+    "| Count | `grep -c nope file.txt` | **0** |\n" +
+    "| Flag | `test -f missing` | **exit 1** |\n" +
+    "| Other | `git status` | **clean** |\n";
+  const runner = stubRunner({
+    "grep -c nope file.txt": { status: 1, stdout: "0\n" },
+    "test -f missing": { status: 1 },
+    "git status": { status: 1, stdout: "clean" },
+  });
+  const r = mod.verify(mod.parseHandoff(doc), { runner });
+  assert.equal(r.lines[0].verdict, "confirmed", "grep exit 1 with a 0 count");
+  assert.equal(r.lines[1].verdict, "confirmed", "an explicit exit 1 figure");
+  assert.equal(
+    r.lines[2].verdict,
+    "unverifiable",
+    "git exit 1 is still a failure",
+  );
+  assert.match(r.lines[2].detail, /command failed \(exit 1\)/);
+});
+
 // ---------------------------------------------------------------------------
 // Regression — the 2026-09-10 handoff against the 2026-09-12 measurements
 // ---------------------------------------------------------------------------
@@ -377,7 +549,7 @@ function runCli(args, cwd) {
 }
 
 test("cli: --json emits one object with reason/counts/lines/exitCode and mirrors it in the exit code", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-verify-"));
+  const dir = tempDir();
   execFileSync("git", ["init", "-q"], { cwd: dir });
   fs.writeFileSync(
     path.join(dir, "handoff.md"),
@@ -403,7 +575,7 @@ test("cli: --json emits one object with reason/counts/lines/exitCode and mirrors
 });
 
 test("cli: missing file → reason=missing exit 1; unknown flag → usage exit 2; --help exit 0", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-verify-"));
+  const dir = tempDir();
   const missing = runCli(["nope.md", "--json"], dir);
   assert.equal(missing.status, 1);
   assert.equal(JSON.parse(missing.stdout).reason, "missing");
@@ -415,18 +587,48 @@ test("cli: missing file → reason=missing exit 1; unknown flag → usage exit 2
   assert.match(help.stderr, /usage: handoff-verify/);
 });
 
-test("cli: the default runner strips `command ` and executes through bash, and a timeout is reported not thrown", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "handoff-verify-"));
-  execFileSync("git", ["init", "-q"], { cwd: dir });
+test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a timeout kills the whole process group (CR-6)", () => {
+  const dir = tempDir();
+  const pidFile = path.join(dir, "child.pid");
+  // slow.js forks a grandchild that records its pid and sleeps; the group
+  // kill must reach it, not only slow.js.
+  fs.writeFileSync(
+    path.join(dir, "slow.js"),
+    `const { spawn } = require("child_process");
+     const c = spawn(process.execPath, ["-e", "setTimeout(function(){}, 20000)"], { stdio: "ignore" });
+     require("fs").writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));
+     setTimeout(function(){}, 20000);`,
+  );
   fs.writeFileSync(
     path.join(dir, "handoff.md"),
-    TABLE_HEADER +
-      '| Slow | `command node -e "setTimeout(function(){},5000)"` | **done** |\n',
+    TABLE_HEADER + "| Slow | `command node slow.js` | **done** |\n",
   );
-  const r = runCli(["handoff.md", "--json", "--timeout", "1"], dir);
+  // 3 s, not 1: under load node can take longer than a second to start, and
+  // a leader killed before it forked proves nothing about the group kill.
+  const r = runCli(["handoff.md", "--json", "--timeout", "3"], dir);
   const obj = JSON.parse(r.stdout);
   assert.equal(obj.lines[0].verdict, "unverifiable");
-  assert.match(obj.lines[0].detail, /timeout \(1s\)/);
+  assert.match(obj.lines[0].detail, /timeout \(3s\)/);
+  const grandchild = Number(fs.readFileSync(pidFile, "utf8"));
+  assert.ok(grandchild > 0);
+  let alive = true;
+  try {
+    process.kill(grandchild, 0);
+  } catch {
+    alive = false;
+  }
+  if (alive) {
+    try {
+      process.kill(grandchild, "SIGKILL");
+    } catch {
+      /* raced */
+    }
+  }
+  assert.equal(
+    alive,
+    false,
+    "the grandchild outlived the timeout — the process group was not killed",
+  );
 });
 
 // ---------------------------------------------------------------------------
