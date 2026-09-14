@@ -37,7 +37,7 @@ Add one mutation-proved end-to-end test to `skills/sync-jira-story/tests/end-to-
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #406: https://github.com/Gamaroff/agent-skills/pull/406 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.109.qa.{N}.*.md`; `task.109.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 1 cycle; gate 1 PASS 100; 5c APPROVE (`task.109.pr-review.1.…md`) | —                    |
 | 7. finalise                | ✅ Done    | `task.109.dod.{N}.*.md`; task `status: accepted`                       | ACCEPTED; DoD 1; acceptance commit `4bb15019`; CI reading 2 SUCCESS | —                    |
-| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | implementation report committed (see Completion); PR #406 | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Committed in `0c43d064`; PR #406 | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
