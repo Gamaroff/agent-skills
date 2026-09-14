@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-6
 **Severity**: HIGH
 **Priority**: P0
-**Status**: ✅ Ready for QA
+**Status**: 🔁 Reopened
 **Found By**: QA Engineer (cycle 4 reviewer, CR-1)
 **Date Found**: 2026-09-13
 
@@ -36,9 +36,18 @@ Add an explicit step to `On exit` (and to the FAIL/open arm's hand-off generally
 
 **Testing**: new test "the Action row the consumers read has a writer on every route" pins the post-guard sentence, the value set, the absence of the dead value, and On-exit step 1 (with both row values). Mutation-proved: remove step 1 → red; re-add `Proceeding to finalise` → red; drop "post-guard write" → red. `npm run ci:fast` 3270/3269/0.
 
+### Iteration 2
+
+#### QA Verification (Ready for QA → Reopened)
+
+**Date**: 2026-09-14 (QA cycle 5, CR-5)
+
+**Reopening reason**: the fix is verified (post-guard write; On-exit step 1; closed set) — reopened only for the residue: the post-guard rule specifies the `**PR Review**` value for 5c and 5b but not for the third resolution of arms 4–5, the Convergence-check trip. **Re-fix**: state that the escalation arm writes `not reached — gate did not exit the loop` on `**PR Review**` beside `Escalating — loop not converging` on `**Action**`.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-13 | New          | QA         | Cycle 4 reviewer (CR-1) |
 | 2026-09-13 | Ready for QA | qa-fix     | Post-guard write + On-exit step 1 + closed value set |
+| 2026-09-14 | Reopened     | QA         | Cycle 5: escalation-arm PR Review value |

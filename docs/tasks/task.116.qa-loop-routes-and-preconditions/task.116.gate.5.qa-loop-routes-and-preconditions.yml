@@ -1,0 +1,90 @@
+schema: 1
+task: 'task.116.qa-loop-routes-and-preconditions'
+task_title: 'The QA loop routes on the verdict token, gates before its own review returns, reads boundary deliverables it could execute, and has no vocabulary for a subagent that never ran'
+gate: FAIL
+status_reason: 'Cycle-4 fixes verified. But the branch now carries release housekeeping merged between sessions that references a skill absent from the branch — the fast gate is red (catalog test) — and files the task changelog entries under v0.47.0. One HIGH (red suite) → FAIL by rule 1. Task-attributable residue: the runbook verification grep is empty when more than one implementation report exists, the escalation arm leaves PR Review unspecified, and two qa-flow sentences still overlap.'
+reviewer: 'QA Engineer'
+updated: '2026-09-14T05:46:09Z'
+
+top_issues:
+  - id: 'CR-2'
+    severity: high
+    file: 'package.json'
+    finding: 'skill-catalog.md and the eval:test-it / eval:all scripts (merged in b36bca4a) reference skills/test-it and evals/test-it/scenarios, which exist on origin/develop but not on this branch; the catalog test fails (126 vs 127) and npm run ci:fast exits 1.'
+    suggested_action: 'Merge origin/develop into the branch so test-it and its evals travel with the hunks; regenerate the catalog; confirm ci:fast green.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.7.release-housekeeping-merged-mid-pr.md'
+    status: open
+  - id: 'CR-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'The five task-116 Changed bullets sit under "## [v0.47.0] - 2026-09-13" (header inserted above them by 23cc8e33), recording unreleased work as shipped.'
+    suggested_action: 'Move the bullets back under ## [Unreleased] → ### Changed.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.7.release-housekeeping-merged-mid-pr.md'
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'docs/runbooks/task-development.md'
+    finding: 'The verification snippet grep -A8 "^### QA Cycle" …/*.implementation.*.md | grep "^\*\*Action\*\*" prints nothing when the glob matches more than one report (multi-file grep prefixes "filename-" and the ^ anchor no longer matches) — exit 0, empty output reads as nothing to check. Same at story-development.md.'
+    suggested_action: 'Add -h to the first grep (or target the highest-numbered report) and state the expected non-empty output.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The post-guard write rule specifies the PR Review value for 5c and 5b but not for the third resolution of arms 4–5 — the Convergence-check trip (Action "Escalating — loop not converging") — so the escalation path leaves PR Review unspecified.'
+    suggested_action: 'State that the escalation arm writes "not reached — gate did not exit the loop" on PR Review.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.6.on-exit-never-writes-the-action-row.md'
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'docs/runbooks/qa-flow.md'
+    finding: 'Phase 3 lead "If the gate is CONCERNS or FAIL:" still sends every CONCERNS to qa-fix, contradicting the Reservation-without-a-queue row in the same file; and the Clean-gate row overlaps the route-3 row while the mermaid qa-fix edge captures an active WAIVED (CR-4, CR-6).'
+    suggested_action: 'Key the lead on the queue; label the edge "FAIL, or an open finding no active waiver covers"; qualify the Clean-gate row.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 3270
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered; unchanged. Re-review scope: since 2026-09-13T09:14:25Z plus the three housekeeping files merged between sessions; SAFETY_REPROBE=false.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: FAIL
+    notes: 'npm run ci:fast TEST_EXIT=1 on HEAD a7c425d3 — "generated catalog is in sync with SKILL.md frontmatter" (126 vs 127). Green at 009f4587 (3270/3269/0) before the housekeeping merge. Cycle-4 fixes themselves verified; QA mutation proof (On-exit step 1) → covered.'
+  maintainability:
+    status: PASS
+    notes: 'Task-attributable findings are three sentences and one grep flag. The reviewer subagent failed once on a quota error (429) and was re-dispatched once on operator instruction — recorded in the implementation report Issues Log.'
+
+recommendations:
+  immediate:
+    - action: 'Merge origin/develop; regenerate catalog; ci:fast green; changelog bullets back under Unreleased (CR-2, CR-1)'
+      refs: ['package.json', 'docs/reference/skill-catalog.md', 'CHANGELOG.md']
+    - action: 'Runbook grep -h; escalation-arm PR Review value; qa-flow lead/row/edge (CR-3, CR-5, CR-4/6)'
+      refs: ['docs/runbooks/task-development.md', 'docs/runbooks/story-development.md', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'docs/runbooks/qa-flow.md']
+  future: []
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-2 closed (suite green)', 'CR-1 closed', 'CR-3 closed']
