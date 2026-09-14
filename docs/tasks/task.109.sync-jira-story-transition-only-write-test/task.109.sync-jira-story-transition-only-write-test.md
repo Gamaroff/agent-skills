@@ -143,6 +143,7 @@ Delete the test. Nothing else changes.
 | 2026-09-14 | 1.1     | Review passed (9/10) — linked GitHub issue #405; ready for development | review-task |
 | 2026-09-14 |         | Status → ready-for-development | review-task |
 | 2026-09-14 |         | Implemented — 2 files, 1 test (mutation-proved) | develop |
+| 2026-09-14 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 
 ---
 
@@ -153,6 +154,29 @@ Delete the test. Nothing else changes.
 - [x] Mutation-proved against the gate at `sync-jira-story.js` ≈1265-1272
 ### Phase 2: close the loop
 - [x] Handoff §3c and this task's registry row updated (§3c closed in develop; registry Status cell is ticked by `/finalise`)
+
+---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-14
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.109.qa.1.sync-jira-story-transition-only-write-test.md](./task.109.qa.1.sync-jira-story-transition-only-write-test.md)
+- **Gate File**: [task.109.gate.1.sync-jira-story-transition-only-write-test.yml](./task.109.gate.1.sync-jira-story-transition-only-write-test.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3271 (`ci:fast`), 6 in the story e2e suite
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. Mutation proof independently reproduced at QA (`covered`). Two low advisory cleanups (CR-1, CR-2) and one LOW documentary note (criterion 1 names `skipped:true`, which the story engine does not return) recorded in the QA report.
 
 ---
 
