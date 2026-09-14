@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-7
 **Severity**: HIGH
 **Priority**: P0
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 5 reviewer, CR-1 / CR-2; fast gate)
 **Date Found**: 2026-09-14
 
@@ -32,9 +32,16 @@ Merge `origin/develop` into the branch so `test-it` and its evals travel with th
 
 **Testing**: `npm run ci:fast` → exit 0, 3270 tests, 0 fail (the catalog test that was red now passes); `npm run bundle -- --check` → 127 skills, 0 problems.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-14 (QA cycle 6)
+
+**Verification**: `skills/test-it/SKILL.md` and `evals/test-it/` present after merge `d0a53d62`; `npm run generate-catalog` → 127 skills, tree unchanged; `npm run ci:fast` on `f5b8d94b` → 3270 / 3269 / 0 / 1 skipped, EXIT=0 (the catalog test passes); `git diff origin/develop -- CHANGELOG.md` → 36 insertions, 0 deletions — v0.47.0 identical to the tagged text, the five task-116 bullets under `[Unreleased]` → `### Changed`. **Closed.**
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes |
 | ---------- | ------------ | ---------- | ----- |
 | 2026-09-14 | New          | QA         | Cycle 5 reviewer (CR-1 / CR-2); fast gate red |
 | 2026-09-14 | Ready for QA | operator   | develop merged, catalog regenerated, changelog bullets moved to Unreleased |
+| 2026-09-14 | Closed       | QA         | Cycle 6: verified — suite green, catalog in sync, changelog refiled |

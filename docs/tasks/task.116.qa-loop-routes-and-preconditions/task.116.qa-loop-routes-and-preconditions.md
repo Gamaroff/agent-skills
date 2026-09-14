@@ -5,7 +5,7 @@ type: task
 description: "Six observations on qa-task / qa-story and the 5b/5c router. A CONCERNS gate with empty top_issues[] — legitimate under gate rule 4 — has no route and halts the run on 'nothing to fix' (#51). Step 10 can write and publish a PASS gate while the Step 3b code review is still running; task.106's gate 1 was posted minutes before the review returned two confirmed defects (#56). A predicate deliverable is read at QA and only executed at the Step 7 DoD probe, so its defect lands after the gate that should have covered it (#20). A green suite on macOS was blessed as evidence about Linux (#17). And skills document an agent that failed but not one that was unavailable (#44) or one whose output file is small (#62)."
 tags: [qa-task, qa-story, pipeline, subagents]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-09-12
@@ -17,7 +17,7 @@ github_issue: 403
 
 # Technical Task: The QA loop routes on the verdict token, gates before its own review returns, reads boundary deliverables it could execute, and has no vocabulary for a subagent that never ran
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.116.review.1.qa-loop-routes-and-preconditions.md` implemented 2026-09-13
 **GitHub Issue**: [#403](https://github.com/Gamaroff/agent-skills/issues/403)
 
@@ -152,28 +152,31 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 
 ## QA Testing Results
 
-**QA Status**: ❌ FAIL (cycle 5)
+**QA Status**: ✅ PASS (cycle 6 — operator-authorised after the cycle-5 escalation)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-14
-**Quality Score**: 50/100
-**Gate Decision**: FAIL
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.116.qa.5.qa-loop-routes-and-preconditions.md](./task.116.qa.5.qa-loop-routes-and-preconditions.md) (earlier: [qa.4](./task.116.qa.4.qa-loop-routes-and-preconditions.md), [qa.3](./task.116.qa.3.qa-loop-routes-and-preconditions.md), [qa.2](./task.116.qa.2.qa-loop-routes-and-preconditions.md), [qa.1](./task.116.qa.1.qa-loop-routes-and-preconditions.md))
-- **Gate File**: [task.116.gate.5.qa-loop-routes-and-preconditions.yml](./task.116.gate.5.qa-loop-routes-and-preconditions.yml) (earlier: [gate.4](./task.116.gate.4.qa-loop-routes-and-preconditions.yml), [gate.3](./task.116.gate.3.qa-loop-routes-and-preconditions.yml), [gate.2](./task.116.gate.2.qa-loop-routes-and-preconditions.yml), [gate.1](./task.116.gate.1.qa-loop-routes-and-preconditions.yml))
+- **Full Report**: [task.116.qa.6.qa-loop-routes-and-preconditions.md](./task.116.qa.6.qa-loop-routes-and-preconditions.md) (earlier: [qa.5](./task.116.qa.5.qa-loop-routes-and-preconditions.md), [qa.4](./task.116.qa.4.qa-loop-routes-and-preconditions.md), [qa.3](./task.116.qa.3.qa-loop-routes-and-preconditions.md), [qa.2](./task.116.qa.2.qa-loop-routes-and-preconditions.md), [qa.1](./task.116.qa.1.qa-loop-routes-and-preconditions.md))
+- **Gate File**: [task.116.gate.6.qa-loop-routes-and-preconditions.yml](./task.116.gate.6.qa-loop-routes-and-preconditions.yml) (earlier: [gate.5](./task.116.gate.5.qa-loop-routes-and-preconditions.yml), [gate.4](./task.116.gate.4.qa-loop-routes-and-preconditions.yml), [gate.3](./task.116.gate.3.qa-loop-routes-and-preconditions.yml), [gate.2](./task.116.gate.2.qa-loop-routes-and-preconditions.yml), [gate.1](./task.116.gate.1.qa-loop-routes-and-preconditions.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3270 (3268 pass, 1 skipped, 1 fail — catalog drift from the housekeeping merge)
+- **Tests Executed**: 3270 (3269 pass, 1 skipped, 0 fail — `ci:fast` on `f5b8d94b`)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1 HIGH (2 MEDIUM, 2 LOW)
-- **NFR Status**: Security: PASS (reasoned, no boundary), Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM (1 LOW, closed in-cycle; 4 advisory)
+- **NFR Status**: Security: PASS (reasoned, no boundary), Performance: PASS, Reliability: PASS (suite green on `f5b8d94b`; was FAIL at gate 5), Maintainability: PASS
 
 ### Bug Reports
 
 #### Open Bugs
-- [Bug 116.7: Release housekeeping merged mid-PR references a skill the branch does not have](./task.116.bug.7.release-housekeeping-merged-mid-pr.md) - ✅ Ready for QA (post-escalation: develop merged, catalog regenerated, changelog bullets under Unreleased) - Priority: P0
-- [Bug 116.6: The Diminishing-returns On-exit steps never write the Action row](./task.116.bug.6.on-exit-never-writes-the-action-row.md) - ✅ Ready for QA (iteration 2, post-escalation: Convergence-trip resolution named; test extended) - Priority: P0
-- [Bug 116.2: Consumer docs still restate "CONCERNS → qa-fix"](./task.116.bug.2.consumer-docs-restate-old-route.md) - ✅ Ready for QA (iteration 5, post-escalation: grep -h + expected output; qa-flow lead/row/edge) - Priority: P2
+- None
+
+#### Closed (cycle 6)
+- [Bug 116.7: Release housekeeping merged mid-PR references a skill the branch does not have](./task.116.bug.7.release-housekeeping-merged-mid-pr.md) - ✅ Closed (cycle 6 — verified: develop merged, catalog in sync, changelog refiled) - Priority: P0
+- [Bug 116.6: The Diminishing-returns On-exit steps never write the Action row](./task.116.bug.6.on-exit-never-writes-the-action-row.md) - ✅ Closed (cycle 6 — verified; mutation-proven) - Priority: P0
+- [Bug 116.2: Consumer docs still restate "CONCERNS → qa-fix"](./task.116.bug.2.consumer-docs-restate-old-route.md) - ✅ Closed (cycle 6 — verified, 5 iterations) - Priority: P2
 
 #### Closed Bugs
 - [Bug 116.1: Outcome branching leaves two gate shapes unrouted](./task.116.bug.1.unrouted-gate-shapes.md) - ✅ Closed (cycle 3) - Priority: P1
@@ -182,6 +185,8 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 - [Bug 116.5: The loop document disagrees with its own arms](./task.116.bug.5.loop-doc-disagrees-with-its-own-arms.md) - ✅ Closed (cycle 4) - Priority: P1
 
 ### Key Findings
+**Cycle 6 (PASS):** all cycle-5 findings verified fixed; suite green after the develop merge; one LOW on the cycle-5 QA summary block (Reliability shown PASS against a FAIL gate), rewritten by this cycle; four advisory notes (arm-5 sub-case wording, exact-vs-prefix Action row, route-2 mermaid edge, glob order) recorded for follow-up.
+
 **Cycle 5 (FAIL):** release housekeeping merged between sessions references `test-it` (absent on the branch) — fast gate red — and files the task's changelog under v0.47.0; runbook grep empty with two reports; escalation-arm PR Review unspecified; two qa-flow sentences.
 
 **Cycle 4 (FAIL):** the `On exit` steps never write the `Action` row the consumers now read; one runbook snippet's commands disagree with its comment; three stale consumer sentences.
@@ -208,6 +213,7 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 | 2026-09-13 |         | QA gate FAIL (70/100) — 5 findings (1 HIGH: On-exit never writes the Action row the consumers read) | qa-task |
 | 2026-09-13 |         | QA findings fixed — the accepting-route set lives once in §5c and its mechanical record (the cycle entry's Action row) has a writer on every route (post-guard write; On-exit step 1); consumers point, never paraphrase; matrix-driven + paraphrase-forbidding + writer tests; 5 iterations (the fifth applied by the operator after the cycle-5 escalation: develop merged, changelog refiled, grep -h, Convergence-trip write, qa-flow lead/row/edge) | qa-fix |
 | 2026-09-14 |         | QA gate FAIL (50/100) — 5 findings (1 HIGH: housekeeping merge references an absent skill, suite red) | qa-task |
+| 2026-09-14 |         | QA gate PASS (100/100) — 0 blocking findings; cycle 6 authorised by the operator after the cycle-5 escalation; suite green after develop merge | qa-task |
 
 ---
 
@@ -235,7 +241,7 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 
 ---
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.116.qa-loop-routes-and-preconditions/task.116.qa-loop-routes-and-preconditions.md`

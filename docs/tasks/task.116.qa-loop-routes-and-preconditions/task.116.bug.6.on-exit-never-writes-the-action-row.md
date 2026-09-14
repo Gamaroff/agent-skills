@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-6
 **Severity**: HIGH
 **Priority**: P0
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 4 reviewer, CR-1)
 **Date Found**: 2026-09-13
 
@@ -52,6 +52,12 @@ Add an explicit step to `On exit` (and to the FAIL/open arm's hand-off generally
 
 **Testing**: "the Action row the consumers read has a writer on every route" extended to assert the Convergence-trip sentence with both row values. Mutation-proved: sentence removed → 29/30 (that test red); restored → 30/30. `npm run ci:fast` 3270 tests, 0 fail.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-14 (QA cycle 6)
+
+**Verification**: `shared/resources/develop-pipeline-step-5-6-qa-loop.md:266–268` names the Convergence-trip resolution with both row values; source and both bundled copies identical (`bundle --check` 127 / 0). QA mutation: PR Review value swapped → "the Action row the consumers read has a writer on every route" red (29/30), restored 30/30 → `covered`. One advisory note carried to gate 6 `recommendations.future`: the rule's "after both guards for arms 4–5" misstates arm 5's no-open-entry sub-case (medium confidence). **Closed.**
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes |
@@ -60,3 +66,4 @@ Add an explicit step to `On exit` (and to the FAIL/open arm's hand-off generally
 | 2026-09-13 | Ready for QA | qa-fix     | Post-guard write + On-exit step 1 + closed value set |
 | 2026-09-14 | Reopened     | QA         | Cycle 5: escalation-arm PR Review value |
 | 2026-09-14 | Ready for QA | operator   | Iteration 2: Convergence-trip resolution named; test extended (post-escalation) |
+| 2026-09-14 | Closed       | QA         | Cycle 6: verified; mutation-proven |

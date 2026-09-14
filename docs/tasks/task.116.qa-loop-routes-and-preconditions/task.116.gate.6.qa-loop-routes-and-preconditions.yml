@@ -1,0 +1,70 @@
+schema: 1
+task: 'task.116.qa-loop-routes-and-preconditions'
+task_title: 'The QA loop routes on the verdict token, gates before its own review returns, reads boundary deliverables it could execute, and has no vocabulary for a subagent that never ran'
+gate: PASS
+status_reason: 'All five cycle-5 findings verified fixed in the tree (develop merged, catalog in sync, changelog refiled, grep -h, Convergence-trip write rule, qa-flow lead/row/edge); suite 3270/3269/0 skipped 1 on HEAD f5b8d94b; one low-severity finding on the task document QA summary block, which this cycle rewrites in Step 12 (closed in-cycle). Four further findings are advisory (medium/low confidence).'
+reviewer: 'QA Engineer'
+updated: '2026-09-14T06:35:03Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'docs/tasks/task.116.qa-loop-routes-and-preconditions/task.116.qa-loop-routes-and-preconditions.md'
+    finding: 'The QA Testing Results block reported "Reliability: PASS" while the gate 5 it cited recorded nfr_validation.reliability.status: FAIL — the summary contradicted its own artifact.'
+    suggested_action: 'Rewrite the NFR Status line from the gate it cites; the block is owned by qa-task Step 12 and is regenerated every cycle from that cycle''s gate.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-14'
+    resolution: 'Closed in this cycle: qa-task Step 12 rewrites the QA Testing Results block from gate 6; the NFR line now reads Reliability: PASS against a gate whose reliability axis is PASS. Recorded here so the finding is not lost, not carried as open work.'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3270
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered by this cycle''s diff (prose, a runbook grep, a CHANGELOG move, a test assertion); unchanged from gates 1–5. Re-review scope: since 2026-09-14T05:46:09Z (default); SAFETY_REPROBE=false (gate 5 security PASS reasoned).'
+  performance:
+    status: PASS
+    notes: 'Documentation, runbook and test changes only; ci:fast wall time unchanged.'
+  reliability:
+    status: PASS
+    notes: 'npm run ci:fast on HEAD f5b8d94b: 3270 tests, 3269 pass, 0 fail, 1 skipped, EXIT=0 — the catalog test that failed gate 5 passes after the develop merge (127 skills). npm run bundle -- --check: 127 skills, 0 problems. Mutation proof: Convergence-trip PR Review value mutated → "the Action row … has a writer on every route" red (29/30), restored 30/30 → covered.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory residue recorded in the QA report Code Review section: arm-5 sub-case wording in the post-guard rule (CR-2, medium confidence), Action-row annotations vs the "exactly" value set (CR-3, medium confidence), mermaid edges omit route 2 (CR-4 cleanup), glob order at ≥10 reports (CR-5 cleanup, low confidence), qa-flow Phase 3 lead not pinned by a test (mutation no-red-untested). None is a defect in a fix this cycle verified.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Qualify the post-guard write rule for arm 5''s no-open-entry sub-case, which reaches 5c without the guards (CR-2)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+    - action: 'Decide whether the Action row is an exact closed-set value or a prefix, and make the loop doc, the runbook comment and the report template agree (CR-3)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'docs/runbooks/task-development.md', 'docs/runbooks/story-development.md']
+    - action: 'Add a route-2 edge to the qa-flow mermaid so it agrees with the four-row exits table; add the reverted Phase 3 lead shape to the paraphrase guard (CR-4; mutation no-red-untested)'
+      refs: ['docs/runbooks/qa-flow.md', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'Version-sort the runbook glob or state the single-report assumption (CR-5)'
+      refs: ['docs/runbooks/task-development.md', 'docs/runbooks/story-development.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-14'
+  total_iterations: 5
+  verification_method: 'Tree read + ci:fast + bundle --check + mutation proof; bugs 7, 2 (iteration 5), 6 (iteration 2) verified and closed'

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (Step 6 breaking-change sweep)
 **Date Found**: 2026-09-13
 
@@ -121,6 +121,12 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 
 **Testing**: behavioural — the snippet run over a two-report glob prints nothing without `-h` and the last Action row with it (reproduced against `docs/tasks/task.11[56]*/`). `pr-review-loop-parity` 30/30, `qa-gate-preconditions-parity` 8/8; `npm run ci:fast` 3270 tests, 0 fail.
 
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-14 (QA cycle 6)
+
+**Verification**: (a) both runbook snippets read `grep -h -A8 …` with the expected-output comment; reproduced over a two-report glob — empty without `-h`, the last Action row with it; (b) `qa-flow.md:62` lead keyed on the queue; (c) `:80` Clean-gate row reads `PASS` with no open entry (no overlap with the route-3 row); `:21` edge excludes an active `WAIVED`. Parity suites 38/38. Advisory notes carried to gate 6 `recommendations.future` (route-2 mermaid edge; glob order at ≥10 reports) — not defects in this fix. **Closed after 5 iterations.**
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes                          |
@@ -136,3 +142,4 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 4: iteration 4 fix |
 | 2026-09-14 | Reopened     | QA         | Cycle 5: grep -h; qa-flow lead/row/edge |
 | 2026-09-14 | Ready for QA | operator   | Iteration 5: grep -h + expected output; qa-flow lead/row/edge (post-escalation) |
+| 2026-09-14 | Closed       | QA         | Cycle 6: verified (5 iterations) |
