@@ -191,7 +191,7 @@ find "$D" -maxdepth 1 -name '*.pr-review.*.md' 2>/dev/null
 **Glob on the artifact segment; never reconstruct an exact filename.** The trailing slug is free descriptive text — `task.53.implementation.1.jira-rest-interception-initial-run.md` does not repeat the work-item slug. The sprint-review file is unprefixed in task directories and prefixed in some story directories, so glob `*sprint-review-summary.md`.
 
 Read the **highest-numbered** gate for `gate:`, `quality_score`, `top_issues`, `waiver`; the DoD header block; and the implementation report's Pipeline Progress table. The same verification predicates the pipeline uses to confirm a completed run apply here: a gate
-that reads `PASS` or `WAIVED`, a DoD file present once the document says `accepted`. (In this
+that reached 5c (the QA loop's §5c accepting-route set — read from the last QA cycle entry's `**Action**: Proceeding to 5c` row, not from the gate token), a DoD file present once the document says `accepted`. (In this
 repo they are written up in `docs/reference/pipeline-artifacts.md`; that is a repo document, not
 a bundled skill reference, so it is named rather than linked.)
 
@@ -543,7 +543,7 @@ After editing, run `npm run bundle`.
 ## Relationship to the develop pipelines
 
 `/develop-story` and `/develop-task` **do** call `/review-pr`, as **Step 5c** — the exit gate of
-their Steps 5–6 QA loop. It runs once a QA gate reads `PASS` or `WAIVED`, and nothing leaves that
+their Steps 5–6 QA loop. It runs once a QA gate reaches it by any of §5c's three routes — the cycle entry's `**Action**` row reads `Proceeding to 5c` — and nothing leaves that
 loop without passing through it. The full routing lives in the pipelines' Steps 5–6 QA loop step
 file, §5c — deliberately not linked by path, because the bundler follows such a reference and would
 copy that file and its transitive dependencies into this skill, which does not need them to run.

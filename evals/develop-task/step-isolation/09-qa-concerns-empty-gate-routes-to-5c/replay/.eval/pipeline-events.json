@@ -1,0 +1,6 @@
+[
+  {"skill": "qa-task",   "args": null, "status": "started",   "timestamp": 1000},
+  {"skill": "qa-task",   "args": null, "status": "completed", "timestamp": 1500},
+  {"skill": "review-pr", "args": "--effort medium --comment", "status": "started",   "timestamp": 2000},
+  {"skill": "review-pr", "args": "--effort medium --comment", "status": "completed", "timestamp": 2500}
+]

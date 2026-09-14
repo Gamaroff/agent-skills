@@ -236,7 +236,7 @@ silently lies. It can be honest about not having a value: under a deferring mode
 stdout (every notice goes to stderr, so a capture cannot see it), records the mutation with `produces`
 set, and marks a value-producing kind `blocking: true`. The checklist then opens with a banner naming
 the **two-run convergence**: perform the action, write the value into the document, re-run. Contract:
-[`tracker-issue-cli.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/tracker-issue-cli.md).
+[`tracker-issue-cli.md`](tracker-issue-cli.md).
 
 No placeholder is ever written. `github_issue: 0` would defeat the idempotent search that stops the
 next run creating a duplicate, so a wrong key is worse than no key.

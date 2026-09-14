@@ -26,7 +26,7 @@ Task mode (mode=<mode> where <mode>=task):
   Bug Reports: task.<id>.bug.*.md                   (all matches)
 
 The **PR Review** report is written by Step 5c (`/review-pr`) and is the ONLY carrier of findings on
-the review-driven path: 5c runs when the gate is already `PASS`/`WAIVED`, so a `REQUEST CHANGES`
+the review-driven path: 5c runs when the gate reached it (any of the QA loop's three accepting routes, §5c), so a `REQUEST CHANGES`
 verdict has no gate `top_issues[]` to travel in. Omitting this glob makes that path silently
 findings-free — qa-fix would change nothing and the loop would HALT reporting the issues as
 unfixable.
@@ -170,7 +170,7 @@ findings_summary:
 - Sort findings by severity: high first, then medium, then low
 - Within same severity, sort by source: gate > pr-review > report > bug. (`pr-review` ranks above
   `report` because on the review-driven path it is the only source carrying this cycle's findings —
-  the gate that sent the run to 5c reads `PASS`.)
+  the gate that sent the run to 5c carries no open fix target on any of §5c's three routes.)
 - Cap at 20 findings total. If raw count exceeds 20:
   - Include the top 20 by severity
   - Set `truncated_count` to the number of findings dropped

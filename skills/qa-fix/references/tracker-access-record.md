@@ -370,5 +370,5 @@ invisible-drift failure this whole sequence exists to remove.
 ## See also
 
 - [`defer-mutation.js`](defer-mutation.js) — the single writer (CLI + `require`)
-- [`handover-render.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/handover-render.js) — the four renderers
+- [`handover-render.js`](handover-render.js) — the four renderers
 - [`platform-detection.md`](platform-detection.md) — how `ACCESS_TRACKER` is resolved

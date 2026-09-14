@@ -1,0 +1,84 @@
+schema: 1
+task: 'task.116.qa-loop-routes-and-preconditions'
+task_title: 'The QA loop routes on the verdict token, gates before its own review returns, reads boundary deliverables it could execute, and has no vocabulary for a subagent that never ran'
+gate: FAIL
+status_reason: 'Cycle 3 made "reached 5c" a mechanical signal (the cycle entry Action row) and every consumer now reads it — but the loop doc never instructs the Diminishing-returns exit to WRITE it, and its template still offers an unreachable value, so route 2 is mis-handled one layer down. One HIGH → FAIL by rule 1. Everything else from cycle 3 verified; remaining findings are one runbook snippet whose commands disagree with its comment and three stale consumer sentences.'
+reviewer: 'QA Engineer'
+updated: '2026-09-13T09:14:25Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The Diminishing-returns On-exit steps (:558-568) instruct only the Loop exit row and never the Action (or PR Review → pending) overwrite; the entry template (:315) still offers the unreachable "Proceeding to finalise"; so the claim at :257 that 5a writes "Proceeding to 5c" on every accepting route is unbacked for route 2, and both consumers then decide a route-2 gate never reached 5c.'
+    suggested_action: 'Add the Action/PR Review overwrite as an explicit On-exit step (and on every hand-off to 5c/5b after the guards), drop "Proceeding to finalise" from the template, and pin the value set + the On-exit step in the parity test.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.6.on-exit-never-writes-the-action-row.md'
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'docs/runbooks/story-development.md'
+    finding: 'The verification snippet comment (:297; task-development.md:179) says to confirm the Action row reads "Proceeding to 5c" but the commands beneath still grep the gate token from the gate file — the paraphrase regex was satisfied without the check being changed.'
+    suggested_action: 'Add a grep over the implementation report last QA Cycle entry for the Action row, or reword the comment to what the gate grep establishes.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/qa-findings-ingester-prompt.md'
+    finding: 'Rules section :172 still says "the gate that sent the run to 5c reads PASS" — false on routes 2 and 3 and contradicting :28 in the same file.'
+    suggested_action: 'Reword to "carries no open fix target on any of §5c three routes".'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'skills/review-pr/SKILL.md'
+    finding: 'The host skill of the rewritten conformance prompt still states the completion predicate as "a gate that reads PASS or WAIVED" (:194) and "runs once a QA gate reads PASS or WAIVED" (:546) — the prompt says do NOT read the token while the SKILL loading it says read the token.'
+    suggested_action: 'Point both sentences at §5c accepting-route set and the cycle entry Action row.'
+    suggested_owner: dev
+    bug_ref: 'task.116.bug.2.consumer-docs-restate-old-route.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 3269
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered; unchanged. Re-review scope: since 2026-09-13T08:54:10Z (default narrowing; SAFETY_REPROBE=false).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-3 fixes verified in source + bundled copies; QA mutation proof on the resume not-reached row → covered; ci:fast 3269/3268/0. The unwritten Action row (CR-1) is carried in top_issues.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory CR-5: qa-flow How-the-loop-ends "Clean gate" row omits the inactive-WAIVED-no-open cell; say "route 1 — see §5c" rather than enumerate tokens. Findings are shrinking and local: 7 → 8 → 5, HIGH [0,2,0,1] — the last HIGH is a missing write in the mechanism cycle 3 introduced, not a regression of a closed one.'
+
+recommendations:
+  immediate:
+    - action: 'On-exit (and every post-guard hand-off) writes the Action + PR Review rows; drop Proceeding to finalise; pin in the parity test (CR-1)'
+      refs: ['shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'evals/shared/tests/pr-review-loop-parity.test.mjs']
+    - action: 'Runbook snippets check what their comment says; ingester :172; review-pr SKILL.md :194/:546 (CR-2, CR-3, CR-4)'
+      refs: ['docs/runbooks/story-development.md', 'docs/runbooks/task-development.md', 'shared/resources/qa-findings-ingester-prompt.md', 'skills/review-pr/SKILL.md']
+  future:
+    - action: 'qa-flow Clean-gate row → "route 1 — see §5c" (CR-5)'
+      refs: ['docs/runbooks/qa-flow.md']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['CR-1 closed', 'CR-2 closed']
