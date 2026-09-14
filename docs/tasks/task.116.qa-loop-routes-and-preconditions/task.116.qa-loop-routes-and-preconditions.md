@@ -171,9 +171,9 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 ### Bug Reports
 
 #### Open Bugs
-- [Bug 116.7: Release housekeeping merged mid-PR references a skill the branch does not have](./task.116.bug.7.release-housekeeping-merged-mid-pr.md) - 🆕 New - Priority: P0
-- [Bug 116.6: The Diminishing-returns On-exit steps never write the Action row](./task.116.bug.6.on-exit-never-writes-the-action-row.md) - 🔁 Reopened (cycle 5: escalation-arm PR Review value only) - Priority: P0
-- [Bug 116.2: Consumer docs still restate "CONCERNS → qa-fix"](./task.116.bug.2.consumer-docs-restate-old-route.md) - 🔁 Reopened (cycle 5: grep -h; qa-flow lead/row/edge) - Priority: P2
+- [Bug 116.7: Release housekeeping merged mid-PR references a skill the branch does not have](./task.116.bug.7.release-housekeeping-merged-mid-pr.md) - ✅ Ready for QA (post-escalation: develop merged, catalog regenerated, changelog bullets under Unreleased) - Priority: P0
+- [Bug 116.6: The Diminishing-returns On-exit steps never write the Action row](./task.116.bug.6.on-exit-never-writes-the-action-row.md) - ✅ Ready for QA (iteration 2, post-escalation: Convergence-trip resolution named; test extended) - Priority: P0
+- [Bug 116.2: Consumer docs still restate "CONCERNS → qa-fix"](./task.116.bug.2.consumer-docs-restate-old-route.md) - ✅ Ready for QA (iteration 5, post-escalation: grep -h + expected output; qa-flow lead/row/edge) - Priority: P2
 
 #### Closed Bugs
 - [Bug 116.1: Outcome branching leaves two gate shapes unrouted](./task.116.bug.1.unrouted-gate-shapes.md) - ✅ Closed (cycle 3) - Priority: P1
@@ -206,7 +206,7 @@ from item 5 and record `killed at N minutes`, never `stalled`.
 | 2026-09-13 |         | QA gate FAIL (40/100) — 7 findings (2 HIGH: resume contract + conformance prompt still key 5c on PASS/WAIVED) | qa-task |
 | 2026-09-13 |         | QA gate CONCERNS (60/100) — 6 findings (4 MEDIUM: restated set omits route 2; loop doc vs its own arms) | qa-task |
 | 2026-09-13 |         | QA gate FAIL (70/100) — 5 findings (1 HIGH: On-exit never writes the Action row the consumers read) | qa-task |
-| 2026-09-13 |         | QA findings fixed — the accepting-route set lives once in §5c and its mechanical record (the cycle entry's Action row) has a writer on every route (post-guard write; On-exit step 1); consumers point, never paraphrase; matrix-driven + paraphrase-forbidding + writer tests; 4 iterations | qa-fix |
+| 2026-09-13 |         | QA findings fixed — the accepting-route set lives once in §5c and its mechanical record (the cycle entry's Action row) has a writer on every route (post-guard write; On-exit step 1); consumers point, never paraphrase; matrix-driven + paraphrase-forbidding + writer tests; 5 iterations (the fifth applied by the operator after the cycle-5 escalation: develop merged, changelog refiled, grep -h, Convergence-trip write, qa-flow lead/row/edge) | qa-fix |
 | 2026-09-14 |         | QA gate FAIL (50/100) — 5 findings (1 HIGH: housekeeping merge references an absent skill, suite red) | qa-task |
 
 ---

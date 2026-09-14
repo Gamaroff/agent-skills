@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: 🔁 Reopened
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (Step 6 breaking-change sweep)
 **Date Found**: 2026-09-13
 
@@ -113,6 +113,14 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 
 **Reopening reason**: (a) the verification snippet's `grep -A8 … | grep '^\*\*Action\*\*'` prints nothing when the glob matches more than one implementation report — multi-file grep prefixes `filename-` and the `^` anchor no longer matches (reproduced with two files: empty output, exit 0); (b) `qa-flow.md:62` Phase 3 lead still says "CONCERNS or FAIL → qa-fix"; (c) the Clean-gate row overlaps the route-3 row and the mermaid qa-fix edge captures an active WAIVED. **Re-fix**: `grep -h` (or target the highest-numbered report) and state the expected output; key the lead on the queue; qualify the row; relabel the edge "FAIL, or an open finding no active waiver covers".
 
+#### Fix Implementation — Iteration 5 (In Progress → Ready for QA)
+
+**Date**: 2026-09-14 (operator, after the QA-loop escalation)
+
+**Fix Description**: (a) both runbook verification snippets now run `grep -h -A8 …` and carry a comment stating the expected output — exactly one line reading `**Action**: Proceeding to 5c (PR conformance review)` — and that an empty result is a failure (`docs/runbooks/task-development.md`, `docs/runbooks/story-development.md`; commit `c2755abb`); (b) `qa-flow.md` Phase 3 lead → "If the gate is `FAIL`, or carries an open `top_issues[]` entry no active waiver covers:"; (c) Clean-gate row → "`PASS` with no open entry, or an active `WAIVED` (route 1 — see §5c)", no longer overlapping the route-3 row; mermaid qa-fix edge → "FAIL, or an open finding no active waiver covers" (the qa-flow runbook commit, which also carries this record).
+
+**Testing**: behavioural — the snippet run over a two-report glob prints nothing without `-h` and the last Action row with it (reproduced against `docs/tasks/task.11[56]*/`). `pr-review-loop-parity` 30/30, `qa-gate-preconditions-parity` 8/8; `npm run ci:fast` 3270 tests, 0 fail.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes                          |
@@ -127,3 +135,4 @@ Reword the five lines to key on an open finding rather than the token; in `qa-fl
 | 2026-09-13 | Reopened     | QA         | Cycle 4: three stale sentences + snippet commands |
 | 2026-09-13 | Ready for QA | qa-fix     | Cycle 4: iteration 4 fix |
 | 2026-09-14 | Reopened     | QA         | Cycle 5: grep -h; qa-flow lead/row/edge |
+| 2026-09-14 | Ready for QA | operator   | Iteration 5: grep -h + expected output; qa-flow lead/row/edge (post-escalation) |

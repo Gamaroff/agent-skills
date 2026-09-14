@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-7
 **Severity**: HIGH
 **Priority**: P0
-**Status**: New
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (cycle 5 reviewer, CR-1 / CR-2; fast gate)
 **Date Found**: 2026-09-14
 
@@ -19,3 +19,22 @@ Between sessions the branch received `23cc8e33` (chore(release): v0.47.0), `b36b
 ## Recommendation
 
 Merge `origin/develop` into the branch so `test-it` and its evals travel with the catalog/`package.json` hunks (the reviewer's suggested action; also brings v0.48.0), then re-run `npm run generate-catalog` and confirm 0 drift. Move the five task-116 bullets back under `## [Unreleased]` → `### Changed`.
+
+## Developer Fix Cycle
+
+### Iteration 1
+
+#### Fix Implementation (New → Ready for QA)
+
+**Date**: 2026-09-14 (operator, after the QA-loop escalation — the merge is an operator decision, not one the loop takes)
+
+**Fix Description**: (1) `git merge origin/develop` (`d63b2096..e4bf2f2d`, v0.48.0) into the branch — clean, no conflicts — so `skills/test-it/` and `evals/test-it/` travel with the catalog and `package.json` hunks that referenced them; `npm run generate-catalog` reports 127 skills and leaves the tree unchanged (merge commit `d0a53d62`). (2) The five task-116 `### Changed` bullets moved from `## [v0.47.0]` to directly under `## [Unreleased]`; the v0.47.0 section now matches the tagged text byte-for-byte — `git diff origin/develop -- CHANGELOG.md` is 36 insertions, 0 deletions (commit `6b86eb4b`). Before the merge, the working tree carried a develop snapshot of `skills/` and `scripts/generate-prd-epic-index.mjs` (a consumer-install overlay dated 08:12 that reverted every bundled task-116 copy); it was byte-identical to `origin/develop` and was discarded before merging.
+
+**Testing**: `npm run ci:fast` → exit 0, 3270 tests, 0 fail (the catalog test that was red now passes); `npm run bundle -- --check` → 127 skills, 0 problems.
+
+## Status History
+
+| Date       | Status       | Changed By | Notes |
+| ---------- | ------------ | ---------- | ----- |
+| 2026-09-14 | New          | QA         | Cycle 5 reviewer (CR-1 / CR-2); fast gate red |
+| 2026-09-14 | Ready for QA | operator   | develop merged, catalog regenerated, changelog bullets moved to Unreleased |

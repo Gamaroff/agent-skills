@@ -4,7 +4,7 @@
 **Bug ID**: TASK-116-BUG-6
 **Severity**: HIGH
 **Priority**: P0
-**Status**: 🔁 Reopened
+**Status**: ✅ Ready for QA
 **Found By**: QA Engineer (cycle 4 reviewer, CR-1)
 **Date Found**: 2026-09-13
 
@@ -44,6 +44,14 @@ Add an explicit step to `On exit` (and to the FAIL/open arm's hand-off generally
 
 **Reopening reason**: the fix is verified (post-guard write; On-exit step 1; closed set) — reopened only for the residue: the post-guard rule specifies the `**PR Review**` value for 5c and 5b but not for the third resolution of arms 4–5, the Convergence-check trip. **Re-fix**: state that the escalation arm writes `not reached — gate did not exit the loop` on `**PR Review**` beside `Escalating — loop not converging` on `**Action**`.
 
+#### Fix Implementation — Iteration 2 (In Progress → Ready for QA)
+
+**Date**: 2026-09-14 (operator, after the QA-loop escalation)
+
+**Fix Description**: the post-guard write rule in `shared/resources/develop-pipeline-step-5-6-qa-loop.md` now names the third resolution of arms 4–5: when the Convergence check trips, the same write puts `**Action**: Escalating — loop not converging` and `**PR Review**: not reached — gate did not exit the loop` on the row. Bundled copies regenerated (commit `cf780a01`).
+
+**Testing**: "the Action row the consumers read has a writer on every route" extended to assert the Convergence-trip sentence with both row values. Mutation-proved: sentence removed → 29/30 (that test red); restored → 30/30. `npm run ci:fast` 3270 tests, 0 fail.
+
 ## Status History
 
 | Date       | Status       | Changed By | Notes |
@@ -51,3 +59,4 @@ Add an explicit step to `On exit` (and to the FAIL/open arm's hand-off generally
 | 2026-09-13 | New          | QA         | Cycle 4 reviewer (CR-1) |
 | 2026-09-13 | Ready for QA | qa-fix     | Post-guard write + On-exit step 1 + closed value set |
 | 2026-09-14 | Reopened     | QA         | Cycle 5: escalation-arm PR Review value |
+| 2026-09-14 | Ready for QA | operator   | Iteration 2: Convergence-trip resolution named; test extended (post-escalation) |

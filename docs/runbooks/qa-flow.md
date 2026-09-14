@@ -18,7 +18,7 @@ If you're shipping new work end-to-end, use [Story Development](./story-developm
 flowchart TD
     A[qa-planning] -->|risk profile + test design| B[qa-story / qa-task]
     B -->|gate file + NFR + traceability| C[qa-gate]
-    B -->|FAIL, or any open finding| D[qa-fix]
+    B -->|FAIL, or an open finding no active waiver covers| D[qa-fix]
     D --> B
     B -->|no open finding, or active WAIVED| E[review-pr]
     E -->|REQUEST CHANGES| D
@@ -59,7 +59,7 @@ Produces (co-located with the story or task):
 
 ## Phase 3 — Fix cycle
 
-If the gate is `CONCERNS` or `FAIL`:
+If the gate is `FAIL`, or carries an open `top_issues[]` entry no active waiver covers:
 
 ```bash
 /qa-fix <story-or-task-path>
@@ -77,7 +77,7 @@ Four ways it ends, and they are not interchangeable — the first three hand to 
 
 | Exit | Fires when | Effect |
 |---|---|---|
-| Clean gate | route 1 — no open finding, or an active `WAIVED` (see §5c) | Hands to Step 5c |
+| Clean gate | `PASS` with no open entry, or an active `WAIVED` (route 1 — see §5c) | Hands to Step 5c |
 | **Reservation without a queue** | `CONCERNS` whose `top_issues[]` is empty or all closed (route 3) | Hands to Step 5c — nothing for `qa-fix` to act on |
 | **Diminishing returns** | All three conditions below hold | Hands to Step 5c — the loop *finished working* |
 | Convergence check | HIGH findings **remain and stop falling** | Escalates — the loop *stopped working* |
