@@ -1,0 +1,55 @@
+{
+  "name": "01-happy",
+  "skill": "test-it",
+  "description": "Happy-path test-it matrix execution: evaluates QA checklist, updates status checkboxes in-place, authors test cases within existing stack conventions, and syncs testing stack architecture documentation.",
+  "prompt": "Run test-it protocol against docs/qa/qa-checklist-auth.md",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/qa/qa-checklist-auth.md"
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/qa/qa-checklist-auth.md",
+        "- \\[x\\] Validate JWT token signature and expiration"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md",
+        "## Harness & Framework Matrix"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md",
+        "## Infrastructure & Dependencies"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md",
+        "## Personas & Auth States"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md",
+        "## Execution Cheatsheet"
+      ]
+    }
+  ]
+}

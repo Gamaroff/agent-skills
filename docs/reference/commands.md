@@ -69,6 +69,7 @@ Every `/foo` command exposed by the skills in this library, what it does, and wh
 | `/qa-story <path>` | Story QA review + gate file | [`qa-story`](../../skills/qa-story/SKILL.md) |
 | `/qa-task <path>` | Task QA review + gate file | [`qa-task`](../../skills/qa-task/SKILL.md) |
 | `/qa-fix <path>` | Apply fixes from QA findings | [`qa-fix`](../../skills/qa-fix/SKILL.md) |
+| `/test-it <target>` | Universal autonomous test investigator, environment orchestrator, QA checklist executor, test author, and testing stack architecture documenter | [`test-it`](../../skills/test-it/SKILL.md) |
 | `/qa-gate <path>` | Manual gate decision (WAIVED, overrides) | [`qa-gate`](../../skills/qa-gate/SKILL.md) |
 
 ## Git / PR

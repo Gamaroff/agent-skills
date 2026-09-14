@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.48.0] - 2026-09-13
+
+### Added
+
+- **New skill: test-it** ([`skills/test-it/SKILL.md`](skills/test-it/SKILL.md)) — Universal autonomous test investigator, environment orchestrator, QA checklist executor, test author, and testing stack architecture documenter.
+
 ## [v0.47.0] - 2026-09-13
 
 ### Added

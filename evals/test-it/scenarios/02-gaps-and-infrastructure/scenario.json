@@ -1,0 +1,35 @@
+{
+  "name": "02-gaps-and-infrastructure",
+  "skill": "test-it",
+  "description": "Multi-faceted infrastructure evaluation: evaluates checkout service, detects infrastructure gaps (missing Payment Mock API container and Webhook fixture), documents multi-faceted infrastructure dependencies, and updates testing stack architecture docs.",
+  "prompt": "Run test-it protocol against src/checkout module and evaluate multi-faceted testing infrastructure",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md",
+        "## Infrastructure & Dependencies"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md",
+        "Payment Mock API"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/testing/testing-stack.md",
+        "## Infrastructure Gaps & Improvement Suggestions"
+      ]
+    }
+  ]
+}
