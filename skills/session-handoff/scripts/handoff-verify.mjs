@@ -99,12 +99,23 @@ const POS = Object.freeze({
   ANY: "any", // any non-flag token (values of flags, jq filters, patterns)
 });
 
+/**
+ * Absolute on POSIX (`/x`), UNC (`\\x`, and `//host` by the same rule) or a
+ * Windows drive letter (`C:/x`, `C:\\x`). The design refused `//host` as UNC
+ * for Windows' sake but accepted `C:\\tmp\\evil.js` on the same platform
+ * (gate 6, QA-4); one predicate now answers for every spelling.
+ */
+function isAbsoluteToken(tok) {
+  return (
+    tok.startsWith("/") || tok.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(tok)
+  );
+}
+
 function isSafePositional(tok, policy, { allowAbsolute = false } = {}) {
   if (policy === POS.NONE) return false;
   if (tok.startsWith("-")) return false;
   if (policy === POS.ANY) return !tok.split(/[\\/]/).includes("..");
-  if (!allowAbsolute && (tok.startsWith("/") || tok.startsWith("\\")))
-    return false;
+  if (!allowAbsolute && isAbsoluteToken(tok)) return false;
   return !tok.split(/[\\/]/).includes("..");
 }
 
@@ -129,7 +140,6 @@ const PATTERN_FLAGS = new Set([
   "--jq",
   "--search",
   "--template",
-  "--date",
   "--since",
   "--until",
   "--after",
@@ -185,11 +195,11 @@ function valueOk(name, v, spec) {
   // names that are a pattern under one binary and a module to load under
   // another: `--format` is a git pretty-format but an eslint formatter module,
   // `--reporter` is a mocha module. Gate 5 found the global set re-opened the
-  // gate-3 invariant for exactly those four; a spec now opts its own in.
+  // gate-3 invariant for five names (`--format` `--pretty` `--reporter`
+  // `--reporters` `--formatter`); a spec now opts its own in.
   if (PATTERN_FLAGS.has(name) || (spec.patternFlags ?? []).includes(name))
     return true;
-  if (!spec.allowAbsolute && (v.startsWith("/") || v.startsWith("\\")))
-    return false;
+  if (!spec.allowAbsolute && isAbsoluteToken(v)) return false;
   return true;
 }
 
@@ -425,6 +435,7 @@ const GIT_SPECS = Object.freeze({
       "-e",
       "--date=",
     ],
+    patternFlags: GIT_PATTERN_FLAGS,
     positional: POS.PATHS,
     allowDashDash: true,
   },
@@ -619,6 +630,11 @@ function ghRule(rest) {
   if (group === "api") {
     const [path0, ...more] = args;
     if (!path0 || path0.startsWith("-")) return false; // the path comes first, always
+    // An endpoint containing `://` is taken by gh as a full request URL and
+    // sent to that host — the egress `--hostname` was refused for, through
+    // another spelling (gate 6, bug.7). A leading `//` is refused for the
+    // same reason it is everywhere else. `/user` stays: that is a path.
+    if (path0.includes("://") || path0.startsWith("//")) return false;
     if (!isSafePositional(path0, POS.PATHS, { allowAbsolute: true }))
       return false;
     return checkArgs(more, { flags: GH_API_FLAGS, positional: POS.ANY });
@@ -635,13 +651,27 @@ function ghRule(rest) {
 // Flags before the script are allow-listed; the script is a relative path
 // with no `..`; everything after the script belongs to the script and is
 // passed through (gate 2, CR-13).
-function interpreterRule(safeFlags, safePattern, testModeFlag) {
+function makeFlagOk(safeFlags, safePattern) {
   const flags = new Set(safeFlags);
   const withValue = new Set(
     safeFlags.filter((f) => f.endsWith("=")).map((f) => f.slice(0, -1)),
   );
-  const flagOk = (a) =>
+  return (a) =>
     flagTokenOk(a, { flags, withValue, flagPattern: safePattern, spec: {} });
+}
+/**
+ * The `--test`-mode rule: no script, so every dash token is the
+ * interpreter's own and is held to its allow-list; positionals are relative
+ * patterns. One function, used by the `node` arm AND by `npm test -- …`,
+ * whose tail is exactly this argv (gate 6, bug.6).
+ */
+function testModeArgsOk(tokens, flagOk) {
+  return tokens.every((t) =>
+    t.startsWith("-") ? flagOk(t) : isSafePositional(t, POS.PATHS),
+  );
+}
+function interpreterRule(safeFlags, safePattern, testModeFlag) {
+  const flagOk = makeFlagOk(safeFlags, safePattern);
   return (rest) => {
     let testMode = false;
     for (let i = 0; i < rest.length; i++) {
@@ -658,10 +688,7 @@ function interpreterRule(safeFlags, safePattern, testModeFlag) {
       // preloads pre.js (found by the cycle-2 re-probe). So every later dash
       // token is held to the same allow-list. With a real script, node stops
       // at it and the rest belongs to the script.
-      if (testMode)
-        return after.every((t) =>
-          t.startsWith("-") ? flagOk(t) : isSafePositional(t, POS.PATHS),
-        );
+      if (testMode) return testModeArgsOk(after, flagOk);
       return after.every(
         (t) =>
           isSafePositional(t, POS.ANY) ||
@@ -689,11 +716,11 @@ const PY_FLAGS = ["-u", "-B", "-O", "-OO", "-q", "-s", "-E", "-I"];
 const PY_FLAG_PATTERN = /^-(W|X)[A-Za-z0-9:.,=_-]+$/;
 
 // --- npm / npx -------------------------------------------------------------
-// Scripts are named EXACTLY. `bundle` is admitted only in its check form, as
-// the whole argv `run bundle -- --check` — `--check` anywhere else means
-// nothing to npm and is forwarded to whatever the script is (gate 2, CR-3).
+// Scripts are named EXACTLY, and none of these takes a tail. `test` has its
+// own arm below. `bundle` is admitted only in its check form, as the whole
+// argv `run bundle -- --check` — `--check` anywhere else means nothing to npm
+// and is forwarded to whatever the script is (gate 2, CR-3).
 const NPM_SCRIPTS = new Set([
-  "test",
   "ci",
   "ci:fast",
   "format:check",
@@ -704,35 +731,39 @@ const NPM_SCRIPTS = new Set([
   "test:tracker-access",
   "test:bitbucket-auth",
 ]);
+// Everything after `--` is appended to the LAST command of the script, so the
+// tail of `npm test` is `node --test …` and the tail of `format:check` is
+// `prettier --check .`. Gate 6 (bug.6) executed both: `-- --write` rewrote the
+// tree and `-- -r /tmp/evil.js` preloaded a file, through the one arm that did
+// not look at its arguments. So: `test` takes a tail held to the node
+// `--test`-mode rule — the SAME rule the `node` arm applies — and no other
+// script takes a tail at all, because none of them has a read-only argument
+// worth a handoff line.
+const NODE_TEST_FLAG_OK = makeFlagOk(NODE_FLAGS, NODE_FLAG_PATTERN);
+function npmTestTailOk(more) {
+  if (more.length === 0) return true;
+  if (more[0] !== "--") return false;
+  return testModeArgsOk(more.slice(1), NODE_TEST_FLAG_OK);
+}
+// `eval:*:cli` and `eval:*:sdk` set DRIVER=claude-* and shell out to a live,
+// billed agent run the repo documents as opt-in (gate 6, QA-3).
+const EVAL_SCRIPT = /^eval:[a-z0-9][a-z0-9:-]*$/;
+const EVAL_LIVE_DRIVER = /:(cli|sdk)$/;
 function npmRule(rest) {
   const [verb, ...args] = rest;
-  if (verb === "test")
-    return args.every(
-      (a, i) =>
-        (i === 0 && a === "--") ||
-        (i > 0 && isSafePositional(a, POS.ANY)) ||
-        (i > 0 && a.startsWith("-")),
-    );
+  if (verb === "test") return npmTestTailOk(args);
   if (verb === "ls" || verb === "view")
     return args.every((a) => isSafePositional(a, POS.ANY));
   if (verb !== "run") return false;
   const [script, ...more] = args;
   if (!script || script.startsWith("-")) return false;
+  if (script === "test") return npmTestTailOk(more);
   if (script === "bundle")
     return more.length === 2 && more[0] === "--" && more[1] === "--check";
-  if (/^eval:[a-z0-9][a-z0-9:-]*$/.test(script)) return more.length === 0;
+  if (EVAL_SCRIPT.test(script))
+    return more.length === 0 && !EVAL_LIVE_DRIVER.test(script);
   if (!NPM_SCRIPTS.has(script)) return false;
-  return (
-    more.length === 0 ||
-    (more[0] === "--" &&
-      more
-        .slice(1)
-        .every(
-          (a) =>
-            isSafePositional(a, POS.ANY) ||
-            (a.startsWith("-") && !a.includes("..")),
-        ))
-  );
+  return more.length === 0;
 }
 
 const NPX_TOOLS = Object.freeze({
@@ -1379,6 +1410,7 @@ export function defaultRunner(argv, { cwd, timeoutMs }) {
         stderr: "",
         timedOut: false,
         error: String(e.message || e),
+        truncated: false,
       });
       return;
     }

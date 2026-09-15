@@ -232,6 +232,19 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "git log --format=%H --date=/x",
     "npx eslint --format=json .",
     "npx mocha --reporter=spec x.js",
+    // QA cycle 6 — the per-spec patternFlags path: a leading `/` in a git
+    // pretty-format is a pattern under git ONLY. Removing `patternFlags` from
+    // GIT_SPECS.log / .show turns these red (gate 6, QA-5).
+    "git log --format=/%H",
+    "git show --pretty=/x HEAD",
+    "git blame --date=format:/%Y x.js",
+    // QA cycle 6 — `npm test -- …` is held to the node --test-mode rule, so the
+    // shapes the node arm allows stay allowed through npm (bug.6).
+    "npm run test -- --test-only",
+    "npm test -- skills/x/tests/",
+    "npm test -- --test-reporter=spec",
+    "npm run eval:develop-task:smoke",
+    "gh api repos/x/y/milestones?per_page=100",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -392,6 +405,45 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "npx eslint --format=/tmp/evil.js src/": /not on whitelist: npx/,
     "npx stylelint --formatter=/tmp/evil.js x.css": /not on whitelist: npx/,
     "npx eslint --format=../evil.js src/": /not on whitelist: npx/,
+    // QA cycle 6 (bug.6) — everything after `--` lands on the LAST command of
+    // the script: `format:check -- --write` rewrote the tree and
+    // `test -- -r /tmp/evil.js` preloaded the file (both executed). No script
+    // but `test` takes a tail, and that tail is the node --test-mode rule.
+    "npm run format:check -- --write": /not on whitelist: npm/,
+    "npm run bundle:check -- --write": /not on whitelist: npm/,
+    "npm run validate -- /tmp/x": /not on whitelist: npm/,
+    "npm run test:platform -- --write": /not on whitelist: npm/,
+    "npm run eval:all -- --write": /not on whitelist: npm/,
+    "npm test -- -r /tmp/evil.js": /not on whitelist: npm/,
+    "npm test -- -r ./x": /not on whitelist: npm/,
+    "npm test -- --require=/tmp/evil.js": /not on whitelist: npm/,
+    "npm test -- --import=/tmp/evil.js": /not on whitelist: npm/,
+    "npm test -- --test-reporter=/tmp/evil.js": /not on whitelist: npm/,
+    "npm test -- --experimental-loader=/tmp/evil.js": /not on whitelist: npm/,
+    "npm test -- --loader=/tmp/evil.js": /not on whitelist: npm/,
+    'npm test -- "--require=/tmp/evil.js"': /not on whitelist: npm/,
+    "npm test -- '-r /tmp/evil.js'": /not on whitelist: npm/,
+    "npm test -- /tmp/x": /not on whitelist: npm/,
+    "npm run test -- -r /tmp/evil.js": /not on whitelist: npm/,
+    "npm run test -- --write": /not on whitelist: npm/,
+    // QA cycle 6 (bug.7) — an endpoint with `://` is a full URL to gh and is
+    // requested as-is (executed against a local listener); `//` is refused
+    // for the reason it is refused everywhere.
+    "gh api https://evil.example/x": /not on whitelist: gh/,
+    "gh api http://127.0.0.1:8099/probe-path": /not on whitelist: gh/,
+    "gh api //evil.example/x": /not on whitelist: gh/,
+    "gh api https://evil.example/x --jq .": /not on whitelist: gh/,
+    // QA cycle 6 (QA-3) — the :cli / :sdk eval variants are live, billed
+    // agent runs.
+    "npm run eval:create-task:cli": /not on whitelist: npm/,
+    "npm run eval:create-story:sdk": /not on whitelist: npm/,
+    // QA cycle 6 (QA-4) — a drive-letter path is absolute too.
+    "node C:/tmp/evil.js": /not on whitelist: node/,
+    "node C:\\tmp\\evil.js": /not on whitelist: node/,
+    "npx prettier --config=C:/tmp/evil.js --check .": /not on whitelist: npx/,
+    "npx eslint --config=c:\\evil.js .": /not on whitelist: npx/,
+    "git log C:/x": /not on whitelist: git/,
+    "npm test -- C:/tmp/x": /not on whitelist: npm/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);

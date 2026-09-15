@@ -204,6 +204,8 @@ remains readable by hand.
 | 2026-09-15 |         | QA findings fixed — ls-remote anchored + PATHS, truncation → unverifiable, pattern flags exempt from the slash rule, one joined-flag helper, setEncoding; 28 tests, 4 iterations | qa-fix |
 | 2026-09-15 |         | QA gate CONCERNS (80/100) cycle 5 — 0 HIGH, 1 MEDIUM (regression in the cycle-4 pattern-flag exemption), 2 LOW | qa-task |
 | 2026-09-15 |         | QA findings fixed — pattern-flag exemption made per-spec (module-loading flags keep the path rule); comment accuracy; 28 tests, 5 iterations | qa-fix |
+| 2026-09-15 |         | QA gate FAIL (40/100) cycle 6 — 1 HIGH (npm `--` passthrough: write + outside-repo module load, executed), 1 MEDIUM (`gh api` absolute URL egress, executed), 3 LOW; bugs 6–7 filed | qa-task |
+| 2026-09-15 |         | QA findings fixed — npm tail held to the node --test-mode rule (no tail on other scripts), `gh api` refuses URLs, eval:*:cli/sdk excluded, drive-letter paths absolute, per-spec patternFlags tested, `--date` one home, catch-block `truncated`; 28 tests (+31 shapes), 6 iterations | qa-fix |
 
 ---
 
@@ -221,21 +223,21 @@ remains readable by hand.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: FAIL
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-15 (cycle 5)
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Testing Date**: 2026-09-15 (cycle 6 — standalone `/qa-task`)
+**Quality Score**: 40/100
+**Gate Decision**: FAIL
 
 ### QA Report
-- **Full Report**: [task.110.qa.5.session-handoff-skill.md](./task.110.qa.5.session-handoff-skill.md) (earlier: [qa.1](./task.110.qa.1.session-handoff-skill.md), [qa.2](./task.110.qa.2.session-handoff-skill.md), [qa.3](./task.110.qa.3.session-handoff-skill.md), [qa.4](./task.110.qa.4.session-handoff-skill.md))
-- **Gate File**: [task.110.gate.5.session-handoff-skill.yml](./task.110.gate.5.session-handoff-skill.yml) (earlier: [gate.1](./task.110.gate.1.session-handoff-skill.yml), [gate.2](./task.110.gate.2.session-handoff-skill.yml), [gate.3](./task.110.gate.3.session-handoff-skill.yml), [gate.4](./task.110.gate.4.session-handoff-skill.yml))
+- **Full Report**: [task.110.qa.6.session-handoff-skill.md](./task.110.qa.6.session-handoff-skill.md) (earlier: [qa.1](./task.110.qa.1.session-handoff-skill.md), [qa.2](./task.110.qa.2.session-handoff-skill.md), [qa.3](./task.110.qa.3.session-handoff-skill.md), [qa.4](./task.110.qa.4.session-handoff-skill.md), [qa.5](./task.110.qa.5.session-handoff-skill.md))
+- **Gate File**: [task.110.gate.6.session-handoff-skill.yml](./task.110.gate.6.session-handoff-skill.yml) (earlier: [gate.1](./task.110.gate.1.session-handoff-skill.yml), [gate.2](./task.110.gate.2.session-handoff-skill.yml), [gate.3](./task.110.gate.3.session-handoff-skill.yml), [gate.4](./task.110.gate.4.session-handoff-skill.yml), [gate.5](./task.110.gate.5.session-handoff-skill.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 28 (skill) + full hermetic suite (3299); 243 boundary probes re-run
-- **Phases Verified**: 3/3 (1 with concerns)
-- **Critical Issues**: 0 HIGH, 1 MEDIUM (regression: PATTERN_FLAGS exempts module-loading flags under npx tools), 2 LOW; bugs 1–5 closed
-- **NFR Status**: Security: FAIL (measured, 56 probes), Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **Tests Executed**: 28 (skill) + full hermetic suite (3299: 3298 pass, 0 fail, 1 skipped); 73 boundary probes (3 executed in a fixture)
+- **Phases Verified**: 3/3 (phase 2 blocked)
+- **Critical Issues**: 1 HIGH (npm `--` passthrough: a working-tree write and an outside-repo module load — both executed), 1 MEDIUM (`gh api` accepts an absolute URL — executed), 3 LOW; bugs 1–5 closed, bugs 6–7 open
+- **NFR Status**: Security: FAIL (measured, 73 probes), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Bug Reports
 - [bug.1 whitelist admits mutating shapes](./task.110.bug.1.whitelist-admits-mutating-shapes.md) — ✅ Closed (verified cycle 2)
@@ -243,9 +245,11 @@ remains readable by hand.
 - [bug.3 timed-out child keeps running](./task.110.bug.3.timed-out-child-keeps-running.md) — ✅ Closed (verified cycle 2)
 - [bug.4 deny-list mechanism cannot hold](./task.110.bug.4.deny-list-mechanism-cannot-hold.md) — ✅ Closed (verified cycle 3)
 - [bug.5 interrupted verifier orphans child](./task.110.bug.5.interrupted-verifier-orphans-child.md) — ✅ Closed (verified cycle 3)
+- [bug.6 npm passthrough admits writes and outside modules](./task.110.bug.6.npm-passthrough-admits-writes-and-outside-modules.md) — ✅ Ready for QA (fixed 2026-09-15, cycle 6) - Priority: P1
+- [bug.7 gh api accepts absolute URL](./task.110.bug.7.gh-api-accepts-absolute-url.md) — ✅ Ready for QA (fixed 2026-09-15, cycle 6) - Priority: P2
 
 ### Key Findings
-Cycle 5 (narrowed): cycle-4 fixes verified; one regression in them — the pattern-flag exemption covers `--reporter`/`--format`, which load JS under npx tools. Cycle 4 (narrowed): PRB-6/7/8 closed; three small defects in those fixes — ls-remote `//host`, cap keeps the head, regex values falsely refused. Cycle 3: the allow-list holds against a third enumeration and every corpus sink; one MEDIUM — joined `name=value` flag values skip the path check (`--config=../evil.js`). Cycle 2: the cycle-1 shapes are closed, but the deny-list mechanism itself fails a fresh enumeration — git option prefixes, `-v` bypasses, `ls-remote --upload-pack`, `npm run <any> --check`, `gh api --hostname`, `--write=.`. Replace with per-binary allow-lists (bug.4). Cycle 1: the read-only whitelist — the risk §10 names — was porous: `gh api -XPOST`, `git branch -D` / `tag` / `remote add` / `--output=`, `node -e`, `npx --write --check`, `find -fprint` are accepted. Parser aborts on a malformed `expect:`; a blank line does not end the header table; a timed-out child is orphaned under bash 3.2.
+Cycle 6 (narrowed diff + executed boundary probes through every arm reaching the same binaries): the cycle-5 fix holds and is mutation-proven; `npm run format:check -- --write` rewrote a fixture tree and `npm test -- -r /tmp/evil.js` preloaded the file — the npm `--` passthrough forwards any dash token and absolute positional, an arm no cycle probed with an absolute value (cycle 3 tried `-r ./x` and accepted it as relative); `gh api https://…` requests any host (no token sent). Cycle 5 (narrowed): cycle-4 fixes verified; one regression in them — the pattern-flag exemption covers `--reporter`/`--format`, which load JS under npx tools. Cycle 4 (narrowed): PRB-6/7/8 closed; three small defects in those fixes — ls-remote `//host`, cap keeps the head, regex values falsely refused. Cycle 3: the allow-list holds against a third enumeration and every corpus sink; one MEDIUM — joined `name=value` flag values skip the path check (`--config=../evil.js`). Cycle 2: the cycle-1 shapes are closed, but the deny-list mechanism itself fails a fresh enumeration — git option prefixes, `-v` bypasses, `ls-remote --upload-pack`, `npm run <any> --check`, `gh api --hostname`, `--write=.`. Replace with per-binary allow-lists (bug.4). Cycle 1: the read-only whitelist — the risk §10 names — was porous: `gh api -XPOST`, `git branch -D` / `tag` / `remote add` / `--output=`, `node -e`, `npx --write --check`, `find -fprint` are accepted. Parser aborts on a malformed `expect:`; a blank line does not end the header table; a timed-out child is orphaned under bash 3.2.
 
 ---
 
