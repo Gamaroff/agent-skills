@@ -200,6 +200,8 @@ remains readable by hand.
 | 2026-09-15 |         | QA findings fixed — deny-lists replaced by per-binary allow-lists; async runner with signal group kill; 27 tests, 2 iterations | qa-fix |
 | 2026-09-15 |         | QA gate CONCERNS (80/100) cycle 3 — 0 HIGH, 1 MEDIUM (joined flag values unchecked); bugs 4–5 closed | qa-task |
 | 2026-09-15 |         | QA findings fixed — joined flag values held to the positional rule, output cap, ls-remote/eval: tightened; 28 tests, 3 iterations | qa-fix |
+| 2026-09-15 |         | QA gate CONCERNS (70/100) cycle 4 — 0 HIGH, 2 MEDIUM in the cycle-3 fixes (ls-remote leading slash; cap keeps the head), 1 LOW | qa-task |
+| 2026-09-15 |         | QA findings fixed — ls-remote anchored + PATHS, truncation → unverifiable, pattern flags exempt from the slash rule, one joined-flag helper, setEncoding; 28 tests, 4 iterations | qa-fix |
 
 ---
 
@@ -219,18 +221,18 @@ remains readable by hand.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-15 (cycle 3)
-**Quality Score**: 80/100
+**Testing Date**: 2026-09-15 (cycle 4)
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.110.qa.3.session-handoff-skill.md](./task.110.qa.3.session-handoff-skill.md) (earlier: [qa.1](./task.110.qa.1.session-handoff-skill.md), [qa.2](./task.110.qa.2.session-handoff-skill.md))
-- **Gate File**: [task.110.gate.3.session-handoff-skill.yml](./task.110.gate.3.session-handoff-skill.yml) (earlier: [gate.1](./task.110.gate.1.session-handoff-skill.yml), [gate.2](./task.110.gate.2.session-handoff-skill.yml))
+- **Full Report**: [task.110.qa.4.session-handoff-skill.md](./task.110.qa.4.session-handoff-skill.md) (earlier: [qa.1](./task.110.qa.1.session-handoff-skill.md), [qa.2](./task.110.qa.2.session-handoff-skill.md), [qa.3](./task.110.qa.3.session-handoff-skill.md))
+- **Gate File**: [task.110.gate.4.session-handoff-skill.yml](./task.110.gate.4.session-handoff-skill.yml) (earlier: [gate.1](./task.110.gate.1.session-handoff-skill.yml), [gate.2](./task.110.gate.2.session-handoff-skill.yml), [gate.3](./task.110.gate.3.session-handoff-skill.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 27 (skill) + full hermetic suite (3298); 243 boundary probes this cycle
-- **Phases Verified**: 3/3 (1 with a concern)
-- **Critical Issues**: 0 HIGH, 1 MEDIUM (PRB-6 joined flag values unchecked), 2 LOW; bugs 1–5 closed
+- **Tests Executed**: 28 (skill) + full hermetic suite (3299); 243 boundary probes re-run
+- **Phases Verified**: 3/3 (1 with concerns)
+- **Critical Issues**: 0 HIGH, 2 MEDIUM (ls-remote leading slash; cap keeps the head), 1 LOW; bugs 1–5 closed
 - **NFR Status**: Security: FAIL (measured, 56 probes), Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Bug Reports
@@ -241,7 +243,7 @@ remains readable by hand.
 - [bug.5 interrupted verifier orphans child](./task.110.bug.5.interrupted-verifier-orphans-child.md) — ✅ Closed (verified cycle 3)
 
 ### Key Findings
-Cycle 3: the allow-list holds against a third enumeration and every corpus sink; one MEDIUM — joined `name=value` flag values skip the path check (`--config=../evil.js`). Cycle 2: the cycle-1 shapes are closed, but the deny-list mechanism itself fails a fresh enumeration — git option prefixes, `-v` bypasses, `ls-remote --upload-pack`, `npm run <any> --check`, `gh api --hostname`, `--write=.`. Replace with per-binary allow-lists (bug.4). Cycle 1: the read-only whitelist — the risk §10 names — was porous: `gh api -XPOST`, `git branch -D` / `tag` / `remote add` / `--output=`, `node -e`, `npx --write --check`, `find -fprint` are accepted. Parser aborts on a malformed `expect:`; a blank line does not end the header table; a timed-out child is orphaned under bash 3.2.
+Cycle 4 (narrowed): PRB-6/7/8 closed; three small defects in those fixes — ls-remote `//host`, cap keeps the head, regex values falsely refused. Cycle 3: the allow-list holds against a third enumeration and every corpus sink; one MEDIUM — joined `name=value` flag values skip the path check (`--config=../evil.js`). Cycle 2: the cycle-1 shapes are closed, but the deny-list mechanism itself fails a fresh enumeration — git option prefixes, `-v` bypasses, `ls-remote --upload-pack`, `npm run <any> --check`, `gh api --hostname`, `--write=.`. Replace with per-binary allow-lists (bug.4). Cycle 1: the read-only whitelist — the risk §10 names — was porous: `gh api -XPOST`, `git branch -D` / `tag` / `remote add` / `--output=`, `node -e`, `npx --write --check`, `find -fprint` are accepted. Parser aborts on a malformed `expect:`; a blank line does not end the header table; a timed-out child is orphaned under bash 3.2.
 
 ---
 

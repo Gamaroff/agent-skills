@@ -115,13 +115,93 @@ function isSafePositional(tok, policy, { allowAbsolute = false } = {}) {
  * value; `flagPattern` admits short-flag clusters (`-rn`) where a binary
  * takes them. Returns true only if every token is accounted for.
  */
-/** A joined flag value: empty is fine; otherwise no `..` segment and no absolute path unless the spec allows one. */
-function valueOk(v, spec) {
+/**
+ * Flags whose value is a PATTERN, not a path: a leading `/` there is regex
+ * syntax (`--test-name-pattern=/select/i`, `--grep=/foo`), so only the `..`
+ * segment rule applies to them (gate 4, CR-3). Everything else that takes a
+ * value is treated as a path — `--config=`, `--ignore-path=`, `-p=` — and a
+ * prettier/eslint config is JavaScript (gate 3, PRB-6).
+ */
+const PATTERN_FLAGS = new Set([
+  "--test-name-pattern",
+  "--grep",
+  "--match",
+  "--jq",
+  "--search",
+  "--template",
+  "--format",
+  "--pretty",
+  "--date",
+  "--since",
+  "--until",
+  "--after",
+  "--before",
+  "--author",
+  "--sort",
+  "--testNamePattern",
+  "--severity",
+  "--exclude",
+  "--shell",
+  "--reporter",
+  "--log-level",
+  "--porcelain",
+  "--untracked-files",
+  "--color",
+  "--state",
+  "--limit",
+  "--label",
+  "--assignee",
+  "--milestone",
+  "--branch",
+  "--workflow",
+  "--status",
+  "--event",
+  "--user",
+  "--commit",
+  "--order",
+  "--cache",
+  "--header",
+  "--preview",
+  "--iso-8601",
+  "--rfc-3339",
+  "--max-old-space-size",
+  "--test-concurrency",
+  "--max-warnings",
+  "--ext",
+  "--maxWorkers",
+  "--timeout",
+  "--head",
+  "--base",
+  "--repo",
+  "--short",
+  "--abbrev",
+  "--max-count",
+  "--lines",
+  "--bytes",
+  "--formatter",
+  "--reporters",
+]);
+
+/** A joined flag value: empty is fine; no `..` segment ever; no absolute path unless the flag takes a pattern or the spec allows one. */
+function valueOk(name, v, spec) {
   if (v === "") return true;
   if (v.split(/[\\/]/).includes("..")) return false;
+  if (PATTERN_FLAGS.has(name)) return true;
   if (!spec.allowAbsolute && (v.startsWith("/") || v.startsWith("\\")))
     return false;
   return true;
+}
+
+/**
+ * One joined-flag decision for both call sites (gate 4, CR-5): is `a` an
+ * allow-listed flag, and if it carries `=value`, is the value acceptable?
+ */
+function flagTokenOk(a, { flags, withValue, flagPattern, spec }) {
+  const eq = a.indexOf("=");
+  const name = eq > 0 ? a.slice(0, eq) : a;
+  if (eq > 0 && withValue.has(name))
+    return valueOk(name, a.slice(eq + 1), spec);
+  return flags.has(a) || (flagPattern instanceof RegExp && flagPattern.test(a));
 }
 
 function checkArgs(args, spec) {
@@ -142,18 +222,15 @@ function checkArgs(args, spec) {
       continue;
     }
     if (a.startsWith("-")) {
-      const eq = a.indexOf("=");
-      const name = eq > 0 ? a.slice(0, eq) : a;
-      const joined = eq > 0 && withValue.has(name);
-      const ok =
-        flags.has(a) ||
-        joined ||
-        (spec.flagPattern instanceof RegExp && spec.flagPattern.test(a));
-      if (!ok) return false;
-      // The VALUE of a joined flag is held to the same rule as a positional:
-      // `--config=../evil.js` is a path that leaves the cwd exactly as
-      // `-c ../evil.js` is, and a prettier/eslint config is JavaScript (gate 3).
-      if (joined && !valueOk(a.slice(eq + 1), spec)) return false;
+      if (
+        !flagTokenOk(a, {
+          flags,
+          withValue,
+          flagPattern: spec.flagPattern,
+          spec,
+        })
+      )
+        return false;
       continue;
     }
     if (
@@ -285,7 +362,7 @@ const GIT_SPECS = Object.freeze({
   // Positionals are a remote NAME or ref pattern — never a URL: a handoff must
   // not point the reader's SSH agent at an arbitrary host (gate 3, PRB-8).
   "ls-remote": {
-    positionalPattern: /^[A-Za-z0-9._\/*-]+$/,
+    positionalPattern: /^[A-Za-z0-9][A-Za-z0-9._\/*-]*$/, // never a leading slash: `//host` is UNC on Windows
     flags: [
       "--heads",
       "-h",
@@ -296,7 +373,7 @@ const GIT_SPECS = Object.freeze({
       "-q",
       "--quiet",
     ],
-    positional: POS.ANY,
+    positional: POS.PATHS,
   },
   diff: {
     flags: [
@@ -557,12 +634,8 @@ function interpreterRule(safeFlags, safePattern, testModeFlag) {
   const withValue = new Set(
     safeFlags.filter((f) => f.endsWith("=")).map((f) => f.slice(0, -1)),
   );
-  const flagOk = (a) => {
-    const eq = a.indexOf("=");
-    const name = eq > 0 ? a.slice(0, eq) : a;
-    if (eq > 0 && withValue.has(name)) return valueOk(a.slice(eq + 1), {});
-    return flags.has(a) || (safePattern && safePattern.test(a));
-  };
+  const flagOk = (a) =>
+    flagTokenOk(a, { flags, withValue, flagPattern: safePattern, spec: {} });
   return (rest) => {
     let testMode = false;
     for (let i = 0; i < rest.length; i++) {
@@ -1321,6 +1394,10 @@ export function defaultRunner(argv, { cwd, timeoutMs }) {
       }
       return buf + d;
     };
+    // Decode at the stream so a multi-byte glyph split across chunks is not
+    // mangled (gate 4, CR-4).
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
     child.stdout.on("data", (d) => (stdout = take(stdout, d)));
     child.stderr.on("data", (d) => (stderr = take(stderr, d)));
     child.on("error", (e) => (spawnError = String(e.message || e)));
@@ -1331,9 +1408,8 @@ export function defaultRunner(argv, { cwd, timeoutMs }) {
       resolve({
         status: code,
         stdout,
-        stderr: truncated
-          ? `${stderr}\n[handoff-verify: output truncated at ${CAP} bytes]`
-          : stderr,
+        stderr,
+        truncated, // verify() reports this as unverifiable — a partial stream is not a measurement (gate 4, CR-2)
         timedOut,
         error: spawnError && !timedOut ? spawnError : null,
       });
@@ -1416,6 +1492,16 @@ export async function verify(figures, opts = {}) {
         ...base,
         verdict: "unverifiable",
         detail: `timeout (${timeoutMs / 1000}s)`,
+        measured: null,
+      });
+      continue;
+    }
+    if (run.truncated) {
+      lines.push({
+        ...base,
+        verdict: "unverifiable",
+        detail:
+          "output truncated (more than 16 MiB) — a partial stream is not a measurement",
         measured: null,
       });
       continue;

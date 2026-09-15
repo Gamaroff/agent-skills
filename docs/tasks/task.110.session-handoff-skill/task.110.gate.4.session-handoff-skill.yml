@@ -1,0 +1,76 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: CONCERNS
+status_reason: 'Cycle-3 fixes verified (PRB-6/7/8 closed; joined values held to the positional rule; corpus 0/73; all three enumerations 0 unexpected accepts). Narrowed review of the cycle-3 changes found three small defects in them: the ls-remote pattern still admits a leading slash (//host on Windows is a UNC network path — the class PRB-8 targeted), the output cap keeps the head of the stream while figures live in the tail, and valueOk refuses legitimate regex values (false refusals). No HIGH; converging (3 → 7 → 0 → 0).'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T04:02:39Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The ls-remote positionalPattern permits a leading slash and the spec is POS.ANY, so git ls-remote //evil.example/x and /tmp/x are accepted; on Windows //host/share is a UNC path git contacts over the network — the arbitrary-host class PRB-8 set out to close.'
+    suggested_action: 'Anchor the pattern to start with an alphanumeric and switch the spec to POS.PATHS so absolute and // prefixes are refused; add both shapes to the refused list.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'take() keeps the HEAD of the stream and drops the rest, but figures are compared against the tail in practice (npm test prints its summary last), so a >16 MiB run is reported stale with a misleading measured value; verify() never inspects the truncation (only a stderr notice is appended).'
+    suggested_action: 'Surface truncated: true in the runner result and have verify() report unverifiable: output truncated rather than compare against a partial stream; extend the PRB-7 test to assert the verdict.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'valueOk applies path semantics (no leading /) to every joined value, so legitimate regex values are refused — node --test-name-pattern=/select/i and git log --grep=/foo return not on whitelist.'
+    suggested_action: 'Exempt pattern-taking flags (--test-name-pattern= --grep= --match= --jq= --search= --template= --format=) from the leading-slash rule while keeping the .. segment check.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 28
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 243
+    notes: 'All three enumerations + corpus re-run against the cycle-3 build: 0 hostile accepted, 0 unexpected accepts. CR-1 is a narrow residual of PRB-8 (Windows UNC). Reviewer returned in 2m17s (narrowed scope).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-2: truncation compares the wrong half of a pathological stream instead of reporting unverifiable.'
+  maintainability:
+    status: PASS
+    notes: 'CR-4/CR-5 cleanups (setEncoding for multi-byte chunks; one joined-flag helper for both call sites) recommended.'
+
+recommendations:
+  immediate:
+    - action: 'CR-1 anchor + POS.PATHS; CR-2 truncated → unverifiable; CR-3 pattern-flag exemption; CR-4/5 cleanups while there.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+  future: []
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 3
+  verification_method: 'PRB-6/7/8 re-probed (refused / capped / refused); mutation proof on PRB-6 re-run'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1, CR-2 closed']

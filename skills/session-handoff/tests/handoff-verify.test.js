@@ -226,6 +226,9 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "gh api repos/x --jq=.[0].id",
     "git ls-remote --heads origin refs/heads/main",
     "npm run eval:develop-next",
+    // QA cycle 4 — pattern-taking flags may start with `/`
+    "node --test-name-pattern=/select/i --test tests/",
+    "git log --grep=/foo",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -375,6 +378,10 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "git ls-remote ssh://evil.example/x": /not on whitelist: git/,
     "git ls-remote https://evil.example/x": /not on whitelist: git/,
     "npm run eval:": /not on whitelist: npm/,
+    // QA cycle 4 — the ls-remote positional can never start with a slash
+    // (`//host` is a UNC network path on Windows).
+    "git ls-remote //evil.example/x": /not on whitelist: git/,
+    "git ls-remote /tmp/x": /not on whitelist: git/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);
@@ -830,7 +837,7 @@ test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a
   );
 });
 
-test("runner: output is capped, and the cap is announced rather than silently dropped (PRB-7)", async () => {
+test("runner: output beyond the cap makes the figure unverifiable, never a comparison against a partial stream (PRB-7, CR-2)", async () => {
   const dir = tempDir();
   fs.writeFileSync(
     path.join(dir, "loud.js"),
@@ -841,11 +848,27 @@ test("runner: output is capped, and the cap is announced rather than silently dr
     timeoutMs: 30000,
   });
   assert.equal(r.status, 0);
+  assert.equal(r.truncated, true);
   assert.ok(
     r.stdout.length <= 16 * 1024 * 1024 + 1024 * 1024,
     `stdout held to the cap (${r.stdout.length})`,
   );
-  assert.match(r.stderr, /output truncated at/);
+  // verify() must not compare a figure against the head of a truncated stream.
+  const figures = mod.parseHandoff(
+    TABLE_HEADER + "| Loud | `git status` | **END** |\n",
+  );
+  const v = await mod.verify(figures, {
+    runner: () => ({
+      status: 0,
+      stdout: "x".repeat(100),
+      stderr: "",
+      timedOut: false,
+      error: null,
+      truncated: true,
+    }),
+  });
+  assert.equal(v.lines[0].verdict, "unverifiable");
+  assert.match(v.lines[0].detail, /output truncated/);
 });
 
 test("cli: SIGINT on the verifier kills the running command's process group (CR-7)", async () => {
