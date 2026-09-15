@@ -75,7 +75,7 @@ test.after(() => {
  * anything else — an unexpected exec is the failure this stub exists to catch.
  */
 // Spelled from parts, deliberately: `bundle_skill.py` scans every .js under a
-// skill and reads a literal `shared/resources/<file>` or `references/<file>`
+// skill and reads a literal shared-resources or references path to a file
 // as a bundle directive — `npm run bundle` would rewrite these spellings and
 // `--check` demands a bundled copy of every engine they name.
 const SHARED = "shared/" + "resources";
