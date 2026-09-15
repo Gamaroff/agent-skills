@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-11
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -110,3 +110,4 @@ the code comment that calls test-mode positionals "patterns, not a script".
 | ---------- | ------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 8 — executed in a scratch clone: `generate-skill-dependencies.mjs` re-created a deleted tracked file; `run-loop.mjs` spawned two `claude -p` sessions |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Third strike: mechanism replaced — no positional in `--test` mode through either arm; runnable code named by identity only |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 9 — executed through the CLI in a scratch clone (stripped env, no `claude` on PATH): `node --test scripts/generate-skill-dependencies.mjs`, `node --test skills/loop-supervisor/scripts/run-loop.mjs`, `npm test -- <file>` and `npm run test -- <file>` all `unverifiable: not on whitelist`; the deleted `skill-dependencies.json` stayed deleted, no `.claude/state`, nothing under the throwaway HOME. `node --test` and `--test-name-pattern=` still admitted (261-line allowed list). Three mutations (positional re-admitted in `testModeArgsOk`; `interpreterRule` running a test-mode positional; bare `--test` refused) each turned the named test red — `covered` ×3 |

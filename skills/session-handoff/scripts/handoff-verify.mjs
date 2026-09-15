@@ -55,7 +55,7 @@
  *                 NO figure could be checked at all, which is a claim about the
  *                 instrument rather than the handoff                exit 1
  *   no-figures    the file parsed but carries no verifiable figure exit 1
- *   missing       the handoff file does not exist                 exit 1
+ *   missing       the handoff file does not exist or is unreadable exit 1
  *   usage         bad arguments                                   exit 2
  *
  * Emits with `process.exitCode = n; return` — never `process.exit()`, which
@@ -130,8 +130,9 @@ function isSafePositional(tok, policy, { allowAbsolute = false } = {}) {
  * Flags whose value is a PATTERN, not a path: a leading `/` there is regex
  * syntax (`--test-name-pattern=/select/i`, `--grep=/foo`), so only the `..`
  * segment rule applies to them (gate 4, CR-3). Everything else that takes a
- * value is treated as a path — `--config=`, `--ignore-path=`, `-p=` — and a
- * prettier/eslint config is JavaScript (gate 3, PRB-6).
+ * value is treated as a path — `-p=`, `--roadmap=` — unless the spec names a
+ * KIND for it (`valueKinds`, below): a value the tool would LOAD AS CODE is
+ * never judged as a path at all.
  */
 const PATTERN_FLAGS = new Set([
   "--test-name-pattern",
@@ -186,9 +187,44 @@ const PATTERN_FLAGS = new Set([
   "--bytes",
 ]);
 
+/**
+ * Value KINDS — the identity principle applied to flag values (gate 9,
+ * bug.14). A tool that takes `--config=<file>` resolves the file by extension
+ * and `import()`s a `.js`/`.mjs`/`.cjs` one; a formatter or reporter flag
+ * `require()`s a path. Gate 3 (PRB-6) accepted that as "in-repo code is
+ * trusted", and gate 9 executed it: `npx prettier -l --config=<a shipped
+ * .mjs whose top level calls main()> <js>` imported that module — under
+ * PRETTIER'S argv — and it
+ * rewrote a PRD through read mode. The module was trusted; the invocation
+ * was not the one its author wrote. So a loaded value is judged by what it
+ * IS, never by where it sits:
+ *
+ *   data  a file the tool PARSES — `.json` `.jsonc` `.json5` `.yaml` `.yml`
+ *         `.toml`, or an extensionless dotfile (`.prettierrc`, `.eslintrc`,
+ *         `.prettierignore`) — at a relative path with no `..` segment.
+ *         `.prettierrc.js` is not one: its extension is `.js`.
+ *   name  a bare identifier — a built-in formatter/reporter (`json`, `spec`,
+ *         `stylish`) or an installed package — never a path.
+ *
+ * A kind is checked before the pattern exemption and before the path rule,
+ * and it is a full answer.
+ */
+const DATA_FILE =
+  /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*(?:[A-Za-z0-9_.-]+\.(?:json|jsonc|json5|yaml|yml|toml)|\.[A-Za-z0-9_-]+)$/;
+const BARE_NAME = /^[A-Za-z0-9_-]+$/;
+const VALUE_KINDS = Object.freeze({
+  data: (v) => DATA_FILE.test(v) && !v.split("/").includes(".."),
+  name: (v) => BARE_NAME.test(v),
+});
+
 /** A joined flag value: empty is fine; no `..` segment ever; no absolute path unless the flag takes a pattern or the spec allows one. */
 function valueOk(name, v, spec) {
-  // A per-flag value pattern is checked FIRST and is a full answer: gh's
+  // A per-flag value KIND is checked first of all: a value the tool loads is
+  // held to what it is (data file or bare name), and an empty value is not
+  // one (gate 9, bug.14).
+  const kind = spec.valueKinds?.[name];
+  if (kind) return VALUE_KINDS[kind](v);
+  // A per-flag value pattern is checked next and is a full answer: gh's
   // `--repo` is `[HOST/]OWNER/REPO` and the host part is the egress bug.9
   // executed, so its value is held to OWNER/REPO whether joined or spaced.
   const vp = spec.valuePatterns?.[name];
@@ -855,7 +891,9 @@ function npmTestTailOk(more) {
 // `eval:*:cli` and `eval:*:sdk` set DRIVER=claude-* and shell out to a live,
 // billed agent run the repo documents as opt-in (gate 6, QA-3).
 const EVAL_SCRIPT = /^eval:[a-z0-9][a-z0-9:-]*$/;
-const EVAL_LIVE_DRIVER = /:(cli|sdk)$/;
+// Matched as ANY segment, not only the last: `eval:x:cli:smoke` would be as
+// live as `eval:x:cli` (gate 9, QA-6).
+const EVAL_LIVE_DRIVER = /(^|:)(cli|sdk)(:|$)/;
 // A bare package name — optional @scope, name, optional @range — and, for
 // `view`, a field selector (`version`, `dist-tags.latest`), which the same
 // shape covers. A package SPEC may also be a tarball URL, a `git+…` URL, a
@@ -882,6 +920,16 @@ function npmRule(rest) {
   return more.length === 0;
 }
 
+// Every flag whose value the tool LOADS carries a kind (see VALUE_KINDS): a
+// config is `data`, a formatter or reporter is `name`. The spaced form
+// (`-c x`, `-f x`, `-R x`) is a valueFlag so the value is consumed and judged
+// by its flag rather than falling through as a positional — the gate-7
+// mechanism for `gh -R`, applied here. A tool whose first positional is a
+// SUBCOMMAND (mocha `init`, vitest `run|watch|dev|bench|typecheck|related|
+// list|init`) refuses that vocabulary: `npx mocha init out` scaffolded four
+// files through read mode (gate 9, bug.15) — the `--init` FLAG was refused on
+// jest/eslint/tsc from gate 1, and the subcommand spelling of the same thing
+// had no leading dash to be refused by.
 const NPX_TOOLS = Object.freeze({
   prettier: {
     flags: [
@@ -893,19 +941,26 @@ const NPX_TOOLS = Object.freeze({
       "--no-error-on-unmatched-pattern",
       "--log-level=",
     ],
+    valueFlags: ["--config", "--ignore-path"],
+    valueKinds: { "--config": "data", "--ignore-path": "data" },
     positional: POS.PATHS,
   },
   eslint: {
     flags: [
       "--max-warnings=",
       "--format=",
-      "-f",
       "--config=",
-      "-c",
       "--quiet",
       "--no-eslintrc",
       "--ext=",
     ],
+    valueFlags: ["--format", "-f", "--config", "-c"],
+    valueKinds: {
+      "--format": "name",
+      "-f": "name",
+      "--config": "data",
+      "-c": "data",
+    },
     positional: POS.PATHS,
   },
   tsc: {
@@ -914,22 +969,32 @@ const NPX_TOOLS = Object.freeze({
     requireFlag: ["--noEmit"],
   },
   markdownlint: {
-    flags: ["--config=", "-c", "--ignore-path=", "-p", "--quiet", "-q"],
+    // markdownlint-cli reads a `.js` config too — `data` refuses it.
+    flags: ["--config=", "--ignore-path=", "--quiet", "-q"],
+    valueFlags: ["--config", "-c", "--ignore-path", "-p"],
+    valueKinds: {
+      "--config": "data",
+      "-c": "data",
+      "--ignore-path": "data",
+      "-p": "data",
+    },
     positional: POS.PATHS,
   },
   "markdownlint-cli2": {
     flags: ["--config=", "--no-globs"],
+    valueFlags: ["--config"],
+    valueKinds: { "--config": "data" },
     positional: POS.PATHS,
   },
   stylelint: {
-    flags: [
-      "--config=",
-      "-c",
-      "--ignore-path=",
-      "--quiet",
-      "-q",
-      "--formatter=",
-    ],
+    flags: ["--config=", "--ignore-path=", "--quiet", "-q", "--formatter="],
+    valueFlags: ["--config", "-c", "--ignore-path", "--formatter"],
+    valueKinds: {
+      "--config": "data",
+      "-c": "data",
+      "--ignore-path": "data",
+      "--formatter": "name",
+    },
     positional: POS.PATHS,
   },
   jest: {
@@ -942,6 +1007,8 @@ const NPX_TOOLS = Object.freeze({
       "--maxWorkers=",
       "--reporters=",
     ],
+    valueFlags: ["--reporters"],
+    valueKinds: { "--reporters": "name" },
     positional: POS.PATHS,
   },
   vitest: {
@@ -953,25 +1020,43 @@ const NPX_TOOLS = Object.freeze({
       "--passWithNoTests",
       "--silent",
     ],
+    valueFlags: ["--reporter"],
+    valueKinds: { "--reporter": "name" },
     positional: POS.PATHS,
+    // A positional is a file or pattern, never one of vitest's subcommands;
+    // `--run` is required the way tsc requires `--noEmit`.
+    positionalPattern:
+      /^(?!(?:run|watch|dev|bench|typecheck|related|list|init)$)/,
+    requireFlag: ["--run"],
   },
   mocha: {
-    flags: ["--reporter=", "-R", "-t", "--timeout=", "--grep=", "-g"],
+    flags: ["--reporter=", "-t", "--timeout=", "--grep=", "-g"],
+    valueFlags: ["--reporter", "-R"],
+    valueKinds: { "--reporter": "name", "-R": "name" },
     positional: POS.PATHS,
+    positionalPattern: /^(?!init$)/,
   },
   shellcheck: {
     flags: [
       "--severity=",
-      "-S",
-      "-f",
       "--format=",
       "-x",
       "-e",
       "--exclude=",
       "--shell=",
-      "-s",
       "--version",
     ],
+    // Formats, shells and severities are built-in names; a `-f <path>` is an
+    // error to shellcheck, and a name is what the flag means.
+    valueFlags: ["-S", "--severity", "-f", "--format", "-s", "--shell"],
+    valueKinds: {
+      "-S": "name",
+      "--severity": "name",
+      "-f": "name",
+      "--format": "name",
+      "-s": "name",
+      "--shell": "name",
+    },
     positional: POS.PATHS,
   },
 });
@@ -1104,6 +1189,11 @@ const UTIL_SPECS = Object.freeze({
     ],
     positional: POS.PATHS,
     allowAbsolute: true,
+    // jq's `env` builtin dumps the verifier's own inherited environment —
+    // tokens included — into the measured figure, and needs no path to do it
+    // (gate 9, QA-4). `$ENV` is already refused by the `$` rule; the bare word
+    // is refused here unless it is a key (`.env`) or a path segment (`x/env`).
+    positionalPattern: /^(?![\s\S]*(?:^|[^A-Za-z0-9_.\/])env(?![A-Za-z0-9_]))/,
   },
   shellcheck: NPX_TOOLS.shellcheck,
   find: {
@@ -1128,7 +1218,6 @@ const UTIL_SPECS = Object.freeze({
       "-prune",
       "-regex",
       "-iregex",
-      "!",
     ],
     positional: POS.PATHS,
     allowAbsolute: true,
@@ -1136,11 +1225,12 @@ const UTIL_SPECS = Object.freeze({
   // Read-only date: a positional sets the clock on BSD and GNU alike, so only
   // `+format` is allowed as one (gate 2, CR-9).
   date: {
+    // `-r` is gone: its operand (seconds on BSD, a file on GNU) is a positional
+    // the `+`-only rule refuses, so it could never run (gate 9, CR-5).
     flags: [
       "-u",
       "--utc",
       "-j",
-      "-r",
       "-I",
       "-R",
       "--iso-8601",
@@ -1158,11 +1248,7 @@ function utilRule(bin) {
       rest.some((a) => !a.startsWith("-") && !a.startsWith("+"))
     )
       return false;
-    if (bin === "find" && rest.some((a) => a === "!"))
-      return checkArgs(
-        rest.filter((a) => a !== "!"),
-        spec,
-      );
+    // `!` and `(` `)` carry no dash and pass as positionals; nothing to filter.
     return checkArgs(rest, spec);
   };
 }
@@ -1206,21 +1292,31 @@ const OPERATOR_INSIDE = /(\$\(|`|[<>])/; // a redirect glued to a word is still 
 // bread and butter of jq filters and cannot expand without a shell either.
 const SHELL_EXPANSION = /(\*|~|\$)/;
 
-/** Split on whitespace, honouring simple single/double quotes. */
+/**
+ * Split on whitespace, honouring simple single/double quotes. A closed quote
+ * pair is a token even when it is empty — `grep -c "" f` has four tokens, and
+ * dropping the third ran `grep -c f` against stdin and CONFIRMED the wrong
+ * command (gate 9, bug.16). An unterminated quote is not a guess about where
+ * the author meant it to close: it returns null and the line is refused.
+ */
 export function tokenize(cmd) {
   const out = [];
   let cur = "";
   let q = null;
+  let quoted = false; // a quote pair closed inside the current token
   for (const ch of cmd) {
     if (q) {
       if (ch === q) q = null;
       else cur += ch;
-    } else if (ch === '"' || ch === "'") q = ch;
+    } else if (ch === '"' || ch === "'") ((q = ch), (quoted = true));
     else if (/\s/.test(ch)) {
-      if (cur) (out.push(cur), (cur = ""));
+      if (cur || quoted) out.push(cur);
+      cur = "";
+      quoted = false;
     } else cur += ch;
   }
-  if (cur) out.push(cur);
+  if (q) return null;
+  if (cur || quoted) out.push(cur);
   return out;
 }
 
@@ -1233,6 +1329,7 @@ export function isAllowed(cmd, whitelist = WHITELIST) {
     return { ok: false, detail: "no command" };
   if (RAW_REFUSED.test(cmd)) return { ok: false, detail: "shell operator" };
   const argv = tokenize(cmd.trim());
+  if (argv === null) return { ok: false, detail: "unterminated quote" };
   if (argv[0] === "command") argv.shift();
   if (!argv.length) return { ok: false, detail: "no command" };
   if (
@@ -1816,7 +1913,21 @@ export async function run(argv, io = {}) {
   const file = path.resolve(cwd, opts.file);
   if (!exists(file))
     return { reason: "missing", file, exitCode: 1, json: opts.json };
-  const figures = parseHandoff(readFile(file));
+  let text;
+  try {
+    text = readFile(file);
+  } catch (e) {
+    // A directory or an unreadable file is one JSON object like every other
+    // outcome, not a stack trace (gate 9, QA-5).
+    return {
+      reason: "missing",
+      file,
+      detail: String(e.code || e.message || e),
+      exitCode: 1,
+      json: opts.json,
+    };
+  }
+  const figures = parseHandoff(text);
   const result = await verify(figures, {
     runner: io.runner,
     cwd,
@@ -1852,7 +1963,9 @@ if (isInvokedDirectly()) {
     const { json, ...rest } = r;
     process.stdout.write(JSON.stringify(rest, null, 2) + "\n");
   } else if (r.reason === "missing") {
-    process.stderr.write(`handoff-verify: ${r.file} does not exist\n`);
+    process.stderr.write(
+      `handoff-verify: ${r.file} ${r.detail ? `is not readable (${r.detail})` : "does not exist"}\n`,
+    );
   } else {
     process.stdout.write(renderTable(r, r.file) + "\n");
   }

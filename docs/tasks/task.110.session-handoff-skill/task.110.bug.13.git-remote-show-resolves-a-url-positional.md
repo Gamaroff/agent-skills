@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-13
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (reviewer CR-1, confirmed by execution)
 **Date Found**: 2026-09-15
 
@@ -87,3 +87,4 @@ remote show origin`.
 | ---------- | ------ | ----------- | ------------------------------------------------------------------------------------------------- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 8 — reviewer CR-1; executed: http form reached the listener, scp form invoked ssh        |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `remote show` removed; `get-url` name anchored |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 9 — with a listener on 127.0.0.1:8099: `git remote show http://127.0.0.1:8099/x.git`, `git remote show 127.0.0.1:8099/x.git` and `git remote get-url http://127.0.0.1:8099/x.git` through the CLI all `unverifiable: not on whitelist: git`; no request logged, no ssh. `git remote -v` / `get-url origin` / `get-url --push origin` admitted. Re-admitting `show` and dropping the `get-url` anchor each turned the refused-list test red — `covered` ×2 |

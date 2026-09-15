@@ -1,0 +1,116 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: FAIL
+status_reason: 'Cycle-8 fixes verified (bug.11, bug.12, bug.13 closed; all eight cycle-8 mechanisms mutation-proven covered; the fourteen gate-6/7/8 spellings re-executed through the CLI in a scratch clone — all refused, deleted file stayed deleted, no write, no request). Unscoped safety re-probe (3,367 in-process spellings, 30 executed end-to-end, 8 mutation proofs) re-decided the PRB-6 / CR-2 boundary the handoff asked about and found it does not stand: prettier `--config=<in-repo .mjs>` imports and runs the module under prettier''s argv, and this repository ships `generate-prd-epic-index.mjs` with an unguarded top-level main() — executed through read mode against a consumer-shaped PRD tree, a PRD document was rewritten and the verdict read confirmed (HIGH, bug.14). `npx mocha init <dir>` — a subcommand positional — wrote four files in a consumer-shaped project; `npx vitest init browser` admitted by the same rule (MEDIUM, bug.15). tokenize() drops an empty quoted token, so `grep -c "" README.md` ran as `grep -c README.md` and confirmed against the wrong command (MEDIUM, bug.16, reviewer CR-1). Three LOW. HIGH sequence across gates 6–9: 1, 1, 1, 1 on handoff-verify.mjs — a FOURTH strike; the operator waived the strike halt for this run and the loop continues to qa-fix under the replace-the-mechanism rule.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T16:20:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The npx arm admits a module-loading flag value by path shape (relative, no ..): prettier --config=, eslint --config=/-c/--format=/-f, stylelint --config=/--formatter=, mocha --reporter=/-R, jest --reporters=, vitest --reporter=, markdownlint -c/--config=. The tool imports the module and its top level runs under the tool''s argv. Executed through read mode in a scratch clone: `npx prettier -l --config=shared/resources/generate-prd-epic-index.mjs skills/session-handoff/scripts/handoff-verify.mjs` against a consumer-shaped docs/prd/prd.zz/ tree rewrote prd.zz.md (index block added, md5 changed) and the line read `confirmed`. A canary module written to a file confirmed the import mechanism against this checkout; the static scan finds two tracked modules with an unguarded top-level main() (generate-prd-epic-index.mjs, registry-tick.js). This is the PRB-6 / CR-2 boundary accepted since gate 3; the handoff asked for an explicit decision and, on measurement, it does not stand — the cycle-8 identity principle applies to this arm too.'
+    suggested_action: 'Fourth strike: replace the mechanism, not the list — a flag value the tool loads as code is held by KIND: --config=/-c/--ignore-path= to a data file (.json/.jsonc/.yaml/.yml/.toml or an extensionless dotfile), --format=/-f/--formatter=/--reporter=/-R/--reporters= to a bare name ([A-Za-z0-9_-]+, built-in or installed package), never a path to a .js/.mjs/.cjs/.ts; or drop the module-loading flags from NPX_TOOLS entirely. Refused-list tests for the executed spelling and each tool''s loader flag with a code-file value; allowed tests for --config=.prettierrc, --config=.eslintrc.json, -f json, -R spec; mutation = the kind check removed. Correct the SKILL.md npx row and retire the "accepted boundary" note wherever restated.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.14.npx-config-and-formatter-values-load-in-repo-modules.md'
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'A positional under npx mocha / npx vitest is read by the tool as a SUBCOMMAND, and `init` scaffolds files: executed through the CLI (--cwd) in a consumer-shaped project with mocha installed, `npx mocha init out9` wrote out9/index.html, mocha.css, mocha.js (484 KB) and tests.spec.js; `npx mocha init .` overwrites the same four names at the root. `npx vitest init browser` (and watch/dev/bench/typecheck/related/list) is admitted by the same rule — not executed, vitest not installed. In this repository neither tool is installed so the cycle-7 --no-install injection refuses both (vitest → one 404 manifest GET, the documented residual); the write is nil here and real in any consumer with either devDependency. The --init FLAGS on jest/eslint/tsc are refused; the subcommand spelling of the same thing is not.'
+    suggested_action: 'Drop mocha and vitest from NPX_TOOLS (this repo uses node --test; a consumer cites them through npm test), or add a positionalPattern on both that refuses the subcommand vocabulary and require --run on vitest as tsc requires --noEmit. Refused-list tests: `npx mocha init out`, `npx mocha init .`, `npx vitest init browser`, `npx vitest watch`; mutation = the pattern removed.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.15.npx-subcommand-positional-selects-a-scaffolder.md'
+    status: open
+  - id: 'QA-3'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-1 (medium/high), confirmed by execution: tokenize() pushes a token only `if (cur)`, so an empty quoted token vanishes — `grep -c "" README.md` is approved and RUN as `grep -c README.md` (pattern README.md, stdin /dev/null) and `jq --arg x "" . f` as `jq --arg x . f`; an unterminated quote is swallowed silently. Through the CLI against a one-line README: `grep -c "" README.md; expect: 0` read `confirmed` with measured 0 — the correct command prints 1. The argv judged and the argv run are the same (safety holds); neither is the command recorded, and the verdict is about the wrong command.'
+    suggested_action: 'Track a sawQuote flag per token in tokenize() and push when cur is non-empty OR a quote pair closed; refuse an unterminated quote (`unverifiable: unterminated quote`). Tests: tokenize of the three spellings expecting the empty token preserved, plus the CLI line reading stale against expect 0 / confirmed against expect 1.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.16.tokenize-drops-empty-quoted-tokens.md'
+    status: open
+  - id: 'QA-4'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-2 (low/medium), confirmed by execution: `jq -n env` is admitted (jq filter positional) and jq''s env builtin dumps the verifier''s own inherited environment into `measured` — executed under a stripped env with CANARY_SECRET set, the value appeared in the measured field of both the table and --json output. A new spelling of the CR-6 measured-echo class that needs no path knowledge; `$ENV` is already refused by the `$` rule, `env` is a bare word.'
+    suggested_action: 'Refuse a jq positional that contains the bare word `env` (`/\benv\b/`) alongside the existing `$` refusal, or scrub the child environment to the variables the admitted binaries need; record the choice in the CR-6 note.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-5'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-3 (low/high), confirmed: run() guards only exists(file); a directory path (`handoff-verify.mjs skills/session-handoff --json`) throws EISDIR from readFileSync, the top-level await rejects, and the CLI exits 1 with a stack trace and no JSON object — against the header contract that every non-usage outcome is one JSON object with a reason.'
+    suggested_action: 'Wrap the read in try/catch and return { reason: "missing" (or "unreadable"), file, detail, exitCode: 1 }; test with a directory path under --json.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-6'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'EVAL_LIVE_DRIVER (/:(cli|sdk)$/) excludes a live driver only as the LAST segment: `npm run eval:x:cli:y` and `eval:x:sdk:smoke` are admitted by construction (isAllowed ok). No such script exists in package.json today, so the executed impact is nil; the shape is one added script away from a billed live run through read mode (gate 6, QA-3).'
+    suggested_action: 'Match `:cli` / `:sdk` as ANY segment (`/(^|:)(cli|sdk)(:|$)/`), or admit eval scripts by exact name from package.json the way NPM_SCRIPTS does; refused-list test for the mid-segment spelling.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 30
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 3405
+    notes: '3,106 refused-list and 261 allowed-list spellings through isAllowed() (186 of the refused list admitted — triaged, 3 hazardous: bug.14, bug.15, jq env; 7 of the allowed list refused — usability only: `git status -sb`, quoted globs, `date -r`); 30 executed end-to-end through the CLI in a scratch clone of cb3ddd63 and a consumer-shaped project (mocha + prettier installed), under env -i with no `claude` on PATH, a throwaway HOME and a listener on 127.0.0.1:8099: the fourteen gate-6/7/8 spellings all refused with no write and no request; prettier --config=<module> executed twice (canary written; PRD rewritten), mocha init executed (four files), grep -c "" executed (spurious confirmed), jq -n env executed (environment echoed), vitest init refused by --no-install (one 404 GET, the documented residual); 8 mutation proofs, all covered. Static scan: 208 tracked modules, 2 with an unguarded top-level main(). Nothing written under ~/.claude/projects or ~/.cache; the listener saw only the two vitest manifest GETs.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 30/30 in 4.8 s; full hermetic suite 3300 pass / 0 fail / 1 skipped in 177 s; TMPDIR=/tmp 30/30. The CR-6 timeout test passed in the full run (3.1 s) — the known load flake did not recur.'
+  reliability:
+    status: PASS
+    notes: 'No orphaned children after the executed probes; timeout and cap paths unchanged since gate 8; --json contract holds for every outcome except the directory-path case (QA-5, low).'
+  maintainability:
+    status: CONCERNS
+    notes: 'The cycle-8 identity principle is stated in the interpreter arm''s header comment and contradicted by the npx arm two hundred lines below; SKILL.md''s npx row and the gate-3 "accepted boundary" note restate the contradiction. Reviewer cleanups CR-4 (dead `!` filter in find), CR-5 (`date -r` admitted but unusable), CR-6 (SHELL_EXPANSION applied after quoting is discarded, so quoted globs/regexes are unusable) are advisory.'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent, unscoped safety re-probe over the code-only branch diff (4,116 lines), dispatched 15:41 returned 15:53 (11m33s — past the 10-minute budget, not killed; block in hand before this gate was written); instructed read-only with in-process isAllowed probes only'
+  bugs: 3
+  cleanups: 3
+  boundary: true
+  probes_executed: 3405
+  promoted: ['CR-1 → QA-3 (medium/high, executed)']
+  advisory: ['CR-2 → QA-4 at low (jq env echo)', 'CR-3 → QA-5 at low (directory path stack trace)', 'CR-4 dead find `!` filter', 'CR-5 date -r unusable', 'CR-6 quoted glob/regex tokens refused', 'gate-8 advisories unchanged: CR-4 DRIVER/MODE env passthrough, CR-5 win32 cwd-first resolution, CR-6 absolute reads + measured echo, CR-9 gh api --cache, QA-6 python -X cache write']
+
+recommendations:
+  immediate:
+    - action: 'bug.14 — hold module-loading flag values by kind (data file or bare name), or drop the loader flags from NPX_TOOLS; mechanism change under the strike rule'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+    - action: 'bug.15 — drop mocha/vitest or refuse their subcommand vocabulary as positionals'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+    - action: 'bug.16 — preserve empty quoted tokens; refuse an unterminated quote'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+  future:
+    - action: 'QA-4 jq env echo; QA-5 directory path JSON; QA-6 eval live-driver segment match; reviewer cleanups CR-4/5/6'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 3
+  fix_date: '2026-09-15'
+  total_iterations: 8
+  verification_method: 'Executed probes through the verifier CLI in a scratch clone and a consumer-shaped project under a stripped environment with a local listener; in-process isAllowed enumeration; eight mutation proofs; static module scan; full hermetic suite'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['bug.14 closed', 'bug.15 closed', 'bug.16 closed']

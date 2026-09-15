@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -93,3 +93,4 @@ that both forms are reads (verified: `cmdFamilies` has no writer).
 | ---------- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 2026-09-15 | New    | QA Engineer | QA cycle 8 — executed against a scratch workspace: a fresh tree and an id-floor file created; a resolved entry moved to `archive/` |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `next-id` removed from the admitted verbs |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 9 — `node shared/resources/observation-log.js next-id --workspace <throwaway>/obs --json` through the CLI: `unverifiable: not on whitelist: node`; no tree created at the workspace. `doctor`/`scan`/`queue`/`families` still admitted. Re-admitting `next-id` in the positionalPattern turned the refused-list test red — `covered` |

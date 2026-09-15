@@ -294,6 +294,26 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npm run test -- --test-name-pattern=x",
     `node ${SHARED}/observation-log.js families --json`,
     "git remote get-url --all origin",
+    // QA cycle 9 (bug.14) — a loaded value is a DATA file or a bare NAME:
+    // every config/formatter/reporter spelling a handoff line would use.
+    "npx prettier --check --config=.prettierrc .",
+    "npx prettier --check --config .prettierrc.json --ignore-path=.prettierignore .",
+    "npx prettier --check --config config/prettier.yaml .",
+    "npx eslint -c .eslintrc.json -f json .",
+    "npx eslint --config=.eslintrc.yml --format=stylish .",
+    "npx stylelint --config=.stylelintrc -q --formatter=json src",
+    "npx markdownlint -c .markdownlint.json -p .markdownlintignore docs",
+    "npx markdownlint-cli2 --config=.markdownlint-cli2.jsonc --no-globs docs/x.md",
+    "npx jest --ci --reporters=default",
+    "npx mocha -R spec --reporter=dot -t 5000 test",
+    "npx vitest --run --reporter=dot x.test.ts",
+    "npx shellcheck -f gcc -S warning -s bash --shell=sh --severity=error x.sh",
+    "shellcheck -f gcc -e SC2034 --exclude=SC1091 -s bash x.sh",
+    // QA cycle 9 (bug.15) — a file positional under mocha/vitest stays fine.
+    "npx mocha test",
+    // QA cycle 9 (QA-4) — `env` as a key or a path segment is not the builtin.
+    "jq .env x.json",
+    "jq . data/env.json",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -614,6 +634,59 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "git remote show git@evil.example:x.git": /not on whitelist: git/,
     "git remote get-url https://evil.example/x.git": /not on whitelist: git/,
     "git remote get-url git@evil.example:x.git": /not on whitelist: git/,
+    // QA cycle 9 (bug.14) — a loaded value is judged by KIND: prettier
+    // import()s a `.mjs` config and ran generate-prd-epic-index.mjs's
+    // top-level main() under prettier's argv (executed: a PRD rewritten
+    // through read mode). A code file is refused for what it is, at any
+    // relative path; so is a path where a bare name is the only meaning.
+    [`npx prettier -l --config=${SHARED}/generate-prd-epic-index.mjs x.mjs`]:
+      /not on whitelist: npx/,
+    "npx prettier --check --config=skills/loop-supervisor/scripts/run-loop.mjs .":
+      /not on whitelist: npx/,
+    "npx prettier --check --config=.prettierrc.js .": /not on whitelist: npx/,
+    "npx prettier --check --config .prettierrc.cjs .": /not on whitelist: npx/,
+    "npx prettier --check --config= .": /not on whitelist: npx/,
+    "npx prettier --check --ignore-path=x.js .": /not on whitelist: npx/,
+    [`npx eslint -c ${SHARED}/registry-tick.js --max-warnings=0 .`]:
+      /not on whitelist: npx/,
+    "npx eslint --config=eslint.config.mjs .": /not on whitelist: npx/,
+    [`npx eslint -f ${SHARED}/registry-tick.js .`]: /not on whitelist: npx/,
+    "npx eslint --format=./x.js .": /not on whitelist: npx/,
+    "npx eslint -f=json .": /not on whitelist: npx/,
+    [`npx mocha -R ${SHARED}/registry-tick.js test`]: /not on whitelist: npx/,
+    "npx mocha --reporter=./rep.cjs test": /not on whitelist: npx/,
+    [`npx stylelint --formatter=${SHARED}/registry-tick.js src`]:
+      /not on whitelist: npx/,
+    "npx stylelint -c stylelint.config.js src": /not on whitelist: npx/,
+    [`npx markdownlint -c ${SHARED}/registry-tick.js docs`]:
+      /not on whitelist: npx/,
+    "npx markdownlint-cli2 --config=.markdownlint-cli2.mjs docs/x.md":
+      /not on whitelist: npx/,
+    "npx jest --reporters=./x.js": /not on whitelist: npx/,
+    "npx vitest --run --reporter=../x.js": /not on whitelist: npx/,
+    "npx shellcheck -f /x y": /not on whitelist: npx/,
+    "npx shellcheck -s ./sh x.sh": /not on whitelist: npx/,
+    // QA cycle 9 (bug.15) — a positional under mocha/vitest is never a
+    // subcommand (`npx mocha init out` scaffolded four files, executed);
+    // vitest requires --run as tsc requires --noEmit.
+    "npx mocha init out9": /not on whitelist: npx/,
+    "npx mocha init .": /not on whitelist: npx/,
+    "npx vitest init browser": /not on whitelist: npx/,
+    "npx vitest --run init browser": /not on whitelist: npx/,
+    "npx vitest watch": /not on whitelist: npx/,
+    "npx vitest --run dev": /not on whitelist: npx/,
+    "npx vitest": /not on whitelist: npx/,
+    "npx vitest x.test.ts": /not on whitelist: npx/,
+    // QA cycle 9 (QA-4) — jq's env builtin prints the inherited environment.
+    "jq -n env": /not on whitelist: jq/,
+    "jq -rn env.GH_TOKEN": /not on whitelist: jq/,
+    "jq -n (env)": /not on whitelist: jq/,
+    // QA cycle 9 (QA-6) — a live driver segment anywhere, not only last.
+    "npm run eval:x:cli:smoke": /not on whitelist: npm/,
+    "npm run eval:x:sdk:y": /not on whitelist: npm/,
+    // QA cycle 9 (CR-5) — `-r` could never run; it is no longer claimed.
+    "date -r 0": /not on whitelist: date/,
+    "date -r +%s": /not on whitelist: date/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);
@@ -737,6 +810,37 @@ test("whitelist: shell operators are judged per token — a quoted pipe is a pat
     false,
     "> is refused even quoted — no read-only use",
   );
+});
+
+test("tokenize: an empty quoted token is a token, and an unterminated quote is refused (gate 9, bug.16)", () => {
+  // The argv that runs must be the command the handoff recorded: dropping
+  // the "" ran `grep -c README.md` against stdin and CONFIRMED the wrong
+  // command against an expect of 0.
+  assert.deepEqual(mod.tokenize('grep -c "" README.md'), [
+    "grep",
+    "-c",
+    "",
+    "README.md",
+  ]);
+  assert.deepEqual(mod.tokenize("jq --arg x '' . f"), [
+    "jq",
+    "--arg",
+    "x",
+    "",
+    ".",
+    "f",
+  ]);
+  assert.deepEqual(mod.isAllowed('grep -c "" README.md').argv, [
+    "grep",
+    "-c",
+    "",
+    "README.md",
+  ]);
+  assert.deepEqual(mod.tokenize('a "b c"d e'), ["a", "b cd", "e"]);
+  assert.equal(mod.tokenize('grep -c "a b'), null);
+  const r = mod.isAllowed('grep -c "a b');
+  assert.equal(r.ok, false);
+  assert.equal(r.detail, "unterminated quote");
 });
 
 // ---------------------------------------------------------------------------
@@ -1083,6 +1187,18 @@ test("cli: missing file → reason=missing exit 1; unknown flag → usage exit 2
   const missing = runCli(["nope.md", "--json"], dir);
   assert.equal(missing.status, 1);
   assert.equal(JSON.parse(missing.stdout).reason, "missing");
+  // A directory (or an unreadable file) is one JSON object like every other
+  // outcome, never a stack trace (gate 9, QA-5).
+  fs.mkdirSync(path.join(dir, "adir"));
+  const unreadable = runCli(["adir", "--json"], dir);
+  assert.equal(unreadable.status, 1);
+  const u = JSON.parse(unreadable.stdout);
+  assert.equal(u.reason, "missing");
+  assert.equal(u.detail, "EISDIR");
+  assert.doesNotMatch(unreadable.stderr, /at .*node:fs/);
+  const plain = runCli(["adir"], dir);
+  assert.equal(plain.status, 1);
+  assert.match(plain.stderr, /is not readable \(EISDIR\)/);
   const usage = runCli(["--bogus"], dir);
   assert.equal(usage.status, 2);
   assert.match(usage.stderr, /unknown flag/);
