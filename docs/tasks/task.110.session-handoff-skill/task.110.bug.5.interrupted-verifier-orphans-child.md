@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -38,3 +38,4 @@ Async spawn (await the `close` event) so SIGINT/SIGTERM handlers can `process.ki
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | CR-7 |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Async runner + signal-driven group kill |
+| 2026-09-15 | Closed | QA Engineer | Verified in QA cycle 3 (gate 3) |

@@ -221,6 +221,11 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "head -1 x",
     "ls -la docs",
     "ls 'a;b'",
+    "npx prettier --config=.prettierrc.json --check .",
+    "git log --format=%ci --since=2026-09-01",
+    "gh api repos/x --jq=.[0].id",
+    "git ls-remote --heads origin refs/heads/main",
+    "npm run eval:develop-next",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -359,6 +364,17 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "env git log": /not on whitelist: env/,
     "./git log": /not on whitelist: git/,
     "Git log": /not on whitelist: Git/,
+    // QA cycle 3 — joined flag VALUES are positionals too (PRB-6); ls-remote
+    // takes a remote name, never a URL (PRB-8); eval: needs a name.
+    "npx prettier --config=../evil.js --check .": /not on whitelist: npx/,
+    "npx prettier --config=/abs/evil.js --check .": /not on whitelist: npx/,
+    "npx eslint --config=../evil.js .": /not on whitelist: npx/,
+    "npx prettier --ignore-path=../x --check .": /not on whitelist: npx/,
+    "node --test-name-pattern=../x --test tests/": /not on whitelist: node/,
+    "gh api repos/x --template=../x": /not on whitelist: gh/,
+    "git ls-remote ssh://evil.example/x": /not on whitelist: git/,
+    "git ls-remote https://evil.example/x": /not on whitelist: git/,
+    "npm run eval:": /not on whitelist: npm/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);
@@ -812,6 +828,24 @@ test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a
     false,
     "the grandchild outlived the timeout — the process group was not killed",
   );
+});
+
+test("runner: output is capped, and the cap is announced rather than silently dropped (PRB-7)", async () => {
+  const dir = tempDir();
+  fs.writeFileSync(
+    path.join(dir, "loud.js"),
+    "const s = 'x'.repeat(1024 * 1024); for (let i = 0; i < 40; i++) process.stdout.write(s); process.stdout.write('\\nEND\\n');",
+  );
+  const r = await mod.defaultRunner([process.execPath, "loud.js"], {
+    cwd: dir,
+    timeoutMs: 30000,
+  });
+  assert.equal(r.status, 0);
+  assert.ok(
+    r.stdout.length <= 16 * 1024 * 1024 + 1024 * 1024,
+    `stdout held to the cap (${r.stdout.length})`,
+  );
+  assert.match(r.stderr, /output truncated at/);
 });
 
 test("cli: SIGINT on the verifier kills the running command's process group (CR-7)", async () => {

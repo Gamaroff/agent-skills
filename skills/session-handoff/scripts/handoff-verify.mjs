@@ -115,6 +115,15 @@ function isSafePositional(tok, policy, { allowAbsolute = false } = {}) {
  * value; `flagPattern` admits short-flag clusters (`-rn`) where a binary
  * takes them. Returns true only if every token is accounted for.
  */
+/** A joined flag value: empty is fine; otherwise no `..` segment and no absolute path unless the spec allows one. */
+function valueOk(v, spec) {
+  if (v === "") return true;
+  if (v.split(/[\\/]/).includes("..")) return false;
+  if (!spec.allowAbsolute && (v.startsWith("/") || v.startsWith("\\")))
+    return false;
+  return true;
+}
+
 function checkArgs(args, spec) {
   const flags = new Set(spec.flags ?? []);
   const withValue = new Set(
@@ -135,11 +144,16 @@ function checkArgs(args, spec) {
     if (a.startsWith("-")) {
       const eq = a.indexOf("=");
       const name = eq > 0 ? a.slice(0, eq) : a;
+      const joined = eq > 0 && withValue.has(name);
       const ok =
         flags.has(a) ||
-        (eq > 0 && withValue.has(name)) ||
+        joined ||
         (spec.flagPattern instanceof RegExp && spec.flagPattern.test(a));
       if (!ok) return false;
+      // The VALUE of a joined flag is held to the same rule as a positional:
+      // `--config=../evil.js` is a path that leaves the cwd exactly as
+      // `-c ../evil.js` is, and a prettier/eslint config is JavaScript (gate 3).
+      if (joined && !valueOk(a.slice(eq + 1), spec)) return false;
       continue;
     }
     if (
@@ -148,6 +162,7 @@ function checkArgs(args, spec) {
       })
     )
       return false;
+    if (spec.positionalPattern && !spec.positionalPattern.test(a)) return false;
     positionals += 1;
   }
   if (
@@ -267,7 +282,10 @@ const GIT_SPECS = Object.freeze({
     positional: POS.PATHS,
     allowDashDash: true,
   },
+  // Positionals are a remote NAME or ref pattern — never a URL: a handoff must
+  // not point the reader's SSH agent at an arbitrary host (gate 3, PRB-8).
   "ls-remote": {
+    positionalPattern: /^[A-Za-z0-9._\/*-]+$/,
     flags: [
       "--heads",
       "-h",
@@ -542,11 +560,8 @@ function interpreterRule(safeFlags, safePattern, testModeFlag) {
   const flagOk = (a) => {
     const eq = a.indexOf("=");
     const name = eq > 0 ? a.slice(0, eq) : a;
-    return (
-      flags.has(a) ||
-      (eq > 0 && withValue.has(name)) ||
-      (safePattern && safePattern.test(a))
-    );
+    if (eq > 0 && withValue.has(name)) return valueOk(a.slice(eq + 1), {});
+    return flags.has(a) || (safePattern && safePattern.test(a));
   };
   return (rest) => {
     let testMode = false;
@@ -626,8 +641,7 @@ function npmRule(rest) {
   if (!script || script.startsWith("-")) return false;
   if (script === "bundle")
     return more.length === 2 && more[0] === "--" && more[1] === "--check";
-  if (script.startsWith("eval:") && /^[a-z0-9:-]+$/.test(script))
-    return more.length === 0;
+  if (/^eval:[a-z0-9][a-z0-9:-]*$/.test(script)) return more.length === 0;
   if (!NPM_SCRIPTS.has(script)) return false;
   return (
     more.length === 0 ||
@@ -1296,8 +1310,19 @@ export function defaultRunner(argv, { cwd, timeoutMs }) {
       timedOut = true;
       killGroup(child.pid);
     }, timeoutMs);
-    child.stdout.on("data", (d) => (stdout += d));
-    child.stderr.on("data", (d) => (stderr += d));
+    // Bounded: a chatty command must not grow two strings without limit
+    // (gate 3, PRB-7). The tail is what a figure is compared against anyway.
+    const CAP = 16 * 1024 * 1024;
+    let truncated = false;
+    const take = (buf, d) => {
+      if (buf.length >= CAP) {
+        truncated = true;
+        return buf;
+      }
+      return buf + d;
+    };
+    child.stdout.on("data", (d) => (stdout = take(stdout, d)));
+    child.stderr.on("data", (d) => (stderr = take(stderr, d)));
     child.on("error", (e) => (spawnError = String(e.message || e)));
     child.on("close", (code) => {
       clearTimeout(timer);
@@ -1306,7 +1331,9 @@ export function defaultRunner(argv, { cwd, timeoutMs }) {
       resolve({
         status: code,
         stdout,
-        stderr,
+        stderr: truncated
+          ? `${stderr}\n[handoff-verify: output truncated at ${CAP} bytes]`
+          : stderr,
         timedOut,
         error: spawnError && !timedOut ? spawnError : null,
       });

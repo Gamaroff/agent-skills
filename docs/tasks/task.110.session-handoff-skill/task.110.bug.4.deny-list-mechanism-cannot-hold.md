@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-4
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -71,3 +71,4 @@ Replace, do not patch: per-binary allow-lists; remove `--hostname`; `--check` on
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | Gate 2 refute pass + re-probe |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Deny-lists replaced by per-binary allow-lists |
+| 2026-09-15 | Closed | QA Engineer | Verified in QA cycle 3 (gate 3) |
