@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-10
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -50,8 +50,31 @@ code — except `tsc`, where the registry package is unrelated to the TypeScript
 Require `--no-install` (or inject `--no`) in the `npx` arm; refused-list test for a bare
 `npx stylelint --version` and an allowed test for `npx --no-install prettier --check .`.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-09-15 · **Developer**: Claude (qa-fix, cycle 7)
+
+**Root Cause**: `npxRule` accepted an optional `--no-install` / `--no` prefix and otherwise let the bare tool name through; the runner spawns non-TTY with `CI=1`, under which npm 11 resolves a missing tool against the registry and installs it without the prompt a TTY would show. Measured on npm 11.17.0 during the fix: `--no-install` is rewritten by `npx-cli.js` to `--yes=false`, and a missing tool then fails with `npx canceled due to missing packages and no YES option`. `--no`, however, is **not** an alias at all on npx 7+ — it is an unknown option that swallows the next token as its value, so `npx --no prettier --check .` ran npm with `no=prettier` and printed npm's own version. Accepting it was a second defect of the same rule.
+
+**Fix**: `isAllowed` **injects** `--no-install` into the argv that runs for every approved `npx` command (`npxArgv`; once — an argv that already carries it is left alone), so a handoff written as `npx prettier --check .` keeps verifying and a missing tool is an exit-1 `stale`, never an install. This is the one place the approved argv and the running argv differ, and only by a flag that removes a capability; SKILL.md says so. `--no` is refused. Residual, documented in SKILL.md: npm still resolves the tool's name against the registry (one manifest GET) before deciding not to install.
+
+**Files Modified**:
+- `skills/session-handoff/scripts/handoff-verify.mjs` — `NPX_NO_INSTALL`, `npxRule`, `npxArgv`, `isAllowed`
+- `skills/session-handoff/tests/handoff-verify.test.js` — new test `an approved npx argv runs with --no-install, injected once` (deep-equal on the argv for the bare, `command`-prefixed and already-prefixed spellings; `npm`/`git` argv untouched); refused: `npx --no prettier --check .`, a doubled `--no-install`, `npx stylelint --version`; the 2026-09-10 regression stub is keyed on the injected argv and asserts the measurement reached it
+- `skills/session-handoff/SKILL.md` — `npx` row; the "argv the rule sees is the argv that runs" sentence names the exception
+
+**Testing**: 29/29. Executed through the verifier in a scratch package with no `tsc` installed, `CI=1`, stdin closed: `npx tsc --noEmit` → `stale: moved: exit 0 → exit 1`, `node_modules` unchanged afterwards. Mutation-proved: removing the injection → the new test and the regression test red; re-accepting `--no` → the refused list red.
+
+**Verification Steps for QA**:
+1. `isAllowed("npx prettier --check .").argv` deep-equals `["npx","--no-install","prettier","--check","."]`.
+2. In a scratch package with no `cowsay`: a handoff line `npx tsc --noEmit` through read mode with `CI=1 … </dev/null` reads `stale` and `ls node_modules` is unchanged; `~/.npm/_npx` gains no new entry.
+3. `isAllowed("npx --no prettier --check .").ok === false`.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | QA cycle 7 — non-TTY install executed with `cowsay@1.6.0`; the tool list checked against `node_modules/.bin` |
+| 2026-09-15 | Ready for QA | Claude (qa-fix) | `--no-install` injected into every approved npx argv; `--no` refused (it is not an alias — it swallows the tool name) |

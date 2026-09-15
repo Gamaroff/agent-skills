@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -64,8 +64,31 @@ to `owner/name`; anchor list/view positionals to `^[A-Za-z0-9._-]+$` (a number, 
 anchor `npm view`/`ls` positionals to a package-name pattern. Refused-list tests for the six
 spellings above.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-09-15 · **Developer**: Claude (qa-fix, cycle 7)
+
+**Root Cause**: two arms shared one shape of defect — a value that names a host was judged by the *positional* rule, not by the flag it belonged to. In `ghRule`, `-R` and `--repo` were bare entries in `GH_LIST_VIEW_FLAGS`, so `-R 127.0.0.1:8099/o/r` was a flag followed by a `POS.ANY` positional; the joined `--repo=…` was exempted from the path rule by `PATTERN_FLAGS`; and a URL positional on `repo view` was `POS.ANY` too. In `npmRule`, `view`/`ls` positionals were `POS.ANY`, and a package spec may be a tarball URL, a `git+…` URL, a `file:` path or the `owner/repo` GitHub shorthand.
+
+**Fix**: gh list/view flags are split into switches and **value-taking flags that consume their next token** (`checkArgs` `valueFlags`), with `--repo`/`-R` held to exactly `OWNER/REPO` by a per-flag `valuePatterns` entry (joined and spaced forms alike; `--repo` removed from `PATTERN_FLAGS`). What remains is a genuine positional and is anchored: `GH_POSITIONAL` admits a number, branch, tag, run id or workflow file — no `:`, no `//` — and `repo view` takes only `NAME` or `OWNER/NAME` (`GH_REPO_POSITIONAL`), never `HOST/OWNER/NAME`. npm `view`/`ls` positionals are held to `NPM_PKG_SPEC` — optional `@scope/`, name, optional `@range` — which also covers a field selector (`version`, `dist-tags.latest`); no `:`, no `/` outside a scope, no leading `.`.
+
+**Files Modified**:
+- `skills/session-handoff/scripts/handoff-verify.mjs` — `GH_LIST_VIEW_SWITCHES`, `GH_LIST_VIEW_VALUE_FLAGS`, `GH_OWNER_REPO`, `GH_POSITIONAL`, `GH_REPO_POSITIONAL`, `ghListViewSpec`, `NPM_PKG_SPEC`; `valueOk` consults `spec.valuePatterns` first
+- `skills/session-handoff/tests/handoff-verify.test.js` — refused: `-R 127.0.0.1:8099/o/r`, `--repo 127.0.0.1:8099/o/r`, `--repo=https://evil/o/r`, `-R evil.com/o/r`, `gh repo view https://…` / `evil.com/o/r` / `127.0.0.1:8099/o/r`, `gh pr view <url>`, a trailing bare `-R`; `npm view` of a tarball URL, `git+http`, `git+ssh`, `github:o/r`, `o/r`, `file:../x`, `.`, `npm ls <url>`; allowed: `-R o/r`, `--repo=o/r`, branch/tag/run-id/workflow-file positionals, `repo view o/r`, `--search author:@me`, bare and scoped package names with a field
+- `skills/session-handoff/SKILL.md` — `gh` and `npm` rows; refused-by-construction list
+
+**Testing**: 29/29. Executed through the verifier: `gh pr list -R 127.0.0.1:8099/o/r` and `npm view http://127.0.0.1:8099/pkg.tgz` → `unverifiable: not on whitelist`, nothing spawned. Mutation-proved separately: removing `valuePatterns` → red; removing the positional pattern → red; reverting npm to `POS.ANY` → red.
+
+**Verification Steps for QA**:
+1. With the listener up: `isAllowed("gh pr list -R 127.0.0.1:8099/o/r").ok === false`, `isAllowed("gh pr list --repo=https://127.0.0.1:8099/o/r").ok === false`, `isAllowed("gh repo view 127.0.0.1:8099/o/r").ok === false` — it receives nothing.
+2. `isAllowed("npm view http://127.0.0.1:8099/pkg.tgz").ok === false`; `… git+http://…` and `… git+ssh://…` likewise.
+3. `isAllowed("gh pr list -R o/r --json number").ok === true`; `isAllowed("npm view prettier version").ok === true`.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | QA cycle 7 — executed against a local listener |
+| 2026-09-15 | Ready for QA | Claude (qa-fix) | gh value flags consume their value and `--repo`/`-R` is `OWNER/REPO`; list/view positionals anchored; npm view/ls held to a bare package-name pattern |

@@ -179,7 +179,6 @@ const PATTERN_FLAGS = new Set([
   "--timeout",
   "--head",
   "--base",
-  "--repo",
   "--short",
   "--abbrev",
   "--max-count",
@@ -189,6 +188,11 @@ const PATTERN_FLAGS = new Set([
 
 /** A joined flag value: empty is fine; no `..` segment ever; no absolute path unless the flag takes a pattern or the spec allows one. */
 function valueOk(name, v, spec) {
+  // A per-flag value pattern is checked FIRST and is a full answer: gh's
+  // `--repo` is `[HOST/]OWNER/REPO` and the host part is the egress bug.9
+  // executed, so its value is held to OWNER/REPO whether joined or spaced.
+  const vp = spec.valuePatterns?.[name];
+  if (vp) return vp.test(v);
   if (v === "") return true;
   if (v.split(/[\\/]/).includes("..")) return false;
   // The exemption is global for genuinely pattern-only names, and PER-SPEC for
@@ -220,11 +224,34 @@ function checkArgs(args, spec) {
   const withValue = new Set(
     [...flags].filter((f) => f.endsWith("=")).map((f) => f.slice(0, -1)),
   );
+  // Flags whose value is the NEXT token (`--repo o/r`, `--workspace /x`).
+  // Before this the value fell through as a positional and was judged by
+  // the positional policy, not by the flag it belonged to — which is how
+  // `-R evil/o/r` reached a host (gate 7, bug.9).
+  const valueFlags = new Set(spec.valueFlags ?? []);
   let positionals = 0;
   let passthrough = false;
-  for (const a of args) {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
     if (passthrough) {
-      if (!isSafePositional(a, POS.ANY)) return false;
+      // The spec's OWN positional policy, not POS.ANY: `git diff --no-index
+      // -- /etc/hosts x` read an outside file through an arm whose policy
+      // refuses a leading `/` (gate 7, QA-6).
+      if (
+        !isSafePositional(a, spec.positional, {
+          allowAbsolute: spec.allowAbsolute,
+        })
+      )
+        return false;
+      if (spec.positionalPattern && !spec.positionalPattern.test(a))
+        return false;
+      continue;
+    }
+    if (valueFlags.has(a)) {
+      const v = args[i + 1];
+      if (v === undefined || v.startsWith("-")) return false;
+      if (!valueOk(a, v, spec)) return false;
+      i += 1;
       continue;
     }
     if (a === "--") {
@@ -536,72 +563,71 @@ function gitRule(rest) {
 }
 
 // --- gh --------------------------------------------------------------------
-const GH_LIST_VIEW_FLAGS = [
-  "--json",
-  "--json=",
-  "--jq",
-  "--jq=",
-  "-q",
-  "--template",
-  "--template=",
-  "-t",
-  "--state",
-  "--state=",
-  "-s",
-  "--limit",
-  "--limit=",
-  "-L",
-  "--head",
-  "--head=",
-  "--base",
-  "--base=",
-  "--label",
-  "--label=",
-  "-l",
-  "--author",
-  "--author=",
-  "-A",
-  "--assignee",
-  "--assignee=",
-  "-a",
-  "--search",
-  "--search=",
-  "-S",
-  "--repo",
-  "--repo=",
-  "-R",
+// list/view flags are split by whether they take a value. A value-taking flag
+// CONSUMES its next token, so what is left over is a genuine positional and can
+// be anchored: gate 7 (bug.9) executed `gh pr list -R 127.0.0.1:8099/o/r`
+// against a local listener — `-R` was a bare flag and the host-bearing repo
+// spec slid through as a POS.ANY positional.
+const GH_LIST_VIEW_SWITCHES = [
   "--comments",
   "-c",
-  "--milestone",
-  "--milestone=",
-  "--branch",
-  "--branch=",
-  "-b",
-  "--workflow",
-  "--workflow=",
-  "-w",
-  "--status",
-  "--status=",
-  "--event",
-  "--event=",
-  "--user",
-  "--user=",
-  "-u",
-  "--commit",
-  "--commit=",
   "--draft",
   "--required",
   "--exclude-drafts",
   "--exclude-pre-releases",
-  "--order",
-  "--order=",
-  "--sort",
-  "--sort=",
-  "--color",
-  "--color=",
   "--name-only",
   "--patch",
 ];
+const GH_LIST_VIEW_VALUE_FLAGS = [
+  "--json",
+  "--jq",
+  "-q",
+  "--template",
+  "-t",
+  "--state",
+  "-s",
+  "--limit",
+  "-L",
+  "--head",
+  "--base",
+  "--label",
+  "-l",
+  "--author",
+  "-A",
+  "--assignee",
+  "-a",
+  "--search",
+  "-S",
+  "--repo",
+  "-R",
+  "--milestone",
+  "--branch",
+  "-b",
+  "--status",
+  "--event",
+  "--user",
+  "-u",
+  "--commit",
+  "--order",
+  "--sort",
+  "--color",
+];
+// `-w` is `--workflow <name>` under `run list` and `--web` — open the
+// reader's browser — on every `view` (gate 7, QA-5). Admitted only where it
+// names a workflow.
+const GH_RUN_LIST_VALUE_FLAGS = ["--workflow", "-w"];
+// `[HOST/]OWNER/REPO` minus the HOST: exactly two segments, no dot-dot, no
+// scheme. A host-bearing value is a request to that host.
+const GH_OWNER_REPO = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const GH_REPO_VALUE_PATTERNS = Object.freeze({
+  "--repo": GH_OWNER_REPO,
+  "-R": GH_OWNER_REPO,
+});
+// A list/view positional is a number, a branch, a tag, a run id or a workflow
+// file: no `:` (a URL, a host:port), no `//`. `repo view` takes NAME or
+// OWNER/NAME, never HOST/OWNER/NAME.
+const GH_POSITIONAL = /^(?!.*\/\/)[A-Za-z0-9._/@#-]+$/;
+const GH_REPO_POSITIONAL = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)?$/;
 const GH_API_FLAGS = [
   "--jq",
   "--jq=",
@@ -625,6 +651,20 @@ const GH_API_FLAGS = [
   "--preview=",
 ];
 
+function ghListViewSpec(group, verb) {
+  const valueFlags = [
+    ...GH_LIST_VIEW_VALUE_FLAGS,
+    ...(group === "run" && verb === "list" ? GH_RUN_LIST_VALUE_FLAGS : []),
+  ];
+  return {
+    flags: [...GH_LIST_VIEW_SWITCHES, ...valueFlags.map((f) => `${f}=`)],
+    valueFlags,
+    valuePatterns: GH_REPO_VALUE_PATTERNS,
+    positional: POS.ANY,
+    positionalPattern: group === "repo" ? GH_REPO_POSITIONAL : GH_POSITIONAL,
+  };
+}
+
 function ghRule(rest) {
   const [group, ...args] = rest;
   if (group === "api") {
@@ -644,13 +684,25 @@ function ghRule(rest) {
     return false;
   if (!["list", "view", "status", "checks", "diff"].includes(verb))
     return false;
-  return checkArgs(more, { flags: GH_LIST_VIEW_FLAGS, positional: POS.ANY });
+  return checkArgs(more, ghListViewSpec(group, verb));
 }
 
 // --- interpreters ----------------------------------------------------------
-// Flags before the script are allow-listed; the script is a relative path
-// with no `..`; everything after the script belongs to the script and is
-// passed through (gate 2, CR-13).
+// Flags before the script are allow-listed; the script is one of an EXACT
+// list of read-only in-repo entry points, and what follows it is held to
+// that entry point's own spec. Until gate 7 any relative script passed and
+// everything after it was passed through — the NPM_SCRIPTS discipline applied
+// to npm and not to node — so `node node_modules/prettier/bin/prettier.cjs
+// --write x` rewrote a file through read mode, and the repo's own writers
+// (registry-tick.js, gh-stage.js, tracker-comment.js, generate_catalog.py)
+// were one spelling away from the `npm run` forms that refuse them (bug.8).
+//
+// Each entry names the script by the locations it is installed at — this
+// repository's `skills/<skill>/…` and a consumer's `.agents/skills/<skill>/…`
+// — so a handoff written in either verifies in both. An engine that ships as
+// a bundled copy (`observation-log.js`) is admitted under any skill's
+// `references/` and under `shared/resources/`, because the bundle test holds
+// every copy byte-identical to the source.
 function makeFlagOk(safeFlags, safePattern) {
   const flags = new Set(safeFlags);
   const withValue = new Set(
@@ -670,7 +722,42 @@ function testModeArgsOk(tokens, flagOk) {
     t.startsWith("-") ? flagOk(t) : isSafePositional(t, POS.PATHS),
   );
 }
-function interpreterRule(safeFlags, safePattern, testModeFlag) {
+const SKILL_ROOT = "(?:\\.agents/)?skills/";
+const ENGINE_COPY = `(?:${SKILL_ROOT}[A-Za-z0-9._-]+/references|shared/resources)/`;
+const scriptAt = (re) => new RegExp(`^${re}$`);
+const NODE_SCRIPTS = Object.freeze([
+  {
+    // Roadmap selection: pure read of the roadmap and registries. `--lint`
+    // and `--batch` are the two shapes the handoff cites.
+    path: scriptAt(`${SKILL_ROOT}develop-next/scripts/select-next\\.mjs`),
+    spec: {
+      flags: ["--lint", "--batch", "--require-touches"],
+      valueFlags: ["--roadmap", "--bug-registry", "--task-registry"],
+      positional: POS.NONE,
+    },
+  },
+  {
+    // The observation log's READ verbs only. `write`, `init`, `set-status`,
+    // `archive` and `checkpoint` all write the log; the workspace lives
+    // outside the repo, so `--workspace` may be absolute.
+    path: scriptAt(`${ENGINE_COPY}observation-log\\.js`),
+    spec: {
+      flags: ["--json", "--quiet", "--audit", "--workspace=", "--audit-root="],
+      valueFlags: ["--workspace", "--audit-root"],
+      allowAbsolute: true,
+      positional: POS.ANY,
+      positionalPattern: /^(doctor|scan|queue|next-id|families)$/,
+    },
+  },
+]);
+const PY_SCRIPTS = Object.freeze([
+  {
+    // Skill validation: reads SKILL.md, writes nothing.
+    path: scriptAt(`${SKILL_ROOT}create-skill/scripts/quick_validate\\.py`),
+    spec: { positional: POS.PATHS },
+  },
+]);
+function interpreterRule(safeFlags, safePattern, scripts, testModeFlag) {
   const flagOk = makeFlagOk(safeFlags, safePattern);
   return (rest) => {
     let testMode = false;
@@ -686,14 +773,13 @@ function interpreterRule(safeFlags, safePattern, testModeFlag) {
       // In test mode the positionals are patterns, not a script, and node
       // keeps parsing ITS OWN options after them — `node --test x/ -r pre.js`
       // preloads pre.js (found by the cycle-2 re-probe). So every later dash
-      // token is held to the same allow-list. With a real script, node stops
-      // at it and the rest belongs to the script.
+      // token is held to the same allow-list.
       if (testMode) return testModeArgsOk(after, flagOk);
-      return after.every(
-        (t) =>
-          isSafePositional(t, POS.ANY) ||
-          (t.startsWith("-") && !t.includes("..")),
-      );
+      // A real script: node stops parsing at it and the rest is the script's,
+      // so the rest is held to THAT script's spec — and only a listed script
+      // has one.
+      const entry = scripts.find((e) => e.path.test(a));
+      return entry ? checkArgs(after, entry.spec) : false;
     }
     return false; // no script: REPL / stdin
   };
@@ -749,11 +835,20 @@ function npmTestTailOk(more) {
 // billed agent run the repo documents as opt-in (gate 6, QA-3).
 const EVAL_SCRIPT = /^eval:[a-z0-9][a-z0-9:-]*$/;
 const EVAL_LIVE_DRIVER = /:(cli|sdk)$/;
+// A bare package name — optional @scope, name, optional @range — and, for
+// `view`, a field selector (`version`, `dist-tags.latest`), which the same
+// shape covers. A package SPEC may also be a tarball URL, a `git+…` URL, a
+// `file:` path or a GitHub shorthand (`owner/repo`), and npm fetches each one:
+// gate 7 (bug.9) executed `npm view http://127.0.0.1:8099/pkg.tgz` and
+// `npm view git+http://…` against a local listener. No `:`, no `/` outside a
+// scope, no leading `.`.
+const NPM_PKG_SPEC =
+  /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*(@[a-z0-9.^~<>=*|+-]+)?$/i;
 function npmRule(rest) {
   const [verb, ...args] = rest;
   if (verb === "test") return npmTestTailOk(args);
   if (verb === "ls" || verb === "view")
-    return args.every((a) => isSafePositional(a, POS.ANY));
+    return args.every((a) => NPM_PKG_SPEC.test(a));
   if (verb !== "run") return false;
   const [script, ...more] = args;
   if (!script || script.startsWith("-")) return false;
@@ -859,14 +954,31 @@ const NPX_TOOLS = Object.freeze({
     positional: POS.PATHS,
   },
 });
+// The runner is non-TTY with CI=1, under which npm 11 installs a missing
+// package from the registry without a prompt (gate 7, bug.10: `npx cowsay`
+// printed "will be installed" and ran) — and nine of the ten tools here are
+// absent from this repo's node_modules, so `npx tsc --noEmit` would fetch and
+// run whatever the registry publishes under `tsc`. `--no-install` (npx
+// rewrites it to `--yes=false`) makes a missing tool an error instead:
+// "npx canceled due to missing packages". It is INJECTED into the argv by
+// `isAllowed` rather than required in the handoff, so every handoff already
+// written keeps verifying, and the rule refuses to run without it. `--no` is
+// NOT an alias: to npx 7+ it is an unknown option that swallows the next
+// token as its value, so `npx --no prettier --check .` runs npm with
+// `no=prettier` and prettier never starts.
+const NPX_NO_INSTALL = "--no-install";
 function npxRule(rest) {
-  let i = 0;
-  while (i < rest.length && (rest[i] === "--no-install" || rest[i] === "--no"))
-    i++;
+  const i = rest[0] === NPX_NO_INSTALL ? 1 : 0;
   const tool = rest[i];
   const spec = NPX_TOOLS[tool];
   if (!spec) return false;
   return checkArgs(rest.slice(i + 1), spec);
+}
+/** The argv that RUNS for an approved npx command: `--no-install` first, once. */
+function npxArgv(argv) {
+  return argv[1] === NPX_NO_INSTALL
+    ? argv
+    : [argv[0], NPX_NO_INSTALL, ...argv.slice(1)];
 }
 
 // --- small read-only utilities --------------------------------------------
@@ -1037,8 +1149,8 @@ function utilRule(bin) {
 export const WHITELIST = Object.freeze({
   git: gitRule,
   gh: ghRule,
-  node: interpreterRule(NODE_FLAGS, NODE_FLAG_PATTERN, "--test"),
-  python3: interpreterRule(PY_FLAGS, PY_FLAG_PATTERN),
+  node: interpreterRule(NODE_FLAGS, NODE_FLAG_PATTERN, NODE_SCRIPTS, "--test"),
+  python3: interpreterRule(PY_FLAGS, PY_FLAG_PATTERN, PY_SCRIPTS),
   npm: npmRule,
   npx: npxRule,
   grep: utilRule("grep"),
@@ -1122,7 +1234,9 @@ export function isAllowed(cmd, whitelist = WHITELIST) {
   const rule = whitelist[bin];
   if (!rule || !rule(argv.slice(1)))
     return { ok: false, detail: `not on whitelist: ${bin}` };
-  return { ok: true, argv };
+  // The one place the approved argv and the running argv differ, and only by
+  // a flag that removes a capability (see npxRule).
+  return { ok: true, argv: bin === "npx" ? npxArgv(argv) : argv };
 }
 
 // ---------------------------------------------------------------------------

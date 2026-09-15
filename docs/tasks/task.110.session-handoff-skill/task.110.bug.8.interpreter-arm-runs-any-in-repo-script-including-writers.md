@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-8
 **Severity**: HIGH
 **Priority**: P1
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -94,8 +94,31 @@ segments and document the residual trust. Add the executed spellings above to th
 test and the read-only entry points the live handoff uses to the allowed list, so the live handoff
 still reads 17+ confirmed.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-09-15 · **Developer**: Claude (qa-fix, cycle 7)
+
+**Root Cause**: `interpreterRule` held only the interpreter's own leading flags and required the script to be a relative path with no `..`; the script's identity was never consulted and everything after it was passed through as "belongs to the script" (gate 2, CR-13). So the trust boundary of the arm was "any file in the checkout, with any arguments" — which includes `node_modules/*/bin/*` and every writer the `npm run` arm refuses by name.
+
+**Fix**: the script positional is an **exact allow-list of read-only entry points** (`NODE_SCRIPTS`, `PY_SCRIPTS`), each carrying its own `checkArgs` spec for the tail — the `NPM_SCRIPTS` discipline applied to scripts. Listed: `develop-next/scripts/select-next.mjs` (`--lint` `--batch` `--require-touches`, the three registry/roadmap paths relative-only, no positional), `observation-log.js` under any skill's `references/` or `shared/resources/` (read verbs `doctor` `scan` `queue` `next-id` `families` only; `--workspace`/`--audit-root` may be absolute since the log lives outside the repo), and `create-skill/scripts/quick_validate.py` (one relative positional). Each matches at this repo's `skills/…` path and a consumer's `.agents/skills/…` path, so the same handoff line verifies in both. Anything else — `node_modules/…`, `.bin/…`, `registry-tick.js`, `gh-stage.js`, `tracker-comment.js`, `generate_catalog.py`, `bundle_skill.py`, a listed engine's write verbs — is `not on whitelist`. `checkArgs` gained `valueFlags` (a flag that consumes its next token) to express `--workspace /abs` without loosening positionals. SKILL.md's `node` and `python3` rows now state the list and the reason, so the "read-only whitelist" opening and the row agree (gate 7 maintainability CONCERNS).
+
+**Files Modified**:
+- `skills/session-handoff/scripts/handoff-verify.mjs` — `NODE_SCRIPTS`, `PY_SCRIPTS`, `interpreterRule(…, scripts, …)`, `checkArgs` `valueFlags`
+- `skills/session-handoff/tests/handoff-verify.test.js` — refused: the prettier.cjs `--write`, `.bin/prettier`, registry-tick, gh-stage, tracker-comment, generate_catalog, bundle_skill, package_skill spellings, the bug's former allowed fixtures `node skills/x.mjs` / `python3 skills/x.py`, and a listed engine's `write`/`archive`/`set-status`/`checkpoint`/`init`; allowed: the live handoff's entry points at both install paths. The three CLI tests that used `node slow.js` as a slow fixture now run it as the fixture package's `npm test` (the tree the group kill covers is one level deeper: verifier → npm → sh → node → grandchild)
+- `skills/session-handoff/SKILL.md` — `node`, `python3` rows; refused-by-construction list; the specs paragraph names `NODE_SCRIPTS`/`PY_SCRIPTS` and says how to add an entry point
+
+**Testing**: 29/29. Executed through the verifier in a scratch fixture with prettier installed: `node node_modules/prettier/bin/prettier.cjs --write scripts/ugly.js` → `unverifiable: not on whitelist: node`, the file byte-identical afterwards. Live handoff read mode: `select-next.mjs`, `select-next.mjs --lint`, `quick_validate.py` and `observation-log.js queue --workspace … --json` all execute (the last reads `stale` because the total moved 52 → 57 — genuine). Mutation-proved: reverting the script lookup to pass-through → `whitelist: mutating shapes … are refused` red; dropping the `valueOk` check on a spaced value → red.
+
+**Verification Steps for QA**:
+1. `isAllowed("node node_modules/prettier/bin/prettier.cjs --write x").ok === false`; same for `node shared/resources/registry-tick.js --dry-run` and `python3 skills/create-skill/scripts/generate_catalog.py`.
+2. `isAllowed("node .agents/skills/observe-work/references/observation-log.js queue --workspace /abs --json").ok === true`; `… write --title x` is `false`.
+3. `command node skills/session-handoff/scripts/handoff-verify.mjs .agents/handoff.md --json` — no interpreter row reads `not on whitelist`.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | QA cycle 7 — prettier write executed through the verifier in a scratch fixture; registry-tick reached under `--dry-run` |
+| 2026-09-15 | Ready for QA | Claude (qa-fix) | interpreter script positional is an exact allow-list with per-entry specs; the prettier `--write` spelling executed through the verifier and refused |
