@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-19
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle-13 5c CR-1 executed `--noEmit false`; cycle-14 reviewer CR-1/CR-2/CR-3 and QA executed the rest)
 **Date Found**: 2026-09-15
 
@@ -104,3 +104,4 @@ rule removed → red.
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 14 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Universal npx positional rule — no true/false/null, no @response — folded from the tsc-only pattern |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 15 — through the clone's own verifier at `72bf03b4` against consumer9 (typescript + jest declared) under an inherited `CI=false`: `npx tsc --noEmit null zz.ts`, `--noEmit @tsargs.txt`, `--noEmit false zz.ts`, `npx jest --ci false --silent`, `npx mocha zz.ts` → all `unverifiable: not on whitelist: npx`; no `zz.js`, no snapshot; `npx tsc --noEmit zz.ts` `confirmed`. 3,653 prior spellings re-run with no decision change. Mutations M1 (rule removed), M2 (`null` re-admitted), M3 (`@` re-admitted) → red — `covered` ×3 |

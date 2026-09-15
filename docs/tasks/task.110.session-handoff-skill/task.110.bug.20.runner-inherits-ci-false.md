@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-20
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (reviewer CR-4, confirmed by execution)
 **Date Found**: 2026-09-15
 
@@ -67,3 +67,4 @@ under an inherited `CI=false` and reads `1`. Mutation: the `??` restored → red
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 14 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | CI forced to 1 in the child env; runner test under an inherited CI=false |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 15 — `npx jest --silent` through the clone's own verifier under `env -i … CI=false` fails on the missing snapshot instead of writing it; no `__snapshots__/`. Mutation M4 (`??` restored) → the new runner test red — `covered` |

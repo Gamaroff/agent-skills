@@ -304,7 +304,7 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npx stylelint --config=.stylelintrc -q --formatter=json src",
     "npx markdownlint -c .markdownlint.json -p .markdownlintignore docs",
     "npx markdownlint-cli2 --config=.markdownlint-cli2.jsonc --no-globs docs/x.md",
-    "npx jest --ci --reporters=default",
+    "npx jest --ci --silent --passWithNoTests",
     "npx mocha -R spec --reporter=dot -t 5000 --grep=x -g y --timeout=1",
     "npx vitest --run --reporter=dot x.test.ts",
     "npx shellcheck -f gcc -S warning -s bash --shell=sh --severity=error x.sh",
@@ -318,7 +318,7 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     // stdout-only built-ins, spaced or joined.
     "npx mocha -R nyan --reporter=json-stream",
     "npx vitest --run --reporter=junit --reporter tap-flat x.test.ts",
-    "npx jest --reporters=summary --reporters github-actions",
+    "npx jest --ci --maxWorkers=2 -t x",
     "npx eslint -f stylish --format=json .",
     "npx stylelint --formatter verbose src",
     "npx shellcheck -f json1 -s dash -S style --format=tty --shell=ksh --severity=info x.sh",
@@ -765,6 +765,21 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "npx vitest --run false x": /not on whitelist: npx/,
     "npx prettier --check @x": /not on whitelist: npx/,
     "npx stylelint --quiet false src": /not on whitelist: npx/,
+    // QA cycle 15 (bug.21) — jest's --reporters is a greedy yargs array; a
+    // following "test path" is loaded as a reporter module (executed).
+    "npx jest --ci --reporters default ./zzrep.js": /not on whitelist: npx/,
+    "npx jest --reporters=default ./x.js": /not on whitelist: npx/,
+    "npx jest --reporters=default": /not on whitelist: npx/,
+    // QA cycle 15 (bug.22) — Object.prototype keys are not rules.
+    "constructor rm -rf x": /not on whitelist: constructor/,
+    "toString anything": /not on whitelist: toString/,
+    "__proto__ x": /not on whitelist: __proto__/,
+    "hasOwnProperty x": /not on whitelist: hasOwnProperty/,
+    "git hasOwnProperty x": /not on whitelist: git/,
+    "git constructor": /not on whitelist: git/,
+    "npx constructor foo": /not on whitelist: npx/,
+    "npx __proto__ x": /not on whitelist: npx/,
+    "npx toString": /not on whitelist: npx/,
     // 5c (CR-2) — mocha runs an explicitly named file whatever its name
     // (the bug.11 class): no positional at all, as under `node --test`.
     "npx mocha skills/loop-supervisor/scripts/run-loop.mjs":
@@ -1397,6 +1412,29 @@ test("runner: output beyond the cap makes the figure unverifiable, never a compa
   });
   assert.equal(v.lines[0].verdict, "unverifiable");
   assert.match(v.lines[0].detail, /output truncated/);
+});
+
+test("verify: a rule that throws is one unverifiable line, never a lost run (gate 15, bug.22)", async () => {
+  const r = await mod.verify(
+    mod.parseHandoff("- x **1** <!-- cmd: boom x; expect: 1 -->\n"),
+    {
+      whitelist: {
+        boom: () => {
+          throw new Error("rule exploded");
+        },
+      },
+      runner: () => ({
+        status: 0,
+        stdout: "",
+        stderr: "",
+        timedOut: false,
+        error: null,
+        truncated: false,
+      }),
+    },
+  );
+  assert.equal(r.lines[0].verdict, "unverifiable");
+  assert.match(r.lines[0].detail, /could not judge: rule exploded/);
 });
 
 test("runner: CI is forced to 1 in the child — an inherited CI=false never reaches it (gate 14, bug.20)", async () => {

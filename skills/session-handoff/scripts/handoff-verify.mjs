@@ -93,6 +93,16 @@ import { fileURLToPath } from "node:url";
  */
 
 /** Positional policies. */
+/**
+ * A table lookup that cannot reach Object.prototype: `constructor`, `toString`
+ * and `hasOwnProperty` are callable, so as plain lookups they were "rules"
+ * that admitted `constructor rm -rf x`; `__proto__` is not callable and threw
+ * out of verify() (gate 15, bug.22).
+ */
+function own(table, key) {
+  return Object.hasOwn(table, key) ? table[key] : undefined;
+}
+
 const POS = Object.freeze({
   NONE: "none", // no positional at all
   PATHS: "paths", // relative paths / refs: no leading `-`, no `/` prefix, no `..` segment
@@ -239,7 +249,6 @@ const ESLINT_FORMATS = /^(stylish|json|json-with-metadata|html)$/;
 const ESLINT_CONFIG =
   /^(?!.*\.\.)(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|yaml|yml)$/;
 const STYLELINT_FORMATTERS = /^(string|compact|github|json|tap|unix|verbose)$/;
-const JEST_REPORTERS = /^(default|summary|github-actions)$/;
 // `basic` is gone in Vitest 4, where an unknown name is a module load.
 const VITEST_REPORTERS =
   /^(default|verbose|dot|tap|tap-flat|github-actions|json|junit)$/;
@@ -632,7 +641,7 @@ function gitRule(rest) {
       });
     return false;
   }
-  const spec = GIT_SPECS[sub];
+  const spec = own(GIT_SPECS, sub);
   return spec ? checkArgs(args, spec) : false;
 }
 
@@ -1051,10 +1060,12 @@ const NPX_TOOLS = Object.freeze({
       "--testNamePattern=",
       "--passWithNoTests",
       "--maxWorkers=",
-      "--reporters=",
     ],
-    valueFlags: ["--reporters"],
-    valuePatterns: { "--reporters": JEST_REPORTERS },
+    // No `--reporters`: it is a yargs ARRAY option and yargs-parser's greedy
+    // arrays swallow every following non-dash token into it, so a "test
+    // path" positional after `--reporters default` is loaded as a reporter
+    // module — `./zzrep.js` ran through read mode (gate 15, bug.21,
+    // executed). The default reporter is what a figure reads anyway.
     positional: POS.PATHS,
   },
   vitest: {
@@ -1153,7 +1164,7 @@ function npxPositionalsOk(args, spec) {
 function npxRule(rest) {
   const i = rest[0] === NPX_NO_INSTALL ? 1 : 0;
   const tool = rest[i];
-  const spec = NPX_TOOLS[tool];
+  const spec = own(NPX_TOOLS, tool);
   if (!spec) return false;
   const args = rest.slice(i + 1);
   return npxPositionalsOk(args, spec) && checkArgs(args, spec);
@@ -1322,7 +1333,7 @@ const UTIL_SPECS = Object.freeze({
   },
 });
 function utilRule(bin) {
-  const spec = UTIL_SPECS[bin];
+  const spec = own(UTIL_SPECS, bin);
   return (rest) => {
     if (
       bin === "date" &&
@@ -1430,7 +1441,7 @@ export function isAllowed(cmd, whitelist = WHITELIST) {
   const bin = argv[0];
   if (bin.includes("/") || bin.includes("\\"))
     return { ok: false, detail: `not on whitelist: ${path.basename(bin)}` };
-  const rule = whitelist[bin];
+  const rule = own(whitelist, bin);
   if (!rule || !rule(argv.slice(1)))
     return { ok: false, detail: `not on whitelist: ${bin}` };
   // The one place the approved argv and the running argv differ, and only by
@@ -1842,7 +1853,13 @@ export async function verify(figures, opts = {}) {
       });
       continue;
     }
-    const allowed = isAllowed(fig.command, whitelist);
+    let allowed;
+    try {
+      allowed = isAllowed(fig.command, whitelist);
+    } catch (e) {
+      // A rule that throws is a verdict on one line, never a lost run.
+      allowed = { ok: false, detail: `could not judge: ${e.message || e}` };
+    }
     if (!allowed.ok) {
       lines.push({
         ...base,
