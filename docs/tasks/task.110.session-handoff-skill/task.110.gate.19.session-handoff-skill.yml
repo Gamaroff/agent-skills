@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: PASS
+status_reason: 'Cycle-18 fix verified (gate-18 QA-1 closed: ESLINT_CONFIG admits the same optional leading `./` as DATA_FILE — `npx eslint -c ./x.json .` admitted and executed through the clone''s own verifier at 15e9cfe4 (npx cancelled on the missing tool, the documented exit-1 path), `./../x.json` and `.//x.json` refused; two mutation proofs covered; the 3,653 prior spellings moved nowhere; the reviewer''s 31-value × 3-spelling probe and 149,792-value differential fuzz of ESLINT_CONFIG against DATA_FILE found only the intended difference). Bugs 1–23 all closed; no HIGH, no MEDIUM, no LOW; no open finding. Scope: default narrowed (gate 18 security PASS/measured). Empty queue → 5c.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T19:40:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 33
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 3657
+    notes: 'Bugs 1–23 closed. 3,653 prior spellings re-run in-process and diffed against gate 18 — no decision change; the reviewer''s 93 eslint spellings against 15e9cfe4^ and a 149,792-value differential fuzz found only the intended `./` admissions; 2 executed end-to-end through the clone''s own verifier at 15e9cfe4 against consumer9 under env -i with CI=1 (`-c ./zz.eslintrc.json` admitted — npx cancelled on the missing tool, exit 1, nothing fetched; `-c ./../zz.eslintrc.json` refused); two mutation proofs covered; TMPDIR=/tmp 33/33; zero requests on the listener.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 33/33; full hermetic suite green (npm test exit 0); bundle --check, prettier --check, validate exit 0.'
+  reliability:
+    status: PASS
+    notes: 'No orphaned children; listener empty; JSON contract holds.'
+  maintainability:
+    status: PASS
+    notes: 'Comments and SKILL.md match the code.'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent over the cycle-18 fix diff (15e9cfe4, 38 lines), dispatched 23:30 returned 23:32 local (1m46s, in budget); read-only with in-process isAllowed probes and a differential fuzz of the two config patterns'
+  bugs: 0
+  cleanups: 0
+  boundary: true
+  probes_executed: 3657
+  promoted: []
+  advisory: ['gate-8..18 advisories unchanged']
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Scrubbed child environment; quoted-glob tokenising'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 18
+  verification_method: 'Executed probes through the clone''s own verifier and the consumer-shaped project under a stripped environment with a local listener; in-process regression re-run; two mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
