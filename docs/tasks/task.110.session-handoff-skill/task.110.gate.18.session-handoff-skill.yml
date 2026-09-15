@@ -1,0 +1,74 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: PASS
+status_reason: 'Cycle-17 refinements verified (gate-17 QA-1, QA-2 closed; the four cycle-17 mechanisms mutation-proven; through the clone''s own verifier at 4e91fa33: `-p ./tsconfig.json` confirmed, `-p ./../x.json`, a dangling `-t` and `-p --noEmit` refused, a `-t` value runs as the test-name regex it is; the 3,653 prior spellings moved only on the three intended decisions, and the reviewer''s 525-shape differential over every test-file command found only the thirteen intended moves). Bugs 1–23 all closed; no HIGH, no MEDIUM. Scope: default narrowed (gate 17 security PASS/measured). One LOW cleanup promoted: ESLINT_CONFIG was not given the optional leading `./` that DATA_FILE now has, so `npx eslint -c ./x.json .` is refused while SKILL.md''s sentence promises the spelling for every data config. One line → qa-fix once more, then 5c.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T19:22:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-1 (low/high), confirmed in-process: ESLINT_CONFIG (checked through valuePatterns before the shared data kind) has no `(?:\./)?` prefix, so `npx eslint -c ./x.json .` and `--config=./x.json` are refused while `-c x.json`, `prettier --config ./.prettierrc` and `tsc -p ./tsconfig.json` are admitted; SKILL.md''s npx row now says a config is data "at a relative path (an optional leading `./`)" and describes eslint''s `-c` as that kind by extension only.'
+    suggested_action: 'Add `(?:\./)?` after the `(?!.*\.\.)` lookahead in ESLINT_CONFIG; allowed: `npx eslint -c ./x.json .`; refused: `-c ./../x.json`, `-c .//x.json`. Mutation: the prefix removed.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 33
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 3667
+    notes: 'Bugs 1–23 closed. 3,653 prior spellings re-run in-process and diffed against gate 17 — a dangling `-t` refused on jest and vitest, `--config=./x.json` admitted, zero collateral; the reviewer''s 525-shape differential against 4e91fa33^ found only the intended moves; 6 executed end-to-end through the clone''s own verifier at 4e91fa33 against consumer9 under env -i with CI=1: `-p ./tsconfig.json` confirmed, `-p ./../x.json`, `jest -t --ci`, `tsc -p --noEmit` refused, `-t /etc/passwd` ran as a test-name regex (exit 0, passWithNoTests, nothing written); four mutation proofs covered; TMPDIR=/tmp 33/33; zero requests on the listener. The open LOW is a consistency gap between two config patterns, not a reachable write or egress.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 33/33; full hermetic suite green (npm test exit 0); bundle --check, prettier --check, validate exit 0.'
+  reliability:
+    status: PASS
+    notes: 'No orphaned children; listener empty; JSON contract holds.'
+  maintainability:
+    status: PASS
+    notes: 'Comments and SKILL.md match the code except the eslint `./` sentence (QA-1).'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent over the cycle-17 fix diff (4e91fa33, 92 lines) with the full code diff for context, dispatched 23:14 returned 23:18 local (3m25s, in budget); read-only with in-process isAllowed probes (27 targeted shapes + a 525-shape differential against 4e91fa33^); jest-cli 30.5.1 read for `-t` semantics'
+  bugs: 0
+  cleanups: 1
+  boundary: true
+  probes_executed: 3667
+  promoted: ['CR-1 → QA-1 at low']
+  advisory: ['gate-8..17 advisories unchanged (incl. gate 17 CR-3: tsc refuses `-p` mixed with source files itself)']
+
+recommendations:
+  immediate:
+    - action: 'QA-1 — the `./` prefix on ESLINT_CONFIG'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: 'Scrubbed child environment; quoted-glob tokenising'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 17
+  verification_method: 'Executed probes through the clone''s own verifier and the consumer-shaped project under a stripped environment with a local listener; in-process regression re-run; four mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['QA-1 closed (one-line refinement)']
