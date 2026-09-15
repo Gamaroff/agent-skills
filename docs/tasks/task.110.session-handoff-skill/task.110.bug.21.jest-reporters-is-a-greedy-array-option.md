@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-21
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (reviewer CR-1, confirmed by execution)
 **Date Found**: 2026-09-15
 
@@ -97,3 +97,4 @@ any tool is an array/greedy option (mocha's array options — `--spec`, `--requi
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 15 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `--reporters` removed from the jest spec (greedy yargs array) — identity principle |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 16 — through the clone's verifier at 9cf723a6 in consumer9 with jest and a root-level `zzrep.js`: `npx jest --ci --reporters default ./zzrep.js` → `unverifiable: not on whitelist: npx`, no canary; `npx jest --ci --silent` → `confirmed`. The five `--reporters` spellings of the 3,653-spelling regression set moved to refused, nothing else moved. M1 (`--reporters=` re-admitted) → red — `covered` |

@@ -35,7 +35,7 @@ Build `skills/session-handoff/` — write mode emits `.agents/handoff.md` in a f
 | 2. review-task             | ✅ Done    | `task.110.review.{N}.{name}.md` exists (or skip logged)                | `task.110.review.1.session-handoff-skill.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development; issue #407 created | pre-pass B/C dispatched inline-summarised in report |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; fast gate green on run 3 (prettier, then doc-coverage rows); 17 tests, 3 mutants killed | surface map + 2 pre-pass agents (inline-summarised) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #408: https://github.com/Gamaroff/agent-skills/pull/408 — two commits (0bd5c531 feat, 7053c0a6 docs); in-review comment posted | — |
-| 5–6. qa-task / qa-fix loop | ⏳ In Progress | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 14 cycles so far: loop limit at 5; cycles 6–8 authorised; second resume with the budget and strike halt waived; gates 9 FAIL → 10/11 CONCERNS → 12/13 PASS → 5c REQUEST CHANGES → 14 FAIL (parser-value / response-file class) → qa-fix, cycle 15 next | —                    |
+| 5–6. qa-task / qa-fix loop | ⏳ In Progress | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 16 cycles so far: loop limit at 5; cycles 6–8 authorised; second and third resumes with the budget and strike halt waived; gates 9 FAIL → 10/11 CONCERNS → 12/13 PASS → 5c REQUEST CHANGES → 14/15 FAIL (parser-value, greedy-array classes) → 16 CONCERNS (one misdeclared tsc value flag) → qa-fix, cycle 17 next | —                    |
 | 7. finalise                | ⏳ Pending | `task.110.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -365,6 +365,14 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **Action**: Running qa-fix (cycle 15)
 **Fix (qa-fix)**: jest `--reporters` dropped (bug.21); own-property lookups + verify guard (bug.22); three mutation proofs red; `9cf723a6` pushed; handed back to QA for cycle 16
 
+### QA Cycle 16 — 2026-09-15 (third session; budget and strike halt waived by the operator)
+**Gate Result**: CONCERNS (80/100)
+**Issues Found**: 3 — 0 HIGH; 1 MEDIUM (tsc `-p`/`--project` declared bare while tsc consumes the next token as the project path: `npx tsc -p --noEmit` satisfied the required flag and emitted under a directory named `--noEmit` in the consumer-shaped project — bug.23, reviewer CR-1, held at MEDIUM because the repository model is contrived); 2 LOW (prettier resolves a string-valued data config as a shareable-config module — executed, in-repo-config class, to be documented — reviewer CR-2; tsc `--pretty=` dead — CR-3). Cycle-15 fixes verified and mutation-proven; bugs 1–22 closed. Reviewer 14m00s (over budget, not killed — mid-verification in the installed parsers; block in hand before the gate).
+**HIGH findings**: 0 (14, 15, 16 → 1, 1, 0 — no strike)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 16)
+
 ---
 
 ## Completion
@@ -379,38 +387,20 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 
 
 ---
----
-
 
 ## Pipeline Paused — 2026-09-15T18:25:48Z
-## Pipeline Paused — 2026-09-15T18:25:48Z
-
 
 ⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
 
-⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
-**State at pause**:
-
-
 **State at pause**:
 - Skill: `/develop-task`
-
-- Skill: `/develop-task`
-- Branch: `feature/task.110.session-handoff-skill`
 - Branch: `feature/task.110.session-handoff-skill`
 - Last step boundary: Step 5
-- Last step boundary: Step 5
-- PR: https://github.com/Gamaroff/agent-skills/pull/408
 - PR: https://github.com/Gamaroff/agent-skills/pull/408
 - Tracker: github #407
-- Tracker: github #407
-
 
 **Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 5.
-**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 5.
-
 
 **Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
-**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
 
-
+> Resumed 2026-09-15 (third session) at QA cycle 16. The hook had appended this block twice line-for-line (one timestamp, one commit — `dd934a86`) and posted its PR comment twice at 18:25:53Z; deduplicated here, hook double-fire logged as an observation.

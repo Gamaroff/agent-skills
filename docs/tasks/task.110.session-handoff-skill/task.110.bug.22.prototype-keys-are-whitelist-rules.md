@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-22
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (reviewer CR-2, confirmed in-process)
 **Date Found**: 2026-09-15
 
@@ -77,3 +77,4 @@ positions; a verify test that a throwing rule yields a verdict, not an exception
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 15 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Own-property lookups at every table; a throwing rule is one unverifiable line |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 16 — through the clone's verifier at 9cf723a6: `__proto__ x` and `constructor rm -rf x` → `unverifiable: not on whitelist`, run completes with a JSON object. M2 (`own()` → plain lookup) and M3 (verify guard removed) → red — `covered` ×2 |

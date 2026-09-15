@@ -1,0 +1,89 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: CONCERNS
+status_reason: 'Cycle-15 fixes verified (bug.21, bug.22 closed; the three cycle-15 mechanisms mutation-proven; the greedy `--reporters` spelling and the prototype-key spellings refused through the clone''s own verifier at 9cf723a6 — no canary, run completes; the 3,653 prior spellings moved only on the five intended jest decisions). Unscoped safety re-probe (gate 15 security FAIL/measured) found one more misdeclared value flag: tsc''s `-p`/`--project` are listed bare but tsc consumes the next token as the project path, so `npx tsc -p --noEmit` satisfies requireFlag while tsc never sets noEmit — executed, emitted `./--noEmit/zzout/a.js` in a consumer-shaped project carrying a directory of that name (bug.23; held at MEDIUM because that repository model matches no real project, on the ground gate 11 used — the grammar defect is real and one line). Two LOW: prettier treats a data file whose whole content is a string as a module specifier (executed with a one-line `.zzrc` → `./canary.mjs` imported; no tracked file of that shape here — document beside the tsbuildinfo residual or narrow); tsc `--pretty=` is dead. No HIGH: 14, 15, 16 → 1, 1, 0 — no strike. Rule 4 → CONCERNS with an open queue → qa-fix once more.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T19:05:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-1 (high/high; held at medium — executed, but only under a repository directory literally named `--noEmit`): the tsc spec declares `-p` and `--project` as bare flags; tsc''s parseOptionValue (`case "string"`) consumes the following token unconditionally, so `npx tsc -p --noEmit` and `npx tsc --project --noEmit` pass checkArgs and requireFlag while tsc parses `project: "--noEmit"` with noEmit unset. Executed through the clone''s own verifier at 9cf723a6 against consumer9 (typescript 7.0.2) with `./--noEmit/{a.ts,tsconfig.json}` present: both `confirmed`, `./--noEmit/zzout/a.js` emitted through read mode. Without that directory tsc exits 1, no emit.'
+    suggested_action: 'Move `-p`/`--project` to tsc valueFlags with valueKinds data; refused: `npx tsc -p --noEmit`, `--project --noEmit`, `--noEmit -p --noEmit`, `-p ../x.json --noEmit`; allowed: `-p tsconfig.json --noEmit`, `--project tsconfig.build.json --noEmit`. Mutation: `-p` back to bare. Audit every remaining bare flag on every tool against its parser''s value-taking set.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.23.tsc-project-flag-declared-bare-consumes-noemit.md'
+    status: open
+  - id: 'QA-2'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-2 (low/medium), confirmed by execution: prettier''s loadConfig parses an admitted data file (extensionless → YAML, `.json` → JSON) and, when the parsed value is a string, resolves it as a shareable-config module specifier via createRequire(configFile)/import(). A one-line `.zzrc` containing `./canary.mjs` under `--config .zzrc` imported it (CANARY-IMPORTED.txt written); a bare `canary.mjs` in a `.yml` did not resolve (exit 1). The `data` kind is therefore only as safe as the repository''s data files under prettier — the in-repo-config class already accepted for tsc''s tsbuildinfo. No tracked file of that shape exists here; the shape is prettier''s own shareable-config feature, so narrowing to prettier''s config names does not close it.'
+    suggested_action: 'Document beside the tsbuildinfo residual in SKILL.md and the tsc/prettier spec comments: a data file whose entire content is a module specifier is a code load under prettier.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-3 (low/high), confirmed: tsc has no `--opt=value` syntax — `npx tsc --pretty=false --noEmit` is admitted and always exits 1 (`Unknown compiler option ''--pretty=false''`), a dead entry.'
+    suggested_action: 'Drop `--pretty=` from the tsc flags.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 33
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 3667
+    notes: '3,653 prior spellings re-run in-process and diffed against gate 15 — the five jest `--reporters` decisions moved to refused, nothing else moved; 4 in-process on the reviewer''s tsc class; 11 executed end-to-end through the clone''s own verifier at 9cf723a6 against consumer9 under env -i with CI=1: the cycle-15 greedy spelling and `__proto__`/`constructor` refused with no canary, `npx jest --ci --silent` and `git rev-parse` confirmed; `tsc -p --noEmit` and `--project --noEmit` emitted under the `--noEmit/` directory model; `prettier --config .zzrc` (one-line module specifier) imported the module; 3 mutation proofs covered; TMPDIR=/tmp 33/33. Zero requests on the local listener. Both executed residues need a repository file no real project carries; neither is the greedy/positional class the last two cycles closed.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 33/33; full hermetic suite green (npm test exit 0); bundle --check, prettier --check, validate all exit 0.'
+  reliability:
+    status: PASS
+    notes: 'A `__proto__` line no longer crashes the run (bug.22 closed); no orphaned children; JSON contract holds.'
+  maintainability:
+    status: CONCERNS
+    notes: 'tsc spec: `--pretty=` dead; `-p`/`--project` misdeclared. Comments and SKILL.md otherwise match the code.'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent, unscoped safety re-probe over the code-only branch diff (4,611 lines) plus the cycle-15 fix diff (188 lines), dispatched 22:24 returned 22:38 local (14m00s — past the 10-minute budget, not killed; block in hand before this gate); parsers checked against jest-cli 30.5.1, mocha 12.0.1, prettier 3.9.6 in consumer9 and the TypeScript 6.0.3 JS parser'
+  bugs: 2
+  cleanups: 1
+  boundary: true
+  probes_executed: 3667
+  promoted: ['CR-1 → QA-1 (executed; held at medium)', 'CR-2 → QA-2 at low (executed)', 'CR-3 → QA-3 at low (confirmed)']
+  advisory: ['gate-8..15 advisories unchanged']
+
+recommendations:
+  immediate:
+    - action: 'bug.23 — tsc -p/--project as data value flags; drop --pretty=; document the prettier string-config residual; audit remaining bare flags against each parser'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+  future:
+    - action: 'Scrubbed child environment; quoted-glob tokenising'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-09-15'
+  total_iterations: 15
+  verification_method: 'Executed probes through the clone''s own verifier and the consumer-shaped project under a stripped environment with a local listener; in-process regression re-run; three mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['bug.23 closed', 'QA-2 documented', 'QA-3 dropped']
