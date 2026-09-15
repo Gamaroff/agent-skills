@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-10
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -78,3 +78,4 @@ Require `--no-install` (or inject `--no`) in the `npx` arm; refused-list test fo
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | QA cycle 7 — non-TTY install executed with `cowsay@1.6.0`; the tool list checked against `node_modules/.bin` |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `--no-install` injected into every approved npx argv; `--no` refused (it is not an alias — it swallows the tool name) |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 8 — `npx eslint .` run through the CLI with the registry at a listener: argv carried `--no-install`, one manifest GET (retried once), no tarball, exit 1; `--no` and `npx stylelint --version` refused; injection and the non-alias mutation-proven covered |

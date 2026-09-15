@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-9
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -92,3 +92,4 @@ spellings above.
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | QA cycle 7 — executed against a local listener |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | gh value flags consume their value and `--repo`/`-R` is `OWNER/REPO`; list/view positionals anchored; npm view/ls held to a bare package-name pattern |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 8 — `-R`/`--repo=`/URL-positional and `npm view <url>` spellings re-run through the CLI against a local listener: refused, no request; four mechanisms mutation-proven covered; `-w` on view refused |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-8
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -122,3 +122,4 @@ still reads 17+ confirmed.
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | QA cycle 7 — prettier write executed through the verifier in a scratch fixture; registry-tick reached under `--dry-run` |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | interpreter script positional is an exact allow-list with per-entry specs; the prettier `--write` spelling executed through the verifier and refused |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 8 — the seven executed spellings re-run through the CLI in a scratch clone: all refused, fixture file byte-identical; three mechanisms (exact list, per-entry spec, `.agents/` path) mutation-proven covered |
