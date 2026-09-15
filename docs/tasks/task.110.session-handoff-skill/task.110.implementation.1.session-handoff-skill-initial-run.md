@@ -3,7 +3,7 @@
 **Task**: `task.110.session-handoff-skill.md`
 **Run Number**: 1
 **Started**: 2026-09-15 08:30
-**Status**: In Progress — QA loop exited at cycle 19 (gate 19 PASS 100, empty queue); Step 5c review 2 CONCERNS → Step 7 finalise
+**Status**: ✅ Complete — accepted 2026-09-16 (gate 19 PASS 100/100; DoD `task.110.dod.1`; PR #408 ready to merge)
 
 ---
 
@@ -36,8 +36,8 @@ Build `skills/session-handoff/` — write mode emits `.agents/handoff.md` in a f
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; fast gate green on run 3 (prettier, then doc-coverage rows); 17 tests, 3 mutants killed | surface map + 2 pre-pass agents (inline-summarised) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #408: https://github.com/Gamaroff/agent-skills/pull/408 — two commits (0bd5c531 feat, 7053c0a6 docs); in-review comment posted | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 19 cycles: loop limit at 5; cycles 6–8 authorised; second and third resumes with the budget and strike halt waived; gates 9 FAIL → 10/11 CONCERNS → 12/13 PASS → 5c REQUEST CHANGES → 14/15 FAIL (parser-value, greedy-array classes) → 16 CONCERNS (one misdeclared tsc value flag) → 17 PASS (two LOW refinements) → 18 PASS (one LOW) → 19 PASS 100 (empty queue) → 5c | —                    |
-| 7. finalise                | ⏳ Pending | `task.110.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done | `task.110.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     |       | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -400,17 +400,24 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **Loop exit**: empty queue → 5c → CONCERNS (non-blocking) → Step 7
 **Action**: Proceeding to 5c
 
+### Step 7 — finalise — 2026-09-16
+**DoD**: `task.110.dod.1.session-handoff-skill.md` — ACCEPTED. Four parallel DoD agents: AC 6/6 PASS (each with a per-PR test lane), security PASS (boundary probed: 85 candidates executed against `isAllowed`, held; one documented residual — absolute reads for the plain readers), compliance NOT_APPLICABLE, docs PASS.
+**CI reading 1**: SUCCESS @ `364a706bed5d` (acceptance decision). **CI reading 2**: SUCCESS @ `44a0f426cd7c` (the pushed acceptance commit — DoD, sprint review, `status: accepted`, registry ticked) after 120 s.
+**Side-effects (after the publish boundary)**: canonical PR comment posted; issue #407 document link re-pointed to `develop`, `done` comment posted, issue closed (state CLOSED confirmed); board `done` stage → `already`. CHANGELOG cites (task 110). PR review decision: no human reviewer on this repository — recorded as unverified by human review (5c: REQUEST CHANGES → fixed → CONCERNS).
+
 ---
 
 ## Completion
 
-**Finished**: {populated at Step 8}
-**Final Status**: In progress — QA loop exited at cycle 19; 5c review 2 CONCERNS (trail/doc items fixed in the review commit; five LOW code findings recorded for follow-up); Step 7 next
+**Finished**: 2026-09-16 00:20 (+04)
+**Final Status**: ✅ Complete — task accepted; PR #408 open against `develop` with CI green on the acceptance head `44a0f426cd7c`; issue #407 closed; board Done
 **Branch**: `feature/task.110.session-handoff-skill`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/408
 **QA Iterations**: 19 (5 in the loop, 1 standalone after the first halt, 2 authorised on the first resume, 11 under the operator's waiver across the second and third resumes)
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**DoD Summary**: `task.110.dod.1.session-handoff-skill.md` — ACCEPTED (AC 6/6, security PASS with 85 executed boundary probes, compliance N/A, docs PASS; CI readings 1 and 2 SUCCESS)
+**Tracker debt**: none — issue #407 closed and re-linked to `develop`; board `done` → `already`; `ready-for-merge` and the per-cycle `qa-gate`/`qa-fix` stages are `stage-disabled` on this board by design
+
+**Completion Summary**: `skills/session-handoff/` shipped — write mode (fixed section order, per-figure command, half-life labels) and read mode (`handoff-verify.mjs`: parse → whitelist → run → compare → one verdict per line, `--json` contract). The read-only whitelist was hardened over 19 QA cycles that executed hostile spellings through a clone of the branch against a consumer-shaped project: 23 bugs filed and closed, every mechanism mutation-proven, the identity / kind / closed-set / parser-faithful-value-flag principles recorded in SKILL.md. Two `/review-pr` passes (REQUEST CHANGES → fixed → CONCERNS). Follow-ups recorded, none blocking: `pr-review.2` CR-1, CR-3, CR-4, CR-5; scrubbed child environment; quoted-glob tokenising; README badge 126 → 128. Observations this run: #99, #100, #101.
 
 
 ---
