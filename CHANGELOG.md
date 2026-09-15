@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file. Format foll
   `docs/contributing/traps.md`, never content. The parse rule is explicit (first backticked span in
   the Command cell; `<!-- cmd: …; expect: … -->` on prose), the runner is injectable so the 33 tests
   never execute a real command, and every whitelist mechanism is mutation-proven — the allow-list
-  was hardened over sixteen QA cycles (twenty-three bugs, all closed): a flag value a tool would
+  was hardened over nineteen QA cycles (twenty-three bugs, all closed): a flag value a tool would
   load is judged by kind, runnable code is named by identity, reporters are per-tool closed sets, a
   value flag consumes exactly what its tool's parser consumes (no greedy array, no bare flag that
   takes a value), and each hostile spelling QA executed is a refused-list test. `AGENTS.md` now names read mode as the way to consume the

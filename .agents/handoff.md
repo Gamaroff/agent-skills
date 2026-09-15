@@ -103,7 +103,7 @@ touch was 2026-08-17) — the regression fixture for the verifier is built on ex
 
 ### 3b. Live Jira verification (task.45) — still unrunnable here
 
-`JIRA_URL` unset; this repo is GitHub-tracked. <!-- cmd: git remote get-url origin; expect: github.com -->
+`JIRA_URL` unset; this repo is GitHub-tracked. <!-- cmd: git remote get-url origin; expect: /github\.com/ -->
 The four-step check is unchanged at
 `docs/tasks/task.45.change-log-pipeline-and-sync/task.45.plan.change-log-pipeline-and-sync.md`
 (§Phase 5). Gate 2: staging APPROVED, production CONDITIONAL. Carry it openly — read mode reports

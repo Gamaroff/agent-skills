@@ -265,7 +265,7 @@ remains readable by hand.
 - **Tests Executed**: 33 (skill) + full hermetic suite (green, `npm test` exit 0) + `TMPDIR=/tmp` 33/33; 3,657 boundary probes (3,653 regression re-run, 2 executed end-to-end through the clone's own verifier at `15e9cfe4` and the consumer-shaped project, 2 mutation proofs — all `covered`; the reviewer's 149,792-value differential fuzz of the two config patterns)
 - **Phases Verified**: 3/3
 - **Critical Issues**: none — no open finding; bugs 1–23 all closed
-- **NFR Status**: Security: FAIL (measured), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS (measured), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Bug Reports
 - [bug.1 whitelist admits mutating shapes](./task.110.bug.1.whitelist-admits-mutating-shapes.md) — ✅ Closed (verified cycle 2)
