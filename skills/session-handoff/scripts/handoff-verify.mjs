@@ -713,9 +713,7 @@ const GH_JQ_VALUE_PATTERNS = Object.freeze({
   "-q": JQ_FILTER,
 });
 const GH_API_FLAGS = [
-  "--jq",
   "--jq=",
-  "-q",
   "--paginate",
   "--slurp",
   "--cache",
@@ -1014,10 +1012,10 @@ const NPX_TOOLS = Object.freeze({
   tsc: {
     flags: ["--noEmit", "-p", "--project", "--pretty", "--pretty="],
     positional: POS.PATHS,
-    // tsc reads a `true`/`false` token after a boolean flag as its VALUE:
-    // `--noEmit false <file>` passed as a benign positional and tsc emitted
-    // into the tree (gate 13, 5c CR-1, executed). Neither word is a file.
-    positionalPattern: /^(?!(?:true|false)$)/i,
+    // `true`/`false`/`null` and `@response` positionals are refused for every
+    // tool by npxPositionalsOk (bug.19). Residual, documented in SKILL.md: a
+    // repository tsconfig with `incremental`/`composite` makes tsc write
+    // *.tsbuildinfo even under --noEmit (gate 14, CR-5).
     requireFlag: ["--noEmit"],
   },
   markdownlint: {
@@ -1128,12 +1126,37 @@ const NPX_TOOLS = Object.freeze({
 // token as its value, so `npx --no prettier --check .` runs npm with
 // `no=prettier` and prettier never starts.
 const NPX_NO_INSTALL = "--no-install";
+// A positional under an npx tool is a FILE or a PATTERN, and a tool's parser
+// reads some tokens as neither: tsc consumes a following `true`/`false`/`null`
+// as a boolean option's value (`--noEmit null` → unset → emit) and reads an
+// `@`-prefixed positional as a RESPONSE FILE whose contents are argv
+// (`--noEmit @tsargs.txt` with a repository file carrying `--noEmit false` →
+// emit — every refused flag back through a data file); jest's yargs consumes
+// `--ci false` and then writes snapshots (gate 13 5c CR-1; gate 14, bug.19 —
+// all executed). One rule for every tool, so the next tool cannot forget it.
+// Case-insensitive on purpose: tsc compares exactly, others may not, and no
+// file is named `false`.
+const NPX_NOT_A_FILE = /^(?:true|false|null)$/i;
+function npxPositionalsOk(args, spec) {
+  const valueFlags = new Set(spec.valueFlags ?? []);
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (valueFlags.has(a)) {
+      i += 1; // its value is judged by the flag, not here
+      continue;
+    }
+    if (a.startsWith("-")) continue;
+    if (NPX_NOT_A_FILE.test(a) || a.startsWith("@")) return false;
+  }
+  return true;
+}
 function npxRule(rest) {
   const i = rest[0] === NPX_NO_INSTALL ? 1 : 0;
   const tool = rest[i];
   const spec = NPX_TOOLS[tool];
   if (!spec) return false;
-  return checkArgs(rest.slice(i + 1), spec);
+  const args = rest.slice(i + 1);
+  return npxPositionalsOk(args, spec) && checkArgs(args, spec);
 }
 /** The argv that RUNS for an approved npx command: `--no-install` first, once. */
 function npxArgv(argv) {
@@ -1709,7 +1732,10 @@ export function defaultRunner(argv, { cwd, timeoutMs }) {
         cwd,
         detached: true,
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, CI: process.env.CI ?? "1" },
+        // Forced, not defaulted: an inherited `CI=false` is ci-info's explicit
+        // "not CI", under which jest writes snapshots with no flag at all
+        // (gate 14, bug.20, executed).
+        env: { ...process.env, CI: "1" },
       });
     } catch (e) {
       resolve({

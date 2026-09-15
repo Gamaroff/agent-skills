@@ -326,6 +326,10 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npx prettier --check --config=.prettierrc --ignore-path .gitignore .",
     "npx markdownlint -c .markdownlintrc -p .markdownlintignore docs",
     "npx eslint -c .eslintrc.json --config=.eslintrc.yml .",
+    // QA cycle 14 (bug.19) — a value flag's own value is judged by the flag,
+    // never by the not-a-file rule.
+    "npx mocha -R spec -t 5000 -g true",
+    "npx jest --ci -t x",
     // 5c (CR-1/CR-3) — tsc file positionals and gh --jq filters still pass.
     "npx tsc --noEmit src/x.ts",
     "gh api /user --jq .login",
@@ -749,6 +753,18 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "npx tsc --noEmit false src": /not on whitelist: npx/,
     "npx tsc --noEmit FALSE": /not on whitelist: npx/,
     "npx tsc --noEmit true": /not on whitelist: npx/,
+    // QA cycle 14 (bug.19) — the tool's parser reads these as something other
+    // than a file: tsc consumes `null` (unset) and reads `@file` as a response
+    // file; jest's yargs consumes `--ci false` and then writes snapshots.
+    "npx tsc --noEmit null": /not on whitelist: npx/,
+    "npx tsc --noEmit null src": /not on whitelist: npx/,
+    "npx tsc --noEmit @tsargs.txt": /not on whitelist: npx/,
+    "npx tsc --noEmit @x": /not on whitelist: npx/,
+    "npx jest --ci false": /not on whitelist: npx/,
+    "npx jest --silent false": /not on whitelist: npx/,
+    "npx vitest --run false x": /not on whitelist: npx/,
+    "npx prettier --check @x": /not on whitelist: npx/,
+    "npx stylelint --quiet false src": /not on whitelist: npx/,
     // 5c (CR-2) — mocha runs an explicitly named file whatever its name
     // (the bug.11 class): no positional at all, as under `node --test`.
     "npx mocha skills/loop-supervisor/scripts/run-loop.mjs":
@@ -1344,15 +1360,19 @@ test("runner: output beyond the cap makes the figure unverifiable, never a compa
     path.join(dir, "loud.js"),
     // Past the cap, then linger: the runner must not wait for the child once
     // the verdict is fixed (5c CR-6) — it kills the group at the cap.
-    "const s = 'x'.repeat(1024 * 1024); for (let i = 0; i < 20; i++) process.stdout.write(s); process.stdout.write('\\nEND\\n'); setTimeout(() => {}, 20000);",
+    // The linger (45 s) is well past the bound (40 s) and the runner timeout
+    // (90 s) is past both, so the only way to resolve inside the bound is
+    // the kill at the cap — with slack for a loaded machine (a 10 s bound
+    // went red once under the full suite at concurrency 4; gate 14, QA-3).
+    "const s = 'x'.repeat(1024 * 1024); for (let i = 0; i < 18; i++) process.stdout.write(s); process.stdout.write('\\nEND\\n'); setTimeout(() => {}, 45000);",
   );
   const t0 = Date.now();
   const r = await mod.defaultRunner([process.execPath, "loud.js"], {
     cwd: dir,
-    timeoutMs: 30000,
+    timeoutMs: 90000,
   });
   assert.ok(
-    Date.now() - t0 < 10000,
+    Date.now() - t0 < 40000,
     `resolved at the cap, not at exit (${Date.now() - t0} ms)`,
   );
   assert.equal(r.status, null, "killed at the cap, not exited");
@@ -1377,6 +1397,26 @@ test("runner: output beyond the cap makes the figure unverifiable, never a compa
   });
   assert.equal(v.lines[0].verdict, "unverifiable");
   assert.match(v.lines[0].detail, /output truncated/);
+});
+
+test("runner: CI is forced to 1 in the child — an inherited CI=false never reaches it (gate 14, bug.20)", async () => {
+  const dir = tempDir();
+  fs.writeFileSync(
+    path.join(dir, "ci.js"),
+    "process.stdout.write(String(process.env.CI));",
+  );
+  const saved = process.env.CI;
+  process.env.CI = "false";
+  try {
+    const r = await mod.defaultRunner([process.execPath, "ci.js"], {
+      cwd: dir,
+      timeoutMs: 10000,
+    });
+    assert.equal(r.stdout, "1");
+  } finally {
+    if (saved === undefined) delete process.env.CI;
+    else process.env.CI = saved;
+  }
 });
 
 test("cli: SIGINT on the verifier kills the running command's process group (CR-7)", async () => {
