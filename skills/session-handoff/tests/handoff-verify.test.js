@@ -229,6 +229,9 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     // QA cycle 4 — pattern-taking flags may start with `/`
     "node --test-name-pattern=/select/i --test tests/",
     "git log --grep=/foo",
+    "git log --format=%H --date=/x",
+    "npx eslint --format=json .",
+    "npx mocha --reporter=spec x.js",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -382,6 +385,13 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     // (`//host` is a UNC network path on Windows).
     "git ls-remote //evil.example/x": /not on whitelist: git/,
     "git ls-remote /tmp/x": /not on whitelist: git/,
+    // QA cycle 5 — a flag that is a pattern under git is a MODULE under an
+    // npx tool; the exemption is per spec, never global.
+    "npx mocha --reporter=/tmp/evil.js tests/": /not on whitelist: npx/,
+    "npx jest --reporters=/tmp/evil.js": /not on whitelist: npx/,
+    "npx eslint --format=/tmp/evil.js src/": /not on whitelist: npx/,
+    "npx stylelint --formatter=/tmp/evil.js x.css": /not on whitelist: npx/,
+    "npx eslint --format=../evil.js src/": /not on whitelist: npx/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);

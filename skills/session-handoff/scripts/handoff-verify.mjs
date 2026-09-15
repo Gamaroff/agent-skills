@@ -129,8 +129,6 @@ const PATTERN_FLAGS = new Set([
   "--jq",
   "--search",
   "--template",
-  "--format",
-  "--pretty",
   "--date",
   "--since",
   "--until",
@@ -142,7 +140,6 @@ const PATTERN_FLAGS = new Set([
   "--severity",
   "--exclude",
   "--shell",
-  "--reporter",
   "--log-level",
   "--porcelain",
   "--untracked-files",
@@ -178,15 +175,19 @@ const PATTERN_FLAGS = new Set([
   "--max-count",
   "--lines",
   "--bytes",
-  "--formatter",
-  "--reporters",
 ]);
 
 /** A joined flag value: empty is fine; no `..` segment ever; no absolute path unless the flag takes a pattern or the spec allows one. */
 function valueOk(name, v, spec) {
   if (v === "") return true;
   if (v.split(/[\\/]/).includes("..")) return false;
-  if (PATTERN_FLAGS.has(name)) return true;
+  // The exemption is global for genuinely pattern-only names, and PER-SPEC for
+  // names that are a pattern under one binary and a module to load under
+  // another: `--format` is a git pretty-format but an eslint formatter module,
+  // `--reporter` is a mocha module. Gate 5 found the global set re-opened the
+  // gate-3 invariant for exactly those four; a spec now opts its own in.
+  if (PATTERN_FLAGS.has(name) || (spec.patternFlags ?? []).includes(name))
+    return true;
   if (!spec.allowAbsolute && (v.startsWith("/") || v.startsWith("\\")))
     return false;
   return true;
@@ -290,14 +291,17 @@ const GIT_COMMON_LOG_FLAGS = [
   "-s",
   "--no-patch",
 ];
+const GIT_PATTERN_FLAGS = ["--format", "--pretty", "--date"];
 const GIT_SPECS = Object.freeze({
   log: {
+    patternFlags: GIT_PATTERN_FLAGS,
     flags: GIT_COMMON_LOG_FLAGS,
     flagPattern: /^-\d+$/,
     positional: POS.PATHS,
     allowDashDash: true,
   },
   show: {
+    patternFlags: GIT_PATTERN_FLAGS,
     flags: GIT_COMMON_LOG_FLAGS,
     positional: POS.PATHS,
     allowDashDash: true,
@@ -362,7 +366,9 @@ const GIT_SPECS = Object.freeze({
   // Positionals are a remote NAME or ref pattern — never a URL: a handoff must
   // not point the reader's SSH agent at an arbitrary host (gate 3, PRB-8).
   "ls-remote": {
-    positionalPattern: /^[A-Za-z0-9][A-Za-z0-9._\/*-]*$/, // never a leading slash: `//host` is UNC on Windows
+    // POS.PATHS refuses a leading slash (`//host` is UNC on Windows); the
+    // anchor additionally refuses a leading `.`, `*`, `_` or `-`.
+    positionalPattern: /^[A-Za-z0-9][A-Za-z0-9._\/*-]*$/,
     flags: [
       "--heads",
       "-h",
@@ -1352,7 +1358,9 @@ function killGroup(pid) {
  * found the bash wrapper left a ten-minute suite running after `timeout`, and
  * gate 2 found the synchronous detached child survived Ctrl-C.
  *
- * Resolves { status, stdout, stderr, timedOut, error }.
+ * Resolves { status, stdout, stderr, timedOut, error, truncated } — `truncated`
+ * is true when collected output hit the cap, and verify() then reports the
+ * figure `unverifiable` rather than compare against a partial stream.
  */
 export function defaultRunner(argv, { cwd, timeoutMs }) {
   return new Promise((resolve) => {
@@ -1385,7 +1393,7 @@ export function defaultRunner(argv, { cwd, timeoutMs }) {
     }, timeoutMs);
     // Bounded: a chatty command must not grow two strings without limit
     // (gate 3, PRB-7). The tail is what a figure is compared against anyway.
-    const CAP = 16 * 1024 * 1024;
+    const CAP = 16 * 1024 * 1024; // characters (UTF-16 units) after setEncoding, not bytes
     let truncated = false;
     const take = (buf, d) => {
       if (buf.length >= CAP) {
@@ -1501,7 +1509,7 @@ export async function verify(figures, opts = {}) {
         ...base,
         verdict: "unverifiable",
         detail:
-          "output truncated (more than 16 MiB) — a partial stream is not a measurement",
+          "output truncated (more than 16 M characters) — a partial stream is not a measurement",
         measured: null,
       });
       continue;
