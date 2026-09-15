@@ -3,7 +3,7 @@
 **Task**: `task.110.session-handoff-skill.md`
 **Run Number**: 1
 **Started**: 2026-09-15 08:30
-**Status**: Escalated
+**Status**: Escalated (second time — the authorised extra cycle read FAIL)
 
 ---
 
@@ -35,7 +35,7 @@ Build `skills/session-handoff/` — write mode emits `.agents/handoff.md` in a f
 | 2. review-task             | ✅ Done    | `task.110.review.{N}.{name}.md` exists (or skip logged)                | `task.110.review.1.session-handoff-skill.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development; issue #407 created | pre-pass B/C dispatched inline-summarised in report |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; fast gate green on run 3 (prettier, then doc-coverage rows); 17 tests, 3 mutants killed | surface map + 2 pre-pass agents (inline-summarised) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #408: https://github.com/Gamaroff/agent-skills/pull/408 — two commits (0bd5c531 feat, 7053c0a6 docs); in-review comment posted | — |
-| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted |       | —                    |
+| 5–6. qa-task / qa-fix loop | ⚠️ Needs Attention | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | Loop limit hit after cycle 5; cycle 6 run standalone after the halt; resumed 2026-09-15 with cycle 7 authorised; cycle 7 FAIL 40/100 (1 HIGH in a fourth arm) → escalated again | —                    |
 | 7. finalise                | ⏳ Pending | `task.110.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -125,6 +125,20 @@ Build `skills/session-handoff/` — write mode emits `.agents/handoff.md` in a f
 - Cycle 5 / 5b: changes-requested → stage-disabled. `/qa-fix gate=…gate.5…`: three fixes, one mutation proof, gate green first attempt. PR + `qa-fix-5` comments posted. Counter → 6 > 5 → **Loop Escalation (loop limit)**.
 - Cycle 5 / 5a: gate 4 non-trigger → narrowed to the cycle-4 commit (266 lines). Reviewer 1m44s. Gate 5 CONCERNS 80/100. Convergence: HIGH 3 → 7 → 0 → 0 → 0 — the mechanical `>=` reads flat on zeros, but the rule's own text ("escalating a run with zero HIGH would misreport finished work as stalled") makes zero HIGH a non-trigger; not tripped. Third strike: not tripped. Diminishing-returns: residue is a boundary invariant, not test machinery — not taken. Open MEDIUM → 5b (cycle 5 of 5 — the last fix cycle in budget; the loop cannot reach 5c after it).
 
+### Resume — 2026-09-15 (after the loop-limit halt)
+
+- `/develop-task` re-invoked on the branch. Phase 0b: previous run detected (halt snapshot `halt_step: 5`, `qa_cycles_completed: 5`, reason: loop limit). No active lock.
+- Found on the branch **after** the halt: a **standalone cycle 6** run outside the orchestrator — `/qa-task` (gate 6 FAIL 40/100: QA-1 HIGH npm `--` passthrough admits `--write` / `-r /tmp/evil.js`; QA-2 MEDIUM `gh api <url>` egress; 3 LOW; bug.6, bug.7) and `/qa-fix` (`b1279afa`, all five entries fixed, bugs 6–7 → Ready for QA). The commit was local only, the report carried no cycle-6 entry, and the PR had no cycle-6 fix comment.
+- Resume verified inline (no detector subagent): branch matches the snapshot; PR #408 OPEN; gate.1–6 / qa.1–6 / bug.1–7 present; skill suite 28/28 at `b1279afa`.
+- User asked (AskUserQuestion — the budget is spent, so re-entry is the operator's call): **Resume at 5a with one extra cycle** (recommended option). Cycle 7 = `/qa-task` narrowed to `b1279afa`; a clean gate hands to 5c; another FAIL halts again. Alternatives offered and declined: skip re-QA straight to 5c; start fresh.
+- Lock recreated from the snapshot (`current_step: 5`, `qa_cycles_completed: 6`, `resumed_at` set). `b1279afa` pushed (origin was at `5d306eb3`).
+- Deferred cycle-6 comments: `qa-cycle-6` on issue 407 → `posted`; `qa-fix-6` on issue 407 → `already` (the standalone qa-fix had posted it); qa-fix cycle 6 PR comment posted to #408.
+- GitHub board: QA-start re-assert not repeated (already run before cycle 1; `in-review` is stage-disabled on this board).
+- Cycle 7 / 5a: gate 6 security FAIL (measured) → SAFETY_REPROBE=true, unscoped; the reviewer's diff was the branch less `docs/tasks/` and the generated catalog/deps files (3,702 lines, 12 files). Traceability mapper skipped (no Success Criteria table). `/qa-task code_review_blocking=true`. Reviewer subagent **returned at 21m27s — past the 10-minute budget, not killed**: its block arrived while the direct probes (1,377 spellings; fast gate; mutation proofs; live handoff) were still running and before the gate was written; independence kept, budget overrun recorded. QA executed 5 probes end-to-end: a prettier `--write` through read mode via `node node_modules/…/prettier.cjs` (rewrote the file), `registry-tick.js --dry-run` reach, `gh pr list -R 127.0.0.1:8099/o/r` and `npm view <url>` against a local listener, and a non-TTY `npx` install. Three cycle-6 mechanisms mutation-proven by QA (`covered`). Gate 7 **FAIL 40/100** — 1 HIGH (bug.8: the `node`/`python3` arm runs any in-repo script with any arguments), 3 MEDIUM (bug.9: `gh -R <host>` / `npm view <url>` egress; bug.10: `npx` registry install), 2 LOW; bugs 6–7 closed. Task → in-progress; Change Log row.
+- Cycle 7 tracker: PR comment posted (#408); qa-task's own `qa-gate` issue comment `already` (un-indexed stage, obs #66); orchestrator `qa-cycle-7` comment `posted`.
+- **Convergence check** (cycle ≥3): HIGH 3 → 7 → 0 → 0 → 0 → 1 → 1 — cycle 7 did not reduce the count below cycle 6's, and the budget the operator granted on resume was one cycle ("another FAIL halts again"). **Escalating — loop not converging / budget spent.** Third strike: HIGH on `handoff-verify.mjs` in gates 6 and 7 only (gate 5 had none) — not tripped. Diminishing-returns exit: HIGH remain — not applicable.
+- Cycle 7's gate, QA report, bugs 8–10, the closed bug.6/7, the task document and this report are committed and pushed before the halt (one commit, one push).
+
 ---
 
 ## Issues Log
@@ -153,6 +167,27 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 1. Run `/qa-task` once more on `979a1a8e` (a narrowed review of the 3-line cycle-5 change) — the expected outcome is PASS or a CONCERNS with an empty queue, either of which reaches 5c.
 2. Then `/develop-next` resumes at Step 5c (`/review-pr`), Step 7 (`/finalise`) and the merge.
 3. Alternatively, accept gate 5 with a documented waiver for the three fixed-but-unverified entries and proceed with `/finalise` — the operator's call, not the loop's.
+
+### QA Loop Escalation (second) — 2026-09-15
+
+The loop was re-entered after the loop-limit halt with one operator-authorised extra cycle; that cycle read FAIL.
+
+**Final gate status**: FAIL (gate 7, 40/100 — 1 HIGH, 3 MEDIUM, 2 LOW; security NFR FAIL, measured)
+**HIGH findings per cycle**: 3, 7, 0, 0, 0, 1, 1
+**Remaining issues** (from gate 7, all open):
+- QA-1 (high) `skills/session-handoff/scripts/handoff-verify.mjs` — the `node`/`python3` arm runs any relative script with any arguments: `node node_modules/prettier/bin/prettier.cjs --write` rewrote a fixture file through read mode (executed); the repo's own writers (`registry-tick.js`, `gh-stage.js --stage done`, `tracker-comment.js`, `generate_catalog.py`, `bundle_skill.py --all`) reachable → bug.8
+- QA-2 / QA-3 (medium) — `gh <verb> -R <host>/o/r`, `--repo=https://…`, URL positionals; `npm view <tarball|git url>` — all reached a local listener → bug.9
+- QA-4 (medium) — `npx <tool>` installs a missing tool from the registry with no prompt under the runner's non-TTY `CI=1` conditions; 9/10 allow-listed tools absent locally → bug.10
+- QA-5 / QA-6 (low) — `-w` on `gh … view` is `--web`; `--` passthrough ignores the spec's positional policy
+
+**What was attempted**: cycles 1–5 as recorded in the first escalation entry; cycle 6 (standalone, after the halt) closed the npm `--` tail and `gh api <url>`; cycle 7 verified cycle 6 (all mechanisms mutation-proven) and re-probed unscoped.
+
+**Likely root cause**: each cycle closes the arm it executed and the next execution finds the next arm. Cycles 1–5 read the interpreter arm as "in-repo-trusted" and never executed an installed binary by path or an in-repo writer by name; the `-R` / `npm view` / `npx`-absent spellings were never tried with a host or a missing tool. The mechanism (per-binary allow-lists) holds for every arm that has been given the exact-name discipline — `npm` scripts, git subcommands, gh api — and bug.8 is the one arm that has not.
+
+**Recommended next steps** (operator's call — the loop's budget and its one extension are spent):
+1. `/qa-fix` on gate 7 outside the loop: bug.8 is a design choice — exact allow-list of read-only in-repo entry points for the script positional (the `NPM_SCRIPTS` discipline; the live handoff needs `select-next.mjs`, `observation-log.js queue|scan|doctor`, `quick_validate.py`, `handoff-verify.mjs`), or refuse `node_modules/` / `.bin/` and state the residual trust in SKILL.md. bug.9 and bug.10 are small spec changes.
+2. Then one narrowed `/qa-task`, then `/develop-task` resumes at 5c (`/review-pr`) → `/finalise`.
+3. Or accept gate 7 with a documented waiver naming the trust boundary for repo-authored scripts — bug.8 is then a documented design decision rather than a defect, and the SKILL.md opening line must say so.
 
 - 2026-09-15 — Steps 5–6, after the cycle-1 fix push: `gh` token invalid (HTTP 401 on `gh pr comment`, `gh pr view`, `gh api user`; `gh auth token` empty). Cannot be repaired from inside the session (`gh auth login` is interactive). Pipeline paused at Step 5 (cycle 1 complete, cycle 2 pending). qa-fix cycle 1 comments not posted (PR: 401 ×3 retries; issue: `no-credentials`). Resume: `gh auth login -h github.com` (or unlock the keychain), then `/develop-next` — Step 0 resumes the pipeline from the lock.
 
@@ -210,14 +245,32 @@ The pipeline completed 5 qa-task/qa-fix cycles without a clean PASS.
 **Fixes Applied**: pattern-flag exemption made per spec (`patternFlags`); `--format/--reporter/--reporters/--formatter/--pretty` left the global set; git log/show opt `--format/--pretty/--date` in; module-loading flags under npx tools keep the path rule; runner JSDoc + cap wording + anchor comment. 28 tests; regression shapes in the refused list; mutation-proved (global exemption restored → red). Fast gate green first attempt (3298/3299).
 **Commit**: `979a1a8e` (pushed)
 
+### QA Cycle 6 — 2026-09-15 (standalone — run after the loop-limit halt, recorded on resume)
+**Gate Result**: FAIL
+**Issues Found**: 5 — 1 HIGH (npm `--` passthrough forwards any dash token / absolute positional: `npm run format:check -- --write` rewrote the fixture tree, `npm test -- -r /tmp/evil.js` preloaded the file — both executed), 1 MEDIUM (`gh api https://evil.example/x` requested as-is — egress to any host, executed against a local listener), 3 LOW (`eval:*:cli|sdk` admitted; drive-letter absolute paths; per-spec `patternFlags` untested), 3 reviewer cleanups. Cycle-5 fixes (CR-1/2/3) verified closed, mutation-proven. Security NFR FAIL (measured, 73 probes). Bugs 6–7 filed.
+**HIGH findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 — outside the 5-cycle budget; authorised by the operator)
+**Fixes Applied**: `npm test -- …` / `npm run test -- …` held to the node `--test`-mode rule (`testModeArgsOk`, shared with the `node` arm); every other `run` script takes no tail; `gh api` endpoint refuses `://` and leading `//`; `eval:*:cli|sdk` excluded; `isAbsoluteToken` for drive-letter paths; per-spec `patternFlags` tested; `--date` one home; 31 refused + 8 allowed shapes; all six fixes mutation-proven; SKILL.md whitelist rows updated. Tests 28/28.
+**Commit**: `b1279afa` (pushed on resume)
+
+### QA Cycle 7 — 2026-09-15 (the one authorised extra cycle)
+**Gate Result**: FAIL
+**Issues Found**: 6 — 1 HIGH (the `node`/`python3` arm runs any relative script with any arguments — prettier `--write` via `node_modules/` path executed through read mode; repo writers reachable), 3 MEDIUM (`gh <verb> -R <host>` / URL positionals egress; `npm view <url-spec>` egress; `npx` installs a missing tool without a prompt — all executed), 2 LOW (`-w` = `--web`; `--` passthrough policy). Cycle-6 bugs 6–7 verified closed; three mechanisms mutation-proven. Reviewer returned at 21m27s (over budget, not killed). Refuted: `node --test-only <script> --test -r X` (no preload); `gh api http:host/x` (api.github.com).
+**HIGH findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Escalating — loop not converging (budget spent: 5 cycles + 1 authorised extra)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-15 (halted — second escalation)
+**Final Status**: Escalated (Step 5 — gate 7 FAIL after the authorised extra cycle)
 **Branch**: `feature/task.110.session-handoff-skill`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/408
-**QA Iterations**: {populated at end}
+**QA Iterations**: 7 (5 in the loop, 1 standalone after the first halt, 1 authorised on resume)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

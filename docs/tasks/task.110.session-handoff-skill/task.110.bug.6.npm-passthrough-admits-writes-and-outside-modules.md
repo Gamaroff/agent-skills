@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-6
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -95,3 +95,4 @@ arm already enforces) and `POS.PATHS` to positionals. Add all five absolute-valu
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | QA cycle 6 — executed in a scratch fixture |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | npm tail held to the node --test-mode rule; no tail on other scripts |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 7 — refused-list spellings verified; mechanism mutation-proven (`covered`) |

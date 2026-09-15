@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-7
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -77,3 +77,4 @@ Refuse `://` in the endpoint (and `//` at the start); add `gh api https://evil.e
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | QA cycle 6 — executed against a local listener |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `://` and leading `//` refused in the api endpoint |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 7 — refused-list spellings verified; mechanism mutation-proven (`covered`) |
