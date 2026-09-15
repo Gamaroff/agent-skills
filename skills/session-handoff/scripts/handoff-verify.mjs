@@ -227,8 +227,10 @@ const PATTERN_FLAGS = new Set([
  * A kind is checked before the pattern exemption and before the path rule,
  * and it is a full answer.
  */
+// An optional leading `./` — the spelling handoffs use for a project file
+// (`-p ./tsconfig.json`), which a positional already admits (gate 17, QA-2).
 const DATA_FILE =
-  /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*(?:\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|json5|yaml|yml|toml)|\.[a-z0-9-]+(?:rc|ignore))$/;
+  /^(?:\.\/)?(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*(?:\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|json5|yaml|yml|toml)|\.[a-z0-9-]+(?:rc|ignore))$/;
 const VALUE_KINDS = Object.freeze({
   data: (v) => DATA_FILE.test(v) && !v.includes(".."),
 });
@@ -1072,11 +1074,14 @@ const NPX_TOOLS = Object.freeze({
     flags: [
       "--ci",
       "--silent",
-      "-t",
       "--testNamePattern=",
       "--passWithNoTests",
       "--maxWorkers=",
     ],
+    // `-t` is a string option (`requiresArg`): a value flag, held as a
+    // pattern, so the verifier consumes what yargs consumes (gate 17, QA-1).
+    valueFlags: ["-t"],
+    patternFlags: ["-t"],
     // No `--reporters`: it is a yargs ARRAY option and yargs-parser's greedy
     // arrays swallow every following non-dash token into it, so a "test
     // path" positional after `--reporters default` is loaded as a reporter
@@ -1088,12 +1093,13 @@ const NPX_TOOLS = Object.freeze({
     flags: [
       "--run",
       "--reporter=",
-      "-t",
       "--testNamePattern=",
       "--passWithNoTests",
       "--silent",
     ],
-    valueFlags: ["--reporter"],
+    // `-t <pattern>` takes a value under cac too (gate 17, QA-1).
+    valueFlags: ["--reporter", "-t"],
+    patternFlags: ["-t"],
     // `html` and `blob` write into the tree by default; not in the set.
     valuePatterns: { "--reporter": VITEST_REPORTERS },
     positional: POS.PATHS,

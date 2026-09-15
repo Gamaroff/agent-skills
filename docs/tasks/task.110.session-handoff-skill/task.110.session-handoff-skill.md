@@ -230,6 +230,7 @@ remains readable by hand.
 | 2026-09-15 |         | QA gate CONCERNS (80/100) cycle 16 — no HIGH; 1 MEDIUM (tsc `-p`/`--project` declared bare while tsc consumes the next token — `npx tsc -p --noEmit` emitted under a directory named `--noEmit`, executed), 2 LOW (prettier resolves a string-valued data file as a module specifier — executed, in-repo-config class; tsc `--pretty=` dead); bugs 21–22 closed, bug.23 filed | qa-task |
 | 2026-09-15 |         | QA findings fixed — tsc `-p`/`--project` are data value flags (bug.23); `--pretty=` dropped; bare-flag audit made shellcheck `-e` a value flag held to `SC` codes; prettier string-config residual documented; 33 tests (+17 shapes), 16 iterations | qa-fix |
 | 2026-09-15 |         | QA gate PASS (90/100) cycle 17 — no HIGH, no MEDIUM; bug.23 closed (bugs 1–23 all closed); 2 LOW (jest/vitest `-t` value-taking but declared bare — no bypass; `-p ./tsconfig.json` refused because `DATA_FILE` admits no leading `./`) | qa-task |
+| 2026-09-15 |         | QA findings fixed — jest/vitest `-t` declared as pattern value flags (QA-1); `DATA_FILE` admits an optional leading `./` (QA-2); 33 tests (+10 shapes), 17 iterations | qa-fix |
 
 ---
 

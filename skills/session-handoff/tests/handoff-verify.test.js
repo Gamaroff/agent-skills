@@ -338,6 +338,10 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npx tsc --noEmit --pretty",
     "npx shellcheck -e SC2086,SC2046 x.sh",
     "npx shellcheck --exclude=2086 x.sh",
+    "npx tsc --noEmit -p ./tsconfig.json",
+    "npx prettier --check --config ./.prettierrc .",
+    "npx vitest --run -t x",
+    "npx jest --ci -t 'a b'",
     "gh api /user --jq .login",
     "gh pr list --jq .[0].number -q .[]",
     "gh api repos/o/r --jq=.name",
@@ -781,6 +785,15 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "npx shellcheck -e --format=json x.sh": /not on whitelist: npx/,
     "npx shellcheck -e ./x x.sh": /not on whitelist: npx/,
     "npx shellcheck --exclude=./x x.sh": /not on whitelist: npx/,
+    // QA cycle 17 — `-t` takes a value on jest (yargs requiresArg) and vitest
+    // (cac); declared bare, the next token was judged as a positional.
+    "npx jest -t --ci": /not on whitelist: npx/,
+    "npx jest --ci -t": /not on whitelist: npx/,
+    "npx vitest -t --run x": /not on whitelist: npx/,
+    // The `./` prefix admits no traversal and no doubled slash.
+    "npx tsc --noEmit -p ./../x.json": /not on whitelist: npx/,
+    "npx tsc --noEmit -p .//x.json": /not on whitelist: npx/,
+    "npx tsc --noEmit -p ./x.mjs": /not on whitelist: npx/,
     "npx jest --ci false": /not on whitelist: npx/,
     "npx jest --silent false": /not on whitelist: npx/,
     "npx vitest --run false x": /not on whitelist: npx/,

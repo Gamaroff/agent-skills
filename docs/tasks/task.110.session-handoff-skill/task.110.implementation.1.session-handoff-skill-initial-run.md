@@ -381,6 +381,7 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **PR Review**: not reached — open LOW entries route to qa-fix first
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 17)
+**Fix (qa-fix)**: jest/vitest `-t` as pattern value flags (QA-1); optional leading `./` in `DATA_FILE` (QA-2); four mutation proofs red; handed back to QA for cycle 18
 
 ---
 
