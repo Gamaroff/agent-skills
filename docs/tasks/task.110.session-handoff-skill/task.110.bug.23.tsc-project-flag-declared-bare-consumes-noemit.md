@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-23
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (reviewer CR-1, confirmed by execution)
 **Date Found**: 2026-09-15
 
@@ -96,3 +96,4 @@ bare. Audit: every remaining bare flag on every tool against its parser's value-
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 16 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `-p`/`--project` are data value flags; `--pretty=` dropped; shellcheck `-e` a value flag; prettier string-config residual documented |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 17 — through the clone's verifier at ce15f7c7 in consumer9 with `./--noEmit/{a.ts,tsconfig.json}` present: `npx tsc -p --noEmit`, `--project --noEmit`, `--noEmit -p` → `unverifiable: not on whitelist: npx`, nothing emitted; `-p tsconfig.json --noEmit` → `confirmed`. M1 (`-p`/`--project` back to bare), M5 (value kind dropped) → red — `covered` ×2 |

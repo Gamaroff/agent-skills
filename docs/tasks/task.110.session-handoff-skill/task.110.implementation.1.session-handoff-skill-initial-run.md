@@ -35,7 +35,7 @@ Build `skills/session-handoff/` — write mode emits `.agents/handoff.md` in a f
 | 2. review-task             | ✅ Done    | `task.110.review.{N}.{name}.md` exists (or skip logged)                | `task.110.review.1.session-handoff-skill.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development; issue #407 created | pre-pass B/C dispatched inline-summarised in report |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; fast gate green on run 3 (prettier, then doc-coverage rows); 17 tests, 3 mutants killed | surface map + 2 pre-pass agents (inline-summarised) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #408: https://github.com/Gamaroff/agent-skills/pull/408 — two commits (0bd5c531 feat, 7053c0a6 docs); in-review comment posted | — |
-| 5–6. qa-task / qa-fix loop | ⏳ In Progress | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 16 cycles so far: loop limit at 5; cycles 6–8 authorised; second and third resumes with the budget and strike halt waived; gates 9 FAIL → 10/11 CONCERNS → 12/13 PASS → 5c REQUEST CHANGES → 14/15 FAIL (parser-value, greedy-array classes) → 16 CONCERNS (one misdeclared tsc value flag) → qa-fix, cycle 17 next | —                    |
+| 5–6. qa-task / qa-fix loop | ⏳ In Progress | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 16 cycles so far: loop limit at 5; cycles 6–8 authorised; second and third resumes with the budget and strike halt waived; gates 9 FAIL → 10/11 CONCERNS → 12/13 PASS → 5c REQUEST CHANGES → 14/15 FAIL (parser-value, greedy-array classes) → 16 CONCERNS (one misdeclared tsc value flag) → 17 PASS (two LOW refinements) → qa-fix, cycle 18 next → 5c | —                    |
 | 7. finalise                | ⏳ Pending | `task.110.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -373,6 +373,14 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 16)
 **Fix (qa-fix)**: tsc `-p`/`--project` as data value flags, `--pretty=` dropped (bug.23); bare-flag audit → shellcheck `-e` a value flag; prettier string-config residual documented; five mutation proofs red; handed back to QA for cycle 17
+
+### QA Cycle 17 — 2026-09-15
+**Gate Result**: PASS (90/100)
+**Issues Found**: 2 LOW — jest/vitest `-t` value-taking but declared bare (no bypass; reviewer CR-1); `npx tsc --noEmit -p ./tsconfig.json` refused because `DATA_FILE` admits no leading `./` (reviewer CR-2). Advisory: `-p x.json src/x.ts` admitted, tsc refuses the mix itself (CR-3). Cycle-16 fix verified and mutation-proven (five mechanisms); bug.23 closed — bugs 1–23 all closed. Reviewer 6m58s, in budget.
+**HIGH findings**: 0
+**PR Review**: not reached — open LOW entries route to qa-fix first
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 17)
 
 ---
 
