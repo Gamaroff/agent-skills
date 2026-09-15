@@ -257,6 +257,7 @@ const MOCHA_REPORTERS =
 const SHELLCHECK_FORMATS = /^(checkstyle|diff|gcc|json|json1|quiet|tty)$/;
 const SHELLCHECK_SHELLS = /^(sh|bash|dash|ksh|busybox)$/;
 const SHELLCHECK_SEVERITIES = /^(error|warning|info|style)$/;
+const SHELLCHECK_CODES = /^(?:SC)?\d{4}(?:,(?:SC)?\d{4})*$/;
 
 /** A joined flag value: empty is fine; no `..` segment ever; no absolute path unless the flag takes a pattern or the spec allows one. */
 function valueOk(name, v, spec) {
@@ -998,6 +999,11 @@ const NPX_TOOLS = Object.freeze({
     ],
     valueFlags: ["--config", "--ignore-path"],
     valueKinds: { "--config": "data", "--ignore-path": "data" },
+    // Residual, documented in SKILL.md: prettier's loadConfig resolves a
+    // config whose parsed value is a single STRING as a shareable-config
+    // module specifier (createRequire/import), so a data file whose whole
+    // content is `./x.mjs` is a code load — the in-repo-config class, like
+    // tsc's tsbuildinfo (gate 16, CR-2, executed with a one-line `.zzrc`).
     positional: POS.PATHS,
   },
   eslint: {
@@ -1019,7 +1025,17 @@ const NPX_TOOLS = Object.freeze({
     positional: POS.PATHS,
   },
   tsc: {
-    flags: ["--noEmit", "-p", "--project", "--pretty", "--pretty="],
+    // No `--opt=value` form exists in tsc (`--pretty=false` is "Unknown
+    // compiler option", gate 16 CR-3); its booleans take a following
+    // true/false, which npxPositionalsOk refuses.
+    flags: ["--noEmit", "--pretty"],
+    // `-p`/`--project` CONSUME the next token unconditionally (parseOptionValue,
+    // case "string"), so declared bare they let `-p --noEmit` satisfy the
+    // required flag while tsc read `--noEmit` as the project path and emitted
+    // (gate 16, bug.23, executed). A value flag consumes what tsc consumes,
+    // and a `-`-prefixed value is refused before the kind is asked.
+    valueFlags: ["-p", "--project"],
+    valueKinds: { "-p": "data", "--project": "data" },
     positional: POS.PATHS,
     // `true`/`false`/`null` and `@response` positionals are refused for every
     // tool by npxPositionalsOk (bug.19). Residual, documented in SKILL.md: a
@@ -1106,14 +1122,17 @@ const NPX_TOOLS = Object.freeze({
       "--severity=",
       "--format=",
       "-x",
-      "-e",
       "--exclude=",
       "--shell=",
       "--version",
     ],
-    // Formats, shells and severities are shellcheck's own closed sets.
-    valueFlags: ["-S", "--severity", "-f", "--format", "-s", "--shell"],
+    // Formats, shells and severities are shellcheck's own closed sets. `-e`
+    // takes a code list (getopt consumes the next token whatever it is) —
+    // declared as the value flag it is, after the tsc `-p` lesson (gate 16).
+    valueFlags: ["-S", "--severity", "-f", "--format", "-s", "--shell", "-e"],
     valuePatterns: {
+      "-e": SHELLCHECK_CODES,
+      "--exclude": SHELLCHECK_CODES,
       "-S": SHELLCHECK_SEVERITIES,
       "--severity": SHELLCHECK_SEVERITIES,
       "-f": SHELLCHECK_FORMATS,

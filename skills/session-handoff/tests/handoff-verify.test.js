@@ -332,6 +332,12 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npx jest --ci -t x",
     // 5c (CR-1/CR-3) — tsc file positionals and gh --jq filters still pass.
     "npx tsc --noEmit src/x.ts",
+    "npx tsc -p tsconfig.json --noEmit",
+    "npx tsc --project tsconfig.build.json --noEmit",
+    "npx tsc --noEmit --project packages/a/tsconfig.json",
+    "npx tsc --noEmit --pretty",
+    "npx shellcheck -e SC2086,SC2046 x.sh",
+    "npx shellcheck --exclude=2086 x.sh",
     "gh api /user --jq .login",
     "gh pr list --jq .[0].number -q .[]",
     "gh api repos/o/r --jq=.name",
@@ -760,6 +766,21 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "npx tsc --noEmit null src": /not on whitelist: npx/,
     "npx tsc --noEmit @tsargs.txt": /not on whitelist: npx/,
     "npx tsc --noEmit @x": /not on whitelist: npx/,
+    // QA cycle 16 (bug.23) — tsc's `-p`/`--project` consume the next token
+    // as the project path: `-p --noEmit` satisfied the required flag while
+    // tsc emitted under a directory of that name (executed). A project is a
+    // data file; tsc has no `--opt=value` form at all.
+    "npx tsc -p --noEmit": /not on whitelist: npx/,
+    "npx tsc --project --noEmit": /not on whitelist: npx/,
+    "npx tsc --noEmit -p --noEmit": /not on whitelist: npx/,
+    "npx tsc -p ../x.json --noEmit": /not on whitelist: npx/,
+    "npx tsc -p x.mjs --noEmit": /not on whitelist: npx/,
+    "npx tsc -p /etc/tsconfig.json --noEmit": /not on whitelist: npx/,
+    "npx tsc --noEmit -p": /not on whitelist: npx/,
+    "npx tsc --pretty=false --noEmit": /not on whitelist: npx/,
+    "npx shellcheck -e --format=json x.sh": /not on whitelist: npx/,
+    "npx shellcheck -e ./x x.sh": /not on whitelist: npx/,
+    "npx shellcheck --exclude=./x x.sh": /not on whitelist: npx/,
     "npx jest --ci false": /not on whitelist: npx/,
     "npx jest --silent false": /not on whitelist: npx/,
     "npx vitest --run false x": /not on whitelist: npx/,

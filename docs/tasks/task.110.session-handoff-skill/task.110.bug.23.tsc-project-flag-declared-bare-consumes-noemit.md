@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-23
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer (reviewer CR-1, confirmed by execution)
 **Date Found**: 2026-09-15
 
@@ -68,8 +68,31 @@ Move `-p` / `--project` to tsc `valueFlags` with `valueKinds: data` (a `..`-free
 tsconfig.json --noEmit`, `npx tsc --project tsconfig.build.json --noEmit`. Mutation: `-p` back to
 bare. Audit: every remaining bare flag on every tool against its parser's value-taking set.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-09-15 · **Developer**: Claude (qa-fix, cycle 16)
+
+**Root Cause**: the tsc spec declared `-p` / `--project` in `flags` (bare) while tsc's `parseOptionValue` consumes the following token unconditionally as the project path; the verifier's model consumed nothing, so the required `--noEmit` could be the token tsc ate.
+
+**Fix**: `-p` / `--project` moved to tsc `valueFlags` with `valueKinds: data` — the verifier consumes what tsc consumes, a `-`-prefixed value is refused before the kind is asked, and the value is held to a `..`-free relative data file (`tsconfig.json`, `tsconfig.build.json`). `--pretty=` dropped (tsc has no `--opt=value` form; CR-3). Audit of every remaining bare flag on every npx tool against its parser: one more value-taking flag was bare — shellcheck's `-e` (getopt consumes the next token whatever it is; consequence-free, shellcheck has no writing option) — now a value flag held, with `--exclude=`, to a list of `SC` codes. jest/vitest `-t` are string options whose parsers do **not** consume a `-`-prefixed token, so a bare `-t` followed by a judged positional is exactly what the tools read. The prettier string-config residual (CR-2) is documented in SKILL.md and the prettier spec comment beside the tsbuildinfo residual.
+
+**Files Modified**:
+- `skills/session-handoff/scripts/handoff-verify.mjs` — tsc spec, shellcheck spec, `SHELLCHECK_CODES`, prettier comment
+- `skills/session-handoff/tests/handoff-verify.test.js` — refused: `-p --noEmit`, `--project --noEmit`, `--noEmit -p --noEmit`, `-p ../x.json`, `-p x.mjs`, `-p /etc/tsconfig.json`, trailing `-p`, `--pretty=false`, shellcheck `-e --format=json`, `-e ./x`, `--exclude=./x`; allowed: `-p tsconfig.json --noEmit`, `--project tsconfig.build.json --noEmit`, `--noEmit --project packages/a/tsconfig.json`, `--noEmit --pretty`, `-e SC2086,SC2046`, `--exclude=2086`
+- `skills/session-handoff/SKILL.md` — npx row (tsc `-p` as data; prettier string-config residual; shellcheck `-e`), refused list
+- `CHANGELOG.md` — figures
+
+**Testing**: 33/33. Mutation-proved red (five): `-p`/`--project` back to bare; `--pretty=` re-admitted; shellcheck `-e` back to bare; `SHELLCHECK_CODES` widened; tsc project value kind dropped. Re-executed through the fixed verifier in consumer9 with the `--noEmit/` directory present: `-p --noEmit`, `--project --noEmit`, `--pretty=false --noEmit` → `unverifiable: not on whitelist: npx`, no emit; `-p tsconfig.json --noEmit` → `confirmed` (exit 0).
+
+**Verification Steps for QA**:
+1. `isAllowed("npx tsc -p --noEmit").ok === false`; `isAllowed("npx tsc -p tsconfig.json --noEmit").ok === true`.
+2. Through the CLI in a project carrying a `--noEmit/` directory with a tsconfig: the line reads `unverifiable`; nothing is emitted.
+
 ## Status History
 
 | Date       | Status | Changed By  | Notes |
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 16 — filed |
+| 2026-09-15 | Ready for QA | Claude (qa-fix) | `-p`/`--project` are data value flags; `--pretty=` dropped; shellcheck `-e` a value flag; prettier string-config residual documented |

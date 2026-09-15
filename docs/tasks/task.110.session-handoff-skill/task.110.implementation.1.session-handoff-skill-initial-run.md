@@ -372,6 +372,7 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 16)
+**Fix (qa-fix)**: tsc `-p`/`--project` as data value flags, `--pretty=` dropped (bug.23); bare-flag audit → shellcheck `-e` a value flag; prettier string-config residual documented; five mutation proofs red; handed back to QA for cycle 17
 
 ---
 
