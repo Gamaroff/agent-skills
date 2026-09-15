@@ -311,9 +311,21 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "shellcheck -f gcc -e SC2034 --exclude=SC1091 -s bash x.sh",
     // QA cycle 9 (bug.15) — a file positional under mocha/vitest stays fine.
     "npx mocha test",
-    // QA cycle 9 (QA-4) — `env` as a key or a path segment is not the builtin.
+    // QA cycle 9 (QA-4) — `env` as a key is not the builtin.
     "jq .env x.json",
-    "jq . data/env.json",
+    "jq -r .environment x.json",
+    // QA cycle 10 (bug.17) — a reporter/formatter is one of its tool's
+    // stdout-only built-ins, spaced or joined.
+    "npx mocha -R nyan --reporter=json-stream test",
+    "npx vitest --run --reporter=junit --reporter tap-flat x.test.ts",
+    "npx jest --reporters=summary --reporters github-actions",
+    "npx eslint -f unix --format=checkstyle .",
+    "npx stylelint --formatter verbose src",
+    "npx shellcheck -f json1 -s dash -S style --format=tty --shell=ksh --severity=info x.sh",
+    // QA cycle 10 (QA-3) — the data dotfiles are the tools' rc/ignore names.
+    "npx prettier --check --config=.prettierrc --ignore-path .gitignore .",
+    "npx markdownlint -c .markdownlintrc -p .markdownlintignore docs",
+    "npx eslint -c .eslintrc --config=.eslintrc.json .",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -687,6 +699,34 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     // QA cycle 9 (CR-5) — `-r` could never run; it is no longer claimed.
     "date -r 0": /not on whitelist: date/,
     "date -r +%s": /not on whitelist: date/,
+    // QA cycle 10 (bug.17) — a bare NAME is not a closed set: mocha falls
+    // back to `require(path.resolve(name))` (executed: `-R zzrep` ran a
+    // root-level zzrep.js), vitest html/blob and jest jest-junit write.
+    "npx mocha -R zzrep t.js": /not on whitelist: npx/,
+    "npx mocha --reporter=index t": /not on whitelist: npx/,
+    "npx mocha -R lib t": /not on whitelist: npx/,
+    "npx mocha -R mocha-junit-reporter t": /not on whitelist: npx/,
+    "npx vitest --run --reporter=html x": /not on whitelist: npx/,
+    "npx vitest --run --reporter blob x": /not on whitelist: npx/,
+    "npx jest --reporters=jest-junit": /not on whitelist: npx/,
+    "npx eslint -f eslint-formatter-pretty .": /not on whitelist: npx/,
+    "npx stylelint --formatter=custom src": /not on whitelist: npx/,
+    "npx shellcheck -f x y": /not on whitelist: npx/,
+    "npx shellcheck -s fish y": /not on whitelist: npx/,
+    "npx shellcheck -S loud y": /not on whitelist: npx/,
+    // QA cycle 10 (bug.18) — `//` is jq's alternative operator, not a path.
+    "jq -n null//env": /not on whitelist: jq/,
+    "jq -n .//env": /not on whitelist: jq/,
+    "jq -n [.//env]": /not on whitelist: jq/,
+    "jq -n 1//env": /not on whitelist: jq/,
+    "jq . data/env.json": /not on whitelist: jq/,
+    // QA cycle 10 (QA-3/QA-4) — a data dotfile is a `*rc` / `*ignore` name;
+    // `..` is refused anywhere in the value.
+    "npx eslint -c .env .": /not on whitelist: npx/,
+    "npx prettier --check --config=.js .": /not on whitelist: npx/,
+    "npx prettier --check --config=.mjs .": /not on whitelist: npx/,
+    "npx prettier --check --config=x..json .": /not on whitelist: npx/,
+    "npx prettier --check --config=..json .": /not on whitelist: npx/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);

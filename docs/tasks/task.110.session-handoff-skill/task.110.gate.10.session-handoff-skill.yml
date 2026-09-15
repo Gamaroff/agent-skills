@@ -1,0 +1,99 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: CONCERNS
+status_reason: 'Cycle-9 fixes verified (bug.14, bug.15, bug.16 closed; all twelve cycle-9 mechanisms mutation-proven covered; the cycle-9 spellings and the gate-6/7/8 spellings re-executed through the clone''s own verifier at efcd3ae3 — all refused, PRD md5 unchanged, no canary, no scaffold, no request). No HIGH for the first time since gate 5. Unscoped safety re-probe found two MEDIUM residues of the cycle-9 mechanism: the `name` kind is a character class and a reporter name is not one — mocha resolves a bare reporter name against the cwd and executed a root-level module (bug.17, executed in a consumer-shaped project; reviewer CR-2), and vitest/jest have built-in reporters that write files (reviewer CR-3, not executed); and the jq `env` refusal''s `/` exemption is jq''s `//` operator, so `jq -n null//env` printed the full environment through read mode (bug.18, executed; reviewer CR-1 — the QA-4 fix regressed). Two LOW. HIGH sequence across gates 6–10: 1, 1, 1, 1, 0 — the strike on handoff-verify.mjs is not renewed; the loop continues to qa-fix on the open MEDIUMs.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T16:45:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The `name` kind (`[A-Za-z0-9_-]+`) stands for "a built-in or an installed package", but a reporter name is not that on two tools. mocha''s `Mocha.prototype.reporter` falls back from `require.resolve(name)` to `require(path.resolve(name))`, so a bare name loads `<cwd>/<name>.js` / `<name>/index.js`: executed through the CLI (--cwd) in the consumer-shaped project with mocha installed, `npx mocha -R zzrep t.js` ran a root-level `zzrep.js` (canary file written) before mocha rejected it as a reporter; `-R index`, `--reporter=scripts`, `-R lib` admitted (reviewer CR-2). vitest''s built-in `html` and `blob` reporters write `html/` and `.vitest-reports/` by default and jest''s `--reporters=jest-junit` writes `./junit.xml`; `npx vitest --run --reporter=html x`, `--reporter=blob x`, `npx jest --reporters=jest-junit` admitted (reviewer CR-3, not executed — neither tool installed). Nil in this repository (no root-level module, mocha absent); real in a consumer with mocha and an `index.js`.'
+    suggested_action: 'Replace the `name` kind on every reporter/formatter flag with a per-tool closed set of stdout-only built-ins (mocha spec/dot/nyan/tap/landing/list/progress/json/json-stream/min/markdown/xunit; vitest default/basic/verbose/dot/tap/tap-flat/github-actions/json/junit; jest default/summary/github-actions; eslint and stylelint their documented formatters) — the identity principle applied to the value. Refused: `-R zzrep`, `--reporter=index`, `-R lib`, `--reporter=html`, `--reporter=blob`, `--reporters=jest-junit`; allowed: `-R spec`, `--reporter=dot`, `--reporters=default`, `-f json`. Mutation: the set widened back to BARE_NAME.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.17.reporter-name-kind-is-a-shape-not-a-closed-set.md'
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The cycle-9 QA-4 fix refuses a jq positional containing the bare word `env` unless preceded by `.` or `/`; jq''s alternative operator is `//`, so `jq -n null//env`, `.//env`, `1//env`, `[.//env]` are admitted. Executed through the CLI under a stripped env with CANARY_SECRET set: `jq -n null//env; expect: canary-9-xyz` → `confirmed`, measured carries the whole inherited environment. Reviewer CR-1 (high/high); held at medium — nothing in this repository posts the report anywhere, and the class (CR-6 measured echo) has been judged advisory since gate 8 — but not low: the fix regressed on its own exemption.'
+    suggested_action: 'Judge the jq filter (first positional; -f/--from-file are refused) with no `/` exemption at all, keeping the path exemption only for later file positionals; refused: `null//env`, `.//env`, `[.//env]`, `1//env`; allowed: `.env`, `. data/env.json`. Consider spawning children with a scrubbed environment as the mechanism that retires the class.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.18.jq-alternative-operator-bypasses-the-env-refusal.md'
+    status: open
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-4 (low/low): the `data` kind judges the name, not what the tool does with it — eslint 9 `-c <file>` import()s the file whatever its extension, so an extensionless dotfile (`-c .env`) is admitted and evaluated as a module (a syntax error for non-JS content, code for JS content); prettier treats a config whose parsed value is a single string as a shareable-config module specifier, so `--config=.nvmrc`-style dotfiles become a module lookup. Not executed; in this repository every tracked dotfile is data.'
+    suggested_action: 'Narrow the extensionless-dotfile alternative of DATA_FILE to the tools'' own config/ignore names (.prettierrc .prettierignore .eslintrc .eslintignore .stylelintrc .stylelintignore .markdownlintrc .markdownlintignore .markdownlint-cli2 …) or document that `data` is only as safe as the repository''s data files.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-4'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Cosmetic residue of the DATA_FILE regex: `--config=.js`, `--config=.mjs` (dotfiles named like an extension) and `x..json` / `x/..json` (a file literally named `..json`) are admitted as data. Executed: prettier does not import a dotfile named `.js` (no canary; extname is empty, YAML loader); the `..` guard holds for real traversal. Untidy, not unsafe.'
+    suggested_action: 'Require at least one character before the dot in the dotfile alternative (`\.[A-Za-z0-9_-]+` → a name that is not itself a known code extension) and refuse a basename beginning with `..`.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 3676
+    notes: '3,367 cycle-9 spellings re-run (only the intended decisions changed; no collateral refusal); 177 refused-list + 109 allowed-list fresh spellings on the kind/subcommand/tokenize/jq/eval mechanisms (12 admitted, triaged: 2 hazardous — mocha reporter cwd fallback, jq //env — the rest cosmetic); 23 executed end-to-end through the clone''s own verifier at efcd3ae3 and the consumer-shaped project under env -i with a listener: every cycle-9 and gate-6/7/8 spelling refused, PRD md5 unchanged, no canary, no scaffold, zero requests on the listener; mocha -R <cwd module> and jq null//env executed and confirmed the two findings; 12 mutation proofs, all covered; TMPDIR=/tmp 31/31. The read-only invariant holds through every arm against the enumerated surface except the two MEDIUM residues above, both narrower than any prior cycle''s finding.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 31/31; full hermetic suite 3301 pass / 0 fail / 1 skipped in 190 s; the CR-6 timeout test green.'
+  reliability:
+    status: PASS
+    notes: 'Directory path → one JSON object (QA-5 verified); unterminated quote → unverifiable; no orphaned children after the executed probes.'
+  maintainability:
+    status: PASS
+    notes: 'The identity principle now reads the same in the interpreter and npx arms; SKILL.md rows match the specs; the retired PRB-6 acceptance is gone from both. The `name` kind''s comment overstates what a bare name guarantees (QA-1) and should be corrected with the fix.'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent, unscoped safety re-probe over the code-only branch diff (4,345 lines) plus this cycle''s fix diff (526 lines), dispatched 16:26 returned 16:36 (10m08s — marginally past the 10-minute budget, not killed; block in hand before this gate was written); read-only with in-process isAllowed probes only — it noted the working tree mutating under it (QA''s mutation proofs) and read HEAD'
+  bugs: 4
+  cleanups: 0
+  boundary: true
+  probes_executed: 3676
+  promoted: ['CR-1 → QA-2 (severity held at medium; executed)', 'CR-2 + CR-3 → QA-1 (one mechanism, two tools; mocha executed)']
+  advisory: ['CR-4 → QA-3 at low', 'gate-8/9 advisories unchanged: DRIVER/MODE env passthrough, win32 cwd-first resolution, absolute reads + measured echo, gh api --cache, python -X cache write, quoted-glob refusal (cycle-9 CR-6)']
+
+recommendations:
+  immediate:
+    - action: 'bug.17 — reporter/formatter values held to a per-tool closed set of stdout-only built-ins instead of the name shape'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+    - action: 'bug.18 — jq filter refuses `env` with no `/` exemption; or scrub the child environment'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+  future:
+    - action: 'QA-3 dotfile allow-list for the data kind; QA-4 DATA_FILE cosmetic tightening'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 2
+  fix_date: '2026-09-15'
+  total_iterations: 9
+  verification_method: 'Executed probes through the clone''s own verifier and a consumer-shaped project under a stripped environment with a local listener; in-process isAllowed enumeration; twelve mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: BLOCKED
+  conditions: ['bug.17 closed', 'bug.18 closed']

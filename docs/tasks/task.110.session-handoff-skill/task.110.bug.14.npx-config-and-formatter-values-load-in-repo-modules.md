@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-14
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (the accepted PRB-6 / CR-2 boundary, re-decided on measurement)
 **Date Found**: 2026-09-15
 
@@ -141,3 +141,4 @@ SKILL.md npx row and retire the PRB-6 "accepted boundary" note wherever it is re
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 9 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Fourth strike (halt waived by the operator): mechanism replaced — a loaded flag value is judged by kind (data file / bare name), never by path; spaced forms consume their value |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 10 — through the clone's own verifier at `efcd3ae3` (stripped env, listener up): the PRD spelling, the canary-import spelling, `npx eslint -c <shipped .js> .` and `npx mocha -R <shipped .js> x` all `unverifiable: not on whitelist: npx`; the consumer-shaped PRD's md5 unchanged; no canary file; `--config=.prettierrc` (a data value) ran and `confirmed`. 177 fresh kind spellings in-process (every loader flag × js/mjs/cjs/ts, joined and spaced, dot-dot, absolute, empty) refused; 109 data/name spellings admitted. Mutations M1 (kind check removed), M2 (`data` admits .js), M3 (`name` admits a path), M12 (spaced `-c` no longer consumed) each turned the named test red — `covered` ×4. One residual of the `name` premise filed separately as bug.17 (mocha resolves a bare reporter name against the cwd) |

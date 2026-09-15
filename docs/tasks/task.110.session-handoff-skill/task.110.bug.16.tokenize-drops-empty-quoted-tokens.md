@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-16
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (reviewer CR-1, confirmed by execution)
 **Date Found**: 2026-09-15
 
@@ -86,3 +86,4 @@ the CLI line, expecting `["grep","-c","","README.md"]` and `unverifiable` for th
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 9 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Empty quoted token preserved; unterminated quote refused as `unverifiable: unterminated quote` |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 10 — `tokenize('grep -c "" README.md')` → `["grep","-c","","README.md"]`; through the CLI against the one-line README, `expect: 1` → `confirmed`, measured `1`; `grep -c "a b README.md` → `unverifiable: unterminated quote`. `''`, `""""`, `"a b"c`, `test -z ""` verified in-process. Mutations M7 (empty token dropped), M8 (unterminated tolerated) → red — `covered` ×2 |

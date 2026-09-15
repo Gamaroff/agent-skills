@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-15
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -101,3 +101,4 @@ Refused-list tests for `npx mocha init out`, `npx mocha init .`, `npx vitest ini
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 9 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `init` and the vitest subcommand vocabulary refused as positionals; vitest requires --run |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 10 — `npx mocha init out9` through the CLI against the consumer-shaped project with mocha installed → `unverifiable: not on whitelist: npx`, no `out9/`; `npx vitest init browser` (clone) refused before npx ran — no registry request on the listener. `npx mocha -R dot README.md` (a file positional) still runs. Mutations M4 (vitest vocabulary), M5 (`--run` not required), M6 (mocha `init`) → red — `covered` ×3 |

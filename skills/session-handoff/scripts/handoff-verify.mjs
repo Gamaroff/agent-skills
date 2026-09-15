@@ -200,28 +200,50 @@ const PATTERN_FLAGS = new Set([
  * IS, never by where it sits:
  *
  *   data  a file the tool PARSES — `.json` `.jsonc` `.json5` `.yaml` `.yml`
- *         `.toml`, or an extensionless dotfile (`.prettierrc`, `.eslintrc`,
- *         `.prettierignore`) — at a relative path with no `..` segment.
- *         `.prettierrc.js` is not one: its extension is `.js`.
- *   name  a bare identifier — a built-in formatter/reporter (`json`, `spec`,
- *         `stylish`) or an installed package — never a path.
+ *         `.toml`, or a dotfile named `.<tool>rc` / `.<tool>ignore`
+ *         (`.prettierrc`, `.eslintrc`, `.prettierignore`) — at a relative
+ *         path, no `..` anywhere. `.prettierrc.js` is not one: its extension
+ *         is `.js`; `.env` is not one either (gate 10, QA-3: eslint 9 imports
+ *         whatever `-c` names, so the dotfile set is the tools' own config
+ *         names, not "any dotfile").
+ *
+ * There is no `name` kind. Gate 9 had one — "a built-in or an installed
+ * package" — and gate 10 executed its counter-example: mocha resolves a
+ * reporter name that is neither by `require(path.resolve(name))`, so
+ * `npx mocha -R zzrep t` ran `./zzrep.js` (bug.17); vitest's `html`/`blob`
+ * and jest's `jest-junit` are names that WRITE. A formatter or reporter is
+ * therefore a per-tool CLOSED SET of stdout-only built-ins, declared as a
+ * `valuePatterns` entry beside the flag — the identity principle applied to
+ * the value, not a shape standing in for it.
  *
  * A kind is checked before the pattern exemption and before the path rule,
  * and it is a full answer.
  */
 const DATA_FILE =
-  /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*(?:[A-Za-z0-9_.-]+\.(?:json|jsonc|json5|yaml|yml|toml)|\.[A-Za-z0-9_-]+)$/;
-const BARE_NAME = /^[A-Za-z0-9_-]+$/;
+  /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*(?:\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|json5|yaml|yml|toml)|\.[a-z0-9-]+(?:rc|ignore))$/;
 const VALUE_KINDS = Object.freeze({
-  data: (v) => DATA_FILE.test(v) && !v.split("/").includes(".."),
-  name: (v) => BARE_NAME.test(v),
+  data: (v) => DATA_FILE.test(v) && !v.includes(".."),
 });
+// Stdout-only built-in formatters / reporters, per tool. A name outside its
+// tool's set is refused whether it is a path, an installed package or a
+// built-in that writes a file.
+const ESLINT_FORMATS =
+  /^(stylish|compact|json|json-with-metadata|unix|visualstudio|checkstyle|html|jslint-xml|junit|tap)$/;
+const STYLELINT_FORMATTERS = /^(string|compact|github|json|tap|unix|verbose)$/;
+const JEST_REPORTERS = /^(default|summary|github-actions)$/;
+const VITEST_REPORTERS =
+  /^(default|basic|verbose|dot|tap|tap-flat|github-actions|json|junit)$/;
+const MOCHA_REPORTERS =
+  /^(spec|dot|nyan|tap|landing|list|progress|json|json-stream|min|doc|markdown|xunit|html)$/;
+const SHELLCHECK_FORMATS = /^(checkstyle|diff|gcc|json|json1|quiet|tty)$/;
+const SHELLCHECK_SHELLS = /^(sh|bash|dash|ksh|busybox)$/;
+const SHELLCHECK_SEVERITIES = /^(error|warning|info|style)$/;
 
 /** A joined flag value: empty is fine; no `..` segment ever; no absolute path unless the flag takes a pattern or the spec allows one. */
 function valueOk(name, v, spec) {
   // A per-flag value KIND is checked first of all: a value the tool loads is
-  // held to what it is (data file or bare name), and an empty value is not
-  // one (gate 9, bug.14).
+  // held to what it is (a data file), and an empty value is not one (gate 9,
+  // bug.14).
   const kind = spec.valueKinds?.[name];
   if (kind) return VALUE_KINDS[kind](v);
   // A per-flag value pattern is checked next and is a full answer: gh's
@@ -955,12 +977,8 @@ const NPX_TOOLS = Object.freeze({
       "--ext=",
     ],
     valueFlags: ["--format", "-f", "--config", "-c"],
-    valueKinds: {
-      "--format": "name",
-      "-f": "name",
-      "--config": "data",
-      "-c": "data",
-    },
+    valueKinds: { "--config": "data", "-c": "data" },
+    valuePatterns: { "--format": ESLINT_FORMATS, "-f": ESLINT_FORMATS },
     positional: POS.PATHS,
   },
   tsc: {
@@ -989,12 +1007,8 @@ const NPX_TOOLS = Object.freeze({
   stylelint: {
     flags: ["--config=", "--ignore-path=", "--quiet", "-q", "--formatter="],
     valueFlags: ["--config", "-c", "--ignore-path", "--formatter"],
-    valueKinds: {
-      "--config": "data",
-      "-c": "data",
-      "--ignore-path": "data",
-      "--formatter": "name",
-    },
+    valueKinds: { "--config": "data", "-c": "data", "--ignore-path": "data" },
+    valuePatterns: { "--formatter": STYLELINT_FORMATTERS },
     positional: POS.PATHS,
   },
   jest: {
@@ -1008,7 +1022,7 @@ const NPX_TOOLS = Object.freeze({
       "--reporters=",
     ],
     valueFlags: ["--reporters"],
-    valueKinds: { "--reporters": "name" },
+    valuePatterns: { "--reporters": JEST_REPORTERS },
     positional: POS.PATHS,
   },
   vitest: {
@@ -1021,7 +1035,8 @@ const NPX_TOOLS = Object.freeze({
       "--silent",
     ],
     valueFlags: ["--reporter"],
-    valueKinds: { "--reporter": "name" },
+    // `html` and `blob` write into the tree by default; not in the set.
+    valuePatterns: { "--reporter": VITEST_REPORTERS },
     positional: POS.PATHS,
     // A positional is a file or pattern, never one of vitest's subcommands;
     // `--run` is required the way tsc requires `--noEmit`.
@@ -1032,7 +1047,9 @@ const NPX_TOOLS = Object.freeze({
   mocha: {
     flags: ["--reporter=", "-t", "--timeout=", "--grep=", "-g"],
     valueFlags: ["--reporter", "-R"],
-    valueKinds: { "--reporter": "name", "-R": "name" },
+    // Built-ins only: a name mocha does not know is `require()`d from
+    // node_modules and then from the CWD (gate 10, bug.17, executed).
+    valuePatterns: { "--reporter": MOCHA_REPORTERS, "-R": MOCHA_REPORTERS },
     positional: POS.PATHS,
     positionalPattern: /^(?!init$)/,
   },
@@ -1046,16 +1063,15 @@ const NPX_TOOLS = Object.freeze({
       "--shell=",
       "--version",
     ],
-    // Formats, shells and severities are built-in names; a `-f <path>` is an
-    // error to shellcheck, and a name is what the flag means.
+    // Formats, shells and severities are shellcheck's own closed sets.
     valueFlags: ["-S", "--severity", "-f", "--format", "-s", "--shell"],
-    valueKinds: {
-      "-S": "name",
-      "--severity": "name",
-      "-f": "name",
-      "--format": "name",
-      "-s": "name",
-      "--shell": "name",
+    valuePatterns: {
+      "-S": SHELLCHECK_SEVERITIES,
+      "--severity": SHELLCHECK_SEVERITIES,
+      "-f": SHELLCHECK_FORMATS,
+      "--format": SHELLCHECK_FORMATS,
+      "-s": SHELLCHECK_SHELLS,
+      "--shell": SHELLCHECK_SHELLS,
     },
     positional: POS.PATHS,
   },
@@ -1192,8 +1208,11 @@ const UTIL_SPECS = Object.freeze({
     // jq's `env` builtin dumps the verifier's own inherited environment —
     // tokens included — into the measured figure, and needs no path to do it
     // (gate 9, QA-4). `$ENV` is already refused by the `$` rule; the bare word
-    // is refused here unless it is a key (`.env`) or a path segment (`x/env`).
-    positionalPattern: /^(?![\s\S]*(?:^|[^A-Za-z0-9_.\/])env(?![A-Za-z0-9_]))/,
+    // is refused in every positional unless it is a key (`.env`). Gate 9
+    // exempted a `/` before it for path segments, and `/` is half of jq's
+    // `//` operator: `jq -n null//env` printed the environment (gate 10,
+    // bug.18). A file named `env.json` is the price; a filter is not.
+    positionalPattern: /^(?![\s\S]*(?:^|[^A-Za-z0-9_.])env(?![A-Za-z0-9_]))/,
   },
   shellcheck: NPX_TOOLS.shellcheck,
   find: {
