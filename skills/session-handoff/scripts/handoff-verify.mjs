@@ -64,7 +64,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 // ---------------------------------------------------------------------------
@@ -702,6 +702,16 @@ const GH_REPO_VALUE_PATTERNS = Object.freeze({
 // OWNER/NAME, never HOST/OWNER/NAME.
 const GH_POSITIONAL = /^(?!.*\/\/)[A-Za-z0-9._/@#-]+$/;
 const GH_REPO_POSITIONAL = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)?$/;
+// A jq filter — under `jq` and under gh's `--jq`, which gh evaluates with
+// gojq — may not name the `env` builtin unless it is a key (`.env`): it dumps
+// the verifier's inherited environment, tokens included, into the measured
+// figure (gate 9 QA-4, gate 10 bug.18 under jq; gate 13 5c CR-3 under gh).
+// `$ENV` is already refused with every other `$`.
+const JQ_FILTER = /^(?![\s\S]*(?:^|[^A-Za-z0-9_.])env(?![A-Za-z0-9_]))/;
+const GH_JQ_VALUE_PATTERNS = Object.freeze({
+  "--jq": JQ_FILTER,
+  "-q": JQ_FILTER,
+});
 const GH_API_FLAGS = [
   "--jq",
   "--jq=",
@@ -733,7 +743,7 @@ function ghListViewSpec(group, verb) {
   return {
     flags: [...GH_LIST_VIEW_SWITCHES, ...valueFlags.map((f) => `${f}=`)],
     valueFlags,
-    valuePatterns: GH_REPO_VALUE_PATTERNS,
+    valuePatterns: { ...GH_REPO_VALUE_PATTERNS, ...GH_JQ_VALUE_PATTERNS },
     positional: POS.ANY,
     positionalPattern: group === "repo" ? GH_REPO_POSITIONAL : GH_POSITIONAL,
   };
@@ -751,7 +761,12 @@ function ghRule(rest) {
     if (path0.includes("://") || path0.startsWith("//")) return false;
     if (!isSafePositional(path0, POS.PATHS, { allowAbsolute: true }))
       return false;
-    return checkArgs(more, { flags: GH_API_FLAGS, positional: POS.ANY });
+    return checkArgs(more, {
+      flags: GH_API_FLAGS,
+      valueFlags: ["--jq", "-q"],
+      valuePatterns: GH_JQ_VALUE_PATTERNS,
+      positional: POS.ANY,
+    });
   }
   const [verb, ...more] = args;
   if (!["pr", "issue", "repo", "run", "release", "workflow"].includes(group))
@@ -999,6 +1014,10 @@ const NPX_TOOLS = Object.freeze({
   tsc: {
     flags: ["--noEmit", "-p", "--project", "--pretty", "--pretty="],
     positional: POS.PATHS,
+    // tsc reads a `true`/`false` token after a boolean flag as its VALUE:
+    // `--noEmit false <file>` passed as a benign positional and tsc emitted
+    // into the tree (gate 13, 5c CR-1, executed). Neither word is a file.
+    positionalPattern: /^(?!(?:true|false)$)/i,
     requireFlag: ["--noEmit"],
   },
   markdownlint: {
@@ -1060,13 +1079,18 @@ const NPX_TOOLS = Object.freeze({
     requireFlag: ["--run"],
   },
   mocha: {
-    flags: ["--reporter=", "-t", "--timeout=", "--grep=", "-g"],
-    valueFlags: ["--reporter", "-R"],
+    flags: ["--reporter=", "--timeout=", "--grep="],
+    // With no positional, every value flag must consume its value.
+    valueFlags: ["--reporter", "-R", "-t", "--timeout", "-g", "--grep"],
+    patternFlags: ["-t", "--timeout", "-g", "--grep"],
     // Built-ins only: a name mocha does not know is `require()`d from
     // node_modules and then from the CWD (gate 10, bug.17, executed).
     valuePatterns: { "--reporter": MOCHA_REPORTERS, "-R": MOCHA_REPORTERS },
-    positional: POS.PATHS,
-    positionalPattern: /^(?!init$)/,
+    // No positional at all — the node `--test` rule: mocha runs an explicitly
+    // named file whatever its name (gate 13, 5c CR-2; the bug.11 class), and
+    // its own `spec` / .mocharc discovers. A subcommand (`init`) is refused
+    // by the same absence (gate 10, bug.15).
+    positional: POS.NONE,
   },
   shellcheck: {
     flags: [
@@ -1227,7 +1251,7 @@ const UTIL_SPECS = Object.freeze({
     // exempted a `/` before it for path segments, and `/` is half of jq's
     // `//` operator: `jq -n null//env` printed the environment (gate 10,
     // bug.18). A file named `env.json` is the price; a filter is not.
-    positionalPattern: /^(?![\s\S]*(?:^|[^A-Za-z0-9_.])env(?![A-Za-z0-9_]))/,
+    positionalPattern: JQ_FILTER,
   },
   shellcheck: NPX_TOOLS.shellcheck,
   find: {
@@ -1640,6 +1664,18 @@ function firstLines(output, max = 160) {
 export const activeChild = { pid: null };
 
 function killGroup(pid) {
+  if (process.platform === "win32") {
+    // Negative pids are unsupported on Windows; taskkill /T takes the tree
+    // (gate 13, 5c CR-4).
+    try {
+      spawnSync("taskkill", ["/T", "/F", "/PID", String(pid)], {
+        stdio: "ignore",
+      });
+    } catch {
+      /* already gone */
+    }
+    return;
+  }
   try {
     process.kill(-pid, "SIGKILL"); // the group, not the leader alone
   } catch {
@@ -1701,6 +1737,9 @@ export function defaultRunner(argv, { cwd, timeoutMs }) {
     let truncated = false;
     const take = (buf, d) => {
       if (buf.length >= CAP) {
+        // The verdict is fixed at `unverifiable` the moment the cap is hit;
+        // nothing more the child prints can change it (gate 13, 5c CR-6).
+        if (!truncated) killGroup(child.pid);
         truncated = true;
         return buf;
       }

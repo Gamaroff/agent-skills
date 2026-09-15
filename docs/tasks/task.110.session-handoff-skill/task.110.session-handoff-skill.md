@@ -13,6 +13,7 @@ updated: 2026-09-15
 assignee:
 estimated_effort_hours: 8
 github_issue: 407
+pr_number: 408
 ---
 
 # Technical Task: A session-handoff skill that writes the handoff and re-measures it on read
@@ -20,6 +21,7 @@ github_issue: 407
 **Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.110.review.1.session-handoff-skill.md` implemented 2026-09-15
 **GitHub Issue**: [#407](https://github.com/Gamaroff/agent-skills/issues/407)
+**Pull Request**: [#408](https://github.com/Gamaroff/agent-skills/pull/408)
 
 ---
 
@@ -136,6 +138,7 @@ None. New skill; the handoff file format gains structure but stays Markdown a hu
 | `package.json` | test glob `'skills/session-handoff/tests/*.test.js'` |
 | `AGENTS.md` | pointer names read mode and its command |
 | `docs/reference/skill-catalog.md`, `shared/resources/skill-dependencies.json`, `skills/create-skill/references/skill-dependencies.json` | regenerated (128 skills; `generate_catalog.py` gained `session-handoff` under Skill Tooling) |
+| `docs/reference/commands.md`, `docs/reference/activation-phrases.md` | one row each for `/session-handoff` (write / read) |
 | `.agents/handoff.md` | rewritten 2026-09-15 in the new shape by the skill's own write mode; read mode run on it before commit |
 | `CHANGELOG.md` | `[Unreleased]` → Added entry |
 
@@ -219,6 +222,7 @@ remains readable by hand.
 | 2026-09-15 |         | QA gate PASS (95/100) cycle 12 — 0 HIGH, 0 MEDIUM, 2 LOW nits (`x..json` on the eslint config pattern; a stale `.eslintrc` example); cycle-11 refinements verified | qa-task |
 | 2026-09-15 |         | QA findings fixed — `ESLINT_CONFIG` refuses `..` anywhere; `.eslintrc` example replaced by `.markdownlintrc` in the comment and SKILL.md; 31 tests (+2 shapes), 12 iterations | qa-fix |
 | 2026-09-15 |         | QA gate PASS (100/100) cycle 13 — no open finding; bugs 1–18 closed; hands to the PR conformance review | qa-task |
+| 2026-09-15 |         | PR conformance review fixes — `npx tsc --noEmit false` refused (5c CR-1, executed write), mocha takes no positional (CR-2), gh `--jq` held to the jq `env` rule (CR-3), win32 kill fallback and kill-on-cap (CR-4/6), `exit N` figures documented (CR-5); `pr_number: 408` and the Pull Request line added (PC-2), §7 lists the two reference docs (PC-4), CHANGELOG figures refreshed (PC-3); 31 tests (+18 shapes), 13 iterations | qa-fix |
 
 ---
 

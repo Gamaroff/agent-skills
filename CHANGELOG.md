@@ -15,9 +15,11 @@ All notable changes to this project will be documented in this file. Format foll
   command and a timed-out suite are each a stated reason, never a tick. Write mode is a template
   with a fixed section order and half-life labels, and §5 Traps is a pointer to
   `docs/contributing/traps.md`, never content. The parse rule is explicit (first backticked span in
-  the Command cell; `<!-- cmd: …; expect: … -->` on prose), the runner is injectable so the 17 tests
-  never execute a real command, and three mutants (comparator always true, whitelist off, failures
-  swallowed) each turn a named test red. `AGENTS.md` now names read mode as the way to consume the
+  the Command cell; `<!-- cmd: …; expect: … -->` on prose), the runner is injectable so the 31 tests
+  never execute a real command, and every whitelist mechanism is mutation-proven — the allow-list
+  was hardened over thirteen QA cycles (eighteen bugs, all closed): a flag value a tool would load
+  is judged by kind, runnable code is named by identity, reporters are per-tool closed sets, and
+  each hostile spelling QA executed is a refused-list test. `AGENTS.md` now names read mode as the way to consume the
   handoff; the historical 2026-09-10 handoff is kept as an annotated regression fixture.
 
 - **`sync-jira-story`'s skipped-but-transitioned write gate has a run()-level test (task 109).** A

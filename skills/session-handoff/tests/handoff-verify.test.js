@@ -238,7 +238,7 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "git log --grep=/foo",
     "git log --format=%H --date=/x",
     "npx eslint --format=json .",
-    "npx mocha --reporter=spec x.js",
+    "npx mocha --reporter=spec",
     // QA cycle 6 — the per-spec patternFlags path: a leading `/` in a git
     // pretty-format is a pattern under git ONLY. Removing `patternFlags` from
     // GIT_SPECS.log / .show turns these red (gate 6, QA-5).
@@ -305,18 +305,18 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npx markdownlint -c .markdownlint.json -p .markdownlintignore docs",
     "npx markdownlint-cli2 --config=.markdownlint-cli2.jsonc --no-globs docs/x.md",
     "npx jest --ci --reporters=default",
-    "npx mocha -R spec --reporter=dot -t 5000 test",
+    "npx mocha -R spec --reporter=dot -t 5000 --grep=x -g y --timeout=1",
     "npx vitest --run --reporter=dot x.test.ts",
     "npx shellcheck -f gcc -S warning -s bash --shell=sh --severity=error x.sh",
     "shellcheck -f gcc -e SC2034 --exclude=SC1091 -s bash x.sh",
     // QA cycle 9 (bug.15) — a file positional under mocha/vitest stays fine.
-    "npx mocha test",
+    "npx mocha",
     // QA cycle 9 (QA-4) — `env` as a key is not the builtin.
     "jq .env x.json",
     "jq -r .environment x.json",
     // QA cycle 10 (bug.17) — a reporter/formatter is one of its tool's
     // stdout-only built-ins, spaced or joined.
-    "npx mocha -R nyan --reporter=json-stream test",
+    "npx mocha -R nyan --reporter=json-stream",
     "npx vitest --run --reporter=junit --reporter tap-flat x.test.ts",
     "npx jest --reporters=summary --reporters github-actions",
     "npx eslint -f stylish --format=json .",
@@ -326,6 +326,11 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npx prettier --check --config=.prettierrc --ignore-path .gitignore .",
     "npx markdownlint -c .markdownlintrc -p .markdownlintignore docs",
     "npx eslint -c .eslintrc.json --config=.eslintrc.yml .",
+    // 5c (CR-1/CR-3) — tsc file positionals and gh --jq filters still pass.
+    "npx tsc --noEmit src/x.ts",
+    "gh api /user --jq .login",
+    "gh pr list --jq .[0].number -q .[]",
+    "gh api repos/o/r --jq=.name",
     // QA cycle 11 — ESLint 9's core formatters; vitest without `basic`.
     "npx eslint -f json-with-metadata --format=html .",
     "npx vitest --run --reporter=verbose x.test.ts",
@@ -737,6 +742,27 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "npx eslint --format=checkstyle .": /not on whitelist: npx/,
     "npx eslint -f tap .": /not on whitelist: npx/,
     "npx vitest --run --reporter=basic x": /not on whitelist: npx/,
+    // QA cycle 13 / 5c (CR-1) — tsc reads a true/false token after a boolean
+    // flag as its value: `--noEmit false <file>` emitted into the tree
+    // (executed in a consumer-shaped project).
+    "npx tsc --noEmit false": /not on whitelist: npx/,
+    "npx tsc --noEmit false src": /not on whitelist: npx/,
+    "npx tsc --noEmit FALSE": /not on whitelist: npx/,
+    "npx tsc --noEmit true": /not on whitelist: npx/,
+    // 5c (CR-2) — mocha runs an explicitly named file whatever its name
+    // (the bug.11 class): no positional at all, as under `node --test`.
+    "npx mocha skills/loop-supervisor/scripts/run-loop.mjs":
+      /not on whitelist: npx/,
+    "npx mocha test": /not on whitelist: npx/,
+    "npx mocha -t 5000 test": /not on whitelist: npx/,
+    "npx mocha -t": /not on whitelist: npx/,
+    // 5c (CR-3) — gh evaluates --jq with gojq, which has `env` too.
+    "gh api /user --jq env": /not on whitelist: gh/,
+    "gh api /user -q env": /not on whitelist: gh/,
+    "gh api /user --jq=env": /not on whitelist: gh/,
+    "gh pr list --jq env": /not on whitelist: gh/,
+    "gh pr list -q null//env": /not on whitelist: gh/,
+    "gh pr view 1 --jq=[.//env]": /not on whitelist: gh/,
     // QA cycle 12 (QA-1) — a basename containing `..` is refused on eslint too.
     "npx eslint -c x..json .": /not on whitelist: npx/,
     "npx eslint --config=a../x.yml .": /not on whitelist: npx/,
@@ -1316,13 +1342,20 @@ test("runner: output beyond the cap makes the figure unverifiable, never a compa
   const dir = tempDir();
   fs.writeFileSync(
     path.join(dir, "loud.js"),
-    "const s = 'x'.repeat(1024 * 1024); for (let i = 0; i < 40; i++) process.stdout.write(s); process.stdout.write('\\nEND\\n');",
+    // Past the cap, then linger: the runner must not wait for the child once
+    // the verdict is fixed (5c CR-6) — it kills the group at the cap.
+    "const s = 'x'.repeat(1024 * 1024); for (let i = 0; i < 20; i++) process.stdout.write(s); process.stdout.write('\\nEND\\n'); setTimeout(() => {}, 20000);",
   );
+  const t0 = Date.now();
   const r = await mod.defaultRunner([process.execPath, "loud.js"], {
     cwd: dir,
     timeoutMs: 30000,
   });
-  assert.equal(r.status, 0);
+  assert.ok(
+    Date.now() - t0 < 10000,
+    `resolved at the cap, not at exit (${Date.now() - t0} ms)`,
+  );
+  assert.equal(r.status, null, "killed at the cap, not exited");
   assert.equal(r.truncated, true);
   assert.ok(
     r.stdout.length <= 16 * 1024 * 1024 + 1024 * 1024,
