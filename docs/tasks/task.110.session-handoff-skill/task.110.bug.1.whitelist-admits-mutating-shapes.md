@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -89,3 +89,4 @@ corpus's hostile direction is asserted on every run.
 | 2026-09-15 | New | QA Engineer | Found by 56 executed probes + diff review (CR-1, CR-2, CR-5, CR-10) |
 | 2026-09-15 | In Progress | Claude (qa-fix) | Investigation |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Whitelist rewritten per-axis; probe committed as a test |
+| 2026-09-15 | Closed | QA Engineer | Verified in QA cycle 2 (gate 2): shape refused / behaviour proved; corpus 0/73 hostile accepted |

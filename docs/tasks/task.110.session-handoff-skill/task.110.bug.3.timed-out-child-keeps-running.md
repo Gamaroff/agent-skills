@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -59,3 +59,4 @@ directly without the bash wrapper so the killed process is the command itself.
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | CR-6 |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Direct spawn, detached, group kill on timeout |
+| 2026-09-15 | Closed | QA Engineer | Verified in QA cycle 2 (gate 2): shape refused / behaviour proved; corpus 0/73 hostile accepted |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -66,3 +66,4 @@ try/catch the RegExp and surface `unverifiable: bad expect regex`; reset `header
 | --- | --- | --- | --- |
 | 2026-09-15 | New | QA Engineer | CR-3, CR-4, CR-9 |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | Guarded RegExp; blank line ends table; empty cell → no figure |
+| 2026-09-15 | Closed | QA Engineer | Verified in QA cycle 2 (gate 2): shape refused / behaviour proved; corpus 0/73 hostile accepted |

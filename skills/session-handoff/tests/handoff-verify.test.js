@@ -185,6 +185,42 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npx eslint .",
     "gh api repos/x/y/milestones --jq .[0].title",
     "find docs -name x.md",
+    // QA cycle 2 — legitimate shapes the allow-list must keep admitting
+    "git remote",
+    "git remote show origin",
+    "git remote get-url --push origin",
+    "git ls-files -o --exclude-standard",
+    "git rev-parse --short origin/develop",
+    "git status --porcelain",
+    "git log -1 --format=%ci -- src/change-log.js",
+    "git log --oneline -5",
+    "gh api /user",
+    "gh api repos/x/y/issues/1/comments --jq .",
+    "gh pr view 1 --comments",
+    "gh pr checks 1",
+    "gh run list --limit 5",
+    "node --test-reporter=spec --test tests/",
+    "node skills/x.mjs --json --check",
+    "python3 skills/x.py -c 1",
+    "npm run ci:fast",
+    "npm run eval:all",
+    "npm test -- --test-name-pattern=x",
+    "npx prettier .",
+    "npx tsc --noEmit",
+    "npx --no-install prettier --check .",
+    "cat /Users/someone/.claude/projects/x/last-review-date.txt",
+    "grep -c no-transition /abs/file.js",
+    "grep -E 'a|b' file.txt",
+    "jq '.a | .b' x.json",
+    "jq length some/dir/skill-dependencies.json",
+    "date +%s",
+    "date -u",
+    "test -f x",
+    "find docs -type f -name x.md",
+    "wc -l x",
+    "head -1 x",
+    "ls -la docs",
+    "ls 'a;b'",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -251,6 +287,78 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "ls docs/tasks/*.md": /shell expansion/,
     "cat ~/.ssh/id_rsa": /shell expansion/,
     "test -z $JIRA_URL": /shell expansion/,
+    // QA cycle 2 — the refute pass (gate 2, bug.4). Deny-lists could not
+    // enumerate these; the allow-list refuses them by never having heard of them.
+    "git ls-remote --upload-pack=echo .": /not on whitelist: git/,
+    "git ls-remote -u echo .": /not on whitelist: git/,
+    "git remote -v add evil x": /not on whitelist: git/,
+    "git remote --verbose remove origin": /not on whitelist: git/,
+    "git remote -v set-url origin x": /not on whitelist: git/,
+    "git remote prune origin": /not on whitelist: git/,
+    "git branch -v newname": /not on whitelist: git/,
+    "git branch -v --del foo": /not on whitelist: git/,
+    "git branch --del foo": /not on whitelist: git/,
+    "git branch --forc x": /not on whitelist: git/,
+    "git branch --set-upstream-t=origin/main": /not on whitelist: git/,
+    "git branch --unset-upstrea": /not on whitelist: git/,
+    "git tag -l -d v1": /not on whitelist: git/,
+    "git log --ext-diff": /not on whitelist: git/,
+    "git diff --textconv": /not on whitelist: git/,
+    "git log --exec-path": /not on whitelist: git/,
+    "git -c core.pager=x log": /not on whitelist: git/,
+    "git --git-dir=/tmp/x log": /not on whitelist: git/,
+    "git -C /tmp log": /not on whitelist: git/,
+    "git config --get x": /not on whitelist: git/,
+    "git log /abs/path": /not on whitelist: git/,
+    "npm run format --check": /not on whitelist: npm/,
+    "npm run bundle --check": /not on whitelist: npm/,
+    "npm run bundle -- --check --write": /not on whitelist: npm/,
+    "npm run generate-catalog -- --check": /not on whitelist: npm/,
+    "npm run generate-skill-deps -- --check": /not on whitelist: npm/,
+    "npm run lint:fix": /not on whitelist: npm/,
+    "npm run validate:fix": /not on whitelist: npm/,
+    "npm run test:update-snapshots": /not on whitelist: npm/,
+    "npm run format": /not on whitelist: npm/,
+    "npm run build": /not on whitelist: npm/,
+    "npm test --prefix /tmp/x": /not on whitelist: npm/,
+    "npm exec x": /not on whitelist: npm/,
+    "gh api --hostname evil.com repos/x": /not on whitelist: gh/,
+    "gh api repos/x --method GET": /not on whitelist: gh/,
+    "gh api repos/x --input -": /not on whitelist: gh/,
+    "gh api graphql -f query=x": /not on whitelist: gh/,
+    "gh pr view 1 --web": /not on whitelist: gh/,
+    "gh pr create": /not on whitelist: gh/,
+    "npx prettier --write=.": /not on whitelist: npx/,
+    "npx tsc": /not on whitelist: npx/,
+    "npx eslint -o r.txt .": /not on whitelist: npx/,
+    "npx eslint --output-file r.txt .": /not on whitelist: npx/,
+    "npx eslint --cache .": /not on whitelist: npx/,
+    "npx jest --coverage": /not on whitelist: npx/,
+    "npx jest --outputFile=r.json": /not on whitelist: npx/,
+    "npx stylelint -o r.txt x.css": /not on whitelist: npx/,
+    "npx markdownlint -o r.txt x.md": /not on whitelist: npx/,
+    "npx --yes prettier --check .": /not on whitelist: npx/,
+    "node --test-reporter=../../evil.mjs tests/": /not on whitelist: node/,
+    "node --test x/ -r ./pre.js": /not on whitelist: node/,
+    "node --test tests/ --import ./evil.mjs": /not on whitelist: node/,
+    "node --test-reporter=./evil.mjs tests/": /not on whitelist: node/,
+    "node --env-file=.env x.js": /not on whitelist: node/,
+    "node --inspect x.js": /not on whitelist: node/,
+    "python3 -mjson.tool x": /not on whitelist: python3/,
+    "date 0101120026": /not on whitelist: date/,
+    "date --set=now": /not on whitelist: date/,
+    "tail -f x": /not on whitelist: tail/,
+    "find . -fprint0": /not on whitelist: find/,
+    "find . -exec": /not on whitelist: find/,
+    "cat README.md>/tmp/x": /shell operator/,
+    "cat README.md >/tmp/x": /shell operator/,
+    "git log | head": /shell operator/,
+    "ls;": /shell operator/,
+    "ls&&": /shell operator/,
+    "sudo git log": /not on whitelist: sudo/,
+    "env git log": /not on whitelist: env/,
+    "./git log": /not on whitelist: git/,
+    "Git log": /not on whitelist: Git/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);
@@ -280,11 +388,77 @@ test("whitelist: the shell-exec corpus's hostile direction is refused in full (t
   }
 });
 
+test("whitelist: an unknown flag is refused on EVERY binary and git subcommand (the allow-list property)", () => {
+  const probes = [
+    "git log --zz-unknown",
+    "git show --zz-unknown",
+    "git status --zz-unknown",
+    "git rev-parse --zz-unknown",
+    "git describe --zz-unknown",
+    "git ls-files --zz-unknown",
+    "git ls-remote --zz-unknown .",
+    "git diff --zz-unknown",
+    "git rev-list --zz-unknown HEAD",
+    "git cat-file --zz-unknown x",
+    "git blame --zz-unknown x",
+    "git shortlog --zz-unknown",
+    "git branch --zz-unknown",
+    "git tag --zz-unknown",
+    "git remote --zz-unknown",
+    "git remote get-url --zz-unknown origin",
+    "gh pr list --zz-unknown",
+    "gh api repos/x --zz-unknown",
+    "node --zz-unknown x.js",
+    "python3 --zz-unknown x.py",
+    "npm run test --zz-unknown",
+    "npm test --zz-unknown",
+    "npx prettier --zz-unknown .",
+    "npx eslint --zz-unknown .",
+    "grep --zz-unknown x y",
+    "ls --zz-unknown",
+    "wc --zz-unknown x",
+    "cat --zz-unknown x",
+    "head --zz-unknown x",
+    "tail --zz-unknown x",
+    "stat --zz-unknown x",
+    "test --zz-unknown x",
+    "jq --zz-unknown . x",
+    "shellcheck --zz-unknown x.sh",
+    "find . --zz-unknown",
+    "date --zz-unknown",
+    // joined and abbreviated forms of the same
+    "git log --zz=1",
+    "gh api repos/x --zz=1",
+    "npx prettier --zz=1 .",
+    "git branch --lis",
+    "git branch --list=x --del",
+  ];
+  const accepted = probes.filter((p) => mod.isAllowed(p).ok);
+  assert.deepEqual(accepted, [], "an unknown flag was accepted");
+});
+
+test("whitelist: shell operators are judged per token — a quoted pipe is a pattern, a bare one is a pipe (CR-12)", () => {
+  assert.equal(mod.isAllowed("grep -E 'a|b' x").ok, true);
+  assert.equal(mod.isAllowed("jq '.a | .b' x.json").ok, true);
+  assert.equal(mod.isAllowed("git log | head").ok, false);
+  assert.equal(mod.isAllowed("git log |head").ok, false);
+  assert.equal(
+    mod.isAllowed("cat x>y").ok,
+    false,
+    "a glued redirect is still a redirect",
+  );
+  assert.equal(
+    mod.isAllowed("cat 'x>y'").ok,
+    false,
+    "> is refused even quoted — no read-only use",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // verify — every verdict through the injected runner
 // ---------------------------------------------------------------------------
 
-test("verify: confirmed when every figure's tokens appear in the output; stale when one moved", () => {
+test("verify: confirmed when every figure's tokens appear in the output; stale when one moved", async () => {
   const doc =
     TABLE_HEADER +
     "| Frontier | `command node select-next.mjs` | **selected B13** |\n" +
@@ -295,7 +469,7 @@ test("verify: confirmed when every figure's tokens appear in the output; stale w
     },
     "node select-next.mjs --lint": { stdout: '{"errors":0,"warnings":0}' },
   });
-  const r = mod.verify(mod.parseHandoff(doc), { runner });
+  const r = await mod.verify(mod.parseHandoff(doc), { runner });
   assert.equal(r.lines[0].verdict, "stale");
   assert.match(r.lines[0].detail, /selected B13/);
   assert.match(
@@ -309,28 +483,28 @@ test("verify: confirmed when every figure's tokens appear in the output; stale w
   assert.equal(r.exitCode, 0, "stale is information, not failure");
 });
 
-test("verify: token match is whole-token — `b13` is not satisfied by `b130`", () => {
+test("verify: token match is whole-token — `b13` is not satisfied by `b130`", async () => {
   const doc = TABLE_HEADER + "| Frontier | `git status` | **B13** |\n";
-  const r = mod.verify(mod.parseHandoff(doc), {
+  const r = await mod.verify(mod.parseHandoff(doc), {
     runner: stubRunner({ "git status": { stdout: "selected B130" } }),
   });
   assert.equal(r.lines[0].verdict, "stale");
 });
 
-test("verify: an `exit N` figure is compared against the exit code, not the text", () => {
+test("verify: an `exit N` figure is compared against the exit code, not the text", async () => {
   const doc = TABLE_HEADER + "| Suite | `command npm test` | **exit 0** |\n";
-  const ok = mod.verify(mod.parseHandoff(doc), {
+  const ok = await mod.verify(mod.parseHandoff(doc), {
     runner: stubRunner({ "npm test": { status: 0, stdout: "garbage" } }),
   });
   assert.equal(ok.lines[0].verdict, "confirmed");
-  const bad = mod.verify(mod.parseHandoff(doc), {
+  const bad = await mod.verify(mod.parseHandoff(doc), {
     runner: stubRunner({ "npm test": { status: 1, stdout: "exit 0" } }),
   });
   assert.equal(bad.lines[0].verdict, "stale");
   assert.equal(bad.lines[0].measured, "exit 1");
 });
 
-test("verify: every unverifiable detail is reachable, and none of them calls the runner", () => {
+test("verify: every unverifiable detail is reachable, and none of them calls the runner", async () => {
   const doc =
     TABLE_HEADER +
     "| No command | inspect the catalog | 126 rows |\n" +
@@ -348,7 +522,7 @@ test("verify: every unverifiable detail is reachable, and none of them calls the
     if (argv[0] === "git" && argv[1] === "status") throw new Error("ENOENT");
     return runner(argv, o);
   };
-  const r = mod.verify(mod.parseHandoff(doc), {
+  const r = await mod.verify(mod.parseHandoff(doc), {
     runner: throwing,
     timeoutSeconds: 7,
   });
@@ -375,29 +549,29 @@ test("verify: every unverifiable detail is reachable, and none of them calls the
   );
 });
 
-test("verify: unverifiable alongside confirmed is reason=unverifiable with exit 0; stale outranks it", () => {
+test("verify: unverifiable alongside confirmed is reason=unverifiable with exit 0; stale outranks it", async () => {
   const doc =
     TABLE_HEADER + "| A | `git status` | **clean** |\n| B | prose only | x |\n";
-  const r = mod.verify(mod.parseHandoff(doc), {
+  const r = await mod.verify(mod.parseHandoff(doc), {
     runner: stubRunner({ "git status": { stdout: "clean" } }),
   });
   assert.equal(r.reason, "unverifiable");
   assert.equal(r.exitCode, 0);
-  const r2 = mod.verify(mod.parseHandoff(doc), {
+  const r2 = await mod.verify(mod.parseHandoff(doc), {
     runner: stubRunner({ "git status": { stdout: "dirty" } }),
   });
   assert.equal(r2.reason, "stale");
 });
 
-test("verify: an empty document is no-figures, exit 1", () => {
-  const r = mod.verify(mod.parseHandoff("# nothing here\n"), {
+test("verify: an empty document is no-figures, exit 1", async () => {
+  const r = await mod.verify(mod.parseHandoff("# nothing here\n"), {
     runner: stubRunner({}),
   });
   assert.equal(r.reason, "no-figures");
   assert.equal(r.exitCode, 1);
 });
 
-test("parse: a malformed or path-shaped expect: is one unverifiable line, never a throw (CR-3)", () => {
+test("parse: a malformed or path-shaped expect: is one unverifiable line, never a throw (CR-3)", async () => {
   const doc = [
     "path **x** <!-- cmd: git status; expect: /usr/bin/node -->",
     "broken **x** <!-- cmd: git status; expect: /2026-09-(0[8-9]/ -->",
@@ -405,7 +579,7 @@ test("parse: a malformed or path-shaped expect: is one unverifiable line, never 
   ].join("\n");
   const figures = mod.parseHandoff(doc);
   assert.equal(figures.length, 3);
-  const r = mod.verify(figures, {
+  const r = await mod.verify(figures, {
     runner: stubRunner({ "git status": { stdout: "clean" } }),
   });
   assert.equal(r.lines[0].verdict, "unverifiable");
@@ -428,11 +602,11 @@ test("parse: a blank line ends the header table, so a following table is not rea
   assert.equal(figures[0].check, "A");
 });
 
-test("parse: an empty or punctuation-only Result cell is `no figure`, not a figure of nothing (CR-9)", () => {
+test("parse: an empty or punctuation-only Result cell is `no figure`, not a figure of nothing (CR-9)", async () => {
   const doc =
     TABLE_HEADER + "| A | `git status` |  |\n| B | `git status` | — |\n";
   const runner = stubRunner({ "git status": { stdout: "clean" } });
-  const r = mod.verify(mod.parseHandoff(doc), { runner });
+  const r = await mod.verify(mod.parseHandoff(doc), { runner });
   assert.deepEqual(
     r.lines.map((l) => [l.verdict, l.detail]),
     [
@@ -443,9 +617,18 @@ test("parse: an empty or punctuation-only Result cell is `no figure`, not a figu
   assert.deepEqual(runner.calls, [], "nothing to compare → nothing runs");
 });
 
-test("compare: snake_case is not emphasis — probes_executed matches probes_executed (CR-8)", () => {
+test("parse: an empty bold figure on the comment path is `no figure`, as on the table path (CR-10)", async () => {
+  const doc = "Open PRs: **—** <!-- cmd: git status -->\n";
+  const runner = stubRunner({ "git status": { stdout: "clean" } });
+  const r = await mod.verify(mod.parseHandoff(doc), { runner });
+  assert.equal(r.lines[0].verdict, "unverifiable");
+  assert.equal(r.lines[0].detail, "no figure");
+  assert.deepEqual(runner.calls, []);
+});
+
+test("compare: snake_case is not emphasis — probes_executed matches probes_executed (CR-8)", async () => {
   const doc = TABLE_HEADER + "| A | `git status` | **probes_executed** 3 |\n";
-  const r = mod.verify(mod.parseHandoff(doc), {
+  const r = await mod.verify(mod.parseHandoff(doc), {
     runner: stubRunner({
       "git status": { stdout: "probes_executed: 3 verdict_kind: x" },
     }),
@@ -453,7 +636,7 @@ test("compare: snake_case is not emphasis — probes_executed matches probes_exe
   assert.equal(r.lines[0].verdict, "confirmed");
 });
 
-test("verify: grep exit 1 (no match) and test exit 1 (false) are measurements, not failures (CR-11)", () => {
+test("verify: grep exit 1 (no match) and test exit 1 (false) are measurements, not failures (CR-11)", async () => {
   const doc =
     TABLE_HEADER +
     "| Count | `grep -c nope file.txt` | **0** |\n" +
@@ -464,7 +647,7 @@ test("verify: grep exit 1 (no match) and test exit 1 (false) are measurements, n
     "test -f missing": { status: 1 },
     "git status": { status: 1, stdout: "clean" },
   });
-  const r = mod.verify(mod.parseHandoff(doc), { runner });
+  const r = await mod.verify(mod.parseHandoff(doc), { runner });
   assert.equal(r.lines[0].verdict, "confirmed", "grep exit 1 with a 0 count");
   assert.equal(r.lines[1].verdict, "confirmed", "an explicit exit 1 figure");
   assert.equal(
@@ -479,7 +662,7 @@ test("verify: grep exit 1 (no match) and test exit 1 (false) are measurements, n
 // Regression — the 2026-09-10 handoff against the 2026-09-12 measurements
 // ---------------------------------------------------------------------------
 
-test("regression: the 2026-09-10 handoff reads stale on the frontier line and the change-log.js 'touched since' claim", () => {
+test("regression: the 2026-09-10 handoff reads stale on the frontier line and the change-log.js 'touched since' claim", async () => {
   const text = fs.readFileSync(FIXTURE_2026_09_10, "utf8");
   const figures = mod.parseHandoff(text);
   // What the 2026-09-12 session measured (its handoff §1 and §3a), injected so
@@ -508,7 +691,7 @@ test("regression: the 2026-09-10 handoff reads stale on the frontier line and th
       stdout: "All matched files use Prettier code style!",
     },
   });
-  const r = mod.verify(figures, { runner });
+  const r = await mod.verify(figures, { runner });
   const byCheck = Object.fromEntries(r.lines.map((l) => [l.check, l]));
 
   const frontier = r.lines.find((l) => /frontier is not empty/i.test(l.check));
@@ -631,11 +814,62 @@ test("cli: a `command ` prefix is stripped, the argv runs without a shell, and a
   );
 });
 
+test("cli: SIGINT on the verifier kills the running command's process group (CR-7)", async () => {
+  const dir = tempDir();
+  const pidFile = path.join(dir, "child.pid");
+  fs.writeFileSync(
+    path.join(dir, "slow.js"),
+    `const { spawn } = require("child_process");
+     const c = spawn(process.execPath, ["-e", "setTimeout(function(){}, 20000)"], { stdio: "ignore" });
+     require("fs").writeFileSync(${JSON.stringify(pidFile)}, String(c.pid));
+     setTimeout(function(){}, 20000);`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "handoff.md"),
+    TABLE_HEADER + "| Slow | `node slow.js` | **done** |\n",
+  );
+  const { spawn } = require("child_process");
+  const cli = spawn(
+    process.execPath,
+    [SCRIPT, "handoff.md", "--json", "--timeout", "30"],
+    { cwd: dir, stdio: "ignore" },
+  );
+  // Wait for the grandchild to exist, then interrupt the verifier.
+  const deadline = Date.now() + 10000;
+  while (!fs.existsSync(pidFile) && Date.now() < deadline)
+    await new Promise((r) => setTimeout(r, 50));
+  assert.ok(fs.existsSync(pidFile), "the grandchild never started");
+  const grandchild = Number(fs.readFileSync(pidFile, "utf8"));
+  await new Promise((r) => setTimeout(r, 100));
+  cli.kill("SIGINT");
+  const code = await new Promise((r) => cli.on("close", r));
+  assert.equal(code, 130, "the verifier dies by SIGINT (130)");
+  await new Promise((r) => setTimeout(r, 200));
+  let alive = true;
+  try {
+    process.kill(grandchild, 0);
+  } catch {
+    alive = false;
+  }
+  if (alive) {
+    try {
+      process.kill(grandchild, "SIGKILL");
+    } catch {
+      /* raced */
+    }
+  }
+  assert.equal(
+    alive,
+    false,
+    "the grandchild outlived the interrupted verifier",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Write mode — the template
 // ---------------------------------------------------------------------------
 
-test("template: fixed section order, half-life labels, and the traps section is a pointer only", () => {
+test("template: fixed section order, half-life labels, and the traps section is a pointer only", async () => {
   const t = fs.readFileSync(TEMPLATE, "utf8");
   const headings = [...t.matchAll(/^## (.+)$/gm)].map((m) => m[1]);
   const expected = [

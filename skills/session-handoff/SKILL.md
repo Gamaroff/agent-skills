@@ -60,6 +60,7 @@ each is `unverifiable` with its reason, and none of them fails the run.
 | `not on whitelist: <bin>`   | the first token, or a flag on it, is not a read-only shape (see below) — **not executed** |
 | `shell operator`            | the command contains `;` `&&` `\|` `>` `<` `$(` a backtick or a newline — **not executed** |
 | `shell expansion not supported` | a token carries `*`, `~` or `$` — nothing expands without a shell, so it would run literally and diverge from what the author saw — **not executed** |
+| `not on whitelist: <bin>`   | also: a flag the binary's allow-list does not name, an option prefix, a positional where the policy refuses one |
 | `bad expect regex: …`       | an `expect:` written as `/…/` is not a valid regex (a path such as `/usr/bin/node` matches the shape) |
 | `timeout (Ns)`              | exceeded `--timeout` (default 60 s). Expected for `npm test`; the read is a preflight  |
 | `command failed (exit N)`   | non-zero exit on a line whose figure is not an `exit N` figure                         |
@@ -89,34 +90,43 @@ appear verbatim in the output. `**0 failures**` against a runner that prints `0 
 `**not re-run this session**` is prose, matches nothing, and will read `stale` the moment the
 command runs — which is the correct verdict for a figure nobody measured.
 
-### The whitelist
+### The whitelist — per-binary allow-lists
 
-Commands run only through a read-only whitelist, **fail-closed on every axis**: an unknown binary,
-an unknown flag on a binary whose flags are enumerated, a positional where a listing flag is required,
-an inline-code flag on an interpreter — each is `unverifiable`, never run. The `command ` prefix is
-stripped before matching; a path to a binary (`/bin/ls`) is refused. **No shell is involved**, so the
-argv the rule sees is the argv that runs, and there is no quoting to get wrong.
+Commands run only through a read-only whitelist, and the whitelist is an **allow-list per binary**:
+a token that starts with `-` must be in that binary's list — as an exact name, or as `name=value`
+where the entry ends in `=` — and a token that does not must satisfy the binary's positional policy.
+**Unknown ⇒ refused.** That is the whole design: git accepts unambiguous long-option *prefixes*
+(`--del`, `--set-upstream-t=`), npm forwards `--check` to any script, `gh` has joined flag forms,
+and a deny-list would have to enumerate every one of those; an allow-list refuses them by never
+having heard of them. Two QA cycles of deny-list patching produced this (task.110 gates 1 and 2);
+every shape both gates named is a refused-list test, and a property test asserts an unknown flag is
+refused on every binary and every git subcommand.
+
+The `command ` prefix is stripped before matching; a path to a binary (`/bin/ls`) is refused; **no
+shell is involved**, so the argv the rule sees is the argv that runs.
 
 | First token | Allowed shapes |
 | --- | --- |
-| `git` | `log` `show` `status` `rev-parse` `describe` `ls-files` `ls-remote` `diff` `rev-list` `cat-file` `blame` `shortlog` — never with `--output`/`-o`. `branch` and `tag` only in listing form (no positional unless `--list`/`-l`/`--contains`/`--merged`/`--points-at`/… is present; no `-d -D -m -M -c -C -f -a -s`). `remote` only bare, `-v`, `show`, `get-url` |
-| `gh` | `pr` / `issue` / `repo` / `run` / `release` / `workflow` + `list` / `view` / `status` / `checks` / `diff`; `api <path>` with only read-shaping flags (`--jq` `--paginate` `--cache` `--template` `-i` `-H` …) — any `-X`/`--method`/`-f`/`-F`/`--field`/`--input`, joined or not, is refused |
-| `node` | a **relative script path** (no leading `/`, no `..`) after at most known-harmless flags (`--test`, `--test-concurrency=`, `--enable-source-maps`, `--no-warnings` …). `-e` `--eval` `-p` `--print` `-r` `--require` `--import` `--loader` `--input-type` `-` are refused. Scripts in the repo are trusted by convention; the rule stops the handoff itself from carrying code |
-| `python3` | the same shape: a relative script; `-c`, `-m`, `-` refused |
-| `npm` | `test`; `run` of `ci`, `ci:fast`, `eval:*`, `validate:*`, `lint:*`, `format:check`, `bundle:check`, `test:*`; any `run` carrying `--check` (`npm run bundle -- --check`); `ls`, `view` |
-| `npx` | one of `prettier` `eslint` `tsc` `markdownlint` `markdownlint-cli2` `stylelint` `jest` `vitest` `mocha` `shellcheck`, never with `--write`/`-w`/`--fix`/`-u`, never with `-p`/`--package`/`-c`/`-y` |
-| `find` | without `-delete` `-exec` `-execdir` `-ok` `-okdir` `-fprint` `-fprint0` `-fprintf` `-fls` |
-| `date` | without `-s`/`--set` |
-| `shellcheck`, `grep`, `ls`, `wc`, `cat`, `head`, `tail`, `jq`, `stat`, `test` | any |
+| `git` | one subcommand from `log` `show` `status` `rev-parse` `describe` `ls-files` `ls-remote` `diff` `rev-list` `cat-file` `blame` `shortlog` `branch` `tag` `remote`, each with its own flag list (see `GIT_SPECS`). No global options (`-C`, `-c`, `--git-dir`). `branch`/`tag` take a positional only with a list-selecting flag (`--list` `--contains` `--merged` `--points-at` …) — `-v` decorates, it does not select. `remote` only bare, `-v`, `show <name>`, `get-url [--push] <name>`. Positionals are relative refs/paths (no `..`, no leading `/`) |
+| `gh` | `pr` / `issue` / `repo` / `run` / `release` / `workflow` + `list` / `view` / `status` / `checks` / `diff` with list/view flags (`--json` `--jq` `--state` `--limit` …; never `--web`); `api <path>` first, then only read-shaping flags (`--jq` `--paginate` `--cache` `--template` `-i` `-H` …) — no `--hostname`, no method or field flags |
+| `node` | allow-listed leading flags (`--test`, `--test-concurrency=`, `--test-reporter=` **built-in names only**, `--enable-source-maps`, `--no-warnings`, `--max-old-space-size=` …), then a **relative script** (no `/` prefix, no `..`); everything after a script belongs to the script. In `--test` mode there is no script and node keeps parsing its own options, so every later dash token is held to the same list (`node --test x/ -r pre.js` preloads `pre.js` otherwise) |
+| `python3` | `-u -B -O -OO -q -s -E -I -W… -X…`, then a relative script; `-c`, `-m`, `-` refused |
+| `npm` | `test [-- args]`; `run` of exactly `ci` `ci:fast` `format:check` `bundle:check` `validate` `validate:all` `test:platform` `test:tracker-access` `test:bitbucket-auth` or any `eval:*`; `run bundle -- --check` as that exact argv and nothing else; `ls`, `view` |
+| `npx` | one of `prettier` `eslint` `tsc` `markdownlint` `markdownlint-cli2` `stylelint` `jest` `vitest` `mocha` `shellcheck`, each with its own read-only flag list (`tsc` **requires** `--noEmit`; no `-o`, `--coverage`, `--cache`, `--fix`, `--write`); only `--no-install` before the tool |
+| `grep` `ls` `wc` `cat` `head` `tail` `stat` `test` `jq` `find` `shellcheck` | their read-only flags (`tail -f` is not one; `find` has no `-exec`/`-delete`/`-fprint*`); absolute paths are allowed for these plain readers only |
+| `date` | read flags and `+format`; a bare positional sets the clock and is refused |
 
-`npm run generate-catalog`, `npm run generate-skill-deps`, `npm run bundle` (no `--check`), `npx prettier
---write`, `git push`, `git branch -D`, `git tag v1`, `gh pr merge`, `gh api -XPOST`, `node -e`, `rm` —
-refused. The whitelist lives in the script (`WHITELIST`) and its tests, which include every shape
-gate 1 of task.110 found accepted and the `shell-exec` hostile corpus; change all three together.
+Refused by construction: `git push`, `git branch -D`, `git branch --del`, `git tag v1`, `git remote -v add`,
+`git ls-remote --upload-pack=`, `--output=`, `gh pr merge`, `gh api -XPOST`, `gh api --hostname`,
+`node -e`, `node --test x/ -r pre.js`, `python3 -c`, `npm run format --check`, any script not on the exact list (`lint:fix`, `build`, `generate-catalog`),
+`npx prettier --write=.`, `npx tsc` (no `--noEmit`), `find -fprint`, `date 0101120026`, `rm`, `sudo`,
+any `|` `;` `&&` `>` `<` `$(` backtick or newline **as a token** — a quoted `'a|b'` is a pattern.
+The specs live in the script (`GIT_SPECS`, `GH_*_FLAGS`, `NODE_FLAGS`, `NPM_SCRIPTS`, `NPX_TOOLS`,
+`UTIL_SPECS`) and in its tests; change both together.
 
-**Timeout kills the whole process group.** The command is spawned detached; on `--timeout` the
-verifier kills the group, so a ten-minute `npm test` does not keep running after `unverifiable:
-timeout` is reported.
+**Timeout — and interruption — kill the whole process group.** The command is spawned detached and
+asynchronously; on `--timeout`, and on SIGINT/SIGTERM to the verifier, the group is killed, so a
+ten-minute `npm test` does not keep running after `unverifiable: timeout` or after Ctrl-C.
 
 ### `--json`
 
