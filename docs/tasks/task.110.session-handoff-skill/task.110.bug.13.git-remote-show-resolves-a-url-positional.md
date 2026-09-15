@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-13
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer (reviewer CR-1, confirmed by execution)
 **Date Found**: 2026-09-15
 
@@ -60,8 +60,30 @@ Apply `ls-remote`'s `positionalPattern` to `remote show` (and `get-url`, for sym
 `remote show`; refused-list tests for the http, https and scp spellings; allowed test for `git
 remote show origin`.
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-09-15 · **Developer**: Claude (qa-fix, cycle 8)
+
+**Root Cause**: `remote show` positionals were `POS.ANY` while `ls-remote` was anchored against exactly this — git resolves an unconfigured name as a URL alias and queries it.
+
+**Fix**: `remote show` removed from the arm — a deletion: `git remote -v` and `git remote get-url <name>` answer every question a handoff records without a round-trip. `get-url`'s positional is held to the `ls-remote` anchor (`POS.PATHS` + `positionalPattern`), so a URL there is refused too even though `get-url` does not alias.
+
+**Files Modified**:
+- `skills/session-handoff/scripts/handoff-verify.mjs` — `gitRule`: `show` branch removed; `get-url` spec anchored
+- `skills/session-handoff/tests/handoff-verify.test.js` — refused: `remote show origin`, the http, scp and `git@` forms, `get-url https://…`, `get-url git@…`; allowed: `remote get-url origin`, `--push origin`, `--all origin` (the `remote show origin` allowed entry replaced)
+- `skills/session-handoff/SKILL.md` — `git` row and refused list
+
+**Testing**: 30/30. Executed through the fixed verifier with the listener up: the http and scp spellings read `unverifiable: not on whitelist` and the listener received nothing; `git remote get-url origin` read `confirmed`. Mutation-proved: `show` re-admitted → refused list red; `get-url` anchor removed → red.
+
+**Verification Steps for QA**:
+1. `isAllowed("git remote show origin").ok === false`; `isAllowed("git remote get-url origin").ok === true`.
+2. The listener reproduction in this report receives no request through read mode.
+
 ## Status History
 
 | Date       | Status | Changed By  | Notes                                                                                             |
 | ---------- | ------ | ----------- | ------------------------------------------------------------------------------------------------- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 8 — reviewer CR-1; executed: http form reached the listener, scp form invoked ssh        |
+| 2026-09-15 | Ready for QA | Claude (qa-fix) | `remote show` removed; `get-url` name anchored |

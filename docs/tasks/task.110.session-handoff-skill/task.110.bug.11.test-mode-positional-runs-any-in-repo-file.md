@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-11
 **Severity**: HIGH
 **Priority**: P1
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -82,8 +82,31 @@ and `node --test node_modules/prettier/bin/prettier.cjs`; allowed tests for `nod
 skills/x/tests/`, `node --test skills/x/tests/y.test.js` and `npm test -- skills/x/tests/`. Correct
 the code comment that calls test-mode positionals "patterns, not a script".
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-09-15 · **Developer**: Claude (qa-fix, cycle 8 — under the third strike)
+
+**Root Cause**: `interpreterRule` (and `npmTestTailOk`, the same rule through `npm test --`) judged a `--test`-mode positional by its *form* — relative, no `..` — on the belief that test-mode positionals are patterns. To node they are files: an explicitly named file is executed as a test whatever its name, and on node ≥ 22 a directory is not recursed at all (executed during the fix: `node --test scripts/` and `node --test skills/session-handoff/tests/` each fail as one test, running nothing). So the only positional that ever *worked* under current node was an explicit file — the dangerous form — and directories were dead weight.
+
+**Third-strike move — replace the mechanism.** `handoff-verify.mjs` carried a HIGH in gates 6, 7 and 8, each for the same mechanism: admitting a path that reaches an interpreter by its shape (bug.6 `npm test -- /tmp/pre.js`; bug.8 `node node_modules/prettier/bin/prettier.cjs`; bug.11 `node --test <file>`). Each cycle held one more positional to a list. This cycle replaced the rule: **runnable code is named by identity, never by shape** — a path that would be executed is admitted only when an exact-list entry point matches it (`NODE_SCRIPTS` / `PY_SCRIPTS`, which held under gate 8's seven executed spellings), and a path that would be *discovered* is not admitted at all: in `--test` mode there is **no positional**; `node --test` alone is node's own discovery (`*.test.*` patterns, `node_modules` excluded), which is what `npm test` runs. Deleting the artifact was not available (the verifier is the task's deliverable) and waiving was not (a `claude -p` launch from a read is not a tolerable residual). What a handoff loses is `node --test <one file>`; it keeps `node --test`, `npm test`, `--test-name-pattern=` and every listed script.
+
+**Files Modified**:
+- `skills/session-handoff/scripts/handoff-verify.mjs` — `testModeArgsOk` admits flags only; `interpreterRule` refuses a positional in test mode and admits bare `--test` (`return testMode`); the arm's header comment records the three strikes and the replacement
+- `skills/session-handoff/tests/handoff-verify.test.js` — refused: both executed spellings, the `npm test --` forms, `node --test node_modules/prettier/bin/prettier.cjs`, a `*.test.js` file, a directory, `.`, `--experimental-strip-types scripts/x.ts`, bare `--test-only`; allowed: `node --test`, `node --test --test-only`, `--test-reporter=spec --test`, `--test-name-pattern=… --test`, `npm run test -- --test-name-pattern=x`, `npm test -- --test-concurrency=1` (the three directory/file positionals removed from the allowed list)
+- `skills/session-handoff/SKILL.md` — `node` and `npm` rows; refused-by-construction list
+
+**Testing**: 30/30. Executed through the fixed verifier in the scratch clone with the listener up: both gate-8 spellings, `npm test -- skills/loop-supervisor/scripts/run-loop.mjs` and the `next-id` / `remote show` spellings all `unverifiable: not on whitelist`; the deleted `skill-dependencies.json` stayed deleted, no `.claude/state` appeared, no request reached the listener. Mutation-proved: positionals re-admitted in `testModeArgsOk` → refused list red; `interpreterRule` running a test-mode positional → red; bare `--test` refused again → allowed list red.
+
+**Verification Steps for QA**:
+1. `isAllowed("node --test scripts/generate-skill-dependencies.mjs").ok === false`; same for `npm test -- <file>` and `node --test skills/x/tests/y.test.js`.
+2. `isAllowed("node --test").ok === true` and `isAllowed("node --test --test-name-pattern=x").ok === true`.
+3. In a scratch clone, the two gate-8 lines through read mode read `unverifiable`; the tree and `.claude/state` are untouched.
+
 ## Status History
 
 | Date       | Status | Changed By  | Notes                                                                                                                                           |
 | ---------- | ------ | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 8 — executed in a scratch clone: `generate-skill-dependencies.mjs` re-created a deleted tracked file; `run-loop.mjs` spawned two `claude -p` sessions |
+| 2026-09-15 | Ready for QA | Claude (qa-fix) | Third strike: mechanism replaced — no positional in `--test` mode through either arm; runnable code named by identity only |

@@ -5,7 +5,7 @@ type: task
 description: "`.agents/handoff.md` is the 'read this first' file, and it decays within a day — the 2026-09-10 version named T107 as next and 'frontier not empty'; T107 merged the next day and the frontier is empty. Every figure in it already carries the command that produced it, so the read end can re-run them. Build the skill the 2026-09-08 observe-work review proposed: write mode with a fixed section order and a per-figure command, read mode that re-measures and reports confirmed / stale / unverifiable per line. Traps live in docs/contributing/traps.md, not in the handoff."
 tags: [skill, handoff, observe-work, docs]
 category: other
-status: in-progress
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-12
@@ -17,7 +17,7 @@ github_issue: 407
 
 # Technical Task: A session-handoff skill that writes the handoff and re-measures it on read
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.110.review.1.session-handoff-skill.md` implemented 2026-09-15
 **GitHub Issue**: [#407](https://github.com/Gamaroff/agent-skills/issues/407)
 
@@ -209,6 +209,7 @@ remains readable by hand.
 | 2026-09-15 |         | QA gate FAIL (40/100) cycle 7 — 1 HIGH (node/python3 arm runs any in-repo script with any arguments: prettier `--write` via `node_modules/` path executed; repo writers reachable), 3 MEDIUM (`gh -R <host>` and `npm view <url>` egress; `npx` registry install — all executed), 2 LOW; bugs 6–7 closed, bugs 8–10 filed | qa-task |
 | 2026-09-15 |         | QA findings fixed — interpreter script positional is an exact allow-list with per-entry specs (bug.8); gh value flags consume their value, `--repo`/`-R` held to `OWNER/REPO`, list/view positionals anchored, `-w` only under `run list`; npm view/ls bare package names (bug.9); `--no-install` injected into every npx argv, `--no` refused as not-an-alias (bug.10); spec's own policy after `--`; 29 tests (+70 shapes), 7 iterations | qa-fix |
 | 2026-09-15 |         | QA gate FAIL (40/100) cycle 8 — 1 HIGH (`node --test <any in-repo file>` runs it bare: a tracked file re-created and two `claude -p` sessions spawned through read mode, executed), 2 MEDIUM (`observation-log.js next-id` writes; `git remote show <url>` egress incl. ssh — executed), 4 LOW; bugs 8–10 closed, bugs 11–13 filed; third strike on `handoff-verify.mjs` | qa-task |
+| 2026-09-15 |         | QA findings fixed — third strike on `handoff-verify.mjs`: mechanism replaced — runnable code named by identity only, no positional in `--test` mode through either arm (bug.11); `next-id` and `remote show` removed, `get-url` name anchored (bug.12, bug.13); empty `expect:` → `no figure`, short row → `row N`; 30 tests (+31 shapes), 8 iterations | qa-fix |
 
 ---
 
@@ -253,9 +254,9 @@ remains readable by hand.
 - [bug.8 interpreter arm runs any in-repo script including writers](./task.110.bug.8.interpreter-arm-runs-any-in-repo-script-including-writers.md) — ✅ Closed (verified cycle 8)
 - [bug.9 gh and npm reach any host through repo and package specs](./task.110.bug.9.gh-and-npm-reach-any-host-through-repo-and-package-specs.md) — ✅ Closed (verified cycle 8)
 - [bug.10 npx installs a missing tool from the registry](./task.110.bug.10.npx-installs-a-missing-tool-from-the-registry.md) — ✅ Closed (verified cycle 8)
-- [bug.11 test-mode positional runs any in-repo file](./task.110.bug.11.test-mode-positional-runs-any-in-repo-file.md) — 🔴 New (cycle 8) - Priority: P1
-- [bug.12 observation-log next-id is a write](./task.110.bug.12.observation-log-next-id-is-a-write.md) — 🔴 New (cycle 8) - Priority: P2
-- [bug.13 git remote show resolves a URL positional](./task.110.bug.13.git-remote-show-resolves-a-url-positional.md) — 🔴 New (cycle 8) - Priority: P2
+- [bug.11 test-mode positional runs any in-repo file](./task.110.bug.11.test-mode-positional-runs-any-in-repo-file.md) — ✅ Ready for QA (fixed cycle 8) - Priority: P1
+- [bug.12 observation-log next-id is a write](./task.110.bug.12.observation-log-next-id-is-a-write.md) — ✅ Ready for QA (fixed cycle 8) - Priority: P2
+- [bug.13 git remote show resolves a URL positional](./task.110.bug.13.git-remote-show-resolves-a-url-positional.md) — ✅ Ready for QA (fixed cycle 8) - Priority: P2
 
 ### Key Findings
 Cycle 8 (unscoped safety re-probe, 136 probes, 29 executed end-to-end): every cycle-7 fix holds and all eleven mechanisms are mutation-proven; the seventeen spellings gate 7 executed are refused through the CLI with no write and no request; the npx residual is as documented. The bug.8 class is open through the one spelling bug.8 did not hold — a `--test`-mode positional is any relative file and Node runs an explicitly named file as a test regardless of its name, so `node --test scripts/generate-skill-dependencies.mjs` re-created a deleted tracked file and `node --test skills/loop-supervisor/scripts/run-loop.mjs` spawned two `claude -p` sessions from read mode (in a checkout with the skill installed, the autonomous `/develop-next` pipeline). The cycle-7 fix itself admitted `observation-log.js next-id` as a read; it archives resolved entries and writes the id floor at any absolute `--workspace`. `git remote show <url>` queries a document-chosen host (reviewer CR-1; scp form invokes ssh). Third strike on `handoff-verify.mjs`. Cycle 7 (unscoped safety re-probe, 1,377 spellings, 5 executed): the cycle-6 fixes hold and all three mechanisms are mutation-proven; the read-only invariant is open in a fourth arm — `node`/`python3` accept any relative script with any arguments, so an installed binary by path (`node node_modules/prettier/bin/prettier.cjs --write`) rewrote a fixture tree through read mode and the repo's own writers (`registry-tick.js`, `gh-stage.js --stage done`, `generate_catalog.py`) are one spelling away from the `npm run` names cycle 2 refused; `gh <verb> -R <host>/o/r` and `npm view <url-spec>` reach any host; `npx <tool>` installs a missing tool from the registry under the runner's non-TTY conditions. Cycle 6 (narrowed diff + executed boundary probes through every arm reaching the same binaries): the cycle-5 fix holds and is mutation-proven; `npm run format:check -- --write` rewrote a fixture tree and `npm test -- -r /tmp/evil.js` preloaded the file — the npm `--` passthrough forwards any dash token and absolute positional, an arm no cycle probed with an absolute value (cycle 3 tried `-r ./x` and accepted it as relative); `gh api https://…` requests any host (no token sent). Cycle 5 (narrowed): cycle-4 fixes verified; one regression in them — the pattern-flag exemption covers `--reporter`/`--format`, which load JS under npx tools. Cycle 4 (narrowed): PRB-6/7/8 closed; three small defects in those fixes — ls-remote `//host`, cap keeps the head, regex values falsely refused. Cycle 3: the allow-list holds against a third enumeration and every corpus sink; one MEDIUM — joined `name=value` flag values skip the path check (`--config=../evil.js`). Cycle 2: the cycle-1 shapes are closed, but the deny-list mechanism itself fails a fresh enumeration — git option prefixes, `-v` bypasses, `ls-remote --upload-pack`, `npm run <any> --check`, `gh api --hostname`, `--write=.`. Replace with per-binary allow-lists (bug.4). Cycle 1: the read-only whitelist — the risk §10 names — was porous: `gh api -XPOST`, `git branch -D` / `tag` / `remote add` / `--output=`, `node -e`, `npx --write --check`, `find -fprint` are accepted. Parser aborts on a malformed `expect:`; a blank line does not end the header table; a timed-out child is orphaned under bash 3.2.
@@ -272,7 +273,7 @@ Cycle 8 (unscoped safety re-probe, 136 probes, 29 executed end-to-end): every cy
 
 ---
 
-**Status:** In Progress
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.110.session-handoff-skill/task.110.session-handoff-skill.md`

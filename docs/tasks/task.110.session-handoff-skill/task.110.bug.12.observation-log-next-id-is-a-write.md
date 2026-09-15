@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-12
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Ready for QA
 **Found By**: QA Engineer
 **Date Found**: 2026-09-15
 
@@ -66,8 +66,30 @@ for `node …/observation-log.js next-id --workspace /x --json`; correct the SKI
 verb list. While there, note in the row that `families` is admitted with or without `--audit` and
 that both forms are reads (verified: `cmdFamilies` has no writer).
 
+## Developer Fix Cycle
+
+### Iteration 1
+
+**Date**: 2026-09-15 · **Developer**: Claude (qa-fix, cycle 8)
+
+**Root Cause**: the cycle-7 spec listed `next-id` among the observation log's read verbs on the strength of its name; `nextId()` runs the archival sweep and writes the id floor, and `--dry-run` was not admitted. `doctor`, `scan`, `queue` and `families` are the four verbs whose command functions touch no fs writer (checked during the fix).
+
+**Fix**: `next-id` removed from `positionalPattern` — a deletion, not a patch to the struck mechanism; nothing in a handoff needs the next id (`scan`/`queue` carry the counts a handoff records).
+
+**Files Modified**:
+- `skills/session-handoff/scripts/handoff-verify.mjs` — `positionalPattern: /^(doctor|scan|queue|families)$/`; comment names `next-id` as a writer
+- `skills/session-handoff/tests/handoff-verify.test.js` — refused: `next-id --workspace /x --json` and the bare form; allowed: `families --workspace=/x/y --json` (replacing the `next-id` allowed entry) and `families --json` at the shared source
+- `skills/session-handoff/SKILL.md` — `node` row lists the four read verbs and names `next-id` as refused
+
+**Testing**: 30/30. Executed through the fixed verifier: the `next-id --workspace $HOME/.cache/qa110-ws-probe` line read `unverifiable: not on whitelist` and no directory was created. Mutation-proved: `next-id` re-admitted → refused list red.
+
+**Verification Steps for QA**:
+1. `isAllowed("node shared/resources/observation-log.js next-id --json").ok === false`; `queue --json` and `families --audit --json` remain `true`.
+2. The scratch-workspace reproduction in this report produces no files when run through read mode.
+
 ## Status History
 
 | Date       | Status | Changed By  | Notes                                                                                                                                |
 | ---------- | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 2026-09-15 | New    | QA Engineer | QA cycle 8 — executed against a scratch workspace: a fresh tree and an id-floor file created; a resolved entry moved to `archive/` |
+| 2026-09-15 | Ready for QA | Claude (qa-fix) | `next-id` removed from the admitted verbs |

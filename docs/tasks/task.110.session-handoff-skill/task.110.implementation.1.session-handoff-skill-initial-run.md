@@ -263,6 +263,15 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **Loop exit**: n/a — this exit not taken
 **Action**: Escalating — loop not converging (budget spent: 5 cycles + 1 authorised extra)
 
+### QA Cycle 8 — 2026-09-15 (operator-authorised on resume after the second escalation)
+**Gate Result**: FAIL (40/100)
+**Issues Found**: 7 — 1 HIGH (a `--test`-mode positional is any in-repo file and node runs an explicitly named file as a test whatever its name: `node --test scripts/generate-skill-dependencies.mjs` re-created a tracked file and `node --test skills/loop-supervisor/scripts/run-loop.mjs` spawned two `claude -p` sessions through read mode — executed), 2 MEDIUM (`observation-log.js next-id` admitted as a read but archives entries and writes the id floor — executed; `git remote show <url>` queries a document-chosen host, scp form via ssh — reviewer CR-1, executed), 4 LOW (empty `expect:` reads `stale`; short row → `check` undefined; `-X…=…` python cache write; task body status line). Cycle-7 bugs 8–10 verified closed; eleven mechanisms mutation-proven; the seventeen gate-7 spellings re-executed and refused. Reviewer returned at 10m55s (past budget, not killed; block in hand before the gate).
+**HIGH findings**: 1 → **third strike** on `skills/session-handoff/scripts/handoff-verify.mjs` (gates 6, 7, 8 — `high_files()` over the three gates)
+**Fix (qa-fix, under the strike)**: **replace the mechanism** — the struck mechanism was admitting a path that reaches an interpreter by its shape (bug.6 → bug.8 → bug.11, one list per cycle); replaced by "runnable code is named by identity, never by shape": exact-list entry points only, and **no positional at all in `--test` mode** through either arm (`node --test` bare is node's own discovery, as `npm test` is). Deletion was unavailable (the verifier is the deliverable); waiving was unavailable (a `claude -p` launch from a read is not tolerable). bug.12 and bug.13 closed by deletion (`next-id` and `remote show` removed; `get-url` name anchored). QA-4/QA-5 parser fixes. Eight mechanisms mutation-proven red. Executed through the fixed verifier in the scratch clone: every cycle-8 spelling refused, no write, no request. Note for QA: the CR-6 CLI timeout test went red twice in ~15 runs this session under load (3 s window for `npm → sh → node slow.js → grandchild`); green 6/6 alone and in three clean full runs — pre-existing, untouched by the fix.
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: handed back to QA for cycle 9
+
 ---
 
 ## Completion
@@ -271,6 +280,6 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **Final Status**: Escalated (Step 5 — gate 7 FAIL after the authorised extra cycle)
 **Branch**: `feature/task.110.session-handoff-skill`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/408
-**QA Iterations**: 7 (5 in the loop, 1 standalone after the first halt, 1 authorised on resume)
+**QA Iterations**: 8 (5 in the loop, 1 standalone after the first halt, 2 authorised on resume)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}

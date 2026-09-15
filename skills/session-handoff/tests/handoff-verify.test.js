@@ -187,14 +187,14 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "git tag --list v0.4",
     "git remote get-url origin",
     "git remote -v",
-    "node --test skills/x/tests/y.test.js",
+    "node --test",
     "python3 skills/create-skill/scripts/quick_validate.py skills/x",
     "npx eslint .",
     "gh api repos/x/y/milestones --jq .[0].title",
     "find docs -name x.md",
     // QA cycle 2 — legitimate shapes the allow-list must keep admitting
     "git remote",
-    "git remote show origin",
+    "git remote get-url origin",
     "git remote get-url --push origin",
     "git ls-files -o --exclude-standard",
     "git rev-parse --short origin/develop",
@@ -206,7 +206,7 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "gh pr view 1 --comments",
     "gh pr checks 1",
     "gh run list --limit 5",
-    "node --test-reporter=spec --test tests/",
+    "node --test-reporter=spec --test",
     "node skills/develop-next/scripts/select-next.mjs",
     "python3 skills/create-skill/scripts/quick_validate.py skills/session-handoff",
     "npm run ci:fast",
@@ -234,7 +234,7 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "git ls-remote --heads origin refs/heads/main",
     "npm run eval:develop-next",
     // QA cycle 4 — pattern-taking flags may start with `/`
-    "node --test-name-pattern=/select/i --test tests/",
+    "node --test-name-pattern=/select/i --test",
     "git log --grep=/foo",
     "git log --format=%H --date=/x",
     "npx eslint --format=json .",
@@ -248,7 +248,7 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     // QA cycle 6 — `npm test -- …` is held to the node --test-mode rule, so the
     // shapes the node arm allows stay allowed through npm (bug.6).
     "npm run test -- --test-only",
-    "npm test -- skills/x/tests/",
+    "npm test -- --test-concurrency=1",
     "npm test -- --test-reporter=spec",
     "npm run eval:develop-task:smoke",
     "gh api repos/x/y/milestones?per_page=100",
@@ -262,7 +262,7 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     `node .agents/skills/observe-work/${REFS}/observation-log.js doctor --json`,
     `node ${SHARED}/observation-log.js scan --json`,
     `node skills/observe-work/${REFS}/observation-log.js families --audit --json`,
-    `node skills/observe-work/${REFS}/observation-log.js next-id --workspace=/x/y --json`,
+    `node skills/observe-work/${REFS}/observation-log.js families --workspace=/x/y --json`,
     "python3 .agents/skills/create-skill/scripts/quick_validate.py skills/x",
     // QA cycle 7 (bug.9) — a repo is OWNER/REPO; a positional is a number, a
     // branch, a tag, a run id or a workflow file; `-w` names a workflow under
@@ -286,6 +286,14 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     // QA cycle 7 (bug.10) — the natural spelling stays allowed; the argv that
     // runs carries --no-install (asserted below).
     "npx --no-install eslint .",
+    // QA cycle 8 (bug.11) — the interpreter arms take no path positional:
+    // `--test` alone is node's own discovery, and the listed entry points
+    // are matched by identity. `families` is a read with or without --audit.
+    "node --test",
+    "node --test --test-only",
+    "npm run test -- --test-name-pattern=x",
+    `node ${SHARED}/observation-log.js families --json`,
+    "git remote get-url --all origin",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -569,6 +577,43 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
       /not on whitelist: git/,
     "git log -- /etc/hosts": /not on whitelist: git/,
     "git log -- ../x": /not on whitelist: git/,
+    // QA cycle 8 (bug.11) — node runs an explicitly named file as a test
+    // whatever its name, so a `--test`-mode positional was any in-repo file
+    // run bare: `generate-skill-dependencies.mjs` re-created a tracked file
+    // and `run-loop.mjs` (default subcommand `run`) spawned two `claude -p`
+    // sessions through read mode (executed). The third strike replaced the
+    // rule: no positional in test mode, through either arm.
+    "node --test scripts/generate-skill-dependencies.mjs":
+      /not on whitelist: node/,
+    "node --test skills/loop-supervisor/scripts/run-loop.mjs":
+      /not on whitelist: node/,
+    "npm test -- scripts/generate-skill-dependencies.mjs":
+      /not on whitelist: npm/,
+    "npm run test -- skills/loop-supervisor/scripts/run-loop.mjs":
+      /not on whitelist: npm/,
+    "node --test node_modules/prettier/bin/prettier.cjs":
+      /not on whitelist: node/,
+    "node --test skills/x/tests/y.test.js": /not on whitelist: node/,
+    "node --test skills/x/tests/": /not on whitelist: node/,
+    "node --test .": /not on whitelist: node/,
+    "node --test --experimental-strip-types scripts/x.ts":
+      /not on whitelist: node/,
+    "node --test-only": /not on whitelist: node/,
+    // QA cycle 8 (bug.12) — `next-id` archives resolved entries and writes
+    // the id floor; it is not a read.
+    [`node skills/observe-work/${REFS}/observation-log.js next-id --workspace /x --json`]:
+      /not on whitelist: node/,
+    [`node ${SHARED}/observation-log.js next-id --json`]:
+      /not on whitelist: node/,
+    // QA cycle 8 (bug.13) — an unconfigured `remote show` name is a URL
+    // alias git queries (executed: http form reached a listener, scp form
+    // invoked ssh). `remote show` is gone; `get-url` takes a NAME.
+    "git remote show origin": /not on whitelist: git/,
+    "git remote show http://127.0.0.1:8099/x.git": /not on whitelist: git/,
+    "git remote show 127.0.0.1:8099/x.git": /not on whitelist: git/,
+    "git remote show git@evil.example:x.git": /not on whitelist: git/,
+    "git remote get-url https://evil.example/x.git": /not on whitelist: git/,
+    "git remote get-url git@evil.example:x.git": /not on whitelist: git/,
   };
   for (const [cmd, why] of Object.entries(refused)) {
     const r = mod.isAllowed(cmd);
@@ -866,6 +911,23 @@ test("parse: an empty bold figure on the comment path is `no figure`, as on the 
   assert.equal(r.lines[0].verdict, "unverifiable");
   assert.equal(r.lines[0].detail, "no figure");
   assert.deepEqual(runner.calls, []);
+});
+
+test("parse: an empty `expect:` is `no figure`, and a row shorter than its header is named by row (gate 8, QA-4/QA-5)", async () => {
+  // An empty expect: used to parse as figures [""] — past the no-figure
+  // guard, and a "" that every output fails to contain, so `stale: moved:`.
+  const doc = "Tip: <!-- cmd: git status; expect:  -->\n";
+  const runner = stubRunner({ "git status": { stdout: "clean" } });
+  const r = await mod.verify(mod.parseHandoff(doc), { runner });
+  assert.equal(r.lines[0].verdict, "unverifiable");
+  assert.equal(r.lines[0].detail, "no figure");
+  assert.deepEqual(runner.calls, []);
+  // Check column last, row with one cell: no check cell exists.
+  const short = mod.parseHandoff(
+    "| Command | Result | Check |\n|---|---|---|\n| `git status` |\n",
+  );
+  assert.equal(short[0].check, "row 3");
+  assert.equal(short[0].command, "git status");
 });
 
 test("compare: snake_case is not emphasis — probes_executed matches probes_executed (CR-8)", async () => {

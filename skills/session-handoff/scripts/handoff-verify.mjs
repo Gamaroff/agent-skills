@@ -550,11 +550,17 @@ function gitRule(rest) {
     if (rem.length === 0)
       return args.every((a) => a === "-v" || a === "--verbose");
     const [verb, ...more] = rem;
-    if (verb === "show") return more.every((a) => isSafePositional(a, POS.ANY));
+    // `get-url <name>` only. `remote show <name>` is gone: git resolves an
+    // unconfigured name as a URL alias and QUERIES it — `git remote show
+    // http://127.0.0.1:8099/x.git` reached a local listener and the scp form
+    // invoked the reader's ssh (gate 8, bug.13) — and `remote -v` plus
+    // `get-url` answer a handoff without a round-trip. The name is held to
+    // the `ls-remote` anchor for the same reason that anchor exists.
     if (verb === "get-url")
       return checkArgs(more, {
         flags: ["--push", "--all"],
-        positional: POS.ANY,
+        positional: POS.PATHS,
+        positionalPattern: GIT_SPECS["ls-remote"].positionalPattern,
       });
     return false;
   }
@@ -688,14 +694,26 @@ function ghRule(rest) {
 }
 
 // --- interpreters ----------------------------------------------------------
-// Flags before the script are allow-listed; the script is one of an EXACT
-// list of read-only in-repo entry points, and what follows it is held to
-// that entry point's own spec. Until gate 7 any relative script passed and
-// everything after it was passed through — the NPM_SCRIPTS discipline applied
-// to npm and not to node — so `node node_modules/prettier/bin/prettier.cjs
-// --write x` rewrote a file through read mode, and the repo's own writers
-// (registry-tick.js, gh-stage.js, tracker-comment.js, generate_catalog.py)
-// were one spelling away from the `npm run` forms that refuse them (bug.8).
+// An interpreter arm names runnable code by IDENTITY, never by shape. Flags
+// before the script are allow-listed; the script is one of an EXACT list of
+// read-only in-repo entry points, and what follows it is held to that entry
+// point's own spec. In `--test` mode there is NO positional at all: node's
+// own discovery (the `*.test.*` patterns, node_modules excluded) picks the
+// files, exactly as `npm test` does.
+//
+// Three gates said the same thing about the previous mechanism, which judged
+// a path by its FORM (relative, no `..`) and let it reach the interpreter:
+// gate 6 — `npm test -- /tmp/pre.js` preloaded a file (bug.6); gate 7 —
+// `node node_modules/prettier/bin/prettier.cjs --write x` rewrote a file
+// (bug.8); gate 8 — `node --test skills/loop-supervisor/scripts/run-loop.mjs`
+// ran the supervisor bare and spawned two `claude -p` sessions from read
+// mode, because node executes an explicitly named file as a test whatever
+// its name (bug.11). Each cycle held one more positional to a list; the
+// third strike replaced the rule instead: a path that would be EXECUTED is
+// admitted only when a listed entry point matches it exactly, and a path
+// that would be DISCOVERED is not admitted at all — node discovers on its
+// own. What a handoff loses is `node --test <one file>`; what it keeps is
+// `node --test`, `npm test`, `--test-name-pattern=` and every listed script.
 //
 // Each entry names the script by the locations it is installed at — this
 // repository's `skills/<skill>/…` and a consumer's `.agents/skills/<skill>/…`
@@ -712,15 +730,16 @@ function makeFlagOk(safeFlags, safePattern) {
     flagTokenOk(a, { flags, withValue, flagPattern: safePattern, spec: {} });
 }
 /**
- * The `--test`-mode rule: no script, so every dash token is the
- * interpreter's own and is held to its allow-list; positionals are relative
- * patterns. One function, used by the `node` arm AND by `npm test -- …`,
- * whose tail is exactly this argv (gate 6, bug.6).
+ * The `--test`-mode rule: no script and NO positional, so every token is a
+ * dash token that is the interpreter's own and is held to its allow-list.
+ * One function, used by the `node` arm AND by `npm test -- …`, whose tail
+ * is exactly this argv (gate 6, bug.6). A positional here would be a file
+ * node runs as a test regardless of its name (gate 8, bug.11) — or, on
+ * node ≥ 22, a directory it fails on — so none is admitted; discovery is
+ * node's job.
  */
 function testModeArgsOk(tokens, flagOk) {
-  return tokens.every((t) =>
-    t.startsWith("-") ? flagOk(t) : isSafePositional(t, POS.PATHS),
-  );
+  return tokens.every((t) => t.startsWith("-") && flagOk(t));
 }
 const SKILL_ROOT = "(?:\\.agents/)?skills/";
 const ENGINE_COPY = `(?:${SKILL_ROOT}[A-Za-z0-9._-]+/references|shared/resources)/`;
@@ -737,16 +756,19 @@ const NODE_SCRIPTS = Object.freeze([
     },
   },
   {
-    // The observation log's READ verbs only. `write`, `init`, `set-status`,
-    // `archive` and `checkpoint` all write the log; the workspace lives
-    // outside the repo, so `--workspace` may be absolute.
+    // The observation log's READ verbs only — the four whose command
+    // functions touch no fs writer. `write`, `init`, `set-status`, `archive`
+    // and `checkpoint` write the log; so does `next-id`, which runs the
+    // archival sweep and writes the id floor (gate 8, bug.12 — it created a
+    // tree at a fresh --workspace and moved a resolved entry). The workspace
+    // lives outside the repo, so `--workspace` may be absolute.
     path: scriptAt(`${ENGINE_COPY}observation-log\\.js`),
     spec: {
       flags: ["--json", "--quiet", "--audit", "--workspace=", "--audit-root="],
       valueFlags: ["--workspace", "--audit-root"],
       allowAbsolute: true,
       positional: POS.ANY,
-      positionalPattern: /^(doctor|scan|queue|next-id|families)$/,
+      positionalPattern: /^(doctor|scan|queue|families)$/,
     },
   },
 ]);
@@ -768,20 +790,19 @@ function interpreterRule(safeFlags, safePattern, scripts, testModeFlag) {
         if (testModeFlag && a === testModeFlag) testMode = true;
         continue;
       }
+      // In test mode a positional is a file node would RUN as a test (or a
+      // directory it fails on) — never a pattern — so there is none.
+      if (testMode) return false;
       if (!isSafePositional(a, POS.PATHS)) return false;
-      const after = rest.slice(i + 1);
-      // In test mode the positionals are patterns, not a script, and node
-      // keeps parsing ITS OWN options after them — `node --test x/ -r pre.js`
-      // preloads pre.js (found by the cycle-2 re-probe). So every later dash
-      // token is held to the same allow-list.
-      if (testMode) return testModeArgsOk(after, flagOk);
       // A real script: node stops parsing at it and the rest is the script's,
       // so the rest is held to THAT script's spec — and only a listed script
       // has one.
       const entry = scripts.find((e) => e.path.test(a));
-      return entry ? checkArgs(after, entry.spec) : false;
+      return entry ? checkArgs(rest.slice(i + 1), entry.spec) : false;
     }
-    return false; // no script: REPL / stdin
+    // No script: `--test` alone is node's own discovery and is a read;
+    // anything else is the REPL / stdin.
+    return testMode;
   };
 }
 const NODE_FLAGS = [
@@ -1327,8 +1348,12 @@ export function parseHandoff(text) {
         continue;
       }
       if (headerCols && sawHeaderSeparator) {
+        // A row shorter than its header has no check cell; name it by row,
+        // as when the column is absent (gate 8).
         const check =
-          headerCols.check >= 0 ? cells[headerCols.check] : `row ${i + 1}`;
+          headerCols.check >= 0 && cells[headerCols.check] !== undefined
+            ? cells[headerCols.check]
+            : `row ${i + 1}`;
         const cmdCell = cells[headerCols.command] ?? "";
         const resCell = cells[headerCols.result] ?? "";
         const command = firstBacktick(cmdCell);
@@ -1369,7 +1394,9 @@ export function parseHandoff(text) {
       const prose = raw.replace(CMD_COMMENT, "").trim();
       let figures;
       if (expect !== null) {
-        figures = [parseExpect(expect)];
+        // An empty `expect:` is `no figure`, as an empty Result cell is —
+        // not a figure of "" that every output fails to contain (gate 8).
+        figures = expect === "" ? [] : [parseExpect(expect)];
       } else {
         figures = boldSpans(prose).filter((f) => normalise(f) !== "");
       }
