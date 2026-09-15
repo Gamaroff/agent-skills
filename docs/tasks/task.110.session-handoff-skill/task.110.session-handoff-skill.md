@@ -232,6 +232,7 @@ remains readable by hand.
 | 2026-09-15 |         | QA gate PASS (90/100) cycle 17 — no HIGH, no MEDIUM; bug.23 closed (bugs 1–23 all closed); 2 LOW (jest/vitest `-t` value-taking but declared bare — no bypass; `-p ./tsconfig.json` refused because `DATA_FILE` admits no leading `./`) | qa-task |
 | 2026-09-15 |         | QA findings fixed — jest/vitest `-t` declared as pattern value flags (QA-1); `DATA_FILE` admits an optional leading `./` (QA-2); 33 tests (+10 shapes), 17 iterations | qa-fix |
 | 2026-09-15 |         | QA gate PASS (95/100) cycle 18 — no HIGH, no MEDIUM; gate-17 refinements verified and mutation-proven; bugs 1–23 closed; 1 LOW (`ESLINT_CONFIG` lacks the `./` prefix `DATA_FILE` has) | qa-task |
+| 2026-09-15 |         | QA finding fixed — `ESLINT_CONFIG` admits the same optional leading `./` as `DATA_FILE` (QA-1); 33 tests (+5 shapes), 18 iterations | qa-fix |
 
 ---
 

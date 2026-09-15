@@ -390,6 +390,7 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **PR Review**: not reached — an open LOW entry routes to qa-fix first
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 18)
+**Fix (qa-fix)**: `ESLINT_CONFIG` given the same optional leading `./` as `DATA_FILE` (QA-1); two mutation proofs red; handed back to QA for cycle 19
 
 ---
 

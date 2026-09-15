@@ -248,8 +248,9 @@ const ESLINT_FORMATS = /^(stylish|json|json-with-metadata|html)$/;
 // JavaScript (gate 11, QA-1).
 // `..` refused anywhere, as the data kind does — valuePatterns is a full
 // answer, so the shared guard never runs for it (gate 12, QA-1).
+// The same optional leading `./` as DATA_FILE (gate 18, QA-1).
 const ESLINT_CONFIG =
-  /^(?!.*\.\.)(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|yaml|yml)$/;
+  /^(?!.*\.\.)(?:\.\/)?(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|yaml|yml)$/;
 const STYLELINT_FORMATTERS = /^(string|compact|github|json|tap|unix|verbose)$/;
 // `basic` is gone in Vitest 4, where an unknown name is a module load.
 const VITEST_REPORTERS =
