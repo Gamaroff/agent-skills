@@ -5,11 +5,12 @@ type: task
 description: "`.agents/handoff.md` is the 'read this first' file, and it decays within a day — the 2026-09-10 version named T107 as next and 'frontier not empty'; T107 merged the next day and the frontier is empty. Every figure in it already carries the command that produced it, so the read end can re-run them. Build the skill the 2026-09-08 observe-work review proposed: write mode with a fixed section order and a per-figure command, read mode that re-measures and reports confirmed / stale / unverifiable per line. Traps live in docs/contributing/traps.md, not in the handoff."
 tags: [skill, handoff, observe-work, docs]
 category: other
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-12
-updated: 2026-09-15
+updated: 2026-09-16
+completed_date: 2026-09-16
 assignee:
 estimated_effort_hours: 8
 github_issue: 407
@@ -18,7 +19,7 @@ pr_number: 408
 
 # Technical Task: A session-handoff skill that writes the handoff and re-measures it on read
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.110.review.1.session-handoff-skill.md` implemented 2026-09-15
 **GitHub Issue**: [#407](https://github.com/Gamaroff/agent-skills/issues/407)
 **Pull Request**: [#408](https://github.com/Gamaroff/agent-skills/pull/408)
@@ -234,6 +235,8 @@ remains readable by hand.
 | 2026-09-15 |         | QA gate PASS (95/100) cycle 18 — no HIGH, no MEDIUM; gate-17 refinements verified and mutation-proven; bugs 1–23 closed; 1 LOW (`ESLINT_CONFIG` lacks the `./` prefix `DATA_FILE` has) | qa-task |
 | 2026-09-15 |         | QA finding fixed — `ESLINT_CONFIG` admits the same optional leading `./` as `DATA_FILE` (QA-1); 33 tests (+5 shapes), 18 iterations | qa-fix |
 | 2026-09-15 |         | QA gate PASS (100/100) cycle 19 — no finding of any severity; the cycle-18 fix verified and mutation-proven; bugs 1–23 closed; queue empty → 5c | qa-task |
+| 2026-09-15 |         | 5c review 2 CONCERNS (non-blocking) — implementation report, NFR line, CHANGELOG and the handoff's remote figure brought into line; four LOW code findings recorded for follow-up | review-pr |
+| 2026-09-16 | 1.2     | DoD passed — accepted (PR #408) | finalise |
 
 ---
 
@@ -297,6 +300,40 @@ Cycle 19 (default narrowed scope): the cycle-18 fix holds and is mutation-proven
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.110.qa.19.session-handoff-skill.md` (cycles 1–19)
+**Gate File**: `task.110.gate.19.session-handoff-skill.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: `task.110.pr-review.2.session-handoff-skill.md` — CONCERNS, non-blocking (`pr-review.1` REQUEST CHANGES, all findings fixed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** All 6 met — each traced to code in the PR and to a test or CI lane that runs per-PR (`test.yml`, `validate.yml`)
+✅ **Tests:** 33 tests in `skills/session-handoff/tests/handoff-verify.test.js` under `npm test`; full hermetic suite green; every whitelist mechanism mutation-proven across 19 QA cycles
+✅ **PR Review:** PR #408 (`feature/task.110.session-handoff-skill` → `develop`); no human reviewer on this repository — Step 5c `/review-pr` twice (REQUEST CHANGES → fixed → CONCERNS, non-blocking); recorded as unverified by human review
+✅ **CI:** reading 1 SUCCESS @ `364a706bed5d` (branch-policy, link-check, shellcheck, test, validate); reading 2 on the acceptance head recorded on the PR canonical comment and in the implementation report
+✅ **Documentation:** `SKILL.md`, `CHANGELOG.md` (task 110), skill catalog, skill dependencies, `commands.md`, `activation-phrases.md`, `AGENTS.md` pointer, `.agents/handoff.md` rewritten in the fixed section order
+✅ **Security Review:** ✅ PASS — the read-only whitelist is a boundary deliverable: 85 candidates executed against `isAllowed` (corpus `shell-exec` / `path` / `url-authority` + 31 boundary-specific), every hostile, mutating, egress, shell-expansion and code-load candidate refused, every whitelisted read-only command admitted; one documented residual (absolute paths for the plain readers, `SKILL.md:119`)
+✅ **Compliance Review:** ⚠️ NOT_APPLICABLE — no personal, payment, UI or health data
+✅ **Performance / Reliability / Maintainability:** ✅ PASS (gate 19)
+
+**Deployment Readiness:**
+
+- Staging: ✅ APPROVED
+- Production: ✅ APPROVED (gate 19)
+
+**Recorded follow-ups (none blocking):** `pr-review.2` CR-1 (mid-token `~` refused), CR-3 (a table row carrying a trailing comment ends the table), CR-4/CR-5 (two cleanups); scrubbed child environment and quoted-glob tokenising (future work since gate 8); README skills badge 126 → 128 (pre-existing drift).
+
+**Task marked as ACCEPTED on:** 2026-09-16
+
+**Detailed Verification Log:** See `task.110.dod.1.session-handoff-skill.md` for complete verification evidence and timestamps.
+
 ## References
 
 - **Plan**: [`task.110.plan.session-handoff-skill.md`](task.110.plan.session-handoff-skill.md)
@@ -307,7 +344,7 @@ Cycle 19 (default narrowed scope): the cycle-18 fix holds and is mutation-proven
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.110.session-handoff-skill/task.110.session-handoff-skill.md`
