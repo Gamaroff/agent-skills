@@ -737,6 +737,9 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     "npx eslint --format=checkstyle .": /not on whitelist: npx/,
     "npx eslint -f tap .": /not on whitelist: npx/,
     "npx vitest --run --reporter=basic x": /not on whitelist: npx/,
+    // QA cycle 12 (QA-1) — a basename containing `..` is refused on eslint too.
+    "npx eslint -c x..json .": /not on whitelist: npx/,
+    "npx eslint --config=a../x.yml .": /not on whitelist: npx/,
     "npx prettier --check --config=.js .": /not on whitelist: npx/,
     "npx prettier --check --config=.mjs .": /not on whitelist: npx/,
     "npx prettier --check --config=x..json .": /not on whitelist: npx/,

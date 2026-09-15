@@ -199,7 +199,7 @@ const PATTERN_FLAGS = new Set([
  *
  *   data  a file the tool PARSES — `.json` `.jsonc` `.json5` `.yaml` `.yml`
  *         `.toml`, or a dotfile named `.<tool>rc` / `.<tool>ignore`
- *         (`.prettierrc`, `.eslintrc`, `.prettierignore`) — at a relative
+ *         (`.prettierrc`, `.markdownlintrc`, `.prettierignore`) — at a relative
  *         path, no `..` anywhere. `.prettierrc.js` is not one: its extension
  *         is `.js`; `.env` is not one either (gate 10, QA-3: eslint 9 imports
  *         whatever `-c` names, so the dotfile set is the tools' own config
@@ -234,8 +234,10 @@ const ESLINT_FORMATS = /^(stylish|json|json-with-metadata|html)$/;
 // rejects a data file without executing it. So eslint's config is data by
 // EXTENSION only — no dotfile alternative, which Node would parse as
 // JavaScript (gate 11, QA-1).
+// `..` refused anywhere, as the data kind does — valuePatterns is a full
+// answer, so the shared guard never runs for it (gate 12, QA-1).
 const ESLINT_CONFIG =
-  /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|yaml|yml)$/;
+  /^(?!.*\.\.)(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|yaml|yml)$/;
 const STYLELINT_FORMATTERS = /^(string|compact|github|json|tap|unix|verbose)$/;
 const JEST_REPORTERS = /^(default|summary|github-actions)$/;
 // `basic` is gone in Vitest 4, where an unknown name is a module load.
