@@ -319,13 +319,16 @@ test("whitelist: read-only shapes pass; the `command ` prefix is stripped", () =
     "npx mocha -R nyan --reporter=json-stream test",
     "npx vitest --run --reporter=junit --reporter tap-flat x.test.ts",
     "npx jest --reporters=summary --reporters github-actions",
-    "npx eslint -f unix --format=checkstyle .",
+    "npx eslint -f stylish --format=json .",
     "npx stylelint --formatter verbose src",
     "npx shellcheck -f json1 -s dash -S style --format=tty --shell=ksh --severity=info x.sh",
     // QA cycle 10 (QA-3) — the data dotfiles are the tools' rc/ignore names.
     "npx prettier --check --config=.prettierrc --ignore-path .gitignore .",
     "npx markdownlint -c .markdownlintrc -p .markdownlintignore docs",
-    "npx eslint -c .eslintrc --config=.eslintrc.json .",
+    "npx eslint -c .eslintrc.json --config=.eslintrc.yml .",
+    // QA cycle 11 — ESLint 9's core formatters; vitest without `basic`.
+    "npx eslint -f json-with-metadata --format=html .",
+    "npx vitest --run --reporter=verbose x.test.ts",
   ]) {
     const r = mod.isAllowed(cmd);
     assert.equal(r.ok, true, `${cmd} should be allowed: ${r.detail}`);
@@ -723,6 +726,17 @@ test("whitelist: mutating shapes, unknown binaries and shell operators are refus
     // QA cycle 10 (QA-3/QA-4) — a data dotfile is a `*rc` / `*ignore` name;
     // `..` is refused anywhere in the value.
     "npx eslint -c .env .": /not on whitelist: npx/,
+    // QA cycle 11 (QA-1..3) — eslint's config is data by extension only (Node
+    // parses an extensionless dotfile as JavaScript and ESLint 9 import()s
+    // whatever -c names); ESLint 8's removed formatters resolve to a package
+    // first; vitest `basic` is gone in Vitest 4.
+    "npx eslint -c .zzrc .": /not on whitelist: npx/,
+    "npx eslint -c .eslintrc .": /not on whitelist: npx/,
+    "npx eslint --config=.gitignore .": /not on whitelist: npx/,
+    "npx eslint -f compact .": /not on whitelist: npx/,
+    "npx eslint --format=checkstyle .": /not on whitelist: npx/,
+    "npx eslint -f tap .": /not on whitelist: npx/,
+    "npx vitest --run --reporter=basic x": /not on whitelist: npx/,
     "npx prettier --check --config=.js .": /not on whitelist: npx/,
     "npx prettier --check --config=.mjs .": /not on whitelist: npx/,
     "npx prettier --check --config=x..json .": /not on whitelist: npx/,

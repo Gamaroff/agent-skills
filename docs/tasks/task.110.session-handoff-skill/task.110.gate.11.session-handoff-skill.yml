@@ -1,0 +1,95 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: CONCERNS
+status_reason: 'Cycle-10 fixes verified (bug.17, bug.18 closed; all nine cycle-10 mechanisms mutation-proven covered; every cycle-9/10 and gate-6/7/8 spelling re-executed through the clone''s own verifier at e4d0a8a9 — all refused, no write, no request). Bugs 1–18 all closed; no HIGH, no MEDIUM. Scope: default narrowed (gate 10 security CONCERNS/measured — the carve-out does not fire) plus QA''s own re-run of the 3,653 prior spellings. Three LOW residues in the closed sets, none executed: eslint''s `-c` admits any `.<x>rc` dotfile and ESLint 9 import()s whatever `-c` names (reviewer CR-1; a dotfile with JS content would run — none is tracked here, and ESLint 9 rejects every data config, so the per-tool answer is "eslint config = json/jsonc/yaml only"); ESLINT_FORMATS carries seven names ESLint 9 removed from core, which now resolve to an installed `eslint-formatter-<name>` package first (CR-2); VITEST_REPORTERS carries `basic`, removed in Vitest 4, where an unknown name is a module load (CR-3). Maintainability CONCERNS: the NPX_TOOLS header still says a reporter is `name` (CR-4) and two PATTERN_FLAGS entries are dead (CR-5). Rule 4 → CONCERNS with an open queue → qa-fix once more; the loop is converging.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T17:05:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-1 (rated high/medium; held at low — not executed, no tracked dotfile with JS content exists, and the content is repository data): the DATA_FILE dotfile alternative `.[a-z0-9-]+(rc|ignore)` is shared by every tool, so `npx eslint -c .zzrc .` and `-c .gitignore .` are admitted, and ESLint 9 import()s whatever `-c` names — Node parses an extensionless file as JavaScript (verified: import of .prettierrc fails with a JS SyntaxError, not an unknown-extension error). ESLint 9 accepts no data config at all (a .json import is ERR_UNKNOWN_FILE_EXTENSION), so the dotfile alternative buys eslint nothing and admits one shape too many.'
+    suggested_action: 'Give eslint''s --config/-c a per-tool valuePatterns of `.json/.jsonc/.yaml/.yml` names only (ESLint 8 reads them; ESLint 9 refuses them without executing), or drop -c from eslint; refused test for `npx eslint -c .zzrc .`.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-2 (medium/high; held at low — an installed package is the same trust as running the tool): ESLINT_FORMATS lists compact, checkstyle, jslint-xml, junit, tap, unix, visualstudio, which ESLint 9 removed from core; loadFormatter resolves `eslint-formatter-<name>` from node_modules before the built-ins, so under ESLint 9 those seven names only ever load an installed package.'
+    suggested_action: 'Trim ESLINT_FORMATS to the ESLint 9 core set (stylish, json, json-with-metadata, html) and say so in SKILL.md.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-3 (low/medium): VITEST_REPORTERS includes `basic`, deprecated in Vitest 3 and removed in Vitest 4, where a name outside the built-in map is handed to loadCustomReporterModule — a module load by name.'
+    suggested_action: 'Drop `basic` from VITEST_REPORTERS and the SKILL.md list.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-4'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-4/CR-5 (cleanups): the NPX_TOOLS header comment still says a formatter or reporter is `name` after the kind was deleted; `--severity` and `--shell` in the global PATTERN_FLAGS are dead now that shellcheck''s valuePatterns are checked first.'
+    suggested_action: 'Reword the header; remove the two dead PATTERN_FLAGS entries.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 3672
+    notes: 'Bugs 1–18 closed. 3,653 prior spellings re-run in-process and diffed against gate 10 — only the intended decisions moved (three package-name formatters and two env-segment paths now refused); 19 executed end-to-end through the clone''s own verifier at e4d0a8a9 and the consumer-shaped project under env -i with a listener: every cycle-9/10 and gate-6/7/8 spelling refused, `-R zzrep` and `-R index` refused with a root-level module present, `null//env` refused under a canary secret, zero requests on the listener; nine mutation proofs, all covered; TMPDIR=/tmp 31/31. The three LOW residues are unexecuted refinements of the closed sets (a tool-version detail and one shared dotfile alternative), not a reachable write or egress on any tool installed here or in the consumer-shaped project.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 31/31; full hermetic suite 3301 pass / 0 fail / 1 skipped.'
+  reliability:
+    status: PASS
+    notes: 'No orphaned children; listener empty; JSON contract holds.'
+  maintainability:
+    status: CONCERNS
+    notes: 'NPX_TOOLS header comment contradicts the code (says `name`); two dead PATTERN_FLAGS entries; ESLINT_FORMATS and VITEST_REPORTERS carry names the current tool versions no longer treat as built-ins. All one-line edits.'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent over the files changed since gate 10 (fix diff e4d0a8a9, 252 lines), dispatched 16:49 returned 16:54 (4m52s, in budget); read-only with in-process isAllowed probes'
+  bugs: 3
+  cleanups: 2
+  boundary: true
+  probes_executed: 3672
+  promoted: ['CR-1 → QA-1 at low', 'CR-2 → QA-2 at low', 'CR-3 → QA-3 at low', 'CR-4 + CR-5 → QA-4 at low']
+  advisory: ['gate-8/9/10 advisories unchanged: DRIVER/MODE env passthrough, win32 cwd-first resolution, absolute reads + measured echo, gh api --cache, python -X cache write, quoted-glob refusal, env.json refused on jq (documented price), scrubbed child environment as future work']
+
+recommendations:
+  immediate:
+    - action: 'QA-1..QA-4 — eslint config values json/jsonc/yaml only; ESLINT_FORMATS to the ESLint 9 core set; drop vitest `basic`; reword the header; remove two dead PATTERN_FLAGS entries'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+  future:
+    - action: 'Scrubbed child environment (retires the measured-echo class); quoted-glob tokenising (cycle-9 CR-6)'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 10
+  verification_method: 'Executed probes through the clone''s own verifier and a consumer-shaped project under a stripped environment with a local listener; in-process regression re-run; nine mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['QA-1..QA-4 closed (one-line refinements)']

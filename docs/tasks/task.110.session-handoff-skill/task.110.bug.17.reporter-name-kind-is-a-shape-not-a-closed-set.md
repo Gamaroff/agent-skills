@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-17
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (mocha, executed); reviewer CR-2 (mocha, confirmed) and CR-3 (vitest/jest writing reporters)
 **Date Found**: 2026-09-15
 
@@ -114,3 +114,4 @@ is the closed set widened back to `BARE_NAME`.
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 10 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `name` kind deleted; reporters/formatters are per-tool closed sets of stdout-only built-ins |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 11 — `npx mocha -R zzrep t.js` and `-R index t.js` through the CLI against the consumer-shaped project (mocha installed, root-level zzrep.js present) → `unverifiable: not on whitelist: npx`, no canary; `-R spec` still runs. Through the clone's own verifier at `e4d0a8a9`: `npx vitest --run --reporter=html x`, `npx jest --reporters=jest-junit` refused; `shellcheck -f gcc -S warning -s bash <file>` ran. 177+109 in-process spellings re-run: only the intended decisions moved. Mutations M1–M6 (each closed set widened back to the bare-name shape; vitest admitting html/blob) → red — `covered` ×6 |

@@ -148,9 +148,7 @@ const PATTERN_FLAGS = new Set([
   "--author",
   "--sort",
   "--testNamePattern",
-  "--severity",
   "--exclude",
-  "--shell",
   "--log-level",
   "--porcelain",
   "--untracked-files",
@@ -227,12 +225,22 @@ const VALUE_KINDS = Object.freeze({
 // Stdout-only built-in formatters / reporters, per tool. A name outside its
 // tool's set is refused whether it is a path, an installed package or a
 // built-in that writes a file.
-const ESLINT_FORMATS =
-  /^(stylish|compact|json|json-with-metadata|unix|visualstudio|checkstyle|html|jslint-xml|junit|tap)$/;
+// ESLint 9's core set. The seven ESLint 8 formatters it removed (compact,
+// checkstyle, jslint-xml, junit, tap, unix, visualstudio) now resolve to an
+// installed `eslint-formatter-<name>` package first — a name that is no longer
+// an identity (gate 11, QA-2).
+const ESLINT_FORMATS = /^(stylish|json|json-with-metadata|html)$/;
+// ESLint 8 reads a JSON/YAML `-c`; ESLint 9 import()s whatever `-c` names and
+// rejects a data file without executing it. So eslint's config is data by
+// EXTENSION only — no dotfile alternative, which Node would parse as
+// JavaScript (gate 11, QA-1).
+const ESLINT_CONFIG =
+  /^(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*\.?[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(?:json|jsonc|yaml|yml)$/;
 const STYLELINT_FORMATTERS = /^(string|compact|github|json|tap|unix|verbose)$/;
 const JEST_REPORTERS = /^(default|summary|github-actions)$/;
+// `basic` is gone in Vitest 4, where an unknown name is a module load.
 const VITEST_REPORTERS =
-  /^(default|basic|verbose|dot|tap|tap-flat|github-actions|json|junit)$/;
+  /^(default|verbose|dot|tap|tap-flat|github-actions|json|junit)$/;
 const MOCHA_REPORTERS =
   /^(spec|dot|nyan|tap|landing|list|progress|json|json-stream|min|doc|markdown|xunit|html)$/;
 const SHELLCHECK_FORMATS = /^(checkstyle|diff|gcc|json|json1|quiet|tty)$/;
@@ -942,8 +950,9 @@ function npmRule(rest) {
   return more.length === 0;
 }
 
-// Every flag whose value the tool LOADS carries a kind (see VALUE_KINDS): a
-// config is `data`, a formatter or reporter is `name`. The spaced form
+// Every flag whose value the tool LOADS is judged by what it is: a config is
+// the `data` kind (see VALUE_KINDS), a formatter or reporter is a per-tool
+// `valuePatterns` closed set of stdout-only built-ins. The spaced form
 // (`-c x`, `-f x`, `-R x`) is a valueFlag so the value is consumed and judged
 // by its flag rather than falling through as a positional — the gate-7
 // mechanism for `gh -R`, applied here. A tool whose first positional is a
@@ -977,8 +986,12 @@ const NPX_TOOLS = Object.freeze({
       "--ext=",
     ],
     valueFlags: ["--format", "-f", "--config", "-c"],
-    valueKinds: { "--config": "data", "-c": "data" },
-    valuePatterns: { "--format": ESLINT_FORMATS, "-f": ESLINT_FORMATS },
+    valuePatterns: {
+      "--format": ESLINT_FORMATS,
+      "-f": ESLINT_FORMATS,
+      "--config": ESLINT_CONFIG,
+      "-c": ESLINT_CONFIG,
+    },
     positional: POS.PATHS,
   },
   tsc: {

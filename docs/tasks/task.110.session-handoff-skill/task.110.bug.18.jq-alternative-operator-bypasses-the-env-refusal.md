@@ -4,7 +4,7 @@
 **Bug ID**: TASK-110-BUG-18
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (reviewer CR-1, confirmed by execution)
 **Date Found**: 2026-09-15
 
@@ -93,3 +93,4 @@ environment as the mechanism that ends the class.
 | ---------- | ------ | ----------- | ----- |
 | 2026-09-15 | New    | QA Engineer | QA cycle 10 — filed |
 | 2026-09-15 | Ready for QA | Claude (qa-fix) | `/` exemption removed; `env` refused in every jq positional unless a key |
+| 2026-09-15 | Closed | QA Engineer | QA cycle 11 — `jq -n null//env` and `jq -n env` through the clone's own verifier under a stripped env with CANARY_SECRET → `unverifiable: not on whitelist: jq`, measured empty; `jq -r .name package.json` still `confirmed`. Reviewer probes: `[env]`, `{a:env}`, `(env)`, `1+env`, `env.HOME`, `.a|env`, `"\(env)"` all refused; `envs`, `input`, `@base64d` admitted. Mutation M7 (the `/` exemption restored) → red — `covered` |
