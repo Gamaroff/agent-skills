@@ -35,7 +35,7 @@ Build `skills/session-handoff/` — write mode emits `.agents/handoff.md` in a f
 | 2. review-task             | ✅ Done    | `task.110.review.{N}.{name}.md` exists (or skip logged)                | `task.110.review.1.session-handoff-skill.md` — READY TO IMPLEMENT 8/10; Planned → Ready for Development; issue #407 created | pre-pass B/C dispatched inline-summarised in report |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; fast gate green on run 3 (prettier, then doc-coverage rows); 17 tests, 3 mutants killed | surface map + 2 pre-pass agents (inline-summarised) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #408: https://github.com/Gamaroff/agent-skills/pull/408 — two commits (0bd5c531 feat, 7053c0a6 docs); in-review comment posted | — |
-| 5–6. qa-task / qa-fix loop | ⏳ In Progress | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 13 cycles so far: loop limit at 5; cycles 6–8 authorised; second resume with the budget and strike halt waived; gates 9 FAIL → 10 CONCERNS → 11 CONCERNS → 12 PASS (LOW queue) → 13 PASS (empty) → 5c REQUEST CHANGES (tsc `--noEmit false` emits; mocha file positional; gh `--jq env`) → qa-fix, cycle 14 next | —                    |
+| 5–6. qa-task / qa-fix loop | ⏳ In Progress | `task.110.qa.{N}.*.md`; `task.110.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 14 cycles so far: loop limit at 5; cycles 6–8 authorised; second resume with the budget and strike halt waived; gates 9 FAIL → 10/11 CONCERNS → 12/13 PASS → 5c REQUEST CHANGES → 14 FAIL (parser-value / response-file class) → qa-fix, cycle 15 next | —                    |
 | 7. finalise                | ⏳ Pending | `task.110.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
 
@@ -162,6 +162,12 @@ Build `skills/session-handoff/` — write mode emits `.agents/handoff.md` in a f
 - Cycle 12 / 5b: `/qa-fix gate=…gate.12…`; `ESLINT_CONFIG` refuses `..` anywhere; `.eslintrc` example → `.markdownlintrc` in the comment and SKILL.md; +2 tests; mutation red; gates green. Committed `baa3e1a5`, pushed once; PR comment posted; `qa-fix-12` posted.
 - Cycle 13 / 5a: gate 12 security PASS/measured → default narrowed scope (fix diff baa3e1a5, 52 lines). Reviewer returned in 40 s with no findings. QA: 3,653 spellings re-run (no decision moved); `..` guard mutation red; `TMPDIR=/tmp` 31/31; 3 executed through the clone at `baa3e1a5`. Gate 13 **PASS 100/100, empty queue** → **Proceeding to 5c**. PR comment posted; `qa-gate` `already`; `qa-cycle-13` `posted`. Gate 13 and QA report 13 committed and pushed before 5c (no fix commit on this path).
 - Cycle 13 / 5c: trail asserted on origin (`gate.13`, `qa.13`). `/review-pr --effort medium --comment` — code lens 8m03s, conformance lens 1m22s, in parallel. **REQUEST CHANGES**: CR-1 high/high — `npx tsc --noEmit false <file>` passes the whitelist and TypeScript consumes the `false`, so tsc emits (executed by 5c in consumer9 with typescript installed: `zz.js` written); CR-2 medium — `npx mocha <any file>` runs it (bug.11 class); CR-3 medium — gh `--jq env` echoes the environment through gojq (bug.18 class; not executed — no GH_TOKEN in the stripped env); CR-4 low win32 kill; CR-5/6 cleanups. Conformance: PC-1 medium — this report's header/Completion block stale; PC-2 medium — no `pr_number:` in the task frontmatter; PC-3/PC-4 low. Report `task.110.pr-review.1.session-handoff-skill.md`; comment posted (issuecomment-5684943527). Returning to 5b with `gate=…gate.13… pr_review=…pr-review.1…`; the cycle counter is not incremented here.
+- Cycle 13 / 5b (review-driven): `/qa-fix gate=…gate.13… pr_review=…pr-review.1…`; findings from context. CR-1 tsc `true`/`false` refused; CR-2 mocha `POS.NONE` (`-t`/`-g` value flags); CR-3 `JQ_FILTER` shared with gh `--jq`/`-q` on api and list/view; CR-4 win32 taskkill; CR-6 kill on cap (cap test asserts it); CR-5 documented; PC-1..4 trail fixes (this report's header/row/Completion; `pr_number: 408`; CHANGELOG; §7). Five mutations red. Re-executed in consumer9 with typescript: `--noEmit false` refused, no emit. Committed `e7eca2b4` (implementation report included per PC-1) and pushed once; PR comment posted; `qa-fix-13` posted.
+- Cycle 14 / 5a: gate 13 security PASS/measured → carve-out not fired mechanically; QA ran the re-probe **unscoped by judgement** (5c had found an executed HIGH on the boundary after a measured PASS) and said so in the report. Reviewer dispatched 18:12, returned 18:24 (12m06s — over budget, not killed; block in hand before the gate); it walked every admitted flag against each tool's installed parser. QA: 3,653 spellings re-run (only the intended mocha moves); 16 boolean-value spellings; five mutations covered; `TMPDIR=/tmp` 31/31; 11 executed in the clone at `e7eca2b4` and consumer9 (typescript + jest declared) — `--noEmit null`, `@tsargs.txt` and `jest --ci false` each wrote; `jest --silent` under an inherited `CI=false` wrote. Full suite 3300/3301 — the one red is the cycle-13 cap test's 10 s bound under load (QA drafted the widening in the test file and reverted it: qa-fix's edit, recorded as QA-3). Gate 14 **FAIL 50/100** — 1 HIGH (bug.19: the parser-value / response-file class, one universal rule), 1 MEDIUM (bug.20: `CI ?? "1"`), 2 LOW. Task → in-progress. PR comment posted (issuecomment-5685314909); `qa-gate` `already`; `qa-cycle-14` `posted`; `changes-requested` stage-disabled.
+- **Convergence check**: HIGH … 0 → 0 → 0 → 0 → 1 — not two consecutive non-decreases (waived regardless). Strike detector: gates 12, 13 raised no HIGH → no strike. Open queue → **5b**.
+- Cycle 14 / 5b: `/qa-fix gate=…gate.14…`; findings from context. bug.19: `npxPositionalsOk` — one rule for every tool (no `true`/`false`/`null`, no `@…`), the tsc-only pattern folded in; bug.20: `CI: "1"` forced; QA-3 cap-test bound widened; QA-4 tsbuildinfo documented, dead gh flags dropped. Four mutations red. Re-executed in consumer9 under `CI=false`: all refused, no emit, no snapshot. 32/32; full suite 3302/3302; gates green. Committed `72bf03b4`, pushed once; PR comment posted; `qa-fix-14` posted.
+- Cycle 15 / 5a: gate 14 security FAIL/measured → unscoped. Reviewer 10m55s (marginally over budget, not killed). QA: 3,653 spellings unchanged; four mutations covered; `TMPDIR=/tmp` 32/32; 8 executed in the clone at `72bf03b4` / consumer9 under `CI=false` — every cycle-14 spelling refused, `jest --silent` no longer writes. New: jest `--reporters` greedy array (reviewer CR-1) executed — `./zzrep.js` loaded as a reporter, canary written (bug.21 HIGH); plain-object tables — `constructor`/`toString` admitted, `__proto__ x` throws out of verify (bug.22 MEDIUM). Gate 15 **FAIL 50/100**; bugs 19–20 closed. PR comment posted; `qa-gate` `already`; `qa-cycle-15` `posted`; `changes-requested` stage-disabled. Convergence: HIGH 0 → 1 → 1 (gates 13–15) — trips mechanically, waived; strike detector: gate 13 raised none → no strike. Open queue → **5b**.
+- Cycle 15 / 5b: `/qa-fix gate=…gate.15…`; findings from context. bug.21: jest `--reporters` removed (identity principle); bug.22: `own()` lookups at all four tables, `verify()` guards a throwing rule. Three mutations red. Re-executed in consumer9: greedy spelling refused, `__proto__ x` a verdict. 33/33; full suite 3303/3303; gates green. Committed `9cf723a6`, pushed once; PR comment posted; `qa-fix-15` posted.
 
 ---
 
@@ -339,6 +345,25 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **PR Review**: REQUEST CHANGES — `task.110.pr-review.1.session-handoff-skill.md` (CR-1 high/high: `npx tsc --noEmit false` emits through read mode, executed; CR-2/CR-3 medium; PC-1/PC-2 medium)
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 13 — review-driven, on the review's findings)
+**Fix (qa-fix)**: CR-1..6 and PC-1..4 applied; five mutation proofs red; `e7eca2b4` pushed; handed back to QA for cycle 14
+
+### QA Cycle 14 — 2026-09-15
+**Gate Result**: FAIL (50/100)
+**Issues Found**: 4 — 1 HIGH (an npx positional the spec reads as a file is read by the tool as a flag value — `tsc --noEmit null`, `jest --ci false` — or a response file — `tsc @tsargs.txt`; all three wrote into the tree, executed — bug.19, reviewer CR-1/2/3 folded), 1 MEDIUM (the runner's `CI ?? "1"` lets an inherited `CI=false` through; `npx jest --silent` wrote a snapshot, executed — bug.20, reviewer CR-4), 2 LOW (cap-test timing bound under load; tsbuildinfo + two cleanups). Cycle-13 5c fixes verified and mutation-proven. Reviewer returned at 12m06s (over budget, not killed).
+**HIGH findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 14)
+**Fix (qa-fix)**: universal npx positional rule (bug.19); CI forced (bug.20); QA-3/QA-4; four mutation proofs red; `72bf03b4` pushed; handed back to QA for cycle 15
+
+### QA Cycle 15 — 2026-09-15
+**Gate Result**: FAIL (50/100)
+**Issues Found**: 2 — 1 HIGH (jest `--reporters` is a greedy yargs array option: `npx jest --ci --reporters default ./zzrep.js` loaded `./zzrep.js` as a reporter through read mode, executed — bug.21, reviewer CR-1), 1 MEDIUM (plain-object spec tables: `constructor`/`toString`/`hasOwnProperty` resolve as rules and `__proto__ x` crashes the run — bug.22, reviewer CR-2). Cycle-14 fixes verified and mutation-proven; bugs 1–20 closed.
+**HIGH findings**: 1
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 15)
+**Fix (qa-fix)**: jest `--reporters` dropped (bug.21); own-property lookups + verify guard (bug.22); three mutation proofs red; `9cf723a6` pushed; handed back to QA for cycle 16
 
 ---
 
@@ -351,3 +376,41 @@ The loop was re-entered after the loop-limit halt with one operator-authorised e
 **QA Iterations**: 13 so far (5 in the loop, 1 standalone after the first halt, 2 authorised on the first resume, 5 under the operator's waiver on the second)
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7}
+
+
+---
+---
+
+
+## Pipeline Paused — 2026-09-15T18:25:48Z
+## Pipeline Paused — 2026-09-15T18:25:48Z
+
+
+⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+
+⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
+**State at pause**:
+
+
+**State at pause**:
+- Skill: `/develop-task`
+
+- Skill: `/develop-task`
+- Branch: `feature/task.110.session-handoff-skill`
+- Branch: `feature/task.110.session-handoff-skill`
+- Last step boundary: Step 5
+- Last step boundary: Step 5
+- PR: https://github.com/Gamaroff/agent-skills/pull/408
+- PR: https://github.com/Gamaroff/agent-skills/pull/408
+- Tracker: github #407
+- Tracker: github #407
+
+
+**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 5.
+**Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 5.
+
+
+**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+**Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
+
+
