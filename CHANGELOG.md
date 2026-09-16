@@ -47,9 +47,10 @@ All notable changes to this project will be documented in this file. Format foll
   scripts) and heals a file carrying any mix of spellings to one entry per event, removing element
   by element so a matcher group shared with a consumer's own hook keeps it — the `unpatch_hook_exact`
   candidate loop it replaces was a second healer blind to the first one's spelling. The wizard's
-  inline installer in `setup-consumer.sh` mirrors all of it. The resume detector gains a last
-  fallback for a pause hook killed between its lock claim and its snapshot: the orphaned
-  `develop-pipeline.lock.pausing.<pid>` is the lock renamed, and is now read as such. `generate_catalog.py` gains `argparse` (`--readme PATH`, `--no-readme`) and rewrites the
+  inline installer in `setup-consumer.sh` mirrors all of it. The resume detector now reads an
+  orphaned `develop-pipeline.lock.pausing.<pid>` — the lock renamed by a pause hook killed between
+  its claim and its snapshot — alongside `last-halt.json`, choosing by document and then by age,
+  because nothing consumes a snapshot on resume and a stale one would otherwise shadow the claim. `generate_catalog.py` gains `argparse` (`--readme PATH`, `--no-readme`) and rewrites the
   `skills-<N>-` badge in `README.md` to the catalog count, so `validate.yml`'s no-diff check owns it
   (`README.md` joins both trigger path lists — the workflow is path-filtered, and without that a
   hand-edit of the badge would run no check at all). Badge corrected 126 → 128. Each mechanism has a

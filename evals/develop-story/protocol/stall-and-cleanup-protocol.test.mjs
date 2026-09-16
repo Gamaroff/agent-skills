@@ -394,8 +394,13 @@ test("#2e — canonical install-hooks.sh heals every other spelling of a hook by
   );
   assert.match(
     script,
-    /s#\^bash \+##/,
-    "identity must strip the leading `bash ` so the legacy bare-relative form is one spelling of the same hook",
+    /\(bash \+\)\?/,
+    "identity must treat the leading `bash ` as optional so the legacy bare-relative form is one spelling of the same hook",
+  );
+  assert.match(
+    script,
+    /develop-\(story\|task\|bug\)\/\(scripts\//,
+    "identity must REQUIRE a develop-(story|task|bug)/ segment — a consumer's own scripts/<hook>.sh is not ours (task.120 bug.4)",
   );
   assert.match(
     script,

@@ -1612,13 +1612,16 @@ install_skills() {
 
 # ── 9. pipeline hooks ────────────────────────────────────────────────────────
 
-# The identity of a hook is scripts/<hook>.sh — the same script whether reached
-# bare-relative or via "${CLAUDE_PROJECT_DIR}/", through .claude/skills or
-# .agents/skills, under any of the three develop-* skills that ship it. Every
-# spelling is one hook and the host fires all of them (task.120). Mirrors
-# hook_identity in develop-pipeline-install-hooks.sh.
+# The identity of OUR hook is scripts/<hook>.sh, reached under any of the three
+# develop-* skills that ship it (byte-identical), bare-relative or via
+# "${CLAUDE_PROJECT_DIR}/", through .claude/skills or .agents/skills. The skill
+# segment is REQUIRED — a command without one is returned verbatim so a consumer's
+# own project-root scripts/<hook>.sh can never match ours (task.120 bug.4).
+# Mirrors hook_identity in develop-pipeline-install-hooks.sh.
 _hook_identity() {
-  printf '%s' "$1" | sed -E 's#^bash +##; s#^"?\$\{CLAUDE_PROJECT_DIR\}/##; s#^\.(claude|agents)/skills/##; s#^develop-(story|task|bug)/##; s#"$##'
+  local id
+  id=$(printf '%s' "$1" | sed -nE 's#^(bash +)?("?\$\{CLAUDE_PROJECT_DIR\}/)?(\.(claude|agents)/skills/)?develop-(story|task|bug)/(scripts/[^"[:space:]]+)"?$#\6#p')
+  if [[ -n "$id" ]]; then printf '%s' "$id"; else printf '%s' "$1"; fi
 }
 
 # Patch a single hook event into SETTINGS_FILE unless an entry with the same
@@ -1629,16 +1632,20 @@ _patch_hook() {
   local event="$1" cmd="$2"
   local id existing
   id=$(_hook_identity "$cmd")
-  while IFS= read -r existing; do
-    [[ -n "$existing" ]] || continue
-    if [[ "$DRY_RUN" == true && "$existing" != "$cmd" ]]; then
-      continue
-    fi
-    if [[ "$(_hook_identity "$existing")" == "$id" ]]; then
-      info "  ${event}: already registered"
-      return 0
-    fi
-  done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$HOOKS_SETTINGS_FILE")
+  # A --dry-run in a project with no settings file yet has nothing to read; jq
+  # would print "Could not open" into the dry-run output (task.120 cycle-3 CR-4).
+  if [[ -f "$HOOKS_SETTINGS_FILE" ]]; then
+    while IFS= read -r existing; do
+      [[ -n "$existing" ]] || continue
+      if [[ "$DRY_RUN" == true && "$existing" != "$cmd" ]]; then
+        continue
+      fi
+      if [[ "$(_hook_identity "$existing")" == "$id" ]]; then
+        info "  ${event}: already registered"
+        return 0
+      fi
+    done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$HOOKS_SETTINGS_FILE")
+  fi
   if [[ "$DRY_RUN" == true ]]; then
     echo -e "${YELLOW}[dry-run]${NC}   ${event}: would add (${cmd})"
     return 0
@@ -1671,10 +1678,10 @@ _unpatch_hook() {
   [[ "${present:-0}" == "0" ]] && return 0
   local tmp; tmp=$(mktemp)
   jq --arg event "$event" --arg pat "$pattern" \
-    '(.hooks[$event]) |= (map(.hooks |= map(select(.command | test($pat) | not)))
-                          | map(select((.hooks | length) > 0)))
+    '(.hooks[$event]) |= (map(if .hooks == null then . else .hooks |= map(select(.command | test($pat) | not)) end)
+                          | map(select(.hooks == null or (.hooks | length) > 0)))
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
-    "$HOOKS_SETTINGS_FILE" > "$tmp"
+    "$HOOKS_SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; err "jq failed while editing ${HOOKS_SETTINGS_FILE} — file left unchanged"; return 1; }
   mv "$tmp" "$HOOKS_SETTINGS_FILE"
   ok "  ${event}: removed obsolete on-skill-return.sh hook"
 }
@@ -1697,10 +1704,10 @@ _unpatch_hook_exact() {
   local tmp; tmp=$(mktemp)
   # Element-level removal: a shared matcher group keeps its other hooks (task.120 CR-2).
   jq --arg event "$event" --arg cmd "$cmd" \
-    '(.hooks[$event]) |= (map(.hooks |= map(select(.command != $cmd)))
-                          | map(select((.hooks | length) > 0)))
+    '(.hooks[$event]) |= (map(if .hooks == null then . else .hooks |= map(select(.command != $cmd)) end)
+                          | map(select(.hooks == null or (.hooks | length) > 0)))
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
-    "$HOOKS_SETTINGS_FILE" > "$tmp"
+    "$HOOKS_SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; err "jq failed while editing ${HOOKS_SETTINGS_FILE} — file left unchanged"; return 1; }
   mv "$tmp" "$HOOKS_SETTINGS_FILE"
   ok "  ${event}: removed duplicate spelling (${cmd})"
 }

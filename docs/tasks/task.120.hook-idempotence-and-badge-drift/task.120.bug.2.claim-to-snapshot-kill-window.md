@@ -4,7 +4,7 @@
 **Bug ID**: TASK-120-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-2 refute pass, strengthening cycle-1 advisory CR-3)
 **Date Found**: 2026-09-16
 
@@ -75,3 +75,4 @@ In the sweep, promote an orphaned claim to the snapshot when none exists (`[ -f 
 | 2026-09-16 | New | QA Engineer | Filed from QA cycle 2 refute pass (strengthened cycle-1 CR-3) |
 | 2026-09-16 | In Progress | qa-fix | Investigation — promotion-in-sweep rejected as ineffective |
 | 2026-09-16 | Ready for QA | qa-fix | Resume detector reads the orphaned claim; pause.md names the window; scenario 15 |
+| 2026-09-16 | Closed | QA Engineer | Verified in QA cycle 3: detector fallback present (9 bundled copies), scenario 15 holds, cp-for-mv mutation red. Reachability behind a stale snapshot filed separately as bug.5 |

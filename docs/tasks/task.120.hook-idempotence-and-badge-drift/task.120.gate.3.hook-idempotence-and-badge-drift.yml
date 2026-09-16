@@ -1,0 +1,85 @@
+schema: 1
+task: 'task.120.hook-idempotence-and-badge-drift'
+task_title: 'The pause hook, the hook installer and the README badge each rely on a human remembering: make them idempotent, self-healing and generated'
+gate: CONCERNS
+status_reason: 'All three cycle-2 findings verified FIXED (bug.2, bug.3 closed). The scoped cycle-3 review found that the cycle-2 identity widening collapses a consumer''s own project-root scripts/<hook>.sh onto ours and deletes it (medium, regression), that the new orphaned-claim fallback is unreachable while a stale last-halt.json persists (medium), and that the element-level jq rewrite aborts on a matcher group without a hooks key (low). One more fix cycle is required; no HIGH finding in any cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T11:40:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-install-hooks.sh'
+    finding: 'hook_identity strips each prefix independently, so a consumer''s own hook with no skill segment — `bash scripts/on-stop.sh` or `bash "${CLAUDE_PROJECT_DIR}/scripts/on-stop.sh"` — reduces to `scripts/on-stop.sh`, identical to ours, and heal_hook deletes it (reproduced; regression introduced by the cycle-2 CR-3 fix; wizard _hook_identity mirrors it). bug.4.'
+    suggested_action: 'Make the identity one anchored match that REQUIRES the develop-(story|task|bug)/ segment and returns the input unchanged otherwise; mirror in the wizard; fixture: project-root scripts/on-stop.sh and "${CLAUDE_PROJECT_DIR}/scripts/on-precompact.sh" survive while the cross-skill scenario still converges.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/pipeline-resume-detector-prompt.md'
+    finding: 'The orphaned-claim fallback is reached only when last-halt.json is also absent, but nothing consumes last-halt.json on a successful resume (SKILL.md deletes it only on Start fresh) — this repo carries task.110''s snapshot right now — so a stale snapshot always shadows a fresher .pausing.<pid> and the detector would recommend resuming the wrong task at the wrong step. bug.5.'
+    suggested_action: 'When the lock is absent, gather last-halt.json and the newest .pausing.*, drop candidates whose task_or_story_directory is not DOC_DIR (surface the mismatch), take the newest by mtime, set source accordingly; state the rule once in Step 1.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-install-hooks.sh'
+    finding: 'The element-level rewrite `map(.hooks |= map(...))` errors "Cannot iterate over null" on a matcher group with no hooks key (reproduced, jq 1.7.1) — a shape the previous any(.hooks[]?; …) tolerated — so under set -e the installer aborts mid-heal with a raw jq error; same expressions in unpatch_hook and the two wizard mirrors.'
+    suggested_action: 'Use `.hooks |= ((. // []) | map(...))` in all four jq mutations and check jq''s exit status before the mv; fixture: a hooks-less matcher group beside a duplicate spelling → heal completes, the group is left as-is.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 32
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 15
+    notes: 'hook_identity re-probed after the cycle-2 widening: 3 further candidates executed (develop-task/…, develop-bug/…, develop-storyx/…) — the first two collapse as intended, the third does not. CR-1 is a correctness defect in the widened boundary (a consumer input wrongly ACCEPTED as ours), found by the reviewer and reproduced by QA; it is a deletion of a consumer hook, not a bypass into anything privileged. 12 cycle-1 probes stand.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: an installer re-run deletes a consumer''s project-root hook (regression from cycle 2). CR-2: the resume fallback for a killed pause is shadowed by any persisting snapshot. CR-3: installer aborts on a hooks-less matcher group.'
+  maintainability:
+    status: PASS
+    notes: 'Fixes are small and each carries a red-on-revert test; the recurring shape (a widening that over-accepts) argues for the anchored-match form the fix prescribes.'
+
+recommendations:
+  immediate:
+    - action: 'Anchored identity match requiring the develop-* segment; consumer project-root fixtures (CR-1 / bug.4)'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh', 'scripts/setup-consumer.sh', 'shared/resources/develop-pipeline-install-hooks.test.sh']
+    - action: 'Detector chooses between snapshot and orphaned claim by document match + mtime (CR-2 / bug.5)'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+    - action: 'Null-safe hooks[] rewrite in all four jq mutations; hooks-less group fixture (CR-3)'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh', 'scripts/setup-consumer.sh', 'shared/resources/develop-pipeline-install-hooks.test.sh']
+  future:
+    - action: 'CR-4 (cleanup): wizard _patch_hook reads the settings file without the -f guard _heal_hook has, so --dry-run in a project with no settings file prints a jq "Could not open" line'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Orchestrator could remove last-halt.json when it re-creates the lock on a successful resume — would make the detector''s precedence question moot; separate change'
+      refs: ['shared/resources/develop-pipeline-step-1-create-branch.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 2
+  fix_date: '2026-09-16'
+  total_iterations: 2
+  verification_method: 'bug.2: detector prompt Step 1 carries the orphaned_claim fallback (bundled into 9 skills); scenario 15 kill-in-window; cp-for-mv mutation red. bug.3: shared-group reproduction from the report — consumer hook survives in both installers; two group-level mutations red. bug.4 and bug.5 newly filed this cycle.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1, CR-2, CR-3 fixed and re-reviewed'

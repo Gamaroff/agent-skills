@@ -486,7 +486,7 @@ fi
 # The claim renames the lock BEFORE the snapshot is written. A harness kill in
 # that window leaves neither the lock nor last-halt.json; the only copy of the
 # pipeline's state is the claimed file, which the Phase 0a resume detector reads
-# as its last fallback. This proves the state is actually there, byte for byte,
+# alongside last-halt.json. This proves the state is actually there, byte for byte,
 # rather than lost — the property the detector's fallback depends on.
 #
 # The window is entered deterministically: a stale claim makes the sweep call

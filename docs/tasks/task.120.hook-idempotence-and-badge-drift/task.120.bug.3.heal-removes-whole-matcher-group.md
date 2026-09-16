@@ -4,7 +4,7 @@
 **Bug ID**: TASK-120-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-2 refute pass)
 **Date Found**: 2026-09-16
 
@@ -71,3 +71,4 @@ Change `unpatch_hook_exact` (and the wizard's `_unpatch_hook_exact`) to `map(.ho
 | 2026-09-16 | New | QA Engineer | Filed from QA cycle 2 refute pass |
 | 2026-09-16 | In Progress | qa-fix | Investigation — group-level jq filter |
 | 2026-09-16 | Ready for QA | qa-fix | Element-level removal in all four helpers; scenario 7 |
+| 2026-09-16 | Closed | QA Engineer | Verified in QA cycle 3: reproduction from the report — consumer hook survives in installer and wizard; two group-level mutations red |

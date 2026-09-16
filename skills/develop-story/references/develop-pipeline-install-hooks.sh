@@ -130,20 +130,21 @@ fi
 
 # --- patch helpers -----------------------------------------------------------
 
-# hook_identity CMD — the part of a hook command that names the script: strip
-# `bash `, the optional quoted "${CLAUDE_PROJECT_DIR}/", the .claude/skills/ or
-# .agents/skills/ root, and — only for the three skills that ship these hooks —
-# the develop-(story|task|bug)/ segment, since their on-precompact.sh and
-# on-stop.sh are byte-identical wrappers (the header above says so) and a BASE
-# that moves between them across installer runs would otherwise leave two live
-# entries per event (task.120 CR-3). The closing quote goes with the opening
-# one. The strip list is exactly these four literal prefixes and nothing else —
-# the identity keeps the scripts/<hook>.sh tail and any other skill's name, so
-# two DIFFERENT scripts can never collapse to one identity and a consumer's
-# unrelated hook is never touched. Add a fifth spelling here only with a
-# fixture that carries it (develop-pipeline-install-hooks.test.sh).
+# hook_identity CMD — the part of a hook command that names OUR script, or the
+# command unchanged when it is not ours. One anchored match, not independent
+# strips: `bash `, the optional quoted "${CLAUDE_PROJECT_DIR}/", the optional
+# .claude/skills/ or .agents/skills/ root, then a REQUIRED develop-(story|task|bug)/
+# segment (the three ship byte-identical hook scripts), then the scripts/<hook>.sh
+# tail. A command that does not carry one of those three skill names is returned
+# verbatim, so it can never equal our identity — a consumer's own project-root
+# `bash scripts/on-stop.sh` stays a different hook (task.120 CR-1 / bug.4: when
+# the segment was merely stripped-if-present, its absence read the same as its
+# presence and the healer deleted the consumer's hook). Add a spelling here only
+# with a fixture that carries it (develop-pipeline-install-hooks.test.sh).
 hook_identity() {
-  printf '%s' "$1" | sed -E 's#^bash +##; s#^"?\$\{CLAUDE_PROJECT_DIR\}/##; s#^\.(claude|agents)/skills/##; s#^develop-(story|task|bug)/##; s#"$##'
+  local id
+  id=$(printf '%s' "$1" | sed -nE 's#^(bash +)?("?\$\{CLAUDE_PROJECT_DIR\}/)?(\.(claude|agents)/skills/)?develop-(story|task|bug)/(scripts/[^"[:space:]]+)"?$#\6#p')
+  if [ -n "$id" ]; then printf '%s' "$id"; else printf '%s' "$1"; fi
 }
 
 # Adds a hook entry for `event` running `cmd` unless an existing entry already
@@ -199,7 +200,9 @@ patch_hook() {
 # no matching element exists. Used to heal older installs that registered the
 # obsolete on-skill-return.sh PostToolUse hook.
 #
-# Element-level, not group-level (task.120 CR-2 / bug.3): a hand-edited group
+# A group with no hooks[] key at all is left exactly as it is — there is nothing
+# of ours in it to remove, and iterating a null was how the heal aborted mid-run
+# (task.120 cycle 3). Element-level, not group-level (task.120 CR-2 / bug.3): a hand-edited group
 # {matcher, hooks:[<ours>, <the consumer's own hook>]} is one group with two
 # hooks, and removing the GROUP deleted the consumer's hook along with ours —
 # silently, on every re-run. The strip list promises a consumer's unrelated hook
@@ -222,10 +225,10 @@ unpatch_hook() {
   local tmp
   tmp=$(mktemp)
   jq --arg event "$event" --arg pat "$pattern" \
-    '(.hooks[$event]) |= (map(.hooks |= map(select(.command | test($pat) | not)))
-                          | map(select((.hooks | length) > 0)))
+    '(.hooks[$event]) |= (map(if .hooks == null then . else .hooks |= map(select(.command | test($pat) | not)) end)
+                          | map(select(.hooks == null or (.hooks | length) > 0)))
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
-    "$SETTINGS_FILE" > "$tmp"
+    "$SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; echo "Error: jq failed while editing ${SETTINGS_FILE} — file left unchanged." >&2; exit 1; }
 
   if $DRY_RUN; then
     echo "    (dry-run diff:)"
@@ -260,10 +263,10 @@ unpatch_hook_exact() {
   local tmp
   tmp=$(mktemp)
   jq --arg event "$event" --arg cmd "$cmd" \
-    '(.hooks[$event]) |= (map(.hooks |= map(select(.command != $cmd)))
-                          | map(select((.hooks | length) > 0)))
+    '(.hooks[$event]) |= (map(if .hooks == null then . else .hooks |= map(select(.command != $cmd)) end)
+                          | map(select(.hooks == null or (.hooks | length) > 0)))
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
-    "$SETTINGS_FILE" > "$tmp"
+    "$SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; echo "Error: jq failed while editing ${SETTINGS_FILE} — file left unchanged." >&2; exit 1; }
 
   if $DRY_RUN; then
     echo "    (dry-run diff:)"
