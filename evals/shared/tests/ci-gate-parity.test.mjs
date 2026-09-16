@@ -23,6 +23,34 @@
  * Set equality in both directions is what closes that, which is why the
  * assertion is `deepEqual` on sorted sets and not a pair of `includes` checks.
  *
+ * WHICH JOBS DEFINE "GREEN" (task 111)
+ * -------------------------------------
+ * Until 2026-09-16 this read one job — `test.yml`'s `test` — and the composite
+ * matched it. But CI is three workflows, and the other two (`validate.yml`,
+ * `shellcheck.yml`) never invoke an npm script: they run `quick_validate.py` in
+ * a shell loop, the bundler directly, and the pinned `shellcheck` binary. A
+ * one-job reading therefore certified `npm run ci` as CI-equivalent while two
+ * of the five lanes had no local form at all — which is the original defect
+ * again, one workflow over. `shellcheck.yml`'s header records that it got its
+ * own workflow precisely so as not to trip this test, which is the test
+ * blocking the parity it exists to guarantee.
+ *
+ * So every green-defining job is read now, and each `run:` step in them must
+ * be one of exactly four things:
+ *
+ *   1. an `npm run <script>` — counted, as before;
+ *   2. a step whose `name:` is in LANE_TWINS — the named npm script is what
+ *      reproduces it locally, and is counted in its place;
+ *   3. a step whose `name:` is in SETUP_STEPS — environment setup, not a gate;
+ *   4. a step whose `name:` is in EXCLUDED_STEPS — deliberately not mirrored,
+ *      with the reason written down beside it.
+ *
+ * A step that is none of the four FAILS THE TEST, naming the workflow, job and
+ * step. That is the "lane added to CI but not the composite" drift, now caught
+ * on all three workflows rather than one. The twin map is keyed on step names
+ * and every key is asserted to exist in some green job, so renaming a step or
+ * retiring one breaks the map loudly instead of letting the lane drop out.
+ *
  * The tiering invariant is held here too: `ci:fast` — what the develop loop and
  * each qa-fix cycle run — must NOT contain the slow tier. That is not a
  * performance nicety. Paying the end-to-end evals on every loop iteration is what
@@ -30,6 +58,9 @@
  * people route around is a gate that does not exist.
  *
  * Run: node --test evals/shared/tests/ci-gate-parity.test.mjs
+ * Mutations that must go red: add `- name: X` + `run: echo hi` to validate.yml's
+ * job (unclassified step); drop `lint:shell` from `ci` (set diff); rename
+ * "Lint source shell scripts" in shellcheck.yml (stale map key).
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -49,8 +80,52 @@ const workflow = read(".github/workflows/test.yml");
 const FULL_GATE = "ci";
 /** The tier the develop loop and each qa-fix cycle run. */
 const FAST_GATE = "ci:fast";
-/** The workflow job that defines "green". Other jobs are deliberately not read. */
+/** The workflow job that defines "green" in test.yml. */
 const TEST_JOB = "test";
+
+/**
+ * Every workflow job that must be green for a PR into develop. Jobs not listed
+ * here — release.yml (tag-triggered), branch-policy.yml (PRs into main only),
+ * docs-link-check.yml (task 108's checker, path-filtered) — have no local form
+ * and are deliberately not read.
+ */
+const GREEN_JOBS = [
+  { workflow: ".github/workflows/test.yml", job: "test" },
+  { workflow: ".github/workflows/validate.yml", job: "validate" },
+  { workflow: ".github/workflows/shellcheck.yml", job: "shellcheck" },
+];
+
+/**
+ * Step name → the npm script that reproduces it locally. Many-to-one is fine:
+ * validate.yml's two regenerate-and-diff steps are one local script. A step
+ * listed here is counted as its twin when comparing against the composite.
+ */
+const LANE_TWINS = {
+  "Validate all skills": "validate:all",
+  "Catalog up-to-date check": "check:generated",
+  "Skill dependency graph up-to-date check": "check:generated",
+  "Bundle freshness — per-file check": "bundle:check",
+  "Lint source shell scripts": "lint:shell",
+};
+
+/** Environment setup, not a gate — nothing to mirror. */
+const SETUP_STEPS = [
+  "Install PyYAML",
+  "Install awk variants",
+  "Install dependencies",
+  "Install ShellCheck (pinned)",
+];
+
+/**
+ * Gate steps deliberately NOT mirrored by the composite, each with the reason.
+ * An entry here is a decision on file; an unlisted, unmapped step is a defect.
+ */
+const EXCLUDED_STEPS = {
+  "Bundle freshness check":
+    "regenerate-and-diff of every bundled copy; the pre-commit hook re-bundles on " +
+    "every commit that touches shared/resources/ or a SKILL.md (the only way a " +
+    "copy goes stale), and bundle:check covers the read-only per-file half",
+};
 
 // ---------------------------------------------------------------------------
 // Resolving an `npm run …` term to the script it names.
@@ -121,8 +196,8 @@ function workflowScripts() {
  * is perfectly happy with, which inverts the test's purpose. It exists to
  * predict CI, so it must never block a merge CI would pass.
  */
-function jobBlock(jobName) {
-  const lines = workflow.split("\n");
+function jobBlock(jobName, text = workflow) {
+  const lines = text.split("\n");
   const start = lines.findIndex((l) =>
     new RegExp(`^  ${jobName}:\\s*$`).test(l),
   );
@@ -152,6 +227,65 @@ function workflowInvocations() {
     .filter(Boolean)
     .map((m) => scriptInvokedBy(m[1]))
     .filter((name) => name !== null);
+}
+
+/**
+ * Every `- name:` / `run:` step pair in one job, in order. A `run:` with no
+ * preceding `name:` gets an empty name, which no map can match — so an
+ * anonymous gate step fails classification below, which is the right answer:
+ * a step the twin map cannot name is a step nobody can mirror.
+ */
+function jobSteps({ workflow: path, job }) {
+  const block = jobBlock(job, read(path));
+  if (block === null) return null;
+  const steps = [];
+  let name = "";
+  for (const line of block.split("\n")) {
+    const n = line.match(/^\s*-\s*name:\s*(.+?)\s*$/);
+    if (n) {
+      name = n[1].replace(/^['"]|['"]$/g, "");
+      continue;
+    }
+    // A `uses:` step (checkout, setup-node) resets the name so it is never
+    // attributed to a later bare `run:`.
+    if (/^\s*-\s*uses:/.test(line)) {
+      name = "";
+      continue;
+    }
+    const r = line.match(/^\s*run:\s*(.*?)\s*$/);
+    if (r) {
+      // `run: |` is a block scalar; the command text is on the following lines
+      // and the script it invokes (if any) is the first non-comment line.
+      steps.push({ name, run: r[1] === "|" ? "" : r[1], block: r[1] === "|" });
+    }
+  }
+  return steps;
+}
+
+/**
+ * Classify one step. Returns { kind, script } where kind ∈ script | twin |
+ * setup | excluded | unclassified.
+ */
+function classify(step) {
+  const script = scriptInvokedBy(step.run);
+  if (script !== null) return { kind: "script", script };
+  if (step.name in LANE_TWINS)
+    return { kind: "twin", script: LANE_TWINS[step.name] };
+  if (SETUP_STEPS.includes(step.name)) return { kind: "setup", script: null };
+  if (step.name in EXCLUDED_STEPS) return { kind: "excluded", script: null };
+  return { kind: "unclassified", script: null };
+}
+
+/** The npm scripts every green job runs or has a local twin for. */
+function greenScripts() {
+  const out = [];
+  for (const g of GREEN_JOBS) {
+    for (const step of jobSteps(g) ?? []) {
+      const c = classify(step);
+      if (c.script !== null) out.push(c.script);
+    }
+  }
+  return out.filter((name) => name in scripts);
 }
 
 const sorted = (xs) => [...new Set(xs)].sort();
@@ -195,20 +329,79 @@ test("`npm ci` in the workflow is the installer, never the `ci` script", () => {
   assert.equal(scriptInvokedBy("npm test"), "test");
 });
 
-test("workflow steps and the `ci` composite run exactly the same commands", () => {
-  const fromWorkflow = sorted(workflowScripts());
+test("every green job is found, and every step in it is classified", () => {
+  for (const g of GREEN_JOBS) {
+    const steps = jobSteps(g);
+    assert.ok(
+      steps !== null,
+      `${g.workflow} defines no \`${g.job}:\` job — the parity check would silently ` +
+        "read an empty set for it",
+    );
+    assert.ok(steps.length > 0, `${g.workflow}:${g.job} has no run: steps`);
+    const unclassified = steps
+      .filter((s) => classify(s).kind === "unclassified")
+      .map((s) => s.name || "(unnamed step)");
+    assert.deepEqual(
+      unclassified,
+      [],
+      `${g.workflow}:${g.job} has step(s) the composite cannot see: ` +
+        `${unclassified.join(", ")}.\n` +
+        "Every gate step must invoke an npm script, or be named in LANE_TWINS " +
+        "(with the script that reproduces it locally), SETUP_STEPS, or " +
+        "EXCLUDED_STEPS (with a reason). A lane CI runs that npm run ci does " +
+        "not is the defect task 111 exists to close.",
+    );
+  }
+});
+
+test("every LANE_TWINS / SETUP_STEPS / EXCLUDED_STEPS key names a real step", () => {
+  // The other direction: a step renamed or retired in a workflow leaves a map
+  // entry behind that matches nothing, and the lane it named silently drops
+  // out of the comparison. Assert each key is still a step in some green job.
+  const names = new Set(
+    GREEN_JOBS.flatMap((g) => (jobSteps(g) ?? []).map((s) => s.name)),
+  );
+  const stale = [
+    ...Object.keys(LANE_TWINS),
+    ...SETUP_STEPS,
+    ...Object.keys(EXCLUDED_STEPS),
+  ].filter((k) => !names.has(k));
+  assert.deepEqual(
+    stale,
+    [],
+    `map entries name no step in any green job: ${stale.join(", ")} — ` +
+      "the workflow step was renamed or removed; update the map in the same commit",
+  );
+  for (const [step, script] of Object.entries(LANE_TWINS)) {
+    assert.ok(
+      script in scripts,
+      `LANE_TWINS["${step}"] names \`${script}\`, which package.json does not define`,
+    );
+  }
+});
+
+test("green jobs and the `ci` composite run exactly the same commands", () => {
+  const fromWorkflow = sorted(greenScripts());
   const fromComposite = sorted(expand(FULL_GATE));
 
   assert.deepEqual(
     fromComposite,
     fromWorkflow,
-    `The CI workflow and the \`${FULL_GATE}\` composite have diverged.\n` +
-      `  workflow runs:  ${fromWorkflow.join(", ") || "(nothing)"}\n` +
-      `  ${FULL_GATE} runs:        ${fromComposite.join(", ") || "(nothing)"}\n` +
+    `The CI workflows and the \`${FULL_GATE}\` composite have diverged.\n` +
+      `  CI runs (via scripts or twins):  ${fromWorkflow.join(", ") || "(nothing)"}\n` +
+      `  ${FULL_GATE} runs:                        ${fromComposite.join(", ") || "(nothing)"}\n` +
       "A step in one and not the other is a gate the pipeline cannot see, " +
       "which is the defect task 75 exists to close. Add it to both.",
   );
   assert.ok(fromWorkflow.length >= 3, "expected at least three CI tiers");
+  // test.yml's own scripts are still a subset — the widening added lanes, it
+  // did not let the original job drift.
+  for (const s of workflowScripts()) {
+    assert.ok(
+      fromComposite.includes(s),
+      `test.yml runs \`${s}\`, which \`${FULL_GATE}\` no longer does`,
+    );
+  }
 });
 
 test("every npm script the workflow invokes actually exists", () => {
