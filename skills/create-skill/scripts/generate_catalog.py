@@ -179,17 +179,19 @@ def update_readme_badge(readme: Path, total: int) -> bool:
         print(f"⚠️  {readme}: not found — badge not updated", file=sys.stderr)
         return False
     text = readme.read_text()
-    new, n = BADGE.subn(rf"\g<1>{total}\g<2>", text, count=1)
+    after_badge, n = BADGE.subn(rf"\g<1>{total}\g<2>", text, count=1)
     if n == 0:
         print(f"⚠️  {readme}: no skills badge line found — left untouched", file=sys.stderr)
         return False
-    new, n_prose = PROSE_COUNT.subn(rf"{total}\g<1>", new, count=1)
+    new = PROSE_COUNT.sub(rf"{total}\g<1>", after_badge, count=1)
     if new == text:
         print(f"✅ README badge already reads skills-{total}")
         return False
     readme.write_text(new)
-    where = "badge + prose count" if n_prose else "badge"
-    print(f"✅ README {where} → {total} ({readme})")
+    # Label by what actually CHANGED, not by what matched: a stale badge beside
+    # an already-current prose count is a badge-only rewrite (task.120 CR-4).
+    changed = [name for name, moved in (("badge", after_badge != text), ("prose count", new != after_badge)) if moved]
+    print(f"✅ README {' + '.join(changed)} → {total} ({readme})")
     return True
 
 

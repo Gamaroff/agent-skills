@@ -1612,12 +1612,13 @@ install_skills() {
 
 # ── 9. pipeline hooks ────────────────────────────────────────────────────────
 
-# The identity of a hook is <skill>/scripts/<hook>.sh — the same script whether
-# reached bare-relative or via "${CLAUDE_PROJECT_DIR}/", through .claude/skills or
-# .agents/skills. Every spelling is one hook and the host fires all of them
-# (task.120). Mirrors hook_identity in develop-pipeline-install-hooks.sh.
+# The identity of a hook is scripts/<hook>.sh — the same script whether reached
+# bare-relative or via "${CLAUDE_PROJECT_DIR}/", through .claude/skills or
+# .agents/skills, under any of the three develop-* skills that ship it. Every
+# spelling is one hook and the host fires all of them (task.120). Mirrors
+# hook_identity in develop-pipeline-install-hooks.sh.
 _hook_identity() {
-  printf '%s' "$1" | sed -E 's#^bash +##; s#^"?\$\{CLAUDE_PROJECT_DIR\}/##; s#^\.(claude|agents)/skills/##; s#"$##'
+  printf '%s' "$1" | sed -E 's#^bash +##; s#^"?\$\{CLAUDE_PROJECT_DIR\}/##; s#^\.(claude|agents)/skills/##; s#^develop-(story|task|bug)/##; s#"$##'
 }
 
 # Patch a single hook event into SETTINGS_FILE unless an entry with the same
@@ -1665,12 +1666,13 @@ _unpatch_hook() {
   [[ -f "$HOOKS_SETTINGS_FILE" ]] || return 0
   local present
   present=$(jq --arg event "$event" --arg pat "$pattern" \
-    '[.hooks[$event][]? | select(any(.hooks[]?; .command | test($pat)))] | length' \
+    '[.hooks[$event][]?.hooks[]? | select(.command | test($pat))] | length' \
     "$HOOKS_SETTINGS_FILE" 2>/dev/null || echo 0)
   [[ "${present:-0}" == "0" ]] && return 0
   local tmp; tmp=$(mktemp)
   jq --arg event "$event" --arg pat "$pattern" \
-    '(.hooks[$event]) |= map(select(any(.hooks[]?; .command | test($pat)) | not))
+    '(.hooks[$event]) |= (map(.hooks |= map(select(.command | test($pat) | not)))
+                          | map(select((.hooks | length) > 0)))
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
     "$HOOKS_SETTINGS_FILE" > "$tmp"
   mv "$tmp" "$HOOKS_SETTINGS_FILE"
@@ -1689,12 +1691,14 @@ _unpatch_hook_exact() {
   [[ -f "$HOOKS_SETTINGS_FILE" ]] || return 0
   local present
   present=$(jq --arg event "$event" --arg cmd "$cmd" \
-    '[.hooks[$event][]? | select(any(.hooks[]?; .command == $cmd))] | length' \
+    '[.hooks[$event][]?.hooks[]? | select(.command == $cmd)] | length' \
     "$HOOKS_SETTINGS_FILE" 2>/dev/null || echo 0)
   [[ "${present:-0}" == "0" ]] && return 0
   local tmp; tmp=$(mktemp)
+  # Element-level removal: a shared matcher group keeps its other hooks (task.120 CR-2).
   jq --arg event "$event" --arg cmd "$cmd" \
-    '(.hooks[$event]) |= map(select(any(.hooks[]?; .command == $cmd) | not))
+    '(.hooks[$event]) |= (map(.hooks |= map(select(.command != $cmd)))
+                          | map(select((.hooks | length) > 0)))
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
     "$HOOKS_SETTINGS_FILE" > "$tmp"
   mv "$tmp" "$HOOKS_SETTINGS_FILE"

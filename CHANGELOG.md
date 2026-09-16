@@ -42,10 +42,14 @@ All notable changes to this project will be documented in this file. Format foll
   and the losers exit 0 with the empty signal; the winner sweeps stale claims. Its PR comment now
   carries the `agent-skills-comment:pipeline-paused-<step>` marker and is found-by-marker and
   PATCHed in place on a repeat pause at the same step. `install-hooks.sh` dedupes by hook
-  **identity** (`<skill>/scripts/<hook>.sh`, with `bash`, the quoted `${CLAUDE_PROJECT_DIR}/` and
-  either skills root stripped) and heals a file carrying two spellings to one entry per event — the
-  `unpatch_hook_exact` candidate loop it replaces was a second healer blind to the first one's
-  spelling. `generate_catalog.py` gains `argparse` (`--readme PATH`, `--no-readme`) and rewrites the
+  **identity** (`scripts/<hook>.sh`, with `bash`, the quoted `${CLAUDE_PROJECT_DIR}/`, either skills
+  root and the `develop-(story|task|bug)/` segment stripped — the three ship byte-identical hook
+  scripts) and heals a file carrying any mix of spellings to one entry per event, removing element
+  by element so a matcher group shared with a consumer's own hook keeps it — the `unpatch_hook_exact`
+  candidate loop it replaces was a second healer blind to the first one's spelling. The wizard's
+  inline installer in `setup-consumer.sh` mirrors all of it. The resume detector gains a last
+  fallback for a pause hook killed between its lock claim and its snapshot: the orphaned
+  `develop-pipeline.lock.pausing.<pid>` is the lock renamed, and is now read as such. `generate_catalog.py` gains `argparse` (`--readme PATH`, `--no-readme`) and rewrites the
   `skills-<N>-` badge in `README.md` to the catalog count, so `validate.yml`'s no-diff check owns it
   (`README.md` joins both trigger path lists — the workflow is path-filtered, and without that a
   hand-edit of the badge would run no check at all). Badge corrected 126 → 128. Each mechanism has a

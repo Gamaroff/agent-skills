@@ -41,6 +41,8 @@
 #  14. (task.120) the PR comment opens with the `agent-skills-comment:pipeline-paused-<step>`
 #      marker, and when a comment with that marker already exists on the PR the hook
 #      PATCHes it in place instead of posting a second one.
+#  15. (task.120 CR-1 / bug.2) a kill between the claim and the snapshot leaves the
+#      full state in the orphaned claim file — what the resume detector's fallback reads.
 
 PASS=0
 FAIL=0
@@ -478,6 +480,52 @@ elif ! grep -qF 'PR comment: updated in place' <<<"$OUT"; then
   fail "marker edit: signal reports the update, not a post" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
 else
   pass "marker edit: a marked Step-4 comment already on the PR is PATCHed in place; no second pr comment; signal says 'updated in place'"
+fi
+
+# ── Scenario 15 (task.120 CR-1 / bug.2): a kill between the claim and the snapshot ─
+# The claim renames the lock BEFORE the snapshot is written. A harness kill in
+# that window leaves neither the lock nor last-halt.json; the only copy of the
+# pipeline's state is the claimed file, which the Phase 0a resume detector reads
+# as its last fallback. This proves the state is actually there, byte for byte,
+# rather than lost — the property the detector's fallback depends on.
+#
+# The window is entered deterministically: a stale claim makes the sweep call
+# `rm`, and a shim `rm` on PATH sleeps, so the hook is parked between its claim
+# and its snapshot while the test kills it.
+S15="$TMPDIR_TEST/s15"
+mkdir -p "$S15/sleepy-bin"
+cat > "$S15/sleepy-bin/rm" <<'SHIM'
+#!/usr/bin/env bash
+# Park here so the test can kill the hook mid-window; then do nothing.
+sleep 5
+SHIM
+chmod +x "$S15/sleepy-bin/rm"
+LOCK15="$S15/develop-pipeline.lock"
+printf '{"skill":"develop-task","current_step":6,"branch":"feature/x","report_path":"","pr_url":"","tracker":"github","tracker_issue":"42"}\n' > "$LOCK15"
+printf '{"skill":"develop-task","current_step":2}\n' > "$LOCK15.pausing.11111"   # the stale claim that routes the sweep through rm
+PATH="$S15/sleepy-bin:$PATH" PIPELINE_LOCK="$LOCK15" "$BASH_BIN" "$HOOK" >/dev/null 2>&1 &
+HOOK_PID=$!
+# Wait until the hook has claimed (lock gone) — i.e. it is inside the window.
+for _ in $(seq 1 50); do [ -f "$LOCK15" ] || break; sleep 0.1; done
+kill -9 "$HOOK_PID" 2>/dev/null; wait "$HOOK_PID" 2>/dev/null
+pkill -9 -f "$S15/sleepy-bin/rm" 2>/dev/null; sleep 0.2
+CLAIMS15=""
+for c in "$LOCK15".pausing.*; do
+  [ -f "$c" ] || continue
+  case "$c" in *pausing.11111) continue ;; esac
+  CLAIMS15="${CLAIMS15:+$CLAIMS15
+}$c"
+done
+if [ -f "$LOCK15" ]; then
+  fail "kill in window: the hook had claimed the lock before being killed" "lock still present — the kill landed before the claim; test did not reach the window"
+elif [ -f "$S15/develop-pipeline.last-halt.json" ]; then
+  fail "kill in window: no snapshot yet (the kill landed inside the window)" "snapshot exists — kill landed after the window"
+elif [ "$(printf '%s\n' "$CLAIMS15" | grep -c .)" != "1" ]; then
+  fail "kill in window: exactly one orphaned claim survives" "claims: $CLAIMS15"
+elif [ "$(jq -r '.current_step' "$CLAIMS15")" != "6" ] || [ "$(jq -r '.tracker_issue' "$CLAIMS15")" != "42" ]; then
+  fail "kill in window: the orphaned claim carries the lock's full state" "$(cat "$CLAIMS15")"
+else
+  pass "kill in window (claim → snapshot): lock and snapshot both absent, the orphaned claim carries the full state (current_step=6) for the resume detector's fallback"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

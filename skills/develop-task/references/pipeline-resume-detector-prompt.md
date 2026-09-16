@@ -43,7 +43,7 @@ Return **JSON only** — no prose, no markdown fences, no explanation:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `schema_version` | integer | yes | Always `1` |
-| `source` | string | yes | `"lock"` (active pipeline), `"halt_snapshot"` (prior terminal HALT), or `"none"` (fresh start) |
+| `source` | string | yes | `"lock"` (active pipeline), `"halt_snapshot"` (prior terminal HALT or compaction pause), `"orphaned_claim"` (a PreCompact hook killed between its lock claim and its snapshot), or `"none"` (fresh start) |
 | `recommended_step` | integer | yes | Step the orchestrator should resume from (1–8) |
 | `current_step_in_lock` | integer | yes | `current_step` from active lock, or `halt_step` from snapshot, or `0` if none |
 | `halt_reason` | string\|null | yes | Populated only when `source == "halt_snapshot"`; otherwise `null` |
@@ -87,9 +87,16 @@ Snapshot-specific fields (when reading `last-halt.json`):
 
 > A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook before it removed the lock — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt.
 
-Set an output field `source: "lock" | "halt_snapshot" | "none"` so the orchestrator can prompt the user appropriately ("resume the active pipeline?" vs. "resume from the prior halt at step X?").
+Set an output field `source: "lock" | "halt_snapshot" | "orphaned_claim" | "none"` so the orchestrator can prompt the user appropriately ("resume the active pipeline?" vs. "resume from the prior halt at step X?" vs. "resume from the interrupted pause at step X?").
 
-If both files are absent: set `blocking_issues: ["No active lock and no halt snapshot — cannot determine resume step"]`, `recommended_step: 1`, `source: "none"`. The orchestrator should treat this as a fresh start.
+If both files are absent, fall back **once more** to an orphaned claim:
+```bash
+ls -t .claude/state/develop-pipeline.lock.pausing.* 2>/dev/null | head -1
+```
+
+The PreCompact hook claims the lock by renaming it to `develop-pipeline.lock.pausing.<pid>` *before* it writes the snapshot (task.120). A hook killed inside that window leaves the pipeline's state **only** under the claimed name — the lock byte for byte, renamed — and nothing else on disk says a pipeline was running. Read it exactly as the lock (`current_step` → `LOCK_STEP`; no `halt_step`, `pause_reason` or `paused_at` — treat it like a `cp`-degraded snapshot), set `source: "orphaned_claim"`, and surface it to the user as "a compaction pause was interrupted before it could save its snapshot; resume from step X?". Prefer the newest when several exist. The claim file is swept only by the *next* successful pause, which by then has claimed a newer lock, so reading it here is never raced.
+
+If none of the three is present: set `blocking_issues: ["No active lock, no halt snapshot and no orphaned claim — cannot determine resume step"]`, `recommended_step: 1`, `source: "none"`. The orchestrator should treat this as a fresh start.
 
 If the file is present but invalid JSON: add `"Lock/snapshot file unreadable — cannot determine resume step"` to `blocking_issues`.
 

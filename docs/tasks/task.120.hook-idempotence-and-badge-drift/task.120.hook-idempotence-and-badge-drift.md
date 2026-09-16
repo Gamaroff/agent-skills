@@ -219,6 +219,7 @@ None — API stable. The hook's inputs (the lock file, the environment), its out
 
 9. ✅ `README.md` — badge 126 → 128 (generated)
 10. ✅ `shared/resources/develop-pipeline-pause.md` — the claim (side-effect 0), the marker/find-then-edit PR arm, the same-step re-pause note, and the flow diagram
+9a. ✅ `shared/resources/pipeline-resume-detector-prompt.md` — Step 1 gains the `orphaned_claim` fallback (QA cycle 2, bug.2); bundled into 9 skills
 10a. ✅ `shared/resources/develop-pipeline-hooks.md` — trigger condition (claim), installer step 3 (identity + heal), idempotency paragraph, and a troubleshooting row for "paused twice"
 10b. ✅ `docs/reference/configuration.md` — the one-line installer description no longer says "skips entries already present" as if spelling were identity
 11. ✅ `CHANGELOG.md` — `[Unreleased]` entry `(task 120)`
@@ -346,6 +347,8 @@ None.
 | 2026-09-16 |  | Implemented — 28 files (3 sources, 3 test suites, wizard mirror, 4 docs, CHANGELOG, bundled copies), 14 new tests (3 hook scenarios, 6 installer, 5 generator); every mechanism mutation-proven | develop |
 | 2026-09-16 |  | QA gate CONCERNS (90/100) — 2 findings: README prose count not generated (MEDIUM), installer --dry-run self-contradiction (LOW); 2 advisories | qa-task |
 | 2026-09-16 |  | QA findings fixed — QA-1 README prose count generated (bug.1 Ready for QA), CR-1 dry-run reporting; 1 iteration, awaiting re-review | qa-fix |
+| 2026-09-16 |  | QA gate CONCERNS (80/100), cycle 2 refute pass — cycle-1 findings fixed; 2 new MEDIUM (claim-to-snapshot window, whole-group removal) + 1 LOW (doc over-claim) | qa-task |
+| 2026-09-16 |  | QA findings fixed — cycle 2: resume detector reads an orphaned claim (bug.2), element-level hook removal (bug.3), cross-skill hook identity, generator label; 2 iterations so far, awaiting re-review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -373,27 +376,29 @@ None.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-16
-**Quality Score**: 90/100
+**Testing Date**: 2026-09-16 (cycle 2)
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.120.qa.1.hook-idempotence-and-badge-drift.md](./task.120.qa.1.hook-idempotence-and-badge-drift.md)
-- **Gate File**: [task.120.gate.1.hook-idempotence-and-badge-drift.yml](./task.120.gate.1.hook-idempotence-and-badge-drift.yml)
+- **Full Report**: [task.120.qa.2.hook-idempotence-and-badge-drift.md](./task.120.qa.2.hook-idempotence-and-badge-drift.md) (cycle 1: [qa.1](./task.120.qa.1.hook-idempotence-and-badge-drift.md))
+- **Gate File**: [task.120.gate.2.hook-idempotence-and-badge-drift.yml](./task.120.gate.2.hook-idempotence-and-badge-drift.yml) (cycle 1: [gate.1](./task.120.gate.1.hook-idempotence-and-badge-drift.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3309 (`npm run ci:fast`) incl. 14 hook, 6 installer, 5 generator scenarios; 3 mutation proofs re-executed; 12 boundary probes
+- **Tests Executed**: 3311 (`npm run ci:fast`) incl. 14 hook, 7 installer, 7 generator scenarios; 2 cycle-1 fixes mutation-proven again; 12 boundary probes (cycle 1)
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 (1 MEDIUM, 1 LOW open)
-- **NFR Status**: Security: PASS (measured, 12 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 (2 MEDIUM, 1 LOW open)
+- **NFR Status**: Security: PASS (measured), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- **QA-1 (MEDIUM)** — `README.md:7` still hand-states "126 skills covering …" beside the generated `skills-128` badge ([bug.1](./task.120.bug.1.readme-prose-skill-count-drifts.md)) — **fixed cycle 1**: the generator now rewrites the prose count from the same total; bug.1 Ready for QA
-- **CR-1 (LOW)** — installer `--dry-run` prints "removing duplicate spelling (X)" then "already registered (X)" for the same entry; the canonical add is never shown — **fixed cycle 1**: `patch_hook` (and the wizard's `_patch_hook`) ignore non-exact spellings under dry-run; scenario 4b added
+- Cycle 1: **QA-1** (README prose count) and **CR-1** (dry-run reporting) — verified **FIXED** in cycle 2; bug.1 Closed
+- Cycle 2 (refute pass): **CR-1 (MEDIUM)** a kill between the lock claim and the snapshot leaves no resumable state where the resume path looks, and pause.md still promises otherwise ([bug.2](./task.120.bug.2.claim-to-snapshot-kill-window.md)) — **fixed cycle 2**: the resume detector reads the orphaned claim as its last fallback; pause.md names the window; scenario 15. **CR-2 (MEDIUM)** healing a duplicate spelling removes the whole matcher group, deleting a consumer's unrelated hook ([bug.3](./task.120.bug.3.heal-removes-whole-matcher-group.md)) — **fixed cycle 2**: element-level removal in all four unpatch helpers (installer + wizard); scenario 7. **CR-3 (LOW)** "one entry per event" over-claims across the three `develop-*` skill spellings — **fixed cycle 2**: `hook_identity` / `_hook_identity` strip the `develop-(story|task|bug)/` segment (byte-identical scripts) with scenario 8; hooks.md and CHANGELOG updated
+- Advisory CR-4 generator message label (`n_prose` was a match count) — **fixed cycle 2** (labelled by what changed; test added)
 
 ### Bug Reports
-- [bug.1: README prose skill count drifts](./task.120.bug.1.readme-prose-skill-count-drifts.md) — ✅ Ready for QA — Priority: P2 (Fixed 2026-09-16)
-- Advisory: CR-2 (cross-skill identity when BASE moves between runs), CR-3 (mv→snapshot kill window) — recorded in the gate's `recommendations.future`
+- [bug.1: README prose skill count drifts](./task.120.bug.1.readme-prose-skill-count-drifts.md) — ✅ Closed — Priority: P2 (Fixed 2026-09-16, verified cycle 2)
+- [bug.2: claim-to-snapshot kill window](./task.120.bug.2.claim-to-snapshot-kill-window.md) — ✅ Ready for QA — Priority: P2 (Fixed 2026-09-16: resume detector reads the orphaned claim)
+- [bug.3: heal removes whole matcher group](./task.120.bug.3.heal-removes-whole-matcher-group.md) — ✅ Ready for QA — Priority: P2 (Fixed 2026-09-16: element-level removal)
 
 ## References
 

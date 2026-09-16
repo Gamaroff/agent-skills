@@ -28,6 +28,12 @@
 #   6. hook_identity never collapses two DIFFERENT scripts: an on-stop.sh entry
 #      is not removed while healing on-precompact.sh, and a consumer hook whose
 #      command merely resembles ours is left alone.
+#   7. (task.120 CR-2 / bug.3) Removal is element-level: a shared matcher group
+#      keeps the consumer's own hook when our duplicate spelling is removed from
+#      it — for the exact healer and the regex (on-skill-return.sh) one alike.
+#   8. (task.120 CR-3) develop-story / develop-task / develop-bug spellings of the
+#      byte-identical hook scripts are ONE identity; another skill's same-named
+#      script is not.
 
 PASS=0
 FAIL=0
@@ -236,6 +242,80 @@ elif grep -q 'removing' <<<"$OUT6"; then
   fail "no-collapse: nothing reported removed" "$OUT6"
 else
   pass "no-collapse: a different hook script and a different skill's same-named script both survive; ours is added beside them"
+fi
+
+# ── Scenario 7 (CR-2 / bug.3): a shared matcher group keeps the consumer's hook ─
+# A hand-edited group holding a duplicate spelling of OUR hook and the consumer's
+# own hook. Removing the group removed the consumer's hook too; removal must be
+# element-level, and the group survives while it still has a hook in it.
+P7="$TMPDIR_TEST/p7"; make_project "$P7"
+cat > "$P7/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "*", "hooks": [
+        { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/skills/develop-story/scripts/on-precompact.sh\"" },
+        { "type": "command", "command": "echo consumer-hook-keep-me" }
+      ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Write", "hooks": [
+        { "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-skill-return.sh" },
+        { "type": "command", "command": "echo consumer-post-tool-use-keep-me" }
+      ] }
+    ]
+  }
+}
+JSON
+OUT7=$(run_installer "$P7" 2>&1); RC=$?
+S7="$P7/.claude/settings.json"
+PRE7=$(jq -r '.hooks.PreCompact[].hooks[].command' "$S7")
+POST7=$(jq -r '.hooks.PostToolUse[].hooks[].command' "$S7")
+if [ "$RC" -ne 0 ]; then
+  fail "shared group: exits 0" "rc=$RC: $OUT7"
+elif ! grep -qF 'echo consumer-hook-keep-me' <<<"$PRE7"; then
+  fail "shared group: the consumer's hook in the same PreCompact group survives the heal" "$(jq -c '.hooks.PreCompact' "$S7")"
+elif grep -qF '.claude/skills/develop-story' <<<"$PRE7"; then
+  fail "shared group: the duplicate spelling is removed from the group" "$PRE7"
+elif [ "$(jq '[.hooks.PreCompact[].hooks[].command] | length' "$S7")" != "2" ]; then
+  fail "shared group: consumer hook + canonical entry = 2 PreCompact hooks" "$PRE7"
+elif ! grep -qF 'echo consumer-post-tool-use-keep-me' <<<"$POST7" || grep -qF 'on-skill-return' <<<"$POST7"; then
+  fail "shared group: the regex unpatch (on-skill-return.sh) is element-level too" "$POST7"
+else
+  pass "shared group: duplicate spelling removed as an element; consumer's hooks in the same PreCompact and PostToolUse groups survive"
+fi
+
+# ── Scenario 8 (CR-3): the three develop-* skills are one identity ───────────
+# The scripts are byte-identical wrappers; a BASE that moved between skills
+# across installer runs (develop-task installed first, develop-story later) must
+# still converge on one entry per event.
+P8="$TMPDIR_TEST/p8"; make_project "$P8"
+cat > "$P8/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-task/scripts/on-precompact.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-bug/scripts/on-precompact.sh\"" } ] }
+    ],
+    "Stop": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-task/scripts/on-stop.sh" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/some-other-skill/scripts/on-stop.sh\"" } ] }
+    ]
+  }
+}
+JSON
+OUT8=$(run_installer "$P8" 2>&1); RC=$?
+S8="$P8/.claude/settings.json"
+if [ "$RC" -ne 0 ]; then
+  fail "cross-skill: exits 0" "rc=$RC: $OUT8"
+elif [ "$(jq '.hooks.PreCompact | length' "$S8")" != "1" ] || [ "$(jq -r '.hooks.PreCompact[0].hooks[0].command' "$S8")" != "$CANON_PRE" ]; then
+  fail "cross-skill: develop-task and develop-bug spellings converge on the canonical develop-story entry" "$(jq -c '.hooks.PreCompact' "$S8")"
+elif [ "$(jq '.hooks.Stop | length' "$S8")" != "2" ]; then
+  fail "cross-skill: Stop has the canonical entry plus the OTHER skill's on-stop.sh (not ours — kept)" "$(jq -c '.hooks.Stop' "$S8")"
+elif ! jq -r '.hooks.Stop[].hooks[].command' "$S8" | grep -qF 'some-other-skill/scripts/on-stop.sh'; then
+  fail "cross-skill: a different skill's same-named script is never collapsed into ours" "$(jq -c '.hooks.Stop' "$S8")"
+else
+  pass "cross-skill: develop-task / develop-bug spellings heal to one canonical entry per event; another skill's same-named script is untouched"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

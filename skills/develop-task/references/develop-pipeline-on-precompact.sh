@@ -106,6 +106,14 @@ fi
 # before the mv: a loser that started a beat later would delete the winner's
 # claim. (No nullglob in bash 3.2: with no match the loop sees the literal
 # pattern, and rm -f of a name that does not exist is a noop.)
+#
+# A stale claim can be the only copy of a killed run's state — a kill between
+# THAT run's claim and its snapshot leaves nothing under the lock's name and
+# nothing in last-halt.json (task.120 CR-1 / bug.2). That is why the Phase 0a
+# resume detector reads `.pausing.*` as its last fallback: the claim file is
+# the lock, byte for byte, under another name. Sweeping it HERE is safe because
+# reaching this line means a NEW lock was just claimed — a newer pipeline has
+# started, and this run's own snapshot (written next) is the state that matters.
 for stale in "$LOCK".pausing.*; do
   [ "$stale" = "$CLAIM" ] || rm -f "$stale"
 done

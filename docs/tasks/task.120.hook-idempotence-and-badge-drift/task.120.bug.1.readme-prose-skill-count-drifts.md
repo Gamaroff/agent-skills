@@ -4,7 +4,7 @@
 **Bug ID**: TASK-120-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-16
 
@@ -75,3 +75,4 @@ Extend `update_readme_badge()` to also rewrite the prose count — anchored on t
 | 2026-09-16 | New | QA Engineer | Filed from QA cycle 1 (CR-4 promoted) |
 | 2026-09-16 | In Progress | qa-fix | Investigation — single-site rewrite |
 | 2026-09-16 | Ready for QA | qa-fix | Prose count generated from `total`; tests + mutation proof |
+| 2026-09-16 | Closed | QA Engineer | Verified in QA cycle 2: 999 → 128 via the generator, unrelated numbers untouched, README identical to HEAD |

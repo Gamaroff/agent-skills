@@ -114,6 +114,17 @@ test("a README with the badge but no prose count is rewritten at the badge only"
   assert.match(r.stdout, /README badge → 2/);
 });
 
+test("a stale badge beside an already-current prose count is labelled a badge-only rewrite", (t) => {
+  // task.120 CR-4: the label must say what changed, not what matched.
+  const f = makeFixture(t, 3);
+  const readme = path.join(f.dir, "README.md");
+  fs.writeFileSync(readme, `${BADGE_LINE(1)}\n\n3 skills covering QA.\n`);
+  const r = runGenerator([f.skills, f.catalog, "--readme", readme]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /README badge → 3/);
+  assert.doesNotMatch(r.stdout, /prose count/);
+});
+
 test("a README without the badge line is left untouched, with a warning, exit 0", (t) => {
   const f = makeFixture(t, 2);
   const readme = path.join(f.dir, "README.md");
