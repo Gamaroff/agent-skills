@@ -3,7 +3,7 @@
 **Task**: `task.120.hook-idempotence-and-badge-drift.md`
 **Run Number**: 1
 **Started**: 2026-09-16 08:05
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -37,8 +37,8 @@ First automated run of task.120: make the PreCompact pause hook claim the lock a
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 3/3 phases; `ci:fast` green (3308/3309); 8 mutation proofs, all `covered` | — (surface map inline; test triage inline) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #410: https://github.com/Gamaroff/agent-skills/pull/410 — 4 phase commits (f118d2a1, 00e6ff51, b98170a7, 43a61ac2); issue #409 in-review comment posted; board in-review `stage-disabled` (not configured) | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.120.qa.{N}.*.md`; `task.120.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles (gates CONCERNS 90/80/80/80 → PASS 100); 6 bugs filed, 6 closed; 0 HIGH at any point; 5c CONCERNS (advisory) | — (reviewers' YAML captured in qa.N / pr-review.1) |
-| 7. finalise                | ⏳ Pending | `task.120.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.120.dod.{N}.*.md`; task `status: accepted`                       | `task.120.dod.1.*.md` ACCEPTED; CI reading 1 SUCCESS @ `10d787af`, reading 2 SUCCESS @ `ed5c22aa`; acceptance commit `ed5c22aa`; registry ticked; sprint review; PR canonical comment; #409 CLOSED; board `already`; 3 follow-ups recorded | — (4 DoD agents' YAML folded into dod.1) |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report final commit; lock removed (`--complete`) | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -80,6 +80,12 @@ First automated run of task.120: make the PreCompact pause hook claim the lock a
 - Step 5 cycle 5 — `/qa-task` scoped re-review (since gate 4, 5 files). Reviewer (Explore, 286 s) returned before the gate. Gate PASS 100/100, `top_issues: []` → route 1 → 5c. Path-1 commit: gate.5 + qa.5 + bug.6 closure committed (`docs(task.120): QA cycle 5 gate + report`) and pushed once — cycle 5's push is spent. Trail asserted on origin. `qa-cycle-5` posted; PR comment posted; `qa-gate` → `already`.
 - Step 5c — `/review-pr --effort medium --comment`: two Explore lenses in parallel (code 223 s, conformance 163 s). Verdict CONCERNS (no high+high). Acted on PC-3 before Step 7: task doc Out-of-Scope line and the Migration criterion reworded to say the resume contract was *extended* (bug.2/bug.5) — a two-line document correction the DoD would otherwise have verified against a contradiction. CR-1 + PC-1 (orphaned-claim lifecycle in the orchestrators' Start-fresh / terminal-HALT cleanup, files outside this PR) recorded as a follow-up in the pr-review report and gate.5 recommendations. GitHub board: ready-for-merge → see JSON above. Loop exit → Step 7.
 - Questions asked in the upfront `AskUserQuestion` call: 2 (Q1 branch base, Q2 PR target) — matches the required count for `develop-task`.
+- Step 7 — `/finalise` (part 1, local writes): DoD running summary `task.120.dod.1.hook-idempotence-and-badge-drift.md` opened; gate.5 PASS 100 read (0 prior DoD blocks). Four DoD Explore agents dispatched in one message — AC (105 s, PASS 12/12), security (184 s, PASS; boundary probed 95 candidates, 94 held, **one reproduced low-severity deviation**: `hook_identity` anchors per line so a multi-line consumer command containing our script is classified as ours — reproduced in main context, recorded as a follow-up, not fixed post-gate), compliance (NOT_APPLICABLE), docs (122 s, PASS). Mid-step the PreCompact hook fired: it claimed the lock, wrote the snapshot, committed and pushed the pause block (`10d787af`) and consumed the lock; on resume the lock was recreated from the snapshot at `current_step: 7` and the step continued in flight (no re-dispatch — all four agents had returned).
+- Step 7 — CI reading 1: **SUCCESS @ `10d787af5b91e21b2b1f7580dade1ebae8d4c19a`** (validate, test, shellcheck, link-check, branch-policy all COMPLETED SUCCESS; head = the pause commit, docs-only on top of `cc42a9c2`). Decision matrix: AC PASS, PR review decision null (Step 5c advisory CONCERNS — same disposition as task.116), docs PASS, security PASS, compliance N/A, gate PASS, CI SUCCESS → **ACCEPTED**.
+- Step 7 — acceptance writes: frontmatter `status: accepted`, `updated`/`completed_date: 2026-09-16`, `pr_number: 410`; body `**Status:** Accepted`; Change Log row `1.2 | DoD passed — accepted (PR #410) | finalise` via `change-log.js`; `## Definition of Done - PASSED ✅` section with the three follow-ups; `registry-tick.js` → `ticked` (line 162, planned → accepted); `sprint-review-summary.md` created.
+- Step 7 — publish boundary: 6a acceptance commit `ed5c22aa` (`docs(task.120): accept — DoD, sprint review; registry ticked`; implementation report excluded) pushed; 6b all three artefacts tracked and on `origin/feature/task.120.*`, pushed doc reads `status: accepted`, PR head == `ed5c22aa`; 6c CI reading 2 polled in the background on `ed5c22aa` (result below); 6d CHANGELOG `[Unreleased]` cites task 120 ✅.
+- Step 7 — CI reading 2: **SUCCESS @ `ed5c22aa224092e8d5e575d021d177576a0cd34a`** (background poll, 120 s; sampled head == acceptance head). Side-effects after the boundary: canonical PR comment posted (https://github.com/Gamaroff/agent-skills/pull/410#issuecomment-5694456495, marker `<!-- finalise-canonical-summary -->`); issue #409 Document link already on `develop` (no edit); tracker `done` comment → `posted`; `tracker-issue.js --kind close` → `performed`, `gh issue view` confirms CLOSED; `gh-stage.js --stage done` → `already` (card already in the Done column). Tracker debt: none.
+- Step 8 — implementation report finalised (Completion block, rows 7–8 ✅); committed via `/commit-changes`, pushed; lock removed with `advance-pipeline-lock.sh --complete`. Post-run: `.claude/state/develop-pipeline.last-halt.json` is this run's own precompact snapshot (step 7, consumed on resume) — left in place per the resume contract; the orchestrator's Start-fresh path deletes it on the next run.
 
 ---
 
@@ -145,17 +151,17 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-16 12:29
+**Final Status**: Completed
 **Branch**: feature/task.120.hook-idempotence-and-badge-drift
 **PR**: https://github.com/Gamaroff/agent-skills/pull/410
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5 (gates CONCERNS 90/80/80/80 → PASS 100; 6 bugs filed, 6 closed; never a HIGH)
+**DoD Summary**: `task.120.dod.1.hook-idempotence-and-badge-drift.md` — ACCEPTED; CI reading 1 SUCCESS @ `10d787af5b91`, CI reading 2 SUCCESS @ `ed5c22aa2240` (acceptance head)
+**Tracker debt**: none
 
 ---
 
-## Pipeline Paused — 2026-09-16T08:05:02Z
+## Pipeline Paused — 2026-09-16T08:05:02Z (resolved — resumed in Step 7 from the snapshot; pipeline completed)
 
 ⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
 
@@ -170,4 +176,3 @@ _Track each QA review/fix cycle._
 **Resume**: re-invoke `/develop-task <path>` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step 7.
 
 **Pipeline Progress** for this step is now `⏸️ Paused` — equivalent to `⏳ Pending` for resume purposes (the step will re-run from the start).
-
