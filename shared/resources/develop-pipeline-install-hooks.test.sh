@@ -34,10 +34,12 @@
 #   8. (task.120 CR-3) develop-story / develop-task / develop-bug spellings of the
 #      byte-identical hook scripts are ONE identity; another skill's same-named
 #      script is not.
-#   9. (task.120 cycle-3 CR-1 / bug.4) a consumer's own project-root scripts/<hook>.sh
-#      — same tail, no develop-* segment — is NOT ours and survives the heal.
-#  10. (task.120 cycle-3 CR-3) a matcher group with no hooks[] key does not abort the
-#      heal and is left exactly as it is.
+#   9. (task.120 cycle-3 CR-1 / bug.4, cycle-4 CR-1 / bug.6) a consumer's own
+#      project-root scripts/<hook>.sh — bash-prefixed, quoted, or with NO interpreter —
+#      is NOT ours and survives the heal.
+#  10. (task.120 cycle-3 CR-3, cycle-4 CR-2/CR-3) a matcher group with no hooks[] key,
+#      a pre-existing EMPTY hooks[] group, and a prompt-type element without `command`
+#      neither abort the heal nor get removed; they are left exactly as they are.
 
 PASS=0
 FAIL=0
@@ -333,6 +335,7 @@ cat > "$P9/.claude/settings.json" <<'JSON'
     "Stop": [
       { "matcher": "*", "hooks": [ { "type": "command", "command": "bash scripts/on-stop.sh" } ] },
       { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/scripts/on-stop.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "scripts/on-stop.sh" } ] },
       { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-story/scripts/on-stop.sh" } ] }
     ],
     "PreCompact": [
@@ -349,16 +352,19 @@ if [ "$RC" -ne 0 ]; then
   fail "consumer scripts/: exits 0" "rc=$RC: $OUT9"
 elif ! grep -qxF 'bash scripts/on-stop.sh' <<<"$STOP9" || ! grep -qF '${CLAUDE_PROJECT_DIR}/scripts/on-stop.sh' <<<"$STOP9"; then
   fail "consumer scripts/: both project-root on-stop.sh hooks survive" "$STOP9"
+elif ! grep -qxF 'scripts/on-stop.sh' <<<"$STOP9"; then
+  # bug.6: a command with NO interpreter that IS the identity string must not collide.
+  fail "consumer scripts/: the interpreter-less \`scripts/on-stop.sh\` survives (bug.6)" "$STOP9"
 elif grep -qF '.claude/skills/develop-story' <<<"$STOP9" || ! grep -qxF "$CANON_STOP" <<<"$STOP9"; then
   fail "consumer scripts/: OUR bare-relative spelling still heals to the canonical entry" "$STOP9"
-elif [ "$(jq '[.hooks.Stop[].hooks[].command] | length' "$S9")" != "3" ]; then
-  fail "consumer scripts/: 2 consumer hooks + 1 canonical = 3 Stop hooks" "$STOP9"
+elif [ "$(jq '[.hooks.Stop[].hooks[].command] | length' "$S9")" != "4" ]; then
+  fail "consumer scripts/: 3 consumer hooks + 1 canonical = 4 Stop hooks" "$STOP9"
 elif ! grep -qF '${CLAUDE_PROJECT_DIR}/scripts/on-precompact.sh' <<<"$PRE9" || ! grep -qxF "$CANON_PRE" <<<"$PRE9"; then
   fail "consumer scripts/: project-root on-precompact.sh survives beside the canonical add" "$PRE9"
 elif [ "$(grep -c 'removing duplicate spelling' <<<"$OUT9")" != "1" ]; then
   fail "consumer scripts/: exactly one removal (our bare-relative spelling), never a consumer hook" "$OUT9"
 else
-  pass "consumer scripts/<hook>.sh: project-root hooks survive the heal; only our own spelling is removed; canonical entries added"
+  pass "consumer scripts/<hook>.sh (bash-prefixed, quoted, interpreter-less): all survive the heal; only our own spelling is removed; canonical entries added"
 fi
 
 # ── Scenario 10 (cycle-3 CR-3): a matcher group with no hooks[] key ──────────
@@ -370,11 +376,13 @@ cat > "$P10/.claude/settings.json" <<'JSON'
   "hooks": {
     "PreCompact": [
       { "matcher": "*" },
+      { "matcher": "*", "hooks": [] },
       { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-story/scripts/on-precompact.sh" } ] }
     ],
     "PostToolUse": [
       { "matcher": "Write" },
-      { "matcher": "Write", "hooks": [ { "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-skill-return.sh" } ] }
+      { "matcher": "Edit", "hooks": [] },
+      { "matcher": "Write", "hooks": [ { "type": "prompt", "prompt": "consumer prompt hook" }, { "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-skill-return.sh" } ] }
     ]
   }
 }
@@ -387,12 +395,17 @@ elif grep -qi 'cannot iterate' <<<"$OUT10"; then
   fail "hooks-less group: no jq error" "$OUT10"
 elif [ "$(jq -c '.hooks.PreCompact[0]' "$S10")" != '{"matcher":"*"}' ]; then
   fail "hooks-less group: the group without hooks is left exactly as it is" "$(jq -c '.hooks.PreCompact' "$S10")"
-elif [ "$(jq -r '.hooks.PreCompact[1].hooks[0].command' "$S10")" != "$CANON_PRE" ] || [ "$(jq '.hooks.PreCompact | length' "$S10")" != "2" ]; then
+elif [ "$(jq -c '.hooks.PreCompact[1]' "$S10")" != '{"matcher":"*","hooks":[]}' ]; then
+  # cycle-4 CR-2: a PRE-EXISTING empty group is not ours to prune.
+  fail "hooks-less group: a consumer's pre-existing empty hooks[] group survives" "$(jq -c '.hooks.PreCompact' "$S10")"
+elif [ "$(jq -r '.hooks.PreCompact[2].hooks[0].command' "$S10")" != "$CANON_PRE" ] || [ "$(jq '.hooks.PreCompact | length' "$S10")" != "3" ]; then
   fail "hooks-less group: our duplicate spelling still heals to the canonical entry" "$(jq -c '.hooks.PreCompact' "$S10")"
-elif [ "$(jq -c '.hooks.PostToolUse' "$S10")" != '[{"matcher":"Write"}]' ]; then
-  fail "hooks-less group: regex unpatch removes on-skill-return.sh and leaves the hooks-less group" "$(jq -c '.hooks.PostToolUse' "$S10")"
+elif [ "$(jq -c '.hooks.PostToolUse' "$S10")" != '[{"matcher":"Write"},{"matcher":"Edit","hooks":[]},{"matcher":"Write","hooks":[{"type":"prompt","prompt":"consumer prompt hook"}]}]' ]; then
+  # cycle-4 CR-3: a prompt-type element (no `command`) must neither error nor be removed;
+  # the obsolete on-skill-return.sh beside it must still go.
+  fail "hooks-less group: regex unpatch removes on-skill-return.sh, keeps the prompt-type element, the hooks-less group and the pre-existing empty group" "$(jq -c '.hooks.PostToolUse' "$S10")"
 else
-  pass "hooks-less matcher group: heal completes, group left as-is, duplicate healed, regex unpatch element-level"
+  pass "hooks-less / empty / prompt-type shapes: heal completes, both left as-is, duplicate healed, obsolete hook removed beside a prompt-type element"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

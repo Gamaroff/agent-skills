@@ -4,7 +4,7 @@
 **Bug ID**: TASK-120-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 3 — completeness of the cycle-2 fix for bug.2)
 **Date Found**: 2026-09-16
 
@@ -69,3 +69,4 @@ In the detector prompt: when the lock is absent, gather both candidates, drop an
 | 2026-09-16 | New | QA Engineer | Filed from QA cycle 3 |
 | 2026-09-16 | In Progress | qa-fix | Investigation — fixed precedence assumed consumption |
 | 2026-09-16 | Ready for QA | qa-fix | Choose by document, then age; docs aligned |
+| 2026-09-16 | Closed | QA Engineer | Verified in QA cycle 4: Step 1 walked against the real stale task.110 snapshot + synthetic task.120 claim — snapshot dropped, claim wins |

@@ -1621,7 +1621,8 @@ install_skills() {
 _hook_identity() {
   local id
   id=$(printf '%s' "$1" | sed -nE 's#^(bash +)?("?\$\{CLAUDE_PROJECT_DIR\}/)?(\.(claude|agents)/skills/)?develop-(story|task|bug)/(scripts/[^"[:space:]]+)"?$#\6#p')
-  if [[ -n "$id" ]]; then printf '%s' "$id"; else printf '%s' "$1"; fi
+  # A match lives in its own namespace so a verbatim non-match can never equal it (bug.6).
+  if [[ -n "$id" ]]; then printf 'develop-pipeline-hook:%s' "$id"; else printf '%s' "$1"; fi
 }
 
 # Patch a single hook event into SETTINGS_FILE unless an entry with the same
@@ -1673,13 +1674,17 @@ _unpatch_hook() {
   [[ -f "$HOOKS_SETTINGS_FILE" ]] || return 0
   local present
   present=$(jq --arg event "$event" --arg pat "$pattern" \
-    '[.hooks[$event][]?.hooks[]? | select(.command | test($pat))] | length' \
+    '[.hooks[$event][]?.hooks[]? | select((.command // "") | test($pat))] | length' \
     "$HOOKS_SETTINGS_FILE" 2>/dev/null || echo 0)
   [[ "${present:-0}" == "0" ]] && return 0
   local tmp; tmp=$(mktemp)
   jq --arg event "$event" --arg pat "$pattern" \
-    '(.hooks[$event]) |= (map(if .hooks == null then . else .hooks |= map(select(.command | test($pat) | not)) end)
-                          | map(select(.hooks == null or (.hooks | length) > 0)))
+    '(.hooks[$event]) |= map(
+        if .hooks == null then .
+        else (.hooks | length) as $before
+             | .hooks |= map(select((.command // "") | test($pat) | not))
+             | select($before == 0 or (.hooks | length) > 0)
+        end)
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
     "$HOOKS_SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; err "jq failed while editing ${HOOKS_SETTINGS_FILE} — file left unchanged"; return 1; }
   mv "$tmp" "$HOOKS_SETTINGS_FILE"
@@ -1704,8 +1709,12 @@ _unpatch_hook_exact() {
   local tmp; tmp=$(mktemp)
   # Element-level removal: a shared matcher group keeps its other hooks (task.120 CR-2).
   jq --arg event "$event" --arg cmd "$cmd" \
-    '(.hooks[$event]) |= (map(if .hooks == null then . else .hooks |= map(select(.command != $cmd)) end)
-                          | map(select(.hooks == null or (.hooks | length) > 0)))
+    '(.hooks[$event]) |= map(
+        if .hooks == null then .
+        else (.hooks | length) as $before
+             | .hooks |= map(select(.command != $cmd))
+             | select($before == 0 or (.hooks | length) > 0)
+        end)
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
     "$HOOKS_SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; err "jq failed while editing ${HOOKS_SETTINGS_FILE} — file left unchanged"; return 1; }
   mv "$tmp" "$HOOKS_SETTINGS_FILE"
@@ -1725,7 +1734,9 @@ _heal_hook() {
     [[ -n "$existing" ]] || continue
     [[ "$existing" == "$cmd" ]] && continue
     [[ "$(_hook_identity "$existing")" == "$id" ]] || continue
-    _unpatch_hook_exact "$event" "$existing"
+    # Under set -e a bare failing call would end the whole wizard here with no
+    # summary (task.120 cycle-4 CR-4); record it and let the run reach its summary.
+    _unpatch_hook_exact "$event" "$existing" || { record_warning "Pipeline hooks: could not remove duplicate spelling (${existing}) — settings file left unchanged"; return 0; }
   done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$HOOKS_SETTINGS_FILE")
 }
 
@@ -1804,7 +1815,7 @@ install_hooks() {
   _heal_hook  "Stop"        "$_stop_cmd"
   _patch_hook "Stop"        "$_stop_cmd"
   # Migration: strip the obsolete PostToolUse/on-skill-return.sh hook from older installs.
-  _unpatch_hook "PostToolUse" "on-skill-return\\.sh"
+  _unpatch_hook "PostToolUse" "on-skill-return\\.sh" || record_warning "Pipeline hooks: could not remove the obsolete on-skill-return.sh hook — settings file left unchanged"
   if [[ "$DRY_RUN" == false ]]; then
     ok "Pipeline hooks registered in ${HOOKS_SETTINGS_FILE}"
     record_step "Pipeline hooks" "ok" "2 hooks registered"

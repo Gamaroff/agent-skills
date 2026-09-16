@@ -263,7 +263,11 @@ if [ -n "$PR_URL" ]; then
           -q ".comments[] | select(.body | startswith(\"$PR_MARKER\")) | .url" 2>/dev/null \
           | head -1 | grep -oE '[0-9]+$')
         if [ -n "$EXISTING_PR_COMMENT" ]; then
-          PR_REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)
+          # owner/repo is already in PR_URL (github.com/<owner>/<repo>/pull/N);
+          # `gh repo view` in the hook's cwd is only the fallback for a URL that
+          # does not parse — a mismatch there would have built /repos//… .
+          PR_REPO=$(printf '%s' "$PR_URL" | sed -nE 's#^https?://[^/]+/([^/]+/[^/]+)/pull/[0-9]+.*$#\1#p')
+          [ -n "$PR_REPO" ] || PR_REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)
           TRACKER_WRITE_KIND=github.pr.comment \
           TRACKER_WRITE_SKILL="$SKILL" \
           TRACKER_WRITE_INTENT="Update the pipeline-paused notice (Step ${CURRENT_STEP}) on the pull request (body: $PR_BODY_FILE)" \

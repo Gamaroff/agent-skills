@@ -79,7 +79,7 @@ If the lock is absent, the state — if any — is in one of two places, and **n
 **Choose between them by document, then by age — not by a fixed order** (task.120 bug.5: a fixed snapshot-first order let a stale `last-halt.json` from a previous task shadow a fresher claim for this one, and would have recommended resuming the wrong task):
 
 ```bash
-ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeline.lock.pausing.* 2>/dev/null
+ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeline.lock.pausing.* 2>/dev/null || true
 ```
 
 1. Read every candidate listed. Drop any whose `task_or_story_directory` is not the directory of the document being resumed — and **report each one dropped** in `deltas_since_pause` ("stale snapshot for `<other dir>` ignored"); a leftover for another task is itself worth the operator's attention.

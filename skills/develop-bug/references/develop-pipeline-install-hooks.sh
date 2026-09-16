@@ -135,16 +135,16 @@ fi
 # strips: `bash `, the optional quoted "${CLAUDE_PROJECT_DIR}/", the optional
 # .claude/skills/ or .agents/skills/ root, then a REQUIRED develop-(story|task|bug)/
 # segment (the three ship byte-identical hook scripts), then the scripts/<hook>.sh
-# tail. A command that does not carry one of those three skill names is returned
-# verbatim, so it can never equal our identity — a consumer's own project-root
-# `bash scripts/on-stop.sh` stays a different hook (task.120 CR-1 / bug.4: when
-# the segment was merely stripped-if-present, its absence read the same as its
-# presence and the healer deleted the consumer's hook). Add a spelling here only
-# with a fixture that carries it (develop-pipeline-install-hooks.test.sh).
+# tail. A MATCH is returned in its own namespace — `develop-pipeline-hook:scripts/<hook>.sh`
+# — and anything else is returned verbatim, so the two can never be equal: a
+# consumer's own `bash scripts/on-stop.sh` (task.120 bug.4) or even a bare
+# `scripts/on-stop.sh` with no interpreter (bug.6) stays a different hook. The
+# prefix carries a colon, which a hook command never begins with. Add a spelling
+# here only with a fixture that carries it (develop-pipeline-install-hooks.test.sh).
 hook_identity() {
   local id
   id=$(printf '%s' "$1" | sed -nE 's#^(bash +)?("?\$\{CLAUDE_PROJECT_DIR\}/)?(\.(claude|agents)/skills/)?develop-(story|task|bug)/(scripts/[^"[:space:]]+)"?$#\6#p')
-  if [ -n "$id" ]; then printf '%s' "$id"; else printf '%s' "$1"; fi
+  if [ -n "$id" ]; then printf 'develop-pipeline-hook:%s' "$id"; else printf '%s' "$1"; fi
 }
 
 # Adds a hook entry for `event` running `cmd` unless an existing entry already
@@ -200,9 +200,13 @@ patch_hook() {
 # no matching element exists. Used to heal older installs that registered the
 # obsolete on-skill-return.sh PostToolUse hook.
 #
-# A group with no hooks[] key at all is left exactly as it is — there is nothing
-# of ours in it to remove, and iterating a null was how the heal aborted mid-run
-# (task.120 cycle 3). Element-level, not group-level (task.120 CR-2 / bug.3): a hand-edited group
+# A group with no hooks[] key, or an already-empty hooks[], is left exactly as it
+# is — there is nothing of ours in it to remove; iterating a null was how the heal
+# aborted mid-run (task.120 cycle 3), and pruning on "empty after" rather than
+# "emptied by this filter" dropped a consumer's pre-existing empty group whenever
+# a sibling matched (cycle 4). An element with no `command` (a prompt-type hook)
+# is read as "" so it neither matches nor errors. Element-level, not group-level
+# (task.120 CR-2 / bug.3): a hand-edited group
 # {matcher, hooks:[<ours>, <the consumer's own hook>]} is one group with two
 # hooks, and removing the GROUP deleted the consumer's hook along with ours —
 # silently, on every re-run. The strip list promises a consumer's unrelated hook
@@ -213,7 +217,7 @@ unpatch_hook() {
 
   local present
   present=$(jq --arg event "$event" --arg pat "$pattern" \
-    '[.hooks[$event][]?.hooks[]? | select(.command | test($pat))] | length' \
+    '[.hooks[$event][]?.hooks[]? | select((.command // "") | test($pat))] | length' \
     "$SETTINGS_FILE" 2>/dev/null || echo 0)
 
   if [ "${present:-0}" = "0" ]; then
@@ -225,8 +229,12 @@ unpatch_hook() {
   local tmp
   tmp=$(mktemp)
   jq --arg event "$event" --arg pat "$pattern" \
-    '(.hooks[$event]) |= (map(if .hooks == null then . else .hooks |= map(select(.command | test($pat) | not)) end)
-                          | map(select(.hooks == null or (.hooks | length) > 0)))
+    '(.hooks[$event]) |= map(
+        if .hooks == null then .
+        else (.hooks | length) as $before
+             | .hooks |= map(select((.command // "") | test($pat) | not))
+             | select($before == 0 or (.hooks | length) > 0)
+        end)
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
     "$SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; echo "Error: jq failed while editing ${SETTINGS_FILE} — file left unchanged." >&2; exit 1; }
 
@@ -263,8 +271,12 @@ unpatch_hook_exact() {
   local tmp
   tmp=$(mktemp)
   jq --arg event "$event" --arg cmd "$cmd" \
-    '(.hooks[$event]) |= (map(if .hooks == null then . else .hooks |= map(select(.command != $cmd)) end)
-                          | map(select(.hooks == null or (.hooks | length) > 0)))
+    '(.hooks[$event]) |= map(
+        if .hooks == null then .
+        else (.hooks | length) as $before
+             | .hooks |= map(select(.command != $cmd))
+             | select($before == 0 or (.hooks | length) > 0)
+        end)
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
     "$SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; echo "Error: jq failed while editing ${SETTINGS_FILE} — file left unchanged." >&2; exit 1; }
 

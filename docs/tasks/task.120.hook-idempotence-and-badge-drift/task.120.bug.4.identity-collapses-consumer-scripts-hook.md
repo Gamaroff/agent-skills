@@ -4,7 +4,7 @@
 **Bug ID**: TASK-120-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 3 — regression from the cycle-2 fix for CR-3)
 **Date Found**: 2026-09-16
 
@@ -71,3 +71,4 @@ Make the identity a single anchored match rather than independent strips: `^(bas
 | 2026-09-16 | New | QA Engineer | Filed from QA cycle 3 (regression from cycle-2 CR-3 fix) |
 | 2026-09-16 | In Progress | qa-fix | Investigation — optional strips |
 | 2026-09-16 | Ready for QA | qa-fix | Anchored match requiring the develop-* segment; scenario 9 |
+| 2026-09-16 | Closed | QA Engineer | Verified in QA cycle 4: `bash scripts/on-stop.sh` survives; segment-optional mutation red. Residual interpreter-less collision filed as bug.6 |
