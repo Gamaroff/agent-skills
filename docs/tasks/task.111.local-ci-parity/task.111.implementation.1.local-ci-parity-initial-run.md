@@ -3,7 +3,7 @@
 **Task**: `task.111.local-ci-parity.md`
 **Run Number**: 1
 **Started**: 2026-09-16 09:26
-**Status**: Escalated
+**Status**: In Progress (resumed — loop limit lifted by the user)
 
 ---
 
@@ -79,7 +79,15 @@ Make `npm run ci` run every CI lane (add `validate:all`, `bundle:check`, a `lint
 - Step 5b cycle 4 — `/qa-fix`: one fix + two cleanups; first parser attempt gave the deeper dash line the step's own column (caught by the extended synthetic test before commit — the fix-time adversarial pass working). Commit `98a59e89`, pushed once. PR comment posted; tracker `qa-fix` → `already`. Post-fix PR state: OPEN, head 98a59e89. Cycle counter → 5.
 - Step 5 cycle 5 — scoped review; reviewer (Explore, 139 s) → 1 MEDIUM (the same false-green QA had already reproduced by probing) + 3 cleanups. Gate **CONCERNS 90/100** → Convergence: HIGH [0,0,0,0,0] → not tripped; Diminishing-returns: globs unset → continue → **5b**. Deferring the entry to reach 5c was considered and rejected: a MEDIUM false-green in the very test the task adds is not "test machinery residue", and the engine's exit is the only sanctioned early exit. qa-cycle-5 posted; PR comment posted; changes-requested: stage-disabled.
 - Step 4 — SCOPE_PATHS: docs/tasks/task.111.local-ci-parity, .github/workflows, docs/contributing, evals/shared/tests, scripts, skills/create-skill/scripts, skills/develop-story, tests, package.json, CHANGELOG.md, CONTRIBUTING.md. Pre-flight guard: no out-of-scope untracked files. `/create-pr --base develop --issue 411 --scope …` → `/commit-changes` split the work into one commit per phase plus a docs commit (feat(ci) 94493e40, test(pipelines) 52a0627f, feat(create-skill) d8843f3c, docs(task.111) d90e2c5c — the implementation report's first commit rides in the last). PR body written from the author's own knowledge of the diff (produced in this session; no summariser subagent). PR #412 created. Leak check: OK. Post-PR state check (inline `gh pr view`): PR #412 state = OPEN, head d90e2c5c, errors = 0. GitHub board: in-review → stage-disabled (`pipeline.in-review` not configured; correct outcome). Lock `pr_url` updated. Transient `.git/index.lock` contention during staging handled with a retry wrapper (another process on this host holds the lock briefly).
+- Step 5 cycle 6 — scoped review (limit lifted); reviewer (Explore, 154 s) → 2 MEDIUM + 1 LOW (both MEDIUMs reproduced by QA) + 1 cleanup. Gate **CONCERNS 90/100** → 5b with the third-strike constraint passed explicitly (cycles 3–6 all in one file). qa-cycle-6 posted; PR comment posted.
+- Step 5 cycle 7 — scoped review of the new reader; reviewer (Explore, 104 s) → 1 MEDIUM (reproduced) + 2 LOW + 3 cleanups. Gate **CONCERNS 90/100** → 5b. qa-cycle-7 posted; PR comment posted.
+- Step 5 cycle 8 — scoped review; reviewer (Explore, 165 s) → 1 MEDIUM + 2 cleanups. Gate **CONCERNS 90/100** → 5b. qa-cycle-8 posted; PR comment posted.
+- Step 5 cycle 9 — scoped review; reviewer (Explore, 54 s) → 0 bugs, 2 cleanups. Gate **PASS 100/100**, empty queue → **5c** (route 1). Path-1 commit `5536250f` (gate.9 + qa.9), pushed once — cycle 9's push is spent. Trail asserted on origin. qa-cycle-9 posted; PR comment posted.
+- Step 5b cycle 8 — `/qa-fix`: three taken. Commit `ae00296a`, pushed once. Post-fix PR state: OPEN. Cycle counter → 9.
+- Step 5b cycle 7 — `/qa-fix`: all six taken. Commit `cfa79c95`, pushed once. PR comment posted; tracker `qa-fix` → `already`. Post-fix PR state: OPEN, head cfa79c95. Cycle counter → 8.
+- Step 5b cycle 6 — `/qa-fix`: **replace the mechanism** — real YAML read. Commit `d4b830b0`, pushed once. PR comment posted; tracker `qa-fix` → `already`. Post-fix PR state: OPEN, head d4b830b0. Cycle counter → 7.
 - Step 5b cycle 5 — `/qa-fix`: fix + cleanups, adversarial pass caught two of its own regressions before commit. Commit `85ab2985`, pushed once. PR comment posted; tracker `qa-fix` → `already`. Post-fix PR state: OPEN, head 85ab2985. Cycle counter → 6 → **Loop limit** → escalation (Issues Log). `blocked` signal: attempted (see below). Lock snapshotted to `.claude/state/develop-pipeline.last-halt.json` and removed.
+- **User decision (2026-09-16, after the loop-limit HALT): "You can exceed the QA Loop Limit so that the problems can get solved."** The 5-cycle budget is lifted for this run; the loop continues from cycle 6 until a gate reaches 5c. Lock recreated from the halt snapshot at `current_step: 5`; the escalation entry stays in the Issues Log as the record of the halt.
 - Removed stale `.claude/state/develop-pipeline.last-halt.json` — it belonged to task.120 (PR #410, already merged and accepted), not to this run.
 
 ---
@@ -171,12 +179,51 @@ _Track each QA review/fix cycle._
 **Fixes Applied**: key column read off the dash match (`dash[0].length`); items opened only under `steps:` (comment tolerated); every indicator spelling + trailing comment normalised; comment corrected. Mutations: dash+2 restored / steps: gate removed / old indicator regex / steps: comment rejected → synthetic test red each. Adversarial pass caught two things before commit: a `steps: # comment` line would have hidden every step, and the first job-level fixture did not reproduce the phantom (both fixed). Fast gate green 3338/3339.
 **Commit**: `85ab2985` (gate.5 + qa.5 + fix; report excluded), pushed once
 
+### QA Cycle 6 — 2026-09-16 (beyond the budget — user decision)
+**Gate Result**: CONCERNS (90/100) — scoped to `ci-gate-parity.test.mjs`
+**Issues Found**: gate-5 CR-1 verified FIXED. New: CR-1 MEDIUM job keys after `steps:` parsed; CR-2 MEDIUM bare `-` item dropped; CR-3 LOW flow mapping / trailing comments / quoted uses: — the fourth consecutive cycle of new YAML shapes in the same parser
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 6 — replace the mechanism)
+**Fixes Applied**: hand-rolled parser replaced by `parseWorkflow()` (PyYAML via python3) + `stepsOfJob()`; `workflowInvocations()` on the same reader; cycle-6 fixtures added; three block-scalar fixtures corrected (a single-command block IS the command). Mutations: five shapes red incl. bare-dash and flow-mapping gate steps. Real workflows: same 20 steps. Fast gate green 3338/3339.
+**Commit**: `d4b830b0` (gate.6 + qa.6 + fix; report excluded), pushed once
+
+### QA Cycle 7 — 2026-09-16
+**Gate Result**: CONCERNS (90/100) — scoped to the new reader
+**Issues Found**: gate-6 entries all verified FIXED by the mechanism replacement. New: CR-1 MEDIUM date-like scalar crashes json.dumps (misreported as missing PyYAML; reproduced); CR-2 LOW spawn message `undefined`; CR-3 LOW single-command block under a comment; cleanups: stale docstring, dead jobBlock() reader, ~15 spawns
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 7)
+**Fixes Applied**: default=str; spawn-vs-parse messages; command lines exclude blanks/comments; docstring removed; jobBlock() + tautological test removed (one reader); parse memoised (suite 3 s → 0.5 s); dated-step fixture. Mutations: default=str removed → red; comment lines counted → red; python3 absent → names itself. Fast gate green 3338/3339.
+**Commit**: `cfa79c95` (gate.7 + qa.7 + fix; report excluded), pushed once
+
+### QA Cycle 8 — 2026-09-16
+**Gate Result**: CONCERNS (90/100)
+**Issues Found**: gate-7 six items verified FIXED. New: CR-1 MEDIUM the replacement leak guard is tautological (reviewer probed a job-blind reader); CR-2/CR-3 comment mismatches
+**HIGH findings**: 0
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 8)
+**Fixes Applied**: synthetic two-job non-leak assertion (+ missing job → null); docblock and header contract corrected. Mutation: job-blind stepsOfJob → red. Fast gate green 3338/3339.
+**Commit**: `ae00296a` (gate.8 + qa.8 + fix; report excluded), pushed once
+
+### QA Cycle 9 — 2026-09-16
+**Gate Result**: PASS (100/100)
+**Issues Found**: none — gate-8 fix verified (job-blind mutant red); 2 advisory cleanups (recommendations.future)
+**HIGH findings**: 0
+**PR Review**: pending — 5c not yet run
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Commit**: `5536250f` (gate.9 + qa.9 — path 1, one push; trail asserted on origin)
+
 ---
 
 ## Completion
 
 **Finished**: {populated at end}
-**Final Status**: Escalated — QA Loop Limit Reached (see Issues Log)
+**Final Status**: {populated at end}
 **Branch**: `feature/task.111.local-ci-parity`
 **PR**: https://github.com/Gamaroff/agent-skills/pull/412
 **QA Iterations**: 5 (limit)
