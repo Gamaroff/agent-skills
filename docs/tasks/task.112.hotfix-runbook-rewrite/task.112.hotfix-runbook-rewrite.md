@@ -5,18 +5,21 @@ type: task
 description: "docs/runbooks/hotfix.md documents a seven-step manual loop (create-branch --hotfix → implement → tests → commit → PR to main → tag → back-merge) and mentions no pipeline, no bug report, no review-bug gate, no tracker, no review-pr — grep for develop-bug / review-bug / tracker / review-pr returns 0 each. /develop-bug owns the 'production hotfix off main' branch model (Phase 0d Q1) and already handles the PR-to-main and the back-merge note. Same class as task.107, which rewrote bug-fix.md; this is the sibling page it deliberately left out. Two small doc drifts ride along."
 tags: [documentation, runbooks, develop-bug, hotfix]
 category: documentation
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-16
 assignee:
 estimated_effort_hours: 3
+github_issue: 413
 ---
 
 # Technical Task: The hotfix runbook predates /develop-bug's hotfix model and never mentions it
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.112.review.1.hotfix-runbook-rewrite.md` implemented 2026-09-16
+**GitHub Issue**: [#413](https://github.com/Gamaroff/agent-skills/issues/413)
 
 ---
 
@@ -83,7 +86,7 @@ tag step (which `/develop-bug` does not do — tagging is a human call, per `doc
 ### In Scope
 
 ✅ Rewrite `docs/runbooks/hotfix.md`: file the bug → `/develop-bug` with Q1 = hotfix → tag (human) → back-merge; both tracker arms; the Mermaid diagram updated
-✅ `docs/operations/workflows.md`: one paragraph on the plain-language lead, where comments are described
+✅ `docs/operations/workflows.md`: one short **"What the pipelines post"** paragraph on the plain-language lead, added under `## Cross-cutting references` (the page never describes comments today, so there is no existing anchor — this is the section that already links shared resources), pointing at `shared/resources/stakeholder-summary.md`
 ✅ `docs/reference/faq.md:25`: link "Step 5c" to its definition (`develop-story`/`develop-task` Step 5c, review-pr)
 ✅ `docs/runbooks/README.md` one-line description re-checked
 
@@ -101,17 +104,17 @@ None. Documentation only.
    the skill, not from the current page.
 2. Rewrite `hotfix.md` in `bug-fix.md`'s section shape; keep it inside the satellite budget.
    Verify every command by running it or mark it illustrative.
-3. `workflows.md` lead paragraph; `faq.md` link.
+3. `workflows.md` lead paragraph under `## Cross-cutting references`; `faq.md` link.
 4. Local link check against the **tracked** tree; `npm run format:check`.
 
 ## 7. Files Summary
 
 | File | Change |
 | :--- | :--- |
-| `docs/runbooks/hotfix.md` | rewritten |
-| `docs/operations/workflows.md` | +1 paragraph |
-| `docs/reference/faq.md` | +1 link |
-| `docs/runbooks/README.md` | description re-checked |
+| `docs/runbooks/hotfix.md` | rewritten — 140 lines, 62 → 140; task.107 satellite shape |
+| `docs/operations/workflows.md` | +1 paragraph — `### What the pipelines post` under Cross-cutting references |
+| `docs/reference/faq.md` | +1 link — "Step 5c" → `qa-flow.md#phase-3b--pr-conformance-review-review-pr-step-5c` |
+| `docs/runbooks/README.md` | hotfix row description updated to name `/develop-bug`'s hotfix model |
 | `CHANGELOG.md` | `[Unreleased] → Changed` |
 
 ## 8. Testing Strategy
@@ -153,16 +156,19 @@ follow `releases.md`, which owns tagging.
 | Date       | Version | Description                                   | Author      |
 | ---------- | ------- | --------------------------------------------- | ----------- |
 | 2026-09-12 | 1.0     | Initial draft — filed from the 2026-09-12 repo sweep | create-task |
+| 2026-09-16 | 1.1     | Review passed (9/10) — GitHub issue #413 linked; `workflows.md` rider anchored to Cross-cutting references; References paths aligned to `skills/` | review-task |
+| 2026-09-16 |         | Status → ready-for-development                | review-task |
+| 2026-09-16 |         | Implemented — 5 files, 0 tests (docs only; ci:fast + link check green) | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: hotfix.md
-- [ ] Rewritten against `/develop-bug`'s hotfix model; both tracker arms; ≤ 150 lines
+- [x] Rewritten against `/develop-bug`'s hotfix model; both tracker arms; ≤ 150 lines (140)
 ### Phase 2: two small drifts
-- [ ] `docs/operations/workflows.md` names the plain-language lead on tracker + PR comments
-- [ ] `docs/reference/faq.md` "Step 5c" links to its definition
+- [x] `docs/operations/workflows.md` names the plain-language lead on tracker + PR comments
+- [x] `docs/reference/faq.md` "Step 5c" links to its definition
 
 ---
 
@@ -171,12 +177,12 @@ follow `releases.md`, which owns tagging.
 - **Plan**: [`task.112.plan.hotfix-runbook-rewrite.md`](task.112.plan.hotfix-runbook-rewrite.md)
 - **Sweep of origin**: `.agents/handoff.md` (2026-09-12 refresh) — the findings this task was filed from
 - **Predecessor**: task.107 (bug-fix runbook rewrite) — same class, same shape
-- **Related Skill**: `.agents/skills/develop-bug/` (Phase 0d Q1 hotfix branch model), `.agents/skills/create-branch/`
+- **Related Skill**: `skills/develop-bug/` (Phase 0d Q1 hotfix branch model), `skills/create-branch/`
 - **Length budget**: `docs/runbooks/README.md:58-61` (satellite tier)
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.112.hotfix-runbook-rewrite/task.112.hotfix-runbook-rewrite.md`
