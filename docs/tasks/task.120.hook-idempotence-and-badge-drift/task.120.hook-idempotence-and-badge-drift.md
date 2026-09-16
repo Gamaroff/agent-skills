@@ -5,7 +5,7 @@ type: task
 description: "On task.110 the PreCompact pause hook ran twice in parallel — a local settings.json carried the same hook under two path spellings the installer's exact-string dedupe cannot see — and appended its report block line-for-line twice and posted its PR and issue comments twice (obs #101). The hook itself has no claim: two concurrent runs both see the lock. Separately, the README skills badge is a hand-typed number that generate_catalog.py never touches, one behind before task.110 and two behind after it. Three small mechanisms: an atomic pause claim and a marked PR comment in the hook, identity-based dedupe with a healer in the installer, and a badge the catalog generator writes so validate.yml's no-diff check owns it."
 tags: [develop-task, develop-story, hooks, install-hooks, catalog, readme, drift]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-16
@@ -13,11 +13,13 @@ updated: 2026-09-16
 assignee:
 estimated_effort_hours: 8
 github_issue: 409
+pr_number: 410
+completed_date: 2026-09-16
 ---
 
 # Technical Task: The pause hook, the hook installer and the README badge each rely on a human remembering
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.120.review.1.hook-idempotence-and-badge-drift.md` implemented 2026-09-16
 **GitHub Issue**: [#409](https://github.com/Gamaroff/agent-skills/issues/409)
 
@@ -354,6 +356,7 @@ None.
 | 2026-09-16 |  | QA gate CONCERNS (80/100), cycle 4 — cycle-3 fixes verified, bug.4/bug.5 closed; 1 MEDIUM (identity fallback collision, bug.6) + 4 LOW (empty-group prune, null command, wizard set -e, ls exit status) | qa-task |
 | 2026-09-16 |  | QA findings fixed — cycle 4: namespaced hook identity (bug.6), filter-emptied-only prune, null-safe command, wizard error path, exit-clean detector listing, PR_REPO from URL; 4 iterations so far, awaiting re-review | qa-fix |
 | 2026-09-16 |  | QA gate PASS (100/100), cycle 5 — cycle-4 fixes verified, bug.6 closed; no attributable findings; 4 advisories recorded | qa-task |
+| 2026-09-16 | 1.2 | DoD passed — accepted (PR #410) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -400,6 +403,32 @@ None.
 
 ### Bug Reports
 - [bug.1](./task.120.bug.1.readme-prose-skill-count-drifts.md) · [bug.2](./task.120.bug.2.claim-to-snapshot-kill-window.md) · [bug.3](./task.120.bug.3.heal-removes-whole-matcher-group.md) · [bug.4](./task.120.bug.4.identity-collapses-consumer-scripts-hook.md) · [bug.5](./task.120.bug.5.stale-snapshot-shadows-orphaned-claim.md) · [bug.6](./task.120.bug.6.identity-fallback-collides-with-interpreterless-command.md) — all ✅ Closed
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.120.qa.5.hook-idempotence-and-badge-drift.md` (cycles 1–5)
+**Gate File**: `task.120.gate.5.hook-idempotence-and-badge-drift.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (gates 1–4 CONCERNS 90/80/80/80; never a HIGH finding; 6 bugs filed and closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12/12 met — SC-F1–F4 functional, SC-P1–P2 performance, SC-Q1–Q3 quality, SC-M1–M3 migration, each with a code citation and (where a test applies) a per-PR test citation
+✅ **Tests:** 3 new suites chained in `package.json` `scripts.test` — `develop-pipeline-on-precompact.test.sh` (15 scenarios), `develop-pipeline-install-hooks.test.sh` (11), `tests/generate-catalog-badge.test.js` (8); 20 mutation proofs `covered`; `npm run ci:fast` green each cycle
+✅ **PR Review:** PR #410 — Step 5c `/review-pr` CONCERNS (advisory): PC-3 corrected in `cc42a9c2`, CR-1/PC-1 orphaned-claim lifecycle recorded as a follow-up; CI reading 1 SUCCESS @ `10d787af` (validate, test, shellcheck, link-check, branch-policy)
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites `(task 120)`; `develop-pipeline-pause.md`, `develop-pipeline-hooks.md`, `pipeline-resume-detector-prompt.md`, `docs/reference/configuration.md` updated; README badge and prose generated at 128; bundled copies and catalog in sync
+✅ **Security Review:** PASS — no secrets, no eval/exec, jq via `--arg`, `gh api` argv-safe; boundary probed with 95 candidates, 94 held. One reproduced low-severity deviation — `hook_identity` anchors per line, so a hand-authored **multi-line** consumer command containing our script is classified as ours — recorded as a follow-up (not blocking: `overall: PASS`, QA budget spent, post-gate code change would ship on expired evidence)
+⚠️ **Compliance Review:** NOT_APPLICABLE — no data, payment, UI or health scope
+
+**Follow-ups (not blocking):** (1) reject newline-bearing input in `hook_identity` / `_hook_identity` with a red-on-revert fixture; (2) orchestrators' Start-fresh / HALT cleanup also removes `.claude/state/develop-pipeline.lock.pausing.*`; (3) numeric guard on `current_step` before it enters the hook's `jq` comment-lookup filter.
+
+**Detailed Verification Log:** See `task.120.dod.1.hook-idempotence-and-badge-drift.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-09-16
 
 ## References
 
