@@ -1,0 +1,77 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: CONCERNS
+status_reason: 'Gate-6 entries all verified FIXED by the mechanism replacement (every cycle-6 shape reads correctly through PyYAML; real workflows unchanged at 20 steps). The new reader has one MEDIUM — an unquoted date-like scalar anywhere in a green workflow makes json.dumps raise, and the assertion misreports it as a missing interpreter — plus two LOW robustness points and three cleanups (a stale docstring that now contradicts the new reader, the dead regex jobBlock() path, and ~15 interpreter spawns per run). All small, all in one file; one fix cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T12:54:31Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'yaml.safe_load turns an unquoted date/timestamp scalar (e.g. env: RELEASE: 2026-01-01 — GitHub reads it as a string) into a Python date, json.dumps raises "Object of type date is not JSON serializable", python3 exits 1, and the assertion reports "python3 + PyYAML are required" — a false red with the wrong diagnosis (reproduced).'
+    suggested_action: 'json.dumps(..., default=str) so non-JSON YAML scalars are stringified as GitHub sees them; make the assertion distinguish a spawn failure (res.error) from a parse failure (stderr).'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'With python3 absent, spawnSync returns status null and stderr undefined (the ENOENT is in res.error), so the failure is loud but reads "…: undefined" (reproduced with PATH=/nonexistent).'
+    suggested_action: 'Include res.error?.message, falling back to res.stderr, in the assertion message.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'A block scalar whose only command is one "npm run <script>" preceded by a shell comment line contains a newline after trim, so run is blanked and the step classifies by name only although GitHub executes that script (reviewer, medium confidence; consistent with the reader as written).'
+    suggested_action: 'Reduce the body to its non-empty, non-comment lines and treat it as the command when exactly one remains.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'The reader spawns python3 with a fixed -c program and the workflow text on stdin — no shell, no interpolation. Cycle-2 boundary probes stand.'
+  performance:
+    status: PASS
+    notes: 'Each parsed-path test now forks python3 (~200 ms vs ~1 ms); ~15 spawns per run, ~3 s total. Acceptable; memoising per path (CR-6 cleanup) removes most of it.'
+  reliability:
+    status: PASS
+    notes: 'All five cycle-6 shapes read correctly; five mutation shapes red; python3 absent → loud (5 failures naming the requirement). CR-1 is the one shape that would fail wrongly, and no current workflow contains a date-like scalar.'
+  maintainability:
+    status: CONCERNS
+    notes: 'workflowScripts()'"'"'s docstring still says steps are "deliberately parsed off the run: lines rather than with a YAML library" — now false and contradicted by parseWorkflow()'"'"'s own docstring (CR-4). jobBlock() and the "test job is found" test are a second, regex reader kept alive for a tautological assertion (CR-5) — the cycle-6 rule was one reader per file. Cleanups, but the first is a comment that misleads the next reader of this exact file.'
+
+recommendations:
+  immediate:
+    - action: 'json.dumps default=str; spawn-vs-parse failure message; single-command block with comment lines (CR-1, CR-2, CR-3)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+  future:
+    - action: 'CR-4/CR-5 cleanups: delete the stale regex docstring; remove jobBlock() and reduce its test to a non-null stepsOfJob() check'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-6 cleanup: memoise parseWorkflow() per path'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-4 (cycle 1): check:generated compares the working tree — document or compare against HEAD'
+      refs: ['package.json']
+    - action: 'Pre-existing: session-handoff CR-6 timing-sensitive on slow-npm hosts'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1/2/3 fixed and re-reviewed'

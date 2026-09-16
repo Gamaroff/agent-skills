@@ -252,7 +252,8 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 | 2026-09-16 |         | QA gate CONCERNS (90/100), cycle 4 scoped — gate-3 fix verified; 1 MEDIUM (parser reads keys at any indentation: with: name: and list-shaped run bodies misparse) + 2 cleanups | qa-task |
 | 2026-09-16 |         | QA gate CONCERNS (90/100), cycle 5 scoped — gate-4 fix verified; 1 MEDIUM (key column hard-wired to dash+2 drops a `-   name:` step — false green) + 3 cleanups | qa-task |
 | 2026-09-16 |         | QA gate CONCERNS (90/100), cycle 6 (limit lifted by the user) — gate-5 fix verified; 2 MEDIUM + 1 LOW, all YAML shapes the hand-rolled step parser misreads; recommendation: replace the parser with a real YAML read | qa-task |
-| 2026-09-16 |         | QA findings fixed — cycles 1–5 patched the tests (skip return, corpus via the parser, parsed-value cap, uses: steps, exec via pid, key order, key column, dash spacing); cycle 6 replaced the parity test's hand-rolled workflow-step parser with a real YAML read (PyYAML via python3) — third-strike move after four consecutive cycles of new YAML shapes; 6 iterations | qa-fix |
+| 2026-09-16 |         | QA gate CONCERNS (90/100), cycle 7 — mechanism replacement verified (every prior shape reads correctly); 1 MEDIUM (date-like scalar crashes json.dumps, misreported as missing PyYAML) + 2 LOW + 3 cleanups in the new reader | qa-task |
+| 2026-09-16 |         | QA findings fixed — cycles 1–5 patched the tests (skip return, corpus via the parser, parsed-value cap, uses: steps, exec via pid, key order, key column, dash spacing); cycle 6 replaced the parity test's hand-rolled workflow-step parser with a real YAML read (PyYAML via python3) — third-strike move after four consecutive cycles of new YAML shapes; cycle 7 hardened the reader (date-like scalars stringified, spawn-vs-parse failure messages, single-command blocks under comments, dead regex reader removed, parse memoised); 7 iterations | qa-fix |
 
 ---
 
@@ -273,22 +274,22 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-16 (cycle 6)
+**Testing Date**: 2026-09-16 (cycle 7)
 **Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.111.qa.6.local-ci-parity.md](./task.111.qa.6.local-ci-parity.md) (earlier: [qa.1](./task.111.qa.1.local-ci-parity.md), [qa.2](./task.111.qa.2.local-ci-parity.md), [qa.3](./task.111.qa.3.local-ci-parity.md), [qa.4](./task.111.qa.4.local-ci-parity.md), [qa.5](./task.111.qa.5.local-ci-parity.md))
-- **Gate File**: [task.111.gate.6.local-ci-parity.yml](./task.111.gate.6.local-ci-parity.yml) (earlier: [gate.1](./task.111.gate.1.local-ci-parity.yml), [gate.2](./task.111.gate.2.local-ci-parity.yml), [gate.3](./task.111.gate.3.local-ci-parity.yml), [gate.4](./task.111.gate.4.local-ci-parity.yml), [gate.5](./task.111.gate.5.local-ci-parity.yml))
+- **Full Report**: [task.111.qa.7.local-ci-parity.md](./task.111.qa.7.local-ci-parity.md) (earlier: [qa.6](./task.111.qa.6.local-ci-parity.md), [qa.1](./task.111.qa.1.local-ci-parity.md), [qa.2](./task.111.qa.2.local-ci-parity.md), [qa.3](./task.111.qa.3.local-ci-parity.md), [qa.4](./task.111.qa.4.local-ci-parity.md), [qa.5](./task.111.qa.5.local-ci-parity.md))
+- **Gate File**: [task.111.gate.7.local-ci-parity.yml](./task.111.gate.7.local-ci-parity.yml) (earlier: [gate.6](./task.111.gate.6.local-ci-parity.yml), [gate.1](./task.111.gate.1.local-ci-parity.yml), [gate.2](./task.111.gate.2.local-ci-parity.yml), [gate.3](./task.111.gate.3.local-ci-parity.yml), [gate.4](./task.111.gate.4.local-ci-parity.yml), [gate.5](./task.111.gate.5.local-ci-parity.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 25 new (parity 12 incl. 3 new, wrappers 19, frontmatter cap 3) + targeted lanes; 7 boundary probes
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 (cycle 6: 2 MEDIUM, 1 LOW)
+- **Critical Issues**: 0 (cycle 7: 1 MEDIUM, 2 LOW)
 - **NFR Status**: Security: PASS (cycle 2 measured, 9 probes; cycle 3 reasoned), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 6 (scoped, past the budget by the user's decision): gate-5 fix verified; five more YAML shapes the hand-rolled parser misreads (keys after `steps:`; bare `-`; flow mapping; trailing comments; quoted `uses:`) — recommendation: replace the parser with a real YAML read. Cycle 5 (scoped): gate-4 fix verified; the key column is hard-wired to dash+2, so `-   name:` (extra spaces after the dash) drops the step — a false green (CR-1, MEDIUM). Cycle 4 (scoped): gate-3 fix verified; the cycle-3 relaxation reads keys at any indentation — `with: name:` overwrites a step name and a list-shaped `run: |` body spawns a phantom step (CR-1, MEDIUM). Cycle 3 (scoped): gate-2 fixes verified on the head; one LOW — the parity step parser records a step unnamed when `name:` follows `uses:`/`run:` (CR-1). Cycle 2 (refute pass): cycle-1 findings verified fixed; the cap was measured on a normalised string a loader never sees (CR-1, MEDIUM — now the parsed value), `uses:` gate steps slipped the parity classifier (CR-2), and the wrapper test could not detect a dropped `exec` (CR-3). Cycle 1: three LOW defects in the new tests, each verified by execution: `t.skip` fall-through in the wrapper pass-through test (CR-1); the corpus cap test over-counts block-scalar descriptions by 2 (CR-2); the parity test's missing-script guard still reads test.yml only — a typo'd `npm run` step in validate.yml stays green (CR-3). Advisory: `check:generated` false-positives on an unrelated dirty README (CR-4); `jobSteps()` tidy-up (CR-5).
+Cycle 7: the real-YAML reader verified against every prior shape; one MEDIUM (date-like scalar → `json.dumps` raises → misreported), two LOW, three cleanups. Cycle 6 (scoped, past the budget by the user's decision): gate-5 fix verified; five more YAML shapes the hand-rolled parser misreads (keys after `steps:`; bare `-`; flow mapping; trailing comments; quoted `uses:`) — recommendation: replace the parser with a real YAML read. Cycle 5 (scoped): gate-4 fix verified; the key column is hard-wired to dash+2, so `-   name:` (extra spaces after the dash) drops the step — a false green (CR-1, MEDIUM). Cycle 4 (scoped): gate-3 fix verified; the cycle-3 relaxation reads keys at any indentation — `with: name:` overwrites a step name and a list-shaped `run: |` body spawns a phantom step (CR-1, MEDIUM). Cycle 3 (scoped): gate-2 fixes verified on the head; one LOW — the parity step parser records a step unnamed when `name:` follows `uses:`/`run:` (CR-1). Cycle 2 (refute pass): cycle-1 findings verified fixed; the cap was measured on a normalised string a loader never sees (CR-1, MEDIUM — now the parsed value), `uses:` gate steps slipped the parity classifier (CR-2), and the wrapper test could not detect a dropped `exec` (CR-3). Cycle 1: three LOW defects in the new tests, each verified by execution: `t.skip` fall-through in the wrapper pass-through test (CR-1); the corpus cap test over-counts block-scalar descriptions by 2 (CR-2); the parity test's missing-script guard still reads test.yml only — a typo'd `npm run` step in validate.yml stays green (CR-3). Advisory: `check:generated` false-positives on an unrelated dirty README (CR-4); `jobSteps()` tidy-up (CR-5).
 
 ---
 

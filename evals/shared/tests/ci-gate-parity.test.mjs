@@ -193,43 +193,11 @@ function expand(name, seen = new Set()) {
 }
 
 /**
- * Every npm script the workflow's `test` job runs, in order.
- *
- * Deliberately parsed off the `run:` lines rather than with a YAML library: the
- * thing under test is which commands the file actually executes, and a parse
- * that quietly normalises the file away from what a reader sees is the wrong
- * instrument for that.
+ * Every npm script the workflow's `test` job runs, in order — read through
+ * parseWorkflow() / stepsOfJob(), the one reader every check in this file uses.
  */
 function workflowScripts() {
   return workflowInvocations().filter((name) => name in scripts);
-}
-
-/**
- * The raw text of one job's block, from its key to the next key at the same
- * indent (or EOF).
- *
- * The parity check is about the job that defines "green", so it must read that
- * job and no other. Scanning the whole file coincides with the right answer
- * only while the file holds a single job: add a lint lane, a coverage lane or a
- * matrix build that invokes any npm script, and a whole-file scan would demand
- * the `ci` composite contain that script too — failing on a workflow CI itself
- * is perfectly happy with, which inverts the test's purpose. It exists to
- * predict CI, so it must never block a merge CI would pass.
- */
-function jobBlock(jobName, text = workflow) {
-  const lines = text.split("\n");
-  const start = lines.findIndex((l) =>
-    new RegExp(`^  ${jobName}:\\s*$`).test(l),
-  );
-  if (start === -1) return null;
-  let end = lines.length;
-  for (let i = start + 1; i < lines.length; i++) {
-    if (/^  \S/.test(lines[i])) {
-      end = i;
-      break;
-    }
-  }
-  return lines.slice(start, end).join("\n");
 }
 
 /**
@@ -263,23 +231,40 @@ function workflowInvocations() {
  * reader sees is the wrong instrument" — is answered by what the test is for:
  * it predicts what CI *executes*, and CI executes the parsed document.
  */
+const parsedCache = new Map();
 function parseWorkflow(text) {
+  // One interpreter spawn per distinct text — the three workflows are read by
+  // several tests each, and the files do not change mid-run (QA cycle 7, CR-6).
+  if (parsedCache.has(text)) return parsedCache.get(text);
   const script = [
     "import sys, json, yaml",
     "doc = yaml.safe_load(sys.stdin.read())",
-    "print(json.dumps(doc if isinstance(doc, dict) else {}))",
+    // default=str: YAML resolves unquoted dates/timestamps to Python objects
+    // json cannot serialise; GitHub reads them as strings, so stringify rather
+    // than crash with a message that blames the interpreter (QA cycle 7, CR-1).
+    "print(json.dumps(doc if isinstance(doc, dict) else {}, default=str))",
   ].join("\n");
   const res = spawnSync("python3", ["-c", script], {
     input: text,
     encoding: "utf-8",
   });
+  // Two different failures, two different messages: no interpreter at all
+  // (spawn error, status null) versus a parse the interpreter rejected.
+  assert.ok(
+    !res.error,
+    `python3 could not be started — it and PyYAML are required to parse the ` +
+      `workflows (the same hard requirement tests/skill-frontmatter.test.js ` +
+      `states): ${res.error?.message}`,
+  );
   assert.equal(
     res.status,
     0,
-    `python3 + PyYAML are required to parse the workflows (the same hard ` +
-      `requirement tests/skill-frontmatter.test.js states): ${res.stderr}`,
+    `python3 rejected the workflow text (PyYAML missing, or the file is not ` +
+      `valid YAML): ${res.stderr}`,
   );
-  return JSON.parse(res.stdout);
+  const doc = JSON.parse(res.stdout);
+  parsedCache.set(text, doc);
+  return doc;
 }
 
 /** Coerce a YAML scalar (string / number / bool / null) to the string GitHub sees. */
@@ -303,11 +288,17 @@ function stepsOfJob(doc, job) {
       (st) => st && typeof st === "object" && ("run" in st || "uses" in st),
     )
     .map((st) => {
-      const body = scalar(st.run).trim();
+      // The command lines of the body — blank lines and shell comments are not
+      // commands, so a block scalar that is one `npm run …` under a comment is
+      // still that one command (QA cycle 7, CR-3).
+      const commands = scalar(st.run)
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l !== "" && !l.startsWith("#"));
       return {
         name: scalar(st.name).trim(),
         uses: "uses" in st ? scalar(st.uses).trim() : null,
-        run: body.includes("\n") ? "" : body,
+        run: commands.length === 1 ? commands[0] : "",
       };
     });
 }
@@ -367,21 +358,18 @@ test("the `ci` composite exists and is the definition of green", () => {
 });
 
 test("the `test` job is found, and only its steps are read", () => {
-  const block = jobBlock(TEST_JOB);
+  const steps = stepsOfJob(parseWorkflow(workflow), TEST_JOB);
   assert.ok(
-    block !== null,
+    steps !== null,
     `test.yml defines no \`${TEST_JOB}:\` job — the parity check would silently ` +
       "compare against an empty set and pass no matter what the composite held",
   );
-  // A second job's steps must not leak into the comparison.
-  const wholeFile = workflow
-    .split("\n")
-    .filter((l) => /^\s*run:\s/.test(l)).length;
-  const inJob = block.split("\n").filter((l) => /^\s*run:\s/.test(l)).length;
-  assert.ok(
-    inJob <= wholeFile,
-    "job block cannot contain more run: steps than the file",
-  );
+  // Only that job is read: a second job's steps must not leak in. Asserted on
+  // the parsed document rather than by counting run: lines in raw text.
+  const doc = parseWorkflow(workflow);
+  const allSteps = Object.values(doc.jobs).flatMap((j) => j.steps ?? []);
+  assert.ok(steps.length <= allSteps.length);
+  assert.ok(steps.length > 0, "the test job has no steps");
 });
 
 test("`npm ci` in the workflow is the installer, never the `ci` script", () => {
@@ -496,6 +484,15 @@ test("steps are read the way GitHub reads them — any key order, any YAML spell
     "      - name: Commented run # twin",
     "        run: npm run eval:all # slow",
     '      - uses: "actions/checkout@v7"',
+    // A date-like scalar anywhere in the job must not crash the reader, and a
+    // block whose only command sits under a comment is still that command.
+    "      - name: Dated",
+    "        env:",
+    "          RELEASE: 2026-01-01",
+    "        run: |",
+    "          # the one command below is what GitHub runs",
+    "",
+    "          npm run bundle:check",
     "    needs:",
     "      - build",
     "    defaults:",
@@ -514,6 +511,7 @@ test("steps are read the way GitHub reads them — any key order, any YAML spell
       ["Flow mapping", null, "npm test"],
       ["Commented run", null, "npm run eval:all"],
       ["", "actions/checkout@v7", ""],
+      ["Dated", null, "npm run bundle:check"],
     ],
   );
   const parsed = jobStepsFromText("jobs:\n" + synthetic, "probe");
