@@ -120,7 +120,7 @@ The loser's `mv` fails (`ENOENT`), it takes the existing "no lock" noop path, an
 ### Out of Scope
 
 ❌ Making the Stop hook or the develop-next hooks atomic — they are read-only or already idempotent
-❌ Any change to the pause's *content* (the resume contract in `develop-pipeline-pause.md` is unchanged)
+❌ Any change to the pause's *content* — what the report block, PR comment and issue comment say. (The resume contract in `develop-pipeline-pause.md` was originally excluded too; QA cycles 2–3 required extending it — the resume detector now reads an orphaned `develop-pipeline.lock.pausing.<pid>` claim, choosing between it and `last-halt.json` by document and then by age — see bug.2, bug.5 and Files Summary 9a.)
 ❌ Deduplicating the two 2026-09-15 comments on PR #408 / issue #407 — historical, already noted in the trail
 ❌ The four LOW code follow-ups from task.110's `pr-review.2` (separate task)
 
@@ -283,7 +283,7 @@ Not applicable — a hook that runs once per compaction and a generator that run
 ### Migration
 
 - [x] `CHANGELOG.md` `[Unreleased]` cites `(task 120)`
-- [x] `develop-pipeline-pause.md` describes the claim; the resume contract is unchanged
+- [x] `develop-pipeline-pause.md` describes the claim; the resume contract is **extended, not unchanged** — the detector's `orphaned_claim` fallback (bug.2) with document-then-age precedence (bug.5); the wording here was corrected after `/review-pr` PC-3 flagged the contradiction
 - [x] The local `.claude/settings.json` fix applied on 2026-09-16 (duplicates removed by hand) is reproduced by the installer's healer on a re-run — verified against a copy of the pre-fix file (`.claude/settings.json.bak-2026-09-16`)
 
 ---
