@@ -160,3 +160,18 @@ See [`create-parallel-stories` SKILL.md](../../skills/create-parallel-stories/SK
 - [Configuration](../reference/configuration.md) — `skills-config.yaml` keys
 - [Standards](../standards/) — document schemas, file naming, status lifecycle
 - [Platform detection](../../shared/resources/platform-detection.md) — GitHub vs Bitbucket vs Jira resolver
+
+### What the pipelines post
+
+Every comment a pipeline posts to a **tracker issue** — pipeline started, review done, development
+complete, PR opened, each QA cycle, acceptance — and every **summary-level pull-request comment** (the
+PR review summary, a board warning, DoD gaps) opens with a **plain-language lead**: two to four
+sentences answering *what happened, what it means, what happens next*, written for a reader with no
+technical background, with the technical body following unchanged (on GitHub after a `---`; on Jira
+as the next paragraph). Inline PR review findings — the ones anchored to a line of the diff —
+deliberately carry no lead. The call site never writes the lead: the shared engine
+(`stakeholder-summary.js`) renders it from the stage the caller already passes — through
+`tracker-comment.js` for tracker comments and `stakeholder-summary-cli.js` / `pr-inline-comment.js`
+for PR comments — so a comment for which no lead can be produced does not post. Nothing is taken
+away from the developer; something is added for everyone else reading the card. Canonical spec and
+the per-stage catalogue: [Stakeholder summaries](../../shared/resources/stakeholder-summary.md).

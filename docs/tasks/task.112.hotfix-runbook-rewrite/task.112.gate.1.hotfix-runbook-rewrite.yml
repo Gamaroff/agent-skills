@@ -1,0 +1,89 @@
+schema: 1
+task: 'task.112.hotfix-runbook-rewrite'
+task_title: 'The hotfix runbook predates /develop-bug''s hotfix model and never mentions it'
+gate: CONCERNS
+status_reason: 'Both phases delivered and all seven success criteria verified by grep and by reading the cited sources (hotfix.md 140 lines, 15 pipeline-term hits vs 0, force-push line byte-identical, both tracker arms, 70 links resolve, ci:fast green). The diff review found four LOW accuracy defects — three in the new workflows.md lead paragraph, which overstates the canonical spec (attributes PR leads to tracker-comment.js, claims every PR comment including inline findings carries a lead, states the --- separator unconditionally), and one in hotfix.md, which says the description makes /develop-bug skip the Q1 prompt when it only sets the recommended default. Documentation whose one job is to describe the pipeline accurately should not contradict the spec it links to; one fix cycle. Maintainability CONCERNS for the same reason.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T19:44:47Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'docs/operations/workflows.md'
+    finding: 'The "What the pipelines post" paragraph attributes every lead — tracker and PR — to tracker-comment.js, but shared/resources/stakeholder-summary.md §Pull-request comments states the three PR stages are not in COMMENT_STAGES (passing one to tracker-comment.js exits 2) and are rendered by stakeholder-summary-cli.js / pr-inline-comment.js buildSummaryBody() instead (verified: LEAD_STAGES vs PR_COMMENT_STAGES in stakeholder-summary.js).'
+    suggested_action: 'Attribute rendering to the shared engine (stakeholder-summary.js) generically, or name tracker-comment.js for tracker comments and stakeholder-summary-cli.js / pr-inline-comment.js for PR comments.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-16'
+  - id: 'CR-2'
+    severity: low
+    file: 'docs/operations/workflows.md'
+    finding: '"Every comment a pipeline posts to a tracker issue or a pull request" carries a lead contradicts the spec''s "Inline findings carry no lead, deliberately" section — pr-inline-comment.js builds inline review findings as marker + body and a test asserts no lead appears.'
+    suggested_action: 'Scope the claim to tracker comments and summary-level PR comments, and say that inline review findings deliberately carry none.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-16'
+  - id: 'CR-3'
+    severity: low
+    file: 'docs/operations/workflows.md'
+    finding: 'The unconditional "followed by a `---`" contradicts the spec, which states the rule is GitHub-only and a Jira (ADF) comment gets a paragraph boundary instead.'
+    suggested_action: 'Qualify the separator as GitHub-only or drop the detail and defer to the linked spec.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-16'
+  - id: 'CR-4'
+    severity: low
+    file: 'docs/runbooks/hotfix.md'
+    finding: '"that is what makes /develop-bug recommend the hotfix branch model instead of asking" contradicts develop-bug-step-0-resolve-bug.md §0d (Q1 is still asked; the description only sets the recommended default) and the page''s own later text ("Phase 0d asks three branch questions once", "Don''t answer bugfix to Q1").'
+    suggested_action: 'Reword to say the description makes production hotfix the recommended default for Q1 (and the auto-answered choice in an autonomous run), not that the prompt is suppressed.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-09-16'
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3341
+  phases_verified: '2/2'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Documentation only — no boundary in the change set (boundary: false, probes_executed: 0 by design). The documented Verification block runs only read-only git/gh queries; the Phase C commands are the same ones releases.md already documents. No secrets, no network calls introduced.'
+  performance:
+    status: PASS
+    notes: 'Not applicable — no executable change. hotfix.md 140 lines against the ~80–150 satellite budget.'
+  reliability:
+    status: PASS
+    notes: 'Every relative link and #anchor in the four changed docs resolves (markdown-link-check 70/0; anchor slugs recomputed against heading text). Mermaid block parses (flowchart TD, 11 nodes, 2 labelled edges). The three Verification commands were executed against this repo and returned the expected shapes. ci:fast 3340/3341 (1 skipped), changelog-entry-drift 6/6.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The new workflows.md paragraph overstates the canonical spec in three places (CR-1..3) and hotfix.md misstates Q1 once (CR-4). Each is a one-sentence fix; none changes structure. Otherwise the page mirrors bug-fix.md section-for-section, cites sources by identity, and stays inside the length budget.'
+
+recommendations:
+  immediate:
+    - action: 'Reword the lead paragraph: attribute rendering to the shared engine, scope the claim to tracker + summary-level PR comments, qualify the --- as GitHub-only (CR-1, CR-2, CR-3)'
+      refs: ['docs/operations/workflows.md']
+    - action: 'Reword the Q1 sentence: the description sets the recommended default, the prompt is still asked (CR-4)'
+      refs: ['docs/runbooks/hotfix.md']
+  future: []
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-16'
+  total_iterations: 1
+  verification_method: 'Cycle-2 refute pass re-read each reworded sentence against stakeholder-summary.md/.js, stakeholder-summary-cli.js, pr-inline-comment.js and develop-bug step-0 §0d'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1..CR-4 fixed and re-reviewed'

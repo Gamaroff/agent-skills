@@ -29,7 +29,7 @@ After those, pick a runbook from the table below as the work in front of you dem
 | [Task Development](./task-development.md) | Standalone technical work (refactor, infra, cleanup, tooling) that doesn't need a PRD or epic. Covers `create-task` → `review-task` → `develop-task`. |
 | [QA Flow](./qa-flow.md) | Running QA without the full develop-story / develop-task orchestrator — pre-implementation planning, manual review, or rework on findings. |
 | [Bug Fix](./bug-fix.md) | Filing and fixing a defect inside the normal pipeline — all three bug modes, `create-bug-report` → `review-bug` → `develop-bug`. |
-| [Hotfix](./hotfix.md) | Emergency production fix branched from `main` and propagated back to `develop`. |
+| [Hotfix](./hotfix.md) | Emergency production fix through `/develop-bug`'s hotfix branch model — branched from `main`, tagged by a human, merged back to `develop`. |
 | [Sprint Cycle](./sprint-cycle.md) | Coordinating sprint planning → development → review → completion using these skills. |
 | [PM Workflows](./pm-workflows.md) | Framing work before development — greenfield PRD, brownfield enhancement, change management. |
 | [Jira Publish](./jira-publish.md) | Syncing local epics/stories/tasks to Jira and driving status transitions from frontmatter. |

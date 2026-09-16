@@ -48,6 +48,22 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The hotfix runbook is rewritten against `/develop-bug`'s hotfix branch model**
+  ([`docs/runbooks/hotfix.md`](docs/runbooks/hotfix.md), task 112). The page documented a seven-step
+  manual loop — create-branch, implement, tests, commit, PR to `main`, tag, back-merge — and mentioned
+  no pipeline, no bug report, no `review-bug` gate, no tracker card: `grep` for `develop-bug`,
+  `review-bug`, `tracker` and `review-pr` returned 0 each, on the page a reader reaches for the change
+  most likely to be audited later. It now has the shape task 107 gave `bug-fix.md`: file the bug (say
+  "production" in the description, which is what makes Phase 0d recommend the hotfix model), run
+  `/develop-bug` with Q1 = production hotfix, and the pipeline cuts `hotfix/vX.Y.Z` off `main`, targets
+  the PR at `main`, and writes `hotfix: merge-back to develop required` into the Issues Log so the
+  back-merge is a recorded follow-up rather than step 7 of a list done by hand. What stays human is
+  named as such: merging into `main`, cutting the tag with `release.sh --patch`, and the merge-back it
+  performs. Both tracker arms are named, the force-push pitfall survives verbatim, and the page is 141
+  lines against the ≤150 satellite budget. Two drifts found in the same sweep ride along:
+  `docs/operations/workflows.md` gains a "What the pipelines post" paragraph on the plain-language lead
+  every pipeline comment now opens with (tasks 104–106 shipped the behaviour into no consumer doc), and
+  `docs/reference/faq.md`'s bare "Step 5c" links to the `qa-flow.md` phase that defines it.
 - **The pause hook, the hook installer and the README badge no longer rely on a human remembering
   (task 120).** On task.110 the PreCompact pause hook ran twice in parallel — a `settings.json`
   carried it under two path spellings the installer's exact-string dedupe could not see — and
