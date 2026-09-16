@@ -184,7 +184,7 @@ test("validator rejects a description over the Agent Skills 1,024-char cap", () 
     1,
     "validator should reject a 1,025-char description",
   );
-  assert.match(res.stdout + res.stderr, /1025 chars \(max 1024/);
+  assert.match(res.stdout + res.stderr, /1025 chars as parsed \(max 1024/);
 });
 
 test("validator accepts a description of exactly 1,024 chars", () => {
@@ -209,10 +209,31 @@ test("validator accepts a description of exactly 1,024 chars", () => {
   );
 });
 
+/**
+ * Split `desc` into folded-scalar continuation lines at word boundaries so no
+ * line starts with whitespace. A continuation line that begins with a space is
+ * a YAML "more-indented" line: the fold keeps its newline, the parsed value
+ * grows by one, and a fixture meant to sit exactly at the cap silently sits
+ * above it (QA cycle 2, CR-1 — the first folded fixture did this).
+ */
+function foldedLines(desc, indent = "  ") {
+  const words = desc.split(" ");
+  const lines = [];
+  let cur = "";
+  for (const w of words) {
+    if (cur.length + w.length + 1 > 500 && cur) {
+      lines.push(indent + cur);
+      cur = w;
+    } else cur = cur ? `${cur} ${w}` : w;
+  }
+  if (cur) lines.push(indent + cur);
+  return lines;
+}
+
 test("validator accepts a block-scalar description of exactly 1,024 chars", () => {
-  // The cap is measured on the parsed, whitespace-normalised value — a folded
-  // scalar's indicator and indentation do not count. This is the fixture the
-  // corpus check below must agree with the validator on.
+  // The cap is measured on the parsed value (outer whitespace stripped) — a
+  // folded scalar's indicator, indentation and clip newline do not count.
+  // This is the fixture the corpus check below must agree with the validator on.
   const desc = descriptionOfLength(1024);
   const dir = fixtureSkill(
     "at-cap-folded",
@@ -220,8 +241,7 @@ test("validator accepts a block-scalar description of exactly 1,024 chars", () =
       "---",
       "name: at-cap-folded",
       "description: >",
-      `  ${desc.slice(0, 500)}`,
-      `  ${desc.slice(500)}`,
+      ...foldedLines(desc),
       "---",
       "",
       "# At (folded)",
@@ -236,28 +256,60 @@ test("validator accepts a block-scalar description of exactly 1,024 chars", () =
   );
 });
 
+test("validator measures the parsed value, so a more-indented fold line counts its newline", () => {
+  // 1,024 characters of content laid out so the second line begins with a
+  // space: YAML preserves that newline, a loader sees 1,025+ characters, and
+  // the validator must say so rather than normalise it away.
+  const desc = descriptionOfLength(1024);
+  const dir = fixtureSkill(
+    "over-cap-folded",
+    [
+      "---",
+      "name: over-cap-folded",
+      "description: >",
+      `  ${desc.slice(0, 500)}`,
+      `  ${desc.slice(500)}`, // starts with a space → more-indented line
+      "---",
+      "",
+      "# Over (folded)",
+      "",
+    ].join("\n"),
+  );
+  const res = python([VALIDATOR, dir]);
+  assert.equal(res.status, 1, "validator should measure the parsed value");
+  assert.match(res.stdout + res.stderr, /chars as parsed \(max 1024/);
+});
+
 test("every SKILL.md description is within the 1,024-char cap", () => {
   // The corpus-level assertion: the fixture tests prove the check works; this
   // proves the tree satisfies it, so the next skill to drift over is caught
   // here as well as in validate:all.
+  // Measure the PARSED value through the same parser the validator uses —
+  // never a regex re-parse of the frontmatter. The regex version disagreed
+  // with the validator by two characters on every block-scalar skill (QA
+  // cycle 1, CR-2) and would disagree again on any quoting it did not model.
+  const script = [
+    "import sys, json",
+    `sys.path.insert(0, ${JSON.stringify(SCRIPTS_DIR)})`,
+    "import skill_frontmatter",
+    "out = {}",
+    "for p in sys.argv[1:]:",
+    "    data, err = skill_frontmatter.parse(open(p, encoding='utf-8').read())",
+    "    out[p] = None if err else len(str(data.get('description', '')).strip())",
+    "print(json.dumps(out))",
+  ].join("\n");
+  const files = listSkills().map((n) => path.join(SKILLS_DIR, n, "SKILL.md"));
+  const res = python(["-c", script, ...files]);
+  assert.equal(res.status, 0, `parser crashed: ${res.stderr}`);
+  const lengths = JSON.parse(res.stdout);
+  assert.ok(
+    Object.keys(lengths).length >= 100,
+    "corpus check read too few skills",
+  );
   const over = [];
-  for (const skill of listSkills()) {
-    const fm = fs.readFileSync(
-      path.join(SKILLS_DIR, skill, "SKILL.md"),
-      "utf-8",
-    );
-    const m = fm.match(/^description:\s*([\s\S]*?)\n(?=[A-Za-z_-]+:|---)/m);
-    if (!m) continue;
-    let d = m[1].trim();
-    // A block scalar (`description: >` / `|`, optionally with a chomping
-    // indicator) captures its indicator here; the validator measures the
-    // parsed value, so strip it or the two disagree by two characters on every
-    // block-scalar skill (QA cycle 1, CR-2 — six skills measured 2 over).
-    d = d.replace(/^[>|][+-]?\s*/, "");
-    if (/^'.*'$/s.test(d)) d = d.slice(1, -1).replace(/''/g, "'");
-    else if (/^".*"$/s.test(d)) d = d.slice(1, -1);
-    const n = d.split(/\s+/).join(" ").length;
-    if (n > 1024) over.push(`${skill}: ${n}`);
+  for (const [file, n] of Object.entries(lengths)) {
+    if (n === null) continue; // the strict-parse test above owns that failure
+    if (n > 1024) over.push(`${path.relative(SKILLS_DIR, file)}: ${n}`);
   }
   assert.deepEqual(
     over,

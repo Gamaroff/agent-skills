@@ -108,8 +108,23 @@ const LANE_TWINS = {
   "Lint source shell scripts": "lint:shell",
 };
 
+/**
+ * Marketplace actions that are environment setup, matched by prefix on the
+ * `uses:` reference. A `- uses:` step is a step like any other — a lint or
+ * scan action added to a green job is a gate the composite cannot see — so it
+ * must be classified. Unnamed setup steps (`- uses: actions/checkout@v7`) are
+ * recognised here; a named `uses:` step goes through the name maps below.
+ */
+const SETUP_ACTIONS = [
+  "actions/checkout@",
+  "actions/setup-node@",
+  "actions/setup-python@",
+];
+
 /** Environment setup, not a gate — nothing to mirror. */
 const SETUP_STEPS = [
+  "Set up Node",
+  "Set up Python",
   "Install PyYAML",
   "Install awk variants",
   "Install dependencies",
@@ -252,12 +267,20 @@ function jobSteps({ workflow: path, job }) {
     if (/^\s*-\s/.test(line)) {
       name = "";
     }
+    // A `uses:` step is recorded too: a marketplace lint or scan action is a
+    // gate exactly as a `run:` is, and an unrecorded one passes silently
+    // (QA cycle 2, CR-2).
+    const u = line.match(/^\s*-?\s*uses:\s*(\S+)/);
+    if (u) {
+      steps.push({ name, run: "", uses: u[1] });
+      continue;
+    }
     const r = line.match(/^\s*-?\s*run:\s*(.*?)\s*$/);
     if (r) {
       // `run: |` is a block scalar whose commands are on the following lines;
       // such a step is classified by its name only (LANE_TWINS / SETUP_STEPS /
       // EXCLUDED_STEPS), never by its body, so the body is not read here.
-      steps.push({ name, run: r[1] === "|" ? "" : r[1] });
+      steps.push({ name, run: r[1] === "|" ? "" : r[1], uses: null });
     }
   }
   return steps;
@@ -270,6 +293,8 @@ function jobSteps({ workflow: path, job }) {
 function classify(step) {
   const script = scriptInvokedBy(step.run);
   if (script !== null) return { kind: "script", script };
+  if (step.uses && SETUP_ACTIONS.some((p) => step.uses.startsWith(p)))
+    return { kind: "setup", script: null };
   if (step.name in LANE_TWINS)
     return { kind: "twin", script: LANE_TWINS[step.name] };
   if (SETUP_STEPS.includes(step.name)) return { kind: "setup", script: null };
@@ -283,7 +308,10 @@ function greenScripts() {
   for (const g of GREEN_JOBS) {
     for (const step of jobSteps(g) ?? []) {
       const c = classify(step);
-      if (c.script !== null) out.push(c.script);
+      // Expanded to leaves, as the composite side is — a twin that is itself a
+      // composite must compare on the same footing (QA cycle 2, CR-5).
+      if (c.script !== null && c.script in scripts)
+        out.push(...expand(c.script));
     }
   }
   return out.filter((name) => name in scripts);

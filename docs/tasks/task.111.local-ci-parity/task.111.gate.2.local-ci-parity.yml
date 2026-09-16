@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: CONCERNS
+status_reason: 'Cycle-1 findings CR-1/CR-2/CR-3 all verified FIXED by re-execution. The refute pass found three new correctness findings in the tests themselves — the cap was measured on a normalised string a loader never sees (a folded fixture parsed to 1,026 and passed), a `uses:` gate step in any green job slipped the parity classifier, and the wrapper test could not tell exec from a plain call — plus two cleanups. All were verified by execution. Fixes for all five were applied in the working tree during this review (recorded as a process deviation); they enter the branch through 5b.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T15:20:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/create-skill/scripts/quick_validate.py'
+    finding: 'The cap was measured on the whitespace-normalised string, not the parsed value a loader receives: a folded scalar whose continuation line begins with a space is a YAML more-indented line, YAML keeps its newline, and the at-cap-folded fixture that "passed at 1,024" parses to 1,026 (verified with PyYAML). The comment claiming the normalised string is "the same string a loader sees after YAML folding" was false.'
+    suggested_action: 'Measure len(str(fm["description"]).strip()) — the parsed value with only outer whitespace (the clip newline) removed; make the corpus test read the same parsed value through skill_frontmatter.parse; build the folded fixture so no continuation line starts with whitespace, and add the more-indented case as a fixture that must be rejected.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'jobSteps() recorded only `run:` steps, so a gate added to a green job as a marketplace `- uses:` action was never classified and passed silently — verified by mutation: `- name: Marketplace lint / uses: some/lint-action@v1` appended to validate.yml left all 12 tests green — contradicting the header rule that an unclassified step fails.'
+    suggested_action: 'Record `uses:` steps too; recognise unnamed setup actions by a SETUP_ACTIONS prefix list (actions/checkout@, actions/setup-node@, actions/setup-python@) and named ones through the existing maps; add "Set up Node" / "Set up Python" to SETUP_STEPS.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'evals/shared/tests/develop-pipeline-hook-wrappers.test.mjs'
+    finding: 'The header claimed dropping `exec` fails one of the three assertions; it does not — a wrapper that calls the target without exec still propagates argv, inherited stdin and the last command''s exit status (verified: a non-exec wrapper that still mentions exec in a comment passed all three), so the exec half of the wrapper contract was untested.'
+    suggested_action: 'Have the stub print its own $$ and assert it equals the pid spawnSync started — under exec the wrapper''s process is the stub; reword the header to say which mutation each assertion catches.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 42
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 9
+    notes: 'Boundary: the description cap, now measured on the parsed value. 9 candidates executed against the validator after the fix: 1,025 ASCII (reject), 1,024 ASCII (accept), 1,025 multibyte code points (reject), 1,020 multibyte (accept), folded scalar with clean continuation lines normalising to 999 (accept), folded scalar with a more-indented line parsing to 1,026 (reject — the CR-1 case), literal block of 1,024 with clip newline (accept — the newline is not content), literal block with an interior newline parsing to 1,025 (reject), whitespace-only (rejected by the empty check). 9/9 as expected. No network, credential or untrusted-input handling in the change set.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1; the corpus cap test now shells out to Python once for all 128 skills (one process, ~0.3 s) instead of regex-parsing each file — no measurable change.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-1 fixes hold under re-execution (CR-3 typo'd step red in validate.yml and in shellcheck.yml; all six block-scalar skills measure identically in JS and Python; forced-null target is a clean skip with zero TypeErrors). Cycle-2 mutations: uses: gate step red; non-exec wrapper red on the pid assertion; composite twin still compares as leaf sets; reverting the validator to the normalised measure turns the new more-indented fixture red. Advisory CR-4 (cycle 1) unchanged: check:generated compares the working tree.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The corpus cap check had grown a hand-rolled YAML scalar parser (indicator strip, quote strip, no escape handling) beside a sibling test that already parses every skill through skill_frontmatter.parse — the duplication is exactly what produced cycle 1''s two-character disagreement (CR-4, cleanup). greenScripts() pushed twin names unexpanded while the composite side was expanded to leaves (CR-5, cleanup). Both resolved in the working tree alongside the bugs; CONCERNS stands until the fixed files are on the branch and re-reviewed.'
+
+recommendations:
+  immediate:
+    - action: 'Measure the cap on the parsed value; corpus test via the parser; clean folded fixture + more-indented negative fixture (CR-1)'
+      refs: ['skills/create-skill/scripts/quick_validate.py', 'tests/skill-frontmatter.test.js']
+    - action: 'Classify uses: steps; SETUP_ACTIONS prefix list (CR-2)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'Assert exec via $$ == spawned pid; reword header (CR-3)'
+      refs: ['evals/shared/tests/develop-pipeline-hook-wrappers.test.mjs']
+  future:
+    - action: 'CR-4 (cycle 1, medium confidence): check:generated reads an unrelated dirty README/catalog/deps as drift — document the clean-tree expectation or compare against `git show HEAD:<path>`'
+      refs: ['package.json']
+    - action: 'Pre-existing: session-handoff CR-6 (handoff-verify.test.js) fails on hosts with ~1.7 s npm cold start; passed on the second fast-gate run under lower load — timing-sensitive, worth a bug against task 110''s suite'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1, CR-2, CR-3 (cycle 2) on the branch and re-reviewed'

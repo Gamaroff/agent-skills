@@ -122,15 +122,19 @@ def validate_skill(skill_path):
     if '<' in description or '>' in description:
         return False, "Description cannot contain angle brackets (< or >)"
     # Hard cap from the Agent Skills spec: description is at most 1,024
-    # characters. Measured on the whitespace-normalised string above — the same
-    # string a loader sees after YAML folding — so a multi-line description is
-    # judged on its content, not its indentation. This is a failure, not a
-    # warning: a loader that enforces the cap rejects the whole skill, and a cap
-    # nothing here checks is a number in a spec nobody reads at commit time
-    # (develop-story shipped at 1,025 and 128/128 skills "passed"; task 111).
-    if len(description) > DESCRIPTION_MAX_CHARS:
+    # characters. Measured on the PARSED value with only its outer whitespace
+    # stripped — what a loader actually receives after YAML has folded the
+    # scalar — not on the whitespace-normalised string above. The two differ
+    # on a block scalar with a more-indented line: YAML keeps that newline, so
+    # a loader sees it and normalisation would hide it (QA cycle 2 on task 111
+    # produced exactly that: a fixture the normalised measure read as 1,024 and
+    # the parsed value as 1,026). The trailing newline a clip-chomped block
+    # scalar carries is not content and is stripped. This is a failure, not a
+    # warning: a loader that enforces the cap rejects the whole skill.
+    parsed_len = len(str(fm['description']).strip())
+    if parsed_len > DESCRIPTION_MAX_CHARS:
         return False, (
-            f"Description is {len(description)} chars "
+            f"Description is {parsed_len} chars as parsed "
             f"(max {DESCRIPTION_MAX_CHARS} — Agent Skills spec); trim it"
         )
     # Warn if description is too short or too long (target: ~100 words)

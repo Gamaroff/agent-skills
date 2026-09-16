@@ -19,9 +19,12 @@
  *      exists in the real tree (a wrapper pointing at nothing).
  *   2. Behaviourally, in a sandbox where the reference is a stub: argv reaches
  *      the target intact (including an argument with a space), stdin reaches it
- *      (hooks read a JSON event there), and the target's exit status propagates.
- *      That is the whole contract of an `exec` wrapper, and it is what `"$@"`
- *      and `exec` each carry — drop either and one of the three fails.
+ *      (hooks read a JSON event there), the target's exit status propagates,
+ *      and the target runs IN the wrapper's process — the stub's `$$` equals
+ *      the pid that was spawned. Dropping `"$@"` fails the argv assertion;
+ *      dropping `exec` fails the pid assertion (a non-exec child still
+ *      propagates argv, stdin and exit status, so those three alone could not
+ *      tell — QA cycle 2, CR-3).
  *
  * The population is ENUMERATED FROM THE TREE, never typed: every
  * `skills/develop-*` directory with a `scripts/` dir is a pipeline, and every
@@ -108,6 +111,10 @@ function makeSandbox(t, pipeline, wrapperPath, wrapper, target) {
     stub,
     [
       "#!/usr/bin/env bash",
+      // $$ is the stub's own pid. Under `exec` the wrapper's process IS the
+      // stub, so this equals the pid spawnSync started; without exec the stub
+      // is a child and the two differ. That is what makes "drop exec" red.
+      'printf "PID=%s\\n" "$$"',
       'printf "ARGC=%s\\n" "$#"',
       'for a in "$@"; do printf "ARG=[%s]\\n" "$a"; done',
       'printf "STDIN=%s\\n" "$(cat)"',
@@ -174,6 +181,11 @@ for (const { pipeline, scriptsDir, wrappers } of pipelines) {
         cwd: tmpdir(),
       });
 
+      assert.match(
+        res.stdout,
+        new RegExp(`^PID=${res.pid}$`, "m"),
+        `${label}: the target must run in the wrapper's own process (exec dropped?)\n${res.stdout}`,
+      );
       assert.equal(
         res.status,
         STUB_EXIT,
