@@ -1328,6 +1328,28 @@ function firstTableIn(content) {
   return table.join("\n");
 }
 
+// Split a section into blocks on blank lines — fence-aware, so a fenced block
+// containing a blank line is ONE block rather than two. A naive split counted
+// the fence's tail as a paragraph, which inflated `omitted` on the prose path
+// and made the heading-only `beneath` count report content beneath a label
+// where there was only code (task.117 QA cycle 5, CR5-1).
+function splitBlocks(src) {
+  const blocks = [];
+  let cur = [];
+  const isFenced = makeFenceTracker();
+  for (const line of String(src).split("\n")) {
+    const fenced = isFenced(line);
+    if (!fenced && line.trim() === "") {
+      if (cur.length) blocks.push(cur.join("\n").trim());
+      cur = [];
+      continue;
+    }
+    cur.push(line);
+  }
+  if (cur.length) blocks.push(cur.join("\n").trim());
+  return blocks.filter(Boolean);
+}
+
 // Is this section body a list?
 //
 // Judged on the FIRST non-blank line rather than a ratio: a criteria section
@@ -1410,10 +1432,7 @@ function summariseSection(content, opts = {}) {
   }
 
   // Prose: the first PROSE paragraph, capped at `maxSentences`.
-  const paras = src
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const paras = splitBlocks(src);
 
   // Skip leading tables and fenced blocks rather than giving up on the section.
   //
@@ -1446,11 +1465,15 @@ function summariseSection(content, opts = {}) {
     // still yield nothing. That travels as `beneath`, which the preflight
     // reads for its message (QA cycle 2 CR2-2; cycle 4 CR4-1 — folding the
     // two into one field starved the live card of its pointer).
+    // `omitted` is what it is on the prose path — every other block, before
+    // and after — so the card's pointer reads the same for the same shape
+    // (QA cycle 5, CR5-2). `beneath` excludes labels as well as tables and
+    // fences: a label beneath a label delivers nothing either (CR5-3).
     const after = paras.slice(firstIdx + 1);
     return {
       text: first.trim(),
-      omitted: after.length,
-      beneath: after.filter(isProseBlock).length,
+      omitted: paras.length - 1,
+      beneath: after.filter((p) => isProseBlock(p) && !isLabelOnly(p)).length,
       kind: "heading-only",
     };
   }

@@ -118,7 +118,7 @@ and the GitHub-only skills that follow this spec have no use for a Jira client.
 
 | Function | Role |
 |---|---|
-| `summariseSection(content, {maxItems, maxSentences})` | → `{text, omitted, kind}`; detects list vs prose |
+| `summariseSection(content, {maxItems, maxSentences, transform})` | → `{text, omitted, kind}` — plus `beneath` when `kind` is `heading-only` (the summarisable blocks under the label; `omitted` stays every other block, for the pointer); `transform` runs after the label drop |
 | `dropHeadingLines(content)` | removes `###` grouping labels, keeps what is under them |
 | `firstTableIn(content)` | the first pipe table in a section, wherever it sits |
 | `summaryBlockNodes({...})` | one section → ADF heading + body + `+N more` pointer |

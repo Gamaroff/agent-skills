@@ -4,7 +4,7 @@
 **Bug ID**: TASK-117-BUG-6
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-4 review CR4-1, reproduced)
 **Date Found**: 2026-09-17
 
@@ -78,3 +78,4 @@ stopped / nothing-under-it wording on `beneath` and carries both in the block.
 | 2026-09-17 | New          | QA         | Filed from QA cycle 4 (CR4-1)         |
 | 2026-09-17 | In Progress  | qa-fix     | Investigation started                 |
 | 2026-09-17 | Ready for QA | qa-fix     | Fix implemented, mutation-proven      |
+| 2026-09-17 | Closed       | QA         | Verified in QA cycle 5: the card renders `+1 more` for label + fence; M13 red |

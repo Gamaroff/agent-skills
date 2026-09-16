@@ -789,6 +789,31 @@ test("H3: the stopped count is what a ### conversion would deliver — blocks BE
   assert.equal(above.beneath, 1);
 });
 
+test("H3: `beneath` is fence-aware and excludes labels; `omitted` matches the prose path (CR5-1, CR5-2, CR5-3)", () => {
+  // A fence containing a blank line is ONE block, and it is not content
+  // beneath the label.
+  const fence = summariseSection("**Before** (GitHub):\n\n```\nx\n\ny\n```\n");
+  assert.deepEqual(
+    { omitted: fence.omitted, beneath: fence.beneath },
+    { omitted: 1, beneath: 0 },
+  );
+  // A label beneath a label delivers nothing either.
+  const labels = summariseSection("**Before** (GitHub):\n\nKey points:\n");
+  assert.equal(labels.beneath, 0);
+  // `omitted` counts every other block, before AND after, as the prose path
+  // does — the same shape announces the same "+N more".
+  const table = "| a | b |\n| - | - |\n| 1 | 2 |\n\n";
+  assert.equal(
+    summariseSection(`${table}Key points:\n\n- a\n`).omitted,
+    summariseSection(`${table}A sentence.\n\n- a\n`).omitted,
+  );
+  // ...and the prose path no longer counts a fence's tail as a paragraph.
+  assert.equal(
+    summariseSection("A sentence.\n\n```\nx\n\ny\n```\n").omitted,
+    1,
+  );
+});
+
 test("H3: `omitted` stays honest on the heading-only path — the live card still announces the cut (CR4-1)", () => {
   // Label + fence: nothing a ### conversion would deliver (`beneath: 0`), but
   // one block WAS cut, and the card's "+N more" pointer reads `omitted`.

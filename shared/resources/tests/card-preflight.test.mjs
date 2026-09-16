@@ -21,12 +21,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  existsSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
-  writeFileSync,
-  mkdtempSync,
   rmSync,
-  existsSync,
+  statSync,
+  writeFileSync,
 } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -401,8 +402,6 @@ test("B: --json does not emit the document body", () => {
 });
 
 test("B: every sync-jira-* --check-card --json carries the same scope statement (CR2-6)", () => {
-  const { execFileSync } = require("node:child_process");
-  const { readdirSync, statSync } = require("node:fs");
   // A CARD document is the one whose basename equals its directory; every
   // other file in the folder (dod, qa, gate, plan, review) is a sibling
   // artifact no card is built from. Walked with readdirSync, as the corpus

@@ -130,21 +130,21 @@ the four `sync-jira-*` suites unchanged and green.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
-**Quality Score**: 85/100 (cycle 4)
+**Quality Score**: 85/100 (cycle 5)
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.117.qa.4.card-preflight-heading-only.md](./task.117.qa.4.card-preflight-heading-only.md) (earlier: [qa.1](./task.117.qa.1.card-preflight-heading-only.md), [qa.2](./task.117.qa.2.card-preflight-heading-only.md), [qa.3](./task.117.qa.3.card-preflight-heading-only.md))
-- **Gate File**: [task.117.gate.4.card-preflight-heading-only.yml](./task.117.gate.4.card-preflight-heading-only.yml) (earlier: [gate.1](./task.117.gate.1.card-preflight-heading-only.yml), [gate.2](./task.117.gate.2.card-preflight-heading-only.yml), [gate.3](./task.117.gate.3.card-preflight-heading-only.yml))
+- **Full Report**: [task.117.qa.5.card-preflight-heading-only.md](./task.117.qa.5.card-preflight-heading-only.md) (earlier: [qa.1](./task.117.qa.1.card-preflight-heading-only.md), [qa.2](./task.117.qa.2.card-preflight-heading-only.md), [qa.3](./task.117.qa.3.card-preflight-heading-only.md), [qa.4](./task.117.qa.4.card-preflight-heading-only.md))
+- **Gate File**: [task.117.gate.5.card-preflight-heading-only.yml](./task.117.gate.5.card-preflight-heading-only.yml) (earlier: [gate.1](./task.117.gate.1.card-preflight-heading-only.yml), [gate.2](./task.117.gate.2.card-preflight-heading-only.yml), [gate.3](./task.117.gate.3.card-preflight-heading-only.yml), [gate.4](./task.117.gate.4.card-preflight-heading-only.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 515 (eight suites) + 161 boundary probes + 2 mutation proofs
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (cycle 4: 1 medium — CR4-1; cycles 1–3 closed)
+- **Critical Issues**: 0 (cycle 5: 1 medium — CR5-1; cycles 1–4 closed)
 - **NFR Status**: Security: PASS (measured, 161 probes), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycles 1–3 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) … [bug.5](./task.117.bug.5.change-log-rows-inside-fenced-examples.md)). Cycle 4 found one medium contract regression from cycle 2: the heading-only `omitted` count excludes fences/tables beneath the label, which starves the live card's `+N more` pointer ([bug.6](./task.117.bug.6.heading-only-omitted-starves-card-pointer.md), CR4-1); plus two test-hygiene cleanups.
+Cycles 1–4 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) … [bug.6](./task.117.bug.6.heading-only-omitted-starves-card-pointer.md)); the card path is correct on every shape reviewed. Cycle 5 found the cycle-4 `beneath` counter imprecise — not fence-aware, counts label paragraphs, `omitted` differs from the prose path — which mis-words the preflight advisory on two shapes ([bug.7](./task.117.bug.7.beneath-count-not-fence-aware.md), CR5-1..3); plus two cleanups.
 
 ---
 
@@ -172,6 +172,8 @@ Cycles 1–3 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) �
 | 2026-09-17 |         | QA findings fixed — CR3-1 (colon inside bold), CR3-2/3 (real Change Log sections in task.42/43; task.44 row into its table), CR3-4 (label anchored at column 0), CR3-5/6; 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate CONCERNS (85/100) — cycle 4: cycle-3 findings closed; 1 medium (CR4-1 heading-only omitted starves the card pointer), 2 cleanups | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR4-1 (honest `omitted` + separate `beneath`), CR4-2/3 (test hygiene); 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (85/100) — cycle 5: cycle-4 findings closed; 1 medium (CR5-1 beneath not fence-aware), 2 low, 2 cleanups | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR5-1..3 (fence-aware `splitBlocks`, non-label `beneath`, `omitted` matches the prose path), CR5-4/5; 1 iteration | qa-fix |
 
 ---
 
