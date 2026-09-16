@@ -35,8 +35,8 @@
  * own workflow precisely so as not to trip this test, which is the test
  * blocking the parity it exists to guarantee.
  *
- * So every green-defining job is read now, and each `run:` step in them must
- * be one of exactly four things:
+ * So every green-defining job is read now — with a real YAML parser, see
+ * parseWorkflow() — and each step in them must be one of exactly four things:
  *
  *   1. an `npm run <script>` — counted, as before;
  *   2. a step whose `name:` is in LANE_TWINS — the named npm script is what
@@ -65,6 +65,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -238,99 +239,86 @@ function jobBlock(jobName, text = workflow) {
  * test REPORT them instead of silently ignoring them.
  */
 function workflowInvocations() {
-  const block = jobBlock(TEST_JOB);
-  if (block === null) return [];
-  return block
-    .split("\n")
-    .map((line) => line.match(/^\s*run:\s*(.+?)\s*$/))
-    .filter(Boolean)
-    .map((m) => scriptInvokedBy(m[1]))
-    .filter((name) => name !== null);
+  // The same parsed reading every other check uses — two readers of one
+  // file is how a trailing comment was kept by one and stripped by the other
+  // (QA cycle 6).
+  const steps = stepsOfJob(parseWorkflow(workflow), TEST_JOB) ?? [];
+  return steps.map((st) => scriptInvokedBy(st.run)).filter((n) => n !== null);
 }
 
 /**
- * Every `- name:` / `run:` step pair in one job, in order. A `run:` with no
- * preceding `name:` gets an empty name, which no map can match — so an
- * anonymous gate step fails classification below, which is the right answer:
- * a step the twin map cannot name is a step nobody can mirror.
+ * A workflow document, read with a REAL YAML parser.
+ *
+ * Until QA cycle 6 of task 111 the steps were read with regexes over the raw
+ * text — first `run:` lines only, then a hand-rolled step parser that grew a
+ * key-column tracker, a dash-spacing rule, a block-scalar table and a
+ * `steps:` gate, and STILL misread one new shape per review cycle (keys after
+ * `steps:`, a bare `-` item, flow mappings, trailing comments, quoted values).
+ * Every one of those is a consequence of reading YAML without a YAML parser.
+ * PyYAML is already a hard requirement of this suite (tests/skill-frontmatter
+ * .test.js refuses to run without it) and test.yml installs it, so the
+ * workflow is parsed the way GitHub parses it and the shapes stop mattering.
+ *
+ * The earlier objection — "a parse that normalises the file away from what a
+ * reader sees is the wrong instrument" — is answered by what the test is for:
+ * it predicts what CI *executes*, and CI executes the parsed document.
  */
-function jobSteps({ workflow: path, job }) {
-  const block = jobBlock(job, read(path));
-  if (block === null) return null;
-  return jobStepsFromText(block);
+function parseWorkflow(text) {
+  const script = [
+    "import sys, json, yaml",
+    "doc = yaml.safe_load(sys.stdin.read())",
+    "print(json.dumps(doc if isinstance(doc, dict) else {}))",
+  ].join("\n");
+  const res = spawnSync("python3", ["-c", script], {
+    input: text,
+    encoding: "utf-8",
+  });
+  assert.equal(
+    res.status,
+    0,
+    `python3 + PyYAML are required to parse the workflows (the same hard ` +
+      `requirement tests/skill-frontmatter.test.js states): ${res.stderr}`,
+  );
+  return JSON.parse(res.stdout);
 }
 
-/** The step parser proper, over one job block's text — see jobSteps(). */
-function jobStepsFromText(block) {
-  // One step object per list item, its keys assigned in whatever order the
-  // file writes them. YAML mappings are unordered and GitHub accepts
-  // `- uses: x` / `name: Y` as readily as `- name: Y` / `uses: x`; an earlier
-  // version bound the name only when `name:` was the item's first key, so the
-  // second spelling was recorded unnamed — unclassifiable, and its map entry
-  // reported stale — a false red on a workflow CI accepts (QA cycle 3, CR-1).
-  //
-  // Keys are read ONLY at the step's own key column — the column two past the
-  // item's dash. Anything deeper belongs to a nested mapping or a block body:
-  // a `with:` input named `name:` must not overwrite the step name, and a
-  // `run: |` body line that begins "- " must not open a phantom step (both
-  // reproduced in QA cycle 4, CR-1, after the dash was made optional on the
-  // key regexes without bounding the column).
-  const steps = [];
-  let cur = null;
-  let keyCol = -1;
-  const flush = () => {
-    // Only steps that DO something are recorded. A `uses:` step counts: a
-    // marketplace lint or scan action is a gate exactly as a `run:` is, and an
-    // unrecorded one passes silently (QA cycle 2, CR-2).
-    if (cur && (cur.run !== null || cur.uses !== null))
-      steps.push({ name: cur.name, run: cur.run ?? "", uses: cur.uses });
-    cur = null;
-  };
-  const indentOf = (line) => line.match(/^\s*/)[0].length;
-  let inSteps = false;
-  for (const line of block.split("\n")) {
-    if (line.trim() === "" || /^\s*#/.test(line)) continue;
-    // Items are opened only under `steps:`. A job-level sequence before it
-    // (`needs:` / `runs-on:` written as a list) would otherwise open a phantom
-    // step from whatever job keys follow (QA cycle 5, CR-4).
-    if (!inSteps) {
-      inSteps = /^\s*steps:\s*(#.*)?$/.test(line);
-      continue;
-    }
-    const dash = line.match(/^(\s*)-\s+/);
-    // A list item left of the current key column starts a new step; one at or
-    // deeper than it is a list inside the step (a with: array, a block body)
-    // and is skipped with the rest of that nesting.
-    if (dash && (cur === null || dash[1].length < keyCol)) {
-      flush();
-      cur = { name: "", run: null, uses: null };
-      // The key column is wherever the first key actually starts — YAML allows
-      // any run of spaces after the dash (`-   name: X` puts keys at dash + 4),
-      // so it is read off the match, never assumed to be dash + 2 (QA cycle 5,
-      // CR-1: the assumption dropped such a step entirely — a false green).
-      keyCol = dash[0].length;
-    }
-    if (!cur) continue;
-    // A dash line's first key sits where its match ends; a plain line's key
-    // sits at its indent. Only a key at exactly keyCol belongs to this step —
-    // a deeper dash line is a list inside a nested mapping or a block body.
-    const col = dash ? dash[0].length : indentOf(line);
-    if (col !== keyCol) continue;
-    const body = dash ? line.slice(dash[0].length) : line.trim();
-    const n = body.match(/^name:\s*(.+?)\s*$/);
-    if (n) cur.name = n[1].replace(/^['"]|['"]$/g, "");
-    const u = body.match(/^uses:\s*(\S+)/);
-    if (u) cur.uses = u[1];
-    const r = body.match(/^run:\s*(.*?)\s*$/);
-    // `run: |` (or `|-`, `|+`, `>`, `>-`) is a block scalar whose commands are
-    // on the following, deeper-indented lines; such a step is classified by its
-    // name only (LANE_TWINS / SETUP_STEPS / EXCLUDED_STEPS), never by its body,
-    // so the body is not read here and the indicator is not a command.
-    if (r)
-      cur.run = /^[|>]([+-]?\d?|\d?[+-]?)\s*(#.*)?$/.test(r[1]) ? "" : r[1];
-  }
-  flush();
-  return steps;
+/** Coerce a YAML scalar (string / number / bool / null) to the string GitHub sees. */
+const scalar = (v) => (v === null || v === undefined ? "" : String(v));
+
+/**
+ * Every step of one job, in order, as { name, run, uses }.
+ *
+ * `run` is the command a single-line `run:` names; a multi-line body (a block
+ * scalar with several commands) is reported as `""` and such a step is
+ * classified by its name only — its body is a script, not a script NAME, and
+ * the twin map is what says what it reproduces. A step with neither `run` nor
+ * `uses` is not a step GitHub would execute and is not recorded.
+ */
+function stepsOfJob(doc, job) {
+  const j = doc?.jobs?.[job];
+  if (!j || typeof j !== "object") return null;
+  const steps = Array.isArray(j.steps) ? j.steps : [];
+  return steps
+    .filter(
+      (st) => st && typeof st === "object" && ("run" in st || "uses" in st),
+    )
+    .map((st) => {
+      const body = scalar(st.run).trim();
+      return {
+        name: scalar(st.name).trim(),
+        uses: "uses" in st ? scalar(st.uses).trim() : null,
+        run: body.includes("\n") ? "" : body,
+      };
+    });
+}
+
+function jobSteps({ workflow: path, job }) {
+  return stepsOfJob(parseWorkflow(read(path)), job);
+}
+
+/** The same reader over workflow TEXT — what the synthetic fixtures below use. */
+function jobStepsFromText(text, job) {
+  return stepsOfJob(parseWorkflow(text), job);
 }
 
 /**
@@ -430,7 +418,7 @@ test("every green job is found, and every step in it is classified", () => {
   }
 });
 
-test("a step's keys are read in any order and only at the step's own column", () => {
+test("steps are read the way GitHub reads them — any key order, any YAML spelling", () => {
   // Parse a synthetic job block through the same function the green jobs go
   // through, rather than mutating a workflow file. The uses-then-name spelling
   // is the one an earlier version recorded unnamed (QA cycle 3, CR-1).
@@ -457,14 +445,14 @@ test("a step's keys are read in any order and only at the step's own column", ()
     "          - name: bogus",
     "            run: npm run oops",
     "          EOF",
-    // Other block-scalar spellings carry no command either.
+    // Other block-scalar spellings parse like any other.
     "      - name: Folded body",
     "        run: >-",
     "          echo one",
     // Extra spaces after the dash put the keys at dash + 4 (valid YAML).
     "      -   name: Extra spaces after dash",
     "          run: npm run lint:shell",
-    // Indentation-first indicator and a trailing comment are still no command.
+    // Indentation-first indicator and a trailing comment on the indicator.
     "      - name: Indented literal",
     "        run: |2-",
     "          echo two",
@@ -489,16 +477,46 @@ test("a step's keys are read in any order and only at the step's own column", ()
     "",
   ].join("\n");
   assert.deepEqual(
-    jobStepsFromText(jobBlock("probe", jobLevel)).map((s) => [
+    jobStepsFromText("jobs:\n" + jobLevel, "probe").map((s) => [
       s.name,
       s.uses,
       s.run,
     ]),
     [["", null, "npm test"]],
   );
-  const block = jobBlock("probe", synthetic);
-  assert.ok(block, "synthetic job block must parse");
-  const parsed = jobStepsFromText(block);
+  // The cycle-6 shapes: keys after steps:, a bare "-" item, a flow mapping,
+  // trailing comments on plain values, a quoted uses:.
+  const cycleSix = [
+    "  probe:",
+    "    steps:",
+    "      -",
+    "        name: Bare dash",
+    "        run: npm run format:check",
+    "      - { name: Flow mapping, run: npm test }",
+    "      - name: Commented run # twin",
+    "        run: npm run eval:all # slow",
+    '      - uses: "actions/checkout@v7"',
+    "    needs:",
+    "      - build",
+    "    defaults:",
+    "      run:",
+    "        shell: bash",
+    "",
+  ].join("\n");
+  assert.deepEqual(
+    jobStepsFromText("jobs:\n" + cycleSix, "probe").map((s) => [
+      s.name,
+      s.uses,
+      s.run,
+    ]),
+    [
+      ["Bare dash", null, "npm run format:check"],
+      ["Flow mapping", null, "npm test"],
+      ["Commented run", null, "npm run eval:all"],
+      ["", "actions/checkout@v7", ""],
+    ],
+  );
+  const parsed = jobStepsFromText("jobs:\n" + synthetic, "probe");
   assert.deepEqual(
     parsed.map((s) => [s.name, s.uses, s.run]),
     [
@@ -508,10 +526,11 @@ test("a step's keys are read in any order and only at the step's own column", ()
       ["Formatting", null, "npm run format:check"],
       ["Upload coverage", "actions/upload-artifact@v4", ""],
       ["Body with a list", null, ""],
-      ["Folded body", null, ""],
+      // A block scalar holding ONE command is that command — GitHub runs it.
+      ["Folded body", null, "echo one"],
       ["Extra spaces after dash", null, "npm run lint:shell"],
-      ["Indented literal", null, ""],
-      ["Commented literal", null, ""],
+      ["Indented literal", null, "echo two"],
+      ["Commented literal", null, "echo three"],
     ],
   );
 });
