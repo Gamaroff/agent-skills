@@ -41,7 +41,8 @@
  *   1. an `npm run <script>` — counted, as before;
  *   2. a step whose `name:` is in LANE_TWINS — the named npm script is what
  *      reproduces it locally, and is counted in its place;
- *   3. a step whose `name:` is in SETUP_STEPS — environment setup, not a gate;
+ *   3. environment setup, not a gate — a step whose `name:` is in SETUP_STEPS,
+ *      or an unnamed `uses:` of a SETUP_ACTIONS action (checkout, setup-*);
  *   4. a step whose `name:` is in EXCLUDED_STEPS — deliberately not mirrored,
  *      with the reason written down beside it.
  *
@@ -273,8 +274,9 @@ const scalar = (v) => (v === null || v === undefined ? "" : String(v));
 /**
  * Every step of one job, in order, as { name, run, uses }.
  *
- * `run` is the command a single-line `run:` names; a multi-line body (a block
- * scalar with several commands) is reported as `""` and such a step is
+ * `run` is the body's one command when, after dropping blank lines and shell
+ * comments, exactly one line remains — whether written inline or as a block
+ * scalar. A body with several commands is reported as `""` and such a step is
  * classified by its name only — its body is a script, not a script NAME, and
  * the twin map is what says what it reproduces. A step with neither `run` nor
  * `uses` is not a step GitHub would execute and is not recorded.
@@ -364,12 +366,32 @@ test("the `test` job is found, and only its steps are read", () => {
     `test.yml defines no \`${TEST_JOB}:\` job — the parity check would silently ` +
       "compare against an empty set and pass no matter what the composite held",
   );
-  // Only that job is read: a second job's steps must not leak in. Asserted on
-  // the parsed document rather than by counting run: lines in raw text.
-  const doc = parseWorkflow(workflow);
-  const allSteps = Object.values(doc.jobs).flatMap((j) => j.steps ?? []);
-  assert.ok(steps.length <= allSteps.length);
   assert.ok(steps.length > 0, "the test job has no steps");
+  // Only that job is read: a second job's steps must not leak in. test.yml
+  // holds one job, so this is asserted on a synthetic two-job document with
+  // distinct commands — a reader that ignored the job name would return both.
+  // (The earlier `steps.length <= allSteps.length` form was satisfied by
+  // exactly such a reader — QA cycle 8, CR-1.)
+  const twoJobs = [
+    "jobs:",
+    "  test:",
+    "    steps:",
+    "      - run: npm test",
+    "  other:",
+    "    steps:",
+    "      - run: npm run oops",
+    "      - run: npm run format:check",
+    "",
+  ].join("\n");
+  assert.deepEqual(
+    stepsOfJob(parseWorkflow(twoJobs), "test").map((st) => st.run),
+    ["npm test"],
+  );
+  assert.deepEqual(
+    stepsOfJob(parseWorkflow(twoJobs), "other").map((st) => st.run),
+    ["npm run oops", "npm run format:check"],
+  );
+  assert.equal(stepsOfJob(parseWorkflow(twoJobs), "missing"), null);
 });
 
 test("`npm ci` in the workflow is the installer, never the `ci` script", () => {
