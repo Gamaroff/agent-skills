@@ -5,18 +5,21 @@ type: task
 description: "card-preflight.js exits 0 with zero findings on a document whose Success Criteria card block resolves to the 14-character string **Functional** and nothing else, because summariseSection classifies a section that opens with a bold sub-heading as prose and stops at that line. Measured 2026-09-10: 15 of 106 task documents publish that block. The preflight's vocabulary is missing/empty — it cannot say 'present but useless' (#49). Separately, its clean ok: true reads as a structural all-clear when it checks three headings of eleven; task.103 reached review missing two mandatory sections (#43)."
 tags: [card-preflight, jira-sync, create-task, tracker]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-17
 assignee:
 estimated_effort_hours: 4
+github_issue: 415
 ---
 
 # Technical Task: The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.117.review.1.card-preflight-heading-only.md` implemented 2026-09-17
+**GitHub Issue**: [#415](https://github.com/Gamaroff/agent-skills/issues/415)
 
 ---
 
@@ -52,7 +55,9 @@ the same failure — and it says nothing about the eight mandatory sections it d
 - `shared/resources/authoring-card-preflight.md` — the contract; `docs/reference/anti-patterns.md`
   §"Never fix N call sites without a population check" — which already argues the one-definition
   property for these sections.
-- `countMandatorySections` exists for `review-task`'s use.
+- `countMandatorySections` exists in `skills/create-task/scripts/lib.js` (task-only: it counts the
+  eleven numbered `## N.` headings by string match). No review skill consumes it, and it is not
+  reachable from `shared/resources/` without a `shared → skill` dependency.
 
 ## 4. Scope
 
@@ -60,8 +65,8 @@ the same failure — and it says nothing about the eight mandatory sections it d
 
 ✅ `summariseSection`: bold-only line + following list ⇒ the list is the content
 ✅ `heading-only` finding kind, defined by property; corpus test with a floor (expects 15 today, 0 after)
-✅ Preflight output states scope, or counts mandatory sections (decide in the plan; the second is better if authoring gaps keep reaching review)
-✅ `create-task` / `create-story` / `create-epic` step 4.6 text updated to match
+✅ Preflight output states its scope (decided at review 2026-09-17: a scope statement, not a mandatory-section count — the count is task-only and would need a second copy of the heading list, see §3)
+✅ `create-task` §4.6 / `create-story` §6.2a / `create-epic` §"Card Preflight" text updated to match
 
 ### Out of Scope
 
@@ -75,8 +80,12 @@ None; the preflight stays advisory at authoring. Cards synced after the change r
 
 1. Corpus test first (population form): walk `docs/tasks/*/task.*.md`, run `checkCardSections`,
    count `heading-only`; assert the count and a floor of ≥ 100 docs visited.
-2. `summariseSection` fix; `heading-only` kind; re-run → 0.
-3. Scope statement / mandatory-section count in the CLI output; update the three `create-*` steps.
+2. `summariseSection` fix — a bold-only line on its own paragraph (`**Label**` / `**Label**:`) is
+   dropped the way `dropHeadingLines` drops `###`, **every** such line and not only a leading one
+   (the 15 documents carry `**Functional**:` … `**Code Quality**:` in sequence); `heading-only`
+   kind, defined by property (summary has no sentence terminator and no list item); re-run → 0.
+3. Scope statement in the CLI's clean output ("N card blocks resolved — not a template-completeness
+   check"); update the three `create-*` preflight steps.
 4. Mutation: revert the summariser fix → the corpus test reds at 15.
 
 ## 7. Files Summary
@@ -84,8 +93,11 @@ None; the preflight stays advisory at authoring. Cards synced after the change r
 | File | Change |
 | :--- | :--- |
 | `shared/resources/jira-sync.js`, `shared/resources/card-preflight.js` | summariser + finding kind + scope line |
-| `shared/resources/tests/card-preflight-corpus.test.mjs` (new) | population check |
-| `shared/resources/authoring-card-preflight.md`; `skills/create-{task,story,epic}/SKILL.md` step 4.6 | contract + prose |
+| `shared/resources/tests/card-preflight-corpus.test.mjs` (new) | population check (floor 100, count 0) |
+| `shared/resources/tests/jira-sync-card-summary.test.mjs`, `shared/resources/tests/card-preflight.test.mjs` | summariser fixtures (C2), finding/scope fixtures (H), `--json` scope |
+| `shared/resources/tracker-card-summary.md`; `skills/review-{task,story,epic}/SKILL.md` | finding vocabulary gains `heading-only` |
+| `docs/tasks/task.104.…/task.104.….md` | Breaking Changes given a lead sentence (its block resolved to `**Before** (…):`) |
+| `shared/resources/authoring-card-preflight.md`; `skills/create-task/SKILL.md` §4.6, `skills/create-story/SKILL.md` §6.2a, `skills/create-epic/SKILL.md` §"Card Preflight" | contract + prose |
 | `CHANGELOG.md` | Fixed |
 
 ## 8. Testing Strategy
@@ -97,7 +109,7 @@ the four `sync-jira-*` suites unchanged and green.
 
 1. `heading-only` is a finding kind and the corpus test reports 0 after the fix (15 before, recorded)
 2. `summariseSection` renders the list under a bold label
-3. The preflight's clean output names its scope (or counts mandatory sections)
+3. The preflight's clean output names its scope
 4. The one-definition property test still passes; bundled copies match
 5. Observations #43, #49 close naming this PR
 
@@ -125,19 +137,22 @@ the four `sync-jira-*` suites unchanged and green.
 | Date       | Version | Description                                   | Author      |
 | ---------- | ------- | --------------------------------------------- | ----------- |
 | 2026-09-12 | 1.0     | Initial draft — filed from the 2026-09-12 observation review | create-task |
+| 2026-09-17 | 1.1     | Review passed (9/10) — GitHub issue #415 linked; create-* step refs corrected; scope-statement decision recorded | review-task |
+| 2026-09-17 |         | Status → ready-for-development | review-task |
+| 2026-09-17 |         | Implemented — 15 files (+ bundled copies), 16 new tests; corpus 29 → 0 | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: measure
-- [ ] Corpus scan committed as a test: count task docs whose Success Criteria card block renders as a bold label only (expected 15 of 106 on 2026-09-10)
+- [x] Corpus scan committed as a test: count task docs whose Success Criteria card block renders as a bold label only (expected 15 of 106 on 2026-09-10 — **measured 29 of 120 on 2026-09-17** by the test itself: the 15, plus 11 whose label sat directly above its bullets and was joined into a run-on, plus 3 Breaking Changes blocks)
 ### Phase 2: fix
-- [ ] `summariseSection` treats a leading bold-only line followed by a list as a label, not the prose
-- [ ] Preflight gains a `heading-only` finding kind, defined by property (no sentence, no list item)
-- [ ] Preflight's clean result states its scope ("3 card blocks resolve — not a template-completeness check"), or counts mandatory sections
+- [x] `summariseSection` treats a leading bold-only line followed by a list as a label, not the prose (every bold-only line, via `dropHeadingLines`; `RE_BOLD_LABEL` excludes sentence terminators so `**None.**` stays content)
+- [x] Preflight gains a `heading-only` finding kind, defined by property (no sentence, no list item) — `isLabelOnly`; plus the by-construction case where a section is nothing but labels/sub-headings
+- [x] Preflight's clean result states its scope ("3 card blocks resolve — not a template-completeness check") — `describeCardScope`, in the display and as `scope` in `--json`
 ### Phase 3: prove
-- [ ] Corpus test goes to 0; mutation restores one instance → red
+- [x] Corpus test goes to 0; mutation (revert the bold-label drop) → red at 28 of 120; second mutation (property check inert) → optional-block fixture red
 
 ---
 
@@ -151,7 +166,7 @@ the four `sync-jira-*` suites unchanged and green.
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.117.card-preflight-heading-only/task.117.card-preflight-heading-only.md`
