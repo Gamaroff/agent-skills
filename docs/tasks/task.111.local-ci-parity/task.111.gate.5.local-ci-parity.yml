@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: CONCERNS
+status_reason: 'Gate-4 CR-1 verified FIXED on the head (with: name: inputs and list-shaped bodies no longer misparse; the three real workflows parse to the same 20 steps). The scoped review found one MEDIUM: the key column is hard-wired to dash indent + 2, so the YAML-valid spelling "-   name: X" (extra spaces after the dash, keys at dash + 4) drops the step — a FALSE GREEN that would hide a real gate step; found independently by QA probing and by the reviewer. Three cleanups. NFRs PASS. This is cycle 5: the open entry routes to 5b and then the loop limit escalates for a human decision.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T12:14:11Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'jobStepsFromText() sets the key column to dash indent + 2, but YAML and GitHub accept any run of spaces after the dash (`-   name: X` with continuation keys at dash + 4); in that shape run:/uses: sit at a column != keyCol, are skipped, and flush() drops the step — a false green that hides a real gate step (verified by QA with a synthetic block and independently by the reviewer). *.yml is prettier-ignored, so nothing normalises the spacing.'
+    suggested_action: 'Derive the key column from the match — keyCol = dash[0].length when an item opens, and a dash line''s own column is dash[0].length — and add a "-   name:" case to the synthetic-block test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary changed this cycle (one test-file edit); the cycle-2 probes (9/9 measured) stand.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Gate-4 CR-1 verified on the head. QA probed six further GitHub-accepted step shapes (quoted name, if:, env: block with a NAME key, flow-style with: containing name:, a > folded run, a comment between steps): all parse correctly. The one that does not is the extra-spaces-after-dash spelling (CR-1); no workflow in this repository uses it, so no present verdict is wrong.'
+  maintainability:
+    status: PASS
+    notes: 'Cleanups (advisory): the block-scalar indicator regex rejects the indentation-first ordering (|2-) and a trailing comment (| # note) — classification unaffected; one comment says "at or left of" where the guard is strictly "left of"; a job-level sequence (needs:/runs-on: list) before steps: would open a phantom item — no current workflow has one.'
+
+recommendations:
+  immediate:
+    - action: 'Key column from the match (dash[0].length); "-   name:" synthetic case (CR-1)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+  future:
+    - action: 'CR-2 cleanup: accept both block-scalar indicator orderings and a trailing comment'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-3 cleanup: comment says "at or left of"; the guard is strictly less-than'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-4 cleanup (medium confidence): only open items after the job''s steps: line so a job-level sequence cannot open a phantom step'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-4 (cycle 1): check:generated compares the working tree — document or compare against HEAD'
+      refs: ['package.json']
+    - action: 'Pre-existing: session-handoff CR-6 timing-sensitive on slow-npm hosts'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 (cycle 5) fixed; a human confirms the fix or re-runs a review cycle (loop budget exhausted)'

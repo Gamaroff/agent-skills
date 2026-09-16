@@ -287,22 +287,34 @@ function jobStepsFromText(block) {
     cur = null;
   };
   const indentOf = (line) => line.match(/^\s*/)[0].length;
+  let inSteps = false;
   for (const line of block.split("\n")) {
     if (line.trim() === "" || /^\s*#/.test(line)) continue;
+    // Items are opened only under `steps:`. A job-level sequence before it
+    // (`needs:` / `runs-on:` written as a list) would otherwise open a phantom
+    // step from whatever job keys follow (QA cycle 5, CR-4).
+    if (!inSteps) {
+      inSteps = /^\s*steps:\s*(#.*)?$/.test(line);
+      continue;
+    }
     const dash = line.match(/^(\s*)-\s+/);
-    // A list item at or left of the current key column starts a new step; one
-    // deeper is a list inside the step (a with: array, a block body) and is
-    // skipped with the rest of that nesting.
+    // A list item left of the current key column starts a new step; one at or
+    // deeper than it is a list inside the step (a with: array, a block body)
+    // and is skipped with the rest of that nesting.
     if (dash && (cur === null || dash[1].length < keyCol)) {
       flush();
       cur = { name: "", run: null, uses: null };
-      keyCol = dash[1].length + 2;
+      // The key column is wherever the first key actually starts — YAML allows
+      // any run of spaces after the dash (`-   name: X` puts keys at dash + 4),
+      // so it is read off the match, never assumed to be dash + 2 (QA cycle 5,
+      // CR-1: the assumption dropped such a step entirely — a false green).
+      keyCol = dash[0].length;
     }
     if (!cur) continue;
-    // A dash line's first key sits two past its dash; a plain line's key sits
-    // at its indent. Only a key at exactly keyCol belongs to this step — a
-    // deeper dash line is a list inside a nested mapping or a block body.
-    const col = dash ? dash[1].length + 2 : indentOf(line);
+    // A dash line's first key sits where its match ends; a plain line's key
+    // sits at its indent. Only a key at exactly keyCol belongs to this step —
+    // a deeper dash line is a list inside a nested mapping or a block body.
+    const col = dash ? dash[0].length : indentOf(line);
     if (col !== keyCol) continue;
     const body = dash ? line.slice(dash[0].length) : line.trim();
     const n = body.match(/^name:\s*(.+?)\s*$/);
@@ -314,7 +326,8 @@ function jobStepsFromText(block) {
     // on the following, deeper-indented lines; such a step is classified by its
     // name only (LANE_TWINS / SETUP_STEPS / EXCLUDED_STEPS), never by its body,
     // so the body is not read here and the indicator is not a command.
-    if (r) cur.run = /^[|>][+-]?\d?$/.test(r[1]) ? "" : r[1];
+    if (r)
+      cur.run = /^[|>]([+-]?\d?|\d?[+-]?)\s*(#.*)?$/.test(r[1]) ? "" : r[1];
   }
   flush();
   return steps;
@@ -448,8 +461,41 @@ test("a step's keys are read in any order and only at the step's own column", ()
     "      - name: Folded body",
     "        run: >-",
     "          echo one",
+    // Extra spaces after the dash put the keys at dash + 4 (valid YAML).
+    "      -   name: Extra spaces after dash",
+    "          run: npm run lint:shell",
+    // Indentation-first indicator and a trailing comment are still no command.
+    "      - name: Indented literal",
+    "        run: |2-",
+    "          echo two",
+    "      - name: Commented literal",
+    "        run: | # note",
+    "          echo three",
     "",
   ].join("\n");
+  // A job-level sequence before steps: must not open a phantom step — here
+  // `needs:` is written at its key's own indent, so `defaults: run:` lands on
+  // what would have been that phantom's key column. And `steps:` may carry a
+  // trailing comment.
+  const jobLevel = [
+    "  probe:",
+    "    needs:",
+    "    - build",
+    "    defaults:",
+    "      run:",
+    "        shell: bash",
+    "    steps: # the gates",
+    "      - run: npm test",
+    "",
+  ].join("\n");
+  assert.deepEqual(
+    jobStepsFromText(jobBlock("probe", jobLevel)).map((s) => [
+      s.name,
+      s.uses,
+      s.run,
+    ]),
+    [["", null, "npm test"]],
+  );
   const block = jobBlock("probe", synthetic);
   assert.ok(block, "synthetic job block must parse");
   const parsed = jobStepsFromText(block);
@@ -463,6 +509,9 @@ test("a step's keys are read in any order and only at the step's own column", ()
       ["Upload coverage", "actions/upload-artifact@v4", ""],
       ["Body with a list", null, ""],
       ["Folded body", null, ""],
+      ["Extra spaces after dash", null, "npm run lint:shell"],
+      ["Indented literal", null, ""],
+      ["Commented literal", null, ""],
     ],
   );
 });
