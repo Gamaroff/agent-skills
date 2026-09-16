@@ -286,11 +286,18 @@ test("C2: a bold SENTENCE is content and survives", () => {
     /\*\*/,
     "sanity: inline bold mid-line is not a standalone label",
   );
-  assert.equal(
-    summariseSection("**Before** (GitHub):\n\n- a\n").kind,
-    "prose",
-    "a bold run with trailing text on the line is not a label",
+  // A bold run with trailing text is NOT dropped as a label — dropHeadingLines
+  // leaves it — but a short trailing-colon line standing in for a paragraph
+  // is still a label by shape, and it is REPORTED rather than published:
+  // publishing "**Before** (GitHub):" and stopping was task.104's card.
+  assert.match(
+    dropHeadingLines("**Before** (GitHub):\n\n- a\n").join("\n"),
+    /\*\*Before\*\* \(GitHub\):/,
   );
+  const stopped = summariseSection("**Before** (GitHub):\n\n- a\n");
+  assert.equal(stopped.kind, "heading-only");
+  assert.equal(stopped.text, "**Before** (GitHub):");
+  assert.equal(stopped.omitted, 1);
 });
 
 test("C2: a section that is nothing but labels reports heading-only", () => {
@@ -672,12 +679,93 @@ test("H: a clean result names its scope, and the scope counts resolved blocks", 
   );
 });
 
-test("H: isLabelOnly is the property, not a regex on bold", () => {
-  assert.equal(lib.isLabelOnly("Functional", "prose"), true);
-  assert.equal(lib.isLabelOnly("Functional.", "prose"), false);
-  assert.equal(lib.isLabelOnly("Does it work?", "prose"), false);
-  assert.equal(lib.isLabelOnly("- item", "list"), false);
-  assert.equal(lib.isLabelOnly("", "prose"), false);
+test("H: isLabelOnly describes a label, not any unpunctuated paragraph", () => {
+  // Labels: bold-only, or short with a trailing colon.
+  assert.equal(lib.isLabelOnly("**Functional**:"), true);
+  assert.equal(lib.isLabelOnly("Key points:"), true);
+  assert.equal(lib.isLabelOnly("**Before** (GitHub):"), true);
+  // Content: terminator-less prose, one word, a question, a sentence, a list.
+  assert.equal(lib.isLabelOnly("Add a dark-mode toggle to settings"), false);
+  assert.equal(lib.isLabelOnly("None"), false);
+  assert.equal(lib.isLabelOnly("Functional."), false);
+  assert.equal(lib.isLabelOnly("Does it work?"), false);
+  assert.equal(lib.isLabelOnly("- item"), false);
+  assert.equal(lib.isLabelOnly(""), false);
+  // A lead-in sentence ending in a colon is content: too long to be a label.
+  assert.equal(
+    lib.isLabelOnly("The task is done when all of the following hold:"),
+    false,
+  );
+  // A paragraph with a bullet on any line is never a label — decided on the
+  // paragraph's own lines, before they are joined (CR-1).
+  assert.equal(lib.isLabelOnly("Done when:\n- a\n- b"), false);
+});
+
+// ---------------------------------------------------------------------------
+// H2 — the shapes QA cycle 1 reproduced as false heading-only findings
+// ---------------------------------------------------------------------------
+
+test("H2: a lead-in colon with bullets directly beneath is content, not a label (CR-1)", () => {
+  const r = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\nThe task is done when all of:\n- a\n- b\n",
+    TASK_SPECS,
+  );
+  assert.equal(r.ok, true, JSON.stringify(r.findings));
+  // The property is decided on the paragraph's LINES. Joined into one string,
+  // "See:\n- a:" reads "See: - a:" — three words ending in a colon, a label by
+  // shape — and only the line count says otherwise. This is the fixture that
+  // turns red if the check is ever moved back onto the collapsed text.
+  const lines = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\nSee:\n- a:\n",
+    TASK_SPECS,
+  );
+  assert.equal(lines.ok, true, JSON.stringify(lines.findings));
+});
+
+test("H2: terminator-less prose is content — one-line summary, None, truncated paragraph (CR-3)", () => {
+  const cases = [
+    "## Overview\n\nAdd a dark-mode toggle to settings\n\n## Success Criteria\n\n- a\n",
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\n- a\n\n## Breaking Changes\n\nNone\n",
+    `## Overview\n\n${"word ".repeat(200)}\n\n## Success Criteria\n\n- a\n`,
+  ];
+  for (const doc of cases) {
+    const r = lib.checkCardSections(doc, TASK_SPECS);
+    assert.equal(r.ok, true, JSON.stringify(r.findings));
+  }
+});
+
+test("H2: an epic bold label is dropped before the transform, so its list renders (CR-2)", () => {
+  const specs = lib.CARD_SECTIONS_BY_KIND.epic;
+  const r = lib.checkCardSections(
+    "## Epic Goal\n\n**Existing System Context:**\n\n- a\n- b\n",
+    specs,
+  );
+  assert.equal(r.ok, true, JSON.stringify(r.findings));
+  assert.equal(r.blocks[0].kind, "list");
+  // ...and the transform still flattens a MID-paragraph bold run, which is
+  // what it was written for.
+  const { text } = summariseSection("Some text **Existing:** more text.", {
+    transform: specs[0].transform,
+  });
+  assert.equal(text, "Some text Existing: more text.");
+});
+
+test("H2: the heading-only message says whether content was omitted beneath the label (CR-4)", () => {
+  const stopped = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\nKey points:\n\n- a\n",
+    TASK_SPECS,
+  );
+  assert.equal(stopped.findings[0].code, "heading-only");
+  assert.match(stopped.findings[0].message, /stop in front of the 1 block/);
+  assert.equal(
+    stopped.blocks.find((b) => b.heading === "Success Criteria").omitted,
+    1,
+  );
+  const alone = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\nKey points:\n",
+    TASK_SPECS,
+  );
+  assert.match(alone.findings[0].message, /nothing under it/);
 });
 
 // Every real task document in this repo must pass. This is a ZERO-tolerance

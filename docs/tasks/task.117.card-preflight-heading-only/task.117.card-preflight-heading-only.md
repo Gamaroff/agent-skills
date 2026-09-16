@@ -124,6 +124,29 @@ the four `sync-jira-*` suites unchanged and green.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-17
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.117.qa.1.card-preflight-heading-only.md](./task.117.qa.1.card-preflight-heading-only.md)
+- **Gate File**: [task.117.gate.1.card-preflight-heading-only.yml](./task.117.gate.1.card-preflight-heading-only.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 515 (eight suites) + 161 boundary probes + 2 mutation proofs
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 (3 medium — CR-1, CR-2, CR-3)
+- **NFR Status**: Security: PASS (measured, 161 probes), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+The delivered fix is correct and proven for the shape the task named (29 → 0, red at 28 on revert). The new property-based `heading-only` detector misfires on three legitimate shapes — its list-item half reads post-collapse text (CR-1), no-terminator alone is taken as a label (CR-3) — and the epic `transform` runs before the bold-label drop, so epic cards are not fixed (CR-2). Bug reports: [bug.1](./task.117.bug.1.label-property-overbroad.md), [bug.2](./task.117.bug.2.epic-transform-precedes-label-drop.md).
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
   Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
@@ -140,6 +163,8 @@ the four `sync-jira-*` suites unchanged and green.
 | 2026-09-17 | 1.1     | Review passed (9/10) — GitHub issue #415 linked; create-* step refs corrected; scope-statement decision recorded | review-task |
 | 2026-09-17 |         | Status → ready-for-development | review-task |
 | 2026-09-17 |         | Implemented — 15 files (+ bundled copies), 16 new tests; corpus 29 → 0 | develop |
+| 2026-09-17 |         | QA gate CONCERNS (70/100) — 3 medium findings (CR-1, CR-2, CR-3), 4 low | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR-1/CR-3 (label property on pre-collapse lines, label by shape), CR-2 (transform after the drop), CR-4/CR-5; 1 iteration | qa-fix |
 
 ---
 
@@ -149,7 +174,7 @@ the four `sync-jira-*` suites unchanged and green.
 - [x] Corpus scan committed as a test: count task docs whose Success Criteria card block renders as a bold label only (expected 15 of 106 on 2026-09-10 — **measured 29 of 120 on 2026-09-17** by the test itself: the 15, plus 11 whose label sat directly above its bullets and was joined into a run-on, plus 3 Breaking Changes blocks)
 ### Phase 2: fix
 - [x] `summariseSection` treats a leading bold-only line followed by a list as a label, not the prose (every bold-only line, via `dropHeadingLines`; `RE_BOLD_LABEL` excludes sentence terminators so `**None.**` stays content)
-- [x] Preflight gains a `heading-only` finding kind, defined by property (no sentence, no list item) — `isLabelOnly`; plus the by-construction case where a section is nothing but labels/sub-headings
+- [x] Preflight gains a `heading-only` finding kind, defined by property — `isLabelOnly(paragraph)`: one line, no sentence terminator, no list item on any line, and a label's shape (bold-only, or ≤ 4 words with a trailing colon); plus the by-construction case where a section is nothing but labels/sub-headings. (QA cycle 1 tightened this from "no sentence, no list item", which called any terse lead a label.)
 - [x] Preflight's clean result states its scope ("3 card blocks resolve — not a template-completeness check") — `describeCardScope`, in the display and as `scope` in `--json`
 ### Phase 3: prove
 - [x] Corpus test goes to 0; mutation (revert the bold-label drop) → red at 28 of 120; second mutation (property check inert) → optional-block fixture red
