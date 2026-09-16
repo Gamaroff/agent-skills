@@ -234,6 +234,81 @@ test("C: a `###` inside a fenced block is code, not a heading", () => {
   assert.match(out, /### sample/, "a fenced sample must survive verbatim");
 });
 
+// ---------------------------------------------------------------------------
+// C2 — bold labels are grouping, not content (task.117)
+// ---------------------------------------------------------------------------
+// The shapes below are the ones the corpus actually had. Each fixture is one
+// invariant; card-preflight-corpus.test.mjs is the population form.
+
+test("C2: a bold label followed by a list renders the list, not the label", () => {
+  const { kind, text, omitted } = summariseSection(
+    "**Functional**:\n\n- [x] one\n- [x] two\n",
+  );
+  assert.equal(kind, "list");
+  assert.match(text, /one/);
+  assert.doesNotMatch(text, /Functional/);
+  assert.equal(omitted, 0);
+});
+
+test("C2: a bold label directly above its list, no blank line, is still a list", () => {
+  // task.16–27: the label and the bullets in one paragraph. Before the fix the
+  // prose path joined them into a single run-on "sentence".
+  const { kind, text } = summariseSection(
+    "**Functional**:\n- [x] one\n- [x] two\n\n**Quality**:\n- [x] three\n",
+  );
+  assert.equal(kind, "list");
+  assert.equal(text.split("\n").length, 3);
+  assert.doesNotMatch(text, /\*\*/);
+});
+
+test("C2: every bold label goes, not only the first", () => {
+  const out = dropHeadingLines(
+    "**Functional**:\n\n- a\n\n**Code Quality**:\n\n- b\n",
+  ).join("\n");
+  assert.doesNotMatch(out, /Functional|Code Quality/);
+  assert.match(out, /- a[\s\S]*- b/);
+});
+
+test("C2: a bold label followed by prose yields the prose", () => {
+  const { kind, text } = summariseSection("**Context**\n\nThe thing works.\n");
+  assert.equal(kind, "prose");
+  assert.equal(text, "The thing works.");
+});
+
+test("C2: a bold SENTENCE is content and survives", () => {
+  // `**None.**` is what a Breaking Changes section legitimately says. The
+  // terminator is the boundary between a label and a statement.
+  const { kind, text } = summariseSection("**None.**\n");
+  assert.equal(kind, "prose");
+  assert.equal(text, "**None.**");
+  assert.match(
+    "**Label:** with trailing text",
+    /\*\*/,
+    "sanity: inline bold mid-line is not a standalone label",
+  );
+  assert.equal(
+    summariseSection("**Before** (GitHub):\n\n- a\n").kind,
+    "prose",
+    "a bold run with trailing text on the line is not a label",
+  );
+});
+
+test("C2: a section that is nothing but labels reports heading-only", () => {
+  const r = summariseSection("**Functional**\n\n### Quality\n");
+  assert.equal(r.kind, "heading-only");
+  assert.equal(r.text, "");
+  assert.equal(
+    summariseSection("").kind,
+    "empty",
+    "an absent section is still empty, not heading-only",
+  );
+});
+
+test("C2: a bold label inside a fence is code and stays", () => {
+  const out = dropHeadingLines("```md\n**Functional**\n```\n").join("\n");
+  assert.match(out, /\*\*Functional\*\*/);
+});
+
 test("C: firstTableIn finds a table nested under a sub-heading", () => {
   const src = [
     "**Guidelines:**",
@@ -547,6 +622,62 @@ test("H: the formatter renders findings with their fixes", () => {
   assert.match(out, /Success Criteria/);
   assert.match(out, /Fix:/);
   assert.match(out, /MISSING/);
+});
+
+test("H: a label-only block is heading-only, and a labelled list is not a finding", () => {
+  const alone = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\n**Functional**:\n",
+    TASK_SPECS,
+  );
+  assert.deepEqual(
+    alone.findings.map((f) => [f.section, f.code, f.severity]),
+    [["Success Criteria", "heading-only", "critical"]],
+  );
+  assert.equal(
+    alone.blocks.find((b) => b.heading === "Success Criteria").status,
+    "heading-only",
+  );
+  assert.match(lib.formatCardCheck(alone), /HEADING-ONLY/);
+
+  const listed = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\n**Functional**:\n\n- [x] one\n",
+    TASK_SPECS,
+  );
+  assert.equal(listed.ok, true, JSON.stringify(listed.findings));
+});
+
+test("H: a label with nothing but a fence under it is heading-only on an optional block, Important", () => {
+  // task.104's Breaking Changes before it was given a lead sentence.
+  const r = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\n- one\n\n## Breaking Changes\n\n**Before** (GitHub):\n\n```\nx\n```\n",
+    TASK_SPECS,
+  );
+  const bc = r.findings.find((f) => f.section === "Breaking Changes");
+  assert.equal(bc.code, "heading-only");
+  assert.equal(bc.severity, "important");
+});
+
+test("H: a clean result names its scope, and the scope counts resolved blocks", () => {
+  const r = lib.checkCardSections(
+    "## Overview\n\nA summary.\n\n## Success Criteria\n\n- one\n",
+    TASK_SPECS,
+  );
+  assert.equal(r.ok, true);
+  const out = lib.formatCardCheck(r);
+  assert.match(out, /No problems found\. 2 card blocks resolve/);
+  assert.match(out, /card sections only, not template completeness/);
+  assert.equal(
+    lib.describeCardScope({ blocks: [{ status: "ok" }] }),
+    "1 card block resolves — this checks the card sections only, not template completeness.",
+  );
+});
+
+test("H: isLabelOnly is the property, not a regex on bold", () => {
+  assert.equal(lib.isLabelOnly("Functional", "prose"), true);
+  assert.equal(lib.isLabelOnly("Functional.", "prose"), false);
+  assert.equal(lib.isLabelOnly("Does it work?", "prose"), false);
+  assert.equal(lib.isLabelOnly("- item", "list"), false);
+  assert.equal(lib.isLabelOnly("", "prose"), false);
 });
 
 // Every real task document in this repo must pass. This is a ZERO-tolerance

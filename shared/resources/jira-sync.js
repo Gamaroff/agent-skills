@@ -1137,6 +1137,12 @@ const CARD_MAX_SENTENCES = 4; // prose sentences kept on the card
 const CARD_MAX_CHARS = 600;
 
 const RE_SUBHEADING = /^#{3,6}\s+/;
+// A bold label standing alone on its line — `**Functional**`, `**Functional**:`,
+// `**Code Quality:**` — which real documents use exactly as they use `###`: to
+// group the items under it. The terminator exclusion is what keeps `**None.**`
+// (content) apart from `**None**:` (a label); a sentence that happens to be
+// bold is still a sentence.
+const RE_BOLD_LABEL = /^\s*\*\*[^*\n.!?]+\*\*:?\s*$/;
 const RE_FENCE = /^\s*(```|~~~)/;
 
 // Fence-aware section extraction — the function `extractBodySections` and
@@ -1256,7 +1262,8 @@ function splitSentences(text) {
   return out.filter(Boolean);
 }
 
-// Strip `### ` heading LINES while keeping everything under them.
+// Strip `### ` heading LINES and bold-label lines while keeping everything
+// under them.
 //
 // Real documents group card content under sub-headings: a task's Success
 // Criteria opens with `### Functional`, an epic's Stories Breakdown puts its
@@ -1265,6 +1272,15 @@ function splitSentences(text) {
 // card wanted and left the grouping preamble behind — the exact inverse. On a
 // card this short the grouping labels are noise anyway: drop the labels, keep
 // the items.
+//
+// A bold label on its own line (`**Functional**:`) is the same grouping device
+// in different clothes, and it was the one this function did not see: the
+// summariser took it as the section's first prose paragraph and stopped, so
+// 26 task documents published `**Functional**` as their whole Success Criteria
+// block — the list under it never reached the card (task.117). Every such
+// line goes, not only a leading one: the documents carry `**Functional**:` …
+// `**Code Quality**:` in sequence, and dropping only the first would leave the
+// second sitting inside the list on the card.
 function dropHeadingLines(src) {
   const out = [];
   let inFence = false;
@@ -1274,7 +1290,8 @@ function dropHeadingLines(src) {
       out.push(line);
       continue;
     }
-    if (!inFence && RE_SUBHEADING.test(line)) continue;
+    if (!inFence && (RE_SUBHEADING.test(line) || RE_BOLD_LABEL.test(line)))
+      continue;
     out.push(line);
   }
   return out;
@@ -1327,10 +1344,14 @@ function summariseSection(content, opts = {}) {
   const raw = String(content || "").trim();
   if (!raw) return { text: "", omitted: 0, kind: "empty" };
 
-  // Grouping sub-headings go; the items under them stay. See dropHeadingLines.
+  // Grouping sub-headings and bold labels go; the items under them stay. See
+  // dropHeadingLines. A section that was non-empty and is now empty was
+  // NOTHING BUT headings and labels — report that as its own kind, because a
+  // reader given "empty" would look for a section with nothing in it and find
+  // one with a label in it, and conclude the checker is wrong.
   const lines = dropHeadingLines(raw);
   const src = lines.join("\n").trim();
-  if (!src) return { text: "", omitted: 0, kind: "empty" };
+  if (!src) return { text: "", omitted: 0, kind: "heading-only" };
 
   if (isListSection(lines)) {
     // Group each top-level item with its continuation lines so a wrapped or
@@ -1636,6 +1657,21 @@ function buildCardSections(body, specs, opts = {}) {
 // Card preflight
 // ---------------------------------------------------------------------------
 
+// The property that defines a `heading-only` finding: a prose summary with no
+// sentence terminator and no list item. A section that summarises to that has
+// nothing a reader can act on — it is a heading or a bold label standing in
+// for content that was never written, or (before task.117) content the
+// summariser stopped in front of. Stated as a property rather than a regex on
+// `**...**` so a plain-text label (`Functional`) or a stray sub-heading counts
+// the same way; the reader sees the same useless card either way.
+function isLabelOnly(text, kind) {
+  if (kind !== "prose") return false;
+  const t = String(text || "").trim();
+  if (!t) return false;
+  if (/[.!?]/.test(t)) return false;
+  return !t.split("\n").some((l) => RE_BULLET.test(l) || RE_ORDERED.test(l));
+}
+
 /**
  * Check a document against its card spec WITHOUT syncing anything.
  *
@@ -1688,6 +1724,20 @@ function checkCardSections(body, specs, opts = {}) {
       maxSentences: spec.maxSentences,
     });
 
+    if (!text && kind === "heading-only") {
+      // Nothing but headings and bold labels — the grouping was written, the
+      // content under it never was. `heading-only` by construction.
+      findings.push({
+        severity: spec.optional ? "important" : "critical",
+        section: spec.heading,
+        code: "heading-only",
+        message: `The "${spec.heading}" section holds only a label or sub-heading with nothing under it — the card would publish nothing for it.`,
+        fix: `Put a sentence or a bullet list under the label. A bold label (**Functional**) or a sub-heading is a grouping, not content.`,
+      });
+      blocks.push({ heading: spec.heading, status: "heading-only" });
+      continue;
+    }
+
     if (!text) {
       // Present but unusable — almost always a section that is nothing but a
       // table or a code block, which has no prose lead to summarise.
@@ -1699,6 +1749,23 @@ function checkCardSections(body, specs, opts = {}) {
         fix: `Give it a short opening sentence or a bullet list. Tables and code blocks alone cannot be summarised.`,
       });
       blocks.push({ heading: spec.heading, status: "empty" });
+      continue;
+    }
+
+    if (isLabelOnly(text, kind)) {
+      // Present, non-empty, and useless: the block resolves to a label with
+      // nothing under it. `missing` and `empty` could not say this — the
+      // section exists and it yields text — which is how 15 task cards read
+      // `**Functional**` as their whole Success Criteria block and every one
+      // of them passed the preflight (task.117).
+      findings.push({
+        severity: spec.optional ? "important" : "critical",
+        section: spec.heading,
+        code: "heading-only",
+        message: `The "${spec.heading}" section resolves to a label with nothing under it — the card would publish "${text}" and stop.`,
+        fix: `Put a sentence or a bullet list under the label. A bold label (**Functional**) or a sub-heading is a grouping, not content.`,
+      });
+      blocks.push({ heading: spec.heading, status: "heading-only", text });
       continue;
     }
 
@@ -1733,7 +1800,13 @@ function checkCardSections(body, specs, opts = {}) {
 // Render a checkCardSections result for a terminal.
 function formatCardCheck(result, opts = {}) {
   const { title = "Card preflight" } = opts;
-  const icon = { ok: "✅", missing: "🚨", empty: "🚨", "absent-optional": "·" };
+  const icon = {
+    ok: "✅",
+    missing: "🚨",
+    empty: "🚨",
+    "heading-only": "🚨",
+    "absent-optional": "·",
+  };
   const lines = [`${title}`, ""];
 
   for (const b of result.blocks) {
@@ -1758,9 +1831,25 @@ function formatCardCheck(result, opts = {}) {
       lines.push(`     Fix: ${f.fix}`);
     }
   } else {
-    lines.push("", "  No problems found.");
+    lines.push("", `  No problems found. ${describeCardScope(result)}`);
   }
   return lines.join("\n");
+}
+
+// What a clean result is a claim about — and what it is not.
+//
+// `ok: true` with zero findings reads as a structural all-clear, and it was
+// heard as one: task.103 reached review with ten of its eleven mandatory
+// sections, having passed this check, because this check reads the handful
+// of headings the CARD is built from and nothing else (task.117, obs #43).
+// A clean result therefore names its own scope, every time. This is the
+// scope statement the authoring contract asks for; it is deliberately not a
+// mandatory-section count, which is a per-kind template property this
+// tracker-neutral module has no definition of and must not grow a second one.
+function describeCardScope(result) {
+  const resolved = result.blocks.filter((b) => b.status === "ok").length;
+  const noun = resolved === 1 ? "card block resolves" : "card blocks resolve";
+  return `${resolved} ${noun} — this checks the card sections only, not template completeness.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -5580,6 +5669,9 @@ module.exports = {
   buildCardSections,
   checkCardSections,
   formatCardCheck,
+  describeCardScope,
+  isLabelOnly,
+  RE_BOLD_LABEL,
   // priority / labels
   PRIORITY_MAP,
   normalisePriority,

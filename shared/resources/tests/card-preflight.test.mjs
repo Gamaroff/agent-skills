@@ -400,6 +400,23 @@ test("B: --json does not emit the document body", () => {
   assert.equal(typeof pf.preflight(real, "task").body, "string");
 });
 
+test("B: --json and the display both carry the scope statement", () => {
+  const real = join(
+    repoRoot,
+    "docs/tasks/task.102.authoring-time-card-preflight/task.102.authoring-time-card-preflight.md",
+  );
+  const { stdout } = runCli(["--file", real, "--json"]);
+  const payload = JSON.parse(stdout);
+  assert.equal(payload.ok, true);
+  assert.match(
+    payload.scope,
+    /^\d+ card blocks? resolves? — this checks the card sections only, not template completeness\.$/,
+  );
+  const shown = runCli(["--file", real]).stdout;
+  assert.match(shown, /No problems found\. \d+ card block/);
+  assert.match(shown, /not template completeness/);
+});
+
 test("B: card-preflight does not implement its own frontmatter parse", () => {
   const src = readFileSync(CLI, "utf8");
   assert.match(
