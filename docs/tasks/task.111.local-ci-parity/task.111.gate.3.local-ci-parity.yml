@@ -1,0 +1,67 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: CONCERNS
+status_reason: 'Gate-2 findings CR-1/CR-2/CR-3 verified FIXED on the branch head by re-execution; TMPDIR=/tmp variance green. Scoped review of the four files the cycle-2 fix touched found one LOW correctness gap in the parity step parser (a step whose name: follows its uses:/run: key is recorded unnamed — verified) and three comment/message cleanups. NFRs all PASS; the one open LOW routes to a fix cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T11:40:17Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'jobSteps() attributes a name only when name: is the first key of a list item: a step written `- uses: x` / `name: Y` (or `- run: |` / `name: Y`) is recorded with an empty name, so it can never be classified through the name maps and the stale-key guard reports the map entry as naming no step — a false red on a workflow CI itself accepts (verified: `- uses: some/lint-action@v1` followed by `name: Marketplace lint` is reported as unclassified/unnamed).'
+    suggested_action: 'Open a current-step object on every `- ` list item and assign name:/run:/uses: to it regardless of key order, pushing the step at the next list item or end of block; add a fixture-style assertion for the uses-then-name order.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 42
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'The boundary (description cap) did not change in the cycle-2 fix commit beyond what cycle 2 already probed (9/9 measured there); this cycle re-executed the two distinguishing cases (more-indented fold → 1,025 as parsed → reject; clean fold at 1,024 → accept) and reads them as consistent with gate 2. No new input surface.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'All three gate-2 fixes red under their mutations on the branch head (uses: gate step; non-exec wrapper via pid; more-indented fold). TMPDIR=/tmp: 30/30 across the two tmpdir-using suites. CR-1 here is a parser robustness gap, not a wrong verdict on the current workflows (every step in the three green jobs puts name: first or is an unnamed setup action).'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-2 cleanups landed (corpus via the parser; twins expanded). Three stale comments/messages remain (descriptionOfLength docstring cites the superseded measure; "has no run: steps" message; execTargetOf message claims a "$@" check it does not make) plus two SETUP_STEPS entries now redundant with SETUP_ACTIONS — advisory, recorded below.'
+
+recommendations:
+  immediate:
+    - action: 'Parse step keys order-independently in jobSteps(); assert the uses-then-name order (CR-1)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+  future:
+    - action: 'CR-2 cleanup: descriptionOfLength docstring still describes the normalised measure'
+      refs: ['tests/skill-frontmatter.test.js']
+    - action: 'CR-3 cleanup: "has no run: steps" → "has no steps"; drop or annotate the two SETUP_STEPS entries SETUP_ACTIONS already covers'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-4 cleanup: execTargetOf failure message should claim only the exec-target form the regex matches'
+      refs: ['evals/shared/tests/develop-pipeline-hook-wrappers.test.mjs']
+    - action: 'CR-4 (cycle 1): check:generated compares the working tree — document or compare against HEAD'
+      refs: ['package.json']
+    - action: 'Pre-existing: session-handoff CR-6 timing-sensitive on slow-npm hosts'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+    - action: 'Bookkeeping: gate 1 and gate 2 updated: stamps were written in host-local time labelled Z (UTC+4 host) and are corrected in this commit; a git log --since against the uncorrected value returned nothing'
+      refs: ['docs/tasks/task.111.local-ci-parity/task.111.gate.1.local-ci-parity.yml', 'docs/tasks/task.111.local-ci-parity/task.111.gate.2.local-ci-parity.yml']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 (cycle 3) fixed and re-reviewed'

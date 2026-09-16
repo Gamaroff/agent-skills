@@ -1,0 +1,63 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: CONCERNS
+status_reason: 'Gate-3 CR-1 verified FIXED (a mapped uses:-then-name: step classifies; the parser records all 21 real steps correctly). The scoped review found that the cycle-3 relaxation (dash made optional on the key regexes) reads keys at any indentation: a with: input named name: overwrites the step name, and a run: | body line beginning "- " is flushed as a phantom step — both reproduced. One MEDIUM; two cleanups. NFRs PASS.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T11:57:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'jobStepsFromText() matches name:/uses:/run: at any indentation since the cycle-3 change made the leading dash optional, so keys that belong to a nested mapping or a block body are read as step keys — reproduced: a step with `with: name: coverage` is recorded as name "coverage" (unclassifiable → false red), and a `run: |` body containing `- name: bogus` / `run: npm run oops` yields a phantom step invoking `oops` (fails the missing-script guard on a workflow CI accepts).'
+    suggested_action: 'Record the key column when the `- ` item line is seen (dash column + 2) and match name:/uses:/run: only on the dash line or on lines at exactly that column, skipping deeper-indented lines (with:, env:, block bodies); extend the synthetic-order test with a with: name: input and a body containing "- name:".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary changed this cycle (test-file edits only); the description-cap probes from cycle 2 (9/9 measured) stand.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Gate-3 CR-1 verified on the head; parser dump over the three real workflows records exactly their 21 steps with the right names. CR-1 here is a false-red class against workflow shapes this repository does not yet use (with: inputs named name:, list-shaped run bodies); no current verdict is wrong.'
+  maintainability:
+    status: PASS
+    notes: 'Two cleanups: only the bare | indicator is normalised to an empty run (|-, |+, >, >- leave the indicator in step.run — harmless, scriptInvokedBy returns null for all); the trailing name-in-scripts filter in greenScripts() is redundant. Advisory.'
+
+recommendations:
+  immediate:
+    - action: 'Indent-aware key matching in jobStepsFromText(); synthetic cases for with: name: and a list-shaped run body (CR-1)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+  future:
+    - action: 'CR-2 cleanup: normalise every block-scalar indicator (|, |-, |+, >, >-) to an empty run'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-3 cleanup: drop the redundant trailing filter in greenScripts()'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-4 (cycle 1): check:generated compares the working tree — document or compare against HEAD'
+      refs: ['package.json']
+    - action: 'Pre-existing: session-handoff CR-6 timing-sensitive on slow-npm hosts'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 (cycle 4) fixed and re-reviewed'

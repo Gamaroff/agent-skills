@@ -11,12 +11,20 @@ name: ShellCheck
 #     lane exists at all. A lane there would never have fired for the change that
 #     motivated it.
 #   * `test.yml` has no path filter, but `evals/shared/tests/ci-gate-parity.test.mjs`
-#     asserts set equality in BOTH directions between the npm scripts run by that
-#     workflow's `test` job and the `npm run ci` composite. A step added there goes
-#     red unless a matching script also joins `npm run ci` — which would put a
-#     Docker pull or an apt install into the local gate.
+#     asserts set equality in BOTH directions between what CI runs and the
+#     `npm run ci` composite. A step added to test.yml would have needed the
+#     pinned-binary install to join `npm run ci` too — an apt install in the
+#     local gate.
 #
 # So: same triggers as test.yml, no filter, its own job. The lane is ~15s.
+#
+# LOCAL TWIN: scripts/lint-shell.sh (`npm run lint:shell`, part of `npm run ci`).
+# It copies the file-list expression, the two guards and the severity from the
+# "Lint source shell scripts" step below; the parity test maps that step name to
+# the script (LANE_TWINS) and fails if either the name or the script goes
+# missing. Change the list, guards or severity here and in the script in the
+# same commit. The absent-binary case is the one place they differ: the script
+# skips loudly, this lane installs the pinned binary.
 on:
   pull_request:
   push:

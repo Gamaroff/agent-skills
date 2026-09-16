@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: CONCERNS
+status_reason: 'All three phases are present and every new test is mutation-proven; three LOW correctness findings from the diff review, each verified by execution — a skip that falls through into a throw, a corpus measurement that over-counts block-scalar descriptions by two, and a missing-script guard that still reads one job of the three the test now claims to cover — need one fix cycle. Maintainability CONCERNS for the half-widened guard.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T09:55:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'evals/shared/tests/develop-pipeline-hook-wrappers.test.mjs'
+    finding: 'In the per-wrapper pass-through test, `t.skip(...)` does not stop the test function, so when `execTargetOf()` returns null execution continues into `makeSandbox(..., null)` and `path.join(refs, null)` throws — the case that should skip is listed as a failure (verified: a test that calls t.skip() then throws is reported under failing tests).'
+    suggested_action: 'Return from the test after the skip — `if (target === null) return t.skip(...)` — so a non-delegating wrapper is a clean skip in this test and a plain failure in the sibling "execs an existing target" test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'tests/skill-frontmatter.test.js'
+    finding: 'The corpus cap test extracts `description:` with a regex that keeps a block-scalar indicator (`>` / `|`) in the captured text, so the six SKILL.md files using one measure 2 characters longer than quick_validate.py measures them (verified: explain-simply js=791 vs py=789, humaniser 435/433, mermaid-architect 816/814, markdown-wireframe 457/455, railway-postgres-crud 498/496, use-railway 459/457) — the two checks disagree at the 1,023–1,024 boundary.'
+    suggested_action: 'Measure the same string the validator measures — strip a leading `[>|][+-]?` indicator before normalising, or parse the frontmatter with the existing PyYAML-backed `python([...])` helper — and add a block-scalar fixture at exactly 1,024 that must pass both.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'The "every npm script the workflow invokes actually exists" guard still reads only test.yml via workflowInvocations(), while greenScripts() silently drops an `npm run <typo>` step from validate.yml or shellcheck.yml — verified by mutation: appending `run: npm run validate:alll` to validate.yml leaves all 12 parity tests green, and CI would go red on it.'
+    suggested_action: 'Iterate GREEN_JOBS in that guard — classify each step, collect kind === "script" names absent from package.json — and drop the test.yml-only workflowInvocations() path or keep it as a subset check.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 25
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 7
+    notes: 'Boundary: the description cap in quick_validate.py (accept/reject on length). 7 candidates executed against the real validator: 1,025 ASCII (reject), 1,024 ASCII (accept), 1,025 multibyte code points / 2,050 bytes (reject — characters, not bytes), 1,020 multibyte (accept), a folded `>` scalar of 1,100 raw chars normalising under the cap (accept), a folded scalar normalising to 1,026 (reject), whitespace-only (rejected by the earlier empty check). Every actual matched expected. No network, auth or secret handling in the change set; scripts/lint-shell.sh takes no input and its file list comes from git ls-files.'
+  performance:
+    status: PASS
+    notes: 'The four added lanes cost 58 s (validate:all) + 5 s (check:generated) + 24 s (bundle:check) + 29 s (lint:shell) locally; the composite is dominated by npm test (~20 min on this host) and was already the slow tier. ci:fast unchanged, so the develop loop pays nothing.'
+  reliability:
+    status: PASS
+    notes: 'lint-shell.sh keeps both of the workflow guards and skips loudly with exit 0 when the binary is absent (executed: PATH=/usr/bin:/bin → skip message, exit 0). Parity mutations red in all three directions; wrapper mutations red naming the wrapper. Advisory CR-4 (medium confidence): check:generated goes red on an unrelated uncommitted edit to README.md or the two generated files — the same command CI runs on a clean checkout; recorded under recommendations.future.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The parity test now names three green-defining jobs but one of its assertions (missing-script guard) still reads one — the widening is half-applied (CR-3). jobSteps() carries an unused `block` field and a comment describing a `run: |` lookahead the code does not perform, and the step name resets only on `- uses:` rather than on every list item (CR-5, advisory). Docs, CHANGELOG, releases checklist and CONTRIBUTING all updated; shellcheck clean on the new script; prettier clean; bundle --check 0 problems.'
+
+recommendations:
+  immediate:
+    - action: 'Return after t.skip() in the pass-through test (CR-1)'
+      refs: ['evals/shared/tests/develop-pipeline-hook-wrappers.test.mjs']
+    - action: 'Make the corpus cap test measure the string the validator measures; add a block-scalar fixture at the boundary (CR-2)'
+      refs: ['tests/skill-frontmatter.test.js']
+    - action: 'Widen the missing-script guard to every green job (CR-3)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+  future:
+    - action: 'CR-4 (medium confidence): check:generated compares the working tree, so a pre-existing local edit to README.md / the catalog / skill-dependencies.json reads as drift; either document that the lane wants a clean tree for those paths, or compare the regenerated output against `git show HEAD:<path>`'
+      refs: ['package.json']
+    - action: 'CR-5 (cleanup): drop the unused `block` field in jobSteps(), fix its comment, and reset the step name on every `- ` list item rather than only on `- uses:`'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'Pre-existing, not this task: session-handoff CR-6 (`handoff-verify.test.js`) fails on this host because npm cold-starts in ~1.7 s and the 3 s cap fires before the fixture forks; identical on a clean develop worktree. Worth a bug report against task 110''s suite'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1, CR-2 and CR-3 fixed and re-reviewed'

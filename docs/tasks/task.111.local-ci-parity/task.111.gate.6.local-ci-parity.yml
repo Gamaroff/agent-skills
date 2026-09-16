@@ -1,0 +1,75 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: CONCERNS
+status_reason: 'Gate-5 CR-1 verified FIXED. Cycle 6 (run past the five-cycle budget by the user''s decision) found five more shapes the hand-rolled step parser misreads — two MEDIUM (job keys after steps: still parsed; a bare "-" item is dropped) and three LOW — plus one stale comment. This is the fourth consecutive cycle whose findings are all in the same new parser; the recommendation is the third-strike move: replace the mechanism with a real YAML read rather than patch it a fifth time.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T12:38:40Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'The inSteps gate bounds only the START of the steps sequence; job-level keys written after steps: (GitHub accepts any key order) are still parsed — needs: + defaults: run: after the sequence opens a phantom ["", null, ""] step (reproduced), and with the sequence at the same indent as steps: a following defaults: run: overwrites the last real step.'
+    suggested_action: 'Replace the hand-rolled parser with a real YAML read (python3 + PyYAML, already a hard requirement of tests/skill-frontmatter.test.js and installed by test.yml) that returns jobs[job].steps[] as objects; classify from those.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'The dash regex requires whitespace after the dash, so a bare "-" line with the step''s keys on the following lines (valid YAML) never opens a step and the whole step — run: included — is dropped (reproduced: []) — a false green.'
+    suggested_action: 'Same as CR-1 — a real YAML parser has no such case.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'A flow-mapping item (- { name: X, run: npm test }) is opened and flushed unrecorded (false green); a trailing " # comment" on a plain name:/run:/uses: value is kept in the value (false red); a quoted uses: value keeps its quotes and misses the SETUP_ACTIONS prefix (false red).'
+    suggested_action: 'Same as CR-1 — all three are consequences of reading YAML with regexes.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'No boundary changed; cycle-2 probes stand.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Gate-5 fix verified; two jobs in one file bounded; CRLF, blank and comment lines inside a step handled. The remaining misreads are all in shapes no current workflow uses; no present verdict is wrong.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Cycles 3, 4, 5 and 6 have each found a new YAML shape the hand-rolled step parser misreads; each fix was correct for its shape and the next review found the next. That is the third-strike pattern in everything but severity. The parser should be replaced, not patched again. One stale header comment (line 272 still says "two past the dash").'
+
+recommendations:
+  immediate:
+    - action: 'Replace jobStepsFromText()''s regex parser with a real YAML read of the workflow (python3 -c "import yaml, json" — PyYAML is already required by the frontmatter test and installed by test.yml); keep the synthetic fixtures as valid YAML and add the bare-dash, keys-after-steps, flow-mapping, trailing-comment and quoted-uses cases; drop the by-hand column tracking entirely (CR-1, CR-2, CR-3)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+  future:
+    - action: 'CR-6 cleanup: header comment on the key column'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-4 (cycle 1): check:generated compares the working tree — document or compare against HEAD'
+      refs: ['package.json']
+    - action: 'Pre-existing: session-handoff CR-6 timing-sensitive on slow-npm hosts'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'Parser replaced with a real YAML read and re-reviewed'

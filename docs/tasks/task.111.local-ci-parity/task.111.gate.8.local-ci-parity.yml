@@ -1,0 +1,59 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: CONCERNS
+status_reason: 'Gate-7 entries all verified FIXED (date-like scalar stringified; spawn and parse failures distinguished; single command under a comment kept; one reader; memoised). Cycle 8 found that the leak guard which replaced jobBlock()''s test is itself tautological — a reader that ignored the job name would still satisfy it (probed with a two-job document) — plus two documentation mismatches. No product code, no false verdict on any workflow; one small fix cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T13:09:30Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'evals/shared/tests/ci-gate-parity.test.mjs'
+    finding: 'The "only its steps are read" test asserts steps.length <= allSteps.length, which a reader that ignored the job name entirely still satisfies (reviewer probe: leaky reader 3 <= 3), while its comment claims a second job''s steps must not leak in — the same tautology the cycle-7 cleanup was meant to retire.'
+    suggested_action: 'Assert non-leakage on a synthetic two-job document with distinct run: values and check stepsOfJob(doc, "test") returns only the test job''s commands; drop the <= comparison and its comment.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Unchanged; cycle-2 probes stand.'
+  performance:
+    status: PASS
+    notes: 'Suite 0.5 s after memoisation.'
+  reliability:
+    status: PASS
+    notes: 'Every prior shape reads correctly; the reader is a real YAML parse. CR-1 is a weak assertion, not a wrong reading.'
+  maintainability:
+    status: CONCERNS
+    notes: 'stepsOfJob()'"'"'s docblock still describes the pre-cycle-7 single-line rule; the header'"'"'s "exactly four things" omits the SETUP_ACTIONS prefix path that every checkout step takes. Both are the comment-contradicts-code class this file has already paid for.'
+
+recommendations:
+  immediate:
+    - action: 'Two-job synthetic non-leak assertion (CR-1); docblock and header contract corrected (CR-2, CR-3)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+  future:
+    - action: 'CR-4 (cycle 1): check:generated compares the working tree — document or compare against HEAD'
+      refs: ['package.json']
+    - action: 'Pre-existing: session-handoff CR-6 timing-sensitive on slow-npm hosts'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 fixed and re-reviewed'

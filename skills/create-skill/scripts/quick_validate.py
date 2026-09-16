@@ -25,6 +25,10 @@ def yellow(t):  return _c("33", t)
 def bold(t):    return _c("1",  t)
 def dim(t):     return _c("2",  t)
 
+# Agent Skills spec: `description` is capped at 1,024 characters.
+DESCRIPTION_MAX_CHARS = 1024
+
+
 def find_repo_root(skill_path):
     """Walk up from skill_path to find the repo root (contains shared/resources/)."""
     path = Path(skill_path).resolve()
@@ -117,6 +121,22 @@ def validate_skill(skill_path):
     # Check for angle brackets
     if '<' in description or '>' in description:
         return False, "Description cannot contain angle brackets (< or >)"
+    # Hard cap from the Agent Skills spec: description is at most 1,024
+    # characters. Measured on the PARSED value with only its outer whitespace
+    # stripped — what a loader actually receives after YAML has folded the
+    # scalar — not on the whitespace-normalised string above. The two differ
+    # on a block scalar with a more-indented line: YAML keeps that newline, so
+    # a loader sees it and normalisation would hide it (QA cycle 2 on task 111
+    # produced exactly that: a fixture the normalised measure read as 1,024 and
+    # the parsed value as 1,026). The trailing newline a clip-chomped block
+    # scalar carries is not content and is stripped. This is a failure, not a
+    # warning: a loader that enforces the cap rejects the whole skill.
+    parsed_len = len(str(fm['description']).strip())
+    if parsed_len > DESCRIPTION_MAX_CHARS:
+        return False, (
+            f"Description is {parsed_len} chars as parsed "
+            f"(max {DESCRIPTION_MAX_CHARS} — Agent Skills spec); trim it"
+        )
     # Warn if description is too short or too long (target: ~100 words)
     word_count = len(description.split())
     if word_count < 10:

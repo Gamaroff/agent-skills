@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`npm run ci` runs every CI lane (task 111).** It ran three of the five: `validate.yml`'s
+  per-skill validation, catalog and skill-dependency drift checks, and the bundle per-file check,
+  and `shellcheck.yml`'s lint had no local aggregate — a contributor could be green on
+  `npm run ci` and red in CI on a lane they never ran. The composite now adds `validate:all`,
+  `check:generated` (the two regenerate-and-diff steps, CI's exact shape) and `lint:shell`
+  (`scripts/lint-shell.sh`, the workflow's file list, guards and severity; skips loudly, exit 0,
+  when no binary is installed). `evals/shared/tests/ci-gate-parity.test.mjs` — which had asserted
+  set equality against `test.yml`'s job only, and would have gone red on the very change — now reads
+  every green-defining job and requires each step to be an npm script, a named local twin, declared
+  setup, or a declared exclusion with a reason; anything else fails. Two coverage gaps ride along:
+  `evals/shared/tests/develop-pipeline-hook-wrappers.test.mjs` executes all nine
+  `develop-{story,task,bug}/scripts/*.sh` wrappers (none was tested — the develop-story test stubs
+  the hooks), and `quick_validate.py` now fails a `description` over the Agent Skills spec's
+  1,024-character cap (develop-story shipped at 1,025; trimmed to 907).
+
 - **`session-handoff` — the handoff re-measures itself on read (task 110).** `.agents/handoff.md`
   decayed within a day and said so itself: the 2026-09-10 file named T107 as next and "frontier not
   empty", and both were false by the next morning, although every figure carried its command. The

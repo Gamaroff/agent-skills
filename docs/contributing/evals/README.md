@@ -11,6 +11,8 @@ Suite catches drift between SKILL.md prose, deterministic helpers, and end-to-en
 ## TL;DR
 
 ```bash
+npm run ci                       # every CI lane, locally — the full gate (task 111)
+npm run ci:fast                  # format:check + npm test — the develop-loop tier
 npm test                         # everything hermetic — no creds needed
 npm run eval:create-task:sdk     # one live scenario via Claude SDK (needs ANTHROPIC_API_KEY)
 npm run eval:develop-task        # develop-task protocol + step-isolation (no creds)
@@ -19,7 +21,10 @@ npm run eval:develop-story       # develop-story protocol + step-isolation (no c
 npm run eval:develop-story:smoke # develop-story full smoke (needs ANTHROPIC_API_KEY)
 ```
 
-If `npm test` is green, every push will stay green in CI. Live drivers are opt-in.
+If `npm run ci` is green, every push will stay green in CI — it mirrors `test.yml`, `validate.yml`
+and `shellcheck.yml` lane for lane, and a parity test fails `npm test` if the two drift. `npm test`
+alone is the hermetic suite (one of the lanes); it predicts `test.yml`'s middle step, not CI. Live
+drivers are opt-in.
 
 ## Contents
 
