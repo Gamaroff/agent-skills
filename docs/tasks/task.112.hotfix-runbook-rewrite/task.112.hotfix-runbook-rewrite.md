@@ -5,11 +5,13 @@ type: task
 description: "docs/runbooks/hotfix.md documents a seven-step manual loop (create-branch --hotfix → implement → tests → commit → PR to main → tag → back-merge) and mentions no pipeline, no bug report, no review-bug gate, no tracker, no review-pr — grep for develop-bug / review-bug / tracker / review-pr returns 0 each. /develop-bug owns the 'production hotfix off main' branch model (Phase 0d Q1) and already handles the PR-to-main and the back-merge note. Same class as task.107, which rewrote bug-fix.md; this is the sibling page it deliberately left out. Two small doc drifts ride along."
 tags: [documentation, runbooks, develop-bug, hotfix]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-12
 updated: 2026-09-17
+completed_date: 2026-09-17
+pr_number: 414
 assignee:
 estimated_effort_hours: 3
 github_issue: 413
@@ -17,7 +19,7 @@ github_issue: 413
 
 # Technical Task: The hotfix runbook predates /develop-bug's hotfix model and never mentions it
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.112.review.1.hotfix-runbook-rewrite.md` implemented 2026-09-16
 **GitHub Issue**: [#413](https://github.com/Gamaroff/agent-skills/issues/413)
 
@@ -162,6 +164,8 @@ follow `releases.md`, which owns tagging.
 | 2026-09-16 |         | QA gate CONCERNS (90/100) — 4 LOW accuracy findings (workflows.md lead paragraph overstates the spec ×3; hotfix.md says Q1 is skipped) | qa-task |
 | 2026-09-16 |         | QA gate PASS (100/100), cycle 2 refute pass — cycle-1 findings verified fixed; 1 LOW (stale "140 lines" figure in CHANGELOG + Progress Tracking; file is 141) | qa-task |
 | 2026-09-17 |         | QA gate PASS (100/100), cycle 3 scoped — gate-2 fix verified; no findings | qa-task |
+| 2026-09-17 |         | QA findings fixed — gate PASS (100/100), 2 iterations (4 spec-accuracy sentences; one stale line count) | qa-fix |
+| 2026-09-17 | 1.2     | DoD passed — accepted (PR #414)               | finalise |
 
 ---
 
@@ -198,6 +202,38 @@ Cycle 1: four LOW accuracy defects in the new prose against the spec it links to
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.112.qa.1.hotfix-runbook-rewrite.md` → `qa.2` → `qa.3`
+**Gate File**: `task.112.gate.3.hotfix-runbook-rewrite.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Conformance Review (Step 5c)**: ✅ APPROVE — `task.112.pr-review.1.hotfix-runbook-rewrite.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** All 7 met — each traced to a line of the PR diff (`hotfix.md:18,34,87,101,123,90`; `workflows.md:164`; `faq.md:25`)
+✅ **Tests / Gates:** per-PR lanes green on `8ca961c1` — test, shellcheck, link-check, branch policy; `ci:fast` green on every commit; `changelog-entry-drift` 6/6
+✅ **PR Review:** PR #414, 5 commits, 14 files; 3 QA cycles (CONCERNS 90 → PASS 100 → PASS 100), 5c APPROVE
+✅ **Documentation:** `hotfix.md` rewritten (141 lines), `workflows.md` lead paragraph, `faq.md` Step 5c link, README row, CHANGELOG `(task 112)`
+✅ **Security Review:** ✅ PASS — not a boundary; no secrets, no unsafe patterns; force-push prohibition retained (`hotfix.md:123`)
+✅ **Compliance Review:** ⚠️ N/A — documentation only
+
+**Deployment Readiness:**
+
+- Staging: ✅ APPROVED
+- Production: ✅ APPROVED
+
+**Task marked as ACCEPTED on:** 2026-09-17
+
+**Detailed Verification Log:** See `task.112.dod.1.hotfix-runbook-rewrite.md` for complete verification evidence and timestamps.
+
+---
+
 ## References
 
 - **Plan**: [`task.112.plan.hotfix-runbook-rewrite.md`](task.112.plan.hotfix-runbook-rewrite.md)
@@ -208,7 +244,7 @@ Cycle 1: four LOW accuracy defects in the new prose against the spec it links to
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.112.hotfix-runbook-rewrite/task.112.hotfix-runbook-rewrite.md`
