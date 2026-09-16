@@ -111,8 +111,8 @@ None. Documentation only.
 
 | File | Change |
 | :--- | :--- |
-| `docs/runbooks/hotfix.md` | rewritten — 140 lines, 62 → 140; task.107 satellite shape |
-| `docs/operations/workflows.md` | +1 paragraph — `### What the pipelines post` under Cross-cutting references |
+| `docs/runbooks/hotfix.md` | rewritten — 141 lines, 62 → 141; task.107 satellite shape (qa-fix 1: Q1 wording) |
+| `docs/operations/workflows.md` | +1 paragraph — `### What the pipelines post` under Cross-cutting references (qa-fix 1: scoped to tracker + summary-level PR comments; engine attribution; `---` GitHub-only) |
 | `docs/reference/faq.md` | +1 link — "Step 5c" → `qa-flow.md#phase-3b--pr-conformance-review-review-pr-step-5c` |
 | `docs/runbooks/README.md` | hotfix row description updated to name `/develop-bug`'s hotfix model |
 | `CHANGELOG.md` | `[Unreleased] → Changed` |
@@ -159,6 +159,7 @@ follow `releases.md`, which owns tagging.
 | 2026-09-16 | 1.1     | Review passed (9/10) — GitHub issue #413 linked; `workflows.md` rider anchored to Cross-cutting references; References paths aligned to `skills/` | review-task |
 | 2026-09-16 |         | Status → ready-for-development                | review-task |
 | 2026-09-16 |         | Implemented — 5 files, 0 tests (docs only; ci:fast + link check green) | develop |
+| 2026-09-16 |         | QA gate CONCERNS (90/100) — 4 LOW accuracy findings (workflows.md lead paragraph overstates the spec ×3; hotfix.md says Q1 is skipped) | qa-task |
 
 ---
 
@@ -169,6 +170,29 @@ follow `releases.md`, which owns tagging.
 ### Phase 2: two small drifts
 - [x] `docs/operations/workflows.md` names the plain-language lead on tracker + PR comments
 - [x] `docs/reference/faq.md` "Step 5c" links to its definition
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-16 (cycle 1)
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.112.qa.1.hotfix-runbook-rewrite.md](./task.112.qa.1.hotfix-runbook-rewrite.md)
+- **Gate File**: [task.112.gate.1.hotfix-runbook-rewrite.yml](./task.112.gate.1.hotfix-runbook-rewrite.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3341 (`ci:fast`) + 6 (changelog drift) + 70-link check
+- **Phases Verified**: 2/2
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Four LOW accuracy defects from the diff review: the new `workflows.md` lead paragraph overstates the canonical spec in three places (attributes PR leads to `tracker-comment.js`; claims inline findings carry a lead; states the `---` unconditionally), and `hotfix.md:41` says the description makes `/develop-bug` skip the Q1 prompt when it only sets the recommended default.
 
 ---
 

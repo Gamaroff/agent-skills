@@ -38,7 +38,8 @@ The mode decides the filename, the directory and the numbering — exactly as in
 regression is usually a **general bug** (`docs/bugs/bug.{N}.{name}/`, numbered from the registry),
 because the story or task that introduced it is already accepted; file it as a story or task bug only
 when that parent is still open. Write **"production"** or **"regression"** in the description — that is
-what makes `/develop-bug` recommend the hotfix branch model instead of asking.
+what makes `/develop-bug` offer the hotfix branch model as Q1's recommended default (and the answer an
+autonomous run takes); the prompt itself is still asked.
 
 ## Pipeline diagram
 
