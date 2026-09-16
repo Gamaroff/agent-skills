@@ -96,7 +96,8 @@ None; the preflight stays advisory at authoring. Cards synced after the change r
 | `shared/resources/tests/card-preflight-corpus.test.mjs` (new) | population check (floor 100, count 0) |
 | `shared/resources/tests/jira-sync-card-summary.test.mjs`, `shared/resources/tests/card-preflight.test.mjs` | summariser fixtures (C2), finding/scope fixtures (H), `--json` scope |
 | `shared/resources/tracker-card-summary.md`; `skills/review-{task,story,epic}/SKILL.md` | finding vocabulary gains `heading-only` |
-| `docs/tasks/task.104.…/task.104.….md` | Breaking Changes given a lead sentence (its block resolved to `**Before** (…):`) |
+| `docs/tasks/task.{42,43,44,104}.…/*.md` | Breaking Changes given a lead sentence (each block resolved to `**Before** (…):` and stopped) |
+| `skills/sync-jira-{task,story,epic,bug}/scripts/*.js` | `--check-card --json` carries `scope` |
 | `shared/resources/authoring-card-preflight.md`; `skills/create-task/SKILL.md` §4.6, `skills/create-story/SKILL.md` §6.2a, `skills/create-epic/SKILL.md` §"Card Preflight" | contract + prose |
 | `CHANGELOG.md` | Fixed |
 
@@ -129,21 +130,21 @@ the four `sync-jira-*` suites unchanged and green.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
-**Quality Score**: 70/100
+**Quality Score**: 80/100 (cycle 2)
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.117.qa.1.card-preflight-heading-only.md](./task.117.qa.1.card-preflight-heading-only.md)
-- **Gate File**: [task.117.gate.1.card-preflight-heading-only.yml](./task.117.gate.1.card-preflight-heading-only.yml)
+- **Full Report**: [task.117.qa.2.card-preflight-heading-only.md](./task.117.qa.2.card-preflight-heading-only.md) (cycle 1: [qa.1](./task.117.qa.1.card-preflight-heading-only.md))
+- **Gate File**: [task.117.gate.2.card-preflight-heading-only.yml](./task.117.gate.2.card-preflight-heading-only.yml) (cycle 1: [gate.1](./task.117.gate.1.card-preflight-heading-only.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 515 (eight suites) + 161 boundary probes + 2 mutation proofs
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (3 medium — CR-1, CR-2, CR-3)
+- **Critical Issues**: 0 (cycle 2: 1 medium — CR2-1; cycle-1 findings closed)
 - **NFR Status**: Security: PASS (measured, 161 probes), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The delivered fix is correct and proven for the shape the task named (29 → 0, red at 28 on revert). The new property-based `heading-only` detector misfires on three legitimate shapes — its list-item half reads post-collapse text (CR-1), no-terminator alone is taken as a label (CR-3) — and the epic `transform` runs before the bold-label drop, so epic cards are not fixed (CR-2). Bug reports: [bug.1](./task.117.bug.1.label-property-overbroad.md), [bug.2](./task.117.bug.2.epic-transform-precedes-label-drop.md).
+Cycle 1's three findings are fixed and closed ([bug.1](./task.117.bug.1.label-property-overbroad.md), [bug.2](./task.117.bug.2.epic-transform-precedes-label-drop.md)). The cycle-2 refute pass found the label test too strict in one direction: a dot anywhere in the line (a filename, a version) disqualifies a bold label, so `**Changes to jira-sync.js**:` + list still publishes the label and stops ([bug.3](./task.117.bug.3.dot-anywhere-disqualifies-label.md), CR2-1); plus three low findings on the message count, the create-* prose and a bare `**None**` body.
 
 ---
 
@@ -165,6 +166,8 @@ The delivered fix is correct and proven for the shape the task named (29 → 0, 
 | 2026-09-17 |         | Implemented — 15 files (+ bundled copies), 16 new tests; corpus 29 → 0 | develop |
 | 2026-09-17 |         | QA gate CONCERNS (70/100) — 3 medium findings (CR-1, CR-2, CR-3), 4 low | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR-1/CR-3 (label property on pre-collapse lines, label by shape), CR-2 (transform after the drop), CR-4/CR-5; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (80/100) — cycle 2 refute pass: cycle-1 findings closed; 1 medium (CR2-1), 3 low, 3 cleanups | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR2-1 (trailing terminator only), CR2-2 (beneath count), CR2-3 (create-* prose), CR2-4 (bare bold alone is content), CR2-5/6/7; 3 more docs given a lead sentence; 1 iteration | qa-fix |
 
 ---
 

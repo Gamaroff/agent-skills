@@ -4,7 +4,7 @@
 **Bug ID**: TASK-117-BUG-1
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (diff code review CR-1 + CR-3, reproduced)
 **Date Found**: 2026-09-17
 
@@ -109,3 +109,4 @@ CR-1 fixture; M3 (shape clause removed) reds the CR-3 fixture plus three pre-exi
 | 2026-09-17 | New          | QA         | Filed from QA cycle 1 (CR-1, CR-3)    |
 | 2026-09-17 | In Progress  | qa-fix     | Investigation started                 |
 | 2026-09-17 | Ready for QA | qa-fix     | Fix implemented, mutation-proven      |
+| 2026-09-17 | Closed       | QA         | Verified in QA cycle 2 (refute pass): every reproduced shape now `ok`; mutation proofs re-run |

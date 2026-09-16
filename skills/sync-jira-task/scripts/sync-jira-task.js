@@ -497,7 +497,12 @@ async function run({
     });
 
     if (args.json) {
-      output.emit({ action: "check-card", file: filePath, ...check });
+      output.emit({
+        action: "check-card",
+        file: filePath,
+        ...check,
+        scope: lib.describeCardScope(check),
+      });
     } else {
       output.info(
         lib.formatCardCheck(check, {

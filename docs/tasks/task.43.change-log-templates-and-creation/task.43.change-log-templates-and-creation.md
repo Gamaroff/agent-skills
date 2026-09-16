@@ -8,7 +8,7 @@ category: documentation
 status: accepted
 priority: High
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-09-17
 completed_date: 2026-08-12
 pr_number: 210
 assignee:
@@ -147,6 +147,7 @@ Every template emits the canonical block from
 | Date       | Version | Description   | Author       |
 |------------|---------|---------------|--------------|
 | 2026-08-12 | 1.0     | Initial draft | create-task  |
+| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
 ```
 
 Placement, chosen so the log sits with the other document-lifecycle sections rather than
@@ -202,6 +203,8 @@ inside the work content:
 ---
 
 ## 5. Breaking Changes
+
+Two breaking changes: the brownfield PRD Change Log loses its `Change` column, and the epic Change Log moves out of `## Notes & Updates`.
 
 ### Breaking Change 1: brownfield PRD Change Log loses its `Change` column
 

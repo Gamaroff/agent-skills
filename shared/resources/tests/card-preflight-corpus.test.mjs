@@ -109,8 +109,10 @@ test("corpus: the finding fires on a bold label alone and clears when the list u
   const sc = labelled.blocks.find((b) => b.heading === "Success Criteria");
   assert.equal(sc.kind, "list");
 
-  // A label with genuinely nothing under it is the finding, by name.
-  const alone = checkCardSections(doc("**Functional**"), specs);
+  // A label with genuinely nothing under it is the finding, by name. (A bare
+  // bold line with no colon and nothing beneath is content — `**None**` — so
+  // the label form here carries the colon.)
+  const alone = checkCardSections(doc("**Functional**:"), specs);
   assert.equal(alone.ok, false);
   assert.deepEqual(
     alone.findings.map((f) => [f.section, f.code]),

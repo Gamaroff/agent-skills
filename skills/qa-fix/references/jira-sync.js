@@ -1140,10 +1140,13 @@ const CARD_MAX_CHARS = 600;
 const RE_SUBHEADING = /^#{3,6}\s+/;
 // A bold label standing alone on its line — `**Functional**`, `**Functional**:`,
 // `**Code Quality:**` — which real documents use exactly as they use `###`: to
-// group the items under it. The terminator exclusion is what keeps `**None.**`
-// (content) apart from `**None**:` (a label); a sentence that happens to be
-// bold is still a sentence.
-const RE_BOLD_LABEL = /^\s*\*\*[^*\n.!?]+\*\*:?\s*$/;
+// group the items under it. A TRAILING terminator inside the bold is what keeps
+// `**None.**` (content) apart from `**None**:` (a label); a sentence that
+// happens to be bold is still a sentence. Only the trailing one: an earlier
+// version excluded `.` from the whole run, which made `**Changes to
+// jira-sync.js**:` — a label naming a file — neither a label nor reported, and
+// its list never reached the card (task.117 QA cycle 2, CR2-1).
+const RE_BOLD_LABEL = /^\s*\*\*[^*\n]*[^*\n.!?\s]\*\*:?\s*$/;
 const RE_FENCE = /^\s*(```|~~~)/;
 
 // Fence-aware section extraction — the function `extractBodySections` and
@@ -1286,15 +1289,16 @@ function splitSentences(text) {
 // second sitting inside the list on the card.
 function dropHeadingLines(src) {
   const out = [];
-  let inFence = false;
+  // makeFenceTracker, not RE_FENCE parity: a ```` block containing a ``` line
+  // flips a parity toggle out of the fence, and the label drop then deletes
+  // fenced content (task.117 QA cycle 2, CR2-5).
+  const isFenced = makeFenceTracker();
   for (const line of String(src).split("\n")) {
-    if (RE_FENCE.test(line)) {
-      inFence = !inFence;
+    if (isFenced(line)) {
       out.push(line);
       continue;
     }
-    if (!inFence && (RE_SUBHEADING.test(line) || RE_BOLD_LABEL.test(line)))
-      continue;
+    if (RE_SUBHEADING.test(line) || RE_BOLD_LABEL.test(line)) continue;
     out.push(line);
   }
   return out;
@@ -1350,6 +1354,14 @@ function summariseSection(content, opts = {}) {
   const raw = String(content || "").trim();
   if (!raw) return { text: "", omitted: 0, kind: "empty" };
 
+  // A bold-only line WITHOUT a colon that is the whole section is content, not
+  // a label: `**None**` is what a Breaking Changes body says. The same line
+  // with content beneath it is a grouping label and is dropped below; the same
+  // line with a trailing colon is a label whatever follows (QA cycle 2, CR2-4).
+  if (!raw.includes("\n") && RE_BOLD_LABEL.test(raw) && !/:\s*$/.test(raw)) {
+    return { text: raw, omitted: 0, kind: "prose" };
+  }
+
   // Grouping sub-headings and bold labels go; the items under them stay. See
   // dropHeadingLines. A section that was non-empty and is now empty was
   // NOTHING BUT headings and labels — report that as its own kind, because a
@@ -1371,11 +1383,11 @@ function summariseSection(content, opts = {}) {
     // Group each top-level item with its continuation lines so a wrapped or
     // nested bullet stays attached to the item it belongs to.
     const items = [];
-    let inFence = false;
+    const isFenced = makeFenceTracker();
     for (const line of lines) {
-      if (RE_FENCE.test(line)) inFence = !inFence;
+      const fenced = isFenced(line);
       const isTop =
-        !inFence &&
+        !fenced &&
         (RE_BULLET.test(line) || RE_ORDERED.test(line)) &&
         !/^\s/.test(line);
       if (isTop) items.push([line]);
@@ -1422,11 +1434,11 @@ function summariseSection(content, opts = {}) {
   // match and a lead-in colon with bullets directly beneath it read as a label
   // (task.117 QA cycle 1, CR-1).
   if (isLabelOnly(first)) {
-    return {
-      text: first.trim(),
-      omitted: paras.length - 1,
-      kind: "heading-only",
-    };
+    // What a `###` conversion would deliver: the summarisable blocks AFTER the
+    // label. Tables and fences beneath it would still yield nothing, and
+    // blocks above it are not "beneath" (QA cycle 2, CR2-2).
+    const beneath = paras.slice(firstIdx + 1).filter(isProseBlock).length;
+    return { text: first.trim(), omitted: beneath, kind: "heading-only" };
   }
 
   const sentences = splitSentences(first.replace(/\n+/g, " ").trim());
@@ -1708,7 +1720,9 @@ function isLabelOnly(paragraph) {
   const lines = t.split("\n");
   if (lines.length !== 1) return false;
   if (RE_BULLET.test(t) || RE_ORDERED.test(t)) return false;
-  if (/[.!?]/.test(t)) return false;
+  // A TRAILING terminator ends a sentence; a dot inside (`jira-sync.js`,
+  // `v0.48`) does not (CR2-1).
+  if (/[.!?]\**\s*$/.test(t)) return false;
   if (RE_BOLD_LABEL.test(t)) return true;
   return /:$/.test(t) && t.split(/\s+/).length <= LABEL_MAX_WORDS;
 }
@@ -1775,7 +1789,13 @@ function checkCardSections(body, specs, opts = {}) {
         message: `The "${spec.heading}" section holds only a label or sub-heading with nothing under it — the card would publish nothing for it.`,
         fix: `Put a sentence or a bullet list under the label. A bold label (**Functional**) or a sub-heading is a grouping, not content.`,
       });
-      blocks.push({ heading: spec.heading, status: "heading-only" });
+      blocks.push({
+        heading: spec.heading,
+        status: "heading-only",
+        kind,
+        text: "",
+        omitted: 0,
+      });
       continue;
     }
 
@@ -1821,6 +1841,7 @@ function checkCardSections(body, specs, opts = {}) {
       blocks.push({
         heading: spec.heading,
         status: "heading-only",
+        kind,
         text,
         omitted,
       });

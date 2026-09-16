@@ -750,6 +750,89 @@ test("H2: an epic bold label is dropped before the transform, so its list render
   assert.equal(text, "Some text Existing: more text.");
 });
 
+// ---------------------------------------------------------------------------
+// H3 — the shapes QA cycle 2's refute pass found
+// ---------------------------------------------------------------------------
+
+test("H3: only a TRAILING terminator makes a bold run a sentence — a label naming a file is still a label (CR2-1)", () => {
+  const { kind, text } = summariseSection(
+    "**Changes to jira-sync.js**:\n\n- a\n- b\n",
+  );
+  assert.equal(kind, "list");
+  assert.doesNotMatch(text, /Changes to/);
+  assert.equal(lib.isLabelOnly("**v0.48 notes**:"), true);
+  assert.equal(lib.isLabelOnly("See jira-sync.js changes:"), true);
+  assert.equal(lib.isLabelOnly("**Do it now.**"), false);
+  assert.equal(summariseSection("**None.**").text, "**None.**");
+  const r = lib.checkCardSections(
+    "## Overview\n\nA.\n\n## Success Criteria\n\n**Changes to jira-sync.js**:\n\n- a\n",
+    TASK_SPECS,
+  );
+  assert.equal(r.ok, true, JSON.stringify(r.findings));
+});
+
+test("H3: the stopped count is what a ### conversion would deliver — blocks BENEATH the label that summarise (CR2-2)", () => {
+  // Label + fence: nothing summarisable beneath, so the nothing-under-it form.
+  const fence = lib.checkCardSections(
+    "## Overview\n\nA.\n\n## Success Criteria\n\n- one\n\n## Breaking Changes\n\n**Before** (GitHub):\n\n```\nx\n```\n",
+    TASK_SPECS,
+  );
+  const bc = fence.findings.find((f) => f.section === "Breaking Changes");
+  assert.equal(bc.code, "heading-only");
+  assert.match(bc.message, /nothing under it/);
+  // A table ABOVE the label does not count as beneath it.
+  const above = summariseSection(
+    "| a | b |\n| - | - |\n| 1 | 2 |\n\nKey points:\n\n- a\n",
+  );
+  assert.equal(above.kind, "heading-only");
+  assert.equal(above.omitted, 1);
+});
+
+test("H3: a bare bold line that IS the whole section is content; with content beneath it is a label (CR2-4)", () => {
+  assert.deepEqual(summariseSection("**None**"), {
+    text: "**None**",
+    omitted: 0,
+    kind: "prose",
+  });
+  assert.equal(summariseSection("**Functional**\n\n- a\n").kind, "list");
+  // A trailing colon is a label whatever follows.
+  assert.equal(summariseSection("**Functional**:").kind, "heading-only");
+});
+
+test("H3: a label after an inner ``` inside a ```` block is fenced content and stays (CR2-5)", () => {
+  const out = dropHeadingLines("````md\n```\n**Functional**\n````\n").join(
+    "\n",
+  );
+  assert.match(out, /\*\*Functional\*\*/);
+  const { kind, text } = summariseSection(
+    "- one\n\n````md\n```\n- fenced bullet\n````\n",
+  );
+  assert.equal(kind, "list");
+  assert.equal(text.split("\n")[0], "- one");
+});
+
+test("H3: every heading-only block has the same shape, and carries kind (CR2-7)", () => {
+  const alone = lib.checkCardSections(
+    "## Overview\n\nA.\n\n## Success Criteria\n\n**Functional**:\n",
+    TASK_SPECS,
+  );
+  const stopped = lib.checkCardSections(
+    "## Overview\n\nA.\n\n## Success Criteria\n\nKey points:\n\n- a\n",
+    TASK_SPECS,
+  );
+  for (const r of [alone, stopped]) {
+    const b = r.blocks.find((x) => x.heading === "Success Criteria");
+    assert.deepEqual(Object.keys(b).sort(), [
+      "heading",
+      "kind",
+      "omitted",
+      "status",
+      "text",
+    ]);
+    assert.equal(b.kind, "heading-only");
+  }
+});
+
 test("H2: the heading-only message says whether content was omitted beneath the label (CR-4)", () => {
   const stopped = lib.checkCardSections(
     "## Overview\n\nA summary.\n\n## Success Criteria\n\nKey points:\n\n- a\n",

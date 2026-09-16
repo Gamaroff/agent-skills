@@ -8,7 +8,7 @@ category: infrastructure
 status: accepted
 priority: High
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-09-17
 completed_date: 2026-08-12
 pr_number: 209
 assignee:
@@ -182,6 +182,7 @@ Target (one, everywhere):
 | 2026-05-11 | 1.0     | Initial draft                                | create-story    |
 | 2026-05-13 | 1.1     | Review passed (9/10) — ready for development | review-story    |
 | 2026-08-12 |         | Jira story created (PROJ-42)                 | sync-jira-story |
+| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
 <!-- change-log-end -->
 ```
 
@@ -234,6 +235,8 @@ Target (one, everywhere):
 ---
 
 ## 5. Breaking Changes
+
+Three breaking changes: `buildChangelogBlock()` emits four columns instead of two, the insertion fallback no longer targets the first `##`, and matches inside fenced code and inline code spans are ignored.
 
 ### Breaking Change 1: `buildChangelogBlock()` emits four columns, not two
 

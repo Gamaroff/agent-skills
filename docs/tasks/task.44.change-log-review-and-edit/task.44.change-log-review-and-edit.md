@@ -8,7 +8,7 @@ category: refactoring
 status: accepted
 priority: High
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-09-17
 completed_date: 2026-08-12
 pr_number: 211
 assignee:
@@ -191,6 +191,8 @@ Graded by `change-log.enforcement`, exactly as sign-off is graded
 ---
 
 ## 5. Breaking Changes
+
+Two breaking changes: `review-prd`'s Change Log row loses a column, and the `review-*` skills can now fail a document for a missing Change Log.
 
 ### Breaking Change 1: `review-prd`'s Change Log row loses a column
 
@@ -519,6 +521,7 @@ structural-rewrite skill missing its row.
 | 2026-08-12 |         | QA gate PASS (100/100) after 1 fix cycle                      | qa-task     |
 | 2026-08-12 | 1.2     | DoD passed — accepted; CI green on head 75bd814               | finalise    |
 
+| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
 ---
 
 ## Definition of Done - PASSED ✅

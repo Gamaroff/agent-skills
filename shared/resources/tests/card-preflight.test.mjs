@@ -400,6 +400,31 @@ test("B: --json does not emit the document body", () => {
   assert.equal(typeof pf.preflight(real, "task").body, "string");
 });
 
+test("B: every sync-jira-* --check-card --json carries the same scope statement (CR2-6)", () => {
+  const { execFileSync } = require("node:child_process");
+  const real = join(
+    repoRoot,
+    "docs/tasks/task.102.authoring-time-card-preflight/task.102.authoring-time-card-preflight.md",
+  );
+  const out = execFileSync(
+    process.execPath,
+    [
+      join(repoRoot, "skills/sync-jira-task/scripts/sync-jira-task.js"),
+      "--file",
+      real,
+      "--check-card",
+      "--json",
+    ],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+  );
+  const payload = JSON.parse(out.slice(out.indexOf("{")));
+  assert.equal(payload.ok, true);
+  assert.match(payload.scope, /card sections only, not template completeness/);
+  // ...and it is the SAME sentence the preflight CLI emits.
+  const cli = JSON.parse(runCli(["--file", real, "--json"]).stdout);
+  assert.equal(payload.scope, cli.scope);
+});
+
 test("B: --json and the display both carry the scope statement", () => {
   const real = join(
     repoRoot,

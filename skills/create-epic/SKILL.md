@@ -358,8 +358,9 @@ tracker card or a thin one, printing the exact heading to add or rename beside e
   Template completeness is the step above's job, not this call's.
 - **Findings** → print the tool's output verbatim and tell the user it is **advisory**: the document
   is not blocked, and `/review-epic` is the gate that will block it. A `heading-only` finding means the
-  section is present and useless — a bold label (`**Functional**:`) or sub-heading with nothing
-  under it; put a sentence or a list under the label rather than deleting the label.
+  section is present and useless — it resolves to a bold label or sub-heading rather than to content.
+  The finding comes in two forms and the tool's `Fix:` line names the remedy for each; print it, do
+  not re-derive it.
 
 Do not paraphrase a finding or re-derive its fix, and **never restate the list of required sections
 in this skill**. The list lives once, in `CARD_SECTIONS_BY_KIND` in `references/jira-sync.js`;
