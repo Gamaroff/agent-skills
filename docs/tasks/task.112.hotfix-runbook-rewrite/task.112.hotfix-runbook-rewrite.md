@@ -9,7 +9,7 @@ status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-12
-updated: 2026-09-16
+updated: 2026-09-17
 assignee:
 estimated_effort_hours: 3
 github_issue: 413
@@ -161,6 +161,7 @@ follow `releases.md`, which owns tagging.
 | 2026-09-16 |         | Implemented — 5 files, 0 tests (docs only; ci:fast + link check green) | develop |
 | 2026-09-16 |         | QA gate CONCERNS (90/100) — 4 LOW accuracy findings (workflows.md lead paragraph overstates the spec ×3; hotfix.md says Q1 is skipped) | qa-task |
 | 2026-09-16 |         | QA gate PASS (100/100), cycle 2 refute pass — cycle-1 findings verified fixed; 1 LOW (stale "140 lines" figure in CHANGELOG + Progress Tracking; file is 141) | qa-task |
+| 2026-09-17 |         | QA gate PASS (100/100), cycle 3 scoped — gate-2 fix verified; no findings | qa-task |
 
 ---
 
@@ -178,13 +179,13 @@ follow `releases.md`, which owns tagging.
 
 **QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-16 (cycle 2)
+**Testing Date**: 2026-09-17 (cycle 3)
 **Quality Score**: 100/100
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.112.qa.2.hotfix-runbook-rewrite.md](./task.112.qa.2.hotfix-runbook-rewrite.md) (earlier: [qa.1](./task.112.qa.1.hotfix-runbook-rewrite.md))
-- **Gate File**: [task.112.gate.2.hotfix-runbook-rewrite.yml](./task.112.gate.2.hotfix-runbook-rewrite.yml) (earlier: [gate.1](./task.112.gate.1.hotfix-runbook-rewrite.yml))
+- **Full Report**: [task.112.qa.3.hotfix-runbook-rewrite.md](./task.112.qa.3.hotfix-runbook-rewrite.md) (earlier: [qa.2](./task.112.qa.2.hotfix-runbook-rewrite.md), [qa.1](./task.112.qa.1.hotfix-runbook-rewrite.md))
+- **Gate File**: [task.112.gate.3.hotfix-runbook-rewrite.yml](./task.112.gate.3.hotfix-runbook-rewrite.yml) (earlier: [gate.2](./task.112.gate.2.hotfix-runbook-rewrite.yml), [gate.1](./task.112.gate.1.hotfix-runbook-rewrite.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 3341 (`ci:fast`) + 6 (changelog drift) + 70-link check
@@ -193,7 +194,7 @@ follow `releases.md`, which owns tagging.
 - **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1: four LOW accuracy defects in the new prose against the spec it links to — all fixed in qa-fix cycle 1 and verified by the cycle-2 refute pass. Cycle 2: one LOW, high-confidence stale figure ("140 lines" in CHANGELOG + Progress Tracking; the file is 141).
+Cycle 1: four LOW accuracy defects in the new prose against the spec it links to — all fixed in qa-fix cycle 1 and verified by the cycle-2 refute pass. Cycle 2: one LOW, high-confidence stale figure ("140 lines" in CHANGELOG + Progress Tracking; the file is 141) — fixed in qa-fix cycle 2. Cycle 3: verified, no findings.
 
 ---
 

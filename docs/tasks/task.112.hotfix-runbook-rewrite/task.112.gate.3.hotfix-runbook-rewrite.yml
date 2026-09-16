@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.112.hotfix-runbook-rewrite'
+task_title: 'The hotfix runbook predates /develop-bug''s hotfix model and never mentions it'
+gate: PASS
+status_reason: 'Cycle 3, scoped to the files changed since gate 2 (CHANGELOG.md, the task document). The one gate-2 finding is verified fixed: both figures read 141 and the file is 141 lines. No new findings; every NFR PASS. Nothing open.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T20:11:48Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3341
+  phases_verified: '2/2'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Documentation only — boundary: false, probes_executed: 0 by design.'
+  performance:
+    status: PASS
+    notes: 'Not applicable. hotfix.md 141 lines, within budget.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast exit 0 on the cycle-2 fix commit (836ab134); changelog-entry-drift 6/6 re-run at cycle 3; link check unchanged since cycle 2 (the two files edited at cycle 2 contain no links in the edited lines).'
+  maintainability:
+    status: PASS
+    notes: 'All five findings across cycles 1–2 closed; the three statements of the page length now agree with the file.'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-17'
+  total_iterations: 1
+  verification_method: 'grep of both figures against wc -l; changelog-entry-drift test'
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

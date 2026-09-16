@@ -13,7 +13,8 @@ top_issues:
     finding: 'The CHANGELOG entry (line 62) and the task document''s Progress Tracking checkbox (line 169) state hotfix.md is 140 lines; the file is 141 lines after the cycle-1 reword (wc -l and awk agree), and the same task document''s Files Summary row already says 141 — two statements in the diff contradict each other and one is false against the tree.'
     suggested_action: 'Change both 140 figures to 141 so the CHANGELOG, the Progress Tracking line and the Files Summary row agree with the file — or drop the exact count from prose and keep only the budget claim.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-17'
 
 waiver:
   active: false
