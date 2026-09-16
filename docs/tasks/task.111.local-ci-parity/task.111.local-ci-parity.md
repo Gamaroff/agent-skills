@@ -5,7 +5,7 @@ type: task
 description: "npm run ci runs format:check + npm test + eval:all — three of the five CI lanes. validate:all, bundle:check and the ShellCheck lane have no local aggregate, so a contributor can be fully green locally and red in CI on a lane they never ran. Two coverage gaps ride along: develop-task's hook wrappers are untested while develop-story's identical wrappers are, and quick_validate.py does not enforce the 1,024-char description cap (develop-story's is 1,027)."
 tags: [ci, testing, tooling, create-skill]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-12
@@ -17,7 +17,7 @@ github_issue: 411
 
 # Technical Task: One local command that runs every CI lane, and two coverage gaps the sweep found
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.111.review.1.local-ci-parity.md` implemented 2026-09-16
 **GitHub Issue**: [#411](https://github.com/Gamaroff/agent-skills/issues/411)
 
@@ -190,9 +190,10 @@ None. `npm run ci` gets slower (adds four lanes); `ci:fast` is unchanged for the
 | `.github/workflows/shellcheck.yml` | one-line twin comment only (no behaviour change) |
 | `evals/shared/tests/ci-gate-parity.test.mjs` | widened to all green-defining jobs; twin / setup / exclusion map |
 | `evals/shared/tests/develop-pipeline-hook-wrappers.test.mjs` | new — parametrised over the three pipelines' wrappers |
-| `skills/create-skill/scripts/quick_validate.py` | description cap |
+| `skills/create-skill/scripts/quick_validate.py` | description cap (`DESCRIPTION_MAX_CHARS = 1024`) |
+| `tests/skill-frontmatter.test.js` | three cap tests: 1,025 rejected, 1,024 accepted, corpus within cap |
 | `skills/develop-story/SKILL.md` | description ≤ 1,024 |
-| `docs/contributing/releases.md`, `docs/contributing/evals/README.md`, `CHANGELOG.md` | name the aggregate |
+| `docs/contributing/releases.md`, `docs/contributing/evals/README.md`, `CONTRIBUTING.md`, `CHANGELOG.md` | name the aggregate and the fast tier |
 
 ## 8. Testing Strategy
 
@@ -244,19 +245,20 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 | 2026-09-12 | 1.0     | Initial draft — filed from the 2026-09-12 repo sweep | create-task |
 | 2026-09-16 | 1.1     | Review (8/10): ci-gate-parity conflict surfaced and resolved by widening the test; wrapper-test claim corrected (no pipeline's wrappers were tested); cap provenance pinned to the Agent Skills spec; lint:shell moved to a script with the workflow's guards; check:generated added | review-task |
 | 2026-09-16 |         | Status → ready-for-development | review-task |
+| 2026-09-16 |         | Implemented — 12 files, 25 tests | develop |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: one local aggregate
-- [ ] `npm run ci` = format:check + test + eval:all + validate:all + check:generated + bundle:check + shellcheck lane
-- [ ] `ci-gate-parity.test.mjs` widened to every green-defining job (twin / setup / exclusion map)
+- [x] `npm run ci` = format:check + test + eval:all + validate:all + check:generated + bundle:check + shellcheck lane
+- [x] `ci-gate-parity.test.mjs` widened to every green-defining job (twin / setup / exclusion map)
 ### Phase 2: the two coverage gaps
-- [ ] all three pipelines' hook wrappers covered by one tree-enumerated test
-- [ ] `quick_validate.py` enforces the 1,024-char description cap; develop-story's trimmed
+- [x] all three pipelines' hook wrappers covered by one tree-enumerated test
+- [x] `quick_validate.py` enforces the 1,024-char description cap; develop-story's trimmed
 ### Phase 3: docs
-- [ ] `docs/contributing/releases.md` checklist and `docs/contributing/evals/README.md` name the aggregate
+- [x] `docs/contributing/releases.md` checklist and `docs/contributing/evals/README.md` name the aggregate
 
 ---
 
@@ -270,7 +272,7 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 
 ---
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.111.local-ci-parity/task.111.local-ci-parity.md`

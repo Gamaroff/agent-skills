@@ -58,12 +58,20 @@ Full model: [`docs/contributing/releases.md`](./docs/contributing/releases.md#br
 
 ### Before you open a PR
 
-Run the eval suite locally — CI runs the same gates and rejects regressions. See [`docs/contributing/evals/README.md`](./docs/contributing/evals/README.md) for the full reference; the minimum is:
+Run the gates locally — CI runs the same ones and rejects regressions. See [`docs/contributing/evals/README.md`](./docs/contributing/evals/README.md) for the full reference. One command runs every lane CI runs:
 
 ```bash
-npm test                              # required — must be green (L1 unit + L2 fixture + L3 protocol + L4 replay)
-npm run format                        # required — CI fails on unformatted JavaScript
+npm run ci                            # every CI lane: format:check, npm test, eval:all, validate:all, check:generated, bundle:check, lint:shell
 ```
+
+It is slow (the replay evals dominate). The minimum on every push, and what the develop loop runs per iteration, is the fast tier:
+
+```bash
+npm run ci:fast                       # format:check + npm test (L1 unit + L2 fixture + L3 protocol + L4 replay)
+npm run format                        # CI fails on unformatted JavaScript — this fixes it
+```
+
+The sections below say which extra lane each kind of change needs; `npm run ci` runs all of them.
 
 **If you touched `shared/resources/` or any `SKILL.md`**, the pre-commit hook re-bundles for you, but
 one file it cannot: verify with the check CI runs, which is a per-file comparison rather than a
@@ -87,7 +95,10 @@ npm run skill-deps:candidates         # advisory — skills your prose mentions 
 ```
 
 **If you touched a shell script**, run ShellCheck too — the `ShellCheck` workflow gates every PR at
-`--severity=warning` and will reject a new warning-tier finding:
+`--severity=warning` and will reject a new warning-tier finding. `npm run lint:shell`
+(`scripts/lint-shell.sh`) is the lane's local twin — same file list, guards and severity — and prints
+a skip message rather than passing silently when no `shellcheck` binary is installed. The expanded
+form, for reference:
 
 ```bash
 # The lane lints SOURCES ONLY — the grep is what makes it a source list, so do not
