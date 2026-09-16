@@ -146,6 +146,94 @@ test("validator accepts the same description once the apostrophe is escaped", ()
   );
 });
 
+/**
+ * A description of exactly `n` characters with no leading, trailing or doubled
+ * whitespace, so its normalised length (`' '.join(s.split())`, which is what
+ * the validator measures) is also `n`. A trailing space would be folded away
+ * and a 1,025-char fixture would silently measure 1,024 — the first fixture
+ * written for this test did exactly that and "proved" the cap on a pass.
+ */
+function descriptionOfLength(n) {
+  let s = "ab "
+    .repeat(Math.ceil(n / 3))
+    .slice(0, n)
+    .trimEnd();
+  return s + "x".repeat(n - s.length);
+}
+
+test("validator rejects a description over the Agent Skills 1,024-char cap", () => {
+  // The spec caps `description` at 1,024 characters; a loader that enforces it
+  // rejects the whole skill. develop-story shipped at 1,025 (normalised) and
+  // every skill "passed", because nothing here measured it (task 111).
+  const desc = descriptionOfLength(1025);
+  const dir = fixtureSkill(
+    "over-cap",
+    [
+      "---",
+      "name: over-cap",
+      `description: '${desc}'`,
+      "---",
+      "",
+      "# Over",
+      "",
+    ].join("\n"),
+  );
+  const res = python([VALIDATOR, dir]);
+  assert.equal(
+    res.status,
+    1,
+    "validator should reject a 1,025-char description",
+  );
+  assert.match(res.stdout + res.stderr, /1025 chars \(max 1024/);
+});
+
+test("validator accepts a description of exactly 1,024 chars", () => {
+  const desc = descriptionOfLength(1024);
+  const dir = fixtureSkill(
+    "at-cap",
+    [
+      "---",
+      "name: at-cap",
+      `description: '${desc}'`,
+      "---",
+      "",
+      "# At",
+      "",
+    ].join("\n"),
+  );
+  const res = python([VALIDATOR, dir]);
+  assert.equal(
+    res.status,
+    0,
+    `validator rejected a description at the cap: ${res.stdout}${res.stderr}`,
+  );
+});
+
+test("every SKILL.md description is within the 1,024-char cap", () => {
+  // The corpus-level assertion: the fixture tests prove the check works; this
+  // proves the tree satisfies it, so the next skill to drift over is caught
+  // here as well as in validate:all.
+  const over = [];
+  for (const skill of listSkills()) {
+    const fm = fs.readFileSync(
+      path.join(SKILLS_DIR, skill, "SKILL.md"),
+      "utf-8",
+    );
+    const m = fm.match(/^description:\s*([\s\S]*?)\n(?=[A-Za-z_-]+:|---)/m);
+    if (!m) continue;
+    let d = m[1].trim();
+    if (/^'.*'$/s.test(d)) d = d.slice(1, -1).replace(/''/g, "'");
+    else if (/^".*"$/s.test(d)) d = d.slice(1, -1);
+    const n = d.split(/\s+/).join(" ").length;
+    if (n > 1024) over.push(`${skill}: ${n}`);
+  }
+  assert.deepEqual(
+    over,
+    [],
+    `descriptions over 1,024 chars:\n${over.join("\n")}`,
+  );
+});
+
 test("parsed descriptions carry no leftover opening quote", () => {
   // The old catalog generator stripped only double quotes, so single-quoted
   // descriptions rendered with a stray leading `'` in skill-catalog.md.

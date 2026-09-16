@@ -25,6 +25,10 @@ def yellow(t):  return _c("33", t)
 def bold(t):    return _c("1",  t)
 def dim(t):     return _c("2",  t)
 
+# Agent Skills spec: `description` is capped at 1,024 characters.
+DESCRIPTION_MAX_CHARS = 1024
+
+
 def find_repo_root(skill_path):
     """Walk up from skill_path to find the repo root (contains shared/resources/)."""
     path = Path(skill_path).resolve()
@@ -117,6 +121,18 @@ def validate_skill(skill_path):
     # Check for angle brackets
     if '<' in description or '>' in description:
         return False, "Description cannot contain angle brackets (< or >)"
+    # Hard cap from the Agent Skills spec: description is at most 1,024
+    # characters. Measured on the whitespace-normalised string above — the same
+    # string a loader sees after YAML folding — so a multi-line description is
+    # judged on its content, not its indentation. This is a failure, not a
+    # warning: a loader that enforces the cap rejects the whole skill, and a cap
+    # nothing here checks is a number in a spec nobody reads at commit time
+    # (develop-story shipped at 1,025 and 128/128 skills "passed"; task 111).
+    if len(description) > DESCRIPTION_MAX_CHARS:
+        return False, (
+            f"Description is {len(description)} chars "
+            f"(max {DESCRIPTION_MAX_CHARS} — Agent Skills spec); trim it"
+        )
     # Warn if description is too short or too long (target: ~100 words)
     word_count = len(description.split())
     if word_count < 10:
