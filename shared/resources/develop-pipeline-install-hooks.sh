@@ -6,6 +6,16 @@
 # Idempotent: re-running adds nothing if both hooks are already present.
 # Preserves all existing settings.json content (other hooks, permissions, env).
 #
+# Dedupes by hook IDENTITY, not by command string (task.120). The identity of a
+# hook is `<skill>/scripts/<hook>.sh` — the same script whether it is reached
+# bare-relative or via "${CLAUDE_PROJECT_DIR}/", through .claude/skills or
+# .agents/skills (symlinks in this repo, a copy in a consumer). Every spelling is
+# one hook, and the host runs all of them in parallel: on task.110 a settings
+# file carried the PreCompact hook under two spellings, both fired, and every
+# pause side-effect was produced twice. Before adding an entry the installer
+# removes every OTHER spelling of the same identity, so a settings file that
+# already carries two converges on the one the resolver prefers.
+#
 # Auto-detects the install path in this order:
 #   1. .agents/skills/develop-story/scripts/   (setup-consumer.sh — most common)
 #   2. .agents/skills/develop-task/scripts/    (only develop-task installed)
@@ -116,23 +126,35 @@ if ! jq -e . "$SETTINGS_FILE" >/dev/null 2>&1; then
   exit 1
 fi
 
-# --- patch helper ------------------------------------------------------------
+# --- patch helpers -----------------------------------------------------------
 
-# Adds a hook entry for `event` running `cmd` if no existing entry's
-# `hooks[].command` already matches `cmd`. Idempotent.
+# hook_identity CMD — the part of a hook command that names the script: strip
+# `bash `, the optional quoted "${CLAUDE_PROJECT_DIR}/", and the .claude/skills/
+# or .agents/skills/ root; the closing quote goes with the opening one. The
+# strip list is exactly these three literal prefixes and nothing else — the
+# identity keeps the full <skill>/scripts/<hook>.sh tail, so two DIFFERENT
+# scripts can never collapse to one identity and a consumer's unrelated hook is
+# never touched. Add a fourth spelling here only with a fixture that carries it.
+hook_identity() {
+  printf '%s' "$1" | sed -E 's#^bash +##; s#^"?\$\{CLAUDE_PROJECT_DIR\}/##; s#^\.(claude|agents)/skills/##; s#"$##'
+}
+
+# Adds a hook entry for `event` running `cmd` unless an existing entry already
+# runs the same hook IDENTITY (any spelling). Idempotent. Run heal_hook first so
+# the entry that satisfies this check is the canonical spelling, not a stray.
 patch_hook() {
   local event="$1"
   local cmd="$2"
 
-  local already
-  already=$(jq --arg event "$event" --arg cmd "$cmd" \
-    '[.hooks[$event][]?.hooks[]?.command] | index($cmd)' \
-    "$SETTINGS_FILE")
-
-  if [ "$already" != "null" ]; then
-    echo "  ✓ ${event}: already registered (${cmd})"
-    return 0
-  fi
+  local id existing
+  id=$(hook_identity "$cmd")
+  while IFS= read -r existing; do
+    [ -n "$existing" ] || continue
+    if [ "$(hook_identity "$existing")" = "$id" ]; then
+      echo "  ✓ ${event}: already registered (${existing})"
+      return 0
+    fi
+  done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$SETTINGS_FILE")
 
   echo "  + ${event}: adding (${cmd})"
 
@@ -190,11 +212,11 @@ unpatch_hook() {
 
 # Removes any hook entry under `event` whose `hooks[].command` exactly equals
 # `cmd` (no regex, so no escaping needed for literal path strings). Idempotent.
-# Used to migrate installs from the pre-CLAUDE_PROJECT_DIR bare-relative-path
-# commands, which would otherwise sit alongside the fixed entry and keep firing.
+# The optional third argument labels the removal; heal_hook is its one caller.
 unpatch_hook_exact() {
   local event="$1"
   local cmd="$2"
+  local label="${3:-removing legacy pre-CLAUDE_PROJECT_DIR hook}"
 
   local present
   present=$(jq --arg event "$event" --arg cmd "$cmd" \
@@ -205,7 +227,7 @@ unpatch_hook_exact() {
     return 0
   fi
 
-  echo "  - ${event}: removing legacy pre-CLAUDE_PROJECT_DIR hook (${cmd})"
+  echo "  - ${event}: ${label} (${cmd})"
 
   local tmp
   tmp=$(mktemp)
@@ -223,6 +245,25 @@ unpatch_hook_exact() {
   fi
 }
 
+# heal_hook EVENT CMD — remove every entry under `event` whose command is the
+# same hook as `cmd` (identity equal) but not spelled exactly `cmd`. No prefix
+# case, no regex, no escaping: the bare-relative legacy form, the
+# "${CLAUDE_PROJECT_DIR}"-quoted form under either root — each is one more
+# spelling of the identity, and each converges on the spelling the resolver
+# chose. Idempotent: a file that carries only `cmd` is untouched.
+heal_hook() {
+  local event="$1"
+  local cmd="$2"
+  local id existing
+  id=$(hook_identity "$cmd")
+  while IFS= read -r existing; do
+    [ -n "$existing" ] || continue
+    [ "$existing" = "$cmd" ] && continue
+    [ "$(hook_identity "$existing")" = "$id" ] || continue
+    unpatch_hook_exact "$event" "$existing" "removing duplicate spelling"
+  done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$SETTINGS_FILE")
+}
+
 # --- run ---------------------------------------------------------------------
 
 echo "Installing develop-pipeline hooks"
@@ -231,15 +272,15 @@ echo "  Hook base:     ${BASE}"
 $DRY_RUN && echo "  Mode:          DRY RUN (no writes)"
 echo ""
 
-# Migration: strip legacy bare-relative-path hook commands (pre-CLAUDE_PROJECT_DIR
-# fix) for every candidate base, so re-running this installer replaces the old
-# broken entry instead of adding a second one that keeps erroring alongside it.
-for c in "${CANDIDATES[@]}"; do
-  unpatch_hook_exact "PreCompact" "bash ${c}/on-precompact.sh"
-  unpatch_hook_exact "Stop"       "bash ${c}/on-stop.sh"
-done
-
+# Heal, then add. heal_hook removes every other spelling of each hook — the
+# legacy bare-relative form (pre-CLAUDE_PROJECT_DIR fix), the quoted form under
+# the other root, both at once — so re-running this installer converges a
+# settings file on ONE entry per event instead of adding a second that fires
+# alongside the first. Under --dry-run each removal prints its diff and writes
+# nothing, so the subsequent add is shown against the unhealed file.
+heal_hook  "PreCompact"  "$PRECOMPACT_CMD"
 patch_hook "PreCompact"  "$PRECOMPACT_CMD"
+heal_hook  "Stop"        "$STOP_CMD"
 patch_hook "Stop"        "$STOP_CMD"
 
 # Migration: strip the obsolete PostToolUse/on-skill-return.sh hook from older installs.
@@ -253,6 +294,7 @@ else
   echo "   • PreCompact:  graceful pause on context compaction"
   echo "   • Stop:        forced continuation when pipeline tries to stop mid-run"
   echo ""
-  echo "   (Any obsolete PostToolUse/on-skill-return.sh hook from older installs is removed.)"
+  echo "   (Any obsolete PostToolUse/on-skill-return.sh hook from older installs is removed,"
+  echo "    and any duplicate spelling of the same hook is healed to one entry per event.)"
   echo "   Re-running this script is safe — it skips entries that already exist."
 fi

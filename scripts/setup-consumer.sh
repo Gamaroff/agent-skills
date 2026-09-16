@@ -1612,17 +1612,27 @@ install_skills() {
 
 # ── 9. pipeline hooks ────────────────────────────────────────────────────────
 
-# Patch a single hook event into SETTINGS_FILE. Idempotent.
+# The identity of a hook is <skill>/scripts/<hook>.sh — the same script whether
+# reached bare-relative or via "${CLAUDE_PROJECT_DIR}/", through .claude/skills or
+# .agents/skills. Every spelling is one hook and the host fires all of them
+# (task.120). Mirrors hook_identity in develop-pipeline-install-hooks.sh.
+_hook_identity() {
+  printf '%s' "$1" | sed -E 's#^bash +##; s#^"?\$\{CLAUDE_PROJECT_DIR\}/##; s#^\.(claude|agents)/skills/##; s#"$##'
+}
+
+# Patch a single hook event into SETTINGS_FILE unless an entry with the same
+# hook IDENTITY (any spelling) is already there. Idempotent.
 _patch_hook() {
   local event="$1" cmd="$2"
-  local already
-  already=$(jq --arg event "$event" --arg cmd "$cmd" \
-    '[.hooks[$event][]?.hooks[]?.command] | index($cmd)' \
-    "$HOOKS_SETTINGS_FILE")
-  if [[ "$already" != "null" ]]; then
-    info "  ${event}: already registered"
-    return 0
-  fi
+  local id existing
+  id=$(_hook_identity "$cmd")
+  while IFS= read -r existing; do
+    [[ -n "$existing" ]] || continue
+    if [[ "$(_hook_identity "$existing")" == "$id" ]]; then
+      info "  ${event}: already registered"
+      return 0
+    fi
+  done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$HOOKS_SETTINGS_FILE")
   if [[ "$DRY_RUN" == true ]]; then
     echo -e "${YELLOW}[dry-run]${NC}   ${event}: would add (${cmd})"
     return 0
@@ -1663,13 +1673,12 @@ _unpatch_hook() {
 }
 
 # Removes any hook entry under `event` whose command exactly equals `cmd` (no
-# regex, so no escaping needed for literal path strings). Idempotent — heals
-# installs from the pre-CLAUDE_PROJECT_DIR bare-relative-path commands, which
-# would otherwise sit alongside the fixed entry and keep firing.
+# regex, so no escaping needed for literal path strings). Idempotent. Called by
+# _heal_hook for every other spelling of a hook we are about to register.
 _unpatch_hook_exact() {
   local event="$1" cmd="$2"
   if [[ "$DRY_RUN" == true ]]; then
-    echo -e "${YELLOW}[dry-run]${NC}   ${event}: would remove legacy hook if present (${cmd})"
+    echo -e "${YELLOW}[dry-run]${NC}   ${event}: would remove duplicate spelling if present (${cmd})"
     return 0
   fi
   [[ -f "$HOOKS_SETTINGS_FILE" ]] || return 0
@@ -1684,7 +1693,24 @@ _unpatch_hook_exact() {
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
     "$HOOKS_SETTINGS_FILE" > "$tmp"
   mv "$tmp" "$HOOKS_SETTINGS_FILE"
-  ok "  ${event}: removed legacy pre-CLAUDE_PROJECT_DIR hook"
+  ok "  ${event}: removed duplicate spelling (${cmd})"
+}
+
+# Remove every entry under `event` that is the same hook as `cmd` (identity
+# equal) but not spelled exactly `cmd` — the legacy bare-relative form, the
+# quoted form under the other skills root — so the file converges on one entry
+# per event. Mirrors heal_hook in develop-pipeline-install-hooks.sh.
+_heal_hook() {
+  local event="$1" cmd="$2"
+  local id existing
+  [[ -f "$HOOKS_SETTINGS_FILE" ]] || return 0
+  id=$(_hook_identity "$cmd")
+  while IFS= read -r existing; do
+    [[ -n "$existing" ]] || continue
+    [[ "$existing" == "$cmd" ]] && continue
+    [[ "$(_hook_identity "$existing")" == "$id" ]] || continue
+    _unpatch_hook_exact "$event" "$existing"
+  done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$HOOKS_SETTINGS_FILE")
 }
 
 install_hooks() {
@@ -1750,18 +1776,17 @@ install_hooks() {
     fi
   fi
 
-  # Migration: strip legacy bare-relative-path hook commands (pre-CLAUDE_PROJECT_DIR
-  # fix) for every candidate base, so re-running this installer replaces the old
-  # broken entry instead of adding a second one that keeps erroring alongside it.
-  for _c in "${_candidates[@]}"; do
-    _unpatch_hook_exact "PreCompact" "bash ${_c}/on-precompact.sh"
-    _unpatch_hook_exact "Stop"       "bash ${_c}/on-stop.sh"
-  done
-
   # ${CLAUDE_PROJECT_DIR} is kept literal here (escaped) so Claude Code expands
   # it at hook-fire time, resolving to the project root regardless of cwd.
-  _patch_hook "PreCompact"  "bash \"\${CLAUDE_PROJECT_DIR}/${base}/on-precompact.sh\""
-  _patch_hook "Stop"        "bash \"\${CLAUDE_PROJECT_DIR}/${base}/on-stop.sh\""
+  # Heal first, then add: every other spelling of the same hook — the legacy
+  # bare-relative form, the quoted form under the other root — is removed, so
+  # re-running the wizard converges the file on one entry per event.
+  local _precompact_cmd="bash \"\${CLAUDE_PROJECT_DIR}/${base}/on-precompact.sh\""
+  local _stop_cmd="bash \"\${CLAUDE_PROJECT_DIR}/${base}/on-stop.sh\""
+  _heal_hook  "PreCompact"  "$_precompact_cmd"
+  _patch_hook "PreCompact"  "$_precompact_cmd"
+  _heal_hook  "Stop"        "$_stop_cmd"
+  _patch_hook "Stop"        "$_stop_cmd"
   # Migration: strip the obsolete PostToolUse/on-skill-return.sh hook from older installs.
   _unpatch_hook "PostToolUse" "on-skill-return\\.sh"
   if [[ "$DRY_RUN" == false ]]; then

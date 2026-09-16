@@ -378,22 +378,44 @@ test("#2e — canonical install-hooks.sh emits ${CLAUDE_PROJECT_DIR}-prefixed co
   );
 });
 
-test("#2e — canonical install-hooks.sh migrates legacy bare-relative hook entries", async () => {
+test("#2e — canonical install-hooks.sh heals every other spelling of a hook by identity (legacy bare-relative included)", async () => {
+  // task.120 replaced the per-candidate `unpatch_hook_exact "bash ${c}/…"` loop
+  // with one identity-based healer: the bare-relative legacy form is one more
+  // spelling of `<skill>/scripts/<hook>.sh`, alongside the quoted
+  // ${CLAUDE_PROJECT_DIR} form under either skills root. The BEHAVIOUR (a legacy
+  // entry is replaced, not stacked) is pinned by install-hooks-behavior.test.mjs
+  // and develop-pipeline-install-hooks.test.sh; this asserts the mechanism is the
+  // single identity rule rather than a second string-matching healer.
   const script = await readFile(SHARED_INSTALL, "utf-8");
   assert.match(
     script,
-    /unpatch_hook_exact\s*\(\)/,
-    "must define an exact-match de-registration helper",
+    /hook_identity\s*\(\)/,
+    "must define the hook-identity normaliser",
   );
   assert.match(
+    script,
+    /s#\^bash \+##/,
+    "identity must strip the leading `bash ` so the legacy bare-relative form is one spelling of the same hook",
+  );
+  assert.match(
+    script,
+    /heal_hook\s*\(\)/,
+    "must define the identity-based healer",
+  );
+  assert.match(
+    script,
+    /heal_hook\s+"PreCompact"\s+"\$PRECOMPACT_CMD"/,
+    "must heal PreCompact before registering it",
+  );
+  assert.match(
+    script,
+    /heal_hook\s+"Stop"\s+"\$STOP_CMD"/,
+    "must heal Stop before registering it",
+  );
+  assert.doesNotMatch(
     script,
     /unpatch_hook_exact "PreCompact" "bash \$\{c\}\/on-precompact\.sh"/,
-    "must strip the legacy bare-relative PreCompact command",
-  );
-  assert.match(
-    script,
-    /unpatch_hook_exact "Stop"\s+"bash \$\{c\}\/on-stop\.sh"/,
-    "must strip the legacy bare-relative Stop command",
+    "the per-candidate exact-string loop is retired — two healers blind to each other's spelling is the defect",
   );
 });
 
@@ -401,18 +423,38 @@ test("#2e — setup-consumer.sh emits ${CLAUDE_PROJECT_DIR}-prefixed commands an
   const script = await readFile(SETUP_CONSUMER, "utf-8");
   assert.match(
     script,
-    /_patch_hook "PreCompact".*CLAUDE_PROJECT_DIR.*on-precompact\.sh/,
+    /_precompact_cmd=.*CLAUDE_PROJECT_DIR.*on-precompact\.sh/,
     "PreCompact command must be cwd-independent",
   );
   assert.match(
     script,
-    /_patch_hook "Stop".*CLAUDE_PROJECT_DIR.*on-stop\.sh/,
+    /_patch_hook "PreCompact"\s+"\$_precompact_cmd"/,
+    "PreCompact must be registered with the cwd-independent command",
+  );
+  assert.match(
+    script,
+    /_stop_cmd=.*CLAUDE_PROJECT_DIR.*on-stop\.sh/,
     "Stop command must be cwd-independent",
+  );
+  assert.match(
+    script,
+    /_patch_hook "Stop"\s+"\$_stop_cmd"/,
+    "Stop must be registered with the cwd-independent command",
   );
   assert.match(
     script,
     /_unpatch_hook_exact\s*\(\)/,
     "must define an exact-match de-registration helper",
+  );
+  assert.match(
+    script,
+    /_hook_identity\s*\(\)/,
+    "must mirror the canonical installer's identity normaliser (task.120)",
+  );
+  assert.match(
+    script,
+    /_heal_hook\s+"PreCompact"/,
+    "must heal duplicate PreCompact spellings before registering",
   );
 });
 
