@@ -18,6 +18,13 @@
 #   5. Removes the lock file
 #   6. Emits a PIPELINE-PAUSE-SIGNAL via additionalContext so the agent halts cleanly
 #
+# The hook CLAIMS the lock before any of that (task.120): an atomic `mv` of the
+# lock to a per-process `.pausing.$$` name, so N concurrent invocations — a host
+# that registered the hook twice, say — produce exactly one of everything, and
+# the losers exit 0 with the empty signal. The PR comment carries the same
+# idempotency marker family as the issue comment and is updated in place on a
+# repeat pause at the same step.
+#
 # Both tracker writes go through the contract (bug.14). Before that fix they were
 # bare `gh … comment --body "…"` calls: no lead, no marker, and — the part that
 # mattered — no access gate, so a consumer that had declared
@@ -78,14 +85,45 @@ write_pause_snapshot() {
   fi
 }
 
-# No lock = no active pipeline = noop. Return BEFORE writing a snapshot or arming the
-# EXIT trap, so a stray re-fire neither clobbers an existing snapshot nor touches a
-# lock that isn't there (idempotence).
-if [ ! -f "$LOCK" ]; then
+# The claim. No lock = no active pipeline = noop; but "is there a lock" is not a
+# question two concurrent runs can both be allowed to answer yes to — on task.110
+# a settings file carried this hook under two spellings, the host fired both in
+# parallel, both passed a `[ -f "$LOCK" ]` check, and every side-effect below was
+# produced twice (report block, PR comment, issue comment). `mv` on one
+# filesystem is atomic: of N concurrent runs exactly one renames the lock, and
+# every other run's mv fails ENOENT and takes the same noop path a stray
+# re-fire always took. Claiming BEFORE writing a snapshot or arming the EXIT trap
+# keeps the loser side-effect-free: it neither clobbers an existing snapshot nor
+# touches a lock it does not own (idempotence, now by construction).
+CLAIM="${LOCK}.pausing.$$"
+if ! mv "$LOCK" "$CLAIM" 2>/dev/null; then
   emit_empty
 fi
+# Only the winner reaches this line, and a loser never owns a claim file — so
+# every OTHER .pausing.* here belongs to a run the harness killed mid-flow. Sweep
+# them now, or .claude/state/ accumulates one per crash forever. Never sweep
+# before the mv: a loser that started a beat later would delete the winner's
+# claim. (No nullglob in bash 3.2: with no match the loop sees the literal
+# pattern, and rm -f of a name that does not exist is a noop.)
+#
+# A stale claim can be the only copy of a killed run's state — a kill between
+# THAT run's claim and its snapshot leaves nothing under the lock's name and
+# nothing in last-halt.json (task.120 CR-1 / bug.2). That is why the Phase 0a
+# resume detector reads `.pausing.*` alongside last-halt.json — choosing by
+# document and then by age, since a stale snapshot is never consumed (bug.5) —
+# the claim file is the lock, byte for byte, under another name. Sweeping it
+# HERE is safe because
+# reaching this line means a NEW lock was just claimed — a newer pipeline has
+# started, and this run's own snapshot (written next) is the state that matters.
+for stale in "$LOCK".pausing.*; do
+  [ "$stale" = "$CLAIM" ] || rm -f "$stale"
+done
+# Every later read (`jq -r … "$LOCK"`), the degraded-path rm and the EXIT trap
+# now address the claimed copy. SNAPSHOT and STATE_DIR were derived from the
+# original path above, so they still point at the real state directory.
+LOCK="$CLAIM"
 
-# Lock confirmed present — write the resume snapshot NOW, before the EXIT trap that
+# Lock claimed — write the resume snapshot NOW, before the EXIT trap that
 # removes the lock is even armed. This closes the "lock removed, no snapshot" window
 # that a mid-run harness kill would otherwise open.
 write_pause_snapshot
@@ -198,28 +236,62 @@ if [ -n "$PR_URL" ]; then
         # body file, so each record is distinct and points at the text that
         # belongs to it.
         PR_BODY_FILE="$STATE_DIR/precompact-pr-comment.step-${CURRENT_STEP}.md"
-        printf '%s\n\n---\n\n%s\n' "$LEAD" "$PR_BODY" > "$PR_BODY_FILE"
+        # The marker goes FIRST, before the lead. It is the same family
+        # tracker-comment.js writes on the issue arm (agent-skills-comment:<stage>),
+        # and the find-then-edit below keys on `startswith` — a lead inserted above
+        # the marker makes that search miss and posts a NEW comment on every pause
+        # at this step, which is the duplicate this exists to prevent (finalise
+        # Step 6c records the same lesson for its own marker).
+        PR_MARKER="<!-- agent-skills-comment:pipeline-paused-${CURRENT_STEP} -->"
+        printf '%s\n%s\n\n---\n\n%s\n' "$PR_MARKER" "$LEAD" "$PR_BODY" > "$PR_BODY_FILE"
         # tracker_write returns 0 on EVERY deferral branch, including "the record
         # could not be written" — it says so only on stderr. Capture that and
         # read it, so the signal never asserts a journal record that does not
         # exist; an audit trail that claims more than it holds is the failure
         # the journal exists to prevent.
         TW_ERR="$STATE_DIR/precompact-pr-comment.step-${CURRENT_STEP}.stderr"
-        TRACKER_WRITE_KIND=github.pr.comment \
-        TRACKER_WRITE_SKILL="$SKILL" \
-        TRACKER_WRITE_INTENT="Post the pipeline-paused notice (Step ${CURRENT_STEP}) on the pull request (body: $PR_BODY_FILE)" \
-          tracker_write gh pr comment "$PR_URL" --body-file "$PR_BODY_FILE" >/dev/null 2>"$TW_ERR"
-        TW_RC=$?
+        # Find-by-marker → PATCH in place → else create (the finalise Step 6c
+        # recipe). A second pause at the SAME step edits the earlier comment
+        # rather than adding one; the issue arm's engine reports `already` for
+        # the same case, and the implementation report keeps every pause. This
+        # is a partial read — `gh pr view --json comments` does not page —
+        # accepted here as finalise accepts it. The search is a read, so it
+        # stays outside tracker_write; only the mutation goes through the gate,
+        # and both arms keep TRACKER_WRITE_KIND=github.pr.comment so the
+        # deferred journal is unchanged whichever one runs.
+        EXISTING_PR_COMMENT=$(gh pr view "$PR_URL" --json comments \
+          -q ".comments[] | select(.body | startswith(\"$PR_MARKER\")) | .url" 2>/dev/null \
+          | head -1 | grep -oE '[0-9]+$')
+        if [ -n "$EXISTING_PR_COMMENT" ]; then
+          # owner/repo is already in PR_URL (github.com/<owner>/<repo>/pull/N);
+          # `gh repo view` in the hook's cwd is only the fallback for a URL that
+          # does not parse — a mismatch there would have built /repos//… .
+          PR_REPO=$(printf '%s' "$PR_URL" | sed -nE 's#^https?://[^/]+/([^/]+/[^/]+)/pull/[0-9]+.*$#\1#p')
+          [ -n "$PR_REPO" ] || PR_REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)
+          TRACKER_WRITE_KIND=github.pr.comment \
+          TRACKER_WRITE_SKILL="$SKILL" \
+          TRACKER_WRITE_INTENT="Update the pipeline-paused notice (Step ${CURRENT_STEP}) on the pull request (body: $PR_BODY_FILE)" \
+            tracker_write gh api -X PATCH "/repos/${PR_REPO}/issues/comments/${EXISTING_PR_COMMENT}" -F "body=@${PR_BODY_FILE}" >/dev/null 2>"$TW_ERR"
+          TW_RC=$?
+        else
+          TRACKER_WRITE_KIND=github.pr.comment \
+          TRACKER_WRITE_SKILL="$SKILL" \
+          TRACKER_WRITE_INTENT="Post the pipeline-paused notice (Step ${CURRENT_STEP}) on the pull request (body: $PR_BODY_FILE)" \
+            tracker_write gh pr comment "$PR_URL" --body-file "$PR_BODY_FILE" >/dev/null 2>"$TW_ERR"
+          TW_RC=$?
+        fi
         if [ "${ACCESS_TRACKER:-full}" != "full" ]; then
           if grep -q 'recorded as' "$TW_ERR" 2>/dev/null; then
             PR_COMMENT_OUTCOME="deferred — access.tracker=${ACCESS_TRACKER} (recorded in the deferred-mutation journal, not posted)"
           else
             PR_COMMENT_OUTCOME="deferred — access.tracker=${ACCESS_TRACKER}, but the deferred record was NOT written (not posted; body kept at $PR_BODY_FILE)"
           fi
+        elif [ "$TW_RC" -eq 0 ] && [ -n "$EXISTING_PR_COMMENT" ]; then
+          PR_COMMENT_OUTCOME="updated in place: $PR_URL (comment $EXISTING_PR_COMMENT — an earlier pause at Step ${CURRENT_STEP})"
         elif [ "$TW_RC" -eq 0 ]; then
           PR_COMMENT_OUTCOME="posted: $PR_URL"
         else
-          PR_COMMENT_OUTCOME="failed — gh pr comment returned non-zero (body kept at $PR_BODY_FILE)"
+          PR_COMMENT_OUTCOME="failed — gh returned non-zero (body kept at $PR_BODY_FILE)"
         fi
         rm -f "$TW_ERR"
       fi
@@ -262,7 +334,8 @@ if [ -n "$TRACKER_ISSUE" ]; then
   fi
 fi
 
-# Remove the lock file so a stray re-fire is a noop
+# Remove the claimed lock. A stray re-fire is already a noop: the original name
+# was renamed away at the claim, so there is nothing left for it to claim.
 rm -f "$LOCK"
 
 # Build the agent signal

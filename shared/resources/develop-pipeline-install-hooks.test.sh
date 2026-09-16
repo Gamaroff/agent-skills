@@ -1,0 +1,414 @@
+#!/usr/bin/env bash
+# develop-pipeline-install-hooks.test.sh — regression tests for develop-pipeline-install-hooks.sh
+#
+# Usage: bash shared/resources/develop-pipeline-install-hooks.test.sh
+#
+# Focus (task.120): the installer dedupes by hook IDENTITY, not by command
+# string. On task.110 a settings.json carried the PreCompact and Stop hooks under
+# two spellings — "${CLAUDE_PROJECT_DIR}/.claude/skills/…" and
+# "${CLAUDE_PROJECT_DIR}/.agents/skills/…" — the installer's exact-string dedupe
+# saw two different commands, the host fired both in parallel, and every pause
+# side-effect was produced twice. The fixture below is that file's exact shape,
+# plus the legacy bare-relative form the retired `unpatch_hook_exact` candidate
+# loop used to strip (its coverage must not regress), plus an unrelated
+# PostToolUse hook and a permissions block that must come through byte-identical.
+#
+# Covers:
+#   1. Three spellings per event → ONE entry per event, and the survivor is the
+#      resolver's spelling ("${CLAUDE_PROJECT_DIR}/<BASE>/…").
+#   2. Everything that is not one of the two hooks (permissions, env, the
+#      PostToolUse hook) is byte-identical before and after.
+#   3. A second run is a no-op — the file does not change at all.
+#   4. --dry-run prints the prune and changes nothing; "already registered" names only
+#      the canonical entry. 4b: with only a non-canonical spelling present, dry-run
+#      shows "removing X" then "adding canonical" — the same sequence as a real run
+#      (task.120 CR-1).
+#   5. A settings file that already carries only the canonical spelling is
+#      untouched (no spurious "removing").
+#   6. hook_identity never collapses two DIFFERENT scripts: an on-stop.sh entry
+#      is not removed while healing on-precompact.sh, and a consumer hook whose
+#      command merely resembles ours is left alone.
+#   7. (task.120 CR-2 / bug.3) Removal is element-level: a shared matcher group
+#      keeps the consumer's own hook when our duplicate spelling is removed from
+#      it — for the exact healer and the regex (on-skill-return.sh) one alike.
+#   8. (task.120 CR-3) develop-story / develop-task / develop-bug spellings of the
+#      byte-identical hook scripts are ONE identity; another skill's same-named
+#      script is not.
+#   9. (task.120 cycle-3 CR-1 / bug.4, cycle-4 CR-1 / bug.6) a consumer's own
+#      project-root scripts/<hook>.sh — bash-prefixed, quoted, or with NO interpreter —
+#      is NOT ours and survives the heal.
+#  10. (task.120 cycle-3 CR-3, cycle-4 CR-2/CR-3) a matcher group with no hooks[] key,
+#      a pre-existing EMPTY hooks[] group, and a prompt-type element without `command`
+#      neither abort the heal nor get removed; they are left exactly as they are.
+
+PASS=0
+FAIL=0
+INSTALLER="$(cd "$(dirname "$0")" && pwd)/develop-pipeline-install-hooks.sh"
+BASH_BIN="${HOOK_TEST_BASH:-$(command -v bash)}"
+
+pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
+fail() { echo "  FAIL  $1"; echo "        $2"; FAIL=$((FAIL + 1)); }
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "  SKIP  jq not on PATH — the installer requires it; nothing to test"
+  exit 0
+fi
+
+TMPDIR_TEST=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_TEST"' EXIT
+
+# The installer resolves BASE from candidate paths relative to cwd; the first
+# candidate is what a consumer install provides, so the canonical spelling is
+# "${CLAUDE_PROJECT_DIR}/.agents/skills/develop-story/scripts/<hook>".
+BASE=".agents/skills/develop-story/scripts"
+CANON_PRE="bash \"\${CLAUDE_PROJECT_DIR}/${BASE}/on-precompact.sh\""
+CANON_STOP="bash \"\${CLAUDE_PROJECT_DIR}/${BASE}/on-stop.sh\""
+
+# make_project DIR — a throwaway project with runnable-looking hook stubs at
+# the first candidate base, so the resolver picks it.
+make_project() {
+  mkdir -p "$1/$BASE" "$1/.claude"
+  : > "$1/$BASE/on-stop.sh"
+  : > "$1/$BASE/on-precompact.sh"
+}
+
+# The task.110 pre-fix shape (.claude/settings.json.bak-2026-09-16), extended.
+write_fixture() {
+  cat > "$1" <<'JSON'
+{
+  "permissions": {
+    "allow": ["Bash(npm test)", "Read"]
+  },
+  "env": { "KEEP_ME": "1" },
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/skills/develop-story/scripts/on-precompact.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-story/scripts/on-precompact.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-story/scripts/on-precompact.sh" } ] }
+    ],
+    "Stop": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/skills/develop-story/scripts/on-stop.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-story/scripts/on-stop.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-stop.sh" } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Write", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/my-consumer-skill/scripts/on-precompact.sh\"" } ] }
+    ]
+  }
+}
+JSON
+}
+
+run_installer() {   # $1 = project dir, rest = installer args
+  local dir="$1"; shift
+  (cd "$dir" && "$BASH_BIN" "$INSTALLER" --settings .claude/settings.json "$@")
+}
+
+# ── Scenario 1: three spellings per event → one entry, the canonical one ─────
+P1="$TMPDIR_TEST/p1"; make_project "$P1"; write_fixture "$P1/.claude/settings.json"
+OUT1=$(run_installer "$P1" 2>&1); RC=$?
+S1="$P1/.claude/settings.json"
+N_PRE=$(jq '.hooks.PreCompact | length' "$S1")
+N_STOP=$(jq '.hooks.Stop | length' "$S1")
+CMD_PRE=$(jq -r '.hooks.PreCompact[0].hooks[0].command' "$S1")
+CMD_STOP=$(jq -r '.hooks.Stop[0].hooks[0].command' "$S1")
+if [ "$RC" -ne 0 ]; then
+  fail "heal: installer exits 0" "rc=$RC: $OUT1"
+elif [ "$N_PRE" != "1" ] || [ "$N_STOP" != "1" ]; then
+  fail "heal: one entry per event" "PreCompact=$N_PRE Stop=$N_STOP: $(jq -c '.hooks' "$S1")"
+elif [ "$CMD_PRE" != "$CANON_PRE" ] || [ "$CMD_STOP" != "$CANON_STOP" ]; then
+  fail "heal: the survivor is the resolver's spelling" "PreCompact='$CMD_PRE' Stop='$CMD_STOP'"
+elif [ "$(grep -c 'removing duplicate spelling' <<<"$OUT1")" != "4" ]; then
+  fail "heal: four duplicates reported removed (2 per event)" "$OUT1"
+else
+  pass "heal: 3 spellings per event → 1 entry each, canonical spelling survives, 4 removals reported"
+fi
+
+# ── Scenario 2: everything else byte-identical ───────────────────────────────
+write_fixture "$TMPDIR_TEST/fixture.json"
+BEFORE=$(jq -S 'del(.hooks.PreCompact, .hooks.Stop)' "$TMPDIR_TEST/fixture.json")
+AFTER=$(jq -S 'del(.hooks.PreCompact, .hooks.Stop)' "$S1")
+if [ "$BEFORE" != "$AFTER" ]; then
+  fail "heal: non-hook keys and the unrelated PostToolUse hook untouched" "$(diff <(echo "$BEFORE") <(echo "$AFTER"))"
+else
+  pass "heal: permissions, env and the unrelated PostToolUse hook are byte-identical before and after"
+fi
+
+# ── Scenario 3: second run is a no-op ────────────────────────────────────────
+cp "$S1" "$TMPDIR_TEST/after-first.json"
+OUT3=$(run_installer "$P1" 2>&1); RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "idempotent: second run exits 0" "rc=$RC"
+elif ! cmp -s "$S1" "$TMPDIR_TEST/after-first.json"; then
+  fail "idempotent: second run changes nothing" "$(diff "$TMPDIR_TEST/after-first.json" "$S1")"
+elif grep -q 'removing' <<<"$OUT3"; then
+  fail "idempotent: second run reports no removals" "$OUT3"
+else
+  pass "idempotent: a second run leaves the file byte-identical and reports nothing removed"
+fi
+
+# ── Scenario 4: --dry-run shows the prune, writes nothing ────────────────────
+P4="$TMPDIR_TEST/p4"; make_project "$P4"; write_fixture "$P4/.claude/settings.json"
+cp "$P4/.claude/settings.json" "$TMPDIR_TEST/p4-before.json"
+OUT4=$(run_installer "$P4" --dry-run 2>&1); RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "dry-run: exits 0" "rc=$RC"
+elif ! cmp -s "$P4/.claude/settings.json" "$TMPDIR_TEST/p4-before.json"; then
+  fail "dry-run: file unchanged" "file was modified"
+elif ! grep -q 'removing duplicate spelling' <<<"$OUT4"; then
+  fail "dry-run: prune is shown" "$OUT4"
+elif ! grep -q -- '^    -.*\.claude/skills/develop-story/scripts/on-precompact\.sh' <<<"$OUT4"; then
+  fail "dry-run: diff shows the .claude spelling being removed" "$OUT4"
+elif [ "$(grep -c 'already registered' <<<"$OUT4")" != "2" ]; then
+  # The fixture carries the canonical spelling too, so both events are correctly
+  # "already registered" — by the canonical entry, never by a spelling the dry run
+  # just said it would remove (task.120 CR-1).
+  fail "dry-run: 'already registered' reported once per event, for the canonical entry" "$OUT4"
+elif grep 'already registered' <<<"$OUT4" | grep -qv 'agents/skills/develop-story'; then
+  fail "dry-run: 'already registered' never names a spelling that is being removed" "$(grep 'already registered' <<<"$OUT4")"
+else
+  pass "dry-run: prune shown with a diff, settings file untouched, 'already registered' names only the canonical entry"
+fi
+
+# ── Scenario 4b: --dry-run with ONLY a non-canonical spelling → "adding" shown ─
+# The CR-1 shape: heal_hook says "removing X", and before the fix patch_hook then
+# said "already registered (X)" for the same entry, hiding the add a real run
+# performs. A dry run must report the same sequence as the real run.
+P4B="$TMPDIR_TEST/p4b"; make_project "$P4B"
+cat > "$P4B/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "PreCompact": [ { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/skills/develop-story/scripts/on-precompact.sh\"" } ] } ],
+    "Stop":       [ { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-story/scripts/on-stop.sh" } ] } ]
+  }
+}
+JSON
+cp "$P4B/.claude/settings.json" "$TMPDIR_TEST/p4b-before.json"
+OUT4B=$(run_installer "$P4B" --dry-run 2>&1); RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "dry-run (non-canonical only): exits 0" "rc=$RC"
+elif ! cmp -s "$P4B/.claude/settings.json" "$TMPDIR_TEST/p4b-before.json"; then
+  fail "dry-run (non-canonical only): file unchanged" "file was modified"
+elif grep -q 'already registered' <<<"$OUT4B"; then
+  fail "dry-run (non-canonical only): a spelling being removed is never 'already registered'" "$(grep 'already registered' <<<"$OUT4B")"
+elif [ "$(grep -c '^  + .*adding' <<<"$OUT4B")" != "2" ]; then
+  fail "dry-run (non-canonical only): the canonical add is shown for both events" "$OUT4B"
+elif [ "$(grep -c 'removing duplicate spelling' <<<"$OUT4B")" != "2" ]; then
+  fail "dry-run (non-canonical only): both removals shown" "$OUT4B"
+else
+  pass "dry-run (non-canonical only): 'removing X' then 'adding canonical' for both events — same sequence as a real run; file untouched"
+fi
+
+# ── Scenario 5: already-canonical file is left alone ─────────────────────────
+P5="$TMPDIR_TEST/p5"; make_project "$P5"
+jq -n --arg pre "$CANON_PRE" --arg stop "$CANON_STOP" \
+  '{hooks: {PreCompact: [{matcher:"*", hooks:[{type:"command", command:$pre}]}],
+            Stop:       [{matcher:"*", hooks:[{type:"command", command:$stop}]}]}}' \
+  > "$P5/.claude/settings.json"
+cp "$P5/.claude/settings.json" "$TMPDIR_TEST/p5-before.json"
+OUT5=$(run_installer "$P5" 2>&1); RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "canonical-only: exits 0" "rc=$RC"
+elif ! cmp -s "$P5/.claude/settings.json" "$TMPDIR_TEST/p5-before.json"; then
+  fail "canonical-only: file unchanged" "$(diff "$TMPDIR_TEST/p5-before.json" "$P5/.claude/settings.json")"
+elif grep -q 'removing' <<<"$OUT5"; then
+  fail "canonical-only: nothing reported removed" "$OUT5"
+elif [ "$(grep -c 'already registered' <<<"$OUT5")" != "2" ]; then
+  fail "canonical-only: both hooks reported already registered" "$OUT5"
+else
+  pass "canonical-only: file untouched, both hooks 'already registered', no removals"
+fi
+
+# ── Scenario 6: identity never collapses two different scripts ───────────────
+# on-stop.sh under PreCompact is a DIFFERENT hook from on-precompact.sh — a
+# mis-registration, but not ours to remove. Neither is a consumer's script
+# whose path merely ends the same way under a different skill (Scenario 2
+# already covers that under PostToolUse; here it sits under PreCompact itself).
+P6="$TMPDIR_TEST/p6"; make_project "$P6"
+cat > "$P6/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/skills/develop-story/scripts/on-stop.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/other-skill/scripts/on-precompact.sh\"" } ] }
+    ]
+  }
+}
+JSON
+OUT6=$(run_installer "$P6" 2>&1); RC=$?
+S6="$P6/.claude/settings.json"
+CMDS6=$(jq -r '.hooks.PreCompact[].hooks[].command' "$S6" | sort)
+if [ "$RC" -ne 0 ]; then
+  fail "no-collapse: exits 0" "rc=$RC"
+elif [ "$(jq '.hooks.PreCompact | length' "$S6")" != "3" ]; then
+  fail "no-collapse: the two unrelated entries survive and ours is added (3 total)" "$(jq -c '.hooks.PreCompact' "$S6")"
+elif ! grep -qF 'develop-story/scripts/on-stop.sh' <<<"$CMDS6" || ! grep -qF 'other-skill/scripts/on-precompact.sh' <<<"$CMDS6"; then
+  fail "no-collapse: a different script under the same event is never removed" "$CMDS6"
+elif grep -q 'removing' <<<"$OUT6"; then
+  fail "no-collapse: nothing reported removed" "$OUT6"
+else
+  pass "no-collapse: a different hook script and a different skill's same-named script both survive; ours is added beside them"
+fi
+
+# ── Scenario 7 (CR-2 / bug.3): a shared matcher group keeps the consumer's hook ─
+# A hand-edited group holding a duplicate spelling of OUR hook and the consumer's
+# own hook. Removing the group removed the consumer's hook too; removal must be
+# element-level, and the group survives while it still has a hook in it.
+P7="$TMPDIR_TEST/p7"; make_project "$P7"
+cat > "$P7/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "*", "hooks": [
+        { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/skills/develop-story/scripts/on-precompact.sh\"" },
+        { "type": "command", "command": "echo consumer-hook-keep-me" }
+      ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Write", "hooks": [
+        { "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-skill-return.sh" },
+        { "type": "command", "command": "echo consumer-post-tool-use-keep-me" }
+      ] }
+    ]
+  }
+}
+JSON
+OUT7=$(run_installer "$P7" 2>&1); RC=$?
+S7="$P7/.claude/settings.json"
+PRE7=$(jq -r '.hooks.PreCompact[].hooks[].command' "$S7")
+POST7=$(jq -r '.hooks.PostToolUse[].hooks[].command' "$S7")
+if [ "$RC" -ne 0 ]; then
+  fail "shared group: exits 0" "rc=$RC: $OUT7"
+elif ! grep -qF 'echo consumer-hook-keep-me' <<<"$PRE7"; then
+  fail "shared group: the consumer's hook in the same PreCompact group survives the heal" "$(jq -c '.hooks.PreCompact' "$S7")"
+elif grep -qF '.claude/skills/develop-story' <<<"$PRE7"; then
+  fail "shared group: the duplicate spelling is removed from the group" "$PRE7"
+elif [ "$(jq '[.hooks.PreCompact[].hooks[].command] | length' "$S7")" != "2" ]; then
+  fail "shared group: consumer hook + canonical entry = 2 PreCompact hooks" "$PRE7"
+elif ! grep -qF 'echo consumer-post-tool-use-keep-me' <<<"$POST7" || grep -qF 'on-skill-return' <<<"$POST7"; then
+  fail "shared group: the regex unpatch (on-skill-return.sh) is element-level too" "$POST7"
+else
+  pass "shared group: duplicate spelling removed as an element; consumer's hooks in the same PreCompact and PostToolUse groups survive"
+fi
+
+# ── Scenario 8 (CR-3): the three develop-* skills are one identity ───────────
+# The scripts are byte-identical wrappers; a BASE that moved between skills
+# across installer runs (develop-task installed first, develop-story later) must
+# still converge on one entry per event.
+P8="$TMPDIR_TEST/p8"; make_project "$P8"
+cat > "$P8/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-task/scripts/on-precompact.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/develop-bug/scripts/on-precompact.sh\"" } ] }
+    ],
+    "Stop": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-task/scripts/on-stop.sh" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.agents/skills/some-other-skill/scripts/on-stop.sh\"" } ] }
+    ]
+  }
+}
+JSON
+OUT8=$(run_installer "$P8" 2>&1); RC=$?
+S8="$P8/.claude/settings.json"
+if [ "$RC" -ne 0 ]; then
+  fail "cross-skill: exits 0" "rc=$RC: $OUT8"
+elif [ "$(jq '.hooks.PreCompact | length' "$S8")" != "1" ] || [ "$(jq -r '.hooks.PreCompact[0].hooks[0].command' "$S8")" != "$CANON_PRE" ]; then
+  fail "cross-skill: develop-task and develop-bug spellings converge on the canonical develop-story entry" "$(jq -c '.hooks.PreCompact' "$S8")"
+elif [ "$(jq '.hooks.Stop | length' "$S8")" != "2" ]; then
+  fail "cross-skill: Stop has the canonical entry plus the OTHER skill's on-stop.sh (not ours — kept)" "$(jq -c '.hooks.Stop' "$S8")"
+elif ! jq -r '.hooks.Stop[].hooks[].command' "$S8" | grep -qF 'some-other-skill/scripts/on-stop.sh'; then
+  fail "cross-skill: a different skill's same-named script is never collapsed into ours" "$(jq -c '.hooks.Stop' "$S8")"
+else
+  pass "cross-skill: develop-task / develop-bug spellings heal to one canonical entry per event; another skill's same-named script is untouched"
+fi
+
+# ── Scenario 9 (cycle-3 CR-1 / bug.4): a consumer's own scripts/<hook>.sh is not ours ─
+# Same tail as our scripts, no develop-* segment. The cycle-2 widening stripped the
+# segment if present, so its absence read as ours and the healer deleted the
+# consumer's hook. The identity must REQUIRE the segment.
+P9="$TMPDIR_TEST/p9"; make_project "$P9"
+cat > "$P9/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "Stop": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash scripts/on-stop.sh" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/scripts/on-stop.sh\"" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "scripts/on-stop.sh" } ] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-story/scripts/on-stop.sh" } ] }
+    ],
+    "PreCompact": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/scripts/on-precompact.sh\"" } ] }
+    ]
+  }
+}
+JSON
+OUT9=$(run_installer "$P9" 2>&1); RC=$?
+S9="$P9/.claude/settings.json"
+STOP9=$(jq -r '.hooks.Stop[].hooks[].command' "$S9")
+PRE9=$(jq -r '.hooks.PreCompact[].hooks[].command' "$S9")
+if [ "$RC" -ne 0 ]; then
+  fail "consumer scripts/: exits 0" "rc=$RC: $OUT9"
+elif ! grep -qxF 'bash scripts/on-stop.sh' <<<"$STOP9" || ! grep -qF '${CLAUDE_PROJECT_DIR}/scripts/on-stop.sh' <<<"$STOP9"; then
+  fail "consumer scripts/: both project-root on-stop.sh hooks survive" "$STOP9"
+elif ! grep -qxF 'scripts/on-stop.sh' <<<"$STOP9"; then
+  # bug.6: a command with NO interpreter that IS the identity string must not collide.
+  fail "consumer scripts/: the interpreter-less \`scripts/on-stop.sh\` survives (bug.6)" "$STOP9"
+elif grep -qF '.claude/skills/develop-story' <<<"$STOP9" || ! grep -qxF "$CANON_STOP" <<<"$STOP9"; then
+  fail "consumer scripts/: OUR bare-relative spelling still heals to the canonical entry" "$STOP9"
+elif [ "$(jq '[.hooks.Stop[].hooks[].command] | length' "$S9")" != "4" ]; then
+  fail "consumer scripts/: 3 consumer hooks + 1 canonical = 4 Stop hooks" "$STOP9"
+elif ! grep -qF '${CLAUDE_PROJECT_DIR}/scripts/on-precompact.sh' <<<"$PRE9" || ! grep -qxF "$CANON_PRE" <<<"$PRE9"; then
+  fail "consumer scripts/: project-root on-precompact.sh survives beside the canonical add" "$PRE9"
+elif [ "$(grep -c 'removing duplicate spelling' <<<"$OUT9")" != "1" ]; then
+  fail "consumer scripts/: exactly one removal (our bare-relative spelling), never a consumer hook" "$OUT9"
+else
+  pass "consumer scripts/<hook>.sh (bash-prefixed, quoted, interpreter-less): all survive the heal; only our own spelling is removed; canonical entries added"
+fi
+
+# ── Scenario 10 (cycle-3 CR-3): a matcher group with no hooks[] key ──────────
+# `map(.hooks |= map(...))` iterated a null and aborted the heal under set -e.
+# The group must be left exactly as it is and the heal must complete.
+P10="$TMPDIR_TEST/p10"; make_project "$P10"
+cat > "$P10/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "PreCompact": [
+      { "matcher": "*" },
+      { "matcher": "*", "hooks": [] },
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-story/scripts/on-precompact.sh" } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Write" },
+      { "matcher": "Edit", "hooks": [] },
+      { "matcher": "Write", "hooks": [ { "type": "prompt", "prompt": "consumer prompt hook" }, { "type": "command", "command": "bash .agents/skills/develop-story/scripts/on-skill-return.sh" } ] }
+    ]
+  }
+}
+JSON
+OUT10=$(run_installer "$P10" 2>&1); RC=$?
+S10="$P10/.claude/settings.json"
+if [ "$RC" -ne 0 ]; then
+  fail "hooks-less group: installer completes (exit 0)" "rc=$RC: $OUT10"
+elif grep -qi 'cannot iterate' <<<"$OUT10"; then
+  fail "hooks-less group: no jq error" "$OUT10"
+elif [ "$(jq -c '.hooks.PreCompact[0]' "$S10")" != '{"matcher":"*"}' ]; then
+  fail "hooks-less group: the group without hooks is left exactly as it is" "$(jq -c '.hooks.PreCompact' "$S10")"
+elif [ "$(jq -c '.hooks.PreCompact[1]' "$S10")" != '{"matcher":"*","hooks":[]}' ]; then
+  # cycle-4 CR-2: a PRE-EXISTING empty group is not ours to prune.
+  fail "hooks-less group: a consumer's pre-existing empty hooks[] group survives" "$(jq -c '.hooks.PreCompact' "$S10")"
+elif [ "$(jq -r '.hooks.PreCompact[2].hooks[0].command' "$S10")" != "$CANON_PRE" ] || [ "$(jq '.hooks.PreCompact | length' "$S10")" != "3" ]; then
+  fail "hooks-less group: our duplicate spelling still heals to the canonical entry" "$(jq -c '.hooks.PreCompact' "$S10")"
+elif [ "$(jq -c '.hooks.PostToolUse' "$S10")" != '[{"matcher":"Write"},{"matcher":"Edit","hooks":[]},{"matcher":"Write","hooks":[{"type":"prompt","prompt":"consumer prompt hook"}]}]' ]; then
+  # cycle-4 CR-3: a prompt-type element (no `command`) must neither error nor be removed;
+  # the obsolete on-skill-return.sh beside it must still go.
+  fail "hooks-less group: regex unpatch removes on-skill-return.sh, keeps the prompt-type element, the hooks-less group and the pre-existing empty group" "$(jq -c '.hooks.PostToolUse' "$S10")"
+else
+  pass "hooks-less / empty / prompt-type shapes: heal completes, both left as-is, duplicate healed, obsolete hook removed beside a prompt-type element"
+fi
+
+# ── Summary ──────────────────────────────────────────────────────────────────
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ] && exit 0 || exit 1

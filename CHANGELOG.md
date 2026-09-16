@@ -33,6 +33,31 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **The pause hook, the hook installer and the README badge no longer rely on a human remembering
+  (task 120).** On task.110 the PreCompact pause hook ran twice in parallel — a `settings.json`
+  carried it under two path spellings the installer's exact-string dedupe could not see — and
+  appended its report block twice and posted its PR and issue comments twice (obs #101). Three
+  mechanisms replace three assumptions. The hook **claims** the lock with an atomic `mv` to
+  `.pausing.<pid>` before any side-effect, so N concurrent invocations produce one of everything
+  and the losers exit 0 with the empty signal; the winner sweeps stale claims. Its PR comment now
+  carries the `agent-skills-comment:pipeline-paused-<step>` marker and is found-by-marker and
+  PATCHed in place on a repeat pause at the same step. `install-hooks.sh` dedupes by hook
+  **identity** (`scripts/<hook>.sh`, with `bash`, the quoted `${CLAUDE_PROJECT_DIR}/`, either skills
+  root and the `develop-(story|task|bug)/` segment stripped — the three ship byte-identical hook
+  scripts) and heals a file carrying any mix of spellings to one entry per event, removing element
+  by element so a matcher group shared with a consumer's own hook keeps it — the `unpatch_hook_exact`
+  candidate loop it replaces was a second healer blind to the first one's spelling. The wizard's
+  inline installer in `setup-consumer.sh` mirrors all of it. The resume detector now reads an
+  orphaned `develop-pipeline.lock.pausing.<pid>` — the lock renamed by a pause hook killed between
+  its claim and its snapshot — alongside `last-halt.json`, choosing by document and then by age,
+  because nothing consumes a snapshot on resume and a stale one would otherwise shadow the claim. `generate_catalog.py` gains `argparse` (`--readme PATH`, `--no-readme`) and rewrites the
+  `skills-<N>-` badge in `README.md` to the catalog count, so `validate.yml`'s no-diff check owns it
+  (`README.md` joins both trigger path lists — the workflow is path-filtered, and without that a
+  hand-edit of the badge would run no check at all). Badge corrected 126 → 128. Each mechanism has a
+  mutation-proven test: `develop-pipeline-on-precompact.test.sh` (concurrency, stale claim, marker
+  edit), the new `develop-pipeline-install-hooks.test.sh` (three spellings → one, byte-identical
+  siblings, idempotent, dry-run, no collapse of different scripts) and
+  `tests/generate-catalog-badge.test.js`.
 - **The QA loop routes on the queue, not the verdict token (task 116).** A `CONCERNS` gate with no
   open entry in `top_issues[]` — the shape gate rule 4 produces from any NFR-level reservation — now
   reaches §5c (`/review-pr`) as **route 3** instead of falling through to §5b, whose no-code-change

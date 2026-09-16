@@ -944,7 +944,7 @@ The `/develop-story` and `/develop-task` pipelines register two hooks in the pro
 bash .agents/skills/develop-story/scripts/install-hooks.sh
 ```
 
-The install script patches `.claude/settings.json` safely — preserves existing keys, skips entries already present, supports `--dry-run`. Result:
+The install script patches `.claude/settings.json` safely — preserves existing keys, skips entries already present under any spelling of the same hook and heals a file that carries two (`.claude/skills/…` and `.agents/skills/…` are one hook, and a host fires both), supports `--dry-run`. Result:
 
 ```json
 {

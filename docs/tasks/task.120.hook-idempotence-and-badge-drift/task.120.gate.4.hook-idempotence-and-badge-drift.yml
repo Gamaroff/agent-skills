@@ -1,0 +1,97 @@
+schema: 1
+task: 'task.120.hook-idempotence-and-badge-drift'
+task_title: 'The pause hook, the hook installer and the README badge each rely on a human remembering: make them idempotent, self-healing and generated'
+gate: CONCERNS
+status_reason: 'All three cycle-3 findings verified FIXED (bug.4, bug.5 closed). The scoped cycle-4 review found one MEDIUM completeness gap in the bug.4 fix — the identity''s verbatim fallback still collides with an interpreter-less `scripts/<hook>.sh` consumer command — plus four LOW: an already-empty consumer group is pruned when a sibling matches, an element without `command` aborts the regex healer, the wizard''s `return 1` under set -e ends the whole wizard, and the detector''s new `ls -t` block exits 1 when nothing exists. One more fix cycle (the last within budget); no HIGH in any cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T12:40:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-install-hooks.sh'
+    finding: 'hook_identity''s non-match fallback returns the command verbatim, so a consumer hook whose command is literally `scripts/on-stop.sh` (no interpreter) equals our identity `scripts/on-stop.sh` and heal_hook deletes it (reproduced); wizard _hook_identity mirrors it; Scenario 9 covers only bash-prefixed spellings. bug.6.'
+    suggested_action: 'Prefix the MATCH result with a token no command can begin with (e.g. `develop-pipeline-hook:`) and keep the fallback verbatim; mirror in the wizard; add the interpreter-less spelling to Scenario 9.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'shared/resources/develop-pipeline-install-hooks.sh'
+    finding: '`map(select(.hooks == null or (.hooks | length) > 0))` drops a consumer''s pre-existing `{matcher, hooks: []}` group whenever a sibling group in the same event has a match (reproduced: `{"hooks":{}}`), contradicting "a group with nothing of ours in it is left exactly as it is"; same at :266 and the two wizard mutations.'
+    suggested_action: 'Prune only groups the filter itself emptied — capture the pre-filter length and select on it; fixture: an already-empty group beside a matching sibling survives.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-install-hooks.sh'
+    finding: 'The regex healer''s `.command | test($pat)` errors "null cannot be matched" on an element without a `command` key (a `type: prompt` hook); the present-check swallows it to 0 and the obsolete on-skill-return.sh hook is silently never removed (reproduced); wizard mirror same.'
+    suggested_action: 'Use `(.command // "") | test($pat)` in the present-check and the mutation (installer + wizard); add a prompt-type element to Scenario 10.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'scripts/setup-consumer.sh'
+    finding: '_unpatch_hook_exact / _unpatch_hook `return 1` after "file left unchanged" is invoked as a plain statement inside _heal_hook / install_hooks under the wizard''s `set -euo pipefail`, so a jq failure ends the whole wizard mid-section with no record_step and no summary (the canonical installer''s `exit 1` is deliberate; the wizard''s is accidental).'
+    suggested_action: 'Catch the failure at the call sites (`… || { record_warning …; return 0; }`) so the wizard records the failed hooks step and continues to its summary.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-1'
+    severity: low
+    file: 'shared/resources/pipeline-resume-detector-prompt.md'
+    finding: 'Step 4b: the `ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeline.lock.pausing.* 2>/dev/null` block this change set added (line 80) exits 1 under bash and zsh when no candidate exists — the documented "none" branch — so the documented command is not exit-clean (execution-failure, high confidence; rated LOW by impact: the prompt is read by an agent, not run under set -e).'
+    suggested_action: 'Append `|| true` (the same pattern the hook''s own best-effort commands use) so the listing is exit-clean in the empty case; the two pre-existing `cat` blocks (lines 69/74) fail the same way on develop and are out of scope.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 34
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 25
+    notes: '10 further identity probes this cycle (trailing space, double space, sh interpreter, trailing flag, `&& rm -rf /`, unquoted var, hyphenated name, subdirectory, absolute path, space in name): every unrecognised spelling is returned verbatim and left alone — the conservative direction. CR-1 is the one collision the fallback still allows (a command with no interpreter that IS the identity string); a namespace prefix on the match result closes it. 15 prior probes stand.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1 deletes an interpreter-less consumer hook; CR-2 prunes an already-empty consumer group; CR-3 leaves the obsolete hook in place silently when a prompt-type element is present; CR-4 ends the wizard without a summary on a jq failure.'
+  maintainability:
+    status: PASS
+    notes: 'Each finding is a one-expression fix with a fixture; the recurring shape (fallback/prune rules that assume a shape) argues for the explicit pre-filter-length and namespace-prefix forms prescribed.'
+
+recommendations:
+  immediate:
+    - action: 'Namespace-prefix the identity match result; interpreter-less fixture (CR-1 / bug.6)'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh', 'scripts/setup-consumer.sh', 'shared/resources/develop-pipeline-install-hooks.test.sh']
+    - action: 'Prune only filter-emptied groups; null-safe `.command` in the regex healer; wizard call sites catch the failure (CR-2, CR-3, CR-4)'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh', 'scripts/setup-consumer.sh', 'shared/resources/develop-pipeline-install-hooks.test.sh']
+    - action: 'Exit-clean `ls -t … || true` in the detector prompt (QA-1)'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+  future:
+    - action: 'CR-5 (cleanup): the hook''s PATCH arm resolves the repo with `gh repo view` in the cwd rather than from PR_URL, which already carries owner/repo; parse the URL and fall back to gh repo view only when the parse is empty'
+      refs: ['shared/resources/develop-pipeline-on-precompact.sh']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-09-16'
+  total_iterations: 3
+  verification_method: 'bug.4: reproduction — `bash scripts/on-stop.sh` survives; segment-optional mutation red. bug.5: Step 1 walked against this repo''s stale task.110 snapshot plus a synthetic task.120 claim — snapshot dropped (other document), claim wins. bug.6 newly filed.'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 through CR-4 and QA-1 fixed and re-reviewed'

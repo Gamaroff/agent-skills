@@ -5,7 +5,7 @@ type: task
 description: "On task.110 the PreCompact pause hook ran twice in parallel — a local settings.json carried the same hook under two path spellings the installer's exact-string dedupe cannot see — and appended its report block line-for-line twice and posted its PR and issue comments twice (obs #101). The hook itself has no claim: two concurrent runs both see the lock. Separately, the README skills badge is a hand-typed number that generate_catalog.py never touches, one behind before task.110 and two behind after it. Three small mechanisms: an atomic pause claim and a marked PR comment in the hook, identity-based dedupe with a healer in the installer, and a badge the catalog generator writes so validate.yml's no-diff check owns it."
 tags: [develop-task, develop-story, hooks, install-hooks, catalog, readme, drift]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-16
@@ -13,11 +13,14 @@ updated: 2026-09-16
 assignee:
 estimated_effort_hours: 8
 github_issue: 409
+pr_number: 410
+completed_date: 2026-09-16
 ---
 
 # Technical Task: The pause hook, the hook installer and the README badge each rely on a human remembering
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.120.review.1.hook-idempotence-and-badge-drift.md` implemented 2026-09-16
 **GitHub Issue**: [#409](https://github.com/Gamaroff/agent-skills/issues/409)
 
 ---
@@ -64,7 +67,7 @@ Three things drifted during task.110 for the same reason — a mechanism that wo
 [ -f $LOCK ] || emit_empty          # check
 write_pause_snapshot                # copies the lock to last-halt.json
 trap 'rm -f "$LOCK"' EXIT           # act — much later
-append block >> $REPORT             # :128-157
+append block >> $REPORT             # :130-157
 tracker_write gh pr comment …       # :211, no marker
 tracker-comment.js --stage pipeline-paused   # marker, but raced
 git commit + push
@@ -72,7 +75,7 @@ git commit + push
 
 Two processes started within the same second both pass the check; nothing between the check and the `rm` is exclusive.
 
-**Installer** (`shared/resources/develop-pipeline-install-hooks.sh`): resolves one `BASE` from a candidate list (`.agents/skills/…` first, `.claude/skills/…` last, `:62-79`), then `patch_hook EVENT CMD` adds an entry unless `[.hooks[$event][]?.hooks[]?.command] | index($cmd)` finds the exact string (`:128`). `unpatch_hook EVENT PATTERN` (`:159`) removes entries whose command matches a jq regex — used once, to retire `on-skill-return.sh` (`:246`).
+**Installer** (`shared/resources/develop-pipeline-install-hooks.sh`): resolves one `BASE` from a candidate list (`.agents/skills/…` first, `.claude/skills/…` last, `:62-79`), then `patch_hook EVENT CMD` adds an entry unless `[.hooks[$event][]?.hooks[]?.command] | index($cmd)` finds the exact string (`:128`). `unpatch_hook EVENT PATTERN` (`:159`) removes entries whose command matches a jq regex — used once, to retire `on-skill-return.sh` (`:246`). There is already a healer for spelling drift: `unpatch_hook_exact EVENT CMD` (`:193`) is looped over every candidate base (`:237-240`) to strip the legacy **bare-relative** form `bash <candidate>/on-precompact.sh`. It is an exact-string match, so the `${CLAUDE_PROJECT_DIR}`-quoted `.claude/skills/…` form that task.110's settings carried (`.claude/settings.json.bak-2026-09-16`) slips past it — two healers, each blind to the other's spelling, is the enumeration class this task removes.
 
 **Badge**: `README.md:5` — `[![Skills](https://img.shields.io/badge/skills-126-brightgreen)](#skill-catalog)`, edited by hand. `generate_catalog.py` writes `docs/reference/skill-catalog.md` and prints `✅ Generated catalog with {total} skills` (`:214-215`).
 
@@ -91,11 +94,11 @@ PR body starts with "<!-- agent-skills-comment:pipeline-paused-{step} -->" — t
 tracker-comment.js uses — and the post is find-by-marker → edit → else create, as finalise does.
 ```
 
-The loser's `mv` fails (`ENOENT`), it takes the existing "no lock" noop path, and nothing is written. The `last-halt.json` snapshot, the report block, the comments and the commit are each produced once.
+The loser's `mv` fails (`ENOENT`), it takes the existing "no lock" noop path, and nothing is written. The `last-halt.json` snapshot, the report block, the comments and the commit are each produced once. The winner then sweeps every other `$LOCK.pausing.*` — a loser never owns one, so anything else there is a killed run's — which is what keeps `.claude/state/` from accumulating stale claims.
 
-**Installer**: `patch_hook` dedupes on the hook's **identity** — `<skill>/scripts/<hook>.sh` with the `.claude/skills/` or `.agents/skills/` prefix stripped — and, before adding, calls `unpatch_hook` with a pattern that matches the *other* spelling of the same hook, so a settings file carrying both converges on the one the resolver prefers.
+**Installer**: `patch_hook` dedupes on the hook's **identity** — `<skill>/scripts/<hook>.sh` with `bash`, the optional quoted `${CLAUDE_PROJECT_DIR}/` and the `.claude/skills/` or `.agents/skills/` prefix stripped — and, before adding, removes every entry under the event whose identity equals the new hook's and whose command differs from `$cmd`. No per-prefix regex and no escaping: any spelling of the same script — bare-relative, quoted, either root — converges on the one the resolver prefers. The existing `unpatch_hook_exact` loop (`:237-240`) is retired in the same change; the legacy form it strips is one more spelling of the identity.
 
-**Badge**: `generate_catalog.py` gains a `--readme` step (on by default) that rewrites the `skills-\d+-` segment of the badge line in `README.md` to `total`. `validate.yml`'s existing catalog step regenerates and diffs `docs/reference/skill-catalog.md`; it extends its `git diff --quiet` to `README.md` (one path added to one line), so a stale badge fails CI the same way a stale catalog does.
+**Badge**: `generate_catalog.py` gains a `--readme` step (on by default) that rewrites the `skills-\d+-` segment of the badge line in `README.md` to `total`. `validate.yml`'s existing catalog step regenerates and diffs `docs/reference/skill-catalog.md`; it extends its `git diff --quiet` to `README.md`, **and** `README.md` joins both `on.pull_request.paths` and `on.push.paths` (`:3-30`) — the workflow is path-filtered, and without the trigger a hand-edit of the badge would run no check at all (the file's own comment on `skill-dependencies.json` states the rule). Three lines, and a stale badge fails CI the same way a stale catalog does.
 
 ### Important Clarifications
 
@@ -119,7 +122,7 @@ The loser's `mv` fails (`ENOENT`), it takes the existing "no lock" noop path, an
 ### Out of Scope
 
 ❌ Making the Stop hook or the develop-next hooks atomic — they are read-only or already idempotent
-❌ Any change to the pause's *content* (the resume contract in `develop-pipeline-pause.md` is unchanged)
+❌ Any change to the pause's *content* — what the report block, PR comment and issue comment say. (The resume contract in `develop-pipeline-pause.md` was originally excluded too; QA cycles 2–3 required extending it — the resume detector now reads an orphaned `develop-pipeline.lock.pausing.<pid>` claim, choosing between it and `last-halt.json` by document and then by age — see bug.2, bug.5 and Files Summary 9a.)
 ❌ Deduplicating the two 2026-09-15 comments on PR #408 / issue #407 — historical, already noted in the trail
 ❌ The four LOW code follow-ups from task.110's `pr-review.2` (separate task)
 
@@ -145,10 +148,12 @@ None — API stable. The hook's inputs (the lock file, the environment), its out
 - `shared/resources/develop-pipeline-pause.md` (one paragraph: the claim)
 
 **Changes**:
-- [ ] Replace the `[ -f "$LOCK" ]` check with `mv "$LOCK" "$LOCK.pausing.$$"`; on failure take the existing noop path; point every later read and the EXIT trap at the claimed name
-- [ ] Prefix the PR body with `<!-- agent-skills-comment:pipeline-paused-{step} -->` and post find-by-marker → PATCH → else create (the `finalise` recipe), through `tracker_write` as now
-- [ ] Test: two concurrent invocations with one lock → exactly one snapshot, one report block, one PR-comment call (stub `gh`), one tracker-comment call; the loser exits 0 with the empty signal
-- [ ] Test: a stale `.pausing.*` file from a killed run does not block a fresh pause
+- [x] Replace the `[ -f "$LOCK" ]` check with `mv "$LOCK" "$LOCK.pausing.$$"`; on failure take the existing noop path; point every later read and the EXIT trap at the claimed name
+- [x] After a successful claim, remove every `"$LOCK".pausing.*` other than `$CLAIM` (only the winner runs this; a loser has exited)
+- [x] Prefix the PR body with `<!-- agent-skills-comment:pipeline-paused-{step} -->` (marker **before** the lead — `finalise` records why) and post find-by-marker → PATCH → else create (the `finalise` recipe), through `tracker_write` as now. The search is `gh pr view --json comments`, a partial read (no paging — `tracker-comment.js` moved its own to `gh api --paginate`); accepted here as `finalise` accepts it, and noted in the plan
+- [x] `develop-pipeline-pause.md` paragraph states both the claim and the same-step re-pause semantics: the PR arm **edits** the earlier comment in place, the issue arm reports `already` and posts nothing; the report keeps every pause
+- [x] Test: two concurrent invocations with one lock → exactly one snapshot, one report block, one PR-comment call (stub `gh`), one tracker-comment call; the loser exits 0 with the empty signal
+- [x] Test: a stale `.pausing.*` file from a killed run does not block a fresh pause, and is gone after it
 
 **Dependencies**: none
 
@@ -161,10 +166,11 @@ None — API stable. The hook's inputs (the lock file, the environment), its out
 - `shared/resources/develop-pipeline-install-hooks.test.sh` (new)
 
 **Changes**:
-- [ ] `hook_identity()` — strip `${CLAUDE_PROJECT_DIR}/`, then `.claude/skills/` or `.agents/skills/`, from a command; `patch_hook` compares identities, not strings
-- [ ] Before `patch_hook`, `unpatch_hook EVENT` with a pattern for the other prefix of the same `<skill>/scripts/<hook>.sh`, so both spellings converge on `$BASE`
-- [ ] Test: a settings.json with both spellings for PreCompact and Stop → one entry each, other keys byte-identical; idempotent on a second run; `--dry-run` shows the prune
-- [ ] Wire the test into `package.json` `scripts.test` (the glob lists per-file; a new suite runs nowhere until added — see project memory)
+- [x] `hook_identity()` — strip `bash`, the optional quoted `${CLAUDE_PROJECT_DIR}/`, then `.claude/skills/` or `.agents/skills/`, from a command; `patch_hook` compares identities, not strings
+- [x] Before `patch_hook`, `heal_hook EVENT CMD` removes every entry whose identity equals `hook_identity "$CMD"` and whose command is not exactly `$CMD` (jq: `select(.command != $cmd)` over the identity match); label the echo `removing duplicate spelling`
+- [x] Retire the `unpatch_hook_exact` candidate loop (`:237-240`) — the bare-relative legacy form is one more spelling the identity healer already covers; keep the function only if another caller remains
+- [x] Test: a settings.json with both quoted spellings **and** the legacy bare-relative form for PreCompact and Stop → one entry each (the `$BASE` spelling), other keys and an unrelated `PostToolUse` hook byte-identical; idempotent on a second run; `--dry-run` shows the prune
+- [x] Wire the test into `package.json` `scripts.test` (the glob lists per-file; a new suite runs nowhere until added — see project memory)
 
 **Dependencies**: none (independent of Phase 1)
 
@@ -179,11 +185,12 @@ None — API stable. The hook's inputs (the lock file, the environment), its out
 - a test under `tests/` or the generator's own `--check` path
 
 **Changes**:
-- [ ] After the catalog is written, rewrite `skills-\d+-` in the badge line of `README.md` to `total`; `--no-readme` opts out; print what changed
-- [ ] `validate.yml` "Catalog up-to-date check": `git diff --quiet docs/reference/skill-catalog.md README.md`
-- [ ] Bump the badge to 128 (the generator does it; commit the result)
-- [ ] Test: a README with a stale count is rewritten; a README without the badge line is left untouched with a warning, never an error
-- [ ] `npm run generate-catalog` and `npm run bundle` — no diff after
+- [x] Switch `main()` (`:218-223`, positional `sys.argv` only) to `argparse`: the two positionals (`skills_dir`, `output_file`) stay optional with today's defaults, plus `--no-readme` and `--readme PATH` — `npm run generate-catalog` and the CI step are unchanged
+- [x] After the catalog is written, rewrite `skills-\d+-` in the badge line of `README.md` (or `--readme PATH`) to `total`; `--no-readme` opts out; print what changed
+- [x] `validate.yml` "Catalog up-to-date check": `git diff --quiet docs/reference/skill-catalog.md README.md`; add `README.md` to `on.pull_request.paths` and `on.push.paths` so a badge-only edit triggers the workflow
+- [x] Bump the badge to 128 (the generator does it; commit the result)
+- [x] Test: a README with a stale count is rewritten; a README without the badge line is left untouched with a warning, never an error
+- [x] `npm run generate-catalog` and `npm run bundle` — no diff after
 
 **Dependencies**: none
 
@@ -195,23 +202,28 @@ None — API stable. The hook's inputs (the lock file, the environment), its out
 
 1. ✅ `shared/resources/develop-pipeline-on-precompact.sh` — atomic claim; marked, idempotent PR comment
 2. ✅ `shared/resources/develop-pipeline-install-hooks.sh` — identity dedupe; healer for the other spelling
-3. ✅ `skills/create-skill/scripts/generate_catalog.py` — badge rewrite
+3. ✅ `skills/create-skill/scripts/generate_catalog.py` — argparse CLI; badge rewrite; the "<N> skills covering" prose count rewritten from the same total (QA cycle 1, bug.1)
 
 ### Files to Modify (Tests)
 
 4. ✅ `shared/resources/develop-pipeline-on-precompact.test.sh` — concurrency and stale-claim cases
 5. ✅ `shared/resources/develop-pipeline-install-hooks.test.sh` — new; both-spellings → one; idempotent
-6. ✅ a generator test for the badge rewrite (Python, beside the existing catalog tests if any; else a `node --test` file under `tests/` that runs the script against a fixture README)
-7. ✅ `package.json` — test globs for the new suites
+6. ✅ `tests/generate-catalog-badge.test.js` — the generator test for the badge rewrite (`node --test`, runs the script against a fixture skills tree + README; the repo has no Python test harness); QA cycle 1 added the prose-count cases
+7. ✅ `package.json` — the new shell suite added to the `bash …` chain (`tests/*.test.js` is already a glob, so the generator test needs no entry)
+7a. ✅ `evals/develop-story/protocol/stall-and-cleanup-protocol.test.mjs` — the static `#2e` assertions re-pointed from the retired `unpatch_hook_exact "bash ${c}/…"` loop to the identity healer (`hook_identity`, `heal_hook`), and to the wizard's mirrored `_hook_identity` / `_heal_hook`
 
 ### Files to Modify (Dependencies)
 
-8. ✅ `.github/workflows/validate.yml` — diff `README.md` with the catalog
+8. ✅ `.github/workflows/validate.yml` — diff `README.md` with the catalog; `README.md` in both trigger path lists
+8a. ✅ `scripts/setup-consumer.sh` — the wizard's inline installer (`_patch_hook` / `_unpatch_hook_exact` loop) is a second copy of the same exact-string dedupe; ported to the same `_hook_identity` / `_heal_hook` rule so a consumer set up by the wizard does not re-create the duplicate this task removes (found by the static `#2e` test naming both files; not in the original scope, same defect)
 
 ### Files to Modify (Documentation)
 
 9. ✅ `README.md` — badge 126 → 128 (generated)
-10. ✅ `shared/resources/develop-pipeline-pause.md` — the claim, one paragraph
+10. ✅ `shared/resources/develop-pipeline-pause.md` — the claim (side-effect 0), the marker/find-then-edit PR arm, the same-step re-pause note, and the flow diagram
+9a. ✅ `shared/resources/pipeline-resume-detector-prompt.md` — Step 1 gains the `orphaned_claim` fallback (QA cycle 2, bug.2); bundled into 9 skills
+10a. ✅ `shared/resources/develop-pipeline-hooks.md` — trigger condition (claim), installer step 3 (identity + heal), idempotency paragraph, and a troubleshooting row for "paused twice"
+10b. ✅ `docs/reference/configuration.md` — the one-line installer description no longer says "skips entries already present" as if spelling were identity
 11. ✅ `CHANGELOG.md` — `[Unreleased]` entry `(task 120)`
 12. ✅ `skills/develop-{story,task,bug}/references/*` and `scripts/on-precompact.sh` — via `npm run bundle`
 
@@ -254,27 +266,27 @@ Not applicable — a hook that runs once per compaction and a generator that run
 
 ### Functional
 
-- [ ] Two concurrent PreCompact invocations against one lock produce one snapshot, one report block, one PR comment and one issue comment; the loser exits 0 with the empty signal
-- [ ] `install-hooks.sh` on a settings.json carrying `.claude/skills/…` and `.agents/skills/…` entries for the same hook ends with one entry per event, and is a no-op on the second run
-- [ ] `generate_catalog.py` rewrites the README badge to the catalog count; `validate.yml` fails on a stale badge
-- [ ] `README.md` badge reads 128 on the branch
+- [x] Two concurrent PreCompact invocations against one lock produce one snapshot, one report block, one PR comment and one issue comment; the loser exits 0 with the empty signal
+- [x] `install-hooks.sh` on a settings.json carrying `.claude/skills/…` and `.agents/skills/…` entries for the same hook ends with one entry per event, and is a no-op on the second run
+- [x] `generate_catalog.py` rewrites the README badge to the catalog count; `validate.yml` fails on a stale badge, and runs on a PR that touches only `README.md`
+- [x] `README.md` badge reads 128 on the branch
 
 ### Performance
 
-- [ ] The hook's wall-clock is unchanged within noise (one `mv` replaces one `test -f`)
-- [ ] `generate_catalog.py` completes in the same time class (one extra small file rewrite)
+- [x] The hook's wall-clock is unchanged within noise (one `mv` replaces one `test -f`)
+- [x] `generate_catalog.py` completes in the same time class (one extra small file rewrite)
 
 ### Code Quality
 
-- [ ] Every new mechanism has a test that goes red when the mechanism is reverted (recorded as `covered` in the implementation report)
-- [ ] `shellcheck` clean on both shell scripts; `bundle --check` clean; `prettier --check` clean
-- [ ] The new test suites are listed in `package.json` `scripts.test`
+- [x] Every new mechanism has a test that goes red when the mechanism is reverted (recorded as `covered` in the implementation report)
+- [x] `shellcheck` clean on both shell scripts; `bundle --check` clean; `prettier --check` clean
+- [x] The new test suites are listed in `package.json` `scripts.test`
 
 ### Migration
 
-- [ ] `CHANGELOG.md` `[Unreleased]` cites `(task 120)`
-- [ ] `develop-pipeline-pause.md` describes the claim; the resume contract is unchanged
-- [ ] The local `.claude/settings.json` fix applied on 2026-09-16 (duplicates removed by hand) is reproduced by the installer's healer on a re-run — verified against a copy of the pre-fix file (`.claude/settings.json.bak-2026-09-16`)
+- [x] `CHANGELOG.md` `[Unreleased]` cites `(task 120)`
+- [x] `develop-pipeline-pause.md` describes the claim; the resume contract is **extended, not unchanged** — the detector's `orphaned_claim` fallback (bug.2) with document-then-age precedence (bug.5); the wording here was corrected after `/review-pr` PC-3 flagged the contradiction
+- [x] The local `.claude/settings.json` fix applied on 2026-09-16 (duplicates removed by hand) is reproduced by the installer's healer on a re-run — verified against a copy of the pre-fix file (`.claude/settings.json.bak-2026-09-16`)
 
 ---
 
@@ -298,9 +310,9 @@ None.
 2. **A consumer README without the badge line**
    - Risk: the generator warns and leaves README untouched; a consumer's CI diff step does not include README unless they add it
    - Mitigation: the README rewrite is a no-op without the line; `--no-readme` for consumers who generate their own
-3. **`unpatch_hook` pattern over-matches**
-   - Risk: a jq regex that strips too much removes a consumer's unrelated hook
-   - Mitigation: the pattern is anchored on `<skill>/scripts/<hook>.sh` with the specific prefix; the test asserts non-hook keys and unrelated hooks are byte-identical
+3. **`hook_identity` strips too much**
+   - Risk: an identity that collapses two different scripts to one string removes a consumer's unrelated hook
+   - Mitigation: the strip list is three literal prefixes (`bash`, the quoted `${CLAUDE_PROJECT_DIR}/`, `.claude/skills/` | `.agents/skills/`) and nothing else — the identity keeps the full `<skill>/scripts/<hook>.sh` tail; the test asserts non-hook keys and an unrelated hook are byte-identical
 
 ---
 
@@ -318,7 +330,7 @@ None.
 
 ### Forward Fix
 
-- **When to use**: the healer's pattern misses a third spelling — add it to the identity strip list with a test; never widen the regex without one
+- **When to use**: the healer misses a third spelling — add it to `hook_identity`'s strip list with a fixture that carries it; never widen the strip without one
 
 ### Rollback Triggers
 
@@ -326,15 +338,25 @@ None.
 - **Non-critical**: badge or dedupe cosmetics — fix forward
 
 ---
-
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-16 | 1.0     | Initial draft — filed from task.110's finalise (obs #101; README badge drift) | create-task |
-
+| 2026-09-16 | 1.1 | Review passed (9/10) — 3 Important + 5 Optional fixes applied: identity-based installer healer (retires unpatch_hook_exact loop), README.md in validate.yml triggers, argparse for generate_catalog.py, stale-claim sweep, re-pause semantics; ready for development | review-task |
+| 2026-09-16 |  | Status → ready-for-development | review-task |
+| 2026-09-16 |  | Implemented — 28 files (3 sources, 3 test suites, wizard mirror, 4 docs, CHANGELOG, bundled copies), 14 new tests (3 hook scenarios, 6 installer, 5 generator); every mechanism mutation-proven | develop |
+| 2026-09-16 |  | QA gate CONCERNS (90/100) — 2 findings: README prose count not generated (MEDIUM), installer --dry-run self-contradiction (LOW); 2 advisories | qa-task |
+| 2026-09-16 |  | QA findings fixed — QA-1 README prose count generated (bug.1 Ready for QA), CR-1 dry-run reporting; 1 iteration, awaiting re-review | qa-fix |
+| 2026-09-16 |  | QA gate CONCERNS (80/100), cycle 2 refute pass — cycle-1 findings fixed; 2 new MEDIUM (claim-to-snapshot window, whole-group removal) + 1 LOW (doc over-claim) | qa-task |
+| 2026-09-16 |  | QA findings fixed — cycle 2: resume detector reads an orphaned claim (bug.2), element-level hook removal (bug.3), cross-skill hook identity, generator label; 2 iterations so far, awaiting re-review | qa-fix |
+| 2026-09-16 |  | QA gate CONCERNS (80/100), cycle 3 — cycle-2 fixes verified, bug.2/bug.3 closed; 2 new MEDIUM (identity over-accepts consumer hook — regression; stale snapshot shadows orphaned claim) + 1 LOW | qa-task |
+| 2026-09-16 |  | QA findings fixed — cycle 3: anchored hook identity (bug.4), detector chooses snapshot vs claim by document then age (bug.5), null-safe jq rewrite, wizard dry-run guard; 3 iterations so far, awaiting re-review | qa-fix |
+| 2026-09-16 |  | QA gate CONCERNS (80/100), cycle 4 — cycle-3 fixes verified, bug.4/bug.5 closed; 1 MEDIUM (identity fallback collision, bug.6) + 4 LOW (empty-group prune, null command, wizard set -e, ls exit status) | qa-task |
+| 2026-09-16 |  | QA findings fixed — cycle 4: namespaced hook identity (bug.6), filter-emptied-only prune, null-safe command, wizard error path, exit-clean detector listing, PR_REPO from URL; 4 iterations so far, awaiting re-review | qa-fix |
+| 2026-09-16 |  | QA gate PASS (100/100), cycle 5 — cycle-4 fixes verified, bug.6 closed; no attributable findings; 4 advisories recorded | qa-task |
+| 2026-09-16 | 1.2 | DoD passed — accepted (PR #410) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -342,21 +364,71 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Atomic pause claim and a marked PR comment
-- [ ] `mv` claim; loser takes the noop path; EXIT trap on the claimed name
-- [ ] Marked, find-then-edit PR comment
-- [ ] Concurrency and stale-claim tests
+- [x] `mv` claim; loser takes the noop path; EXIT trap on the claimed name; winner sweeps stale claims
+- [x] Marked, find-then-edit PR comment
+- [x] Concurrency and stale-claim tests
 
 ### Phase 2: Installer dedupes by identity and heals
-- [ ] `hook_identity()`; identity compare in `patch_hook`
-- [ ] Heal the other spelling before adding
-- [ ] Both-spellings test; `package.json` glob
+- [x] `hook_identity()`; identity compare in `patch_hook`
+- [x] Heal every other spelling of the same identity before adding; retire the `unpatch_hook_exact` loop
+- [x] Both-spellings test; `package.json` glob
 
 ### Phase 3: The badge is generated
-- [ ] `generate_catalog.py` badge rewrite (+ `--no-readme`)
-- [ ] `validate.yml` diffs README; badge at 128
-- [ ] Generator test; bundle clean
+- [x] `generate_catalog.py` argparse CLI; badge rewrite (+ `--no-readme`, `--readme PATH`)
+- [x] `validate.yml` diffs README and triggers on it; badge at 128
+- [x] Generator test; bundle clean
 
 ---
+
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-16 (cycle 5)
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.120.qa.5.hook-idempotence-and-badge-drift.md](./task.120.qa.5.hook-idempotence-and-badge-drift.md) (earlier: [qa.1](./task.120.qa.1.hook-idempotence-and-badge-drift.md), [qa.2](./task.120.qa.2.hook-idempotence-and-badge-drift.md), [qa.3](./task.120.qa.3.hook-idempotence-and-badge-drift.md), [qa.4](./task.120.qa.4.hook-idempotence-and-badge-drift.md))
+- **Gate File**: [task.120.gate.5.hook-idempotence-and-badge-drift.yml](./task.120.gate.5.hook-idempotence-and-badge-drift.yml) (earlier: [gate.1](./task.120.gate.1.hook-idempotence-and-badge-drift.yml), [gate.2](./task.120.gate.2.hook-idempotence-and-badge-drift.yml), [gate.3](./task.120.gate.3.hook-idempotence-and-badge-drift.yml), [gate.4](./task.120.gate.4.hook-idempotence-and-badge-drift.yml))
+
+### Test Coverage Summary
+- **Tests Executed**: 3312 (`npm run ci:fast`) incl. 15 hook, 11 installer, 8 generator scenarios; 20 mutation proofs `covered` across the loop; 27 boundary probes cumulative
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0 (no open findings)
+- **NFR Status**: Security: PASS (measured), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- Five QA cycles; six bugs filed and all six closed; no HIGH finding in any cycle. Cycle 5: no defect attributable to the change set. Advisory (pre-existing): two byte-identical canonical entries are not collapsed. Cleanups: Scenario 14 stub distinguishability, wizard step status after a warning, detector output-field table row — recorded in gate.5 `recommendations.future`.
+
+### Bug Reports
+- [bug.1](./task.120.bug.1.readme-prose-skill-count-drifts.md) · [bug.2](./task.120.bug.2.claim-to-snapshot-kill-window.md) · [bug.3](./task.120.bug.3.heal-removes-whole-matcher-group.md) · [bug.4](./task.120.bug.4.identity-collapses-consumer-scripts-hook.md) · [bug.5](./task.120.bug.5.stale-snapshot-shadows-orphaned-claim.md) · [bug.6](./task.120.bug.6.identity-fallback-collides-with-interpreterless-command.md) — all ✅ Closed
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.120.qa.5.hook-idempotence-and-badge-drift.md` (cycles 1–5)
+**Gate File**: `task.120.gate.5.hook-idempotence-and-badge-drift.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (gates 1–4 CONCERNS 90/80/80/80; never a HIGH finding; 6 bugs filed and closed)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 12/12 met — SC-F1–F4 functional, SC-P1–P2 performance, SC-Q1–Q3 quality, SC-M1–M3 migration, each with a code citation and (where a test applies) a per-PR test citation
+✅ **Tests:** 3 new suites chained in `package.json` `scripts.test` — `develop-pipeline-on-precompact.test.sh` (15 scenarios), `develop-pipeline-install-hooks.test.sh` (11), `tests/generate-catalog-badge.test.js` (8); 20 mutation proofs `covered`; `npm run ci:fast` green each cycle
+✅ **PR Review:** PR #410 — Step 5c `/review-pr` CONCERNS (advisory): PC-3 corrected in `cc42a9c2`, CR-1/PC-1 orphaned-claim lifecycle recorded as a follow-up; CI reading 1 SUCCESS @ `10d787af` (validate, test, shellcheck, link-check, branch-policy)
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites `(task 120)`; `develop-pipeline-pause.md`, `develop-pipeline-hooks.md`, `pipeline-resume-detector-prompt.md`, `docs/reference/configuration.md` updated; README badge and prose generated at 128; bundled copies and catalog in sync
+✅ **Security Review:** PASS — no secrets, no eval/exec, jq via `--arg`, `gh api` argv-safe; boundary probed with 95 candidates, 94 held. One reproduced low-severity deviation — `hook_identity` anchors per line, so a hand-authored **multi-line** consumer command containing our script is classified as ours — recorded as a follow-up (not blocking: `overall: PASS`, QA budget spent, post-gate code change would ship on expired evidence)
+⚠️ **Compliance Review:** NOT_APPLICABLE — no data, payment, UI or health scope
+
+**Follow-ups (not blocking):** (1) reject newline-bearing input in `hook_identity` / `_hook_identity` with a red-on-revert fixture; (2) orchestrators' Start-fresh / HALT cleanup also removes `.claude/state/develop-pipeline.lock.pausing.*`; (3) numeric guard on `current_step` before it enters the hook's `jq` comment-lookup filter.
+
+**Detailed Verification Log:** See `task.120.dod.1.hook-idempotence-and-badge-drift.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-09-16
 
 ## References
 
@@ -372,3 +444,14 @@ None.
 ## Notes
 
 The 2026-09-16 hand fix to the local `.claude/settings.json` (duplicates removed, backup at `.claude/settings.json.bak-2026-09-16`) is the manual form of Phase 2; keep the backup until Phase 2's healer has been run against it.
+
+**Implementation record (2026-09-16, `/develop` via the develop-task pipeline)**
+
+- **Phase 1** — `develop-pipeline-on-precompact.sh`: the `[ -f "$LOCK" ]` check is now `mv "$LOCK" "$LOCK.pausing.$$"`; the loser takes the pre-existing `emit_empty` path; the winner sweeps other `.pausing.*` files and reassigns `LOCK` so every later read, the degraded `rm` and the EXIT trap address the claim (`SNAPSHOT`/`STATE_DIR` were derived before the reassignment and still point at the real state dir). The PR body opens with `<!-- agent-skills-comment:pipeline-paused-<step> -->`; the post is `gh pr view --json comments` → `gh api -X PATCH …/issues/comments/<id> -F body=@<file>` on a hit, `gh pr comment --body-file` on a miss, both through `tracker_write` with the same `TRACKER_WRITE_KIND`. The outcome string distinguishes `updated in place` from `posted`.
+- **Phase 2** — `develop-pipeline-install-hooks.sh`: `hook_identity()` (strips `bash `, the quoted `${CLAUDE_PROJECT_DIR}/`, either skills root, the closing quote), `patch_hook` compares identities, `heal_hook` removes identity-equal/command-different entries via `unpatch_hook_exact` (which gained an optional label). The per-candidate `unpatch_hook_exact "bash ${c}/…"` loop is deleted. Verified against `.claude/settings.json.bak-2026-09-16`: the healer's output is byte-identical (after `jq -S`) to the hand-fixed live file. The wizard's inline copy in `scripts/setup-consumer.sh` got the same `_hook_identity` / `_heal_hook` (found because the static `#2e` protocol test names both files).
+- **Phase 3** — `generate_catalog.py`: `argparse` with the two optional positionals, `--readme PATH`, `--no-readme`; `generate_catalog()` returns the total; `update_readme_badge()` rewrites only the `img.shields.io/badge/skills-<N>-` segment (anchored so prose is never touched), warns on a README without it, reports "already reads" without rewriting. `validate.yml` diffs `README.md` beside the catalog and lists it in both trigger path lists. Badge 126 → 128 by running the generator.
+- **Tests** (all hermetic): hook suite 11 → 14 scenarios (concurrent ×2 with a sleeping `git` shim so the runs provably overlap; stale claim swept; marker → PATCH); new `develop-pipeline-install-hooks.test.sh` (6 scenarios) wired into `package.json`; new `tests/generate-catalog-badge.test.js` (5, incl. the CI no-diff check run locally against scratch copies). `install-hooks-behavior.test.mjs` (real installer, legacy-replacement) still green.
+- **Mutation proofs** — each turned exactly the named test red and was restored from a `cp` snapshot: claim → `[ -f ]`+`cp` (concurrent: 2 report blocks); sweep dropped (stale claim survives); PATCH arm disabled (second `pr comment`); `hook_identity` = identity (3 entries/event); `bash ` no longer stripped (legacy form escapes); healer matches on tail only (different script collapsed); `update_readme_badge` call removed (3 generator tests); badge regex unanchored (prose rewritten, badge stale).
+- **Gate** — `npm run ci:fast`: prettier clean, 3308/3309 pass (1 skipped, pre-existing); shellcheck clean on all 58 source shell files incl. the two new/changed suites; `bundle --check` 0 problems; `generate_catalog.py` + `git diff --quiet docs/reference/skill-catalog.md README.md` clean.
+- **Timing** — hook 0.12–0.13 s (no PR/issue path), unchanged; generator 0.16 s with and without `--readme`.
+- **Deferred** — none. Two static `#2e` assertions in `stall-and-cleanup-protocol.test.mjs` that pinned the retired loop by source text were re-pointed at the identity mechanism (and now assert the loop is *gone*).

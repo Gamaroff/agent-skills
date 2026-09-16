@@ -42,7 +42,7 @@ Return **JSON only** — no prose, no markdown fences, no explanation:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `schema_version` | integer | yes | Always `1` |
-| `source` | string | yes | `"lock"` (active pipeline), `"halt_snapshot"` (prior terminal HALT), or `"none"` (fresh start) |
+| `source` | string | yes | `"lock"` (active pipeline), `"halt_snapshot"` (prior terminal HALT or compaction pause), `"orphaned_claim"` (a PreCompact hook killed between its lock claim and its snapshot), or `"none"` (fresh start) |
 | `recommended_step` | integer | yes | Step the orchestrator should resume from (1–8) |
 | `current_step_in_lock` | integer | yes | `current_step` from active lock, or `halt_step` from snapshot, or `0` if none |
 | `halt_reason` | string\|null | yes | Populated only when `source == "halt_snapshot"`; otherwise `null` |
@@ -70,25 +70,37 @@ Active lock first:
 cat .claude/state/develop-pipeline.lock
 ```
 
-If absent, fall back to the **halt snapshot** written by terminal HALTs **or by the PreCompact hook** (an interrupted compaction):
+If the lock is absent, the state — if any — is in one of two places, and **neither may be assumed to be about this document or fresher than the other**:
+
+- the **halt snapshot** `.claude/state/develop-pipeline.last-halt.json`, written by a terminal HALT **or by the PreCompact hook** (an interrupted compaction) — and **never consumed on a successful resume**, so a snapshot from an earlier run, even of another task, persists indefinitely;
+- an **orphaned claim** `.claude/state/develop-pipeline.lock.pausing.<pid>` — the PreCompact hook claims the lock by renaming it *before* it writes the snapshot (task.120), so a hook killed inside that window leaves the pipeline's state **only** under the claimed name: the lock byte for byte, renamed. It is swept only by the *next* successful pause, which by then has claimed a newer lock, so reading it here is never raced.
+
+**Choose between them by document, then by age — not by a fixed order** (task.120 bug.5: a fixed snapshot-first order let a stale `last-halt.json` from a previous task shadow a fresher claim for this one, and would have recommended resuming the wrong task):
+
 ```bash
-cat .claude/state/develop-pipeline.last-halt.json
+ls -t .claude/state/develop-pipeline.last-halt.json .claude/state/develop-pipeline.lock.pausing.* 2>/dev/null || true
 ```
 
-Extract from whichever is present:
-- `current_step` (lock) or `halt_step` (snapshot) → `LOCK_STEP`
+1. Read every candidate listed. Drop any whose `task_or_story_directory` is not the directory of the document being resumed — and **report each one dropped** in `deltas_since_pause` ("stale snapshot for `<other dir>` ignored"); a leftover for another task is itself worth the operator's attention.
+2. Of the candidates that remain, take the **newest by mtime** (the `ls -t` order above).
+3. `source` is `"halt_snapshot"` when the winner is `last-halt.json`, `"orphaned_claim"` when it is a `.pausing.*` file.
+
+Extract from the winner (or from the lock, when present):
+- `current_step` (lock or orphaned claim) or `halt_step` (snapshot) → `LOCK_STEP`
 - `task_or_story_directory` → `DOC_DIR`
 - `branch` → verify it exists: `git branch --list "{branch}"`
 
-Snapshot-specific fields (when reading `last-halt.json`):
+Snapshot-specific fields (when the winner is `last-halt.json`):
 - `halt_reason` (terminal HALT) **or** `pause_reason` (PreCompact, value `"precompact"`) → human-readable cause (include in `deltas_since_pause` for the user surface)
 - `halted_at` (terminal HALT) **or** `paused_at` (PreCompact) → ISO-8601 timestamp of the halt/pause
 
 > A snapshot tagged `pause_reason: "precompact"` was left by the PreCompact hook before it removed the lock — surface it to the user as "resume from the compaction pause at step X?" rather than a hard terminal halt.
 
-Set an output field `source: "lock" | "halt_snapshot" | "none"` so the orchestrator can prompt the user appropriately ("resume the active pipeline?" vs. "resume from the prior halt at step X?").
+An orphaned claim carries no `halt_step`, `pause_reason` or `paused_at` — treat it like a `cp`-degraded snapshot, and surface it as "a compaction pause was interrupted before it could save its snapshot; resume from step X?".
 
-If both files are absent: set `blocking_issues: ["No active lock and no halt snapshot — cannot determine resume step"]`, `recommended_step: 1`, `source: "none"`. The orchestrator should treat this as a fresh start.
+Set an output field `source: "lock" | "halt_snapshot" | "orphaned_claim" | "none"` so the orchestrator can prompt the user appropriately ("resume the active pipeline?" vs. "resume from the prior halt at step X?" vs. "resume from the interrupted pause at step X?").
+
+If no lock is present and no candidate survives step 1 (none exist, or every one belongs to another document): set `blocking_issues: ["No active lock, no halt snapshot and no orphaned claim for this document — cannot determine resume step"]`, `recommended_step: 1`, `source: "none"`. The orchestrator should treat this as a fresh start — and still surface any dropped candidates.
 
 If the file is present but invalid JSON: add `"Lock/snapshot file unreadable — cannot determine resume step"` to `blocking_issues`.
 

@@ -1,0 +1,83 @@
+schema: 1
+task: 'task.120.hook-idempotence-and-badge-drift'
+task_title: 'The pause hook, the hook installer and the README badge each rely on a human remembering: make them idempotent, self-healing and generated'
+gate: CONCERNS
+status_reason: 'Both cycle-1 findings verified FIXED (QA-1 README prose count generated; CR-1 dry-run reporting). The cycle-2 full-diff refute pass found two new MEDIUM defects in the mechanisms themselves — the atomic claim reopens a claim-to-snapshot kill window the pause doc still says cannot exist, and the identity healer deletes a whole matcher group including a consumer''s unrelated hook — plus one LOW doc over-claim. A further fix cycle is required.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T10:40:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-on-precompact.sh'
+    finding: 'A harness kill between the claiming mv (:99) and write_pause_snapshot (:119) leaves neither the lock nor last-halt.json — the only state is .pausing.<pid>, which the Phase 0a resume detector never reads and the next winner''s sweep (:108) deletes; develop-pipeline-pause.md item 1 still asserts every exit path leaves the snapshot on disk (bug.2; strengthens cycle-1 advisory CR-3 — two individually correct fixes reopen the window the first closed).'
+    suggested_action: 'In the sweep, promote an orphaned claim to the snapshot when none exists before removing it; reword pause.md item 1 to name the claim-to-snapshot window and what covers it; add a test that a stale claim with no snapshot present yields a snapshot carrying the stale claim''s current_step.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-install-hooks.sh'
+    finding: 'unpatch_hook_exact removes the whole matcher group when ANY hook inside it matches, and heal_hook now routes every non-canonical spelling through it, so a hand-edited group {matcher, hooks:[duplicate spelling, consumer''s hook]} loses the consumer''s hook — reproduced: "echo consumer-hook-keep-me" deleted (bug.3). The wizard''s _unpatch_hook_exact mirrors it.'
+    suggested_action: 'Remove only the matching hooks[] element and drop the group only when its hooks[] becomes empty (installer + wizard; apply the same to the regex unpatch_hook); add a shared-group fixture scenario asserting the consumer''s hook survives.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/develop-pipeline-hooks.md'
+    finding: 'The idempotency sentence ("converges on one entry per event") and the CHANGELOG entry over-claim: hook_identity keeps the <skill>/ segment, so develop-task/… and develop-story/… spellings of the byte-identical scripts stay as two entries per event (cycle-1 advisory CR-2 stands). The combination neutralises the pause (atomic claim) and the Stop hook is side-effect-free, so it is a false statement rather than a live defect.'
+    suggested_action: 'Either extend hook_identity (and the wizard mirror) to strip the develop-(story|task|bug)/ segment — the installer header already states the three scripts are byte-identical — with a fixture carrying a develop-task spelling, or qualify the doc and CHANGELOG to "one entry per event per skill spelling"; do not leave the claim as written.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 28
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    notes: 'Boundary hook_identity() re-probed in cycle 1 (12 hostile candidates, no collapse); the cycle-1 fixes touch no boundary (a dry-run reporting branch and an anchored prose regex). CR-2 is a data-loss defect in what the healer removes, not a boundary bypass — the identity check still decides correctly which command matched; the jq removal is what over-reaches.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from cycle 1: hook 0.12–0.13 s, generator 0.16 s.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1: the atomic claim opens a claim-to-snapshot window in which a kill leaves no resumable state where the resume path looks, and the pause contract still promises the opposite. Narrow, but the guarantee is stated in absolute terms. CR-2: an installer re-run can silently delete a consumer''s unrelated hook from a shared matcher group.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle-1 fixes are small and tested; CR-3 is a documentation over-claim to be corrected in the same cycle as whichever way it is resolved.'
+
+recommendations:
+  immediate:
+    - action: 'Promote an orphaned .pausing.* claim to the snapshot in the sweep; reword pause.md item 1; add the test (CR-1 / bug.2)'
+      refs: ['shared/resources/develop-pipeline-on-precompact.sh', 'shared/resources/develop-pipeline-pause.md', 'shared/resources/develop-pipeline-on-precompact.test.sh']
+    - action: 'Element-level removal in unpatch_hook_exact / _unpatch_hook_exact (and unpatch_hook); shared-group fixture (CR-2 / bug.3)'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh', 'scripts/setup-consumer.sh', 'shared/resources/develop-pipeline-install-hooks.test.sh']
+    - action: 'Make the "one entry per event" claim true across the three develop-* skill spellings, or qualify it (CR-3)'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh', 'shared/resources/develop-pipeline-hooks.md', 'CHANGELOG.md']
+  future:
+    - action: 'CR-4 (cleanup): n_prose is subn''s match count, not a change count — a stale badge beside an already-current prose count prints "badge + prose count"; compare the prose-substituted text against the badge-substituted text before choosing the label'
+      refs: ['skills/create-skill/scripts/generate_catalog.py']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 2
+  fix_date: '2026-09-16'
+  total_iterations: 1
+  verification_method: 'bug.1 verified FIXED — prose set to 999 comes back to 128 via the generator, unrelated numbers untouched, README identical to HEAD; bug.2 and bug.3 newly filed this cycle'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1, CR-2 fixed and CR-3 resolved, then re-reviewed'

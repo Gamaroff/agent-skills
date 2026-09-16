@@ -2,19 +2,26 @@
 """
 Skill Catalog Generator
 
-Regenerates docs/reference/skill-catalog.md from SKILL.md frontmatters.
+Regenerates docs/reference/skill-catalog.md from SKILL.md frontmatters, and
+rewrites the skills-count badge in README.md to the same total, so the two
+cannot drift apart (task.120: the badge was a hand-typed number, one behind
+before task.110 and two behind after it, and nothing ever checked it).
 
 Usage:
-    python generate_catalog.py [skills_dir] [output_file]
+    python generate_catalog.py [skills_dir] [output_file] [--readme PATH] [--no-readme]
 
 Defaults:
     skills_dir  — <repo_root>/skills/
     output_file — <repo_root>/docs/reference/skill-catalog.md
+    --readme    — <repo_root>/README.md  (the badge line is rewritten in place;
+                  a README without the badge line is left untouched with a warning)
+    --no-readme — skip the README rewrite entirely
 
 Categories are assigned by matching skill names against known prefixes/patterns.
 Uncategorized skills fall into "Other".
 """
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -147,7 +154,49 @@ def truncate(text: str, max_words: int = 25) -> str:
     return " ".join(words[:max_words]) + "…"
 
 
-def generate_catalog(skills_dir: Path, output_file: Path) -> None:
+# The badge is `[![Skills](https://img.shields.io/badge/skills-<N>-brightgreen)](#skill-catalog)`;
+# only the count between `skills-` and the next `-` is generated. Anchored on the
+# shields.io path so a prose mention of "skills-126" elsewhere is never touched.
+BADGE = re.compile(r"(img\.shields\.io/badge/skills-)\d+(-)")
+# The README's own sentence two lines below the badge — "128 skills covering …" —
+# is a second hand-typed count and drifted exactly as the badge did (task.120
+# QA-1). Anchored on the literal phrase so no other number in the file is touched;
+# a README without the sentence simply has nothing to rewrite here.
+PROSE_COUNT = re.compile(r"\b\d+( skills covering\b)")
+
+
+def update_readme_badge(readme: Path, total: int) -> bool:
+    """Rewrite every generated skill count in `readme` to `total`.
+
+    Two sites: the shields.io badge (required — its absence is a warning) and the
+    "<N> skills covering" sentence (optional — rewritten when present). Returns
+    True when the file was changed. A README without the badge line is a warning,
+    never an error: a consumer that generates its own README, or a fork that
+    dropped the badge, must not be blocked from regenerating the catalog by a
+    line it does not have.
+    """
+    if not readme.exists():
+        print(f"⚠️  {readme}: not found — badge not updated", file=sys.stderr)
+        return False
+    text = readme.read_text()
+    after_badge, n = BADGE.subn(rf"\g<1>{total}\g<2>", text, count=1)
+    if n == 0:
+        print(f"⚠️  {readme}: no skills badge line found — left untouched", file=sys.stderr)
+        return False
+    new = PROSE_COUNT.sub(rf"{total}\g<1>", after_badge, count=1)
+    if new == text:
+        print(f"✅ README badge already reads skills-{total}")
+        return False
+    readme.write_text(new)
+    # Label by what actually CHANGED, not by what matched: a stale badge beside
+    # an already-current prose count is a badge-only rewrite (task.120 CR-4).
+    changed = [name for name, moved in (("badge", after_badge != text), ("prose count", new != after_badge)) if moved]
+    print(f"✅ README {' + '.join(changed)} → {total} ({readme})")
+    return True
+
+
+def generate_catalog(skills_dir: Path, output_file: Path) -> int:
+    """Write the catalog and return the number of skills it lists."""
     skills = {}
     for skill_path in sorted(skills_dir.iterdir()):
         if not skill_path.is_dir():
@@ -213,20 +262,31 @@ def generate_catalog(skills_dir: Path, output_file: Path) -> None:
     output_file.write_text("\n".join(lines))
     total = sum(len(v) for v in skills.values())
     print(f"✅ Generated catalog with {total} skills → {output_file}")
+    return total
 
 
 def main():
     script_dir = Path(__file__).resolve().parent
     repo_root = find_repo_root(script_dir)
 
-    skills_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else repo_root / "skills"
-    output_file = Path(sys.argv[2]) if len(sys.argv) > 2 else repo_root / "docs" / "reference" / "skill-catalog.md"
+    # The two positionals keep their pre-argparse defaults and optionality, so
+    # `npm run generate-catalog` (no args) and the CI step are unchanged.
+    parser = argparse.ArgumentParser(description="Regenerate the skill catalog and the README skills badge.")
+    parser.add_argument("skills_dir", nargs="?", type=Path, default=repo_root / "skills")
+    parser.add_argument("output_file", nargs="?", type=Path,
+                        default=repo_root / "docs" / "reference" / "skill-catalog.md")
+    parser.add_argument("--readme", type=Path, default=repo_root / "README.md",
+                        help="README whose skills badge is rewritten to the catalog count")
+    parser.add_argument("--no-readme", action="store_true", help="do not touch the README")
+    args = parser.parse_args()
 
-    if not skills_dir.exists():
-        print(f"❌ Skills directory not found: {skills_dir}")
+    if not args.skills_dir.exists():
+        print(f"❌ Skills directory not found: {args.skills_dir}")
         sys.exit(1)
 
-    generate_catalog(skills_dir, output_file)
+    total = generate_catalog(args.skills_dir, args.output_file)
+    if not args.no_readme:
+        update_readme_badge(args.readme, total)
 
 
 if __name__ == "__main__":

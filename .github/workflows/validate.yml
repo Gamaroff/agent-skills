@@ -17,6 +17,10 @@ on:
       # triggering no workflow at all.
       - 'shared/resources/**'
       - 'docs/reference/skill-catalog.md'
+      # `README.md` carries the generated skills badge the catalog check diffs
+      # (task.120). Without it here, a hand-edit of the badge would not even
+      # trigger this workflow — the same rule as `skill-dependencies.json` above.
+      - 'README.md'
       - '.github/workflows/validate.yml'
   push:
     branches: [main, develop]
@@ -30,6 +34,7 @@ on:
       # triggering no workflow at all.
       - 'shared/resources/**'
       - 'docs/reference/skill-catalog.md'
+      - 'README.md'
       - '.github/workflows/validate.yml'
 
 jobs:
@@ -72,11 +77,13 @@ jobs:
       - name: Catalog up-to-date check
         run: |
           # generate-catalog is a pure Python script — no Node setup needed.
+          # The generator also rewrites the skills badge in README.md, so a
+          # stale badge fails here the same way a stale catalog does (task.120).
           python3 skills/create-skill/scripts/generate_catalog.py
-          if ! git diff --quiet docs/reference/skill-catalog.md; then
-            echo "::error::Skill catalog is out of date."
+          if ! git diff --quiet docs/reference/skill-catalog.md README.md; then
+            echo "::error::Skill catalog or README skills badge is out of date."
             echo "Run 'npm run generate-catalog' locally and commit the diff."
-            git --no-pager diff docs/reference/skill-catalog.md | head -100
+            git --no-pager diff docs/reference/skill-catalog.md README.md | head -100
             exit 1
           fi
 

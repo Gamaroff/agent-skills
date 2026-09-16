@@ -41,7 +41,7 @@ Both scripts are byte-identical across `develop-story` and `develop-task` instal
 
 **Purpose**: durably checkpoint the running pipeline so it can be cleanly resumed after compaction.
 
-**Trigger condition** (inside the hook): `.claude/state/develop-pipeline.lock` exists. With no lock = no active pipeline = noop.
+**Trigger condition** (inside the hook): `.claude/state/develop-pipeline.lock` exists **and this invocation claims it** — the hook's first act is an atomic `mv` of the lock to `develop-pipeline.lock.pausing.<pid>`. With no lock = no active pipeline = noop; with a lock another concurrent invocation has already claimed = the same noop. So a hook registered twice (task.110: one `settings.json`, two path spellings of the same command) still produces one pause, not two. The winner sweeps any stale `.pausing.*` a killed run left behind.
 
 **Side effects** (best-effort, all wrapped in `... || true`):
 
@@ -120,10 +120,10 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 **What it does**:
 1. Locates the install path — tries `.agents/skills/develop-story/scripts/`, then `.agents/skills/develop-task/scripts/`, then `.claude/skills/develop-story/scripts/`, then `.claude/skills/develop-task/scripts/`. First match wins.
 2. Creates `.claude/settings.json` if missing (with `{}`)
-3. For each hook (`PreCompact`, `Stop`): checks if any existing `hooks[event][].hooks[].command` already matches the target command. If yes → skip. If no → append a new entry.
+3. For each hook (`PreCompact`, `Stop`): compares by hook **identity** — `scripts/<hook>.sh` with `bash`, the optional quoted `${CLAUDE_PROJECT_DIR}/`, the `.claude/skills/` or `.agents/skills/` root and the `develop-(story|task|bug)/` skill segment stripped (the three ship byte-identical hook scripts) — not by command string. First it **heals**: every existing `hooks[]` element with the same identity but a different spelling (the legacy bare-relative form, the quoted form under the other root, the same script under another of the three skills) is removed — element by element, so a matcher group shared with a consumer's own hook keeps that hook. Then, if an entry with that identity remains → skip; otherwise → append the canonical one.
 4. Uses `jq` for safe JSON manipulation; refuses to patch if existing settings.json is invalid JSON.
 
-**Idempotency**: re-running the script makes no changes if both hooks are already registered. Safe to wire into project setup scripts.
+**Idempotency**: re-running the script makes no changes if both hooks are already registered under any single spelling; a file carrying several spellings of the same hook — either root, quoted or bare-relative, any of the three `develop-*` skills — converges on one entry per event (task.120 — two spellings fire in parallel and paused twice). Safe to wire into project setup scripts.
 
 **Other config preserved**: the script only touches `.hooks.PreCompact` and `.hooks.Stop` arrays. Permissions, env vars, other hook events, and unrelated keys are untouched.
 
@@ -189,6 +189,7 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | Hook crashes future pipeline runs | Stale lock file left over | `rm -f .claude/state/develop-pipeline.lock` |
 | Installer refuses to write | Existing `settings.json` is invalid JSON | Fix or back up, re-run installer |
 | Hook fails with `No such file or directory` though the script exists | Legacy bare-relative `command` from a pre-`${CLAUDE_PROJECT_DIR}` install — resolved against the shell's cwd at hook-fire time, which breaks after any `cd` into a subdirectory | Re-run `bash .agents/skills/develop-story/scripts/install-hooks.sh` — it migrates the old entry to the cwd-independent `${CLAUDE_PROJECT_DIR}` form automatically |
+| Pause block appended twice, PR/issue commented twice | `settings.json` carries the same hook under two spellings (`.claude/skills/…` and `.agents/skills/…`), so the host fires it twice in parallel | Re-run the installer — it heals duplicate spellings to one entry per event. The hook itself now claims the lock atomically, so even a doubled registration pauses once |
 
 ---
 

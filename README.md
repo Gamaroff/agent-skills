@@ -2,9 +2,9 @@
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Validate Skills](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml/badge.svg)](https://github.com/Gamaroff/agent-skills/actions/workflows/validate.yml)
-[![Skills](https://img.shields.io/badge/skills-126-brightgreen)](#skill-catalog)
+[![Skills](https://img.shields.io/badge/skills-128-brightgreen)](#skill-catalog)
 
-A library of **AI coding agent skills** — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 126 skills covering development, story management, QA, PM, architecture, validation, and more.
+A library of **AI coding agent skills** — modular, self-contained packages that extend agent capabilities with specialized workflows, domain knowledge, and tooling. 128 skills covering development, story management, QA, PM, architecture, validation, and more.
 
 Skills live in `.agents/skills/` inside any project. Compatible agents (Claude Code and others) pick them up automatically at startup — no config needed. Skills activate by context match or explicit invocation.
 

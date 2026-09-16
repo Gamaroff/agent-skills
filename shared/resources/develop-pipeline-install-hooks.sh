@@ -6,6 +6,17 @@
 # Idempotent: re-running adds nothing if both hooks are already present.
 # Preserves all existing settings.json content (other hooks, permissions, env).
 #
+# Dedupes by hook IDENTITY, not by command string (task.120). The identity of a
+# hook is `scripts/<hook>.sh` — the same script whether it is reached
+# bare-relative or via "${CLAUDE_PROJECT_DIR}/", through .claude/skills or
+# .agents/skills (symlinks in this repo, a copy in a consumer), and under any of
+# the three develop-* skills that ship it (byte-identical wrappers). Every
+# spelling is one hook, and the host runs all of them in parallel: on task.110 a
+# settings file carried the PreCompact hook under two spellings, both fired, and
+# every pause side-effect was produced twice. Before adding an entry the
+# installer removes every OTHER spelling of the same identity, so a settings
+# file that already carries two converges on the one the resolver prefers.
+#
 # Auto-detects the install path in this order:
 #   1. .agents/skills/develop-story/scripts/   (setup-consumer.sh — most common)
 #   2. .agents/skills/develop-task/scripts/    (only develop-task installed)
@@ -116,23 +127,52 @@ if ! jq -e . "$SETTINGS_FILE" >/dev/null 2>&1; then
   exit 1
 fi
 
-# --- patch helper ------------------------------------------------------------
+# --- patch helpers -----------------------------------------------------------
 
-# Adds a hook entry for `event` running `cmd` if no existing entry's
-# `hooks[].command` already matches `cmd`. Idempotent.
+# hook_identity CMD — the part of a hook command that names OUR script, or the
+# command unchanged when it is not ours. One anchored match, not independent
+# strips: `bash `, the optional quoted "${CLAUDE_PROJECT_DIR}/", the optional
+# .claude/skills/ or .agents/skills/ root, then a REQUIRED develop-(story|task|bug)/
+# segment (the three ship byte-identical hook scripts), then the scripts/<hook>.sh
+# tail. A MATCH is returned in its own namespace — `develop-pipeline-hook:scripts/<hook>.sh`
+# — and anything else is returned verbatim, so the two can never be equal: a
+# consumer's own `bash scripts/on-stop.sh` (task.120 bug.4) or even a bare
+# `scripts/on-stop.sh` with no interpreter (bug.6) stays a different hook. The
+# prefix carries a colon, which a hook command never begins with. Add a spelling
+# here only with a fixture that carries it (develop-pipeline-install-hooks.test.sh).
+hook_identity() {
+  local id
+  id=$(printf '%s' "$1" | sed -nE 's#^(bash +)?("?\$\{CLAUDE_PROJECT_DIR\}/)?(\.(claude|agents)/skills/)?develop-(story|task|bug)/(scripts/[^"[:space:]]+)"?$#\6#p')
+  if [ -n "$id" ]; then printf 'develop-pipeline-hook:%s' "$id"; else printf '%s' "$1"; fi
+}
+
+# Adds a hook entry for `event` running `cmd` unless an existing entry already
+# runs the same hook IDENTITY (any spelling). Idempotent. Run heal_hook first so
+# the entry that satisfies this check is the canonical spelling, not a stray.
+#
+# Under --dry-run heal_hook writes nothing, so the file this reads still carries
+# the spellings heal_hook just said it "would remove". Those must not count as
+# "already registered" — a dry run that prints "removing X" and then "already
+# registered (X)" contradicts itself and hides the add a real run performs
+# (task.120 CR-1). Only an entry spelled exactly $cmd satisfies the check in
+# dry-run mode; in a real run heal_hook has already removed every other spelling,
+# so the two modes report the same outcome.
 patch_hook() {
   local event="$1"
   local cmd="$2"
 
-  local already
-  already=$(jq --arg event "$event" --arg cmd "$cmd" \
-    '[.hooks[$event][]?.hooks[]?.command] | index($cmd)' \
-    "$SETTINGS_FILE")
-
-  if [ "$already" != "null" ]; then
-    echo "  ✓ ${event}: already registered (${cmd})"
-    return 0
-  fi
+  local id existing
+  id=$(hook_identity "$cmd")
+  while IFS= read -r existing; do
+    [ -n "$existing" ] || continue
+    if $DRY_RUN && [ "$existing" != "$cmd" ]; then
+      continue
+    fi
+    if [ "$(hook_identity "$existing")" = "$id" ]; then
+      echo "  ✓ ${event}: already registered (${existing})"
+      return 0
+    fi
+  done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$SETTINGS_FILE")
 
   echo "  + ${event}: adding (${cmd})"
 
@@ -153,17 +193,30 @@ patch_hook() {
   fi
 }
 
-# Removes any hook entry under `event` whose `hooks[].command` matches `pattern`
-# (a jq regex), and prunes the event array if it becomes empty. Idempotent — does
-# nothing when no matching entry exists. Used to heal older installs that
-# registered the obsolete on-skill-return.sh PostToolUse hook.
+# Removes every `hooks[]` ELEMENT under `event` whose `command` matches `pattern`
+# (a jq regex); a matcher group is dropped only when its hooks[] becomes empty,
+# and the event key only when no group remains. Idempotent — does nothing when
+# no matching element exists. Used to heal older installs that registered the
+# obsolete on-skill-return.sh PostToolUse hook.
+#
+# A group with no hooks[] key, or an already-empty hooks[], is left exactly as it
+# is — there is nothing of ours in it to remove; iterating a null was how the heal
+# aborted mid-run (task.120 cycle 3), and pruning on "empty after" rather than
+# "emptied by this filter" dropped a consumer's pre-existing empty group whenever
+# a sibling matched (cycle 4). An element with no `command` (a prompt-type hook)
+# is read as "" so it neither matches nor errors. Element-level, not group-level
+# (task.120 CR-2 / bug.3): a hand-edited group
+# {matcher, hooks:[<ours>, <the consumer's own hook>]} is one group with two
+# hooks, and removing the GROUP deleted the consumer's hook along with ours —
+# silently, on every re-run. The strip list promises a consumer's unrelated hook
+# is never touched; that has to hold inside a shared group too.
 unpatch_hook() {
   local event="$1"
   local pattern="$2"
 
   local present
   present=$(jq --arg event "$event" --arg pat "$pattern" \
-    '[.hooks[$event][]? | select(any(.hooks[]?; .command | test($pat)))] | length' \
+    '[.hooks[$event][]?.hooks[]? | select((.command // "") | test($pat))] | length' \
     "$SETTINGS_FILE" 2>/dev/null || echo 0)
 
   if [ "${present:-0}" = "0" ]; then
@@ -175,9 +228,14 @@ unpatch_hook() {
   local tmp
   tmp=$(mktemp)
   jq --arg event "$event" --arg pat "$pattern" \
-    '(.hooks[$event]) |= map(select(any(.hooks[]?; .command | test($pat)) | not))
+    '(.hooks[$event]) |= map(
+        if .hooks == null then .
+        else (.hooks | length) as $before
+             | .hooks |= map(select((.command // "") | test($pat) | not))
+             | select($before == 0 or (.hooks | length) > 0)
+        end)
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
-    "$SETTINGS_FILE" > "$tmp"
+    "$SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; echo "Error: jq failed while editing ${SETTINGS_FILE} — file left unchanged." >&2; exit 1; }
 
   if $DRY_RUN; then
     echo "    (dry-run diff:)"
@@ -188,31 +246,38 @@ unpatch_hook() {
   fi
 }
 
-# Removes any hook entry under `event` whose `hooks[].command` exactly equals
-# `cmd` (no regex, so no escaping needed for literal path strings). Idempotent.
-# Used to migrate installs from the pre-CLAUDE_PROJECT_DIR bare-relative-path
-# commands, which would otherwise sit alongside the fixed entry and keep firing.
+# Removes every `hooks[]` ELEMENT under `event` whose `command` exactly equals
+# `cmd` (no regex, so no escaping needed for literal path strings); a group is
+# dropped only when its hooks[] becomes empty. Idempotent. Same element-level
+# rule as unpatch_hook, for the same reason (task.120 CR-2 / bug.3). The
+# optional third argument labels the removal; heal_hook is its one caller.
 unpatch_hook_exact() {
   local event="$1"
   local cmd="$2"
+  local label="${3:-removing legacy pre-CLAUDE_PROJECT_DIR hook}"
 
   local present
   present=$(jq --arg event "$event" --arg cmd "$cmd" \
-    '[.hooks[$event][]? | select(any(.hooks[]?; .command == $cmd))] | length' \
+    '[.hooks[$event][]?.hooks[]? | select(.command == $cmd)] | length' \
     "$SETTINGS_FILE" 2>/dev/null || echo 0)
 
   if [ "${present:-0}" = "0" ]; then
     return 0
   fi
 
-  echo "  - ${event}: removing legacy pre-CLAUDE_PROJECT_DIR hook (${cmd})"
+  echo "  - ${event}: ${label} (${cmd})"
 
   local tmp
   tmp=$(mktemp)
   jq --arg event "$event" --arg cmd "$cmd" \
-    '(.hooks[$event]) |= map(select(any(.hooks[]?; .command == $cmd) | not))
+    '(.hooks[$event]) |= map(
+        if .hooks == null then .
+        else (.hooks | length) as $before
+             | .hooks |= map(select(.command != $cmd))
+             | select($before == 0 or (.hooks | length) > 0)
+        end)
      | if (.hooks[$event] | length) == 0 then del(.hooks[$event]) else . end' \
-    "$SETTINGS_FILE" > "$tmp"
+    "$SETTINGS_FILE" > "$tmp" || { rm -f "$tmp"; echo "Error: jq failed while editing ${SETTINGS_FILE} — file left unchanged." >&2; exit 1; }
 
   if $DRY_RUN; then
     echo "    (dry-run diff:)"
@@ -221,6 +286,25 @@ unpatch_hook_exact() {
   else
     mv "$tmp" "$SETTINGS_FILE"
   fi
+}
+
+# heal_hook EVENT CMD — remove every entry under `event` whose command is the
+# same hook as `cmd` (identity equal) but not spelled exactly `cmd`. No prefix
+# case, no regex, no escaping: the bare-relative legacy form, the
+# "${CLAUDE_PROJECT_DIR}"-quoted form under either root — each is one more
+# spelling of the identity, and each converges on the spelling the resolver
+# chose. Idempotent: a file that carries only `cmd` is untouched.
+heal_hook() {
+  local event="$1"
+  local cmd="$2"
+  local id existing
+  id=$(hook_identity "$cmd")
+  while IFS= read -r existing; do
+    [ -n "$existing" ] || continue
+    [ "$existing" = "$cmd" ] && continue
+    [ "$(hook_identity "$existing")" = "$id" ] || continue
+    unpatch_hook_exact "$event" "$existing" "removing duplicate spelling"
+  done < <(jq -r --arg event "$event" '.hooks[$event][]?.hooks[]?.command // empty' "$SETTINGS_FILE")
 }
 
 # --- run ---------------------------------------------------------------------
@@ -231,15 +315,17 @@ echo "  Hook base:     ${BASE}"
 $DRY_RUN && echo "  Mode:          DRY RUN (no writes)"
 echo ""
 
-# Migration: strip legacy bare-relative-path hook commands (pre-CLAUDE_PROJECT_DIR
-# fix) for every candidate base, so re-running this installer replaces the old
-# broken entry instead of adding a second one that keeps erroring alongside it.
-for c in "${CANDIDATES[@]}"; do
-  unpatch_hook_exact "PreCompact" "bash ${c}/on-precompact.sh"
-  unpatch_hook_exact "Stop"       "bash ${c}/on-stop.sh"
-done
-
+# Heal, then add. heal_hook removes every other spelling of each hook — the
+# legacy bare-relative form (pre-CLAUDE_PROJECT_DIR fix), the quoted form under
+# the other root, both at once — so re-running this installer converges a
+# settings file on ONE entry per event instead of adding a second that fires
+# alongside the first. Under --dry-run each removal prints its diff and writes
+# nothing; patch_hook then ignores the spellings heal_hook would have removed,
+# so the dry run reports the same "removing X / adding canonical" sequence a
+# real run performs (the add's diff is shown against the unhealed file).
+heal_hook  "PreCompact"  "$PRECOMPACT_CMD"
 patch_hook "PreCompact"  "$PRECOMPACT_CMD"
+heal_hook  "Stop"        "$STOP_CMD"
 patch_hook "Stop"        "$STOP_CMD"
 
 # Migration: strip the obsolete PostToolUse/on-skill-return.sh hook from older installs.
@@ -253,6 +339,7 @@ else
   echo "   • PreCompact:  graceful pause on context compaction"
   echo "   • Stop:        forced continuation when pipeline tries to stop mid-run"
   echo ""
-  echo "   (Any obsolete PostToolUse/on-skill-return.sh hook from older installs is removed.)"
+  echo "   (Any obsolete PostToolUse/on-skill-return.sh hook from older installs is removed,"
+  echo "    and any duplicate spelling of the same hook is healed to one entry per event.)"
   echo "   Re-running this script is safe — it skips entries that already exist."
 fi
