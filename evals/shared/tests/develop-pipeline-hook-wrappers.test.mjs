@@ -158,7 +158,11 @@ for (const { pipeline, scriptsDir, wrappers } of pipelines) {
 
     test(`${label} — argv, stdin and exit status pass through the exec`, (t) => {
       const target = execTargetOf(wrapperPath);
-      if (target === null) t.skip("not a delegating wrapper — covered above");
+      // `t.skip()` marks the test skipped but does NOT stop the function —
+      // without the return, execution continued into makeSandbox(..., null)
+      // and the "skip" was reported as a failure (QA cycle 1, CR-1).
+      if (target === null)
+        return t.skip("not a delegating wrapper — covered above");
       const sbWrapper = makeSandbox(t, pipeline, wrapperPath, wrapper, target);
 
       const args = ["--skill", pipeline, "an argument with spaces"];

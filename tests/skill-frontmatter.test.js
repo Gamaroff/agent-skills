@@ -209,6 +209,33 @@ test("validator accepts a description of exactly 1,024 chars", () => {
   );
 });
 
+test("validator accepts a block-scalar description of exactly 1,024 chars", () => {
+  // The cap is measured on the parsed, whitespace-normalised value — a folded
+  // scalar's indicator and indentation do not count. This is the fixture the
+  // corpus check below must agree with the validator on.
+  const desc = descriptionOfLength(1024);
+  const dir = fixtureSkill(
+    "at-cap-folded",
+    [
+      "---",
+      "name: at-cap-folded",
+      "description: >",
+      `  ${desc.slice(0, 500)}`,
+      `  ${desc.slice(500)}`,
+      "---",
+      "",
+      "# At (folded)",
+      "",
+    ].join("\n"),
+  );
+  const res = python([VALIDATOR, dir]);
+  assert.equal(
+    res.status,
+    0,
+    `validator rejected a folded description at the cap: ${res.stdout}${res.stderr}`,
+  );
+});
+
 test("every SKILL.md description is within the 1,024-char cap", () => {
   // The corpus-level assertion: the fixture tests prove the check works; this
   // proves the tree satisfies it, so the next skill to drift over is caught
@@ -222,6 +249,11 @@ test("every SKILL.md description is within the 1,024-char cap", () => {
     const m = fm.match(/^description:\s*([\s\S]*?)\n(?=[A-Za-z_-]+:|---)/m);
     if (!m) continue;
     let d = m[1].trim();
+    // A block scalar (`description: >` / `|`, optionally with a chomping
+    // indicator) captures its indicator here; the validator measures the
+    // parsed value, so strip it or the two disagree by two characters on every
+    // block-scalar skill (QA cycle 1, CR-2 — six skills measured 2 over).
+    d = d.replace(/^[>|][+-]?\s*/, "");
     if (/^'.*'$/s.test(d)) d = d.slice(1, -1).replace(/''/g, "'");
     else if (/^".*"$/s.test(d)) d = d.slice(1, -1);
     const n = d.split(/\s+/).join(" ").length;

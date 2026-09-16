@@ -246,6 +246,8 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 | 2026-09-16 | 1.1     | Review (8/10): ci-gate-parity conflict surfaced and resolved by widening the test; wrapper-test claim corrected (no pipeline's wrappers were tested); cap provenance pinned to the Agent Skills spec; lint:shell moved to a script with the workflow's guards; check:generated added | review-task |
 | 2026-09-16 |         | Status → ready-for-development | review-task |
 | 2026-09-16 |         | Implemented — 12 files, 25 tests | develop |
+| 2026-09-16 |         | QA gate CONCERNS (90/100) — 3 LOW findings (skip fall-through, corpus over-count on block scalars, missing-script guard reads one job); 2 advisories | qa-task |
+| 2026-09-16 |         | QA findings fixed — CR-1 return after skip, CR-2 corpus strips block-scalar indicator (+ folded boundary fixture), CR-3 missing-script guard reads every green job, CR-5 jobSteps tidy; 1 iteration | qa-fix |
 
 ---
 
@@ -259,6 +261,29 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 - [x] `quick_validate.py` enforces the 1,024-char description cap; develop-story's trimmed
 ### Phase 3: docs
 - [x] `docs/contributing/releases.md` checklist and `docs/contributing/evals/README.md` name the aggregate
+
+---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-16 (cycle 1)
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.111.qa.1.local-ci-parity.md](./task.111.qa.1.local-ci-parity.md)
+- **Gate File**: [task.111.gate.1.local-ci-parity.yml](./task.111.gate.1.local-ci-parity.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 25 new (parity 12 incl. 3 new, wrappers 19, frontmatter cap 3) + targeted lanes; 7 boundary probes
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0 (3 LOW)
+- **NFR Status**: Security: PASS (measured, 7 probes), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+Three LOW defects in the new tests, each verified by execution: `t.skip` fall-through in the wrapper pass-through test (CR-1); the corpus cap test over-counts block-scalar descriptions by 2 (CR-2); the parity test's missing-script guard still reads test.yml only — a typo'd `npm run` step in validate.yml stays green (CR-3). Advisory: `check:generated` false-positives on an unrelated dirty README (CR-4); `jobSteps()` tidy-up (CR-5).
 
 ---
 

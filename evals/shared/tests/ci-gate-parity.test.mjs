@@ -246,17 +246,18 @@ function jobSteps({ workflow: path, job }) {
       name = n[1].replace(/^['"]|['"]$/g, "");
       continue;
     }
-    // A `uses:` step (checkout, setup-node) resets the name so it is never
-    // attributed to a later bare `run:`.
-    if (/^\s*-\s*uses:/.test(line)) {
+    // Any new list item — `- uses:`, `- run:`, `- env:` — starts a new step, so
+    // a name can never be attributed to a later step that did not declare one.
+    // `- name:` was matched above and has already set the new name.
+    if (/^\s*-\s/.test(line)) {
       name = "";
-      continue;
     }
-    const r = line.match(/^\s*run:\s*(.*?)\s*$/);
+    const r = line.match(/^\s*-?\s*run:\s*(.*?)\s*$/);
     if (r) {
-      // `run: |` is a block scalar; the command text is on the following lines
-      // and the script it invokes (if any) is the first non-comment line.
-      steps.push({ name, run: r[1] === "|" ? "" : r[1], block: r[1] === "|" });
+      // `run: |` is a block scalar whose commands are on the following lines;
+      // such a step is classified by its name only (LANE_TWINS / SETUP_STEPS /
+      // EXCLUDED_STEPS), never by its body, so the body is not read here.
+      steps.push({ name, run: r[1] === "|" ? "" : r[1] });
     }
   }
   return steps;
@@ -404,16 +405,30 @@ test("green jobs and the `ci` composite run exactly the same commands", () => {
   }
 });
 
-test("every npm script the workflow invokes actually exists", () => {
+test("every npm script any green job invokes actually exists", () => {
   // Without this, an `npm run <typo>` step is filtered out of the parity
-  // comparison and the composite still matches — the workflow would go red in
-  // CI while the test that exists to predict CI stayed green.
-  const missing = workflowInvocations().filter((name) => !(name in scripts));
+  // comparison (greenScripts() keeps only names package.json defines) and the
+  // composite still matches — the workflow would go red in CI while the test
+  // that exists to predict CI stayed green. Read every green job, not only
+  // test.yml: a typo'd step in validate.yml stayed green here until QA cycle 1
+  // appended one and watched all twelve tests pass (CR-3).
+  const missing = [];
+  for (const g of GREEN_JOBS) {
+    for (const step of jobSteps(g) ?? []) {
+      const c = classify(step);
+      if (c.kind === "script" && !(c.script in scripts))
+        missing.push(`${g.workflow}:${g.job} → ${c.script}`);
+    }
+  }
   assert.deepEqual(
     missing,
     [],
     `workflow invokes npm script(s) absent from package.json: ${missing.join(", ")}`,
   );
+  // The test.yml-only reading is kept as a subset check so the older, narrower
+  // guard cannot silently disappear if GREEN_JOBS is ever reduced.
+  const missingInTestYml = workflowInvocations().filter((n) => !(n in scripts));
+  assert.deepEqual(missingInTestYml, []);
 });
 
 test("CI still names each tier separately, so a red build says which broke", () => {
