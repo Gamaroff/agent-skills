@@ -143,6 +143,14 @@ hook_identity() {
 # Adds a hook entry for `event` running `cmd` unless an existing entry already
 # runs the same hook IDENTITY (any spelling). Idempotent. Run heal_hook first so
 # the entry that satisfies this check is the canonical spelling, not a stray.
+#
+# Under --dry-run heal_hook writes nothing, so the file this reads still carries
+# the spellings heal_hook just said it "would remove". Those must not count as
+# "already registered" — a dry run that prints "removing X" and then "already
+# registered (X)" contradicts itself and hides the add a real run performs
+# (task.120 CR-1). Only an entry spelled exactly $cmd satisfies the check in
+# dry-run mode; in a real run heal_hook has already removed every other spelling,
+# so the two modes report the same outcome.
 patch_hook() {
   local event="$1"
   local cmd="$2"
@@ -151,6 +159,9 @@ patch_hook() {
   id=$(hook_identity "$cmd")
   while IFS= read -r existing; do
     [ -n "$existing" ] || continue
+    if $DRY_RUN && [ "$existing" != "$cmd" ]; then
+      continue
+    fi
     if [ "$(hook_identity "$existing")" = "$id" ]; then
       echo "  ✓ ${event}: already registered (${existing})"
       return 0
@@ -278,7 +289,9 @@ echo ""
 # the other root, both at once — so re-running this installer converges a
 # settings file on ONE entry per event instead of adding a second that fires
 # alongside the first. Under --dry-run each removal prints its diff and writes
-# nothing, so the subsequent add is shown against the unhealed file.
+# nothing; patch_hook then ignores the spellings heal_hook would have removed,
+# so the dry run reports the same "removing X / adding canonical" sequence a
+# real run performs (the add's diff is shown against the unhealed file).
 heal_hook  "PreCompact"  "$PRECOMPACT_CMD"
 patch_hook "PreCompact"  "$PRECOMPACT_CMD"
 heal_hook  "Stop"        "$STOP_CMD"

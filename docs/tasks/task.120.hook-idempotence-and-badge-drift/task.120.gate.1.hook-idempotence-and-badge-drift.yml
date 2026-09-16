@@ -1,0 +1,69 @@
+schema: 1
+task: 'task.120.hook-idempotence-and-badge-drift'
+task_title: 'The pause hook, the hook installer and the README badge each rely on a human remembering: make them idempotent, self-healing and generated'
+gate: CONCERNS
+status_reason: 'All three mechanisms are present, mutation-proven and green under the full fast gate; two open findings — a self-contradicting --dry-run report in the installer (low) and a second hand-typed skill count in README.md prose that the generator does not own (medium) — need a fix cycle before acceptance.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T09:40:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'shared/resources/develop-pipeline-install-hooks.sh'
+    finding: 'Under --dry-run, heal_hook prints "removing duplicate spelling (X)" and then patch_hook — checking identities against the unhealed file — prints "already registered (X)" for the same entry, so the canonical add a real run performs is never shown and the two lines contradict each other; scripts/setup-consumer.sh _patch_hook mirrors the gap, and the run-block comment claiming the add "is shown against the unhealed file" is wrong.'
+    suggested_action: 'In patch_hook (and _patch_hook) treat an identity-equal entry whose command is not exactly $cmd as absent when DRY_RUN is true — i.e. skip the entries heal_hook would have removed — so dry-run reports "would add" for the canonical spelling; fix the comment; extend the dry-run test scenario to assert the "adding" line appears.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-1'
+    severity: medium
+    file: 'README.md'
+    finding: 'README.md:7 still hand-states "126 skills covering …" two lines below the now-generated skills-128 badge, so the README contradicts itself and the prose count will drift exactly as the badge did — the defect class this task closes, in the same file (bug report task.120.bug.1).'
+    suggested_action: 'Have update_readme_badge() (or a sibling called from main) also rewrite the "<N> skills covering" prose count from the same total, anchored on that literal phrase; add a generator test asserting both are rewritten and an unrelated number is not; regenerate and commit README.md.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 25
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 12
+    notes: 'Boundary: hook_identity() — its equality decides whether a consumer settings entry is deleted. 12 hostile candidates executed (empty, bare bash, double-space, unquoted ${CLAUDE_PROJECT_DIR}, sh instead of bash, ../ traversal, trailing args, trailing "&& rm -rf /", ./-prefixed root, unicode skill name, node script, no interpreter): no input collapses onto a clean <skill>/scripts/<hook>.sh identity — every extra token or path segment is retained in the identity, so an injected or traversal spelling can never match and be removed as a "duplicate". The hook claim uses mv on a caller-supplied PIPELINE_LOCK path; no new secret handling; gh calls unchanged in shape and gated by tracker_write.'
+  performance:
+    status: PASS
+    notes: 'Hook wall-clock 0.12–0.13 s across 3 runs (no PR/issue path) — one mv replaces one test -f; generate_catalog.py 0.16 s with and without --readme.'
+  reliability:
+    status: PASS
+    notes: 'Concurrency test forces a real overlap (git shim sleeps 1 s inside the winner) and holds: one snapshot, one report block, one PR call, one issue call, loser exits 0 with the empty signal, no lock or claim left behind. Stale claim swept. All three mutation proofs reddened exactly their tests under QA re-execution. Advisory (CR-3, medium confidence): a harness kill in the microsecond window between the claiming mv and write_pause_snapshot leaves the state only under .pausing.<pid>, which no resume path reads — recorded under recommendations.future, not gating.'
+  maintainability:
+    status: PASS
+    notes: 'One identity rule replaces two string-matching healers; the wizard mirror is labelled as a mirror; pause/hooks docs, configuration.md and CHANGELOG updated; two static #2e assertions re-pointed at the mechanism and assert the retired loop is gone. shellcheck clean, prettier clean, bundle --check 0 problems.'
+
+recommendations:
+  immediate:
+    - action: 'Fix the --dry-run self-contradiction in patch_hook / _patch_hook and extend the dry-run test (CR-1)'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh', 'scripts/setup-consumer.sh', 'shared/resources/develop-pipeline-install-hooks.test.sh']
+    - action: 'Generate the README prose skill count from the same total as the badge, or remove the number (QA-1 / bug.1)'
+      refs: ['skills/create-skill/scripts/generate_catalog.py', 'README.md', 'tests/generate-catalog-badge.test.js']
+  future:
+    - action: 'CR-2 (medium confidence): hook_identity keeps the <skill>/ segment, so a consumer whose resolved BASE moves between develop-task and develop-story across installer runs ends with two live entries per event; consider normalising the three hook-bearing skill names to one identity — a deliberate widening of the strip list the task capped at three prefixes, so it needs its own fixture and decision'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh']
+    - action: 'CR-3 (medium confidence): promote a stale .pausing.* claim to the snapshot when none exists instead of deleting it, or teach the Phase 0b resume detector to read .pausing.* — closes the mv→snapshot kill window'
+      refs: ['shared/resources/develop-pipeline-on-precompact.sh']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 and QA-1 fixed and re-reviewed'

@@ -72,12 +72,46 @@ test("a stale badge is rewritten to the catalog count", (t) => {
     after.includes("Prose that says skills-126- must stay."),
     "only the shields.io badge is rewritten — prose is never touched",
   );
-  assert.match(r.stdout, /README badge → skills-3/);
+  assert.match(r.stdout, /README badge → 3/);
   // The catalog is still written with the same total.
   assert.match(
     fs.readFileSync(f.catalog, "utf8"),
     /Categorized index of all 3 skills/,
   );
+});
+
+test("the prose skill count beside the badge is generated too; unrelated numbers are not", (t) => {
+  // task.120 QA-1: README.md:7 read "126 skills covering …" two lines below a
+  // badge that had just been regenerated to 128. Both counts come from `total`.
+  const f = makeFixture(t, 4);
+  const readme = path.join(f.dir, "README.md");
+  fs.writeFileSync(
+    readme,
+    `${BADGE_LINE(126)}\n\nA library of skills. 126 skills covering QA and more. Tested on 3 platforms since 2024.\n`,
+  );
+  const r = runGenerator([f.skills, f.catalog, "--readme", readme]);
+  assert.equal(r.status, 0, r.stderr);
+  const after = fs.readFileSync(readme, "utf8");
+  assert.ok(after.includes(BADGE_LINE(4)), `badge not rewritten:\n${after}`);
+  assert.ok(
+    after.includes("4 skills covering QA"),
+    `prose count not rewritten:\n${after}`,
+  );
+  assert.ok(
+    after.includes("Tested on 3 platforms since 2024."),
+    "only the '<N> skills covering' phrase is rewritten — other numbers are untouched",
+  );
+  assert.match(r.stdout, /README badge \+ prose count → 4/);
+});
+
+test("a README with the badge but no prose count is rewritten at the badge only", (t) => {
+  const f = makeFixture(t, 2);
+  const readme = path.join(f.dir, "README.md");
+  fs.writeFileSync(readme, `${BADGE_LINE(9)}\n\nNo count sentence here.\n`);
+  const r = runGenerator([f.skills, f.catalog, "--readme", readme]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(fs.readFileSync(readme, "utf8").includes(BADGE_LINE(2)));
+  assert.match(r.stdout, /README badge → 2/);
 });
 
 test("a README without the badge line is left untouched, with a warning, exit 0", (t) => {

@@ -158,15 +158,22 @@ def truncate(text: str, max_words: int = 25) -> str:
 # only the count between `skills-` and the next `-` is generated. Anchored on the
 # shields.io path so a prose mention of "skills-126" elsewhere is never touched.
 BADGE = re.compile(r"(img\.shields\.io/badge/skills-)\d+(-)")
+# The README's own sentence two lines below the badge — "128 skills covering …" —
+# is a second hand-typed count and drifted exactly as the badge did (task.120
+# QA-1). Anchored on the literal phrase so no other number in the file is touched;
+# a README without the sentence simply has nothing to rewrite here.
+PROSE_COUNT = re.compile(r"\b\d+( skills covering\b)")
 
 
 def update_readme_badge(readme: Path, total: int) -> bool:
-    """Rewrite the skills-count badge in `readme` to `total`.
+    """Rewrite every generated skill count in `readme` to `total`.
 
-    Returns True when the file was changed. A README without the badge line is a
-    warning, never an error: a consumer that generates its own README, or a
-    fork that dropped the badge, must not be blocked from regenerating the
-    catalog by a line it does not have.
+    Two sites: the shields.io badge (required — its absence is a warning) and the
+    "<N> skills covering" sentence (optional — rewritten when present). Returns
+    True when the file was changed. A README without the badge line is a warning,
+    never an error: a consumer that generates its own README, or a fork that
+    dropped the badge, must not be blocked from regenerating the catalog by a
+    line it does not have.
     """
     if not readme.exists():
         print(f"⚠️  {readme}: not found — badge not updated", file=sys.stderr)
@@ -176,11 +183,13 @@ def update_readme_badge(readme: Path, total: int) -> bool:
     if n == 0:
         print(f"⚠️  {readme}: no skills badge line found — left untouched", file=sys.stderr)
         return False
+    new, n_prose = PROSE_COUNT.subn(rf"{total}\g<1>", new, count=1)
     if new == text:
         print(f"✅ README badge already reads skills-{total}")
         return False
     readme.write_text(new)
-    print(f"✅ README badge → skills-{total} ({readme})")
+    where = "badge + prose count" if n_prose else "badge"
+    print(f"✅ README {where} → {total} ({readme})")
     return True
 
 

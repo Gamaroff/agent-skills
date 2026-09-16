@@ -200,13 +200,13 @@ None — API stable. The hook's inputs (the lock file, the environment), its out
 
 1. ✅ `shared/resources/develop-pipeline-on-precompact.sh` — atomic claim; marked, idempotent PR comment
 2. ✅ `shared/resources/develop-pipeline-install-hooks.sh` — identity dedupe; healer for the other spelling
-3. ✅ `skills/create-skill/scripts/generate_catalog.py` — argparse CLI; badge rewrite
+3. ✅ `skills/create-skill/scripts/generate_catalog.py` — argparse CLI; badge rewrite; the "<N> skills covering" prose count rewritten from the same total (QA cycle 1, bug.1)
 
 ### Files to Modify (Tests)
 
 4. ✅ `shared/resources/develop-pipeline-on-precompact.test.sh` — concurrency and stale-claim cases
 5. ✅ `shared/resources/develop-pipeline-install-hooks.test.sh` — new; both-spellings → one; idempotent
-6. ✅ `tests/generate-catalog-badge.test.js` — the generator test for the badge rewrite (`node --test`, runs the script against a fixture skills tree + README; the repo has no Python test harness)
+6. ✅ `tests/generate-catalog-badge.test.js` — the generator test for the badge rewrite (`node --test`, runs the script against a fixture skills tree + README; the repo has no Python test harness); QA cycle 1 added the prose-count cases
 7. ✅ `package.json` — the new shell suite added to the `bash …` chain (`tests/*.test.js` is already a glob, so the generator test needs no entry)
 7a. ✅ `evals/develop-story/protocol/stall-and-cleanup-protocol.test.mjs` — the static `#2e` assertions re-pointed from the retired `unpatch_hook_exact "bash ${c}/…"` loop to the identity healer (`hook_identity`, `heal_hook`), and to the wizard's mirrored `_hook_identity` / `_heal_hook`
 
@@ -344,6 +344,8 @@ None.
 | 2026-09-16 | 1.1 | Review passed (9/10) — 3 Important + 5 Optional fixes applied: identity-based installer healer (retires unpatch_hook_exact loop), README.md in validate.yml triggers, argparse for generate_catalog.py, stale-claim sweep, re-pause semantics; ready for development | review-task |
 | 2026-09-16 |  | Status → ready-for-development | review-task |
 | 2026-09-16 |  | Implemented — 28 files (3 sources, 3 test suites, wizard mirror, 4 docs, CHANGELOG, bundled copies), 14 new tests (3 hook scenarios, 6 installer, 5 generator); every mechanism mutation-proven | develop |
+| 2026-09-16 |  | QA gate CONCERNS (90/100) — 2 findings: README prose count not generated (MEDIUM), installer --dry-run self-contradiction (LOW); 2 advisories | qa-task |
+| 2026-09-16 |  | QA findings fixed — QA-1 README prose count generated (bug.1 Ready for QA), CR-1 dry-run reporting; 1 iteration, awaiting re-review | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -366,6 +368,32 @@ None.
 - [x] Generator test; bundle clean
 
 ---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-16
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.120.qa.1.hook-idempotence-and-badge-drift.md](./task.120.qa.1.hook-idempotence-and-badge-drift.md)
+- **Gate File**: [task.120.gate.1.hook-idempotence-and-badge-drift.yml](./task.120.gate.1.hook-idempotence-and-badge-drift.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3309 (`npm run ci:fast`) incl. 14 hook, 6 installer, 5 generator scenarios; 3 mutation proofs re-executed; 12 boundary probes
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0 (1 MEDIUM, 1 LOW open)
+- **NFR Status**: Security: PASS (measured, 12 probes), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- **QA-1 (MEDIUM)** — `README.md:7` still hand-states "126 skills covering …" beside the generated `skills-128` badge ([bug.1](./task.120.bug.1.readme-prose-skill-count-drifts.md)) — **fixed cycle 1**: the generator now rewrites the prose count from the same total; bug.1 Ready for QA
+- **CR-1 (LOW)** — installer `--dry-run` prints "removing duplicate spelling (X)" then "already registered (X)" for the same entry; the canonical add is never shown — **fixed cycle 1**: `patch_hook` (and the wizard's `_patch_hook`) ignore non-exact spellings under dry-run; scenario 4b added
+
+### Bug Reports
+- [bug.1: README prose skill count drifts](./task.120.bug.1.readme-prose-skill-count-drifts.md) — ✅ Ready for QA — Priority: P2 (Fixed 2026-09-16)
+- Advisory: CR-2 (cross-skill identity when BASE moves between runs), CR-3 (mv→snapshot kill window) — recorded in the gate's `recommendations.future`
 
 ## References
 

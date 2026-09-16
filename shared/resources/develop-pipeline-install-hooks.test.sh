@@ -19,7 +19,10 @@
 #   2. Everything that is not one of the two hooks (permissions, env, the
 #      PostToolUse hook) is byte-identical before and after.
 #   3. A second run is a no-op — the file does not change at all.
-#   4. --dry-run prints the prune and changes nothing.
+#   4. --dry-run prints the prune and changes nothing; "already registered" names only
+#      the canonical entry. 4b: with only a non-canonical spelling present, dry-run
+#      shows "removing X" then "adding canonical" — the same sequence as a real run
+#      (task.120 CR-1).
 #   5. A settings file that already carries only the canonical spelling is
 #      untouched (no spurious "removing").
 #   6. hook_identity never collapses two DIFFERENT scripts: an on-stop.sh entry
@@ -144,8 +147,44 @@ elif ! grep -q 'removing duplicate spelling' <<<"$OUT4"; then
   fail "dry-run: prune is shown" "$OUT4"
 elif ! grep -q -- '^    -.*\.claude/skills/develop-story/scripts/on-precompact\.sh' <<<"$OUT4"; then
   fail "dry-run: diff shows the .claude spelling being removed" "$OUT4"
+elif [ "$(grep -c 'already registered' <<<"$OUT4")" != "2" ]; then
+  # The fixture carries the canonical spelling too, so both events are correctly
+  # "already registered" — by the canonical entry, never by a spelling the dry run
+  # just said it would remove (task.120 CR-1).
+  fail "dry-run: 'already registered' reported once per event, for the canonical entry" "$OUT4"
+elif grep 'already registered' <<<"$OUT4" | grep -qv 'agents/skills/develop-story'; then
+  fail "dry-run: 'already registered' never names a spelling that is being removed" "$(grep 'already registered' <<<"$OUT4")"
 else
-  pass "dry-run: prune shown with a diff, settings file untouched"
+  pass "dry-run: prune shown with a diff, settings file untouched, 'already registered' names only the canonical entry"
+fi
+
+# ── Scenario 4b: --dry-run with ONLY a non-canonical spelling → "adding" shown ─
+# The CR-1 shape: heal_hook says "removing X", and before the fix patch_hook then
+# said "already registered (X)" for the same entry, hiding the add a real run
+# performs. A dry run must report the same sequence as the real run.
+P4B="$TMPDIR_TEST/p4b"; make_project "$P4B"
+cat > "$P4B/.claude/settings.json" <<'JSON'
+{
+  "hooks": {
+    "PreCompact": [ { "matcher": "*", "hooks": [ { "type": "command", "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/skills/develop-story/scripts/on-precompact.sh\"" } ] } ],
+    "Stop":       [ { "matcher": "*", "hooks": [ { "type": "command", "command": "bash .claude/skills/develop-story/scripts/on-stop.sh" } ] } ]
+  }
+}
+JSON
+cp "$P4B/.claude/settings.json" "$TMPDIR_TEST/p4b-before.json"
+OUT4B=$(run_installer "$P4B" --dry-run 2>&1); RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "dry-run (non-canonical only): exits 0" "rc=$RC"
+elif ! cmp -s "$P4B/.claude/settings.json" "$TMPDIR_TEST/p4b-before.json"; then
+  fail "dry-run (non-canonical only): file unchanged" "file was modified"
+elif grep -q 'already registered' <<<"$OUT4B"; then
+  fail "dry-run (non-canonical only): a spelling being removed is never 'already registered'" "$(grep 'already registered' <<<"$OUT4B")"
+elif [ "$(grep -c '^  + .*adding' <<<"$OUT4B")" != "2" ]; then
+  fail "dry-run (non-canonical only): the canonical add is shown for both events" "$OUT4B"
+elif [ "$(grep -c 'removing duplicate spelling' <<<"$OUT4B")" != "2" ]; then
+  fail "dry-run (non-canonical only): both removals shown" "$OUT4B"
+else
+  pass "dry-run (non-canonical only): 'removing X' then 'adding canonical' for both events — same sequence as a real run; file untouched"
 fi
 
 # ── Scenario 5: already-canonical file is left alone ─────────────────────────

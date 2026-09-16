@@ -1621,13 +1621,18 @@ _hook_identity() {
 }
 
 # Patch a single hook event into SETTINGS_FILE unless an entry with the same
-# hook IDENTITY (any spelling) is already there. Idempotent.
+# hook IDENTITY (any spelling) is already there. Idempotent. Under --dry-run
+# _heal_hook writes nothing, so a spelling it "would remove" must not read as
+# already registered here — only an exact match does (task.120 CR-1).
 _patch_hook() {
   local event="$1" cmd="$2"
   local id existing
   id=$(_hook_identity "$cmd")
   while IFS= read -r existing; do
     [[ -n "$existing" ]] || continue
+    if [[ "$DRY_RUN" == true && "$existing" != "$cmd" ]]; then
+      continue
+    fi
     if [[ "$(_hook_identity "$existing")" == "$id" ]]; then
       info "  ${event}: already registered"
       return 0
