@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-12
-**Next Available Task Number:** **120**
+**Next Available Task Number:** **121**
 
 ## How to use
 
@@ -149,7 +149,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 107 | [The bug-fix runbook documents a pipeline that has been superseded twice](task.107.bug-runbook-rewrite/task.107.bug-runbook-rewrite.md) | accepted              | documentation | Medium | 2026-09-10 | — | — |
 | 108 | [The bundler copies depth-relative links verbatim, so every bundled references/ file carries broken links](task.108.bundler-rewrites-relative-links/task.108.bundler-rewrites-relative-links.md) | accepted | infrastructure | High | 2026-09-12 | — | — |
 | 109 | [sync-jira-story's skipped-but-transitioned write gate has no run()-level test](task.109.sync-jira-story-transition-only-write-test/task.109.sync-jira-story-transition-only-write-test.md) | accepted | testing | Medium | 2026-09-12 | [#405](https://github.com/Gamaroff/agent-skills/issues/405) | PR #406 merged |
-| 110 | [A session-handoff skill that writes the handoff and re-measures it on read](task.110.session-handoff-skill/task.110.session-handoff-skill.md) | accepted | other | Medium | 2026-09-12 | — | — |
+| 110 | [A session-handoff skill that writes the handoff and re-measures it on read](task.110.session-handoff-skill/task.110.session-handoff-skill.md) | accepted | other | Medium | 2026-09-12 | [#407](https://github.com/Gamaroff/agent-skills/issues/407) | PR #408 merged |
 | 111 | [One local command that runs every CI lane, and two coverage gaps the sweep found](task.111.local-ci-parity/task.111.local-ci-parity.md) | planned | infrastructure | Medium | 2026-09-12 | — | — |
 | 112 | [The hotfix runbook predates /develop-bug's hotfix model and never mentions it](task.112.hotfix-runbook-rewrite/task.112.hotfix-runbook-rewrite.md) | planned | documentation | Medium | 2026-09-12 | — | — |
 | 113 | [develop-next's Step 4, merge gate and Step 1→2 signal still assume a roadmap-sourced, PASS-gated item](task.113.develop-next-registry-bookkeeping/task.113.develop-next-registry-bookkeeping.md) | accepted | refactoring | High | 2026-09-12 | [#397](https://github.com/Gamaroff/agent-skills/issues/397) | Observation review 2026-09-12: obs #13, #30, #31, #34, #35, #46, #52, #53 · PR #398 merged |
@@ -159,6 +159,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 117 | [The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs](task.117.card-preflight-heading-only/task.117.card-preflight-heading-only.md) | planned | refactoring | Medium | 2026-09-12 | — | Observation review 2026-09-12: obs #43, #49 |
 | 118 | [review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted](task.118.probes-executed-from-engine/task.118.probes-executed-from-engine.md) | planned | refactoring | Medium | 2026-09-12 | — | Observation review 2026-09-12: obs #10 |
 | 119 | [Four authoring rules the corpus already obeys by accident: positional tokens in fenced bash, hardcoded shell matrices, comment paths the bundler follows, and how many task docs a change is](task.119.create-skill-authoring-guards/task.119.create-skill-authoring-guards.md) | planned | documentation | Medium | 2026-09-12 | — | Observation review 2026-09-12: obs #23, #24, #36, #39 |
+| 120 | [The pause hook, the hook installer and the README badge each rely on a human remembering: make them idempotent, self-healing and generated](task.120.hook-idempotence-and-badge-drift/task.120.hook-idempotence-and-badge-drift.md) | planned | refactoring | Medium | 2026-09-16 | — | task.110 finalise: obs #101; README badge drift |
 
 - **Tasks 104-106 close the stakeholder-readability gap in tracker comments**, filed 2026-09-09 after stakeholders reported that Jira and GitHub issue comments are unreadable to a non-technical reader. One shippable unit each, in dependency order: **104** builds the primitive (a per-stage catalogue of plain-language lead paragraphs, rendered by `tracker-comment.js` from the `--stage` every call site already passes — so all 22 sites gain a lead with no call-site edit); **105** feeds real values into the lead's slots and converts the seven sites that post a bare `gh issue comment` and never reach the engine at all; **106** carries the same lead onto the eleven pull-request conversation templates. 105 and 106 both depend on 104 and are independent of each other. Per-line inline PR findings are deliberately excluded — see task.106 §4. None has a tracker issue yet.
 
