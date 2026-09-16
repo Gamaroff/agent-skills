@@ -59,7 +59,7 @@ All notable changes to this project will be documented in this file. Format foll
   the PR at `main`, and writes `hotfix: merge-back to develop required` into the Issues Log so the
   back-merge is a recorded follow-up rather than step 7 of a list done by hand. What stays human is
   named as such: merging into `main`, cutting the tag with `release.sh --patch`, and the merge-back it
-  performs. Both tracker arms are named, the force-push pitfall survives verbatim, and the page is 140
+  performs. Both tracker arms are named, the force-push pitfall survives verbatim, and the page is 141
   lines against the ≤150 satellite budget. Two drifts found in the same sweep ride along:
   `docs/operations/workflows.md` gains a "What the pipelines post" paragraph on the plain-language lead
   every pipeline comment now opens with (tasks 104–106 shipped the behaviour into no consumer doc), and

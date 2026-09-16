@@ -13,28 +13,32 @@ top_issues:
     finding: 'The "What the pipelines post" paragraph attributes every lead — tracker and PR — to tracker-comment.js, but shared/resources/stakeholder-summary.md §Pull-request comments states the three PR stages are not in COMMENT_STAGES (passing one to tracker-comment.js exits 2) and are rendered by stakeholder-summary-cli.js / pr-inline-comment.js buildSummaryBody() instead (verified: LEAD_STAGES vs PR_COMMENT_STAGES in stakeholder-summary.js).'
     suggested_action: 'Attribute rendering to the shared engine (stakeholder-summary.js) generically, or name tracker-comment.js for tracker comments and stakeholder-summary-cli.js / pr-inline-comment.js for PR comments.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-16'
   - id: 'CR-2'
     severity: low
     file: 'docs/operations/workflows.md'
     finding: '"Every comment a pipeline posts to a tracker issue or a pull request" carries a lead contradicts the spec''s "Inline findings carry no lead, deliberately" section — pr-inline-comment.js builds inline review findings as marker + body and a test asserts no lead appears.'
     suggested_action: 'Scope the claim to tracker comments and summary-level PR comments, and say that inline review findings deliberately carry none.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-16'
   - id: 'CR-3'
     severity: low
     file: 'docs/operations/workflows.md'
     finding: 'The unconditional "followed by a `---`" contradicts the spec, which states the rule is GitHub-only and a Jira (ADF) comment gets a paragraph boundary instead.'
     suggested_action: 'Qualify the separator as GitHub-only or drop the detail and defer to the linked spec.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-16'
   - id: 'CR-4'
     severity: low
     file: 'docs/runbooks/hotfix.md'
     finding: '"that is what makes /develop-bug recommend the hotfix branch model instead of asking" contradicts develop-bug-step-0-resolve-bug.md §0d (Q1 is still asked; the description only sets the recommended default) and the page''s own later text ("Phase 0d asks three branch questions once", "Don''t answer bugfix to Q1").'
     suggested_action: 'Reword to say the description makes production hotfix the recommended default for Q1 (and the auto-answered choice in an autonomous run), not that the prompt is suppressed.'
     suggested_owner: dev
-    status: open
+    status: closed
+    fixed_date: '2026-09-16'
 
 waiver:
   active: false
@@ -70,6 +74,13 @@ recommendations:
     - action: 'Reword the Q1 sentence: the description sets the recommended default, the prompt is still asked (CR-4)'
       refs: ['docs/runbooks/hotfix.md']
   future: []
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-16'
+  total_iterations: 1
+  verification_method: 'Cycle-2 refute pass re-read each reworded sentence against stakeholder-summary.md/.js, stakeholder-summary-cli.js, pr-inline-comment.js and develop-bug step-0 §0d'
 
 deployment_readiness:
   staging: CONDITIONAL

@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.112.hotfix-runbook-rewrite'
+task_title: 'The hotfix runbook predates /develop-bug''s hotfix model and never mentions it'
+gate: PASS
+status_reason: 'Cycle 2 refute pass. All four cycle-1 findings verified fixed against the sources they cite (LEAD_STAGES/PR_COMMENT_STAGES in stakeholder-summary.js, stakeholder-summary-cli.js, pr-inline-comment.js, develop-bug step-0 §0d); every NFR PASS. One new LOW finding, high confidence, promoted under code_review_blocking: the CHANGELOG entry and the task''s Progress Tracking line say hotfix.md is 140 lines, the file is 141 after cycle 1 — a number copied from prose into prose. Gate rules 1–4 do not fire on a LOW entry, so the verdict is PASS; the open entry routes one more fix cycle.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T19:56:48Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'The CHANGELOG entry (line 62) and the task document''s Progress Tracking checkbox (line 169) state hotfix.md is 140 lines; the file is 141 lines after the cycle-1 reword (wc -l and awk agree), and the same task document''s Files Summary row already says 141 — two statements in the diff contradict each other and one is false against the tree.'
+    suggested_action: 'Change both 140 figures to 141 so the CHANGELOG, the Progress Tracking line and the Files Summary row agree with the file — or drop the exact count from prose and keep only the budget claim.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3341
+  phases_verified: '2/2'
+  trace:
+    phases_covered: [1, 2]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    notes: 'Documentation only — boundary: false, probes_executed: 0 by design. No secrets, network or auth in the change set.'
+  performance:
+    status: PASS
+    notes: 'Not applicable. hotfix.md 141 lines, within the ~80–150 satellite budget.'
+  reliability:
+    status: PASS
+    notes: 'Links and anchors in both edited files re-checked (16 + 23, 0 dead). ci:fast 3340/0. Mermaid unchanged since cycle 1 and still parses.'
+  maintainability:
+    status: PASS
+    notes: 'The four spec-accuracy findings are fixed and the reworded sentences match their sources sentence-for-sentence. The one residual is a stale line count in two places, which the fix cycle closes.'
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-09-16'
+  total_iterations: 1
+  verification_method: 'Refute-pass re-read of each reworded sentence against its cited source; ci:fast; link check'
+
+recommendations:
+  immediate:
+    - action: 'Align the two 140 figures with the 141-line file (CR-1)'
+      refs: ['CHANGELOG.md', 'docs/tasks/task.112.hotfix-runbook-rewrite/task.112.hotfix-runbook-rewrite.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR-1 fixed'

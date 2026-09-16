@@ -160,13 +160,14 @@ follow `releases.md`, which owns tagging.
 | 2026-09-16 |         | Status → ready-for-development                | review-task |
 | 2026-09-16 |         | Implemented — 5 files, 0 tests (docs only; ci:fast + link check green) | develop |
 | 2026-09-16 |         | QA gate CONCERNS (90/100) — 4 LOW accuracy findings (workflows.md lead paragraph overstates the spec ×3; hotfix.md says Q1 is skipped) | qa-task |
+| 2026-09-16 |         | QA gate PASS (100/100), cycle 2 refute pass — cycle-1 findings verified fixed; 1 LOW (stale "140 lines" figure in CHANGELOG + Progress Tracking; file is 141) | qa-task |
 
 ---
 
 ## Progress Tracking
 
 ### Phase 1: hotfix.md
-- [x] Rewritten against `/develop-bug`'s hotfix model; both tracker arms; ≤ 150 lines (140)
+- [x] Rewritten against `/develop-bug`'s hotfix model; both tracker arms; ≤ 150 lines (141)
 ### Phase 2: two small drifts
 - [x] `docs/operations/workflows.md` names the plain-language lead on tracker + PR comments
 - [x] `docs/reference/faq.md` "Step 5c" links to its definition
@@ -175,24 +176,24 @@ follow `releases.md`, which owns tagging.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-16 (cycle 1)
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Testing Date**: 2026-09-16 (cycle 2)
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.112.qa.1.hotfix-runbook-rewrite.md](./task.112.qa.1.hotfix-runbook-rewrite.md)
-- **Gate File**: [task.112.gate.1.hotfix-runbook-rewrite.yml](./task.112.gate.1.hotfix-runbook-rewrite.yml)
+- **Full Report**: [task.112.qa.2.hotfix-runbook-rewrite.md](./task.112.qa.2.hotfix-runbook-rewrite.md) (earlier: [qa.1](./task.112.qa.1.hotfix-runbook-rewrite.md))
+- **Gate File**: [task.112.gate.2.hotfix-runbook-rewrite.yml](./task.112.gate.2.hotfix-runbook-rewrite.yml) (earlier: [gate.1](./task.112.gate.1.hotfix-runbook-rewrite.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 3341 (`ci:fast`) + 6 (changelog drift) + 70-link check
 - **Phases Verified**: 2/2
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS (reasoned), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Four LOW accuracy defects from the diff review: the new `workflows.md` lead paragraph overstates the canonical spec in three places (attributes PR leads to `tracker-comment.js`; claims inline findings carry a lead; states the `---` unconditionally), and `hotfix.md:41` says the description makes `/develop-bug` skip the Q1 prompt when it only sets the recommended default.
+Cycle 1: four LOW accuracy defects in the new prose against the spec it links to — all fixed in qa-fix cycle 1 and verified by the cycle-2 refute pass. Cycle 2: one LOW, high-confidence stale figure ("140 lines" in CHANGELOG + Progress Tracking; the file is 141).
 
 ---
 
