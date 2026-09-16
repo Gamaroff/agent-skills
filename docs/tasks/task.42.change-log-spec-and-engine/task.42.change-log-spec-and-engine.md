@@ -182,7 +182,6 @@ Target (one, everywhere):
 | 2026-05-11 | 1.0     | Initial draft                                | create-story    |
 | 2026-05-13 | 1.1     | Review passed (9/10) — ready for development | review-story    |
 | 2026-08-12 |         | Jira story created (PROJ-42)                 | sync-jira-story |
-| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
 <!-- change-log-end -->
 ```
 
@@ -739,6 +738,18 @@ re-bundle. Do not revert — the extraction itself is not the defect.
 loses existing Change Log rows.
 **Non-critical (fix forward)**: a wrong insertion anchor, a missed legacy migration case, a
 standards document that reads badly.
+
+---
+
+<!-- change-log-start -->
+
+## Change Log
+
+| Date       | Version | Description                                   | Author      |
+| ---------- | ------- | --------------------------------------------- | ----------- |
+| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
+
+<!-- change-log-end -->
 
 ---
 

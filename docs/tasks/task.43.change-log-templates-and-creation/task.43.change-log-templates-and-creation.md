@@ -147,7 +147,6 @@ Every template emits the canonical block from
 | Date       | Version | Description   | Author       |
 |------------|---------|---------------|--------------|
 | 2026-08-12 | 1.0     | Initial draft | create-task  |
-| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
 ```
 
 Placement, chosen so the log sits with the other document-lifecycle sections rather than
@@ -579,6 +578,18 @@ revert — placement is a one-line move.
 malformed.
 **Non-critical (fix forward)**: a template copy missed; instruction wording; a
 `review-epic` advisory finding caused by the moved heading.
+
+---
+
+<!-- change-log-start -->
+
+## Change Log
+
+| Date       | Version | Description                                   | Author      |
+| ---------- | ------- | --------------------------------------------- | ----------- |
+| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
+
+<!-- change-log-end -->
 
 ---
 

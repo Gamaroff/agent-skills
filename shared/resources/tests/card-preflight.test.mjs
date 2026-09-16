@@ -401,28 +401,68 @@ test("B: --json does not emit the document body", () => {
 });
 
 test("B: every sync-jira-* --check-card --json carries the same scope statement (CR2-6)", () => {
-  const { execFileSync } = require("node:child_process");
-  const real = join(
-    repoRoot,
-    "docs/tasks/task.102.authoring-time-card-preflight/task.102.authoring-time-card-preflight.md",
+  const { execFileSync, execSync } = require("node:child_process");
+  // One representative CARD document per kind — the one whose basename equals
+  // its directory, found the way the corpus tests find them.
+  // A CARD document is the one whose basename equals its directory; every
+  // other file in the folder (dod, qa, gate, plan, review) is a sibling
+  // artifact no card is built from.
+  const first = (prefix) =>
+    execSync(`find ${repoRoot}/docs -type f -name '${prefix}.*.md' | sort`, {
+      encoding: "utf8",
+    })
+      .trim()
+      .split("\n")
+      .find((f) => {
+        const parts = f.split("/");
+        return parts.at(-1) === `${parts.at(-2)}.md`;
+      });
+  const docs = {
+    task: join(
+      repoRoot,
+      "docs/tasks/task.102.authoring-time-card-preflight/task.102.authoring-time-card-preflight.md",
+    ),
+    story: first("story"),
+    epic: first("epic"),
+    bug: first("bug"),
+  };
+  let checked = 0;
+  for (const [kind, doc] of Object.entries(docs)) {
+    assert.ok(doc, `no ${kind} document found for the scope check`);
+    const out = execFileSync(
+      process.execPath,
+      [
+        join(repoRoot, `skills/sync-jira-${kind}/scripts/sync-jira-${kind}.js`),
+        "--file",
+        doc,
+        "--check-card",
+        "--json",
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    const payload = JSON.parse(out.slice(out.indexOf("{")));
+    assert.match(
+      payload.scope,
+      /^\d+ card blocks? resolves? — this checks the card sections only, not template completeness\.$/,
+      `${kind}: scope missing or malformed`,
+    );
+    // ...and it is derived from THIS payload's resolved blocks — not a
+    // constant, and not the preflight CLI's count: the epic sync checks one
+    // block more than the shared spec (Stories Breakdown, where `no-table`
+    // lives), so equality across the two tools would be the wrong pin.
+    const resolved = payload.blocks.filter((b) => b.status === "ok").length;
+    assert.equal(
+      Number.parseInt(payload.scope, 10),
+      resolved,
+      `${kind}: scope count does not match the payload's resolved blocks`,
+    );
+    checked++;
+  }
+  assert.equal(
+    checked,
+    4,
+    "non-vacuity: all four sync scripts must have been run",
   );
-  const out = execFileSync(
-    process.execPath,
-    [
-      join(repoRoot, "skills/sync-jira-task/scripts/sync-jira-task.js"),
-      "--file",
-      real,
-      "--check-card",
-      "--json",
-    ],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
-  );
-  const payload = JSON.parse(out.slice(out.indexOf("{")));
-  assert.equal(payload.ok, true);
-  assert.match(payload.scope, /card sections only, not template completeness/);
-  // ...and it is the SAME sentence the preflight CLI emits.
-  const cli = JSON.parse(runCli(["--file", real, "--json"]).stdout);
-  assert.equal(payload.scope, cli.scope);
 });
 
 test("B: --json and the display both carry the scope statement", () => {

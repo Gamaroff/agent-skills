@@ -4,7 +4,7 @@
 **Bug ID**: TASK-117-BUG-3
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-2 refute review CR-1, reproduced)
 **Date Found**: 2026-09-17
 
@@ -93,3 +93,4 @@ CR2-1 fixture; corpus 0 of 120 after the three document fixes.
 | 2026-09-17 | New          | QA         | Filed from QA cycle 2 (CR2-1)         |
 | 2026-09-17 | In Progress  | qa-fix     | Investigation started                 |
 | 2026-09-17 | Ready for QA | qa-fix     | Fix implemented, mutation-proven      |
+| 2026-09-17 | Closed       | QA         | Verified in QA cycle 3: file/version labels are labels, `**None.**` is content; M5/M6 red |

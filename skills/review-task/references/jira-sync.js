@@ -1146,7 +1146,10 @@ const RE_SUBHEADING = /^#{3,6}\s+/;
 // version excluded `.` from the whole run, which made `**Changes to
 // jira-sync.js**:` — a label naming a file — neither a label nor reported, and
 // its list never reached the card (task.117 QA cycle 2, CR2-1).
-const RE_BOLD_LABEL = /^\s*\*\*[^*\n]*[^*\n.!?\s]\*\*:?\s*$/;
+// Anchored at column 0 like RE_SUBHEADING: an indented bold line sits under a
+// list item (or inside an indented fence the tracker's 3-space cap cannot see)
+// and is not a grouping label (QA cycle 3, CR3-4).
+const RE_BOLD_LABEL = /^\*\*[^*\n]*[^*\n.!?\s]\*\*:?\s*$/;
 const RE_FENCE = /^\s*(```|~~~)/;
 
 // Fence-aware section extraction — the function `extractBodySections` and
@@ -1358,7 +1361,9 @@ function summariseSection(content, opts = {}) {
   // a label: `**None**` is what a Breaking Changes body says. The same line
   // with content beneath it is a grouping label and is dropped below; the same
   // line with a trailing colon is a label whatever follows (QA cycle 2, CR2-4).
-  if (!raw.includes("\n") && RE_BOLD_LABEL.test(raw) && !/:\s*$/.test(raw)) {
+  // The colon test sees through the closing bold: `**Label:**` is as much a
+  // label as `**Label**:` (QA cycle 3, CR3-1).
+  if (!raw.includes("\n") && RE_BOLD_LABEL.test(raw) && !/:\**\s*$/.test(raw)) {
     return { text: raw, omitted: 0, kind: "prose" };
   }
 
@@ -1779,22 +1784,38 @@ function checkCardSections(body, specs, opts = {}) {
       transform: spec.transform,
     });
 
-    if (!text && kind === "heading-only") {
-      // Nothing but headings and bold labels — the grouping was written, the
-      // content under it never was. `heading-only` by construction.
+    if (kind === "heading-only") {
+      // Present and useless: the block resolves to a label — or to nothing but
+      // labels and sub-headings. `missing` and `empty` could not say this —
+      // the section exists — which is how 29 of 120 task documents
+      // (2026-09-17; see tests/card-preflight-corpus.test.mjs, the one place
+      // the figure is measured) read a bold label as their whole Success
+      // Criteria block and every one of them passed the preflight (task.117).
+      //
+      // Two situations, two messages: with summarisable content beneath the
+      // label, the author wrote the content and the card stopped in front of
+      // it; with nothing beneath (or nothing but labels), the content was
+      // never written. Telling the first author to "put a list under the
+      // label" asks for what already exists (QA cycle 1, CR-4).
+      const stopped = omitted > 0;
+      const shown = text ? `"${text}"` : "nothing";
       findings.push({
         severity: spec.optional ? "important" : "critical",
         section: spec.heading,
         code: "heading-only",
-        message: `The "${spec.heading}" section holds only a label or sub-heading with nothing under it — the card would publish nothing for it.`,
-        fix: `Put a sentence or a bullet list under the label. A bold label (**Functional**) or a sub-heading is a grouping, not content.`,
+        message: stopped
+          ? `The "${spec.heading}" section opens with a label — the card would publish ${shown} and stop in front of the ${omitted} block(s) beneath it.`
+          : `The "${spec.heading}" section resolves to a label with nothing under it — the card would publish ${shown} and stop.`,
+        fix: stopped
+          ? `Make the label a \`###\` sub-heading or a bold-only line (**Label**), which the card drops, or turn it into a sentence; the content beneath it then reaches the card.`
+          : `Put a sentence or a bullet list under the label. A bold label (**Functional**:) or a sub-heading is a grouping, not content.`,
       });
       blocks.push({
         heading: spec.heading,
         status: "heading-only",
         kind,
-        text: "",
-        omitted: 0,
+        text,
+        omitted,
       });
       continue;
     }
@@ -1810,41 +1831,6 @@ function checkCardSections(body, specs, opts = {}) {
         fix: `Give it a short opening sentence or a bullet list. Tables and code blocks alone cannot be summarised.`,
       });
       blocks.push({ heading: spec.heading, status: "empty" });
-      continue;
-    }
-
-    if (kind === "heading-only") {
-      // Present, non-empty, and useless: the block resolves to a label.
-      // `missing` and `empty` could not say this — the section exists and it
-      // yields text — which is how 29 of 120 task documents (2026-09-17; see
-      // tests/card-preflight-corpus.test.mjs, the one place the figure is
-      // measured) read a bold label as their whole Success Criteria block and
-      // every one of them passed the preflight (task.117).
-      //
-      // Two different situations, two different messages: with content
-      // omitted beneath the label, the author wrote the content and the card
-      // stopped in front of it; with nothing beneath, the content was never
-      // written. Telling the first author to "put a list under the label"
-      // asks for what already exists (QA cycle 1, CR-4).
-      const stopped = omitted > 0;
-      findings.push({
-        severity: spec.optional ? "important" : "critical",
-        section: spec.heading,
-        code: "heading-only",
-        message: stopped
-          ? `The "${spec.heading}" section opens with a label — the card would publish "${text}" and stop in front of the ${omitted} block(s) beneath it.`
-          : `The "${spec.heading}" section resolves to a label with nothing under it — the card would publish "${text}" and stop.`,
-        fix: stopped
-          ? `Make the label a \`###\` sub-heading or a bold-only line (**Label**), which the card drops, or turn it into a sentence; the content beneath it then reaches the card.`
-          : `Put a sentence or a bullet list under the label. A bold label (**Functional**) or a sub-heading is a grouping, not content.`,
-      });
-      blocks.push({
-        heading: spec.heading,
-        status: "heading-only",
-        kind,
-        text,
-        omitted,
-      });
       continue;
     }
 

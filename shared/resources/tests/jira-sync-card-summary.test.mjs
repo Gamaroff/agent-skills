@@ -794,6 +794,13 @@ test("H3: a bare bold line that IS the whole section is content; with content be
     omitted: 0,
     kind: "prose",
   });
+  // The colon may sit inside the bold: `**Label:**` alone is a label, not
+  // content (QA cycle 3, CR3-1).
+  assert.equal(summariseSection("**Functional:**").kind, "heading-only");
+  assert.equal(
+    summariseSection("**Existing System Context:**").kind,
+    "heading-only",
+  );
   assert.equal(summariseSection("**Functional**\n\n- a\n").kind, "list");
   // A trailing colon is a label whatever follows.
   assert.equal(summariseSection("**Functional**:").kind, "heading-only");
@@ -809,6 +816,22 @@ test("H3: a label after an inner ``` inside a ```` block is fenced content and s
   );
   assert.equal(kind, "list");
   assert.equal(text.split("\n")[0], "- one");
+});
+
+test("H3: a bold line under a list item, or in an indented fence, is not a grouping label (CR3-4)", () => {
+  const out = dropHeadingLines(
+    "- item\n\n    ```\n    **Functional**\n    ```\n",
+  ).join("\n");
+  assert.match(out, /\*\*Functional\*\*/);
+  assert.match(
+    dropHeadingLines("- item\n  **Note**: nested\n").join("\n"),
+    /\*\*Note\*\*/,
+  );
+  // ...while a column-0 label is still dropped.
+  assert.doesNotMatch(
+    dropHeadingLines("**Functional**:\n\n- a\n").join("\n"),
+    /Functional/,
+  );
 });
 
 test("H3: every heading-only block has the same shape, and carries kind (CR2-7)", () => {

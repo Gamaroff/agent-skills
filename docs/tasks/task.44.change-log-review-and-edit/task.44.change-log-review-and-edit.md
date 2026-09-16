@@ -520,8 +520,8 @@ structural-rewrite skill missing its row.
 | 2026-08-12 |         | TASK-44-BUG-1 fixed — Step 8.5 block moved, scope made unconditional | qa-fix      |
 | 2026-08-12 |         | QA gate PASS (100/100) after 1 fix cycle                      | qa-task     |
 | 2026-08-12 | 1.2     | DoD passed — accepted; CI green on head 75bd814               | finalise    |
-
 | 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
+
 ---
 
 ## Definition of Done - PASSED ✅
