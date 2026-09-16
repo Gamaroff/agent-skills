@@ -33,6 +33,14 @@
 #      records with DISTINCT ids, and both body files still on disk.
 #  11. (bug.14 / cycle-2 CR-3) resolve-platform.sh present but read-config.sh absent
 #      → "not found beside the hook" (a bundling problem), not "failed to load".
+#  12. (task.120) two CONCURRENT invocations against one lock → exactly one snapshot,
+#      one report block, one PR-comment call, one issue-comment call; both exit 0,
+#      and exactly one of the two emits the pause signal (the other the empty one).
+#  13. (task.120) a stale `.pausing.*` claim from a killed run neither blocks a fresh
+#      pause nor survives it.
+#  14. (task.120) the PR comment opens with the `agent-skills-comment:pipeline-paused-<step>`
+#      marker, and when a comment with that marker already exists on the PR the hook
+#      PATCHes it in place instead of posting a second one.
 
 PASS=0
 FAIL=0
@@ -55,7 +63,9 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 # it finishes the rich pause flow.
 NOJQ_BIN="$TMPDIR_TEST/nojq-bin"
 mkdir -p "$NOJQ_BIN"
-for tool in dirname cp date rm cat mkdir; do
+# `mv` is here because the claim (task.120) is an mv; without it the degraded
+# path could not even claim the lock and would take the noop exit.
+for tool in dirname cp date rm cat mkdir mv; do
   src=$(command -v "$tool" 2>/dev/null) && [ -n "$src" ] && ln -sf "$src" "$NOJQ_BIN/$tool"
 done
 
@@ -220,12 +230,14 @@ elif grep -qE -- '--body ' <<<"$PR_LINE"; then
   fail "full: PR comment travels by --body-file, not inline --body" "$PR_LINE"
 elif [ -z "$PR_FILE" ] || [ ! -f "$PR_FILE" ]; then
   fail "full: PR comment body file exists when gh runs" "body file '$PR_FILE' not found (hook must not delete it before gh reads it)"
-elif ! head -1 "$PR_FILE" | grep -qF 'paused'; then
-  fail "full: PR comment opens with the plain-language lead" "$(head -3 "$PR_FILE")"
+elif ! head -1 "$PR_FILE" | grep -qE '^<!-- agent-skills-comment:pipeline-paused-4 -->$'; then
+  fail "full: PR comment opens with the step-scoped idempotency marker" "$(head -3 "$PR_FILE")"
+elif ! sed -n '2p' "$PR_FILE" | grep -qF 'paused'; then
+  fail "full: PR comment has the plain-language lead right after the marker" "$(head -3 "$PR_FILE")"
 elif ! grep -qF 'Pipeline paused' "$PR_FILE"; then
   fail "full: PR comment still carries the developer body" "$(cat "$PR_FILE")"
 else
-  pass "full: issue comment via tracker-comment.js (marker + lead, --body-file -); PR comment leads with the plain-language paragraph via --body-file"
+  pass "full: issue comment via tracker-comment.js (marker + lead, --body-file -); PR comment is marker, then lead, via --body-file"
 fi
 
 # ── Scenario 6: resolver unavailable → PR comment skipped, hook still clean ──
@@ -338,6 +350,134 @@ elif ! grep -qF 'PR comment: skipped — resolve-platform.sh or read-config.sh n
   fail "partial bundle: PR outcome says 'not found beside the hook'" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
 else
   pass "partial bundle (resolver present, read-config.sh absent): 'not found beside the hook', nothing posted"
+fi
+
+# ── Scenario 12 (task.120): two concurrent runs → one of everything ──────────
+# The task.110 failure: the host fired the hook twice in parallel (one settings
+# file, two spellings of the same command) and both runs passed `[ -f "$LOCK" ]`.
+# With the atomic claim exactly one run owns the lock. A report file is present
+# here so the appended block is counted too; `git` is shimmed to a noop so the
+# best-effort commit neither needs a repo nor touches this one — and it SLEEPS,
+# so the first run is provably still inside its pause flow when the second
+# starts. Without that the two could serialise, and the pre-claim hook (which
+# removed the lock only at the very end) would pass this scenario by luck.
+S12="$TMPDIR_TEST/s12"
+mkdir -p "$S12/.claude/state" "$S12/stdin"
+printf '# report\n' > "$S12/report.md"
+cat > "$SHIM_BIN/git" <<'SHIM'
+#!/usr/bin/env bash
+[ "$1" = "commit" ] && sleep 1
+exit 0
+SHIM
+chmod +x "$SHIM_BIN/git"
+printf '{"skill":"develop-task","current_step":5,"branch":"feature/x","report_path":"report.md","pr_url":"https://github.com/o/r/pull/7","tracker":"github","tracker_issue":"42"}\n' \
+  > "$S12/.claude/state/develop-pipeline.lock"
+: > "$S12/gh.log"
+(
+  cd "$S12" || exit 1
+  export PATH="$SHIM_BIN:$PATH" GH_LOG="$S12/gh.log" GH_STDIN_DIR="$S12/stdin" \
+    PIPELINE_LOCK="$S12/.claude/state/develop-pipeline.lock" \
+    TRACKER_ACTIONS_JOURNAL="$S12/.claude/state/tracker-actions.jsonl"
+  "$BASH_BIN" "$HOOK" > "$S12/out.a" 2>/dev/null & A=$!
+  "$BASH_BIN" "$HOOK" > "$S12/out.b" 2>/dev/null & B=$!
+  wait "$A"; echo $? > "$S12/rc.a"
+  wait "$B"; echo $? > "$S12/rc.b"
+)
+N_SNAP=$(ls "$S12/.claude/state/"develop-pipeline.last-halt.json 2>/dev/null | wc -l | tr -d ' ')
+N_BLOCK=$(grep -c '^## Pipeline Paused' "$S12/report.md")
+N_PR=$(grep -cE '^pr comment ' "$S12/gh.log")
+N_ISSUE=$(grep -cE '^issue comment 42 ' "$S12/gh.log")
+N_SIGNAL=$(cat "$S12/out.a" "$S12/out.b" | grep -c 'PIPELINE-PAUSE-SIGNAL')
+N_EMPTY=$(cat "$S12/out.a" "$S12/out.b" | grep -cF '"additionalContext":""')
+N_CLAIMS=$(ls "$S12/.claude/state/"develop-pipeline.lock.pausing.* 2>/dev/null | wc -l | tr -d ' ')
+if [ "$(cat "$S12/rc.a")" != "0" ] || [ "$(cat "$S12/rc.b")" != "0" ]; then
+  fail "concurrent: both runs exit 0" "rc.a=$(cat "$S12/rc.a") rc.b=$(cat "$S12/rc.b")"
+elif [ "$N_SNAP" != "1" ]; then
+  fail "concurrent: exactly one snapshot" "found $N_SNAP"
+elif [ "$N_BLOCK" != "1" ]; then
+  fail "concurrent: exactly one report block appended" "found $N_BLOCK '## Pipeline Paused' headings"
+elif [ "$N_PR" != "1" ]; then
+  fail "concurrent: exactly one PR-comment call" "found $N_PR in gh.log: $(cat "$S12/gh.log")"
+elif [ "$N_ISSUE" != "1" ]; then
+  fail "concurrent: exactly one issue-comment call" "found $N_ISSUE in gh.log: $(cat "$S12/gh.log")"
+elif [ "$N_SIGNAL" != "1" ] || [ "$N_EMPTY" != "1" ]; then
+  fail "concurrent: one run emits the pause signal, the other the empty signal" "signals=$N_SIGNAL empties=$N_EMPTY"
+elif [ -f "$S12/.claude/state/develop-pipeline.lock" ] || [ "$N_CLAIMS" != "0" ]; then
+  fail "concurrent: no lock and no claim file left behind" "$(ls "$S12/.claude/state")"
+else
+  pass "concurrent (2 runs, 1 lock): one snapshot, one report block, one PR call, one issue call; loser exits 0 with the empty signal; nothing left behind"
+fi
+
+# ── Scenario 13 (task.120): a stale claim from a killed run is swept, not fatal ─
+S13="$TMPDIR_TEST/s13"
+mkdir -p "$S13"
+printf '{"skill":"develop-task","current_step":4,"branch":"feature/x","report_path":"","pr_url":"","tracker":"","tracker_issue":""}\n' > "$S13/develop-pipeline.lock"
+printf '{"skill":"develop-task","current_step":2}\n' > "$S13/develop-pipeline.lock.pausing.99999"
+OUT=$(PIPELINE_LOCK="$S13/develop-pipeline.lock" "$BASH_BIN" "$HOOK" 2>/dev/null)
+RC=$?
+if [ "$RC" -ne 0 ]; then
+  fail "stale claim: hook exits 0" "rc=$RC"
+elif ! grep -qF "PIPELINE-PAUSE-SIGNAL" <<<"$OUT"; then
+  fail "stale claim: a fresh pause still completes" "signal absent"
+elif [ "$(jq -r '.halt_step' "$S13/develop-pipeline.last-halt.json" 2>/dev/null)" != "4" ]; then
+  fail "stale claim: snapshot is taken from the live lock, not the stale claim" "halt_step=$(jq -r '.halt_step' "$S13/develop-pipeline.last-halt.json" 2>/dev/null)"
+elif [ -f "$S13/develop-pipeline.lock.pausing.99999" ]; then
+  fail "stale claim: swept by the winner" "stale claim file still present"
+elif ls "$S13"/develop-pipeline.lock* >/dev/null 2>&1; then
+  fail "stale claim: no lock or claim left behind" "$(ls "$S13")"
+else
+  pass "stale claim (.pausing.99999): fresh pause completes from the live lock and the stale file is gone"
+fi
+
+# ── Scenario 14 (task.120): marker → a repeat pause at the same step is an edit ─
+# A `gh` shim variant that answers `pr view --json comments` with one existing
+# comment whose body starts with the Step-4 marker. The hook must PATCH that
+# comment by id, not `pr comment` a second one.
+SHIM2_BIN="$TMPDIR_TEST/shim2-bin"
+mkdir -p "$SHIM2_BIN"
+cp "$SHIM_BIN/git" "$SHIM2_BIN/git"
+cat > "$SHIM2_BIN/gh" <<'SHIM'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_LOG"
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "repo view") case "$*" in *nameWithOwner*) echo "o/r" ;; *) echo "o/r" ;; esac; exit 0 ;;
+  "api --paginate") exit 0 ;;
+  "pr view")
+    # The jq filter the hook passes selects on startswith(marker); emulate it by
+    # answering with the URL only when the requested marker is the seeded one.
+    case "$*" in
+      *"pipeline-paused-4"*) echo "https://github.com/o/r/pull/7#issuecomment-31337" ;;
+    esac
+    exit 0 ;;
+esac
+for a in "$@"; do
+  if [ "$a" = "-" ]; then
+    n=$(ls "$GH_STDIN_DIR" 2>/dev/null | wc -l | tr -d ' ')
+    cat > "$GH_STDIN_DIR/$((n + 1))"
+  fi
+done
+exit 0
+SHIM
+chmod +x "$SHIM2_BIN/gh"
+S14="$TMPDIR_TEST/s14"
+SHIM_SAVED="$SHIM_BIN"; SHIM_BIN="$SHIM2_BIN"
+OUT=$(run_hook_in_consumer "$S14" "")
+RC=$?
+SHIM_BIN="$SHIM_SAVED"
+PATCH_LINE=$(grep -E '^api -X PATCH /repos/o/r/issues/comments/31337 ' "$S14/gh.log")
+if [ "$RC" -ne 0 ]; then
+  fail "marker edit: hook exits 0" "rc=$RC"
+elif grep -qE '^pr comment ' "$S14/gh.log"; then
+  fail "marker edit: no second pr comment when a marked one exists" "$(grep -E '^pr comment' "$S14/gh.log")"
+elif [ -z "$PATCH_LINE" ]; then
+  fail "marker edit: existing comment PATCHed by id" "gh.log: $(cat "$S14/gh.log")"
+elif ! grep -qF -- '-F body=@' <<<"$PATCH_LINE"; then
+  fail "marker edit: PATCH body travels by file, not inline" "$PATCH_LINE"
+elif ! grep -qF 'PR comment: updated in place' <<<"$OUT"; then
+  fail "marker edit: signal reports the update, not a post" "$(grep -o 'PR comment: .*' <<<"$OUT" | head -1)"
+else
+  pass "marker edit: a marked Step-4 comment already on the PR is PATCHed in place; no second pr comment; signal says 'updated in place'"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
