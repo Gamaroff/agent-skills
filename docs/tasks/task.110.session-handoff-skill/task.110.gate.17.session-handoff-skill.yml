@@ -1,0 +1,81 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: PASS
+status_reason: 'Cycle-16 fix verified (bug.23 closed; the five cycle-16 mechanisms mutation-proven; `-p --noEmit`, `--project --noEmit`, `--pretty=false --noEmit`, a trailing `-p`, the greedy jest spelling, `__proto__ x` and `shellcheck -e --format=json` all refused through the clone''s own verifier at ce15f7c7 with nothing emitted; `-p tsconfig.json --noEmit` confirmed; the 3,653 prior spellings moved only on three intended decisions). Bugs 1–23 all closed; no HIGH, no MEDIUM. Scope: default narrowed (gate 16 security CONCERNS/measured — the carve-out does not fire) plus QA''s own regression re-run. Two LOW cleanups promoted from the reviewer, neither a reachable write or egress: jest/vitest `-t` is a value-taking option declared bare (no bypass — yargs requiresArg errors on a following dash token, cac still sees `--run`; a consistency gap with the gate-16 mechanism), and the fix made a common spelling unverifiable — `npx tsc --noEmit -p ./tsconfig.json` was admitted with `-p` bare and is refused now because DATA_FILE admits no leading `./`. One advisory: `-p x.json src/x.ts` is admitted and tsc itself refuses the mix (TS5042) — the line reads stale with the exit code. Open LOW entries → qa-fix once more, then 5c.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T19:10:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-1 (low/high), confirmed in-process: jest''s `-t` (`testNamePattern`, alias `t`, `type: string`, `requiresArg: true` — jest-cli 30.5.1) and vitest''s `-t <pattern>` are value-taking options declared bare, so `npx jest -t --ci` and `npx vitest -t --run x` are admitted and the following token is judged by the positional policy rather than by the flag. No bypass: yargs-parser errors "Not enough arguments following: t" on the dash token (confirmed with the installed jest), and cac sets `-t` true and still sees `--run` (vitest not installed — reviewer''s reading). The gap is consistency with the gate-7/16 mechanism, which mocha already follows for its own `-t`/`-g`.'
+    suggested_action: 'Move `-t` into valueFlags with `patternFlags: ["-t"]` on jest and vitest; refused: `npx jest -t --ci`, `npx vitest -t --run x`, trailing `-t`; allowed: `npx jest --ci -t x`, `npx vitest --run -t x`.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-2 (low/high), confirmed in-process: `npx tsc --noEmit -p ./tsconfig.json` was admitted before the fix (bare `-p`, `./tsconfig.json` a positional) and is refused now — DATA_FILE requires every segment to start with `[A-Za-z0-9_-]`, so a leading `./` never matches, while the same prefix is admitted for a positional (`--noEmit ./src/x.ts`). The pre-existing data-kind rule (`prettier --config ./x.json` is refused the same way), surfaced by the fix on a spelling handoffs commonly use. Harmless tightening alongside: `-e SC2086,SC2046,` (trailing comma) is refused where shellcheck would accept it.'
+    suggested_action: 'Admit an optional leading `./` in DATA_FILE (the `..` guard in VALUE_KINDS.data still applies); allowed: `npx tsc --noEmit -p ./tsconfig.json`, `npx prettier --check --config ./.prettierrc .`; refused: `-p .//x.json`, `-p ./../x.json`. Mutation: the prefix removed.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 33
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 3669
+    notes: 'Bugs 1–23 closed. 3,653 prior spellings re-run in-process and diffed against gate 16 — three intended moves (bare `shellcheck -e`, `--exclude=/x`, `tsc --pretty=…` refused), zero collateral; 8 in-process on the reviewer''s shapes; 8 executed end-to-end through the clone''s own verifier at ce15f7c7 against consumer9 under env -i with CI=1 and the `--noEmit/` directory present: every cycle-16 spelling refused, nothing emitted, `-p tsconfig.json --noEmit` confirmed; five mutation proofs covered; TMPDIR=/tmp 33/33; zero requests on the listener. The two open LOWs are a declared-bare value flag with no bypass and a usability narrowing.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 33/33; full hermetic suite green (npm test exit 0); bundle --check, prettier --check, validate exit 0.'
+  reliability:
+    status: PASS
+    notes: 'No orphaned children; listener empty; JSON contract holds.'
+  maintainability:
+    status: PASS
+    notes: 'Comments and SKILL.md match the code; the audit claim in the bug.23 fix should be reworded once QA-1 lands (no bare flag consumes a token another rule depends on).'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent over the cycle-16 fix diff (ce15f7c7, 125 lines) with the full code diff for context, dispatched 22:54 returned 23:01 local (6m58s, in budget); read-only with in-process isAllowed probes (~70 shapes, current and pre-fix via git show); parsers checked against jest-cli 30.5.1, mocha 12, prettier 3.9.6'
+  bugs: 0
+  cleanups: 3
+  boundary: true
+  probes_executed: 3669
+  promoted: ['CR-1 → QA-1 at low', 'CR-2 → QA-2 at low']
+  advisory: ['CR-3: `-p x.json src/x.ts` admitted; tsc refuses the mix itself (TS5042) and the line reads stale with the exit code — left to tsc', 'gate-8..16 advisories unchanged']
+
+recommendations:
+  immediate:
+    - action: 'QA-1 jest/vitest `-t` as pattern value flags; QA-2 optional leading `./` in DATA_FILE'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: 'Scrubbed child environment; quoted-glob tokenising'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 16
+  verification_method: 'Executed probes through the clone''s own verifier and the consumer-shaped project under a stripped environment with a local listener; in-process regression re-run; five mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['QA-1, QA-2 closed (two small refinements)']

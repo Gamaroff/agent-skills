@@ -1,0 +1,104 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: FAIL
+status_reason: 'Cycle-5 fix verified (CR-1/2/3 closed; mutation-proven). Executed boundary probes through the arms no previous cycle reached found the read-only invariant broken twice: the npm -- passthrough forwards any dash token and absolute positional, so npm run format:check -- --write rewrote the tree (HIGH, no precondition) and npm test -- -r /tmp/evil.js preloaded a module from outside the repo; and gh api accepts an absolute URL, so read mode requests any host (MEDIUM, no token sent). HIGH sequence across gates 4, 5, 6: 0, 0, 1 — third-strike does not fire.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T04:38:06Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'npmRule forwards everything after -- unchecked (any dash token; POS.ANY positionals): npm run format:check -- --write runs prettier --check . --write and rewrote every file in the fixture tree (executed); npm test -- -r /tmp/evil.js reaches node --test -r /tmp/evil.js and preloaded the file (executed) — the node --test x/ -r pre.js shape the contract lists as refused, through the arm that does not look at its arguments.'
+    suggested_action: 'Drop the -- passthrough for non-test scripts; hold npm test -- … to NODE_FLAGS/NODE_FLAG_PATTERN and POS.PATHS; add the write and the five absolute-value spellings (plus the quoted form) to the refused-list test.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.6.npm-passthrough-admits-writes-and-outside-modules.md'
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'ghRule checks the api endpoint with POS.PATHS + allowAbsolute (refuses only ..), so gh api https://evil.example/x is allowed and gh requests the URL as-is — a local listener received GET /probe-path from GitHub CLI 2.94.0 with no Authorization header (executed): egress to any host through the spelling --hostname was refused for.'
+    suggested_action: 'Refuse :// in the endpoint (or anchor it to ^[A-Za-z0-9_./-]+$); add gh api https://evil.example/x to the refused-list test.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.7.gh-api-accepts-absolute-url.md'
+    status: open
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'npm run eval:<x>:cli and :sdk are admitted by the eval:* regex; both set DRIVER=claude-* and shell out to claude -p — a live, billed agent run the repo documents as opt-in (reasoned, not executed).'
+    suggested_action: 'Exclude the :cli/:sdk suffixes from the eval:* admission.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-4'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Windows drive-letter absolute paths (C:/tmp/evil.js, C:\tmp\evil.js) pass valueOk and isSafePositional, although the design already refuses //host as UNC for Windows (reasoned; harmless on POSIX).'
+    suggested_action: 'Treat /^[A-Za-z]:[\/]/ as absolute beside the leading-slash rule.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-5'
+    severity: low
+    file: 'skills/session-handoff/tests/handoff-verify.test.js'
+    finding: 'The per-spec patternFlags mechanism the cycle-5 fix introduced has no committed test: deleting patternFlags from GIT_SPECS.log and .show leaves 28/28 green (mutant no-red-untested; reviewer CR-1 independently).'
+    suggested_action: 'Assert git log --format=/%H and git show --pretty=/x HEAD are allowed, so removing the opt-in turns a test red.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 28
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 73
+    notes: '63 isAllowed() spellings (17 unexpected allow) + 7 per-spec spellings + 3 executed runs in a scratch fixture: prettier --write rewrote files, node -r preloaded /tmp/evil.js, gh api reached a local listener (no Authorization header). Cycle-5 shapes all refused. The failures are in arms (npm -- passthrough, gh api <url>) no cycle 1-5 enumeration reached; cycle 3 tried npm test -- -r ./x, accepted it as relative, and stopped.'
+  performance:
+    status: PASS
+    notes: 'No hot path; live read mode completes in seconds at --timeout 20; cap and timeout bound every child.'
+  reliability:
+    status: PASS
+    notes: 'Timeout and truncation both report unverifiable; no orphaned children after the live run.'
+  maintainability:
+    status: CONCERNS
+    notes: 'patternFlags per-spec path untested; --date in two sets (CR-2); comment miscounts removed names (CR-3); catch-block resolve omits truncated (CR-4); task document QA section drifted for four cycles (corrected this cycle).'
+
+code_review:
+  blocking: false
+  reviewer: 'Explore subagent, narrowed to 979a1a8e, 4m05s'
+  bugs: 1
+  cleanups: 3
+  boundary: true
+  probes_executed: 73
+
+recommendations:
+  immediate:
+    - action: 'bug.6 — no passthrough for non-test npm scripts; npm test -- args held to the node --test allow-list and POS.PATHS; refused-list tests for the write and the absolute module loads.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+    - action: 'bug.7 — refuse :// in the gh api endpoint; refused-list test.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: 'Exclude eval:*:cli|sdk; drive-letter absolute rule; test the per-spec patternFlags path; one home for --date; the three reviewer cleanups; consider not echoing measured output for plain readers on absolute paths outside the repo.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 2
+  fix_date: ''
+  total_iterations: 5
+  verification_method: 'Executed probes in a scratch fixture; mutation proofs; live handoff read mode'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['bug.6 closed', 'bug.7 closed', 'patternFlags path tested']

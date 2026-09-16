@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`session-handoff` — the handoff re-measures itself on read (task 110).** `.agents/handoff.md`
+  decayed within a day and said so itself: the 2026-09-10 file named T107 as next and "frontier not
+  empty", and both were false by the next morning, although every figure carried its command. The
+  new skill's read mode (`skills/session-handoff/scripts/handoff-verify.mjs`) re-runs each figure's
+  command through a fail-closed read-only whitelist and reports every line as `confirmed`, `stale`
+  (with the new value) or `unverifiable` (with why) — a Jira check in a GitHub repo, a refused
+  command and a timed-out suite are each a stated reason, never a tick. Write mode is a template
+  with a fixed section order and half-life labels, and §5 Traps is a pointer to
+  `docs/contributing/traps.md`, never content. The parse rule is explicit (first backticked span in
+  the Command cell; `<!-- cmd: …; expect: … -->` on prose), the runner is injectable so the 33 tests
+  never execute a real command, and every whitelist mechanism is mutation-proven — the allow-list
+  was hardened over nineteen QA cycles (twenty-three bugs, all closed): a flag value a tool would
+  load is judged by kind, runnable code is named by identity, reporters are per-tool closed sets, a
+  value flag consumes exactly what its tool's parser consumes (no greedy array, no bare flag that
+  takes a value), and each hostile spelling QA executed is a refused-list test. `AGENTS.md` now names read mode as the way to consume the
+  handoff; the historical 2026-09-10 handoff is kept as an annotated regression fixture.
+
 - **`sync-jira-story`'s skipped-but-transitioned write gate has a run()-level test (task 109).** A
   status-only sync — body unchanged, card moved — skips the PUT but must still write the file, because
   the `Status → …` Change Log row and the refreshed `jira_last_synced_at` are the only record of the

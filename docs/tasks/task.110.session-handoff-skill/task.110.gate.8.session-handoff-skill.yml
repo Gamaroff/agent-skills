@@ -1,0 +1,116 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: FAIL
+status_reason: 'Cycle-7 fixes verified (bug.8, bug.9, bug.10 closed; all eleven mechanisms mutation-proven; the seventeen gate-7 spellings re-executed through the CLI — all refused, no write, no request). Unscoped safety re-probe (136 probes, 29 executed end-to-end) found the bug.8 class open through the one spelling bug.8 did not hold: a `--test`-mode positional is any relative file and Node runs an explicitly named file as a test regardless of its name, so `node --test scripts/generate-skill-dependencies.mjs` re-created a deleted tracked file and `node --test skills/loop-supervisor/scripts/run-loop.mjs` spawned two `claude -p` sessions through read mode (HIGH, no precondition); `observation-log.js next-id`, admitted as a read verb by the cycle-7 fix, archives entries and writes the id floor at any absolute --workspace (MEDIUM); `git remote show <url>` queries a document-chosen host, scp form via ssh (MEDIUM, reviewer CR-1, executed). HIGH sequence across gates 6, 7, 8: 1, 1, 1 on handoff-verify.mjs — THIRD STRIKE fires: qa-fix may not patch that file again (delete, replace the mechanism, or waive).'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T10:52:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'interpreterRule admits every --test-mode positional as a POS.PATHS "pattern", but Node executes an explicitly named file under --test whatever its name, and npm test -- <file> reaches the same runner through testModeArgsOk. Executed through read mode in a scratch clone: `node --test scripts/generate-skill-dependencies.mjs` (isMain true in the runner child) re-created shared/resources/skill-dependencies.json after it was deleted — verdict confirmed; `node --test skills/loop-supervisor/scripts/run-loop.mjs` (default subcommand `run`) spawned two `claude -p` iterations against roadmap item T111 (runs.jsonl spawned:true ×2, two transcripts under ~/.claude/projects) — verdict confirmed, exit 0; each exited at turn 0 only because the clone had no .claude/skills link. isAllowed also admits `node --test node_modules`, `node --test .`, `npm run test -- skills/loop-supervisor/scripts/run-loop.mjs`.'
+    suggested_action: 'Hold --test-mode positionals (in testModeArgsOk, so the node and npm-test arms move together) to a directory or a Node test-file name (*.test.{js,mjs,cjs}, *-test.*, *_test.*, test.*, under test/ or tests/); refused-list tests for both executed spellings, `npm test -- scripts/…` and `node --test node_modules/prettier/bin/prettier.cjs`; allowed tests for the test-directory and *.test.js shapes; correct the "patterns, not a script" comment. Third strike: this must be a mechanism change, a deletion or a documented waiver — not a patch — and the fix summary must say which.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.11.test-mode-positional-runs-any-in-repo-file.md'
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'git remote show <name> positionals are POS.ANY and git resolves an unconfigured name as a URL alias and queries it — the PRB-8 primitive ls-remote was anchored against, one subcommand over. Executed against a local listener: `git remote show http://127.0.0.1:8099/x.git` → GET /x.git/info/refs?service=git-upload-pack; `git remote show 127.0.0.1:8099/x.git` → ssh invoked against 127.0.0.1:22 (the reader''s keys and agent); get-url unaffected. Reviewer CR-1 (high/high); severity held at medium for consistency with gate 7''s egress findings.'
+    suggested_action: 'Apply ls-remote''s positionalPattern to remote show (and get-url), or drop remote show — `remote -v` / `get-url <name>` answer a handoff without a round-trip; refused-list tests for the http, https and scp spellings; allowed test for `git remote show origin`.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.13.git-remote-show-resolves-a-url-positional.md'
+    status: open
+  - id: 'QA-3'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The cycle-7 observation-log.js spec admits next-id under "read verbs only", but nextId() runs sweepResolved() (renameSync of every resolved entry into archive/) and writeIdFloor() (mkdirSync + write) and --dry-run is not admitted. Executed against a scratch workspace under $HOME: fresh empty dir → skill-observations/observation-log/archive/.id-floor created (three directories and a file at a path the document chose); with one status: actioned entry → archived: ["0001-x.md"], file moved, floor 2. doctor/scan/queue/families verified writer-free.'
+    suggested_action: 'Remove next-id from positionalPattern (or require --dry-run the way tsc requires --noEmit); refused-list test for `node …/observation-log.js next-id --workspace /x --json`; correct the SKILL.md node row.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.12.observation-log-next-id-is-a-write.md'
+    status: open
+  - id: 'QA-4'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-7 (low/high, confirmed in-process): a prose line with an empty `; expect:` yields figures [""], which passes the no-figure guard and always reads `stale: moved:` (blank) — the table branch filters empty figures, the comment branch does not.'
+    suggested_action: 'Filter empty strings out of [parseExpect(expect)] with the same normalise(f) !== "" test the table branch uses; test for the empty-expect line reading unverifiable: no figure.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-5'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-8 (low/high, confirmed in-process): a table row with fewer cells than the header leaves cells[headerCols.check] undefined, so `check` renders as "undefined" and is dropped from --json; the command and result cells already fall back to "".'
+    suggested_action: 'Fall back to `row ${i + 1}` when the check cell is missing, as when the column is absent.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-6'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'PY_FLAG_PATTERN admits any -X<chars> value: `python3 -Xpycache_prefix=zzcache skills/create-skill/scripts/quick_validate.py skills/session-handoff` read confirmed and created zzcache/ in the tree; -Xperf writes /tmp/perf-<pid>.map. Cache bytes only, and Python writes __pycache__ beside quick_validate.py''s sibling import in the plain form regardless (reviewer CR-3 rated medium; held at low).'
+    suggested_action: 'Enumerate the accepted -X values (utf8, dev, importtime, frozen_modules=…) instead of a character class, and inject -B into the running argv the way --no-install is injected for npx — or document the cache write as tolerated in the python3 row.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 40
+
+evidence:
+  tests_reviewed: 29
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 136
+    notes: '95 fresh spellings through isAllowed(); 27 executed end-to-end through the CLI in a scratch clone with a listener on 127.0.0.1:8099 (17 gate-7 spellings — all refused, no write, no request; 6 new spellings; 1 write probe; 3 reviewer candidates); 2 direct next-id executions; 12 spot checks. Executed and confirmed: node --test <in-repo file> re-created a tracked file and spawned two claude -p sessions; next-id created a tree + id floor and moved a resolved entry; git remote show <url> reached the listener and invoked ssh. npx residual measured as documented (one manifest GET, retried once, no tarball, exit 1). All eleven cycle-7 mechanisms mutation-proven covered.'
+  performance:
+    status: PASS
+    notes: 'Live read of .agents/handoff.md at --timeout 20: 58 s wall for 20 lines (two full-suite lines hit the timeout); every child bounded by cap and timeout.'
+  reliability:
+    status: PASS
+    notes: 'Timeout and truncation report unverifiable; no orphaned children after the live run; TMPDIR=/tmp 29/29; full suite 3299 pass / 0 fail / 1 skipped.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The interpreterRule comment ("in test mode the positionals are patterns, not a script") states the false premise QA-1 rests on, and the SKILL.md node row lists next-id among the reads; both one-line corrections once the mechanism is settled. Task body **Status:** In Progress disagrees with frontmatter ready-for-review.'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent, unscoped safety re-probe over the code-only branch diff (4,046 lines), dispatched 14:36 returned 14:47 (10m55s — past the 10-minute budget, not killed; block in hand before this gate was written)'
+  bugs: 9
+  cleanups: 2
+  boundary: true
+  probes_executed: 136
+  promoted: ['CR-1 → QA-2 (severity held at medium)', 'CR-7 → QA-4', 'CR-8 → QA-5']
+  advisory: ['CR-2 npx module-loading flags (accepted boundary since gate 3 PRB-6; confidence lowered to medium)', 'CR-3 folded into QA-6 at low', 'CR-4 DRIVER/MODE env passthrough to eval scripts', 'CR-5 win32 cwd-first binary resolution', 'CR-6 absolute reads + measured echo', 'CR-9 gh api --cache writes the HTTP cache']
+
+recommendations:
+  immediate:
+    - action: 'bug.11 — hold --test-mode positionals to a directory or a Node test-file name in testModeArgsOk; refused/allowed tests; fix the comment. Third strike on handoff-verify.mjs: mechanism change, deletion or documented waiver — not a patch.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js', 'skills/session-handoff/SKILL.md']
+    - action: 'bug.12 — drop next-id from the observation-log verb pattern (or require --dry-run); refused test; SKILL.md node row.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js', 'skills/session-handoff/SKILL.md']
+    - action: 'bug.13 — anchor remote show / get-url positionals as ls-remote is, or drop remote show; refused tests for http, https and scp spellings.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: 'QA-4/QA-5 (empty expect: → no figure; short row → row N); QA-6 -X values; pin DRIVER=replay / delete MODE for eval scripts (CR-4); NoDefaultCurrentDirectoryInExePath=1 in the child env (CR-5); drop gh api --cache (CR-9); decide the npx module-loading boundary explicitly (CR-2); jq `..` and find numeric operands (CR-10); `node --test` bare (CR-11); task body Status line.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md', 'docs/tasks/task.110.session-handoff-skill/task.110.session-handoff-skill.md']
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 3
+  fix_date: '2026-09-15'
+  total_iterations: 7
+  verification_method: 'Executed probes through the verifier CLI in a scratch clone and against a local listener; direct engine execution; eleven mutation proofs; live handoff read mode; full hermetic suite'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['bug.11 closed', 'bug.12 closed', 'bug.13 closed']

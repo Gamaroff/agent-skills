@@ -1,0 +1,65 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: PASS
+status_reason: 'Cycle-12 nits verified (ESLINT_CONFIG refuses `..` anywhere — mutation-proven; the `.eslintrc` example replaced in the comment and SKILL.md); the 3,653 prior spellings re-run with no decision change; `npx eslint -c x..json .` refused and `--config=.prettierrc` ran through the clone''s own verifier at baa3e1a5. Reviewer over the 52-line diff: no findings. Bugs 1–18 closed; no HIGH, no MEDIUM, no LOW; every NFR PASS. Empty queue — the gate hands to 5c (PR conformance review).'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T17:50:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 3657
+    notes: '3,653 prior spellings re-run in-process and diffed against gate 12 (no decision moved); 3 executed through the clone''s own verifier at baa3e1a5 under env -i; 1 mutation proof (the `..` lookahead removed → red); TMPDIR=/tmp 31/31. Bugs 1–18 closed across cycles 2–11; every spelling gates 6–12 executed remains refused.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 31/31; full hermetic suite 3301 pass / 0 fail / 1 skipped.'
+  reliability:
+    status: PASS
+    notes: 'JSON contract holds; no orphaned children.'
+  maintainability:
+    status: PASS
+    notes: 'Comments and SKILL.md match the code.'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent over the files changed since gate 12 (fix diff baa3e1a5, 52 lines), dispatched 17:42 returned 17:43 (40s); read-only with in-process isAllowed probes'
+  bugs: 0
+  cleanups: 0
+  boundary: true
+  probes_executed: 3657
+  promoted: []
+  advisory: ['gate-8..12 advisories unchanged: DRIVER/MODE env passthrough, win32 cwd-first resolution, absolute reads + measured echo, gh api --cache, python -X cache write, quoted-glob refusal, env.json refused on jq, npx --no-install manifest GET; future: scrubbed child environment, quoted-glob tokenising']
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Scrubbed child environment (retires the measured-echo class); quoted-glob tokenising (cycle-9 CR-6)'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 12
+  verification_method: 'In-process regression re-run; executed probes through the clone''s own verifier under a stripped environment; mutation proof; full hermetic suite'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -1,0 +1,83 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: FAIL
+status_reason: 'Cycle-14 fixes verified (bug.19, bug.20 closed; four mechanisms mutation-proven; the cycle-14 spellings refused through the clone''s own verifier at 72bf03b4 under an inherited CI=false — no emit, no snapshot; the 3,653 prior spellings unchanged). Unscoped safety re-probe (gate 14 security FAIL/measured) found two new defects: jest''s `--reporters` is a greedy yargs array option, so `npx jest --ci --reporters default ./zzrep.js` loads `./zzrep.js` as a reporter module — executed, canary written (bug.21, HIGH — the bug.14/17 class via a parser semantic the specs do not model); and the spec tables are plain objects, so `constructor`/`toString`/`hasOwnProperty` resolve as rules and `__proto__ x` throws out of isAllowed and verify, crashing the run on one line (bug.22, MEDIUM, confirmed in-process). HIGH across gates 13, 14, 15: 0, 1, 1 — no strike.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T19:35:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-1 (high/high), confirmed by execution: jest declares `--reporters` as a yargs array option and yargs-parser''s greedy-arrays default consumes every following non-dash token into it, so `npx jest --ci --reporters default ./zzrep.js` — `default` admitted by JEST_REPORTERS, `./zzrep.js` admitted as a POS.PATHS test path — parses as reporters [default, ./zzrep.js] and jest requireOrImportModule()s `./zzrep.js` before any test runs. Executed through the clone''s own verifier in consumer9: `confirmed`, CANARY-JEST-REPORTER.txt written. The joined form behaves the same.'
+    suggested_action: 'Drop `--reporters`/`--reporters=` from the jest spec (the default reporter is what a figure reads) — identity principle; refused-list tests for the spaced and joined greedy spellings; confirm no other admitted flag on any tool is an array/greedy option.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.21.jest-reporters-is-a-greedy-array-option.md'
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-2 (medium/high), confirmed in-process: WHITELIST, NPX_TOOLS, GIT_SPECS, UTIL_SPECS are plain objects looked up without an own-property check, so `constructor rm -rf x` and `toString anything` are admitted (Object / Object.prototype.toString return truthy), `git hasOwnProperty x` and `npx constructor foo` pass, and `__proto__ x` throws "rule is not a function" out of isAllowed and verify — one handoff line crashes the run.'
+    suggested_action: 'Object.hasOwn at every table lookup (isAllowed, npxRule, gitRule, utilRule) and a try/catch around isAllowed in verify() so a throw is `unverifiable: could not run`; refused tests for constructor/toString/__proto__ at the binary, npx-tool and git-subcommand positions; a verify test that a throwing rule yields a verdict.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.22.prototype-keys-are-whitelist-rules.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 32
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 3672
+    notes: '3,653 prior spellings re-run (no decision change); 8 in-process on the reviewer''s two classes; 8 executed end-to-end through the clone''s own verifier at 72bf03b4 against consumer9 under CI=false and CI=1 — every cycle-14 spelling refused, no emit, no snapshot; `--reporters default ./zzrep.js` executed the module; 4 mutation proofs covered; TMPDIR=/tmp 32/32.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 32/32; full hermetic suite 3302 pass / 0 fail; the widened cap test ran in 145 ms.'
+  reliability:
+    status: CONCERNS
+    notes: 'A `__proto__` line crashes the run (bug.22).'
+  maintainability:
+    status: PASS
+    notes: 'Comments and SKILL.md match the code.'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent, unscoped safety re-probe over the code-only branch diff (4,554 lines) plus the cycle-14 fix diff, dispatched 19:13 returned 19:24 (10m55s — marginally past the 10-minute budget, not killed; block in hand before this gate); parsers checked against the installed jest-cli 30.3.0 + yargs-parser 21.1.1 and vitest 4.1.11'
+  bugs: 2
+  cleanups: 0
+  boundary: true
+  probes_executed: 3672
+  promoted: ['CR-1 → QA-1 (executed)', 'CR-2 → QA-2 (confirmed in-process)']
+  advisory: ['gate-8..14 advisories unchanged']
+
+recommendations:
+  immediate:
+    - action: 'bug.21 — drop jest --reporters; bug.22 — own-property lookups and a verdict for a throwing rule'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+  future:
+    - action: 'Scrubbed child environment; quoted-glob tokenising'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 2
+  fix_date: '2026-09-15'
+  total_iterations: 14
+  verification_method: 'Executed probes through the clone''s own verifier and the consumer-shaped project under a stripped environment; in-process regression re-run; four mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['bug.21 closed', 'bug.22 closed']

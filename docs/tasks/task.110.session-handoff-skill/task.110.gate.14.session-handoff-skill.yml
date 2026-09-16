@@ -1,0 +1,99 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: FAIL
+status_reason: 'The cycle-13 5c fixes verified (tsc true/false refused, mocha no positional, gh --jq env refused, kill-on-cap; five mechanisms mutation-proven; re-executed through the clone at e7eca2b4 and consumer9: `--noEmit false` refused, no emit). Unscoped safety re-probe (QA judgement — 5c had found an executed HIGH on the boundary one cycle after a measured PASS) found the class the 5c fix closed one spelling of: a positional the specs read as a file is read by the tool as a flag VALUE or a RESPONSE FILE — `npx tsc --noEmit null zz.ts` and `npx tsc --noEmit @tsargs.txt` (a repository file carrying `--noEmit false`) both emitted, and `npx jest --ci false` wrote a snapshot (bug.19, HIGH, all three executed in the consumer-shaped project). The runner defaults CI only when unset, so an inherited CI=false let `npx jest --silent` write a snapshot with no flag at all (bug.20, MEDIUM, executed). Two LOW (tsbuildinfo under an incremental tsconfig; the cap test''s 10 s bound went red once under the full suite at concurrency 4) and two cleanups. Bugs 1–18 remain closed. HIGH across gates 12, 13, 14: 0, 0, 1 — no strike.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T18:40:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'A positional an npx spec reads as a file is read by the tool as something else: TypeScript consumes a following `null` for any option (`--noEmit null` → unset → emit) and reads an `@`-prefixed positional as a RESPONSE FILE whose contents are argv (`--noEmit @tsargs.txt` with a repo file `--noEmit false zz.ts` → emit — every refused flag back through a data file, the bug.14 shape); jest''s yargs consumes a following true/false and jest-config sets updateSnapshot=new when ci is false (`--ci false` → snapshot files written, inline-snapshot test sources rewritten). All three executed through the CLI in the consumer-shaped project with typescript/jest declared. Reviewer CR-1/CR-2/CR-3 (high/high ×3), folded: one class, one rule.'
+    suggested_action: 'One universal rule in npxRule after the tool spec passes: refuse any positional matching /^(true|false|null)$/i or beginning with `@` — fold the tsc-only positionalPattern into it. Refused-list tests: `npx tsc --noEmit null`, `--noEmit null src`, `--noEmit @x`, `npx jest --ci false`, `--silent false`, `npx vitest --run false x`, `npx prettier --check @x`; mutation = the rule removed.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.19.npx-positionals-read-as-flag-values-and-response-files.md'
+    status: open
+  - id: 'QA-2'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-4 (medium/medium), confirmed by execution: defaultRunner sets `CI: process.env.CI ?? "1"`, so an inherited `CI=false` reaches the child; `npx jest --silent` under env -i CI=false wrote a snapshot through read mode with no flag in the handoff line. SKILL.md''s "the runner is non-TTY with CI=1" is conditional on the reader''s shell.'
+    suggested_action: 'Force `CI: "1"` unconditionally in the child env; runner test that an inherited CI=false does not reach the child; mutation = the `??` restored.'
+    suggested_owner: dev
+    bug_ref: 'task.110.bug.20.runner-inherits-ci-false.md'
+    status: open
+  - id: 'QA-3'
+    severity: low
+    file: 'skills/session-handoff/tests/handoff-verify.test.js'
+    finding: 'The cycle-13 cap test asserts the runner resolves within 10 s of the kill-at-cap; under the full suite at concurrency 4 it went red once at 20.2 s (the child''s linger) while passing 3/3 alone and 1/1 at concurrency 4 over four files. The bound is too tight for a loaded machine, not the mechanism (kill-on-cap mutation-proven red). QA drafted and reverted the widening — it is qa-fix''s edit.'
+    suggested_action: 'Write 18 MB past the cap, linger 45 s, runner timeout 90 s, bound 40 s — the only way to resolve inside the bound is the kill at the cap, with slack for load.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-4'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-5 (low/medium): under a repository tsconfig with `incremental`/`composite`, tsc ≥ 4.0 writes `*.tsbuildinfo` even with --noEmit; `-p tsconfig.json` and the bare tsconfig-driven run reach it although `--incremental`/`--tsBuildInfoFile` are refused. Reviewer CR-6/CR-7 cleanups: bare `--jq`/`-q` in GH_API_FLAGS are dead after the valueFlags change; the tsc pattern''s /i over-approximates tsc''s case-sensitive compare (harmless; say so).'
+    suggested_action: 'Document the tsbuildinfo residual in the SKILL.md tsc row as a known in-repo-config write; drop the dead entries; reword the comment.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 3680
+    notes: '3,653 prior spellings re-run (only the intended mocha moves); 16 boolean-value spellings across every npx tool in-process; 11 executed end-to-end through the clone''s own verifier at e7eca2b4 and the consumer-shaped project (typescript + jest declared) under env -i: the cycle-13 spellings refused; `--noEmit null`, `--noEmit @tsargs.txt`, `jest --ci false` and `jest --silent` under CI=false each wrote into the tree; five mutation proofs covered; TMPDIR=/tmp 31/31. The reviewer verified the parsers against the installed TypeScript, jest-cli/yargs-parser, prettier and vitest sources.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 31/31 alone; full suite 3300 pass / 1 fail — the one failure is the cap test''s timing bound under load (QA-3), not a mechanism.'
+  reliability:
+    status: CONCERNS
+    notes: 'Kill-on-cap holds (mutation red) but its test is load-sensitive (QA-3); the runner''s CI promise is conditional on the reader''s shell (QA-2).'
+  maintainability:
+    status: PASS
+    notes: 'Two dead GH_API_FLAGS entries and one over-precise comment (QA-4).'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent, unscoped safety re-probe over the code-only branch diff (4,488 lines) plus the cycle-13 fix diff, dispatched 18:12 returned 18:24 (12m06s — past the 10-minute budget, not killed; block in hand before this gate); it verified tool parsers against the installed TypeScript 6.0.3, jest-cli 29.7 + yargs-parser 21, prettier 3.9.6 and vitest 4.1.11'
+  bugs: 5
+  cleanups: 2
+  boundary: true
+  probes_executed: 3680
+  promoted: ['CR-1 + CR-2 + CR-3 → QA-1 (one class; all executed by QA)', 'CR-4 → QA-2 (executed)', 'CR-5 + CR-6 + CR-7 → QA-4 at low']
+  advisory: ['gate-8..13 advisories unchanged; the win32 taskkill branch is platform-only and untested on darwin']
+
+recommendations:
+  immediate:
+    - action: 'bug.19 — universal npx positional rule (no true/false/null, no @file); bug.20 — CI forced to 1'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+    - action: 'QA-3 — cap test bound; QA-4 — document tsbuildinfo, drop dead entries'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: 'Scrubbed child environment; quoted-glob tokenising'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 2
+  fix_date: '2026-09-15'
+  total_iterations: 13
+  verification_method: 'Executed probes through the clone''s own verifier and the consumer-shaped project under a stripped environment; in-process regression re-run; five mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['bug.19 closed', 'bug.20 closed']

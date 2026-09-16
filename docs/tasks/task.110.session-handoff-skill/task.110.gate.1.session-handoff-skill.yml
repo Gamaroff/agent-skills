@@ -1,0 +1,117 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: FAIL
+status_reason: 'The read-only whitelist — the one risk §10 names — admits mutating shapes: gh api -XPOST/--method=, git branch -D / tag / remote add / --output=, node -e. Found by executing 56 hostile probes against isAllowed and confirmed by the independent diff review. Deliverable, tests and wiring are otherwise sound.'
+reviewer: 'QA Engineer'
+updated: '2026-09-14T21:03:39Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The gh api rule only refuses space-separated flag forms, so gh api --method=DELETE …, gh api -XPOST … and gh api --field=title=x … pass the read-only whitelist and would execute a mutating request.'
+    suggested_action: 'Match flags by prefix (/^(-X|--method|-f|-F|--field|--raw-field|--input)(=|$)/ plus /^-[XfF]./), or only allow gh api when every argument is a bare path / --jq / --paginate.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'GIT_READ_ONLY admits branch, tag and remote unconditionally (git branch -D develop, git tag v9, git tag -d v1, git remote remove origin all execute), and git log/show/diff --output=<file> writes a file — the corpus case shell-exec.git-diff-output was accepted.'
+    suggested_action: 'Restrict branch/tag/remote to list/inspect shapes (no positional ref for tag/branch; refuse -d/-D/-m/-M/--delete/add/remove/set-url/rename/prune/update) and refuse any --output argument on every git subcommand.'
+    suggested_owner: dev
+    status: open
+  - id: 'PRB-1'
+    severity: high
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'node: () => true and python3: () => true accept inline code (node -e "require(\"fs\").rmSync(\"x\")", node --eval, python3 -c) and npx accepts any package with --check/--dry-run (npx prettier --write --check . passes) — the handoff document itself becomes executable, contradicting the read-only contract. (QA probe; CR-5 reports the same at medium/medium.)'
+    suggested_action: 'Refuse node/python3 eval and preload flags (-e --eval -p --print -c -m -r --require --import --input-type, and a bare -), require the script argument to be a relative path without .., refuse npx when --write/-w is present and restrict its binary to a known read-only set; move the timeout test off node -e.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'new RegExp(rx[1], rx[2]) is unguarded: an expect: that looks like a slash path (expect: /usr/bin/node) or a malformed regex throws inside parseHandoff and aborts the whole run with a stack trace instead of one unverifiable line.'
+    suggested_action: 'Wrap the RegExp construction in try/catch and surface the line as unverifiable: bad expect regex.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'A blank line does not end the header table, so a second table following it after only a blank line has its header, separator and body rows emitted as command=null figures, inflating the unverifiable count.'
+    suggested_action: 'Treat a blank line as the end of the current table (reset headerCols and sawHeaderSeparator on an empty line), as Markdown does.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-7'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'shellQuote single-quotes tokens containing * ? [ ~, so a recorded ls docs/tasks/*.md runs as a literal path and is reported command failed although it worked for the author — undocumented divergence.'
+    suggested_action: 'Refuse glob/tilde tokens with an explicit unverifiable: glob not supported detail (and say so in SKILL.md), or leave bare glob metacharacters unquoted since SHELL_OPERATOR already blocks operators.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-8'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'stripEmphasis treats snake_case underscores as emphasis and is applied to both sides with different underscore counts, so **probes_executed** against probes_executed: 3 normalises differently on each side → false stale.'
+    suggested_action: 'Strip underscore emphasis only at word boundaries, or drop the underscore rule since normalise already maps _ to a space.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-9'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'A table row with an empty or punctuation-only Result cell yields figures [""], so the command runs and reports stale — moved: (empty) instead of unverifiable: no figure.'
+    suggested_action: 'Drop figures whose normalised form is empty so the existing no figure branch fires.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-10'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The find rule omits the file-writing actions -fprint, -fprint0, -fprintf, -fls and -okdir, so find . -fprint /tmp/out is whitelisted and writes a file.'
+    suggested_action: 'Refuse any argument matching /^-(delete|exec|execdir|ok|okdir|fprint0?|fprintf|fls)$/.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 30
+
+evidence:
+  tests_reviewed: 17
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: FAIL
+    evidence: measured
+    probes_executed: 56
+    notes: '31 shell-exec corpus cases + 25 whitelist-specific hostile inputs executed against isAllowed(): 1 corpus hostile accepted (git diff --output) and 10 hand-picked hostile shapes accepted (node -e, node --eval, gh api -XPOST, npx --write --check, git remote add/set-url, git branch -D, git tag -d, embedded newline, find -fprint). The whitelist is the safety boundary §10 names; it is present but porous.'
+  performance:
+    status: PASS
+    notes: 'Read mode over the live handoff completes in seconds at --timeout 20 (slow rows land unverifiable: timeout by design). No hot path.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-3 (a malformed expect: aborts the whole run) and CR-6 (a timed-out child keeps running under bash 3.2) — both degrade a per-line verdict into a process-level failure.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR-12 dead split in firstLines; CR-13 tests leak temp dirs; otherwise well-structured, header-documented, 17 tests with three mutants proved at dev time and one re-proved here.'
+
+recommendations:
+  immediate:
+    - action: 'Close the whitelist: prefix-match gh flags, restrict git branch/tag/remote, refuse --output, refuse node/python3 eval flags and npx --write, extend the find deny-list.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+    - action: 'Guard the expect: RegExp and end a table on a blank line.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+    - action: 'Add a test that feeds the shell-exec corpus (and the hand-picked hostile shapes) through isAllowed and asserts every hostile input is refused — the probe that found these, made permanent.'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: 'Kill the process group on timeout (CR-6); decide glob policy (CR-7); word-boundary underscore stripping (CR-8); empty Result cell → no figure (CR-9); treat grep exit 1 as a measurement (CR-11); remove the dead split (CR-12); clean temp dirs in tests (CR-13).'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['All HIGH findings closed and the whitelist probe test committed']

@@ -1,0 +1,78 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: CONCERNS
+status_reason: 'The allow-list mechanism holds: 0/73 corpus hostile accepted across all five sinks, a third fresh enumeration of 170 spellings (flag values, positional verbs, tokenizer edges) accepted nothing that mutates or executes from outside the repo — with one exception. Joined name=value flag values skip the no-..-no-absolute check that separate-token values get, so npx prettier --config=../evil.js (a .js config executes) reaches outside the cwd. Medium: it needs both a committed handoff line and an attacker file already on the reader'"'"'s disk, unlike the cycle-1/2 shapes which needed only the commit. No HIGH; no third strike.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T03:49:51Z'
+
+top_issues:
+  - id: 'PRB-6'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'checkArgs validates only the NAME of a name=value flag, so --config=../evil.js, --config=/abs/evil.js, --ignore-path=../x, -p=../x pass while the separate-token forms (-c ../evil.js) are refused by the positional policy; prettier/eslint/stylelint configs may be JavaScript, so this executes code from outside the cwd.'
+    suggested_action: 'Validate the value of every name=value flag with the same rule as a positional (no .. segment; no leading / unless the spec allows absolute paths).'
+    suggested_owner: dev
+    status: open
+  - id: 'PRB-7'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The async runner accumulates stdout/stderr without bound (the spawnSync maxBuffer went with the wrapper); a chatty command can grow two strings without limit.'
+    suggested_action: 'Cap collected output (e.g. 64 MiB) and mark the run as truncated in measured.'
+    suggested_owner: dev
+    status: open
+  - id: 'PRB-8'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'git ls-remote accepts any positional, so a handoff can point the reader at an arbitrary remote URL (a network read with the reader'"'"'s SSH agent); npm run eval: with an empty suffix is admitted by the prefix rule (harmless: npm errors).'
+    suggested_action: 'Restrict ls-remote positionals to remote names / patterns without a URL scheme; require a non-empty eval:<name>.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 27
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 243
+    notes: 'QA: 73 corpus cases (0 hostile accepted) + 170 fresh spellings (flag values, positional verbs, tokenizer edges). Every cycle-2 shape refused; property test holds; two mechanisms re-proved by mutation (git positional gate, gh api flag gate). One medium invariant gap (PRB-6). Reviewer subagent: killed at 12 minutes (budget 10) — the pass was performed inline; independence lost on this cycle.'
+  performance:
+    status: PASS
+    notes: 'Async runner; live handoff read in seconds at --timeout 20.'
+  reliability:
+    status: PASS
+    notes: 'Missing binary resolves (could not run); activeChild resets between figures; SIGINT and timeout both kill the group (tests + mutation).'
+  maintainability:
+    status: PASS
+    notes: 'Specs are data; the property test makes adding a binary safe by default.'
+
+recommendations:
+  immediate:
+    - action: 'Validate name=value flag values as positionals (PRB-6); add the joined forms to the refused list.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+  future:
+    - action: 'PRB-7 output cap; PRB-8 ls-remote / eval: tightening.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 2
+  verification_method: 'Every gate-2 shape re-probed (refused); corpus 0/73; property test; SIGINT test; 2 QA mutation proofs (covered)'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['PRB-6 closed']

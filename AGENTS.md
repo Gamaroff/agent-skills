@@ -2,7 +2,7 @@
 
 This file provides guidance to AI agents working with code in this repository.
 
-> **Picking up work here? Read [`.agents/handoff.md`](./.agents/handoff.md) first** — where things stand, what to pick up, the standing decisions, and the traps that cost time. Its state figures each carry the command that produced them: **re-run those commands rather than trusting the date at the top**. State decays within days (branch tip, what is in flight, next available task number); the traps live in [`docs/contributing/traps.md`](./docs/contributing/traps.md) and stay true much longer.
+> **Picking up work here? Read [`.agents/handoff.md`](./.agents/handoff.md) first** — where things stand, what to pick up, the standing decisions, and the traps that cost time. Its state figures each carry the command that produced them: **re-measure them rather than trusting the date at the top** — `command node .agents/skills/session-handoff/scripts/handoff-verify.mjs` (the `session-handoff` skill's read mode) re-runs every one and reports each line as confirmed, stale or unverifiable. State decays within days (branch tip, what is in flight, next available task number); the traps live in [`docs/contributing/traps.md`](./docs/contributing/traps.md) and stay true much longer.
 
 ## Repository Purpose
 

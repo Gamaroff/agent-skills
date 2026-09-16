@@ -1,0 +1,76 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: CONCERNS
+status_reason: 'Cycle-4 fixes verified (CR-1/2/3 closed). The narrowed review found a REGRESSION introduced by the cycle-4 fix for CR-3: the global PATTERN_FLAGS exemption covers --reporter/--reporters/--format/--formatter, which for mocha/jest/eslint/stylelint name a JS module to load, so npx mocha --reporter=/tmp/evil.js is allowed again — the gate-3 invariant re-broken for those four flags. Medium by the gate-3 reasoning (needs a committed handoff line and an attacker file already on disk); no HIGH; HIGH sequence 3, 7, 0, 0, 0.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T04:14:45Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'PATTERN_FLAGS exempts --reporter, --reporters, --format and --formatter from the absolute-path rule, but under mocha/vitest/jest/eslint/stylelint those flags name a JS module to LOAD, so npx mocha --reporter=/tmp/evil.js, npx jest --reporters=/tmp/evil.js, npx eslint --format=/tmp/evil.js are allowed (verified) — a regression of the gate-3 invariant introduced by the cycle-4 fix.'
+    suggested_action: 'Make the pattern exemption per-spec (a patternFlags list on each spec) rather than a global name set; module-loading flags under npx tools keep the path rule.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'The defaultRunner JSDoc omits the truncated field verify() now branches on.'
+    suggested_action: 'Add truncated to the runner contract comment.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'After setEncoding the cap compares UTF-16 code units, so the 16 MiB wording is inexact for non-ASCII output; the ls-remote anchor comment attributes the slash rule to the regex when POS.PATHS already provides it.'
+    suggested_action: 'Word the cap as characters (or count bytes); reword the anchor comment.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 28
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 243
+    notes: 'All three enumerations + corpus re-run against the cycle-4 build: 0 hostile accepted. CR-1 is a regression in the cycle-4 fix, found by the narrowed reviewer (1m44s), reproduced via isAllowed.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Truncation now reports unverifiable (mutation-proved in cycle 4).'
+  maintainability:
+    status: PASS
+    notes: 'Two comment-accuracy cleanups.'
+
+recommendations:
+  immediate:
+    - action: 'Per-spec patternFlags; refuse module-loading flag values under npx tools; add the four shapes to the refused list.'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/tests/handoff-verify.test.js']
+  future: []
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 4
+  verification_method: 'Cycle-4 shapes re-probed; cap test asserts the verdict; corpus 0/73'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 closed']

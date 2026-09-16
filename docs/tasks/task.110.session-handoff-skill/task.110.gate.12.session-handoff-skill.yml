@@ -1,0 +1,81 @@
+schema: 1
+task: 'task.110.session-handoff-skill'
+task_title: 'A session-handoff skill that writes the handoff and re-measures it on read'
+gate: PASS
+status_reason: 'Cycle-11 refinements verified (QA-1..4 closed; three mechanisms mutation-proven covered; the 3,653 prior spellings re-run — only the four intended eslint decisions moved; five spellings executed through the clone''s own verifier at 5f6e67cd — refused or ran as documented). Bugs 1–18 closed; no HIGH, no MEDIUM; security PASS measured; every NFR PASS. Two LOW nits from the narrowed review remain open — ESLINT_CONFIG admits a basename containing `..` (`x..json`, a file name, not a traversal) because valuePatterns is a full answer before the `..` rule the shared data kind carries; and the VALUE_KINDS doc block / SKILL.md still cite `.eslintrc` as a data-dotfile example though eslint no longer uses the data kind — so the gate carries an open queue of two one-liners and routes to qa-fix once more before 5c.'
+reviewer: 'QA Engineer'
+updated: '2026-09-15T17:30:00Z'
+
+top_issues:
+  - id: 'QA-1'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-1 (low/high), confirmed: ESLINT_CONFIG is checked through valuePatterns — a full answer before the `..` rule — and its classes admit `..` inside a name, so `npx eslint -c x..json .` and `-c a../x.json .` are admitted while the shared data kind refuses the identical prettier value. A true `..` segment (`../x.json`, `a/../x.json`) is refused, so this is an invariant inconsistency, not traversal.'
+    suggested_action: 'Refuse `..` anywhere in ESLINT_CONFIG (a negative lookahead, or route eslint''s config through a VALUE_KINDS entry that shares the data guard); refused test for `npx eslint -c x..json .`.'
+    suggested_owner: dev
+    status: open
+  - id: 'QA-2'
+    severity: low
+    file: 'skills/session-handoff/scripts/handoff-verify.mjs'
+    finding: 'Reviewer CR-2 (cleanup): the VALUE_KINDS doc block and the SKILL.md npx row cite `.eslintrc` as the canonical data-dotfile example, but eslint no longer uses the data kind after cycle 11 — the example names a value the verifier refuses.'
+    suggested_action: 'Replace `.eslintrc` with `.markdownlintrc` in both places; keep the eslint-9 rationale beside ESLINT_CONFIG where it now lives.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 31
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 3661
+    notes: '3,653 prior spellings re-run in-process and diffed against gate 11 (four intended eslint moves, zero collateral); 5 executed through the clone''s own verifier at 5f6e67cd under env -i (`-c .zzrc` refused, `--config=.prettierrc` ran, `null//env` refused, the gate-9 PRD spelling refused; `-c .eslintrc.json` ran npx, which timed out retrying the offline local registry — the documented manifest-GET residual); 3 mutation proofs covered; TMPDIR=/tmp 31/31. No reachable write or egress; the open LOW is a file-name cosmetic.'
+  performance:
+    status: PASS
+    notes: 'Skill suite 31/31; full hermetic suite 3301 pass / 0 fail / 1 skipped.'
+  reliability:
+    status: PASS
+    notes: 'JSON contract holds; no orphaned children.'
+  maintainability:
+    status: PASS
+    notes: 'Comments and SKILL.md match the code except the `.eslintrc` example (QA-2, one word in two places).'
+
+code_review:
+  blocking: true
+  reviewer: 'Explore subagent over the files changed since gate 11 (fix diff 5f6e67cd, 121 lines), dispatched 17:14 returned 17:16 (1m17s); read-only with in-process isAllowed probes'
+  bugs: 1
+  cleanups: 1
+  boundary: true
+  probes_executed: 3661
+  promoted: ['CR-1 → QA-1 at low', 'CR-2 → QA-2 at low']
+  advisory: ['gate-8..11 advisories unchanged']
+
+recommendations:
+  immediate:
+    - action: 'QA-1, QA-2 — two one-liners'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs', 'skills/session-handoff/SKILL.md']
+  future:
+    - action: 'Scrubbed child environment; quoted-glob tokenising'
+      refs: ['skills/session-handoff/scripts/handoff-verify.mjs']
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  fix_date: '2026-09-15'
+  total_iterations: 11
+  verification_method: 'In-process regression re-run; executed probes through the clone''s own verifier under a stripped environment; three mutation proofs; full hermetic suite'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
