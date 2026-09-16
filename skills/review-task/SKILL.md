@@ -707,9 +707,16 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - An `empty` finding → **Critical** (or **Important** for an optional block).
      The heading exists but holds only a table or a code block, so there is no
      prose or list to summarise.
+   - A `heading-only` finding → **Critical** (or **Important** for an optional
+     block). The section is present and useless: a bold label or sub-heading
+     with nothing under it. Put a sentence or a list under the label.
    - A `no-body` finding → **Critical**. Nothing resolved; the card would publish
      an empty description.
-   - Exit 0 → no finding. Do **not** raise anything about card length: the
+   - Exit 0 → no finding, **within the check's own scope** — the clean line says
+     `N card blocks resolve — this checks the card sections only, not template
+     completeness`, and means it. Section presence (check 1 above) is this
+     step's job, not the preflight's; `task.103` passed the preflight with ten
+     sections of eleven. Do **not** raise anything about card length: the
      builder caps it (4-sentence summary, 5 success criteria, 3 breaking changes) and announces every omission
      with a `+N more` link, so a long document cannot produce a long card.
 
@@ -718,7 +725,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
 **Issues to Flag**:
 
-- **Critical**: Missing required sections (Implementation Plan, Testing Strategy); unsigned sign-off when `sign-off.enforcement: blocking`; a tracker-card block that fails preflight with `missing`, `empty`, or `no-body`
+- **Critical**: Missing required sections (Implementation Plan, Testing Strategy); unsigned sign-off when `sign-off.enforcement: blocking`; a tracker-card block that fails preflight with `missing`, `empty`, `heading-only`, or `no-body`
 - **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage; unsigned sign-off when `sign-off.enforcement: advisory` (the default)
 - **Optional**: Missing optional sections or metadata; a numbered `## 12. Stakeholder Sign-off` heading
 

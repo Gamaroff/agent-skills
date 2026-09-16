@@ -352,9 +352,14 @@ node references/card-preflight.js --file "${PRD_ROOT}/[domain]/[feature]/epics/e
 Offline — no auth, no network, no writes. It reports whether this document will publish a complete
 tracker card or a thin one, printing the exact heading to add or rename beside each finding.
 
-- **No findings** → say nothing. A clean preflight is not news.
+- **No findings** → say nothing. A clean preflight is not news — and it is not an all-clear: the
+  clean line ends `N card blocks resolve — this checks the card sections only, not template
+  completeness`, because it reads the handful of headings the card is built from and nothing else.
+  Template completeness is the step above's job, not this call's.
 - **Findings** → print the tool's output verbatim and tell the user it is **advisory**: the document
-  is not blocked, and `/review-epic` is the gate that will block it.
+  is not blocked, and `/review-epic` is the gate that will block it. A `heading-only` finding means the
+  section is present and useless — a bold label (`**Functional**:`) or sub-heading with nothing
+  under it; put a sentence or a list under the label rather than deleting the label.
 
 Do not paraphrase a finding or re-derive its fix, and **never restate the list of required sections
 in this skill**. The list lives once, in `CARD_SECTIONS_BY_KIND` in `references/jira-sync.js`;

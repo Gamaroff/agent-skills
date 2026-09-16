@@ -9,7 +9,7 @@ status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-09
-updated: 2026-09-10
+updated: 2026-09-17
 completed_date: 2026-09-10
 pr_number: 377
 assignee:
@@ -163,6 +163,8 @@ prefix, and the lead must be the first thing a human sees.
 ---
 
 ## 5. Breaking Changes
+
+Every comment body posted through `tracker-comment.js` gains a plain-language leading paragraph, and a comment for which no lead can be produced no longer posts.
 
 ### 5.1 Every posted body gains a leading paragraph
 
@@ -481,6 +483,7 @@ Jira arm, with a `status: closed` sitting on top of it. That is the case the ref
 | 2026-09-10 |  | QA cycle 2 (refute pass) — gate PASS 92/100, zero open findings. 4 new findings + 2 cleanups, both defects in cycle 1's own fixes: slot coercion was swallowing legitimate text values, and a zero-width-only summary file bypassed the empty check. all in cycle 1's own fixes, all closed and mutation-proven within the cycle | qa-task |
 | 2026-09-10 |  | Step 5c PR review — CONCERNS, 11 findings all resolved. The head commit was missing a full cycle of work gate 2 had certified; also three low-severity slot-coercion bugs, and contract/report/document accuracy corrections | review-pr |
 | 2026-09-10 | 1.2 | DoD verified 13/13 — accepted (PR #377). Security measured with 45 boundary probes, 0 reproduced; CI green on acd0dcd4 | finalise |
+| 2026-09-17 |  | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
 
 ---
 

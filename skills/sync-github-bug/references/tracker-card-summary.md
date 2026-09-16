@@ -159,11 +159,15 @@ node .agents/skills/sync-jira-task/scripts/sync-jira-task.js --file <doc.md> --c
 No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 =
 findings, each printed with its fix. `--json` gives `{ok, findings, blocks}`.
 Finding codes: `missing` (no heading matched), `empty` (heading present but
-nothing summarisable under it), `no-body` (nothing resolved at all), `no-table`
-(epic Stories Breakdown has no overview table).
+nothing summarisable under it), `heading-only` (heading present, but what is
+under it is a bold label or sub-heading with nothing beneath — present and
+useless), `no-body` (nothing resolved at all), `no-table` (epic Stories
+Breakdown has no overview table). A clean result ends with a scope line —
+`N card blocks resolve — this checks the card sections only, not template
+completeness` — because `ok: true` was being read as a structural all-clear.
 
 `review-story`, `review-task` and `review-epic` run this in their template
-compliance step and treat `missing` / `empty` / `no-body` as **Critical**. The
+compliance step and treat `missing` / `empty` / `heading-only` / `no-body` as **Critical**. The
 fix always belongs in the document — no code can invent a Summary the file does
 not contain.
 

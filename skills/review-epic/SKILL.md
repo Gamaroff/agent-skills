@@ -269,6 +269,8 @@ the exact fix. Add `--json` for a machine-readable `{ok, findings, blocks}`.
   not have.
 - An `empty` finding → **Critical**. The heading exists but holds only a table or
   code block, so there is no prose to summarise.
+- A `heading-only` finding → **Critical**. The section is present and useless: a
+  bold label or sub-heading with nothing under it. Put a sentence under the label.
 - A `no-table` finding on Stories Breakdown → **Important**. The card cannot show
   which stories exist. Add a pipe table (commonly under `### Stories Overview`).
 - Exit 0 → no finding. Do **not** raise anything about card length: the builder

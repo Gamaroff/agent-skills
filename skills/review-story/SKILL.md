@@ -798,6 +798,9 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - An `empty` finding → **Critical** (or **Important** for an optional block).
      The heading exists but holds only a table or a code block, so there is no
      prose or list to summarise.
+   - A `heading-only` finding → **Critical**. The section is present and
+     useless: a bold label or sub-heading with nothing under it. Put a sentence
+     or a list under the label.
    - A `no-body` finding → **Critical**. Nothing resolved; the card would publish
      an empty description.
    - Exit 0 → no finding. Do **not** raise anything about card length: the
@@ -809,7 +812,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 
 **Issues to Flag**:
 
-- **Critical**: Missing required sections (Story, ACs, Tasks, Dev Notes); unsigned sign-off when `sign-off.enforcement: blocking`; a tracker-card block that fails preflight with `missing`, `empty`, or `no-body`
+- **Critical**: Missing required sections (Story, ACs, Tasks, Dev Notes); unsigned sign-off when `sign-off.enforcement: blocking`; a tracker-card block that fails preflight with `missing`, `empty`, `heading-only`, or `no-body`
 - **Important**: Unfilled placeholders in core sections, missing GitHub issue linkage; unsigned sign-off when `sign-off.enforcement: advisory` (the default)
 - **Optional**: Missing optional sections or subsections
 
@@ -1435,7 +1438,7 @@ Report:  <path>
 > Card preflight (Step 2 check 6a) has no dimension of its own. A document that
 > cannot produce a usable tracker card is a template-compliance defect, so its
 > findings lower **Template Compliance** and are named in that row's note. A
-> `missing` / `empty` / `no-body` finding is Critical, which the verdict rules
+> `missing` / `empty` / `heading-only` / `no-body` finding is Critical, which the verdict rules
 > above already turn into NO-GO (Rework) whatever the numeric score.
 
 **Overall:** [weighted average]/10
