@@ -353,6 +353,7 @@ None.
 | 2026-09-16 |  | QA findings fixed — cycle 3: anchored hook identity (bug.4), detector chooses snapshot vs claim by document then age (bug.5), null-safe jq rewrite, wizard dry-run guard; 3 iterations so far, awaiting re-review | qa-fix |
 | 2026-09-16 |  | QA gate CONCERNS (80/100), cycle 4 — cycle-3 fixes verified, bug.4/bug.5 closed; 1 MEDIUM (identity fallback collision, bug.6) + 4 LOW (empty-group prune, null command, wizard set -e, ls exit status) | qa-task |
 | 2026-09-16 |  | QA findings fixed — cycle 4: namespaced hook identity (bug.6), filter-emptied-only prune, null-safe command, wizard error path, exit-clean detector listing, PR_REPO from URL; 4 iterations so far, awaiting re-review | qa-fix |
+| 2026-09-16 |  | QA gate PASS (100/100), cycle 5 — cycle-4 fixes verified, bug.6 closed; no attributable findings; 4 advisories recorded | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -378,31 +379,27 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-16 (cycle 4)
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Testing Date**: 2026-09-16 (cycle 5)
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.120.qa.4.hook-idempotence-and-badge-drift.md](./task.120.qa.4.hook-idempotence-and-badge-drift.md) (earlier: [qa.1](./task.120.qa.1.hook-idempotence-and-badge-drift.md), [qa.2](./task.120.qa.2.hook-idempotence-and-badge-drift.md), [qa.3](./task.120.qa.3.hook-idempotence-and-badge-drift.md))
-- **Gate File**: [task.120.gate.4.hook-idempotence-and-badge-drift.yml](./task.120.gate.4.hook-idempotence-and-badge-drift.yml) (earlier: [gate.1](./task.120.gate.1.hook-idempotence-and-badge-drift.yml), [gate.2](./task.120.gate.2.hook-idempotence-and-badge-drift.yml), [gate.3](./task.120.gate.3.hook-idempotence-and-badge-drift.yml))
+- **Full Report**: [task.120.qa.5.hook-idempotence-and-badge-drift.md](./task.120.qa.5.hook-idempotence-and-badge-drift.md) (earlier: [qa.1](./task.120.qa.1.hook-idempotence-and-badge-drift.md), [qa.2](./task.120.qa.2.hook-idempotence-and-badge-drift.md), [qa.3](./task.120.qa.3.hook-idempotence-and-badge-drift.md), [qa.4](./task.120.qa.4.hook-idempotence-and-badge-drift.md))
+- **Gate File**: [task.120.gate.5.hook-idempotence-and-badge-drift.yml](./task.120.gate.5.hook-idempotence-and-badge-drift.yml) (earlier: [gate.1](./task.120.gate.1.hook-idempotence-and-badge-drift.yml), [gate.2](./task.120.gate.2.hook-idempotence-and-badge-drift.yml), [gate.3](./task.120.gate.3.hook-idempotence-and-badge-drift.yml), [gate.4](./task.120.gate.4.hook-idempotence-and-badge-drift.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3312 (`npm run ci:fast`) incl. 15 hook, 11 installer, 8 generator scenarios; cycle-3 fixes mutation-proven again; 25 boundary probes cumulative
+- **Tests Executed**: 3312 (`npm run ci:fast`) incl. 15 hook, 11 installer, 8 generator scenarios; 20 mutation proofs `covered` across the loop; 27 boundary probes cumulative
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 (1 MEDIUM, 4 LOW open)
-- **NFR Status**: Security: PASS (measured), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (no open findings)
+- **NFR Status**: Security: PASS (measured), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycles 1–3: all findings verified FIXED; bug.1–bug.5 Closed
-- Cycle 4: **CR-1 (MEDIUM)** the identity's verbatim fallback collides with an interpreter-less `scripts/<hook>.sh` consumer command ([bug.6](./task.120.bug.6.identity-fallback-collides-with-interpreterless-command.md)); **LOW** ×4 — a pre-existing empty consumer group is pruned when a sibling matches; an element without `command` aborts the regex healer; the wizard's `return 1` under `set -e` ends the wizard; the detector's new `ls -t` block exits 1 in the empty case
-- Cycle 4 fixes (qa-fix): CR-1 → match result namespaced `develop-pipeline-hook:`; CR-2 → prune only filter-emptied groups; CR-3 → `(.command // "")`; CR-4 → wizard call sites record and continue; QA-1 → `ls -t … || true`; CR-5 → `PR_REPO` parsed from `PR_URL`. Scenarios 9 and 10 extended; 3 mutation proofs. All Ready for QA.
+- Five QA cycles; six bugs filed and all six closed; no HIGH finding in any cycle. Cycle 5: no defect attributable to the change set. Advisory (pre-existing): two byte-identical canonical entries are not collapsed. Cleanups: Scenario 14 stub distinguishability, wizard step status after a warning, detector output-field table row — recorded in gate.5 `recommendations.future`.
 
 ### Bug Reports
-- [bug.1](./task.120.bug.1.readme-prose-skill-count-drifts.md) — ✅ Closed · [bug.2](./task.120.bug.2.claim-to-snapshot-kill-window.md) — ✅ Closed · [bug.3](./task.120.bug.3.heal-removes-whole-matcher-group.md) — ✅ Closed
-- [bug.4](./task.120.bug.4.identity-collapses-consumer-scripts-hook.md) — ✅ Closed (verified cycle 4) · [bug.5](./task.120.bug.5.stale-snapshot-shadows-orphaned-claim.md) — ✅ Closed (verified cycle 4)
-- [bug.6: identity fallback collides with interpreter-less command](./task.120.bug.6.identity-fallback-collides-with-interpreterless-command.md) — ✅ Ready for QA — P2 (Fixed 2026-09-16: namespace-prefixed match result)
+- [bug.1](./task.120.bug.1.readme-prose-skill-count-drifts.md) · [bug.2](./task.120.bug.2.claim-to-snapshot-kill-window.md) · [bug.3](./task.120.bug.3.heal-removes-whole-matcher-group.md) · [bug.4](./task.120.bug.4.identity-collapses-consumer-scripts-hook.md) · [bug.5](./task.120.bug.5.stale-snapshot-shadows-orphaned-claim.md) · [bug.6](./task.120.bug.6.identity-fallback-collides-with-interpreterless-command.md) — all ✅ Closed
 
 ## References
 

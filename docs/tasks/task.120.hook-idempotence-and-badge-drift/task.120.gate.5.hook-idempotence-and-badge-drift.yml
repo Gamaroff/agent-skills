@@ -1,0 +1,61 @@
+schema: 1
+task: 'task.120.hook-idempotence-and-badge-drift'
+task_title: 'The pause hook, the hook installer and the README badge each rely on a human remembering: make them idempotent, self-healing and generated'
+gate: PASS
+status_reason: 'All cycle-4 findings verified FIXED (bug.6 closed). The scoped cycle-5 review found no defect attributable to the change set: one low/medium-confidence pre-existing gap (two byte-identical canonical entries are not collapsed — develop''s installer behaves the same) and three cleanups, all recorded as future recommendations. Five cycles, no HIGH finding in any of them; six bugs filed and closed.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T13:40:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 34
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 27
+    notes: '2 further identity probes this cycle (interpreter-less `scripts/on-stop.sh` → verbatim, never equal to the namespaced match; the canonical spelling → `develop-pipeline-hook:scripts/on-stop.sh`). Cumulative 27 hostile candidates against hook_identity across five cycles; every unrecognised spelling is left alone and the match result lives in its own namespace, so a consumer command cannot be classified as ours. The hook''s PR PATCH arm now derives owner/repo from PR_URL, so a cwd mismatch cannot build a wrong /repos path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged: hook 0.12–0.13 s, generator 0.16 s.'
+  reliability:
+    status: PASS
+    notes: 'Cycle-4 fixes verified by reproduction: interpreter-less consumer hook survives; pre-existing empty group and prompt-type element survive while the obsolete hook is removed beside them; the wizard records a forced jq failure and continues; the detector''s listing is exit-clean; four cycle-4 mutations reddened on re-execution. Advisory (pre-existing, not introduced here): two byte-identical canonical entries are not collapsed.'
+  maintainability:
+    status: PASS
+    notes: 'Cleanups recorded: Scenario 14''s gh stub cannot distinguish URL-parsed PR_REPO from the fallback; install_hooks records ok even after a helper warning; the detector''s output-field table does not yet name the orphaned claim as a current_step source.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Collapse byte-identical canonical entries under one event to one (pre-existing gap; the installer never creates this shape, a hand-edit does) — e.g. unique_by(.command) within the event, with a fixture'
+      refs: ['shared/resources/develop-pipeline-install-hooks.sh', 'scripts/setup-consumer.sh']
+    - action: 'Scenario 14: make the gh stub''s `repo view` return a distinguishable value so the PATCH assertion proves PR_REPO came from the URL parse; add a non-parsing pr_url case for the fallback'
+      refs: ['shared/resources/develop-pipeline-on-precompact.test.sh']
+    - action: 'install_hooks: record the step as warn when a helper recorded a warning, so the summary table and the warning list agree'
+      refs: ['scripts/setup-consumer.sh']
+    - action: 'Detector prompt: extend the current_step_in_lock row of the output-field table to name the orphaned claim''s current_step as a third source'
+      refs: ['shared/resources/pipeline-resume-detector-prompt.md']
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-09-16'
+  total_iterations: 4
+  verification_method: 'bug.6: `hook_identity "scripts/on-stop.sh"` → verbatim; reproduction fixture keeps the consumer hook; prefix-removed mutation red. bug.1–bug.5 closed in cycles 2–4 by reproduction of each report.'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

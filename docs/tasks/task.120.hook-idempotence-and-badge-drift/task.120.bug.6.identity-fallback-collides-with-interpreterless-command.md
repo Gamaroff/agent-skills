@@ -4,7 +4,7 @@
 **Bug ID**: TASK-120-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle 4 — completeness of the cycle-3 fix for bug.4)
 **Date Found**: 2026-09-16
 
@@ -61,3 +61,4 @@ Prefix the **match** result with a token no command can begin with — e.g. `dev
 | 2026-09-16 | New | QA Engineer | Filed from QA cycle 4 |
 | 2026-09-16 | In Progress | qa-fix | Investigation — shared string space |
 | 2026-09-16 | Ready for QA | qa-fix | Namespace-prefixed match result; scenario 9 |
+| 2026-09-16 | Closed | QA Engineer | Verified in QA cycle 5: interpreter-less command survives the heal; prefix-removed mutation red |
