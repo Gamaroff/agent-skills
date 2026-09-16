@@ -5,11 +5,13 @@ type: task
 description: "npm run ci runs format:check + npm test + eval:all — three of the five CI lanes. validate:all, bundle:check and the ShellCheck lane have no local aggregate, so a contributor can be fully green locally and red in CI on a lane they never ran. Two coverage gaps ride along: develop-task's hook wrappers are untested while develop-story's identical wrappers are, and quick_validate.py does not enforce the 1,024-char description cap (develop-story's is 1,027)."
 tags: [ci, testing, tooling, create-skill]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-12
 updated: 2026-09-16
+completed_date: 2026-09-16
+pr_number: 412
 assignee:
 estimated_effort_hours: 4
 github_issue: 411
@@ -17,7 +19,7 @@ github_issue: 411
 
 # Technical Task: One local command that runs every CI lane, and two coverage gaps the sweep found
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.111.review.1.local-ci-parity.md` implemented 2026-09-16
 **GitHub Issue**: [#411](https://github.com/Gamaroff/agent-skills/issues/411)
 
@@ -256,6 +258,7 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 | 2026-09-16 |         | QA gate CONCERNS (90/100), cycle 8 — reader hardening verified; 1 MEDIUM (replacement leak guard is tautological) + 2 comment mismatches | qa-task |
 | 2026-09-16 |         | QA findings fixed — cycles 1–5 patched the tests (skip return, corpus via the parser, parsed-value cap, uses: steps, exec via pid, key order, key column, dash spacing); cycle 6 replaced the parity test's hand-rolled workflow-step parser with a real YAML read (PyYAML via python3) — third-strike move after four consecutive cycles of new YAML shapes; cycle 7 hardened the reader (date-like scalars stringified, spawn-vs-parse failure messages, single-command blocks under comments, dead regex reader removed, parse memoised); cycle 8 gave the leak guard a real two-job assertion and corrected two comments; 8 iterations | qa-fix |
 | 2026-09-16 |         | QA gate PASS (100/100), cycle 9 — gate-8 fix verified; no correctness findings, 2 advisory cleanups | qa-task |
+| 2026-09-16 | 1.2 | DoD passed — accepted (PR #412) | finalise |
 
 ---
 
@@ -295,6 +298,34 @@ Cycle 9: PASS — no correctness findings; two advisory cleanups. Cycle 8: reade
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.111.qa.9.local-ci-parity.md` (9 cycles; the 5-cycle budget was lifted by the user)
+**Gate File**: `task.111.gate.9.local-ci-parity.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (Step 5c)**: `task.111.pr-review.1.local-ci-parity.md` — ⚠️ CONCERNS (advisory; no blocking finding; follow-ups recorded)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** All 6 met — SC-1 composite + parity set equality; SC-2 wrapper test; SC-3 description cap; SC-4 loud skip (test added at finalise: `evals/shared/tests/lint-shell-absent-binary.test.mjs`); SC-5 docs; SC-6 parity reads all three green jobs
+✅ **Tests:** 27 new tests, all mutation-proven; local fast gate 3340 pass / 0 fail on `3de30623`
+✅ **PR & CI:** PR #412 (`feature/task.111.local-ci-parity` → `develop`); CI reading 1 SUCCESS @ `3de306239a94` — test, validate, shellcheck, link-check, branch-policy all green
+✅ **Documentation:** `CHANGELOG.md` (task 111), `docs/contributing/releases.md`, `docs/contributing/evals/README.md`, `CONTRIBUTING.md`
+✅ **Security Review:** ✅ PASS — no secrets, no shell interpolation, no new dependencies; description-cap boundary probed with 34 candidates and held (one pre-existing null/bool coercion outside this PR → observation #107)
+✅ **Compliance Review:** NOT_APPLICABLE — internal CI tooling
+✅ **Performance / Reliability / Maintainability:** ✅ PASS (gate 9 NFR validation)
+
+**Task marked as ACCEPTED on:** 2026-09-16
+
+**Detailed Verification Log:** See `task.111.dod.1.local-ci-parity.md` for complete verification evidence and timestamps. Sprint review: `sprint-review-summary.md`.
+
+---
+
 ## References
 
 - **Plan**: [`task.111.plan.local-ci-parity.md`](task.111.plan.local-ci-parity.md)
@@ -305,7 +336,7 @@ Cycle 9: PASS — no correctness findings; two advisory cleanups. Cycle 8: reade
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.111.local-ci-parity/task.111.local-ci-parity.md`
