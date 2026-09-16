@@ -50,8 +50,8 @@ family and this check does not change it:
 **The finding vocabulary is `missing` / `empty` / `heading-only` / `no-body`**, and the third one is
 the one a reader can miss: it means *present and useless*. A section that holds a bold label
 (`**Functional**:`) or a sub-heading with nothing under it is neither missing nor empty, and before
-task.117 it passed — 29 of 120 task documents (2026-09-17, measured by
-`references/tests/card-preflight-corpus.test.mjs`, which is where the figure lives) published a
+task.117 it passed — 29 of 120 task documents (2026-09-17, measured by the corpus test
+`card-preflight-corpus.test.mjs` beside the engine, which is where the figure lives) published a
 bold label as their entire Success Criteria or Breaking Changes block because the summariser took
 the label as the section's prose and stopped in front of the list.
 The summariser now drops bold-label lines the way it drops `###` lines, so a label *with* a list
