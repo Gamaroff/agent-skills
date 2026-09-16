@@ -1,0 +1,54 @@
+schema: 1
+task: 'task.111.local-ci-parity'
+task_title: 'One local command that runs every CI lane, and two coverage gaps the sweep found'
+gate: PASS
+status_reason: 'Gate-8 entries verified FIXED on the head (job-blind reader mutation red; docblock and header corrected). The cycle-9 reviewer, asked to refute a three-hunk change, found no correctness defect — two LOW cleanups only (a one-word over-qualification in the header; three assertions that could go through the existing jobStepsFromText helper). No open entry; every NFR PASS. The deliverable has been stable since cycle 2; the parity test now reads workflows with a real YAML parser and every shape cycles 3–8 raised is a fixture.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T13:23:27Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 43
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 9
+    notes: 'Boundary: the description cap in quick_validate.py — 9 probes executed in cycle 2 against the parsed-value measure that has not changed since (1,025/1,024 ASCII, multibyte code points vs bytes, folded scalars clean and more-indented, literal block with clip newline and with an interior newline, whitespace-only); the two distinguishing cases were re-executed in cycle 3. The parity test spawns python3 with a fixed -c program and the workflow on stdin — no shell, no interpolation. No network, credential or untrusted-input handling anywhere in the change set.'
+  performance:
+    status: PASS
+    notes: 'Composite ≈ 22 min on the dev machine, dominated by npm test; the four added lanes cost ≈ 2 min; ci:fast unchanged. Parity suite 0.5 s (memoised parse).'
+  reliability:
+    status: PASS
+    notes: 'lint-shell.sh keeps both workflow guards and skips loudly without the binary. Parity mutations red in every direction (dropped lane, unclassified run:/uses:/flow steps, typo''d script, renamed step, job-blind reader); wrapper mutations red (dropped "", renamed target, non-exec call via pid). Real workflows read to the same 20 steps at every cycle.'
+  maintainability:
+    status: PASS
+    notes: 'One reader per workflow (PyYAML), memoised; the hand-rolled parser and its dead regex sibling are gone; docstrings match the code. Two advisory cleanups recorded below.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Header item 3: drop "unnamed" — SETUP_ACTIONS matches named uses: steps too (cycle 9 CR-1)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'Route the two-job fixture through jobStepsFromText() like the other fixtures (cycle 9 CR-2)'
+      refs: ['evals/shared/tests/ci-gate-parity.test.mjs']
+    - action: 'CR-4 (cycle 1): check:generated compares the working tree — document or compare against HEAD'
+      refs: ['package.json']
+    - action: 'Pre-existing: session-handoff CR-6 timing-sensitive on slow-npm hosts'
+      refs: ['skills/session-handoff/tests/handoff-verify.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
