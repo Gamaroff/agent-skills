@@ -249,7 +249,8 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 | 2026-09-16 |         | QA gate CONCERNS (90/100) — 3 LOW findings (skip fall-through, corpus over-count on block scalars, missing-script guard reads one job); 2 advisories | qa-task |
 | 2026-09-16 |         | QA gate CONCERNS (90/100), cycle 2 refute pass — cycle-1 findings verified fixed; 1 MEDIUM (cap measured on a normalised string, not the parsed value) + 2 LOW (uses: gate step unclassified; exec untested) + 2 cleanups | qa-task |
 | 2026-09-16 |         | QA gate CONCERNS (100/100), cycle 3 scoped — gate-2 fixes verified; 1 LOW (parity step parser ignores key order) + 3 comment cleanups | qa-task |
-| 2026-09-16 |         | QA findings fixed — cycle 1: return after skip, corpus strips block-scalar indicator, missing-script guard over every green job, jobSteps tidy; cycle 2: cap measured on the parsed value, uses: steps classified, exec asserted via pid, twins expanded; cycle 3: step keys parsed order-independently (+ synthetic-order test), three stale comments/messages corrected; 3 iterations | qa-fix |
+| 2026-09-16 |         | QA gate CONCERNS (90/100), cycle 4 scoped — gate-3 fix verified; 1 MEDIUM (parser reads keys at any indentation: with: name: and list-shaped run bodies misparse) + 2 cleanups | qa-task |
+| 2026-09-16 |         | QA findings fixed — cycle 1: return after skip, corpus strips block-scalar indicator, missing-script guard over every green job, jobSteps tidy; cycle 2: cap measured on the parsed value, uses: steps classified, exec asserted via pid, twins expanded; cycle 3: step keys parsed order-independently; cycle 4: keys read only at the step's own column (with: inputs and block bodies no longer misparse), every block-scalar indicator normalised, redundant filter dropped; 4 iterations | qa-fix |
 
 ---
 
@@ -270,22 +271,22 @@ Revert `package.json`; the tests and the cap are additive and can stay.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-16 (cycle 3)
-**Quality Score**: 100/100
-**Gate Decision**: CONCERNS (one open LOW)
+**Testing Date**: 2026-09-16 (cycle 4)
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.111.qa.3.local-ci-parity.md](./task.111.qa.3.local-ci-parity.md) (earlier: [qa.1](./task.111.qa.1.local-ci-parity.md), [qa.2](./task.111.qa.2.local-ci-parity.md))
-- **Gate File**: [task.111.gate.3.local-ci-parity.yml](./task.111.gate.3.local-ci-parity.yml) (earlier: [gate.1](./task.111.gate.1.local-ci-parity.yml), [gate.2](./task.111.gate.2.local-ci-parity.yml))
+- **Full Report**: [task.111.qa.4.local-ci-parity.md](./task.111.qa.4.local-ci-parity.md) (earlier: [qa.1](./task.111.qa.1.local-ci-parity.md), [qa.2](./task.111.qa.2.local-ci-parity.md), [qa.3](./task.111.qa.3.local-ci-parity.md))
+- **Gate File**: [task.111.gate.4.local-ci-parity.yml](./task.111.gate.4.local-ci-parity.yml) (earlier: [gate.1](./task.111.gate.1.local-ci-parity.yml), [gate.2](./task.111.gate.2.local-ci-parity.yml), [gate.3](./task.111.gate.3.local-ci-parity.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 25 new (parity 12 incl. 3 new, wrappers 19, frontmatter cap 3) + targeted lanes; 7 boundary probes
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 (cycle 3: 1 LOW)
+- **Critical Issues**: 0 (cycle 4: 1 MEDIUM)
 - **NFR Status**: Security: PASS (cycle 2 measured, 9 probes; cycle 3 reasoned), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle 3 (scoped): gate-2 fixes verified on the head; one LOW — the parity step parser records a step unnamed when `name:` follows `uses:`/`run:` (CR-1). Cycle 2 (refute pass): cycle-1 findings verified fixed; the cap was measured on a normalised string a loader never sees (CR-1, MEDIUM — now the parsed value), `uses:` gate steps slipped the parity classifier (CR-2), and the wrapper test could not detect a dropped `exec` (CR-3). Cycle 1: three LOW defects in the new tests, each verified by execution: `t.skip` fall-through in the wrapper pass-through test (CR-1); the corpus cap test over-counts block-scalar descriptions by 2 (CR-2); the parity test's missing-script guard still reads test.yml only — a typo'd `npm run` step in validate.yml stays green (CR-3). Advisory: `check:generated` false-positives on an unrelated dirty README (CR-4); `jobSteps()` tidy-up (CR-5).
+Cycle 4 (scoped): gate-3 fix verified; the cycle-3 relaxation reads keys at any indentation — `with: name:` overwrites a step name and a list-shaped `run: |` body spawns a phantom step (CR-1, MEDIUM). Cycle 3 (scoped): gate-2 fixes verified on the head; one LOW — the parity step parser records a step unnamed when `name:` follows `uses:`/`run:` (CR-1). Cycle 2 (refute pass): cycle-1 findings verified fixed; the cap was measured on a normalised string a loader never sees (CR-1, MEDIUM — now the parsed value), `uses:` gate steps slipped the parity classifier (CR-2), and the wrapper test could not detect a dropped `exec` (CR-3). Cycle 1: three LOW defects in the new tests, each verified by execution: `t.skip` fall-through in the wrapper pass-through test (CR-1); the corpus cap test over-counts block-scalar descriptions by 2 (CR-2); the parity test's missing-script guard still reads test.yml only — a typo'd `npm run` step in validate.yml stays green (CR-3). Advisory: `check:generated` false-positives on an unrelated dirty README (CR-4); `jobSteps()` tidy-up (CR-5).
 
 ---
 

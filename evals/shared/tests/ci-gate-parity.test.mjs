@@ -268,8 +268,16 @@ function jobStepsFromText(block) {
   // version bound the name only when `name:` was the item's first key, so the
   // second spelling was recorded unnamed — unclassifiable, and its map entry
   // reported stale — a false red on a workflow CI accepts (QA cycle 3, CR-1).
+  //
+  // Keys are read ONLY at the step's own key column — the column two past the
+  // item's dash. Anything deeper belongs to a nested mapping or a block body:
+  // a `with:` input named `name:` must not overwrite the step name, and a
+  // `run: |` body line that begins "- " must not open a phantom step (both
+  // reproduced in QA cycle 4, CR-1, after the dash was made optional on the
+  // key regexes without bounding the column).
   const steps = [];
   let cur = null;
+  let keyCol = -1;
   const flush = () => {
     // Only steps that DO something are recorded. A `uses:` step counts: a
     // marketplace lint or scan action is a gate exactly as a `run:` is, and an
@@ -278,21 +286,35 @@ function jobStepsFromText(block) {
       steps.push({ name: cur.name, run: cur.run ?? "", uses: cur.uses });
     cur = null;
   };
+  const indentOf = (line) => line.match(/^\s*/)[0].length;
   for (const line of block.split("\n")) {
-    if (/^\s*-\s/.test(line)) {
+    if (line.trim() === "" || /^\s*#/.test(line)) continue;
+    const dash = line.match(/^(\s*)-\s+/);
+    // A list item at or left of the current key column starts a new step; one
+    // deeper is a list inside the step (a with: array, a block body) and is
+    // skipped with the rest of that nesting.
+    if (dash && (cur === null || dash[1].length < keyCol)) {
       flush();
       cur = { name: "", run: null, uses: null };
+      keyCol = dash[1].length + 2;
     }
     if (!cur) continue;
-    const n = line.match(/^\s*-?\s*name:\s*(.+?)\s*$/);
+    // A dash line's first key sits two past its dash; a plain line's key sits
+    // at its indent. Only a key at exactly keyCol belongs to this step — a
+    // deeper dash line is a list inside a nested mapping or a block body.
+    const col = dash ? dash[1].length + 2 : indentOf(line);
+    if (col !== keyCol) continue;
+    const body = dash ? line.slice(dash[0].length) : line.trim();
+    const n = body.match(/^name:\s*(.+?)\s*$/);
     if (n) cur.name = n[1].replace(/^['"]|['"]$/g, "");
-    const u = line.match(/^\s*-?\s*uses:\s*(\S+)/);
+    const u = body.match(/^uses:\s*(\S+)/);
     if (u) cur.uses = u[1];
-    const r = line.match(/^\s*-?\s*run:\s*(.*?)\s*$/);
-    // `run: |` is a block scalar whose commands are on the following lines;
-    // such a step is classified by its name only (LANE_TWINS / SETUP_STEPS /
-    // EXCLUDED_STEPS), never by its body, so the body is not read here.
-    if (r) cur.run = r[1] === "|" ? "" : r[1];
+    const r = body.match(/^run:\s*(.*?)\s*$/);
+    // `run: |` (or `|-`, `|+`, `>`, `>-`) is a block scalar whose commands are
+    // on the following, deeper-indented lines; such a step is classified by its
+    // name only (LANE_TWINS / SETUP_STEPS / EXCLUDED_STEPS), never by its body,
+    // so the body is not read here and the indicator is not a command.
+    if (r) cur.run = /^[|>][+-]?\d?$/.test(r[1]) ? "" : r[1];
   }
   flush();
   return steps;
@@ -326,7 +348,7 @@ function greenScripts() {
         out.push(...expand(c.script));
     }
   }
-  return out.filter((name) => name in scripts);
+  return out;
 }
 
 const sorted = (xs) => [...new Set(xs)].sort();
@@ -395,7 +417,7 @@ test("every green job is found, and every step in it is classified", () => {
   }
 });
 
-test("a step's keys are read in any order — uses: before name: still binds the name", () => {
+test("a step's keys are read in any order and only at the step's own column", () => {
   // Parse a synthetic job block through the same function the green jobs go
   // through, rather than mutating a workflow file. The uses-then-name spelling
   // is the one an earlier version recorded unnamed (QA cycle 3, CR-1).
@@ -409,6 +431,23 @@ test("a step's keys are read in any order — uses: before name: still binds the
     "        name: Hermetic test suite (L1–L4)",
     "      - name: Formatting",
     "        run: npm run format:check",
+    // A with: input named `name:` belongs to the action, not the step.
+    "      - name: Upload coverage",
+    "        uses: actions/upload-artifact@v4",
+    "        with:",
+    "          name: coverage",
+    "          path: cov/",
+    // A block body whose lines look like list items and step keys.
+    "      - name: Body with a list",
+    "        run: |",
+    "          cat <<EOF",
+    "          - name: bogus",
+    "            run: npm run oops",
+    "          EOF",
+    // Other block-scalar spellings carry no command either.
+    "      - name: Folded body",
+    "        run: >-",
+    "          echo one",
     "",
   ].join("\n");
   const block = jobBlock("probe", synthetic);
@@ -421,6 +460,9 @@ test("a step's keys are read in any order — uses: before name: still binds the
       ["Marketplace lint", "some/lint-action@v1", ""],
       ["Hermetic test suite (L1–L4)", null, "npm test"],
       ["Formatting", null, "npm run format:check"],
+      ["Upload coverage", "actions/upload-artifact@v4", ""],
+      ["Body with a list", null, ""],
+      ["Folded body", null, ""],
     ],
   );
 });
