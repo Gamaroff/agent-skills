@@ -152,8 +152,9 @@ for (const { pipeline, scriptsDir, wrappers } of pipelines) {
       const target = execTargetOf(wrapperPath);
       assert.ok(
         target !== null,
-        `${label} does not exec "$(dirname "$0")/../references/<script>.sh" "$@" — ` +
-          "it is not a delegating wrapper (or the form changed; update execTargetOf)",
+        `${label} does not exec "$(dirname "$0")/../references/<script>.sh" — ` +
+          "it is not a delegating wrapper (or the form changed; update execTargetOf). " +
+          'The "$@" pass-through is asserted behaviourally by the sibling test.',
       );
       const real = path.join(SKILLS, pipeline, "references", target);
       assert.ok(

@@ -4,7 +4,7 @@ task_title: 'One local command that runs every CI lane, and two coverage gaps th
 gate: CONCERNS
 status_reason: 'All three phases are present and every new test is mutation-proven; three LOW correctness findings from the diff review, each verified by execution — a skip that falls through into a throw, a corpus measurement that over-counts block-scalar descriptions by two, and a missing-script guard that still reads one job of the three the test now claims to cover — need one fix cycle. Maintainability CONCERNS for the half-widened guard.'
 reviewer: 'QA Engineer'
-updated: '2026-09-16T13:55:00Z'
+updated: '2026-09-16T09:55:00Z'
 
 top_issues:
   - id: 'CR-1'

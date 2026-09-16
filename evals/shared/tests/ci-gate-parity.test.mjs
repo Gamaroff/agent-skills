@@ -121,7 +121,11 @@ const SETUP_ACTIONS = [
   "actions/setup-python@",
 ];
 
-/** Environment setup, not a gate — nothing to mirror. */
+/**
+ * Environment setup, not a gate — nothing to mirror. "Set up Node" / "Set up
+ * Python" are already caught by SETUP_ACTIONS before the name maps are read;
+ * they are listed so the stale-key guard notices if either step is renamed.
+ */
 const SETUP_STEPS = [
   "Set up Node",
   "Set up Python",
@@ -253,36 +257,44 @@ function workflowInvocations() {
 function jobSteps({ workflow: path, job }) {
   const block = jobBlock(job, read(path));
   if (block === null) return null;
+  return jobStepsFromText(block);
+}
+
+/** The step parser proper, over one job block's text — see jobSteps(). */
+function jobStepsFromText(block) {
+  // One step object per list item, its keys assigned in whatever order the
+  // file writes them. YAML mappings are unordered and GitHub accepts
+  // `- uses: x` / `name: Y` as readily as `- name: Y` / `uses: x`; an earlier
+  // version bound the name only when `name:` was the item's first key, so the
+  // second spelling was recorded unnamed — unclassifiable, and its map entry
+  // reported stale — a false red on a workflow CI accepts (QA cycle 3, CR-1).
   const steps = [];
-  let name = "";
+  let cur = null;
+  const flush = () => {
+    // Only steps that DO something are recorded. A `uses:` step counts: a
+    // marketplace lint or scan action is a gate exactly as a `run:` is, and an
+    // unrecorded one passes silently (QA cycle 2, CR-2).
+    if (cur && (cur.run !== null || cur.uses !== null))
+      steps.push({ name: cur.name, run: cur.run ?? "", uses: cur.uses });
+    cur = null;
+  };
   for (const line of block.split("\n")) {
-    const n = line.match(/^\s*-\s*name:\s*(.+?)\s*$/);
-    if (n) {
-      name = n[1].replace(/^['"]|['"]$/g, "");
-      continue;
-    }
-    // Any new list item — `- uses:`, `- run:`, `- env:` — starts a new step, so
-    // a name can never be attributed to a later step that did not declare one.
-    // `- name:` was matched above and has already set the new name.
     if (/^\s*-\s/.test(line)) {
-      name = "";
+      flush();
+      cur = { name: "", run: null, uses: null };
     }
-    // A `uses:` step is recorded too: a marketplace lint or scan action is a
-    // gate exactly as a `run:` is, and an unrecorded one passes silently
-    // (QA cycle 2, CR-2).
+    if (!cur) continue;
+    const n = line.match(/^\s*-?\s*name:\s*(.+?)\s*$/);
+    if (n) cur.name = n[1].replace(/^['"]|['"]$/g, "");
     const u = line.match(/^\s*-?\s*uses:\s*(\S+)/);
-    if (u) {
-      steps.push({ name, run: "", uses: u[1] });
-      continue;
-    }
+    if (u) cur.uses = u[1];
     const r = line.match(/^\s*-?\s*run:\s*(.*?)\s*$/);
-    if (r) {
-      // `run: |` is a block scalar whose commands are on the following lines;
-      // such a step is classified by its name only (LANE_TWINS / SETUP_STEPS /
-      // EXCLUDED_STEPS), never by its body, so the body is not read here.
-      steps.push({ name, run: r[1] === "|" ? "" : r[1], uses: null });
-    }
+    // `run: |` is a block scalar whose commands are on the following lines;
+    // such a step is classified by its name only (LANE_TWINS / SETUP_STEPS /
+    // EXCLUDED_STEPS), never by its body, so the body is not read here.
+    if (r) cur.run = r[1] === "|" ? "" : r[1];
   }
+  flush();
   return steps;
 }
 
@@ -366,7 +378,7 @@ test("every green job is found, and every step in it is classified", () => {
       `${g.workflow} defines no \`${g.job}:\` job — the parity check would silently ` +
         "read an empty set for it",
     );
-    assert.ok(steps.length > 0, `${g.workflow}:${g.job} has no run: steps`);
+    assert.ok(steps.length > 0, `${g.workflow}:${g.job} has no steps`);
     const unclassified = steps
       .filter((s) => classify(s).kind === "unclassified")
       .map((s) => s.name || "(unnamed step)");
@@ -381,6 +393,36 @@ test("every green job is found, and every step in it is classified", () => {
         "not is the defect task 111 exists to close.",
     );
   }
+});
+
+test("a step's keys are read in any order — uses: before name: still binds the name", () => {
+  // Parse a synthetic job block through the same function the green jobs go
+  // through, rather than mutating a workflow file. The uses-then-name spelling
+  // is the one an earlier version recorded unnamed (QA cycle 3, CR-1).
+  const synthetic = [
+    "  probe:",
+    "    steps:",
+    "      - uses: actions/checkout@v7",
+    "      - uses: some/lint-action@v1",
+    "        name: Marketplace lint",
+    "      - run: npm test",
+    "        name: Hermetic test suite (L1–L4)",
+    "      - name: Formatting",
+    "        run: npm run format:check",
+    "",
+  ].join("\n");
+  const block = jobBlock("probe", synthetic);
+  assert.ok(block, "synthetic job block must parse");
+  const parsed = jobStepsFromText(block);
+  assert.deepEqual(
+    parsed.map((s) => [s.name, s.uses, s.run]),
+    [
+      ["", "actions/checkout@v7", ""],
+      ["Marketplace lint", "some/lint-action@v1", ""],
+      ["Hermetic test suite (L1–L4)", null, "npm test"],
+      ["Formatting", null, "npm run format:check"],
+    ],
+  );
 });
 
 test("every LANE_TWINS / SETUP_STEPS / EXCLUDED_STEPS key names a real step", () => {

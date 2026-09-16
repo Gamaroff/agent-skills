@@ -4,7 +4,7 @@ task_title: 'One local command that runs every CI lane, and two coverage gaps th
 gate: CONCERNS
 status_reason: 'Cycle-1 findings CR-1/CR-2/CR-3 all verified FIXED by re-execution. The refute pass found three new correctness findings in the tests themselves — the cap was measured on a normalised string a loader never sees (a folded fixture parsed to 1,026 and passed), a `uses:` gate step in any green job slipped the parity classifier, and the wrapper test could not tell exec from a plain call — plus two cleanups. All were verified by execution. Fixes for all five were applied in the working tree during this review (recorded as a process deviation); they enter the branch through 5b.'
 reviewer: 'QA Engineer'
-updated: '2026-09-16T15:20:00Z'
+updated: '2026-09-16T11:20:00Z'
 
 top_issues:
   - id: 'CR-1'

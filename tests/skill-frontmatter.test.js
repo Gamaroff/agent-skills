@@ -148,10 +148,11 @@ test("validator accepts the same description once the apostrophe is escaped", ()
 
 /**
  * A description of exactly `n` characters with no leading, trailing or doubled
- * whitespace, so its normalised length (`' '.join(s.split())`, which is what
- * the validator measures) is also `n`. A trailing space would be folded away
- * and a 1,025-char fixture would silently measure 1,024 — the first fixture
- * written for this test did exactly that and "proved" the cap on a pass.
+ * whitespace, so its parsed-and-stripped length — what quick_validate.py now
+ * measures (`len(str(fm['description']).strip())`) — is also `n`. A trailing
+ * space would be stripped away and a 1,025-char fixture would silently measure
+ * 1,024 — the first fixture written for this test did exactly that and "proved"
+ * the cap on a pass.
  */
 function descriptionOfLength(n) {
   let s = "ab "
