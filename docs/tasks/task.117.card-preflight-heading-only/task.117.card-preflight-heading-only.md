@@ -130,21 +130,21 @@ the four `sync-jira-*` suites unchanged and green.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
-**Quality Score**: 80/100 (cycle 3)
+**Quality Score**: 85/100 (cycle 4)
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.117.qa.3.card-preflight-heading-only.md](./task.117.qa.3.card-preflight-heading-only.md) (earlier: [qa.1](./task.117.qa.1.card-preflight-heading-only.md), [qa.2](./task.117.qa.2.card-preflight-heading-only.md))
-- **Gate File**: [task.117.gate.3.card-preflight-heading-only.yml](./task.117.gate.3.card-preflight-heading-only.yml) (earlier: [gate.1](./task.117.gate.1.card-preflight-heading-only.yml), [gate.2](./task.117.gate.2.card-preflight-heading-only.yml))
+- **Full Report**: [task.117.qa.4.card-preflight-heading-only.md](./task.117.qa.4.card-preflight-heading-only.md) (earlier: [qa.1](./task.117.qa.1.card-preflight-heading-only.md), [qa.2](./task.117.qa.2.card-preflight-heading-only.md), [qa.3](./task.117.qa.3.card-preflight-heading-only.md))
+- **Gate File**: [task.117.gate.4.card-preflight-heading-only.yml](./task.117.gate.4.card-preflight-heading-only.yml) (earlier: [gate.1](./task.117.gate.1.card-preflight-heading-only.yml), [gate.2](./task.117.gate.2.card-preflight-heading-only.yml), [gate.3](./task.117.gate.3.card-preflight-heading-only.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 515 (eight suites) + 161 boundary probes + 2 mutation proofs
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (cycle 3: 2 medium — CR3-1, CR3-2; cycle-1 and cycle-2 findings closed)
+- **Critical Issues**: 0 (cycle 4: 1 medium — CR4-1; cycles 1–3 closed)
 - **NFR Status**: Security: PASS (measured, 161 probes), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycles 1 and 2 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md), [bug.2](./task.117.bug.2.epic-transform-precedes-label-drop.md), [bug.3](./task.117.bug.3.dot-anywhere-disqualifies-label.md)). Cycle 3 found two medium defects in cycle-2's own work: the bare-bold shortcut misses a label whose colon sits inside the bold ([bug.4](./task.117.bug.4.colon-inside-bold-shortcut.md), CR3-1), and the Change Log rows for task.42/43 were written into fenced example tables ([bug.5](./task.117.bug.5.change-log-rows-inside-fenced-examples.md), CR3-2/3); plus an indented-fence edge (CR3-4).
+Cycles 1–3 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) … [bug.5](./task.117.bug.5.change-log-rows-inside-fenced-examples.md)). Cycle 4 found one medium contract regression from cycle 2: the heading-only `omitted` count excludes fences/tables beneath the label, which starves the live card's `+N more` pointer ([bug.6](./task.117.bug.6.heading-only-omitted-starves-card-pointer.md), CR4-1); plus two test-hygiene cleanups.
 
 ---
 
@@ -170,6 +170,8 @@ Cycles 1 and 2 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md)
 | 2026-09-17 |         | QA findings fixed — CR2-1 (trailing terminator only), CR2-2 (beneath count), CR2-3 (create-* prose), CR2-4 (bare bold alone is content), CR2-5/6/7; 3 more docs given a lead sentence; 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate CONCERNS (80/100) — cycle 3: cycle-2 findings closed; 2 medium (CR3-1 colon-inside-bold, CR3-2 change-log rows in fenced examples), 2 low, 2 cleanups | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR3-1 (colon inside bold), CR3-2/3 (real Change Log sections in task.42/43; task.44 row into its table), CR3-4 (label anchored at column 0), CR3-5/6; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (85/100) — cycle 4: cycle-3 findings closed; 1 medium (CR4-1 heading-only omitted starves the card pointer), 2 cleanups | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR4-1 (honest `omitted` + separate `beneath`), CR4-2/3 (test hygiene); 1 iteration | qa-fix |
 
 ---
 

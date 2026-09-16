@@ -4,7 +4,7 @@
 **Bug ID**: TASK-117-BUG-5
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-3 review CR3-2, CR3-3, reproduced)
 **Date Found**: 2026-09-17
 
@@ -75,3 +75,4 @@ unfenced table under `## Change Log`; the fenced examples in task.42 §3 / task.
 | 2026-09-17 | New          | QA         | Filed from QA cycle 3                 |
 | 2026-09-17 | In Progress  | qa-fix     | Investigation started                 |
 | 2026-09-17 | Ready for QA | qa-fix     | Fix implemented, mutation-proven      |
+| 2026-09-17 | Closed       | QA         | Verified in QA cycle 4: change-log.js finds a real section in each of task.42/43/44; no row inside a fence |

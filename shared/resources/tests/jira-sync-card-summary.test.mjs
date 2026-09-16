@@ -281,10 +281,11 @@ test("C2: a bold SENTENCE is content and survives", () => {
   const { kind, text } = summariseSection("**None.**\n");
   assert.equal(kind, "prose");
   assert.equal(text, "**None.**");
+  // Inline bold with trailing text is neither dropped nor a label.
+  assert.equal(lib.isLabelOnly("**Label:** with trailing text"), false);
   assert.match(
-    "**Label:** with trailing text",
-    /\*\*/,
-    "sanity: inline bold mid-line is not a standalone label",
+    dropHeadingLines("**Label:** with trailing text\n").join("\n"),
+    /Label/,
   );
   // A bold run with trailing text is NOT dropped as a label — dropHeadingLines
   // leaves it — but a short trailing-colon line standing in for a paragraph
@@ -785,7 +786,34 @@ test("H3: the stopped count is what a ### conversion would deliver — blocks BE
     "| a | b |\n| - | - |\n| 1 | 2 |\n\nKey points:\n\n- a\n",
   );
   assert.equal(above.kind, "heading-only");
-  assert.equal(above.omitted, 1);
+  assert.equal(above.beneath, 1);
+});
+
+test("H3: `omitted` stays honest on the heading-only path — the live card still announces the cut (CR4-1)", () => {
+  // Label + fence: nothing a ### conversion would deliver (`beneath: 0`), but
+  // one block WAS cut, and the card's "+N more" pointer reads `omitted`.
+  const r = summariseSection("**Before** (GitHub):\n\n```\nx\n```\n");
+  assert.equal(r.kind, "heading-only");
+  assert.equal(r.beneath, 0);
+  assert.equal(r.omitted, 1);
+  const nodes = summaryBlockNodes({
+    heading: "Breaking Changes",
+    content: "**Before** (GitHub):\n\n```\nx\n```\n",
+    sourceUrl: DOC_URL,
+  });
+  assert.match(textOf(nodes), /\+1 more in/);
+  // ...and the preflight keys its wording on `beneath`, not `omitted`.
+  const check = lib.checkCardSections(
+    "## Overview\n\nA.\n\n## Success Criteria\n\n- one\n\n## Breaking Changes\n\n**Before** (GitHub):\n\n```\nx\n```\n",
+    TASK_SPECS,
+  );
+  const bc = check.findings.find((f) => f.section === "Breaking Changes");
+  assert.match(bc.message, /nothing under it/);
+  const block = check.blocks.find((b) => b.heading === "Breaking Changes");
+  assert.deepEqual(
+    { omitted: block.omitted, beneath: block.beneath },
+    { omitted: 1, beneath: 0 },
+  );
 });
 
 test("H3: a bare bold line that IS the whole section is content; with content beneath it is a label (CR2-4)", () => {
@@ -846,6 +874,7 @@ test("H3: every heading-only block has the same shape, and carries kind (CR2-7)"
   for (const r of [alone, stopped]) {
     const b = r.blocks.find((x) => x.heading === "Success Criteria");
     assert.deepEqual(Object.keys(b).sort(), [
+      "beneath",
       "heading",
       "kind",
       "omitted",

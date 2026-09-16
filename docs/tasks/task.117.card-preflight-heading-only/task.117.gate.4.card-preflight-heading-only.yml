@@ -1,0 +1,64 @@
+schema: 1
+task: 'task.117.card-preflight-heading-only'
+task_title: 'The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs'
+gate: CONCERNS
+status_reason: 'All six cycle-3 findings verified fixed; bug.4 and bug.5 closed. One medium defect in the cycle-2 fix for CR2-2: the heading-only omitted count now excludes fences and tables beneath the label, which starves the live card of its +N more pointer — silent truncation on the sync path. Two test-hygiene cleanups. HIGH 0 on all four gates; guards not applicable; one more fix cycle (the last).'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T21:52:50Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: medium
+    file: 'shared/resources/jira-sync.js'
+    finding: 'The heading-only branch of summariseSection returns omitted as only the summarisable blocks beneath the label, so a label followed by a fence or table yields omitted 0 and summaryBlockNodes publishes the bare label on the live card with no +N more pointer — silent truncation, which the omitted contract forbids.'
+    suggested_action: 'Keep omitted as the count of every block after the label and carry the summarisable count in a separate beneath field that checkCardSections keys its message on; fixtures on the card path and the preflight path.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.6.heading-only-omitted-starves-card-pointer.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 497
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+  cycle_3_findings_verified_fixed: 6
+  security_probes: 161
+  re_review_scope: 'since gate 3 — 6 files'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 161
+    notes: 'Probe re-run after the column-0 anchor: unchanged — no throw, all under 50 ms, the same four known deviations (two **** refusals, one stale probe expectation, CRLF pre-existing).'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-1: the live card can now truncate without announcing it for a label-plus-fence section — the one property summariseSection promises. Narrow shape, no corpus document has it after the cycle-2/3 document fixes, but the contract is the contract.'
+  maintainability:
+    status: PASS
+    notes: 'Two test-hygiene cleanups only: the sync-scope test shells out to find where a readdirSync walk exists beside it (CR4-2), and one tautological assertion in the C2 bold-sentence fixture (CR4-3). Neither implicates product behaviour.'
+
+recommendations:
+  immediate:
+    - action: 'Honest omitted plus a separate beneath count in the heading-only result; message keyed on beneath; card-path and preflight-path fixtures (CR4-1)'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/tests/jira-sync-card-summary.test.mjs']
+  future:
+    - action: 'readdirSync-based card-document walk in the sync-scope test (CR4-2); replace the tautological assertion (CR4-3)'
+      refs: ['shared/resources/tests/card-preflight.test.mjs', 'shared/resources/tests/jira-sync-card-summary.test.mjs']
+    - action: 'CRLF lists; review-story:2321 — pre-existing, carried from gate 1'
+      refs: ['shared/resources/jira-sync.js', 'skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR4-1 fixed and mutation-proven on the card path; suites green'

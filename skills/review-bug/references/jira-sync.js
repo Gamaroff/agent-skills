@@ -1439,11 +1439,20 @@ function summariseSection(content, opts = {}) {
   // match and a lead-in colon with bullets directly beneath it read as a label
   // (task.117 QA cycle 1, CR-1).
   if (isLabelOnly(first)) {
-    // What a `###` conversion would deliver: the summarisable blocks AFTER the
-    // label. Tables and fences beneath it would still yield nothing, and
-    // blocks above it are not "beneath" (QA cycle 2, CR2-2).
-    const beneath = paras.slice(firstIdx + 1).filter(isProseBlock).length;
-    return { text: first.trim(), omitted: beneath, kind: "heading-only" };
+    // `omitted` stays what it is everywhere else — every block after the
+    // label, so the card's "+N more" pointer still announces the cut. What
+    // a `###` conversion would deliver is a DIFFERENT number: only the
+    // summarisable blocks beneath the label, since tables and fences would
+    // still yield nothing. That travels as `beneath`, which the preflight
+    // reads for its message (QA cycle 2 CR2-2; cycle 4 CR4-1 — folding the
+    // two into one field starved the live card of its pointer).
+    const after = paras.slice(firstIdx + 1);
+    return {
+      text: first.trim(),
+      omitted: after.length,
+      beneath: after.filter(isProseBlock).length,
+      kind: "heading-only",
+    };
   }
 
   const sentences = splitSentences(first.replace(/\n+/g, " ").trim());
@@ -1778,7 +1787,12 @@ function checkCardSections(body, specs, opts = {}) {
       continue;
     }
 
-    const { text, omitted, kind } = summariseSection(raw, {
+    const {
+      text,
+      omitted,
+      kind,
+      beneath = 0,
+    } = summariseSection(raw, {
       maxItems: spec.maxItems,
       maxSentences: spec.maxSentences,
       transform: spec.transform,
@@ -1797,14 +1811,14 @@ function checkCardSections(body, specs, opts = {}) {
       // it; with nothing beneath (or nothing but labels), the content was
       // never written. Telling the first author to "put a list under the
       // label" asks for what already exists (QA cycle 1, CR-4).
-      const stopped = omitted > 0;
+      const stopped = beneath > 0;
       const shown = text ? `"${text}"` : "nothing";
       findings.push({
         severity: spec.optional ? "important" : "critical",
         section: spec.heading,
         code: "heading-only",
         message: stopped
-          ? `The "${spec.heading}" section opens with a label — the card would publish ${shown} and stop in front of the ${omitted} block(s) beneath it.`
+          ? `The "${spec.heading}" section opens with a label — the card would publish ${shown} and stop in front of the ${beneath} block(s) beneath it.`
           : `The "${spec.heading}" section resolves to a label with nothing under it — the card would publish ${shown} and stop.`,
         fix: stopped
           ? `Make the label a \`###\` sub-heading or a bold-only line (**Label**), which the card drops, or turn it into a sentence; the content beneath it then reaches the card.`
@@ -1816,6 +1830,7 @@ function checkCardSections(body, specs, opts = {}) {
         kind,
         text,
         omitted,
+        beneath,
       });
       continue;
     }

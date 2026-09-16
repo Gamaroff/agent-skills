@@ -401,22 +401,32 @@ test("B: --json does not emit the document body", () => {
 });
 
 test("B: every sync-jira-* --check-card --json carries the same scope statement (CR2-6)", () => {
-  const { execFileSync, execSync } = require("node:child_process");
-  // One representative CARD document per kind — the one whose basename equals
-  // its directory, found the way the corpus tests find them.
+  const { execFileSync } = require("node:child_process");
+  const { readdirSync, statSync } = require("node:fs");
   // A CARD document is the one whose basename equals its directory; every
   // other file in the folder (dod, qa, gate, plan, review) is a sibling
-  // artifact no card is built from.
-  const first = (prefix) =>
-    execSync(`find ${repoRoot}/docs -type f -name '${prefix}.*.md' | sort`, {
-      encoding: "utf8",
-    })
-      .trim()
-      .split("\n")
-      .find((f) => {
-        const parts = f.split("/");
-        return parts.at(-1) === `${parts.at(-2)}.md`;
-      });
+  // artifact no card is built from. Walked with readdirSync, as the corpus
+  // test beside this one does — no shell, no path quoting (CR4-2).
+  const first = (prefix) => {
+    const stack = [join(repoRoot, "docs")];
+    const hits = [];
+    while (stack.length) {
+      const dir = stack.pop();
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          stack.push(full);
+        } else if (
+          entry.startsWith(`${prefix}.`) &&
+          entry.endsWith(".md") &&
+          entry === `${dir.split(sep).at(-1)}.md`
+        ) {
+          hits.push(full);
+        }
+      }
+    }
+    return hits.sort()[0];
+  };
   const docs = {
     task: join(
       repoRoot,

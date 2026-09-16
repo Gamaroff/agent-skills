@@ -4,7 +4,7 @@
 **Bug ID**: TASK-117-BUG-4
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-3 review CR3-1, reproduced)
 **Date Found**: 2026-09-17
 
@@ -73,3 +73,4 @@ indented bold line under a list item or inside an indented fence is not a groupi
 | 2026-09-17 | New          | QA         | Filed from QA cycle 3                 |
 | 2026-09-17 | In Progress  | qa-fix     | Investigation started                 |
 | 2026-09-17 | Ready for QA | qa-fix     | Fix implemented, mutation-proven      |
+| 2026-09-17 | Closed       | QA         | Verified in QA cycle 4: file/colon-inside-bold and indented-fence shapes verified; M10/M11 red |
