@@ -104,7 +104,7 @@ That is the intended tightening; CHANGELOG under Changed.
    must still say so.
 4. Population test: grep shipped `.md` for `probes_executed:` / `evidence: measured` and assert each
    site's surrounding instruction names the record; allowlist the documentation examples; floor ≥ 2 sites.
-5. Mutation: delete the record after a run → the block reads `reasoned`; type `measured` → the contract test reds.
+5. Mutation: delete the record after a run → the block reads `reasoned` (tested); hand-edit the totals or a control → the block still reads what the entries say (tested); a `measured` typed into the *report* is not testable until security reports exist in the corpus — the population test holds the paste rule at every producer site instead.
 6. `npm run bundle` — `security-probe.mjs`, `security-review-prompt.md` and
    `finalise-dod-security-prompt.md` are all bundled into skill `references/` copies; `bundle:check` and
    `bundled-parity.test.mjs` go red in CI without it.
@@ -129,7 +129,7 @@ the block; population test with floor; mutation as in §6.
 ## 9. Success Criteria
 
 1. `probes_executed` and `evidence:` in a review's output block are copied from an engine-written record
-2. `measured` cannot appear without a record; the contract test fails if it does
+2. `measured` cannot appear in the engine-emitted block without a record — `evidenceOf` computes it from the entries and the contract test fails if the block says otherwise; the paste into the report is prose-enforced ("pasted, never typed") and population-checked, not tested on the report file
 3. finalise's DoD security step reads the same record
 4. The population test finds ≥ 2 sites and every one reads an artefact or is allowlisted
 5. Observation #10 closes naming this PR
@@ -181,6 +181,7 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 | 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 9 — CR8-1..5 verified fixed; 1 low (orphan-check race on concurrent first runs) | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR9-1 (orphan check re-reads the directory before throwing; injectable readdir for the test), CR9-2 (one `openRecordForWrite` prologue), CR9-3 (exact exit codes); 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate PASS (100/100) cycle 10 — CR9-1..3 verified fixed; no findings; 1 advisory cleanup | qa-task |
+| 2026-09-17 |         | PR review CONCERNS (PC-1 medium: SC2 claim narrowed to the `--emit-block` boundary; CR-1..3 low, follow-up) — SC2 and §6.5 reworded | review-pr |
 
 ---
 
