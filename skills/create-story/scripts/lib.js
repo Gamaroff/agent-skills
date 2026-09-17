@@ -2,7 +2,7 @@
 /**
  * create-story deterministic helpers. Mirrors skills/create-task/scripts/lib.js.
  * Shared cross-skill helpers (parseFrontmatter, extractSourceCitations,
- * mergeSprintStatus, isKebab) live in shared/resources/create-skills-lib.js.
+ * mergeSprintStatus, isKebab) live in create-skills-lib.js, a shared resource.
  */
 
 const fs = require("fs");

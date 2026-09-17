@@ -1,0 +1,59 @@
+schema: 1
+task: 'task.119.create-skill-authoring-guards'
+task_title: 'Four authoring rules the corpus already obeys by accident: positional tokens in fenced bash, hardcoded shell matrices, comment paths the bundler follows, and how many task docs a change is'
+gate: CONCERNS
+status_reason: 'Cycle-1 fixes verified (CR-1 nesting, CR-2 scope, CR-3 dedupe all FIXED), but the refute pass showed the new §5 parity test is tautological — it counts pushes, not scanned lines, so it cannot see the fence-state loss it claims to guard (medium, high confidence). One further low-confidence edge (a fence-shaped line inside a runnable heredoc) and one leftover vendored copy are advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T14:20:46Z'
+
+top_issues:
+  - id: 'CR-4'
+    severity: medium
+    file: 'tests/fenced-bash-positional-params.test.js'
+    finding: '§5 is tautological: blocks++ fires on every runnable info-string push regardless of stack state, so scanned == naive by construction and the assertion cannot see fence-state loss — a reader with the pop rule removed still matches the naive count on all 128 SKILL.md files — yet the task document, QA report 1 and the commit message cite §5 as the proof that nested templates can no longer hide a real block.'
+    suggested_action: 'Make §5 assert line-level coverage — for every naive opener whose next line is not itself a fence, that next line must appear in the scanned lines — and keep §4 as the in-process nesting proof; then re-run the pop-rule-removed mutation and confirm §5 goes red.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3411
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, unchanged from cycle 1 — the cycle-1 fixes touched a Markdown fence reader, a test docstring and a warning dedupe set; no accept/reject function on a security sink. Refute pass probed the dedupe set for suppression of a warning that should print: key is (repo-relative path, line, target), so the same origin reached from a second skill is correctly a duplicate and a different origin never collides.'
+  performance:
+    status: PASS
+    notes: 'Unchanged; the dedupe set removes O(skills) repeated prints under --all.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 3410/0 on the fixed tree; the stack reader survived five adversarial fence shapes (tilde outer/backtick inner, longer bare closer, unclosed template, info string on a closing line, indented fence in a list) with every token found; pop-rule-removed mutation reds §4 (the fixture) even though it does not red §5 (CR-4).'
+  maintainability:
+    status: PASS
+    notes: 'CR-4 is a test that overclaims, not a coverage regression — §4 still holds the nesting proof. Advisory: CR-5 (fence-shaped line inside a runnable heredoc pushes a non-runnable entry — no live instance; 4-backtick outer handles it) and CR-6 (skills/develop-next/references/document-status-lifecycle.md is now reached by no discovery rule and survives only via source_backed_on_disk — the comment-born vendoring this task set out to stop, frozen in place; 12 other skills carry pre-existing unreached copies, out of scope).'
+
+recommendations:
+  immediate:
+    - action: 'Rewrite §5 as a line-level coverage assertion and mutation-prove it against a pop-rule-removed reader (CR-4)'
+      refs: ['tests/fenced-bash-positional-params.test.js']
+  future:
+    - action: 'Treat an info-string fence inside a runnable block as content and add the heredoc shape to §4 (CR-5)'
+      refs: ['tests/fenced-bash-positional-params.test.js']
+    - action: 'Delete the orphaned develop-next copy of document-status-lifecycle.md; file the 12 pre-existing unreached copies as a follow-up (CR-6)'
+      refs: ['skills/develop-next/references/document-status-lifecycle.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-4 fixed — a parity test that cannot fail is a claim the guard does not hold']

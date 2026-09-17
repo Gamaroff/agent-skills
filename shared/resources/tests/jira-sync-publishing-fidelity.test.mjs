@@ -1,7 +1,7 @@
 "use strict";
 /**
  * Unit tests for the four publishing-fidelity defects closed in
- * shared/resources/jira-sync.js (rebirth-wallet task.33 / RAPP-575).
+ * jira-sync.js, a shared resource (rebirth-wallet task.33 / RAPP-575).
  *
  * Every one of them FAILED SILENTLY. That is the property under test here, and
  * it is why each test asserts on observable output rather than on "no throw":

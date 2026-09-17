@@ -151,7 +151,7 @@ export const TASK_ELIGIBLE_STATUSES = new Set([
 // Sources of truth these mirror, and which a test in
 // evals/develop-next/unit/select-next.test.mjs parses and compares against:
 //   bug  → docs/standards/bug-documents.md §"Frontmatter schema"
-//   task → shared/resources/document-status-lifecycle.md
+//   task → document-status-lifecycle.md (a shared resource)
 export const BUG_LIFECYCLE_STATUSES = new Set([
   "new",
   "in-progress",

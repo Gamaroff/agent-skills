@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.119.create-skill-authoring-guards'
+task_title: 'Four authoring rules the corpus already obeys by accident: positional tokens in fenced bash, hardcoded shell matrices, comment paths the bundler follows, and how many task docs a change is'
+gate: PASS
+status_reason: 'Cycle-2 fixes verified — §5 is now a line-level coverage assertion that goes red on the original CommonMark-style reader, fence-shaped lines inside runnable blocks are scanned, the orphaned develop-next copy is gone. Cycle-3 narrowed review returned no high-confidence bug: one latent regex-divergence edge (medium confidence, no live instance) and two documentation staleness items, all advisory and recorded below.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T14:35:22Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3411
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false, unchanged across three cycles — no accept/reject function on a security sink was added or modified; the cycle-2 changes are a Markdown fence reader, a test fixture and a file deletion.'
+  performance:
+    status: PASS
+    notes: 'Guards complete in <100 ms; no runtime code path changed this cycle.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast 3410/0/1 on the fixed tree. QA re-ran the CR-4 mutation (original reader → §5 red naming create-epics-from-shards:357/:364) and the CR-5 heredoc shape (both tokens found). bundle --check clean after the deletion.'
+  maintainability:
+    status: PASS
+    notes: 'Advisory residue: (a) §5 OPENER regex ends in \b so an info string like shell-session or bash-x would count as runnable while runnableLines does not — latent, no live instance; derive both from one tokeniser. (b) Task doc Files Summary still says "§5 asserts opener parity" and Progress Tracking still says 478 blocks; the scan reports 485 and §5 is line-level. (c) Guard header says 100 SKILL.md files; skillFiles() returns 128.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Derive §5 opener detection from the same ([\w+.-]*) tokenisation + RUNNABLE_LANGS check as runnableLines so the two cannot diverge (latent, medium confidence)'
+      refs: ['tests/fenced-bash-positional-params.test.js']
+    - action: 'Reconcile the task document (Files Summary §5 wording, Progress Tracking block count 478 → 485) and the guard header file count (100 → 128) with what the scan reports'
+      refs: ['docs/tasks/task.119.create-skill-authoring-guards/task.119.create-skill-authoring-guards.md', 'tests/fenced-bash-positional-params.test.js']
+    - action: 'File an observation for the 12 skills carrying bundled references/ copies no discovery rule reaches (source_backed_on_disk keeps them forever; --check has no UNREACHED class)'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

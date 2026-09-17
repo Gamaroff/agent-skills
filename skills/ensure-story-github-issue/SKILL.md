@@ -70,8 +70,8 @@ Read `project.yml` from the repo root:
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
-PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
+PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
 PROJECT_NAME=$(grep 'project_board_name:' project.yml | sed -E 's/.*: *"?([^"]+)"?/\1/')
 MILESTONE_TITLE="Epic ${STORY_E} — ${EPIC_TITLE}"
 # Prefer the current branch's remote-tracking branch (strip the remote prefix),

@@ -900,7 +900,7 @@ function parseArgs(argv) {
 }
 
 function detectTracker(repoRoot) {
-  // Mirrors shared/resources/resolve-platform.sh: explicit config, then env.
+  // Mirrors resolve-platform.sh (a shared resource): explicit config, then env.
   try {
     const cfg = fs.readFileSync(
       path.join(repoRoot, "skills-config.yaml"),

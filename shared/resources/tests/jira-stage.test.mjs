@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Unit tests for the pipeline-stage machinery in shared/resources/jira-sync.js
+ * Unit tests for the pipeline-stage machinery in jira-sync.js
  * and the jira-stage.js CLI.
  *
  * Three of these guard properties that are easy to break by accident and

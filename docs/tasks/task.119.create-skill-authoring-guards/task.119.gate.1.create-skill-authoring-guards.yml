@@ -1,0 +1,59 @@
+schema: 1
+task: 'task.119.create-skill-authoring-guards'
+task_title: 'Four authoring rules the corpus already obeys by accident: positional tokens in fenced bash, hardcoded shell matrices, comment paths the bundler follows, and how many task docs a change is'
+gate: CONCERNS
+status_reason: 'All four phases delivered and both guards mutation-proven, but the positional-token guard''s fence parser loses state on a nested fence inside a ```markdown template block, leaving ~8 real bash blocks in 4 skills unscanned (CR-1, medium, high confidence) — promoted to top_issues under code_review_blocking.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T14:02:52Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'tests/fenced-bash-positional-params.test.js'
+    finding: 'runnableLines() treats any bare closing fence as closing the current block, so a ```markdown template that embeds a ```mermaid/```bash block inverts fence state for the rest of the file — verified: mermaid-architect (1 real bash block, 0 scanned), create-epics-from-shards (2 → 0), create-parallel-stories (13 → 9), qa-story (16 → 15); a token injected after the nested template is not reported.'
+    suggested_action: 'Track fence nesting explicitly (a fence line with a non-empty info string inside an open block opens a nested fence that its own bare closer pops; only the outermost bare closer ends the runnable block), add a §4 fixture case for a template block embedding a nested fence followed by a real bash block carrying a token, and confirm the live scan count rises to the naive opener count on all four affected files.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3410
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [0, 1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — the deliverable is a Markdown lint guard, a bundler warning and prose; no accept/reject function on a security sink (url-authority, sql-orm, shell-exec, path, template-render) was added or modified. bundle_skill.py''s existing _within() containment check is untouched. No network, no credentials, no new dependencies.'
+  performance:
+    status: PASS
+    notes: 'Both guards run in-process over ~100 files in <100 ms; the bundler warning adds one regex pass per line of each JS/MJS source it already reads. ci:fast wall time unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Each rewritten shell/awk form executed against the original under bash and zsh with identical output (re-verified by QA). npm run bundle -- --check clean; no references/ files added or removed. Rollback is git revert; the guard can stay with a wider allowlist.'
+  maintainability:
+    status: PASS
+    notes: 'Both guards carry their failure history, a non-vacuity floor and a reason-checked allowlist; the rule text is token-free in SKILL.md with the literal table in a Read-loaded reference; the bundle-dependency: declaration form replaces two prose-declared dependencies with an explicit, greppable line. Cleanups CR-2 (docstring overclaims scope parity; references/ skipped only at top level) and CR-3 (warning repeated per bundling skill under --all) are advisory.'
+
+recommendations:
+  immediate:
+    - action: 'Fix the fence-nesting state loss in runnableLines() and add the nested-fence fixture (CR-1)'
+      refs: ['tests/fenced-bash-positional-params.test.js']
+  future:
+    - action: 'Reword liveSources() docstring as a deliberate superset and skip references/ at any depth (CR-2)'
+      refs: ['tests/bundle-comment-origin.test.js']
+    - action: 'Dedupe the comment-only warning per (file, line, target) so --all prints each origin once (CR-3)'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed — the guard must scan every real bash block, or its header''s coverage claim is false']

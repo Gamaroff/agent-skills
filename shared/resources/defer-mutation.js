@@ -17,10 +17,12 @@
 //   1. An unknown `kind` is REFUSED, not written. A record nothing can render is
 //      worse than no record: the checklist silently omits an action a human must
 //      perform, which is the exact invisible-drift failure the sequence removes.
-//      The roster is read from shared/resources/tracker-access-record.md, so the
-//      schema doc and the writer cannot drift apart.
+//      The roster is read from tracker-access-record.md, so the schema doc and
+//      the writer cannot drift apart.
 //
-//      That path is written out in full DELIBERATELY. It is how bundle_skill.py
+//      bundle-dependency: shared/resources/tracker-access-record.md
+//
+//      That declaration line is DELIBERATE. It is how bundle_skill.py
 //      learns to copy the schema doc into each skill's references/ alongside this
 //      file — the doc is loaded at runtime via `__dirname`, not `require`, so
 //      nothing else would tell the bundler it is a dependency, and a bundled
@@ -485,9 +487,12 @@ function redactDeep(value, envTable, keyPath = "") {
 //
 // So there is only ONE reader. resolve-platform.sh is sourced in a subprocess
 // and its answer is used verbatim, which makes parity structural rather than
-// asserted. shared/resources/resolve-platform.sh is named here so bundle_skill.py
-// copies it — and, following its sibling `source`, read-config.sh — into every
-// skill that bundles this file. At runtime both sit beside this file in either
+// asserted. The declaration below is what makes bundle_skill.py copy it — and,
+// following its sibling `source`, read-config.sh — into every skill that bundles
+// this file.
+//
+// bundle-dependency: shared/resources/resolve-platform.sh
+// At runtime both sit beside this file in either
 // layout, so __dirname finds them without knowing which layout it is in.
 // The markers resolve-platform.sh prints. Kept as escapes so this file stays
 // ASCII-clean for the shell chokepoints that grep it.

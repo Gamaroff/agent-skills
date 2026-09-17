@@ -41,6 +41,8 @@ All documents with a `status:` frontmatter field follow the canonical lifecycle:
 
 Skills reference shared files using the explicit path `shared/resources/<filename>` in their `.md` files. **Never use symlinks or relative paths.** Run `npm run bundle` after adding or changing `shared/resources/` references.
 
+**In a `.js`/`.mjs` file, that path is a dependency declaration wherever it appears — inside a comment too.** The bundler's scanner has no notion of intent, so a commented `see shared/resources/x.md` in a file bundled into twenty skills vendors `x.md` into all twenty (task.119 / observation #39: +16,000 lines from four comment lines). Refer to siblings by **bare filename** in comments. Where a script genuinely loads a shared file at runtime by basename and a comment is the only place the full path can live, declare it on its own line as `// bundle-dependency: shared/resources/<filename>` — the bundler follows that silently and warns on every other comment-only origin; `tests/bundle-comment-origin.test.js` fails the build on one.
+
 ## Platform branching
 
 Skills that branch on tracker or VCS platform source `shared/resources/resolve-platform.sh` **guarded**:

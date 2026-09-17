@@ -26,7 +26,7 @@ const bugSync = require("../scripts/sync-jira-bug.js");
 
 // The fake Jira, the ADF readers and the repo/runner helpers are shared with
 // the story, task and epic end-to-end suites. Source of truth:
-// shared/resources/fake-jira.js, vendored here by `npm run bundle`.
+// fake-jira.js under shared resources, vendored here by `npm run bundle`.
 const {
   BB,
   BASE,

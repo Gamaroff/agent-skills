@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Unit tests for shared/resources/generate-prd-epic-index.mjs.
+ * Unit tests for generate-prd-epic-index.mjs (a shared resource).
  *
  * The script runs on import (it is an executable, not a module with exports), so
  * each case spawns it as a subprocess against a throwaway PRD tree and asserts on

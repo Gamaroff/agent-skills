@@ -235,7 +235,7 @@ After finding the story file and validating PR exists:
 
    ```bash
    if [ -n "$LATEST_GATE" ]; then
-     GATE_STATUS=$(grep '^gate:' "$LATEST_GATE" | awk '{print $2}')
+     GATE_STATUS=$(grep '^gate:' "$LATEST_GATE" | awk '{print $(2)}')
      HAS_ISSUES=$(grep -c '^  - issue:' "$LATEST_GATE")
 
      echo "📋 Found existing QA review: $LATEST_GATE"

@@ -414,7 +414,7 @@ test("the resolver never emits a raw config token as a tracker", () => {
 // Each case asserts the two resolvers AGREE, and separately what they agree on.
 //
 // HONEST NOTE ON WHAT THE AGREEMENT HALF PROVES SINCE DELEGATION. In a bare temp
-// repo `_locate_resolver` finds this repo's own shared/resources/resolve-platform.sh
+// repo `_locate_resolver` finds this repo's own shared resolve-platform.sh
 // — the very file `runtimeTracker` sources — so the two sides cannot disagree by
 // construction, and `assert.equal(install, runtime)` is close to a tautology for
 // every row below. That is the intended end state (one implementation, not two),
@@ -713,7 +713,7 @@ test("an illegal `tracker:` is still refused even when nothing else is wrong", (
 //
 // HONEST NOTE ON WHAT THE AGREEMENT ASSERTION PROVES HERE: not much. In a bare
 // temp repo `_locate_resolver` finds this repo's own
-// `shared/resources/resolve-platform.sh` — the very file `runtimeTracker`
+// the shared `resolve-platform.sh` — the very file `runtimeTracker`
 // sources — so the two sides cannot disagree by construction, and
 // `assert.equal(install, runtime)` is close to a tautology for these rows. It is
 // kept because it stops being a tautology the moment the installer stops

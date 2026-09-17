@@ -6,6 +6,26 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Four authoring rules the corpus obeyed by accident, and two guards (task 119).** The harness
+  substitutes dollar-digit positional tokens inside an invoked `SKILL.md` — fenced code included —
+  so the block an agent runs is not the block on disk, and every test reads the disk. Phase 0 settled
+  the mechanism empirically: only the invoked `SKILL.md` is rendered (a Read-loaded reference arrives
+  verbatim), substitution is zero-indexed and leaves tokens past the argument count alone, a backslash
+  escape survives delivery but breaks the on-disk form inside awk, and the braced/parenthesised forms
+  (`${N}`, `$(N)`) are safe in both. `tests/fenced-bash-positional-params.test.js` now scans every
+  `skills/*/SKILL.md` for the tokens with a floor and a reasoned allowlist; the 22 shipped hits in 12
+  files were rewritten to equivalent token-free forms (verified under bash and zsh). `bundle_skill.py`
+  warns when it follows a `shared/resources/` path that appears only on a comment line of a `.js`/
+  `.mjs` source — the mechanism that vendored +16,000 lines from four comment lines — and accepts an
+  explicit `// bundle-dependency: shared/resources/X` line for the honest case;
+  `tests/bundle-comment-origin.test.js` proves the warning fires on a fixture and asserts the live
+  tree has no undeclared origin. `create-skill` states the three rules (runnable prose, shell matrices from `zshAvailable()`,
+  comments as dependency declarations) with their failures, the token-free equivalents living in a
+  Read-loaded `references/runnable-prose.md` so the rule is not corrupted by the mechanism it
+  describes; `qa-task` Step 4b states its from-disk limit; `create-task` gains §1.2 "One task or
+  several?" with the three-way splitting test, the three named seams and the registry-note
+  obligation.
+
 - **`npm run ci` runs every CI lane (task 111).** It ran three of the five: `validate.yml`'s
   per-skill validation, catalog and skill-dependency drift checks, and the bundle per-file check,
   and `shellcheck.yml`'s lint had no local aggregate — a contributor could be green on

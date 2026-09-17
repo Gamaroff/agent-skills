@@ -2,7 +2,7 @@
 // (task 84).
 //
 // The graph is DECLARED in each SKILL.md's `invokes:` frontmatter and generated
-// into shared/resources/skill-dependencies.json. Two ways that rots:
+// into the shared skill-dependencies.json. Two ways that rots:
 //
 //  (a) Someone edits `invokes:` and forgets to regenerate. Caught here and in
 //      CI (validate.yml on PRs, release.yml at tag time).

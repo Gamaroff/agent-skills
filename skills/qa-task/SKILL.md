@@ -158,7 +158,7 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
 
    ```bash
    if [ -n "$LATEST_GATE" ]; then
-     GATE_STATUS=$(grep '^gate:' "$LATEST_GATE" | awk '{print $2}')
+     GATE_STATUS=$(grep '^gate:' "$LATEST_GATE" | awk '{print $(2)}')
      HAS_ISSUES=$(grep -c '^  - issue:' "$LATEST_GATE" 2>/dev/null || echo 0)
      echo "Found existing QA review: $LATEST_GATE"
      echo "Gate Status: $GATE_STATUS — Issues: $HAS_ISSUES"
@@ -173,7 +173,7 @@ PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
    ```bash
    GATE_DATE=$(grep -E '^updated:' "$LATEST_GATE" | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
    DOC_DATE=$(grep -E '^updated:' "$TASK_FILE"  | head -1 | sed -E "s/updated:[[:space:]]*//; s/['\"]//g")
-   DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $2}')
+   DOC_STATUS=$(grep -E '^status:' "$TASK_FILE" | head -1 | awk '{print $(2)}')
    # Any commit touching source since the gate was written?
    CODE_MOVED=$(git log --since="$GATE_DATE" --name-only --format="" -- \
      apps packages 2>/dev/null | sort -u | head -1)
@@ -587,6 +587,13 @@ rule, including why the safety boundary is an allow-list rather than a deny-list
 
 When the rule does not fire, record `Step 4b: not applicable — no runnable prose in the change set` in
 the QA report's Review Methodology and move on. The step is cheap where it does not apply.
+
+**What a green Step 4b does not prove.** The engine executes each block **from disk**. The harness
+renders an invoked `SKILL.md` before the agent sees it — a dollar-digit positional token inside a
+fenced block is substituted with an invocation argument — so the block an agent runs can differ from
+the block this step ran, and this step cannot see that. Delivery-time corruption of that class is
+prevented upstream by `tests/fenced-bash-positional-params.test.js`, not detected here; do not read
+a clean Step 4b as covering what the harness delivers. (create-skill § *Runnable prose*.)
 
 When it does fire, run the engine over each changed in-scope file:
 

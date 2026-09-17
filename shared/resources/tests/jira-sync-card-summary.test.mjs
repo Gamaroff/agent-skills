@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Unit tests for card summarisation in shared/resources/jira-sync.js.
+ * Unit tests for card summarisation in jira-sync.js.
  *
  * A tracker card is a POINTER to the document, not a copy of it. Before this,
  * the Jira task card published all ELEVEN `## ` sections of the task document
@@ -18,7 +18,7 @@
  *   3. A realistic full task document lands an order of magnitude under Jira's
  *      limit — the whole point of the change.
  *
- * Spec: shared/resources/tracker-card-summary.md
+ * Spec: tracker-card-summary.md (a shared resource)
  * Run: node --test shared/resources/tests/jira-sync-card-summary.test.mjs
  */
 import test from "node:test";

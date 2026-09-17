@@ -2300,8 +2300,8 @@ EOF
    Ensure issue is on the project board (idempotent, graceful):
 
    ```bash
-   BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
-   OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
+   BOARD_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
+   OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
    REPO=$(gh repo view --json name -q '.name')
    source references/resolve-platform.sh || exit 1
    tracker_write gh project item-add "$BOARD_NUM" --owner "$OWNER" \

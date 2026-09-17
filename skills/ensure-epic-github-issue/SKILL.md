@@ -48,8 +48,8 @@ Read `project.yml` from the repo root:
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
-PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
+PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
 MILESTONE_TITLE="Epic ${EPIC_N} — ${EPIC_TITLE}"
 # Prefer the current branch's remote-tracking branch (strip the remote prefix),
 # so the link points at the branch where the work lives. Fall back to the repo's

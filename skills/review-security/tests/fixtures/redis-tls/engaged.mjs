@@ -4,7 +4,7 @@
  * Composes an ioredis-style options object from an untrusted authority
  * component. TLS is applied UNCONDITIONALLY — it cannot be gated on an
  * environment variable, because the probe sandbox's env is a fixed six-key
- * allowlist (`sandboxEnv`, shared/resources/qa-execute-snippets.mjs) that a
+ * allowlist (`sandboxEnv` in qa-execute-snippets.mjs, a shared resource) that a
  * probe spec has no way to extend.
  *
  * One argument, by the engine's contract: the child runner calls `fn(input)`.

@@ -83,9 +83,9 @@ The search term is the **bug id**, which is unique across the repo — `[story.7
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
+OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
 REPO_NAME=$(gh repo view --json name -q '.name')
-PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
 DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || echo develop)
 DOC_BRANCH=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null | sed 's|^[^/]*/||')
 BASE="https://github.com/$REPO/blob/${DOC_BRANCH:-$DEFAULT_BRANCH}"

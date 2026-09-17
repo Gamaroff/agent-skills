@@ -155,6 +155,80 @@ Full rationale and the review-time form of both rules:
 [`docs/reference/anti-patterns.md`](../../docs/reference/anti-patterns.md) § *Never let one signal
 report two states*.
 
+## Three Rules the Corpus Learned by Failing
+
+Each of these is a rule that existed nowhere until a failure that every gate passed. Each is stated
+with the failure and the alternative, because a rule without its failure reads as a preference.
+
+### Runnable prose carries no positional-parameter token
+
+**The rule.** A fenced `bash`/`sh`/`shell` block in a `SKILL.md` — a block an agent is meant to copy
+and run — must not contain a shell positional-parameter token: a dollar sign immediately followed by
+a digit. Guard: `tests/fenced-bash-positional-params.test.js`, which scans every `skills/*/SKILL.md`
+and names the file and line. The token-free equivalents for every shape the corpus used, and the
+Phase 0 evidence behind them, are in
+[`references/runnable-prose.md`](references/runnable-prose.md) — deliberately a *reference*, because
+this file is rendered on invocation and a rule that spelled the tokens out here would be corrupted
+by the mechanism it describes.
+
+**The failure.** The harness substitutes those tokens when the skill is invoked with arguments —
+inside fenced code as readily as in prose. Substitution is zero-indexed from the argument list (the
+first token names the first argument), and a token past the argument count is left alone, which is
+why the field-two `awk` idiom sat in nineteen skills for months without biting: almost every skill
+takes one argument, so only the first token was ever touched. When one finally used it, `/qa-task
+<path>` delivered an awk `match()` on the whole record as a `match()` on the literal task path —
+eight substitutions in one program, a silent wrong answer, and the comment written to warn about it
+carried the same token and was corrupted too. Nothing on disk was wrong; every test reads the disk.
+
+**The alternatives, in one line each** (full table in the reference): awk field *N* is `$(N)` —
+not `cut -fN`, which is tab-delimited and not equivalent; a bare `/re/` tests the whole record;
+`length` with no argument is its length; a script's *N*th argument is `${N}`; a script's own path is
+`${BASH_SOURCE[0]}`; a currency amount in a comment is spelled `20 USD`. A backslash escape survives
+rendering but leaves the on-disk form a syntax error inside awk program text, so it is tolerated by
+the guard only for bash double-quoted strings. Where a token is genuinely unavoidable, allowlist the
+line in the guard **with a reason**.
+
+**What this does not cover, stated so nobody reads a green check as coverage.** Only the invoked
+`SKILL.md` is rendered; a `references/*.md` or `shared/resources/*.md` loaded with Read arrives
+verbatim, so the guard's scope is `SKILL.md` alone. And `qa-task` Step 4b, which executes
+documented snippets, executes them **from disk** — it cannot see a render-time corruption, and its
+own step says so.
+
+### Shell matrices are derived from `zshAvailable()`, never hardcoded
+
+**The rule.** A test that spawns a shell takes its matrix from
+`qa-execute-snippets.mjs` (a shared resource) — its exported, memoised `zshAvailable()`:
+`const SHELLS = zshAvailable() ? ["bash", "zsh"] : ["bash"]`. Two assertions belong beside it, and
+they fail in opposite directions — `bash` is in the matrix **unconditionally** (if the probe ever
+answered false for both, every behavioural case would be skipped and the suite would pass having
+executed nothing), and when zsh is absent the test emits a visible `zsh-unavailable` note, so a
+report never infers cross-shell agreement from silence.
+
+**The failure.** `const SHELLS = ["bash", "zsh"]` — hand-written on task.101 — passed three QA cycles,
+Step 5c and four `npm run ci:fast` runs, then failed CI on four `[zsh]` cases: `ubuntu-latest` has no
+zsh and the author's macOS does. Nothing local could have caught it; the first falsifying environment
+was after `/finalise` had assembled its DoD. The repository already shipped the probe.
+
+**The criterion, stated honestly:** *both shells agree wherever both exist, and the matrix says which
+ran* — not *both shells always run*.
+
+### In a `.js` under `shared/resources/`, a `shared/resources/` path in a comment is a dependency
+
+**The rule.** `bundle_skill.py`'s reference scanner (`SHARED_REF_RE`) matches a
+`shared/resources/` path anywhere in a file — code, string or comment alike. That is right for
+`.md`, where every reference is prose, and a trap for `.js`/`.mjs`. In a shared script, refer to a
+sibling by **bare filename** in comments (`see tracker-card-summary.md`), and reserve the full path
+for a reference the script actually loads. The bundler now prints
+`⚠️ comment-only reference: <file>:<line> → <target>` when it follows a path that appears only on a
+comment line, and `tests/bundle-comment-origin.test.js` asserts the live tree has none.
+
+**The failure.** Four constants moved into `jira-sync.js` — bundled into 21 skills — carried their
+leading comments, each naming the shared-resources path of `tracker-card-summary.md`, one naming a test's
+path. The next `npm run bundle` copied a 646-line test and a 172-line doc into twenty skills that use
+neither: +16,000 lines of generated churn from four comment lines, and the bundler reported ✅, as it
+always does. The blast radius scales with how widely the destination is bundled — inversely to how
+much a comment looks like it matters.
+
 ## Skill Creation Process
 
 Copy this checklist and track your progress when creating a skill:

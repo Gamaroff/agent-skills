@@ -588,7 +588,7 @@ docker volume ls | grep test
 docker compose -f docker/docker-compose.test.yml down -v
 
 # Solution 2: Remove all test volumes
-docker volume ls | grep test | awk '{print $2}' | xargs docker volume rm
+docker volume ls | grep test | awk '{print $(2)}' | xargs docker volume rm
 
 # Solution 3: Clean all stopped containers and volumes
 docker container prune -f
