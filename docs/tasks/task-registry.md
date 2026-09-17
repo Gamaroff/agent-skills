@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-09-12
-**Next Available Task Number:** **121**
+**Next Available Task Number:** **123**
 
 ## How to use
 
@@ -160,6 +160,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 118 | [review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted](task.118.probes-executed-from-engine/task.118.probes-executed-from-engine.md) | accepted | refactoring | Medium | 2026-09-12 | [#417](https://github.com/Gamaroff/agent-skills/issues/417) | Observation review 2026-09-12: obs #10 · PR #418 merged |
 | 119 | [Four authoring rules the corpus already obeys by accident: positional tokens in fenced bash, hardcoded shell matrices, comment paths the bundler follows, and how many task docs a change is](task.119.create-skill-authoring-guards/task.119.create-skill-authoring-guards.md) | accepted | documentation | Medium | 2026-09-12 | [#419](https://github.com/Gamaroff/agent-skills/issues/419) | Observation review 2026-09-12: obs #23, #24, #36, #39 · PR #420 merged |
 | 120 | [The pause hook, the hook installer and the README badge each rely on a human remembering: make them idempotent, self-healing and generated](task.120.hook-idempotence-and-badge-drift/task.120.hook-idempotence-and-badge-drift.md) | accepted | refactoring | Medium | 2026-09-16 | [#409](https://github.com/Gamaroff/agent-skills/issues/409) | task.110 finalise: obs #101; README badge drift · PR #410 merged |
+| 121 | [QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped: make qa-gate and qa-fix cycle-scoped at the call sites, and guard it](task.121.cycle-scoped-qa-tracker-comments/task.121.cycle-scoped-qa-tracker-comments.md) | planned | refactoring | High | 2026-09-17 | [#421](https://github.com/Gamaroff/agent-skills/issues/421) | Obs #75 (consolidates #66, #70, #78, #80, #84, #93, #94) |
+| 122 | [Twelve skills carry bundled copies no discovery rule reaches: give --check an UNREACHED class, a discovery rule for the invocations that actually use them, and delete the dead ones](task.122.bundle-check-unreached-copies/task.122.bundle-check-unreached-copies.md) | planned | refactoring | Medium | 2026-09-17 | [#422](https://github.com/Gamaroff/agent-skills/issues/422) | Obs #118 |
 
 - **Tasks 104-106 close the stakeholder-readability gap in tracker comments**, filed 2026-09-09 after stakeholders reported that Jira and GitHub issue comments are unreadable to a non-technical reader. One shippable unit each, in dependency order: **104** builds the primitive (a per-stage catalogue of plain-language lead paragraphs, rendered by `tracker-comment.js` from the `--stage` every call site already passes — so all 22 sites gain a lead with no call-site edit); **105** feeds real values into the lead's slots and converts the seven sites that post a bare `gh issue comment` and never reach the engine at all; **106** carries the same lead onto the eleven pull-request conversation templates. 105 and 106 both depend on 104 and are independent of each other. Per-line inline PR findings are deliberately excluded — see task.106 §4. None has a tracker issue yet.
 
