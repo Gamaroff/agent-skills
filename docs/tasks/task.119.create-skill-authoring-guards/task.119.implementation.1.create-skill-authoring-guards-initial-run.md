@@ -38,7 +38,7 @@ First automated run of task.119: a guard test for positional-parameter tokens in
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #420: https://github.com/Gamaroff/agent-skills/pull/420 — 4 commits; in-review comment posted; board stage-disabled | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.119.qa.{N}.*.md`; `task.119.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: CONCERNS→fix, CONCERNS (refute)→fix, PASS 100; 5c APPROVE (5 low) | — |
 | 7. finalise                | ✅ Done    | `task.119.dod.{N}.*.md`; task `status: accepted`                       | ACCEPTED; dod.1 + sprint review; CI 1 SUCCESS @ 9dfc8586, CI 2 SUCCESS @ 01628e12; PR canonical comment; #419 closed; board Done | — |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Committed in `e9634f7b`, pushed; PR #420 | — |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
