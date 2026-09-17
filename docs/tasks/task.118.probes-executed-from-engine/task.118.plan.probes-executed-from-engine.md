@@ -13,12 +13,12 @@ task-ref: task.118.probes-executed-from-engine.md
 Carry a number from the component that counted to the component that reports; make the hand-typed path unrepresentable.
 
 ## Phase-by-Phase Implementation Guide
-### Phase 1 — record: `security-probe.run.json` `{version:1, sinks:[{sink, executed, reproduced, verdict}], totals:{executed, reproduced}}` written next to the review report path the CLI already receives.
-### Phase 2 — readers: replace "fill in `probes_executed`" with a `command node … --emit-block <record>` that prints the YAML block; the skill pastes engine output, never types it.
+### Phase 1 — record: `security-probe.run.json` `{version:1, controls:[{sink, entry, executed, reproduced, verdict, reason}], totals:{executed, reproduced}}` written by a new `--record <path>` flag (the CLI receives no report path today — `main()` parses only `--json/--sink/--entry/--cases-file/--timeout`). The engine merges into an existing record keyed by `{sink, entry}`, so one review with several controls builds one file.
+### Phase 2 — readers: replace "fill in `probes_executed`" with `command node security-probe.mjs --emit-block <record>`, which prints the `security_review:` YAML block; the skill pastes engine output, never types it. finalise's probe-mode Step 3 currently hand-writes a temp script — rewrite it to run `security-probe.mjs --record` so the count it copies is engine-emitted (keep `finalise-dod-prompt-contract.test.mjs` green: execution + corpus-sourced).
 ### Phase 3 — population test: `git grep -n 'probes_executed' -- 'skills/*/SKILL.md' 'shared/resources/*.md'` → for each site, assert `--emit-block` or the record name within ±5 lines, or allowlist by path+line with a reason.
 
 ## Key Patterns and References
 `stakeholder-summary-cli.js` (task.106) — the pattern of an engine printing a block the prose pastes verbatim. `docs/reference/anti-patterns.md` §population check.
 
 ## Testing Approach
-Contract test runs the engine; mutation deletes the record.
+Contract test runs the engine; mutation deletes the record. `npm run bundle` after every shared-resource edit — all three touched sources are bundled into skill `references/`.
