@@ -5,7 +5,7 @@ type: task
 description: "The harness substitutes $0–$9 inside a SKILL.md's fenced bash when the skill is invoked with an argument — the delivered copy is corrupted while every test reads the file from disk; 12 files carry such tokens (#23). A hand-written const SHELLS = ['bash','zsh'] passed every local gate and failed CI, while zshAvailable() already existed (#36). bundle_skill.py follows shared/resources paths inside .js comments, so moving four commented constants added +16,000 lines of bundle churn (#39). And create-task decides whether to write a task doc but never how many; three authors hand-wrote the same splitting rule into the registry (#24). One task: a guard test for the first, and the rules for all four where authors read."
 tags: [create-skill, create-task, authoring, bundling, testing]
 category: documentation
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-12
@@ -13,11 +13,13 @@ updated: 2026-09-17
 assignee:
 estimated_effort_hours: 5
 github_issue: 419
+completed_date: 2026-09-17
+pr_number: 420
 ---
 
 # Technical Task: Four authoring rules the corpus already obeys by accident: positional tokens in fenced bash, hardcoded shell matrices, comment paths the bundler follows, and how many task docs a change is
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.119.review.1.create-skill-authoring-guards.md` implemented 2026-09-17
 **GitHub Issue**: [#419](https://github.com/Gamaroff/agent-skills/issues/419)
 **PR**: [#420](https://github.com/Gamaroff/agent-skills/pull/420)
@@ -198,6 +200,36 @@ need rewriting, which raises the effort; stop and re-estimate before Phase 1.
 ### Key Findings
 Three QA cycles. Cycle 1: CR-1 fence-state loss on nested template fences (fixed: stack reader). Cycle 2 (refute pass): CR-4 the parity test could not fail (fixed: line-level §5, mutation-proven against the original reader), CR-5 heredoc fence lines, CR-6 orphaned vendored copy. Cycle 3: no gating finding; advisory residue (§5 opener tokeniser divergence — latent; stale doc counts) recorded in the gate's `recommendations.future`.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.119.qa.1` (CONCERNS 90) → `task.119.qa.2` (CONCERNS 90, refute pass) → `task.119.qa.3` (PASS 100)
+**Gate File**: `task.119.gate.3.create-skill-authoring-guards.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: ✅ APPROVE — `task.119.pr-review.1.create-skill-authoring-guards.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** All 5 met — guard under `npm test` with floor and reasoned allowlist; create-skill three rules + qa-task 4b limit; bundler warning + comment-origin guard; create-task §1.2; observations #23/#24/#36/#39 actioned naming PR #420
+✅ **Tests:** `npm run ci:fast` 3410 pass / 0 fail / 1 skipped; both guards mutation-proven (four proofs in develop, five re-run by QA)
+✅ **PR Review:** PR #420 — 8 commits, 3 QA cycles, 5c APPROVE; CI reading 1 SUCCESS @ `9dfc8586a295`
+✅ **Documentation:** CHANGELOG (Unreleased → Added), create-skill/create-task/qa-task SKILL.md, `references/runnable-prose.md`, coding-standards § Cross-skill resources
+✅ **Security Review:** ✅ PASS — no secrets, no unsafe patterns, no dependency changes; `boundary: false`
+✅ **Compliance Review:** ⚠️ NOT_APPLICABLE — no data, payments, UI or healthcare surface
+
+**Deployment Readiness:**
+
+- Staging: ✅ APPROVED
+- Production: ✅ APPROVED
+
+**Task marked as ACCEPTED on:** 2026-09-17
+
+**Detailed Verification Log:** See `task.119.dod.1.create-skill-authoring-guards.md` for complete verification evidence and timestamps.
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
   Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
@@ -219,6 +251,7 @@ Three QA cycles. Cycle 1: CR-1 fence-state loss on nested template fences (fixed
 | 2026-09-17 |         | QA gate CONCERNS (90/100), cycle 2 refute — CR-1/2/3 fixed; 1 new finding (CR-4 §5 tautology), 2 advisory | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR-4 §5 now line-level (mutation: original reader → red naming lines), CR-5 fence lines inside runnable blocks are content + heredoc fixture, CR-6 orphaned develop-next copy removed; 2 iterations | qa-fix |
 | 2026-09-17 |         | QA gate PASS (100/100), cycle 3 — CR-4/5/6 verified fixed; 0 gating findings, 3 advisory | qa-task |
+| 2026-09-17 | 1.2     | DoD passed — accepted (PR #420) | finalise |
 
 ---
 
@@ -251,7 +284,7 @@ Three QA cycles. Cycle 1: CR-1 fence-state loss on nested template fences (fixed
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.119.create-skill-authoring-guards/task.119.create-skill-authoring-guards.md`
