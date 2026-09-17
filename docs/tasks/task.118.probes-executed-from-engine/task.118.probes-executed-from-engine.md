@@ -5,11 +5,13 @@ type: task
 description: "review-security's output block carries probes_executed and evidence: measured — with measured requiring probes_executed > 0 — and nothing mechanical connects the probes that ran to the integer that appears. security-probe.mjs already keeps an executed counter and already returns unverifiable on zero; its count is not carried into the block. A prior review fixed the documentation half (the skill says the count is transcribed); this is the mechanism half. Second site: finalise's DoD security step carries the same agent-supplied count under boundary: true. Carry the count from the engine, make measured unrepresentable without an artefact, and assert the population."
 tags: [review-security, finalise, security, evidence]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: medium
 created: 2026-09-12
 updated: 2026-09-17
+completed_date: 2026-09-17
+pr_number: 418
 assignee:
 estimated_effort_hours: 5
 github_issue: 417
@@ -17,7 +19,7 @@ github_issue: 417
 
 # Technical Task: review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.118.review.1.probes-executed-from-engine.md` implemented 2026-09-17
 **GitHub Issue**: [#417](https://github.com/Gamaroff/agent-skills/issues/417)
 
@@ -182,6 +184,7 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 | 2026-09-17 |         | QA findings fixed — CR9-1 (orphan check re-reads the directory before throwing; injectable readdir for the test), CR9-2 (one `openRecordForWrite` prologue), CR9-3 (exact exit codes); 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate PASS (100/100) cycle 10 — CR9-1..3 verified fixed; no findings; 1 advisory cleanup | qa-task |
 | 2026-09-17 |         | PR review CONCERNS (PC-1 medium: SC2 claim narrowed to the `--emit-block` boundary; CR-1..3 low, follow-up) — SC2 and §6.5 reworded | review-pr |
+| 2026-09-17 | 1.2     | DoD passed — accepted (PR #418); 10 QA cycles, gate PASS 100/100; observation #10 actioned | finalise |
 
 ---
 
@@ -217,6 +220,37 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 
 ### Key Findings
 No critical issues identified. Ten cycles, never a HIGH: 45 findings closed, each fixed and mutation-proven in its cycle; the merged-file lock of cycles 2–5 was replaced in cycle 6 by one atomic entry file per control, and cycles 7–10 closed that layout's edges. One advisory cleanup remains (a stranded JSDoc).
+---
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.118.qa.10.probes-executed-from-engine.md` (cycles 1–9 beside it)
+**Gate File**: `task.118.gate.10.probes-executed-from-engine.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 5/5 — SC1–SC4 cited to engine code and per-PR tests; SC5 (observation #10 → `actioned`, resolution naming PR #418) performed at finalise
+✅ **Tests:** `npm run ci:fast` 3401 tests, 3400 pass, 1 skipped; 55 engine tests + 6 population tests added over the change; every fix mutation-proven in its cycle
+✅ **PR Review:** PR #418, Step 5c `/review-pr` CONCERNS (advisory — PC-1 acted on as a documentation edit; CR-1..3 low recorded for follow-up); CI reading 1 SUCCESS @ `c2075a51`
+✅ **Documentation:** CHANGELOG (task 118); review-security SKILL + prompt, finalise DoD prompt, qa-task/qa-story 3b; bundles in sync
+✅ **Security Review:** ✅ PASS — no boundary in the change set; secrets/unsafe-pattern greps clean; no dependency change
+✅ **Compliance Review:** ⚠️ NOT_APPLICABLE — internal tooling, no personal/payment/UI/health data
+✅ **Reliability / Maintainability:** ✅ PASS (gate 10)
+
+**Ten QA cycles, never a HIGH.** The deliverable was correct from cycle 2; cycles 2–5 hardened a merged-file lock that kept growing crash-recovery edges, cycle 6 replaced it with one atomic entry file per control folded on read, cycles 7–10 closed that layout's edges. 45 findings fixed; bugs 1 and 2 closed.
+
+**Follow-up (non-blocking):** CR10-1 stranded JSDoc; 5c CR-1 (circular remedy in the orphan-snapshot message), CR-2 (null-sink default name), CR-3 (`emitBlock` on a bare object).
+
+**Task marked as ACCEPTED on:** 2026-09-17
+
+**Detailed Verification Log:** See `task.118.dod.1.probes-executed-from-engine.md` for complete verification evidence and timestamps.
+
 ---
 
 ## Implementation Notes
@@ -267,7 +301,7 @@ bundled copy is a pre-existing limit now worked around by `--repo-root` rather t
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
 1. `/develop-task docs/tasks/task.118.probes-executed-from-engine/task.118.probes-executed-from-engine.md`
