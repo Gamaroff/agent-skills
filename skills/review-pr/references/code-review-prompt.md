@@ -54,6 +54,27 @@ B. CLEANUPS (category: cleanup) — quality improvements, NEVER blocking:
    - SIMPLIFICATION: redundant branches, dead code, needless complexity
    - EFFICIENCY: obvious wasteful work (N+1, repeated recompute, unnecessary allocation)
 
+C. AMBIGUOUS SIGNALS (category: bug when the value gates a decision, else cleanup):
+   - a check, status or return value that reaches ONE falsy/empty/zero value from two
+     distinguishable states where the right response differs — "found nothing" vs "could not
+     look"; "no work to do" vs "the reader is broken"; "not configured" vs "no config file
+     found". Report as: *this condition is reached by two distinguishable states and reports
+     one value.*
+   - a scan, guard or assertion that PASSES when it matches nothing — no non-vacuity floor
+   - a check built on the same matcher, parser or helper it is checking, so it cannot
+     contradict it and passes vacuously on exactly the defect it was written for
+   - a test that asserts a documented example is well-formed while being presented as the
+     enforcement of a runtime property
+   - a count, flag or verdict the agent self-reports, used to gate a decision about whether
+     the agent did the work
+
+D. ENUMERATION RISK (category: bug):
+   - the diff applies the SAME edit at more than one call site, or its root cause is "this
+     site was not updated when the contract changed". The finding is the MISSING POPULATION
+     CHECK, not the edits: every site in the diff is correct in isolation and every test
+     passes, so the risk is entirely in the sites nobody listed. Name the population and say
+     what would enumerate it.
+
 ## Discipline (mandatory)
 - VERIFY every candidate against the actual surrounding code before reporting — read the lines,
   trace the call. Do NOT flag on a pattern/name match alone.
@@ -62,6 +83,9 @@ B. CLEANUPS (category: cleanup) — quality improvements, NEVER blocking:
 - Only report issues attributable to THIS diff. Do not report pre-existing debt in unchanged code.
 - If the diff is empty, unreadable, or touches no reviewable code: return an empty findings list.
   Never invent issues.
+- An empty findings list is a claim about the diff. Before returning one, confirm the diff was
+  actually read and non-trivial — "found nothing" and "could not look" must not resolve to the
+  same output.
 
 ## Output contract — emit EXACTLY this YAML and nothing else
 

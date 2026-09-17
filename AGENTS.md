@@ -180,6 +180,13 @@ Canonical rules: [`docs/standards/bug-registry.md`](./docs/standards/bug-registr
 
 Never use symlinks or relative paths.
 
+**Inside `shared/resources/` itself, cite a sibling by bare filename** (`see change-log.js`), never
+by the `shared/resources/<file>` literal: within a shared source that literal is a bundling
+instruction, not a reference — the bundler copies the named file into every skill that bundles the
+citing one, `bundle:check` then fails on the untracked copies, and the author finds out from CI.
+The rule and its failure: `skills/create-skill/SKILL.md` § "Inside `shared/resources/`, a
+`shared/resources/` literal is a bundling instruction".
+
 ## Observing This Session
 
 Before the first tool call of any session — and before writing or proposing a

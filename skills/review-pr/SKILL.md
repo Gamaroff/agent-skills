@@ -249,6 +249,15 @@ git diff "origin/$BASE_BRANCH...origin/$HEAD_BRANCH" -- . ':(exclude)*/reference
 Widen the exclusion to whatever the repo generates (lockfiles, `dist/`, snapshots). State in the
 report which paths were excluded, so the review's scope is auditable.
 
+**Check the exclusion against authorial intent before applying it.** The rule is a heuristic about
+*intent* ("the author did not write these") applied by *path*, and it inverts when the PR's subject
+is the generated tree itself — on the PR that introduced bundle-freshness checking, one `references/`
+file was the headline finding, not noise. Mechanically: list what the exclusion would remove, and if
+any excluded path is also named in the work item's Files Summary, the PR body, or a commit-message
+subject, **review it** — a generated file nobody mentions is noise; one the author wrote a commit
+message about is a deliberate change. Record the deviation in the same scope note that records the
+default. (obs #33)
+
 Empty diff → say so and stop.
 
 ### Step 5 — Dispatch both lenses in parallel

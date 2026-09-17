@@ -509,6 +509,28 @@ test("QA-5c: `command -v` is a lookup and stays runnable; bare `command` does no
   assert.equal(classifyBlock("command rm -f /tmp/x").klass, "mutating");
 });
 
+test("QA-5d: bare `command X` classifies as X — the repo's own prefix trap", () => {
+  // AGENTS.md prescribes `command node …` because `node` is an nvm shell function
+  // on the maintainer's machine; the gate that runs documented snippets refused
+  // every such block as a runner (obs #90). `command` without an option runs its
+  // argument with the same argv, so the argument's own rule decides.
+  for (const [prefixed, bare] of [
+    ["command node x.mjs --json", "node x.mjs --json"],
+    ["command npm test", "npm test"],
+    ["command ls -la", "ls -la"],
+    ["command touch /tmp/qa-x", "touch /tmp/qa-x"],
+    ["echo a; command rm -f /tmp/qa-x", "echo a; rm -f /tmp/qa-x"],
+  ]) {
+    assert.equal(
+      classifyBlock(prefixed).klass,
+      classifyBlock(bare).klass,
+      prefixed,
+    );
+  }
+  // Option-bearing forms are still refused: -p overrides PATH, which is a runner.
+  assert.equal(classifyBlock("command -p node x.mjs").klass, "mutating");
+});
+
 test("QA-14: an obfuscated command name is unquoted before it is judged", () => {
   // Found at the DoD gate, after cycle 1 had already closed thirteen holes.
   // `who\'am\'i` blanked to `who''i`, failed the command-name test, and was

@@ -26,7 +26,7 @@
  *   queue                       the review work queue, with reconciliation
  *   next-id                     sweep, then derive the next id
  *   write --title … --skill …   sweep -> derive -> create -> write
- *        --siblings-checked … --body-file …
+ *        --siblings-checked … --body-file … [--not-duplicate-of 12,34]
  *   set-status --id N --status s [--parked-until …] [--resolution …]
  *   archive                     standalone stale sweep
  *   families [--audit]          read skill-families.md; audit shared rules
@@ -58,6 +58,8 @@
  *   invalid-frontmatter       a file's header could not be parsed
  *   parked-without-condition  status: parked with no parked_until
  *   dry-run                   --dry-run; nothing read, nothing written
+ *   possible-duplicate        `write` found an open/parked entry on the same
+ *                             skill with an overlapping title; nothing written
  *   usage                     the invocation was wrong; always paired with exit 2
  *
  * Deliberately NOT in the CLI surface:
@@ -313,6 +315,158 @@ function asList(v) {
   if (Array.isArray(v)) return v.map((x) => String(x));
   const s = String(v).trim();
   return s === "" ? [] : [s];
+}
+
+// ── the duplicate check ──────────────────────────────────────────────────────
+
+/**
+ * Title words that carry no identity. Kept small and structural: the point is
+ * to stop "the", "a", "is" from making every pair of titles look alike, not to
+ * build a stop-list that itself needs maintaining.
+ */
+const TITLE_NOISE = new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "of",
+  "to",
+  "in",
+  "on",
+  "for",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "it",
+  "its",
+  "that",
+  "this",
+  "with",
+  "as",
+  "by",
+  "at",
+  "from",
+  "not",
+  "no",
+  "so",
+  "than",
+  "then",
+  "when",
+  "which",
+  "while",
+  "into",
+  "does",
+  "do",
+  "has",
+  "have",
+  "never",
+  "every",
+  "only",
+  "one",
+  "two",
+  "all",
+  "any",
+  "but",
+  "if",
+  "up",
+  "out",
+  "own",
+  "same",
+  "can",
+  "cannot",
+  "must",
+  "should",
+  "still",
+  "after",
+  "before",
+  "first",
+  "second",
+  "third",
+  "new",
+  "old",
+  "per",
+  "also",
+  "again",
+  "ever",
+  "already",
+]);
+
+/**
+ * The distinctive tokens of a title: lower-cased, split on every non-alphanumeric
+ * (so `qa-gate` and `qa-fix` share `qa`, and `cycle-less` yields `cycle`), a
+ * trailing plural stripped (`comments` ~ `comment`), noise words dropped.
+ * Calibrated on the live backlog of 2026-09-17: the eight-entry cluster's
+ * members each score ≥ 0.29 against at least one sibling, and the only other
+ * pairs above 0.28 were three duplicate clusters found independently by hand.
+ */
+function titleTokens(title) {
+  return new Set(
+    String(title)
+      .toLowerCase()
+      .replace(/[`'"]/g, "")
+      .split(/[^a-z0-9]+/)
+      .map((w) => w.replace(/ies$/, "y").replace(/s$/, ""))
+      .filter((w) => w.length >= 2 && !TITLE_NOISE.has(w)),
+  );
+}
+
+/**
+ * Open and parked entries that share a `skill:` value with the candidate and
+ * whose title overlaps it beyond a threshold. The threshold is deliberately
+ * coarse — Jaccard over distinctive tokens, ≥ 0.28 — because the failure this
+ * guards against is not a near-miss; it is the same defect written eight times
+ * over five days by sessions that never looked (obs #66, #70, #75, #78, #80,
+ * #84, #93, #94 — one defect). A guard that only fires on identical titles
+ * would have caught none of them; each was phrased afresh.
+ *
+ * Reads frontmatter only, through the bounded reader, so it is scan-cheap.
+ * Resolved entries are excluded: a recurrence of an ACTIONED defect is a real
+ * new observation (the fix did not hold), not a duplicate.
+ */
+function findPossibleDuplicates(logDir, title, skills) {
+  const want = titleTokens(title);
+  if (want.size === 0) return [];
+  const mine = new Set(
+    asList(skills)
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  const out = [];
+  let names = [];
+  try {
+    names = fs.readdirSync(logDir).filter((n) => /^\d{4}-.*\.md$/.test(n));
+  } catch {
+    return [];
+  }
+  for (const name of names) {
+    const fm = readFrontmatter(path.join(logDir, name));
+    if (!fm) continue;
+    const st = statusOf(fm);
+    if (st !== "open" && st !== "parked") continue;
+    const theirs = asList(fm.skill).map((s) => s.trim());
+    // Multi-skill entries may store "a,b" as one item; split so either shape matches.
+    const theirSkills = new Set(
+      theirs.flatMap((s) => s.split(",")).map((s) => s.trim()),
+    );
+    if (mine.size && ![...mine].some((s) => theirSkills.has(s))) continue;
+    const have = titleTokens(fm.title);
+    if (have.size === 0) continue;
+    let inter = 0;
+    for (const w of want) if (have.has(w)) inter++;
+    const jaccard = inter / (want.size + have.size - inter);
+    if (jaccard >= 0.28) {
+      out.push({
+        id: Number(fm.id),
+        title: String(fm.title),
+        status: st,
+        overlap: Number(jaccard.toFixed(2)),
+      });
+    }
+  }
+  return out.sort((a, b) => b.overlap - a.overlap);
 }
 
 // ── the archival sweep ───────────────────────────────────────────────────────
@@ -705,6 +859,31 @@ function cmdWrite(P, args) {
 
   if (args.dryRun) {
     return { reason: "dry-run", id: null, file: null, exitCode: 0 };
+  }
+
+  // A recurrence of a KNOWN open defect is evidence for the existing entry, not
+  // a new fact. `--siblings-checked` asks about sibling SKILLS; nothing asked
+  // about prior ENTRIES, and the same tracker-comment defect was written eight
+  // times in five days (obs #119). The check is here, in the one write path,
+  // so it needs no discipline to hold. It exits 0 — a recognised duplicate is
+  // a normal outcome, not a tripped guard — and it writes nothing: the caller
+  // either bumps the existing entry or re-runs with --not-duplicate-of naming
+  // every candidate, which is a recorded judgement of the same kind as
+  // `--siblings-checked none`.
+  const dupes = findPossibleDuplicates(P.logDir, args.title, args.skill);
+  const cleared = new Set(args.notDuplicateOf.map((x) => Number(x)));
+  const unresolved = dupes.filter((d) => !cleared.has(d.id));
+  if (unresolved.length) {
+    return {
+      reason: "possible-duplicate",
+      id: null,
+      file: null,
+      candidates: unresolved,
+      hint:
+        "bump the existing entry (cite this session in its body) or re-run with " +
+        `--not-duplicate-of ${unresolved.map((d) => d.id).join(",")}`,
+      exitCode: 0,
+    };
   }
 
   fs.mkdirSync(P.logDir, { recursive: true });
@@ -1246,6 +1425,7 @@ function parseArgs(argv) {
     skill: [],
     proposesSkill: [],
     siblingsChecked: "",
+    notDuplicateOf: [],
     bodyFile: "",
     type: "",
     area: "",
@@ -1317,6 +1497,16 @@ function parseArgs(argv) {
         break;
       case "--siblings-checked":
         args.siblingsChecked = value(i, a);
+        i++;
+        break;
+      case "--not-duplicate-of":
+        // Comma-separated ids the caller has judged NOT to be duplicates.
+        args.notDuplicateOf.push(
+          ...value(i, a)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        );
         i++;
         break;
       case "--body-file":

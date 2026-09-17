@@ -45,7 +45,9 @@ Run the bug-appropriate verification signals, in order. **All must pass** for a 
 
 1. **Regression test** — re-run the test added in Step 3. It MUST pass now and MUST have failed on the pre-fix code (that property was established in Step 3). This is the primary "bug is gone" signal.
 2. **Affected suite + lint** — run the project's lint + the test suite covering the changed files (`npx nx test <project>` / `deno test -A`, etc.). Zero failures, zero lint errors → no regressions introduced.
-3. **Diff code review** — invoke `/review-code` on the fix diff (advisory mode) to surface high-confidence correctness regressions the tests might miss. Treat only **high-confidence correctness** findings as blocking; note simplification/style findings without blocking.
+3. **Diff code review** — invoke `/review-code` on the fix diff (advisory mode) to surface correctness regressions the tests might miss. **A finding blocks when it is `category: bug` AND `confidence: high`** — the same predicate the QA gate uses under `CR_BLOCKING=true` (`code-review-prompt.md` § Opt-in to blocking), stated there once and referenced here rather than paraphrased. "High-confidence correctness" is the same rule in words, and it was read two ways on bug.13/14: as a confidence threshold and as a severity one (obs #68). Read the two fields.
+
+   **Non-blocking findings on a PASS cycle** (a `bug` with `confidence: medium`/`low`, or any `cleanup`) **are applied before Step 7 in the same cycle, not carried into the fix record as open.** Apply them, re-run signals 1 and 2 on the touched suites, and record them in the cycle entry as `Applied non-blocking: N` — the merge gate is the backstop. Skipping them because "the cycle already passed" ships a known defect with a green verify record; deferring them to a new cycle spends a full verify round on cosmetics. A finding the fixer judges *wrong* is declined in the cycle entry with a sentence, never silently dropped.
 
 > Standard vs lite: in lite mode (`Minor`/`Trivial` + `Low`/`Medium` only — see Phase 0c), run signals 1 + 2 and skip signal 3. `Blocker`/`Critical`/`Major` bugs always run all three.
 
@@ -60,7 +62,7 @@ Log the cycle in the implementation report's QA Iteration History:
 ### Verify Cycle {N} — {YYYY-MM-DD}
 **Regression test**: {pass/fail}
 **Suite + lint**: {pass/fail}
-**Code review**: {clean / N blocking findings}
+**Code review**: {clean / N blocking findings} · Applied non-blocking: {N, or 0} · Declined: {N, or 0}
 **Fast gate**: {pass / fail — log path / n/a}
 **Verdict**: {PASS / FAIL}
 **Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
@@ -80,7 +82,7 @@ cat > .claude/state/comment-body.md <<EOF
 
 **Regression test**: {pass/fail}
 **Suite + lint**: {pass/fail}
-**Code review**: {clean / N blocking findings}
+**Code review**: {clean / N blocking findings} · Applied non-blocking: {N, or 0} · Declined: {N, or 0}
 **Action**: {Proceeding to finalise / Running qa-fix (cycle N of 5)}
 EOF
 

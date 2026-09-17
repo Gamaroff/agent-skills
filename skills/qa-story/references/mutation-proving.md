@@ -107,12 +107,35 @@ output is shaped exactly like a reading about the code.
    When a test's name contains *refused*, *rejected*, *halts* or *non-zero*, its
    assertion must read the status, not the falsiness of a payload.
 
-And one rule about the check itself rather than the run: **a check is blind to
-whatever it does not iterate.** A consistency check between two collections that
-walks one of them catches every mismatch and no absence — a document with no
-registry row is never visited, because it is not a row. Proving a check can fail
-says nothing about what it can see. State which collection drives the walk, drive
-it from both, and give each direction its own non-vacuity floor.
+And two rules about the check itself rather than the run.
+
+**A check is blind to whatever it does not iterate.** A consistency check between
+two collections that walks one of them catches every mismatch and no absence — a
+document with no registry row is never visited, because it is not a row. Proving a
+check can fail says nothing about what it can see. State which collection drives
+the walk, drive it from both, and give each direction its own non-vacuity floor.
+
+**One floor per population, never one total.** A guard that walks two corpora and
+asserts `files >= 200` over their sum is satisfied by one corpus alone. On task.108
+a `shared/resources/**/*.md` git pathspec matched a single nested file — a default
+pathspec treats `**` as `*` and wants a literal `/` — so 57 shared sources were
+never walked, and 605 skill files plus one sat far above the floor for three QA
+cycles before 606 was read as 605 + 1. A per-corpus floor (`skills ≥ 200 AND
+shared ≥ 40`) was what finally turned the narrowed pathspec red (obs #73). Where a
+scan has N populations it has N floors, and the report prints each count, so a
+zero in one of them is a number a reader sees rather than a fraction of a total.
+
+**When a guard misses an instance it named, enumerate every predicate before
+repairing one.** A guard is a conjunction — *is this a call site?* AND *is it
+routed?* — and each predicate can produce a false negative on its own. Finding one
+explanation for a miss is not evidence it was the only one: on the task that
+produced this rule, the call-detection predicate had silently absorbed the routing
+question ("wrapped, therefore fine"), so fixing the routing predicate changed
+nothing and the mutation stayed green. Treat that green as the finding — the guard
+is still blind — not as a defect in the mutation. Check each predicate separately
+against the known-missed instance, keep the questions in separate functions, and
+mutation-prove the **guard repair**, not only the code fix it was guarding
+(obs #50).
 
 ## What a mutation run can tell you
 

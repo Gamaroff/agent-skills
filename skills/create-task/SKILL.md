@@ -427,6 +427,9 @@ After the Implementation Plan and Technical Background are populated, decide whe
 - **Incomplete migration paths**: Every breaking change must have a concrete migration path — not just "update callers". Flag vague migrations.
 - **Inadequate rollback plan**: Are rollback triggers specific enough to act on? Are steps actionable in under 1 hour if needed?
 - **Risk underestimation**: Does the Risk Assessment account for side effects surfaced by git history (recent reverts, related fixes)?
+- **Second mechanism for a job the file already does** (obs #103): when a phase adds a function whose purpose is to dedupe, heal, migrate, retry, normalise or reconcile, grep the target file for existing functions of that kind. The Technical Background must name them and say whether the new one replaces, extends or sits beside each — and "sits beside" needs a sentence.
+- **A figure the test will re-measure** (obs #117): a count stated in prose decays within days. Record the **definition** (what is scanned, with which pattern and exclusions) and the **command**, and let the test record the number. Where a guard is scoped over several file classes, name the mechanism that reaches each class — a scan wider than the hazard opens with an allowlist of false positives, and an allowlist nobody believes is a guard nobody reads.
+- **A widened check inside a path-filtered workflow** (obs #102): when a phase adds a path or file class to a check that runs in an existing CI workflow, read the workflow's `on.<event>.paths` and list the new path there too — or the widened check never runs on the changes it was widened for.
 
 #### ⚡ Should Add (present to user for confirmation)
 
@@ -685,6 +688,13 @@ Benefits of Solution (list 4-6 with metrics if possible):
 ```
 
 ### Section 3: Technical Background
+
+**Cite by identity, not by coordinate.** A line number decays on every edit above it — on one task
+every `file:line` anchor was wrong within seven days while every path stayed right. Prefer a stable
+anchor (a heading, a symbol name, a unique string) over a line number; where a line number genuinely
+helps, pair it with the identifier so the citation survives the next edit:
+`qa-task/SKILL.md:580` *(`- **Security**: Review for security issues`)*. A reader who finds the
+coordinate stale can still find the thing. (obs #22)
 
 ```
 Current Architecture:

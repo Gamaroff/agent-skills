@@ -889,8 +889,20 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    # silently stops mattering.
    if [ "$PRIOR_GATES" -ge 2 ] && [ -n "$LAST_GATE_DATE" ] && [ "$SAFETY_REPROBE" != "true" ]; then   # cycle 3+ — scope to files changed since last gate
      REFUTE_PASS=false
-     FILES=$(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
-     [ -n "$FILES" ] && git diff "$BASE...HEAD" -- $FILES > "$DIFF_FILE"
+     # An ARRAY, read line by line, and expanded as "${FILES[@]}". A scalar $FILES expanded bare
+     # word-splits under bash and does NOT under zsh: there the whole newline-joined list is one
+     # pathspec that matches nothing, git diff writes an empty patch, and the reviewer reviews
+     # nothing while reporting clean (obs #76, #110 — task.110 cycle 3). The array form splits
+     # the same way in both shells.
+     FILES=()
+     while IFS= read -r f; do [ -n "$f" ] && FILES+=("$f"); done \
+       < <(git log --since="$LAST_GATE_DATE" --name-only --format="" | sort -u)
+     [ "${#FILES[@]}" -gt 0 ] && git diff "$BASE...HEAD" -- "${FILES[@]}" > "$DIFF_FILE"
+     # Non-vacuity: files changed but the scoped patch is empty ⇒ the scoping is wrong, not the
+     # code clean. Refuse to dispatch on nothing.
+     if [ "${#FILES[@]}" -gt 0 ] && [ ! -s "$DIFF_FILE" ]; then
+       echo "HALT: ${#FILES[@]} files changed since $LAST_GATE_DATE but the scoped diff is empty — check the pathspec expansion"; exit 1
+     fi
    else                                                             # first review, cycle 2, or safety re-probe — whole branch diff
      [ "$PRIOR_GATES" = "1" ] && REFUTE_PASS=true || REFUTE_PASS=false
      git diff "$BASE...HEAD" > "$DIFF_FILE" 2>/dev/null || git diff "origin/develop...HEAD" > "$DIFF_FILE"
@@ -995,6 +1007,21 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    `references/code-review-prompt.md`, so the reviewer reports the candidate and this step runs it.
 
 5. **Record — always (advisory):** every finding (bugs + cleanups, with `file:line`) goes into the QA report `## Code Review` section and the PR comment.
+
+5b. **Provenance — is a reproduced finding new to this change?** For every `category: bug` finding
+   this step reproduced, run the same input against the PR **base** before it can enter the gate:
+   `git show "origin/${BASE}:${file}"` into a scratch copy and execute the reproduction there, and
+   where a fixture corpus exists, scan it for the shape. **Identical output on base and zero corpus
+   hits ⇒ `pre-existing`**: record both measurements beside the finding, keep its severity and
+   confidence exactly as returned, do **not** enter it in `top_issues[]`, and route it to the gate's
+   `recommendations.future` with a named follow-up. Not a downgrade — only the attribution changes,
+   and both measurements are in the report (obs #116; qa-task Step 3b carries the same rule).
+
+5c. **Verification is execution against the committed state — a QA step never leaves a fix in the
+   working tree.** A probe or a mutation reverts to what is committed before the next check runs;
+   a fix is 5b's (`/qa-fix`), and a gate written over an already-fixed tree records a finding that
+   no longer exists while the commit under review still carries it (obs #106). `git status
+   --porcelain` must be as it was when this step began, before Output 2 writes the gate.
 
 6. **Gate mapping — resolve blocking, then map:** apply the **canonical resolution** from the **Opt-in to blocking** section of `references/code-review-prompt.md`. It combines a run-level override (from Skill `args`) with the story frontmatter flag; an explicit per-doc `false` is the escape hatch:
 
@@ -1627,6 +1654,13 @@ After review:
 1. Create QA report file: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story file)
 2. Create quality gate file: `{qa.qaLocation}/gates/[prd-path]/story.[epic].[story].gate.[number].[descriptive-name].yml`
 3. **Update Story/Task File with QA Results**:
+
+   **Replace the whole `## QA Testing Results` section from the gate just written — never patch
+   it field by field.** On a re-review the section already exists, and editing only the fields
+   that changed leaves the rest looking current: on task.110 the `NFR Status` line stayed at
+   cycle 1's values through four cycles (obs #92). Render the section from the gate in full, then
+   check that every NFR status in it equals the gate's `nfr_validation.<axis>.status` before
+   writing.
 
    **For Stories - Update these sections:**
 

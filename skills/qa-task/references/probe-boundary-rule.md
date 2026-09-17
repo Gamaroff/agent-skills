@@ -179,6 +179,42 @@ selects for anyway. If it turns out that most real controls are not importable
 in-process and v1 declines almost everything, **that is a finding to record here
 in this section**, not something to paper over by loosening §2.
 
+### 5.1 When the sink is declined and the reviewer probes it by hand
+
+A declined sink (a shell/exec sink, a CLI that must be spawned) is not exempt from
+being tested; it is exempt from the *engine*. When the reviewer executes such
+candidates itself, two rules apply that the engine would otherwise have enforced:
+
+**Every refused shape is re-tried through every arm that reaches the same sink.**
+A CLI has more than one way in — its own argv, a `--` passthrough, a wrapper such
+as `npm run` / `npx`, a path taken from an environment variable — and each arm
+parses independently. On task.111 the absolute-path form was refused by the first
+arm tried and the enumeration stopped; the `npm run` wrapper passed the same
+string through untouched and reached the sink (obs #91). An arm is recorded clean
+only after the shapes refused elsewhere have been run through it, and the
+absolute form of any shape the arm accepted relatively has been run under the same
+arm. Record the arm × shape pairs tried, not only the verdict.
+
+**A by-hand probe runs under a minimal environment, in a scratch checkout, with a
+throwaway `HOME`.** The engine's `sandboxEnv()` allow-lists six keys for exactly
+this reason; a probe run from the reviewer's shell inherits the reader's entire
+session — API keys, `GH_TOKEN`, `CLAUDE_*`, npm config, and the `.claude/` /
+`.agents/` links of the working copy. On task.111 an executed candidate launched
+two agent sessions from inside the review (obs #97). The floor:
+
+```bash
+# Minimal env: only what the command under probe needs. Add keys deliberately.
+env -i PATH=/usr/bin:/bin:/usr/local/bin HOME="$(mktemp -d)" \
+  <command> <candidate>
+```
+
+and the working directory is a scratch clone (`git worktree add` of the PR head is
+enough) that carries no `.claude/`, `.agents/` or credential files. A probe that
+needs a variable the minimal env removed is a probe whose result must say so.
+Anything an executed candidate writes lands under the throwaway `HOME` or the
+scratch tree, and the reviewer diffs both afterwards — the by-hand equivalent of
+the engine's sentinel directory.
+
 ## 6. Exit codes
 
 `0` clean / `1` findings / `2` hard error, per the repository convention stated at

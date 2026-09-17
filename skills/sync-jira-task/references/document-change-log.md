@@ -171,6 +171,33 @@ the `Author` cell and whether `Version` moves.
 "bump minor" means `1.0` → `1.1`. A major bump (`1.x` → `2.0`) is a human decision, never
 automatic.
 
+### How a writer appends a row
+
+**Through the engine, never by text search.** "Append after the last table row following
+`## Change Log`" is a regex, and a regex cannot tell the real section from a fenced example of one:
+on task.42/43 it landed the row inside a ```` ```markdown ```` sample, and on task.44 after the blank
+line before `---` (obs #113). `change-log.js` already knows the fenced ranges, the legacy marker
+pairs and the insertion point; a writing skill calls it:
+
+```bash
+command node -e '
+  const fs = require("fs");
+  const CL = require("./.agents/skills/{skill}/references/change-log.js");
+  const [file, date, version, description, author] = process.argv.slice(1);
+  let c = fs.readFileSync(file, "utf8");
+  c = CL.upsertChangeLog(c, { date, version, description, author });
+  c = CL.bumpUpdated(c, date);
+  fs.writeFileSync(file, c);
+' "$DOC" "$(date +%F)" "" "Implemented — 12 files, 34 tests" develop
+```
+
+`upsertChangeLog` locates the real section (creating the canonical marker block after the last
+mandatory section when there is none), preserves rows it does not recognise, migrates the legacy
+`jira-sync-`/`github-sync-` pairs in place, and `bumpUpdated` moves frontmatter `updated:` in the
+same write — the two edits the contract requires to be one. The `version` argument is `""` for
+every machine writer and the bumped minor for `finalise`. A writer that cannot reach the engine
+(no `node`) reports that as a skipped step; it does not fall back to a regex.
+
 ## Exclusions
 
 **Bug reports carry no Change Log.** `## Status History` in

@@ -47,6 +47,15 @@ Ask it to find: all files likely affected by the success criteria and implementa
 
 After the Explore subagent returns, look for a co-located plan file:
 
+> **A plan's shell-variable names are claims about a file, not facts about it.** Before inserting
+> any snippet a plan supplies, extract every `$VAR` it references and grep the insertion-target file
+> for an assignment (`grep -n 'VAR=' <target>` — and for the bare *name*, which surfaces a paragraph
+> documenting it as wrong). Report the ones with no assignment rather than inserting them. Three
+> shapes fail *silently* rather than erroring: a variable that exists nowhere expands to empty and a
+> tolerant consumer degrades gracefully; a quoted heredoc (`<<'EOF'`) makes every `$NAME` inside it
+> inert text; and the target may already say the name is wrong (task.106's plan proposed `$QA_CYCLE`
+> for a file that documents, by name, that `$QA_CYCLE` exists nowhere in it). (obs #54)
+
 #### develop-story
 ```bash
 ls {story-directory}/story.{epic}.{story}.plan.*.md 2>/dev/null
@@ -226,6 +235,18 @@ Main reads only the triage summary (counts + ≤10 failure bullets + `next_file`
 - `TEST_EXIT != 0` → retain for post-mortem; do not delete on failure
 
 ---
+
+### Never revert or clean by directory inside a step
+
+In a repository where generated and authored files share a tree — this one's `skills/` holds both
+bundled `references/` and hand-written `SKILL.md`s; any repo with `dist/`, codegen or vendored
+copies is the same — a path-scoped `git checkout -- <dir>` or `git clean -fdq <dir>` cannot tell
+"files this step generated wrongly" from "files this step authored correctly". Both succeed, report
+success, and leave `git status` showing *less* work rather than broken work, with the report rows
+already ticked ✅. Undo generated output by **re-running the generator**, or by naming the specific
+paths. If a directory-scoped revert is genuinely needed: `git status` and `git diff --stat` before,
+the same after, and compare — the operation succeeds, so the comparison is the only thing that
+catches it. (obs #38)
 
 ### After loop exits (both orchestrators)
 

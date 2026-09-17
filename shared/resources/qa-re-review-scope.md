@@ -201,6 +201,17 @@ fix cycle changes the behaviour of code its own diff never touched, so a defect 
 as the ones just closed is the expected finding, not a surprising one.
 ```
 
+**4. A carried-forward trust boundary is in scope, not exempt.** A prior gate may carry an
+advisory of the form *"X is admitted because Y is trusted"* — an accepted trust boundary. It was
+reasoned, not measured: nothing executed the admitted shape. Under `SAFETY_REPROBE=true` every such
+boundary is **executed** in this cycle — run the admitted shape at least once, record the result
+beside the advisory — before it may be carried forward again; a cycle that re-copies the advisory
+without executing it records `evidence: reasoned` for that finding, and `reasoned` is not
+`measured`. On task.111 an accepted boundary was carried through four cycles on the strength of the
+first cycle's sentence, and the shape it admitted was the one that escaped (obs #99). The
+re-probe's job is to disbelieve the previous cycle's reasoning; a boundary that was never run is the
+first thing to disbelieve.
+
 ## Recording the decision
 
 Every re-review records the scope it ran at, in the QA report's **Review Methodology** section, as

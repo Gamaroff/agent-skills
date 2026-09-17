@@ -507,6 +507,17 @@ Options:
   Change Log gets exactly one row on loop exit (see the authorised-sections list below); a row per
   decision is the churn this format exists to avoid.
 
+**A safety flag named in a `suggested_action` is a claim about the installed binary — execute it
+before the plan relies on it.** When a fix turns on a flag whose whole job is to *remove* a
+capability (`--no-install`, `--noEmit`, `--dry-run`, `--check`, `--read-only`, `--ignore-scripts`),
+run that flag against the installed tool version **twice** — once where the capability would
+fire and once where it would not — and record the version and both outcomes in the fix plan
+before allow-listing or requiring the flag. On task.111 a `suggested_action` named a flag that
+the installed version accepted and ignored, and the fix shipped the flag as its safety argument
+(obs #96). A flag named in a finding but never executed is an unverified premise — the same
+class as "unrunnable is a claim" — and the plan says `verified against <tool> <version>` or it
+says `unverified`.
+
 **Guidance**:
 
 - Add tests closing coverage gaps before or with code changes
@@ -520,9 +531,15 @@ The develop-story / develop-task pipeline passes a **third strike** into this in
 file has been the subject of HIGH findings in three consecutive QA cycles. It names the file and
 the cycles. When you receive one:
 
-**You may not patch that file again.** A fourth correction to a mechanism that has been corrected
-three times is the loop's failure mode, not its progress. The permitted moves are exactly three,
-and the fix plan must record which one was chosen and why:
+**You may not patch the struck mechanism again.** The strike is *detected* on the file (that is
+what the pipeline can read off three gates), but what three consecutive HIGH findings share is a
+mechanism inside it — the pipeline names it in the prompt (`Struck mechanism: …`), derived from the
+three `finding:` texts. Other findings in the same file that do not touch that mechanism are fixed
+as usual; a one-line correction to an unrelated function in a struck file is not a fourth patch
+(obs #98). If the prompt names only the file, derive the mechanism yourself from the last three
+gates' findings, state it in the fix summary, and treat it as the constraint. A fourth correction
+to a mechanism that has been corrected three times is the loop's failure mode, not its progress.
+The permitted moves are exactly three, and the fix plan must record which one was chosen and why:
 
 | Move                       | When it is right                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------ |
@@ -537,6 +554,15 @@ and better than a fourth patch.
 
 Determining the strike is the pipeline's job, not yours: it reads the `file:` key on each gate's
 HIGH `top_issues[]` entries across the last three gates. You act on the strike you are given.
+
+The fix summary for a struck file has a fixed shape, so the next cycle can tell a replaced
+mechanism from a patched one without re-reading the diff:
+
+```
+Struck mechanism: {X}
+Move: delete | replace | waive — {one sentence why}
+Other findings in {file}: fixed as usual ({N}) | none
+```
 
 ### Step 3: Apply Changes
 
@@ -581,6 +607,21 @@ explicitly — they are the states the original finding never mentioned:
 | **In-flight computation** | If input arrives *while* the operation is running, is it applied, queued, or silently dropped? |
 | **Error path** | When the operation fails, is state left recoverable — or stranded so retry is impossible? |
 | **Reconnect** | After a drop and re-establish, does it converge to correct state, or resume from a stale one? |
+
+**For a documentation deliverable, the four probes above are the wrong shape — use these.** When
+the fix touches a `SKILL.md` or a `shared/resources/*.md`, the transition that breaks is not a
+lifecycle but a *sentence elsewhere in the same file*. On one task three consecutive QA cycles each
+found a defect introduced by the previous cycle's prose fix, and every one was one grep away:
+
+| Probe | Ask |
+| ----- | --- |
+| **What did this edit make false elsewhere?** | Grep the file for other statements about the same subject; check each against the new text |
+| **Does the edit's own claim survive its neighbours?** | A table whose rows are internally consistent can still contradict independent statements in the same file — check each row against them, not against each other |
+| **Did the fix create a record the template does not define, or a default that is false in some branch?** | A new row or field needs a definition; a default sentence must hold on the ordinary path, not only the one the finding described |
+
+In a document that is *executed* rather than read, a section is a call site: editing one can break
+another exactly as a code change can, and the neighbours are the blind spot because the diff does
+not show them. (obs #21)
 
 **Review the combination, not only each fix.** At least one real defect of this shape was caused by
 two earlier fixes that were each correct alone. After the last fix in a cycle, re-read the full diff

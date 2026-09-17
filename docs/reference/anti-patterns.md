@@ -169,6 +169,62 @@ assert.ok(section5c().includes("--stage ready-for-merge"), "the stage call must 
 
 `tests/lib/relationship-assertion-lint.js` fails CI on the four shapes this has taken; it models the six instances that happened, so a seventh in an unmodelled shape still needs you to read the message against the pattern.
 
+## Never anchor a Markdown edit on a bare substring of a heading
+
+**The rule:** an edit that locates a heading must match it **at line start** — `l == "## Heading"`
+over a line list, or `^## Heading$` with a multiline flag — never `s.replace("## Heading", …)` or
+`s.index("## Heading")`.
+
+**Why:** these documents routinely discuss their own structure, so a heading string is *especially*
+likely to appear earlier as an inline code span (`` `## Change Log` ``). A bare substring match hits
+the first occurrence, splices the new section into the middle of a sentence, and leaves a malformed
+heading behind. The result is still valid Markdown, so a formatter, a link checker and a 3,000-test
+suite are all silent on it — only a reader who compares meaning to intent sees it.
+
+**What happens if you ignore it:** on task.107 a `## QA Testing Results` section was inserted 80
+lines early inside a sentence in the Motivation, survived `prettier --check`, `markdown-link-check`,
+`npm run ci:fast` and two full QA cycles, and was caught at Step 5c. The repair used `s.index(...)`
+and did it again.
+
+**How to do it right:** locate both boundaries by line, assert both, cut by explicit line range,
+then verify fence parity (`$(grep -c '^```' "$f") % 2` must be `0`) and re-read the structure. A
+gate that validates *form* cannot see a defect in *meaning*. (obs #61)
+
+## Never write `grep -c … || echo 0`
+
+**The rule:** `grep -c` prints a count on **every** path, including `0` when nothing matches — and
+exits 1 in that case, so the `|| echo 0` fires *as well*. The captured value is the two-line string
+`"0\n0"`, and the next `[ "$V" -gt 0 ]` aborts with `integer expression expected`.
+
+**Why it matters more than a typo:** the failure does not look like this idiom. It looks like
+something *else* stalled. On one run a waiter built on it silently never met its exit condition,
+the stall was attributed to a different, healthy background poll, and that poll was killed three
+samples from a SUCCESS verdict.
+
+**How to do it right:** `$(grep -c PATTERN FILE || true)` when the exit code must not propagate,
+or just `$(grep -c PATTERN FILE 2>/dev/null; true)`. And the wider rule: **a stalled result is a
+claim about the instrument too** — when a background process looks stuck, read its output directly
+or re-run its check inline before killing it, and suspect the thing you wrote three minutes ago
+before the thing that has run correctly for two. (obs #28)
+
+## Never copy a number from prose into prose
+
+**The rule:** a figure derived from a command (`git ls-files … | wc -l`, a test count, a file
+count) appears in documentation as the **invocation that produces it**, not as its output. Keep a
+number only where it carries an argument the reader cannot reconstruct — and then date it, so it
+reads as a measurement rather than a standing claim.
+
+**Why:** a number in prose is a measurement with no timestamp and no owner. It is correct once and
+decays at the rate the tree changes, while looking identical to a number that is still true. Three
+files stated the ShellCheck lane's input as 247 / 56 files; five days and thirty merges later the
+answer was 266 / 58, and a documentation sweep copied the stale figures into a fourth file —
+stamped with a fresh commit date.
+
+**How to do it right:** print the command. Where a doc sweep copies a factual claim from one file
+to another, **re-derive it at the point of copying** — that is the moment checking is cheapest and
+the appearance of freshness is highest. The same applies to a count of another *document's*
+contents ("the four shapes" of a document that has six): drop the count or test it. (obs #60, #18)
+
 ## See also
 
 - [Troubleshooting](./troubleshooting.md) — what to do when something breaks

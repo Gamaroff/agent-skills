@@ -907,6 +907,13 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Check environment variables exist
    - Verify file paths match project structure
    - Validate naming conventions
+   - **Line anchors resolve, not only paths.** When a citation carries `:N` or `:N-M`, read those
+     lines (`sed -n 'N,Mp'`) and confirm they contain the thing the citation names. A path whose line
+     suffix points at unrelated code passes the path check and is **worse than no anchor**: it sends
+     the developer to plausible neighbouring code and invites them to reconcile it with the claim.
+     Measured on task.82: five anchors, every path right, every line number wrong within seven days.
+     Report a drifted anchor as **Optional** with the corrected number — the claim is true, the
+     coordinate moved. (obs #22)
 
 6. **Reference Validation**:
    - Test all `[Source: ...]` references point to real sections
