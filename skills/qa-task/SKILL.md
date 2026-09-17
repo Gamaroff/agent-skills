@@ -451,14 +451,18 @@ Adversarially review the change set's **diff** for **correctness bugs** (logic e
    function whose purpose is to accept or reject (a classifier, validator, parser, sanitiser, or
    any predicate whose `false` prevents an action). The signals and the
    explicit negative case are stated once, in Step 1b of `references/finalise-dod-security-prompt.md`;
-   do not restate them here. When the rule fires, take the candidate inputs from
-   `references/security-input-corpus.mjs` (`corpusFor(<sink>)`), write a short script in a temporary
-   directory that imports the entry point and calls it on each candidate, **run it**, and report each
-   candidate whose `actual` differs from `expected` on the existing `code_review` finding shape
-   (`category: bug`, `file_line` = the entry point, `finding` naming the input verbatim). Record the
-   total executed as **`probes_executed: N`** beside the block: an empty findings list with
-   `probes_executed: 0` is a review that read the boundary and did not test it, which is the defect
-   this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
+   do not restate them here. When the rule fires, the probe engine is the harness — **run it**:
+   `node references/security-probe.mjs --sink <sink> --entry '<path>#<export>' --repo-root "$(git rev-parse --show-toplevel)" --record <work-item-dir>/<stem>.qa.<N>.security.run.json --json`.
+   It takes the candidates from `references/security-input-corpus.mjs` (`corpusFor(<sink>)`)
+   itself, imports the entry point in a sandboxed child, and calls it on each candidate.
+   Report each case in its JSON `cases[]` whose `outcome` differs from what its `direction` requires
+   on the existing `code_review` finding shape (`category: bug`, `file_line` = the entry point,
+   `finding` naming the input verbatim). Record the total executed as **`probes_executed: N`**
+   beside the block, **copied from the run record's `totals.executed`** (the file `--record`
+   wrote — equal to `executed` in the engine's JSON), never counted by hand; the gate's
+   `nfr_validation.security.evidence` may read `measured` only when that total is positive. An empty
+   findings list with `probes_executed: 0` is a review that read the boundary and did not test it,
+   which is the defect this item closes. `boundary: false` is the common case and a legitimate skip — record it in the QA
    report's `## Code Review` section rather than leaving `probes_executed` absent. A boundary that is
    read at QA and executed only at the Step 7 DoD probe lands its defect after the gate that should
    have covered it: a 14-star glob compiled to `[^/]*` × 14 passed five green cycles and was found at

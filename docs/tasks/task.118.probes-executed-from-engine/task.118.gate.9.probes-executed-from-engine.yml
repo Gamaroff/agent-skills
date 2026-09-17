@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'Cycle-8 fixes verified (CR8-1..5 FIXED; 2 mutation proofs covered). The scoped cycle-9 review found no high-confidence bug: a low race in the orphan-snapshot check — readdir ENOENT then existsSync(snapshot) true because a sibling first run created the directory and wrote its snapshot in between — which QA rates real by reading and promotes because the failing case (concurrent first runs) is the one the entry-file design exists for, and its effect is a dropped control; plus two cleanups.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T15:05:00Z'
+
+top_issues:
+  - id: 'CR9-1'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'readRecord''s orphan check spans two syscalls: a concurrent first run whose readdirSync(dir) gets ENOENT before a sibling''s mkdirSync but whose existsSync(recordPath) lands after the sibling''s snapshot write throws "no entry directory" and exits 2 — the run''s control is never written. Verified by reading; the window is the sibling''s mkdir+entry+snapshot sequence against the caller''s readdir→existsSync gap.'
+    suggested_action: 'On ENOENT with the snapshot present, re-check the entry directory (retry the readdir once) and throw only if it is still absent; test by creating the directory between the two checks.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3400
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+  mutation_proofs: 2
+  prior_findings_verified: '5/5 FIXED'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — unchanged.'
+  performance:
+    status: PASS
+    notes: 'CR9-2 (cleanup): the CLI path parses the entries three times per run (preflight, recordRun guard, fold) — O(controls), negligible, but one helper would do.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR9-1 only.'
+  maintainability:
+    status: PASS
+    notes: 'CR9-2 duplicated prologue; CR9-3 the exit-code assertion collapses non-zero codes. Cleanups.'
+
+recommendations:
+  immediate:
+    - action: 'Re-check the entry directory before throwing the orphan error (CR9-1); one prologue helper for preflightRecord and recordRun (CR9-2); assert exit codes exactly (CR9-3)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR9-1 closed']

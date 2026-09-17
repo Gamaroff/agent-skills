@@ -54,6 +54,15 @@ Two rules follow, and both are enforced in CI rather than left to your discretio
   execution is `evidence: reasoned`, always — however confident the reading.
 - **Zero executed probes renders `unverifiable`**, never `engages` and never a pass.
 
+**You do not type either number.** Both come from the **run record** the engine writes when it is
+run with `--record`: `probes_executed` is the record's `totals.executed`, and `evidence` is computed
+from it by `security-probe.mjs` — `measured` only when that total is positive, `reasoned` otherwise.
+`--emit-block <record>` prints the whole `security_review:` block from the record and you paste its
+output verbatim (§4). A block whose `evidence: measured` was not produced by `--emit-block` is the
+self-report this rule exists to remove: an agent that ran nothing has no record, and a missing record
+renders `reasoned` with `probes_executed: 0` — which is the honest block for a review that did not
+execute.
+
 ---
 
 ## 3. Method — where the ordering lives
@@ -119,7 +128,10 @@ re-run is an assertion, not evidence.
 - **Command**:
   ```bash
   node references/security-probe.mjs --sink url-authority \
-    --entry 'apps/api/src/redis.ts#buildRedisOptions'
+    --entry 'apps/api/src/redis.ts#buildRedisOptions' \
+    --repo-root "$(git rev-parse --show-toplevel)" \
+    --record docs/tasks/task.81.x/task.81.security.1.run.json \
+    --name redis-tls --call-site apps/api/src/redis.ts:41
   ```
 - **What passed that should not**: `evil.example.com/x` — accepted. The `/` ends the authority, so
   the connection is re-pointed and the port silently dropped.
@@ -127,13 +139,28 @@ re-run is an assertion, not evidence.
   than `absent`: the control demonstrably runs.
 ````
 
-And the machine block, once per report, which is what a gate consumes:
+And the machine block, once per report, which is what a gate consumes. **It is printed, not
+written.** Every probe passes `--repo-root "$(git rev-parse --show-toplevel)"` — the engine's
+containment root defaults to two directories above its own file, which in an installed skill is the
+skill directory, not the repository, so without the flag every repo-relative entry resolves under
+the skill and is `unverifiable` before it is ever imported — and every probe in the review passes
+the same `--record <path>` (the record sits beside the
+report as `{stem}.security.{N}.run.json`; each probe writes its own control's entry file under
+`{stem}.security.{N}.run.json.d/` and the engine folds the directory — a re-run of the same
+`{sink, entry}` replaces only its own entry, and concurrent probes never share a write), and the
+block is the output of:
+
+```bash
+node references/security-probe.mjs --emit-block {stem}.security.{N}.run.json --mode diff
+```
+
+Paste what it prints. It looks like this:
 
 ```yaml
 security_review:
   mode: diff              # diff | full
-  probes_executed: 12     # 0 ⇒ every verdict is `unverifiable`
-  evidence: measured      # measured | reasoned — `measured` REQUIRES probes_executed > 0
+  probes_executed: 12     # totals.executed from the run record — 0 ⇒ every verdict is `unverifiable`
+  evidence: measured      # computed by security-probe.mjs from the record — `measured` REQUIRES probes_executed > 0
   controls:
     - name: redis-tls
       verdict: present-but-inert
@@ -142,9 +169,13 @@ security_review:
       entry: apps/api/src/redis.ts#buildRedisOptions
       sink: url-authority
       reason: a-hostile-case-passed-a-control-that-rejects-others
+      probes_executed: 12   # per control, from the record
 ```
 
-`reason` is the engine's own string — copy it, do not paraphrase it.
+`reason` is the engine's own string — copy it, do not paraphrase it. `name` and `call_site` are
+the `--name` / `--call-site` you passed when probing; a control probed without them renders
+`sink:export` and `null`, which is a prompt to re-run with them rather than a value to edit in.
+**Do not edit the emitted block** — a hand-corrected count is a typed count.
 
 ### Lifting the block into a QA gate
 

@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'Engine, readers and population test are in place and mutation-proven; the code review found the review-security probe command itself omits --repo-root (inoperable from an installed copy), emitBlock trusts a record totals field it could recompute, and the --repo-root test passes for a different reason than its message states. All three are bug + high-confidence under code_review_blocking; none is HIGH.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T07:41:00Z'
+
+top_issues:
+  - id: 'CR-1'
+    severity: medium
+    file: 'shared/resources/security-review-prompt.md'
+    finding: 'The review-security probe command (§4 Command block; bundled as `node references/security-probe.mjs …`) omits --repo-root, so from an installed copy defaultRepoRoot() is the skill dir, every repo-relative entry fails to import, and the engine records unverifiable / executed: 0 for every control — the exact consumer --repo-root was added for.'
+    suggested_action: 'Add --repo-root "$(git rev-parse --show-toplevel)" to the §4 command and to review-security SKILL.md step 5, matching the finalise / qa-task / qa-story sites, and guard it with a test.'
+    suggested_owner: dev
+    bug_ref: 'task.118.bug.1.review-security-command-omits-repo-root.md'
+    status: open
+  - id: 'CR-2'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'emitBlock dereferences record.totals.executed while readRecord validates only version and controls, so a version-1 record without totals throws an uncaught TypeError (exit 1, not the documented 2); and a record whose totals.executed is hand-edited to 12 with controls: [] renders evidence: measured, which the forged-case test comment claims is impossible.'
+    suggested_action: 'Derive evidence and the block totals from totalsOf(record.controls) rather than trusting the file, and have readRecord reject a record whose totals is missing or not an object.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'skills/review-security/tests/review-security.test.js'
+    finding: 'The --repo-root test, finalise-dod-security-prompt.md:138, CHANGELOG and the task docs say a repo-relative entry is "declined as an escape" from a nested copy, but resolveEntry returns ok: true for the contained-but-nonexistent path and the unverifiable comes from entry-not-probeable — the test passes for a reason other than the one its message asserts.'
+    suggested_action: 'Assert without.reason === "entry-not-probeable" alongside the verdict, and reword the four "declined as an escape" claims to "resolves under the skill dir and cannot be imported".'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3382
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+  mutation_proofs: 2
+  snippet_blocks_executed: 6
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — the change set adds no accept/reject function. readRecord is a schema check on a JSON file the engine itself wrote (throws on a non-record, never silently empties — verified by the corrupt-record CLI test); resolveEntry containment is pre-existing and unchanged, and --repo-root only re-anchors the root a caller already controls by where it places the engine. No untrusted input reaches a shell: --name / --call-site values are rendered through yamlStr into a YAML block (CR-4 notes # / @ leading characters are left unquoted — advisory, confidence medium).'
+  performance:
+    status: PASS
+    notes: 'One JSON read + one atomic write per probe run; emit-block is a single read. The population test walks ~150 markdown files once (3 ms).'
+  reliability:
+    status: PASS
+    notes: 'Record write is temp+rename; a corrupt record exits 2 rather than reading as empty; a missing record renders the honest zero block. CR-2 (totals trusted from the file) is the one gap and is low severity.'
+  maintainability:
+    status: PASS
+    notes: 'The count has one route (record → emit-block); the population test carries an allowlist with reasons, a non-vacuity floor, a stale-entry check and a negative control, and it found the third site the task had not named. CR-5/CR-6 (dead operand guards, --mode ignored in probe mode) are cleanups.'
+
+recommendations:
+  immediate:
+    - action: 'Add --repo-root to the review-security command block and SKILL step 5; guard with a test so a shipped security-probe invocation without it is a finding (CR-1)'
+      refs: ['shared/resources/security-review-prompt.md', 'skills/review-security/SKILL.md', 'evals/shared/tests/probes-executed-population.test.mjs']
+    - action: 'Recompute totals from controls in evidenceOf/emitBlock and reject a record without totals in readRecord; assert the forged case renders reasoned (CR-2)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+    - action: 'Assert the reason in the --repo-root test and reword "declined as an escape" in the prompt, CHANGELOG and task docs (CR-3)'
+      refs: ['skills/review-security/tests/review-security.test.js', 'shared/resources/finalise-dod-security-prompt.md', 'CHANGELOG.md']
+  future:
+    - action: 'Quote yamlStr values whose first character is a YAML indicator (CR-4); check flag operands at parse time so --record / --emit-block / --repo-root without an operand exit 2 on their own (CR-5); validate --mode regardless of mode (CR-6)'
+      refs: ['shared/resources/security-probe.mjs']
+    - action: 'emitBlock(null) hardcodes reasoned without calling evidenceOf — route the null case through evidenceOf so one function owns the answer (found by the QA mutation proof: forcing evidenceOf to measured did not red the deletion test)'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR-1 fixed — the review-security command must carry --repo-root', 'CR-2 and CR-3 closed']

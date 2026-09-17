@@ -1,0 +1,66 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'Cycle-3 fixes verified (CR3-1..8 FIXED; 5 mutation proofs covered, 1 absorbed by the float branch). The narrowed cycle-4 review found one residual lock edge — a waiter that stat-ed a stale lock can rename away a live lock another waiter has just re-created — rated low (needs a crashed holder, two waiters and a microsecond window) but real by code reading, plus a YAML-1.1-reader typing note and two cleanups. QA adds a load-sensitive timing assertion in the fail-fast test. No HIGH.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T10:05:00Z'
+
+top_issues:
+  - id: 'CR4-1'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'reclaimStaleLock renames whatever is at the lock path without confirming it is the stale file the caller observed: if waiter A reclaims, removes and re-creates a fresh lock between waiter B''s statSync and B''s renameSync, B renames away A''s live lock, returns true, and both enter the critical section. Verified by code reading (QA); the window is a few syscalls after a crashed holder with two waiters.'
+    suggested_action: 'Pass the observed mtimeMs into reclaimStaleLock; after the rename, statSync the claimed file and if its mtime is not the observed stale one, rename it back to the lock path and return false. Test: rename a fresh (non-stale) lock in via the observed-mtime mismatch path and assert it is restored and the call returns false.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR4-5'
+    severity: low
+    file: 'skills/review-security/tests/review-security.test.js'
+    finding: 'The fail-fast test asserts the corrupt --record run returned in under 3000 ms; under load (the QA mutation run) it took 5118 ms and failed although the preflight fired first. Wall-clock is not the property — "the probe did not run" is.'
+    suggested_action: 'Assert the property directly: stdout is empty (no verdict line was printed) and stderr carries only the cannot-use message; drop the elapsed-time bound.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3397
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+  mutation_proofs: 6
+  prior_findings_verified: '8/8 FIXED'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR4-1: the reclaim can steal a live lock in a narrow window after a crashed holder. Contained to reclaimStaleLock; the fix is a post-rename identity check.'
+  maintainability:
+    status: PASS
+    notes: 'CR4-2 (js-yaml 1.1 typing of 1_000 / dates — state YAML 1.2 support or widen the regex), CR4-3 (unused destructure + void), CR4-4 (dead int alternative — the float branch subsumes it, which is also why the leading-zero mutation was absorbed), CR4-5 (load-sensitive timing assertion). Cleanups.'
+
+recommendations:
+  immediate:
+    - action: 'Identity-check the reclaimed lock after the rename; restore and return false on a mismatch (CR4-1). Replace the 3000 ms bound with a no-verdict-printed assertion (CR4-5).'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+  future:
+    - action: 'State in the yamlStr comment that YAML 1.2 core-schema readers are the target, or add the 1.1 underscore-int and timestamp forms (CR4-2); remove the dead int alternative (CR4-4); drop the unused recordRun destructure (CR4-3)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1 and CR4-5 closed']

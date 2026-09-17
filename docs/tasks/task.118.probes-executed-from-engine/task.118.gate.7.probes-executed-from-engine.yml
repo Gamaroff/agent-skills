@@ -1,0 +1,66 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'The cycle-6 mechanism replacement is verified: no lock code remains, three concurrent runs converge to three entry files, four mutation proofs covered. The scoped cycle-7 review found one real edge in the new code — emit mode rewrites the snapshot outside its try, so a read-only snapshot directory throws out of main with exit 1 and no block (reproduced) — plus a legacy-snapshot silence (reproduced: snapshot with no entry directory reads as no record) and a fold that does not dedupe by key, and five cleanups (stale docstrings and test residue from the lock era). First cycle whose findings are about the new mechanism rather than the lock.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T13:05:00Z'
+
+top_issues:
+  - id: 'CR7-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'In --emit-block mode writeSnapshot sits outside the try/catch that guards readRecord; on a read-only snapshot directory writeAtomic throws out of main, Node prints a stack trace, exit 1 (the "does not engage" code) and no block is printed although every entry was readable. Reproduced (chmod 500 the record dir → exit 1, stack trace).'
+    suggested_action: 'The snapshot is a reader convenience: in emit mode catch the write failure, warn on stderr, and still print the block with exit 0.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR7-2'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'readRecord returns null when <path>.d is absent without looking at <path>, so a snapshot with no entry directory — any record written before the cycle-6 layout, or one whose entry directory was removed — reads as "no record" (reasoned / 0) and is silently overwritten by the next --record. Reproduced. Contradicts the stated rule that a record which exists but cannot be read is a finding, not an empty one.'
+    suggested_action: 'When the entry directory is ENOENT but <path> exists, throw a "snapshot without entries — re-run the probes" error so it fails loudly at exit 2.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3395
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+  mutation_proofs: 4
+  prior_findings_verified: 'CR6-1..4 closed as a class — lock code absent, 3 concurrent runs → 3 entries'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — unchanged.'
+  performance:
+    status: PASS
+    notes: 'One entry write + one fold + one snapshot write per run; the fold is O(controls).'
+  reliability:
+    status: CONCERNS
+    notes: 'CR7-1 (gating) and CR7-2 (gating, low). CR7-3 (low/low, advisory): the fold counts any *.json regardless of name, so a stray copy of an entry under another name double-counts — dedupe by controlKey keeping the latest ran_at.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Lock-era residue: recordRun docstring still narrates the O_EXCL lock (CR7-4); an orphaned JSDoc above recordEntriesDir (CR7-5); the concurrency test keeps a dead .lock assertion and checks temp litter in the wrong directory (CR7-6); the cycle-3 banner names deleted tests and an unused RECORD_VERSION destructure (CR7-7); the forgery test hardcodes 12 (CR7-8). All cleanups, all in the same fix.'
+
+recommendations:
+  immediate:
+    - action: 'Catch the emit-mode snapshot write; warn and still print the block (CR7-1). Throw on a snapshot with no entry directory (CR7-2). Dedupe the fold by controlKey (CR7-3).'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+  future:
+    - action: 'Rewrite the recordRun docstring; delete the orphaned JSDoc; fix the concurrency test assertions; trim the cycle-3 banner; assert against the live count in the forgery test (CR7-4..8)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR7-1 and CR7-2 closed']

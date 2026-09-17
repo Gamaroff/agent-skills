@@ -83,9 +83,18 @@ Invoke as `/review-security [work-item] [--mode diff|full]`.
    [`references/security-review-prompt.md`](references/security-review-prompt.md),
    which is passed to the reviewing agent verbatim. Sink selection and entry-point rules live there.
 5. **Run the engine.** `runProbeSpec` executes every corpus case for the sink in a sandboxed child and
-   returns the verdict, the reason, and the per-case results.
+   returns the verdict, the reason, and the per-case results. Run it through the CLI with
+   `--repo-root "$(git rev-parse --show-toplevel)"` and
+   `--record {work-item-dir}/{stem}.security.{N}.run.json` (plus `--name` and `--call-site`) for
+   **every** control — `--repo-root` because an installed copy's default containment root is the
+   skill directory, and a repo-relative entry resolved there is `unverifiable` before it is imported — the record accumulates one entry per `{sink, entry}` and is the only place the
+   probe count is allowed to come from.
 6. **Write the report** to `{work-item-dir}/{stem}.security.{N}.{name}.md`, including the
-   `security_review:` machine block.
+   `security_review:` machine block — **pasted from
+   `security-probe.mjs --emit-block {stem}.security.{N}.run.json`, never typed.** `probes_executed`
+   and `evidence` are read from the record and `evidence` is computed by the engine, so `measured`
+   cannot appear unless the engine ran; a review that skipped step 5 pastes a block reading
+   `probes_executed: 0` / `evidence: reasoned`, which is the truthful block for that review.
 
 ## Output
 
@@ -112,7 +121,7 @@ than good intentions:
 | --- | --- |
 | The agent cannot write a verdict | `computeVerdict` in the engine; the agent supplies only `{sink, entry}` |
 | Zero executed probes never reads as a pass | `runProbeSpec` returns `unverifiable` on `no-cases-executed` |
-| `evidence: measured` implies `probes_executed > 0` | contract test in CI |
+| `evidence: measured` implies `probes_executed > 0` | both values come from the engine's run record via `--emit-block`; `evidenceOf()` computes `measured` only from a positive `totals.executed`, and the contract test runs the engine, emits the block, then deletes the record and asserts it reads `reasoned` |
 | The block's keys match the QA gate's, so a cycle lifts rather than translates | `evals/shared/tests/qa-re-review-scope-parity.test.mjs`; values defined once in [`references/qa-gate-security-evidence.md`](references/qa-gate-security-evidence.md) |
 | A bare PASS is unrepresentable | no PASS token exists in the output schema |
 | A grep-passing control is still caught | the falsifiability fixtures — each inert variant *contains* the tokens a grep reviewer accepts |

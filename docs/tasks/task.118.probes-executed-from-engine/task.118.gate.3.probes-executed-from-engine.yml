@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'Cycle-2 fixes verified (CR2-1..3 FIXED; 4 QA mutation proofs incl. the lock made a no-op). The narrowed cycle-3 review of the lock + record code found a YAML rendering gap (a value ending in ":" renders an unparseable block), an integer form the typed-scalar regex misses (leading zeros), a lock timeout shorter than the stale window, and four lower-confidence lock/preflight/schema edges. No HIGH; one MEDIUM and two LOW high-confidence entries gate.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T09:20:00Z'
+
+top_issues:
+  - id: 'CR3-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'yamlStr emits a value ending in ":" bare (":" is in the safe class and not an indicator START); `name: foo:` is a YAML syntax error in both js-yaml and yaml, so --name x: or --call-site x.ts: (line omitted) renders a security_review block no gate can parse.'
+    suggested_action: 'JSON-quote when the string ends with ":" (and, to be safe, when it contains ": " or " #"), and add the case to the quoting test.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-3'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'LOCK_TIMEOUT_MS (20 s) is shorter than LOCK_STALE_MS (30 s): a waiter arriving less than 10 s after a holder dies times out with exit 2 before the lock becomes reclaimable — the reclaim path is unreachable in the window it exists for.'
+    suggested_action: 'Make the wait timeout exceed the stale window by at least one retry interval, or re-check staleness once before throwing.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR3-4'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'YAML_TYPED_SCALAR integer branch is (?:0|[1-9][0-9]*), so a leading-zero scalar such as 007 or 0123 is emitted bare and resolves to an integer in both js-yaml (octal) and yaml — the --name stays-a-string guarantee is broken for that form.'
+    suggested_action: 'Use the YAML 1.2 core-schema forms ([-+]?[0-9]+ for int; the matching float form) and add 007 to the typed-scalar test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3391
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+  mutation_proofs: 4
+  prior_findings_verified: '3/3 FIXED (+ CR2-4..7 cleanups taken)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — the cycle-2 diff adds a lock and a stricter record schema; neither an accept/reject boundary over untrusted input. The lock file path is derived from --record, which the operator supplies.'
+  performance:
+    status: PASS
+    notes: 'The lock adds one O_EXCL open per record write; contention sleeps 25 ms via Atomics.wait rather than spinning.'
+  reliability:
+    status: CONCERNS
+    notes: 'Advisory (confidence medium/low, not gating): CR3-2 stale reclaim is a stat→rm TOCTOU — two waiters that both see a stale lock can each rm and re-create, re-opening the lost merge after a crashed holder; CR3-5 preflightRecord does not detect an existing read-only directory; CR3-7 a persistent non-ENOENT statSync error on the lock is an unbounded loop. All three are in the lock/preflight code the cycle-2 fix added and belong in the same fix.'
+  maintainability:
+    status: PASS
+    notes: 'CR3-6 validControl accepts any string verdict (medium confidence); CR3-8 spawn re-required inline in two tests. Cleanups.'
+
+recommendations:
+  immediate:
+    - action: 'Quote a value ending in ":" (CR3-1); widen the typed-scalar regex to the YAML 1.2 core-schema int/float forms (CR3-4); make the lock timeout exceed the stale window (CR3-3)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+  future:
+    - action: 'Reclaim a stale lock by atomic rename to a per-pid name instead of rmSync on the shared path (CR3-2); accessSync(W_OK) in preflightRecord (CR3-5); require VERDICTS membership in validControl and drop the severity fallback (CR3-6); continue only on ENOENT in the stat catch (CR3-7); destructure spawn once (CR3-8)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-09-17'
+  total_iterations: 2
+  verification_method: 'bug 2: three-process repro → 3 controls; lock no-op reds 3 tests; stale-reclaim removal reds the reclaim test; control-validation removal and typed-scalar removal each red their test'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1 fixed', 'CR3-3 and CR3-4 closed']

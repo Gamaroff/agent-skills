@@ -110,28 +110,11 @@ its caller, and not the code that acts on the verdict.
 
 **2. Take the candidates from the corpus.** The inputs already known to defeat each sink are written
 down once, in [`references/security-input-corpus.md`](security-input-corpus.md) and its
-machine-readable peer `references/security-input-corpus.mjs`. Start there rather than
-re-inventing a candidate set per run:
-
-```js
-// Step 3 runs this from a TEMP directory, so the specifier must be ABSOLUTE —
-// a bare or relative one throws ERR_MODULE_NOT_FOUND from there.
-//
-// Do not guess the directory. The corpus module ships BESIDE this prompt file,
-// and you already know that path: it is the file you are reading. Substitute it
-// for PROMPT_DIR below. (In this repository that is `shared/resources`; in an
-// installed skill it is the skill's own `references` directory, which is not
-// under the repo root — which is why guessing a fixed pair of names fails.)
-import { pathToFileURL } from "node:url";
-import { join } from "node:path";
-
-const PROMPT_DIR = "<the directory you read this prompt from>";
-const { corpusFor } = await import(
-  pathToFileURL(join(PROMPT_DIR, "security-input-corpus.mjs"))
-);
-// sinks: url-authority | sql-orm | shell-exec | path | template-render
-const cases = corpusFor("shell-exec");
-```
+machine-readable peer `references/security-input-corpus.mjs`. You do not import them yourself:
+the engine in step 3 calls `corpusFor(sink)` for the sink you name, so choosing the sink **is**
+choosing the candidates. Sinks: `url-authority` | `sql-orm` | `shell-exec` | `path` |
+`template-render` — pick by what the boundary *decides* (where a connection goes, what reaches a
+query, what reaches a shell, what location is read or written, what is interpolated into output).
 
 Each case carries the input, **why** it is dangerous, and **what a correct implementation does to
 it** — so the corpus says what a pass looks like, not merely what to try. Between them the cases
@@ -143,9 +126,33 @@ each re-derive a candidate set from prose test different things and reach differ
 that imports the corpus tests what is known to get past the control. If you find an input the corpus
 does not have, add it there — every later probe then gets it for free.
 
-**3. Execute them.** Write a short script in a temporary directory that imports the entry point and
-calls it on each candidate, and **run it**. Do not reason abstractly about what the code would return —
+**3. Execute them.** Run the probe engine, `references/security-probe.mjs`, against the entry
+point with the sink you chose, and **run it** with `--record` so the count of what executed is
+written by the engine and not by you. Do not reason abstractly about what the code would return —
 reasoning about it is precisely what the checklist already does, and what it gets wrong.
+
+```bash
+# The engine ships BESIDE this prompt file (in this repository: shared/resources;
+# in an installed skill: the skill's own references directory). Substitute that
+# directory for PROMPT_DIR. --repo-root re-anchors the engine's containment check
+# on the consumer's tree — from a bundled copy its default root is the skill dir,
+# and every repo-relative entry would resolve under the skill dir, fail to
+# import, and read as unverifiable (executed: 0) without it.
+node PROMPT_DIR/security-probe.mjs \
+  --sink <sink> --entry '<path-from-repo-root>#<exportName>' \
+  --repo-root "$(git rev-parse --show-toplevel)" \
+  --record <STORY_DIR>/<stem>.dod.security.run.json --json
+```
+
+The engine imports the entry in a sandboxed child, calls it on every corpus case for the sink —
+both directions — and prints a JSON result whose `executed` is the count of candidates that
+actually ran, whose `reproduced[]` names the hostile cases that were accepted, and whose
+`overblocked[]` names the legitimate cases that were refused. The record it writes carries the same
+counts; **`probes_executed:` below is the record's `totals.executed`, copied, never composed.** An
+entry the engine cannot import (a non-JS boundary, or a function needing more than one argument) is
+`verdict: unverifiable` with `executed: 0` and takes the zero-guard below — say why in `summary`,
+do not fall back to a hand-written harness, because a count from a harness is the self-report this
+step removed.
 
 **4. Report only what reproduced — but count everything you ran.** A candidate you did not run is not a
 finding. A candidate that ran and returned its expected verdict is not a finding either. `probes[]`
@@ -154,13 +161,17 @@ verbatim so a reader can re-run it.
 
 Because `probes[]` is filtered, it cannot also serve as the record of how much work was done. Report the
 total in **`probes_executed:`** — every candidate actually executed, including the legitimate inputs from
-step 5 and every candidate that behaved correctly. An empty `probes[]` with a high `probes_executed` is
+step 5 and every candidate that behaved correctly — **taken from the run record** (`totals.executed`
+in the file `--record` wrote, equal to `executed` in the engine's JSON), never counted by hand.
+Build `probes[]` from the engine's `cases[]`: each entry whose `outcome` differs from what its
+`direction` requires (a hostile case `accepted`, a legitimate case `rejected`), with the case's
+`input` attached verbatim. An empty `probes[]` with a high `probes_executed` is
 the *good* result; an empty `probes[]` with `probes_executed: 0` is the failure in the guard below. The
 two are indistinguishable without this count, which is why it is required rather than optional.
 
 **5. Probe the other direction too.** The corpus's `legitimate` cases *are* the set of **legitimate
-inputs that must still be accepted** — filter for `direction === "legitimate"` and assert that they
-are. Every sink carries at least one, held by the corpus's own schema test rather than by this
+inputs that must still be accepted** — the engine runs them in the same pass and reports a refused
+one under `overblocked[]`; carry each into `probes[]` with `expected: accepted`. Every sink carries at least one, held by the corpus's own schema test rather than by this
 sentence. A fix that closes a hole by refusing everything is also a defect, and without this
 direction an over-strict boundary looks identical to a correct one.
 
@@ -197,7 +208,8 @@ security_review:
       note: "optional"
   boundary: true | false # REQUIRED. Did Step 1b's rule fire? Never inferred from `probes`.
   probes_executed: 0 # REQUIRED when boundary is true. Every candidate actually run, including
-    # the legitimate inputs of step 5 and every candidate that behaved correctly.
+    # the legitimate inputs of step 5 and every candidate that behaved correctly —
+    # totals.executed from the engine's run record (--record), never composed by hand.
   probes: # only candidates that REPRODUCED a defect; [] is correct and good when none did
     - input: "svc deploy --target prod" # the candidate, verbatim and re-runnable
       expected: "denied"

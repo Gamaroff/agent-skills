@@ -12,6 +12,18 @@
  *   --cases-file <path>  JSON array of cases, replacing the corpus for this run
  *   --timeout <ms>       per-case timeout (default: the shared spawn budget)
  *   --json               emit one JSON object on stdout
+ *   --repo-root <path>   containment root for --entry (default: two dirs above this
+ *                        file — the repo root in-tree, the SKILL dir in a bundled
+ *                        copy; pass `$(git rev-parse --show-toplevel)` from a bundle)
+ *   --record <path>      write this run's control to <path>.d/ and the folded
+ *                        snapshot at <path> — see "The run record"
+ *   --name <name>        control name stored in the record (with --record)
+ *   --call-site <ref>    `file:line` of the call site, stored in the record (with --record)
+ *
+ * Emit mode (no probe is run):
+ *   node <this-file> --emit-block <record> [--mode diff|full]
+ *   Prints the `security_review:` YAML block with `probes_executed`, `evidence`
+ *   and `controls[]` filled FROM THE RECORD. The block is pasted, never typed.
  *
  * Exit codes (repository convention):
  *   0  clean — the control engages
@@ -36,7 +48,19 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  accessSync,
+  constants as fsConstants,
+  mkdtempSync,
+  mkdirSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -497,17 +521,388 @@ export function runProbeSpec({
   };
 }
 
+// ── The run record ───────────────────────────────────────────────────────────
+//
+// `probes_executed` and `evidence` in a review's output block used to be typed
+// by the agent, and the contract test read the DOCUMENTED example rather than a
+// real run — so an agent that executed nothing and wrote `12` satisfied both
+// the prose rule and CI. The condition the check exists to catch (probes
+// skipped) is exactly the one under which a self-report is unreliable (obs #10).
+//
+// This record is the number's only legitimate route from the engine to the
+// block. `--record <path>` writes it; `--emit-block <record>` reads it back and
+// prints the YAML the report carries. `evidence` is COMPUTED from the totals and
+// never accepted as input, so `measured` is unrepresentable without a record
+// whose `totals.executed` is positive. Delete the record and the block reads
+// `reasoned` — that is the mutation the contract test performs.
+//
+// One record per review, one ENTRY FILE per control. `--record <path>` writes
+// this run's control to `<path>.d/<key>.json` — an atomic temp+rename to a name
+// derived from `{sink, entry}`, so two controls never share a file and a re-run
+// of the same control replaces only its own — and then writes the folded
+// snapshot at `<path>` for readers. `readRecord` folds the entry directory,
+// never the snapshot, so the snapshot cannot mislead the engine.
+//
+// WHY ENTRY FILES AND NOT A MERGED FILE. The first version merged every run
+// into one JSON file: read → filter → push → rename. Concurrent runs (an agent
+// issuing its probes as parallel tool calls) lost controls to last-writer-wins
+// (CR2-1). A lock fixed that and then spent four QA cycles growing crash-
+// recovery edges — stale reclaim, reclaim TOCTOU, put-back overwrite, orphan
+// stall, pid-write leak (CR3-2, CR4-1, CR5-1, CR5-2, CR6-1) — each real, each
+// fixed, each exposing the next. Distinct files per control have no shared
+// write, so there is nothing to lock, reclaim, put back or identify. The
+// reviewer proposed this in cycle 2; it took four more to earn it.
+
+export const RECORD_VERSION = 1;
+
+/** Severity the review prompt assigns each verdict — stated once, here. */
+export const SEVERITY_BY_VERDICT = Object.freeze({
+  engages: "none",
+  "present-but-inert": "high",
+  absent: "medium",
+  unverifiable: "unverifiable",
+});
+
+const controlKey = (c) => `${c.sink ?? ""}\u0000${c.entry ?? ""}`;
+
+/**
+ * Reduce a `runProbeSpec` result to the per-control entry the record stores.
+ * Counts only — the per-case detail stays in the engine's own `--json` output.
+ */
+export function toRecordEntry(result, { name, callSite } = {}) {
+  return {
+    sink: result.sink ?? null,
+    entry: result.entry ?? null,
+    name: name ?? null,
+    call_site: callSite ?? null,
+    verdict: result.verdict,
+    reason: result.reason,
+    executed: result.executed ?? 0,
+    passed: result.passed ?? 0,
+    reproduced: result.reproduced?.length ?? 0,
+    overblocked: result.overblocked?.length ?? 0,
+    declined: result.declined?.length ?? 0,
+    escaped: result.escapes?.length ?? 0,
+    ran_at: new Date().toISOString(),
+  };
+}
+
+function totalsOf(controls) {
+  return controls.reduce(
+    (t, c) => ({
+      executed: t.executed + (c.executed ?? 0),
+      reproduced: t.reproduced + (c.reproduced ?? 0),
+    }),
+    { executed: 0, reproduced: 0 },
+  );
+}
+
+/** The entry directory beside a record path. */
+export function recordEntriesDir(recordPath) {
+  return `${recordPath}.d`;
+}
+
+const isCount = (n) => Number.isInteger(n) && n >= 0;
+const validControl = (c) =>
+  c !== null &&
+  typeof c === "object" &&
+  !Array.isArray(c) &&
+  isCount(c.executed) &&
+  isCount(c.reproduced) &&
+  VERDICTS.includes(c.verdict) &&
+  (c.ran_at === undefined || c.ran_at === null || typeof c.ran_at === "string");
+
+/** The one ordering of runs: ISO timestamps compare as strings; missing sorts first. */
+const ranAt = (c) => c.ran_at ?? "";
+
+/**
+ * Read a record by folding its entry directory. `null` when there is no
+ * directory; throws on an entry that is not a control — the record is
+ * rejected as a unit, because reading around one hand-edited or truncated
+ * entry would let it through as "a record with one bad row". The folded
+ * snapshot at `recordPath` is never read: it is for humans, and a stale or
+ * edited snapshot must not be able to change what the engine emits.
+ */
+export function readRecord(recordPath, { readdir = readdirSync } = {}) {
+  const dir = recordEntriesDir(recordPath);
+  let names;
+  try {
+    names = readdir(dir);
+  } catch (e) {
+    if (e.code !== "ENOENT") throw e;
+    // No entries. A snapshot standing alone is not "no record": it is a record
+    // whose entries are gone (or one written by the merged-file layout this
+    // replaced), and reading it as empty would let the next --record silently
+    // overwrite it (QA cycle 7, CR7-2). Loud, like every other unreadable record.
+    //
+    // But look at the DIRECTORY again before concluding, not only at the
+    // snapshot: a sibling first run may have created the directory, written its
+    // entry and its snapshot between our readdir and this check, and that is a
+    // record, not an orphan (QA cycle 9, CR9-1). One re-read settles it.
+    if (existsSync(recordPath)) {
+      try {
+        names = readdir(dir);
+      } catch (again) {
+        if (again.code !== "ENOENT") throw again;
+        throw new Error(
+          `${recordPath} has no entry directory (${dir}) — a snapshot without entries is not a record; re-run the probes with --record`,
+        );
+      }
+    } else {
+      return null;
+    }
+  }
+  const controls = [];
+  for (const name of names.filter((n) => n.endsWith(".json")).sort()) {
+    let entry;
+    try {
+      entry = JSON.parse(readFileSync(join(dir, name), "utf8"));
+    } catch {
+      entry = null;
+    }
+    if (!validControl(entry)) {
+      throw new Error(
+        `${join(dir, name)} is not a version-${RECORD_VERSION} security-probe run record entry`,
+      );
+    }
+    controls.push(entry);
+  }
+  return foldRecord(dedupeByKey(controls));
+}
+
+/**
+ * One control per `{sink, entry}`, latest run wins. The writer already
+ * guarantees this by file name, but the fold must not depend on it: a copy of
+ * an entry under another name would otherwise count one control twice (CR7-3).
+ */
+function dedupeByKey(controls) {
+  const byKey = new Map();
+  for (const c of controls) {
+    const k = controlKey(c);
+    const prev = byKey.get(k);
+    if (!prev || ranAt(c) >= ranAt(prev)) byKey.set(k, c);
+  }
+  return [...byKey.values()];
+}
+
+function foldRecord(controls) {
+  return {
+    version: RECORD_VERSION,
+    controls,
+    totals: totalsOf(controls),
+    updated_at:
+      controls.reduce((m, c) => (ranAt(c) > m ? ranAt(c) : m), "") || null,
+  };
+}
+
+/** Filesystem-safe, collision-free name for a control's entry file. */
+function entryFileName(entry) {
+  return `${createHash("sha256").update(controlKey(entry)).digest("hex").slice(0, 24)}.json`;
+}
+
+/** Atomic write: temp in the same directory, then rename. */
+function writeAtomic(target, text) {
+  const tmp = `${target}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+  try {
+    writeFileSync(tmp, text);
+    renameSync(tmp, target);
+  } catch (e) {
+    rmSync(tmp, { force: true });
+    throw e;
+  }
+}
+
+/**
+ * Record one probe run: write this control's entry file under `<path>.d/`
+ * (atomic, named from `{sink, entry}`), then fold the directory into the
+ * snapshot at `<path>`. Concurrent runs of different controls write different
+ * files and never contend; a re-run of the same control replaces only its own.
+ * Returns the folded record.
+ */
+/**
+ * Read-then-create: the one prologue every writer runs. Reading FIRST is what
+ * makes a snapshot with no entries throw instead of being written over
+ * (CR7-2), and having it here rather than in each caller is what gives a
+ * library caller the same guard as the CLI preflight (CR8-1, CR9-2).
+ * @returns the entry directory
+ */
+function openRecordForWrite(recordPath) {
+  readRecord(recordPath); // throws on a corrupt entry or an orphaned snapshot
+  const dir = recordEntriesDir(recordPath);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function recordRun(recordPath, result, opts = {}) {
+  const dir = openRecordForWrite(recordPath);
+  const entry = toRecordEntry(result, opts);
+  // This control's own file; a concurrent run of a DIFFERENT control writes a
+  // different name and a re-run of the SAME control replaces this one, which
+  // is the merge semantics the single file used to implement with a lock.
+  writeAtomic(
+    join(dir, entryFileName(entry)),
+    `${JSON.stringify(entry, null, 2)}\n`,
+  );
+  // The snapshot is a convenience for a reader opening the record by hand. Two
+  // runs may race to write it and the loser's view is momentarily stale — that
+  // is fine, because nothing in the engine reads it: --emit-block folds the
+  // directory and rewrites the snapshot exactly.
+  const record = readRecord(recordPath);
+  writeSnapshot(recordPath, record);
+  return record;
+}
+
+export function writeSnapshot(recordPath, record) {
+  writeAtomic(recordPath, `${JSON.stringify(record, null, 2)}\n`);
+}
+
+/**
+ * Fail fast on a --record that cannot be used, BEFORE the probe run spends its
+ * spawn budget: a corrupt existing record or an unwritable directory used to
+ * be discovered only after every corpus case had run, and reported as a write
+ * failure even when the read was what failed (CR2-4).
+ */
+export function preflightRecord(recordPath) {
+  const dir = openRecordForWrite(recordPath);
+  // mkdirSync is a no-op on an EXISTING read-only directory, so the write
+  // permission is checked explicitly (CR3-5) — on both the entry directory
+  // and the snapshot's parent.
+  accessSync(dir, fsConstants.W_OK);
+  accessSync(dirname(resolve(recordPath)), fsConstants.W_OK);
+}
+
+/**
+ * The `evidence` value a record supports. Computed, never supplied: this is the
+ * one function that decides whether `measured` may appear at all.
+ *
+ * The totals are RECOMPUTED from `controls`, never read from the file. The
+ * stored `totals` is a convenience for a human reader; a record whose
+ * `totals.executed` was hand-edited upward with no control behind it must still
+ * render `reasoned`, or the field becomes the typed count one layer down.
+ */
+export function evidenceOf(record) {
+  if (!record) return "reasoned";
+  return totalsOf(record.controls ?? []).executed > 0 ? "measured" : "reasoned";
+}
+
+/**
+ * First characters YAML reads as an indicator. A value starting with one is
+ * JSON-quoted even when the rest of it is in the safe class — `name: #foo` is
+ * a comment, not a name.
+ */
+const YAML_INDICATOR_START = /^[-?:,[\]{}#&*!|>'"%@`]/;
+
+/**
+ * Plain scalars YAML's core schema resolves to something other than a string.
+ * A `--name 123` must stay the string the agent passed, so these are quoted
+ * even though every character is in the safe class.
+ */
+// YAML 1.2 core-schema forms, which is the target: the number alternative
+// covers every plain integer run (leading zeros included — a 1.2 reader types
+// 007 as 7, a 1.1 reader as octal; both as a NUMBER) as well as floats with a
+// bare leading or trailing dot, so no separate int branch is needed; then the
+// 0o/0x, inf/nan, bool and null words. YAML 1.1-only forms (1_000, dates)
+// are deliberately not covered — a 1.1 reader of this block is out of scope.
+const YAML_TYPED_SCALAR =
+  /^(?:[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)|true|True|TRUE|false|False|FALSE|yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF|null|Null|NULL|~)$/;
+// A ":" at the END of a plain scalar makes `key: value:` a parse error in every
+// YAML implementation tried (CR3-1); the indicator-START rule cannot see it.
+const YAML_TRAILING_COLON = /:$/;
+
+const yamlStr = (v) => {
+  if (v === null || v === undefined) return "null";
+  const s = String(v);
+  return /^[A-Za-z0-9_./#:@-]+$/.test(s) &&
+    !YAML_INDICATOR_START.test(s) &&
+    !YAML_TRAILING_COLON.test(s) &&
+    !YAML_TYPED_SCALAR.test(s)
+    ? s
+    : JSON.stringify(s);
+};
+
+/**
+ * Render the `security_review:` block from a record. A `null` record renders
+ * the honest empty block — zero probes, `reasoned`, no controls — with a comment
+ * saying no engine run was recorded, so a report that skipped the engine says so
+ * in the artefact a gate reads rather than in prose a reader may skip.
+ */
+export function emitBlock(record, { mode = "diff" } = {}) {
+  const lines = ["security_review:", `  mode: ${mode}`];
+  // One function owns the answer on every path, including the missing-record
+  // one — a hardcoded "reasoned" here would be correct today and silently
+  // decoupled from evidenceOf() the day that function changes.
+  const evidence = evidenceOf(record);
+  if (!record) {
+    lines.push(
+      "  probes_executed: 0    # no run record — the engine did not run",
+      `  evidence: ${evidence}    # computed by security-probe.mjs; measured needs a record`,
+      "  controls: []",
+    );
+    return `${lines.join("\n")}\n`;
+  }
+  const totals = totalsOf(record.controls);
+  lines.push(
+    `  probes_executed: ${totals.executed}`,
+    `  evidence: ${evidence}    # computed by security-probe.mjs from the run record`,
+  );
+  if (record.controls.length === 0) {
+    lines.push("  controls: []");
+  } else {
+    lines.push("  controls:");
+    for (const c of record.controls) {
+      lines.push(
+        `    - name: ${yamlStr(
+          c.name ??
+            `${c.sink}:${String(c.entry ?? "")
+              .split("#")
+              .pop()}`,
+        )}`,
+        `      verdict: ${yamlStr(c.verdict)}`,
+        `      severity: ${yamlStr(SEVERITY_BY_VERDICT[c.verdict])}`,
+        `      call_site: ${yamlStr(c.call_site)}`,
+        `      entry: ${yamlStr(c.entry)}`,
+        `      sink: ${yamlStr(c.sink)}`,
+        `      reason: ${yamlStr(c.reason)}`,
+        `      probes_executed: ${c.executed}`,
+      );
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 // ── CLI ──────────────────────────────────────────────────────────────────────
+
+/** Flags that take exactly one operand. A missing or flag-shaped operand is exit 2. */
+const OPERAND_FLAGS = Object.freeze({
+  "--sink": "sink",
+  "--entry": "entry",
+  "--cases-file": "casesFile",
+  "--repo-root": "repoRoot",
+  "--record": "record",
+  "--name": "name",
+  "--call-site": "callSite",
+  "--emit-block": "emitBlock",
+  "--mode": "mode",
+});
 
 export function main(argv = process.argv.slice(2)) {
   const opts = { json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--json") opts.json = true;
-    else if (a === "--sink") opts.sink = argv[++i];
-    else if (a === "--entry") opts.entry = argv[++i];
-    else if (a === "--cases-file") opts.casesFile = argv[++i];
-    else if (a === "--timeout") {
+    else if (Object.hasOwn(OPERAND_FLAGS, a)) {
+      // Checked at parse time: `argv[++i]` on a trailing flag yields undefined,
+      // which a post-loop `!== undefined` guard cannot tell from the flag never
+      // having been given — `--record` with no path used to exit 2 only because
+      // `--entry` happened to be absent too.
+      const operand = argv[i + 1];
+      if (operand === undefined || operand.startsWith("--")) {
+        process.stderr.write(`${a} requires an operand\n`);
+        return 2;
+      }
+      opts[OPERAND_FLAGS[a]] = operand;
+      i += 1;
+    } else if (a === "--timeout") {
       // Validated with the SAME rule the spawn budget applies to its env vars,
       // imported rather than restated. `Number()` alone was the defect: it
       // yields NaN for a missing or non-numeric value, NaN is neither null nor
@@ -529,6 +924,37 @@ export function main(argv = process.argv.slice(2)) {
       return 2;
     }
   }
+  // Emit mode runs no probe: it renders the block from whatever the record
+  // says. A missing record is a legitimate input here (it renders `reasoned`);
+  // a corrupt one is not, and exits 2 rather than reading as empty.
+  // Validated regardless of mode: a bad --mode is a bad argument whether or
+  // not this run happens to emit a block.
+  if (opts.mode !== undefined && opts.mode !== "diff" && opts.mode !== "full") {
+    process.stderr.write("--mode must be diff or full\n");
+    return 2;
+  }
+  if (opts.emitBlock !== undefined) {
+    let record;
+    try {
+      record = readRecord(opts.emitBlock);
+    } catch (e) {
+      process.stderr.write(`cannot read --emit-block record: ${e.message}\n`);
+      return 2;
+    }
+    // The snapshot is a reader convenience; failing to refresh it must not
+    // cost the block, which is the deliverable (QA cycle 7, CR7-1).
+    if (record) {
+      try {
+        writeSnapshot(opts.emitBlock, record);
+      } catch (e) {
+        process.stderr.write(
+          `warning: could not refresh the snapshot at ${opts.emitBlock}: ${e.message}\n`,
+        );
+      }
+    }
+    process.stdout.write(emitBlock(record, { mode: opts.mode ?? "diff" }));
+    return 0;
+  }
   if (!opts.entry) {
     process.stderr.write("--entry <path#exportName> is required\n");
     return 2;
@@ -548,14 +974,41 @@ export function main(argv = process.argv.slice(2)) {
     }
   }
 
+  if (opts.record) {
+    try {
+      preflightRecord(opts.record);
+    } catch (e) {
+      process.stderr.write(`cannot use --record: ${e.message}\n`);
+      return 2;
+    }
+  }
+
   const result = runProbeSpec({
     sink: opts.sink,
     entry: opts.entry,
     cases,
     timeoutMs: opts.timeoutMs,
+    ...(opts.repoRoot ? { repoRoot: resolve(opts.repoRoot) } : {}),
   });
 
   const escaped = result.escapes?.length ?? 0;
+
+  // Written BEFORE the output so a caller reading the block can rely on the
+  // record existing whenever the summary line was printed. A record write that
+  // fails is a hard error: the count was the deliverable, and printing a verdict
+  // whose count then cannot be carried forward is the self-report this file
+  // exists to remove.
+  if (opts.record) {
+    try {
+      recordRun(opts.record, result, {
+        name: opts.name,
+        callSite: opts.callSite,
+      });
+    } catch (e) {
+      process.stderr.write(`cannot update --record: ${e.message}\n`);
+      return 2;
+    }
+  }
 
   if (opts.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

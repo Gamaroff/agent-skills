@@ -1,0 +1,52 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: PASS
+status_reason: 'Cycle-9 fixes verified (CR9-1..3 FIXED; both mutation proofs covered; the re-look interleaving reproduced through the injected readdir). The scoped cycle-10 review found no bug — one cleanup, a JSDoc block stranded above the wrong function. The deliverable has been unchanged since cycle 2; the record mechanism has been stable since its cycle-6 replacement, and cycles 7–10 closed its edges. Ten cycles, never a HIGH.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T15:55:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3401
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+  mutation_proofs: 2
+  prior_findings_verified: '3/3 FIXED'
+  cycles: 10
+  findings_closed_total: 45
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — the change set adds no accept/reject function over untrusted input. readRecord validates a JSON artefact the engine itself wrote and rejects it as a unit; resolveEntry containment is pre-existing and unchanged; --repo-root only re-anchors a root the caller already controls by where the engine file sits; --name / --call-site reach only a YAML renderer that quotes every YAML-significant form. No untrusted input reaches a shell.'
+  performance:
+    status: PASS
+    notes: 'One entry write, one fold and one snapshot write per probe run; emit is one fold. Entries are parsed twice per CLI run (preflight, fold) — O(controls).'
+  reliability:
+    status: PASS
+    notes: 'No shared write anywhere in the record path: one atomic entry file per control, folded on read; the orphan-snapshot invariant is enforced by the writer and re-checked against a sibling first run; a corrupt entry, a stray copy, a non-string timestamp and a read-only snapshot directory each have a test and a mutation proof.'
+  maintainability:
+    status: PASS
+    notes: 'CR10-1 (cleanup, advisory): the "Record one probe run" JSDoc sits above openRecordForWrite instead of recordRun — move it. Nothing else.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Move the "Record one probe run…" JSDoc block to sit immediately above export function recordRun (CR10-1)'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

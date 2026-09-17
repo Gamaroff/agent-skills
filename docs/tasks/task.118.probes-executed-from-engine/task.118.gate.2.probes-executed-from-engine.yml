@@ -1,0 +1,86 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'Cycle-1 fixes verified (CR-1..3 FIXED, each mutation-proven). The cycle-2 refute pass found the record merge is last-writer-wins under concurrent --record runs (reproduced: 3 runs → 1 control), a null control element crashes emit-block with exit 1, and yamlStr leaves YAML-typed scalars bare. No HIGH; one MEDIUM and two LOW, all high-confidence, gating under code_review_blocking.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T08:35:00Z'
+
+top_issues:
+  - id: 'CR2-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'recordRun is an unlocked read-filter-push-rename, so concurrent engine invocations sharing one --record each read the pre-existing file and the last rename drops the others — reproduced with 3 parallel runs yielding 1 control; --emit-block then undercounts probes_executed and omits a probed control.'
+    suggested_action: 'Serialise the merge with an exclusive lock file (O_EXCL create, bounded retry) around read → merge → rename, and add a test that runs N probes concurrently against one record and asserts N controls.'
+    suggested_owner: dev
+    bug_ref: 'task.118.bug.2.record-merge-last-writer-wins.md'
+    status: open
+  - id: 'CR2-2'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'readRecord validates only that controls is an array, so {controls:[null]} passes and totalsOf throws an uncaught TypeError from emitBlock, which main calls outside the try that maps corrupt records to exit 2 (verified: exit 1 with a stack trace); a control whose executed is a string renders probes_executed via concatenation.'
+    suggested_action: 'Validate each control in readRecord (plain object; Number.isInteger(executed) >= 0; integer reproduced) and reject the file with the existing not-a-record error.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR2-3'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'yamlStr leaves values YAML types as non-strings bare — --name 123 renders name: 123 and --call-site true renders call_site: true (verified), so a YAML consumer reads an int/bool for a string the agent passed.'
+    suggested_action: 'JSON-quote any value matching the YAML core-schema scalar forms (integer, float, true/false/yes/no/on/off, null/~) in addition to the indicator-start rule.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3384
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+  mutation_proofs: 4
+  snippet_blocks_executed: 0
+  prior_findings_verified: '3/3 FIXED'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — unchanged from cycle 1; the cycle-1 diff adds parse-time operand checks and a stricter record schema, neither an input boundary in the probe sense. No untrusted input reaches a shell.'
+  performance:
+    status: PASS
+    notes: 'Unchanged. CR2-4 (record validated only after the probe run) is a fail-late cost, not a regression.'
+  reliability:
+    status: CONCERNS
+    notes: 'The record merge is not concurrency-safe (CR2-1, reproduced) and a malformed control element crashes emit-block outside the exit-2 mapping (CR2-2). Both are contained in one function pair and are the cycle-2 fix.'
+  maintainability:
+    status: PASS
+    notes: 'CR2-5 (totals requirement now dead validation with a stale test comment), CR2-6 (SEVERITY_BY_VERDICT restated by hand in the prompt table, untied), CR2-7 (temp file left on rename failure) are cleanups for the same fix cycle.'
+
+recommendations:
+  immediate:
+    - action: 'Lock the merge (O_EXCL lock file, bounded retry) and prove it with a concurrent-runs test (CR2-1)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+    - action: 'Validate every control element in readRecord; reject a null or non-integer entry with the not-a-record error (CR2-2)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+    - action: 'Quote YAML-typed scalars in yamlStr (CR2-3)'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'Validate the existing record and mkdir before running the probe so a bad --record fails fast, and word the read-failure message as a read failure (CR2-4); reword or drop the dead totals requirement and its test comment (CR2-5); tie the prompt severity table to SEVERITY_BY_VERDICT with a prose assertion (CR2-6); rm the temp file on rename failure (CR2-7)'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/security-review-prompt.md', 'skills/review-security/tests/review-security.test.js']
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 1
+  fix_date: '2026-09-17'
+  total_iterations: 1
+  verification_method: 'grep for the flag at both sites; nested-copy run reports entry-not-probeable; forged-totals and no-totals cases; per-flag operand cases; 4 mutation proofs (readRecord totals guard, evidenceOf recompute, operand check, --repo-root population guard) each redding the predicted test'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR2-1 fixed — concurrent --record runs must converge', 'CR2-2 and CR2-3 closed']
