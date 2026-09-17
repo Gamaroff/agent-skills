@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Unit tests for section extraction in shared/resources/jira-sync.js.
+ * Unit tests for section extraction in jira-sync.js.
  *
  * These exist because of a defect that shipped silently: `sectionRe` matched
  * `## Overview` but not `## 1. Overview`, while create-task's own template emits

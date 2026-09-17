@@ -68,7 +68,7 @@ const INTERRUPT_SIGNATURES = [
 ];
 
 // ── minimal YAML subset ──────────────────────────────────────────────────────
-// Moved to shared/resources/yaml-subset.js, which is imported above. It was the
+// Moved to yaml-subset.js (a shared resource), which is imported above. It was the
 // most capable of this repo's five hand-rolled readers, and tracker-workflow.js
 // needs the same shape — so it is shared rather than copied.
 //

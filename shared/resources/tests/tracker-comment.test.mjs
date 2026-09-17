@@ -1509,7 +1509,7 @@ test("the numeric suffix is legal only for cycle-scoped stages (NEW-6)", () => {
 });
 
 // ── The plain-language lead ────────────────────────────────────────────────
-// Standard and catalogue: shared/resources/stakeholder-summary.md.
+// Standard and catalogue: stakeholder-summary.md (a shared resource).
 
 test("the lead sits below the marker and above the caller's body", async () => {
   const dir = withRepo();

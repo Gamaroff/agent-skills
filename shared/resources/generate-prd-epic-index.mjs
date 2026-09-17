@@ -73,7 +73,7 @@ function argValue(flag) {
 
 /**
  * Read `prd.prdShardedLocation` from skills-config.yaml without a YAML dependency.
- * Mirrors the awk fallback in shared/resources/resolve-paths.sh: find the top-level
+ * Mirrors the awk fallback in resolve-paths.sh (a shared resource): find the top-level
  * `prd:` block, then the first indented `prdShardedLocation:` within it.
  */
 function prdRootFromConfig() {

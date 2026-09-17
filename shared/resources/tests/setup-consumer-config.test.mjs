@@ -369,7 +369,7 @@ ${Object.entries(HISTORICAL_BLOCK)
 // ---------------------------------------------------------------------------
 // The one shared resource that is vendored OUTSIDE .agents/.
 //
-// `setup-consumer.sh` copies `shared/resources/generate-prd-epic-index.mjs` to a
+// `setup-consumer.sh` copies the shared `generate-prd-epic-index.mjs` to a
 // consumer's `scripts/generate-prd-epic-index.mjs`, so their `docs:epic-index` npm
 // script can reach it. That destination is the problem: it lands in `scripts/`,
 // beside the consumer's own tooling, and `--update` overwrites it silently.

@@ -7,7 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 
-// The deferred-mutation writer — shared/resources/defer-mutation.js, bundled
+// The deferred-mutation writer — defer-mutation.js, a shared resource bundled
 // into this skill's references/ by `npm run bundle`.
 //
 // This file calls global `fetch` directly and does NOT go through

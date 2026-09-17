@@ -98,6 +98,53 @@ HEADERLESS_SUFFIXES = {'.json'}
 AUTOGEN_MARKER = "AUTO-GENERATED — DO NOT EDIT"
 
 
+# A line that is comment-only in a JS/MJS source. SHARED_REF_RE has no notion of
+# intent — it matches `shared/resources/X` in code, string and comment alike — so
+# moving a commented constant into a widely-bundled shared file changes the bundle
+# graph without any dependency changing (task.119, observation #39: four comment
+# lines moved into jira-sync.js vendored +16,000 lines into twenty skills, and the
+# bundler reported ✅). The rule for `.js`/`.mjs` under shared/resources/ is to name
+# siblings by BARE filename in comments; a reference that a comment must declare —
+# a file loaded at runtime by basename, so no string literal carries the full path —
+# is spelled on its own line as `// bundle-dependency: shared/resources/X`, which is
+# the one comment form this warning does not fire on.
+COMMENT_LINE_RE = re.compile(r'^\s*(?://|/\*|\*|#)')
+BUNDLE_DECL_RE = re.compile(r'bundle-dependency:\s*(?:\.\./)*shared/resources/')
+
+
+def comment_only_refs(text):
+    """Return [(line_no, target)] for every shared/resources/ reference in a
+    JS/MJS source that sits on a comment-only line and is not an explicit
+    `bundle-dependency:` declaration. Pure; the caller decides what to print."""
+    out = []
+    for i, line in enumerate(text.split('\n'), 1):
+        if not COMMENT_LINE_RE.match(line) or BUNDLE_DECL_RE.search(line):
+            continue
+        for m in SHARED_REF_RE.finditer(line):
+            target = m.group(1).rstrip('.,;:')
+            if target:
+                out.append((i, target))
+    return out
+
+
+def warn_comment_only_refs(path, text, repo_root):
+    """Print one warning per comment-only reference in a JS/MJS source."""
+    if path.suffix not in ('.js', '.mjs'):
+        return
+    try:
+        rel = path.relative_to(repo_root)
+    except ValueError:
+        rel = path
+    shared_dir = repo_root / 'shared' / 'resources'
+    for line_no, target in comment_only_refs(text):
+        # A file naming its own shared path (an AUTO-GENERATED banner, a
+        # `Run: node --test shared/resources/tests/x.test.mjs` line) is not a
+        # dependency — following it is a no-op — so it is not a finding.
+        if (shared_dir / target).resolve() == path.resolve():
+            continue
+        print(f"⚠️  comment-only reference: {rel}:{line_no} → shared/resources/{target}")
+
+
 def autogen_header(filename, suffix):
     msg = (
         f"{AUTOGEN_MARKER}. "
@@ -357,6 +404,7 @@ def discover_needed(skill_path, shared_dir, refs_dir):
     `source_backed_on_disk()` instead, which keys on a file already existing rather
     than on a sentence mentioning it.
     """
+    repo_root = shared_dir.parent.parent
     skill_files = (
         list(skill_path.rglob('*.md'))
         + list(skill_path.rglob('*.js'))
@@ -382,6 +430,7 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             # claiming it was the only unguarded read, which left the crash live.
             continue
         pending.extend(collect_shared_refs(text))
+        warn_comment_only_refs(f, text, repo_root)
         for m in REFS_REF_RE.finditer(text):
             pending_quiet.append(m.group(1))
 
@@ -415,6 +464,7 @@ def discover_needed(skill_path, shared_dir, refs_dir):
         except (UnicodeDecodeError, OSError):
             continue
         pending.extend(collect_shared_refs(text))
+        warn_comment_only_refs(src, text, repo_root)
         if src.suffix in ('.js', '.mjs'):
             pending.extend(m.group(1) for m in JS_SIBLING_RE.finditer(text))
             pending.extend(m.group(1) for m in JS_ESM_SIBLING_RE.finditer(text))
