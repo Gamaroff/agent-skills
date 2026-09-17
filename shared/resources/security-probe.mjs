@@ -12,6 +12,17 @@
  *   --cases-file <path>  JSON array of cases, replacing the corpus for this run
  *   --timeout <ms>       per-case timeout (default: the shared spawn budget)
  *   --json               emit one JSON object on stdout
+ *   --repo-root <path>   containment root for --entry (default: two dirs above this
+ *                        file — the repo root in-tree, the SKILL dir in a bundled
+ *                        copy; pass `$(git rev-parse --show-toplevel)` from a bundle)
+ *   --record <path>      write (or merge into) the run record — see "The run record"
+ *   --name <name>        control name stored in the record (with --record)
+ *   --call-site <ref>    `file:line` of the call site, stored in the record (with --record)
+ *
+ * Emit mode (no probe is run):
+ *   node <this-file> --emit-block <record> [--mode diff|full]
+ *   Prints the `security_review:` YAML block with `probes_executed`, `evidence`
+ *   and `controls[]` filled FROM THE RECORD. The block is pasted, never typed.
  *
  * Exit codes (repository convention):
  *   0  clean — the control engages
@@ -36,7 +47,14 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -497,6 +515,180 @@ export function runProbeSpec({
   };
 }
 
+// ── The run record ───────────────────────────────────────────────────────────
+//
+// `probes_executed` and `evidence` in a review's output block used to be typed
+// by the agent, and the contract test read the DOCUMENTED example rather than a
+// real run — so an agent that executed nothing and wrote `12` satisfied both
+// the prose rule and CI. The condition the check exists to catch (probes
+// skipped) is exactly the one under which a self-report is unreliable (obs #10).
+//
+// This record is the number's only legitimate route from the engine to the
+// block. `--record <path>` writes it; `--emit-block <record>` reads it back and
+// prints the YAML the report carries. `evidence` is COMPUTED from the totals and
+// never accepted as input, so `measured` is unrepresentable without a record
+// whose `totals.executed` is positive. Delete the record and the block reads
+// `reasoned` — that is the mutation the contract test performs.
+//
+// One record per review, keyed by `{sink, entry}` per control. A review probes
+// several controls, so a write MERGES into an existing record rather than
+// replacing it; two controls sharing a sink (both `url-authority`, say) would
+// otherwise overwrite each other, which is why the key is the pair and not the
+// sink alone.
+
+export const RECORD_VERSION = 1;
+
+/** Severity the review prompt assigns each verdict — stated once, here. */
+export const SEVERITY_BY_VERDICT = Object.freeze({
+  engages: "none",
+  "present-but-inert": "high",
+  absent: "medium",
+  unverifiable: "unverifiable",
+});
+
+const controlKey = (c) => `${c.sink ?? ""}\u0000${c.entry ?? ""}`;
+
+/**
+ * Reduce a `runProbeSpec` result to the per-control entry the record stores.
+ * Counts only — the per-case detail stays in the engine's own `--json` output.
+ */
+export function toRecordEntry(result, { name, callSite } = {}) {
+  return {
+    sink: result.sink ?? null,
+    entry: result.entry ?? null,
+    name: name ?? null,
+    call_site: callSite ?? null,
+    verdict: result.verdict,
+    reason: result.reason,
+    executed: result.executed ?? 0,
+    passed: result.passed ?? 0,
+    reproduced: result.reproduced?.length ?? 0,
+    overblocked: result.overblocked?.length ?? 0,
+    declined: result.declined?.length ?? 0,
+    escaped: result.escapes?.length ?? 0,
+    ran_at: new Date().toISOString(),
+  };
+}
+
+function totalsOf(controls) {
+  return controls.reduce(
+    (t, c) => ({
+      executed: t.executed + (c.executed ?? 0),
+      reproduced: t.reproduced + (c.reproduced ?? 0),
+    }),
+    { executed: 0, reproduced: 0 },
+  );
+}
+
+/**
+ * Read a record. `null` when the file is absent; throws on a file that exists
+ * but is not a record — a corrupt record is a finding, not an empty one, and
+ * silently treating it as empty would let a truncated write read as "reasoned".
+ */
+export function readRecord(recordPath) {
+  let text;
+  try {
+    text = readFileSync(recordPath, "utf8");
+  } catch (e) {
+    if (e.code === "ENOENT") return null;
+    throw e;
+  }
+  const rec = JSON.parse(text);
+  if (rec?.version !== RECORD_VERSION || !Array.isArray(rec.controls)) {
+    throw new Error(
+      `${recordPath} is not a version-${RECORD_VERSION} security-probe run record`,
+    );
+  }
+  return rec;
+}
+
+/**
+ * Merge one result into the record at `recordPath` and write it back. Returns
+ * the record written. The write is atomic (temp file + rename) so a crash
+ * mid-write cannot leave a half-record that `readRecord` then rejects.
+ */
+export function recordRun(recordPath, result, opts = {}) {
+  const existing = readRecord(recordPath) ?? {
+    version: RECORD_VERSION,
+    controls: [],
+  };
+  const entry = toRecordEntry(result, opts);
+  const key = controlKey(entry);
+  const controls = existing.controls.filter((c) => controlKey(c) !== key);
+  controls.push(entry);
+  const record = {
+    version: RECORD_VERSION,
+    controls,
+    totals: totalsOf(controls),
+    updated_at: entry.ran_at,
+  };
+  mkdirSync(dirname(resolve(recordPath)), { recursive: true });
+  const tmp = `${recordPath}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
+  renameSync(tmp, recordPath);
+  return record;
+}
+
+/**
+ * The `evidence` value a record supports. Computed, never supplied: this is the
+ * one function that decides whether `measured` may appear at all.
+ */
+export function evidenceOf(record) {
+  return record && record.totals?.executed > 0 ? "measured" : "reasoned";
+}
+
+const yamlStr = (v) =>
+  v === null || v === undefined
+    ? "null"
+    : /^[A-Za-z0-9_./#:@-]+$/.test(String(v))
+      ? String(v)
+      : JSON.stringify(String(v));
+
+/**
+ * Render the `security_review:` block from a record. A `null` record renders
+ * the honest empty block — zero probes, `reasoned`, no controls — with a comment
+ * saying no engine run was recorded, so a report that skipped the engine says so
+ * in the artefact a gate reads rather than in prose a reader may skip.
+ */
+export function emitBlock(record, { mode = "diff" } = {}) {
+  const lines = ["security_review:", `  mode: ${mode}`];
+  if (!record) {
+    lines.push(
+      "  probes_executed: 0    # no run record — the engine did not run",
+      "  evidence: reasoned    # computed by security-probe.mjs; measured needs a record",
+      "  controls: []",
+    );
+    return `${lines.join("\n")}\n`;
+  }
+  lines.push(
+    `  probes_executed: ${record.totals.executed}`,
+    `  evidence: ${evidenceOf(record)}    # computed by security-probe.mjs from the run record`,
+  );
+  if (record.controls.length === 0) {
+    lines.push("  controls: []");
+  } else {
+    lines.push("  controls:");
+    for (const c of record.controls) {
+      lines.push(
+        `    - name: ${yamlStr(
+          c.name ??
+            `${c.sink}:${String(c.entry ?? "")
+              .split("#")
+              .pop()}`,
+        )}`,
+        `      verdict: ${yamlStr(c.verdict)}`,
+        `      severity: ${yamlStr(SEVERITY_BY_VERDICT[c.verdict] ?? "unverifiable")}`,
+        `      call_site: ${yamlStr(c.call_site)}`,
+        `      entry: ${yamlStr(c.entry)}`,
+        `      sink: ${yamlStr(c.sink)}`,
+        `      reason: ${yamlStr(c.reason)}`,
+        `      probes_executed: ${c.executed}`,
+      );
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
 export function main(argv = process.argv.slice(2)) {
@@ -507,6 +699,12 @@ export function main(argv = process.argv.slice(2)) {
     else if (a === "--sink") opts.sink = argv[++i];
     else if (a === "--entry") opts.entry = argv[++i];
     else if (a === "--cases-file") opts.casesFile = argv[++i];
+    else if (a === "--repo-root") opts.repoRoot = argv[++i];
+    else if (a === "--record") opts.record = argv[++i];
+    else if (a === "--name") opts.name = argv[++i];
+    else if (a === "--call-site") opts.callSite = argv[++i];
+    else if (a === "--emit-block") opts.emitBlock = argv[++i];
+    else if (a === "--mode") opts.mode = argv[++i];
     else if (a === "--timeout") {
       // Validated with the SAME rule the spawn budget applies to its env vars,
       // imported rather than restated. `Number()` alone was the defect: it
@@ -528,6 +726,40 @@ export function main(argv = process.argv.slice(2)) {
       process.stderr.write(`unknown argument: ${a}\n`);
       return 2;
     }
+  }
+  // Emit mode runs no probe: it renders the block from whatever the record
+  // says. A missing record is a legitimate input here (it renders `reasoned`);
+  // a corrupt one is not, and exits 2 rather than reading as empty.
+  if (opts.emitBlock !== undefined) {
+    if (!opts.emitBlock) {
+      process.stderr.write("--emit-block <record> requires a path\n");
+      return 2;
+    }
+    if (
+      opts.mode !== undefined &&
+      opts.mode !== "diff" &&
+      opts.mode !== "full"
+    ) {
+      process.stderr.write("--mode must be diff or full\n");
+      return 2;
+    }
+    let record;
+    try {
+      record = readRecord(opts.emitBlock);
+    } catch (e) {
+      process.stderr.write(`cannot read --emit-block record: ${e.message}\n`);
+      return 2;
+    }
+    process.stdout.write(emitBlock(record, { mode: opts.mode ?? "diff" }));
+    return 0;
+  }
+  if (opts.record !== undefined && !opts.record) {
+    process.stderr.write("--record requires a path\n");
+    return 2;
+  }
+  if (opts.repoRoot !== undefined && !opts.repoRoot) {
+    process.stderr.write("--repo-root requires a path\n");
+    return 2;
   }
   if (!opts.entry) {
     process.stderr.write("--entry <path#exportName> is required\n");
@@ -553,9 +785,27 @@ export function main(argv = process.argv.slice(2)) {
     entry: opts.entry,
     cases,
     timeoutMs: opts.timeoutMs,
+    ...(opts.repoRoot ? { repoRoot: resolve(opts.repoRoot) } : {}),
   });
 
   const escaped = result.escapes?.length ?? 0;
+
+  // Written BEFORE the output so a caller reading the block can rely on the
+  // record existing whenever the summary line was printed. A record write that
+  // fails is a hard error: the count was the deliverable, and printing a verdict
+  // whose count then cannot be carried forward is the self-report this file
+  // exists to remove.
+  if (opts.record) {
+    try {
+      recordRun(opts.record, result, {
+        name: opts.name,
+        callSite: opts.callSite,
+      });
+    } catch (e) {
+      process.stderr.write(`cannot write --record: ${e.message}\n`);
+      return 2;
+    }
+  }
 
   if (opts.json) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

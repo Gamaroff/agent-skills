@@ -447,3 +447,208 @@ test("the prompt does not restate the corpus cases", async () => {
     `the prompt restates corpus case ids (${restated.join(", ")}) — reference the corpus doc instead`,
   );
 });
+
+// ---------------------------------------------------------------------------
+// The run record (task.118). `probes_executed` and `evidence` reach the block
+// FROM THE ENGINE, never from the agent. These tests run the engine, write the
+// record, emit the block, and assert the invariant on a REAL run rather than
+// on the prompt's example — then perform the mutation: delete the record and
+// the block must read `reasoned`.
+// ---------------------------------------------------------------------------
+
+const os = require("os");
+const { spawnSync } = require("child_process");
+const ENGINE_PATH = path.join(REPO_ROOT, "shared/resources/security-probe.mjs");
+
+function tmpRecord() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t118-record-"));
+  return path.join(dir, "security-probe.run.json");
+}
+
+function cli(args) {
+  return spawnSync(process.execPath, [ENGINE_PATH, ...args], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  });
+}
+
+test("recordRun merges by {sink, entry} and recomputes totals", async () => {
+  const { recordRun, readRecord, evidenceOf } = await engine();
+  const rec = tmpRecord();
+  const a = await probe("redis-tls/inert");
+  const b = await probe("db-url/engaged");
+  recordRun(rec, a, { name: "redis-tls", callSite: "x.ts:41" });
+  const r1 = readRecord(rec);
+  assert.equal(r1.controls.length, 1);
+  assert.equal(r1.totals.executed, a.executed);
+  // Same key again → REPLACED, not appended.
+  recordRun(rec, a, { name: "redis-tls" });
+  assert.equal(readRecord(rec).controls.length, 1);
+  // A second control → appended; totals are the sum.
+  recordRun(rec, b);
+  const r2 = readRecord(rec);
+  assert.equal(r2.controls.length, 2);
+  assert.equal(r2.totals.executed, a.executed + b.executed);
+  assert.equal(evidenceOf(r2), "measured");
+  assert.equal(
+    r2.controls[0].call_site,
+    null,
+    "a re-run without --call-site clears it — the record is the latest run",
+  );
+});
+
+test("the emitted block satisfies measured ⇒ probes_executed > 0 on a real run", async () => {
+  const { recordRun, readRecord, emitBlock } = await engine();
+  const rec = tmpRecord();
+  const a = await probe("redis-tls/inert");
+  recordRun(rec, a, { name: "redis-tls" });
+  const block = emitBlock(readRecord(rec));
+  const { probes_executed, evidence } = readBlock(block);
+  assert.equal(probes_executed, a.executed);
+  assert.ok(probes_executed > 0);
+  assert.equal(evidence, "measured");
+  assert.match(block, /^security_review:\n  mode: diff\n/);
+  assert.match(
+    block,
+    /- name: redis-tls\n\s+verdict: present-but-inert\n\s+severity: high/,
+  );
+});
+
+test("MUTATION — delete the record and the block reads reasoned with zero probes", async () => {
+  const { recordRun, readRecord, emitBlock } = await engine();
+  const rec = tmpRecord();
+  recordRun(rec, await probe("redis-tls/inert"));
+  fs.unlinkSync(rec);
+  const block = emitBlock(readRecord(rec));
+  const { probes_executed, evidence } = readBlock(block);
+  assert.equal(probes_executed, 0);
+  assert.equal(evidence, "reasoned");
+  assert.doesNotMatch(block, /evidence:\s*measured/);
+});
+
+test("`measured` is unrepresentable without executed probes — evidenceOf never says it on zero", async () => {
+  const { evidenceOf, emitBlock, RECORD_VERSION } = await engine();
+  assert.equal(evidenceOf(null), "reasoned");
+  const empty = {
+    version: RECORD_VERSION,
+    controls: [],
+    totals: { executed: 0, reproduced: 0 },
+  };
+  assert.equal(evidenceOf(empty), "reasoned");
+  assert.equal(readBlock(emitBlock(empty)).evidence, "reasoned");
+  // A record whose totals were hand-edited to claim probes with no controls
+  // still cannot produce `measured` — the totals are recomputed on write, but a
+  // reader is only as honest as the file, so this is the reader's own floor.
+  const forged = { ...empty, totals: { executed: 0, reproduced: 5 } };
+  assert.equal(evidenceOf(forged), "reasoned");
+});
+
+test("CLI: --record writes the record and --emit-block prints the block from it", async () => {
+  const rec = tmpRecord();
+  const spec = (await specs())["redis-tls/inert"];
+  const run = cli([
+    "--sink",
+    spec.sink,
+    "--entry",
+    spec.entry,
+    "--record",
+    rec,
+    "--name",
+    "redis-tls",
+    "--call-site",
+    "apps/x.ts:41",
+  ]);
+  assert.equal(run.status, 1, `inert control exits 1: ${run.stderr}`);
+  assert.ok(fs.existsSync(rec), "the record must exist after --record");
+  const emitted = cli(["--emit-block", rec, "--mode", "full"]);
+  assert.equal(emitted.status, 0, emitted.stderr);
+  const { probes_executed, evidence } = readBlock(emitted.stdout);
+  assert.ok(probes_executed > 0);
+  assert.equal(evidence, "measured");
+  assert.match(emitted.stdout, /mode: full/);
+  assert.match(emitted.stdout, /call_site: apps\/x\.ts:41/);
+});
+
+test("CLI: --emit-block on a missing record renders the honest empty block, exit 0", () => {
+  const emitted = cli([
+    "--emit-block",
+    path.join(os.tmpdir(), "t118-nope", "none.json"),
+  ]);
+  assert.equal(emitted.status, 0, emitted.stderr);
+  const { probes_executed, evidence } = readBlock(emitted.stdout);
+  assert.equal(probes_executed, 0);
+  assert.equal(evidence, "reasoned");
+  assert.match(emitted.stdout, /the engine did not run/);
+});
+
+test("CLI: a corrupt record is exit 2, never read as empty", () => {
+  const rec = tmpRecord();
+  fs.writeFileSync(rec, "{ not json");
+  const emitted = cli(["--emit-block", rec]);
+  assert.equal(emitted.status, 2);
+  assert.match(emitted.stderr, /cannot read --emit-block record/);
+  const wrongVersion = tmpRecord();
+  fs.writeFileSync(wrongVersion, JSON.stringify({ version: 99, controls: [] }));
+  assert.equal(cli(["--emit-block", wrongVersion]).status, 2);
+});
+
+test("CLI: --record, --emit-block, --mode and --repo-root reject a missing or bad operand with exit 2", () => {
+  assert.equal(cli(["--emit-block"]).status, 2);
+  assert.equal(
+    cli(["--emit-block", tmpRecord(), "--mode", "sideways"]).status,
+    2,
+  );
+  assert.equal(cli(["--record"]).status, 2);
+  assert.equal(cli(["--repo-root"]).status, 2);
+});
+
+test("CLI: --repo-root re-anchors containment so a bundled copy can probe the consumer's tree", async () => {
+  // Copy the engine and its imports into a nested dir, as the bundler does into
+  // skills/*/references/. From there defaultRepoRoot() is the nested dir and a
+  // repo-relative entry is an escape; --repo-root makes it resolve again.
+  const nest = fs.mkdtempSync(
+    path.join(REPO_ROOT, "skills/review-security/tests/.t118-nest-"),
+  );
+  try {
+    for (const f of [
+      "security-probe.mjs",
+      "security-input-corpus.mjs",
+      "qa-execute-snippets.mjs",
+      "spawn-budget.mjs",
+    ]) {
+      fs.copyFileSync(
+        path.join(REPO_ROOT, "shared/resources", f),
+        path.join(nest, f),
+      );
+    }
+    const spec = (await specs())["redis-tls/engaged"];
+    const runNested = (extra) =>
+      spawnSync(
+        process.execPath,
+        [
+          path.join(nest, "security-probe.mjs"),
+          "--sink",
+          spec.sink,
+          "--entry",
+          spec.entry,
+          "--json",
+          ...extra,
+        ],
+        { cwd: REPO_ROOT, encoding: "utf8" },
+      );
+    const without = JSON.parse(runNested([]).stdout);
+    assert.equal(
+      without.verdict,
+      "unverifiable",
+      "from the nested dir the entry is outside the default root",
+    );
+    const withRoot = JSON.parse(runNested(["--repo-root", REPO_ROOT]).stdout);
+    assert.equal(
+      withRoot.verdict,
+      "engages",
+      JSON.stringify(withRoot.declined),
+    );
+  } finally {
+    fs.rmSync(nest, { recursive: true, force: true });
+  }
+});
