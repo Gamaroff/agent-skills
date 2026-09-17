@@ -122,15 +122,21 @@ function runnableLines(markdown) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const m = line.match(/^\s*(`{3,}|~{3,})\s*([\w+.-]*)/);
-    if (m && m[2] !== "") {
+    const top = stack[stack.length - 1];
+    const inRunnable = Boolean(top && RUNNABLE_LANGS.has(top.lang));
+    // An info-string fence opens a nested block — unless we are already inside a
+    // RUNNABLE block, where a fence-shaped line is shell content (a heredoc
+    // writing a Markdown file, say) and must be scanned rather than pushed
+    // (QA cycle 2, CR-5). Only a bare closer ends a runnable block.
+    if (m && m[2] !== "" && !inRunnable) {
       const lang = m[2].toLowerCase();
       stack.push({ marker: m[1], lang });
       if (RUNNABLE_LANGS.has(lang)) blocks++;
       continue;
     }
-    const top = stack[stack.length - 1];
     if (
       m &&
+      m[2] === "" &&
       top &&
       m[1][0] === top.marker[0] &&
       m[1].length >= top.marker.length
@@ -138,8 +144,7 @@ function runnableLines(markdown) {
       stack.pop();
       continue;
     }
-    if (top && RUNNABLE_LANGS.has(top.lang))
-      out.push({ line: i + 1, text: line });
+    if (inRunnable) out.push({ line: i + 1, text: line });
   }
   return { lines: out, blocks };
 }
@@ -262,9 +267,19 @@ test("§4 the fence parser sees tokens (self-check against a fixture string)", (
     "```bash",
     'echo "final $6"',
     "```",
+    // A runnable block whose heredoc writes a Markdown file: the fence-shaped
+    // lines inside it are shell content, so the token between them is scanned
+    // and the block is closed only by its own (longer) bare closer.
+    "````bash",
+    "cat > out.md <<'EOF'",
+    "```yaml",
+    "name: $7",
+    "```",
+    "EOF",
+    "````",
   ].join("\n");
   const r = runnableLines(md);
-  assert.equal(r.blocks, 6);
+  assert.equal(r.blocks, 7);
   const flagged = r.lines
     .map((l) => ({ line: l.line, tokens: l.text.match(POSITIONAL_RE) }))
     .filter((l) => l.tokens);
@@ -275,29 +290,40 @@ test("§4 the fence parser sees tokens (self-check against a fixture string)", (
     { line: 22, tokens: ["$4"] },
     { line: 26, tokens: ["$5"] },
     { line: 30, tokens: ["$6"] },
+    { line: 35, tokens: ["$7"] },
   ]);
 });
 
-test("§5 the scan sees every runnable opener in the live tree (no fence-state loss)", () => {
-  // The naive count — every line that opens a runnable fence, regardless of
-  // structure — is the number the stack-based reader must reproduce exactly.
-  // Fewer means a template swallowed a real block (CR-1); more means a fence
-  // was counted twice.
-  const mismatches = [];
+test("§5 every runnable opener's content is scanned in the live tree (no fence-state loss)", () => {
+  // Line-level, not count-level: for every line that opens a runnable fence,
+  // the line after it — when it is not itself a fence line — must be among the
+  // lines the reader scanned. A count of pushes cannot see fence-state loss
+  // (QA cycle 2, CR-4: an earlier §5 compared opener counts, which the stack
+  // reader matched by construction even with its pop rule removed); a missing
+  // content line can.
+  const OPENER = /^\s*(?:`{3,}|~{3,})\s*(?:bash|sh|shell)\b/i;
+  const FENCE = /^\s*(?:`{3,}|~{3,})/;
+  const misses = [];
+  let openers = 0;
   for (const rel of skillFiles()) {
     const md = fs.readFileSync(path.join(REPO_ROOT, rel), "utf8");
-    const naive = (
-      md.match(/^\s*(?:`{3,}|~{3,})\s*(?:bash|sh|shell)\b/gim) || []
-    ).length;
-    const scanned = runnableLines(md).blocks;
-    if (naive !== scanned)
-      mismatches.push(`${rel}: ${naive} runnable openers, ${scanned} scanned`);
+    const src = md.split("\n");
+    const scanned = new Set(runnableLines(md).lines.map((l) => l.line));
+    for (let i = 0; i < src.length - 1; i++) {
+      if (!OPENER.test(src[i])) continue;
+      openers++;
+      if (FENCE.test(src[i + 1])) continue; // an empty block, or a nested fence
+      if (!scanned.has(i + 2))
+        misses.push(
+          `${rel}:${i + 2} — content after the opener at line ${i + 1} was not scanned`,
+        );
+    }
   }
-  assert.deepEqual(
-    mismatches,
-    [],
-    `Fence-state loss:\n${mismatches.join("\n")}`,
+  assert.ok(
+    openers >= MIN_BLOCKS,
+    `Only ${openers} runnable openers found (floor ${MIN_BLOCKS})`,
   );
+  assert.deepEqual(misses, [], `Fence-state loss:\n${misses.join("\n")}`);
 });
 
 module.exports = { runnableLines, scan, POSITIONAL_RE, ALLOWLIST, MIN_BLOCKS };

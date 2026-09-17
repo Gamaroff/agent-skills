@@ -180,22 +180,22 @@ need rewriting, which raises the effort; stop and re-estimate before Phase 1.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-17
+**Testing Date**: 2026-09-17 (cycle 2)
 **Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.119.qa.1.create-skill-authoring-guards.md](./task.119.qa.1.create-skill-authoring-guards.md)
-- **Gate File**: [task.119.gate.1.create-skill-authoring-guards.yml](./task.119.gate.1.create-skill-authoring-guards.yml)
+- **Full Report**: [task.119.qa.2.create-skill-authoring-guards.md](./task.119.qa.2.create-skill-authoring-guards.md) (cycle 1: [qa.1](./task.119.qa.1.create-skill-authoring-guards.md))
+- **Gate File**: [task.119.gate.2.create-skill-authoring-guards.yml](./task.119.gate.2.create-skill-authoring-guards.yml) (cycle 1: [gate.1](./task.119.gate.1.create-skill-authoring-guards.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3410 (3409 pass, 1 skipped)
+- **Tests Executed**: 3411 (3410 pass, 1 skipped)
 - **Phases Verified**: 4/4 (Phase 1 with concerns)
-- **Critical Issues**: 0 (1 medium: CR-1)
+- **Critical Issues**: 0 (1 medium: CR-4)
 - **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-CR-1 (medium, high confidence): the positional-token guard's fence parser loses state on a nested fence inside a ```markdown template block, so ~8 real bash blocks in 4 skills are never scanned. Promoted to the gate under `code_review_blocking`. Two advisory cleanups (CR-2 docstring scope claim, CR-3 duplicate warnings under `--all`).
+Cycle 1's CR-1/CR-2/CR-3 verified FIXED. Cycle 2 (refute pass): CR-4 (medium, high confidence) — the new §5 parity test counts fence pushes, not scanned lines, so it cannot see fence-state loss; promoted to the gate. Advisory: CR-5 (fence-shaped line inside a runnable heredoc), CR-6 (orphaned vendored copy in develop-next).
 
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
@@ -215,6 +215,8 @@ CR-1 (medium, high confidence): the positional-token guard's fence parser loses 
 | 2026-09-17 |         | Implemented — 38 files (+128 regenerated bundle copies), 9 tests; status → ready-for-review | develop |
 | 2026-09-17 |         | QA gate CONCERNS (90/100) — 1 finding (CR-1 fence nesting), 2 cleanups | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR-1 stack-based fence tracking + §5 opener parity (485 blocks), CR-2 scope docstring/depth, CR-3 warning dedupe; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (90/100), cycle 2 refute — CR-1/2/3 fixed; 1 new finding (CR-4 §5 tautology), 2 advisory | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR-4 §5 now line-level (mutation: original reader → red naming lines), CR-5 fence lines inside runnable blocks are content + heredoc fixture, CR-6 orphaned develop-next copy removed; 2 iterations | qa-fix |
 
 ---
 
