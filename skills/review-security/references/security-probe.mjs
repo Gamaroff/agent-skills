@@ -663,13 +663,39 @@ export const LOCK_TIMING = Object.freeze({
  *   already gone. Exported so the exactly-one-winner property is testable
  *   without staging a race.
  */
-export function reclaimStaleLock(lock) {
+export function reclaimStaleLock(lock, observedMtimeMs) {
   const claimed = `${lock}.stale.${process.pid}.${Math.random().toString(36).slice(2)}`;
   try {
     renameSync(lock, claimed);
   } catch (e) {
     if (e.code === "ENOENT") return false;
     throw e;
+  }
+  // The rename moved WHATEVER was at the path. Between the caller's stat and
+  // this rename another waiter may have reclaimed the stale file and created
+  // a fresh, LIVE lock there — which is what was just moved. Identity-check
+  // it: a file that is not the stale one the caller observed goes back where
+  // it was, and this caller reports no win (QA cycle 4, CR4-1).
+  if (observedMtimeMs !== undefined) {
+    let mtime;
+    try {
+      mtime = statSync(claimed).mtimeMs;
+    } catch (e) {
+      if (e.code === "ENOENT") return false;
+      throw e;
+    }
+    if (mtime !== observedMtimeMs) {
+      try {
+        renameSync(claimed, lock);
+      } catch (e) {
+        // The holder we stole from may have finished and removed nothing
+        // (its rm found no file); if a NEW lock appeared meanwhile, leave it
+        // and drop the stolen copy — a duplicate lock file is worse than none.
+        if (e.code !== "EEXIST" && e.code !== "ENOTEMPTY") throw e;
+        rmSync(claimed, { force: true });
+      }
+      return false;
+    }
   }
   rmSync(claimed, { force: true });
   return true;
@@ -685,8 +711,10 @@ function withRecordLock(recordPath, fn) {
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
       let age = 0;
+      let observed;
       try {
-        age = Date.now() - statSync(lock).mtimeMs;
+        observed = statSync(lock).mtimeMs;
+        age = Date.now() - observed;
       } catch (statErr) {
         // Only "it is gone" means the holder released; anything else (EACCES,
         // EIO) is a real failure and must not become an unslept loop (CR3-7).
@@ -694,7 +722,7 @@ function withRecordLock(recordPath, fn) {
         throw statErr;
       }
       if (age > LOCK_STALE_MS) {
-        reclaimStaleLock(lock);
+        reclaimStaleLock(lock, observed);
         continue;
       }
       if (Date.now() - started > LOCK_TIMEOUT_MS) {
@@ -798,11 +826,14 @@ const YAML_INDICATOR_START = /^[-?:,[\]{}#&*!|>'"%@`]/;
  * A `--name 123` must stay the string the agent passed, so these are quoted
  * even though every character is in the safe class.
  */
-// YAML 1.2 core-schema forms: int is any digit run (leading zeros included —
-// js-yaml reads 007 as octal, yaml as 123; both as a NUMBER), float allows a
-// bare leading or trailing dot, plus the 0o/0x, inf/nan, bool and null words.
+// YAML 1.2 core-schema forms, which is the target: the number alternative
+// covers every plain integer run (leading zeros included — a 1.2 reader types
+// 007 as 7, a 1.1 reader as octal; both as a NUMBER) as well as floats with a
+// bare leading or trailing dot, so no separate int branch is needed; then the
+// 0o/0x, inf/nan, bool and null words. YAML 1.1-only forms (1_000, dates)
+// are deliberately not covered — a 1.1 reader of this block is out of scope.
 const YAML_TYPED_SCALAR =
-  /^(?:[-+]?[0-9]+|[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)|true|True|TRUE|false|False|FALSE|yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF|null|Null|NULL|~)$/;
+  /^(?:[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)|true|True|TRUE|false|False|FALSE|yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF|null|Null|NULL|~)$/;
 // A ":" at the END of a plain scalar makes `key: value:` a parse error in every
 // YAML implementation tried (CR3-1); the indicator-START rule cannot see it.
 const YAML_TRAILING_COLON = /:$/;

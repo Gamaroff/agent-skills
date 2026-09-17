@@ -827,16 +827,18 @@ test("CLI: a corrupt --record fails before the probe runs, and says it could not
   const rec = tmpRecord();
   fs.writeFileSync(rec, "{ not json");
   const spec = (await specs())["redis-tls/engaged"];
-  const started = Date.now();
   const r = cli(["--sink", spec.sink, "--entry", spec.entry, "--record", rec]);
   assert.equal(r.status, 2, r.stderr);
   assert.match(r.stderr, /cannot use --record/);
   assert.doesNotMatch(r.stderr, /cannot (write|update) --record/);
-  // Fail-fast: a probe run spawns 12 sandboxed children and takes seconds; a
-  // preflight failure returns before any of them.
-  assert.ok(
-    Date.now() - started < 3000,
-    "the run should not have spent the probe budget first",
+  // Fail-fast: the PROPERTY is that no probe ran — the engine prints a verdict
+  // line on stdout after a run, so an empty stdout is the direct evidence. A
+  // wall-clock bound was the previous assertion and failed under load with the
+  // preflight having fired (CR4-5).
+  assert.equal(
+    r.stdout,
+    "",
+    "a verdict was printed — the probe ran before the preflight failed",
   );
 });
 
@@ -979,7 +981,6 @@ test("the lock's wait timeout exceeds its stale window", async () => {
 });
 
 test("stale-lock reclaim is by atomic rename — two waiters cannot both win", async () => {
-  const { recordRun } = await engine();
   const rec = tmpRecord();
   const lock = `${rec}.lock`;
   fs.writeFileSync(lock, "");
@@ -1026,7 +1027,6 @@ test("stale-lock reclaim is by atomic rename — two waiters cannot both win", a
     0,
     "the renamed stale lock is removed",
   );
-  void recordRun;
 });
 
 test("reclaimStaleLock has exactly one winner per stale lock", async () => {
@@ -1044,6 +1044,35 @@ test("reclaimStaleLock has exactly one winner per stale lock", async () => {
       .length,
     0,
   );
+});
+
+test("reclaimStaleLock puts back a lock that is not the stale one it was told about", async () => {
+  const { reclaimStaleLock } = await engine();
+  const lock = `${tmpRecord()}.lock`;
+  fs.writeFileSync(lock, "");
+  const stale = new Date(Date.now() - 60_000);
+  fs.utimesSync(lock, stale, stale);
+  const observed = fs.statSync(lock).mtimeMs;
+  // Another waiter reclaimed and re-created the lock in between: the file at
+  // the path is now FRESH. A caller still holding the old observation must not
+  // take it.
+  fs.rmSync(lock);
+  fs.writeFileSync(lock, "");
+  assert.equal(
+    reclaimStaleLock(lock, observed),
+    false,
+    "a live lock was stolen",
+  );
+  assert.ok(fs.existsSync(lock), "the live lock must be restored");
+  assert.equal(
+    fs.readdirSync(path.dirname(lock)).filter((f) => f.includes(".stale."))
+      .length,
+    0,
+  );
+  // The genuine stale case still reclaims.
+  fs.utimesSync(lock, stale, stale);
+  assert.equal(reclaimStaleLock(lock, fs.statSync(lock).mtimeMs), true);
+  assert.ok(!fs.existsSync(lock));
 });
 
 test("readRecord rejects a control whose verdict is not one of VERDICTS", async () => {
