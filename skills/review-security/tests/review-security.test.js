@@ -619,8 +619,9 @@ test("CLI: a corrupt record is exit 2, never read as empty", () => {
   const wrongVersion = tmpRecord();
   fs.writeFileSync(wrongVersion, JSON.stringify({ version: 99, controls: [] }));
   assert.equal(cli(["--emit-block", wrongVersion]).status, 2);
-  // A version-1 record with no totals is not a record either — it used to pass
-  // readRecord and then throw a TypeError (exit 1) inside emitBlock.
+  // A version-1 record with no totals is not a record either. Readers recompute
+  // totals from controls, so this is a schema check, not crash prevention: a
+  // file without the field was not written by this engine.
   const noTotals = tmpRecord();
   fs.writeFileSync(noTotals, JSON.stringify({ version: 1, controls: [] }));
   const r = cli(["--emit-block", noTotals]);
@@ -710,4 +711,218 @@ test("CLI: --repo-root re-anchors containment so a bundled copy can probe the co
   } finally {
     fs.rmSync(nest, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 2 (task.118): the merge is serialised, the record's contents are
+// validated, YAML-typed scalars are quoted, and a bad --record fails fast.
+// ---------------------------------------------------------------------------
+
+test("concurrent --record runs against one file converge — every control survives", async () => {
+  const rec = tmpRecord();
+  const all = await specs();
+  const runs = [
+    ["a", all["redis-tls/engaged"]],
+    ["b", all["redis-tls/inert"]],
+    ["c", all["db-url/engaged"]],
+  ].map(
+    ([name, spec]) =>
+      new Promise((resolve) => {
+        const child = require("child_process").spawn(
+          process.execPath,
+          [
+            ENGINE_PATH,
+            "--sink",
+            spec.sink,
+            "--entry",
+            spec.entry,
+            "--record",
+            rec,
+            "--name",
+            name,
+          ],
+          { cwd: REPO_ROOT, stdio: "ignore" },
+        );
+        child.on("exit", resolve);
+      }),
+  );
+  await Promise.all(runs);
+  const { readRecord } = await engine();
+  const r = readRecord(rec);
+  assert.deepEqual(
+    r.controls.map((c) => c.name).sort(),
+    ["a", "b", "c"],
+    "an unlocked read-merge-rename keeps only the last writer's control",
+  );
+  assert.equal(
+    r.totals.executed,
+    r.controls.reduce((n, c) => n + c.executed, 0),
+  );
+  assert.ok(!fs.existsSync(`${rec}.lock`), "the lock is released");
+  assert.equal(
+    fs.readdirSync(path.dirname(rec)).filter((f) => f.endsWith(".tmp")).length,
+    0,
+  );
+});
+
+test("readRecord rejects a record whose control elements are malformed", async () => {
+  const { readRecord, RECORD_VERSION } = await engine();
+  const bad = [
+    [null],
+    ["x"],
+    [{ executed: "12", reproduced: 0, verdict: "engages" }],
+    [{ executed: -1, reproduced: 0, verdict: "engages" }],
+    [{ executed: 1, reproduced: 0 }],
+  ];
+  for (const controls of bad) {
+    const rec = tmpRecord();
+    fs.writeFileSync(
+      rec,
+      JSON.stringify({ version: RECORD_VERSION, controls, totals: {} }),
+    );
+    assert.throws(
+      () => readRecord(rec),
+      /not a version-1/,
+      JSON.stringify(controls),
+    );
+    const r = cli(["--emit-block", rec]);
+    assert.equal(
+      r.status,
+      2,
+      `emit-block on ${JSON.stringify(controls)}: ${r.stderr}`,
+    );
+  }
+});
+
+test("emitBlock quotes a scalar YAML would type as a number, boolean or null", async () => {
+  const { emitBlock, RECORD_VERSION } = await engine();
+  const mk = (name, callSite) => ({
+    version: RECORD_VERSION,
+    totals: {},
+    controls: [
+      {
+        sink: "path",
+        entry: "a.mjs#b",
+        name,
+        call_site: callSite,
+        verdict: "engages",
+        reason: "ok",
+        executed: 1,
+        reproduced: 0,
+      },
+    ],
+  });
+  assert.match(emitBlock(mk("123", "true")), /name: "123"\n\s+verdict/);
+  assert.match(emitBlock(mk("123", "true")), /call_site: "true"/);
+  assert.match(emitBlock(mk("1e3", "null")), /name: "1e3"/);
+  assert.match(emitBlock(mk("1e3", "null")), /call_site: "null"/);
+  assert.match(
+    emitBlock(mk("redis-tls", "x.ts:41")),
+    /name: redis-tls\n/,
+    "a plain name stays bare",
+  );
+});
+
+test("CLI: a corrupt --record fails before the probe runs, and says it could not be used", async () => {
+  const rec = tmpRecord();
+  fs.writeFileSync(rec, "{ not json");
+  const spec = (await specs())["redis-tls/engaged"];
+  const started = Date.now();
+  const r = cli(["--sink", spec.sink, "--entry", spec.entry, "--record", rec]);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /cannot use --record/);
+  assert.doesNotMatch(r.stderr, /cannot (write|update) --record/);
+  // Fail-fast: a probe run spawns 12 sandboxed children and takes seconds; a
+  // preflight failure returns before any of them.
+  assert.ok(
+    Date.now() - started < 3000,
+    "the run should not have spent the probe budget first",
+  );
+});
+
+test("SEVERITY_BY_VERDICT is the prompt's severity table — one definition", async () => {
+  const { SEVERITY_BY_VERDICT, VERDICTS } = await engine();
+  for (const v of VERDICTS) {
+    const row = new RegExp(
+      "^\\| `" + v + "` \\|[^|]*\\|\\s*([^|]+?)\\s*\\|",
+      "m",
+    ).exec(PROMPT);
+    assert.ok(row, `the prompt's verdict table has no row for ${v}`);
+    const prose = row[1].replace(/\*/g, "").trim();
+    const expected = SEVERITY_BY_VERDICT[v];
+    if (v === "unverifiable") {
+      assert.match(
+        prose,
+        /^—/,
+        "unverifiable carries no severity in the prompt — it is a finding, never a pass",
+      );
+    } else {
+      assert.equal(
+        prose,
+        expected,
+        `prompt says ${prose} for ${v}, engine says ${expected}`,
+      );
+    }
+  }
+});
+
+// The three-process race above proves convergence but cannot reliably PROVOKE
+// the race (the read→rename window is ~1 ms). These two prove the lock itself:
+// a held lock blocks the write until released; a stale one is reclaimed.
+test("recordRun waits on a held lock and writes once it is released", async () => {
+  const rec = tmpRecord();
+  const lock = `${rec}.lock`;
+  fs.writeFileSync(lock, "");
+  const script = `
+    import(${JSON.stringify(require("node:url").pathToFileURL(ENGINE_PATH).href)}).then((m) => {
+      m.recordRun(${JSON.stringify(rec)}, { sink: "s", entry: "e#f", verdict: "engages", reason: "ok", executed: 1, passed: 1, reproduced: [], overblocked: [], declined: [], escapes: [] });
+    });`;
+  const child = require("child_process").spawn(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    { cwd: REPO_ROOT, stdio: "ignore" },
+  );
+  const exited = new Promise((resolve) => child.on("exit", resolve));
+  await new Promise((r) => setTimeout(r, 700));
+  assert.ok(
+    !fs.existsSync(rec),
+    "the record must not be written while another process holds the lock",
+  );
+  assert.equal(
+    child.exitCode,
+    null,
+    "the writer must still be waiting, not exited",
+  );
+  fs.rmSync(lock);
+  const code = await exited;
+  assert.equal(code, 0);
+  assert.ok(fs.existsSync(rec), "released lock → the write goes through");
+});
+
+test("recordRun reclaims a stale lock left by a dead holder", async () => {
+  const { recordRun } = await engine();
+  const rec = tmpRecord();
+  const lock = `${rec}.lock`;
+  fs.writeFileSync(lock, "");
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(lock, old, old);
+  const started = Date.now();
+  recordRun(rec, {
+    sink: "s",
+    entry: "e#f",
+    verdict: "engages",
+    reason: "ok",
+    executed: 1,
+    passed: 1,
+    reproduced: [],
+    overblocked: [],
+    declined: [],
+    escapes: [],
+  });
+  assert.ok(
+    Date.now() - started < 2000,
+    "a stale lock must be reclaimed, not waited on",
+  );
+  assert.ok(fs.existsSync(rec));
+  assert.ok(!fs.existsSync(lock));
 });

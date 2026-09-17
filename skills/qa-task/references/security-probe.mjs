@@ -49,11 +49,14 @@
 
 import { spawnSync } from "node:child_process";
 import {
+  closeSync,
   mkdtempSync,
   mkdirSync,
+  openSync,
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -595,9 +598,25 @@ export function readRecord(recordPath) {
     throw e;
   }
   const rec = JSON.parse(text);
+  // The whole shape is validated here, contents included, so nothing downstream
+  // (`totalsOf`, `emitBlock`) can throw on a file that passed the reader. A
+  // record is rejected as a unit: a null element or a string count is not
+  // "a record with one bad row", it is not a record, and reading around it
+  // would let one hand-edited entry through. `totals` is required as a schema
+  // field even though every reader recomputes it — a record without it was not
+  // written by this engine.
+  const isCount = (n) => Number.isInteger(n) && n >= 0;
+  const validControl = (c) =>
+    c !== null &&
+    typeof c === "object" &&
+    !Array.isArray(c) &&
+    isCount(c.executed) &&
+    isCount(c.reproduced) &&
+    typeof c.verdict === "string";
   if (
     rec?.version !== RECORD_VERSION ||
     !Array.isArray(rec.controls) ||
+    !rec.controls.every(validControl) ||
     typeof rec.totals !== "object" ||
     rec.totals === null
   ) {
@@ -609,30 +628,107 @@ export function readRecord(recordPath) {
 }
 
 /**
+ * Serialise the read → merge → rename against other engine processes writing
+ * the same record. A review probes several controls, and an agent that issues
+ * those probes as parallel tool calls runs several engines at once; without
+ * this every one of them reads the record as it stood before any wrote, and
+ * the last rename silently drops the others (QA cycle 2, CR2-1 — three runs,
+ * one surviving control). The lock is an O_EXCL create: the kernel hands it to
+ * exactly one process, and a holder that died leaves a file whose age tells
+ * the next caller to reclaim it rather than wait forever.
+ */
+const LOCK_RETRY_MS = 25;
+const LOCK_STALE_MS = 30_000;
+const LOCK_TIMEOUT_MS = 20_000;
+
+function withRecordLock(recordPath, fn) {
+  const lock = `${recordPath}.lock`;
+  const started = Date.now();
+  for (;;) {
+    let fd;
+    try {
+      fd = openSync(lock, "wx");
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      let age = 0;
+      try {
+        age = Date.now() - statSync(lock).mtimeMs;
+      } catch {
+        continue; // the holder released between our open and stat — retry
+      }
+      if (age > LOCK_STALE_MS) {
+        rmSync(lock, { force: true });
+        continue;
+      }
+      if (Date.now() - started > LOCK_TIMEOUT_MS) {
+        throw new Error(`timed out waiting for ${lock}`);
+      }
+      // Synchronous sleep: this file is sync end to end and a busy-wait would
+      // pin a core for the whole spawn budget of the other process.
+      Atomics.wait(
+        new Int32Array(new SharedArrayBuffer(4)),
+        0,
+        0,
+        LOCK_RETRY_MS,
+      );
+      continue;
+    }
+    try {
+      closeSync(fd);
+      return fn();
+    } finally {
+      rmSync(lock, { force: true });
+    }
+  }
+}
+
+/**
  * Merge one result into the record at `recordPath` and write it back. Returns
  * the record written. The write is atomic (temp file + rename) so a crash
  * mid-write cannot leave a half-record that `readRecord` then rejects.
  */
 export function recordRun(recordPath, result, opts = {}) {
-  const existing = readRecord(recordPath) ?? {
-    version: RECORD_VERSION,
-    controls: [],
-  };
-  const entry = toRecordEntry(result, opts);
-  const key = controlKey(entry);
-  const controls = existing.controls.filter((c) => controlKey(c) !== key);
-  controls.push(entry);
-  const record = {
-    version: RECORD_VERSION,
-    controls,
-    totals: totalsOf(controls),
-    updated_at: entry.ran_at,
-  };
   mkdirSync(dirname(resolve(recordPath)), { recursive: true });
-  const tmp = `${recordPath}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
-  renameSync(tmp, recordPath);
-  return record;
+  return withRecordLock(recordPath, () => {
+    // Read INSIDE the lock: a read taken before it is the stale snapshot the
+    // lock exists to prevent.
+    const existing = readRecord(recordPath) ?? {
+      version: RECORD_VERSION,
+      controls: [],
+    };
+    const entry = toRecordEntry(result, opts);
+    const key = controlKey(entry);
+    const controls = existing.controls.filter((c) => controlKey(c) !== key);
+    controls.push(entry);
+    const record = {
+      version: RECORD_VERSION,
+      controls,
+      totals: totalsOf(controls),
+      updated_at: entry.ran_at,
+    };
+    const tmp = `${recordPath}.${process.pid}.tmp`;
+    try {
+      writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
+      renameSync(tmp, recordPath);
+    } catch (e) {
+      // A temp file left beside the record after a failed rename is a
+      // permanent orphan nothing else names (CR2-7).
+      rmSync(tmp, { force: true });
+      throw e;
+    }
+    return record;
+  });
+}
+
+/**
+ * Fail fast on a --record that cannot be used, BEFORE the probe run spends its
+ * spawn budget: a corrupt existing record or an unwritable directory used to
+ * be discovered only after every corpus case had run, and reported as a write
+ * failure even when the read was what failed (CR2-4).
+ */
+export function preflightRecord(recordPath) {
+  mkdirSync(dirname(resolve(recordPath)), { recursive: true });
+  readRecord(recordPath); // throws with the not-a-record message on a corrupt file
 }
 
 /**
@@ -656,10 +752,20 @@ export function evidenceOf(record) {
  */
 const YAML_INDICATOR_START = /^[-?:,[\]{}#&*!|>'"%@`]/;
 
+/**
+ * Plain scalars YAML's core schema resolves to something other than a string.
+ * A `--name 123` must stay the string the agent passed, so these are quoted
+ * even though every character is in the safe class.
+ */
+const YAML_TYPED_SCALAR =
+  /^(?:[-+]?(?:0|[1-9][0-9]*)(?:\.[0-9]*)?(?:[eE][-+]?[0-9]+)?|[-+]?\.[0-9]+(?:[eE][-+]?[0-9]+)?|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)|true|True|TRUE|false|False|FALSE|yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF|null|Null|NULL|~)$/;
+
 const yamlStr = (v) => {
   if (v === null || v === undefined) return "null";
   const s = String(v);
-  return /^[A-Za-z0-9_./#:@-]+$/.test(s) && !YAML_INDICATOR_START.test(s)
+  return /^[A-Za-z0-9_./#:@-]+$/.test(s) &&
+    !YAML_INDICATOR_START.test(s) &&
+    !YAML_TYPED_SCALAR.test(s)
     ? s
     : JSON.stringify(s);
 };
@@ -807,6 +913,15 @@ export function main(argv = process.argv.slice(2)) {
     }
   }
 
+  if (opts.record) {
+    try {
+      preflightRecord(opts.record);
+    } catch (e) {
+      process.stderr.write(`cannot use --record: ${e.message}\n`);
+      return 2;
+    }
+  }
+
   const result = runProbeSpec({
     sink: opts.sink,
     entry: opts.entry,
@@ -829,7 +944,7 @@ export function main(argv = process.argv.slice(2)) {
         callSite: opts.callSite,
       });
     } catch (e) {
-      process.stderr.write(`cannot write --record: ${e.message}\n`);
+      process.stderr.write(`cannot update --record: ${e.message}\n`);
       return 2;
     }
   }

@@ -161,6 +161,8 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 | 2026-09-17 |         | Implemented — 12 source files, 14 tests (9 engine + 5 population) | develop |
 | 2026-09-17 |         | QA gate CONCERNS (90/100) — 1 medium, 2 low blocking (CR-1..3) | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR-1 (`--repo-root` on the review-security command + population guard), CR-2 (totals recomputed from controls; record without totals rejected), CR-3 (reason asserted; "escape" wording corrected), CR-4/5/6 + emitBlock(null) via evidenceOf; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 2 — CR-1..3 verified fixed; 1 medium (concurrent record merge), 2 low | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR2-1 (O_EXCL lock around the record merge, stale-lock reclaim, 2 deterministic lock tests), CR2-2 (every control element validated), CR2-3 (YAML-typed scalars quoted), CR2-4 (record preflight before the run), CR2-5/6/7; 1 iteration | qa-fix |
 
 ---
 
@@ -182,20 +184,20 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
 **Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Gate Decision**: CONCERNS (cycle 2)
 
 ### QA Report
-- **Full Report**: [task.118.qa.1.probes-executed-from-engine.md](./task.118.qa.1.probes-executed-from-engine.md)
-- **Gate File**: [task.118.gate.1.probes-executed-from-engine.yml](./task.118.gate.1.probes-executed-from-engine.yml)
+- **Full Report**: [task.118.qa.2.probes-executed-from-engine.md](./task.118.qa.2.probes-executed-from-engine.md) (cycle 1: [qa.1](./task.118.qa.1.probes-executed-from-engine.md))
+- **Gate File**: [task.118.gate.2.probes-executed-from-engine.yml](./task.118.gate.2.probes-executed-from-engine.yml) (cycle 1: [gate.1](./task.118.gate.1.probes-executed-from-engine.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3382 (3381 pass, 1 skipped)
+- **Tests Executed**: 3384 (3383 pass, 1 skipped)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 MEDIUM, 4 LOW)
-- **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 (1 MEDIUM, 2 LOW gating, 4 cleanups)
+- **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-CR-1 (MEDIUM): the review-security probe command omits `--repo-root`, so an installed copy records `unverifiable` / 0 for every control — [bug 1](./task.118.bug.1.review-security-command-omits-repo-root.md). CR-2 / CR-3 (LOW): `emitBlock` trusts the file's `totals`; the `--repo-root` test passes for a reason its message does not state.
+Cycle-1 findings CR-1..3 FIXED and mutation-proven; [bug 1](./task.118.bug.1.review-security-command-omits-repo-root.md) closed. Cycle 2: CR2-1 (MEDIUM) the record merge is last-writer-wins under concurrent `--record` runs — [bug 2](./task.118.bug.2.record-merge-last-writer-wins.md); CR2-2/3 (LOW) control elements unvalidated; YAML-typed scalars bare.
 
 ---
 

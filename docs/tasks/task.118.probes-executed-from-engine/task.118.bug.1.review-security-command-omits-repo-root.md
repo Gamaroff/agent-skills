@@ -4,7 +4,7 @@
 **Bug ID**: TASK-118-BUG-1
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (diff code review CR-1, reproduced)
 **Date Found**: 2026-09-17
 
@@ -98,3 +98,4 @@ revisited. Nothing mechanical asserted the flag's presence across shipped invoca
 | 2026-09-17 | New          | QA         | Found by diff code review CR-1, reproduced     |
 | 2026-09-17 | In Progress  | qa-fix     | Investigation — root cause: sites edited before the flag existed |
 | 2026-09-17 | Ready for QA | qa-fix     | Flag added at both sites; population guard added and mutation-proven |
+| 2026-09-17 | Closed       | QA         | Cycle 2: verified at both sites and the bundled copy; guard mutation-proven by QA |
