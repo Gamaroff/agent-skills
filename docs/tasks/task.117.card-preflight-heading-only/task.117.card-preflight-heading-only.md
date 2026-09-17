@@ -5,18 +5,23 @@ type: task
 description: "card-preflight.js exits 0 with zero findings on a document whose Success Criteria card block resolves to the 14-character string **Functional** and nothing else, because summariseSection classifies a section that opens with a bold sub-heading as prose and stops at that line. Measured 2026-09-10: 15 of 106 task documents publish that block. The preflight's vocabulary is missing/empty — it cannot say 'present but useless' (#49). Separately, its clean ok: true reads as a structural all-clear when it checks three headings of eleven; task.103 reached review missing two mandatory sections (#43)."
 tags: [card-preflight, jira-sync, create-task, tracker]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-12
-updated: 2026-09-12
+updated: 2026-09-17
 assignee:
 estimated_effort_hours: 4
+github_issue: 415
+completed_date: 2026-09-17
+pr_number: 416
 ---
 
 # Technical Task: The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.117.review.1.card-preflight-heading-only.md` implemented 2026-09-17
+**GitHub Issue**: [#415](https://github.com/Gamaroff/agent-skills/issues/415)
 
 ---
 
@@ -52,7 +57,9 @@ the same failure — and it says nothing about the eight mandatory sections it d
 - `shared/resources/authoring-card-preflight.md` — the contract; `docs/reference/anti-patterns.md`
   §"Never fix N call sites without a population check" — which already argues the one-definition
   property for these sections.
-- `countMandatorySections` exists for `review-task`'s use.
+- `countMandatorySections` exists in `skills/create-task/scripts/lib.js` (task-only: it counts the
+  eleven numbered `## N.` headings by string match). No review skill consumes it, and it is not
+  reachable from `shared/resources/` without a `shared → skill` dependency.
 
 ## 4. Scope
 
@@ -60,8 +67,8 @@ the same failure — and it says nothing about the eight mandatory sections it d
 
 ✅ `summariseSection`: bold-only line + following list ⇒ the list is the content
 ✅ `heading-only` finding kind, defined by property; corpus test with a floor (expects 15 today, 0 after)
-✅ Preflight output states scope, or counts mandatory sections (decide in the plan; the second is better if authoring gaps keep reaching review)
-✅ `create-task` / `create-story` / `create-epic` step 4.6 text updated to match
+✅ Preflight output states its scope (decided at review 2026-09-17: a scope statement, not a mandatory-section count — the count is task-only and would need a second copy of the heading list, see §3)
+✅ `create-task` §4.6 / `create-story` §6.2a / `create-epic` §"Card Preflight" text updated to match
 
 ### Out of Scope
 
@@ -75,8 +82,12 @@ None; the preflight stays advisory at authoring. Cards synced after the change r
 
 1. Corpus test first (population form): walk `docs/tasks/*/task.*.md`, run `checkCardSections`,
    count `heading-only`; assert the count and a floor of ≥ 100 docs visited.
-2. `summariseSection` fix; `heading-only` kind; re-run → 0.
-3. Scope statement / mandatory-section count in the CLI output; update the three `create-*` steps.
+2. `summariseSection` fix — a bold-only line on its own paragraph (`**Label**` / `**Label**:`) is
+   dropped the way `dropHeadingLines` drops `###`, **every** such line and not only a leading one
+   (the 15 documents carry `**Functional**:` … `**Code Quality**:` in sequence); `heading-only`
+   kind, defined by property (summary has no sentence terminator and no list item); re-run → 0.
+3. Scope statement in the CLI's clean output ("N card blocks resolved — not a template-completeness
+   check"); update the three `create-*` preflight steps.
 4. Mutation: revert the summariser fix → the corpus test reds at 15.
 
 ## 7. Files Summary
@@ -84,8 +95,12 @@ None; the preflight stays advisory at authoring. Cards synced after the change r
 | File | Change |
 | :--- | :--- |
 | `shared/resources/jira-sync.js`, `shared/resources/card-preflight.js` | summariser + finding kind + scope line |
-| `shared/resources/tests/card-preflight-corpus.test.mjs` (new) | population check |
-| `shared/resources/authoring-card-preflight.md`; `skills/create-{task,story,epic}/SKILL.md` step 4.6 | contract + prose |
+| `shared/resources/tests/card-preflight-corpus.test.mjs` (new) | population check (floor 100, count 0) |
+| `shared/resources/tests/jira-sync-card-summary.test.mjs`, `shared/resources/tests/card-preflight.test.mjs` | summariser fixtures (C2), finding/scope fixtures (H), `--json` scope |
+| `shared/resources/tracker-card-summary.md`; `skills/review-{task,story,epic}/SKILL.md` | finding vocabulary gains `heading-only` |
+| `docs/tasks/task.{42,43,44,104}.…/*.md` | Breaking Changes given a lead sentence (each block resolved to `**Before** (…):` and stopped) |
+| `skills/sync-jira-{task,story,epic,bug}/scripts/*.js` | `--check-card --json` carries `scope` |
+| `shared/resources/authoring-card-preflight.md`; `skills/create-task/SKILL.md` §4.6, `skills/create-story/SKILL.md` §6.2a, `skills/create-epic/SKILL.md` §"Card Preflight" | contract + prose |
 | `CHANGELOG.md` | Fixed |
 
 ## 8. Testing Strategy
@@ -97,7 +112,7 @@ the four `sync-jira-*` suites unchanged and green.
 
 1. `heading-only` is a finding kind and the corpus test reports 0 after the fix (15 before, recorded)
 2. `summariseSection` renders the list under a bold label
-3. The preflight's clean output names its scope (or counts mandatory sections)
+3. The preflight's clean output names its scope
 4. The one-definition property test still passes; bundled copies match
 5. Observations #43, #49 close naming this PR
 
@@ -112,6 +127,29 @@ the four `sync-jira-*` suites unchanged and green.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS (no open entry)
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-17
+**Quality Score**: 90/100 (cycle 6)
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.117.qa.6.card-preflight-heading-only.md](./task.117.qa.6.card-preflight-heading-only.md) (earlier: [qa.1](./task.117.qa.1.card-preflight-heading-only.md), [qa.2](./task.117.qa.2.card-preflight-heading-only.md), [qa.3](./task.117.qa.3.card-preflight-heading-only.md), [qa.4](./task.117.qa.4.card-preflight-heading-only.md), [qa.5](./task.117.qa.5.card-preflight-heading-only.md))
+- **Gate File**: [task.117.gate.6.card-preflight-heading-only.yml](./task.117.gate.6.card-preflight-heading-only.yml) (earlier: [gate.1](./task.117.gate.1.card-preflight-heading-only.yml), [gate.2](./task.117.gate.2.card-preflight-heading-only.yml), [gate.3](./task.117.gate.3.card-preflight-heading-only.yml), [gate.4](./task.117.gate.4.card-preflight-heading-only.yml), [gate.5](./task.117.gate.5.card-preflight-heading-only.yml))
+
+### Test Coverage Summary
+- **Tests Executed**: 499 (card + sync suites, cycle 6) + 91 boundary probes + 3 mutation proofs re-run (M14–M16; 16 across the loop)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0 (cycle 6: no open entry; cycles 1–5 closed — bug.1–7)
+- **NFR Status**: Security: PASS (measured, 91 probes), Performance: PASS, Reliability: CONCERNS (pre-existing glued-fence shape, CR6-1 — advisory), Maintainability: PASS
+
+### Key Findings
+Cycles 1–5 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) … [bug.7](./task.117.bug.7.beneath-count-not-fence-aware.md)); the card path and the preflight advisory are correct on every shape reviewed across six cycles. Cycle 6 surfaced one pre-existing, out-of-scope limitation — a fence glued directly beneath a prose or label line is joined into the sentence (identical on `develop`, 0 of 120 corpus documents) — recorded as CR6-1 for a separate task, not gated.
+
+---
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
   Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
@@ -119,25 +157,41 @@ the four `sync-jira-*` suites unchanged and green.
   Authoring/review/edit skills bump Version; machine writers leave it blank.
   EVERY new row bumps frontmatter `updated:` in the same edit.
 -->
-
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                   | Author      |
-| ---------- | ------- | --------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-12 | 1.0     | Initial draft — filed from the 2026-09-12 observation review | create-task |
+| 2026-09-17 | 1.1     | Review passed (9/10) — GitHub issue #415 linked; create-* step refs corrected; scope-statement decision recorded | review-task |
+| 2026-09-17 |         | Status → ready-for-development | review-task |
+| 2026-09-17 |         | Implemented — 15 files (+ bundled copies), 16 new tests; corpus 29 → 0 | develop |
+| 2026-09-17 |         | QA gate CONCERNS (70/100) — 3 medium findings (CR-1, CR-2, CR-3), 4 low | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR-1/CR-3 (label property on pre-collapse lines, label by shape), CR-2 (transform after the drop), CR-4/CR-5; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (80/100) — cycle 2 refute pass: cycle-1 findings closed; 1 medium (CR2-1), 3 low, 3 cleanups | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR2-1 (trailing terminator only), CR2-2 (beneath count), CR2-3 (create-* prose), CR2-4 (bare bold alone is content), CR2-5/6/7; 3 more docs given a lead sentence; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (80/100) — cycle 3: cycle-2 findings closed; 2 medium (CR3-1 colon-inside-bold, CR3-2 change-log rows in fenced examples), 2 low, 2 cleanups | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR3-1 (colon inside bold), CR3-2/3 (real Change Log sections in task.42/43; task.44 row into its table), CR3-4 (label anchored at column 0), CR3-5/6; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (85/100) — cycle 4: cycle-3 findings closed; 1 medium (CR4-1 heading-only omitted starves the card pointer), 2 cleanups | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR4-1 (honest `omitted` + separate `beneath`), CR4-2/3 (test hygiene); 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (85/100) — cycle 5: cycle-4 findings closed; 1 medium (CR5-1 beneath not fence-aware), 2 low, 2 cleanups | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR5-1..3 (fence-aware `splitBlocks`, non-label `beneath`, `omitted` matches the prose path), CR5-4/5; 1 iteration | qa-fix |
+| 2026-09-17 |  | QA gate CONCERNS (90/100) — cycle 6 (budget extended): cycle-5 findings closed (bug.7); no open entry; 1 pre-existing advisory medium (CR6-1 glued fence), 1 low, 1 cleanup | qa-task |
+| 2026-09-17 | 1.2 | DoD passed — accepted (PR #416); six QA cycles, Step 5c APPROVE; observations #43/#49 closed | finalise |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: measure
-- [ ] Corpus scan committed as a test: count task docs whose Success Criteria card block renders as a bold label only (expected 15 of 106 on 2026-09-10)
+- [x] Corpus scan committed as a test: count task docs whose Success Criteria card block renders as a bold label only (expected 15 of 106 on 2026-09-10 — **measured 29 of 120 on 2026-09-17** by the test itself: the 15, plus 11 whose label sat directly above its bullets and was joined into a run-on, plus 3 Breaking Changes blocks)
 ### Phase 2: fix
-- [ ] `summariseSection` treats a leading bold-only line followed by a list as a label, not the prose
-- [ ] Preflight gains a `heading-only` finding kind, defined by property (no sentence, no list item)
-- [ ] Preflight's clean result states its scope ("3 card blocks resolve — not a template-completeness check"), or counts mandatory sections
+- [x] `summariseSection` treats a leading bold-only line followed by a list as a label, not the prose (every bold-only line, via `dropHeadingLines`; `RE_BOLD_LABEL` excludes sentence terminators so `**None.**` stays content)
+- [x] Preflight gains a `heading-only` finding kind, defined by property — `isLabelOnly(paragraph)`: one line, no sentence terminator, no list item on any line, and a label's shape (bold-only, or ≤ 4 words with a trailing colon); plus the by-construction case where a section is nothing but labels/sub-headings. (QA cycle 1 tightened this from "no sentence, no list item", which called any terse lead a label.)
+- [x] Preflight's clean result states its scope ("3 card blocks resolve — not a template-completeness check") — `describeCardScope`, in the display and as `scope` in `--json`
 ### Phase 3: prove
-- [ ] Corpus test goes to 0; mutation restores one instance → red
+- [x] Corpus test goes to 0; mutation (revert the bold-label drop) → red at 28 of 120; second mutation (property check inert) → optional-block fixture red
 
 ---
 
@@ -149,10 +203,37 @@ the four `sync-jira-*` suites unchanged and green.
 - **Canonical**: `shared/resources/jira-sync.js` (`summariseSection`, `CARD_SECTIONS_BY_KIND`, `checkCardSections`); `shared/resources/card-preflight.js`; `shared/resources/authoring-card-preflight.md`
 - **Predecessor**: task.102 (the preflight)
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.117.qa.1` … `task.117.qa.6.card-preflight-heading-only.md` (six cycles — the 5-cycle budget was extended by the user after the cycle-5 escalation)
+**Gate File**: `task.117.gate.6.card-preflight-heading-only.yml`
+**Gate Status**: ⚠️ CONCERNS — `top_issues: []` (no open entry; the reliability axis records a pre-existing, out-of-scope limitation, CR6-1, for a separate task)
+**Quality Score**: 90/100
+**PR Review (Step 5c)**: ✅ APPROVE — `task.117.pr-review.1.card-preflight-heading-only.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 5/5 — SC1–4 with code + test citations in the per-PR `npm test` lane; SC5 (observations #43, #49 closed naming PR #416) performed at finalise
+✅ **Tests:** 499/499 card + sync suites; `ci:fast` 3367/3368; 16 mutation proofs across the loop (M14–M16 re-run at cycle 6); 91 QA boundary probes + 1113 DoD security probes, 0 reproduced
+✅ **PR Review:** PR #416 → develop; six QA gates (70, 80, 80, 85, 85, 90; HIGH 0 throughout); Step 5c APPROVE; CI reading 1 SUCCESS @ `e087c163`
+✅ **Documentation:** CHANGELOG Fixed entry (task 117); `authoring-card-preflight.md`, `tracker-card-summary.md`, create-{task,story,epic} and review-{task,story,epic} SKILL.md carry the `heading-only` kind and scope statement; bundle:check 0 problems
+✅ **Security Review:** PASS — no secrets, no exec patterns, no dependency changes; boundary probed and held
+✅ **Compliance Review:** NOT_APPLICABLE — no data, payments, UI or PHI
+
+**Follow-up (not blocking):** CR6-1 (fence glued to a prose/label line is joined into the sentence — pre-existing, identical on `develop`, 0 corpus hits), CR6-2 (CRLF), CR6-3 (dead `.filter(Boolean)`), 5c CR-1 (`dropHeadingLines` API row), 5c CR-2 (early return skips `transform`) — file together as one task.
+
+**Task marked as ACCEPTED on:** 2026-09-17
+
+**Detailed Verification Log:** See `task.117.dod.1.card-preflight-heading-only.md` for complete verification evidence and timestamps.
+
 ---
 
-**Status:** Planned
+**Status:** Accepted
 
 **Next Steps**:
-1. `/develop-task docs/tasks/task.117.card-preflight-heading-only/task.117.card-preflight-heading-only.md`
-2. QA will create the co-located QA report, gate and (if needed) bug reports
+1. Merge PR #416 into develop (`/develop-next` Step 3)
+2. File the follow-up task for CR6-1 / CR6-2 / CR6-3 / 5c CR-1 / 5c CR-2

@@ -555,6 +555,7 @@ async function run({
         file: filePath,
         bug_mode: mode.mode,
         ...check,
+        scope: lib.describeCardScope(check),
       });
     } else {
       output.info(

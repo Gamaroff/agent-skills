@@ -123,6 +123,32 @@ All notable changes to this project will be documented in this file. Format foll
   (develop Step 3, review-task and review-story Phase 1.5, qa-task 3b / qa-story 1.6, qa-fix 1a)
   point at it rather than restating it (obs #44).
 
+### Fixed
+
+- **The card preflight now catches a section that is a label with nothing under it, and its
+  clean result names its own scope (task 117).** `summariseSection` took a bold-only line
+  (`**Functional**:`) as a section's first prose paragraph and stopped there, so the criteria list
+  under it never reached the card — **29 of 120** task documents (2026-09-17, measured by the new corpus
+  test) published `**Functional**` (or a run-on of label and bullets) as their entire Success Criteria
+  or Breaking Changes block, and the preflight passed every
+  one because its vocabulary was `missing` / `empty` and the block was neither. Bold-label lines are
+  now dropped the way `###` lines are (every one, not only a leading one — the documents carry
+  `**Functional**:` … `**Code Quality**:` in sequence), so the list under a label renders; a label
+  with nothing under it is the new **`heading-only`** finding, defined by property (the property is
+  a label's shape: one line, no sentence terminator, no list item on any line of its paragraph, and
+  either bold-only or a short trailing-colon line — so plain terminator-less prose, `None` and a
+  truncated paragraph stay content) rather than by regex. The epic spec's `**Label:**` transform now
+  runs *after* the label drop, so epic cards get the fix too. The
+  clean line — and a new `scope` field in `--json` — now reads `N card blocks resolve — this checks
+  the card sections only, not template completeness`, because `ok: true` was being heard as a
+  structural all-clear (task.103 passed it with ten sections of eleven). Proven in population form:
+  `shared/resources/tests/card-preflight-corpus.test.mjs` walks the task corpus with a floor of 100
+  documents and asserts zero; reverting the summariser turns it red at 28 (task.104's block was fixed in
+  the document). **Body diff on next sync:**
+  the affected cards gain their criteria list, which is the fix, but it will show as a description
+  change on each. `task.104`'s Breaking Changes section was given a lead sentence — its card block
+  resolved to `**Before** (…):` and stopped.
+
 ## [v0.48.0] - 2026-09-13
 
 ### Added

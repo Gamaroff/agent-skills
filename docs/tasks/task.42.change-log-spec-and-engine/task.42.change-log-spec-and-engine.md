@@ -8,7 +8,7 @@ category: infrastructure
 status: accepted
 priority: High
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-09-17
 completed_date: 2026-08-12
 pr_number: 209
 assignee:
@@ -234,6 +234,8 @@ Target (one, everywhere):
 ---
 
 ## 5. Breaking Changes
+
+Three breaking changes: `buildChangelogBlock()` emits four columns instead of two, the insertion fallback no longer targets the first `##`, and matches inside fenced code and inline code spans are ignored.
 
 ### Breaking Change 1: `buildChangelogBlock()` emits four columns, not two
 
@@ -736,6 +738,18 @@ re-bundle. Do not revert — the extraction itself is not the defect.
 loses existing Change Log rows.
 **Non-critical (fix forward)**: a wrong insertion anchor, a missed legacy migration case, a
 standards document that reads badly.
+
+---
+
+<!-- change-log-start -->
+
+## Change Log
+
+| Date       | Version | Description                                   | Author      |
+| ---------- | ------- | --------------------------------------------- | ----------- |
+| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
+
+<!-- change-log-end -->
 
 ---
 

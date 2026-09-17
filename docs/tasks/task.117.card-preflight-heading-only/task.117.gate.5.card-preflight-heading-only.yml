@@ -1,0 +1,80 @@
+schema: 1
+task: 'task.117.card-preflight-heading-only'
+task_title: 'The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs'
+gate: CONCERNS
+status_reason: 'Cycle-4 finding verified fixed (bug.6 closed): the live card announces the cut again. The cycle-5 review found the new beneath counter imprecise in three ways — not fence-aware, counts label paragraphs, and the heading-only omitted differs from the prose path — which mis-words the preflight advisory (the card itself is correct). One medium, two low, two cleanups. HIGH 0 across all five gates; guards not applicable. This is the fifth cycle: after its fix the loop limit escalates.'
+reviewer: 'QA Engineer'
+updated: '2026-09-16T22:02:56Z'
+
+top_issues:
+  - id: 'CR5-1'
+    severity: medium
+    file: 'shared/resources/jira-sync.js'
+    finding: 'beneath is computed over blank-line paragraphs with no fence awareness, so a fence containing a blank line beneath a label yields beneath 1 and the preflight emits the stopped wording and the convert-to-### fix where nothing summarisable is beneath the label (card output unaffected).'
+    suggested_action: 'Count beneath over fence-aware blocks (a fence is one unit) so the nothing-under-it message fires for label + multi-paragraph fence.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.7.beneath-count-not-fence-aware.md'
+    status: open
+  - id: 'CR5-2'
+    severity: low
+    file: 'shared/resources/jira-sync.js'
+    finding: 'Heading-only omitted counts blocks after the label only; the prose path counts every other paragraph, so +N more differs for the same shape with a leading table.'
+    suggested_action: 'Use paras.length - 1 on the heading-only branch, keeping beneath as the after-only summarisable count.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.7.beneath-count-not-fence-aware.md'
+    status: open
+  - id: 'CR5-3'
+    severity: low
+    file: 'shared/resources/jira-sync.js'
+    finding: 'isProseBlock does not exclude label paragraphs, so a label followed only by another label gives beneath 1 and the stopped wording.'
+    suggested_action: 'Filter with isProseBlock(p) && !isLabelOnly(p) when computing beneath.'
+    suggested_owner: dev
+    bug_ref: 'task.117.bug.7.beneath-count-not-fence-aware.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 85
+
+evidence:
+  tests_reviewed: 498
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [2]
+  cycle_4_findings_verified_fixed: 3
+  security_probes: 161
+  re_review_scope: 'since gate 4 — 3 files'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 161
+    notes: 'Unchanged — re-run after the cycle-4 change; the same four known deviations.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'The card path is now correct on every shape reviewed in five cycles: the pointer announces every cut (CR4-1 verified). The remaining defects are confined to the preflight advisory wording and one pointer count on a leading-table shape.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two cleanups: in-test require of already-imported symbols (CR5-4); the summariseSection API row in tracker-card-summary.md predates transform and beneath (CR5-5).'
+
+recommendations:
+  immediate:
+    - action: 'Fence-aware, non-label beneath; omitted = paras.length - 1 on the heading-only branch; fixtures for the three shapes (CR5-1, CR5-2, CR5-3)'
+      refs: ['shared/resources/jira-sync.js', 'shared/resources/tests/jira-sync-card-summary.test.mjs']
+  future:
+    - action: 'Drop the in-test requires (CR5-4); update the summariseSection API row (CR5-5)'
+      refs: ['shared/resources/tests/card-preflight.test.mjs', 'shared/resources/tracker-card-summary.md']
+    - action: 'CRLF lists; review-story:2321 — pre-existing, carried from gate 1'
+      refs: ['shared/resources/jira-sync.js', 'skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'CR5-1..3 fixed; a human confirms the cycle-5 fix (the loop budget is exhausted after it)'

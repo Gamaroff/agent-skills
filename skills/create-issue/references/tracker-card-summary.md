@@ -118,7 +118,7 @@ and the GitHub-only skills that follow this spec have no use for a Jira client.
 
 | Function | Role |
 |---|---|
-| `summariseSection(content, {maxItems, maxSentences})` | → `{text, omitted, kind}`; detects list vs prose |
+| `summariseSection(content, {maxItems, maxSentences, transform})` | → `{text, omitted, kind}` — plus `beneath` when `kind` is `heading-only` (the summarisable blocks under the label; `omitted` stays every other block, for the pointer); `transform` runs after the label drop |
 | `dropHeadingLines(content)` | removes `###` grouping labels, keeps what is under them |
 | `firstTableIn(content)` | the first pipe table in a section, wherever it sits |
 | `summaryBlockNodes({...})` | one section → ADF heading + body + `+N more` pointer |
@@ -159,11 +159,15 @@ node .agents/skills/sync-jira-task/scripts/sync-jira-task.js --file <doc.md> --c
 No auth, no network, no writes. Exit 0 = every card block resolves; exit 1 =
 findings, each printed with its fix. `--json` gives `{ok, findings, blocks}`.
 Finding codes: `missing` (no heading matched), `empty` (heading present but
-nothing summarisable under it), `no-body` (nothing resolved at all), `no-table`
-(epic Stories Breakdown has no overview table).
+nothing summarisable under it), `heading-only` (heading present, but what is
+under it is a bold label or sub-heading with nothing beneath — present and
+useless), `no-body` (nothing resolved at all), `no-table` (epic Stories
+Breakdown has no overview table). A clean result ends with a scope line —
+`N card blocks resolve — this checks the card sections only, not template
+completeness` — because `ok: true` was being read as a structural all-clear.
 
 `review-story`, `review-task` and `review-epic` run this in their template
-compliance step and treat `missing` / `empty` / `no-body` as **Critical**. The
+compliance step and treat `missing` / `empty` / `heading-only` / `no-body` as **Critical**. The
 fix always belongs in the document — no code can invent a Summary the file does
 not contain.
 

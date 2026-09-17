@@ -8,7 +8,7 @@ category: documentation
 status: accepted
 priority: High
 created: 2026-08-12
-updated: 2026-08-12
+updated: 2026-09-17
 completed_date: 2026-08-12
 pr_number: 210
 assignee:
@@ -202,6 +202,8 @@ inside the work content:
 ---
 
 ## 5. Breaking Changes
+
+Two breaking changes: the brownfield PRD Change Log loses its `Change` column, and the epic Change Log moves out of `## Notes & Updates`.
 
 ### Breaking Change 1: brownfield PRD Change Log loses its `Change` column
 
@@ -576,6 +578,18 @@ revert — placement is a one-line move.
 malformed.
 **Non-critical (fix forward)**: a template copy missed; instruction wording; a
 `review-epic` advisory finding caused by the moved heading.
+
+---
+
+<!-- change-log-start -->
+
+## Change Log
+
+| Date       | Version | Description                                   | Author      |
+| ---------- | ------- | --------------------------------------------- | ----------- |
+| 2026-09-17 |         | Breaking Changes given a lead sentence — the card block resolved to `**Before** (…):` and stopped (task.117 corpus check) | develop |
+
+<!-- change-log-end -->
 
 ---
 

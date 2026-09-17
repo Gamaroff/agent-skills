@@ -1137,6 +1137,18 @@ const CARD_MAX_SENTENCES = 4; // prose sentences kept on the card
 const CARD_MAX_CHARS = 600;
 
 const RE_SUBHEADING = /^#{3,6}\s+/;
+// A bold label standing alone on its line — `**Functional**`, `**Functional**:`,
+// `**Code Quality:**` — which real documents use exactly as they use `###`: to
+// group the items under it. A TRAILING terminator inside the bold is what keeps
+// `**None.**` (content) apart from `**None**:` (a label); a sentence that
+// happens to be bold is still a sentence. Only the trailing one: an earlier
+// version excluded `.` from the whole run, which made `**Changes to
+// jira-sync.js**:` — a label naming a file — neither a label nor reported, and
+// its list never reached the card (task.117 QA cycle 2, CR2-1).
+// Anchored at column 0 like RE_SUBHEADING: an indented bold line sits under a
+// list item (or inside an indented fence the tracker's 3-space cap cannot see)
+// and is not a grouping label (QA cycle 3, CR3-4).
+const RE_BOLD_LABEL = /^\*\*[^*\n]*[^*\n.!?\s]\*\*:?\s*$/;
 const RE_FENCE = /^\s*(```|~~~)/;
 
 // Fence-aware section extraction — the function `extractBodySections` and
@@ -1256,7 +1268,8 @@ function splitSentences(text) {
   return out.filter(Boolean);
 }
 
-// Strip `### ` heading LINES while keeping everything under them.
+// Strip `### ` heading LINES and bold-label lines while keeping everything
+// under them.
 //
 // Real documents group card content under sub-headings: a task's Success
 // Criteria opens with `### Functional`, an epic's Stories Breakdown puts its
@@ -1265,16 +1278,29 @@ function splitSentences(text) {
 // card wanted and left the grouping preamble behind — the exact inverse. On a
 // card this short the grouping labels are noise anyway: drop the labels, keep
 // the items.
+//
+// A bold label on its own line (`**Functional**:`) is the same grouping device
+// in different clothes, and it was the one this function did not see: the
+// summariser took it as the section's first prose paragraph and stopped, so
+// 29 of 120 task documents (2026-09-17; measured by
+// tests/card-preflight-corpus.test.mjs, the one place the figure lives)
+// published a bold label as their whole Success Criteria or Breaking Changes
+// block — the list under it never reached the card (task.117). Every such
+// line goes, not only a leading one: the documents carry `**Functional**:` …
+// `**Code Quality**:` in sequence, and dropping only the first would leave the
+// second sitting inside the list on the card.
 function dropHeadingLines(src) {
   const out = [];
-  let inFence = false;
+  // makeFenceTracker, not RE_FENCE parity: a ```` block containing a ``` line
+  // flips a parity toggle out of the fence, and the label drop then deletes
+  // fenced content (task.117 QA cycle 2, CR2-5).
+  const isFenced = makeFenceTracker();
   for (const line of String(src).split("\n")) {
-    if (RE_FENCE.test(line)) {
-      inFence = !inFence;
+    if (isFenced(line)) {
       out.push(line);
       continue;
     }
-    if (!inFence && RE_SUBHEADING.test(line)) continue;
+    if (RE_SUBHEADING.test(line) || RE_BOLD_LABEL.test(line)) continue;
     out.push(line);
   }
   return out;
@@ -1301,6 +1327,28 @@ function firstTableIn(content) {
   return table.join("\n");
 }
 
+// Split a section into blocks on blank lines — fence-aware, so a fenced block
+// containing a blank line is ONE block rather than two. A naive split counted
+// the fence's tail as a paragraph, which inflated `omitted` on the prose path
+// and made the heading-only `beneath` count report content beneath a label
+// where there was only code (task.117 QA cycle 5, CR5-1).
+function splitBlocks(src) {
+  const blocks = [];
+  let cur = [];
+  const isFenced = makeFenceTracker();
+  for (const line of String(src).split("\n")) {
+    const fenced = isFenced(line);
+    if (!fenced && line.trim() === "") {
+      if (cur.length) blocks.push(cur.join("\n").trim());
+      cur = [];
+      continue;
+    }
+    cur.push(line);
+  }
+  if (cur.length) blocks.push(cur.join("\n").trim());
+  return blocks.filter(Boolean);
+}
+
 // Is this section body a list?
 //
 // Judged on the FIRST non-blank line rather than a ratio: a criteria section
@@ -1322,25 +1370,50 @@ function isListSection(lines) {
  * read the whole thing, which is worse than any amount of verbosity.
  */
 function summariseSection(content, opts = {}) {
-  const { maxItems = CARD_MAX_LIST_ITEMS, maxSentences = CARD_MAX_SENTENCES } =
-    opts;
+  const {
+    maxItems = CARD_MAX_LIST_ITEMS,
+    maxSentences = CARD_MAX_SENTENCES,
+    transform = null,
+  } = opts;
   const raw = String(content || "").trim();
   if (!raw) return { text: "", omitted: 0, kind: "empty" };
 
-  // Grouping sub-headings go; the items under them stay. See dropHeadingLines.
-  const lines = dropHeadingLines(raw);
+  // A bold-only line WITHOUT a colon that is the whole section is content, not
+  // a label: `**None**` is what a Breaking Changes body says. The same line
+  // with content beneath it is a grouping label and is dropped below; the same
+  // line with a trailing colon is a label whatever follows (QA cycle 2, CR2-4).
+  // The colon test sees through the closing bold: `**Label:**` is as much a
+  // label as `**Label**:` (QA cycle 3, CR3-1).
+  if (!raw.includes("\n") && RE_BOLD_LABEL.test(raw) && !/:\**\s*$/.test(raw)) {
+    return { text: raw, omitted: 0, kind: "prose" };
+  }
+
+  // Grouping sub-headings and bold labels go; the items under them stay. See
+  // dropHeadingLines. A section that was non-empty and is now empty was
+  // NOTHING BUT headings and labels — report that as its own kind, because a
+  // reader given "empty" would look for a section with nothing in it and find
+  // one with a label in it, and conclude the checker is wrong.
+  // `transform` runs AFTER the drop, never before it. The epic spec flattens
+  // `**Label:**` to `Label:` so ADF need not render mid-paragraph bold; applied
+  // first, it turned a standalone bold label into plain text before this
+  // function could recognise it, and the one document kind whose spec handles
+  // bold labels was the one the label drop skipped (task.117 QA cycle 1, CR-2).
+  const dropped = dropHeadingLines(raw);
+  const lines = transform
+    ? String(transform(dropped.join("\n"))).split("\n")
+    : dropped;
   const src = lines.join("\n").trim();
-  if (!src) return { text: "", omitted: 0, kind: "empty" };
+  if (!src) return { text: "", omitted: 0, kind: "heading-only" };
 
   if (isListSection(lines)) {
     // Group each top-level item with its continuation lines so a wrapped or
     // nested bullet stays attached to the item it belongs to.
     const items = [];
-    let inFence = false;
+    const isFenced = makeFenceTracker();
     for (const line of lines) {
-      if (RE_FENCE.test(line)) inFence = !inFence;
+      const fenced = isFenced(line);
       const isTop =
-        !inFence &&
+        !fenced &&
         (RE_BULLET.test(line) || RE_ORDERED.test(line)) &&
         !/^\s/.test(line);
       if (isTop) items.push([line]);
@@ -1358,10 +1431,7 @@ function summariseSection(content, opts = {}) {
   }
 
   // Prose: the first PROSE paragraph, capped at `maxSentences`.
-  const paras = src
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const paras = splitBlocks(src);
 
   // Skip leading tables and fenced blocks rather than giving up on the section.
   //
@@ -1380,6 +1450,32 @@ function summariseSection(content, opts = {}) {
     return { text: "", omitted: paras.length, kind: "prose" };
   }
   const first = paras[firstIdx];
+
+  // A label standing in for a paragraph — decided on the paragraph's own
+  // lines, BEFORE they are joined into one string below. An earlier version
+  // tested the joined text, so its "no list item on any line" half could never
+  // match and a lead-in colon with bullets directly beneath it read as a label
+  // (task.117 QA cycle 1, CR-1).
+  if (isLabelOnly(first)) {
+    // `omitted` stays what it is everywhere else — every block after the
+    // label, so the card's "+N more" pointer still announces the cut. What
+    // a `###` conversion would deliver is a DIFFERENT number: only the
+    // summarisable blocks beneath the label, since tables and fences would
+    // still yield nothing. That travels as `beneath`, which the preflight
+    // reads for its message (QA cycle 2 CR2-2; cycle 4 CR4-1 — folding the
+    // two into one field starved the live card of its pointer).
+    // `omitted` is what it is on the prose path — every other block, before
+    // and after — so the card's pointer reads the same for the same shape
+    // (QA cycle 5, CR5-2). `beneath` excludes labels as well as tables and
+    // fences: a label beneath a label delivers nothing either (CR5-3).
+    const after = paras.slice(firstIdx + 1);
+    return {
+      text: first.trim(),
+      omitted: paras.length - 1,
+      beneath: after.filter((p) => isProseBlock(p) && !isLabelOnly(p)).length,
+      kind: "heading-only",
+    };
+  }
 
   const sentences = splitSentences(first.replace(/\n+/g, " ").trim());
   let kept = sentences.slice(0, maxSentences);
@@ -1417,10 +1513,12 @@ function summaryBlockNodes(opts = {}) {
     linkResolver = null,
     maxItems,
     maxSentences,
+    transform = null,
   } = opts;
   const { text, omitted } = summariseSection(content, {
     maxItems,
     maxSentences,
+    transform,
   });
   if (!text) return [];
 
@@ -1615,17 +1713,16 @@ function buildCardSections(body, specs, opts = {}) {
     // `transform` lets a caller normalise a section before it is summarised —
     // epics use it to flatten inline `**Label:**` runs, which ADF renders badly
     // mid-paragraph.
-    const content = spec.transform ? spec.transform(raw) : raw;
-    if (!content) continue;
     nodes.push(
       ...summaryBlockNodes({
         heading: spec.heading,
-        content,
+        content: raw,
         sourceUrl,
         docLabel,
         linkResolver,
         maxItems: spec.maxItems,
         maxSentences: spec.maxSentences,
+        transform: spec.transform,
       }),
     );
   }
@@ -1635,6 +1732,36 @@ function buildCardSections(body, specs, opts = {}) {
 // ---------------------------------------------------------------------------
 // Card preflight
 // ---------------------------------------------------------------------------
+
+// Is this paragraph a LABEL rather than content? The property behind a
+// `heading-only` finding, stated on the paragraph's own lines.
+//
+// A label is one line, carries no sentence terminator, has no list item on any
+// line of its paragraph, and has the SHAPE of a label: a bold-only run
+// (`**Functional**:` — what dropHeadingLines removes, so this sees it only when
+// that drop has been reverted, which is the mutation the corpus test proves),
+// or a short trailing-colon line (`Key points:`, `**Before** (GitHub):`). The
+// shape clause is what keeps this from being "any unpunctuated prose": a
+// one-line Summary written without a full stop, a Breaking Changes reading
+// `None`, a story statement whose clause lacks a period, a long paragraph
+// truncated to `…` — every one is content, and an earlier version called all
+// four a label and escalated them to Critical (task.117 QA cycle 1, CR-3). The
+// word cap keeps a lead-in sentence ending in a colon ("The task is done when
+// all of the following hold:") on the content side, where isListSection's
+// rationale already puts it.
+const LABEL_MAX_WORDS = 4;
+function isLabelOnly(paragraph) {
+  const t = String(paragraph || "").trim();
+  if (!t) return false;
+  const lines = t.split("\n");
+  if (lines.length !== 1) return false;
+  if (RE_BULLET.test(t) || RE_ORDERED.test(t)) return false;
+  // A TRAILING terminator ends a sentence; a dot inside (`jira-sync.js`,
+  // `v0.48`) does not (CR2-1).
+  if (/[.!?]\**\s*$/.test(t)) return false;
+  if (RE_BOLD_LABEL.test(t)) return true;
+  return /:$/.test(t) && t.split(/\s+/).length <= LABEL_MAX_WORDS;
+}
 
 /**
  * Check a document against its card spec WITHOUT syncing anything.
@@ -1682,11 +1809,53 @@ function checkCardSections(body, specs, opts = {}) {
       continue;
     }
 
-    const content = spec.transform ? spec.transform(raw) : raw;
-    const { text, omitted, kind } = summariseSection(content, {
+    const {
+      text,
+      omitted,
+      kind,
+      beneath = 0,
+    } = summariseSection(raw, {
       maxItems: spec.maxItems,
       maxSentences: spec.maxSentences,
+      transform: spec.transform,
     });
+
+    if (kind === "heading-only") {
+      // Present and useless: the block resolves to a label — or to nothing but
+      // labels and sub-headings. `missing` and `empty` could not say this —
+      // the section exists — which is how 29 of 120 task documents
+      // (2026-09-17; see tests/card-preflight-corpus.test.mjs, the one place
+      // the figure is measured) read a bold label as their whole Success
+      // Criteria block and every one of them passed the preflight (task.117).
+      //
+      // Two situations, two messages: with summarisable content beneath the
+      // label, the author wrote the content and the card stopped in front of
+      // it; with nothing beneath (or nothing but labels), the content was
+      // never written. Telling the first author to "put a list under the
+      // label" asks for what already exists (QA cycle 1, CR-4).
+      const stopped = beneath > 0;
+      const shown = text ? `"${text}"` : "nothing";
+      findings.push({
+        severity: spec.optional ? "important" : "critical",
+        section: spec.heading,
+        code: "heading-only",
+        message: stopped
+          ? `The "${spec.heading}" section opens with a label — the card would publish ${shown} and stop in front of the ${beneath} block(s) beneath it.`
+          : `The "${spec.heading}" section resolves to a label with nothing under it — the card would publish ${shown} and stop.`,
+        fix: stopped
+          ? `Make the label a \`###\` sub-heading or a bold-only line (**Label**), which the card drops, or turn it into a sentence; the content beneath it then reaches the card.`
+          : `Put a sentence or a bullet list under the label. A bold label (**Functional**:) or a sub-heading is a grouping, not content.`,
+      });
+      blocks.push({
+        heading: spec.heading,
+        status: "heading-only",
+        kind,
+        text,
+        omitted,
+        beneath,
+      });
+      continue;
+    }
 
     if (!text) {
       // Present but unusable — almost always a section that is nothing but a
@@ -1733,7 +1902,13 @@ function checkCardSections(body, specs, opts = {}) {
 // Render a checkCardSections result for a terminal.
 function formatCardCheck(result, opts = {}) {
   const { title = "Card preflight" } = opts;
-  const icon = { ok: "✅", missing: "🚨", empty: "🚨", "absent-optional": "·" };
+  const icon = {
+    ok: "✅",
+    missing: "🚨",
+    empty: "🚨",
+    "heading-only": "🚨",
+    "absent-optional": "·",
+  };
   const lines = [`${title}`, ""];
 
   for (const b of result.blocks) {
@@ -1758,9 +1933,25 @@ function formatCardCheck(result, opts = {}) {
       lines.push(`     Fix: ${f.fix}`);
     }
   } else {
-    lines.push("", "  No problems found.");
+    lines.push("", `  No problems found. ${describeCardScope(result)}`);
   }
   return lines.join("\n");
+}
+
+// What a clean result is a claim about — and what it is not.
+//
+// `ok: true` with zero findings reads as a structural all-clear, and it was
+// heard as one: task.103 reached review with ten of its eleven mandatory
+// sections, having passed this check, because this check reads the handful
+// of headings the CARD is built from and nothing else (task.117, obs #43).
+// A clean result therefore names its own scope, every time. This is the
+// scope statement the authoring contract asks for; it is deliberately not a
+// mandatory-section count, which is a per-kind template property this
+// tracker-neutral module has no definition of and must not grow a second one.
+function describeCardScope(result) {
+  const resolved = result.blocks.filter((b) => b.status === "ok").length;
+  const noun = resolved === 1 ? "card block resolves" : "card blocks resolve";
+  return `${resolved} ${noun} — this checks the card sections only, not template completeness.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -5580,6 +5771,9 @@ module.exports = {
   buildCardSections,
   checkCardSections,
   formatCardCheck,
+  describeCardScope,
+  isLabelOnly,
+  RE_BOLD_LABEL,
   // priority / labels
   PRIORITY_MAP,
   normalisePriority,

@@ -159,8 +159,18 @@ function main(argv) {
     // which is noise for every consumer and a log-bloat hazard for the ones
     // that capture it.
     const { body: _body, ...payload } = result;
+    // `scope` says what `ok` is a claim about. A consumer branching on
+    // `ok: true` alone reads it as a structural all-clear (task.117).
     process.stdout.write(
-      JSON.stringify({ action: "card-preflight", ...payload }, null, 2) + "\n",
+      JSON.stringify(
+        {
+          action: "card-preflight",
+          ...payload,
+          scope: lib.describeCardScope(result),
+        },
+        null,
+        2,
+      ) + "\n",
     );
   } else if (!args.quiet || !result.ok) {
     process.stdout.write(

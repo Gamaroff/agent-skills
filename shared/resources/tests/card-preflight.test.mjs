@@ -21,12 +21,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  existsSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
-  writeFileSync,
-  mkdtempSync,
   rmSync,
-  existsSync,
+  statSync,
+  writeFileSync,
 } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -398,6 +399,96 @@ test("B: --json does not emit the document body", () => {
 
   // ...while the library caller still gets it, which is what the parity test needs.
   assert.equal(typeof pf.preflight(real, "task").body, "string");
+});
+
+test("B: every sync-jira-* --check-card --json carries the same scope statement (CR2-6)", () => {
+  // A CARD document is the one whose basename equals its directory; every
+  // other file in the folder (dod, qa, gate, plan, review) is a sibling
+  // artifact no card is built from. Walked with readdirSync, as the corpus
+  // test beside this one does — no shell, no path quoting (CR4-2).
+  const first = (prefix) => {
+    const stack = [join(repoRoot, "docs")];
+    const hits = [];
+    while (stack.length) {
+      const dir = stack.pop();
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          stack.push(full);
+        } else if (
+          entry.startsWith(`${prefix}.`) &&
+          entry.endsWith(".md") &&
+          entry === `${dir.split(sep).at(-1)}.md`
+        ) {
+          hits.push(full);
+        }
+      }
+    }
+    return hits.sort()[0];
+  };
+  const docs = {
+    task: join(
+      repoRoot,
+      "docs/tasks/task.102.authoring-time-card-preflight/task.102.authoring-time-card-preflight.md",
+    ),
+    story: first("story"),
+    epic: first("epic"),
+    bug: first("bug"),
+  };
+  let checked = 0;
+  for (const [kind, doc] of Object.entries(docs)) {
+    assert.ok(doc, `no ${kind} document found for the scope check`);
+    const out = execFileSync(
+      process.execPath,
+      [
+        join(repoRoot, `skills/sync-jira-${kind}/scripts/sync-jira-${kind}.js`),
+        "--file",
+        doc,
+        "--check-card",
+        "--json",
+      ],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    const payload = JSON.parse(out.slice(out.indexOf("{")));
+    assert.match(
+      payload.scope,
+      /^\d+ card blocks? resolves? — this checks the card sections only, not template completeness\.$/,
+      `${kind}: scope missing or malformed`,
+    );
+    // ...and it is derived from THIS payload's resolved blocks — not a
+    // constant, and not the preflight CLI's count: the epic sync checks one
+    // block more than the shared spec (Stories Breakdown, where `no-table`
+    // lives), so equality across the two tools would be the wrong pin.
+    const resolved = payload.blocks.filter((b) => b.status === "ok").length;
+    assert.equal(
+      Number.parseInt(payload.scope, 10),
+      resolved,
+      `${kind}: scope count does not match the payload's resolved blocks`,
+    );
+    checked++;
+  }
+  assert.equal(
+    checked,
+    4,
+    "non-vacuity: all four sync scripts must have been run",
+  );
+});
+
+test("B: --json and the display both carry the scope statement", () => {
+  const real = join(
+    repoRoot,
+    "docs/tasks/task.102.authoring-time-card-preflight/task.102.authoring-time-card-preflight.md",
+  );
+  const { stdout } = runCli(["--file", real, "--json"]);
+  const payload = JSON.parse(stdout);
+  assert.equal(payload.ok, true);
+  assert.match(
+    payload.scope,
+    /^\d+ card blocks? resolves? — this checks the card sections only, not template completeness\.$/,
+  );
+  const shown = runCli(["--file", real]).stdout;
+  assert.match(shown, /No problems found\. \d+ card block/);
+  assert.match(shown, /not template completeness/);
 });
 
 test("B: card-preflight does not implement its own frontmatter parse", () => {
