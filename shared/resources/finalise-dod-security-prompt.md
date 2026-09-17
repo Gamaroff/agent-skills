@@ -135,7 +135,8 @@ reasoning about it is precisely what the checklist already does, and what it get
 # in an installed skill: the skill's own references directory). Substitute that
 # directory for PROMPT_DIR. --repo-root re-anchors the engine's containment check
 # on the consumer's tree — from a bundled copy its default root is the skill dir,
-# and every repo-relative entry would be declined as an escape without it.
+# and every repo-relative entry would resolve under the skill dir, fail to
+# import, and read as unverifiable (executed: 0) without it.
 node PROMPT_DIR/security-probe.mjs \
   --sink <sink> --entry '<path-from-repo-root>#<exportName>' \
   --repo-root "$(git rev-parse --show-toplevel)" \

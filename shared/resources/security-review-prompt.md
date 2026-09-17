@@ -128,6 +128,7 @@ re-run is an assertion, not evidence.
   ```bash
   node shared/resources/security-probe.mjs --sink url-authority \
     --entry 'apps/api/src/redis.ts#buildRedisOptions' \
+    --repo-root "$(git rev-parse --show-toplevel)" \
     --record docs/tasks/task.81.x/task.81.security.1.run.json \
     --name redis-tls --call-site apps/api/src/redis.ts:41
   ```
@@ -138,7 +139,11 @@ re-run is an assertion, not evidence.
 ````
 
 And the machine block, once per report, which is what a gate consumes. **It is printed, not
-written.** Every probe in the review passes the same `--record <path>` (the record sits beside the
+written.** Every probe passes `--repo-root "$(git rev-parse --show-toplevel)"` — the engine's
+containment root defaults to two directories above its own file, which in an installed skill is the
+skill directory, not the repository, so without the flag every repo-relative entry resolves under
+the skill and is `unverifiable` before it is ever imported — and every probe in the review passes
+the same `--record <path>` (the record sits beside the
 report as `{stem}.security.{N}.run.json`; the engine merges each control into it, keyed by
 `{sink, entry}`), and the block is the output of:
 

@@ -536,11 +536,40 @@ test("`measured` is unrepresentable without executed probes — evidenceOf never
   };
   assert.equal(evidenceOf(empty), "reasoned");
   assert.equal(readBlock(emitBlock(empty)).evidence, "reasoned");
-  // A record whose totals were hand-edited to claim probes with no controls
-  // still cannot produce `measured` — the totals are recomputed on write, but a
-  // reader is only as honest as the file, so this is the reader's own floor.
-  const forged = { ...empty, totals: { executed: 0, reproduced: 5 } };
+  // A record whose stored totals were hand-edited upward with no control behind
+  // them: the reader recomputes from controls, so the forgery renders reasoned.
+  const forged = { ...empty, totals: { executed: 12, reproduced: 5 } };
   assert.equal(evidenceOf(forged), "reasoned");
+  assert.equal(readBlock(emitBlock(forged)).evidence, "reasoned");
+  assert.equal(readBlock(emitBlock(forged)).probes_executed, 0);
+});
+
+test("emitBlock quotes a value whose first character is a YAML indicator", async () => {
+  const { emitBlock, RECORD_VERSION } = await engine();
+  const rec = {
+    version: RECORD_VERSION,
+    totals: { executed: 1, reproduced: 0 },
+    controls: [
+      {
+        sink: "path",
+        entry: "a.mjs#b",
+        name: "#foo",
+        call_site: "@x:1",
+        verdict: "engages",
+        reason: "ok",
+        executed: 1,
+        reproduced: 0,
+      },
+    ],
+  };
+  const block = emitBlock(rec);
+  assert.match(
+    block,
+    /name: "#foo"/,
+    "a #-leading name must be quoted, or YAML reads it as a comment",
+  );
+  assert.match(block, /call_site: "@x:1"/);
+  assert.match(block, /entry: a\.mjs#b\n/, "a safe value stays bare");
 });
 
 test("CLI: --record writes the record and --emit-block prints the block from it", async () => {
@@ -590,16 +619,42 @@ test("CLI: a corrupt record is exit 2, never read as empty", () => {
   const wrongVersion = tmpRecord();
   fs.writeFileSync(wrongVersion, JSON.stringify({ version: 99, controls: [] }));
   assert.equal(cli(["--emit-block", wrongVersion]).status, 2);
+  // A version-1 record with no totals is not a record either — it used to pass
+  // readRecord and then throw a TypeError (exit 1) inside emitBlock.
+  const noTotals = tmpRecord();
+  fs.writeFileSync(noTotals, JSON.stringify({ version: 1, controls: [] }));
+  const r = cli(["--emit-block", noTotals]);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /not a version-1/);
 });
 
-test("CLI: --record, --emit-block, --mode and --repo-root reject a missing or bad operand with exit 2", () => {
-  assert.equal(cli(["--emit-block"]).status, 2);
+test("CLI: every operand flag rejects a missing or flag-shaped operand with exit 2, on its own", () => {
+  // Each case supplies --sink and --entry so the only defect is the operand —
+  // the old guards passed these only because --entry happened to be absent.
+  const base = ["--sink", "url-authority", "--entry", "x.mjs#y"];
+  for (const flag of [
+    "--record",
+    "--emit-block",
+    "--repo-root",
+    "--name",
+    "--call-site",
+    "--mode",
+    "--cases-file",
+  ]) {
+    const r = cli([...base, flag]);
+    assert.equal(r.status, 2, `${flag} trailing: ${r.stderr}`);
+    assert.match(r.stderr, /requires an operand/);
+    const r2 = cli([...base, flag, "--json"]);
+    assert.equal(r2.status, 2, `${flag} followed by a flag: ${r2.stderr}`);
+  }
   assert.equal(
     cli(["--emit-block", tmpRecord(), "--mode", "sideways"]).status,
     2,
   );
-  assert.equal(cli(["--record"]).status, 2);
-  assert.equal(cli(["--repo-root"]).status, 2);
+  // --mode is validated in probe mode too, not only under --emit-block.
+  const probeMode = cli([...base, "--mode", "sideways"]);
+  assert.equal(probeMode.status, 2);
+  assert.match(probeMode.stderr, /--mode must be diff or full/);
 });
 
 test("CLI: --repo-root re-anchors containment so a bundled copy can probe the consumer's tree", async () => {
@@ -637,10 +692,14 @@ test("CLI: --repo-root re-anchors containment so a bundled copy can probe the co
         { cwd: REPO_ROOT, encoding: "utf8" },
       );
     const without = JSON.parse(runNested([]).stdout);
+    assert.equal(without.verdict, "unverifiable");
+    // Not an escape: the path is CONTAINED in the nested root and simply does
+    // not exist there. Asserting the reason is what keeps this test honest about
+    // which failure --repo-root fixes.
     assert.equal(
-      without.verdict,
-      "unverifiable",
-      "from the nested dir the entry is outside the default root",
+      without.reason,
+      "entry-not-probeable",
+      JSON.stringify(without.declined),
     );
     const withRoot = JSON.parse(runNested(["--repo-root", REPO_ROOT]).stdout);
     assert.equal(

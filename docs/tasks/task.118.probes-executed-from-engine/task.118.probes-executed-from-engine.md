@@ -159,6 +159,8 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 | 2026-09-17 | 1.1     | Review passed (8/10) — `--record` flag stated (CLI has no report path), record keyed by `{sink, entry}`, finalise probe mode to run the engine, bundle step added, issue #417 linked | review-task |
 | 2026-09-17 |         | Status → ready-for-development | review-task |
 | 2026-09-17 |         | Implemented — 12 source files, 14 tests (9 engine + 5 population) | develop |
+| 2026-09-17 |         | QA gate CONCERNS (90/100) — 1 medium, 2 low blocking (CR-1..3) | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR-1 (`--repo-root` on the review-security command + population guard), CR-2 (totals recomputed from controls; record without totals rejected), CR-3 (reason asserted; "escape" wording corrected), CR-4/5/6 + emitBlock(null) via evidenceOf; 1 iteration | qa-fix |
 
 ---
 
@@ -174,6 +176,29 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-17
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.118.qa.1.probes-executed-from-engine.md](./task.118.qa.1.probes-executed-from-engine.md)
+- **Gate File**: [task.118.gate.1.probes-executed-from-engine.yml](./task.118.gate.1.probes-executed-from-engine.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3382 (3381 pass, 1 skipped)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0 (1 MEDIUM, 4 LOW)
+- **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+CR-1 (MEDIUM): the review-security probe command omits `--repo-root`, so an installed copy records `unverifiable` / 0 for every control — [bug 1](./task.118.bug.1.review-security-command-omits-repo-root.md). CR-2 / CR-3 (LOW): `emitBlock` trusts the file's `totals`; the `--repo-root` test passes for a reason its message does not state.
+
+---
+
 ## Implementation Notes
 
 **Implementation summary (2026-09-17).** The count now has one route from the engine to every
@@ -184,7 +209,8 @@ write), `--emit-block <record> [--mode]` (print the `security_review:` YAML with
 `evidenceOf()`, `measured` only on `totals.executed > 0`; a missing record renders the honest
 empty block, a corrupt one exits 2), and `--repo-root` (the containment root defaults to two
 dirs above the engine file, which in a bundled `references/` copy is the skill dir — without the
-flag every consumer entry was declined as an escape). `--name` / `--call-site` carry the two
+flag every consumer entry resolved under the skill dir, could not be imported, and read as
+`unverifiable` with `executed: 0`). `--name` / `--call-site` carry the two
 descriptive fields into the record so the emitted block is complete.
 
 **Readers.** `security-review-prompt.md` §2 states that neither number is typed; §4 shows the

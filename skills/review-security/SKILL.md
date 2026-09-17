@@ -84,8 +84,10 @@ Invoke as `/review-security [work-item] [--mode diff|full]`.
    which is passed to the reviewing agent verbatim. Sink selection and entry-point rules live there.
 5. **Run the engine.** `runProbeSpec` executes every corpus case for the sink in a sandboxed child and
    returns the verdict, the reason, and the per-case results. Run it through the CLI with
+   `--repo-root "$(git rev-parse --show-toplevel)"` and
    `--record {work-item-dir}/{stem}.security.{N}.run.json` (plus `--name` and `--call-site`) for
-   **every** control — the record accumulates one entry per `{sink, entry}` and is the only place the
+   **every** control — `--repo-root` because an installed copy's default containment root is the
+   skill directory, and a repo-relative entry resolved there is `unverifiable` before it is imported — the record accumulates one entry per `{sink, entry}` and is the only place the
    probe count is allowed to come from.
 6. **Write the report** to `{work-item-dir}/{stem}.security.{N}.{name}.md`, including the
    `security_review:` machine block — **pasted from

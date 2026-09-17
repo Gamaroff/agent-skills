@@ -594,7 +594,12 @@ export function readRecord(recordPath) {
     throw e;
   }
   const rec = JSON.parse(text);
-  if (rec?.version !== RECORD_VERSION || !Array.isArray(rec.controls)) {
+  if (
+    rec?.version !== RECORD_VERSION ||
+    !Array.isArray(rec.controls) ||
+    typeof rec.totals !== "object" ||
+    rec.totals === null
+  ) {
     throw new Error(
       `${recordPath} is not a version-${RECORD_VERSION} security-probe run record`,
     );
@@ -633,16 +638,30 @@ export function recordRun(recordPath, result, opts = {}) {
  * The `evidence` value a record supports. Computed, never supplied: this is the
  * one function that decides whether `measured` may appear at all.
  */
+//
+// The totals are RECOMPUTED from `controls`, never read from the file. The
+// stored `totals` is a convenience for a human reader; a record whose
+// `totals.executed` was hand-edited upward with no control behind it must still
+// render `reasoned`, or the field becomes the typed count one layer down.
 export function evidenceOf(record) {
-  return record && record.totals?.executed > 0 ? "measured" : "reasoned";
+  if (!record) return "reasoned";
+  return totalsOf(record.controls ?? []).executed > 0 ? "measured" : "reasoned";
 }
 
-const yamlStr = (v) =>
-  v === null || v === undefined
-    ? "null"
-    : /^[A-Za-z0-9_./#:@-]+$/.test(String(v))
-      ? String(v)
-      : JSON.stringify(String(v));
+/**
+ * First characters YAML reads as an indicator. A value starting with one is
+ * JSON-quoted even when the rest of it is in the safe class — `name: #foo` is
+ * a comment, not a name.
+ */
+const YAML_INDICATOR_START = /^[-?:,[\]{}#&*!|>'"%@`]/;
+
+const yamlStr = (v) => {
+  if (v === null || v === undefined) return "null";
+  const s = String(v);
+  return /^[A-Za-z0-9_./#:@-]+$/.test(s) && !YAML_INDICATOR_START.test(s)
+    ? s
+    : JSON.stringify(s);
+};
 
 /**
  * Render the `security_review:` block from a record. A `null` record renders
@@ -652,17 +671,22 @@ const yamlStr = (v) =>
  */
 export function emitBlock(record, { mode = "diff" } = {}) {
   const lines = ["security_review:", `  mode: ${mode}`];
+  // One function owns the answer on every path, including the missing-record
+  // one — a hardcoded "reasoned" here would be correct today and silently
+  // decoupled from evidenceOf() the day that function changes.
+  const evidence = evidenceOf(record);
   if (!record) {
     lines.push(
       "  probes_executed: 0    # no run record — the engine did not run",
-      "  evidence: reasoned    # computed by security-probe.mjs; measured needs a record",
+      `  evidence: ${evidence}    # computed by security-probe.mjs; measured needs a record`,
       "  controls: []",
     );
     return `${lines.join("\n")}\n`;
   }
+  const totals = totalsOf(record.controls);
   lines.push(
-    `  probes_executed: ${record.totals.executed}`,
-    `  evidence: ${evidenceOf(record)}    # computed by security-probe.mjs from the run record`,
+    `  probes_executed: ${totals.executed}`,
+    `  evidence: ${evidence}    # computed by security-probe.mjs from the run record`,
   );
   if (record.controls.length === 0) {
     lines.push("  controls: []");
@@ -691,21 +715,37 @@ export function emitBlock(record, { mode = "diff" } = {}) {
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
+/** Flags that take exactly one operand. A missing or flag-shaped operand is exit 2. */
+const OPERAND_FLAGS = Object.freeze({
+  "--sink": "sink",
+  "--entry": "entry",
+  "--cases-file": "casesFile",
+  "--repo-root": "repoRoot",
+  "--record": "record",
+  "--name": "name",
+  "--call-site": "callSite",
+  "--emit-block": "emitBlock",
+  "--mode": "mode",
+});
+
 export function main(argv = process.argv.slice(2)) {
   const opts = { json: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === "--json") opts.json = true;
-    else if (a === "--sink") opts.sink = argv[++i];
-    else if (a === "--entry") opts.entry = argv[++i];
-    else if (a === "--cases-file") opts.casesFile = argv[++i];
-    else if (a === "--repo-root") opts.repoRoot = argv[++i];
-    else if (a === "--record") opts.record = argv[++i];
-    else if (a === "--name") opts.name = argv[++i];
-    else if (a === "--call-site") opts.callSite = argv[++i];
-    else if (a === "--emit-block") opts.emitBlock = argv[++i];
-    else if (a === "--mode") opts.mode = argv[++i];
-    else if (a === "--timeout") {
+    else if (Object.hasOwn(OPERAND_FLAGS, a)) {
+      // Checked at parse time: `argv[++i]` on a trailing flag yields undefined,
+      // which a post-loop `!== undefined` guard cannot tell from the flag never
+      // having been given — `--record` with no path used to exit 2 only because
+      // `--entry` happened to be absent too.
+      const operand = argv[i + 1];
+      if (operand === undefined || operand.startsWith("--")) {
+        process.stderr.write(`${a} requires an operand\n`);
+        return 2;
+      }
+      opts[OPERAND_FLAGS[a]] = operand;
+      i += 1;
+    } else if (a === "--timeout") {
       // Validated with the SAME rule the spawn budget applies to its env vars,
       // imported rather than restated. `Number()` alone was the defect: it
       // yields NaN for a missing or non-numeric value, NaN is neither null nor
@@ -730,19 +770,13 @@ export function main(argv = process.argv.slice(2)) {
   // Emit mode runs no probe: it renders the block from whatever the record
   // says. A missing record is a legitimate input here (it renders `reasoned`);
   // a corrupt one is not, and exits 2 rather than reading as empty.
+  // Validated regardless of mode: a bad --mode is a bad argument whether or
+  // not this run happens to emit a block.
+  if (opts.mode !== undefined && opts.mode !== "diff" && opts.mode !== "full") {
+    process.stderr.write("--mode must be diff or full\n");
+    return 2;
+  }
   if (opts.emitBlock !== undefined) {
-    if (!opts.emitBlock) {
-      process.stderr.write("--emit-block <record> requires a path\n");
-      return 2;
-    }
-    if (
-      opts.mode !== undefined &&
-      opts.mode !== "diff" &&
-      opts.mode !== "full"
-    ) {
-      process.stderr.write("--mode must be diff or full\n");
-      return 2;
-    }
     let record;
     try {
       record = readRecord(opts.emitBlock);
@@ -752,14 +786,6 @@ export function main(argv = process.argv.slice(2)) {
     }
     process.stdout.write(emitBlock(record, { mode: opts.mode ?? "diff" }));
     return 0;
-  }
-  if (opts.record !== undefined && !opts.record) {
-    process.stderr.write("--record requires a path\n");
-    return 2;
-  }
-  if (opts.repoRoot !== undefined && !opts.repoRoot) {
-    process.stderr.write("--repo-root requires a path\n");
-    return 2;
   }
   if (!opts.entry) {
     process.stderr.write("--entry <path#exportName> is required\n");

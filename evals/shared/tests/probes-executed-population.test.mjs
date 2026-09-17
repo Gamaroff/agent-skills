@@ -213,6 +213,54 @@ test("the three named producer sites read the record", () => {
   }
 });
 
+/**
+ * Every shipped invocation of the engine that names an --entry must also pass
+ * --repo-root. From an installed skill the engine's default containment root is
+ * the skill directory, so a repo-relative entry resolved there does not exist
+ * and records `unverifiable` / 0 for every control — the exact run this task
+ * exists to make impossible to misreport (QA cycle 1, CR-1: the review-security
+ * command itself shipped without the flag).
+ */
+function invocationsOf(lines) {
+  const out = [];
+  lines.forEach((text, i) => {
+    if (!/security-probe\.mjs/.test(text) || /^\s*(#|\/\/)/.test(text)) return;
+    // Reassemble a backslash-continued command before reading its flags.
+    let cmd = text;
+    let j = i;
+    while (/\\\s*$/.test(lines[j]) && j + 1 < lines.length) {
+      j += 1;
+      cmd += " " + lines[j];
+    }
+    if (/--entry\b/.test(cmd)) out.push({ line: i + 1, cmd });
+  });
+  return out;
+}
+
+test("every shipped security-probe invocation that names an --entry passes --repo-root", () => {
+  const bare = [];
+  let total = 0;
+  for (const abs of shippedDocs()) {
+    const rel = path.relative(REPO_ROOT, abs);
+    const lines = fs.readFileSync(abs, "utf8").split("\n");
+    for (const inv of invocationsOf(lines)) {
+      total += 1;
+      if (!/--repo-root\b/.test(inv.cmd))
+        bare.push(`${rel}:${inv.line}  ${inv.cmd.trim().slice(0, 100)}`);
+    }
+  }
+  // relationship-assertion-lint: allow — a walk-sanity floor on the invocation count, not a row mapping
+  assert.ok(
+    total >= 4,
+    `only ${total} engine invocations found — the reassembly or the walk is broken`,
+  );
+  assert.deepEqual(
+    bare,
+    [],
+    "these invocations would resolve the entry under the skill directory from an installed copy",
+  );
+});
+
 test("negative control — the matcher sees a hand-typed count", () => {
   const typed = [
     "**4. Report only what reproduced.**",

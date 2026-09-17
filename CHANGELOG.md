@@ -59,7 +59,8 @@ All notable changes to this project will be documented in this file. Format foll
   which prints the `security_review:` YAML block with `probes_executed` and `evidence` filled from
   it — `evidence` is **computed** by `evidenceOf()` and is `measured` only when
   `totals.executed > 0` — and `--repo-root`, so a bundled copy under `skills/*/references/` can
-  probe a consumer's tree instead of declining every repo-relative entry as an escape. The
+  probe a consumer's tree — without it every repo-relative entry resolves under the skill directory,
+  cannot be imported, and reads as `unverifiable` with `executed: 0`. The
   review-security prompt and SKILL, finalise's DoD security prompt, and qa-story / qa-task Step 3b
   now run the engine with `--record` and copy the count from the record; the finalise prompt and
   the QA step previously told the agent to hand-write a temporary harness and count its own
