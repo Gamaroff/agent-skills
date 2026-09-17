@@ -178,24 +178,24 @@ need rewriting, which raises the effort; stop and re-estimate before Phase 1.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-09-17 (cycle 2)
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Testing Date**: 2026-09-17 (cycle 3)
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.119.qa.2.create-skill-authoring-guards.md](./task.119.qa.2.create-skill-authoring-guards.md) (cycle 1: [qa.1](./task.119.qa.1.create-skill-authoring-guards.md))
-- **Gate File**: [task.119.gate.2.create-skill-authoring-guards.yml](./task.119.gate.2.create-skill-authoring-guards.yml) (cycle 1: [gate.1](./task.119.gate.1.create-skill-authoring-guards.yml))
+- **Full Report**: [task.119.qa.3.create-skill-authoring-guards.md](./task.119.qa.3.create-skill-authoring-guards.md) (earlier cycles: [qa.1](./task.119.qa.1.create-skill-authoring-guards.md), [qa.2](./task.119.qa.2.create-skill-authoring-guards.md))
+- **Gate File**: [task.119.gate.3.create-skill-authoring-guards.yml](./task.119.gate.3.create-skill-authoring-guards.yml) (earlier: [gate.1](./task.119.gate.1.create-skill-authoring-guards.yml), [gate.2](./task.119.gate.2.create-skill-authoring-guards.yml))
 
 ### Test Coverage Summary
 - **Tests Executed**: 3411 (3410 pass, 1 skipped)
-- **Phases Verified**: 4/4 (Phase 1 with concerns)
-- **Critical Issues**: 0 (1 medium: CR-4)
+- **Phases Verified**: 4/4 + close-out
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle 1's CR-1/CR-2/CR-3 verified FIXED. Cycle 2 (refute pass): CR-4 (medium, high confidence) — the new §5 parity test counts fence pushes, not scanned lines, so it cannot see fence-state loss; promoted to the gate. Advisory: CR-5 (fence-shaped line inside a runnable heredoc), CR-6 (orphaned vendored copy in develop-next).
+Three QA cycles. Cycle 1: CR-1 fence-state loss on nested template fences (fixed: stack reader). Cycle 2 (refute pass): CR-4 the parity test could not fail (fixed: line-level §5, mutation-proven against the original reader), CR-5 heredoc fence lines, CR-6 orphaned vendored copy. Cycle 3: no gating finding; advisory residue (§5 opener tokeniser divergence — latent; stale doc counts) recorded in the gate's `recommendations.future`.
 
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
@@ -217,6 +217,7 @@ Cycle 1's CR-1/CR-2/CR-3 verified FIXED. Cycle 2 (refute pass): CR-4 (medium, hi
 | 2026-09-17 |         | QA findings fixed — CR-1 stack-based fence tracking + §5 opener parity (485 blocks), CR-2 scope docstring/depth, CR-3 warning dedupe; 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate CONCERNS (90/100), cycle 2 refute — CR-1/2/3 fixed; 1 new finding (CR-4 §5 tautology), 2 advisory | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR-4 §5 now line-level (mutation: original reader → red naming lines), CR-5 fence lines inside runnable blocks are content + heredoc fixture, CR-6 orphaned develop-next copy removed; 2 iterations | qa-fix |
+| 2026-09-17 |         | QA gate PASS (100/100), cycle 3 — CR-4/5/6 verified fixed; 0 gating findings, 3 advisory | qa-task |
 
 ---
 
