@@ -457,7 +457,7 @@ test("the prompt does not restate the corpus cases", async () => {
 // ---------------------------------------------------------------------------
 
 const os = require("os");
-const { spawnSync } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const ENGINE_PATH = path.join(REPO_ROOT, "shared/resources/security-probe.mjs");
 
 function tmpRecord() {
@@ -728,7 +728,7 @@ test("concurrent --record runs against one file converge — every control survi
   ].map(
     ([name, spec]) =>
       new Promise((resolve) => {
-        const child = require("child_process").spawn(
+        const child = spawn(
           process.execPath,
           [
             ENGINE_PATH,
@@ -877,11 +877,10 @@ test("recordRun waits on a held lock and writes once it is released", async () =
     import(${JSON.stringify(require("node:url").pathToFileURL(ENGINE_PATH).href)}).then((m) => {
       m.recordRun(${JSON.stringify(rec)}, { sink: "s", entry: "e#f", verdict: "engages", reason: "ok", executed: 1, passed: 1, reproduced: [], overblocked: [], declined: [], escapes: [] });
     });`;
-  const child = require("child_process").spawn(
-    process.execPath,
-    ["--input-type=module", "-e", script],
-    { cwd: REPO_ROOT, stdio: "ignore" },
-  );
+  const child = spawn(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: REPO_ROOT,
+    stdio: "ignore",
+  });
   const exited = new Promise((resolve) => child.on("exit", resolve));
   await new Promise((r) => setTimeout(r, 700));
   assert.ok(
@@ -925,4 +924,154 @@ test("recordRun reclaims a stale lock left by a dead holder", async () => {
   );
   assert.ok(fs.existsSync(rec));
   assert.ok(!fs.existsSync(lock));
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 3 (task.118): the renderer's remaining YAML edges, the lock's
+// timeout/stale ordering and rename-based reclaim, the preflight's write check.
+// ---------------------------------------------------------------------------
+
+test("emitBlock quotes a value ending in ':' and a leading-zero integer", async () => {
+  const { emitBlock, RECORD_VERSION } = await engine();
+  const mk = (name, callSite) => ({
+    version: RECORD_VERSION,
+    totals: {},
+    controls: [
+      {
+        sink: "path",
+        entry: "a.mjs#b",
+        name,
+        call_site: callSite,
+        verdict: "engages",
+        reason: "ok",
+        executed: 1,
+        reproduced: 0,
+      },
+    ],
+  });
+  assert.match(
+    emitBlock(mk("foo:", "x.ts:")),
+    /name: "foo:"\n/,
+    "a trailing colon is a YAML parse error when bare",
+  );
+  assert.match(emitBlock(mk("foo:", "x.ts:")), /call_site: "x.ts:"\n/);
+  assert.match(
+    emitBlock(mk("007", "0123")),
+    /name: "007"\n/,
+    "js-yaml reads 007 as octal, yaml as 123",
+  );
+  assert.match(emitBlock(mk("007", "0123")), /call_site: "0123"\n/);
+  assert.match(
+    emitBlock(mk("x.ts:41", "a:b")),
+    /call_site: a:b\n/,
+    "an interior colon stays bare",
+  );
+});
+
+test("the lock's wait timeout exceeds its stale window", async () => {
+  // Exported for this assertion only: with timeout < stale a waiter that
+  // arrives just after a holder dies exits 2 before the lock becomes reclaimable.
+  const { LOCK_TIMING } = await engine();
+  assert.ok(
+    LOCK_TIMING.timeoutMs > LOCK_TIMING.staleMs,
+    `timeout ${LOCK_TIMING.timeoutMs} must exceed stale ${LOCK_TIMING.staleMs}`,
+  );
+});
+
+test("stale-lock reclaim is by atomic rename — two waiters cannot both win", async () => {
+  const { recordRun } = await engine();
+  const rec = tmpRecord();
+  const lock = `${rec}.lock`;
+  fs.writeFileSync(lock, "");
+  const old = new Date(Date.now() - 60_000);
+  fs.utimesSync(lock, old, old);
+  // Two processes race to reclaim the same stale lock and each merge one control.
+  const result = (name) => ({
+    sink: "s",
+    entry: `${name}#f`,
+    verdict: "engages",
+    reason: "ok",
+    executed: 1,
+    passed: 1,
+    reproduced: [],
+    overblocked: [],
+    declined: [],
+    escapes: [],
+  });
+  const script = (name) => `
+    import(${JSON.stringify(require("node:url").pathToFileURL(ENGINE_PATH).href)}).then((m) => {
+      m.recordRun(${JSON.stringify(rec)}, ${JSON.stringify(result(name))});
+    });`;
+  const kids = ["a", "b"].map(
+    (n) =>
+      new Promise((resolve) =>
+        spawn(process.execPath, ["--input-type=module", "-e", script(n)], {
+          cwd: REPO_ROOT,
+          stdio: "ignore",
+        }).on("exit", resolve),
+      ),
+  );
+  const codes = await Promise.all(kids);
+  assert.deepEqual(codes, [0, 0]);
+  const r = JSON.parse(fs.readFileSync(rec, "utf8"));
+  assert.deepEqual(
+    r.controls.map((c) => c.entry).sort(),
+    ["a#f", "b#f"],
+    "an rm-based reclaim lets both waiters in and one merge is lost",
+  );
+  assert.ok(!fs.existsSync(lock));
+  assert.equal(
+    fs.readdirSync(path.dirname(rec)).filter((f) => f.includes(".stale."))
+      .length,
+    0,
+    "the renamed stale lock is removed",
+  );
+  void recordRun;
+});
+
+test("reclaimStaleLock has exactly one winner per stale lock", async () => {
+  const { reclaimStaleLock } = await engine();
+  const lock = `${tmpRecord()}.lock`;
+  fs.writeFileSync(lock, "");
+  // Two reclaimers of the same path: the first removes it, the second must
+  // report it was already gone — an rm-based reclaim returns true for both,
+  // which is the TOCTOU that lets two waiters into the critical section.
+  assert.equal(reclaimStaleLock(lock), true);
+  assert.equal(reclaimStaleLock(lock), false);
+  assert.ok(!fs.existsSync(lock));
+  assert.equal(
+    fs.readdirSync(path.dirname(lock)).filter((f) => f.includes(".stale."))
+      .length,
+    0,
+  );
+});
+
+test("readRecord rejects a control whose verdict is not one of VERDICTS", async () => {
+  const { readRecord, RECORD_VERSION } = await engine();
+  const rec = tmpRecord();
+  fs.writeFileSync(
+    rec,
+    JSON.stringify({
+      version: RECORD_VERSION,
+      totals: {},
+      controls: [{ executed: 1, reproduced: 0, verdict: "engage" }],
+    }),
+  );
+  assert.throws(() => readRecord(rec), /not a version-1/);
+});
+
+test("preflightRecord fails on an existing read-only directory before the probe runs", async () => {
+  if (process.getuid && process.getuid() === 0) return; // root ignores mode bits
+  const { preflightRecord } = await engine();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t118-ro-"));
+  fs.chmodSync(dir, 0o500);
+  try {
+    assert.throws(
+      () => preflightRecord(path.join(dir, "run.json")),
+      /EACCES|EPERM/,
+    );
+  } finally {
+    fs.chmodSync(dir, 0o700);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

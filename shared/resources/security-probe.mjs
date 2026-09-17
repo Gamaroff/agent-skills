@@ -48,7 +48,9 @@
 
 import { spawnSync } from "node:child_process";
 import {
+  accessSync,
   closeSync,
+  constants as fsConstants,
   mkdtempSync,
   mkdirSync,
   openSync,
@@ -611,7 +613,7 @@ export function readRecord(recordPath) {
     !Array.isArray(c) &&
     isCount(c.executed) &&
     isCount(c.reproduced) &&
-    typeof c.verdict === "string";
+    VERDICTS.includes(c.verdict);
   if (
     rec?.version !== RECORD_VERSION ||
     !Array.isArray(rec.controls) ||
@@ -638,7 +640,39 @@ export function readRecord(recordPath) {
  */
 const LOCK_RETRY_MS = 25;
 const LOCK_STALE_MS = 30_000;
-const LOCK_TIMEOUT_MS = 20_000;
+// Strictly longer than the stale window, so a waiter that arrives just after a
+// holder dies lives to reclaim the lock instead of timing out 10 s before it
+// becomes reclaimable (QA cycle 3, CR3-3).
+const LOCK_TIMEOUT_MS = LOCK_STALE_MS + 10_000;
+/** Exported for the ordering assertion only; not a tuning surface. */
+export const LOCK_TIMING = Object.freeze({
+  retryMs: LOCK_RETRY_MS,
+  staleMs: LOCK_STALE_MS,
+  timeoutMs: LOCK_TIMEOUT_MS,
+});
+
+/**
+ * Remove a lock left by a dead holder. Reclaim is by RENAME, not rm: rename
+ * is atomic, so of two waiters that both saw the same stale lock exactly one
+ * succeeds and the other sees ENOENT. With rm, the second waiter's rm deletes
+ * the lock the first has just re-created via O_EXCL, and both proceed — the
+ * lost merge CR2-1 closed, reopened for any crashed holder (CR3-2).
+ *
+ * @returns {boolean} true when THIS caller removed the lock; false when it was
+ *   already gone. Exported so the exactly-one-winner property is testable
+ *   without staging a race.
+ */
+export function reclaimStaleLock(lock) {
+  const claimed = `${lock}.stale.${process.pid}.${Math.random().toString(36).slice(2)}`;
+  try {
+    renameSync(lock, claimed);
+  } catch (e) {
+    if (e.code === "ENOENT") return false;
+    throw e;
+  }
+  rmSync(claimed, { force: true });
+  return true;
+}
 
 function withRecordLock(recordPath, fn) {
   const lock = `${recordPath}.lock`;
@@ -652,11 +686,14 @@ function withRecordLock(recordPath, fn) {
       let age = 0;
       try {
         age = Date.now() - statSync(lock).mtimeMs;
-      } catch {
-        continue; // the holder released between our open and stat — retry
+      } catch (statErr) {
+        // Only "it is gone" means the holder released; anything else (EACCES,
+        // EIO) is a real failure and must not become an unslept loop (CR3-7).
+        if (statErr.code === "ENOENT") continue;
+        throw statErr;
       }
       if (age > LOCK_STALE_MS) {
-        rmSync(lock, { force: true });
+        reclaimStaleLock(lock);
         continue;
       }
       if (Date.now() - started > LOCK_TIMEOUT_MS) {
@@ -726,7 +763,11 @@ export function recordRun(recordPath, result, opts = {}) {
  * failure even when the read was what failed (CR2-4).
  */
 export function preflightRecord(recordPath) {
-  mkdirSync(dirname(resolve(recordPath)), { recursive: true });
+  const dir = dirname(resolve(recordPath));
+  mkdirSync(dir, { recursive: true });
+  // mkdirSync is a no-op on an EXISTING read-only directory, so the write
+  // permission is checked explicitly (CR3-5).
+  accessSync(dir, fsConstants.W_OK);
   readRecord(recordPath); // throws with the not-a-record message on a corrupt file
 }
 
@@ -756,14 +797,21 @@ const YAML_INDICATOR_START = /^[-?:,[\]{}#&*!|>'"%@`]/;
  * A `--name 123` must stay the string the agent passed, so these are quoted
  * even though every character is in the safe class.
  */
+// YAML 1.2 core-schema forms: int is any digit run (leading zeros included —
+// js-yaml reads 007 as octal, yaml as 123; both as a NUMBER), float allows a
+// bare leading or trailing dot, plus the 0o/0x, inf/nan, bool and null words.
 const YAML_TYPED_SCALAR =
-  /^(?:[-+]?(?:0|[1-9][0-9]*)(?:\.[0-9]*)?(?:[eE][-+]?[0-9]+)?|[-+]?\.[0-9]+(?:[eE][-+]?[0-9]+)?|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)|true|True|TRUE|false|False|FALSE|yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF|null|Null|NULL|~)$/;
+  /^(?:[-+]?[0-9]+|[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|0o[0-7]+|0x[0-9a-fA-F]+|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)|true|True|TRUE|false|False|FALSE|yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF|null|Null|NULL|~)$/;
+// A ":" at the END of a plain scalar makes `key: value:` a parse error in every
+// YAML implementation tried (CR3-1); the indicator-START rule cannot see it.
+const YAML_TRAILING_COLON = /:$/;
 
 const yamlStr = (v) => {
   if (v === null || v === undefined) return "null";
   const s = String(v);
   return /^[A-Za-z0-9_./#:@-]+$/.test(s) &&
     !YAML_INDICATOR_START.test(s) &&
+    !YAML_TRAILING_COLON.test(s) &&
     !YAML_TYPED_SCALAR.test(s)
     ? s
     : JSON.stringify(s);
@@ -807,7 +855,7 @@ export function emitBlock(record, { mode = "diff" } = {}) {
               .pop()}`,
         )}`,
         `      verdict: ${yamlStr(c.verdict)}`,
-        `      severity: ${yamlStr(SEVERITY_BY_VERDICT[c.verdict] ?? "unverifiable")}`,
+        `      severity: ${yamlStr(SEVERITY_BY_VERDICT[c.verdict])}`,
         `      call_site: ${yamlStr(c.call_site)}`,
         `      entry: ${yamlStr(c.entry)}`,
         `      sink: ${yamlStr(c.sink)}`,

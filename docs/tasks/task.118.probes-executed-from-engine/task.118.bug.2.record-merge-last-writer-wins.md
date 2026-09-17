@@ -4,7 +4,7 @@
 **Bug ID**: TASK-118-BUG-2
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-2 refute pass CR2-1, reproduced)
 **Date Found**: 2026-09-17
 
@@ -91,3 +91,4 @@ two atomic writes of two stale snapshots still lose one.
 | 2026-09-17 | New          | QA         | Found by the cycle-2 refute pass (CR2-1), reproduced 3 → 1 |
 | 2026-09-17 | In Progress  | qa-fix     | Root cause: atomic write ≠ atomic merge       |
 | 2026-09-17 | Ready for QA | qa-fix     | Exclusive lock around read→merge→rename; two deterministic lock tests, mutation-proven |
+| 2026-09-17 | Closed       | QA         | Cycle 3: 3-process repro → 3 controls; lock no-op reds 3 tests. Residual reclaim TOCTOU tracked as CR3-2 |
