@@ -180,6 +180,7 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 | 2026-09-17 |         | QA findings fixed — CR8-1 (`recordRun` reads before creating the entry directory), CR8-2 (`ran_at` validated; one comparator), CR8-3/4/5; 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 9 — CR8-1..5 verified fixed; 1 low (orphan-check race on concurrent first runs) | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR9-1 (orphan check re-reads the directory before throwing; injectable readdir for the test), CR9-2 (one `openRecordForWrite` prologue), CR9-3 (exact exit codes); 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate PASS (100/100) cycle 10 — CR9-1..3 verified fixed; no findings; 1 advisory cleanup | qa-task |
 
 ---
 
@@ -197,24 +198,24 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS (cycle 9)
+**Quality Score**: 100/100
+**Gate Decision**: PASS (cycle 10)
 
 ### QA Report
-- **Full Report**: [task.118.qa.9.probes-executed-from-engine.md](./task.118.qa.9.probes-executed-from-engine.md) (earlier: [qa.8](./task.118.qa.8.probes-executed-from-engine.md), [qa.7](./task.118.qa.7.probes-executed-from-engine.md), [qa.6](./task.118.qa.6.probes-executed-from-engine.md), [qa.5](./task.118.qa.5.probes-executed-from-engine.md), [qa.1](./task.118.qa.1.probes-executed-from-engine.md), [qa.2](./task.118.qa.2.probes-executed-from-engine.md), [qa.3](./task.118.qa.3.probes-executed-from-engine.md), [qa.4](./task.118.qa.4.probes-executed-from-engine.md))
-- **Gate File**: [task.118.gate.9.probes-executed-from-engine.yml](./task.118.gate.9.probes-executed-from-engine.yml) (earlier: [gate.8](./task.118.gate.8.probes-executed-from-engine.yml), [gate.7](./task.118.gate.7.probes-executed-from-engine.yml), [gate.6](./task.118.gate.6.probes-executed-from-engine.yml), [gate.5](./task.118.gate.5.probes-executed-from-engine.yml), [gate.1](./task.118.gate.1.probes-executed-from-engine.yml), [gate.2](./task.118.gate.2.probes-executed-from-engine.yml), [gate.3](./task.118.gate.3.probes-executed-from-engine.yml), [gate.4](./task.118.gate.4.probes-executed-from-engine.yml))
+- **Full Report**: [task.118.qa.10.probes-executed-from-engine.md](./task.118.qa.10.probes-executed-from-engine.md) (earlier: [qa.9](./task.118.qa.9.probes-executed-from-engine.md), [qa.8](./task.118.qa.8.probes-executed-from-engine.md), [qa.7](./task.118.qa.7.probes-executed-from-engine.md), [qa.6](./task.118.qa.6.probes-executed-from-engine.md), [qa.5](./task.118.qa.5.probes-executed-from-engine.md), [qa.1](./task.118.qa.1.probes-executed-from-engine.md), [qa.2](./task.118.qa.2.probes-executed-from-engine.md), [qa.3](./task.118.qa.3.probes-executed-from-engine.md), [qa.4](./task.118.qa.4.probes-executed-from-engine.md))
+- **Gate File**: [task.118.gate.10.probes-executed-from-engine.yml](./task.118.gate.10.probes-executed-from-engine.yml) (earlier: [gate.9](./task.118.gate.9.probes-executed-from-engine.yml), [gate.8](./task.118.gate.8.probes-executed-from-engine.yml), [gate.7](./task.118.gate.7.probes-executed-from-engine.yml), [gate.6](./task.118.gate.6.probes-executed-from-engine.yml), [gate.5](./task.118.gate.5.probes-executed-from-engine.yml), [gate.1](./task.118.gate.1.probes-executed-from-engine.yml), [gate.2](./task.118.gate.2.probes-executed-from-engine.yml), [gate.3](./task.118.gate.3.probes-executed-from-engine.yml), [gate.4](./task.118.gate.4.probes-executed-from-engine.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3400 (3399 pass, 1 skipped)
+- **Tests Executed**: 3401 (3400 pass, 1 skipped)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 LOW gating; 2 cleanups)
-- **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **Critical Issues**: 0 (1 advisory cleanup)
+- **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycles 1–8 closed. Cycle 9: CR9-1 (LOW) the orphan-snapshot check can spuriously fail a concurrent first run; two cleanups.
+No critical issues identified. Ten cycles, never a HIGH: 45 findings closed, each fixed and mutation-proven in its cycle; the merged-file lock of cycles 2–5 was replaced in cycle 6 by one atomic entry file per control, and cycles 7–10 closed that layout's edges. One advisory cleanup remains (a stranded JSDoc).
 ---
 
 ## Implementation Notes
