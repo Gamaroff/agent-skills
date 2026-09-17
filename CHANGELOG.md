@@ -48,6 +48,31 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`probes_executed` and `evidence: measured` now come from the engine, not the agent (task 118).**
+  `review-security`'s output block carried a probe count the agent typed, and the contract test
+  checked the prompt's *example* block rather than a run — so an agent that executed nothing and
+  wrote `12` satisfied both the prose rule and CI, on exactly the condition the check exists to
+  catch (obs #10; the documentation half landed earlier, this is the mechanism half).
+  `shared/resources/security-probe.mjs` gains `--record <path>`, which writes a versioned run
+  record (`{version, controls:[{sink, entry, executed, reproduced, verdict, reason, …}], totals}`,
+  merged per `{sink, entry}` so a multi-control review builds one file), `--emit-block <record>`,
+  which prints the `security_review:` YAML block with `probes_executed` and `evidence` filled from
+  it — `evidence` is **computed** by `evidenceOf()` and is `measured` only when
+  `totals.executed > 0` — and `--repo-root`, so a bundled copy under `skills/*/references/` can
+  probe a consumer's tree instead of declining every repo-relative entry as an escape. The
+  review-security prompt and SKILL, finalise's DoD security prompt, and qa-story / qa-task Step 3b
+  now run the engine with `--record` and copy the count from the record; the finalise prompt and
+  the QA step previously told the agent to hand-write a temporary harness and count its own
+  output, which is the self-report this removes. **Behaviour change:** a review or DoD step whose
+  engine did not run (non-JS boundary, an entry needing more than one argument) now reports
+  `probes_executed: 0` / `evidence: reasoned` where it may previously have said `measured` —
+  that is the truth surfacing, not a regression. `skills/review-security/tests/` runs the engine,
+  emits the block, deletes the record and asserts `reasoned`; the new
+  `evals/shared/tests/probes-executed-population.test.mjs` walks every shipped `SKILL.md` and
+  `shared/resources/*.md` for a probe count that gates a verdict and fails any site that neither
+  reads the record nor carries an allowlist reason — it found the qa-story / qa-task site the task
+  had not named on its first run.
+
 - **The hotfix runbook is rewritten against `/develop-bug`'s hotfix branch model**
   ([`docs/runbooks/hotfix.md`](docs/runbooks/hotfix.md), task 112). The page documented a seven-step
   manual loop — create-branch, implement, tests, commit, PR to `main`, tag, back-merge — and mentioned
