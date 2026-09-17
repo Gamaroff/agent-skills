@@ -1,0 +1,64 @@
+schema: 1
+task: 'task.117.card-preflight-heading-only'
+task_title: 'The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs'
+gate: CONCERNS
+status_reason: 'Cycle-5 findings CR5-1..3 verified fixed from a clean process (bug.7 closed); mutation proofs M14–M16 re-run red; 499/499 across the card + sync suites; 91 boundary probes, 0 deviations. No open entry this cycle. The one medium the cycle-6 reviewer found — a fence glued directly to a prose or label line is joined into the sentence and the preflight reports ok — is byte-identical on develop and present in 0 of 120 corpus documents, so it is pre-existing rather than introduced here and stays advisory (confidence medium, not promoted); reliability CONCERNS records it. Cycle 6 of an extended budget: the loop exits to Step 5c.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T03:43:46Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 499
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: []
+  cycle_5_findings_verified_fixed: 3
+  security_probes: 91
+  re_review_scope: 'since gate 5 — 4 canonical files (49 paths incl. bundled copies)'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 91
+    notes: 'Corpus re-executed against summariseSection and checkCardSections (73 corpus cases across five sinks + 18 hand-written shapes): every result well-formed, no throw, no deviation from the expected kind/omitted/beneath on the named shapes.'
+  performance:
+    status: PASS
+    notes: 'Unchanged — splitBlocks is one linear pass with the same fence tracker the list path already used.'
+  reliability:
+    status: CONCERNS
+    notes: 'This change is correct on every shape reviewed across six cycles, including the three cycle-5 shapes. CONCERNS records a verified PRE-EXISTING limitation the cycle-6 reviewer surfaced (CR6-1): a fence opening directly beneath a prose or label line, with no blank line, is joined into that block and published as sentence text ("**Before** (GitHub): ``` x ```"), and the preflight reports ok. develop returns the identical output; 0 of 120 task documents carry the shape. Out of this task''s scope (bold labels); file separately.'
+  maintainability:
+    status: PASS
+    notes: 'CR5-4 and CR5-5 fixed. One advisory cleanup (CR6-3): a dead .filter(Boolean) in splitBlocks and a redundant .trim() on first.'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-17'
+  total_iterations: 1
+  verification_method: 'Clean-process reproduction of the three bug.7 shapes; M14–M16 mutation proofs; card + sync suites'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Split a fenced block from adjacent prose even without a blank line (flush on the fence transition in splitBlocks) so a glued fence never reaches the card as sentence text — pre-existing, 0 corpus hits; file as its own task/bug (CR6-1)'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'CRLF: makeFenceTracker, RE_BULLET and extractSection all stop at \r — normalise line endings once at the top of extractSection/summariseSection (CR6-2; carried from gate 1)'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'Drop the dead .filter(Boolean) and redundant .trim() or comment the invariant (CR6-3)'
+      refs: ['shared/resources/jira-sync.js']
+    - action: 'review-story:2321 trailing guard exits 1 — pre-existing, carried from gate 1'
+      refs: ['skills/review-story/SKILL.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

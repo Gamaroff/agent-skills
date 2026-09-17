@@ -127,24 +127,24 @@ the four `sync-jira-*` suites unchanged and green.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: CONCERNS (no open entry)
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
-**Quality Score**: 85/100 (cycle 5)
+**Quality Score**: 90/100 (cycle 6)
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.117.qa.5.card-preflight-heading-only.md](./task.117.qa.5.card-preflight-heading-only.md) (earlier: [qa.1](./task.117.qa.1.card-preflight-heading-only.md), [qa.2](./task.117.qa.2.card-preflight-heading-only.md), [qa.3](./task.117.qa.3.card-preflight-heading-only.md), [qa.4](./task.117.qa.4.card-preflight-heading-only.md))
-- **Gate File**: [task.117.gate.5.card-preflight-heading-only.yml](./task.117.gate.5.card-preflight-heading-only.yml) (earlier: [gate.1](./task.117.gate.1.card-preflight-heading-only.yml), [gate.2](./task.117.gate.2.card-preflight-heading-only.yml), [gate.3](./task.117.gate.3.card-preflight-heading-only.yml), [gate.4](./task.117.gate.4.card-preflight-heading-only.yml))
+- **Full Report**: [task.117.qa.6.card-preflight-heading-only.md](./task.117.qa.6.card-preflight-heading-only.md) (earlier: [qa.1](./task.117.qa.1.card-preflight-heading-only.md), [qa.2](./task.117.qa.2.card-preflight-heading-only.md), [qa.3](./task.117.qa.3.card-preflight-heading-only.md), [qa.4](./task.117.qa.4.card-preflight-heading-only.md), [qa.5](./task.117.qa.5.card-preflight-heading-only.md))
+- **Gate File**: [task.117.gate.6.card-preflight-heading-only.yml](./task.117.gate.6.card-preflight-heading-only.yml) (earlier: [gate.1](./task.117.gate.1.card-preflight-heading-only.yml), [gate.2](./task.117.gate.2.card-preflight-heading-only.yml), [gate.3](./task.117.gate.3.card-preflight-heading-only.yml), [gate.4](./task.117.gate.4.card-preflight-heading-only.yml), [gate.5](./task.117.gate.5.card-preflight-heading-only.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 515 (eight suites) + 161 boundary probes + 2 mutation proofs
+- **Tests Executed**: 499 (card + sync suites, cycle 6) + 91 boundary probes + 3 mutation proofs re-run (M14–M16; 16 across the loop)
 - **Phases Verified**: 5/5
-- **Critical Issues**: 0 (cycle 5: 1 medium — CR5-1; cycles 1–4 closed)
-- **NFR Status**: Security: PASS (measured, 161 probes), Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 (cycle 6: no open entry; cycles 1–5 closed — bug.1–7)
+- **NFR Status**: Security: PASS (measured, 91 probes), Performance: PASS, Reliability: CONCERNS (pre-existing glued-fence shape, CR6-1 — advisory), Maintainability: PASS
 
 ### Key Findings
-Cycles 1–4 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) … [bug.6](./task.117.bug.6.heading-only-omitted-starves-card-pointer.md)); the card path is correct on every shape reviewed. Cycle 5 found the cycle-4 `beneath` counter imprecise — not fence-aware, counts label paragraphs, `omitted` differs from the prose path — which mis-words the preflight advisory on two shapes ([bug.7](./task.117.bug.7.beneath-count-not-fence-aware.md), CR5-1..3); plus two cleanups.
+Cycles 1–5 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) … [bug.7](./task.117.bug.7.beneath-count-not-fence-aware.md)); the card path and the preflight advisory are correct on every shape reviewed across six cycles. Cycle 6 surfaced one pre-existing, out-of-scope limitation — a fence glued directly beneath a prose or label line is joined into the sentence (identical on `develop`, 0 of 120 corpus documents) — recorded as CR6-1 for a separate task, not gated.
 
 ---
 
@@ -155,11 +155,11 @@ Cycles 1–4 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) �
   Authoring/review/edit skills bump Version; machine writers leave it blank.
   EVERY new row bumps frontmatter `updated:` in the same edit.
 -->
-
+<!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                   | Author      |
-| ---------- | ------- | --------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-09-12 | 1.0     | Initial draft — filed from the 2026-09-12 observation review | create-task |
 | 2026-09-17 | 1.1     | Review passed (9/10) — GitHub issue #415 linked; create-* step refs corrected; scope-statement decision recorded | review-task |
 | 2026-09-17 |         | Status → ready-for-development | review-task |
@@ -174,8 +174,10 @@ Cycles 1–4 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) �
 | 2026-09-17 |         | QA findings fixed — CR4-1 (honest `omitted` + separate `beneath`), CR4-2/3 (test hygiene); 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate CONCERNS (85/100) — cycle 5: cycle-4 findings closed; 1 medium (CR5-1 beneath not fence-aware), 2 low, 2 cleanups | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR5-1..3 (fence-aware `splitBlocks`, non-label `beneath`, `omitted` matches the prose path), CR5-4/5; 1 iteration | qa-fix |
+| 2026-09-17 |  | QA gate CONCERNS (90/100) — cycle 6 (budget extended): cycle-5 findings closed (bug.7); no open entry; 1 pre-existing advisory medium (CR6-1 glued fence), 1 low, 1 cleanup | qa-task |
 
 ---
+<!-- change-log-end -->
 
 ## Progress Tracking
 

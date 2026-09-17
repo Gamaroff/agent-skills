@@ -4,7 +4,7 @@
 **Bug ID**: TASK-117-BUG-7
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer (cycle-5 review CR5-1, CR5-2, CR5-3, reproduced)
 **Date Found**: 2026-09-17
 
@@ -74,4 +74,11 @@ each red the CR5 fixture; suites 499/499.
 | ---------- | ------------ | ---------- | ------------------------------------- |
 | 2026-09-17 | New          | QA         | Filed from QA cycle 5 (CR5-1..3)      |
 | 2026-09-17 | In Progress  | qa-fix     | Investigation started                 |
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-17 · **QA cycle 6**
+
+All three shapes reproduced from a clean process: label + fence containing a blank line → `{omitted: 1, beneath: 0}` ("nothing under it" wording); label + label → `beneath: 0`; table + label + list and table + sentence + list both `omitted: 2`. Mutation proofs M14 (naive split), M15 (labels count as beneath) and M16 (`omitted` after-only) each red the CR5 fixture and the source was restored byte-identical. 499/499 across the card + sync suites. **Verified fixed — Closed.**
+
 | 2026-09-17 | Ready for QA | qa-fix     | Fix implemented, mutation-proven      |
+| 2026-09-17 | Closed       | QA         | Verified in QA cycle 6 (gate 6)       |
