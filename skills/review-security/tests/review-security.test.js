@@ -783,11 +783,7 @@ test("concurrent --record runs against one file converge — every control survi
       }),
   );
   const codes = await Promise.all(runs);
-  assert.deepEqual(
-    codes.map((c) => (c === 0 ? 0 : 1)),
-    [0, 1, 0],
-    "engaged/inert/engaged exit codes",
-  );
+  assert.deepEqual(codes, [0, 1, 0], "engaged/inert/engaged exit codes");
   const { readRecord, recordEntriesDir } = await engine();
   const r = readRecord(rec);
   assert.deepEqual(
@@ -1170,4 +1166,49 @@ test("readRecord rejects a non-string ran_at, and updated_at is the latest strin
     reproduced: 0,
   });
   assert.equal(readRecord(rec2).updated_at, "2026-01-02T00:00:00Z");
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 9 (task.118): the orphan check must not misread a sibling's fresh
+// record as an orphan.
+// ---------------------------------------------------------------------------
+
+test("a directory that appears between the two checks is a record, not an orphan", async () => {
+  // Stage exactly the interleaving with an injected readdir: ENOENT on the
+  // first look (the sibling has not created the directory yet), and by the
+  // second look the sibling has landed its entry and its snapshot.
+  const { readRecord } = await engine();
+  const rec = tmpRecord();
+  const entry = {
+    sink: "s",
+    entry: "e#f",
+    verdict: "engages",
+    reason: "ok",
+    executed: 4,
+    reproduced: 0,
+    ran_at: "2026-01-01T00:00:00Z",
+  };
+  let looks = 0;
+  const readdir = (dir) => {
+    looks += 1;
+    if (looks === 1) {
+      const e = new Error("ENOENT");
+      e.code = "ENOENT";
+      writeEntry(rec, "sibling.json", entry);
+      fs.writeFileSync(rec, "{}");
+      throw e;
+    }
+    return fs.readdirSync(dir);
+  };
+  const r = readRecord(rec, { readdir });
+  assert.ok(
+    r,
+    "a record that exists by the second look must be read, not thrown on",
+  );
+  assert.equal(r.totals.executed, 4);
+  assert.equal(looks, 2);
+  // And the genuine orphan — no directory on either look — is still loud.
+  const orphan = tmpRecord();
+  fs.writeFileSync(orphan, "{}");
+  assert.throws(() => readRecord(orphan), /no entry directory/);
 });

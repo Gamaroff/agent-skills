@@ -624,23 +624,34 @@ const ranAt = (c) => c.ran_at ?? "";
  * snapshot at `recordPath` is never read: it is for humans, and a stale or
  * edited snapshot must not be able to change what the engine emits.
  */
-export function readRecord(recordPath) {
+export function readRecord(recordPath, { readdir = readdirSync } = {}) {
   const dir = recordEntriesDir(recordPath);
   let names;
   try {
-    names = readdirSync(dir);
+    names = readdir(dir);
   } catch (e) {
     if (e.code !== "ENOENT") throw e;
     // No entries. A snapshot standing alone is not "no record": it is a record
     // whose entries are gone (or one written by the merged-file layout this
     // replaced), and reading it as empty would let the next --record silently
     // overwrite it (QA cycle 7, CR7-2). Loud, like every other unreadable record.
+    //
+    // But look at the DIRECTORY again before concluding, not only at the
+    // snapshot: a sibling first run may have created the directory, written its
+    // entry and its snapshot between our readdir and this check, and that is a
+    // record, not an orphan (QA cycle 9, CR9-1). One re-read settles it.
     if (existsSync(recordPath)) {
-      throw new Error(
-        `${recordPath} has no entry directory (${dir}) — a snapshot without entries is not a record; re-run the probes with --record`,
-      );
+      try {
+        names = readdir(dir);
+      } catch (again) {
+        if (again.code !== "ENOENT") throw again;
+        throw new Error(
+          `${recordPath} has no entry directory (${dir}) — a snapshot without entries is not a record; re-run the probes with --record`,
+        );
+      }
+    } else {
+      return null;
     }
-    return null;
   }
   const controls = [];
   for (const name of names.filter((n) => n.endsWith(".json")).sort()) {
@@ -709,14 +720,22 @@ function writeAtomic(target, text) {
  * files and never contend; a re-run of the same control replaces only its own.
  * Returns the folded record.
  */
-export function recordRun(recordPath, result, opts = {}) {
-  // The writer enforces the orphan-snapshot invariant itself — reading first
-  // is what makes a snapshot with no entries throw instead of being written
-  // over — so a library caller gets the same guard the CLI preflight gives
-  // (QA cycle 8, CR8-1).
-  readRecord(recordPath);
+/**
+ * Read-then-create: the one prologue every writer runs. Reading FIRST is what
+ * makes a snapshot with no entries throw instead of being written over
+ * (CR7-2), and having it here rather than in each caller is what gives a
+ * library caller the same guard as the CLI preflight (CR8-1, CR9-2).
+ * @returns the entry directory
+ */
+function openRecordForWrite(recordPath) {
+  readRecord(recordPath); // throws on a corrupt entry or an orphaned snapshot
   const dir = recordEntriesDir(recordPath);
   mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function recordRun(recordPath, result, opts = {}) {
+  const dir = openRecordForWrite(recordPath);
   const entry = toRecordEntry(result, opts);
   // This control's own file; a concurrent run of a DIFFERENT control writes a
   // different name and a re-run of the SAME control replaces this one, which
@@ -745,12 +764,7 @@ export function writeSnapshot(recordPath, record) {
  * failure even when the read was what failed (CR2-4).
  */
 export function preflightRecord(recordPath) {
-  // Read BEFORE creating the entry directory: creating it first would turn a
-  // snapshot-without-entries (CR7-2) into an empty, valid-looking record and
-  // let this run write over it.
-  readRecord(recordPath); // throws on a corrupt entry or an orphaned snapshot
-  const dir = recordEntriesDir(recordPath);
-  mkdirSync(dir, { recursive: true });
+  const dir = openRecordForWrite(recordPath);
   // mkdirSync is a no-op on an EXISTING read-only directory, so the write
   // permission is checked explicitly (CR3-5) — on both the entry directory
   // and the snapshot's parent.
