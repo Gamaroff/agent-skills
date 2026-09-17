@@ -5,7 +5,7 @@ type: task
 description: "card-preflight.js exits 0 with zero findings on a document whose Success Criteria card block resolves to the 14-character string **Functional** and nothing else, because summariseSection classifies a section that opens with a bold sub-heading as prose and stops at that line. Measured 2026-09-10: 15 of 106 task documents publish that block. The preflight's vocabulary is missing/empty — it cannot say 'present but useless' (#49). Separately, its clean ok: true reads as a structural all-clear when it checks three headings of eleven; task.103 reached review missing two mandatory sections (#43)."
 tags: [card-preflight, jira-sync, create-task, tracker]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-12
@@ -13,11 +13,13 @@ updated: 2026-09-17
 assignee:
 estimated_effort_hours: 4
 github_issue: 415
+completed_date: 2026-09-17
+pr_number: 416
 ---
 
 # Technical Task: The card preflight passes a Success Criteria block that renders as a bold label with nothing under it — 15 of 106 task docs
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.117.review.1.card-preflight-heading-only.md` implemented 2026-09-17
 **GitHub Issue**: [#415](https://github.com/Gamaroff/agent-skills/issues/415)
 
@@ -175,6 +177,7 @@ Cycles 1–5 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) �
 | 2026-09-17 |         | QA gate CONCERNS (85/100) — cycle 5: cycle-4 findings closed; 1 medium (CR5-1 beneath not fence-aware), 2 low, 2 cleanups | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR5-1..3 (fence-aware `splitBlocks`, non-label `beneath`, `omitted` matches the prose path), CR5-4/5; 1 iteration | qa-fix |
 | 2026-09-17 |  | QA gate CONCERNS (90/100) — cycle 6 (budget extended): cycle-5 findings closed (bug.7); no open entry; 1 pre-existing advisory medium (CR6-1 glued fence), 1 low, 1 cleanup | qa-task |
+| 2026-09-17 | 1.2 | DoD passed — accepted (PR #416); six QA cycles, Step 5c APPROVE; observations #43/#49 closed | finalise |
 
 ---
 <!-- change-log-end -->
@@ -200,10 +203,37 @@ Cycles 1–5 are closed ([bug.1](./task.117.bug.1.label-property-overbroad.md) �
 - **Canonical**: `shared/resources/jira-sync.js` (`summariseSection`, `CARD_SECTIONS_BY_KIND`, `checkCardSections`); `shared/resources/card-preflight.js`; `shared/resources/authoring-card-preflight.md`
 - **Predecessor**: task.102 (the preflight)
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.117.qa.1` … `task.117.qa.6.card-preflight-heading-only.md` (six cycles — the 5-cycle budget was extended by the user after the cycle-5 escalation)
+**Gate File**: `task.117.gate.6.card-preflight-heading-only.yml`
+**Gate Status**: ⚠️ CONCERNS — `top_issues: []` (no open entry; the reliability axis records a pre-existing, out-of-scope limitation, CR6-1, for a separate task)
+**Quality Score**: 90/100
+**PR Review (Step 5c)**: ✅ APPROVE — `task.117.pr-review.1.card-preflight-heading-only.md`
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 5/5 — SC1–4 with code + test citations in the per-PR `npm test` lane; SC5 (observations #43, #49 closed naming PR #416) performed at finalise
+✅ **Tests:** 499/499 card + sync suites; `ci:fast` 3367/3368; 16 mutation proofs across the loop (M14–M16 re-run at cycle 6); 91 QA boundary probes + 1113 DoD security probes, 0 reproduced
+✅ **PR Review:** PR #416 → develop; six QA gates (70, 80, 80, 85, 85, 90; HIGH 0 throughout); Step 5c APPROVE; CI reading 1 SUCCESS @ `e087c163`
+✅ **Documentation:** CHANGELOG Fixed entry (task 117); `authoring-card-preflight.md`, `tracker-card-summary.md`, create-{task,story,epic} and review-{task,story,epic} SKILL.md carry the `heading-only` kind and scope statement; bundle:check 0 problems
+✅ **Security Review:** PASS — no secrets, no exec patterns, no dependency changes; boundary probed and held
+✅ **Compliance Review:** NOT_APPLICABLE — no data, payments, UI or PHI
+
+**Follow-up (not blocking):** CR6-1 (fence glued to a prose/label line is joined into the sentence — pre-existing, identical on `develop`, 0 corpus hits), CR6-2 (CRLF), CR6-3 (dead `.filter(Boolean)`), 5c CR-1 (`dropHeadingLines` API row), 5c CR-2 (early return skips `transform`) — file together as one task.
+
+**Task marked as ACCEPTED on:** 2026-09-17
+
+**Detailed Verification Log:** See `task.117.dod.1.card-preflight-heading-only.md` for complete verification evidence and timestamps.
+
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Next Steps**:
-1. `/develop-task docs/tasks/task.117.card-preflight-heading-only/task.117.card-preflight-heading-only.md`
-2. QA will create the co-located QA report, gate and (if needed) bug reports
+1. Merge PR #416 into develop (`/develop-next` Step 3)
+2. File the follow-up task for CR6-1 / CR6-2 / CR6-3 / 5c CR-1 / 5c CR-2
