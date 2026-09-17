@@ -176,6 +176,8 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 | 2026-09-17 |         | QA findings fixed — CR6-1..4 closed as a class: merged record file + lock replaced by one atomic entry file per control under `<record>.d/`, folded on read; lock/reclaim/put-back/pid code and 8 lock tests removed, 3 entry tests added; 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 7 — replacement verified under mutation; 1 medium (emit snapshot write unguarded), 1 low (snapshot without entries silent) | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR7-1 (emit prints the block even if the snapshot cannot be written), CR7-2 (orphaned snapshot is loud; preflight reads before mkdir), CR7-3 (fold dedupes by key), CR7-4..8 lock-era residue cleared; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 8 — CR7-1..8 verified fixed; 1 low (library recordRun unguarded) | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR8-1 (`recordRun` reads before creating the entry directory), CR8-2 (`ran_at` validated; one comparator), CR8-3/4/5; 1 iteration | qa-fix |
 
 ---
 
@@ -197,20 +199,20 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
 **Quality Score**: 90/100
-**Gate Decision**: CONCERNS (cycle 7)
+**Gate Decision**: CONCERNS (cycle 8)
 
 ### QA Report
-- **Full Report**: [task.118.qa.7.probes-executed-from-engine.md](./task.118.qa.7.probes-executed-from-engine.md) (earlier: [qa.6](./task.118.qa.6.probes-executed-from-engine.md), [qa.5](./task.118.qa.5.probes-executed-from-engine.md), [qa.1](./task.118.qa.1.probes-executed-from-engine.md), [qa.2](./task.118.qa.2.probes-executed-from-engine.md), [qa.3](./task.118.qa.3.probes-executed-from-engine.md), [qa.4](./task.118.qa.4.probes-executed-from-engine.md))
-- **Gate File**: [task.118.gate.7.probes-executed-from-engine.yml](./task.118.gate.7.probes-executed-from-engine.yml) (earlier: [gate.6](./task.118.gate.6.probes-executed-from-engine.yml), [gate.5](./task.118.gate.5.probes-executed-from-engine.yml), [gate.1](./task.118.gate.1.probes-executed-from-engine.yml), [gate.2](./task.118.gate.2.probes-executed-from-engine.yml), [gate.3](./task.118.gate.3.probes-executed-from-engine.yml), [gate.4](./task.118.gate.4.probes-executed-from-engine.yml))
+- **Full Report**: [task.118.qa.8.probes-executed-from-engine.md](./task.118.qa.8.probes-executed-from-engine.md) (earlier: [qa.7](./task.118.qa.7.probes-executed-from-engine.md), [qa.6](./task.118.qa.6.probes-executed-from-engine.md), [qa.5](./task.118.qa.5.probes-executed-from-engine.md), [qa.1](./task.118.qa.1.probes-executed-from-engine.md), [qa.2](./task.118.qa.2.probes-executed-from-engine.md), [qa.3](./task.118.qa.3.probes-executed-from-engine.md), [qa.4](./task.118.qa.4.probes-executed-from-engine.md))
+- **Gate File**: [task.118.gate.8.probes-executed-from-engine.yml](./task.118.gate.8.probes-executed-from-engine.yml) (earlier: [gate.7](./task.118.gate.7.probes-executed-from-engine.yml), [gate.6](./task.118.gate.6.probes-executed-from-engine.yml), [gate.5](./task.118.gate.5.probes-executed-from-engine.yml), [gate.1](./task.118.gate.1.probes-executed-from-engine.yml), [gate.2](./task.118.gate.2.probes-executed-from-engine.yml), [gate.3](./task.118.gate.3.probes-executed-from-engine.yml), [gate.4](./task.118.gate.4.probes-executed-from-engine.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3395 (3394 pass, 1 skipped)
+- **Tests Executed**: 3398 (3397 pass, 1 skipped)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 MEDIUM + 1 LOW gating; 1 LOW advisory; 5 cleanups)
+- **Critical Issues**: 0 (1 LOW gating; 4 cleanups)
 - **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycles 1–6 closed: the lock was replaced by per-control entry files in cycle 6, closing CR6-1..4 and the whole lock class; bugs 1 and 2 closed. Cycle 7: CR7-1 (MEDIUM) emit mode throws out of `main` on a read-only snapshot directory; CR7-2 (LOW) a snapshot without an entry directory reads as "no record"; CR7-3 fold dedupe; five lock-era cleanups.
+Cycles 1–7 closed. Cycle 8: no MEDIUM for the first time — CR8-1 (LOW) the library `recordRun` lacks the orphan-snapshot guard the CLI preflight has; four cleanups.
 ---
 
 ## Implementation Notes

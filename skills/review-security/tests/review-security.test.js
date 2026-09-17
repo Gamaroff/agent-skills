@@ -491,9 +491,19 @@ test("recordRun merges by {sink, entry} and recomputes totals", async () => {
   assert.equal(r2.totals.executed, a.executed + b.executed);
   assert.equal(evidenceOf(r2), "measured");
   assert.equal(
-    r2.controls[0].call_site,
+    r2.controls.find((c) => c.entry === a.entry).call_site,
     null,
     "a re-run without --call-site clears it — the record is the latest run",
+  );
+  // The other control keeps its own fields, whatever order the fold returns.
+  recordRun(rec, b, { callSite: "b.ts:1" });
+  assert.equal(
+    readRecord(rec).controls.find((c) => c.entry === b.entry).call_site,
+    "b.ts:1",
+  );
+  assert.equal(
+    readRecord(rec).controls.find((c) => c.entry === a.entry).call_site,
+    null,
   );
 });
 
@@ -752,7 +762,7 @@ test("concurrent --record runs against one file converge — every control survi
     ["c", all["db-url/engaged"]],
   ].map(
     ([name, spec]) =>
-      new Promise((resolve) => {
+      new Promise((resolve, reject) => {
         const child = spawn(
           process.execPath,
           [
@@ -768,10 +778,16 @@ test("concurrent --record runs against one file converge — every control survi
           ],
           { cwd: REPO_ROOT, stdio: "ignore" },
         );
+        child.on("error", reject);
         child.on("exit", resolve);
       }),
   );
-  await Promise.all(runs);
+  const codes = await Promise.all(runs);
+  assert.deepEqual(
+    codes.map((c) => (c === 0 ? 0 : 1)),
+    [0, 1, 0],
+    "engaged/inert/engaged exit codes",
+  );
   const { readRecord, recordEntriesDir } = await engine();
   const r = readRecord(rec);
   assert.deepEqual(
@@ -1100,4 +1116,58 @@ test("the fold dedupes by {sink, entry}, latest run wins, whatever the file name
   assert.equal(r.controls.length, 2, "one control per key");
   assert.equal(r.controls.find((c) => c.entry === "e#f").name, "new");
   assert.equal(r.totals.executed, 12, "a duplicate must not be counted twice");
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 8 (task.118): the writer guards the orphan snapshot itself; ran_at
+// is validated and compared one way.
+// ---------------------------------------------------------------------------
+
+test("recordRun as a library call refuses to write over an orphaned snapshot", async () => {
+  const { recordRun } = await engine();
+  const rec = tmpRecord();
+  fs.writeFileSync(
+    rec,
+    JSON.stringify({ version: 1, controls: [], totals: {} }),
+  );
+  const a = await probe("redis-tls/inert");
+  assert.throws(() => recordRun(rec, a), /no entry directory/);
+  assert.ok(
+    !fs.existsSync(`${rec}.d`),
+    "the entry directory must not have been created",
+  );
+});
+
+test("readRecord rejects a non-string ran_at, and updated_at is the latest string", async () => {
+  const { readRecord } = await engine();
+  const rec = tmpRecord();
+  writeEntry(rec, "n.json", {
+    sink: "s",
+    entry: "e#f",
+    verdict: "engages",
+    reason: "ok",
+    executed: 1,
+    reproduced: 0,
+    ran_at: 1700000000,
+  });
+  assert.throws(() => readRecord(rec), /not a version-1/);
+  const rec2 = tmpRecord();
+  writeEntry(rec2, "a.json", {
+    sink: "s",
+    entry: "a#f",
+    verdict: "engages",
+    reason: "ok",
+    executed: 1,
+    reproduced: 0,
+    ran_at: "2026-01-02T00:00:00Z",
+  });
+  writeEntry(rec2, "b.json", {
+    sink: "s",
+    entry: "b#f",
+    verdict: "engages",
+    reason: "ok",
+    executed: 1,
+    reproduced: 0,
+  });
+  assert.equal(readRecord(rec2).updated_at, "2026-01-02T00:00:00Z");
 });

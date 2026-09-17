@@ -610,7 +610,11 @@ const validControl = (c) =>
   !Array.isArray(c) &&
   isCount(c.executed) &&
   isCount(c.reproduced) &&
-  VERDICTS.includes(c.verdict);
+  VERDICTS.includes(c.verdict) &&
+  (c.ran_at === undefined || c.ran_at === null || typeof c.ran_at === "string");
+
+/** The one ordering of runs: ISO timestamps compare as strings; missing sorts first. */
+const ranAt = (c) => c.ran_at ?? "";
 
 /**
  * Read a record by folding its entry directory. `null` when there is no
@@ -666,8 +670,7 @@ function dedupeByKey(controls) {
   for (const c of controls) {
     const k = controlKey(c);
     const prev = byKey.get(k);
-    if (!prev || String(c.ran_at ?? "") >= String(prev.ran_at ?? ""))
-      byKey.set(k, c);
+    if (!prev || ranAt(c) >= ranAt(prev)) byKey.set(k, c);
   }
   return [...byKey.values()];
 }
@@ -678,7 +681,7 @@ function foldRecord(controls) {
     controls,
     totals: totalsOf(controls),
     updated_at:
-      controls.reduce((m, c) => (c.ran_at > m ? c.ran_at : m), "") || null,
+      controls.reduce((m, c) => (ranAt(c) > m ? ranAt(c) : m), "") || null,
   };
 }
 
@@ -707,6 +710,11 @@ function writeAtomic(target, text) {
  * Returns the folded record.
  */
 export function recordRun(recordPath, result, opts = {}) {
+  // The writer enforces the orphan-snapshot invariant itself — reading first
+  // is what makes a snapshot with no entries throw instead of being written
+  // over — so a library caller gets the same guard the CLI preflight gives
+  // (QA cycle 8, CR8-1).
+  readRecord(recordPath);
   const dir = recordEntriesDir(recordPath);
   mkdirSync(dir, { recursive: true });
   const entry = toRecordEntry(result, opts);
@@ -753,12 +761,12 @@ export function preflightRecord(recordPath) {
 /**
  * The `evidence` value a record supports. Computed, never supplied: this is the
  * one function that decides whether `measured` may appear at all.
+ *
+ * The totals are RECOMPUTED from `controls`, never read from the file. The
+ * stored `totals` is a convenience for a human reader; a record whose
+ * `totals.executed` was hand-edited upward with no control behind it must still
+ * render `reasoned`, or the field becomes the typed count one layer down.
  */
-//
-// The totals are RECOMPUTED from `controls`, never read from the file. The
-// stored `totals` is a convenience for a human reader; a record whose
-// `totals.executed` was hand-edited upward with no control behind it must still
-// render `reasoned`, or the field becomes the typed count one layer down.
 export function evidenceOf(record) {
   if (!record) return "reasoned";
   return totalsOf(record.controls ?? []).executed > 0 ? "measured" : "reasoned";

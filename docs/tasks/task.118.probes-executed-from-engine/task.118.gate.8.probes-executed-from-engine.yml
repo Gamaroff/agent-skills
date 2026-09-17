@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'Cycle-7 fixes verified (CR7-1..8 FIXED; 4 mutation proofs covered; CR7-1 and CR7-2 re-reproduced fixed). The scoped cycle-8 review found no high-confidence bug: one low API gap (recordRun as a library call creates the entry directory before reading, so it lacks the orphan-snapshot guard preflightRecord gives the CLI — QA-verified by reading, promoted) and four cleanups. First cycle with no MEDIUM.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T14:20:00Z'
+
+top_issues:
+  - id: 'CR8-1'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'recordRun calls mkdirSync(dir) before any read, so a library caller silently turns an orphaned snapshot into an empty, valid-looking record and writes over it; the CR7-2 guard lives only on the CLI path via preflightRecord. Verified by reading (reviewer medium confidence; the sequence is unambiguous).'
+    suggested_action: 'Read the record at the top of recordRun before creating the directory, so the writer itself enforces the invariant; test the library path directly.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3398
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+  mutation_proofs: 4
+  prior_findings_verified: '8/8 FIXED'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR8-1 only. Cleanups: CR8-2 ran_at is compared two ways and never validated; CR8-5 the concurrency test has no error handler on spawn.'
+  maintainability:
+    status: PASS
+    notes: 'CR8-3 evidenceOf JSDoc detached by a // block; CR8-4 a re-run assertion relies on hash order. Cleanups.'
+
+recommendations:
+  immediate:
+    - action: 'Guard recordRun itself (CR8-1); validate ran_at and share one comparator (CR8-2); reattach the evidenceOf JSDoc (CR8-3); make the re-run assertion order-independent (CR8-4); reject on spawn error (CR8-5)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR8-1 closed']
