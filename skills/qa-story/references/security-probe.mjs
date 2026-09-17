@@ -52,6 +52,7 @@ import {
   accessSync,
   closeSync,
   constants as fsConstants,
+  linkSync,
   mkdtempSync,
   mkdirSync,
   openSync,
@@ -664,6 +665,13 @@ export const LOCK_TIMING = Object.freeze({
  *   without staging a race.
  */
 export function reclaimStaleLock(lock, observedMtimeMs) {
+  // Required, not optional: an optional observation is a silent path that
+  // skips the identity check, and the caller wiring had no test (QA cycle 5).
+  if (typeof observedMtimeMs !== "number") {
+    throw new TypeError(
+      "reclaimStaleLock needs the mtime the caller observed as stale",
+    );
+  }
   const claimed = `${lock}.stale.${process.pid}.${Math.random().toString(36).slice(2)}`;
   try {
     renameSync(lock, claimed);
@@ -676,29 +684,65 @@ export function reclaimStaleLock(lock, observedMtimeMs) {
   // a fresh, LIVE lock there — which is what was just moved. Identity-check
   // it: a file that is not the stale one the caller observed goes back where
   // it was, and this caller reports no win (QA cycle 4, CR4-1).
-  if (observedMtimeMs !== undefined) {
-    let mtime;
-    try {
-      mtime = statSync(claimed).mtimeMs;
-    } catch (e) {
-      if (e.code === "ENOENT") return false;
-      throw e;
-    }
-    if (mtime !== observedMtimeMs) {
-      try {
-        renameSync(claimed, lock);
-      } catch (e) {
-        // The holder we stole from may have finished and removed nothing
-        // (its rm found no file); if a NEW lock appeared meanwhile, leave it
-        // and drop the stolen copy — a duplicate lock file is worse than none.
-        if (e.code !== "EEXIST" && e.code !== "ENOTEMPTY") throw e;
-        rmSync(claimed, { force: true });
-      }
-      return false;
-    }
+  let mtime;
+  try {
+    mtime = statSync(claimed).mtimeMs;
+  } catch (e) {
+    if (e.code === "ENOENT") return false;
+    throw e;
+  }
+  if (mtime !== observedMtimeMs) {
+    restoreStolenLock(claimed, lock);
+    return false;
   }
   rmSync(claimed, { force: true });
   return true;
+}
+
+/**
+ * Put a stolen live lock back at its path. With LINK, not rename: rename
+ * REPLACES an existing file, so a fresh lock a third waiter created in the
+ * meantime would be clobbered by the stolen copy (QA cycle 5, CR5-1). link
+ * fails with EEXIST instead, and then the new lock stays and the stolen copy
+ * is dropped — a duplicate lock file is worse than none.
+ *
+ * @returns {boolean} true when the copy was restored, false when a newer lock
+ *   already occupied the path and the copy was dropped.
+ */
+export function restoreStolenLock(claimed, lock) {
+  let restored = true;
+  try {
+    linkSync(claimed, lock);
+  } catch (e) {
+    if (e.code !== "EEXIST") throw e;
+    restored = false;
+  }
+  rmSync(claimed, { force: true });
+  return restored;
+}
+
+/**
+ * Is the lock's holder still alive? The lock body carries the holder pid; a
+ * pid that no longer exists (ESRCH) means the holder died and the lock is
+ * stale NOW, not after LOCK_STALE_MS — which caps the orphan a put-back can
+ * leave when the holder released between the steal and the restore (CR5-2).
+ * An unreadable or pid-less body, or EPERM (a live pid we may not signal),
+ * answers "alive" so the age rule stays the only other route to reclaim.
+ */
+export function lockHolderAlive(lock) {
+  let pid;
+  try {
+    pid = Number.parseInt(readFileSync(lock, "utf8"), 10);
+  } catch {
+    return true;
+  }
+  if (!Number.isInteger(pid) || pid <= 0) return true;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code !== "ESRCH";
+  }
 }
 
 function withRecordLock(recordPath, fn) {
@@ -708,6 +752,7 @@ function withRecordLock(recordPath, fn) {
     let fd;
     try {
       fd = openSync(lock, "wx");
+      writeFileSync(fd, String(process.pid));
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
       let age = 0;
@@ -721,7 +766,7 @@ function withRecordLock(recordPath, fn) {
         if (statErr.code === "ENOENT") continue;
         throw statErr;
       }
-      if (age > LOCK_STALE_MS) {
+      if (age > LOCK_STALE_MS || !lockHolderAlive(lock)) {
         reclaimStaleLock(lock, observed);
         continue;
       }

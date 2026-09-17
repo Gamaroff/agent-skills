@@ -1,0 +1,59 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'Cycle-4 fixes verified (CR4-1..5 FIXED; the put-back path and the fail-fast property are mutation-proven; the observed-mtime WIRING is untested — no test reds when the caller omits it). The narrowed cycle-5 review found the put-back rename overwrites an existing file (verified: rename replaces, link throws EEXIST), so its EEXIST branch is dead and a third waiter''s fresh lock can be clobbered by the stolen copy — real and high-confidence, low practical impact because both waiters are already inside by then; plus a 30 s orphan stall after a steal on a released holder (medium confidence). No HIGH at any of five cycles.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T10:50:00Z'
+
+top_issues:
+  - id: 'CR5-1'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'The put-back renameSync(claimed, lock) atomically REPLACES an existing regular file (verified on this host: rename over a file overwrites; link throws EEXIST), so the EEXIST/ENOTEMPTY branch is unreachable and a live lock a third waiter created during the steal window is silently clobbered by the stolen copy, contrary to the comment. Rated low: by the time the put-back runs, the steal has already let both waiters into the critical section; the clobber adds no further lost merge, but the claim the code makes about itself is false.'
+    suggested_action: 'Put the stolen file back with linkSync(claimed, lock) (EEXIST when a new lock exists) then rmSync the copy; on EEXIST drop the copy and leave the new lock. Test: pre-create a fresh lock at the path before the put-back and assert it survives with its own mtime.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3398
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+  mutation_proofs: 3
+  prior_findings_verified: '5/5 FIXED'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR5-2 (medium confidence): when the holder whose live lock was moved releases before the put-back, the restored lock is an orphan nobody holds and every waiter blocks for LOCK_STALE_MS (30 s) — a stall, not a lost merge. Mitigation candidate: write the holder pid into the lock and treat a dead pid as stale on the next retry. Also recorded: the observed-mtime wiring from withRecordLock into reclaimStaleLock has no test (mutation no-red-untested) — make the argument required so an unwired caller fails loudly.'
+  maintainability:
+    status: PASS
+    notes: 'The lock is now ~90 lines with four documented edge cases; each is tested directly. Nothing further.'
+
+recommendations:
+  immediate:
+    - action: 'linkSync-based put-back with EEXIST fallback and a survives-with-own-mtime test (CR5-1)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+  future:
+    - action: 'Holder pid in the lock file; dead pid ⇒ stale on the next retry, capping the orphan stall (CR5-2). Make observedMtimeMs a required argument of reclaimStaleLock so the caller wiring cannot silently regress.'
+      refs: ['shared/resources/security-probe.mjs']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR5-1 closed']

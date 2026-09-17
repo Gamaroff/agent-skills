@@ -1036,8 +1036,9 @@ test("reclaimStaleLock has exactly one winner per stale lock", async () => {
   // Two reclaimers of the same path: the first removes it, the second must
   // report it was already gone — an rm-based reclaim returns true for both,
   // which is the TOCTOU that lets two waiters into the critical section.
-  assert.equal(reclaimStaleLock(lock), true);
-  assert.equal(reclaimStaleLock(lock), false);
+  const observed = fs.statSync(lock).mtimeMs;
+  assert.equal(reclaimStaleLock(lock, observed), true);
+  assert.equal(reclaimStaleLock(lock, observed), false);
   assert.ok(!fs.existsSync(lock));
   assert.equal(
     fs.readdirSync(path.dirname(lock)).filter((f) => f.includes(".stale."))
@@ -1073,6 +1074,78 @@ test("reclaimStaleLock puts back a lock that is not the stale one it was told ab
   fs.utimesSync(lock, stale, stale);
   assert.equal(reclaimStaleLock(lock, fs.statSync(lock).mtimeMs), true);
   assert.ok(!fs.existsSync(lock));
+});
+
+test("the put-back never clobbers a lock a third waiter created meanwhile", async () => {
+  const { restoreStolenLock } = await engine();
+  const lock = `${tmpRecord()}.lock`;
+  const claimed = `${lock}.stale.x`;
+  // A third waiter's lock already sits at the path when the put-back runs.
+  fs.writeFileSync(lock, "third");
+  fs.writeFileSync(claimed, "stolen");
+  assert.equal(restoreStolenLock(claimed, lock), false);
+  assert.equal(
+    fs.readFileSync(lock, "utf8"),
+    "third",
+    "a rename-based put-back overwrote the third waiter's lock",
+  );
+  assert.ok(!fs.existsSync(claimed), "the stolen copy is dropped");
+  // No lock at the path: the copy goes back.
+  fs.rmSync(lock);
+  fs.writeFileSync(claimed, "stolen");
+  assert.equal(restoreStolenLock(claimed, lock), true);
+  assert.equal(fs.readFileSync(lock, "utf8"), "stolen");
+  assert.ok(!fs.existsSync(claimed));
+});
+
+test("reclaimStaleLock refuses to run without the caller's observation", async () => {
+  const { reclaimStaleLock } = await engine();
+  assert.throws(
+    () => reclaimStaleLock(`${tmpRecord()}.lock`),
+    /needs the mtime/,
+  );
+});
+
+test("a lock whose holder pid is dead is reclaimed on the next retry, not after the stale window", async () => {
+  const { recordRun, LOCK_TIMING } = await engine();
+  const rec = tmpRecord();
+  const lock = `${rec}.lock`;
+  // A pid that certainly does not exist: spawn-and-reap a child, use its pid.
+  const child = spawnSync(process.execPath, ["-e", "0"]);
+  fs.writeFileSync(lock, String(child.pid));
+  const started = Date.now();
+  recordRun(rec, {
+    sink: "s",
+    entry: "e#f",
+    verdict: "engages",
+    reason: "ok",
+    executed: 1,
+    passed: 1,
+    reproduced: [],
+    overblocked: [],
+    declined: [],
+    escapes: [],
+  });
+  const waited = Date.now() - started;
+  assert.ok(
+    waited < LOCK_TIMING.staleMs / 2,
+    `waited ${waited} ms — the dead-holder lock was not reclaimed early`,
+  );
+  assert.ok(fs.existsSync(rec));
+  assert.ok(!fs.existsSync(lock));
+});
+
+test("a fresh lock held by a LIVE pid is not reclaimed early", async () => {
+  const { lockHolderAlive } = await engine();
+  const lock = `${tmpRecord()}.lock`;
+  fs.writeFileSync(lock, String(process.pid));
+  assert.equal(lockHolderAlive(lock), true);
+  fs.writeFileSync(lock, "");
+  assert.equal(
+    lockHolderAlive(lock),
+    true,
+    "a pid-less body must not read as dead",
+  );
 });
 
 test("readRecord rejects a control whose verdict is not one of VERDICTS", async () => {

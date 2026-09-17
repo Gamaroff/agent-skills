@@ -167,6 +167,8 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 | 2026-09-17 |         | QA findings fixed — CR3-1 (trailing `:` quoted), CR3-3 (lock timeout > stale window, exported `LOCK_TIMING`), CR3-4 (YAML 1.2 int/float forms), CR3-2 (rename-based `reclaimStaleLock`, one winner), CR3-5 (`accessSync` W_OK preflight), CR3-6 (`VERDICTS` membership), CR3-7 (ENOENT-only continue), CR3-8; 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 4 — CR3-1..8 verified fixed; 2 low (reclaim identity check, timing assertion) | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR4-1 (post-rename identity check in `reclaimStaleLock`; stolen live lock restored), CR4-5 (fail-fast asserts no verdict printed, not wall-clock), CR4-2 (YAML 1.2 target stated), CR4-3/4 (dead int branch removed); 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 5 — CR4-1..5 verified fixed; 1 low (put-back overwrites via rename) | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR5-1 (`restoreStolenLock` by link, EEXIST leaves the newer lock), CR5-2 (holder pid in the lock; dead pid ⇒ stale next retry), `observedMtimeMs` required; 1 iteration | qa-fix |
 
 ---
 
@@ -188,20 +190,20 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
 **Quality Score**: 90/100
-**Gate Decision**: CONCERNS (cycle 4)
+**Gate Decision**: CONCERNS (cycle 5)
 
 ### QA Report
-- **Full Report**: [task.118.qa.4.probes-executed-from-engine.md](./task.118.qa.4.probes-executed-from-engine.md) (earlier: [qa.1](./task.118.qa.1.probes-executed-from-engine.md), [qa.2](./task.118.qa.2.probes-executed-from-engine.md), [qa.3](./task.118.qa.3.probes-executed-from-engine.md))
-- **Gate File**: [task.118.gate.4.probes-executed-from-engine.yml](./task.118.gate.4.probes-executed-from-engine.yml) (earlier: [gate.1](./task.118.gate.1.probes-executed-from-engine.yml), [gate.2](./task.118.gate.2.probes-executed-from-engine.yml), [gate.3](./task.118.gate.3.probes-executed-from-engine.yml))
+- **Full Report**: [task.118.qa.5.probes-executed-from-engine.md](./task.118.qa.5.probes-executed-from-engine.md) (earlier: [qa.1](./task.118.qa.1.probes-executed-from-engine.md), [qa.2](./task.118.qa.2.probes-executed-from-engine.md), [qa.3](./task.118.qa.3.probes-executed-from-engine.md), [qa.4](./task.118.qa.4.probes-executed-from-engine.md))
+- **Gate File**: [task.118.gate.5.probes-executed-from-engine.yml](./task.118.gate.5.probes-executed-from-engine.yml) (earlier: [gate.1](./task.118.gate.1.probes-executed-from-engine.yml), [gate.2](./task.118.gate.2.probes-executed-from-engine.yml), [gate.3](./task.118.gate.3.probes-executed-from-engine.yml), [gate.4](./task.118.gate.4.probes-executed-from-engine.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3397 (3396 pass, 1 skipped)
+- **Tests Executed**: 3398 (3397 pass, 1 skipped)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (2 LOW gating; 3 LOW advisory/cleanup)
+- **Critical Issues**: 0 (1 LOW gating; 1 LOW advisory; 1 test gap)
 - **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycles 1–3 closed: CR-1..3, CR2-1..3, CR3-1..8 FIXED and mutation-proven; bugs 1 and 2 closed. Cycle 4: CR4-1 (LOW) the stale-lock reclaim can rename away a live lock in a narrow window; CR4-5 (LOW, QA-found) a load-sensitive timing assertion; advisory CR4-2/3/4.
+Cycles 1–4 closed: 21 findings FIXED and mutation-proven; bugs 1 and 2 closed. Cycle 5: CR5-1 (LOW) the reclaim put-back uses `rename`, which overwrites an existing lock — EEXIST branch dead; CR5-2 (advisory) orphan-lock stall after a steal on a released holder; the observed-mtime wiring is untested.
 ---
 
 ## Implementation Notes
