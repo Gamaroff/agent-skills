@@ -175,6 +175,41 @@ From this, auto-generate:
 - **File Path**: `task.[ID].[kebab-case-name].md`
 - **Registry update** (after the task doc + plan are written, in Step 5): add a new row to `task-registry.md` and increment **Next Available Task Number**. Commit the registry update in the same commit as the new task files.
 
+### 1.2 One Task or Several?
+
+The decision tree above answers *whether* a task document is the right artefact. It does not answer
+*how many*, and the count is a design decision with the same consequences as the content: it fixes
+what can be shipped alone, reverted alone and reviewed alone. Left unstated, the decision does not go
+away — it moves into whatever the current session improvises. Three separate authors hand-wrote the
+same rule into `docs/tasks/task-registry.md` § Notes (tasks 51–58, 62–64, 93–95), each phrased
+differently, because there was nowhere to write it once. Decide the count **here**, before any section
+content is gathered, because the answer decides how many documents the content is gathered *into*.
+
+**The splitting test.** A unit is its own task when it is **independently shippable, independently
+revertible and independently valuable — all three.** A unit that is shippable but delivers nothing on
+its own is a *phase* of one task, not a task. Ask it of every candidate seam.
+
+**The three seams the corpus already uses** (each is a proven cut, not a suggestion):
+
+| Seam | Shape | Why it is a real boundary |
+| --- | --- | --- |
+| **primitive → migration** | build the mechanism first with no call site touched; move the call sites in a second task | the primitive is revertible without regressing anything that uses it, and the migration can be reviewed as "did every site move?" |
+| **per-axis** | the same change on two independent axes — `TRACKER` and `VCS`, Jira and GitHub — is two tasks | they fail independently and are tested against different environments |
+| **substantive → cleanup** | the fix, then the guard that stops it recurring | the fix is urgent and small; the guard is a test with an allowlist and a floor, and its review is a different conversation |
+
+**The obligation a split creates.** When the answer is N > 1 documents, write **one note** under
+`## Notes` in `docs/tasks/task-registry.md` stating the ordering — which units depend on which, which
+are independent of each other, and which (if any) must land first. Copy the shape of the existing
+notes for tasks 51–58, 62–64 and 93–95: *"one shippable unit each, in dependency order: A ships the
+primitive and is usable before anything calls it; B and C both depend on A and are independent of each
+other."* One note per split, not one per task, and written in the same commit as the first document.
+
+**The anti-pattern: splitting by file touched.** "Task 1: edit the engine; task 2: edit the tests" or
+"task 1: the `.md` files; task 2: the `.js` files" produces two units neither of which is shippable —
+the first is untested and the second tests nothing. Split by **outcome delivered**, never by where the
+diff lands. If two candidate tasks would each leave the tree in a state nobody would merge alone, they
+are one task.
+
 ### 1.5 Analyse Git History for Technical Context
 
 Before building the document, run a git history scan to ground the technical content:
