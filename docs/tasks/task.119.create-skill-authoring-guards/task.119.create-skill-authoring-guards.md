@@ -20,6 +20,7 @@ github_issue: 419
 **Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.119.review.1.create-skill-authoring-guards.md` implemented 2026-09-17
 **GitHub Issue**: [#419](https://github.com/Gamaroff/agent-skills/issues/419)
+**PR**: [#420](https://github.com/Gamaroff/agent-skills/pull/420)
 
 ---
 
@@ -126,7 +127,7 @@ comment rewrites.
 
 | File | Change |
 | :--- | :--- |
-| `tests/fenced-bash-positional-params.test.js` (new) | the guard — scope `skills/*/SKILL.md` (Phase 0 fixed it), regex `(?<!\\)\$[0-9]`, floor 50 blocks (478 scanned), empty allowlist with reason-checking, Phase 0 findings in the header; `package.json` unchanged (`tests/*.test.js` already in the glob — verified) |
+| `tests/fenced-bash-positional-params.test.js` (new) | the guard — scope `skills/*/SKILL.md` (Phase 0 fixed it), regex `(?<!\\)\$[0-9]`, floor 50 blocks (485 scanned; fences tracked as a stack so nested template fences cannot hide a real block — §5 asserts opener parity), empty allowlist with reason-checking, Phase 0 findings in the header; `package.json` unchanged (`tests/*.test.js` already in the glob — verified) |
 | `tests/bundle-comment-origin.test.js` (new) | fixture proves the bundler warning fires and that a `bundle-dependency:` line and a code reference do not; live-tree assertion over every JS/MJS the bundler reads; empty allowlist with reason-checking |
 | `skills/create-skill/scripts/bundle_skill.py` | `comment_only_refs()` / `warn_comment_only_refs()` — `⚠️ comment-only reference: <file>:<line> → <target>` on a comment-only origin in a `.js`/`.mjs`; `// bundle-dependency: shared/resources/X` is the silent declaration form; self-references skipped |
 | `skills/create-skill/SKILL.md` | new § *Three Rules the Corpus Learned by Failing* — runnable prose, shell matrices, comments as dependency declarations — each with its failure; written token-free because this file is rendered on invocation |
@@ -175,6 +176,27 @@ need rewriting, which raises the effort; stop and re-estimate before Phase 1.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-17
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.119.qa.1.create-skill-authoring-guards.md](./task.119.qa.1.create-skill-authoring-guards.md)
+- **Gate File**: [task.119.gate.1.create-skill-authoring-guards.yml](./task.119.gate.1.create-skill-authoring-guards.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3410 (3409 pass, 1 skipped)
+- **Phases Verified**: 4/4 (Phase 1 with concerns)
+- **Critical Issues**: 0 (1 medium: CR-1)
+- **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+CR-1 (medium, high confidence): the positional-token guard's fence parser loses state on a nested fence inside a ```markdown template block, so ~8 real bash blocks in 4 skills are never scanned. Promoted to the gate under `code_review_blocking`. Two advisory cleanups (CR-2 docstring scope claim, CR-3 duplicate warnings under `--all`).
+
 <!--
   Append-only. Newest row LAST. Four columns, exactly as below.
   Deliberately UNNUMBERED — the 11 numbered sections above are the mandatory contract.
@@ -191,6 +213,8 @@ need rewriting, which raises the effort; stop and re-estimate before Phase 1.
 | 2026-09-17 | 1.1     | Review 1 (7/10, NEEDS REVISION → fixes applied): Phase 0 verifies the two harness premises and fixes the guard's scope and regex; bundler warning gains a guard test; verification and mutation folded into Testing Strategy; `cut -f2` qualified; GitHub issue #419 linked | review-task |
 | 2026-09-17 |         | Status → ready-for-development | review-task |
 | 2026-09-17 |         | Implemented — 38 files (+128 regenerated bundle copies), 9 tests; status → ready-for-review | develop |
+| 2026-09-17 |         | QA gate CONCERNS (90/100) — 1 finding (CR-1 fence nesting), 2 cleanups | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR-1 stack-based fence tracking + §5 opener parity (485 blocks), CR-2 scope docstring/depth, CR-3 warning dedupe; 1 iteration | qa-fix |
 
 ---
 
@@ -209,7 +233,7 @@ need rewriting, which raises the effort; stop and re-estimate before Phase 1.
 ### Phase 3: create-task
 - [x] "One task or several?" step (§1.2): the three-way splitting test, the three named seams, the dependency-note obligation, the by-file anti-pattern
 ### Close-out
-- [ ] Observations #23, #24, #36, #39 set to `actioned` with resolution naming the PR
+- [x] Observations #23, #24, #36, #39 set to `actioned` with resolution naming PR #420 (2026-09-17)
 
 ---
 

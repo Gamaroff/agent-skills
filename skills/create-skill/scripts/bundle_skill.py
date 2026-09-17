@@ -127,8 +127,15 @@ def comment_only_refs(text):
     return out
 
 
+# Origins already warned about this run. A shared source is visited once per
+# skill that bundles it, so without this a single comment-only line in a
+# 21-skill file prints the identical warning 21 times under `--all` — and a
+# warning repeated until it is noise is a warning nobody reads.
+_WARNED_COMMENT_ORIGINS = set()
+
+
 def warn_comment_only_refs(path, text, repo_root):
-    """Print one warning per comment-only reference in a JS/MJS source."""
+    """Print one warning per comment-only reference in a JS/MJS source, once per run."""
     if path.suffix not in ('.js', '.mjs'):
         return
     try:
@@ -142,6 +149,10 @@ def warn_comment_only_refs(path, text, repo_root):
         # dependency — following it is a no-op — so it is not a finding.
         if (shared_dir / target).resolve() == path.resolve():
             continue
+        key = (str(rel), line_no, target)
+        if key in _WARNED_COMMENT_ORIGINS:
+            continue
+        _WARNED_COMMENT_ORIGINS.add(key)
         print(f"⚠️  comment-only reference: {rel}:{line_no} → shared/resources/{target}")
 
 

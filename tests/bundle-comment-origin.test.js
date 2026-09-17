@@ -104,8 +104,10 @@ function walk(dir, out, skip) {
     if (EXCLUDE_DIRS.has(entry.name)) continue;
     const abs = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      // `skip` applies at EVERY depth, matching discover_needed's
+      // `'references' not in f.relative_to(skill_path).parts`.
       if (skip && skip(entry.name)) continue;
-      walk(abs, out, null);
+      walk(abs, out, skip);
     } else if (/\.(js|mjs)$/.test(entry.name)) {
       out.push(path.relative(REPO_ROOT, abs));
     }
@@ -113,11 +115,15 @@ function walk(dir, out, skip) {
 }
 
 /**
- * Exactly the set of JS/MJS files the bundler's discovery reads: every one
- * under `shared/resources/` (recursively — it follows into `tests/`), and every
- * one under a skill directory except the generated `references/` copies. A
- * guard's stated scope and its scanned scope must agree, and the bundler's
- * warning is the stated scope.
+ * A deliberate SUPERSET of the JS/MJS files the bundler's discovery reads.
+ * `discover_needed` seeds from a skill's own files and then follows only the
+ * shared sources it transitively reaches; this scan reads every `.js`/`.mjs`
+ * under `shared/resources/` (recursively — `tests/` included, because a test
+ * file that is ever reached is bundled whole, which is how #39's 646-line
+ * test travelled) and every one under a skill directory except its generated
+ * `references/` copies, which `discover_needed` excludes at any depth. Wider
+ * than the bundler on purpose: a comment-only path in a file the bundler does
+ * not read TODAY becomes a live origin the day something references that file.
  */
 function liveSources() {
   const out = [];

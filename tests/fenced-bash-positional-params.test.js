@@ -44,7 +44,7 @@
  *       is its length) are better still where they fit.
  *
  * AUTHORING-TIME HIT COUNT (recorded here, not in the task document, because a
- * number in prose decays): the first run of this scan over 478 fenced
+ * number in prose decays): the first run of this scan over 485 fenced
  * bash/sh/shell blocks in 100 `SKILL.md` files found 22 hits in 12 files —
  * 19 × `awk '{print $2}'`, one `PR_NUMBER=$1; …=$4` script header, one
  * `$(dirname "$0")`, one `$20` in a comment. All 22 were rewritten to a safe
@@ -81,7 +81,7 @@ const RUNNABLE_LANGS = new Set(["bash", "sh", "shell"]);
 const POSITIONAL_RE = /(?<!\\)\$[0-9]/g;
 
 /**
- * Non-vacuity floor. 478 blocks at authoring time; a scan that covers fewer
+ * Non-vacuity floor. 485 blocks at authoring time; a scan that covers fewer
  * than this has lost its inputs (a moved skills directory, a fence parser
  * that stopped matching) and must not report a clean zero.
  */
@@ -100,31 +100,45 @@ const ALLOWLIST = [];
  * Extract fenced blocks with a runnable info string from a Markdown file.
  * Returns one entry per LINE inside such a block, with its 1-based line
  * number, so a hit can be reported at the line rather than the block.
+ *
+ * NESTING. This is deliberately NOT a CommonMark parser. Skills embed
+ * templates — a ```markdown or ````markdown block whose body carries its own
+ * ```mermaid / ```bash fences — and the harness renders the whole file, so a
+ * token inside a nested ```bash is substituted exactly as one at the top level
+ * would be. A CommonMark reader closes the outer template at the first bare
+ * fence, inverts fence state for the rest of the file, and never sees the real
+ * top-level ```bash that follows (QA cycle 1 of task.119, CR-1: mermaid-architect
+ * 1 → 0 blocks scanned, create-epics-from-shards 2 → 0, create-parallel-stories
+ * 13 → 9, qa-story 16 → 15). So fences are tracked as a STACK: a fence line
+ * with an info string pushes; a bare fence line pops the top entry when its
+ * marker char matches and its length is at least the top's. A line is scanned
+ * when the top of the stack is a runnable fence, wherever it sits.
  */
 function runnableLines(markdown) {
   const out = [];
   const lines = markdown.split("\n");
-  let fence = null; // { marker, lang }
+  const stack = []; // [{ marker, lang }] — innermost last
   let blocks = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const m = line.match(/^\s*(`{3,}|~{3,})\s*([\w+.-]*)/);
-    if (!fence && m) {
-      fence = { marker: m[1], lang: m[2].toLowerCase() };
-      if (RUNNABLE_LANGS.has(fence.lang)) blocks++;
+    if (m && m[2] !== "") {
+      const lang = m[2].toLowerCase();
+      stack.push({ marker: m[1], lang });
+      if (RUNNABLE_LANGS.has(lang)) blocks++;
       continue;
     }
+    const top = stack[stack.length - 1];
     if (
-      fence &&
       m &&
-      m[2] === "" &&
-      m[1][0] === fence.marker[0] &&
-      m[1].length >= fence.marker.length
+      top &&
+      m[1][0] === top.marker[0] &&
+      m[1].length >= top.marker.length
     ) {
-      fence = null;
+      stack.pop();
       continue;
     }
-    if (fence && RUNNABLE_LANGS.has(fence.lang))
+    if (top && RUNNABLE_LANGS.has(top.lang))
       out.push({ line: i + 1, text: line });
   }
   return { lines: out, blocks };
@@ -223,16 +237,67 @@ test("§4 the fence parser sees tokens (self-check against a fixture string)", (
     "~~~sh",
     "awk '{print $2}'",
     "~~~",
+    // A template block embedding a nested fence (the CR-1 shape): the nested
+    // ```bash is scanned, the bare ``` pops it and the outer template survives
+    // the pop, and the REAL top-level ```bash after the template is scanned too.
+    "```markdown",
+    "# Template",
+    "```mermaid",
+    "graph TD",
+    "```",
+    "```bash",
+    'echo "nested $3"',
+    "```",
+    "```",
+    "```bash",
+    'echo "after-template $4"',
+    "```",
+    // A four-backtick template whose three-backtick content fence must not
+    // close it, and whose nested runnable fence is still scanned.
+    "````markdown",
+    "```bash",
+    'echo "four-in-three $5"',
+    "```",
+    "````",
+    "```bash",
+    'echo "final $6"',
+    "```",
   ].join("\n");
   const r = runnableLines(md);
-  assert.equal(r.blocks, 2);
+  assert.equal(r.blocks, 6);
   const flagged = r.lines
     .map((l) => ({ line: l.line, tokens: l.text.match(POSITIONAL_RE) }))
     .filter((l) => l.tokens);
   assert.deepEqual(flagged, [
     { line: 3, tokens: ["$0"] },
     { line: 10, tokens: ["$2"] },
+    { line: 18, tokens: ["$3"] },
+    { line: 22, tokens: ["$4"] },
+    { line: 26, tokens: ["$5"] },
+    { line: 30, tokens: ["$6"] },
   ]);
+});
+
+test("§5 the scan sees every runnable opener in the live tree (no fence-state loss)", () => {
+  // The naive count — every line that opens a runnable fence, regardless of
+  // structure — is the number the stack-based reader must reproduce exactly.
+  // Fewer means a template swallowed a real block (CR-1); more means a fence
+  // was counted twice.
+  const mismatches = [];
+  for (const rel of skillFiles()) {
+    const md = fs.readFileSync(path.join(REPO_ROOT, rel), "utf8");
+    const naive = (
+      md.match(/^\s*(?:`{3,}|~{3,})\s*(?:bash|sh|shell)\b/gim) || []
+    ).length;
+    const scanned = runnableLines(md).blocks;
+    if (naive !== scanned)
+      mismatches.push(`${rel}: ${naive} runnable openers, ${scanned} scanned`);
+  }
+  assert.deepEqual(
+    mismatches,
+    [],
+    `Fence-state loss:\n${mismatches.join("\n")}`,
+  );
 });
 
 module.exports = { runnableLines, scan, POSITIONAL_RE, ALLOWLIST, MIN_BLOCKS };
