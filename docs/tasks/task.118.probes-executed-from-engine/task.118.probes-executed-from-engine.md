@@ -68,9 +68,10 @@ requires `N > 0`. The integer is typed by the agent. The engine that ran the pro
 
 ### In Scope
 
-✅ Engine emits a run record — `security-probe.mjs --record <path>` writes/merges `security-probe.run.json`
-   (`{version, controls:[{sink, entry, executed, reproduced, verdict, reason}], totals:{executed, reproduced}}`),
-   keyed by `{sink, entry}` so two controls sharing a sink do not overwrite each other; `--emit-block <record>`
+✅ Engine emits a run record — `security-probe.mjs --record <path>` writes this run's control as an
+   entry file under `<path>.d/` (named from `{sink, entry}`, atomic) and the folded snapshot at `<path>`
+   (`{version, controls:[{sink, entry, executed, reproduced, verdict, reason}], totals:{executed, reproduced}}`);
+   two controls never share a file and concurrent probes cannot lose each other; `--emit-block <record>`
    prints the `security_review:` YAML skeleton with `probes_executed`, `evidence` and `controls[]` filled from it
 ✅ review-security reads it; the block's `probes_executed` and `evidence:` are copied from the record; absent record ⇒ `reasoned` (stated as the only representable value)
 ✅ finalise DoD prompt reads the same record — its probe-mode Step 3 runs `security-probe.mjs --record`
@@ -90,8 +91,10 @@ That is the intended tightening; CHANGELOG under Changed.
 ## 6. Implementation Plan
 
 1. Record format (small, versioned, `controls[]` keyed by `{sink, entry}`); `--record <path>` flag on
-   `security-probe.mjs` writes it — merging into an existing record so a multi-control review
-   accumulates one file; `--emit-block <record>` prints the YAML block; unit test for both.
+   `security-probe.mjs` writes one entry file per control under `<path>.d/` and folds them into the
+   snapshot at `<path>` — no merged file, no lock (QA cycles 2–6 established that a merged file needs
+   a lock and a lock needs crash recovery that never converges); `--emit-block <record>` prints the
+   YAML block; unit test for both.
 2. review-security: replace the transcription instruction with "read `<record>`; copy the fields";
    remove the ability to write `measured` without one.
 3. finalise prompt: rewrite probe-mode Step 3 to run `security-probe.mjs --sink … --entry … --record …`
@@ -110,7 +113,7 @@ That is the intended tightening; CHANGELOG under Changed.
 
 | File | Change |
 | :--- | :--- |
-| `shared/resources/security-probe.mjs` | `--record <path>` writes/merges the run record; `--emit-block <record>` prints the YAML block |
+| `shared/resources/security-probe.mjs` | `--record <path>` writes the control's entry file under `<path>.d/` and the folded snapshot; `--emit-block <record>` prints the YAML block |
 | `skills/review-security/SKILL.md`, `shared/resources/security-review-prompt.md` | read the record |
 | `shared/resources/finalise-dod-security-prompt.md` | probe-mode Step 3 runs the engine with `--record`; reads the record |
 | `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` | Step 3b runs the engine with `--record` (third site, found by the population test) |
@@ -169,6 +172,8 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 | 2026-09-17 |         | QA findings fixed — CR4-1 (post-rename identity check in `reclaimStaleLock`; stolen live lock restored), CR4-5 (fail-fast asserts no verdict printed, not wall-clock), CR4-2 (YAML 1.2 target stated), CR4-3/4 (dead int branch removed); 1 iteration | qa-fix |
 | 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 5 — CR4-1..5 verified fixed; 1 low (put-back overwrites via rename) | qa-task |
 | 2026-09-17 |         | QA findings fixed — CR5-1 (`restoreStolenLock` by link, EEXIST leaves the newer lock), CR5-2 (holder pid in the lock; dead pid ⇒ stale next retry), `observedMtimeMs` required; 1 iteration | qa-fix |
+| 2026-09-17 |         | QA gate CONCERNS (90/100) cycle 6 — CR5-1/2 verified fixed; 1 medium (pid-write failure leaks the lock); replace the lock mechanism | qa-task |
+| 2026-09-17 |         | QA findings fixed — CR6-1..4 closed as a class: merged record file + lock replaced by one atomic entry file per control under `<record>.d/`, folded on read; lock/reclaim/put-back/pid code and 8 lock tests removed, 3 entry tests added; 1 iteration | qa-fix |
 
 ---
 
@@ -190,28 +195,29 @@ more `reasoned`. That is the truth surfacing, and the CHANGELOG must say so.
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-17
 **Quality Score**: 90/100
-**Gate Decision**: CONCERNS (cycle 5)
+**Gate Decision**: CONCERNS (cycle 6)
 
 ### QA Report
-- **Full Report**: [task.118.qa.5.probes-executed-from-engine.md](./task.118.qa.5.probes-executed-from-engine.md) (earlier: [qa.1](./task.118.qa.1.probes-executed-from-engine.md), [qa.2](./task.118.qa.2.probes-executed-from-engine.md), [qa.3](./task.118.qa.3.probes-executed-from-engine.md), [qa.4](./task.118.qa.4.probes-executed-from-engine.md))
-- **Gate File**: [task.118.gate.5.probes-executed-from-engine.yml](./task.118.gate.5.probes-executed-from-engine.yml) (earlier: [gate.1](./task.118.gate.1.probes-executed-from-engine.yml), [gate.2](./task.118.gate.2.probes-executed-from-engine.yml), [gate.3](./task.118.gate.3.probes-executed-from-engine.yml), [gate.4](./task.118.gate.4.probes-executed-from-engine.yml))
+- **Full Report**: [task.118.qa.6.probes-executed-from-engine.md](./task.118.qa.6.probes-executed-from-engine.md) (earlier: [qa.5](./task.118.qa.5.probes-executed-from-engine.md), [qa.1](./task.118.qa.1.probes-executed-from-engine.md), [qa.2](./task.118.qa.2.probes-executed-from-engine.md), [qa.3](./task.118.qa.3.probes-executed-from-engine.md), [qa.4](./task.118.qa.4.probes-executed-from-engine.md))
+- **Gate File**: [task.118.gate.6.probes-executed-from-engine.yml](./task.118.gate.6.probes-executed-from-engine.yml) (earlier: [gate.5](./task.118.gate.5.probes-executed-from-engine.yml), [gate.1](./task.118.gate.1.probes-executed-from-engine.yml), [gate.2](./task.118.gate.2.probes-executed-from-engine.yml), [gate.3](./task.118.gate.3.probes-executed-from-engine.yml), [gate.4](./task.118.gate.4.probes-executed-from-engine.yml))
 
 ### Test Coverage Summary
-- **Tests Executed**: 3398 (3397 pass, 1 skipped)
+- **Tests Executed**: 3402 (3401 pass, 1 skipped)
 - **Phases Verified**: 4/4
-- **Critical Issues**: 0 (1 LOW gating; 1 LOW advisory; 1 test gap)
+- **Critical Issues**: 0 (1 MEDIUM gating; 3 LOW advisory; 1 test gap)
 - **NFR Status**: Security: PASS (reasoned, boundary: false), Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Cycles 1–4 closed: 21 findings FIXED and mutation-proven; bugs 1 and 2 closed. Cycle 5: CR5-1 (LOW) the reclaim put-back uses `rename`, which overwrites an existing lock — EEXIST branch dead; CR5-2 (advisory) orphan-lock stall after a steal on a released holder; the observed-mtime wiring is untested.
+Cycles 1–5 closed: 24 findings FIXED and mutation-proven; bugs 1 and 2 closed. Cycle 6: CR6-1 (MEDIUM) a failed pid write leaks the fd and leaves an "alive" empty lock; CR6-2/3/4 (advisory) the steal-and-repair design cannot restore mutual exclusion after a steal. QA recommends replacing the lock with per-control entry files.
 ---
 
 ## Implementation Notes
 
 **Implementation summary (2026-09-17).** The count now has one route from the engine to every
-block that carries it. `security-probe.mjs` gained three flags: `--record <path>` (write/merge a
-version-1 run record keyed by `{sink, entry}`, atomic temp+rename, totals recomputed on every
-write), `--emit-block <record> [--mode]` (print the `security_review:` YAML with
+block that carries it. `security-probe.mjs` gained three flags: `--record <path>` (write this run's
+control as an atomic entry file under `<path>.d/`, named from `{sink, entry}`, and fold the directory
+into the snapshot at `<path>` — the merged-file-plus-lock design of cycles 2–5 was replaced in QA cycle 6
+because each lock fix exposed the next crash-recovery edge), `--emit-block <record> [--mode]` (print the `security_review:` YAML with
 `probes_executed`, `evidence` and `controls[]` from the record — `evidence` computed by
 `evidenceOf()`, `measured` only on `totals.executed > 0`; a missing record renders the honest
 empty block, a corrupt one exits 2), and `--repo-root` (the containment root defaults to two

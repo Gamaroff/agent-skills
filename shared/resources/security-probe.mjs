@@ -15,7 +15,8 @@
  *   --repo-root <path>   containment root for --entry (default: two dirs above this
  *                        file — the repo root in-tree, the SKILL dir in a bundled
  *                        copy; pass `$(git rev-parse --show-toplevel)` from a bundle)
- *   --record <path>      write (or merge into) the run record — see "The run record"
+ *   --record <path>      write this run's control to <path>.d/ and the folded
+ *                        snapshot at <path> — see "The run record"
  *   --name <name>        control name stored in the record (with --record)
  *   --call-site <ref>    `file:line` of the call site, stored in the record (with --record)
  *
@@ -47,18 +48,16 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   accessSync,
-  closeSync,
   constants as fsConstants,
-  linkSync,
   mkdtempSync,
   mkdirSync,
-  openSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -536,11 +535,22 @@ export function runProbeSpec({
 // whose `totals.executed` is positive. Delete the record and the block reads
 // `reasoned` — that is the mutation the contract test performs.
 //
-// One record per review, keyed by `{sink, entry}` per control. A review probes
-// several controls, so a write MERGES into an existing record rather than
-// replacing it; two controls sharing a sink (both `url-authority`, say) would
-// otherwise overwrite each other, which is why the key is the pair and not the
-// sink alone.
+// One record per review, one ENTRY FILE per control. `--record <path>` writes
+// this run's control to `<path>.d/<key>.json` — an atomic temp+rename to a name
+// derived from `{sink, entry}`, so two controls never share a file and a re-run
+// of the same control replaces only its own — and then writes the folded
+// snapshot at `<path>` for readers. `readRecord` folds the entry directory,
+// never the snapshot, so the snapshot cannot mislead the engine.
+//
+// WHY ENTRY FILES AND NOT A MERGED FILE. The first version merged every run
+// into one JSON file: read → filter → push → rename. Concurrent runs (an agent
+// issuing its probes as parallel tool calls) lost controls to last-writer-wins
+// (CR2-1). A lock fixed that and then spent four QA cycles growing crash-
+// recovery edges — stale reclaim, reclaim TOCTOU, put-back overwrite, orphan
+// stall, pid-write leak (CR3-2, CR4-1, CR5-1, CR5-2, CR6-1) — each real, each
+// fixed, each exposing the next. Distinct files per control have no shared
+// write, so there is nothing to lock, reclaim, put back or identify. The
+// reviewer proposed this in cycle 2; it took four more to earn it.
 
 export const RECORD_VERSION = 1;
 
@@ -591,42 +601,80 @@ function totalsOf(controls) {
  * but is not a record — a corrupt record is a finding, not an empty one, and
  * silently treating it as empty would let a truncated write read as "reasoned".
  */
+/** The entry directory beside a record path. */
+export function recordEntriesDir(recordPath) {
+  return `${recordPath}.d`;
+}
+
+const isCount = (n) => Number.isInteger(n) && n >= 0;
+const validControl = (c) =>
+  c !== null &&
+  typeof c === "object" &&
+  !Array.isArray(c) &&
+  isCount(c.executed) &&
+  isCount(c.reproduced) &&
+  VERDICTS.includes(c.verdict);
+
+/**
+ * Read a record by folding its entry directory. `null` when there is no
+ * directory; throws on an entry that is not a control — the record is
+ * rejected as a unit, because reading around one hand-edited or truncated
+ * entry would let it through as "a record with one bad row". The folded
+ * snapshot at `recordPath` is never read: it is for humans, and a stale or
+ * edited snapshot must not be able to change what the engine emits.
+ */
 export function readRecord(recordPath) {
-  let text;
+  const dir = recordEntriesDir(recordPath);
+  let names;
   try {
-    text = readFileSync(recordPath, "utf8");
+    names = readdirSync(dir);
   } catch (e) {
     if (e.code === "ENOENT") return null;
     throw e;
   }
-  const rec = JSON.parse(text);
-  // The whole shape is validated here, contents included, so nothing downstream
-  // (`totalsOf`, `emitBlock`) can throw on a file that passed the reader. A
-  // record is rejected as a unit: a null element or a string count is not
-  // "a record with one bad row", it is not a record, and reading around it
-  // would let one hand-edited entry through. `totals` is required as a schema
-  // field even though every reader recomputes it — a record without it was not
-  // written by this engine.
-  const isCount = (n) => Number.isInteger(n) && n >= 0;
-  const validControl = (c) =>
-    c !== null &&
-    typeof c === "object" &&
-    !Array.isArray(c) &&
-    isCount(c.executed) &&
-    isCount(c.reproduced) &&
-    VERDICTS.includes(c.verdict);
-  if (
-    rec?.version !== RECORD_VERSION ||
-    !Array.isArray(rec.controls) ||
-    !rec.controls.every(validControl) ||
-    typeof rec.totals !== "object" ||
-    rec.totals === null
-  ) {
-    throw new Error(
-      `${recordPath} is not a version-${RECORD_VERSION} security-probe run record`,
-    );
+  const controls = [];
+  for (const name of names.filter((n) => n.endsWith(".json")).sort()) {
+    let entry;
+    try {
+      entry = JSON.parse(readFileSync(join(dir, name), "utf8"));
+    } catch {
+      entry = null;
+    }
+    if (!validControl(entry)) {
+      throw new Error(
+        `${join(dir, name)} is not a version-${RECORD_VERSION} security-probe run record entry`,
+      );
+    }
+    controls.push(entry);
   }
-  return rec;
+  return foldRecord(controls);
+}
+
+function foldRecord(controls) {
+  return {
+    version: RECORD_VERSION,
+    controls,
+    totals: totalsOf(controls),
+    updated_at:
+      controls.reduce((m, c) => (c.ran_at > m ? c.ran_at : m), "") || null,
+  };
+}
+
+/** Filesystem-safe, collision-free name for a control's entry file. */
+function entryFileName(entry) {
+  return `${createHash("sha256").update(controlKey(entry)).digest("hex").slice(0, 24)}.json`;
+}
+
+/** Atomic write: temp in the same directory, then rename. */
+function writeAtomic(target, text) {
+  const tmp = `${target}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+  try {
+    writeFileSync(tmp, text);
+    renameSync(tmp, target);
+  } catch (e) {
+    rmSync(tmp, { force: true });
+    throw e;
+  }
 }
 
 /**
@@ -639,194 +687,28 @@ export function readRecord(recordPath) {
  * exactly one process, and a holder that died leaves a file whose age tells
  * the next caller to reclaim it rather than wait forever.
  */
-const LOCK_RETRY_MS = 25;
-const LOCK_STALE_MS = 30_000;
-// Strictly longer than the stale window, so a waiter that arrives just after a
-// holder dies lives to reclaim the lock instead of timing out 10 s before it
-// becomes reclaimable (QA cycle 3, CR3-3).
-const LOCK_TIMEOUT_MS = LOCK_STALE_MS + 10_000;
-/** Exported for the ordering assertion only; not a tuning surface. */
-export const LOCK_TIMING = Object.freeze({
-  retryMs: LOCK_RETRY_MS,
-  staleMs: LOCK_STALE_MS,
-  timeoutMs: LOCK_TIMEOUT_MS,
-});
-
-/**
- * Remove a lock left by a dead holder. Reclaim is by RENAME, not rm: rename
- * is atomic, so of two waiters that both saw the same stale lock exactly one
- * succeeds and the other sees ENOENT. With rm, the second waiter's rm deletes
- * the lock the first has just re-created via O_EXCL, and both proceed — the
- * lost merge CR2-1 closed, reopened for any crashed holder (CR3-2).
- *
- * @returns {boolean} true when THIS caller removed the lock; false when it was
- *   already gone. Exported so the exactly-one-winner property is testable
- *   without staging a race.
- */
-export function reclaimStaleLock(lock, observedMtimeMs) {
-  // Required, not optional: an optional observation is a silent path that
-  // skips the identity check, and the caller wiring had no test (QA cycle 5).
-  if (typeof observedMtimeMs !== "number") {
-    throw new TypeError(
-      "reclaimStaleLock needs the mtime the caller observed as stale",
-    );
-  }
-  const claimed = `${lock}.stale.${process.pid}.${Math.random().toString(36).slice(2)}`;
-  try {
-    renameSync(lock, claimed);
-  } catch (e) {
-    if (e.code === "ENOENT") return false;
-    throw e;
-  }
-  // The rename moved WHATEVER was at the path. Between the caller's stat and
-  // this rename another waiter may have reclaimed the stale file and created
-  // a fresh, LIVE lock there — which is what was just moved. Identity-check
-  // it: a file that is not the stale one the caller observed goes back where
-  // it was, and this caller reports no win (QA cycle 4, CR4-1).
-  let mtime;
-  try {
-    mtime = statSync(claimed).mtimeMs;
-  } catch (e) {
-    if (e.code === "ENOENT") return false;
-    throw e;
-  }
-  if (mtime !== observedMtimeMs) {
-    restoreStolenLock(claimed, lock);
-    return false;
-  }
-  rmSync(claimed, { force: true });
-  return true;
-}
-
-/**
- * Put a stolen live lock back at its path. With LINK, not rename: rename
- * REPLACES an existing file, so a fresh lock a third waiter created in the
- * meantime would be clobbered by the stolen copy (QA cycle 5, CR5-1). link
- * fails with EEXIST instead, and then the new lock stays and the stolen copy
- * is dropped — a duplicate lock file is worse than none.
- *
- * @returns {boolean} true when the copy was restored, false when a newer lock
- *   already occupied the path and the copy was dropped.
- */
-export function restoreStolenLock(claimed, lock) {
-  let restored = true;
-  try {
-    linkSync(claimed, lock);
-  } catch (e) {
-    if (e.code !== "EEXIST") throw e;
-    restored = false;
-  }
-  rmSync(claimed, { force: true });
-  return restored;
-}
-
-/**
- * Is the lock's holder still alive? The lock body carries the holder pid; a
- * pid that no longer exists (ESRCH) means the holder died and the lock is
- * stale NOW, not after LOCK_STALE_MS — which caps the orphan a put-back can
- * leave when the holder released between the steal and the restore (CR5-2).
- * An unreadable or pid-less body, or EPERM (a live pid we may not signal),
- * answers "alive" so the age rule stays the only other route to reclaim.
- */
-export function lockHolderAlive(lock) {
-  let pid;
-  try {
-    pid = Number.parseInt(readFileSync(lock, "utf8"), 10);
-  } catch {
-    return true;
-  }
-  if (!Number.isInteger(pid) || pid <= 0) return true;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return e.code !== "ESRCH";
-  }
-}
-
-function withRecordLock(recordPath, fn) {
-  const lock = `${recordPath}.lock`;
-  const started = Date.now();
-  for (;;) {
-    let fd;
-    try {
-      fd = openSync(lock, "wx");
-      writeFileSync(fd, String(process.pid));
-    } catch (e) {
-      if (e.code !== "EEXIST") throw e;
-      let age = 0;
-      let observed;
-      try {
-        observed = statSync(lock).mtimeMs;
-        age = Date.now() - observed;
-      } catch (statErr) {
-        // Only "it is gone" means the holder released; anything else (EACCES,
-        // EIO) is a real failure and must not become an unslept loop (CR3-7).
-        if (statErr.code === "ENOENT") continue;
-        throw statErr;
-      }
-      if (age > LOCK_STALE_MS || !lockHolderAlive(lock)) {
-        reclaimStaleLock(lock, observed);
-        continue;
-      }
-      if (Date.now() - started > LOCK_TIMEOUT_MS) {
-        throw new Error(`timed out waiting for ${lock}`);
-      }
-      // Synchronous sleep: this file is sync end to end and a busy-wait would
-      // pin a core for the whole spawn budget of the other process.
-      Atomics.wait(
-        new Int32Array(new SharedArrayBuffer(4)),
-        0,
-        0,
-        LOCK_RETRY_MS,
-      );
-      continue;
-    }
-    try {
-      closeSync(fd);
-      return fn();
-    } finally {
-      rmSync(lock, { force: true });
-    }
-  }
-}
-
-/**
- * Merge one result into the record at `recordPath` and write it back. Returns
- * the record written. The write is atomic (temp file + rename) so a crash
- * mid-write cannot leave a half-record that `readRecord` then rejects.
- */
 export function recordRun(recordPath, result, opts = {}) {
-  mkdirSync(dirname(resolve(recordPath)), { recursive: true });
-  return withRecordLock(recordPath, () => {
-    // Read INSIDE the lock: a read taken before it is the stale snapshot the
-    // lock exists to prevent.
-    const existing = readRecord(recordPath) ?? {
-      version: RECORD_VERSION,
-      controls: [],
-    };
-    const entry = toRecordEntry(result, opts);
-    const key = controlKey(entry);
-    const controls = existing.controls.filter((c) => controlKey(c) !== key);
-    controls.push(entry);
-    const record = {
-      version: RECORD_VERSION,
-      controls,
-      totals: totalsOf(controls),
-      updated_at: entry.ran_at,
-    };
-    const tmp = `${recordPath}.${process.pid}.tmp`;
-    try {
-      writeFileSync(tmp, `${JSON.stringify(record, null, 2)}\n`);
-      renameSync(tmp, recordPath);
-    } catch (e) {
-      // A temp file left beside the record after a failed rename is a
-      // permanent orphan nothing else names (CR2-7).
-      rmSync(tmp, { force: true });
-      throw e;
-    }
-    return record;
-  });
+  const dir = recordEntriesDir(recordPath);
+  mkdirSync(dir, { recursive: true });
+  const entry = toRecordEntry(result, opts);
+  // This control's own file; a concurrent run of a DIFFERENT control writes a
+  // different name and a re-run of the SAME control replaces this one, which
+  // is the merge semantics the single file used to implement with a lock.
+  writeAtomic(
+    join(dir, entryFileName(entry)),
+    `${JSON.stringify(entry, null, 2)}\n`,
+  );
+  // The snapshot is a convenience for a reader opening the record by hand. Two
+  // runs may race to write it and the loser's view is momentarily stale — that
+  // is fine, because nothing in the engine reads it: --emit-block folds the
+  // directory and rewrites the snapshot exactly.
+  const record = readRecord(recordPath);
+  writeSnapshot(recordPath, record);
+  return record;
+}
+
+export function writeSnapshot(recordPath, record) {
+  writeAtomic(recordPath, `${JSON.stringify(record, null, 2)}\n`);
 }
 
 /**
@@ -836,12 +718,14 @@ export function recordRun(recordPath, result, opts = {}) {
  * failure even when the read was what failed (CR2-4).
  */
 export function preflightRecord(recordPath) {
-  const dir = dirname(resolve(recordPath));
+  const dir = recordEntriesDir(recordPath);
   mkdirSync(dir, { recursive: true });
   // mkdirSync is a no-op on an EXISTING read-only directory, so the write
-  // permission is checked explicitly (CR3-5).
+  // permission is checked explicitly (CR3-5) — on both the entry directory
+  // and the snapshot's parent.
   accessSync(dir, fsConstants.W_OK);
-  readRecord(recordPath); // throws with the not-a-record message on a corrupt file
+  accessSync(dirname(resolve(recordPath)), fsConstants.W_OK);
+  readRecord(recordPath); // throws with the not-a-record message on a corrupt entry
 }
 
 /**
@@ -1014,6 +898,7 @@ export function main(argv = process.argv.slice(2)) {
       process.stderr.write(`cannot read --emit-block record: ${e.message}\n`);
       return 2;
     }
+    if (record) writeSnapshot(opts.emitBlock, record);
     process.stdout.write(emitBlock(record, { mode: opts.mode ?? "diff" }));
     return 0;
   }

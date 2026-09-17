@@ -55,7 +55,8 @@ All notable changes to this project will be documented in this file. Format foll
   catch (obs #10; the documentation half landed earlier, this is the mechanism half).
   `shared/resources/security-probe.mjs` gains `--record <path>`, which writes a versioned run
   record (`{version, controls:[{sink, entry, executed, reproduced, verdict, reason, …}], totals}`,
-  merged per `{sink, entry}` so a multi-control review builds one file), `--emit-block <record>`,
+  folded from one entry file per control under `<record>.d/` — no shared write, so concurrent
+  probes cannot lose each other's control), `--emit-block <record>`,
   which prints the `security_review:` YAML block with `probes_executed` and `evidence` filled from
   it — `evidence` is **computed** by `evidenceOf()` and is `measured` only when
   `totals.executed > 0` — and `--repo-root`, so a bundled copy under `skills/*/references/` can

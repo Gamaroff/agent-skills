@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.118.probes-executed-from-engine'
+task_title: "review-security's strongest verdict rests on a probe count the agent types, not one the engine emitted"
+gate: CONCERNS
+status_reason: 'Cycle-5 fixes verified (CR5-1, CR5-2, required observation — 3 mutation proofs covered; the pid write itself is untested). The narrowed cycle-6 review found a failed pid write after the O_EXCL open leaks the descriptor and leaves an empty-body lock every waiter treats as alive for 30 s (medium, high confidence, verified by reading), plus three low-confidence edges that together say the lock''s steal-and-repair design cannot restore mutual exclusion once a steal has happened. Fifth consecutive cycle of findings in the same 120 lines: replace the mechanism, do not patch it again.'
+reviewer: 'QA Engineer'
+updated: '2026-09-17T12:10:00Z'
+
+top_issues:
+  - id: 'CR6-1'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'If writeFileSync(fd, pid) throws after the O_EXCL openSync succeeded (ENOSPC/EIO), the catch rethrows without closing the fd or removing the just-created lock; the empty-body lock reads as alive to lockHolderAlive, so every other engine stalls for LOCK_STALE_MS. Verified by reading: the write sits inside the try whose catch handles only EEXIST.'
+    suggested_action: 'Replace the shared-file lock outright with per-control entry files (one atomic temp+rename per run, distinct names per {sink, entry}) folded on read — no merge, no lock, no reclaim, no pid — which removes CR6-1..4 and every prior lock finding as a class; fall back to closing the fd and removing the lock before rethrowing only if the lock is kept.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3402
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+  mutation_proofs: 4
+  prior_findings_verified: '3/3 FIXED'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'boundary: false — unchanged.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR6-1 (gating). Advisory, all low/low: CR6-2 mtime-only identity check can alias on coarse-timestamp filesystems now that a dead-pid lock is reclaimable within milliseconds; CR6-3 after a steal the original holder and the third waiter are both inside fn() and nothing detects it; CR6-4 a non-EEXIST link error leaves a .stale.* orphan and no lock at the path. QA-found: the pid write in withRecordLock has no test (mutation no-red-untested). Cycles 2–6 have each fixed one real edge in this lock and each fix exposed the next; the reviewer''s own alternative from cycle 2 (per-control files, folded on emit) has no shared write and therefore none of these edges.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The lock is ~130 lines with six documented edge cases and eight tests; the record itself is ~40. The complexity is in the mechanism the task did not ask for.'
+
+recommendations:
+  immediate:
+    - action: 'Replace withRecordLock/reclaimStaleLock/restoreStolenLock/lockHolderAlive with per-control entry files under <record>.d/ (atomic temp+rename each; same {sink, entry} overwrites its own file), fold on readRecord, write the folded snapshot at <record> for readers; delete the lock tests and keep the convergence, corrupt-entry, missing-record and emit tests (CR6-1..4 as a class)'
+      refs: ['shared/resources/security-probe.mjs', 'skills/review-security/tests/review-security.test.js']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR6-1 closed — by mechanism replacement']

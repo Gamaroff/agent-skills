@@ -518,7 +518,16 @@ test("MUTATION — delete the record and the block reads reasoned with zero prob
   const { recordRun, readRecord, emitBlock } = await engine();
   const rec = tmpRecord();
   recordRun(rec, await probe("redis-tls/inert"));
+  // "Delete the record" means the entry directory — the snapshot is never read
+  // by the engine, and deleting only it must change nothing.
   fs.unlinkSync(rec);
+  const { emitBlock: eb, readRecord: rr } = await engine();
+  assert.equal(
+    readBlock(eb(rr(rec))).evidence,
+    "measured",
+    "the snapshot is not the record",
+  );
+  fs.rmSync(`${rec}.d`, { recursive: true, force: true });
   const block = emitBlock(readRecord(rec));
   const { probes_executed, evidence } = readBlock(block);
   assert.equal(probes_executed, 0);
@@ -610,23 +619,39 @@ test("CLI: --emit-block on a missing record renders the honest empty block, exit
   assert.match(emitted.stdout, /the engine did not run/);
 });
 
-test("CLI: a corrupt record is exit 2, never read as empty", () => {
+/** Write one raw entry file into a record's entry directory. */
+function writeEntry(rec, name, body) {
+  fs.mkdirSync(`${rec}.d`, { recursive: true });
+  fs.writeFileSync(
+    path.join(`${rec}.d`, name),
+    typeof body === "string" ? body : JSON.stringify(body),
+  );
+}
+
+test("CLI: a corrupt record entry is exit 2, never read as empty", () => {
   const rec = tmpRecord();
-  fs.writeFileSync(rec, "{ not json");
+  writeEntry(rec, "a.json", "{ not json");
   const emitted = cli(["--emit-block", rec]);
   assert.equal(emitted.status, 2);
   assert.match(emitted.stderr, /cannot read --emit-block record/);
-  const wrongVersion = tmpRecord();
-  fs.writeFileSync(wrongVersion, JSON.stringify({ version: 99, controls: [] }));
-  assert.equal(cli(["--emit-block", wrongVersion]).status, 2);
-  // A version-1 record with no totals is not a record either. Readers recompute
-  // totals from controls, so this is a schema check, not crash prevention: a
-  // file without the field was not written by this engine.
-  const noTotals = tmpRecord();
-  fs.writeFileSync(noTotals, JSON.stringify({ version: 1, controls: [] }));
-  const r = cli(["--emit-block", noTotals]);
-  assert.equal(r.status, 2, r.stderr);
-  assert.match(r.stderr, /not a version-1/);
+  const wrongShape = tmpRecord();
+  writeEntry(wrongShape, "a.json", { version: 99, controls: [] });
+  assert.equal(cli(["--emit-block", wrongShape]).status, 2);
+  // A corrupt SNAPSHOT changes nothing: the engine folds the entries.
+  const snap = tmpRecord();
+  writeEntry(snap, "a.json", {
+    sink: "s",
+    entry: "e#f",
+    verdict: "engages",
+    reason: "ok",
+    executed: 3,
+    reproduced: 0,
+    ran_at: "2026-01-01T00:00:00Z",
+  });
+  fs.writeFileSync(snap, "{ not json");
+  const ok = cli(["--emit-block", snap]);
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(readBlock(ok.stdout).probes_executed, 3);
 });
 
 test("CLI: every operand flag rejects a missing or flag-shaped operand with exit 2, on its own", () => {
@@ -776,10 +801,7 @@ test("readRecord rejects a record whose control elements are malformed", async (
   ];
   for (const controls of bad) {
     const rec = tmpRecord();
-    fs.writeFileSync(
-      rec,
-      JSON.stringify({ version: RECORD_VERSION, controls, totals: {} }),
-    );
+    writeEntry(rec, "x.json", controls[0]);
     assert.throws(
       () => readRecord(rec),
       /not a version-1/,
@@ -825,7 +847,7 @@ test("emitBlock quotes a scalar YAML would type as a number, boolean or null", a
 
 test("CLI: a corrupt --record fails before the probe runs, and says it could not be used", async () => {
   const rec = tmpRecord();
-  fs.writeFileSync(rec, "{ not json");
+  writeEntry(rec, "a.json", "{ not json");
   const spec = (await specs())["redis-tls/engaged"];
   const r = cli(["--sink", spec.sink, "--entry", spec.entry, "--record", rec]);
   assert.equal(r.status, 2, r.stderr);
@@ -866,66 +888,6 @@ test("SEVERITY_BY_VERDICT is the prompt's severity table — one definition", as
       );
     }
   }
-});
-
-// The three-process race above proves convergence but cannot reliably PROVOKE
-// the race (the read→rename window is ~1 ms). These two prove the lock itself:
-// a held lock blocks the write until released; a stale one is reclaimed.
-test("recordRun waits on a held lock and writes once it is released", async () => {
-  const rec = tmpRecord();
-  const lock = `${rec}.lock`;
-  fs.writeFileSync(lock, "");
-  const script = `
-    import(${JSON.stringify(require("node:url").pathToFileURL(ENGINE_PATH).href)}).then((m) => {
-      m.recordRun(${JSON.stringify(rec)}, { sink: "s", entry: "e#f", verdict: "engages", reason: "ok", executed: 1, passed: 1, reproduced: [], overblocked: [], declined: [], escapes: [] });
-    });`;
-  const child = spawn(process.execPath, ["--input-type=module", "-e", script], {
-    cwd: REPO_ROOT,
-    stdio: "ignore",
-  });
-  const exited = new Promise((resolve) => child.on("exit", resolve));
-  await new Promise((r) => setTimeout(r, 700));
-  assert.ok(
-    !fs.existsSync(rec),
-    "the record must not be written while another process holds the lock",
-  );
-  assert.equal(
-    child.exitCode,
-    null,
-    "the writer must still be waiting, not exited",
-  );
-  fs.rmSync(lock);
-  const code = await exited;
-  assert.equal(code, 0);
-  assert.ok(fs.existsSync(rec), "released lock → the write goes through");
-});
-
-test("recordRun reclaims a stale lock left by a dead holder", async () => {
-  const { recordRun } = await engine();
-  const rec = tmpRecord();
-  const lock = `${rec}.lock`;
-  fs.writeFileSync(lock, "");
-  const old = new Date(Date.now() - 60_000);
-  fs.utimesSync(lock, old, old);
-  const started = Date.now();
-  recordRun(rec, {
-    sink: "s",
-    entry: "e#f",
-    verdict: "engages",
-    reason: "ok",
-    executed: 1,
-    passed: 1,
-    reproduced: [],
-    overblocked: [],
-    declined: [],
-    escapes: [],
-  });
-  assert.ok(
-    Date.now() - started < 2000,
-    "a stale lock must be reclaimed, not waited on",
-  );
-  assert.ok(fs.existsSync(rec));
-  assert.ok(!fs.existsSync(lock));
 });
 
 // ---------------------------------------------------------------------------
@@ -970,196 +932,12 @@ test("emitBlock quotes a value ending in ':' and a leading-zero integer", async 
   );
 });
 
-test("the lock's wait timeout exceeds its stale window", async () => {
-  // Exported for this assertion only: with timeout < stale a waiter that
-  // arrives just after a holder dies exits 2 before the lock becomes reclaimable.
-  const { LOCK_TIMING } = await engine();
-  assert.ok(
-    LOCK_TIMING.timeoutMs > LOCK_TIMING.staleMs,
-    `timeout ${LOCK_TIMING.timeoutMs} must exceed stale ${LOCK_TIMING.staleMs}`,
-  );
-});
-
-test("stale-lock reclaim is by atomic rename — two waiters cannot both win", async () => {
-  const rec = tmpRecord();
-  const lock = `${rec}.lock`;
-  fs.writeFileSync(lock, "");
-  const old = new Date(Date.now() - 60_000);
-  fs.utimesSync(lock, old, old);
-  // Two processes race to reclaim the same stale lock and each merge one control.
-  const result = (name) => ({
-    sink: "s",
-    entry: `${name}#f`,
-    verdict: "engages",
-    reason: "ok",
-    executed: 1,
-    passed: 1,
-    reproduced: [],
-    overblocked: [],
-    declined: [],
-    escapes: [],
-  });
-  const script = (name) => `
-    import(${JSON.stringify(require("node:url").pathToFileURL(ENGINE_PATH).href)}).then((m) => {
-      m.recordRun(${JSON.stringify(rec)}, ${JSON.stringify(result(name))});
-    });`;
-  const kids = ["a", "b"].map(
-    (n) =>
-      new Promise((resolve) =>
-        spawn(process.execPath, ["--input-type=module", "-e", script(n)], {
-          cwd: REPO_ROOT,
-          stdio: "ignore",
-        }).on("exit", resolve),
-      ),
-  );
-  const codes = await Promise.all(kids);
-  assert.deepEqual(codes, [0, 0]);
-  const r = JSON.parse(fs.readFileSync(rec, "utf8"));
-  assert.deepEqual(
-    r.controls.map((c) => c.entry).sort(),
-    ["a#f", "b#f"],
-    "an rm-based reclaim lets both waiters in and one merge is lost",
-  );
-  assert.ok(!fs.existsSync(lock));
-  assert.equal(
-    fs.readdirSync(path.dirname(rec)).filter((f) => f.includes(".stale."))
-      .length,
-    0,
-    "the renamed stale lock is removed",
-  );
-});
-
-test("reclaimStaleLock has exactly one winner per stale lock", async () => {
-  const { reclaimStaleLock } = await engine();
-  const lock = `${tmpRecord()}.lock`;
-  fs.writeFileSync(lock, "");
-  // Two reclaimers of the same path: the first removes it, the second must
-  // report it was already gone — an rm-based reclaim returns true for both,
-  // which is the TOCTOU that lets two waiters into the critical section.
-  const observed = fs.statSync(lock).mtimeMs;
-  assert.equal(reclaimStaleLock(lock, observed), true);
-  assert.equal(reclaimStaleLock(lock, observed), false);
-  assert.ok(!fs.existsSync(lock));
-  assert.equal(
-    fs.readdirSync(path.dirname(lock)).filter((f) => f.includes(".stale."))
-      .length,
-    0,
-  );
-});
-
-test("reclaimStaleLock puts back a lock that is not the stale one it was told about", async () => {
-  const { reclaimStaleLock } = await engine();
-  const lock = `${tmpRecord()}.lock`;
-  fs.writeFileSync(lock, "");
-  const stale = new Date(Date.now() - 60_000);
-  fs.utimesSync(lock, stale, stale);
-  const observed = fs.statSync(lock).mtimeMs;
-  // Another waiter reclaimed and re-created the lock in between: the file at
-  // the path is now FRESH. A caller still holding the old observation must not
-  // take it.
-  fs.rmSync(lock);
-  fs.writeFileSync(lock, "");
-  assert.equal(
-    reclaimStaleLock(lock, observed),
-    false,
-    "a live lock was stolen",
-  );
-  assert.ok(fs.existsSync(lock), "the live lock must be restored");
-  assert.equal(
-    fs.readdirSync(path.dirname(lock)).filter((f) => f.includes(".stale."))
-      .length,
-    0,
-  );
-  // The genuine stale case still reclaims.
-  fs.utimesSync(lock, stale, stale);
-  assert.equal(reclaimStaleLock(lock, fs.statSync(lock).mtimeMs), true);
-  assert.ok(!fs.existsSync(lock));
-});
-
-test("the put-back never clobbers a lock a third waiter created meanwhile", async () => {
-  const { restoreStolenLock } = await engine();
-  const lock = `${tmpRecord()}.lock`;
-  const claimed = `${lock}.stale.x`;
-  // A third waiter's lock already sits at the path when the put-back runs.
-  fs.writeFileSync(lock, "third");
-  fs.writeFileSync(claimed, "stolen");
-  assert.equal(restoreStolenLock(claimed, lock), false);
-  assert.equal(
-    fs.readFileSync(lock, "utf8"),
-    "third",
-    "a rename-based put-back overwrote the third waiter's lock",
-  );
-  assert.ok(!fs.existsSync(claimed), "the stolen copy is dropped");
-  // No lock at the path: the copy goes back.
-  fs.rmSync(lock);
-  fs.writeFileSync(claimed, "stolen");
-  assert.equal(restoreStolenLock(claimed, lock), true);
-  assert.equal(fs.readFileSync(lock, "utf8"), "stolen");
-  assert.ok(!fs.existsSync(claimed));
-});
-
-test("reclaimStaleLock refuses to run without the caller's observation", async () => {
-  const { reclaimStaleLock } = await engine();
-  assert.throws(
-    () => reclaimStaleLock(`${tmpRecord()}.lock`),
-    /needs the mtime/,
-  );
-});
-
-test("a lock whose holder pid is dead is reclaimed on the next retry, not after the stale window", async () => {
-  const { recordRun, LOCK_TIMING } = await engine();
-  const rec = tmpRecord();
-  const lock = `${rec}.lock`;
-  // A pid that certainly does not exist: spawn-and-reap a child, use its pid.
-  const child = spawnSync(process.execPath, ["-e", "0"]);
-  fs.writeFileSync(lock, String(child.pid));
-  const started = Date.now();
-  recordRun(rec, {
-    sink: "s",
-    entry: "e#f",
-    verdict: "engages",
-    reason: "ok",
-    executed: 1,
-    passed: 1,
-    reproduced: [],
-    overblocked: [],
-    declined: [],
-    escapes: [],
-  });
-  const waited = Date.now() - started;
-  assert.ok(
-    waited < LOCK_TIMING.staleMs / 2,
-    `waited ${waited} ms — the dead-holder lock was not reclaimed early`,
-  );
-  assert.ok(fs.existsSync(rec));
-  assert.ok(!fs.existsSync(lock));
-});
-
-test("a fresh lock held by a LIVE pid is not reclaimed early", async () => {
-  const { lockHolderAlive } = await engine();
-  const lock = `${tmpRecord()}.lock`;
-  fs.writeFileSync(lock, String(process.pid));
-  assert.equal(lockHolderAlive(lock), true);
-  fs.writeFileSync(lock, "");
-  assert.equal(
-    lockHolderAlive(lock),
-    true,
-    "a pid-less body must not read as dead",
-  );
-});
-
 test("readRecord rejects a control whose verdict is not one of VERDICTS", async () => {
   const { readRecord, RECORD_VERSION } = await engine();
   const rec = tmpRecord();
-  fs.writeFileSync(
-    rec,
-    JSON.stringify({
-      version: RECORD_VERSION,
-      totals: {},
-      controls: [{ executed: 1, reproduced: 0, verdict: "engage" }],
-    }),
-  );
+  writeEntry(rec, "x.json", { executed: 1, reproduced: 0, verdict: "engage" });
   assert.throws(() => readRecord(rec), /not a version-1/);
+  void RECORD_VERSION;
 });
 
 test("preflightRecord fails on an existing read-only directory before the probe runs", async () => {
@@ -1176,4 +954,53 @@ test("preflightRecord fails on an existing read-only directory before the probe 
     fs.chmodSync(dir, 0o700);
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 6 (task.118): the merged file and its lock are gone. Each run writes
+// its own control's entry file; the record is the fold of the directory.
+// ---------------------------------------------------------------------------
+
+test("a re-run of the same control replaces only its own entry", async () => {
+  const { recordRun, readRecord, recordEntriesDir } = await engine();
+  const rec = tmpRecord();
+  const a = await probe("redis-tls/inert");
+  const b = await probe("db-url/engaged");
+  recordRun(rec, a, { name: "first" });
+  recordRun(rec, b);
+  recordRun(rec, a, { name: "second" });
+  const r = readRecord(rec);
+  assert.equal(r.controls.length, 2);
+  assert.equal(r.controls.find((c) => c.entry === a.entry).name, "second");
+  assert.equal(fs.readdirSync(recordEntriesDir(rec)).length, 2);
+});
+
+test("the engine never reads the snapshot — an edited snapshot cannot change the block", async () => {
+  const { recordRun, emitBlock, readRecord } = await engine();
+  const rec = tmpRecord();
+  recordRun(rec, await probe("redis-tls/inert"));
+  const forged = JSON.parse(fs.readFileSync(rec, "utf8"));
+  forged.controls = [];
+  forged.totals = { executed: 999, reproduced: 0 };
+  fs.writeFileSync(rec, JSON.stringify(forged));
+  const block = emitBlock(readRecord(rec));
+  assert.equal(readBlock(block).probes_executed, 12);
+  // --emit-block rewrites the snapshot exactly from the entries.
+  assert.equal(cli(["--emit-block", rec]).status, 0);
+  assert.equal(JSON.parse(fs.readFileSync(rec, "utf8")).totals.executed, 12);
+});
+
+test("no lock, reclaim or pid machinery remains", async () => {
+  const m = await engine();
+  for (const gone of [
+    "reclaimStaleLock",
+    "restoreStolenLock",
+    "lockHolderAlive",
+    "LOCK_TIMING",
+  ]) {
+    assert.equal(m[gone], undefined, `${gone} should have gone with the lock`);
+  }
+  const src = fs.readFileSync(ENGINE_PATH, "utf8");
+  assert.doesNotMatch(src, /openSync\([^)]*"wx"/, "no O_EXCL lock create");
+  assert.doesNotMatch(src, /Atomics\.wait/, "no lock wait loop");
 });

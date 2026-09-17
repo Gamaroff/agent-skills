@@ -145,8 +145,10 @@ containment root defaults to two directories above its own file, which in an ins
 skill directory, not the repository, so without the flag every repo-relative entry resolves under
 the skill and is `unverifiable` before it is ever imported — and every probe in the review passes
 the same `--record <path>` (the record sits beside the
-report as `{stem}.security.{N}.run.json`; the engine merges each control into it, keyed by
-`{sink, entry}`), and the block is the output of:
+report as `{stem}.security.{N}.run.json`; each probe writes its own control's entry file under
+`{stem}.security.{N}.run.json.d/` and the engine folds the directory — a re-run of the same
+`{sink, entry}` replaces only its own entry, and concurrent probes never share a write), and the
+block is the output of:
 
 ```bash
 node references/security-probe.mjs --emit-block {stem}.security.{N}.run.json --mode diff
