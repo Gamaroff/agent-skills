@@ -95,7 +95,7 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
 1. Source the platform helper and resolve the platform:
    ```bash
    # shellcheck source=references/resolve-platform.sh
-   . "$(dirname "$0")/references/resolve-platform.sh" || exit 1   # adjust to the bundled path in this install
+   . "$(dirname "${0}")/references/resolve-platform.sh" || exit 1   # adjust to the bundled path in this install
    # VCS = github | bitbucket   ← the axis this step branches on
    ```
 2. **Both platforms**: post the findings inline with the shared primitive. It resolves `$VCS` itself, so this call does not branch — and it is real code rather than the prose that used to sit here describing behaviour no file implemented:

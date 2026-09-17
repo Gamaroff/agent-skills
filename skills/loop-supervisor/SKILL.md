@@ -42,7 +42,7 @@ context **between** iterations is the point.
 # See what would happen. Probes, prints the plan and the exact claude argv, spawns nothing.
 node .agents/skills/loop-supervisor/scripts/run-loop.mjs dry-run --adapter develop-next
 
-# Run the roadmap until the frontier empties, capped at 8 hours and $20.
+# Run the roadmap until the frontier empties, capped at 8 hours and 20 USD.
 node .agents/skills/loop-supervisor/scripts/run-loop.mjs run \
   --adapter develop-next --max-duration 8h --max-cost 20
 

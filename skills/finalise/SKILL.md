@@ -346,11 +346,11 @@ Collect these values before dispatching:
 
 ```bash
 # PR number
-PR_NUMBER=$(grep '^pr_number:' {story-file} | awk '{print $2}' | grep -oE '[0-9]+' | head -1)
+PR_NUMBER=$(grep '^pr_number:' {story-file} | awk '{print $(2)}' | grep -oE '[0-9]+' | head -1)
 [ -z "$PR_NUMBER" ] && PR_NUMBER=$(grep -oE 'PR #([0-9]+)|pull/([0-9]+)' {story-file} | grep -oE '[0-9]+' | head -1)
 
 # Story type
-STORY_TYPE=$(grep '^type:' {story-file} | awk '{print $2}' | tr -d '"')
+STORY_TYPE=$(grep '^type:' {story-file} | awk '{print $(2)}' | tr -d '"')
 [ -z "$STORY_TYPE" ] && STORY_TYPE="task"
 
 # Git diff for AC agent (best-effort — empty diff is handled gracefully by the agent)
@@ -1137,7 +1137,7 @@ standalone.
 #!/usr/bin/env bash
 # usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE>
 # Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <WAITED>s".
-PR_NUMBER=$1; EXPECTED_HEAD=$2; MAX_WAIT=$3; RESULT=$4
+PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}
 rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it, do not re-derive it...; }
 # The head CI was actually sampled on — read from the PR, never echoed back from the argument.
 # GitHub form shown; Bitbucket: the PR's .source.commit.hash. "unknown" on failure makes the
@@ -1269,7 +1269,7 @@ POLLEOF
    MARKER="<!-- finalise-canonical-summary -->"
    DOD_PATH=$(ls {document-directory}/*.dod.*.md 2>/dev/null | sort | tail -1)
    FINAL_GATE=$(ls {document-directory}/*.gate.*.yml 2>/dev/null | sort | tail -1 \
-     | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $2}' || echo "N/A")
+     | xargs -I{} grep '^gate:' {} 2>/dev/null | awk '{print $(2)}' || echo "N/A")
 
    # The plain-language lead. It goes BELOW the marker and above everything
    # else — see the warning under Step 6c. `done` is the same stage the tracker

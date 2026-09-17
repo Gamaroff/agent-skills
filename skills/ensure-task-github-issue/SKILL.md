@@ -93,9 +93,9 @@ Read `project.yml` from the repo root:
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q '.nameWithOwner')
-OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $2}')
+OWNER=$(grep '^ *owner:' project.yml | head -1 | awk '{print $(2)}')
 REPO_NAME=$(gh repo view --json name -q '.name')
-PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $2}')
+PROJECT_NUM=$(grep 'project_board_number:' project.yml | awk '{print $(2)}')
 PROJECT_NAME=$(grep 'project_board_name:' project.yml | sed -E 's/.*: *"?([^"]+)"?/\1/')
 # Prefer the current branch's remote-tracking branch (strip the remote prefix),
 # so the link points at the branch where the work lives. Fall back to the repo's
