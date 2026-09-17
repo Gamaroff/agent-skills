@@ -45,7 +45,7 @@
  *
  * AUTHORING-TIME HIT COUNT (recorded here, not in the task document, because a
  * number in prose decays): the first run of this scan over 485 fenced
- * bash/sh/shell blocks in 100 `SKILL.md` files found 22 hits in 12 files —
+ * bash/sh/shell blocks in 128 `SKILL.md` files found 22 hits in 12 files —
  * 19 × `awk '{print $2}'`, one `PR_NUMBER=$1; …=$4` script header, one
  * `$(dirname "$0")`, one `$20` in a comment. All 22 were rewritten to a safe
  * form in task.119; the allowlist below is therefore empty at authoring time

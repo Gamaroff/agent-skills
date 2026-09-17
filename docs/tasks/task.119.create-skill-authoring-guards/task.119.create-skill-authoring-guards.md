@@ -127,7 +127,7 @@ comment rewrites.
 
 | File | Change |
 | :--- | :--- |
-| `tests/fenced-bash-positional-params.test.js` (new) | the guard — scope `skills/*/SKILL.md` (Phase 0 fixed it), regex `(?<!\\)\$[0-9]`, floor 50 blocks (485 scanned; fences tracked as a stack so nested template fences cannot hide a real block — §5 asserts opener parity), empty allowlist with reason-checking, Phase 0 findings in the header; `package.json` unchanged (`tests/*.test.js` already in the glob — verified) |
+| `tests/fenced-bash-positional-params.test.js` (new) | the guard — scope `skills/*/SKILL.md` (Phase 0 fixed it), regex `(?<!\\)\$[0-9]`, floor 50 blocks (485 scanned; fences tracked as a stack so nested template fences cannot hide a real block, and a fence-shaped line inside a runnable block is content — §5 asserts, per runnable opener in the live tree, that the content line after it was scanned), empty allowlist with reason-checking, Phase 0 findings in the header; `package.json` unchanged (`tests/*.test.js` already in the glob — verified) |
 | `tests/bundle-comment-origin.test.js` (new) | fixture proves the bundler warning fires and that a `bundle-dependency:` line and a code reference do not; live-tree assertion over every JS/MJS the bundler reads; empty allowlist with reason-checking |
 | `skills/create-skill/scripts/bundle_skill.py` | `comment_only_refs()` / `warn_comment_only_refs()` — `⚠️ comment-only reference: <file>:<line> → <target>` on a comment-only origin in a `.js`/`.mjs`; `// bundle-dependency: shared/resources/X` is the silent declaration form; self-references skipped |
 | `skills/create-skill/SKILL.md` | new § *Three Rules the Corpus Learned by Failing* — runnable prose, shell matrices, comments as dependency declarations — each with its failure; written token-free because this file is rendered on invocation |
@@ -138,6 +138,7 @@ comment rewrites.
 | `shared/resources/defer-mutation.js` | its two deliberate comment-path declarations become `bundle-dependency:` lines |
 | `shared/resources/generate-prd-epic-index.mjs`, `shared/resources/tests/*.test.mjs` (9), `skills/{create-story,develop-batch,develop-next,jira-epic-creator,scaffold-tracker-workflow}/scripts/*`, `skills/review-security/tests/fixtures/redis-tls/engaged.mjs`, `skills/sync-jira-bug/tests/end-to-end.test.js` | comment paths → bare filenames (prose); bundle graph unchanged (`npm run bundle -- --check` clean, no references added or removed) |
 | `docs/architecture/concepts/coding-standards.md` § Cross-skill resources | the comment-path rule and the declaration form |
+| `skills/develop-next/references/document-status-lifecycle.md` (removed) | the rewritten `select-next.mjs` comment was its only discovery edge; nothing in develop-next reads it (QA cycle 2, CR-6) |
 | `CHANGELOG.md` | Unreleased → Added entry |
 
 ## 8. Testing Strategy
@@ -227,7 +228,7 @@ Three QA cycles. Cycle 1: CR-1 fence-state loss on nested template fences (fixed
 - [x] Scratch skill A: is a Read-loaded `references/*.md` substituted? **No** — arrived verbatim (2026-09-17, Claude Code 2.1.274); scope fixed to `skills/*/SKILL.md`. Also found: substitution is zero-indexed and leaves tokens past the argument count literal. Recorded in the guard header
 - [x] Scratch skill B: does `\$0` survive rendering? **Yes** (backslash consumed, token intact) — but the on-disk form is an awk syntax error, so the lookbehind is kept and the escape is confined to double-quoted bash strings; `${N}` / `$(N)` / `${BASH_SOURCE[0]}` verified unsubstituted and runnable
 ### Phase 1: the guard
-- [x] Test scans fenced `bash`/`sh`/`shell` blocks for `$0`–`$9` over the scope Phase 0 fixed; allowlist with reasons; floor ≥ 50; the test records the hit count at authoring time (22 hits / 12 files / 478 blocks; all rewritten; mutation: one `$2` reintroduced → red naming `qa-task/SKILL.md:161`)
+- [x] Test scans fenced `bash`/`sh`/`shell` blocks for `$0`–`$9` over the scope Phase 0 fixed; allowlist with reasons; floor ≥ 50; the test records the hit count at authoring time (22 hits / 12 files / 485 blocks; all rewritten; mutation: one `$2` reintroduced → red naming `qa-task/SKILL.md:161`)
 ### Phase 2: the rules in create-skill
 - [x] Runnable prose: no positional-parameter tokens; the implicit-form alternatives; qa-task Step 4b's from-disk limit stated
 - [x] Shell matrices derive from `zshAvailable()`; `bash` unconditional; `zsh-unavailable` note
