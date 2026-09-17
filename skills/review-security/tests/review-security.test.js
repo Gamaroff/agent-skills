@@ -772,22 +772,34 @@ test("concurrent --record runs against one file converge — every control survi
       }),
   );
   await Promise.all(runs);
-  const { readRecord } = await engine();
+  const { readRecord, recordEntriesDir } = await engine();
   const r = readRecord(rec);
   assert.deepEqual(
     r.controls.map((c) => c.name).sort(),
     ["a", "b", "c"],
-    "an unlocked read-merge-rename keeps only the last writer's control",
+    "concurrent runs must each keep their own control",
   );
   assert.equal(
     r.totals.executed,
     r.controls.reduce((n, c) => n + c.executed, 0),
   );
-  assert.ok(!fs.existsSync(`${rec}.lock`), "the lock is released");
+  const entries = fs.readdirSync(recordEntriesDir(rec));
+  assert.equal(
+    entries.filter((f) => f.endsWith(".json")).length,
+    3,
+    "one entry file per control",
+  );
+  assert.equal(
+    entries.filter((f) => f.endsWith(".tmp")).length,
+    0,
+    "no temp litter in the entry dir",
+  );
   assert.equal(
     fs.readdirSync(path.dirname(rec)).filter((f) => f.endsWith(".tmp")).length,
     0,
+    "no temp litter beside the snapshot",
   );
+  assert.ok(fs.existsSync(rec), "the snapshot exists");
 });
 
 test("readRecord rejects a record whose control elements are malformed", async () => {
@@ -891,8 +903,8 @@ test("SEVERITY_BY_VERDICT is the prompt's severity table — one definition", as
 });
 
 // ---------------------------------------------------------------------------
-// QA cycle 3 (task.118): the renderer's remaining YAML edges, the lock's
-// timeout/stale ordering and rename-based reclaim, the preflight's write check.
+// QA cycle 3 (task.118): the renderer's remaining YAML edges and the preflight's
+// write check (the lock tests that lived here went with the lock in cycle 6).
 // ---------------------------------------------------------------------------
 
 test("emitBlock quotes a value ending in ':' and a leading-zero integer", async () => {
@@ -933,11 +945,10 @@ test("emitBlock quotes a value ending in ':' and a leading-zero integer", async 
 });
 
 test("readRecord rejects a control whose verdict is not one of VERDICTS", async () => {
-  const { readRecord, RECORD_VERSION } = await engine();
+  const { readRecord } = await engine();
   const rec = tmpRecord();
   writeEntry(rec, "x.json", { executed: 1, reproduced: 0, verdict: "engage" });
   assert.throws(() => readRecord(rec), /not a version-1/);
-  void RECORD_VERSION;
 });
 
 test("preflightRecord fails on an existing read-only directory before the probe runs", async () => {
@@ -978,16 +989,20 @@ test("a re-run of the same control replaces only its own entry", async () => {
 test("the engine never reads the snapshot — an edited snapshot cannot change the block", async () => {
   const { recordRun, emitBlock, readRecord } = await engine();
   const rec = tmpRecord();
-  recordRun(rec, await probe("redis-tls/inert"));
+  const a = await probe("redis-tls/inert");
+  recordRun(rec, a);
   const forged = JSON.parse(fs.readFileSync(rec, "utf8"));
   forged.controls = [];
   forged.totals = { executed: 999, reproduced: 0 };
   fs.writeFileSync(rec, JSON.stringify(forged));
   const block = emitBlock(readRecord(rec));
-  assert.equal(readBlock(block).probes_executed, 12);
+  assert.equal(readBlock(block).probes_executed, a.executed);
   // --emit-block rewrites the snapshot exactly from the entries.
   assert.equal(cli(["--emit-block", rec]).status, 0);
-  assert.equal(JSON.parse(fs.readFileSync(rec, "utf8")).totals.executed, 12);
+  assert.equal(
+    JSON.parse(fs.readFileSync(rec, "utf8")).totals.executed,
+    a.executed,
+  );
 });
 
 test("no lock, reclaim or pid machinery remains", async () => {
@@ -1003,4 +1018,86 @@ test("no lock, reclaim or pid machinery remains", async () => {
   const src = fs.readFileSync(ENGINE_PATH, "utf8");
   assert.doesNotMatch(src, /openSync\([^)]*"wx"/, "no O_EXCL lock create");
   assert.doesNotMatch(src, /Atomics\.wait/, "no lock wait loop");
+});
+
+// ---------------------------------------------------------------------------
+// QA cycle 7 (task.118): edges of the entry-file layout — emit must never lose
+// the block to a snapshot write, a snapshot without entries is loud, the fold
+// dedupes by key.
+// ---------------------------------------------------------------------------
+
+test("CLI: --emit-block still prints the block when the snapshot cannot be written", async () => {
+  if (process.getuid && process.getuid() === 0) return; // root ignores mode bits
+  const rec = tmpRecord();
+  const a = await probe("redis-tls/inert");
+  const { recordRun } = await engine();
+  recordRun(rec, a);
+  const dir = path.dirname(rec);
+  fs.chmodSync(dir, 0o500);
+  try {
+    const r = cli(["--emit-block", rec]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(readBlock(r.stdout).probes_executed, a.executed);
+    assert.match(r.stderr, /could not refresh the snapshot/);
+  } finally {
+    fs.chmodSync(dir, 0o700);
+  }
+});
+
+test("a snapshot with no entry directory is a loud failure, never an empty record", async () => {
+  const { readRecord } = await engine();
+  const rec = tmpRecord();
+  fs.writeFileSync(
+    rec,
+    JSON.stringify({ version: 1, controls: [], totals: {} }),
+  );
+  assert.throws(() => readRecord(rec), /no entry directory/);
+  const r = cli(["--emit-block", rec]);
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /no entry directory/);
+  // A probe run against it fails fast too, before the budget is spent.
+  const spec = (await specs())["redis-tls/engaged"];
+  const run = cli([
+    "--sink",
+    spec.sink,
+    "--entry",
+    spec.entry,
+    "--record",
+    rec,
+  ]);
+  assert.equal(run.status, 2, run.stderr);
+  assert.equal(run.stdout, "");
+});
+
+test("the fold dedupes by {sink, entry}, latest run wins, whatever the file names", async () => {
+  const { readRecord } = await engine();
+  const rec = tmpRecord();
+  const base = {
+    sink: "s",
+    entry: "e#f",
+    verdict: "engages",
+    reason: "ok",
+    executed: 5,
+    reproduced: 0,
+  };
+  writeEntry(rec, "old.json", {
+    ...base,
+    ran_at: "2026-01-01T00:00:00Z",
+    name: "old",
+  });
+  writeEntry(rec, "new.json", {
+    ...base,
+    ran_at: "2026-01-02T00:00:00Z",
+    name: "new",
+    executed: 7,
+  });
+  writeEntry(rec, "other.json", {
+    ...base,
+    entry: "g#h",
+    ran_at: "2026-01-01T00:00:00Z",
+  });
+  const r = readRecord(rec);
+  assert.equal(r.controls.length, 2, "one control per key");
+  assert.equal(r.controls.find((c) => c.entry === "e#f").name, "new");
+  assert.equal(r.totals.executed, 12, "a duplicate must not be counted twice");
 });

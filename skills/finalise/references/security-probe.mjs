@@ -55,6 +55,7 @@ import {
   constants as fsConstants,
   mkdtempSync,
   mkdirSync,
+  existsSync,
   readdirSync,
   readFileSync,
   renameSync,
@@ -597,11 +598,6 @@ function totalsOf(controls) {
   );
 }
 
-/**
- * Read a record. `null` when the file is absent; throws on a file that exists
- * but is not a record — a corrupt record is a finding, not an empty one, and
- * silently treating it as empty would let a truncated write read as "reasoned".
- */
 /** The entry directory beside a record path. */
 export function recordEntriesDir(recordPath) {
   return `${recordPath}.d`;
@@ -630,8 +626,17 @@ export function readRecord(recordPath) {
   try {
     names = readdirSync(dir);
   } catch (e) {
-    if (e.code === "ENOENT") return null;
-    throw e;
+    if (e.code !== "ENOENT") throw e;
+    // No entries. A snapshot standing alone is not "no record": it is a record
+    // whose entries are gone (or one written by the merged-file layout this
+    // replaced), and reading it as empty would let the next --record silently
+    // overwrite it (QA cycle 7, CR7-2). Loud, like every other unreadable record.
+    if (existsSync(recordPath)) {
+      throw new Error(
+        `${recordPath} has no entry directory (${dir}) — a snapshot without entries is not a record; re-run the probes with --record`,
+      );
+    }
+    return null;
   }
   const controls = [];
   for (const name of names.filter((n) => n.endsWith(".json")).sort()) {
@@ -648,7 +653,23 @@ export function readRecord(recordPath) {
     }
     controls.push(entry);
   }
-  return foldRecord(controls);
+  return foldRecord(dedupeByKey(controls));
+}
+
+/**
+ * One control per `{sink, entry}`, latest run wins. The writer already
+ * guarantees this by file name, but the fold must not depend on it: a copy of
+ * an entry under another name would otherwise count one control twice (CR7-3).
+ */
+function dedupeByKey(controls) {
+  const byKey = new Map();
+  for (const c of controls) {
+    const k = controlKey(c);
+    const prev = byKey.get(k);
+    if (!prev || String(c.ran_at ?? "") >= String(prev.ran_at ?? ""))
+      byKey.set(k, c);
+  }
+  return [...byKey.values()];
 }
 
 function foldRecord(controls) {
@@ -679,14 +700,11 @@ function writeAtomic(target, text) {
 }
 
 /**
- * Serialise the read → merge → rename against other engine processes writing
- * the same record. A review probes several controls, and an agent that issues
- * those probes as parallel tool calls runs several engines at once; without
- * this every one of them reads the record as it stood before any wrote, and
- * the last rename silently drops the others (QA cycle 2, CR2-1 — three runs,
- * one surviving control). The lock is an O_EXCL create: the kernel hands it to
- * exactly one process, and a holder that died leaves a file whose age tells
- * the next caller to reclaim it rather than wait forever.
+ * Record one probe run: write this control's entry file under `<path>.d/`
+ * (atomic, named from `{sink, entry}`), then fold the directory into the
+ * snapshot at `<path>`. Concurrent runs of different controls write different
+ * files and never contend; a re-run of the same control replaces only its own.
+ * Returns the folded record.
  */
 export function recordRun(recordPath, result, opts = {}) {
   const dir = recordEntriesDir(recordPath);
@@ -719,6 +737,10 @@ export function writeSnapshot(recordPath, record) {
  * failure even when the read was what failed (CR2-4).
  */
 export function preflightRecord(recordPath) {
+  // Read BEFORE creating the entry directory: creating it first would turn a
+  // snapshot-without-entries (CR7-2) into an empty, valid-looking record and
+  // let this run write over it.
+  readRecord(recordPath); // throws on a corrupt entry or an orphaned snapshot
   const dir = recordEntriesDir(recordPath);
   mkdirSync(dir, { recursive: true });
   // mkdirSync is a no-op on an EXISTING read-only directory, so the write
@@ -726,7 +748,6 @@ export function preflightRecord(recordPath) {
   // and the snapshot's parent.
   accessSync(dir, fsConstants.W_OK);
   accessSync(dirname(resolve(recordPath)), fsConstants.W_OK);
-  readRecord(recordPath); // throws with the not-a-record message on a corrupt entry
 }
 
 /**
@@ -899,7 +920,17 @@ export function main(argv = process.argv.slice(2)) {
       process.stderr.write(`cannot read --emit-block record: ${e.message}\n`);
       return 2;
     }
-    if (record) writeSnapshot(opts.emitBlock, record);
+    // The snapshot is a reader convenience; failing to refresh it must not
+    // cost the block, which is the deliverable (QA cycle 7, CR7-1).
+    if (record) {
+      try {
+        writeSnapshot(opts.emitBlock, record);
+      } catch (e) {
+        process.stderr.write(
+          `warning: could not refresh the snapshot at ${opts.emitBlock}: ${e.message}\n`,
+        );
+      }
+    }
     process.stdout.write(emitBlock(record, { mode: opts.mode ?? "diff" }));
     return 0;
   }
