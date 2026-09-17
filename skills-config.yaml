@@ -29,3 +29,15 @@ loopSupervisor:
   # dashboardUrl: https://dash.internal/api/loop   # optional; --dashboard overrides
   # There is deliberately no dashboardToken key — this file is committed. The
   # token comes from --dashboard-token or $LOOP_SUPERVISOR_DASHBOARD_TOKEN.
+
+qa: # the QA loop's diminishing-returns exit — schema: docs/reference/configuration.md
+  # Test machinery in THIS repository: the eval suites, the per-skill test dirs and
+  # the top-level tests/. Findings whose file: matches only these can take the
+  # diminishing-returns exit (develop-pipeline-step-5-6-qa-loop.md). This was unset
+  # while the reference repo dogfooded the exit it ships, so the exit designed for
+  # task.110's five-cycle test-helper loop could never fire there (obs #105).
+  testArtifactGlobs:
+    - "evals/**"
+    - "tests/**"
+    - "skills/*/tests/**"
+    - "shared/resources/tests/**"

@@ -412,6 +412,7 @@ Transcribed from `tracker-comment.js` so the
 | `invalid-frontmatter` | a file's header could not be parsed |
 | `parked-without-condition` | `status: parked` with no `parked_until` |
 | `dry-run` | `--dry-run`; nothing read, nothing written |
+| `possible-duplicate` | `write` found an open or parked entry sharing a `skill:` with the candidate whose title overlaps it (Jaccard ≥ 0.28 over distinctive tokens); **nothing was written**. `candidates[]` lists id, title, status and overlap. Exit `0` — a recognised recurrence is a normal outcome. Bump the existing entry, or re-run with `--not-duplicate-of <ids>` naming every candidate; that flag is a recorded judgement, the same shape as `--siblings-checked none`. Resolved entries are never candidates: a recurrence of an actioned defect is a new fact (the fix did not hold) |
 | `usage` | the invocation itself was wrong — unknown subcommand or flag, missing required argument, a flag whose value is absent. Always paired with exit `2`, never `1`: a caller that mistyped a flag has a different problem from one whose guard tripped |
 
 **The vocabulary is a contract from the first commit.** Adding a value later is

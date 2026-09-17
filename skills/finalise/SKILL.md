@@ -653,6 +653,10 @@ CI_ROLLUP=$(gh pr view "$PR_NUMBER" --json statusCheckRollup \
                  or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
         elif any(. == "CANCELLED") then "CANCELLED"
         else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN")
+# How many checks that reading was green over. Reading 2's poll uses it as a floor: a fresh push
+# registers its fast lanes first, and a rollup that is SUCCESS across three checks while the slow
+# lanes have not yet appeared is not a decision (obs #87). Record it beside CI_ROLLUP.
+CI_CHECKS_1=$(gh pr view "$PR_NUMBER" --json statusCheckRollup -q '.statusCheckRollup | length' 2>/dev/null || echo 0)
 ```
 
 #### Bitbucket (`PLATFORM=bitbucket`)
@@ -853,9 +857,7 @@ If all DoD criteria are met, finalize the running summary, update the story/task
 
    - ✅ Story document updated with DoD verification section
    - ✅ Sprint Review summary created
-   - ✅ PR comment posted (if applicable)
-   - ✅ Tracker issue closed/transitioned (GitHub: issue #{github_issue} closed | Jira: transitioned to Done) (or ⚠️ failed — manual action required)
-   - ✅ GitHub project board moved to Done (GitHub only — or ⚠️ not found / mutation failed — see PR comment)
+   - Outward side-effects — the PR canonical comment, the tracker comment and close/transition, the board move — fire **after** this file is committed and pushed (Step 7 publish boundary); their outcomes are recorded on the PR canonical comment and in the implementation report's Decisions Log, not here
 
    **Next Steps:**
 
@@ -863,7 +865,11 @@ If all DoD criteria are met, finalize the running summary, update the story/task
    - No further action required
    ```
 
-> **Note:** When generating the actual DoD summary file, substitute `#{github_issue}` with the real issue number and replace each `✅`/`⚠️` with the actual outcome — do not hardcode `✅`.
+> **Note:** The DoD file is written and committed at 6a, *before* the PR comment, the tracker
+> close and the board move run, so it cannot truthfully carry their outcomes — an earlier template
+> listed them with a `✅` each, which every run either hard-coded or left as a placeholder (obs #81).
+> Local writes are listed with their real outcome; post-boundary outcomes are pointed at, exactly
+> as `CI reading 2` two lines above is.
 
 2. **Update Frontmatter:**
    - Change `status` to `accepted`
@@ -906,8 +912,11 @@ If all DoD criteria are met, finalize the running summary, update the story/task
      `DoD passed — accepted (PR #204)` from `finalise` and `Status → done` from the sync: the local
      acceptance decision, and the tracker reaching its terminal column.
 
-   If the document predates the Change Log template and has no such section, create it — for a
-   task, after `## 11. Rollback Plan`.
+   **Append through `change-log.js`, never by text search** — the one-liner is in
+   [document-change-log.md § How a writer appends a row](references/document-change-log.md), with
+   `version` set to the bumped minor. It creates the section when the document predates the
+   template (for a task, after `## 11. Rollback Plan`) and cannot land the row inside a fenced
+   example, which a regex did on task.42/43 (obs #113).
 
 4. **Tick the task registry row** — in the same step, for a **task** only.
 
@@ -1135,23 +1144,44 @@ standalone.
    # bash swallows the nohup line below into the script, so the poll never starts.
    cat > "$POLL" <<'POLLEOF'
 #!/usr/bin/env bash
-# usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE>
-# Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <WAITED>s".
-PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}
+# usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS]
+# Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <CHECKS> <WAITED>s".
+PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}
 rollup() { : ...the Step 6 rollup query for this platform, verbatim — copy it, do not re-derive it...; }
 # The head CI was actually sampled on — read from the PR, never echoed back from the argument.
 # GitHub form shown; Bitbucket: the PR's .source.commit.hash. "unknown" on failure makes the
 # later-turn head check HALT rather than pass.
 sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev/null || echo unknown; }
-WAITED=0
-STATE=$(rollup)
+# How many checks the rollup is green OVER. A push registers its fast lanes first; a rollup
+# sampled in that window is SUCCESS across three checks while the slow lanes have not yet
+# appeared (obs #87). Bitbucket: the pipeline count for the head commit.
+checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '.statusCheckRollup | length' 2>/dev/null || echo 0; }
+WAITED=0; PREV_CHECKS=-1
+STATE=$(rollup); CHECKS=$(checks)
+# A terminal state is accepted only when ALL of:
+#   (1) WAITED > 0 — the pre-loop sample can still be the PREVIOUS head's rollup, which a
+#       fresh push has not yet replaced (obs #108: a stale SUCCESS accepted at 0s);
+#   (2) the sampled head is the expected head — never gate one commit and read another;
+#   (3) the check count is at least reading 1's count and unchanged since the previous sample —
+#       a rollup that is still growing is not decided, whatever its state says.
+# FAILURE is terminal under (1) and (2) only: a red on a partial rollup is still a red.
+decided() {
+  [ "$WAITED" -gt 0 ] || return 1
+  [ "$(sampled_head | cut -c1-12)" = "$(printf '%s' "$EXPECTED_HEAD" | cut -c1-12)" ] || return 1
+  case "$STATE" in
+    FAILURE) return 0 ;;
+    SUCCESS) [ "$CHECKS" -ge "$EXPECTED_CHECKS" ] && [ "$CHECKS" -eq "$PREV_CHECKS" ] ;;
+    *) return 1 ;;
+  esac
+}
 while [ "$WAITED" -lt "$MAX_WAIT" ]; do
-  case "$STATE" in SUCCESS|FAILURE) break ;; esac
-  sleep 30; WAITED=$((WAITED + 30)); STATE=$(rollup)
+  decided && break
+  sleep 30; WAITED=$((WAITED + 30)); PREV_CHECKS=$CHECKS; STATE=$(rollup); CHECKS=$(checks)
 done
-printf '%s %s %ss\n' "$STATE" "$(sampled_head)" "$WAITED" > "$RESULT"
+printf '%s %s %s %ss\n' "$STATE" "$(sampled_head)" "$CHECKS" "$WAITED" > "$RESULT"
 POLLEOF
-   nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" \
+   # CI_CHECKS_1 is the check count reading 1 was green over (Step 6 records it beside CI_ROLLUP).
+   nohup bash "$POLL" "$PR_NUMBER" "$CI_HEAD_2" "${FINALISE_CI_MAX_WAIT:-1500}" "$RESULT" "${CI_CHECKS_1:-0}" \
      > .claude/state/finalise-ci-poll.log 2>&1 &
    echo $! > "$PIDFILE"
    echo "CI poll backgrounded (pid $(cat "$PIDFILE")) — read $RESULT on a later turn; absent means still polling"
@@ -1175,12 +1205,15 @@ POLLEOF
        echo "HALT: the CI poll is not running and wrote no result — see .claude/state/finalise-ci-poll.log"; exit 1
      fi
    else
-     read -r CI_ROLLUP_2 CI_HEAD_READ WAITED < "$RESULT"
+     read -r CI_ROLLUP_2 CI_HEAD_READ CI_CHECKS_2 WAITED < "$RESULT"
      # CI_HEAD_READ is the head the poll SAMPLED from the PR, so this catches a push that landed
      # mid-poll ("unknown" when the poll could not read it — a HALT, not a pass).
      [ "${CI_HEAD_READ:0:12}" = "${CI_HEAD_2:0:12}" ] \
        || { echo "HALT: CI was sampled on ${CI_HEAD_READ:0:12}, not the acceptance head ${CI_HEAD_2:0:12}"; exit 1; }
-     echo "CI reading 2: $CI_ROLLUP_2 @ ${CI_HEAD_2:0:12} after $WAITED"
+     # Record what the reading was green OVER — a SUCCESS across 3 checks on a repo whose previous
+     # head decided 9 is a partial rollup, and the poll's stop condition refuses it; say so here
+     # too, so a reader of the log can see the count without re-deriving it.
+     echo "CI reading 2: $CI_ROLLUP_2 @ ${CI_HEAD_2:0:12} over $CI_CHECKS_2 checks after $WAITED"
    fi
    ```
 

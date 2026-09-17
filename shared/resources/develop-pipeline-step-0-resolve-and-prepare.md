@@ -314,7 +314,7 @@ fi
 
 **Note (tasks only)**: if no `jira_key` is present (tasks are often purely technical), silently skip all Jira operations.
 
-**Lite mode detection**: `PIPELINE_MODE` is resolved by the Lite-mode + always-load detector dispatched in **0a-parallel** (Agent 3), which **runs the production lite-mode CLI**. The Aggregation block then recomputes `PIPELINE_MODE` from the CLI's already-computed booleans (`risk_ok ∈ {low,absent} AND phase_count < 3 AND single_module`) as defence-in-depth. This mechanical boolean AND of pre-computed values is permitted — it is **not** the forbidden prose re-derivation of the FR3 rule from the document (which the CLI now owns). Do **not** re-parse the document's headings yourself. See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
+**Lite mode detection**: `PIPELINE_MODE` is resolved from the three inputs the Lite-mode + always-load detector (Agent 3, dispatched in **0a-parallel**) reports by **reading the document** — that is Agent 3's normal path, and there is no lite-mode CLI in the tree (`shared/resources/develop-pipeline-lite-mode.md` is the contract, not an executable). The Aggregation block then computes `PIPELINE_MODE` from those reported booleans (`risk_ok ∈ {low,absent} AND phase_count < 3 AND single_module`). What is forbidden is judging `pipeline_mode` **by impression**: report the three inputs as separate fields and let the AND decide. **If Agent 3 was not dispatched** (Phase 0 run inline), derive the same three inputs from the document yourself, exactly as its prompt says, and record that you did. See `shared/resources/develop-pipeline-lite-mode.md` for trigger conditions, `PIPELINE_MODE=lite` behaviour, and the directive format passed to the QA skill.
 
 ---
 
@@ -517,7 +517,7 @@ Determine the list of files to pre-load as context for `/develop`. This section 
 1. **Use 0a-parallel result** (`LITEMODE_RESULT.always_load_files`):
    - If `LITEMODE_RESULT.skills_config_exists = true` and `always_load_files` is non-empty: use that list.
    - If `LITEMODE_RESULT.skills_config_exists = true` but `always_load_files` is empty: skills-config.yaml has no `devLoadAlwaysFiles` key — fall back to defaults.
-   - If `LITEMODE_RESULT.skills_config_exists = false` or Agent 3 failed: use defaults.
+   - If `LITEMODE_RESULT.skills_config_exists = false`, or Agent 3 failed, **or Agent 3 was not dispatched** (inline Phase 0 — a first-class case, not a failure): use defaults.
 
 2. **Defaults** (when skills-config.yaml absent or Agent 3 failed) — anchored to `${ARCH_ROOT}` (default `docs/architecture`):
    - `${ARCH_ROOT}/concepts/coding-standards.md`

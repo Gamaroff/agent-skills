@@ -1283,10 +1283,17 @@ export function classifyBlock(code, bindings = {}) {
   // nothing. Bare `command X` runs X, so the exception is anchored to the flag and
   // nothing else. Without it the repository's own documented zsh guard
   // (`command -v zsh >/dev/null`) is unrunnable by the gate that recommends it.
-  const codeForScan = stripNonCode(code).replace(
-    /\bcommand\s+-[vV]\b/g,
-    "true",
-  );
+  // Bare `command X …` (no option) runs X with the same argv and nothing else —
+  // the one runner whose grammar is trivial. Drop the word and classify X by its
+  // own rules: `command node x.mjs` scans as `node x.mjs` (runnable), `command mv
+  // a b` scans as `mv a b` (mutating, QA-5 still holds). Without this the repo's
+  // own `command`-prefix trap (nvm's node shell function) made every documented
+  // `command node …` block unrunnable by the gate that prescribes the prefix
+  // (obs #90). `command -p X` (PATH override) and `command -v` are NOT this case:
+  // -v is rewritten above, and an option-bearing form stays a refused runner.
+  const codeForScan = stripNonCode(code)
+    .replace(/\bcommand\s+-[vV]\b/g, "true")
+    .replace(/(^|[\s;|&(])command\s+(?![-])/g, "$1");
 
   const unknown = commandWords(codeForScan).filter((w) => {
     if (COMMAND_RUNNERS.has(w)) return true; // CR-5/CR-6 — before the allow-list

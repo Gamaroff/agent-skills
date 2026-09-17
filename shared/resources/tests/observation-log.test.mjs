@@ -26,6 +26,7 @@ import {
   rmSync,
   mkdirSync,
   realpathSync,
+  readdirSync,
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -551,6 +552,92 @@ test("write serialises `skill` as a list even with a single entry", () => {
     const scan = cli(["scan", "--workspace", dir, "--json"]);
     assert.ok(Array.isArray(scan.json.entries[0].skill));
     assert.deepEqual(scan.json.entries[0].skill, ["only-one"]);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("write refuses a probable duplicate of an open entry on the same skill, and --not-duplicate-of clears it", () => {
+  // MUTATION: delete the `findPossibleDuplicates` call in cmdWrite, or raise the
+  // threshold above 1.0.
+  //
+  // The same tracker-comment defect was written eight times in five days
+  // (obs #66, #70, #75, #78, #80, #84, #93, #94), each phrased afresh, by
+  // sessions that checked sibling SKILLS and never prior ENTRIES. The check
+  // lives in the one write path so it needs no discipline to hold; it exits 0
+  // because a recognised recurrence is a normal outcome, and it writes nothing.
+  const { dir, P } = initWs("dup");
+  try {
+    obs(P, "0075-existing.md", {
+      id: 75,
+      title:
+        '"qa-gate / qa-fix tracker comments are idempotent per stage, so only QA cycle 1 ever reaches the issue"',
+      status: "open",
+      skill: "\n  - qa-task",
+    });
+    // A resolved entry with an overlapping title is NOT a candidate.
+    obs(P, "0060-resolved.md", {
+      id: 60,
+      title: '"qa-gate tracker comments are idempotent per stage"',
+      status: "actioned",
+      resolved: "2026-01-01",
+      skill: "\n  - qa-task",
+    });
+    const bodyFile = join(dir, "body.md");
+    writeFileSync(bodyFile, "body\n");
+    const base = [
+      "write",
+      "--workspace",
+      dir,
+      "--title",
+      "qa-task Step 13b tracker comment uses a cycle-less qa-gate stage, so cycle 2+ returns already and never posts",
+      "--skill",
+      "qa-task",
+      "--siblings-checked",
+      "none",
+      "--body-file",
+      bodyFile,
+      "--json",
+    ];
+    const r = cli(base);
+    assert.equal(r.json.reason, "possible-duplicate");
+    assert.equal(r.code, 0);
+    assert.equal(r.json.id, null);
+    assert.deepEqual(
+      r.json.candidates.map((c) => c.id),
+      [75],
+    );
+    assert.equal(
+      readdirSync(P.logDir).filter((f) => f.endsWith(".md")).length,
+      2,
+      "nothing was written",
+    );
+
+    // A different skill with the same words is not a duplicate: skill scopes the check.
+    const other = cli(base.map((a) => (a === "qa-task" ? "finalise" : a)));
+    assert.equal(other.json.reason, "ok");
+
+    // An unrelated title on the same skill passes.
+    const unrelated = cli([
+      "write",
+      "--workspace",
+      dir,
+      "--title",
+      "Executed boundary probes inherit the live environment",
+      "--skill",
+      "qa-task",
+      "--siblings-checked",
+      "none",
+      "--body-file",
+      bodyFile,
+      "--json",
+    ]);
+    assert.equal(unrelated.json.reason, "ok");
+
+    // The recorded judgement clears it.
+    const cleared = cli([...base, "--not-duplicate-of", "75"]);
+    assert.equal(cleared.json.reason, "ok");
+    assert.ok(cleared.json.id > 75);
   } finally {
     cleanup(dir);
   }

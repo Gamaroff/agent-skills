@@ -22,8 +22,8 @@ Two entry points:
 
 ## Workspace resolution
 
-Every read and write below needs the log's location. Resolve it **once per session**, from the
-resolver — never from the current working directory:
+Every read and write below needs the log's location. Resolve it from the resolver — never from the
+current working directory:
 
 ```bash
 source references/resolve-observation-workspace.sh || exit 1
@@ -33,6 +33,25 @@ source references/resolve-observation-workspace.sh || exit 1
 **The `|| exit 1` is required, not stylistic.** A bare `source` prints the resolver's error and then
 carries on with the variables unset, which turns every subsequent filter into a match-nothing glob
 and reports an empty, clean backlog. That is the one answer nobody questions.
+
+**Resolve once per _shell_, not once per session.** Those are the same thing at a human's terminal
+and different things in every agent harness, where each command runs in a fresh process and no
+exported variable survives into the next one. There the `source` must be re-run **in the same
+invocation** as the engine call that needs it:
+
+```bash
+source references/resolve-observation-workspace.sh || exit 1
+command node references/observation-log.js scan --json
+```
+
+Or pass the workspace explicitly with `--workspace <path>`, which every command accepts and which no
+`source` can lose.
+
+**An engine call made in a later shell than its `source` exits 2 with `reason: usage`** and an
+`error` naming `--workspace` and the resolver. That is a lost shell variable, not a missing or
+broken log. Re-source and re-run; do not conclude anything about the log's health from it — reading
+that exit as "the log is not set up" makes exactly the category error the `empty` / `scan-broken`
+split exists to prevent one layer down.
 
 The resolver refuses an ephemeral anchor (`/tmp`, `.claude/worktrees/`, a linked worktree) rather
 than warning about it, because a log written there is deleted with the checkout.
@@ -67,7 +86,7 @@ Act on the check, never on `healthy` alone:
 | Failing check | Do this |
 |---|---|
 | `workspace-exists` | `command node references/observation-log.js init --json`, then re-run `doctor` |
-| `activation-configured` | **Note it and continue.** Step 4 owns this. It must never stop a write. Read its `state`: `not-configured` means the file at `root` lacks the instruction; `no-agent-file` means check the reported `root` before assuming the project was never set up |
+| `activation-configured` | **Note it and continue.** Step 4 owns this. It must never stop a write. **Until bug 15 lands, this check (and `families --audit`) anchors at the cwd**: run both from the repository root, or pass `--audit-root "$(git rev-parse --show-toplevel)"`, or a configured project reads as unconfigured and a family as `member-not-found` |
 | `anchor-durable` | Also reported as `reason` `ephemeral-workspace` — see below |
 | `no-fork` | Also reported as `reason` `fork-detected` — see below |
 
@@ -85,12 +104,6 @@ Then act on `reason`:
 > to fix. Treating `healthy: false` as a blanket stop would refuse to capture in exactly the
 > projects this skill most needs to work in, and it would do so **before** reaching the step that
 > resolves it. Only `workspace-exists` demands an action here; only `reason` demands a halt.
-
-> **The agent-file lookup is anchored at the project root, not the cwd.** `doctor` and
-> `families --audit` walk up to the nearest `.git` (or take `--audit-root` verbatim) and report the
-> `root` they used, so the documented `cd`-into-the-skill invocation answers the same as one from the
-> repo root. Before bug 15 it did not: from `skills/observe-work/` the check false-negatived with
-> `reason: ok` and exit 0, every session, in the reference repo itself.
 
 > **`reason` is `"ok"` on a workspace that does not exist yet, and `exitCode` is `0`.** A missing log
 > is not an error — it is the normal state of a project that has never run this skill — so the engine
@@ -192,6 +205,19 @@ the literal `none` is correct where the target belongs to no family, and it is a
 rather than a missing one. There is deliberately **no `--id` flag**; ids are always derived, and the
 call rejects one.
 
+**Before writing, look for the entry that already says this.** `--siblings-checked` asks about
+sibling *skills*; nothing in it asks about prior *entries*, and the same tracker-comment defect was
+written eight times in five days by sessions that each phrased it afresh (#66, #70, #75, #78, #80,
+#84, #93, #94 — one defect). So `write` now checks for you: an open or parked entry on the same
+skill with an overlapping title returns `reason: possible-duplicate` with the candidate ids, exit 0,
+**and writes nothing**. Read the candidates. A recurrence of a known open defect is **evidence for
+the existing entry** — append a dated line to its Issue naming this session and the artefact, and
+move on — not a new fact. Only when the candidate is genuinely a different defect re-run with
+`--not-duplicate-of <ids>` naming every candidate: that flag is a recorded judgement, the same
+shape as `--siblings-checked none`, and it is the only way past the check. A recurrence of a
+*resolved* defect is a new entry — resolved entries are never candidates, because "the fix did not
+hold" is the finding.
+
 Three rules make the write actually happen:
 
 - **Write silently, in the same turn or the next.** The act of writing is the enforcement. A mental
@@ -276,14 +302,24 @@ audit reports every one of them as drifted.
 
 ## Quick reference
 
+**Every row below needs `OBS_WORKSPACE` set in the shell that runs it.** Compose the resolver and the
+call; do not split them across two invocations (see *Workspace resolution*):
+
+```bash
+source references/resolve-observation-workspace.sh || exit 1
+command node references/observation-log.js <command> --json
+```
+
 | Need | Command |
 |---|---|
 | Resolve the workspace | `source references/resolve-observation-workspace.sh \|\| exit 1` |
+| Skip the resolver entirely | add `--workspace <path>` to any command below |
 | Health check | `command node references/observation-log.js doctor --json` |
 | Create the log | `command node references/observation-log.js init --json` |
 | Read frontmatter | `command node references/observation-log.js scan --json` |
 | The work queue | `command node references/observation-log.js queue --json` |
 | Write an observation | `command node references/observation-log.js write --title … --skill … --siblings-checked … --body-file … --json` |
+| Write past a `possible-duplicate` you have judged distinct | `… write … --not-duplicate-of 12,34 --json` |
 | Checkpoint with nothing to log | `command node references/observation-log.js checkpoint --note "no observations" --json` |
 | Resolve one | `command node references/observation-log.js set-status --id N --status actioned --resolution … --json` |
 | Sweep resolved entries | `command node references/observation-log.js archive --json` |

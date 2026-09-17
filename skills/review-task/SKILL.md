@@ -777,6 +777,13 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Verify all file paths in Implementation Plan exist or are valid new paths
    - Check paths follow project structure conventions
    - Validate naming conventions (kebab-case, PascalCase where appropriate)
+   - **Line anchors resolve, not only paths.** When a citation carries `:N` or `:N-M`, read those
+     lines (`sed -n 'N,Mp'`) and confirm they contain the thing the citation names. A path whose line
+     suffix points at unrelated code passes the path check and is **worse than no anchor**: it sends
+     the developer to plausible neighbouring code and invites them to reconcile it with the claim.
+     Measured on task.82: five anchors, every path right, every line number wrong within seven days.
+     Report a drifted anchor as **Optional** with the corrected number — the claim is true, the
+     coordinate moved. (obs #22)
 
 3. **API Pattern Accuracy**:
    - Verify endpoints match REST API patterns or GraphQL schemas
@@ -792,6 +799,28 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
    - Verify code examples use correct syntax
    - Check imports are from valid paths
    - Validate examples match project coding standards
+
+6. **Same-class mechanism inventory** (obs #103):
+   - When the plan adds a function whose purpose is to dedupe, heal, migrate, retry, normalise or
+     reconcile, grep the target file (and its siblings) for existing functions of that kind
+   - The document must **name** them and state whether the new one *replaces*, *extends* or *sits
+     beside* each — "sits beside" needs a sentence of justification
+   - Flag as **Important** when the inventory is absent; a second mechanism for a job the file
+     already does is the enumeration class in `docs/reference/anti-patterns.md`
+
+7. **Figures that a test will re-measure** (obs #117):
+   - A count in prose ("864 broken links", "12 files carry …") is a claim that decays within days
+   - The document must record the **definition** (files scanned, patterns, exclusions) and the
+     **command** that produced the number, and let the test that lands record the number
+   - Flag as **Optional** when the number is present without its definition; **Important** when a
+     success criterion depends on the number matching
+
+8. **Path-filtered workflow triggers** (obs #102):
+   - When the plan adds a path, glob or file class to a check that runs inside an existing GitHub
+     Actions / CI workflow, read that workflow's `on.<event>.paths` (and `paths-ignore`)
+   - Confirm the new path is listed, or the workflow is unfiltered; otherwise the widened check
+     never runs on the changes it was widened for
+   - Flag as **Important** when absent — the fix is one line per trigger list
 
 **Common Hallucination Patterns to Detect**:
 
@@ -1844,7 +1873,7 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 ### Detection Rules
 
 1. **Technology Verification**: Every library/framework MUST be in tech stack
-2. **Path Verification**: All file paths MUST match project structure
+2. **Path Verification**: All file paths MUST match project structure, and a `file:line` anchor MUST resolve to the thing it names (a path check alone verifies the half that does not rot)
 3. **Pattern Verification**: Code patterns MUST match architecture standards
 4. **API Verification**: Endpoints MUST match documented APIs
 5. **Schema Verification**: Database fields MUST exist in Prisma schema

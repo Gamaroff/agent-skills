@@ -461,13 +461,30 @@ the pipeline noticed.
    as `**HIGH findings**: {HIGH_N}` — that entry is what a resume reads the earlier counts back
    out of, and what the escalation entry tabulates.
 
-3. **From cycle 3 onward, if `HIGH_N >= HIGH_{N-1}` AND `HIGH_{N-1} >= HIGH_{N-2}` — i.e. the HIGH
-   count has failed to strictly decrease across two consecutive cycles — the loop is not
-   converging. Stop and escalate.** Do not run 5b. Go to **Loop Escalation** below and use the
-   *QA Loop Not Converging* variant.
+3. **From cycle 3 onward, if `HIGH_N > 0` AND `HIGH_N >= HIGH_{N-1}` AND `HIGH_{N-1} >= HIGH_{N-2}`
+   — i.e. HIGH findings *remain* and the count has failed to strictly decrease across two
+   consecutive cycles — the loop is not converging. Stop and escalate.** Do not run 5b. Go to
+   **Loop Escalation** below and use the *QA Loop Not Converging* variant.
+
+   **`HIGH_N > 0` is a precondition, not a refinement.** The check exists to catch a loop that
+   *fails to reduce* HIGH findings; a sequence with none has nothing to reduce. Without the
+   precondition the formula reads a flat `0, 0, 0` as `0 >= 0 AND 0 >= 0` — true — and escalates a
+   loop whose remaining findings are all medium or low, which is a loop that is *working*. That is
+   exactly the sequence task.110 produced at cycle 3 (obs #71, #77), and the prose two paragraphs
+   up already excluded it; the formula did not. State the precondition in the check itself so a
+   reader implementing the formula cannot drop it.
 
    Cycles 1 and 2 never trip it: the rule needs three readings to see a flat line, and a single
    flat cycle is normal.
+
+   Worked examples — the second is the one the rule must **not** match:
+
+   | Sequence (oldest → newest) | Trips? | Why |
+   |---|---|---|
+   | `7, 7, 7` | yes, at cycle 3 | `7 > 0`, `7 >= 7`, `7 >= 7` — two flat cycles with HIGH findings remaining |
+   | `0, 0, 0` | **no** | `HIGH_N = 0`: nothing to reduce; the loop routes on the open queue (medium/low) instead |
+   | `3, 0, 0` | no | `HIGH_N = 0` |
+   | `2, 2, 1` | no | `1 >= 2` is false — the count fell |
 
    On the observed `7, 7, 7, 7, 4` sequence this trips at the end of cycle 3 — `7 >= 7` and
    `7 >= 7` — cutting three futile cycles.
@@ -669,20 +686,43 @@ comm -12 <(comm -12 <(high_files "$GATE_N2") <(high_files "$GATE_N1")) <(high_fi
 **If the same file is the subject of HIGH findings in three consecutive cycles, `/qa-fix` may not
 patch it again.** The permitted moves are exactly three:
 
+> **The strike is detected on the `file:`; the constraint applies to the mechanism.** The detector
+> keys on `file:` because that is checkable (below). But what three consecutive HIGH findings share
+> is almost never "this file" — it is one mechanism inside it: a hand-rolled parser, a regex over a
+> format that has a real reader, a fallback that absorbs the case it was meant to reject. When
+> passing the strike, **name the mechanism from the three `finding:` texts**, and say so in the
+> prompt: *other* findings in the same file are fixed normally; only the struck mechanism may not
+> be patched again. A fixer told only "you may not patch `foo.js`" has to decide alone whether a
+> one-line fix to an unrelated function in `foo.js` is a fourth patch (obs #98).
+>
+> **A recognisable pre-strike shape**: from cycle 2 onward, if every HIGH finding of the last two
+> cycles sits in **one file this pipeline created** — a test helper, a fixture parser, a scratch
+> script — the third strike is a cycle away and the third-strike menu already applies. Task.110
+> spent five cycles patching one test-helper YAML parser before replacing it with a real reader
+> (obs #105); naming the pattern at cycle 2 would have saved three. Offer the menu early; do not
+> wait for the detector to prove what the diff already shows.
+
 1. **Delete the artifact** — if what it was for is already covered, or was never worth its cost.
 2. **Replace its mechanism** — a different approach to the same job, not another correction to this
    one. A rewrite that keeps the defeated mechanism is a patch wearing a rewrite's diff.
 3. **Waive** — record the finding as accepted with a documented reason in the gate's `waiver`
    block, and say why the residual is tolerable.
 
-Pass the constraint into the invocation, naming the files:
+Pass the constraint into the invocation, naming the file **and the mechanism**:
 
 ```
 Skill(qa-fix, args="gate={gate-file-path}") — plus, in the prompt:
 "Third strike: {file} has been the subject of HIGH findings in cycles {N-2}, {N-1}, {N}.
- You may NOT patch it again. Delete it, replace its mechanism, or waive with a documented reason,
- and say in the fix summary which of the three you chose and why."
+ Struck mechanism: {one line, derived from the three finding: texts — e.g. 'the hand-rolled
+ workflow-YAML parser in parseWorkflow()'}.
+ You may NOT patch that mechanism again. Delete it, replace it, or waive with a documented
+ reason. Other findings in {file} that do not touch the struck mechanism are fixed as usual.
+ Say in the fix summary: struck mechanism: X; move: delete / replace / waive; other findings
+ in the file: fixed as usual."
 ```
+
+The fix summary shape is fixed so the next cycle's reader can tell a replaced mechanism from a
+patched one without re-reading the diff.
 
 **Why this rule earns its keep.** On the observed task the verification artifact was patched four
 times before being deleted, and its replacement was then deleted too. Deletion was the right answer

@@ -146,6 +146,14 @@ first file it happens to find, is making a claim about the caller's location whi
 claim about the project. Where a skill establishes an anchor precisely because some ambient value is
 untrustworthy, every check downstream inherits that rule.
 
+**A test helper that runs a process and returns one value has collapsed exit status and output
+into one signal.** "Refused" (non-zero, nothing printed) and "resolved to empty" (zero, nothing
+printed) are byte-identical through a helper that returns only the value — so a test named for a
+refusal passes against a warn-and-continue implementation. Return `{ ok, value }` whenever any
+assertion in the file is about the status, and read the status, not the falsiness of a payload.
+This is the rule above, reproduced *inside the test written to enforce it*, which is why it is
+stated here as well. (obs #16)
+
 Corollary for the guidance you write around a check: **if the correct response to a signal is always
 "note it and continue", the signal is broken.** Documenting the workaround makes the check unable to
 report a true positive either, and a signal that is always ignored carries no information. Fix the
@@ -211,6 +219,19 @@ was after `/finalise` had assembled its DoD. The repository already shipped the 
 
 **The criterion, stated honestly:** *both shells agree wherever both exist, and the matrix says which
 ran* — not *both shells always run*.
+
+### Inside `shared/resources/`, a `shared/resources/` literal is a bundling instruction
+
+**The rule.** In any file under `shared/resources/` — `.md` as much as `.js` — cite a sibling by
+**bare filename** (`see tracker-card-summary.md`, `the engine is change-log.js`). A literal
+`references/<file>` is not a reference; it is an instruction to the bundler to copy `<file>`
+into every skill that bundles the file you are writing. That is what the literal is *for* when a
+skill's own `SKILL.md` writes it, and it is the wrong tool inside a shared source, where the copy
+lands in every downstream skill whether or not any of them reads it. The bundler then reports the
+new copies as untracked, `bundle:check` fails on the committed tree, and the author learns the rule
+from a red CI run rather than from the file that should have taught it (obs #114 — a test path cited
+in `authoring-card-preflight.md` cost a second push in one QA cycle). The rule lived only as a comment
+in `jira-sync.js`; it lives here now, and in AGENTS.md § Shared Resources.
 
 ### In a `.js` under `shared/resources/`, a `shared/resources/` path in a comment is a dependency
 

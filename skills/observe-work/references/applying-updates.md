@@ -83,11 +83,60 @@ Before staging, establish whether the live path is generated:
 | A bundled copy under a skill's `references/` directory | The corresponding file under the repository's shared-resources directory — the next bundle reverts a direct edit |
 | A generated catalog or dependency graph | The generator plus its inputs |
 | A managed dotfile (chezmoi, Stow, a symlinked directory) | The dotfile repo, not the symlink target |
+| **A hard-linked install** — two paths, one inode; `ls -l` shows no arrow and `readlink` is empty | There is no copy to stage into: editing either path edits the tracked source. Detect it before classifying: `stat -f "%i %N" <live> <other>` (BSD/macOS) or `stat -c "%i %n" …` (GNU) — an identical inode is one file. A `diff -rq` "identical" cannot separate a fresh copy from a hard link |
 
 Staging against a volatile target produces a change that passes every check in the session that made
 it and is gone after the next regeneration. Say which file is the real target in the summary.
 
 ---
+
+## Verifying a staged change
+
+Staging-only forbids editing the original, so it owes you a way to test the copy. For a **prose**
+change, reading the staged file is the verification. For an **executable** one — an engine, a script,
+a hook — the suite that would prove it lives in the live tree and loads its subject by path, so it
+cannot see the staged copy without help.
+
+Build a **repo-shaped overlay**: copy the tree to a durable location, apply every staged change into
+it, and run the suite there. Three failure modes are structural, and each reads as a defect in the
+change unless you are expecting it:
+
+| Symptom | Cause | Not |
+|---|---|---|
+| The suite exits before running any test | The runner refused to start — an ephemeral scratch base, a missing dependency beside the copied file | A red suite |
+| Tests keyed to the checkout path fail | The overlay is not at the checkout path | A regression |
+| `git worktree` / SCM tests fail | The overlay was `git init`-ed with no commits, so `HEAD` does not resolve | A regression |
+
+Three rules follow:
+
+- **Compare two runs, never one.** Run the suite against an *unmodified* copy in the same location
+  first. The absolute pass count describes the environment as much as the code; only the delta
+  between baseline and staged is evidence. A staged failure is not a finding until the baseline shows
+  it absent.
+- **A suite that never executed a test has not gone red.** Check the executed count, not the exit
+  code. A red that was predicted is the most convincing kind and the easiest to accept wrongly.
+- **Name what the overlay cannot cover.** Anything keyed to the real checkout path is unreachable
+  from a staged copy by construction, because occupying that path means editing live. Say so in the
+  delivery rather than implying full coverage.
+
+Where the change is behavioural and small, a **targeted differential probe** — the same command run
+against live and against staged, outputs shown side by side — is stronger evidence than a pass count,
+because it exhibits the old behaviour and the new one instead of asserting a total.
+
+And for a change that fixes a **check**: revert the fix while keeping the check, and confirm the
+check fires. A check built on the same matcher, parser or helper it is checking inherits that
+component's blind spot and passes vacuously on exactly the defect it was written for.
+
+---
+
+**A test helper that runs a process and returns one value has collapsed the process's exit status
+and its output into one signal.** "Refused" (non-zero, empty output) and "resolved to empty" (zero,
+empty output) are byte-identical through a helper that returns only the value — and a test named
+for a refusal then passes against a warn-and-continue implementation. Return both, `{ ok, value }`,
+whenever any assertion in the file is about the status, and for every test whose name contains
+*refuse*, *reject*, *halt* or *non-zero*, confirm the assertion reads the status or an explicit
+error rather than the falsiness of a payload. Mutation-proving is what audits the instrument: mutate
+the behaviour the test names; if it stays green, suspect the helper before the mutation.
 
 ## Confidentiality layers
 
@@ -141,6 +190,8 @@ actually happened.
 - [ ] No Principle names a project, path, client or person
 - [ ] No section carries a credential, token or customer content
 - [ ] `PENDING.md` lists every staged skill with its install path
+- [ ] Any staged **executable** change was run against a baseline in the same overlay, and the
+      delta reported — not a bare pass count
 - [ ] The user has been told **how to install** — the delivery is not the install
 
 The last one is the one that gets skipped. A staged update the user does not know how to apply is

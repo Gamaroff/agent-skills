@@ -112,3 +112,12 @@ inline list, so nothing in the toolchain pushes you into the wrapped form — ve
   parallel load. Re-run that file alone before believing a failure.
 - The **stdout-drain premise test is not flaky any more** (fixed 2026-09-04; the payload is now sized
   from the pipe buffer). A failure there is real. Do not re-run it away.
+
+### A git pathspec `**` is `*` unless you say otherwise
+
+`git ls-files 'shared/resources/**/*.md'` and `git grep -- 'skills/**/SKILL.md'` do **not**
+recurse: a default pathspec treats `**` like `*` and wants a literal `/` in that position, so the
+pattern matches one nested level and silently misses the rest. On task.108 it matched a single file
+out of 57 and the guard's total floor never noticed. Use the `:(glob)` magic —
+`':(glob)shared/resources/**/*.md'` — or walk the directory with `find`, and give every corpus its
+own non-vacuity floor so the miss is a printed zero rather than a fraction of a total.

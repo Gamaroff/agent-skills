@@ -493,8 +493,25 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
   );
   assert.match(
     sixC,
-    /"\$\(sampled_head\)" "\$WAITED" > "\$RESULT"/,
-    "the result line carries the sampled head",
+    /"\$\(sampled_head\)" "\$CHECKS" "\$WAITED" > "\$RESULT"/,
+    "the result line carries the sampled head AND the check count it was green over (obs #87)",
+  );
+  // The stop condition, not the sample, decides (obs #87, #108): never at 0s, never on a
+  // different head, and SUCCESS only over a count that is ≥ reading 1's and stable.
+  assert.match(
+    sixC,
+    /\[ "\$WAITED" -gt 0 \] \|\| return 1/,
+    "a 0s sample is never terminal",
+  );
+  assert.match(
+    sixC,
+    /SUCCESS\) \[ "\$CHECKS" -ge "\$EXPECTED_CHECKS" \] && \[ "\$CHECKS" -eq "\$PREV_CHECKS" \]/,
+    "SUCCESS needs a complete, stable rollup",
+  );
+  assert.match(
+    sixC,
+    /read -r CI_ROLLUP_2 CI_HEAD_READ CI_CHECKS_2 WAITED < "\$RESULT"/,
+    "the later turn reads the four-field line",
   );
   assert.ok(
     codeLines(sixC).some((l) =>

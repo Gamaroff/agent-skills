@@ -586,8 +586,10 @@ After status validation passes:
     in the same edit:
     `| {today} |  | Implemented — {N} files, {M} tests | develop |`
     Leave `Version` blank — only `/finalise` bumps it. One row per develop run, never one per
-    task: the per-task narrative already lives in the Dev Agent Record. Canonical format:
-    [document-change-log.md](references/document-change-log.md).
+    task: the per-task narrative already lives in the Dev Agent Record. **Append through
+    `change-log.js`, never by text search** — the one-liner is in
+    [document-change-log.md § How a writer appends a row](references/document-change-log.md);
+    a regex cannot tell the real section from a fenced example of one.
 ```
 
 **Testing Checkpoints** (Execute at these milestones):
@@ -748,9 +750,10 @@ After status validation passes:
     bump frontmatter `updated` in the same edit:
     `| {today} |  | Implemented — {N} files, {M} tests | develop |`
     Leave `Version` blank — only `/finalise` bumps it. One row per develop run, never one per
-    phase. If the task predates the Change Log template and has no such section, create it with
-    the four canonical columns. Canonical format:
-    [document-change-log.md](references/document-change-log.md).
+    phase. **Append through `change-log.js`, never by text search** — the one-liner is in
+    [document-change-log.md § How a writer appends a row](references/document-change-log.md);
+    it creates the canonical block when the task predates the template, and it cannot land a row
+    inside a fenced example, which a regex did on task.42/43.
 ```
 
 **Blocking Conditions** (HALT and ask user):

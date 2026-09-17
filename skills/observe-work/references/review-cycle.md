@@ -122,15 +122,42 @@ member without this audit is how families diverge one well-intentioned edit at a
 
 ## Step 5 — Apply, beginning with the copy
 
-**Begin with the copy, not the edit.** For each skill being changed:
+**Load [`applying-updates.md`](applying-updates.md) before the first copy, not after it.** It carries
+the live-file rule, the volatile-target table and the rebase rule — and the rebase rule governs the
+very first write this step makes, so a pointer placed after the numbered steps arrives too late to
+prevent anything.
+
+**Then classify the staging directory before writing to it.** For each skill being changed, if
+`$OBS_STAGING_DIR/<skill>/` already exists, this is its own command, run and read *before* any copy:
+
+```bash
+diff -rq "$OBS_STAGING_DIR/<skill>" "<live skill dir>"
+```
+
+| Comparison | Verdict | Do |
+|---|---|---|
+| identical | the previous staging was installed | restage from live |
+| live is a strict superset | superseded — live already carries it | restage from live |
+| staged content absent from live | not installed | **rebase** the staged intent onto a fresh read of live |
+
+**Never `rm -rf` a pre-existing staged directory.** The delete destroys exactly the evidence this
+classification reads, and the third row is authored work that no later step can recover. Move it
+aside (`$OBS_STAGING_DIR/.superseded-<date>/`) so the next review can still read it. A bare
+"differs" is not a verdict.
+
+> Inspection and destruction batched into one command make the inspection decorative: output that can
+> only be read after the delete has run cannot inform the decision to delete. The `diff` is its own
+> call.
+
+**Only now, the copy.** For each skill being changed:
 
 1. Read the **live** file fresh. Not a workspace copy, not memory.
 2. Copy the **full skill directory** into `$OBS_STAGING_DIR/<skill>/`. Never `SKILL.md` alone — a
    single-file delivery of a multi-file skill truncates it silently.
 3. Edit the staged copy.
 
-Full discipline, including the rebase rule when a staged copy already exists:
-[`applying-updates.md`](applying-updates.md).
+**Run the families audit from the repository root** (Step 4) — until bug 15 lands it anchors at the
+cwd and reports every member `member-not-found` from anywhere else, with `reason: ok`.
 
 ---
 

@@ -468,6 +468,14 @@ Organize Dev Notes by these categories:
 
 - Specific schemas, validation rules, relationships
 - **MANDATORY**: Include source references for each item
+
+**Cite by identity, not by coordinate.** A line number decays on every edit above it — on one task
+every `file:line` anchor was wrong within seven days while every path stayed right. Prefer a stable
+anchor (a heading, a symbol name, a unique string) over a line number; where a line number genuinely
+helps, pair it with the identifier so the citation survives the next edit:
+`qa-task/SKILL.md:580` *(`- **Security**: Review for security issues`)*. A reader who finds the
+coordinate stale can still find the thing. (obs #22)
+
 - Example: `User model includes email, passwordHash, createdAt fields [Source: architecture/data-models.md#user-schema]`
 
 #### API Specifications
