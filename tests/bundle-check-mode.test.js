@@ -740,6 +740,178 @@ test("UNREACHED: a symlinked unreached member keeps its SYMLINK class as well", 
 });
 
 // ---------------------------------------------------------------------------
+// Containment — a symlink at the LEAF is a finding; a symlink at an
+// INTERMEDIATE directory is an escape (task 122, BUG-1).
+// ---------------------------------------------------------------------------
+
+/**
+ * `references/sub` is a symlink to a directory OUTSIDE the fixture root, and a
+ * shared source lives at `shared/resources/sub/s.md`, so any path that reaches
+ * `references/sub/s.md` writes through the link. Returns the outside dir so the
+ * test can assert nothing landed there.
+ */
+function symlinkedIntermediate(fx) {
+  const outside = fs.mkdtempSync(
+    path.join(os.tmpdir(), "bundle-check-outside-"),
+  );
+  fs.mkdirSync(path.join(fx.root, "shared", "resources", "sub"), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    path.join(fx.root, "shared", "resources", "sub", "s.md"),
+    "# s\n",
+  );
+  fs.mkdirSync(path.join(fx.skillDir, "references"), { recursive: true });
+  fs.symlinkSync(outside, path.join(fx.skillDir, "references", "sub"));
+  return outside;
+}
+
+test("a cited name under a symlinked intermediate directory is refused, and nothing is written outside the tree", (t) => {
+  // The regression task 122's first `_within` introduced: resolving only
+  // lexically accepted `sub/s.md` although `references/sub` points out of the
+  // tree, and the leaf-only symlink check in the write gate let the bundler
+  // create `<outside>/s.md`. `develop` refused the name; so must this.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("sub/s.md") },
+      sharedFiles: {},
+    },
+    t,
+  );
+  const outside = symlinkedIntermediate(fx);
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+
+  const stdout = fx.bundle();
+  assert.match(stdout, /refusing out-of-tree reference: sub\/s\.md/);
+  assert.deepEqual(
+    fs.readdirSync(outside),
+    [],
+    "the bundler must never write through a symlinked directory",
+  );
+});
+
+test("a reconciled copy under a symlinked intermediate directory is refused by the write gate", (t) => {
+  // The other inbound path: nothing cites the name, but `references/sub/s.md`
+  // already exists (through the link) and mirrors a shared file. Whether disk
+  // reconciliation even REACHES it depends on the Python version — `rglob`
+  // followed symlinked directories before 3.13 and does not after — so this
+  // test asserts the outcome on either, and probes the write gate directly
+  // rather than trusting the walk to consult it.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": silentSkill() },
+      sharedFiles: {},
+    },
+    t,
+  );
+  const outside = symlinkedIntermediate(fx);
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+  // A stale bundler-product copy behind the link: exactly what a refresh would rewrite.
+  fs.writeFileSync(
+    path.join(outside, "s.md"),
+    `${BANNER("sub/s.md")}# s OLD\n`,
+  );
+  const before = fs.readFileSync(path.join(outside, "s.md"), "utf-8");
+
+  const stdout = fx.bundle();
+  assert.doesNotMatch(stdout, /reconciled references\/sub\/s\.md/);
+  assert.equal(
+    fs.readFileSync(path.join(outside, "s.md"), "utf-8"),
+    before,
+    "the copy behind the link must be left exactly as it was",
+  );
+
+  // The gate itself, asked directly: this is what protects the walk that does
+  // reach the copy.
+  const verdict = execFileSync(
+    "python3",
+    [
+      "-c",
+      [
+        "import sys; sys.path.insert(0, sys.argv[1])",
+        "from pathlib import Path",
+        "import bundle_skill as b",
+        "dst = Path(sys.argv[2]) / 'references' / 'sub' / 's.md'",
+        "src = Path(sys.argv[3])",
+        "print(b.writable_copy(dst, src, 'sub/s.md'), b._skip_reason(dst, 'sub/s.md'))",
+      ].join("\n"),
+      path.dirname(BUNDLER),
+      fx.skillDir,
+      path.join(fx.root, "shared", "resources", "sub", "s.md"),
+    ],
+    { encoding: "utf-8" },
+  ).trim();
+  assert.equal(verdict, "False under a symlinked directory");
+});
+
+test("a `..` leaf is refused even though its parent resolves inside the tree", (t) => {
+  // Only INVOKE_REF_RE can deliver a bare `..` leaf: the shared-ref collector
+  // strips trailing punctuation, so `shared/resources/sub/..` arrives as
+  // `sub/` (a directory — see the next test). `references/..` names the skill
+  // directory itself: the parent (`references/`) resolves inside, so
+  // parent-resolution alone would accept it, and `needed` would then map `..`
+  // onto the shared directory's PARENT. The leaf check is what refuses it.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("step.md") },
+      sharedFiles: {
+        "step.md":
+          "# Step\n\nRun `bash .agents/skills/fixture-skill/references/..`.\n",
+      },
+    },
+    t,
+  );
+  const stdout = fx.bundle();
+  assert.match(stdout, /refusing out-of-tree reference: \.\./);
+  assert.deepEqual(
+    fs.readdirSync(path.join(fx.skillDir, "references")).sort(),
+    ["step.md"],
+    "only the cited doc was bundled; the `..` name produced nothing",
+  );
+});
+
+test("a citation of a shared DIRECTORY is skipped, not bundled and not a crash", (t) => {
+  // `shared/resources/sub/..` at the end of a sentence collects as `sub/`
+  // (trailing punctuation stripped), which is a directory. `discover_needed`
+  // used to admit it on `exists()` and `expected_bytes` then died with
+  // IsADirectoryError — a whole `--all` run lost to one sentence.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/sub/.. for the set.\n`,
+      },
+      sharedFiles: { "sub/s.md": "# s\n" },
+    },
+    t,
+  );
+  const stdout = fx.bundle();
+  assert.match(stdout, /shared\/resources\/sub\/ not found/);
+  assert.equal(
+    fx.refExists("sub"),
+    false,
+    "nothing was created for the directory name",
+  );
+});
+
+test("a symlink at the LEAF still passes containment — the cited copy reports SYMLINK, not UNREACHED", (t) => {
+  // The case the task's `_within` change exists for, pinned beside the two
+  // above so the three cannot be traded against each other: resolving the
+  // whole candidate would refuse this name and report the copy UNREACHED.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("contract.md") },
+      sharedFiles: { "contract.md": "# Contract\n\nBody.\n" },
+    },
+    t,
+  );
+  fx.symlinkRef(
+    "contract.md",
+    path.join(fx.root, "shared", "resources", "contract.md"),
+  );
+  assert.deepEqual(fx.check().classesFound, ["SYMLINK"]);
+});
+
+// ---------------------------------------------------------------------------
 // INVOKE_REF_RE — the one `references/X` spelling followed out of shared text,
 // and only for the skill it names (task 122).
 // ---------------------------------------------------------------------------

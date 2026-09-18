@@ -409,19 +409,56 @@ def _skill_dirs(refs_dir_str):
 
 
 def _within(root, candidate):
-    """True when `candidate` stays inside `root` once `..` segments are resolved.
+    """True when `candidate` stays inside `root`.
 
-    Resolved LEXICALLY, on purpose. `Path.resolve()` also follows whatever sits
-    on disk at the candidate's path, and a symlink at `references/X` pointing
-    outside the tree made discovery refuse a name the skill plainly cites — the
-    copy then dropped out of `needed`, entered the reconciliation population,
-    and read as UNREACHED beside its SYMLINK finding (task 122). This guard is
-    about `..` in the captured NAME; what is at the destination is the write
-    gate's question, and `writable_copy` still refuses to write through a link.
+    Two checks, split by WHERE a symlink can sit — and the split is the whole
+    point, because the two obvious one-line versions each fail on one side:
+
+    - The PARENT is resolved (`Path.resolve()`). A symlinked intermediate
+      directory under `references/` — `references/link/x.md` with
+      `link -> /elsewhere` — resolves out of the tree and is refused. A purely
+      lexical check accepted it, and `writable_copy` tests only the leaf, so
+      the bundler wrote through the link outside the tree (task 122, BUG-1;
+      reproduced against `develop`, which refused it).
+    - The LEAF is judged lexically. Resolving the whole candidate follows a
+      symlink AT the candidate's own path, and a link at `references/X`
+      pointing outside made discovery refuse a name the skill plainly cites —
+      the copy dropped out of `needed`, entered the reconciliation population,
+      and read as UNREACHED beside its SYMLINK finding (task 122). What sits at
+      the leaf is the write gate's question, and `writable_copy` refuses it.
+
+    A `..` (or empty) leaf is refused outright: `..` in the captured name is
+    what this guard was written for, and resolving the parent alone would let
+    `sub/..` land on the root itself. `OSError`/`ValueError` (a null byte, an
+    unreadable component) is a refusal, never a crash.
     """
-    root_n = os.path.normpath(os.fspath(root))
-    cand_n = os.path.normpath(os.fspath(candidate))
-    return cand_n == root_n or cand_n.startswith(root_n + os.sep)
+    try:
+        cand = Path(candidate)
+        if cand.name in ('', '..'):
+            return False
+        parent = cand.parent.resolve()
+        root_r = Path(root).resolve()
+        return parent == root_r or parent.is_relative_to(root_r)
+    except (OSError, ValueError):
+        return False
+
+
+def _symlinked_component(dst, name):
+    """The first directory BETWEEN the references root and `dst` that is a
+    symlink, or None. `name` is the bundled relative name, so its depth says
+    how many of `dst`'s parents lie inside references/.
+
+    Discovery already refuses such a name (`_within` resolves the parent), but
+    the reconciliation path reaches `dst` from a directory walk, not from a
+    name — `Path.rglob` follows a symlinked directory — so the write gate must
+    refuse it too, or a copy that mirrors a shared file through a link is
+    "refreshed" onto whatever the link points at (task 122, BUG-1).
+    """
+    depth = len(Path(name).parts) - 1
+    for parent in list(Path(dst).parents)[:depth]:
+        if parent.is_symlink():
+            return parent
+    return None
 
 
 def discover_needed(skill_path, shared_dir, refs_dir):
@@ -501,7 +538,12 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             print(f"⚠️  refusing out-of-tree reference: {name}")
             continue
         src = shared_dir / name
-        if not src.exists():
+        # `is_file()`, not `exists()`: a citation of a shared DIRECTORY —
+        # `shared/resources/sub/`, which the collector produces from a trailing
+        # `sub/..` after stripping sentence punctuation — used to enter `needed`
+        # and crash `expected_bytes` with IsADirectoryError (found by task 122's
+        # `..`-leaf fixture). A directory is not a bundleable source.
+        if not src.is_file():
             if not quiet:
                 print(f"⚠️  shared/resources/{name} not found")
             continue
@@ -522,10 +564,10 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             # authoring error worth a warning — it is a skill-native script that
             # happens to be invoked by its bundled path.
             for m in INVOKE_REF_RE.finditer(text):
-                who, name = m.group(1), m.group(2)
+                who, invoked = m.group(1), m.group(2)
                 names = who.strip('{}').split('|') if who.startswith('{') else [who]
                 if skill_path.name in names:
-                    pending_quiet.append(name)
+                    pending_quiet.append(invoked)
 
     return needed, skill_files
 
@@ -668,11 +710,21 @@ def writable_copy(dst, src, name):
     A symlink is never writable through: `write_if_changed` unlinks it, but the
     decision to replace a link the operator placed belongs here, visibly.
     """
-    if dst.is_symlink():
+    if dst.is_symlink() or _symlinked_component(dst, name) is not None:
         return False
     if not dst.exists():
         return True
     return _looks_bundled(dst, src, name)
+
+
+def _skip_reason(dst, name):
+    """Why `writable_copy` refused `dst`, for the status line — one definition
+    for both write passes, so the two cannot drift."""
+    if dst.is_symlink():
+        return "symlink"
+    if _symlinked_component(dst, name) is not None:
+        return "under a symlinked directory"
+    return "not bundler output"
 
 
 def write_if_changed(dst, src, name, new_bytes):
@@ -949,13 +1001,15 @@ def check_skill(skill_path):
     expected.update(reconcilable)
     bundled_names = set(expected)
 
-    # Reconcilable-only members are the population the writer refreshes and no
-    # discovery rule reaches. They are fresh by construction — the loop below
-    # will find them in sync — and that is exactly why they need their own
-    # class: the freshness comparison is what hides them. Measured 2026-09-17
-    # at 15 copies across 12 skills, all reported clean. They stay in `expected`
-    # too, so a copy that is both unreached and stale reports both.
-    for rel in sorted(set(reconcilable) - set(needed)):
+    # Reconcilable members are the population the writer refreshes and no
+    # discovery rule reaches — `source_backed_on_disk` already excludes every
+    # name in `needed`, so the two sets are disjoint by construction and every
+    # member here is unreached. They are fresh by construction too — the loop
+    # below will find them in sync — and that is exactly why they need their
+    # own class: the freshness comparison is what hides them. Measured
+    # 2026-09-17 at 15 copies across 12 skills, all reported clean. They stay in
+    # `expected`, so a copy that is both unreached and stale reports both.
+    for rel in sorted(reconcilable):
         report(rel, 'UNREACHED', 'source-backed copy that no discovery rule reaches')
 
     for rel in sorted(expected):
@@ -1208,7 +1262,7 @@ def bundle_skill(skill_path):
         # used the one fixture seed that routed to the branch that worked.
         if not writable_copy(dst, src, name):
             protected += 1
-            why = "symlink" if (refs_dir / name).is_symlink() else "not bundler output"
+            why = _skip_reason(refs_dir / name, name)
             print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
         if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):
@@ -1227,7 +1281,7 @@ def bundle_skill(skill_path):
         dst = refs_dir / name
         if not writable_copy(dst, src, name):
             protected += 1
-            why = "symlink" if (refs_dir / name).is_symlink() else "not bundler output"
+            why = _skip_reason(refs_dir / name, name)
             print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
         if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):

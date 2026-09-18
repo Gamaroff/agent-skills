@@ -256,9 +256,12 @@ much a comment looks like it matters.
 `shared/resources/` source but that no discovery rule in the skill reaches. The copy is not stale —
 the bundler refreshes it on every run, which is exactly why the freshness comparison could never see
 it — it is a dependency nothing declares. The remedy is a decision, not a regenerate, and the class is
-deliberately **not** in `REGENERABLE`: either give the copy a discovery path (cite it as
-`references/<file>` or `references/<file>` from a skill file), or delete it. A bundle run
-cannot clear it, and `tests/bundle-check-mode.test.js` proves that by measurement.
+deliberately **not** in `REGENERABLE`: either give the copy a discovery path (cite it from a skill
+file — by its shared path, or as `references/<file>`), or delete it. A bundle run cannot clear it,
+and `tests/bundle-check-mode.test.js` proves that by measurement. (The two spellings are the two
+the bundler's remedy names; this sentence avoids writing the shared one out, because pass 3
+rewrites that literal in a skill file and the first draft ended up naming `references/<file>`
+twice.)
 
 One `references/<file>` spelling **is** followed out of shared `.md`/`.sh` text: the invocation form
 `.agents/skills/<skill>/references/<file>`, and only when `<skill>` names the skill being bundled —

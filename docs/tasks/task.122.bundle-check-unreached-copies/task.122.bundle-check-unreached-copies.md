@@ -252,6 +252,13 @@ Phase 1 red.
    the moment UNREACHED existed) — the class now admits `/`. Neither is a new rule; each is a
    discovery path that was silently failing.
 
+   **QA cycle 1 fix (TASK-122-BUG-1):** `_within` now resolves the *parent* and judges the *leaf*
+   lexically — a symlinked intermediate directory is refused (as on `develop`), a symlink at the leaf
+   still passes and reports `SYMLINK`, a `..`/empty leaf is refused; `writable_copy` additionally
+   refuses a symlinked component between the references root and the copy (`_symlinked_component`,
+   `_skip_reason`); `discover_needed` admits sources on `is_file()` so a directory citation is skipped
+   rather than crashing. Five fixtures added (test file 37 → 42). CR-2/3/4 cleanups applied.
+
 ### Files to Modify (Documentation)
 
 4. ✅ `skills/create-skill/SKILL.md` or its bundling reference — one paragraph: what UNREACHED means,
@@ -366,6 +373,27 @@ None.
 - **Critical**: a consumer tarball loses a file it invokes.
 - **Non-critical**: remedy wording; summary formatting.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-18
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.122.qa.1.bundle-check-unreached-copies.md](./task.122.qa.1.bundle-check-unreached-copies.md)
+- **Gate File**: [task.122.gate.1.bundle-check-unreached-copies.yml](./task.122.gate.1.bundle-check-unreached-copies.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3448 (`ci:fast`) + 73 bundler-suite + 61 under `TMPDIR=/tmp`
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0 HIGH, 1 MEDIUM (TASK-122-BUG-1)
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+The lexical `_within()` accepts a symlinked intermediate directory under `references/` that `develop` refused, and the write gate checks only the leaf — reproduced end-to-end; see [task.122.bug.1.within-lexical-symlinked-parent-escape.md](./task.122.bug.1.within-lexical-symlinked-parent-escape.md). Three low cleanups advisory (CR-2/3/4).
+
 ## Change Log
 <!-- change-log-start -->
 ## Change Log
@@ -376,6 +404,8 @@ None.
 | 2026-09-18 | 1.1 | Review 1 (7/10 → 9/10 after fixes): population re-traced per member — 3 real deps (not 8), 12 dead (not 5), 0 prose; Phase 2 redesigned around the `{a\|b\|c}` alternation (bare `{skill}` placeholder never followed, wildcard measured at +24 copies); step-8-commit.md:108 respell added; Files to Delete 7 → 12; progression 15 → 12 → 0 | review-task |
 | 2026-09-18 |  | Status → ready-for-development | review-task |
 | 2026-09-18 |  | Implemented — 9 files modified, 12 deleted, 8 new tests (bundle-check-mode 29 → 37); 15 → 12 → 0 UNREACHED measured; 6 mutants caught | develop |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — 1 medium finding (TASK-122-BUG-1), 3 advisory cleanups | qa-task |
+| 2026-09-18 |  | QA findings fixed — TASK-122-BUG-1 (parent-resolving _within, write-gate symlink component, is_file), CR-2/3/4; 5 fixtures, 5 mutants covered; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
