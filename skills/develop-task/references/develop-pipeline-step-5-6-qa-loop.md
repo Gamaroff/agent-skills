@@ -354,7 +354,9 @@ posts nothing to the tracker issue here. This step used to carry its own `qa-cyc
 the same moment; it was never observed posting, and once the skill's stage is cycle-scoped the two
 would race for one marker — whichever posted first would win and the other would silently read
 `already` (task.121). `qa-cycle` stays in the engine for `develop-bug`'s verify loop, which never
-runs a QA skill and so posts it as its only per-cycle comment.
+runs `qa-task` / `qa-story` and so posts it as its only per-cycle *gate* comment (it does run
+`/qa-fix` on a FAIL cycle, whose own per-cycle comment is a separate concern — see the
+follow-up named in task.121's PR review).
 
 **Remaining Work Status block (required, per cycle).** Before re-invoking the QA skill for the next cycle, emit the block with the position line `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {N}/5`. On the cycle that exits the loop, the block is emitted as part of the Step 7 transition instead, in the form 5c specifies (`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate}, PR review {verdict})`). Format: [`references/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
 
