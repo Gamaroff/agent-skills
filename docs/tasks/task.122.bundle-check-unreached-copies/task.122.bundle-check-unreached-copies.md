@@ -5,19 +5,21 @@ type: task
 description: "bundle_skill.py discovers a skill's shared dependencies transitively, then refreshes any further references/ copy that happens to have a shared/resources counterpart (source_backed_on_disk). Measured 2026-09-17: 12 skills, 15 copies that discovery never reaches — three are real dependencies (verify-push-state.sh in develop-story/-task/-bug) invoked from a bundled step doc as .agents/skills/{skill}/references/X with a bare placeholder, and twelve are dead (yaml-subset.js ×4, review-story-prepass-prompts.md, qa-task/qa-story step-0/step-1 docs ×4, qa-task resolve-paths.sh, set-github-project-priority.sh ×2). --check has no class for any of them, so the copies are kept byte-fresh and reported clean. Add an UNREACHED class (not regenerable), respell the one invocation to the {a|b|c} alternation form and add a discovery rule for it, and remove the dead copies. Observation #118; re-traced in review 1."
 tags: [create-skill, bundler, bundle-check, references]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-09-17
 updated: 2026-09-18
 assignee:
+completed_date: 2026-09-18
+pr_number: 434
 estimated_effort_hours: 4
 github_issue: 422
 ---
 
 # Technical Task: Twelve skills carry bundled copies no discovery rule reaches
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.122.review.1.bundle-check-unreached-copies.md` implemented 2026-09-18
 **GitHub Issue**: [#422](https://github.com/Gamaroff/agent-skills/issues/422)
 
@@ -400,6 +402,32 @@ None.
 
 ### Key Findings
 No open findings after three cycles. 15 → 12 → 0 UNREACHED on the live tree; the `_within` containment guard resolves the parent and judges the leaf, the write gate and the check agree on every symlink placement, and every description of the rule is the shipped one.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Reports**: `task.122.qa.1.…md`, `task.122.qa.2.…md`, [task.122.qa.3.bundle-check-unreached-copies.md](./task.122.qa.3.bundle-check-unreached-copies.md)
+**Gate File**: [task.122.gate.3.bundle-check-unreached-copies.yml](./task.122.gate.3.bundle-check-unreached-copies.yml)
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100 (3 cycles: CONCERNS 90 → CONCERNS 90 → PASS 100)
+**PR Review (5c)**: ✅ APPROVE — [task.122.pr-review.1.bundle-check-unreached-copies.md](./task.122.pr-review.1.bundle-check-unreached-copies.md)
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 — F1–F3 (UNREACHED reported; `verify-push-state.sh` discovered for the three pipelines only; 0 UNREACHED on the tree), P1 (wall time within noise), CQ1–CQ2 (every new test mutation-proved; no second definition of the discovery rules), M1–M2 (twelve copies gone; observation #118 `actioned` with PR #434)
+✅ **Tests:** `tests/bundle-check-mode.test.js` 29 → 43; `ci:fast` 3454/3454; bundler suites 79/79; `bundle:check` 128 skills, 0 problems; CI reading 1 SUCCESS @ `3c276b33` over 5 checks
+✅ **PR Review:** PR #434 (`feature/task.122.bundle-check-unreached-copies` → `develop`), 4 commits at acceptance; advisory 5c APPROVE (this pipeline submits no formal GitHub review)
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; create-skill SKILL.md § "A bundled copy nothing reaches is `UNREACHED`"; AGENTS.md § Shared Resources; validate.yml comment
+✅ **Security Review:** ✅ PASS — no secrets or unsafe patterns; the `_within` containment boundary probed with 11 corpus candidates through the probe engine (symlinked intermediate, `..` traversals, absolute, null byte refused; legitimate names accepted); the one reproduced case (`..%2f..%2f…`) is a pre-existing sink mismatch (the bundler never URL-decodes)
+✅ **Compliance Review:** NOT_APPLICABLE — internal build tooling
+✅ **Bugs:** TASK-122-BUG-1 (symlinked-intermediate escape introduced by the first `_within` rewrite) — found in QA cycle 1, fixed, verified and closed in cycle 2
+
+**Detailed Verification Log:** See [task.122.dod.1.bundle-check-unreached-copies.md](./task.122.dod.1.bundle-check-unreached-copies.md) for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-09-18
+
 ## Change Log
 <!-- change-log-start -->
 ## Change Log
@@ -415,6 +443,7 @@ No open findings after three cycles. 15 → 12 → 0 UNREACHED on the live tree;
 | 2026-09-18 |  | QA gate CONCERNS (90/100) — BUG-1 closed; 2 low findings from the refute pass (CR2-1 check/writer divergence on an in-tree symlinked intermediate, CR2-2 docstring/CHANGELOG wording) | qa-task |
 | 2026-09-18 |  | QA findings fixed — TASK-122-CR2-1 (check_skill SYMLINK branch for a symlinked intermediate), CR2-2 (docstring/CHANGELOG wording), CR-3; 1 fixture, 3 mutants covered; 1 iteration | qa-fix |
 | 2026-09-18 |  | QA gate PASS (100/100) — cycle 3, no findings; CR2-1/CR2-2 verified fixed | qa-task |
+| 2026-09-18 | 1.2 | DoD passed — accepted (PR #434) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
