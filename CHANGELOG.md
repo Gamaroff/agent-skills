@@ -172,6 +172,33 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **QA tracker comments are keyed per cycle, so a tracker issue now carries every QA cycle
+  instead of the first one (task 121).** `tracker-comment.js` builds its idempotency marker from
+  `--stage` alone, and `qa-task`/`qa-story` passed a bare `qa-gate` on every cycle while
+  `qa-fix` passed a bare `qa-fix` — so on task.110, task.113 and task.119 the PR carried every
+  cycle, the issue carried cycle 1, and each later call reported `already` as success (obs #75,
+  consolidating #66, #70, #78, #80, #84, #93, #94). `qa-gate` joins `CYCLE_SCOPED_STAGES`; the
+  three skills suffix `qa-gate-{N}` / `qa-fix-{N}` at every gate, fix and PR-lead site, and
+  the develop-story/develop-task orchestrator's duplicate `qa-cycle-{N}` / `qa-fix-{N}` blocks
+  are gone. The cycle comes from one definition: the new `shared/resources/qa-cycle.sh`
+  (bundled as `references/qa-cycle.sh`) prints the **highest-numbered** gate's cycle — not the
+  newest by mtime, which ties in a fresh checkout and then sorts `gate.10` before `gate.2` —
+  and **refuses** (exit 1, empty stdout, one warning) when no gate is numbered, because a guessed
+  `1` would key every cycle to cycle 1's marker and reproduce the bug it replaces, wearing a
+  suffix. Every fenced block that uses the cycle calls it, addressed from the repo root and
+  rc-checked, since each block runs in its own shell. The contract gains a "once per issue, or
+  once per cycle" table that cross-references the engine list rather than restating it.
+  Guards: `comment-slot-coverage.test.mjs` fails on a bare or hard-coded cycle-scoped stage at
+  any tracker or PR-lead site (floor ≥4 per population); `tests/qa-cycle.test.js` (23 tests,
+  bash + zsh) proves the helper, the same-block and root-form call shape, and that no SKILL.md
+  derives the cycle inline — including the two-line continued form the first guard missed.
+  Six bugs across five QA cycles, each mutation-proved; the consumer criterion was met live on
+  the task's own issue (`qa-gate-1..5`, `qa-fix-1..4`, in order). The finalise security probe
+  then executed the boundary and found two more, both fixed: a gate filename with an embedded
+  newline aborted the helper's loop and it exited 0 with a *lower* cycle (now pattern-checked
+  before any arithmetic), and `isKnownStage` admitted `qa-gate-0`, a round nothing else in the
+  chain recognised (now `> 0`; `007` still normalises to 7).
+
 - **The card preflight now catches a section that is a label with nothing under it, and its
   clean result names its own scope (task 117).** `summariseSection` took a bold-only line
   (`**Functional**:`) as a section's first prose paragraph and stopped there, so the criteria list

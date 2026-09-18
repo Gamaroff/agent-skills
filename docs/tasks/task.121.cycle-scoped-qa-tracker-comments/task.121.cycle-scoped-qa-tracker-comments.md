@@ -5,19 +5,21 @@ type: task
 description: "tracker-comment.js builds its idempotency marker from --stage alone. qa-fix is already a cycle-scoped stage in the engine but skills/qa-fix passes the bare name; qa-gate is not cycle-scoped and qa-task/qa-story pass it bare on every cycle. Result on task.110, task.113 and task.119: the PR carries every cycle, the tracker issue carries cycle 1 and reports success for the rest. Add qa-gate to the cycle-scoped list, suffix all three call sites with the cycle they already derive, state once-per-issue vs once-per-cycle in the contract, and add a guard that fails on a bare cycle-scoped stage. Observation #75 (consolidating #66, #70, #78, #80, #84, #93, #94)."
 tags: [tracker-comment, qa-task, qa-story, qa-fix, idempotency]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: low
 created: 2026-09-17
 updated: 2026-09-18
+completed_date: 2026-09-18
 assignee:
 estimated_effort_hours: 8
 github_issue: 421
+pr_number: 430
 ---
 
 # Technical Task: QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.121.review.1.cycle-scoped-qa-tracker-comments.md` implemented 2026-09-18
 **GitHub Issue**: [#421](https://github.com/Gamaroff/agent-skills/issues/421)
 
@@ -307,7 +309,7 @@ None.
 ### Contract Tests
 
 - [x] `CYCLE_SCOPED_STAGES` equals `CYCLE_SCOPED_LEAD_STAGES` (existing test, now with four members).
-- [ ] `tests/bundled-links.test.js` and `npm run bundle:check` green after the bundle.
+- [x] `tests/bundled-links.test.js` and `npm run bundle:check` green after the bundle.
 
 ### Performance Tests
 
@@ -331,12 +333,12 @@ Not applicable — no runtime path changes beyond one array member.
 - [x] No change to comment latency; one extra list member in the validator.
 
 ### Code Quality
-- [ ] `npm test` green; the new guard has a non-vacuity floor and a passed mutation proof recorded
+- [x] `npm test` green; the new guard has a non-vacuity floor and a passed mutation proof recorded
       in the implementation report.
 - [x] `CYCLE_SCOPED_STAGES` remains the single definition (contract table cross-references it).
 
 ### Migration
-- [ ] Contract documents the stage classes; observation #75 marked `actioned` with the PR number.
+- [x] Contract documents the stage classes; observation #75 marked `actioned` with the PR number. (Set by `/finalise` with PR #430.)
 
 ## 10. Risk Assessment
 
@@ -399,6 +401,33 @@ None.
 
 ### Key Findings
 No open issues. Six bugs across five cycles closed and mutation-covered. Four advisory follow-ups (F1–F4) recorded in gate 5: qa-fix's shared body-file path, the helper's stale header example, zero-padded gate names, stale test comments. Consumer criterion met live on #421 (`qa-gate-1..5`, `qa-fix-1..4`).
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.121.qa.5.cycle-scoped-qa-tracker-comments.md` (cycle 5 of 5)
+**Gate File**: `task.121.gate.5.cycle-scoped-qa-tracker-comments.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 met — six verified against code and per-PR tests by the DoD agents; the seventh (observation #75 → `actioned`) completed by `/finalise` with PR #430
+✅ **Tests:** `tests/qa-cycle.test.js` 25 (bash + zsh), `tracker-comment.test.mjs` 74, plus extended `stakeholder-summary`, `comment-slot-coverage` and `transition-protocol-parity` suites; `npm run ci:fast` 3440/3441 (1 skipped); every fix mutation-proved
+✅ **PR Review:** PR #430 — Step 5c `/review-pr` CONCERNS (advisory; documentation findings applied in `41964e2b`, two behaviour follow-ups recorded); CI green on the decision head `a412f59a` (5 checks)
+✅ **Documentation:** contract stage-class table, `stakeholder-summary.md`, Steps 5–6 doc, three SKILL.md call sites, bundles in sync (128/0); CHANGELOG `(task 121)` entry
+✅ **Security Review:** ✅ PASS after fix — boundary probed by execution; two low-severity fail-closed defects (newline-bearing gate filename → lower cycle at exit 0; `qa-gate-0` admitted) found by the finalise probe and fixed in `a412f59a`, tested, mutation-proved, re-probed
+✅ **Compliance Review:** NOT_APPLICABLE — no personal data, payments, UI or health data
+✅ **Performance / Reliability / Maintainability:** ✅ PASS (gate 5 NFR validation)
+
+**Advisory follow-ups (not blocking):** gate 5 F1–F4 (qa-fix body-file path, helper header example, zero-padded gate names, stale test comments); 5c follow-ups (develop-bug's `/qa-fix` cycle source; a qa-fix-specific body file).
+
+**Detailed Verification Log:** See `task.121.dod.1.cycle-scoped-qa-tracker-comments.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-09-18
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -417,6 +446,7 @@ No open issues. Six bugs across five cycles closed and mutation-covered. Four ad
 | 2026-09-18 |  | QA gate CONCERNS (90/100) — cycle 4: 2 medium (guard blind to continued form; rc conflation + PR-lead cwd), 4 low; BUG-4 closed | qa-task |
 | 2026-09-18 |  | QA findings fixed — BUG-5 (continuations joined), BUG-6 (rc check + one cwd everywhere), CR-4..CR-7; cycle 4 (4 iterations so far) | qa-fix |
 | 2026-09-18 |  | QA gate PASS (100/100) — cycle 5: 0 open, 4 advisory follow-ups; BUG-5/BUG-6 closed | qa-task |
+| 2026-09-18 | 1.2 | DoD passed — accepted (PR #430); finalise security probe fixed two low-severity fail-closed defects in a412f59a | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
