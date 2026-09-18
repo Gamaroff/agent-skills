@@ -1,0 +1,73 @@
+schema: 1
+task: 'task.122.bundle-check-unreached-copies'
+task_title: 'Twelve skills carry bundled copies no discovery rule reaches'
+gate: CONCERNS
+status_reason: 'TASK-122-BUG-1 verified fixed and mutation-covered (parent-resolving _within, write-gate symlink component, is_file discovery; 78/78 suites; hand probe re-run: both symlink shapes refused). The cycle-2 refute pass found one low defect introduced by that fix — for an IN-TREE symlinked intermediate under references/ the writer now refuses the copy while --check reports it MISSING under the regenerate remedy that cannot clear it (reproduced) — plus a docstring and the CHANGELOG that describe the cycle-1 rule rather than the shipped one. Deliverable unchanged: 0 UNREACHED across 128 skills.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T11:28:17Z'
+
+top_issues:
+  - id: 'TASK-122-CR2-1'
+    severity: low
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: "check_skill's expected-loop has no branch for a symlinked INTERMEDIATE directory: an in-tree link (references/sub -> real) passes the parent-resolving _within into needed, writable_copy refuses it (_symlinked_component), and the check then reports the name MISSING with the 'run npm run bundle' remedy — a class REGENERABLE membership promises a bundle run clears, and here it provably does not (reproduced: 'SKIPPED … under a symlinked directory' from the writer, 'MISSING x1 — run npm run bundle' from the check)."
+    suggested_action: "In check_skill's loop, before the exists() test, report a name whose _symlinked_component(dst, rel) is not None as SYMLINK (detail naming the component) so the check's population and remedy match the writer's; pin with a fixture whose intermediate link points INSIDE references/ (the out-of-tree case is already covered) and mutation-prove it."
+    suggested_owner: dev
+    status: open
+  - id: 'TASK-122-CR2-2'
+    severity: low
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: "_symlinked_component's docstring states as fact that Path.rglob follows a symlinked directory; on the interpreter that runs this (3.13.7, and CI's python-version '3.x') it does not, and the test beside the fixture says so — the gate's stated justification is false on every interpreter that currently runs it, while the gate itself is still right as defence-in-depth. CHANGELOG.md:23 likewise still says _within is 'now lexical', which is the cycle-1 rule BUG-1 replaced."
+    suggested_action: "Reword the docstring to say the walk followed symlinked directories before 3.13 and the gate is kept so the write decision does not depend on the interpreter; amend the CHANGELOG sentence to 'resolves the parent and judges the leaf lexically'."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3453
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 13
+    notes: 'Boundary re-probed after the fix (engine declines the Python sink; hand probe under env -i, 13 shapes incl. bare ..): symlink-escape, symlink-dotdot, bare .., empty and every ..-traversal refused; legitimate shapes accepted. encoded-traversal is a literal filename (no traversal on a filesystem); null-byte passes _within and is refused by is_file(). BUG-1 repro against the committed branch: refused, nothing written outside.'
+  performance:
+    status: PASS
+    notes: 'One parent resolve() per candidate and one parents-walk per write; live --check unchanged (≈6s).'
+  reliability:
+    status: PASS
+    notes: 'Fix mutation-proved by dev (M1–M5) and independently by QA (QA-M1/M2 covered; QA-M3 depth+1 absorbed — equivalent unless references/ itself is a link). Directory citation no longer crashes the run. Reconciliation fixture is Python-version independent.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Check and writer disagree on an in-tree symlinked intermediate (CR2-1) — the module invariant that the check population and remedies match the writer is broken for that case. Two descriptions of the shipped containment rule are false (docstring, CHANGELOG — CR2-2). Both are cheap; neither touches behaviour of the deliverable.'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-18'
+  total_iterations: 1
+  verification_method: 'Repro against committed branch (refused, outside empty); 13-shape hand probe; QA mutation proofs; 78/78 bundler suites; ci:fast 3453/3453'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-122-CR2-1 (check_skill SYMLINK branch for a symlinked intermediate; in-tree fixture; mutation proof) and TASK-122-CR2-2 (docstring + CHANGELOG wording).'
+      refs: ['skills/create-skill/scripts/bundle_skill.py', 'tests/bundle-check-mode.test.js', 'CHANGELOG.md']
+  future:
+    - action: "CR-3 (cleanup, low): in _within, the '' leaf arm is unreachable from the only call shape and  is implied by is_relative_to; drop them or keep the '' guard with a comment naming the capture it exists for."
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'Observation #118: tick actioned with PR #434 at finalise (Migration criterion).'
+      refs: ['docs/tasks/task.122.bundle-check-unreached-copies/task.122.bundle-check-unreached-copies.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-122-CR2-1 and CR2-2 fixed']

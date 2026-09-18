@@ -1,0 +1,62 @@
+schema: 1
+task: 'task.122.bundle-check-unreached-copies'
+task_title: 'Twelve skills carry bundled copies no discovery rule reaches'
+gate: CONCERNS
+status_reason: 'All three phases delivered and measured (15 → 12 → 0 UNREACHED; 37/37 suite; ci:fast 3448/3448; three QA mutation proofs covered). One medium, high-confidence defect enters the gate under code_review_blocking: the lexical _within() accepts a symlinked intermediate directory under references/ that the resolve()-based guard refused, and the write gate checks only the leaf — reproduced by hand probe (declined sink; Python entry point). Three low cleanups advisory.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T10:57:49Z'
+
+top_issues:
+  - id: 'TASK-122-BUG-1'
+    severity: medium
+    file: 'skills/create-skill/scripts/bundle_skill.py'
+    finding: '_within() moved to lexical normpath containment, so a name whose parent under references/ is a symlinked directory (link-to-etc/passwd) now passes discovery where develop refused it, and writable_copy/write_if_changed test only the leaf for a symlink — the bundler can write through the link outside the tree.'
+    suggested_action: 'Resolve candidate.parent (not the leaf) against root.resolve() and refuse a ".." leaf, keeping the ValueError/OSError → False guard; optionally refuse any symlinked component between refs_dir and dst in writable_copy. Add the symlinked-intermediate fixture (refused, nothing written outside) and keep the cited-leaf-symlink case at ["SYMLINK"]; mutation-prove both.'
+    suggested_owner: dev
+    bug_ref: 'task.122.bug.1.within-lexical-symlinked-parent-escape.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3448
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 12
+    notes: 'Boundary delivered: _within() is a containment predicate. The probe engine imports JS only, so the Python sink was declined and probed by hand under env -i in a scratch tree: 12 shapes (11 path-corpus + symlinked-parent-with-..). Two hostile shapes accepted that develop refused (symlinked intermediate dir, with and without ..) → TASK-122-BUG-1. encoded-traversal and empty are accepted by both old and new (pre-existing; neither is producible by the capture regexes). Null byte is accepted lexically but Path.exists() returns False on it, so it is refused downstream.'
+  performance:
+    status: PASS
+    notes: 'One extra regex pass per shared .md/.sh source and one set difference per check; --check --all wall time unchanged (≈6s on the live-repo test both before and after).'
+  reliability:
+    status: PASS
+    notes: 'UNREACHED is measured non-regenerable (check → bundle → check); over-match check on the live tree produced no new references/ files; the consumer regeneration from an empty develop-task/references/ is byte-identical; a restored deleted copy is named and re-deleted.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of the invocation rule; the class documented in create-skill SKILL.md, AGENTS.md, validate.yml and CHANGELOG. Three low cleanups advisory (CR-2 shadowed loop variable, CR-3 dead set difference, CR-4 duplicate remedy spelling produced by pass 3 rewriting shared/resources/<file> in the skill doc).'
+
+recommendations:
+  immediate:
+    - action: 'Fix TASK-122-BUG-1: parent-resolving _within() (leaf lexical), symlinked-intermediate fixture + mutation proof; keep the cited-leaf-symlink case reporting SYMLINK only.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py', 'tests/bundle-check-mode.test.js']
+  future:
+    - action: 'CR-2 (cleanup, low): rename the INVOKE_REF_RE inner capture so it does not shadow the enclosing while-loop name.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'CR-3 (cleanup, low): iterate sorted(reconcilable) directly — source_backed_on_disk already excludes needed — and say so in the comment.'
+      refs: ['skills/create-skill/scripts/bundle_skill.py']
+    - action: 'CR-4 (cleanup, low): the create-skill remedy sentence now reads references/<file> twice because pass 3 rewrote the shared/resources/<file> spelling; word it so the two remedies the code prints are the two the doc lists without using the literal that gets rewritten.'
+      refs: ['skills/create-skill/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['TASK-122-BUG-1 fixed and mutation-proved']

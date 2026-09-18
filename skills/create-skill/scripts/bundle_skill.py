@@ -51,7 +51,26 @@ JS_ESM_SHARED_RE = re.compile(
 # bundled location, one level up from scripts/).
 SH_SHARED_RE = re.compile(r'(?:\.\./)+shared/resources/([A-Za-z0-9._-]+)')
 # Matches already-rewritten in-tree references (so re-runs and partial states work).
-REFS_REF_RE = re.compile(r'(?:^|[\s(\[`\'"/])references/([A-Za-z0-9._-]+\.(?:json|md|sh|js|mjs|py))')
+# The name may be nested (`references/sub/inner.md`): pass 3 rewrites
+# `shared/resources/sub/inner.md` in a skill file to exactly that, and a class
+# without `/` could not re-discover it on the next run — the copy then survived
+# only by disk reconciliation, which the UNREACHED class reports (task 122).
+REFS_REF_RE = re.compile(
+    r'(?:^|[\s(\[`\'"/])references/'
+    r'((?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.(?:json|md|sh|js|mjs|py))'
+)
+# The invocation spelling a bundled step doc uses to call a script that ships
+# inside the same skill: `.agents/skills/{skill}/references/X`. Followed out of
+# SHARED text only when the skill group names the skill being bundled — a
+# literal name, or a `{a|b|c}` alternation containing it. The bare `references/X`
+# form is deliberately not followed there (see discover_needed), and neither is
+# a bare `{placeholder}` group: read as a wildcard it would vendor `change-log.js`
+# into the 24 skills that bundle `document-change-log.md` (measured, task 122).
+# That case needs no branch — `{skill}` splits to `['skill']`, which is not a
+# skill name, and so is not followed.
+INVOKE_REF_RE = re.compile(
+    r'\.agents/skills/(\{[A-Za-z0-9|-]+\}|[A-Za-z0-9-]+)/references/([A-Za-z0-9._-]+)'
+)
 # Sibling require/import in JS — `require("./foo.js")` — used to follow transitive
 # deps inside bundled shared .js files.
 JS_SIBLING_RE = re.compile(r'require\(["\']\./([A-Za-z0-9._/-]+\.js)["\']\)')
@@ -390,11 +409,60 @@ def _skill_dirs(refs_dir_str):
 
 
 def _within(root, candidate):
-    """True when `candidate` stays inside `root` once `..` segments are resolved."""
+    """True when `candidate` stays inside `root`.
+
+    Two checks, split by WHERE a symlink can sit — and the split is the whole
+    point, because the two obvious one-line versions each fail on one side:
+
+    - The PARENT is resolved (`Path.resolve()`). A symlinked intermediate
+      directory under `references/` — `references/link/x.md` with
+      `link -> /elsewhere` — resolves out of the tree and is refused. A purely
+      lexical check accepted it, and `writable_copy` tests only the leaf, so
+      the bundler wrote through the link outside the tree (task 122, BUG-1;
+      reproduced against `develop`, which refused it).
+    - The LEAF is judged lexically. Resolving the whole candidate follows a
+      symlink AT the candidate's own path, and a link at `references/X`
+      pointing outside made discovery refuse a name the skill plainly cites —
+      the copy dropped out of `needed`, entered the reconciliation population,
+      and read as UNREACHED beside its SYMLINK finding (task 122). What sits at
+      the leaf is the write gate's question, and `writable_copy` refuses it.
+
+    A `..` leaf is refused outright: `..` in the captured name is what this
+    guard was written for, and resolving the parent alone would let `sub/..`
+    land on the root itself (only `INVOKE_REF_RE` can deliver a bare `..` —
+    the shared-ref collector strips trailing punctuation). An empty leaf
+    (`Path('/')`, the absolute-root capture) has no parent inside any root and
+    is refused by the containment test itself. `OSError`/`ValueError` (a null
+    byte, an unreadable component) is a refusal, never a crash.
+    """
     try:
-        return candidate.resolve().is_relative_to(root.resolve())
+        cand = Path(candidate)
+        if cand.name == '..':
+            return False
+        return cand.parent.resolve().is_relative_to(Path(root).resolve())
     except (OSError, ValueError):
         return False
+
+
+def _symlinked_component(dst, name):
+    """The first directory BETWEEN the references root and `dst` that is a
+    symlink, or None. `name` is the bundled relative name, so its depth says
+    how many of `dst`'s parents lie inside references/.
+
+    Discovery already refuses such a name (`_within` resolves the parent), but
+    the reconciliation path reaches `dst` from a directory walk, not from a
+    name. Whether that walk crosses a symlinked directory depends on the
+    interpreter — `Path.rglob` followed them before Python 3.13 and does not
+    on 3.13+ (this repository's CI runs `3.x`) — so the gate is kept here so
+    that the write decision does not depend on which Python is running: a copy
+    that mirrors a shared file through a link must never be "refreshed" onto
+    whatever the link points at (task 122, BUG-1).
+    """
+    depth = len(Path(name).parts) - 1
+    for parent in list(Path(dst).parents)[:depth]:
+        if parent.is_symlink():
+            return parent
+    return None
 
 
 def discover_needed(skill_path, shared_dir, refs_dir):
@@ -413,7 +481,16 @@ def discover_needed(skill_path, shared_dir, refs_dir):
     GitHub-only skills. Following it there vendored 38 unwanted files across the
     repo. Copies that no discovery rule reaches are handled after the fact by
     `source_backed_on_disk()` instead, which keys on a file already existing rather
-    than on a sentence mentioning it.
+    than on a sentence mentioning it — and `check_skill` reports each of those as
+    UNREACHED, because a copy that is refreshed and never depended on is a
+    dependency nothing declares.
+
+    The one `references/X` spelling that IS followed out of shared `.md`/`.sh`
+    text is the invocation form `.agents/skills/<skill>/references/X`
+    (`INVOKE_REF_RE`), and only when `<skill>` names the skill being bundled —
+    literally, or inside a `{a|b|c}` alternation. It carries the skill name, so
+    it can be scoped in a way the bare form cannot; a bare `{placeholder}` group
+    matches no skill and is therefore never followed.
     """
     repo_root = shared_dir.parent.parent
     skill_files = (
@@ -465,7 +542,12 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             print(f"⚠️  refusing out-of-tree reference: {name}")
             continue
         src = shared_dir / name
-        if not src.exists():
+        # `is_file()`, not `exists()`: a citation of a shared DIRECTORY —
+        # `shared/resources/sub/`, which the collector produces from a trailing
+        # `sub/..` after stripping sentence punctuation — used to enter `needed`
+        # and crash `expected_bytes` with IsADirectoryError (found by task 122's
+        # `..`-leaf fixture). A directory is not a bundleable source.
+        if not src.is_file():
             if not quiet:
                 print(f"⚠️  shared/resources/{name} not found")
             continue
@@ -481,6 +563,15 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             pending.extend(m.group(1) for m in JS_ESM_SIBLING_RE.finditer(text))
         if src.suffix == '.sh':
             pending.extend(m.group(1) for m in SH_SIBLING_RE.finditer(text))
+        if src.suffix in ('.md', '.sh'):
+            # `pending_quiet`, not `pending`: a missing source here is not an
+            # authoring error worth a warning — it is a skill-native script that
+            # happens to be invoked by its bundled path.
+            for m in INVOKE_REF_RE.finditer(text):
+                who, invoked = m.group(1), m.group(2)
+                names = who.strip('{}').split('|') if who.startswith('{') else [who]
+                if skill_path.name in names:
+                    pending_quiet.append(invoked)
 
     return needed, skill_files
 
@@ -623,11 +714,21 @@ def writable_copy(dst, src, name):
     A symlink is never writable through: `write_if_changed` unlinks it, but the
     decision to replace a link the operator placed belongs here, visibly.
     """
-    if dst.is_symlink():
+    if dst.is_symlink() or _symlinked_component(dst, name) is not None:
         return False
     if not dst.exists():
         return True
     return _looks_bundled(dst, src, name)
+
+
+def _skip_reason(dst, name):
+    """Why `writable_copy` refused `dst`, for the status line — one definition
+    for both write passes, so the two cannot drift."""
+    if dst.is_symlink():
+        return "symlink"
+    if _symlinked_component(dst, name) is not None:
+        return "under a symlinked directory"
+    return "not bundler output"
 
 
 def write_if_changed(dst, src, name, new_bytes):
@@ -784,6 +885,18 @@ REMEDIES = {
         'permissions and re-run the check. This is a broken instrument, not a '
         'clean result'
     ),
+    # Not regenerable, and the measurement test proves it: a bundle run REFRESHES
+    # an unreached copy (it is in the writer's population) and so cannot clear
+    # the finding. The remedy is a decision, not a regenerate — same shape as
+    # ORPHANED and AMBIGUOUS.
+    'UNREACHED': (
+        'has a shared/resources/ source but no discovery rule in this skill '
+        'reaches it — the copy is refreshed on every bundle and depended on by '
+        'nothing the bundler can see. Cite it from the skill (shared/resources/X '
+        'or references/X in a skill file, or an '
+        '.agents/skills/<this-skill>/references/X invocation in shared text), or '
+        'delete the copy'
+    ),
 }
 
 # The banner's declared source, WITHOUT requiring it to match the file's own
@@ -892,6 +1005,17 @@ def check_skill(skill_path):
     expected.update(reconcilable)
     bundled_names = set(expected)
 
+    # Reconcilable members are the population the writer refreshes and no
+    # discovery rule reaches — `source_backed_on_disk` already excludes every
+    # name in `needed`, so the two sets are disjoint by construction and every
+    # member here is unreached. They are fresh by construction too — the loop
+    # below will find them in sync — and that is exactly why they need their
+    # own class: the freshness comparison is what hides them. Measured
+    # 2026-09-17 at 15 copies across 12 skills, all reported clean. They stay in
+    # `expected`, so a copy that is both unreached and stale reports both.
+    for rel in sorted(reconcilable):
+        report(rel, 'UNREACHED', 'source-backed copy that no discovery rule reaches')
+
     for rel in sorted(expected):
         src = expected[rel]
         dst = refs_dir / rel
@@ -902,6 +1026,22 @@ def check_skill(skill_path):
         # refuses a symlink.
         if dst.is_symlink():
             report(rel, 'SYMLINK', f'symlink -> {os.readlink(dst)}')
+            continue
+
+        # A symlinked INTERMEDIATE directory is the same case one level up: the
+        # writer refuses it (`writable_copy` → `_symlinked_component`), so the
+        # check must not report the name MISSING or STALE under the regenerate
+        # remedy that a bundle run provably cannot honour. Found by the
+        # cycle-2 refute pass on task 122 (CR2-1): an in-tree link
+        # `references/sub -> real` passed the parent-resolving `_within` into
+        # `needed`, the writer printed SKIPPED, and the check said MISSING.
+        component = _symlinked_component(dst, rel)
+        if component is not None:
+            report(
+                rel, 'SYMLINK',
+                f'under symlinked directory references/'
+                f'{component.relative_to(refs_dir).as_posix()} -> {os.readlink(component)}',
+            )
             continue
 
         if not dst.exists():
@@ -1142,7 +1282,7 @@ def bundle_skill(skill_path):
         # used the one fixture seed that routed to the branch that worked.
         if not writable_copy(dst, src, name):
             protected += 1
-            why = "symlink" if (refs_dir / name).is_symlink() else "not bundler output"
+            why = _skip_reason(refs_dir / name, name)
             print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
         if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):
@@ -1161,7 +1301,7 @@ def bundle_skill(skill_path):
         dst = refs_dir / name
         if not writable_copy(dst, src, name):
             protected += 1
-            why = "symlink" if (refs_dir / name).is_symlink() else "not bundler output"
+            why = _skip_reason(refs_dir / name, name)
             print(f"  SKIPPED references/{name} — {why}, left alone")
             continue
         if write_if_changed(dst, src, name, expected_bytes(src, name, refs_dir, bundled_names)):

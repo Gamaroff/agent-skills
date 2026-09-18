@@ -59,7 +59,7 @@ is the non-regenerable proof and belongs beside the existing "classes a bundle r
 
 ### Phase 2: the discovery rule
 
-Regex, beside `REFS_REF_RE` (l.30):
+Regex, beside `REFS_REF_RE` (l.54):
 
 ```python
 # The invocation spelling a bundled step doc uses to call a script that ships
@@ -72,7 +72,10 @@ INVOKE_REF_RE = re.compile(
 ```
 
 In `discover_needed`, inside the shared-source loop (after `pending.extend(collect_shared_refs(text))`,
-l.477), for `.md` and `.sh` sources:
+l.477), for `.md` and `.sh` sources. A bare placeholder group (`{skill}`, no `|`) falls out naturally —
+`names == ['skill']` matches no real skill — and must stay that way: read as a wildcard it would vendor
+`change-log.js` into the 24 skills that bundle `document-change-log.md` (measured, review 1). Assert the
+bare-placeholder case in the fixture; do not add a branch for it:
 
 ```python
         for m in INVOKE_REF_RE.finditer(text):
@@ -85,26 +88,39 @@ l.477), for `.md` and `.sh` sources:
 `pending_quiet`, not `pending`: a missing source here is not a warning-worthy authoring error, it is
 a skill-native file that happens to be invoked by path.
 
-Check `package_skill.py` imports these regexes from `bundle_skill` or restates them; if restated,
-that is the second definition the task forbids — import instead.
+`package_skill.py` imports only `rewrite_text, rewrite_md_links, expected_bytes` from `bundle_skill` and
+collects `shared/resources/` refs by `rglob` over the skill tree **including `references/`**, so it
+reaches these copies by walking the already-bundled tree. It does not need `INVOKE_REF_RE` for the zip;
+do not restate the regex there.
+
+Respell the one real invocation so the rule reaches it:
+`shared/resources/develop-pipeline-step-8-commit.md:108`
+`.agents/skills/{skill}/references/verify-push-state.sh` → `.agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh`,
+then `npm run bundle` refreshes the three bundled copies of the step doc.
 
 Fixture: shared `step.md` containing
 `bash .agents/skills/fx/references/tool.sh` and `shared/resources/tool.sh` present; skill `fx`
 cites `step.md`; assert `tool.sh` in `discover_needed(fx)`; skill `other` cites the same `step.md`;
 assert `tool.sh` not in `discover_needed(other)` and, if `other/references/tool.sh` exists,
-reported UNREACHED.
+reported UNREACHED. Two more variants of the same fixture: `{fx|other}` → in `needed` for both;
+`{skill}` → in `needed` for neither.
 
 ### Phase 3: deletions
 
 ```bash
 git rm skills/{jira-sprint-manager,jira-sprint-retrospective,jira-sprint-review-prep,jira-epic-creator}/references/yaml-subset.js
 git rm skills/review-story/references/review-story-prepass-prompts.md
+git rm skills/{qa-task,qa-story}/references/develop-pipeline-step-0-resolve-and-prepare.md
+git rm skills/{qa-task,qa-story}/references/develop-pipeline-step-1-create-branch.md
+git rm skills/qa-task/references/resolve-paths.sh
+git rm skills/{create-task,create-story}/references/set-github-project-priority.sh
 ```
 
-For `set-github-project-priority.sh` in create-task/create-story: the copy exists because
-`REFS_REF_RE` matches the prose at `create-task/SKILL.md:577` (and its create-story twin). Either
-reword the parenthetical to not spell `references/` (then `git rm` the copies) or keep them; the task
-prefers the reword — a prose mention should not vendor a script.
+`set-github-project-priority.sh` in create-task/create-story needs no reword first: `REFS_REF_RE` does
+not match the bare backticked mention at `create-task/SKILL.md:580`, and create-story has no mention at
+all (review 1 ran the regex against both files). The qa-task/qa-story five are named only in comments in
+`read-config.sh` / `resolve-platform.sh` / `gh-stage.js` — grep each once more before the `rm`, per the
+task's Medium-risk mitigation.
 
 Then `npm run bundle`, `python3 skills/create-skill/scripts/bundle_skill.py --check`, expect zero
 UNREACHED. Mutation proof: `git checkout HEAD~1 -- skills/review-story/references/review-story-prepass-prompts.md`,
@@ -120,6 +136,6 @@ check names it, `git rm` again.
 ## Testing Approach
 
 `node --test tests/bundle-check-mode.test.js` for the fixtures; `npm run bundle:check` and
-`--check --all` on the live tree at each phase boundary (15 → 7 → 0). Consumer check: delete
+`--check --all` on the live tree at each phase boundary (15 → 12 → 0). Consumer check: delete
 `skills/develop-task/references/`, `npm run bundle:skill skills/develop-task`, confirm
 `verify-push-state.sh` is back.

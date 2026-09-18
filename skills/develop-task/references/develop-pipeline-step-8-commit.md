@@ -106,7 +106,7 @@ grep -q "⏳ Pending" "$REPORT" && { echo "❌ Step 8 incomplete: Pipeline Progr
 # 5. The work actually exists on the remote — commits present, tree clean,
 #    local HEAD == remote HEAD, and (when a PR is open) PR head == local HEAD.
 #    Run it UNPIPED and read its own exit status; see the note below.
-bash .agents/skills/{skill}/references/verify-push-state.sh --base "${BASE_BRANCH:?}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh --base "${BASE_BRANCH:?}" ${PR_NUMBER:+--pr "$PR_NUMBER"}
 VERIFY_EXIT=$?
 [ "$VERIFY_EXIT" -eq 0 ] || { echo "❌ Step 8 incomplete: verify-push-state failed (exit $VERIFY_EXIT)"; exit 1; }
 
