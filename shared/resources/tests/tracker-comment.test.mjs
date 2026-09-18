@@ -796,10 +796,23 @@ test("qa-gate-N is keyed per cycle: the same cycle is `already`, the next cycle 
   // deduplicate while the next cycle still reaches the issue.
   const dir = withRepo();
   const f = bodyFile(dir, "body");
-  assert.equal(cli.markerHtml("qa-gate-2"), "<!-- agent-skills-comment:qa-gate-2 -->");
+  assert.equal(
+    cli.markerHtml("qa-gate-2"),
+    "<!-- agent-skills-comment:qa-gate-2 -->",
+  );
   const run = (stage, gh) =>
     cli.run({
-      argv: ["node", "x", "--issue", "42", "--body-file", f, "--stage", stage, "--quiet"],
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--stage",
+        stage,
+        "--quiet",
+      ],
       execImpl: gh.execImpl,
       repoRoot: dir,
       env: { ...baseEnv },
