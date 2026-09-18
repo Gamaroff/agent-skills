@@ -246,7 +246,8 @@ Phase 1 red.
    **Two bundler defects the class exposed on first run, fixed in the same file (`bundle_skill.py`):**
    `_within()` used `Path.resolve()`, which follows a symlink sitting at `references/X` out of the
    tree and made discovery refuse a name the skill cites (the copy then read UNREACHED beside
-   SYMLINK) — now a lexical `..` check; and `REFS_REF_RE` could not capture a nested name
+   SYMLINK) — first made lexical, then corrected in QA cycle 1 to resolve the parent and judge the
+   leaf (see below); and `REFS_REF_RE` could not capture a nested name
    (`references/sub/inner.md`), so a nested reference pass 3 had rewritten in place was never
    rediscovered and survived only by reconciliation (`tests/bundle-link-rewrite.test.js` went red
    the moment UNREACHED existed) — the class now admits `/`. Neither is a new rule; each is a
@@ -258,6 +259,12 @@ Phase 1 red.
    refuses a symlinked component between the references root and the copy (`_symlinked_component`,
    `_skip_reason`); `discover_needed` admits sources on `is_file()` so a directory citation is skipped
    rather than crashing. Five fixtures added (test file 37 → 42). CR-2/3/4 cleanups applied.
+
+   **QA cycle 2 fix (TASK-122-CR2-1/2):** `check_skill` reports a name under a symlinked
+   *intermediate* directory as `SYMLINK` (component named) before the `exists()` test, so the
+   check's population and remedy match the writer's for an in-tree link; `_symlinked_component`'s
+   docstring and the CHANGELOG now describe the shipped rule (parent resolved, leaf lexical; `rglob`
+   behaviour differs by Python version). `_within` simplified (CR-3). One fixture added (42 → 43).
 
 ### Files to Modify (Documentation)
 
@@ -382,18 +389,17 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.122.qa.1.bundle-check-unreached-copies.md](./task.122.qa.1.bundle-check-unreached-copies.md)
-- **Gate File**: [task.122.gate.1.bundle-check-unreached-copies.yml](./task.122.gate.1.bundle-check-unreached-copies.yml)
+- **Full Report**: [task.122.qa.2.bundle-check-unreached-copies.md](./task.122.qa.2.bundle-check-unreached-copies.md) (cycle 1: [task.122.qa.1.bundle-check-unreached-copies.md](./task.122.qa.1.bundle-check-unreached-copies.md))
+- **Gate File**: [task.122.gate.2.bundle-check-unreached-copies.yml](./task.122.gate.2.bundle-check-unreached-copies.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3448 (`ci:fast`) + 73 bundler-suite + 61 under `TMPDIR=/tmp`
+- **Tests Executed**: 3453 (`ci:fast`) + 78 bundler-suite + 42 under `TMPDIR=/tmp`
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 HIGH, 1 MEDIUM (TASK-122-BUG-1)
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **Critical Issues**: 0 HIGH, 0 MEDIUM, 2 LOW open (TASK-122-CR2-1, CR2-2); TASK-122-BUG-1 closed
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The lexical `_within()` accepts a symlinked intermediate directory under `references/` that `develop` refused, and the write gate checks only the leaf — reproduced end-to-end; see [task.122.bug.1.within-lexical-symlinked-parent-escape.md](./task.122.bug.1.within-lexical-symlinked-parent-escape.md). Three low cleanups advisory (CR-2/3/4).
-
+BUG-1 verified fixed (repro refused, 13-shape probe clean, mutants red) — [bug 1 closed](./task.122.bug.1.within-lexical-symlinked-parent-escape.md). Cycle-2 refute pass: for an in-tree symlinked intermediate the writer refuses the copy while `--check` reports it `MISSING` under the regenerate remedy (CR2-1); docstring and CHANGELOG describe the superseded lexical rule (CR2-2). Both low; one more fix cycle.
 ## Change Log
 <!-- change-log-start -->
 ## Change Log
@@ -406,6 +412,8 @@ The lexical `_within()` accepts a symlinked intermediate directory under `refere
 | 2026-09-18 |  | Implemented — 9 files modified, 12 deleted, 8 new tests (bundle-check-mode 29 → 37); 15 → 12 → 0 UNREACHED measured; 6 mutants caught | develop |
 | 2026-09-18 |  | QA gate CONCERNS (90/100) — 1 medium finding (TASK-122-BUG-1), 3 advisory cleanups | qa-task |
 | 2026-09-18 |  | QA findings fixed — TASK-122-BUG-1 (parent-resolving _within, write-gate symlink component, is_file), CR-2/3/4; 5 fixtures, 5 mutants covered; 1 iteration | qa-fix |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — BUG-1 closed; 2 low findings from the refute pass (CR2-1 check/writer divergence on an in-tree symlinked intermediate, CR2-2 docstring/CHANGELOG wording) | qa-task |
+| 2026-09-18 |  | QA findings fixed — TASK-122-CR2-1 (check_skill SYMLINK branch for a symlinked intermediate), CR2-2 (docstring/CHANGELOG wording), CR-3; 1 fixture, 3 mutants covered; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

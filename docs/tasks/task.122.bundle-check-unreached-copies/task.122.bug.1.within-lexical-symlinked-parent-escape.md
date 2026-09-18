@@ -4,7 +4,7 @@
 **Bug ID**: TASK-122-BUG-1
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: ✅ Ready for QA
+**Status**: ✅ Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-18
 
@@ -139,3 +139,4 @@ write gate → reconciled-copy test red; M5 `is_file()`→`exists()` → directo
 | 2026-09-18 | New | Found in QA cycle 1 (hand probe of the `_within` boundary; reviewer CR-1 independently named the same mechanism) |
 | 2026-09-18 | In Progress | qa-fix cycle 1 — investigation |
 | 2026-09-18 | Ready for QA | qa-fix cycle 1 — parent-resolving `_within`, write-gate component check, `is_file()`; 5 fixtures, 5 mutants covered |
+| 2026-09-18 | Closed | QA cycle 2 verified: repro refused on `7252be6f`, 13-shape probe clean, QA mutants red. Follow-on low finding (in-tree symlinked intermediate: check/writer divergence) filed as TASK-122-CR2-1 in gate 2 |

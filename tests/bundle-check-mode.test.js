@@ -844,6 +844,56 @@ test("a reconciled copy under a symlinked intermediate directory is refused by t
   assert.equal(verdict, "False under a symlinked directory");
 });
 
+test("an IN-TREE symlinked intermediate directory reports SYMLINK, never MISSING — the check matches the writer", (t) => {
+  // `references/sub -> real` stays inside the tree, so the parent-resolving
+  // `_within` accepts `sub/s.md` into `needed`; the writer then refuses it
+  // (`under a symlinked directory`). Cycle 2 of task 122 found the check with
+  // no matching branch: it reported the name MISSING under the regenerate
+  // remedy that a bundle run provably cannot honour. The check's population
+  // and remedies must match the writer's, and this is the case where they
+  // parted.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("sub/s.md") },
+      sharedFiles: { "sub/s.md": "# s\n" },
+    },
+    t,
+  );
+  fs.mkdirSync(path.join(fx.skillDir, "references", "real"), {
+    recursive: true,
+  });
+  fs.symlinkSync("real", path.join(fx.skillDir, "references", "sub"));
+
+  const stdout = fx.bundle();
+  assert.match(
+    stdout,
+    /SKIPPED references\/sub\/s\.md — under a symlinked directory/,
+  );
+  assert.equal(
+    fs.existsSync(path.join(fx.skillDir, "references", "real", "s.md")),
+    false,
+    "the writer must not write through the in-tree link either",
+  );
+
+  const res = fx.check();
+  assert.deepEqual(
+    res.classesFound,
+    ["SYMLINK"],
+    "the check agrees with the writer",
+  );
+  assert.equal(
+    res.problems.filter((p) => p.klass === "MISSING").length,
+    0,
+    "never MISSING — that remedy cannot clear it",
+  );
+  const entry = res.problems.find((p) => p.rel === "sub/s.md");
+  assert.ok(entry, "the copy itself is reported, not only the link");
+  assert.match(
+    entry.detail,
+    /under symlinked directory references\/sub -> real/,
+  );
+});
+
 test("a `..` leaf is refused even though its parent resolves inside the tree", (t) => {
   // Only INVOKE_REF_RE can deliver a bare `..` leaf: the shared-ref collector
   // strips trailing punctuation, so `shared/resources/sub/..` arrives as

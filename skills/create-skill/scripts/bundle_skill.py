@@ -427,18 +427,19 @@ def _within(root, candidate):
       and read as UNREACHED beside its SYMLINK finding (task 122). What sits at
       the leaf is the write gate's question, and `writable_copy` refuses it.
 
-    A `..` (or empty) leaf is refused outright: `..` in the captured name is
-    what this guard was written for, and resolving the parent alone would let
-    `sub/..` land on the root itself. `OSError`/`ValueError` (a null byte, an
-    unreadable component) is a refusal, never a crash.
+    A `..` leaf is refused outright: `..` in the captured name is what this
+    guard was written for, and resolving the parent alone would let `sub/..`
+    land on the root itself (only `INVOKE_REF_RE` can deliver a bare `..` —
+    the shared-ref collector strips trailing punctuation). An empty leaf
+    (`Path('/')`, the absolute-root capture) has no parent inside any root and
+    is refused by the containment test itself. `OSError`/`ValueError` (a null
+    byte, an unreadable component) is a refusal, never a crash.
     """
     try:
         cand = Path(candidate)
-        if cand.name in ('', '..'):
+        if cand.name == '..':
             return False
-        parent = cand.parent.resolve()
-        root_r = Path(root).resolve()
-        return parent == root_r or parent.is_relative_to(root_r)
+        return cand.parent.resolve().is_relative_to(Path(root).resolve())
     except (OSError, ValueError):
         return False
 
@@ -450,9 +451,12 @@ def _symlinked_component(dst, name):
 
     Discovery already refuses such a name (`_within` resolves the parent), but
     the reconciliation path reaches `dst` from a directory walk, not from a
-    name — `Path.rglob` follows a symlinked directory — so the write gate must
-    refuse it too, or a copy that mirrors a shared file through a link is
-    "refreshed" onto whatever the link points at (task 122, BUG-1).
+    name. Whether that walk crosses a symlinked directory depends on the
+    interpreter — `Path.rglob` followed them before Python 3.13 and does not
+    on 3.13+ (this repository's CI runs `3.x`) — so the gate is kept here so
+    that the write decision does not depend on which Python is running: a copy
+    that mirrors a shared file through a link must never be "refreshed" onto
+    whatever the link points at (task 122, BUG-1).
     """
     depth = len(Path(name).parts) - 1
     for parent in list(Path(dst).parents)[:depth]:
@@ -1022,6 +1026,22 @@ def check_skill(skill_path):
         # refuses a symlink.
         if dst.is_symlink():
             report(rel, 'SYMLINK', f'symlink -> {os.readlink(dst)}')
+            continue
+
+        # A symlinked INTERMEDIATE directory is the same case one level up: the
+        # writer refuses it (`writable_copy` → `_symlinked_component`), so the
+        # check must not report the name MISSING or STALE under the regenerate
+        # remedy that a bundle run provably cannot honour. Found by the
+        # cycle-2 refute pass on task 122 (CR2-1): an in-tree link
+        # `references/sub -> real` passed the parent-resolving `_within` into
+        # `needed`, the writer printed SKIPPED, and the check said MISSING.
+        component = _symlinked_component(dst, rel)
+        if component is not None:
+            report(
+                rel, 'SYMLINK',
+                f'under symlinked directory references/'
+                f'{component.relative_to(refs_dir).as_posix()} -> {os.readlink(component)}',
+            )
             continue
 
         if not dst.exists():

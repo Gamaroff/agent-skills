@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file. Format foll
   followed (as a wildcard it would vendor `change-log.js` into 24 skills). The step-8 line is
   respelled to the alternation, the twelve dead copies are deleted, and the tree reports zero. Two
   discovery defects the class exposed on first run are fixed alongside: `_within()` resolved
-  symlinks and refused a cited name when a link sat at its destination (now lexical), and
+  symlinks and refused a cited name when a link sat at its destination (it now resolves the parent and judges the leaf lexically, so a symlinked intermediate directory is still refused — QA cycle 1), and
   `REFS_REF_RE` could not capture a nested `references/sub/x.md` after pass 3 rewrote it in place.
 
 - **Four authoring rules the corpus obeyed by accident, and two guards (task 119).** The harness
