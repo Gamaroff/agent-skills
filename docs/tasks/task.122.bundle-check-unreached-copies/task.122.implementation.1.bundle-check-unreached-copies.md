@@ -37,7 +37,7 @@ Add an `UNREACHED` class to `bundle_skill.py --check` for source-backed copies n
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #434: https://github.com/Gamaroff/agent-skills/pull/434 | —                    |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.122.qa.{N}.*.md`; `task.122.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 3 cycles: CONCERNS 90 → CONCERNS 90 → PASS 100; 5c APPROVE; commits `7252be6f`, `97f66ae1`, `3c276b33` | —                    |
 | 7. finalise                | ✅ Done    | `task.122.dod.{N}.*.md`; task `status: accepted`                       | DoD 1 ACCEPTED; acceptance commit `be63f03556ab`; CI 1 SUCCESS @ `3c276b33fecb` (5 checks), CI 2 SUCCESS @ `be63f03556ab` (5 checks, 120s); #422 closed, board Done | —                    |
-| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Committed in the Step 8 `docs(task.122)` commit (hash recorded in the Decisions Log), pushed; lock removed | —                    |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Committed in `454a5af3`, pushed; lock removed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
