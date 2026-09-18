@@ -287,7 +287,10 @@ const CYCLE_SUFFIX = /-\d+$/;
 // `pipeline-paused` is scoped the same way, by the step it paused at: a pipeline
 // that pauses at Step 3, resumes, and pauses again at Step 6 has paused twice,
 // and the second notice must not be suppressed by the first one's marker.
+// `qa-gate` recurs once per QA cycle (task.121) — the same lead renders for
+// `qa-gate-3` as for `qa-gate`, the suffix only keys the marker.
 const CYCLE_SCOPED_LEAD_STAGES = Object.freeze([
+  "qa-gate",
   "qa-cycle",
   "qa-fix",
   "pipeline-paused",

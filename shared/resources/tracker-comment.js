@@ -104,7 +104,10 @@ const COMMENT_MARKER_PREFIX = "agent-skills-comment:";
 // for the same reason: one pipeline can pause more than once, and each pause is
 // its own event. Kept in step with CYCLE_SCOPED_LEAD_STAGES in
 // stakeholder-summary.js, which a test holds equal to this list.
+// `qa-gate` is what qa-task / qa-story post at Step 13b, once per QA cycle
+// (task.121): bare, its marker suppressed every gate after the first.
 const CYCLE_SCOPED_STAGES = Object.freeze([
+  "qa-gate",
   "qa-cycle",
   "qa-fix",
   "pipeline-paused",

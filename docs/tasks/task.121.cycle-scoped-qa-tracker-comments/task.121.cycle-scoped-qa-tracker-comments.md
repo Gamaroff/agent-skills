@@ -5,7 +5,7 @@ type: task
 description: "tracker-comment.js builds its idempotency marker from --stage alone. qa-fix is already a cycle-scoped stage in the engine but skills/qa-fix passes the bare name; qa-gate is not cycle-scoped and qa-task/qa-story pass it bare on every cycle. Result on task.110, task.113 and task.119: the PR carries every cycle, the tracker issue carries cycle 1 and reports success for the rest. Add qa-gate to the cycle-scoped list, suffix all three call sites with the cycle they already derive, state once-per-issue vs once-per-cycle in the contract, and add a guard that fails on a bare cycle-scoped stage. Observation #75 (consolidating #66, #70, #78, #80, #84, #93, #94)."
 tags: [tracker-comment, qa-task, qa-story, qa-fix, idempotency]
 category: refactoring
-status: ready-for-development
+status: in-progress
 priority: High
 risk_level: low
 created: 2026-09-17
@@ -17,7 +17,7 @@ github_issue: 421
 
 # Technical Task: QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped
 
-**Status:** Ready for Development
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.121.review.1.cycle-scoped-qa-tracker-comments.md` implemented 2026-09-18
 **GitHub Issue**: [#421](https://github.com/Gamaroff/agent-skills/issues/421)
 
@@ -189,15 +189,15 @@ post cycle N again once — one duplicate on at most one in-flight issue, then c
 `shared/resources/tests/tracker-comment.test.mjs`, `shared/resources/tests/stakeholder-summary.test.mjs`
 
 **Changes**:
-- [ ] Add `"qa-gate"` to `CYCLE_SCOPED_STAGES` and to `CYCLE_SCOPED_LEAD_STAGES`.
-- [ ] `tracker-comment.test.mjs:1495-1509` ("the numeric suffix is legal only for cycle-scoped
+- [x] Add `"qa-gate"` to `CYCLE_SCOPED_STAGES` and to `CYCLE_SCOPED_LEAD_STAGES`.
+- [x] `tracker-comment.test.mjs:1495-1509` ("the numeric suffix is legal only for cycle-scoped
       stages (NEW-6)") asserts the list **literally** —
       `deepEqual([...CYCLE_SCOPED_STAGES], ["qa-cycle","qa-fix","pipeline-paused"])` — so it goes
       red on the addition. Update the literal to four members and add `qa-gate-2` accepted,
       `in-review-2` still rejected. (Verified 2026-09-18: enumerated, not table-driven.)
-- [ ] `stakeholder-summary.test.mjs:492-505` is behavioural (iterates `COMMENT_STAGES`); bump its
+- [x] `stakeholder-summary.test.mjs:492-505` is behavioural (iterates `COMMENT_STAGES`); bump its
       `≥ 3` non-vacuity floor to `≥ 4`.
-- [ ] Assert the lead for `qa-gate-2` renders identically to `qa-gate` (suffix stripped).
+- [x] Assert the lead for `qa-gate-2` renders identically to `qa-gate` (suffix stripped).
 
 **Dependencies**: none.
 
@@ -384,7 +384,7 @@ None.
 
 ## Progress Tracking
 
-- [ ] Phase 1: engine
+- [x] Phase 1: engine
 - [ ] Phase 2: call sites + orchestrator block
 - [ ] Phase 3: contract + guard
 - [ ] QA: `task.121.qa.[N].cycle-scoped-qa-tracker-comments.md`
