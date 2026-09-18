@@ -382,24 +382,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-18
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.122.qa.2.bundle-check-unreached-copies.md](./task.122.qa.2.bundle-check-unreached-copies.md) (cycle 1: [task.122.qa.1.bundle-check-unreached-copies.md](./task.122.qa.1.bundle-check-unreached-copies.md))
-- **Gate File**: [task.122.gate.2.bundle-check-unreached-copies.yml](./task.122.gate.2.bundle-check-unreached-copies.yml)
+- **Full Report**: [task.122.qa.3.bundle-check-unreached-copies.md](./task.122.qa.3.bundle-check-unreached-copies.md) (cycles 1–2: [qa.1](./task.122.qa.1.bundle-check-unreached-copies.md), [qa.2](./task.122.qa.2.bundle-check-unreached-copies.md))
+- **Gate File**: [task.122.gate.3.bundle-check-unreached-copies.yml](./task.122.gate.3.bundle-check-unreached-copies.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3453 (`ci:fast`) + 78 bundler-suite + 42 under `TMPDIR=/tmp`
+- **Tests Executed**: 3454 (`ci:fast`) + 79 bundler-suite + 43 under `TMPDIR=/tmp`
 - **Phases Verified**: 3/3
-- **Critical Issues**: 0 HIGH, 0 MEDIUM, 2 LOW open (TASK-122-CR2-1, CR2-2); TASK-122-BUG-1 closed
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **Critical Issues**: 0 — TASK-122-BUG-1 closed (cycle 2); CR2-1/CR2-2 fixed (cycle 3)
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-BUG-1 verified fixed (repro refused, 13-shape probe clean, mutants red) — [bug 1 closed](./task.122.bug.1.within-lexical-symlinked-parent-escape.md). Cycle-2 refute pass: for an in-tree symlinked intermediate the writer refuses the copy while `--check` reports it `MISSING` under the regenerate remedy (CR2-1); docstring and CHANGELOG describe the superseded lexical rule (CR2-2). Both low; one more fix cycle.
+No open findings after three cycles. 15 → 12 → 0 UNREACHED on the live tree; the `_within` containment guard resolves the parent and judges the leaf, the write gate and the check agree on every symlink placement, and every description of the rule is the shipped one.
 ## Change Log
 <!-- change-log-start -->
 ## Change Log
@@ -414,6 +414,7 @@ BUG-1 verified fixed (repro refused, 13-shape probe clean, mutants red) — [bug
 | 2026-09-18 |  | QA findings fixed — TASK-122-BUG-1 (parent-resolving _within, write-gate symlink component, is_file), CR-2/3/4; 5 fixtures, 5 mutants covered; 1 iteration | qa-fix |
 | 2026-09-18 |  | QA gate CONCERNS (90/100) — BUG-1 closed; 2 low findings from the refute pass (CR2-1 check/writer divergence on an in-tree symlinked intermediate, CR2-2 docstring/CHANGELOG wording) | qa-task |
 | 2026-09-18 |  | QA findings fixed — TASK-122-CR2-1 (check_skill SYMLINK branch for a symlinked intermediate), CR2-2 (docstring/CHANGELOG wording), CR-3; 1 fixture, 3 mutants covered; 1 iteration | qa-fix |
+| 2026-09-18 |  | QA gate PASS (100/100) — cycle 3, no findings; CR2-1/CR2-2 verified fixed | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

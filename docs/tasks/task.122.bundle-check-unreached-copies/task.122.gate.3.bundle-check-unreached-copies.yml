@@ -1,0 +1,57 @@
+schema: 1
+task: 'task.122.bundle-check-unreached-copies'
+task_title: 'Twelve skills carry bundled copies no discovery rule reaches'
+gate: PASS
+status_reason: 'Cycle-2 findings verified fixed on 97f66ae1: an in-tree symlinked intermediate now reports SYMLINK x2 and never MISSING (check == writer), the docstring/CHANGELOG/task Files Summary describe the shipped rule, _within simplified. QA mutant on the new check branch red; 79/79 bundler suites; 43/43 under TMPDIR=/tmp; bundle:check 0 problems; scoped reviewer (files since gate 2) returned no findings. Deliverable unchanged: 0 UNREACHED across 128 skills; every phase, success criterion and NFR PASS.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T11:44:53Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3454
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 13
+    notes: 'Boundary (_within) probed by hand after the cycle-1 fix (13 shapes under env -i, engine declines the Python sink) and unchanged in behaviour by the cycle-2 simplification (M7/M8 mutants red). Both symlink shapes, bare .., empty and all traversals refused; legitimate shapes accepted.'
+  performance:
+    status: PASS
+    notes: 'One parents-walk per checked name in addition to cycle 1; live --check ≈6s, unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Check and writer agree on every symlink placement (leaf, intermediate in-tree, intermediate out-of-tree); reconciliation fixture Python-version independent; directory citation no longer crashes.'
+  maintainability:
+    status: PASS
+    notes: 'Module invariant restored (check population and remedies match the writer). Every description of the containment rule — docstring, CHANGELOG, create-skill SKILL.md, task Files Summary — states the shipped rule.'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fix_date: '2026-09-18'
+  total_iterations: 2
+  verification_method: 'Repro scripts against the committed branch (BUG-1: refused, nothing written outside; CR2-1: SYMLINK x2, no MISSING); 13-shape hand probe; QA mutation proofs each cycle; 79/79 suites; ci:fast 3454/3454; bundle:check 0'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Observation #118: tick actioned with PR #434 at finalise (Migration criterion).'
+      refs: ['docs/tasks/task.122.bundle-check-unreached-copies/task.122.bundle-check-unreached-copies.md']
+    - action: 'Observation #125 (logged this run): the develop skill cites a change-log.js one-liner at .agents/skills/{skill}/references/change-log.js that develop does not bundle — exactly the bare-{placeholder} class this task documents; a follow-up citation fix per skill.'
+      refs: ['skills/develop/SKILL.md', 'shared/resources/document-change-log.md']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
