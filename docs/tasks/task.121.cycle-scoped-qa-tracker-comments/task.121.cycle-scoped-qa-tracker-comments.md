@@ -5,7 +5,7 @@ type: task
 description: "tracker-comment.js builds its idempotency marker from --stage alone. qa-fix is already a cycle-scoped stage in the engine but skills/qa-fix passes the bare name; qa-gate is not cycle-scoped and qa-task/qa-story pass it bare on every cycle. Result on task.110, task.113 and task.119: the PR carries every cycle, the tracker issue carries cycle 1 and reports success for the rest. Add qa-gate to the cycle-scoped list, suffix all three call sites with the cycle they already derive, state once-per-issue vs once-per-cycle in the contract, and add a guard that fails on a bare cycle-scoped stage. Observation #75 (consolidating #66, #70, #78, #80, #84, #93, #94)."
 tags: [tracker-comment, qa-task, qa-story, qa-fix, idempotency]
 category: refactoring
-status: in-progress
+status: ready-for-review
 priority: High
 risk_level: low
 created: 2026-09-17
@@ -17,7 +17,7 @@ github_issue: 421
 
 # Technical Task: QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.121.review.1.cycle-scoped-qa-tracker-comments.md` implemented 2026-09-18
 **GitHub Issue**: [#421](https://github.com/Gamaroff/agent-skills/issues/421)
 
@@ -373,13 +373,15 @@ None.
 - **Non-critical**: guard false positive, contract wording.
 
 ## Change Log
-
 <!-- change-log-start -->
+## Change Log
+
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-17 | 1.0 | Initial draft | create-task |
 | 2026-09-18 | 1.1 | Review passed (8/10) — scope widened to the orchestrator `qa-fix-{N}` block and four PR-lead sites (incl. precompact `:227`); guard covers `SITES` + `PR_SITES`; `qa-cycle` criterion scoped so `develop-bug`'s verify loop keeps posting; `tracker-comment.test.mjs` literal `deepEqual` called out; effort 4h → 8h | review-task |
 | 2026-09-18 |  | Status → ready-for-development | review-task |
+| 2026-09-18 |  | Implemented — 16 source files (+57 bundled copies), 8 new/extended tests across 3 suites; guard mutation-proved 3 ways | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -401,3 +403,19 @@ None.
 ## Notes
 
 Bugs found during QA land at `task.121.bug.[N].[name].md` in this directory.
+
+**Implementation notes (develop, 2026-09-18).** Three commits, one per phase, plus a format fix.
+Guard counts on the fixed tree (from `collectCallSites()`): 24 tracker sites / **5 suffixed**
+(`precompact.sh:329`, `develop-bug` verify-loop `:89`, `qa-fix:904`, `qa-story:1937`,
+`qa-task:1350`); 12 PR-lead sites / **4 suffixed** (`precompact.sh:227`, `qa-fix:834`,
+`qa-story:1867`, `qa-task:1277`) — exactly the plan's prediction. Mutation proofs: (A) `qa-fix`
+tracker call reverted to bare → `SITES` guard red naming `skills/qa-fix/SKILL.md:904`; (B) `qa-fix`
+PR-lead call reverted to bare → `PR_SITES` guard red; (C) `qa-gate` removed from
+`CYCLE_SCOPED_STAGES` → 6 tests red across `tracker-comment` / `stakeholder-summary` suites and both
+guard populations. Two existing guards needed updating for the intended change:
+`transition-protocol-parity.test.mjs` no longer lists the Steps 5–6 doc as a required comment site
+(it now comments through the QA skills), and `comment-slot-coverage.test.mjs` Guard B compares the
+hook's PR-lead stage through `baseStage()` like its tracker twin. One deviation from the plan:
+`FIX_CYCLE`/`QA_CYCLE` fall back to `1` when no gate file is found, because the same value is now
+the stage suffix and `qa-fix-` is not a stage the engine accepts. Consumer criterion (a real ≥2-cycle
+run) and observation #75 closure are left for the QA loop and `/finalise`.
