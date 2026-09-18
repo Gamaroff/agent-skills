@@ -1,17 +1,17 @@
 ---
 id: task.124
-title: "[Task 124] Resume trusts what it finds on disk: a dirty-tree probe, a summary-gap rule that fires on every healthy resume, a halt snapshot that outlives its run, a Stop hook that cannot tell waiting from stalling, a HALT rm that zsh aborts, and a report nobody reads back"
+title: "[Task 124] Resume trusts what it finds on disk: a dirty-tree probe, a summary-gap rule that fires on every healthy resume, a halt snapshot that outlives its run, a Stop hook that cannot tell waiting from stalling, a HALT rm that zsh aborts, a report nobody reads back, and an in-session resume that has no lock to advance"
 type: task
-description: "Six defects in the develop pipelines' resume and halt lifecycle, all observed on tasks 109–117. Phase 0b inherits a dirty tree instead of classifying it (an overlay reverted every bundled task.116 copy unseen); the resume detector flags a missing step-3 summary as blocking on every resume that never dispatched one; a completed run leaves the earlier halt snapshot on disk and the next run is offered a resume for merged work; the Stop hook re-prompts a step that is legitimately waiting on a background task; the HALT snippet's `rm` pairs the lock with a glob that zsh's nomatch aborts, leaving the lock in place; and the HALT commit shipped a doubled, mid-line-spliced implementation report because no boundary reads the report back. One task: each is a small mechanism in the resume contract, the detector prompt, the hooks, or a new report-lint.js. Observations #85, #86, #88, #89, #111, #115."
-tags: [develop-task, develop-story, develop-bug, resume, hooks, pipeline]
+description: "Six defects in the develop pipelines' resume and halt lifecycle, all observed on tasks 109–117. Phase 0b inherits a dirty tree instead of classifying it (an overlay reverted every bundled task.116 copy unseen); the resume detector flags a missing step-3 summary as blocking on every resume that never dispatched one; a completed run leaves the earlier halt snapshot on disk and the next run is offered a resume for merged work; the Stop hook re-prompts a step that is legitimately waiting on a background task; the HALT snippet's `rm` pairs the lock with a glob that zsh's nomatch aborts, leaving the lock in place; and the HALT commit shipped a doubled, mid-line-spliced implementation report because no boundary reads the report back. One task: each is a small mechanism in the resume contract, the detector prompt, the hooks, or a new report-lint.js. A seventh (task.121): after a PreCompact pause the hook removes the lock by design, and a session that continues in place — rather than re-invoking the skill — has no step that puts it back; advance-pipeline-lock.sh is a silent exit-0 no-op without a lock, so the Stop hook and every advance were inert until the run rebuilt the lock from the snapshot by hand. Observations #85, #86, #88, #89, #111, #115, #123."
+tags: [develop-task, develop-story, develop-bug, resume, hooks, pipeline, precompact]
 category: refactoring
 status: planned
 priority: High
 risk_level: medium
 created: 2026-09-17
-updated: 2026-09-17
+updated: 2026-09-18
 assignee:
-estimated_effort_hours: 8
+estimated_effort_hours: 9
 github_issue: 424
 ---
 
@@ -30,11 +30,12 @@ six points — the resume path *trusts* a recorded or found state that it could 
 task adds the checks: a working-tree probe on resume, an evidence-conditioned summary-gap rule,
 snapshot cleanup owned by the completion path, a `waiting_on` field the Stop hook honours, a HALT
 snippet that cannot leave the lock behind, and a report linter run at every boundary that commits
-the report.
+the report — and, from the 2026-09-18 review, a `--restore` mode on the lock advancer so an
+in-session continuation after a PreCompact pause has a lock to advance.
 
 **Scope**: `develop-pipeline-resume-contract.md`, `pipeline-resume-detector-prompt.md`,
 `develop-pipeline-on-stop.sh`, `develop-pipeline-hooks.md`, the HALT snippets in the step docs,
-the Step 8 completion path, and a new pure `report-lint.js` beside `change-log.js`.
+the Step 8 completion path, `advance-pipeline-lock.sh`, and a new pure `report-lint.js` beside `change-log.js`.
 
 ## 2. Motivation
 
@@ -59,6 +60,12 @@ the Step 8 completion path, and a new pure `report-lint.js` beside `change-log.j
    the Step 4 and 5–6 Decisions Log absent, a fragment spliced mid-line after `## Completion`, and a
    stale full copy appended — 366 lines for 210 intended — as the escalation artefact a human was
    asked to read (#115).
+7. **An in-session resume has no lock to advance.** The PreCompact hook removes the lock and writes
+   the snapshot, and the documented resume path assumes a *new* `/develop-task` invocation. On
+   task.121 the session continued in place after compaction; the instruction "re-assert the lock
+   with `advance-pipeline-lock.sh 7`" was a silent exit-0 no-op (`[ -f "$LOCK" ] || exit 0`), so
+   the Stop hook, `--skill finalise` and `--complete` were all inert until the run rebuilt the lock
+   from the snapshot by hand — a write nothing sanctions (#123).
 
 ### Benefits
 
@@ -68,6 +75,7 @@ the Step 8 completion path, and a new pure `report-lint.js` beside `change-log.j
 4. A step waiting on a background task ends its turn without a re-prompt.
 5. A HALT always removes the lock, in both shells.
 6. A structurally invalid report is caught at the boundary that would commit it.
+7. A continuation after a pause, in-session or by re-invocation, restores the lock through one documented command that HALTs loudly when there is nothing to restore.
 
 ## 3. Technical Background
 
@@ -81,6 +89,7 @@ Step 8       removes the lock on success; last-halt.json untouched
 Stop hook    lock mid-step → re-prompt "invoke /<skill>"
 HALT snippet rm -f .claude/state/develop-pipeline.lock .claude/state/test-output-*.log   (one argv)
 Report       written by append at each transition; never read back
+advance-lock <n> with no lock → exit 0, silent (an in-session resume after a pause advances nothing)
 ```
 
 ### Target Architecture
@@ -98,6 +107,10 @@ Stop hook    waiting_on set → allow the stop with "waiting on {x} since {t}"; 
 HALT snippet rm -f lock; find .claude/state -name 'test-output-*.log' -delete   (two commands)
 report-lint.js  pure: exactly one `# Implementation Report`, each `## ` section once in template order,
                 no `### QA Cycle N` repeated; run before every commit of the report and at HALT
+advance-lock --restore   no lock + snapshot (last-halt.json, else newest .pausing.* — by document, then age)
+                         → rebuild the lock at halt_step, strip the pause fields, consume the snapshot
+                         lock present → no-op exit 0; neither → exit 1 naming both paths
+                         <n> with no lock → exit 1 (was silent exit 0), pointing at --restore
 ```
 
 ### Important Clarifications
@@ -110,6 +123,7 @@ report-lint.js  pure: exactly one `# Implementation Report`, each `## ` section 
   pipeline; a snapshot from a crashed cleanup).
 - **`waiting_on` is written by the step, not inferred by the hook.** The hook has only the lock; a
   field the dispatching step sets and clears is the one thing it can read.
+- **`--restore` consumes the snapshot it reads from**, so a restored run cannot be re-offered later (the other half of #88); the completion-path deletion stays for runs that never restored.
 - **`report-lint.js` is pure and CLI-thin**, like `change-log.js` and `registry-tick.js`: the
   pipelines, the PreCompact hook and a test share one reader.
 
@@ -125,6 +139,7 @@ report-lint.js  pure: exactly one `# Implementation Report`, each `## ` section 
 ✅ HALT snippets in step docs and the resume contract's halt text: two-command form.
 ✅ `shared/resources/report-lint.js` + test; called from the Step Transition Protocol, HALT, and
    the PreCompact hook.
+✅ `advance-pipeline-lock.sh --restore`; the pause reference and the orchestrators' Phase 0 name it as the in-session continuation step; the compaction-summary instruction points at it.
 ✅ `npm run bundle`.
 
 ### Out of Scope
@@ -136,7 +151,8 @@ report-lint.js  pure: exactly one `# Implementation Report`, each `## ` section 
 ## 5. Breaking Changes
 
 None. A lock without `waiting_on` reads as not waiting; a report that fails the linter was already
-unreadable.
+unreadable. `advance-pipeline-lock.sh <n>` with no lock changes from silent exit 0 to exit 1 — a
+caller that relied on the silence was advancing nothing.
 
 ## 6. Implementation Plan
 
@@ -187,6 +203,21 @@ the lock schema in the resume contract, every step doc that dispatches (5, 5c, 7
 
 **Dependencies**: none.
 
+### Phase 4: Lock restore for an in-session continuation (#123)
+
+**Risk Level**: Low
+
+**Files**: `shared/resources/advance-pipeline-lock.sh`, `develop-pipeline-pause.md`, `develop-pipeline-resume-contract.md`,
+the orchestrators' Phase 0 (`develop-task` / `develop-story` / `develop-bug` SKILL.md), `evals/shared/tests/` hook/lock tests
+
+**Changes**:
+- [ ] `--restore`: rebuild from `last-halt.json` or the newest `.pausing.*` claim (choose by document, then age — the detector's rule); strip `paused_at` / `pause_reason` / `halt_step`; keep `current_step`; delete the source.
+- [ ] `<n>` with no lock → exit 1 with a message naming `--restore`; `--complete` stays exempt.
+- [ ] Pause reference + Phase 0: "continuing in the same session after a pause → `--restore` first"; the PreCompact hook's summary instruction says the same.
+- [ ] Tests: no lock + snapshot → lock at halt_step, snapshot gone; lock present → no-op; neither → exit 1; `<n>` with no lock → exit 1.
+
+**Dependencies**: none (shares files with Phase 1's snapshot cleanup; land Phase 1 first).
+
 ## 7. Files Summary
 
 ### Files to Modify (Core Implementation)
@@ -195,20 +226,21 @@ the lock schema in the resume contract, every step doc that dispatches (5, 5c, 7
 2. ✅ `shared/resources/pipeline-resume-detector-prompt.md`
 3. ✅ `shared/resources/develop-pipeline-step-8-commit.md`
 4. ✅ `shared/resources/develop-pipeline-on-stop.sh`, `develop-pipeline-hooks.md`, `develop-pipeline-on-precompact.sh`
-5. ✅ Step docs with dispatch sites and HALT snippets (`develop-pipeline-step-5-6-qa-loop.md`, `-step-7-finalise.md`, `develop-bug-step-5-6-verify-loop.md`)
+5. ✅ `shared/resources/advance-pipeline-lock.sh`, `develop-pipeline-pause.md`, the three orchestrators' Phase 0
+6. ✅ Step docs with dispatch sites and HALT snippets (`develop-pipeline-step-5-6-qa-loop.md`, `-step-7-finalise.md`, `develop-bug-step-5-6-verify-loop.md`)
 
 ### Files to Create
 
-6. ✅ `shared/resources/report-lint.js`
+7. ✅ `shared/resources/report-lint.js`
 
 ### Files to Modify (Tests)
 
-7. ✅ `shared/resources/tests/report-lint.test.mjs` (new), the hooks test, replay fixtures under `evals/develop-task/step-isolation/`
+8. ✅ `shared/resources/tests/report-lint.test.mjs` (new), the hooks test, replay fixtures under `evals/develop-task/step-isolation/`
 
 ### Files to Modify (Documentation)
 
-8. ✅ `docs/reference/anti-patterns.md` — "never put the lock and a glob in one `rm` argv"; `docs/contributing/traps.md` — zsh nomatch
-9. ✅ `skills/*/references/` — regenerated
+9. ✅ `docs/reference/anti-patterns.md` — "never put the lock and a glob in one `rm` argv"; `docs/contributing/traps.md` — zsh nomatch
+10. ✅ `skills/*/references/` — regenerated
 
 ### Files to Delete
 
@@ -219,6 +251,7 @@ None.
 ### Unit Tests
 - [ ] `report-lint.js`: corrupt fixture → three named problems; clean → ok; a report with a fenced example containing `# Implementation Report` → ok (fence-aware, reuse `change-log.js`'s `fencedRanges`).
 - [ ] Stop hook: `waiting_on` set → exit 0 with the waiting line; cleared → re-prompt; older than budget → re-prompt.
+- [ ] `advance-pipeline-lock.sh --restore`: the four cases above; `<n>` with no lock exits 1.
 
 **Command**: `npm test`
 
@@ -244,6 +277,7 @@ Not applicable.
 - [ ] The Stop hook does not re-prompt a step with `waiting_on` set.
 - [ ] A HALT removes the lock in bash and zsh with an empty glob.
 - [ ] A structurally invalid report cannot be committed by the pipeline.
+- [ ] An in-session continuation after a PreCompact pause restores the lock with one documented command; advancing with no lock is an error, not silence.
 
 ### Performance
 - [ ] The tree probe adds one `git status --porcelain` and, for (a), one `git diff --stat` against the base.
@@ -253,7 +287,7 @@ Not applicable.
 - [ ] Every mechanism has a mutation proof recorded.
 
 ### Migration
-- [ ] Observations #85, #86, #88, #89, #111, #115 close naming the PR.
+- [ ] Observations #85, #86, #88, #89, #111, #115, #123 close naming the PR.
 
 ## 10. Risk Assessment
 
@@ -294,6 +328,7 @@ None.
 | Date | Version | Description | Author |
 | ---- | ------- | ----------- | ------ |
 | 2026-09-17 | 1.0 | Initial draft — observation review 2026-09-17 (obs #85, #86, #88, #89, #111, #115) | create-task |
+| 2026-09-18 | 1.1 | Phase 4 added — `advance-pipeline-lock.sh --restore` for an in-session continuation after a PreCompact pause (obs #123, task.121); effort 8h → 9h | observe-work |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -301,12 +336,13 @@ None.
 - [ ] Phase 1: snapshot and tree on resume
 - [ ] Phase 2: waiting_on + HALT rm
 - [ ] Phase 3: report-lint.js
+- [ ] Phase 4: lock restore
 - [ ] QA: `task.124.qa.[N].pipeline-resume-lifecycle-hygiene.md`
 - [ ] Gate: `task.124.gate.[N].pipeline-resume-lifecycle-hygiene.yml`
 
 ## References
 
-- Observations #85, #86, #88, #89, #111, #115; #101 (task.120, merged — the PreCompact double-append)
+- Observations #85, #86, #88, #89, #111, #115, #123; #101 (task.120, merged — the PreCompact double-append)
 - `shared/resources/develop-pipeline-resume-contract.md`, `pipeline-resume-detector-prompt.md`, `develop-pipeline-hooks.md`
 - task.117's HALT commit `329b4a65` — the corrupt-report fixture
 - task.123 — re-entry after a QA loop escalation (sibling; independent)
