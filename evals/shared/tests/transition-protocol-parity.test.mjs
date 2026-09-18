@@ -703,12 +703,18 @@ test("each pipeline comment site positively invokes tracker-comment.js", () => {
   // The positive half. Every step doc that had a comment site must still have
   // one — a rewrite that deleted the comment instead of routing it would pass
   // the two negative guards above and silently stop commenting.
+  //
+  // step-5-6 is deliberately NOT listed (task.121): its two comment blocks
+  // (`qa-cycle-{N}` after the gate, `qa-fix-{N}` after the fix) duplicated the
+  // comments the QA skills post for the same moments — qa-task / qa-story
+  // Step 13b (`qa-gate-{N}`) and qa-fix Step 7 (`qa-fix-{N}`) — and once those
+  // stages are cycle-scoped the two writers race for one marker. Those skill
+  // sites are what comment-slot-coverage.test.mjs collects and guards.
   const REQUIRED = [
     "shared/resources/develop-pipeline-step-0-resolve-and-prepare.md",
     "shared/resources/develop-pipeline-step-2-review.md",
     "shared/resources/develop-pipeline-step-3-develop-loop.md",
     "shared/resources/develop-pipeline-step-4-create-pr.md",
-    "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
     "shared/resources/develop-pipeline-step-7-finalise.md",
   ];
   const missing = REQUIRED.filter(

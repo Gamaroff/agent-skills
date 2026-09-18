@@ -819,13 +819,19 @@ FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 DOC_DIR=$(dirname "$STORY_FILE")
 FIX_CYCLE=$(ls -t "$DOC_DIR"/*.gate.*.yml 2>/dev/null | head -1 \
   | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+# The cycle is also the STAGE SUFFIX (`qa-fix-3`), which is what keys the
+# tracker comment's idempotency marker: bare `qa-fix` was suppressed by cycle
+# 1's marker on every later cycle (task.121). `qa-fix-` with nothing after the
+# hyphen is not a stage the engine accepts, so an unfound gate falls back to 1
+# rather than to a comment that never posts.
+FIX_CYCLE=${FIX_CYCLE:-1}
 
 # The pull-request wrapper — its own heading, then its own plain-language lead.
 # The lead is added HERE, once, above the arm split below, so both arms post the
 # same bytes. It must NOT be folded into $FIX_SUMMARY: that variable also feeds
 # $TRACKER_COMMENT_BODY, where tracker-comment.js renders the lead itself, and a
 # lead in the shared value would double-lead the tracker comment.
-QA_FIX_LEAD=$(node references/stakeholder-summary-cli.js --stage qa-fix \
+QA_FIX_LEAD=$(node references/stakeholder-summary-cli.js --stage "qa-fix-${FIX_CYCLE}" \
   --slot cycle="$FIX_CYCLE") || exit 1
 PR_COMMENT_BODY="## 🛠️ QA Fixes Applied
 
@@ -897,7 +903,7 @@ if [ -n "$FIX_ISSUE" ]; then
 
   node .agents/skills/qa-fix/references/tracker-comment.js \
     --issue "$FIX_ISSUE" --body-file .claude/state/comment-body.md \
-    --stage qa-fix \
+    --stage "qa-fix-${FIX_CYCLE}" \
     --slot cycle="$FIX_CYCLE" \
     --json \
     || echo "⚠️  Tracker issue comment failed — continuing"
@@ -912,8 +918,16 @@ fi
 > `--slot cycle="$QA_CYCLE"` — a variable that exists nowhere in this skill. It would have expanded to
 > the empty string, which the engine drops, so the lead would have degraded silently and correctly and
 > nobody would ever have found out. Deriving from the gate filename uses a value that is genuinely on
-> disk at this point. When no gate file is found, `FIX_CYCLE` is empty and the slot is dropped by the
-> same rule — the degraded path is reached by the engine's own coercion rather than by hoping.
+> disk at this point. When no gate file is found, `FIX_CYCLE` falls back to `1` where it is derived,
+> because the same value is also the stage suffix and `qa-fix-` is not a stage.
+>
+> **The stage is `qa-fix-${FIX_CYCLE}`, never bare `qa-fix`.** `qa-fix` is cycle-scoped in the engine
+> (`CYCLE_SCOPED_STAGES`): the numeric suffix is what the idempotency marker is built from, so cycle
+> 2 posts under `agent-skills-comment:qa-fix-2` instead of reading cycle 1's marker and answering
+> `already` with nothing sent — which is what this block did on every multi-cycle run before task.121.
+> The pull-request lead above takes the same suffixed stage; it renders identically either way, but
+> keeping the two calls textually identical is what lets one guard
+> (`comment-slot-coverage.test.mjs`) cover both. A resumed cycle still deduplicates on its own suffix.
 >
 > This posts `$TRACKER_COMMENT_BODY`, not `$PR_COMMENT_BODY`. The two differ only by their wrapper and
 > share `$FIX_SUMMARY` — edit the summary in one place; never duplicate the prose.

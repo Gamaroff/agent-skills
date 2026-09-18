@@ -348,43 +348,13 @@ function precisely so that what lands here is assertable rather than composed af
 > loop did not continue there, it exited by the ordinary route. A row whose whole purpose is letting a
 > reader distinguish two exits must not itself assert something untrue about one of them.
 
-**Post QA cycle result to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
-
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
-## 🔍 QA Cycle {N} — Gate: {PASS / CONCERNS / FAIL}
-
-**Issues found**: {count, or 'none'}
-{top 3 issues from gate file top_issues list, or 'No issues — proceeding to the PR conformance review (Step 5c)'}
-**Action**: {Proceeding to 5c (PR conformance review) / Running qa-fix (cycle {N} of 5)}
-EOF
-
-node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
-  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage qa-cycle-{N} \
-  --slot verdict="{PASS / CONCERNS / FAIL / WAIVED}" \
-  --slot cycle="{N}" \
-  --json
-```
-
-> **`qa-cycle` reads exactly two slots: `verdict` and `cycle`.** It does **not** read `count` — that
-> slot belongs to `develop-complete`, and passing it here is silently dropped.
->
-> `verdict` is the one slot that is **mapped rather than printed**: the engine turns `PASS` /
-> `CONCERNS` / `FAIL` / `WAIVED` into a plain sentence, because nothing about the word "CONCERNS" tells
-> an outside reader whether to worry. Pass the **raw gate token** here — this is the one place a raw
-> token is correct, because the mapping exists. An unrecognised verdict renders "The results are
-> recorded below" rather than defaulting to reassurance, so a typo degrades safely.
->
-> `cycle` is numeric and positive-integer-only; it is the same `{N}` already in the stage suffix.
-
-> Engine source: `references/tracker-comment.js` (bundled into each skill as `references/tracker-comment.js`). Contract: `references/tracker-comment-contract.md`.
-
-
-Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
-
-On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA cycle {N} result comment posted to {TRACKER} issue {TRACKER_ISSUE}."
+**The per-cycle gate comment is posted by the QA skill itself** (`qa-task` / `qa-story` Step 13b,
+stage `qa-gate-{N}`, suffixed with the cycle it derives from the gate filename). The orchestrator
+posts nothing to the tracker issue here. This step used to carry its own `qa-cycle-{N}` block for
+the same moment; it was never observed posting, and once the skill's stage is cycle-scoped the two
+would race for one marker — whichever posted first would win and the other would silently read
+`already` (task.121). `qa-cycle` stays in the engine for `develop-bug`'s verify loop, which never
+runs a QA skill and so posts it as its only per-cycle comment.
 
 **Remaining Work Status block (required, per cycle).** Before re-invoking the QA skill for the next cycle, emit the block with the position line `Steps 5–6/8 — QA LOOP ⏳ in progress, cycle {N}/5`. On the cycle that exits the loop, the block is emitted as part of the Step 7 transition instead, in the form 5c specifies (`Steps 5–6/8 — QA LOOP ✅ complete ({N} cycles, {gate}, PR review {verdict})`). Format: [`references/develop-pipeline-remaining-work-banner.md`](develop-pipeline-remaining-work-banner.md).
 
@@ -892,30 +862,9 @@ After fixes are applied:
    **Commit**: `{hash}`
    ```
 
-4a. **Post QA fix summary to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
-
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
-## 🔧 QA Fix Cycle {N} Applied — Step 6/8
-
-**Fixes applied**: {brief summary from qa-fix output}
-**Commit**: `{hash}`
-EOF
-
-node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
-  --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
-  --stage qa-fix-{N} \
-  --slot cycle="{N}" \
-  --json
-```
-
-> **`cycle` is the only slot `qa-fix` reads**, and it is the same `{N}` as the stage suffix. Numeric,
-> positive integers only.
-
-Read `reason` and act per the table in [`references/tracker-comment-contract.md`](tracker-comment-contract.md) — `posted`/`already`/`deferred` need nothing, `unverifiable` is logged and never posted over, and `no-credentials` is the one case that may fall back to MCP.
-
-On failure: log warning in Issues Log and continue. Log in Decisions Log: "QA fix cycle {N} comment posted to {TRACKER} issue {TRACKER_ISSUE}."
+4a. **The per-cycle fix comment is posted by `/qa-fix` itself** (Step 7, stage `qa-fix-{N}`). The
+   orchestrator posts nothing to the tracker issue here — an orchestrator block for the same moment
+   would race the skill for the same `qa-fix-{N}` marker (task.121).
 
 5. **Post-fix PR state check (uses tracker state poller)**: Invoke the tracker state poller (see `references/tracker-state-poller-subagent.md`) via an Explore subagent with `PR_NUMBER={PR_NUMBER}` and `ISSUE_KEY=` (empty).
 

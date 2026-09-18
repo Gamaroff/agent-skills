@@ -225,7 +225,7 @@ if [ -n "$PR_URL" ]; then
     fi
     if [ "$RESOLVER_OK" = true ]; then
       PR_COMMENT_OUTCOME="skipped — stakeholder-summary-cli.js could not render the lead (nothing posted)"
-      LEAD=$(command node "$HOOK_DIR/stakeholder-summary-cli.js" --stage pipeline-paused 2>/dev/null) || LEAD=""
+      LEAD=$(command node "$HOOK_DIR/stakeholder-summary-cli.js" --stage "pipeline-paused-${CURRENT_STEP}" 2>/dev/null) || LEAD=""
       if [ -n "$LEAD" ]; then
         PR_BODY=$(printf '⏸️ **Pipeline paused — context compaction imminent**\n\nThe `/%s` orchestrator paused at Step %s because Claude'\''s context window approached its limit.\n\n**State saved in**: `%s`\n\n**To resume**: re-invoke `/%s <path>` (same path) and choose **Resume from last completed step** when prompted.' \
           "$SKILL" "$CURRENT_STEP" "$REPORT" "$SKILL")

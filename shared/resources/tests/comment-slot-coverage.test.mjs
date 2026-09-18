@@ -247,7 +247,10 @@ test("Guard B — the walk sees a `$(command node …)` call site (bug.14 / cycl
     pr.length >= 1,
     "the PreCompact hook's stakeholder-summary-cli.js call was not collected",
   );
-  assert.equal(pr[0].stage, "pipeline-paused");
+  // task.121: the lead call carries the same `-${CURRENT_STEP}` suffix as the
+  // tracker call beside it, so the two are textually identical and one guard
+  // ("never passed bare", below) covers both populations without exempting one.
+  assert.equal(pr[0].stage && baseStage(pr[0].stage), "pipeline-paused");
 });
 
 test("Guard B — every call site passes at least one --slot", () => {

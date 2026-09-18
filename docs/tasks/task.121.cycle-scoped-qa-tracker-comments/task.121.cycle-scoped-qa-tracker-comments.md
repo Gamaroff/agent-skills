@@ -210,18 +210,18 @@ post cycle N again once — one duplicate on at most one in-flight issue, then c
 `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
 
 **Changes**:
-- [ ] `qa-fix` Step 7 (`:900`): `--stage "qa-fix-${FIX_CYCLE}"`; PR lead (`:828`) the same.
-- [ ] `qa-task` / `qa-story` Step 13b: derive `QA_CYCLE` **once, above the PR-lead call**
+- [x] `qa-fix` Step 7 (`:900`): `--stage "qa-fix-${FIX_CYCLE}"`; PR lead (`:828`) the same.
+- [x] `qa-task` / `qa-story` Step 13b: derive `QA_CYCLE` **once, above the PR-lead call**
       (`:1264` / `:1854`) from the newest gate filename with the same `sed` `qa-fix` uses at `:820`;
       pass `--stage "qa-gate-${QA_CYCLE}"` to both the PR lead and the tracker call (`:1339` /
       `:1926`); update the adjacent prose that says the comment is per-stage.
-- [ ] `develop-pipeline-on-precompact.sh:227`: lead call `--stage "pipeline-paused-${CURRENT_STEP}"`
+- [x] `develop-pipeline-on-precompact.sh:227`: lead call `--stage "pipeline-paused-${CURRENT_STEP}"`
       to match its tracker call at `:329`.
-- [ ] Delete the orchestrator's `qa-cycle-{N}` block (~`:350-379`) **and** its `qa-fix-{N}` block
+- [x] Delete the orchestrator's `qa-cycle-{N}` block (~`:350-379`) **and** its `qa-fix-{N}` block
       (step 4a, ~`:894-910`) with their slot notes from the qa-loop doc; leave a one-line pointer at
       each that the QA skill (`qa-task`/`qa-story` Step 13b; `qa-fix` Step 7) posts the per-cycle
       comment. `develop-bug`'s verify loop is **not** touched.
-- [ ] `npm run bundle`.
+- [x] `npm run bundle`.
 
 **Dependencies**: Phase 1 (the suffix must be legal before a call site uses it).
 
@@ -385,7 +385,7 @@ None.
 ## Progress Tracking
 
 - [x] Phase 1: engine
-- [ ] Phase 2: call sites + orchestrator block
+- [x] Phase 2: call sites + orchestrator block
 - [ ] Phase 3: contract + guard
 - [ ] QA: `task.121.qa.[N].cycle-scoped-qa-tracker-comments.md`
 - [ ] Gate: `task.121.gate.[N].cycle-scoped-qa-tracker-comments.yml`

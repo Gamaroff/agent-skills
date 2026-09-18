@@ -1837,9 +1837,9 @@ EOF
 
 # The plain-language lead, obtained ONCE and folded into $BODY_FILE — ABOVE the
 # arm split below, so the GitHub and Bitbucket arms post the same bytes and
-# cannot drift. `qa-gate` is the same stage the tracker comment for this moment
-# uses; a pull-request comment about a moment that also exists on the tracker
-# reuses that stage rather than inventing a second vocabulary.
+# cannot drift. `qa-gate-{N}` is the same stage the tracker comment for this
+# moment uses; a pull-request comment about a moment that also exists on the
+# tracker reuses that stage rather than inventing a second vocabulary.
 #
 # GATE_DECISION is bound HERE, deliberately. The heredoc above is quoted
 # (`<<'EOF'`), so its [GATE_DECISION] placeholder is filled in textually when
@@ -1851,7 +1851,20 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # nothing about whether to worry. Pass the raw token and let the catalogue map
 # it — an unknown verdict renders "the results are recorded below" rather than
 # defaulting to reassurance.
-LEAD=$(node references/stakeholder-summary-cli.js --stage qa-gate \
+# The QA cycle number lives in the gate filename this run just wrote — the same
+# derivation qa-fix uses for FIX_CYCLE, so the two comments cannot disagree about
+# which round this is. Derived ONCE, here, above the pull-request lead; the
+# tracker comment further down reads the same variable. It is the STAGE SUFFIX
+# (`qa-gate-3`), which is what keys the tracker comment's idempotency marker:
+# bare `qa-gate` was suppressed by cycle 1's marker on every later cycle
+# (task.121). The lead renders the same sentence with or without the suffix;
+# passing it here too keeps both calls textually identical so one guard covers
+# both. `qa-gate-` is not a stage, so an unfound gate falls back to 1.
+QA_CYCLE=$(ls -t "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | head -1 \
+  | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+QA_CYCLE=${QA_CYCLE:-1}
+
+LEAD=$(node references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
   --slot verdict="$GATE_DECISION") || exit 1
 printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
   && mv "${BODY_FILE}.tmp" "$BODY_FILE"
@@ -1923,7 +1936,7 @@ if [ -n "$QA_ISSUE" ]; then
 
   node .agents/skills/qa-story/references/tracker-comment.js \
     --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
-    --stage qa-gate \
+    --stage "qa-gate-${QA_CYCLE}" \
     --slot verdict="$GATE_DECISION" \
     --slot blocking_count="$BLOCKING_COUNT" \
     --json \
