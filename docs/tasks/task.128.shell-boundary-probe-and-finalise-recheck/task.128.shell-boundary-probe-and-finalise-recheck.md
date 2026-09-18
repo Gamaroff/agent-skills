@@ -2,7 +2,7 @@
 id: task.128
 title: "[Task 128] A refusing shell script is a boundary the probe engine cannot reach, and finalise can only accept or halt: a filename sink and a shell entry for security-probe.mjs, a boundary rule that names scripts, and a bounded fix-and-recheck exit at Step 7"
 type: task
-description: "On task.121 five QA cycles reached PASS 100/100 with `boundary: false` in every gate, and the finalise DoD security agent then reproduced two fail-closed defects in the very script the task delivered — a gate filename with an embedded newline made qa-cycle.sh exit 0 with a lower cycle, and isKnownStage admitted qa-gate-0. The QA probe never ran because security-probe.mjs imports JS entry points only, so a bash script that says 'refuses, never guesses' is unverifiable to it and the boundary rule read it as not a boundary; and finalise, having found the defect, had two exits — accept, or halt a hands-free pipeline for a human — so the run fixed it inline as an undocumented deviation. Three mechanisms: a `filename` sink in the input corpus and a `shell` entry form in the probe engine (bash <script> <arg>, both shells, count engine-written); the probe-boundary rule names a refusing script as a boundary by its own header; and finalise Step 8 gains a bounded fix-and-recheck path for a low-severity, single-commit, mutation-provable finding inside the task's own file set, with everything else still halting. Observation #121."
+description: "On task.121 five QA cycles reached PASS 100/100 with "No boundary delivered" in every gate's security notes, and the finalise DoD security agent then reproduced two fail-closed defects in the very script the task delivered — a gate filename with an embedded newline made qa-cycle.sh exit 0 with a lower cycle, and isKnownStage admitted qa-gate-0. The QA probe never ran because security-probe.mjs imports JS entry points only, so a bash script that says 'refuses, never guesses' is unverifiable to it and the boundary rule read it as not a boundary; and finalise, having found the defect, had two exits — accept, or halt a hands-free pipeline for a human — so the run fixed it inline as an undocumented deviation. Three mechanisms: a `filename` sink in the input corpus and a `shell` entry form in the probe engine (bash <script> <arg>, both shells, count engine-written); the probe-boundary rule names a refusing script as a boundary by its own header; and finalise Step 8 gains a bounded fix-and-recheck path for a low-severity, single-commit, mutation-provable finding inside the task's own file set, with everything else still halting. Observation #121."
 tags: [qa-task, qa-story, finalise, security-probe, boundary, review-security]
 category: refactoring
 status: planned
@@ -24,7 +24,7 @@ github_issue: 431
 
 ## 1. Overview
 
-Task.118 made the security probe's count engine-written: `security-probe.mjs` imports a JS entry, runs the corpus for a named sink in both directions, and writes the record that `probes_executed` is copied from. Task.121 then delivered a boundary in **bash** — `qa-cycle.sh`, whose header says it "refuses rather than guesses" — and the engine could not reach it: every one of five QA gates recorded `boundary: false, probes_executed: 0` with the note "the helper reads filenames and prints a bounded integer", and the `/finalise` security agent, working by hand in a scratchpad, reproduced two fail-closed defects in ten minutes. Finalise then had no sanctioned way to act on a one-line fix and the run improvised one.
+Task.118 made the security probe's count engine-written: `security-probe.mjs` imports a JS entry, runs the corpus for a named sink in both directions, and writes the record that `probes_executed` is copied from. Task.121 then delivered a boundary in **bash** — `qa-cycle.sh`, whose header says it "refuses rather than guesses" — and the engine could not reach it: every one of five QA gates recorded `evidence: reasoned`, `probes_executed: 0` and "No boundary delivered" in the security notes (gate 5: "the helper reads filenames and prints a bounded integer"), and the `/finalise` security agent, working by hand in a scratchpad, reproduced two fail-closed defects in ten minutes. Finalise then had no sanctioned way to act on a one-line fix and the run improvised one.
 
 This task closes both halves. The probe engine gains a `filename` sink (embedded newline, `$(…)`, backticks, `;|&`, leading `--`/`-n`, glob metacharacters, >9-digit runs, leading zeros) and a `shell` entry form that runs `bash <script> <dir>` against a fixture directory built from each case, under bash and zsh, with the count written by the engine. The boundary rule (`probe-boundary-rule.md`, shared by qa-task, qa-story and review-security) names a script whose header carries *refuses / never guesses / fails closed* as a boundary, so the decision cannot read "not JS" as "not a boundary". And `/finalise` Step 8 gains a **fix-and-recheck** exit with hard preconditions, so the next late, small, provable finding follows a rule instead of a judgement made at 07:00 with no human present.
 
@@ -35,7 +35,7 @@ This task closes both halves. The probe engine gains a `filename` sink (embedded
 ### Current Problems
 
 1. **The probe engine reaches JS only.** `--entry` is `path#exportName` and the engine `import()`s it; a shell script has no export. The prompt's own escape — `verdict: unverifiable, executed: 0` — is correct for the engine and wrong for the deliverable: the boundary existed, nothing executed, and the gate said PASS (task.121 gates 1–5, `evidence: reasoned`).
-2. **The boundary rule keyed on the wrong signal.** Five gates recorded "no boundary delivered"; finalise's agent, reading the same diff, recorded `boundary: true` and probed. Two readers of one rule reached opposite decisions because the rule's signals (an exported predicate, an allow-list, tests of the shape "X is refused") are JS-shaped, and a script that *says* it refuses matched none of them.
+2. **The boundary rule keyed on the wrong signal.** Five gates recorded "no boundary delivered"; finalise's agent, reading the same diff, recorded `boundary: true` and probed. Two readers of one rule reached opposite decisions (the gates carry no `boundary:` key of their own — the decision lives only in the notes, which is itself part of the gap) because the rule's signals (an exported predicate, an allow-list, tests of the shape "X is refused") are JS-shaped, and a script that *says* it refuses matched none of them.
 3. **The corpus has no filename sink.** The hostile inputs that defeated `qa-cycle.sh` — a newline inside a name, which sed splits into two lines — are not in `security-input-corpus.md`, so even a hand probe re-derives them from prose and reaches a different set each time (the failure mode task.118 removed for JS).
 4. **Finalise has two exits.** Step 6's decision matrix and Step 8's gap report: ACCEPTED, or "address the gaps before re-running /finalise". A low-severity, one-line, mutation-provable finding in the task's own file set has no path except halting a hands-free run or an undocumented inline fix. Task.121 took the second and recorded it as a deviation; the next run has the same choice and no rule.
 
@@ -133,7 +133,7 @@ None. `--entry path#export` is unchanged; a corpus without `filename` cases fail
 **Changes**:
 - [ ] Header signal added; "not importable" routed to the shell entry.
 - [ ] Every site that names `--entry '<path>#<export>'` also names `--entry shell:<path>`.
-- [ ] Test: the task.121 gate-5 `boundary: false` note as a fixture the new rule classifies `true`.
+- [ ] Test: the task.121 gate-5 security `notes` ("No boundary delivered — … the helper reads filenames and prints a bounded integer") as a fixture the new rule classifies as a boundary.
 
 **Dependencies**: Phase 1.
 
@@ -202,7 +202,7 @@ None.
 
 ### Functional
 - [ ] `security-probe.mjs --entry shell:shared/resources/qa-cycle.sh --sink filename` executes every case under bash and zsh and reproduces the newline case on the pre-fix script.
-- [ ] The boundary rule classifies a refusing script as a boundary; the task.121 gate-5 note is the red fixture.
+- [ ] The boundary rule classifies a refusing script as a boundary; the task.121 gate-5 security note is the red fixture.
 - [ ] `/finalise` proceeds through fix-and-recheck only when all five preconditions hold, and halts otherwise.
 
 ### Performance
@@ -263,7 +263,7 @@ None.
 ## References
 
 - Observation #121
-- task.118 (merged) — engine-written `probes_executed`; task.121 (merged, PR #430) — the shell boundary, its gate-5 `boundary: false`, the finalise fix `a412f59a`, and `task.121.dod.1` "Deviations recorded" wording
+- task.118 (merged) — engine-written `probes_executed`; task.121 (merged, PR #430) — the shell boundary, its gate-5 "No boundary delivered" note, the finalise fix `a412f59a`, and `task.121.dod.1` "Deviations recorded" wording
 - `shared/resources/security-probe.mjs`, `security-input-corpus.mjs`, `probe-boundary-rule.md`
 
 ## Notes
