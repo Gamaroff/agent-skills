@@ -824,6 +824,12 @@ FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 # numbered gate → empty stdout, one ⚠️ line on stderr, exit 1 — because a guessed
 # `1` would key every cycle to cycle 1's marker, the very suppression the suffix
 # exists to end.
+# Addressed skill-relatively (`references/…`) like the lead CLI call beneath it;
+# the tracker block further down addresses the same helper from the repository
+# root, like ITS engine call — one cwd per block (TASK-121-BUG-4). What a block
+# inherits from earlier blocks is the INPUTS an agent re-binds when it runs the
+# block ($STORY_FILE, $PR_NUMBER, $PR_TITLE, $PR_STATE); a COMPUTED value like
+# the cycle never is.
 DOC_DIR=$(dirname "$STORY_FILE")
 FIX_CYCLE=$(bash references/qa-cycle.sh "$DOC_DIR") || FIX_CYCLE=
 
@@ -911,8 +917,15 @@ if [ -n "$FIX_ISSUE" ]; then
   # same directory, same answer — that is what keeps the two comments agreeing
   # about which round they report. No fallback: an unknown cycle skips the post
   # and says so, rather than keying the comment to a guessed cycle.
+  #
+  # Addressed from the REPOSITORY ROOT — `.agents/skills/qa-fix/references/…` —
+  # because that is how the engine call below is addressed, and every command
+  # in one block must resolve from the same cwd (TASK-121-BUG-4). What this
+  # block inherits from earlier blocks is the INPUTS an agent re-binds when it
+  # runs a block ($STORY_FILE, $FIX_ISSUE); a COMPUTED value like the cycle is
+  # never carried over.
   DOC_DIR=$(dirname "$STORY_FILE")
-  FIX_CYCLE=$(bash references/qa-cycle.sh "$DOC_DIR") || FIX_CYCLE=
+  FIX_CYCLE=$(bash .agents/skills/qa-fix/references/qa-cycle.sh "$DOC_DIR") || FIX_CYCLE=
   if [ -n "$FIX_CYCLE" ]; then
     node .agents/skills/qa-fix/references/tracker-comment.js \
       --issue "$FIX_ISSUE" --body-file .claude/state/comment-body.md \

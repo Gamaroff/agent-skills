@@ -4,7 +4,7 @@
 **Bug ID**: TASK-121-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (refute pass, cycle 2 — reviewer findings CR-1 and CR-3, verified)
 **Date Found**: 2026-09-18
 
@@ -132,3 +132,4 @@ derivation reinserted → "no inline derivation" guard red. `npm run ci:fast` gr
 | 2026-09-18 | New | QA Engineer | Refute pass, cycle 2 (CR-1 + CR-3) |
 | 2026-09-18 | In Progress | qa-fix | Root cause: cycle treated as cross-block state |
 | 2026-09-18 | Ready for QA | qa-fix | Shared helper, derived where used, refusing fallback |
+| 2026-09-18 | Closed | QA Engineer | Verified in cycle 3 — helper in all six blocks; refusal proven under bash and zsh; same-block guard red when a call is removed — superseded on the PATH FORM only by BUG-4 |

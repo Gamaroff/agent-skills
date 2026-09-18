@@ -1857,7 +1857,7 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # bare `qa-gate` was suppressed by cycle 1's marker on every later cycle
 # (task.121). ONE definition — `references/qa-cycle.sh` — called in EVERY block
 # that needs the cycle: each fenced block runs as its own shell, so a value
-# derived in this block does not exist in Step 13b's (TASK-121-BUG-2). The helper
+# derived in this block does not exist in Step 6b's (TASK-121-BUG-2). The helper
 # refuses rather than guesses: no numbered gate → empty stdout, one ⚠️ line on
 # stderr, exit 1. A guessed `1` would key every cycle to cycle 1's marker, the
 # very suppression this suffix exists to end. The lead below renders the same
@@ -1865,6 +1865,12 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # identical to the tracker call so one guard covers both — and when the cycle
 # is unknown the pull-request comment still posts, without the lead, because it
 # carries no marker and losing it would hide the ⚠️ from the reviewer.
+# Addressed skill-relatively (`references/…`) like the lead CLI call beneath it;
+# the tracker block addresses the same helper from the repository root, like
+# ITS engine call — one cwd per block (TASK-121-BUG-4). What a block inherits
+# from earlier blocks is the INPUTS an agent re-binds when it runs the block
+# ($STORY_DIR, $GATE_DECISION, $BODY_FILE, $PR_URL); a COMPUTED value like the
+# cycle never is.
 QA_CYCLE=$(bash references/qa-cycle.sh "$STORY_DIR") || QA_CYCLE=
 if [ -n "$QA_CYCLE" ]; then
   LEAD=$(node references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
@@ -1925,11 +1931,18 @@ if [ -n "$QA_ISSUE" ]; then
     "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
 
   # The cycle — the stage suffix — is derived HERE, in this block, by the same
-  # helper Step 13 called. This block runs as its own shell, so Step 13's
+  # helper Step 6 called. This block runs as its own shell, so Step 6's
   # $QA_CYCLE does not exist here (TASK-121-BUG-2). No fallback: a comment keyed
   # to a guessed cycle is the suppression this suffix exists to end, so an
   # unknown cycle skips the post and says so.
-  QA_CYCLE=$(bash references/qa-cycle.sh "$STORY_DIR") || QA_CYCLE=
+  #
+  # Addressed from the REPOSITORY ROOT — `.agents/skills/qa-story/references/…` —
+  # because that is how the engine call below is addressed, and every command
+  # in one block must resolve from the same cwd (TASK-121-BUG-4). What this
+  # block inherits from earlier blocks is the INPUTS an agent re-binds when it
+  # runs a block ($STORY_DIR, $QA_ISSUE, $GATE_DECISION, $score, $PR_NUMBER,
+  # $PR_URL); a COMPUTED value like the cycle is never carried over.
+  QA_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR") || QA_CYCLE=
 
   # blocking_count — the high-severity entries in the gate this run just wrote:
   # the gate that CARRIES the cycle number above, so the count and the suffix
@@ -2917,9 +2930,13 @@ docs/
 ├── prd/
 │   └── [domain]/
 │       └── [feature]/
-│           ├── story.1.1.epic-name.md
-│           ├── story.1.1.qa.1.epic-name.md    # Co-located QA report (cycle 1)
-│           └── story.1.1.gate.1.epic-name.yml # Co-located gate file (cycle 1)
+│           └── epics/
+│               └── epic.1.epic-name/
+│                   └── stories/
+│                       └── story.1.1.story-name/          # One directory per story — the helper scans it
+│                           ├── story.1.1.story-name.md
+│                           ├── story.1.1.qa.1.story-name.md    # Co-located QA report (cycle 1)
+│                           └── story.1.1.gate.1.story-name.yml # Co-located gate file (cycle 1)
 └── tasks/
     └── task.44.name/
         ├── task.44.name.md

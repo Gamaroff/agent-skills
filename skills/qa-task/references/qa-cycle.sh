@@ -41,11 +41,17 @@ shopt -s nullglob
 best=""
 unnumbered=0
 for f in "$DIR"/*.gate.*.yml; do
-  n=$(printf '%s' "${f##*/}" | sed -nE 's/^.*\.gate\.([0-9]+)\..*$/\1/p')
+  # At most 9 digits: a QA cycle is a small count, and `[ -gt ]` is a 64-bit
+  # integer test that prints "integer expected" and SKIPS the comparison on a
+  # longer run of digits — which would exit 0 with a lower, wrong cycle rather
+  # than refuse. A longer run is treated as a malformed name, not a number.
+  n=$(printf '%s' "${f##*/}" | sed -nE 's/^.*\.gate\.([0-9]{1,9})\..*$/\1/p')
   if [ -z "$n" ]; then
     unnumbered=$((unnumbered + 1))
     continue
   fi
+  # Strip leading zeros so `gate.007` compares as 7 and prints as 7.
+  n=$((10#$n))
   if [ -z "$best" ] || [ "$n" -gt "$best" ]; then
     best=$n
   fi

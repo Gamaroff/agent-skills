@@ -1275,6 +1275,12 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # identical to the tracker call so one guard covers both — and when the cycle
 # is unknown the pull-request comment still posts, without the lead, because it
 # carries no marker and losing it would hide the ⚠️ from the reviewer.
+# Addressed skill-relatively (`references/…`) like the lead CLI call beneath it;
+# the tracker block addresses the same helper from the repository root, like
+# ITS engine call — one cwd per block (TASK-121-BUG-4). What a block inherits
+# from earlier blocks is the INPUTS an agent re-binds when it runs the block
+# ($TASK_DIR, $GATE_DECISION, $BODY_FILE, $PR_URL); a COMPUTED value like the
+# cycle never is.
 QA_CYCLE=$(bash references/qa-cycle.sh "$TASK_DIR") || QA_CYCLE=
 if [ -n "$QA_CYCLE" ]; then
   LEAD=$(node references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
@@ -1345,7 +1351,14 @@ if [ -n "$QA_ISSUE" ]; then
   # $QA_CYCLE does not exist here (TASK-121-BUG-2). No fallback: a comment keyed
   # to a guessed cycle is the suppression this suffix exists to end, so an
   # unknown cycle skips the post and says so.
-  QA_CYCLE=$(bash references/qa-cycle.sh "$TASK_DIR") || QA_CYCLE=
+  #
+  # Addressed from the REPOSITORY ROOT — `.agents/skills/qa-task/references/…` —
+  # because that is how the engine call below is addressed, and every command
+  # in one block must resolve from the same cwd (TASK-121-BUG-4). What this
+  # block inherits from earlier blocks is the INPUTS an agent re-binds when it
+  # runs a block ($TASK_DIR, $QA_ISSUE, $GATE_DECISION, $score, $PR_NUMBER,
+  # $PR_URL); a COMPUTED value like the cycle is never carried over.
+  QA_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR") || QA_CYCLE=
 
   # blocking_count — the high-severity entries in the gate this run just wrote:
   # the gate that CARRIES the cycle number above, so the count and the suffix

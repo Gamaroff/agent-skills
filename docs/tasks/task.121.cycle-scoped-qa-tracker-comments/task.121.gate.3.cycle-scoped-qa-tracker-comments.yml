@@ -1,0 +1,98 @@
+schema: 1
+task: 'task.121.cycle-scoped-qa-tracker-comments'
+task_title: 'QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped'
+gate: CONCERNS
+status_reason: 'Cycle-2 fixes verified and mutation-covered (BUG-2, BUG-3 closed; CR-4, CR-5 fixed). Narrowed review found the three tracker blocks call the new helper by a skill-dir-relative path beside a repo-root-relative engine call, so from the cwd the block assumes the helper is not found and the post is skipped (BUG-4, medium); five low findings. No HIGH.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T06:12:00Z'
+
+top_issues:
+  - id: 'TASK-121-BUG-4'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Tracker blocks (qa-task :1361, qa-story :1932, qa-fix :915) call bash references/qa-cycle.sh beside node .agents/skills/<skill>/references/tracker-comment.js — two cwd assumptions in one block; from the repo root the helper is not found (exit 127), || QA_CYCLE= empties it, and the post is skipped every cycle with a warning. (Reviewer CR-1 rated high/medium; QA records medium — the PR-lead blocks already carry the skill-dir assumption via node references/stakeholder-summary-cli.js, and the fix is a path-form alignment.)'
+    suggested_action: 'Address the helper as .agents/skills/<skill>/references/qa-cycle.sh in the three tracker blocks; widen DERIVES_CYCLE to accept that prefix; add a same-block path-form guard; state which values a block inherits (CR-2).'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.121.bug.4.helper-path-form-differs-from-the-engine-call-beside-it.md'
+  - id: 'CR-2'
+    severity: low
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'The "each block is its own shell" premise is applied only to the cycle: $STORY_DIR / $TASK_DIR / $STORY_FILE, $GATE_DECISION, $score and $QA_ISSUE still cross blocks, and the same-block guard checks only that the helper is called, not that its argument is bound.'
+    suggested_action: 'State in the prose which values a block inherits from earlier blocks (inputs an agent re-binds) versus what must be derived in-block (computed values); no code change required beyond the sentence.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/qa-cycle.sh'
+    finding: '[ "$n" -gt "$best" ] is a 64-bit integer test — a gate numbered beyond that range prints "integer expected", skips the comparison, and the helper exits 0 with the lower number (a wrong cycle rather than a refusal).'
+    suggested_action: 'Bound the digit count (e.g. reject a number longer than 9 digits as malformed → refusal) or compare length-then-lexical; treat a comparison failure as a refusal.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-4'
+    severity: low
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'New comments at :1860 and :1928 say "Step 13b" / "Step 13" — those are qa-task step numbers; qa-story has Steps 6 / 6b.'
+    suggested_action: 'Refer to the blocks by qa-story numbering or by name.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'tests/qa-cycle.test.js'
+    finding: 'INLINE_DERIVATION matches only the retired spelling (| sed -E / -nE); an inline re-derivation written with sed -En, sed -r, grep -oE or awk passes the no-second-definition guard.'
+    suggested_action: 'Assert instead that no $(...) assignment in the three skills contains .gate. outside a call to qa-cycle.sh.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-6'
+    severity: low
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'The redrawn co-located tree still places story.1.1.epic-name.md directly under [feature]/, while create-story and every story on disk use {epic-dir}/stories/story.{E}.{S}.{name}/; the helper whole-directory scan is correct only because each story has its own directory, which the example does not show.'
+    suggested_action: 'Redraw the story branch as epics/epic.1.x/stories/story.1.1.x/ with the numbered qa/gate files beside the story file.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3431
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged surface; the helper reads filenames and prints a number; both CLIs still validate the stage. CR-3 is a wrong-number path on an absurd input, not a security path.'
+  performance:
+    status: PASS
+    notes: 'One extra bash process per block; negligible.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-4: from the cwd the tracker block assumes, the helper is not found and the post is skipped every cycle.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of the cycle; guards in place; contract reconciled. Residual lows are wording (CR-4), an example tree (CR-6) and guard breadth (CR-5).'
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-09-18'
+  total_iterations: 2
+  verification_method: 'Mutation proofs against committed state (cp-restore); ci:fast + CI green at 6bbff589; helper exercised under bash and zsh'
+
+recommendations:
+  immediate:
+    - action: 'BUG-4: repo-root path form for the helper in the three tracker blocks + guard + widened DERIVES_CYCLE. CR-2 sentence. CR-3 digit bound. CR-4 step numbers. CR-5 broader guard. CR-6 tree.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'skills/qa-fix/SKILL.md', 'shared/resources/qa-cycle.sh', 'tests/qa-cycle.test.js']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-4 fixed with a path-form guard', 'lows addressed or explicitly waived']

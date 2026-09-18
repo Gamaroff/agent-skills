@@ -107,6 +107,40 @@ for (const shell of SHELLS) {
     assert.equal(r.stdout, "2\n");
   });
 
+  test(`[${shell}] a run of more than 9 digits is a malformed name, never a wrong lower cycle`, () => {
+    // `[ -gt ]` is a 64-bit test; on a longer run it prints "integer expected"
+    // and skips the comparison, so before the bound the helper exited 0 with
+    // the LOWER number — a wrong cycle rather than a refusal (cycle-3 CR-3).
+    const alone = run(
+      shell,
+      fixture(["task.121.gate.99999999999999999999.x.yml"]),
+    );
+    assert.equal(alone.status, 1);
+    assert.equal(alone.stdout, "");
+    const beside = run(
+      shell,
+      fixture([
+        "task.121.gate.2.a.yml",
+        "task.121.gate.99999999999999999999.x.yml",
+      ]),
+    );
+    assert.equal(beside.status, 0, beside.stderr);
+    assert.equal(beside.stdout, "2\n");
+    assert.equal(
+      beside.stderr,
+      "",
+      "a malformed sibling must not print 'integer expected'",
+    );
+  });
+
+  test(`[${shell}] leading zeros are normalised — gate.007 is cycle 7`, () => {
+    assert.equal(
+      run(shell, fixture(["task.121.gate.007.x.yml", "task.121.gate.2.y.yml"]))
+        .stdout,
+      "7\n",
+    );
+  });
+
   test(`[${shell}] a missing directory → exit 1, empty stdout`, () => {
     const r = run(shell, path.join(os.tmpdir(), "qa-cycle-does-not-exist"));
     assert.equal(r.status, 1);
@@ -123,9 +157,20 @@ const SKILLS = [
   "skills/qa-fix/SKILL.md",
 ];
 const USES_CYCLE = /--stage "qa-(?:gate|fix)-\$\{(?:QA|FIX)_CYCLE\}"/;
+// Either path form: skill-relative (`references/…`, beside a skill-relative
+// lead call) or repository-root (`.agents/skills/<skill>/references/…`, beside
+// a repo-root engine call). Which one a block may use is decided per block by
+// the path-form guard below, not here.
 const DERIVES_CYCLE =
-  /^\s*(?:QA|FIX)_CYCLE=\$\(bash references\/qa-cycle\.sh /m;
-const INLINE_DERIVATION = /\| *sed -n?E? 's\/\.\*\\\.gate\\\./;
+  /^\s*(?:QA|FIX)_CYCLE=\$\(bash (?:\.agents\/skills\/[a-z-]+\/)?references\/qa-cycle\.sh /m;
+// Any command-substitution assignment that reads a NUMBER out of a gate
+// filename, however spelled (sed/awk/grep/cut, -E/-En/-r, anchored or not), is
+// a second definition of "which gate is current". A lookup that merely names a
+// gate path (`LATEST_GATE=$(ls … .gate.*.yml …)`) extracts nothing and is not
+// one. Only a call to the helper may extract digits near `.gate.` — spelled
+// plain or with escaped dots (`\.gate\.`), as a sed/grep pattern would.
+const INLINE_DERIVATION =
+  /=\$\((?![^)]*qa-cycle\.sh)[^\n]*\\?\.gate\\?\.[^\n]*(?:\[0-9\]|\[\[:digit:\]\]|\\d|\bawk\b|\bcut -d)/;
 
 function fencedBlocks(file) {
   const lines = fs.readFileSync(path.join(REPO_ROOT, file), "utf8").split("\n");
@@ -165,6 +210,45 @@ test("every fenced block that passes a cycle-scoped stage derives the cycle in t
   assert.ok(
     using >= 6,
     `only ${using} blocks pass a cycle-scoped stage — expected ≥ 6`,
+  );
+  assert.deepEqual(offenders, []);
+});
+
+test("within one block, the helper is addressed the way the block's engine call is", () => {
+  // Two cwd assumptions in one block is how BUG-4 happened: `bash
+  // references/qa-cycle.sh` beside `node .agents/skills/<s>/references/
+  // tracker-comment.js` — from the cwd the engine call presupposes, the helper
+  // is not found (exit 127) and the post is skipped on every cycle. The rule:
+  // a block that addresses an engine from the repository root addresses the
+  // helper from the repository root, and a block that addresses it
+  // skill-relatively addresses the helper skill-relatively.
+  const offenders = [];
+  let checked = 0;
+  for (const file of SKILLS) {
+    for (const b of fencedBlocks(file)) {
+      const helper =
+        /bash ((?:\.agents\/skills\/[a-z-]+\/)?)references\/qa-cycle\.sh/.exec(
+          b.text,
+        );
+      if (!helper) continue;
+      const engine =
+        /node ((?:\.agents\/skills\/[a-z-]+\/)?)references\/(?:tracker-comment|stakeholder-summary-cli)\.js/.exec(
+          b.text,
+        );
+      if (!engine) continue;
+      checked += 1;
+      const helperRoot = helper[1] !== "";
+      const engineRoot = engine[1] !== "";
+      if (helperRoot !== engineRoot) {
+        offenders.push(
+          `${file}: block at line ${b.start} addresses the helper ${helperRoot ? "from the repo root" : "skill-relatively"} but its engine call ${engineRoot ? "from the repo root" : "skill-relatively"}`,
+        );
+      }
+    }
+  }
+  assert.ok(
+    checked >= 6,
+    `only ${checked} blocks pair a helper call with an engine call — expected ≥ 6`,
   );
   assert.deepEqual(offenders, []);
 });

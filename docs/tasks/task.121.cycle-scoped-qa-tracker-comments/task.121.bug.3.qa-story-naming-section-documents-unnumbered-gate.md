@@ -4,7 +4,7 @@
 **Bug ID**: TASK-121-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (refute pass, cycle 2 — reviewer finding CR-2, verified)
 **Date Found**: 2026-09-18
 
@@ -62,3 +62,4 @@ the numbered forms → no matches.
 | --- | --- | --- | --- |
 | 2026-09-18 | New | QA Engineer | Refute pass, cycle 2 (CR-2) |
 | 2026-09-18 | Ready for QA | qa-fix | Section + three tree examples rewritten |
+| 2026-09-18 | Closed | QA Engineer | Verified in cycle 3 — section + three trees numbered; zero un-numbered forms remain (tree layout note → CR-6, low) |
