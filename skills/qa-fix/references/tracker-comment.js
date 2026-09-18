@@ -259,9 +259,17 @@ function isKnownStage(stage) {
   // runtime rule matches what the error message promises. Allowing `done-1`
   // was harmless but meant the two disagreed, and a rule nobody can predict
   // from its own message is one people route around.
-  return CYCLE_SCOPED_STAGES.some(
-    (k) => stage.startsWith(`${k}-`) && /^\d+$/.test(stage.slice(k.length + 1)),
-  );
+  // A suffix is a round number, and round numbers start at 1: `qa-gate-0`
+  // names no cycle. `qa-cycle.sh` already treats a gate that normalises to 0
+  // as un-numbered and the lead's `cycle` slot drops a 0 — so accepting it
+  // here minted a marker for a round that does not exist, which no other part
+  // of the chain agreed was one (finalise DoD security probe, task.121).
+  // Leading zeros are fine (`007` is 7), matching the helper's normalisation.
+  return CYCLE_SCOPED_STAGES.some((k) => {
+    if (!stage.startsWith(`${k}-`)) return false;
+    const suffix = stage.slice(k.length + 1);
+    return /^\d+$/.test(suffix) && Number(suffix) > 0;
+  });
 }
 
 /** GitHub/Bitbucket: an HTML comment, invisible when rendered. */

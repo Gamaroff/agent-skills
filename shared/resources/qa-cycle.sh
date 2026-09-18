@@ -45,10 +45,19 @@ for f in "$DIR"/*.gate.*.yml; do
   # longer run of digits — which would exit 0 with a lower, wrong cycle rather
   # than refuse. A longer run is treated as a malformed name, not a number.
   n=$(printf '%s' "${f##*/}" | sed -nE 's/^.*\.gate\.([0-9]{1,9})\..*$/\1/p')
-  if [ -z "$n" ]; then
-    unnumbered=$((unnumbered + 1))
-    continue
-  fi
+  # Digits only, or the name is un-numbered. sed works a LINE at a time, so a
+  # filename with an embedded newline yields two lines here — and feeding that
+  # to `$((10#$n))` below is an arithmetic error that ABORTS the loop, leaving
+  # the script to print whatever `best` held and exit 0: a lower, wrong cycle
+  # rather than a refusal (finalise DoD security probe, task.121). The guard is
+  # a pattern, not `-z`, so anything sed did not reduce to one run of digits —
+  # empty, multi-line, or otherwise — takes the un-numbered branch.
+  case "$n" in
+    ''|*[!0-9]*)
+      unnumbered=$((unnumbered + 1))
+      continue
+      ;;
+  esac
   # Strip leading zeros so `gate.007` compares as 7 and prints as 7. A value
   # that normalises to 0 is not a cycle — the `cycle` slot is positive-integer
   # only and would be dropped, and `qa-gate-0` names no round — so it counts

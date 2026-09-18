@@ -1540,6 +1540,10 @@ test("the numeric suffix is legal only for cycle-scoped stages (NEW-6)", () => {
   assert.equal(cli.isKnownStage("qa-fix-11"), true);
   // `done-1` used to pass, which made the runtime rule broader than the error
   // message promised — a rule nobody can predict from its own message.
+  // A suffix that normalises to zero names no round; leading zeros are fine.
+  assert.equal(cli.isKnownStage("qa-gate-0"), false, "cycle 0 is not a round");
+  assert.equal(cli.isKnownStage("qa-gate-000"), false);
+  assert.equal(cli.isKnownStage("qa-gate-007"), true, "007 is cycle 7");
   assert.equal(cli.isKnownStage("done-1"), false);
   assert.equal(cli.isKnownStage("review-3"), false);
   // bug.14: the PreCompact hook scopes its notice by the step it paused at.

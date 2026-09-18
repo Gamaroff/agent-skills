@@ -139,6 +139,28 @@ for (const shell of SHELLS) {
     );
   });
 
+  test(`[${shell}] a filename with an embedded newline is un-numbered — never a lower, wrong cycle`, () => {
+    // sed emits one line per input line, so the extracted value carried a
+    // newline into `$((10#$n))`, which aborted the loop; the script then
+    // printed the lower cycle it had seen and exited 0 (finalise DoD security
+    // probe, task.121). Refuse alone; ignore beside real gates, with the
+    // HIGHEST real gate still winning and nothing on stderr.
+    const alone = run(shell, fixture(["x.gate.5.y\nz.gate.9.w.yml"]));
+    assert.equal(alone.status, 1);
+    assert.equal(alone.stdout, "");
+    const beside = run(
+      shell,
+      fixture([
+        "task.121.gate.3.a.yml",
+        "x.gate.5.y\nz.gate.9.w.yml",
+        "task.121.gate.12.b.yml",
+      ]),
+    );
+    assert.equal(beside.status, 0, beside.stderr);
+    assert.equal(beside.stdout, "12\n");
+    assert.equal(beside.stderr, "", "no arithmetic error may leak");
+  });
+
   test(`[${shell}] leading zeros are normalised — gate.007 is cycle 7`, () => {
     assert.equal(
       run(shell, fixture(["task.121.gate.007.x.yml", "task.121.gate.2.y.yml"]))
