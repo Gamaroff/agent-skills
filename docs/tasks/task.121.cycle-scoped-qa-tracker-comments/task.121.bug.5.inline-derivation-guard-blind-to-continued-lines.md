@@ -4,7 +4,7 @@
 **Bug ID**: TASK-121-BUG-5
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 4 — reviewer CR-1, verified)
 **Date Found**: 2026-09-18
 
@@ -59,3 +59,4 @@ guards red (same-block, root-form, inline-derivation); restored → green.
 | --- | --- | --- | --- |
 | 2026-09-18 | New | QA Engineer | Cycle 4 (CR-1) |
 | 2026-09-18 | Ready for QA | qa-fix | Continuations joined; fixture added |
+| 2026-09-18 | Closed | QA Engineer | Verified in cycle 5 — continuations joined in fencedBlocks(); two-line fixture in place; inserting the two-line form → guard red |

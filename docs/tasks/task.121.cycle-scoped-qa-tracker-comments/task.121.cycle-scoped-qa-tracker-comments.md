@@ -375,25 +375,25 @@ None.
 ## Change Log
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-09-18
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.121.qa.4.cycle-scoped-qa-tracker-comments.md](./task.121.qa.4.cycle-scoped-qa-tracker-comments.md)
-- **Gate File**: [task.121.gate.4.cycle-scoped-qa-tracker-comments.yml](./task.121.gate.4.cycle-scoped-qa-tracker-comments.yml)
-- **Previous cycles**: [qa.3](./task.121.qa.3.cycle-scoped-qa-tracker-comments.md) · [qa.2](./task.121.qa.2.cycle-scoped-qa-tracker-comments.md) · [qa.1](./task.121.qa.1.cycle-scoped-qa-tracker-comments.md)
+- **Full Report**: [task.121.qa.5.cycle-scoped-qa-tracker-comments.md](./task.121.qa.5.cycle-scoped-qa-tracker-comments.md)
+- **Gate File**: [task.121.gate.5.cycle-scoped-qa-tracker-comments.yml](./task.121.gate.5.cycle-scoped-qa-tracker-comments.yml)
+- **Previous cycles**: [qa.4](./task.121.qa.4.cycle-scoped-qa-tracker-comments.md) · [qa.3](./task.121.qa.3.cycle-scoped-qa-tracker-comments.md) · [qa.2](./task.121.qa.2.cycle-scoped-qa-tracker-comments.md) · [qa.1](./task.121.qa.1.cycle-scoped-qa-tracker-comments.md)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3436
+- **Tests Executed**: 3439
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle-3 fixes verified (BUG-4 closed). BUG-5 [medium]: the inline-derivation guard is per-line and misses the two-line continued form. BUG-6 [medium]: `|| VAR=` conflates helper-not-found with refused, and the PR-lead blocks mix `.claude/state` root paths with skill-relative helper/lead calls. Four lows. No HIGH.
+No open issues. Six bugs across five cycles closed and mutation-covered. Four advisory follow-ups (F1–F4) recorded in gate 5: qa-fix's shared body-file path, the helper's stale header example, zero-padded gate names, stale test comments. Consumer criterion met live on #421 (`qa-gate-1..5`, `qa-fix-1..4`).
 <!-- change-log-start -->
 ## Change Log
 
@@ -411,6 +411,7 @@ Cycle-3 fixes verified (BUG-4 closed). BUG-5 [medium]: the inline-derivation gua
 | 2026-09-18 |  | QA findings fixed — BUG-4 (helper path form per block + guard), CR-2..CR-6; cycle 3 (3 iterations so far) | qa-fix |
 | 2026-09-18 |  | QA gate CONCERNS (90/100) — cycle 4: 2 medium (guard blind to continued form; rc conflation + PR-lead cwd), 4 low; BUG-4 closed | qa-task |
 | 2026-09-18 |  | QA findings fixed — BUG-5 (continuations joined), BUG-6 (rc check + one cwd everywhere), CR-4..CR-7; cycle 4 (4 iterations so far) | qa-fix |
+| 2026-09-18 |  | QA gate PASS (100/100) — cycle 5: 0 open, 4 advisory follow-ups; BUG-5/BUG-6 closed | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

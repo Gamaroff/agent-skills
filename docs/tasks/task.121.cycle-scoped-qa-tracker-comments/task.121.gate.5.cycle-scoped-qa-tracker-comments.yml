@@ -1,0 +1,61 @@
+schema: 1
+task: 'task.121.cycle-scoped-qa-tracker-comments'
+task_title: 'QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped'
+gate: PASS
+status_reason: 'Cycle-4 fixes verified and mutation-covered (BUG-5, BUG-6 closed; CR-4..CR-7 fixed). The narrowed review found no open defect in the deliverable: four advisory items (a latent stale-body path shared between skills, a stale usage example in the helper header, a zero-padded gate name no writer produces, stale test comments) are recorded as named follow-ups. No HIGH in five cycles; every cycle live-proved the per-cycle markers on #421.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T06:47:56Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 3439
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered across five cycles; the cycle string is validated by both CLIs against a fixed stage list; the helper reads filenames and prints a bounded integer.'
+  performance:
+    status: PASS
+    notes: 'One list member in two frozen arrays; one bash process per block.'
+  reliability:
+    status: PASS
+    notes: 'Refusal-not-guess helper proven under bash and zsh; rc-checked invocations; root-form paths in all six blocks; per-cycle markers qa-gate-1..5 / qa-fix-1..4 all posted live on #421 from separate-shell blocks. Follow-up F1 (shared body-file path) is latent and needs a lead-CLI failure to trigger.'
+  maintainability:
+    status: PASS
+    notes: 'One definition of the cycle; contract and catalogue consistent; four guards mutation-proved this cycle. Follow-ups F2/F4 are comment text.'
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-09-18'
+  total_iterations: 4
+  verification_method: 'Mutation proofs against committed state (cp-restore) every cycle; ci:fast + CI green at a8485b45; live tracker markers on #421'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'F1 (reviewer CR-1, medium/medium; QA: latent): qa-fix and qa-task both write .claude/state/comment-body.md; if qa-fix PR-lead block aborts on its lead CLI before writing, the tracker block -s check is satisfied by qa-task prior file. Give qa-fix its own file name and write it before the helper/lead calls.'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'F2 (CR-2): the usage example in qa-cycle.sh header (lines 22-26) still shows the skill-relative `|| QA_CYCLE=` idiom the guards now reject; replace with the root-form rc-checked idiom.'
+      refs: ['shared/resources/qa-cycle.sh']
+    - action: 'F3 (CR-3): THIS_GATE globs gate."$QA_CYCLE".* with the normalised value, so a zero-padded gate name (gate.007 → 7) is not found and blocking_count reads 0; no writer produces zero-padded names — treat them as un-numbered in the helper or re-parse with the same normalisation.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/qa-cycle.sh']
+    - action: 'F4 (CR-4): tests/qa-cycle.test.js comments at :43 and :250 still describe the pre-BUG-6 per-block rule and the skill-relative spelling; align prose with the root-only assertions.'
+      refs: ['tests/qa-cycle.test.js']
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

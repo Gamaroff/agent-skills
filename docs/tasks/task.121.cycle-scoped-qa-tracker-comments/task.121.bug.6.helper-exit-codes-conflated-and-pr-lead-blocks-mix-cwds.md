@@ -4,7 +4,7 @@
 **Bug ID**: TASK-121-BUG-6
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 4 — reviewer CR-2 and CR-3, verified)
 **Date Found**: 2026-09-18
 
@@ -76,3 +76,4 @@ new rc check exits 1 with the ⚠️ instead of an empty cycle.
 | --- | --- | --- | --- |
 | 2026-09-18 | New | QA Engineer | Cycle 4 (CR-2 + CR-3) |
 | 2026-09-18 | Ready for QA | qa-fix | rc check ×6; root form in all six blocks; guard |
+| 2026-09-18 | Closed | QA Engineer | Verified in cycle 5 — rc check at all six sites (nonexistent helper → rc 127 → loud exit 1); all six blocks root-form for helper and lead CLI; reverting one → root-form guard red naming the block |
