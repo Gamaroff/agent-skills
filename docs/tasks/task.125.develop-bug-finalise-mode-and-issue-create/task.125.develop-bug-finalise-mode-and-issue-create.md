@@ -1,17 +1,17 @@
 ---
 id: task.125
-title: "[Task 125] develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so"
+title: "[Task 125] develop-bug's only DoD path is documented as a fallback, and its issue create fails whole on a label case mismatch while swallowing the line that says so — and its verify loop calls /qa-fix with no gate to derive a cycle from"
 type: task
-description: "Two develop-bug defects on the same theme — the bug pipeline borrows story/task machinery that does not fit and reports its own failures poorly. Step 7 tells the pipeline to run /finalise against the bug file, whose AC agent, Change Log row, status: accepted, sprint review and registry tick either do not apply or are forbidden for a bug; bug.13 and bug.14 each hand-wrote the same bug-shaped DoD from the template as the 'fallback'. And ensure-bug-github-issue passes priority/severity labels verbatim (High, Major) to a repo whose labels are lowercase with no severity:* at all, so gh rejects the whole create and tracker-issue.js drops the stderr line naming the label; on an unattended run the bug proceeds with no issue. Ship finalise --bug, and make the issue create tolerant and its failure legible. Observations #65, #69."
-tags: [develop-bug, finalise, ensure-bug-github-issue, tracker-issue]
+description: "Three develop-bug defects on the same theme — the bug pipeline borrows story/task machinery that does not fit and reports its own failures poorly. Step 7 tells the pipeline to run /finalise against the bug file, whose AC agent, Change Log row, status: accepted, sprint review and registry tick either do not apply or are forbidden for a bug; bug.13 and bug.14 each hand-wrote the same bug-shaped DoD from the template as the 'fallback'. And ensure-bug-github-issue passes priority/severity labels verbatim (High, Major) to a repo whose labels are lowercase with no severity:* at all, so gh rejects the whole create and tracker-issue.js drops the stderr line naming the label; on an unattended run the bug proceeds with no issue. Ship finalise --bug, and make the issue create tolerant and its failure legible. Observations #65, #69. The third (task.121, 2026-09-18): the verify loop invokes /qa-fix for a general bug, qa-fix now derives its cycle from the highest-numbered gate file with references/qa-cycle.sh — which refuses rather than guesses — and a general bug's directory carries no gate, so the helper refuses and the bug issue gets no fix-cycle comment at all; the loop already knows its cycle and should pass it. Observation #122."
+tags: [develop-bug, finalise, ensure-bug-github-issue, tracker-issue, qa-fix, qa-cycle]
 category: refactoring
 status: planned
 priority: Medium
 risk_level: low
 created: 2026-09-17
-updated: 2026-09-17
+updated: 2026-09-18
 assignee:
-estimated_effort_hours: 8
+estimated_effort_hours: 9
 github_issue: 425
 ---
 
@@ -53,6 +53,14 @@ stderr line that would have explained it. This task gives the bug pipeline a fir
    `tracker-issue.js` reported "create a GitHub issue failed" with the command line and dropped gh's
    stderr, which named the label. The sub-routine's contract makes an empty `BUG_ISSUE_NUM`
    non-blocking, so unattended the bug proceeds with no issue (#65).
+3. **The verify loop's `/qa-fix` has no cycle source.** task.121 made qa-fix's tracker comment
+   cycle-scoped (`--stage qa-fix-${FIX_CYCLE}`), with `FIX_CYCLE` read from the highest-numbered
+   `*.gate.{N}.*.yml` by `references/qa-cycle.sh`, which **refuses** when no gate is numbered — by
+   design, since a guessed `1` reproduces the once-per-issue bug wearing a suffix. develop-bug's
+   verify loop writes `qa-cycle-{N}` comments itself and never produces a gate, so on every
+   develop-bug run the helper refuses, the block prints its ⚠️ and skips the post, and the bug issue
+   carries no fix-cycle comment — a regression from before task.121, when the bare stage posted once.
+   Found by task.121's Step 5c review (CR-1, behaviour half) and deferred here (#122).
 
 ### Benefits
 
@@ -62,7 +70,8 @@ stderr line that would have explained it. This task gives the bug pipeline a fir
    that do not apply are skipped by the mode, not by the operator's judgement.
 3. A label that does not exist skips the label, never the issue; the failure line that names a
    real problem reaches the log.
-4. Two observations close.
+4. A bug loop that already knows its cycle states it; the helper's refusal is kept for the gate-driven path, where guessing is the defect.
+5. Three observations close.
 
 ## 3. Technical Background
 
@@ -90,6 +99,8 @@ ensure-bug-github-issue B5 → labels normalised to the repo's convention (lower
           against `gh label list` and skipped with a warning when absent; the create never carries a
           label that would fail it; severity travels in the body's Metadata table
 tracker-issue.js           → on failure: "create a GitHub issue failed: <first stderr line>" + argv
+develop-bug verify loop    → Skill(qa-fix, args="fix_cycle=N") with the loop's own cycle
+qa-fix Step 7 blocks       → FIX_CYCLE := explicit fix_cycle arg if present, else qa-cycle.sh; refuse only when neither
 ```
 
 ### Important Clarifications
@@ -113,6 +124,7 @@ tracker-issue.js           → on failure: "create a GitHub issue failed: <first
 ✅ `ensure-bug-github-issue` B5: label normalisation + existence check; severity in the body.
 ✅ `tracker-issue.js`: surface gh's first stderr line in the failure message (all kinds, not only create).
 ✅ Tests: finalise mode skip-list test; label tolerance test with a fake `gh`; stderr surfacing test.
+✅ `qa-fix` accepts `fix_cycle=N` in its Skill args and prefers it; develop-bug's verify loop passes its cycle; `tests/qa-cycle.test.js` gains the empty-gate-directory consumer case.
 
 ### Out of Scope
 
@@ -158,6 +170,21 @@ hint naming the mode).
 
 **Dependencies**: none.
 
+### Phase 3: A cycle source for the bug verify loop (#122)
+
+**Risk Level**: Low
+
+**Files**: `skills/qa-fix/SKILL.md` (Pipeline Skill args + the two blocks that derive `FIX_CYCLE`),
+`shared/resources/develop-bug-step-5-6-verify-loop.md`, `tests/qa-cycle.test.js`
+
+**Changes**:
+- [ ] `qa-fix` Pipeline Skill args: `fix_cycle=<N>` (positive integer) → `FIX_CYCLE_ARG`; each deriving block uses it when set, else calls the helper; refuses (warn, skip the post) only when both are absent.
+- [ ] develop-bug verify loop: `Skill(qa-fix, args="fix_cycle=${CYCLE}")` with the cycle it already posts as `qa-cycle-{N}`.
+- [ ] Guard: `tests/qa-cycle.test.js` "every block that uses the cycle" test still passes (the arg is read in the same block); new case: an empty gate directory + `fix_cycle=2` → the block reaches the tracker call with `qa-fix-2`; empty directory + no arg → refuses as today.
+- [ ] Mutation: revert the fallback order (helper first) → the empty-dir case red.
+
+**Dependencies**: none.
+
 ## 7. Files Summary
 
 ### Files to Modify (Core Implementation)
@@ -166,20 +193,22 @@ hint naming the mode).
 2. ✅ `shared/resources/develop-bug-step-7-close-bug.md` — Part A
 3. ✅ `skills/ensure-bug-github-issue/SKILL.md` — Step B5
 4. ✅ `shared/resources/tracker-issue.js` — failure message
+5. ✅ `skills/qa-fix/SKILL.md` — `fix_cycle` arg; `shared/resources/develop-bug-step-5-6-verify-loop.md` — passes it
 
 ### Files to Create
 
-5. ✅ `skills/finalise/assets/bug-dod-template.md`
+6. ✅ `skills/finalise/assets/bug-dod-template.md`
 
 ### Files to Modify (Tests)
 
-6. ✅ `shared/resources/tests/tracker-issue.test.mjs` (or the existing tracker-issue test) — stderr surfacing, label skip
-7. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs` (new) — skip list asserted against the SKILL.md
+7. ✅ `shared/resources/tests/tracker-issue.test.mjs` (or the existing tracker-issue test) — stderr surfacing, label skip
+8. ✅ `evals/shared/tests/finalise-bug-mode.test.mjs` (new) — skip list asserted against the SKILL.md
+9. ✅ `tests/qa-cycle.test.js` — explicit-cycle and empty-directory cases
 
 ### Files to Modify (Documentation)
 
-8. ✅ `docs/runbooks/` bug runbook (task.112's hotfix runbook and the bug flow) — the DoD step
-9. ✅ `skills/*/references/` — regenerated
+10. ✅ `docs/runbooks/` bug runbook (task.112's hotfix runbook and the bug flow) — the DoD step
+11. ✅ `skills/*/references/` — regenerated
 
 ### Files to Delete
 
@@ -189,6 +218,7 @@ None.
 
 ### Unit Tests
 - [ ] `tracker-issue.js` failure includes stderr; label normalisation maps `High`→`high`, `Major` dropped when absent.
+- [ ] `qa-fix` block with `fix_cycle=2` and no gate → `qa-fix-2`; with neither → refuses; with both → the arg wins.
 - [ ] finalise mode test: every step in the skip list is marked `bug: skip` in the SKILL.md and no bug-forbidden writer (Change Log) is reachable in bug mode.
 
 **Command**: `npm test`
@@ -204,7 +234,7 @@ None.
 Not applicable.
 
 ### Consumer Tests
-- [ ] Next `/develop-bug` run: no hand-written DoD; the issue is created with normalised labels.
+- [ ] Next `/develop-bug` run: no hand-written DoD; the issue is created with normalised labels; the bug issue carries one `qa-fix-N` marker per verify cycle.
 
 ## 9. Success Criteria
 
@@ -213,6 +243,7 @@ Not applicable.
 - [ ] Step 7 has no fallback paragraph.
 - [ ] A label absent from the repo never fails an issue create; the warning names it.
 - [ ] Any `tracker-issue.js` failure message carries gh's own first line.
+- [ ] develop-bug's verify loop posts a `qa-fix-{N}` comment per cycle with no gate file present.
 
 ### Performance
 - [ ] One extra `gh label list` per bug create.
@@ -221,7 +252,7 @@ Not applicable.
 - [ ] Skip list stated once; mutation proof: remove a skip → the mode test goes red.
 
 ### Migration
-- [ ] Observations #65, #69 close naming the PR; bug.13/14's hand-written DoDs left as-is.
+- [ ] Observations #65, #69, #122 close naming the PR; bug.13/14's hand-written DoDs left as-is.
 
 ## 10. Risk Assessment
 
@@ -258,18 +289,20 @@ None.
 | Date | Version | Description | Author |
 | ---- | ------- | ----------- | ------ |
 | 2026-09-17 | 1.0 | Initial draft — observation review 2026-09-17 (obs #65, #69) | create-task |
+| 2026-09-18 | 1.1 | Phase 3 added — an explicit `fix_cycle` for qa-fix so develop-bug's verify loop posts per cycle with no gate file (obs #122, task.121 5c CR-1); effort 8h → 9h | observe-work |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
 - [ ] Phase 1: finalise --bug
 - [ ] Phase 2: tolerant issue create
+- [ ] Phase 3: bug verify-loop cycle source
 - [ ] QA: `task.125.qa.[N].develop-bug-finalise-mode-and-issue-create.md`
 - [ ] Gate: `task.125.gate.[N].develop-bug-finalise-mode-and-issue-create.yml`
 
 ## References
 
-- Observations #65, #69; bug.13 and bug.14's hand-written DoD files (the template source)
+- Observations #65, #69, #122; task.121 `task.121.pr-review.1` CR-1; bug.13 and bug.14's hand-written DoD files (the template source)
 - `shared/resources/document-change-log.md` §Exclusions; `shared/resources/status-history.js`
 - `skills/ensure-task-github-issue/SKILL.md` — the sibling label handling to reuse
 
