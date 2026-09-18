@@ -373,6 +373,26 @@ None.
 - **Non-critical**: guard false positive, contract wording.
 
 ## Change Log
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-18
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.121.qa.1.cycle-scoped-qa-tracker-comments.md](./task.121.qa.1.cycle-scoped-qa-tracker-comments.md)
+- **Gate File**: [task.121.gate.1.cycle-scoped-qa-tracker-comments.yml](./task.121.gate.1.cycle-scoped-qa-tracker-comments.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 3416
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+One MEDIUM (BUG-1: the new cycle derivation echoes the path on a number-less gate name, so the `:-1` fallback is unreachable and the stage is rejected) and two LOW guard-hardening gaps (CR-3 literal suffix, CR-4 parity regex). No HIGH.
 <!-- change-log-start -->
 ## Change Log
 
@@ -382,6 +402,8 @@ None.
 | 2026-09-18 | 1.1 | Review passed (8/10) — scope widened to the orchestrator `qa-fix-{N}` block and four PR-lead sites (incl. precompact `:227`); guard covers `SITES` + `PR_SITES`; `qa-cycle` criterion scoped so `develop-bug`'s verify loop keeps posting; `tracker-comment.test.mjs` literal `deepEqual` called out; effort 4h → 8h | review-task |
 | 2026-09-18 |  | Status → ready-for-development | review-task |
 | 2026-09-18 |  | Implemented — 16 source files (+57 bundled copies), 8 new/extended tests across 3 suites; guard mutation-proved 3 ways | develop |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — 1 medium, 2 low | qa-task |
+| 2026-09-18 |  | QA findings fixed — BUG-1 (sed -n/p at 3 sites + pinning test), CR-3, CR-4; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -419,3 +441,12 @@ hook's PR-lead stage through `baseStage()` like its tracker twin. One deviation 
 `FIX_CYCLE`/`QA_CYCLE` fall back to `1` when no gate file is found, because the same value is now
 the stage suffix and `qa-fix-` is not a stage the engine accepts. Consumer criterion (a real ≥2-cycle
 run) and observation #75 closure are left for the QA loop and `/finalise`.
+
+**QA fix cycle 1 (qa-fix, 2026-09-18).** BUG-1: `sed -nE … p` at all three derivations so a
+number-less gate reaches the `:-1` fallback; pinned by `tests/qa-cycle-derivation.test.js`, which
+runs the shipped lines from each SKILL.md against fixtures (newest gate → its number; empty → 1;
+number-less → 1) and asserts the three derivations share one shape. CR-4: the parity scan accepts an
+optional opening quote (`--stage\s+("?)…`) with non-vacuity floors (≥100 literals, ≥4 quoted;
+measured 259 / 6). CR-3: the never-passed-bare guard also rejects a hard-coded numeric cycle
+(`--stage qa-gate-1`). Each mutation-proved: non-printing sed at one site → 2 red; old parity regex →
+quoted floor red; literal `qa-gate-1` in qa-task → guard red naming the site.

@@ -292,6 +292,27 @@ for (const [label, sites, floor] of [
       `Cycle-scoped stage passed bare — every cycle after the first will read ` +
         `\`already\` and post nothing:\n${bare.join("\n")}`,
     );
+    // A FIXED numeric suffix is the bare case wearing a suffix: `--stage
+    // qa-gate-1` written into a skill keys every cycle to cycle 1's marker just
+    // as the bare name did. A real site's suffix is a shell expansion (the
+    // collector captures `qa-gate-` and stops at `$`) or a `{N}` placeholder
+    // (captured `qa-cycle-`), so the digits never reach the captured stage
+    // unless someone typed them (CR-3, task.121 QA cycle 1).
+    const literal = sites
+      .filter(
+        (s) =>
+          s.stage && /-\d+$/.test(s.stage) && baseStage(s.stage) !== s.stage,
+      )
+      .map(
+        (s) =>
+          `${s.file}:${s.line} — --stage ${s.stage} (a literal cycle; use -\${cycle})`,
+      );
+    assert.deepEqual(
+      literal,
+      [],
+      `Cycle-scoped stage with a hard-coded cycle number — the marker is fixed ` +
+        `to that one cycle:\n${literal.join("\n")}`,
+    );
   });
 }
 

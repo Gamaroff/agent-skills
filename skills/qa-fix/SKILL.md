@@ -818,12 +818,14 @@ FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 # comments disagree about which round this is.
 DOC_DIR=$(dirname "$STORY_FILE")
 FIX_CYCLE=$(ls -t "$DOC_DIR"/*.gate.*.yml 2>/dev/null | head -1 \
-  | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+  | sed -nE 's/.*\.gate\.([0-9]+)\..*/\1/p')
 # The cycle is also the STAGE SUFFIX (`qa-fix-3`), which is what keys the
 # tracker comment's idempotency marker: bare `qa-fix` was suppressed by cycle
 # 1's marker on every later cycle (task.121). `qa-fix-` with nothing after the
 # hyphen is not a stage the engine accepts, so an unfound gate falls back to 1
-# rather than to a comment that never posts.
+# rather than to a comment that never posts. `sed -n … p` prints ONLY on a
+# match: a gate whose name carries no number must also reach the fallback, not
+# echo its whole path into the stage (TASK-121-BUG-1).
 FIX_CYCLE=${FIX_CYCLE:-1}
 
 # The pull-request wrapper — its own heading, then its own plain-language lead.

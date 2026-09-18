@@ -1859,9 +1859,11 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # bare `qa-gate` was suppressed by cycle 1's marker on every later cycle
 # (task.121). The lead renders the same sentence with or without the suffix;
 # passing it here too keeps both calls textually identical so one guard covers
-# both. `qa-gate-` is not a stage, so an unfound gate falls back to 1.
+# both. `qa-gate-` is not a stage, so an unfound gate falls back to 1 — and so
+# does a gate whose name carries no number: `sed -n … p` prints ONLY on a match,
+# where a bare `sed` would echo the whole path into the stage (TASK-121-BUG-1).
 QA_CYCLE=$(ls -t "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | head -1 \
-  | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+  | sed -nE 's/.*\.gate\.([0-9]+)\..*/\1/p')
 QA_CYCLE=${QA_CYCLE:-1}
 
 LEAD=$(node references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \

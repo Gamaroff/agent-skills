@@ -1,0 +1,74 @@
+schema: 1
+task: 'task.121.cycle-scoped-qa-tracker-comments'
+task_title: 'QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped'
+gate: CONCERNS
+status_reason: 'All three phases delivered and mutation-proved; one MEDIUM defect in the new cycle derivation (a non-numeric gate name makes the fallback unreachable and the stage invalid) plus two LOW guard-hardening findings from the diff review.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T03:43:00Z'
+
+top_issues:
+  - id: 'TASK-121-BUG-1'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'sed -E without -n/p prints the whole path when the newest gate filename has no numeric segment, so QA_CYCLE/FIX_CYCLE holds a path, the :-1 fallback never fires, and the stage qa-gate-/abs/path is rejected by both CLIs (exit 2), aborting the PR-comment block via || exit 1 — same derivation at skills/qa-story/SKILL.md (~:1863) and skills/qa-fix/SKILL.md (:820).'
+    suggested_action: 'Use sed -nE ... p at all three sites so a non-match yields the empty string and the documented fallback to 1 is reached; add a check that the derivation is empty on a number-less name.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.121.bug.1.cycle-derivation-unreachable-fallback.md'
+  - id: 'CR-4'
+    severity: low
+    file: 'evals/shared/tests/transition-protocol-parity.test.mjs'
+    finding: 'The parity test scans --stage\s+([a-z][a-z-]*), which does not match the quoted form --stage "qa-gate-${QA_CYCLE}" this diff introduced, so the six suffixed QA sites (and the precompact lead call) silently left that test population; they are covered only by comment-slot-coverage Guard C now.'
+    suggested_action: 'Extend the parity regex with an optional opening quote (as comment-slot-coverage collectCallSites already does) so the quoted shell form stays in its population; confirm the site count rises.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-3'
+    severity: low
+    file: 'shared/resources/tests/comment-slot-coverage.test.mjs'
+    finding: 'The never-passed-bare guard accepts any suffix (baseStage(s) !== s), so a hard-coded literal such as --stage qa-gate-1 at a shipped site would pass while reintroducing the cycle-1 marker suppression the guard exists to catch.'
+    suggested_action: 'Also fail a cycle-scoped stage whose captured suffix is a fixed number rather than a shell expansion (the collector leaves qa-gate- when it stops at $) or a {N} placeholder; mutation-prove with a literal.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3416
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'No boundary delivered — one list member, shell stage strings derived from filenames on disk, a documentation table and a guard test; no untrusted input reaches a validator. The only new shell value (the cycle) is interpolated into a --stage argument that both CLIs validate against a fixed list (exit 2 on anything unexpected — which is what BUG-1 trips).'
+  performance:
+    status: PASS
+    notes: 'One additional array member in the stage validator; no runtime path change.'
+  reliability:
+    status: PASS
+    notes: 'Fallback to cycle 1 verified under bash and zsh on an empty directory; marker-per-cycle behaviour proven (same cycle already, next cycle posts, bare marker does not suppress). BUG-1 narrows the fallback but the trigger (number-less gate) is not produced by qa-gate today.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Two test guards narrowed or incomplete relative to the change (CR-3, CR-4); the once-per-issue/once-per-cycle table describes rather than restates the engine list (good); bundled copies regenerated and bundle:check clean.'
+
+recommendations:
+  immediate:
+    - action: 'Fix the sed non-match at all three cycle derivations (BUG-1) and extend the parity regex (CR-4); harden the bare-stage guard against a literal suffix (CR-3).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'skills/qa-fix/SKILL.md', 'evals/shared/tests/transition-protocol-parity.test.mjs', 'shared/resources/tests/comment-slot-coverage.test.mjs']
+  future:
+    - action: 'CR-2 (pre-existing, kept deliberately by the task): the cycle is the mtime-newest gate (ls -t) while Phase 0 of the same skills uses the highest number; in a fresh checkout all gates share an mtime and ls -t falls back to lexical order, so a resumed qa-fix could post under an earlier cycle suffix. Derive the cycle as the maximum numeric segment across gate files when this derivation is next touched.'
+      refs: ['skills/qa-fix/SKILL.md']
+    - action: 'qa-story File Naming Conventions (~:2882) still documents the number-less gate filename form; align it with the numbered form every writer produces.'
+      refs: ['skills/qa-story/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-1 fixed at all three derivation sites', 'CR-4 parity regex extended', 'CR-3 guard hardened (or explicitly waived)']

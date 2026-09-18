@@ -98,6 +98,12 @@ test("every --stage literal in shipped markdown names a real stage", () => {
   const leadCatalogue = require(join(sharedDir, "stakeholder-summary.js"));
   const leadStages = new Set(leadCatalogue.LEAD_STAGES);
   const offenders = [];
+  // How many literals the scan actually read. Widening the regex to the quoted
+  // shell form (below) must RAISE this, and a floor keeps a future narrowing
+  // from passing on an empty population — the quoted sites left this scan
+  // silently when task.121 quoted them, and nothing said so (CR-4).
+  let seen = 0;
+  let seenQuoted = 0;
   const scan = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, entry.name);
@@ -108,7 +114,13 @@ test("every --stage literal in shipped markdown names a real stage", () => {
       }
       if (!entry.name.endsWith(".md")) continue;
       const text = readFileSync(p, "utf-8");
-      for (const m of text.matchAll(/--stage\s+([a-z][a-z-]*)/g)) {
+      // An optional opening quote: a shell site writes `--stage "qa-gate-${N}"`,
+      // and the character class stops at the `$`, leaving `qa-gate-` for the
+      // trailing-hyphen strip below. Without the `"?` every quoted site is
+      // invisible here and validated by nobody in this file.
+      for (const m of text.matchAll(/--stage\s+("?)([a-z][a-z-]*)/g)) {
+        seen += 1;
+        if (m[1]) seenQuoted += 1;
         // Which CLI is this literal an argument to? The nearest CLI filename in
         // the preceding window wins; absent one, assume a board stage, which
         // keeps the original strictness as the default rather than the
@@ -135,7 +147,7 @@ test("every --stage literal in shipped markdown names a real stage", () => {
         // `--stage qa-cycle-{N}` captures a trailing hyphen before the
         // placeholder; cycle-scoped stages are legitimately dynamic, because
         // cycle 2 must not be suppressed by cycle 1's marker.
-        const name = m[1].replace(/-$/, "");
+        const name = m[2].replace(/-$/, "");
         const known = isLead
           ? leadStages
           : isComment
@@ -143,7 +155,7 @@ test("every --stage literal in shipped markdown names a real stage", () => {
             : boardStages;
         const which = isLead ? "lead" : isComment ? "comment" : "board";
         if (!known.has(name)) {
-          offenders.push(`${p}: --stage ${m[1]} (${which} stage)`);
+          offenders.push(`${p}: --stage ${m[2]} (${which} stage)`);
           continue;
         }
         // A comment stage must also RESOLVE TO A LEAD. Being a known stage and
@@ -159,7 +171,7 @@ test("every --stage literal in shipped markdown names a real stage", () => {
         // the one the engine actually consults.
         if ((isComment || isLead) && !leadCatalogue.hasTemplate(name)) {
           offenders.push(
-            `${p}: --stage ${m[1]} is a known comment stage but has no lead ` +
+            `${p}: --stage ${m[2]} is a known comment stage but has no lead ` +
               `template — tracker-comment.js exits 2 and posts nothing.`,
           );
         }
@@ -168,6 +180,17 @@ test("every --stage literal in shipped markdown names a real stage", () => {
   };
   scan(join(repoRoot, "shared", "resources"));
   scan(join(repoRoot, "skills"));
+  // Non-vacuity, both halves: the scan read a real population, and the quoted
+  // form is part of it. The floors sit well under the counts at the time of
+  // writing so ordinary churn does not trip them.
+  assert.ok(
+    seen >= 100,
+    `only ${seen} --stage literals scanned — the walk is probably broken`,
+  );
+  assert.ok(
+    seenQuoted >= 4,
+    `only ${seenQuoted} quoted --stage literals scanned — the "?-form is no longer matched`,
+  );
   assert.deepEqual(
     offenders,
     [],
