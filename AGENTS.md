@@ -176,7 +176,7 @@ Canonical rules: [`docs/standards/bug-registry.md`](./docs/standards/bug-registr
 `shared/resources/` is the single source of truth for cross-skill documentation. Skills reference these files using the explicit path `shared/resources/<filename>` in their `.md` files. Two distribution paths consume these:
 
 - **`package_skill.py`** (zip distribution) — bundles referenced files under `references/` inside each skill's `.zip` and rewrites paths.
-- **`bundle_skill.py`** (in-tree, for `setup-consumer.sh` tarball installs and similar) — does the same rewrite but writes `references/` into each skill directory and updates source `.md`/`.js` files in place. Commit the result. Run via `npm run bundle`.
+- **`bundle_skill.py`** (in-tree, for `setup-consumer.sh` tarball installs and similar) — does the same rewrite but writes `references/` into each skill directory and updates source `.md`/`.js` files in place. Commit the result. Run via `npm run bundle`. Its `--check` (CI) also reports a copy that has a source but that no discovery rule reaches as **`UNREACHED`** — cite it from the skill or delete it; a bundle run refreshes it and cannot clear it (task 122; rule and the `{a|b|c}`-vs-`{placeholder}` invocation spelling: `skills/create-skill/SKILL.md` § "A bundled copy nothing reaches is `UNREACHED`").
 
 Never use symlinks or relative paths.
 

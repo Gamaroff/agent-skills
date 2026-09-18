@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **`bundle_skill.py --check` reports `UNREACHED`, and one invocation spelling is now a discovery
+  path (task 122).** A `references/` copy with a live `shared/resources/` source that no discovery
+  rule in the skill reaches was refreshed on every bundle and never reported — the freshness
+  comparison was the mechanism hiding it. Measured at 15 copies across 12 skills, all clean: three
+  real dependencies (`verify-push-state.sh` in the three develop pipelines, invoked from the step-8
+  commit doc with a bare `{skill}` placeholder) and twelve dead. `--check` now names each as
+  `UNREACHED` with a decision remedy (cite it or delete it), deliberately outside `REGENERABLE`
+  because a bundle run refreshes the copy and cannot clear the finding — proved by measurement in
+  `tests/bundle-check-mode.test.js`. `discover_needed` follows
+  `.agents/skills/<skill>/references/X` out of shared `.md`/`.sh` text only when `<skill>` names
+  the skill being bundled, literally or in a `{a|b|c}` alternation; a bare `{placeholder}` is never
+  followed (as a wildcard it would vendor `change-log.js` into 24 skills). The step-8 line is
+  respelled to the alternation, the twelve dead copies are deleted, and the tree reports zero. Two
+  discovery defects the class exposed on first run are fixed alongside: `_within()` resolved
+  symlinks and refused a cited name when a link sat at its destination (now lexical), and
+  `REFS_REF_RE` could not capture a nested `references/sub/x.md` after pass 3 rewrote it in place.
+
 - **Four authoring rules the corpus obeyed by accident, and two guards (task 119).** The harness
   substitutes dollar-digit positional tokens inside an invoked `SKILL.md` — fenced code included —
   so the block an agent runs is not the block on disk, and every test reads the disk. Phase 0 settled

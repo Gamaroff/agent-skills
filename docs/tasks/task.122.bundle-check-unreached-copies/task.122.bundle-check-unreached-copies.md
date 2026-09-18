@@ -5,7 +5,7 @@ type: task
 description: "bundle_skill.py discovers a skill's shared dependencies transitively, then refreshes any further references/ copy that happens to have a shared/resources counterpart (source_backed_on_disk). Measured 2026-09-17: 12 skills, 15 copies that discovery never reaches — three are real dependencies (verify-push-state.sh in develop-story/-task/-bug) invoked from a bundled step doc as .agents/skills/{skill}/references/X with a bare placeholder, and twelve are dead (yaml-subset.js ×4, review-story-prepass-prompts.md, qa-task/qa-story step-0/step-1 docs ×4, qa-task resolve-paths.sh, set-github-project-priority.sh ×2). --check has no class for any of them, so the copies are kept byte-fresh and reported clean. Add an UNREACHED class (not regenerable), respell the one invocation to the {a|b|c} alternation form and add a discovery rule for it, and remove the dead copies. Observation #118; re-traced in review 1."
 tags: [create-skill, bundler, bundle-check, references]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-09-17
@@ -17,7 +17,7 @@ github_issue: 422
 
 # Technical Task: Twelve skills carry bundled copies no discovery rule reaches
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.122.review.1.bundle-check-unreached-copies.md` implemented 2026-09-18
 **GitHub Issue**: [#422](https://github.com/Gamaroff/agent-skills/issues/422)
 
@@ -183,12 +183,12 @@ None. `--check` may go red in CI on the merge that adds the class if any copy is
 **Files**: `skills/create-skill/scripts/bundle_skill.py`, `tests/bundle-check-mode.test.js`
 
 **Changes**:
-- [ ] `check_skill`: after building `expected`, report every `reconcilable` key not in `needed` as
+- [x] `check_skill`: after building `expected`, report every `reconcilable` key not in `needed` as
       `UNREACHED` (in addition to the STALE/MISSING comparison it already gets).
-- [ ] `REMEDIES['UNREACHED']`; assert it is absent from `REGENERABLE`.
-- [ ] Test: fixture skill with `references/foo.md` mirroring `shared/resources/foo.md` and no
+- [x] `REMEDIES['UNREACHED']`; assert it is absent from `REGENERABLE`.
+- [x] Test: fixture skill with `references/foo.md` mirroring `shared/resources/foo.md` and no
       mention of it → `["UNREACHED"]`; bundle; check → still `["UNREACHED"]`.
-- [ ] Run `--check --all` on the live tree and record the 15 findings in the implementation report
+- [x] Run `--check --all` on the live tree and record the 15 findings in the implementation report
       (this is the baseline the task document predicts; the test records the number going forward).
 
 **Dependencies**: none.
@@ -202,19 +202,19 @@ Phase 1 red.
 (if it does not import the regexes), `tests/bundle-check-mode.test.js`
 
 **Changes**:
-- [ ] `INVOKE_REF_RE` matching `.agents/skills/(\{[A-Za-z0-9|-]+\}|[A-Za-z0-9-]+)/references/([A-Za-z0-9._-]+)`;
+- [x] `INVOKE_REF_RE` matching `.agents/skills/(\{[A-Za-z0-9|-]+\}|[A-Za-z0-9-]+)/references/([A-Za-z0-9._-]+)`;
       in the shared-text pass, follow only matches whose skill group equals the skill being bundled,
       or is a `{a|b|c}` alternation containing it (the step-0/2/3/4 docs write
       `.agents/skills/{develop-story|develop-task|develop-bug}/references/…`). A brace group with no
       `|` — a bare placeholder such as `{skill}` — yields `names == ['skill']`, matches no skill, and
       is thereby not followed; assert that in the test, do not special-case it.
-- [ ] Respell `shared/resources/develop-pipeline-step-8-commit.md:108` from
+- [x] Respell `shared/resources/develop-pipeline-step-8-commit.md:108` from
       `.agents/skills/{skill}/references/verify-push-state.sh` to
       `.agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh`.
-- [ ] Test: fixture shared doc invoking `.agents/skills/fx/references/tool.sh` → `tool.sh` in
+- [x] Test: fixture shared doc invoking `.agents/skills/fx/references/tool.sh` → `tool.sh` in
       `needed` for skill `fx`, absent for skill `other`; alternation `{fx|other}` → present for both;
       bare `{skill}` → absent for both.
-- [ ] `npm run bundle`; confirm the three `verify-push-state.sh` copies now report nothing and
+- [x] `npm run bundle`; confirm the three `verify-push-state.sh` copies now report nothing and
       `git status` shows no *new* `references/` files anywhere (the over-match check).
 
 **Dependencies**: Phase 1 (the class is what shows the rule worked).
@@ -226,9 +226,9 @@ Phase 1 red.
 **Files**: the twelve copies listed in §7 Files to Delete.
 
 **Changes**:
-- [ ] `git rm` each; `npm run bundle`; confirm none returns.
-- [ ] `python3 skills/create-skill/scripts/bundle_skill.py --check` → 0 UNREACHED across the tree.
-- [ ] Mutation-prove: restore one deleted copy from git, run `--check`, confirm it is named; delete again.
+- [x] `git rm` each; `npm run bundle`; confirm none returns.
+- [x] `python3 skills/create-skill/scripts/bundle_skill.py --check` → 0 UNREACHED across the tree.
+- [x] Mutation-prove: restore one deleted copy from git, run `--check`, confirm it is named; delete again.
 
 **Dependencies**: Phase 2.
 
@@ -243,11 +243,22 @@ Phase 1 red.
 
 3. ✅ `tests/bundle-check-mode.test.js` — UNREACHED fixture, non-regenerable proof, invocation-rule fixture
 
+   **Two bundler defects the class exposed on first run, fixed in the same file (`bundle_skill.py`):**
+   `_within()` used `Path.resolve()`, which follows a symlink sitting at `references/X` out of the
+   tree and made discovery refuse a name the skill cites (the copy then read UNREACHED beside
+   SYMLINK) — now a lexical `..` check; and `REFS_REF_RE` could not capture a nested name
+   (`references/sub/inner.md`), so a nested reference pass 3 had rewritten in place was never
+   rediscovered and survived only by reconciliation (`tests/bundle-link-rewrite.test.js` went red
+   the moment UNREACHED existed) — the class now admits `/`. Neither is a new rule; each is a
+   discovery path that was silently failing.
+
 ### Files to Modify (Documentation)
 
 4. ✅ `skills/create-skill/SKILL.md` or its bundling reference — one paragraph: what UNREACHED means,
    the two remedies, and that a bare `{placeholder}` invocation is invisible to discovery
 5. ✅ `AGENTS.md` § Shared Resources — one sentence pointing at the class
+5a. ✅ `.github/workflows/validate.yml` — the `--check` comment names five invisible classes, not four
+5b. ✅ `CHANGELOG.md` — Unreleased entry
 6. ✅ `shared/resources/develop-pipeline-step-8-commit.md` — line 108 respell (`{skill}` →
    `{develop-story|develop-task|develop-bug}`); its three bundled copies refresh via `npm run bundle`
 
@@ -274,21 +285,21 @@ Phase 1 red.
 **Scope**: `check_skill` classification and `discover_needed` rule.
 
 **Actions**:
-- [ ] UNREACHED reported for an undiscovered source-backed copy; not reported once a skill file cites it.
-- [ ] Invocation spelling discovered for the named skill only; alternation form handled; bare
+- [x] UNREACHED reported for an undiscovered source-backed copy; not reported once a skill file cites it.
+- [x] Invocation spelling discovered for the named skill only; alternation form handled; bare
       `{placeholder}` form not followed.
-- [ ] Non-UTF-8 and symlinked members still take their existing classes, not UNREACHED.
+- [x] Non-UTF-8 and symlinked members still take their existing classes, not UNREACHED.
 
 **Command**: `node --test tests/bundle-check-mode.test.js`
 
 ### Integration Tests
 
-- [ ] `--check --all` on the tree: 15 before Phase 2, 12 after Phase 2, 0 after Phase 3.
-- [ ] `npm run bundle:check` green on the final tree; `tests/bundled-links.test.js` green.
+- [x] `--check --all` on the tree: 15 before Phase 2, 12 after Phase 2, 0 after Phase 3.
+- [x] `npm run bundle:check` green on the final tree; `tests/bundled-links.test.js` green.
 
 ### Contract Tests
 
-- [ ] `REGENERABLE` membership test (existing, measurement-based) covers UNREACHED as non-regenerable.
+- [x] `REGENERABLE` membership test (existing, measurement-based) covers UNREACHED as non-regenerable.
 
 ### Performance Tests
 
@@ -296,27 +307,27 @@ Not applicable — one additional regex pass over already-read text.
 
 ### Consumer Tests
 
-- [ ] `setup-consumer.sh` tarball of `develop-task` from a tree with `references/` deleted and
+- [x] `setup-consumer.sh` tarball of `develop-task` from a tree with `references/` deleted and
       re-bundled contains `verify-push-state.sh`.
 
 ## 9. Success Criteria
 
 ### Functional
-- [ ] `--check` reports UNREACHED for every source-backed undiscovered copy and nothing else changes class.
-- [ ] `verify-push-state.sh` is in `needed` for develop-story, develop-task and develop-bug, and in
+- [x] `--check` reports UNREACHED for every source-backed undiscovered copy and nothing else changes class.
+- [x] `verify-push-state.sh` is in `needed` for develop-story, develop-task and develop-bug, and in
       `needed` for no other skill that did not already have it (`git status` clean of new copies).
-- [ ] Zero UNREACHED on the merged tree.
+- [x] Zero UNREACHED on the merged tree.
 
 ### Performance
-- [ ] `--check --all` wall time within noise of today's.
+- [x] `--check --all` wall time within noise of today's.
 
 ### Code Quality
-- [ ] Every new test has a mutation proof recorded; the fixture is built with the existing helper
+- [x] Every new test has a mutation proof recorded; the fixture is built with the existing helper
       (not `os.tmpdir()` paths that a validator may reject — see obs #17).
-- [ ] No second definition of the discovery rules in `package_skill.py`.
+- [x] No second definition of the discovery rules in `package_skill.py`.
 
 ### Migration
-- [ ] Twelve copies gone; observation #118 `actioned` with the PR number.
+- [x] Twelve copies gone; observation #118 `actioned` with the PR number.
 
 ## 10. Risk Assessment
 
@@ -356,20 +367,22 @@ None.
 - **Non-critical**: remedy wording; summary formatting.
 
 ## Change Log
-
 <!-- change-log-start -->
+## Change Log
+
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-17 | 1.0 | Initial draft | create-task |
 | 2026-09-18 | 1.1 | Review 1 (7/10 → 9/10 after fixes): population re-traced per member — 3 real deps (not 8), 12 dead (not 5), 0 prose; Phase 2 redesigned around the `{a\|b\|c}` alternation (bare `{skill}` placeholder never followed, wildcard measured at +24 copies); step-8-commit.md:108 respell added; Files to Delete 7 → 12; progression 15 → 12 → 0 | review-task |
 | 2026-09-18 |  | Status → ready-for-development | review-task |
+| 2026-09-18 |  | Implemented — 9 files modified, 12 deleted, 8 new tests (bundle-check-mode 29 → 37); 15 → 12 → 0 UNREACHED measured; 6 mutants caught | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: UNREACHED class + test
-- [ ] Phase 2: invocation discovery rule + step-8 respell
-- [ ] Phase 3: delete dead copies, zero UNREACHED
+- [x] Phase 1: UNREACHED class + test
+- [x] Phase 2: invocation discovery rule + step-8 respell
+- [x] Phase 3: delete dead copies, zero UNREACHED
 - [ ] QA: `task.122.qa.[N].bundle-check-unreached-copies.md`
 - [ ] Gate: `task.122.gate.[N].bundle-check-unreached-copies.yml`
 

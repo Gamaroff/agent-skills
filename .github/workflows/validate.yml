@@ -109,8 +109,10 @@ jobs:
       #   --check sees what the bundler does NOT write — a copy whose source was
       #   deleted (ORPHANED), a symlinked reference, an authored file sharing a
       #   name with a shared resource (AMBIGUOUS), a banner declaring another path
-      #   (MISDECLARED). regenerate-and-diff is structurally blind to all four:
-      #   the bundler leaves them alone, so there is no diff to see. It found a
+      #   (MISDECLARED), a source-backed copy no discovery rule reaches
+      #   (UNREACHED — refreshed every run, so byte-fresh and invisible to a
+      #   diff). regenerate-and-diff is structurally blind to all five:
+      #   the bundler leaves them alone (or refreshes them), so there is no diff to see. It found a
       #   live instance on its first run — a bundled skill-dependencies.json 44
       #   bytes behind its source, green in CI for as long as it had been wrong.
       #

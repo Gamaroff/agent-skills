@@ -250,6 +250,37 @@ neither: +16,000 lines of generated churn from four comment lines, and the bundl
 always does. The blast radius scales with how widely the destination is bundled — inversely to how
 much a comment looks like it matters.
 
+### A bundled copy nothing reaches is `UNREACHED`, and a bare `{placeholder}` invocation reaches nothing
+
+**The rule.** `bundle_skill.py --check` reports `UNREACHED` for a `references/` copy that has a live
+`shared/resources/` source but that no discovery rule in the skill reaches. The copy is not stale —
+the bundler refreshes it on every run, which is exactly why the freshness comparison could never see
+it — it is a dependency nothing declares. The remedy is a decision, not a regenerate, and the class is
+deliberately **not** in `REGENERABLE`: either give the copy a discovery path (cite it as
+`references/<file>` or `references/<file>` from a skill file), or delete it. A bundle run
+cannot clear it, and `tests/bundle-check-mode.test.js` proves that by measurement.
+
+One `references/<file>` spelling **is** followed out of shared `.md`/`.sh` text: the invocation form
+`.agents/skills/<skill>/references/<file>`, and only when `<skill>` names the skill being bundled —
+literally, or inside a `{a|b|c}` alternation such as
+`.agents/skills/{develop-story|develop-task|develop-bug}/references/<script>` (the spelling the
+step-8 commit doc uses for its push-state verifier). A bare `{placeholder}` group
+(`.agents/skills/{skill}/references/<script>`) names no skill and is invisible to discovery. (And
+note the trap this very paragraph fell into on first draft: naming a *real* file after
+`references/` in a skill file is itself a bundling instruction — `REFS_REF_RE` followed the example
+and vendored the verifier into `create-skill`. Illustrate with `<script>`, not a filename.) That is measured, not cautious: read as a wildcard it would vendor `change-log.js` into
+the 24 skills that bundle `document-change-log.md` and do not carry it — the 38-file over-match that
+stopped the bare `references/<file>` form being followed out of shared text in the first place. If a
+shared doc genuinely invokes a script that must ship with the skill, spell the alternation.
+
+**The failure.** Measured 2026-09-17: 15 such copies across 12 skills, every one reported clean.
+Three were real — `verify-push-state.sh` in the three develop pipelines, invoked from
+`develop-pipeline-step-8-commit.md` with a bare `{skill}` placeholder, so a consumer who deleted
+`references/` and re-bundled lost the script the last pipeline step runs. Twelve were dead:
+`yaml-subset.js` in four Jira skills, step-0/step-1 docs in `qa-task`/`qa-story`, and others last
+touched by work that had since moved on, kept byte-identical to sources they no longer needed
+(task 122, obs #118).
+
 ## Skill Creation Process
 
 Copy this checklist and track your progress when creating a skill:

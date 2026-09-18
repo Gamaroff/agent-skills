@@ -10,7 +10,7 @@
  * its source, the bundler refused to write it ("not bundler output, left alone"),
  * and regenerate-and-diff had therefore been green over a stale copy.
  *
- * Four classes are invisible to regenerate-and-diff, and each has a test below:
+ * Five classes are invisible to regenerate-and-diff, and each has a test below:
  *
  *   ORPHANED    the source was deleted; the copy keeps a banner naming a file
  *               that no longer exists, and nothing ever writes it again
@@ -20,6 +20,10 @@
  *   AMBIGUOUS   an authored file sharing a name with a shared resource; the
  *               bundler correctly leaves it alone and therefore never reports it
  *   MISDECLARED the banner names a path other than the one the file occupies
+ *   UNREACHED   a copy with a live source that no discovery rule in the skill
+ *               reaches; the bundler REFRESHES it every run (it is in the
+ *               writer's population) and so keeps it byte-fresh and invisible —
+ *               the freshness check is the mechanism that hides it (task 122)
  *
  * WHAT THESE TESTS ARE CAREFUL ABOUT
  * ----------------------------------
@@ -127,8 +131,8 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
    * wrong reason. Parsing structured lines is what makes a negative assertion
    * ("AMBIGUOUS was not reported") mean anything.
    */
-  const check = (argv = []) => {
-    const res = runRaw(["--check", skillDir, ...argv]);
+  const checkDir = (dir, argv = []) => {
+    const res = runRaw(["--check", dir, ...argv]);
     const problems = [];
     for (const line of res.stdout.split("\n")) {
       const m = line.match(
@@ -144,11 +148,31 @@ function makeFixture({ skillFiles = {}, sharedFiles = {}, refsFiles = {} }, t) {
       relsFound: problems.map((p) => p.rel).sort(),
     };
   };
+  const check = (argv = []) => checkDir(skillDir, argv);
+
+  /**
+   * A second skill beside `fixture-skill`, for rules whose whole point is that
+   * they are scoped to the skill being bundled (INVOKE_REF_RE). Returns the
+   * same check/bundle surface bound to that directory.
+   */
+  const addSkill = (name, files) => {
+    const dir = path.join(root, "skills", name);
+    fs.mkdirSync(dir, { recursive: true });
+    writeAll(dir, files);
+    return {
+      dir,
+      check: () => checkDir(dir),
+      bundle: () =>
+        execFileSync("python3", [BUNDLER, dir], { encoding: "utf-8" }),
+      refExists: (n) => fs.existsSync(path.join(dir, "references", n)),
+    };
+  };
 
   return {
     root,
     skillDir,
     check,
+    addSkill,
     bundle: () =>
       execFileSync("python3", [BUNDLER, skillDir], { encoding: "utf-8" }),
     refPath: (name) => path.join(skillDir, "references", name),
@@ -490,6 +514,13 @@ test("no class called non-regenerable is cleared by a bundle run", (t) => {
         }
       });
     },
+    // Bundle first while the skill still names the source, then drop the
+    // citation: the copy is now a fresh, correctly-bannered bundler product
+    // that nothing reaches — the shape the 15 live instances had.
+    UNREACHED: (fx) => {
+      fx.bundle();
+      fs.writeFileSync(path.join(fx.skillDir, "SKILL.md"), silentSkill());
+    },
   };
 
   for (const [klass, dirty] of Object.entries(cases)) {
@@ -622,12 +653,189 @@ test("a copy reached only by disk reconciliation is checked too", (t) => {
     t,
   );
   const res = fx.check();
+  // A copy can be both unreached and stale, and the two facts are independent:
+  // STALE says the bytes are behind, UNREACHED says nothing depends on them.
+  // Collapsing to one class would hide whichever was dropped.
   assert.deepEqual(
     res.classesFound,
-    ["STALE"],
-    "nothing names it, disk finds it",
+    ["STALE", "UNREACHED"],
+    "nothing names it, disk finds it — and reports that nothing names it",
   );
-  assert.deepEqual(res.relsFound, ["contract.md"]);
+  assert.deepEqual(res.relsFound, ["contract.md", "contract.md"]);
+});
+
+// ---------------------------------------------------------------------------
+// UNREACHED — the population that was refreshed and never reported (task 122).
+// ---------------------------------------------------------------------------
+
+test("UNREACHED: a fresh source-backed copy that no rule reaches is reported, and only that", (t) => {
+  // Built with the bundler, not by hand: a hand-written copy without a banner
+  // would be AMBIGUOUS, and the test would pass on the wrong class.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("lonely.md") },
+      sharedFiles: { "lonely.md": "# Lonely\n\nBody.\n" },
+    },
+    t,
+  );
+  fx.bundle();
+  assert.deepEqual(fx.check().classesFound, [], "cited ⇒ clean");
+
+  fs.writeFileSync(path.join(fx.skillDir, "SKILL.md"), silentSkill());
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["UNREACHED"]);
+  assert.deepEqual(res.relsFound, ["lonely.md"]);
+  assert.match(res.problems[0].detail, /no discovery rule reaches/);
+  assert.equal(res.status, 1, "an unreached copy is a red check");
+
+  // The remedy is a decision, never a regenerate.
+  const summaryLine = res.stdout
+    .split("\n")
+    .find((l) => l.trim().startsWith("UNREACHED x"));
+  assert.ok(summaryLine, "the summary names the class it counted");
+  assert.doesNotMatch(summaryLine, /npm run bundle/);
+  assert.match(summaryLine, /delete the copy/);
+
+  // Restoring the citation clears it — the other remedy.
+  fs.writeFileSync(
+    path.join(fx.skillDir, "SKILL.md"),
+    namingSkill("lonely.md"),
+  );
+  assert.deepEqual(fx.check().classesFound, [], "cited again ⇒ clean again");
+});
+
+test("UNREACHED: a copy with NO source is skill-native and is never reported as unreached", (t) => {
+  // `source_backed_on_disk` requires a source. A file that merely lives in
+  // references/ with no shared twin is the skill's own and must not be flagged —
+  // the class is about copies the bundler refreshes, not about references/ in
+  // general.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": silentSkill() },
+      refsFiles: { "mine.md": "# Mine\n\nSkill-native.\n" },
+    },
+    t,
+  );
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, []);
+  assert.equal(res.status, 0);
+});
+
+test("UNREACHED: a symlinked unreached member keeps its SYMLINK class as well", (t) => {
+  // Membership is "our concern"; a symlink no rule reaches is both unreached and
+  // a symlink, and the existing class must not be displaced by the new one.
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": silentSkill() },
+      sharedFiles: { "contract.md": "# Contract\n\nBody.\n" },
+    },
+    t,
+  );
+  fx.symlinkRef(
+    "contract.md",
+    path.join(fx.root, "shared", "resources", "contract.md"),
+  );
+  const res = fx.check();
+  assert.deepEqual(res.classesFound, ["SYMLINK", "UNREACHED"]);
+});
+
+// ---------------------------------------------------------------------------
+// INVOKE_REF_RE — the one `references/X` spelling followed out of shared text,
+// and only for the skill it names (task 122).
+// ---------------------------------------------------------------------------
+
+/**
+ * Two skills that both cite the same shared step doc, which invokes a script by
+ * its bundled path. `who` is the skill group in that path. Returns both skills
+ * bundled, so `refExists("tool.sh")` reads as "was tool.sh discovered for me".
+ */
+function invocationFixture(who, t) {
+  const fx = makeFixture(
+    {
+      skillFiles: { "SKILL.md": namingSkill("step.md") },
+      sharedFiles: {
+        "step.md": `# Step\n\nRun \`bash .agents/skills/${who}/references/tool.sh\`.\n`,
+        "tool.sh": "#!/bin/sh\necho hi\n",
+      },
+    },
+    t,
+  );
+  const other = fx.addSkill("other-skill", {
+    "SKILL.md": namingSkill("step.md"),
+  });
+  fx.bundle();
+  other.bundle();
+  return { fx, other };
+}
+
+test("INVOKE_REF_RE: a literal skill name in the invocation path is followed for that skill only", (t) => {
+  const { fx, other } = invocationFixture("fixture-skill", t);
+  assert.equal(fx.refExists("tool.sh"), true, "named skill gets the script");
+  assert.equal(other.refExists("tool.sh"), false, "the other skill does not");
+  assert.deepEqual(fx.check().classesFound, [], "discovered ⇒ not UNREACHED");
+  assert.deepEqual(other.check().classesFound, []);
+});
+
+test("INVOKE_REF_RE: a {a|b|c} alternation is followed for every skill it names", (t) => {
+  const { fx, other } = invocationFixture("{fixture-skill|other-skill}", t);
+  assert.equal(fx.refExists("tool.sh"), true);
+  assert.equal(other.refExists("tool.sh"), true);
+  assert.deepEqual(fx.check().classesFound, []);
+  assert.deepEqual(other.check().classesFound, []);
+});
+
+test("INVOKE_REF_RE: a bare {placeholder} group is never followed — for any skill", (t) => {
+  // Read as a wildcard, `{skill}` would vendor `change-log.js` into the 24
+  // skills that bundle `document-change-log.md` (measured, review 1). There is
+  // no branch for it: `{skill}` splits to `['skill']`, which names no skill.
+  const { fx, other } = invocationFixture("{skill}", t);
+  assert.equal(fx.refExists("tool.sh"), false);
+  assert.equal(other.refExists("tool.sh"), false);
+});
+
+test("INVOKE_REF_RE: an alternation that omits the skill leaves its existing copy UNREACHED", (t) => {
+  // The negative case the class exists for: `other-skill` carries a copy that a
+  // step doc naming only `fixture-skill` does not reach. The rule must not
+  // rescue it, and the check must say so.
+  const { fx, other } = invocationFixture("{fixture-skill|third-skill}", t);
+  assert.equal(fx.refExists("tool.sh"), true);
+  assert.equal(other.refExists("tool.sh"), false);
+  fs.writeFileSync(
+    path.join(other.dir, "references", "tool.sh"),
+    fs.readFileSync(fx.refPath("tool.sh")),
+  );
+  fs.chmodSync(
+    path.join(other.dir, "references", "tool.sh"),
+    fx.refMode("tool.sh"),
+  );
+  const res = other.check();
+  assert.deepEqual(res.classesFound, ["UNREACHED"]);
+  assert.deepEqual(res.relsFound, ["tool.sh"]);
+});
+
+test("INVOKE_REF_RE: the invocation is followed from shared .sh text too, and not from .js", (t) => {
+  // The regex is applied to `.md` and `.sh` shared sources. A `.js` source is
+  // scanned by the JS sibling rules only; an invocation string inside it is not
+  // a dependency edge this rule claims to see.
+  const fx = makeFixture(
+    {
+      skillFiles: {
+        "SKILL.md": `${SKILL_MD_HEAD}\nSee shared/resources/wrap.sh and shared/resources/lib.js.\n`,
+      },
+      sharedFiles: {
+        "wrap.sh":
+          "#!/bin/sh\nbash .agents/skills/fixture-skill/references/tool.sh\n",
+        "lib.js":
+          "// bash .agents/skills/fixture-skill/references/helper.sh\nmodule.exports = {};\n",
+        "tool.sh": "#!/bin/sh\necho hi\n",
+        "helper.sh": "#!/bin/sh\necho no\n",
+      },
+    },
+    t,
+  );
+  fx.bundle();
+  assert.equal(fx.refExists("tool.sh"), true, "followed out of .sh");
+  assert.equal(fx.refExists("helper.sh"), false, "not followed out of .js");
 });
 
 test("a banner after long YAML frontmatter is still found — the window is lines, not bytes", (t) => {

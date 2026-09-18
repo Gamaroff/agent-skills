@@ -51,7 +51,26 @@ JS_ESM_SHARED_RE = re.compile(
 # bundled location, one level up from scripts/).
 SH_SHARED_RE = re.compile(r'(?:\.\./)+shared/resources/([A-Za-z0-9._-]+)')
 # Matches already-rewritten in-tree references (so re-runs and partial states work).
-REFS_REF_RE = re.compile(r'(?:^|[\s(\[`\'"/])references/([A-Za-z0-9._-]+\.(?:json|md|sh|js|mjs|py))')
+# The name may be nested (`references/sub/inner.md`): pass 3 rewrites
+# `shared/resources/sub/inner.md` in a skill file to exactly that, and a class
+# without `/` could not re-discover it on the next run — the copy then survived
+# only by disk reconciliation, which the UNREACHED class reports (task 122).
+REFS_REF_RE = re.compile(
+    r'(?:^|[\s(\[`\'"/])references/'
+    r'((?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\.(?:json|md|sh|js|mjs|py))'
+)
+# The invocation spelling a bundled step doc uses to call a script that ships
+# inside the same skill: `.agents/skills/{skill}/references/X`. Followed out of
+# SHARED text only when the skill group names the skill being bundled — a
+# literal name, or a `{a|b|c}` alternation containing it. The bare `references/X`
+# form is deliberately not followed there (see discover_needed), and neither is
+# a bare `{placeholder}` group: read as a wildcard it would vendor `change-log.js`
+# into the 24 skills that bundle `document-change-log.md` (measured, task 122).
+# That case needs no branch — `{skill}` splits to `['skill']`, which is not a
+# skill name, and so is not followed.
+INVOKE_REF_RE = re.compile(
+    r'\.agents/skills/(\{[A-Za-z0-9|-]+\}|[A-Za-z0-9-]+)/references/([A-Za-z0-9._-]+)'
+)
 # Sibling require/import in JS — `require("./foo.js")` — used to follow transitive
 # deps inside bundled shared .js files.
 JS_SIBLING_RE = re.compile(r'require\(["\']\./([A-Za-z0-9._/-]+\.js)["\']\)')
@@ -390,11 +409,19 @@ def _skill_dirs(refs_dir_str):
 
 
 def _within(root, candidate):
-    """True when `candidate` stays inside `root` once `..` segments are resolved."""
-    try:
-        return candidate.resolve().is_relative_to(root.resolve())
-    except (OSError, ValueError):
-        return False
+    """True when `candidate` stays inside `root` once `..` segments are resolved.
+
+    Resolved LEXICALLY, on purpose. `Path.resolve()` also follows whatever sits
+    on disk at the candidate's path, and a symlink at `references/X` pointing
+    outside the tree made discovery refuse a name the skill plainly cites — the
+    copy then dropped out of `needed`, entered the reconciliation population,
+    and read as UNREACHED beside its SYMLINK finding (task 122). This guard is
+    about `..` in the captured NAME; what is at the destination is the write
+    gate's question, and `writable_copy` still refuses to write through a link.
+    """
+    root_n = os.path.normpath(os.fspath(root))
+    cand_n = os.path.normpath(os.fspath(candidate))
+    return cand_n == root_n or cand_n.startswith(root_n + os.sep)
 
 
 def discover_needed(skill_path, shared_dir, refs_dir):
@@ -413,7 +440,16 @@ def discover_needed(skill_path, shared_dir, refs_dir):
     GitHub-only skills. Following it there vendored 38 unwanted files across the
     repo. Copies that no discovery rule reaches are handled after the fact by
     `source_backed_on_disk()` instead, which keys on a file already existing rather
-    than on a sentence mentioning it.
+    than on a sentence mentioning it — and `check_skill` reports each of those as
+    UNREACHED, because a copy that is refreshed and never depended on is a
+    dependency nothing declares.
+
+    The one `references/X` spelling that IS followed out of shared `.md`/`.sh`
+    text is the invocation form `.agents/skills/<skill>/references/X`
+    (`INVOKE_REF_RE`), and only when `<skill>` names the skill being bundled —
+    literally, or inside a `{a|b|c}` alternation. It carries the skill name, so
+    it can be scoped in a way the bare form cannot; a bare `{placeholder}` group
+    matches no skill and is therefore never followed.
     """
     repo_root = shared_dir.parent.parent
     skill_files = (
@@ -481,6 +517,15 @@ def discover_needed(skill_path, shared_dir, refs_dir):
             pending.extend(m.group(1) for m in JS_ESM_SIBLING_RE.finditer(text))
         if src.suffix == '.sh':
             pending.extend(m.group(1) for m in SH_SIBLING_RE.finditer(text))
+        if src.suffix in ('.md', '.sh'):
+            # `pending_quiet`, not `pending`: a missing source here is not an
+            # authoring error worth a warning — it is a skill-native script that
+            # happens to be invoked by its bundled path.
+            for m in INVOKE_REF_RE.finditer(text):
+                who, name = m.group(1), m.group(2)
+                names = who.strip('{}').split('|') if who.startswith('{') else [who]
+                if skill_path.name in names:
+                    pending_quiet.append(name)
 
     return needed, skill_files
 
@@ -784,6 +829,18 @@ REMEDIES = {
         'permissions and re-run the check. This is a broken instrument, not a '
         'clean result'
     ),
+    # Not regenerable, and the measurement test proves it: a bundle run REFRESHES
+    # an unreached copy (it is in the writer's population) and so cannot clear
+    # the finding. The remedy is a decision, not a regenerate — same shape as
+    # ORPHANED and AMBIGUOUS.
+    'UNREACHED': (
+        'has a shared/resources/ source but no discovery rule in this skill '
+        'reaches it — the copy is refreshed on every bundle and depended on by '
+        'nothing the bundler can see. Cite it from the skill (shared/resources/X '
+        'or references/X in a skill file, or an '
+        '.agents/skills/<this-skill>/references/X invocation in shared text), or '
+        'delete the copy'
+    ),
 }
 
 # The banner's declared source, WITHOUT requiring it to match the file's own
@@ -891,6 +948,15 @@ def check_skill(skill_path):
     expected = dict(needed)
     expected.update(reconcilable)
     bundled_names = set(expected)
+
+    # Reconcilable-only members are the population the writer refreshes and no
+    # discovery rule reaches. They are fresh by construction — the loop below
+    # will find them in sync — and that is exactly why they need their own
+    # class: the freshness comparison is what hides them. Measured 2026-09-17
+    # at 15 copies across 12 skills, all reported clean. They stay in `expected`
+    # too, so a copy that is both unreached and stale reports both.
+    for rel in sorted(set(reconcilable) - set(needed)):
+        report(rel, 'UNREACHED', 'source-backed copy that no discovery rule reaches')
 
     for rel in sorted(expected):
         src = expected[rel]
