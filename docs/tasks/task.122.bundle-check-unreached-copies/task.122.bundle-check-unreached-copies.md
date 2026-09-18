@@ -2,14 +2,14 @@
 id: task.122
 title: "[Task 122] Twelve skills carry bundled copies no discovery rule reaches: give --check an UNREACHED class, a discovery rule for the invocations that actually use them, and delete the dead ones"
 type: task
-description: "bundle_skill.py discovers a skill's shared dependencies transitively, then refreshes any further references/ copy that happens to have a shared/resources counterpart (source_backed_on_disk). Measured 2026-09-17: 12 skills, 15 copies that discovery never reaches — eight are real dependencies invoked only as .agents/skills/{skill}/references/X from inside another bundled file, five are dead (yaml-subset.js ×4, review-story-prepass-prompts.md), two are prose mentions. --check has no class for any of them, so the copies are kept byte-fresh and reported clean. Add an UNREACHED class (not regenerable), a discovery rule for the invocation spelling, and remove the dead copies. Observation #118."
+description: "bundle_skill.py discovers a skill's shared dependencies transitively, then refreshes any further references/ copy that happens to have a shared/resources counterpart (source_backed_on_disk). Measured 2026-09-17: 12 skills, 15 copies that discovery never reaches — three are real dependencies (verify-push-state.sh in develop-story/-task/-bug) invoked from a bundled step doc as .agents/skills/{skill}/references/X with a bare placeholder, and twelve are dead (yaml-subset.js ×4, review-story-prepass-prompts.md, qa-task/qa-story step-0/step-1 docs ×4, qa-task resolve-paths.sh, set-github-project-priority.sh ×2). --check has no class for any of them, so the copies are kept byte-fresh and reported clean. Add an UNREACHED class (not regenerable), respell the one invocation to the {a|b|c} alternation form and add a discovery rule for it, and remove the dead copies. Observation #118; re-traced in review 1."
 tags: [create-skill, bundler, bundle-check, references]
 category: refactoring
-status: planned
+status: ready-for-development
 priority: Medium
 risk_level: low
 created: 2026-09-17
-updated: 2026-09-17
+updated: 2026-09-18
 assignee:
 estimated_effort_hours: 4
 github_issue: 422
@@ -17,7 +17,8 @@ github_issue: 422
 
 # Technical Task: Twelve skills carry bundled copies no discovery rule reaches
 
-**Status:** Planned
+**Status:** Ready for Development
+**Review**: ✅ All review recommendations from `task.122.review.1.bundle-check-unreached-copies.md` implemented 2026-09-18
 **GitHub Issue**: [#422](https://github.com/Gamaroff/agent-skills/issues/422)
 
 ---
@@ -29,9 +30,11 @@ transitively) and `source_backed_on_disk` (copies already in `references/` that 
 but that discovery did not reach). The second population is refreshed on every bundle and compared on
 every `--check`, and never reported — its docstring calls its members "stale copies, not orphans in
 the risky sense". Measured with those two functions, that population is 15 files across 12 skills, and
-it is three different things: real dependencies the discovery regexes cannot see, dead copies nothing
-references, and prose mentions. This task makes the population visible as a `--check` class, gives the
-real dependencies a discovery path so they leave the population, and deletes the rest.
+it is two different things: three real dependencies the discovery regexes cannot see, and twelve dead
+copies nothing references. (The task as drafted called eight "real" and two "prose"; review 1 traced
+every copy to its invocation and found three and none — see the per-member evidence below.) This
+task makes the population visible as a `--check` class, gives the real dependencies a discovery path
+so they leave the population, and deletes the rest.
 
 **Scope**: `bundle_skill.py` discovery and check; its test; the 15 copies.
 
@@ -40,30 +43,42 @@ real dependencies a discovery path so they leave the population, and deletes the
 ### Current Problems
 
 1. **A copy that is refreshed but never discovered is a dependency nothing declares.**
-   `verify-push-state.sh` in develop-task/-story/-bug and `resolve-paths.sh` plus two step docs in
-   qa-task/qa-story are invoked from bundled shared text as `.agents/skills/{skill}/references/X`.
-   `discover_needed` deliberately does not follow `references/X` out of shared text (the
-   `tracker-card-summary.md` rationale at `bundle_skill.py:409-416`), and no rule reads the
-   `.agents/skills/…/references/` spelling at all. A consumer who deletes `references/` and re-bundles
-   loses them; a fresh skill that cites the same step doc never gets them.
-2. **Five copies are dead.** `yaml-subset.js` in jira-sprint-manager, jira-sprint-retrospective,
-   jira-sprint-review-prep and jira-epic-creator; `review-story-prepass-prompts.md` in review-story.
-   Nothing in those skills mentions them (last touched in the 2026-08 access-resolver work). They are
-   kept byte-identical to a source they no longer need.
-3. **Two are prose.** `set-github-project-priority.sh` in create-task and create-story is named in a
-   parenthetical ("unlike the GitHub path, which calls …") — a mention, not an invocation, and the
-   `REFS_REF_RE` match on the skill's own file is what keeps the copy alive.
-4. **`--check` reports all fifteen as clean.** Its eight classes (STALE, MISSING, WRONG MODE,
+   `verify-push-state.sh` in develop-story/-task/-bug is invoked from bundled shared text — exactly
+   one site, `develop-pipeline-step-8-commit.md:108`:
+   `bash .agents/skills/{skill}/references/verify-push-state.sh`. `discover_needed` deliberately does
+   not follow `references/X` out of shared text (the `tracker-card-summary.md` rationale at
+   `bundle_skill.py:409-416`), and no rule reads the `.agents/skills/…/references/` spelling at all.
+   A consumer who deletes `references/` and re-bundles loses it; a fresh skill that cites the same
+   step doc never gets it. Note the spelling: a bare `{skill}` **placeholder**, not a skill name and
+   not the `{develop-story|develop-task|develop-bug}` alternation the step-0/2/3/4 docs use. That
+   matters for the discovery rule (§3 Important Clarifications).
+2. **Twelve copies are dead.** Per-member evidence (review 1, 2026-09-18):
+   - `yaml-subset.js` ×4 in jira-sprint-manager, jira-sprint-retrospective, jira-sprint-review-prep,
+     jira-epic-creator — zero mentions anywhere in those skills (last touched in the 2026-08
+     access-resolver work).
+   - `review-story-prepass-prompts.md` in review-story — zero mentions in the skill.
+   - `develop-pipeline-step-0-resolve-and-prepare.md` and `develop-pipeline-step-1-create-branch.md`
+     in **both** qa-task and qa-story, and `resolve-paths.sh` in qa-task — named only as bare
+     filenames inside comments (`read-config.sh:710,727,787`, `resolve-platform.sh:588`,
+     `gh-stage.js:521`), never invoked, never cited from `SKILL.md`. (`qa-story/SKILL.md:2906` cites
+     `references/resolve-paths.sh`, which is why qa-story's copy of *that* file is discovered and
+     qa-task's is not.)
+   - `set-github-project-priority.sh` in create-task and create-story — `REFS_REF_RE` does **not**
+     match either skill file: `create-task/SKILL.md:580` names it as a bare backticked filename and
+     create-story has zero mentions. Had the regex matched, the copy would be in `needed` and could
+     not be in this list. They are dead copies, not prose-kept ones; no reword is needed.
+   All twelve are kept byte-identical to a source they no longer need.
+3. **`--check` reports all fifteen as clean.** Its eight classes (STALE, MISSING, WRONG MODE,
    ORPHANED, SYMLINK, AMBIGUOUS, MISDECLARED, UNREADABLE) cover files whose source moved or whose
    provenance is unclear; none covers a file whose source is fine and whose *reason to exist* is
    missing. The freshness check is the mechanism that hides them.
 
 ### Benefits
 
-1. The real dependencies become discovered: `needed` gains them, `source_backed_on_disk` loses them,
-   and a fresh bundle from an empty `references/` produces a working skill.
-2. Five dead files and two prose-only copies leave the tree — small, but each is a `references/`
-   entry a reader of the skill has to rule out.
+1. The three real dependencies become discovered: `needed` gains them, `source_backed_on_disk`
+   loses them, and a fresh bundle from an empty `references/` produces a working skill.
+2. Twelve dead copies leave the tree — small, but each is a `references/` entry a reader of the
+   skill has to rule out.
 3. `--check` gains a class whose remedy is a decision ("add a discovery path or delete the copy"),
    not a regenerate — the same shape as ORPHANED and AMBIGUOUS.
 4. The next copy that enters the tree through the back door is reported at the next `--check`,
@@ -88,14 +103,17 @@ check_skill   → compares needed ∪ reconcilable; reports 8 classes; reconcila
 
 ```
 discover_needed(skill)
-  + follows  .agents/skills/{this-skill}/references/X   from shared .md/.sh text   (new INVOKE_RE)
-    — only when {this-skill} names the skill being bundled, so a step doc that names
-      develop-story's path does not vendor into develop-task
+  + follows  .agents/skills/{this-skill}/references/X   from shared .md/.sh text   (new INVOKE_REF_RE)
+    — only when {this-skill} is a literal skill name equal to the one being bundled, or a
+      {a|b|c} alternation containing it; a bare {placeholder} group is NEVER followed
+    — so a step doc that names develop-story's path does not vendor into develop-task
+shared/resources/develop-pipeline-step-8-commit.md:108
+  {skill}  →  {develop-story|develop-task|develop-bug}     (one-line respell; the form step-0/2/3/4 use)
 source_backed_on_disk  unchanged (membership), but check_skill reports each member:
   UNREACHED  — 'source-backed copy no discovery rule reaches; add a discovery path
                 from the skill or delete the copy'   (NOT in REGENERABLE)
 bundle_skill  unchanged for the write; prints the UNREACHED count per skill
-tree          15 → 0 UNREACHED after the rule lands and 7 copies are deleted
+tree          15 → 12 (the dead ones) after the respell + rule land → 0 after the 12 are deleted
 ```
 
 ### Important Clarifications
@@ -104,6 +122,16 @@ tree          15 → 0 UNREACHED after the rule lands and 7 copies are deleted
   removed 38 unwanted vendored files (`tracker-card-summary.md` names `references/jira-sync.js` in
   prose). The new rule keys on the *invocation* spelling, which carries the skill name, so it can be
   scoped to the skill being bundled and cannot over-match the way the bare form did.
+- **A bare `{placeholder}` group is never followed, and this is measured, not cautious.** Four shared
+  docs write `.agents/skills/{skill}/references/X` with a bare placeholder (`document-change-log.md:184`
+  → `change-log.js`, `tracker-comment-contract.md` → `tracker-comment.js`,
+  `pr-inline-comment-contract.md` → `pr-inline-comment.js`, `develop-pipeline-step-8-commit.md:108`
+  → `verify-push-state.sh`). Reading `{skill}` as "whichever skill bundles this doc" would vendor
+  `change-log.js` into the 24 skills that bundle `document-change-log.md` and do not carry it — the
+  38-file over-match again. So the rule follows a literal skill name or a `{a|b|c}` alternation only,
+  and the one placeholder site that is a real invocation (`step-8-commit.md:108`) is respelled to the
+  alternation in Phase 2. The other three placeholder sites are already discovered by other rules and
+  need no change.
 - **`UNREACHED` is not regenerable.** `tests/bundle-check-mode.test.js` verifies `REGENERABLE`
   membership by measurement (check → bundle → check); a bundle run refreshes an UNREACHED copy and
   does not clear it, so the class belongs with ORPHANED/AMBIGUOUS, and the test must assert that.
@@ -117,21 +145,25 @@ tree          15 → 0 UNREACHED after the rule lands and 7 copies are deleted
 ### In Scope
 
 ✅ **Discovery**: one regex for `.agents/skills/{skill}/references/X` in shared `.md`/`.sh` text,
-   scoped to the current skill's name.
+   followed only for a literal skill name equal to the current skill or a `{a|b|c}` alternation
+   containing it — never a bare `{placeholder}`.
+✅ **Respell**: `develop-pipeline-step-8-commit.md:108` `{skill}` → `{develop-story|develop-task|develop-bug}`
+   (the spelling its sibling step docs already use), so the rule reaches the three real copies.
 ✅ **Check**: `UNREACHED` class, remedy text, excluded from `REGENERABLE`; `check_all` summary
    counts it.
 ✅ **Tests**: fixture with an undiscovered source-backed copy → `classesFound == ["UNREACHED"]`;
    check → bundle → check still reports it; fixture with the invocation spelling → discovered, not
    reported.
-✅ **Tree**: delete the five dead and two prose-only copies; confirm `--check --all` reports zero
-   UNREACHED afterwards.
+✅ **Tree**: delete the twelve dead copies; confirm `--check --all` reports zero UNREACHED afterwards.
 ✅ `package_skill.py` — shares the discovery regexes; confirm it picks up the new rule or add it.
 
 ### Out of Scope
 
 ❌ Following bare `references/X` out of shared text (re-opens the 38-file over-match).
 ❌ A `--fix` that deletes UNREACHED copies (the bundler never unlinks; keep it that way).
-❌ Rewriting the `.agents/skills/{skill}/…` invocations into some other spelling.
+❌ Rewriting `.agents/skills/…/references/X` invocations into a non-`.agents/skills` spelling. (The
+   `{skill}` → `{a|b|c}` respell of one line in step-8-commit.md is in scope; it keeps the spelling.)
+❌ Following a bare `{placeholder}` group as a wildcard (measured: +24 `change-log.js` copies).
 ❌ Observations #83 (transitive closure of a citation) and #114 (literal-as-instruction) — related
    bundler work, separately shippable.
 
@@ -170,13 +202,20 @@ Phase 1 red.
 (if it does not import the regexes), `tests/bundle-check-mode.test.js`
 
 **Changes**:
-- [ ] `INVOKE_REF_RE` matching `.agents/skills/([A-Za-z0-9-]+)/references/([A-Za-z0-9._-]+)`; in the
-      shared-text pass, follow only matches whose skill group equals the skill being bundled, or is a
-      `{a|b|c}` alternation containing it (the qa-loop doc writes
-      `.agents/skills/{develop-story|develop-task|develop-bug}/references/…`).
+- [ ] `INVOKE_REF_RE` matching `.agents/skills/(\{[A-Za-z0-9|-]+\}|[A-Za-z0-9-]+)/references/([A-Za-z0-9._-]+)`;
+      in the shared-text pass, follow only matches whose skill group equals the skill being bundled,
+      or is a `{a|b|c}` alternation containing it (the step-0/2/3/4 docs write
+      `.agents/skills/{develop-story|develop-task|develop-bug}/references/…`). A brace group with no
+      `|` — a bare placeholder such as `{skill}` — yields `names == ['skill']`, matches no skill, and
+      is thereby not followed; assert that in the test, do not special-case it.
+- [ ] Respell `shared/resources/develop-pipeline-step-8-commit.md:108` from
+      `.agents/skills/{skill}/references/verify-push-state.sh` to
+      `.agents/skills/{develop-story|develop-task|develop-bug}/references/verify-push-state.sh`.
 - [ ] Test: fixture shared doc invoking `.agents/skills/fx/references/tool.sh` → `tool.sh` in
-      `needed` for skill `fx`, absent for skill `other`.
-- [ ] `npm run bundle`; confirm the eight real dependencies now report nothing.
+      `needed` for skill `fx`, absent for skill `other`; alternation `{fx|other}` → present for both;
+      bare `{skill}` → absent for both.
+- [ ] `npm run bundle`; confirm the three `verify-push-state.sh` copies now report nothing and
+      `git status` shows no *new* `references/` files anywhere (the over-match check).
 
 **Dependencies**: Phase 1 (the class is what shows the rule worked).
 
@@ -184,7 +223,7 @@ Phase 1 red.
 
 **Risk Level**: Low
 
-**Files**: the seven copies listed in §7 Files to Delete.
+**Files**: the twelve copies listed in §7 Files to Delete.
 
 **Changes**:
 - [ ] `git rm` each; `npm run bundle`; confirm none returns.
@@ -206,20 +245,27 @@ Phase 1 red.
 
 ### Files to Modify (Documentation)
 
-4. ✅ `skills/create-skill/SKILL.md` or its bundling reference — one paragraph: what UNREACHED means and
-   the two remedies
+4. ✅ `skills/create-skill/SKILL.md` or its bundling reference — one paragraph: what UNREACHED means,
+   the two remedies, and that a bare `{placeholder}` invocation is invisible to discovery
 5. ✅ `AGENTS.md` § Shared Resources — one sentence pointing at the class
+6. ✅ `shared/resources/develop-pipeline-step-8-commit.md` — line 108 respell (`{skill}` →
+   `{develop-story|develop-task|develop-bug}`); its three bundled copies refresh via `npm run bundle`
 
 ### Files to Delete
 
-6. ❌ `skills/jira-sprint-manager/references/yaml-subset.js`
-7. ❌ `skills/jira-sprint-retrospective/references/yaml-subset.js`
-8. ❌ `skills/jira-sprint-review-prep/references/yaml-subset.js`
-9. ❌ `skills/jira-epic-creator/references/yaml-subset.js`
-10. ❌ `skills/review-story/references/review-story-prepass-prompts.md`
-11. ❌ `skills/create-task/references/set-github-project-priority.sh` — after rewording the prose mention
-    so `REFS_REF_RE` no longer matches it (or accept the copy and drop this line; decide in review)
-12. ❌ `skills/create-story/references/set-github-project-priority.sh` — same
+7. ❌ `skills/jira-sprint-manager/references/yaml-subset.js`
+8. ❌ `skills/jira-sprint-retrospective/references/yaml-subset.js`
+9. ❌ `skills/jira-sprint-review-prep/references/yaml-subset.js`
+10. ❌ `skills/jira-epic-creator/references/yaml-subset.js`
+11. ❌ `skills/review-story/references/review-story-prepass-prompts.md`
+12. ❌ `skills/qa-task/references/develop-pipeline-step-0-resolve-and-prepare.md`
+13. ❌ `skills/qa-task/references/develop-pipeline-step-1-create-branch.md`
+14. ❌ `skills/qa-task/references/resolve-paths.sh`
+15. ❌ `skills/qa-story/references/develop-pipeline-step-0-resolve-and-prepare.md`
+16. ❌ `skills/qa-story/references/develop-pipeline-step-1-create-branch.md`
+17. ❌ `skills/create-task/references/set-github-project-priority.sh` — a dead copy; `REFS_REF_RE`
+    does not match the bare-name mention at `SKILL.md:580`, so no reword is needed
+18. ❌ `skills/create-story/references/set-github-project-priority.sh` — same (zero mentions)
 
 ## 8. Testing Strategy
 
@@ -229,14 +275,15 @@ Phase 1 red.
 
 **Actions**:
 - [ ] UNREACHED reported for an undiscovered source-backed copy; not reported once a skill file cites it.
-- [ ] Invocation spelling discovered for the named skill only; alternation form handled.
+- [ ] Invocation spelling discovered for the named skill only; alternation form handled; bare
+      `{placeholder}` form not followed.
 - [ ] Non-UTF-8 and symlinked members still take their existing classes, not UNREACHED.
 
 **Command**: `node --test tests/bundle-check-mode.test.js`
 
 ### Integration Tests
 
-- [ ] `--check --all` on the tree: 15 before Phase 2, 7 after Phase 2, 0 after Phase 3.
+- [ ] `--check --all` on the tree: 15 before Phase 2, 12 after Phase 2, 0 after Phase 3.
 - [ ] `npm run bundle:check` green on the final tree; `tests/bundled-links.test.js` green.
 
 ### Contract Tests
@@ -256,7 +303,8 @@ Not applicable — one additional regex pass over already-read text.
 
 ### Functional
 - [ ] `--check` reports UNREACHED for every source-backed undiscovered copy and nothing else changes class.
-- [ ] The eight real dependencies are in `needed` for their skills.
+- [ ] `verify-push-state.sh` is in `needed` for develop-story, develop-task and develop-bug, and in
+      `needed` for no other skill that did not already have it (`git status` clean of new copies).
 - [ ] Zero UNREACHED on the merged tree.
 
 ### Performance
@@ -268,7 +316,7 @@ Not applicable — one additional regex pass over already-read text.
 - [ ] No second definition of the discovery rules in `package_skill.py`.
 
 ### Migration
-- [ ] Seven copies gone; observation #118 `actioned` with the PR number.
+- [ ] Twelve copies gone; observation #118 `actioned` with the PR number.
 
 ## 10. Risk Assessment
 
@@ -294,7 +342,7 @@ None.
 ### Immediate Rollback (< 1 hour)
 - **Triggers**: `--check` red in CI on a copy the task cannot classify; a consumer install missing a file.
 - **Steps**: `git revert` the merge; `npm run bundle`; commit.
-- **Validation**: `--check --all` green; the 15 copies present again.
+- **Validation**: `--check --all` green; the 15 copies present again (12 deleted + 3 refreshed).
 
 ### Partial Rollback (1–2 hours)
 - Keep Phase 1 (report only) and revert Phases 2–3: the class shows 15 findings and CI stays red
@@ -313,12 +361,14 @@ None.
 | Date | Version | Description | Author |
 | ---- | ------- | ----------- | ------ |
 | 2026-09-17 | 1.0 | Initial draft | create-task |
+| 2026-09-18 | 1.1 | Review 1 (7/10 → 9/10 after fixes): population re-traced per member — 3 real deps (not 8), 12 dead (not 5), 0 prose; Phase 2 redesigned around the `{a\|b\|c}` alternation (bare `{skill}` placeholder never followed, wildcard measured at +24 copies); step-8-commit.md:108 respell added; Files to Delete 7 → 12; progression 15 → 12 → 0 | review-task |
+| 2026-09-18 |  | Status → ready-for-development | review-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
 - [ ] Phase 1: UNREACHED class + test
-- [ ] Phase 2: invocation discovery rule
+- [ ] Phase 2: invocation discovery rule + step-8 respell
 - [ ] Phase 3: delete dead copies, zero UNREACHED
 - [ ] QA: `task.122.qa.[N].bundle-check-unreached-copies.md`
 - [ ] Gate: `task.122.gate.[N].bundle-check-unreached-copies.yml`
@@ -329,6 +379,8 @@ None.
 - `bundle_skill.py` `discover_needed` (l.400), `source_backed_on_disk` (l.488), `check_skill` (l.867), `REGENERABLE` (l.760)
 - `tests/bundle-check-mode.test.js` — the measurement-based `REGENERABLE` proof to extend
 - task.98 (`bundle-freshness-check-mode`) — the check this extends; task.108 — the link re-relativiser
+- [task.122.review.1.bundle-check-unreached-copies.md](task.122.review.1.bundle-check-unreached-copies.md) —
+  the per-member trace behind the 3/12 split and the `{skill}`-wildcard measurement
 
 ## Notes
 
