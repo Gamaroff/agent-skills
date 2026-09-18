@@ -157,6 +157,15 @@ bash .agents/skills/develop-task/references/advance-pipeline-lock.sh {N+1}
 ```
 For Step 8 → completion: `... advance-pipeline-lock.sh --complete` (removes the lock).
 
+**Steps 5–6 are one step to the lock.** `current_step` goes `4 → 5` when the QA loop is entered and
+`5 → 7` when 5c returns APPROVE or CONCERNS; `advance-pipeline-lock.sh 6` is **never** issued. Inside
+the loop the sub-position is the lock's `qa_phase` field (`5a|5b|5c`), which the step-5-6 doc's
+`set_qa_phase` writes as each sub-step's first action and the `Stop` hook reads to name `/qa-task`,
+`/qa-fix` or `/review-pr`. The helper is monotonic and must stay so; `qa_phase` is how the loop's
+`5b → 5a` re-entry is expressed without moving `current_step` backwards (task.123, option B). The
+loop's budget is `QA_MAX_CYCLES` — 5, plus the lock's `extra_cycles_granted` on a granted re-entry
+(Phase 0b below).
+
 Skip this for Step 1 (the lock is created at the *end* of Step 1, after the feature branch exists — see Step 1 below).
 
 After each step: update the Pipeline Progress table (✅ Done / ❌ Failed / ⚠️ Needs Attention / ⏸️ Paused — see Graceful Pause section) and log any decisions or issues before moving on.
@@ -271,6 +280,15 @@ If a situation arises that is not in this table or the shared defaults table and
   ```
 
   Removing the active lock prevents a future PreCompact firing in this same session from re-running the pause flow, and stops accumulation of transient Step 3 test logs. The **halt snapshot** (`develop-pipeline.last-halt.json`) preserves resume context so the next `/develop-task` invocation can re-enter Phase 0b artifact verification: the resume detector subagent reads the snapshot when no active lock is present, surfaces it to the user, and offers "Resume from {halt_step}" or "Start fresh" (latter deletes the snapshot). The graceful-pause hook also removes the active lock itself if it runs — this rule covers the non-hook halt paths.
+
+  **Re-entry after a QA loop escalation** (`halt_reason` matches `loop-limit|not-converging`): the Phase 0b prompt is the halt message's own three options plus a fourth — **"Resume at 5a with {k} more cycles"** (AskUserQuestion; recommended `k` = 2; "Other" takes a number). Before asking, reconstruct the cycle count **from the gates on disk** and back-fill any `### QA Cycle` entry a cycle the operator ran by hand did not write — the procedure, and why the report count cannot be the source, is the resume contract's **Re-entry after a QA loop escalation**. On accept, write the grant into the lock the resume recreates from the snapshot:
+
+  ```bash
+  TMP=$(mktemp .claude/state/.grant.XXXXXX) && jq --argjson k "{k}" '.extra_cycles_granted = $k' \
+    .claude/state/develop-pipeline.lock > "$TMP" && mv "$TMP" .claude/state/develop-pipeline.lock
+  ```
+
+  and run the loop with `QA_MAX_CYCLES = 5 + extra_cycles_granted`. The field name is `extra_cycles_granted` everywhere it appears — lock, snapshot, step-5-6 doc, resume contract, this file — and `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails on a fifth spelling. Log the grant in the Decisions Log: "QA loop re-entry: {k} extra cycles granted; {m} cycle(s) run outside the loop back-filled from disk." A declined grant re-enters at the halt's own options, as before.
 - **Signal `blocked` on a terminal HALT** (when `TRACKER=jira` and `TRACKER_ISSUE` is set). After the snapshot above, before surfacing the HALT:
 
   ```bash
@@ -303,7 +321,7 @@ If a situation arises that is not in this table or the shared defaults table and
 - `/develop` — Step 3
 - `/create-pr` — Step 4
 - `/qa-task` — Step 5
-- `/qa-fix` — Step 6
+- `/qa-fix` — Step 6 (5b — the lock stays at `current_step: 5`, `qa_phase: 5b`)
 - `/review-pr` — Step 5c (the QA loop's exit gate; advisory — the orchestrator acts on its verdict)
 - `/finalise` — Step 7
 - `/commit-changes` — Step 8

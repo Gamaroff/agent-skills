@@ -19,8 +19,15 @@ flowchart TD
     A[qa-planning] -->|risk profile + test design| B[qa-story / qa-task]
     B -->|gate file + NFR + traceability| C[qa-gate]
     B -->|FAIL, or an open finding no active waiver covers| D[qa-fix]
-    D --> B
-    B -->|no open finding, or active WAIVED| E[review-pr]
+    D -->|budget not spent| B
+    D -->|budget spent, HIGH 0 throughout, MEDIUM falling: route 2c half-cycle| H[qa-story / qa-task — gate the last fix]
+    H -->|PASS, or CONCERNS with no open entry| E
+    H -->|open entry| G
+    D -->|budget spent, half-cycle declined| G[escalate — Loop Escalation]
+    B -->|HIGH remains and stops falling: Convergence check| G
+    B -->|no open finding, or active WAIVED: route 1 / 3| E[review-pr]
+    B -->|HIGH 0 ×2 and residue is all test machinery: route 2| E
+    B -->|PASS with only open LOWs, HIGH 0 ×2: route 2b| E
     E -->|REQUEST CHANGES| D
     E -->|APPROVE/CONCERNS| F[finalise]
 ```
@@ -73,14 +80,23 @@ that step's `REQUEST CHANGES` verdict, and those cycles come out of the same 5-c
 
 ### How the loop ends
 
-Four ways it ends, and they are not interchangeable — the first three hand to Step 5c (§5c's accepting-route set), the fourth escalates:
+Six ways it ends, and they are not interchangeable — the first five hand to Step 5c (§5c's accepting-route set), the sixth escalates:
 
 | Exit | Fires when | Effect |
 |---|---|---|
 | Clean gate | `PASS` with no open entry, or an active `WAIVED` (route 1 — see §5c) | Hands to Step 5c |
 | **Reservation without a queue** | `CONCERNS` whose `top_issues[]` is empty or all closed (route 3) | Hands to Step 5c — nothing for `qa-fix` to act on |
-| **Diminishing returns** | All three conditions below hold | Hands to Step 5c — the loop *finished working* |
+| **Diminishing returns** (route 2) | All three conditions below hold | Hands to Step 5c — the loop *finished working* |
+| **Cosmetic residue** (route 2b) | A `PASS` gate — and only `PASS` — whose open entries are all LOW, after two HIGH-0 gates (cycle ≥ 2) | Hands to Step 5c — the LOWs move to `recommendations.future` by id; a fix cycle for nits is what this avoids (task.110, obs #100) |
+| **Gate the last fix** (route 2c) | The budget is spent, the last cycle landed a fix, HIGH was 0 throughout and MEDIUM fell strictly for three cycles | One review + gate on the fix's head, no `qa-fix`; a clean half-cycle gate hands to Step 5c, an open entry escalates (task.117, obs #112) |
 | Convergence check | HIGH findings **remain and stop falling** | Escalates — the loop *stopped working* |
+
+Routes 2, 2b and 2c are one engine call — `classifyLoopRoute()` in `qa-diminishing-returns.js`, with
+its fixture table at `shared/resources/tests/qa-loop-route.test.mjs` — and the loop's lock position
+throughout is `current_step: 5` with a `qa_phase` of `5a`, `5b` or `5c`. A run halted at the
+budget can be re-invoked with a grant of extra cycles (`extra_cycles_granted` on the lock), and any
+cycle the operator ran by hand in between is counted from its gate on disk — see the resume
+contract's **Re-entry after a QA loop escalation**.
 
 **The diminishing-returns exit needs all three conditions, and every one of them fails closed.** This is the canonical statement; other pages give the short form and point here.
 
@@ -94,7 +110,7 @@ Four ways it ends, and they are not interchangeable — the first three hand to 
 
 So "zero HIGH and the rest is test noise" is the short form, not the rule. A run with a clean HIGH sequence, every finding inside the test globs, and a single `security: CONCERNS` in `nfr_validation` does **not** take this exit.
 
-The last two are opposites and now say so. The Convergence check measures HIGH findings that persist;
+The diminishing-returns exit and the Convergence check are opposites and now say so. The Convergence check measures HIGH findings that persist;
 the diminishing-returns exit fires when they are gone and what is left is the run refining its own
 pins. A run can reach zero HIGH and keep producing MEDIUM and LOW findings inside its own test
 machinery, satisfying nothing the Convergence check looks at — that run used to burn to the

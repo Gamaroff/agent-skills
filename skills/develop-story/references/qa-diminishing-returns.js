@@ -8,6 +8,16 @@
 // exit". That section is the contract a pipeline reader executes; this module is
 // what a test can execute, and the two must say the same thing.
 //
+// Since task.123 this module is also the loop's ROUTE CLASSIFIER —
+// `classifyLoopRoute()` at the bottom — and the Diminishing-returns predicate is
+// one arm of it. The other arms are route 2b (cosmetic residue: a PASS gate
+// whose open entries are all LOW, after two HIGH-0 gates) and route 2c (gate the
+// last fix: the budget is spent, HIGH was 0 throughout, MEDIUM fell strictly for
+// three cycles, and the last budgeted cycle landed a fix no gate has read). Each
+// is a predicate over the gate sequence, the latest gate's queue and the budget
+// state, so each lives here as a fixture row first and prose second. The five
+// properties below apply to every arm.
+//
 // THE QUESTION, AND WHY IT IS NOT THE CONVERGENCE CHECK'S QUESTION
 //
 // The Convergence check beside this one fires when HIGH findings **remain and
@@ -242,8 +252,9 @@ function scalarValue(raw) {
 }
 
 /**
- * The `top_issues[]` entries a gate raises, as `{severity, file, category,
- * status}` — every field a string or null, never undefined.
+ * The `top_issues[]` entries a gate raises, as `{id, severity, file, category,
+ * status}` — every field a string or null, never undefined. `id` is what route 2b
+ * carries into `recommendations.future`; like `file` it is case-preserved.
  *
  * Returns `[]` for a gate with no `top_issues:` block, and `null` when the input
  * is not a string at all. Those are different answers and the caller must not
@@ -283,7 +294,13 @@ function readTopIssues(gateContent) {
 
     if (isEntry && ind === base) {
       push();
-      current = { severity: null, file: null, category: null, status: null };
+      current = {
+        id: null,
+        severity: null,
+        file: null,
+        category: null,
+        status: null,
+      };
       // An inline entry — `- {severity: high, file: x}` — or the first key on the
       // dash line, which is the common `- id: "…"` form.
       const rest = line.slice(line.indexOf("-") + 1);
@@ -304,7 +321,7 @@ function readTopIssues(gateContent) {
 }
 
 const KEY_RE =
-  /(?:^|[{,\s])(severity|file|category|status)[ \t]*:[ \t]*([^,}]*)/g;
+  /(?:^|[{,\s])(id|severity|file|category|status)[ \t]*:[ \t]*([^,}]*)/g;
 
 // Three of the four keys are ENUMERATIONS, where case carries no information and
 // folding makes the comparison robust. The fourth, `file:`, is a FILESYSTEM
@@ -540,15 +557,329 @@ function describeDiminishingReturns(result) {
   return `Diminishing-returns exit not taken (${result.reason}) — ${result.detail}.`;
 }
 
+// ── the loop's route classifier (task.123) ─────────────────────────────────
+
+const ROUTES = Object.freeze({
+  DIMINISHING_RETURNS: "diminishing-returns", // route 2  — obs #100's sibling, pre-existing
+  COSMETIC_RESIDUE: "cosmetic-residue", //       route 2b — obs #100
+  GATE_THE_LAST_FIX: "gate-the-last-fix", //     route 2c — obs #112
+  CONTINUE: "continue", //                       5b, or the escalation as written
+});
+
+// The 5b Action row 5a writes on the road to a fix cycle. Route 2c reads the LAST
+// budgeted cycle's row to establish that a fix exists on the head which no gate
+// has read; a cycle that reached 5c has its gate already, and a fix driven by
+// 5c's REQUEST CHANGES is outside the gate sequence the route reasons over.
+const RUNNING_QA_FIX_RE = /^Running qa-fix\b/;
+
+/**
+ * The gate's verdict token — `PASS`, `CONCERNS`, `FAIL`, `WAIVED` — read from the
+ * top-level `gate:` key, upper-cased. `null` when the input is not a string or the
+ * key is absent; a malformed gate is the caller's HALT, never a route.
+ */
+function readGateToken(gateContent) {
+  if (typeof gateContent !== "string") return null;
+  for (const line of splitLines(gateContent)) {
+    const m = /^gate[ \t]*:[ \t]*(.*)$/.exec(line);
+    if (m) {
+      const v = scalarValue(m[1]);
+      return v === "" ? null : v.toUpperCase();
+    }
+  }
+  return null;
+}
+
+/**
+ * How many `top_issues[]` entries the gate RAISED at MEDIUM and at LOW — the same
+ * "count what was raised, do not exclude `status: closed`" rule the Convergence
+ * check's awk applies to HIGH. `null` when the input is not a string.
+ *
+ * MEDIUM_N comes from here and nowhere else. HIGH is deliberately NOT counted:
+ * property 2 makes the HIGH count an input, and group 7 of the test suite reads
+ * this file's source to make sure no second implementation of it appears. The
+ * orchestrator records the awk's HIGH and this function's MEDIUM on separate rows
+ * of the cycle entry, and `classifyLoopRoute` takes both sequences as input.
+ */
+function countRaised(gateContent) {
+  const issues = readTopIssues(gateContent);
+  if (issues === null) return null;
+  const out = { medium: 0, low: 0 };
+  for (const e of issues) {
+    if (e.severity === "medium") out.medium += 1;
+    else if (e.severity === "low") out.low += 1;
+  }
+  return out;
+}
+
+function isOpen(entry) {
+  return entry.status === null || entry.status === "open";
+}
+
+function allInts(arr, n) {
+  if (!Array.isArray(arr) || arr.length < n) return false;
+  for (let i = 0; i < n; i++) if (!Number.isInteger(arr[i])) return false;
+  return true;
+}
+
+function route(routeName, reason, detail, extra) {
+  return Object.assign(
+    { route: routeName, reason, detail, findings: [] },
+    extra || {},
+  );
+}
+
+/**
+ * Which route does the QA loop take from here?
+ *
+ * Two moments call this, and `budgetSpent` says which:
+ *
+ *   budgetSpent: false — after 5a has read cycle N's gate and the Convergence
+ *     check did not trip. Evaluates route 2 (Diminishing-returns) and then route
+ *     2b (cosmetic residue); `continue` means 5b.
+ *   budgetSpent: true  — at the loop-limit trigger, after 5b of the LAST budgeted
+ *     cycle and BEFORE the escalation entry is written. Evaluates route 2c only;
+ *     `continue` means the escalation as written.
+ *
+ * @param {object} input
+ * @param {number}   input.cycle              the cycle whose gate was last read (1-based)
+ * @param {number[]} input.highCounts         HIGH_N per cycle from QA Iteration History (index 0 = cycle 1)
+ * @param {number[]} [input.mediumCounts]     MEDIUM_N per cycle from QA Iteration History, same shape;
+ *   cycle N's own reading is taken from `latestGateContent` via `countRaised`, so the array
+ *   needs only cycles 1..N-1 (a longer array is fine; index N-1 is ignored)
+ * @param {string|null} input.latestGateContent  full text of the latest gate
+ * @param {string[]} [input.testArtifactGlobs]   resolved `qa.testArtifactGlobs`, default `[]`
+ * @param {boolean}  [input.budgetSpent]      true at the loop-limit trigger (N == QA_MAX_CYCLES)
+ * @param {string|null} [input.lastCycleAction]  the `**Action**` row of cycle N's entry; route 2c
+ *   requires it to read `Running qa-fix …`
+ * @returns {{route: string, reason: string, detail: string, findings: Array,
+ *            verdict?: string, lowIds?: string[], mediumSequence?: number[]}}
+ */
+function classifyLoopRoute(input) {
+  let cycle;
+  let highCounts;
+  let mediumCounts;
+  let latestGateContent;
+  let testArtifactGlobs;
+  let budgetSpent;
+  let lastCycleAction;
+  try {
+    cycle = input && input.cycle;
+    highCounts = input && input.highCounts;
+    mediumCounts = (input && input.mediumCounts) || [];
+    latestGateContent = input && input.latestGateContent;
+    testArtifactGlobs = (input && input.testArtifactGlobs) || [];
+    budgetSpent = Boolean(input && input.budgetSpent);
+    lastCycleAction = input && input.lastCycleAction;
+  } catch {
+    return route(
+      ROUTES.CONTINUE,
+      "input-unreadable",
+      "the inputs could not be read",
+    );
+  }
+
+  if (!Number.isInteger(cycle) || cycle < 1) {
+    return route(
+      ROUTES.CONTINUE,
+      "cycle-missing",
+      `cycle ${describe(cycle)} is not a positive integer`,
+    );
+  }
+
+  if (budgetSpent) {
+    // ── route 2c — gate the last fix (obs #112) ──────────────────────────────
+    if (
+      typeof lastCycleAction !== "string" ||
+      !RUNNING_QA_FIX_RE.test(lastCycleAction.trim())
+    ) {
+      return route(
+        ROUTES.CONTINUE,
+        "last-cycle-not-a-fix",
+        `cycle ${cycle}'s Action row reads ${describe(lastCycleAction)} — route 2c gates a fix that no gate has read, and only a cycle that routed to 5b from 5a has one; a cycle that reached 5c has its gate, and a fix driven by 5c's REQUEST CHANGES is outside the gate sequence this route reasons over`,
+      );
+    }
+    if (cycle < 3) {
+      return route(
+        ROUTES.CONTINUE,
+        "below-cycle-floor",
+        `cycle ${cycle} — three MEDIUM readings are needed to see a strictly falling sequence`,
+      );
+    }
+    if (!allInts(highCounts, cycle)) {
+      return route(
+        ROUTES.CONTINUE,
+        "high-counts-missing",
+        "the HIGH sequence from QA Iteration History is absent, shorter than the cycle count, or carries a non-integer reading",
+      );
+    }
+    const nonZero = highCounts.slice(0, cycle).filter((h) => h !== 0);
+    if (nonZero.length > 0) {
+      return route(
+        ROUTES.CONTINUE,
+        "high-findings-seen",
+        `HIGH was not 0 throughout (${highCounts.slice(0, cycle).join(", ")}) — a loop that raised a blocker at any cycle escalates with its evidence, it is not granted a half-cycle`,
+      );
+    }
+    const raised = countRaised(latestGateContent);
+    if (raised === null) {
+      return route(
+        ROUTES.CONTINUE,
+        "gate-unreadable",
+        "no gate content was supplied, so MEDIUM_N could not be counted",
+      );
+    }
+    if (!allInts(mediumCounts, cycle - 1)) {
+      return route(
+        ROUTES.CONTINUE,
+        "medium-counts-missing",
+        `the MEDIUM sequence from QA Iteration History needs cycles 1..${cycle - 1} and does not have them`,
+      );
+    }
+    const mN = raised.medium;
+    const m1 = mediumCounts[cycle - 2];
+    const m2 = mediumCounts[cycle - 3];
+    const seq = [m2, m1, mN];
+    if (!(mN < m1 && m1 < m2)) {
+      return route(
+        ROUTES.CONTINUE,
+        "medium-not-falling",
+        `MEDIUM reads ${seq.join(", ")} over cycles ${cycle - 2}–${cycle} — route 2c needs it strictly falling, which is the evidence that one more gate would clear`,
+        { mediumSequence: seq },
+      );
+    }
+    return route(
+      ROUTES.GATE_THE_LAST_FIX,
+      "gate-the-last-fix",
+      `the ${cycle}-cycle budget is spent with HIGH 0 throughout and MEDIUM falling ${seq.join(" → ")}; cycle ${cycle}'s fix has landed and no gate has read it, so one ordinary 5a (review + gate, no 5b) runs on that head before any escalation entry is written`,
+      { mediumSequence: seq },
+    );
+  }
+
+  // ── route 2 — the Diminishing-returns exit, unchanged ────────────────────
+  const dr = classifyDiminishingReturns({
+    cycle,
+    highCounts,
+    latestGateContent,
+    testArtifactGlobs,
+  });
+  if (dr.verdict === VERDICTS.EXIT) {
+    return route(ROUTES.DIMINISHING_RETURNS, dr.reason, dr.detail, {
+      verdict: dr.verdict,
+      findings: dr.findings,
+    });
+  }
+
+  // ── route 2b — cosmetic residue (obs #100) ───────────────────────────────
+  // PASS only, stated as an exclusion: a CONCERNS token is a reservation 5c must
+  // see raised, not carried, so a CONCERNS gate whose queue is all LOW still
+  // goes to 5b.
+  const token = readGateToken(latestGateContent);
+  if (token !== "PASS") {
+    return route(
+      ROUTES.CONTINUE,
+      "not-a-pass-gate",
+      `the gate reads ${describe(token)} — route 2b is PASS-only; a CONCERNS token is a reservation 5c must see raised, not carried (and route 2 declined: ${dr.reason})`,
+      { verdict: dr.verdict },
+    );
+  }
+  if (cycle < 2 || !allInts(highCounts, cycle)) {
+    return route(
+      ROUTES.CONTINUE,
+      "high-counts-missing",
+      `route 2b needs HIGH readings for cycles ${Math.max(cycle - 1, 1)} and ${cycle}, and the sequence does not carry both`,
+      { verdict: dr.verdict },
+    );
+  }
+  if (highCounts[cycle - 1] !== 0 || highCounts[cycle - 2] !== 0) {
+    return route(
+      ROUTES.CONTINUE,
+      "high-findings-remain",
+      `HIGH is ${highCounts[cycle - 2]} then ${highCounts[cycle - 1]} — route 2b needs two consecutive zero-HIGH gates`,
+      { verdict: dr.verdict },
+    );
+  }
+  const issues = readTopIssues(latestGateContent);
+  const open = issues.filter(isOpen);
+  if (open.length === 0) {
+    // A PASS with no open entry is route 1's, and it never reaches this
+    // classifier — but the arm is stated so the rule cannot fire on absence.
+    return route(
+      ROUTES.CONTINUE,
+      "no-open-residue",
+      "the gate has no open entry — that is route 1's clean gate, not a cosmetic residue",
+      { verdict: dr.verdict },
+    );
+  }
+  const notLow = open.filter((e) => e.severity !== "low");
+  if (notLow.length > 0) {
+    return route(
+      ROUTES.CONTINUE,
+      "residue-not-all-low",
+      `${notLow.length} of ${open.length} open findings are not LOW (${notLow.map((e) => (e.severity === null ? "unset" : e.severity)).join(", ")}) — the residue is not cosmetic`,
+      { verdict: dr.verdict },
+    );
+  }
+  const lowIds = open
+    .map((e) => e.id)
+    .filter((id) => typeof id === "string" && id !== "");
+  return route(
+    ROUTES.COSMETIC_RESIDUE,
+    "cosmetic-residue",
+    `PASS gate at cycle ${cycle} with HIGH 0 for cycles ${cycle - 1} and ${cycle}; all ${open.length} open findings are LOW and are carried to the gate's recommendations.future by id`,
+    {
+      verdict: dr.verdict,
+      lowIds,
+      findings: open.map((e) => ({
+        file: e.file,
+        matched: matchesAnyGlob(e.file, testArtifactGlobs),
+      })),
+    },
+  );
+}
+
+/**
+ * One line per route for the cycle entry's `**Loop exit**` row. The
+ * Diminishing-returns text is delegated verbatim so the pins on that message hold.
+ */
+function describeLoopRoute(result) {
+  if (!result || typeof result !== "object") {
+    return "loop route: no verdict was produced";
+  }
+  switch (result.route) {
+    case ROUTES.DIMINISHING_RETURNS:
+      return describeDiminishingReturns({
+        verdict: VERDICTS.EXIT,
+        reason: result.reason,
+        detail: result.detail,
+        findings: result.findings,
+      });
+    case ROUTES.COSMETIC_RESIDUE:
+      return `Cosmetic-residue exit taken — ${result.detail}${
+        Array.isArray(result.lowIds) && result.lowIds.length > 0
+          ? ` (${result.lowIds.join(", ")})`
+          : ""
+      }. This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.`;
+    case ROUTES.GATE_THE_LAST_FIX:
+      return `Gate-the-last-fix half-cycle granted — ${result.detail}. This is NOT an exit and NOT an escalation: it is one review + gate on the last fix's head, and its gate decides between 5c and the escalation.`;
+    default:
+      return `Loop route: continue (${result.reason}) — ${result.detail}.`;
+  }
+}
+
 module.exports = {
   // read
   readTopIssues,
   readNfrStatuses,
+  readGateToken,
+  countRaised,
   matchesAnyGlob,
   // classify
   classifyDiminishingReturns,
+  classifyLoopRoute,
   VERDICTS,
+  ROUTES,
   CYCLE_FLOOR,
   // report
   describeDiminishingReturns,
+  describeLoopRoute,
 };

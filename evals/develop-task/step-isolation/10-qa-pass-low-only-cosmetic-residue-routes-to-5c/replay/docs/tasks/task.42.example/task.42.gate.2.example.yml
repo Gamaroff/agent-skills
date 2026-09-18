@@ -1,0 +1,42 @@
+schema: 1
+gate: PASS
+status_reason: "Cycle 2 — HIGH 0 for cycles 1 and 2; two LOW nits rode on the PASS (gate rule 5). Route 2b carried them to recommendations.future."
+reviewer: "QA Engineer"
+updated: "2026-09-18T12:10:00Z"
+
+top_issues:
+  - id: "EX-002"
+    severity: low
+    file: "src/example.ts"
+    finding: "A comment names the pre-fix variable."
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+  - id: "EX-003"
+    severity: low
+    file: "docs/example.md"
+    finding: "A stale anchor."
+    suggested_owner: dev
+    status: closed
+    resolution: carried to recommendations.future (route 2b)
+
+recommendations:
+  future:
+    - id: "EX-002"
+      finding: "A comment names the pre-fix variable."
+      suggested_action: "Rename in the comment."
+      carried_from: top_issues (route 2b, cycle 2)
+    - id: "EX-003"
+      finding: "A stale anchor."
+      suggested_action: "Fix the anchor."
+      carried_from: top_issues (route 2b, cycle 2)
+
+waiver:
+  active: false
+
+quality_score: 92
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

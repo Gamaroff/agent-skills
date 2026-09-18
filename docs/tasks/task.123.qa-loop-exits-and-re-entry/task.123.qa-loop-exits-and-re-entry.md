@@ -5,11 +5,11 @@ type: task
 description: "Four QA-loop shapes the step-5-6 doc has no route for, each observed burning cycles on a real task: a PASS gate whose open entries are all LOW re-enters a full qa-fix cycle (task.110 ran cycles 12–13 for two nits); a converging medium-only loop with HIGH 0 throughout exhausts the budget and escalates an ungated fix (task.117, five CONCERNS gates); advance-pipeline-lock.sh is monotonic so every 5b→5a re-entry needed a hand-rolled jq (task.108); and a re-invocation after a loop-limit halt has no re-entry rule, so a standalone cycle 6 run by the operator was invisible to the resumed pipeline (task.110). One task, one document to change, one lock helper, one resume-contract subsection. Observations #72, #77, #95, #100, #112."
 tags: [develop-task, develop-story, qa-loop, pipeline]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-09-17
-updated: 2026-09-18
+updated: 2026-09-19
 assignee:
 estimated_effort_hours: 8
 github_issue: 423
@@ -17,7 +17,7 @@ github_issue: 423
 
 # Technical Task: The QA loop's guards read only the HIGH count and the lock cannot go backwards
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.123.review.1.qa-loop-exits-and-re-entry.md` implemented 2026-09-18
 **GitHub Issue**: [#423](https://github.com/Gamaroff/agent-skills/issues/423)
 
@@ -209,15 +209,15 @@ None for consumers. A pipeline resumed across this change reads the new snapshot
 `shared/resources/pipeline-lock-cooperation.md`
 
 **Changes**:
-- [ ] Record the decision (B) and its reason in the step-5-6 doc's Loop Setup.
-- [ ] 5a, 5b and 5c each write `qa_phase` (`jq '.qa_phase = "5a"'` … through the lock's atomic-write
+- [x] Record the decision (B) and its reason in the step-5-6 doc's Loop Setup.
+- [x] 5a, 5b and 5c each write `qa_phase` (`jq '.qa_phase = "5a"'` … through the lock's atomic-write
       pattern) and leave `current_step` at `5`; `advance-pipeline-lock.sh 6` is no longer called inside the loop.
-- [ ] `develop-pipeline-on-stop.sh`: `case 5)` reads `qa_phase` → `/qa-task|/qa-story`, `/qa-fix`,
+- [x] `develop-pipeline-on-stop.sh`: `case 5)` reads `qa_phase` → `/qa-task|/qa-story`, `/qa-fix`,
       `/review-pr`; absent `qa_phase` → `/qa-task|/qa-story` (the loud, re-entrant default). `case 6)`
       stays for `develop-bug`, whose map is separate.
-- [ ] Lock helper test: `advance` still refuses 6 → 5 (monotonic pin); a lock carrying `qa_phase` is
+- [x] Lock helper test: `advance` still refuses 6 → 5 (monotonic pin); a lock carrying `qa_phase` is
       still a valid object; `--skill qa-fix` etc. still noop.
-- [ ] Remove the hand-rolled `jq '.current_step = 5'` from any step doc that carries it.
+- [x] Remove the hand-rolled `jq '.current_step = 5'` from any step doc that carries it. *(No step doc carried one — the surface map found the only `.current_step = 5` text in the lock helper's own comments; the doc now states the rule instead, and `qa-loop-lock-fields-parity.test.mjs` fails on a hand `jq` appearing.)*
 
 **Dependencies**: none.
 
@@ -230,21 +230,21 @@ None for consumers. A pipeline resumed across this change reads the new snapshot
 `evals/shared/tests/pr-review-loop-parity.test.mjs`, `docs/runbooks/qa-flow.md`
 
 **Changes**:
-- [ ] Engine: `classifyLoopRoute()` / `describeLoopRoute()` extending `classifyDiminishingReturns`;
+- [x] Engine: `classifyLoopRoute()` / `describeLoopRoute()` extending `classifyDiminishingReturns`;
       fixture table first (sequence, queue, token, budgetSpent → route) including the existing
       `7,7,7,7,4` and `0,0,0` rows; `MEDIUM_N` derived inside from gate content.
-- [ ] Route 2b (cosmetic residue) in Outcome branching beside the Diminishing-returns exit: PASS-only
+- [x] Route 2b (cosmetic residue) in Outcome branching beside the Diminishing-returns exit: PASS-only
       precondition **stated as an exclusion**, LOWs to `recommendations.future` by id, `**Loop exit**`
       row from `describeLoopRoute`.
-- [ ] Route 2c (gate-the-last-fix) as the loop-limit trigger's pre-escalation step in Loop Escalation:
+- [x] Route 2c (gate-the-last-fix) as the loop-limit trigger's pre-escalation step in Loop Escalation:
       precondition, the ordinary 5a invocation on the fix's head, the two outcomes.
-- [ ] Guards table gains both rows; the "two cycle-3 rules are opposites" paragraph becomes a
+- [x] Guards table gains both rows; the "two cycle-3 rules are opposites" paragraph becomes a
       four-way table (stall / finished / cosmetic / budget).
-- [ ] §5c and the parity test: the accepting-route set gains 2b and 2c as routes; consumers still
+- [x] §5c and the parity test: the accepting-route set gains 2b and 2c as routes; consumers still
       point at §5c and read the `**Action**` row, whose value set is unchanged.
-- [ ] `docs/runbooks/qa-flow.md`: the four-ways-it-ends table and the mermaid (add the missing
+- [x] `docs/runbooks/qa-flow.md`: the four-ways-it-ends table and the mermaid (add the missing
       route-2 and escalation edges as well as 2b/2c).
-- [ ] Replay fixtures (both sides): PASS+LOW-only after two HIGH-0 gates → 5c; budget spent,
+- [x] Replay fixtures (both sides): PASS+LOW-only after two HIGH-0 gates → 5c; budget spent,
       HIGH-0 medium-falling → half-cycle gate → 5c.
 
 **Dependencies**: Phase 1 (the half-cycle writes `qa_phase`).
@@ -259,17 +259,17 @@ and the Phase 0b "Resume / Start fresh" prompt), `shared/resources/pipeline-resu
 the develop-task / develop-story HALT messages in the step-5-6 doc
 
 **Changes**:
-- [ ] Reconstruction rule: `QA_CYCLE = max N over gate.{N}.yml`; `cycles_outside_loop = QA_CYCLE −
+- [x] Reconstruction rule: `QA_CYCLE = max N over gate.{N}.yml`; `cycles_outside_loop = QA_CYCLE −
       grep -c "^### QA Cycle"`; back-fill each missing entry (gate verdict, HIGH_N, `run outside the
       loop (operator)`). The report count becomes the cross-check, not the source.
-- [ ] Phase 0b (both SKILL.md): when `halt_reason` ∈ {loop-limit, not-converging}, present the halt
+- [x] Phase 0b (both SKILL.md): when `halt_reason` ∈ {loop-limit, not-converging}, present the halt
       message's own three options plus "Resume at 5a with {k} more cycles"; on accept, write
       `extra_cycles_granted: k` into the **lock**; `QA_MAX_CYCLES = 5 + extra_cycles_granted` for this
       run. Do not reuse `MAX_ITER` — that is the Step 3 develop-loop bound.
-- [ ] The HALT messages name the re-entry option ("re-run /develop-task to resume with more cycles").
-- [ ] Detector prompt reads `extra_cycles_granted` from the lock/snapshot and reports it in `deltas_since_pause`.
-- [ ] Contract test: the resume contract, the step doc and both SKILL.md agree on the field name.
-- [ ] Replay fixture (both sides): halt at 5, standalone cycle 6 on disk, re-invoke → offers the
+- [x] The HALT messages name the re-entry option ("re-run /develop-task to resume with more cycles").
+- [x] Detector prompt reads `extra_cycles_granted` from the lock/snapshot and reports it in `deltas_since_pause`.
+- [x] Contract test: the resume contract, the step doc and both SKILL.md agree on the field name.
+- [x] Replay fixture (both sides): halt at 5, standalone cycle 6 on disk, re-invoke → offers the
       grant → resumes at 5a as cycle 7 with `cycles_outside_loop: 1` back-filled.
 
 **Dependencies**: Phase 1.
@@ -288,14 +288,14 @@ the develop-task / develop-story HALT messages in the step-5-6 doc
 
 ### Files to Modify (Tests)
 
-8. ✅ `shared/resources/qa-diminishing-returns.test.*` (beside the engine) — route fixture table
+8. ✅ `shared/resources/tests/qa-loop-route.test.mjs` (new — the engine's suite lives under `tests/`, not beside it) + 6 gate fixtures under `tests/fixtures/qa-diminishing-returns/` — route fixture table
 9. ✅ `shared/resources/advance-pipeline-lock.test.sh` — monotonic pin; `qa_phase` is a valid lock field
 10. ✅ `evals/develop-task/step-isolation/`, `evals/develop-story/step-isolation/` — three new replay fixtures each
-11. ✅ `evals/shared/tests/pr-review-loop-parity.test.mjs` — accepting-route set now includes 2b/2c
+11. ✅ `evals/shared/tests/pr-review-loop-parity.test.mjs` — accepting-route set now includes 2b/2c; `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` (new) — `qa_phase` / `extra_cycles_granted` spelled once across eight files
 
 ### Files to Modify (Documentation)
 
-12. ✅ `docs/runbooks/qa-flow.md` (table + mermaid), `docs/reference/configuration.md` (if a key is added)
+12. ✅ `docs/runbooks/qa-flow.md` (table + mermaid); `docs/reference/configuration.md` untouched — no config key was added (`extra_cycles_granted` is a lock field, not config)
 13. ✅ `skills/*/references/` — regenerated (`npm run bundle`)
 
 ### Files NOT Modified (deliberately)
@@ -310,20 +310,20 @@ None.
 ## 8. Testing Strategy
 
 ### Unit Tests
-- [ ] Lock helper: `advance` still refuses 6 → 5; a lock with `qa_phase` passes `require_parsable_lock`;
+- [x] Lock helper: `advance` still refuses 6 → 5; a lock with `qa_phase` passes `require_parsable_lock`;
       the Stop hook names `/qa-task`, `/qa-fix`, `/review-pr` from `qa_phase` and `/qa-task` when absent.
-- [ ] `classifyLoopRoute` as a pure function with a fixture table (sequence, queue, token, budgetSpent
+- [x] `classifyLoopRoute` as a pure function with a fixture table (sequence, queue, token, budgetSpent
       → route), including the existing `7,7,7,7,4` and `0,0,0` rows; mutation proof: drop the PASS-only
       guard on 2b and a CONCERNS+LOW row must go red.
 
 **Command**: `npm test`
 
 ### Integration Tests
-- [ ] Replay fixtures for 2b, 2c and re-entry pass under `npm run eval:all`.
-- [ ] `pr-review-loop-parity` still forbids paraphrase of the accepting-route set.
+- [x] Replay fixtures for 2b, 2c and re-entry pass under `npm run eval:all`.
+- [x] `pr-review-loop-parity` still forbids paraphrase of the accepting-route set.
 
 ### Contract Tests
-- [ ] Resume contract, the step doc and both develop-* SKILL.md agree on `extra_cycles_granted` and
+- [x] Resume contract, the step doc and both develop-* SKILL.md agree on `extra_cycles_granted` and
       `qa_phase` (one test, four files).
 
 ### Performance Tests
@@ -335,20 +335,20 @@ Not applicable.
 ## 9. Success Criteria
 
 ### Functional
-- [ ] A PASS gate with LOW-only residue after two HIGH-0 cycles reaches 5c without a 5b cycle.
-- [ ] A HIGH-0, medium-falling loop that spends its budget gets one gated half-cycle before any
+- [x] A PASS gate with LOW-only residue after two HIGH-0 cycles reaches 5c without a 5b cycle.
+- [x] A HIGH-0, medium-falling loop that spends its budget gets one gated half-cycle before any
       escalation entry is written; a clean half-cycle gate hands to 5c.
-- [ ] `current_step` reads `5` for the whole QA loop; `qa_phase` names the sub-step; no step doc
+- [x] `current_step` reads `5` for the whole QA loop; `qa_phase` names the sub-step; no step doc
       instructs a hand `jq` on `current_step`.
-- [ ] Re-invocation after a loop-limit halt offers the grant, counts on-disk gates, and back-fills
+- [x] Re-invocation after a loop-limit halt offers the grant, counts on-disk gates, and back-fills
       the report entries the operator's cycles did not write.
 
 ### Performance
-- [ ] Cycle cost of route 2c ≤ half a full cycle (no fix, no suite re-run beyond the gate's).
+- [x] Cycle cost of route 2c ≤ half a full cycle (no fix, no suite re-run beyond the gate's).
 
 ### Code Quality
-- [ ] Every new route has a replay fixture and a mutation proof recorded.
-- [ ] The accepting-route set is still stated once (§5c) — consumers point, do not restate.
+- [x] Every new route has a replay fixture and a mutation proof recorded.
+- [x] The accepting-route set is still stated once (§5c) — consumers point, do not restate.
 
 ### Migration
 - [ ] Observations #72, #77, #95, #100, #112 close naming the PR.
@@ -388,21 +388,93 @@ None.
 - **Critical**: a HIGH finding exits the loop.
 - **Non-critical**: record wording, runbook diagram.
 
+## Implementation Record
+
+**Implemented**: 2026-09-18 → 2026-09-19 (develop, run 1 of `/develop-task`). **Status**: Ready for Review.
+
+### Summary
+
+Three phases, one engine. The QA loop's route decision is now one call — `classifyLoopRoute()` in
+`shared/resources/qa-diminishing-returns.js` — returning `diminishing-returns | cosmetic-residue |
+gate-the-last-fix | continue`; the lock reads `current_step: 5` for the whole loop with a
+`qa_phase: 5a|5b|5c` sub-position the Stop hook names sub-skills from; and a re-invocation after a
+loop-limit halt reconstructs the cycle count from the gates on disk, back-fills the report, and offers
+`extra_cycles_granted`.
+
+### Approach
+
+- **Phase 1 (option B).** `develop-pipeline-on-stop.sh` gains a `case 5)` that reads `qa_phase`
+  (`5b → /qa-fix`, `5c → /review-pr`, else `/qa-task|/qa-story` — the loud default) and asks for the
+  end-of-loop advance as `5 → 7`; `case 6)` stays for a pre-task.123 lock; develop-bug's map is
+  untouched. The step-5-6 doc's new **Lock position for the loop** subsection defines `set_qa_phase`
+  (mktemp + mv, never `current_step`) and each of 5a/5b/5c calls it first. `advance-pipeline-lock.sh`
+  is unchanged — the test suite now pins that `6 → 5` is still refused and that `qa_phase` survives
+  noop, advance and `--skill` paths.
+- **Phase 2 (routes).** `readTopIssues` now carries `id`; `readGateToken` and `countRaised`
+  (MEDIUM/LOW only — HIGH stays the awk's, and the engine suite's group 7 source check still holds)
+  are new readers. `classifyLoopRoute` wraps `classifyDiminishingReturns` (still exported; route 2
+  first), then route 2b (PASS-only, every open entry LOW, HIGH 0 ×2, cycle ≥ 2), and — with
+  `budgetSpent: true` — route 2c (last cycle's Action row reads `Running qa-fix`, HIGH 0 throughout,
+  MEDIUM strictly falling over three gates, MEDIUM_N read from the gate itself). `describeLoopRoute`
+  delegates route 2's text so the existing pins hold. The doc gains the four-way guards table, the
+  Cosmetic-residue section (On-exit list mirrors route 2's), the Gate-the-last-fix pre-escalation step,
+  a `**MEDIUM findings**` row, the `Escalating — loop limit reached` Action value, and
+  `QA_MAX_CYCLES` in place of the literal 5. §5c enumerates five routes; `pr-review-loop-parity` was
+  extended (not paraphrased) to pin items 4 and 5 and the new value set.
+- **Phase 3 (re-entry).** The resume contract's reconstruction now reads `max N over gate.{N}.yml`;
+  the report count is the cross-check; `CYCLES_OUTSIDE_LOOP` is derived, never stored; back-filled
+  entries carry `**Origin**: run outside the loop (operator)`. Both SKILL.md files carry the Phase 0b
+  grant prompt and the `extra_cycles_granted` lock write; the detector prompt reports both new fields;
+  both HALT messages gain option 4. `MAX_ITER` is untouched.
+
+### Testing
+
+- `npm run ci:fast`: format clean; **3488 pass, 0 fail** (node suites) + all bash suites green
+  (`advance-pipeline-lock.test.sh` 37, `develop-pipeline-on-stop.test.sh` 23).
+- New: `qa-loop-route.test.mjs` (29 tests, 19-row fixture table + 6 gate fixtures),
+  `qa-loop-lock-fields-parity.test.mjs` (5), on-stop scenario 10 (10 rows), lock-helper scenario 7b (7).
+- `npm run eval:all`: 34 replay scenarios green incl. the six new fixtures
+  (`10-qa-pass-low-only-cosmetic-residue-routes-to-5c`, `11-qa-budget-spent-gate-the-last-fix-half-cycle`,
+  `12-qa-reentry-after-loop-limit-with-grant`, on both develop-task and develop-story).
+- `bundle:check`, `check:generated`, `validate:all`, `lint:shell` (shellcheck `--severity=warning`): all exit 0.
+- **Mutation proofs** (each mutant restored byte-identical afterwards):
+
+  | Mutant | Suite | Red |
+  |---|---|---|
+  | drop the PASS-only guard on 2b | qa-loop-route | 6 |
+  | drop the last-cycle-was-5b guard on 2c | qa-loop-route | 1 |
+  | strictly falling → non-strict on 2c | qa-loop-route | 2 |
+  | drop HIGH-0-throughout on 2c | qa-loop-route | 2 |
+  | 2b reads all entries, not open ones | qa-loop-route | 1 |
+  | 2b needs one HIGH-0 gate, not two | qa-loop-route | 1 |
+  | Stop hook ignores `qa_phase` | on-stop.test.sh | 4 |
+  | Stop hook advances 5 → 6 instead of 5 → 7 | on-stop.test.sh | 8 |
+
+### Deferred Work
+
+- Success criterion **Migration** ("Observations #72, #77, #95, #100, #112 close naming the PR") — needs
+  the PR number, so it is done by the orchestrator after Step 4 opens the PR, not here.
+- Consumer test ("next multi-cycle pipeline run") — a future run, by definition.
+- The banner doc's `cycle {CYCLE}/5` strings keep the literal; Loop Setup states that the `5` reads
+  `QA_MAX_CYCLES` on a granted re-entry. Rewriting the banner catalogue was out of scope.
+
+## Change Log
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-17 | 1.0 | Initial draft — observation review 2026-09-17 (obs #72, #77, #95, #100, #112) | create-task |
 | 2026-09-18 | 1.1 | Review 1 (6/10 → revised): Problem 4 rewritten around report-vs-disk cycle count (no `qa_cycles_completed` field exists); route 2c relocated to the loop-limit pre-escalation step; lock option B decided; predicates extend `qa-diminishing-returns.js`; Files Summary corrected; story-side fixtures scoped; title shortened | review-task |
 | 2026-09-18 |  | Status → ready-for-development | review-task |
+| 2026-09-19 |  | Implemented — 14 source files modified, 8 new (engine routes, qa_phase hook, re-entry contract, 6 replay fixtures ×2 sides); 3488 node tests + bash suites green; 8 mutants caught | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: lock position
-- [ ] Phase 2: routes 2b / 2c
-- [ ] Phase 3: re-entry
+- [x] Phase 1: lock position
+- [x] Phase 2: routes 2b / 2c
+- [x] Phase 3: re-entry
 - [ ] QA: `task.123.qa.[N].qa-loop-exits-and-re-entry.md`
 - [ ] Gate: `task.123.gate.[N].qa-loop-exits-and-re-entry.yml`
 

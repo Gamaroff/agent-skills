@@ -80,7 +80,7 @@ For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<
 | 1. create-branch | Branch exists in git | `git branch --list "feature/story.{epic}.{story}.*"` returns the branch |
 | 3. develop | All tasks complete | Story file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's three accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
+| 5–6. qa loop | **Both** `story.{epic}.{story}.qa.{N}.*.md` **and** `story.{epic}.{story}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. | `ls {story-directory}/story.*.qa.*.md` AND `ls {story-directory}/story.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
 | 7. finalise | **All three**: `story.{epic}.{story}.dod.{N}.*.md` exists **and** story `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {story-directory}/story.*.dod.*.md` AND `grep -iE "^status:\s*accepted" {story-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ### develop-task artifact table
@@ -90,7 +90,7 @@ For ✅ steps whose `Subagent summary ref` column points to a `.summaries/step-<
 | 1. create-branch | Branch exists in git | `git branch --list "feature/task.{id}.*"` returns the branch |
 | 3. develop | All phases complete | Task file `Status:` field reads `Ready for Review` |
 | 4. create-pr | PR exists | `gh pr view {PR-number} --json state` returns open or merged |
-| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's three accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. | `ls {task-directory}/task.*.qa.*.md` AND `ls {task-directory}/task.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
+| 5–6. qa loop | **Both** `task.{id}.qa.{N}.*.md` **and** `task.{id}.gate.{N}.*.yml` exist **and** PR comment posted. **Conditional — the 5c check reads the implementation report, not the filesystem**: when the latest gate **reached 5c** — read mechanically from the same entry this check already opens: the highest `### QA Cycle {N}` entry's `**Action**` row reads `Proceeding to 5c` (5a writes it on every one of §5c's five accepting routes; do not re-derive the set from the gate's token or queue) — that entry's `**PR Review**` row must hold a **terminal verdict** — `APPROVE` or `CONCERNS`. Any other value (`pending — 5c not yet run`, `REQUEST CHANGES`, `review failed`, `not reached`, blank, or a missing row) means 5c did not clear, and Step 5–6 is **not** complete. A mid-loop resume on a gate that routed to 5b (its entry's `**Action**` row reads `Running qa-fix`) legitimately has no terminal verdict. | `ls {task-directory}/task.*.qa.*.md` AND `ls {task-directory}/task.*.gate.*.yml` AND `gh pr view {PR} --comments --json comments \| grep -i "QA"` — gate alone is insufficient. Then the 5c check, which is a **read of the implementation report** performed by the resume detector, not a shell command: take the last `### QA Cycle` entry and read its `**PR Review**` row. |
 | 7. finalise | **All three**: `task.{id}.dod.{N}.*.md` exists **and** task `status:` reads `accepted` **and** finalise acceptance comment posted to PR | `ls {task-directory}/task.{id}.dod.*.md` AND `grep -iE "^status:\s*accepted" {task-file}` AND `gh pr view {PR} --comments --json comments \| grep -i "accepted"` |
 
 ## Plan Freshness (Step 3 Prerequisite)
@@ -140,21 +140,72 @@ A `gate.yml` written manually (without running the QA skill) does NOT satisfy St
 > already the row this section reads for cycle reconstruction, and it carries the verdict directly —
 > so no index arithmetic, no globs, and no shell portability surface.
 
-If the last completed step was within the QA loop, count the number of `### QA Cycle` entries in the QA Iteration History section of the implementation report:
+If the last completed step was within the QA loop, reconstruct the cycle count **from the gates on
+disk**, and use the `### QA Cycle` entries in the implementation report as the cross-check:
 
 ```bash
+# The gate is what a QA run leaves behind whether or not it ran inside this pipeline.
+QA_CYCLE=$(ls {doc-directory}/{story|task}.*.gate.*.yml 2>/dev/null \
+  | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/' | sort -n | tail -1)
+QA_CYCLE=${QA_CYCLE:-0}
 COMPLETED=$(grep -c "^### QA Cycle" {implementation-report-path})
-NEXT_CYCLE=$((COMPLETED + 1))
+CYCLES_OUTSIDE_LOOP=$((QA_CYCLE - COMPLETED))     # derived here, never stored — see below
+NEXT_CYCLE=$((QA_CYCLE + 1))
 ```
 
-Set the cycle counter to `NEXT_CYCLE` (= completed + 1) before re-entering the loop. This is the cycle **about to be attempted**.
+Set the cycle counter to `NEXT_CYCLE` (= highest gate + 1) before re-entering the loop. This is the cycle **about to be attempted**.
 
 Examples:
-- 0 entries → `NEXT_CYCLE=1` (fresh start, equivalent to non-resume)
-- 2 entries → `NEXT_CYCLE=3` (cycles 1 + 2 complete, attempting 3 next)
-- 5 entries → `NEXT_CYCLE=6` → exceeds limit → trigger **Loop Escalation** (loop-limit trigger) immediately
+- 0 gates → `NEXT_CYCLE=1` (fresh start, equivalent to non-resume)
+- `gate.2` highest, 2 entries → `NEXT_CYCLE=3` (cycles 1 + 2 complete, attempting 3 next)
+- `gate.5` highest, 5 entries → `NEXT_CYCLE=6` → exceeds `QA_MAX_CYCLES` → the **Re-entry** rule below decides between the grant and **Loop Escalation**
+- `gate.6` highest, 5 entries → `CYCLES_OUTSIDE_LOOP=1`: the operator ran a cycle by hand between halt and re-invocation — back-fill it (below), then `NEXT_CYCLE=7`
 
-This convention ensures the 5-cycle limit is respected across resumes. **The convergence check
+This convention ensures the cycle budget is respected across resumes.
+
+### Re-entry after a QA loop escalation
+
+> **The gap this closes (task.123, obs #95).** A standalone `/qa-task` or `/qa-story` run by the
+> operator after a loop-limit halt writes `gate.{N}` and `qa.{N}` to disk and **no `### QA Cycle`
+> entry** in the implementation report — the entry is the orchestrator's, and no orchestrator was
+> running. Counting report entries therefore under-counts by exactly the cycles the operator ran,
+> and a resumed pipeline re-runs a cycle that already happened. The halt snapshot cannot carry the
+> count either: it is written *at* the halt, before those cycles exist. So the count is
+> **reconstructed from disk at resume** and the report is brought up to it.
+
+1. **Reconstruct.** `QA_CYCLE` = the highest `{N}` over `gate.{N}.*.yml` on disk (the snippet
+   above). `CYCLES_OUTSIDE_LOOP = QA_CYCLE − COMPLETED` is **derived here and never stored** — it is
+   always `0` at halt time, so a snapshot field for it would only ever record nothing.
+2. **Back-fill.** For each `N` with a gate on disk but no `### QA Cycle N` entry, append a minimal
+   entry to QA Iteration History, in cycle order, so the Convergence check and the route classifier
+   read a complete sequence: the gate verdict, `**HIGH findings**` (the Convergence check's awk over
+   that gate), `**MEDIUM findings**` (`countRaised`), `**PR Review**: not reached — gate did not
+   exit the loop`, `**Loop exit**: n/a — this exit not taken`, `**Action**` from the gate's queue by
+   the Outcome branching's arms, and — directly under the heading — `**Origin**: run outside the
+   loop (operator)`. The back-filled entry is a record of a cycle that ran, not a claim that the
+   pipeline ran it.
+3. **Offer the grant.** When the halt snapshot's `halt_reason` matches `loop-limit|not-converging`,
+   Phase 0b's prompt — which lives in `skills/develop-task/SKILL.md` and `skills/develop-story/SKILL.md`,
+   not here — is the halt message's own three options plus **"Resume at 5a with {k} more cycles"**.
+   On accept, write the grant into the **lock** (the orchestrator recreates the lock from the
+   snapshot at Step 1 of the resume; this is one more field on it):
+
+   ```bash
+   jq --argjson k "{k}" '.extra_cycles_granted = $k' .claude/state/develop-pipeline.lock > "$TMP" && mv "$TMP" .claude/state/develop-pipeline.lock
+   ```
+
+   and set **`QA_MAX_CYCLES = 5 + extra_cycles_granted`** for this run. The field is
+   `extra_cycles_granted` in the lock, the halt snapshot (a superset of the lock), the step-5-6 doc
+   and both SKILL.md — one name, and `evals/shared/tests/qa-loop-lock-fields-parity.test.mjs` fails
+   when any of the four disagrees. **Do not reuse `MAX_ITER`**: that is the Step 3 develop-loop
+   bound (below), a different budget over a different loop.
+4. **Re-enter at 5a as cycle `NEXT_CYCLE`** with `set_qa_phase 5a`. A resume with
+   `NEXT_CYCLE > QA_MAX_CYCLES` and no grant goes straight to **Loop Escalation** as before.
+
+The lock's `qa_phase` (`5a|5b|5c`, written by the loop as it moves) corroborates the 5c sub-state
+table above — a snapshot at `qa_phase: 5c` with `**PR Review**: pending` is the narrow window that
+table describes — but the `**PR Review**` row stays the source of truth, because it is written by
+contract on every cycle and `qa_phase` is absent on a lock from a run that predates it. **The convergence check
 also survives a resume**: it reads the per-cycle HIGH counts back out of the `### QA Cycle` entries
 in the implementation report (`**HIGH findings**: {n}`), so a resumed run at cycle 3 or later
 evaluates the same sequence a continuous run would. If an earlier cycle's entry has no HIGH count
@@ -175,6 +226,9 @@ gh pr view "$(grep 'PR:' {implementation-report} | awk '{print $2}')" --json sta
 If the branch or PR no longer matches, warn the user before proceeding: "Pipeline state has diverged — recorded branch/PR may differ from current state. Proceeding anyway."
 
 ## Develop Loop — Stall Semantics and MAX_ITER Bound
+
+> `MAX_ITER` bounds the **Step 3 develop loop** and nothing else. The QA loop's budget is
+> `QA_MAX_CYCLES` (step-5-6 doc, Loop Setup; extended by `extra_cycles_granted` above).
 
 Before iteration 1: dispatch an Explore subagent (read-only) to capture initial loop state, using the **shared loop-audit prompt** (`references/loop-audit-prompt.md`).
 

@@ -1,0 +1,14 @@
+{
+  "skill": "develop-task",
+  "report_path": "docs/tasks/task.42.example/task.42.implementation.1.example.md",
+  "task_or_story_id": "42",
+  "task_or_story_directory": "docs/tasks/task.42.example",
+  "branch": "feature/task.42.example",
+  "pr_url": "https://github.com/example/repo/pull/1",
+  "tracker": "github",
+  "tracker_issue": "1",
+  "current_step": 5,
+  "qa_phase": "5c",
+  "extra_cycles_granted": 2,
+  "started_at": "2026-09-18T12:00:00Z"
+}

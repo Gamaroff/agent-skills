@@ -1,0 +1,16 @@
+{
+  "skill": "develop-story",
+  "report_path": "docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example/story.5.1.implementation.1.example.md",
+  "task_or_story_id": "5.1",
+  "task_or_story_directory": "docs/prd/domain/feature/epics/epic.5.example/stories/story.5.1.example",
+  "branch": "feature/story.5.1.example",
+  "pr_url": "https://github.com/example/repo/pull/1",
+  "tracker": "github",
+  "tracker_issue": "1",
+  "current_step": 5,
+  "qa_phase": "5b",
+  "started_at": "2026-09-18T12:00:00Z",
+  "halted_at": "2026-09-18T13:00:00Z",
+  "halt_reason": "loop-limit",
+  "halt_step": "5"
+}

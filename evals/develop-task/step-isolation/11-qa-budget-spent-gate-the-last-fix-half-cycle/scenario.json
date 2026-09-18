@@ -1,0 +1,77 @@
+{
+  "name": "develop-task-step-05-route-2c-gate-the-last-fix-half-cycle",
+  "skill": "develop-task",
+  "description": "Steps 5–6, route 2c (task.123 / obs #112): five CONCERNS gates with HIGH 0 throughout and MEDIUM falling 4, 3, 2, 1 — the budget is spent on cycle 5's fix, which no gate has read. Loop Escalation evaluates the half-cycle before writing an entry: one ordinary qa-task (no qa-fix) writes gate.6, which reads PASS and hands to 5c. Fixture records qa-task×6, qa-fix×5, review-pr×1 — never six qa-fix, never a halt.",
+  "prompt": "Run steps 5–6 (qa loop) of the develop-task pipeline for task.42.example. Cycles 1–5 read CONCERNS with HIGH 0 and MEDIUM 5, 4, 3, 2, 1; cycle 5's qa-fix lands and the budget is spent.",
+  "assertions": [
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml"
+      ]
+    },
+    {
+      "fn": "fileExists",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.6.example.yml"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.5.example.yml",
+        "gate: CONCERNS"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.6.example.yml",
+        "gate: PASS"
+      ]
+    },
+    {
+      "fn": "fileMatches",
+      "args": [
+        "$SANDBOX/docs/tasks/task.42.example/task.42.gate.6.example.yml",
+        "half-cycle: gate-the-last-fix"
+      ]
+    },
+    {
+      "fn": "pipelineStepsRan",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        [
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "qa-fix",
+          "qa-task",
+          "review-pr"
+        ]
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-fix",
+        5
+      ]
+    },
+    {
+      "fn": "loopBoundedAt",
+      "args": [
+        "$SANDBOX/.eval/pipeline-events.json",
+        "qa-task",
+        6
+      ]
+    }
+  ]
+}

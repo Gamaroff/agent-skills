@@ -213,13 +213,24 @@ test("5b is entered on an open finding, never on the verdict token", () => {
   const s5c = section5c();
   assert.match(
     s5c,
-    /three routes out of 5a/,
-    "5c must state that three routes reach it — the accepting-route set is stated once, in 5c",
+    /five routes out of 5a/,
+    "5c must state that five routes reach it — the accepting-route set is stated once, in 5c",
   );
   assert.match(
     s5c,
     /3\. a gate that reads \*\*`CONCERNS` with no open entry in `top_issues\[\]`\*\*/,
     "5c must enumerate route 3 (CONCERNS with no open top_issues[] entry) in its numbered list",
+  );
+  // task.123: routes 2b and 2c join the set in the same list, not as a paraphrase elsewhere.
+  assert.match(
+    s5c,
+    /4\. \*\*\(route 2b\)\*\* a gate that took the \*\*Cosmetic-residue exit\*\*/,
+    "5c must enumerate route 2b (the Cosmetic-residue exit) as item 4 of its numbered list",
+  );
+  assert.match(
+    s5c,
+    /5\. \*\*\(route 2c\)\*\* the gate written by the \*\*Gate-the-last-fix half-cycle\*\*/,
+    "5c must enumerate route 2c (the Gate-the-last-fix half-cycle's gate) as item 5 of its numbered list",
   );
 });
 
@@ -393,10 +404,10 @@ test("the accepting-route set is stated once: consumers point at §5c and read t
       `${name} must decide "reached 5c" from the cycle entry's Action row, not from the gate`,
     );
   }
-  // And the set itself lives in exactly one enumerated list: §5c's "three routes out of 5a".
+  // And the set itself lives in exactly one enumerated list: §5c's "five routes out of 5a".
   assert.match(
     section5c(),
-    /three routes out of 5a/,
+    /five routes out of 5a/,
     "§5c must be the one enumerated statement of the set",
   );
   assert.doesNotMatch(
@@ -424,8 +435,24 @@ test("the Action row the consumers read has a writer on every route: post-guard 
   );
   assert.match(
     branching,
-    /value set is exactly `\{Proceeding to 5c \(PR conformance review\), Running qa-fix \(cycle \{N\} of 5\), Escalating — loop not converging\}`/,
-    "the preamble must state the closed value set of the Action row",
+    /value set is exactly `\{Proceeding to 5c \(PR conformance review\), Running qa-fix \(cycle \{N\} of \{QA_MAX_CYCLES\}\), Escalating — loop not converging, Escalating — loop limit reached\}`/,
+    "the preamble must state the closed value set of the Action row (task.123: 'of {QA_MAX_CYCLES}', plus the half-cycle's 'Escalating — loop limit reached')",
+  );
+  // task.123: the Cosmetic-residue exit writes the row as its first step too, and the
+  // half-cycle's fourth resolution has a writer sentence.
+  const onExit2b = sectionBetween(
+    "### Cosmetic-residue exit (shared)",
+    "### 5b. Run QA Fix (shared)",
+  );
+  assert.match(
+    onExit2b,
+    /^1\. \*\*Overwrite the cycle entry's routing rows first\*\*/m,
+    "the Cosmetic-residue On-exit list must write the Action / PR Review rows as its FIRST step",
+  );
+  assert.match(
+    branching,
+    /half-cycle's own gate[^.]*`\*\*Action\*\*: Escalating — loop limit reached` and `\*\*PR Review\*\*: not reached — gate did not exit the loop`/,
+    "the post-guard write must name the half-cycle resolution: Action 'Escalating — loop limit reached' and PR Review 'not reached'",
   );
   // Cycle 5: the rule named the 5c and 5b values only. The third resolution — the Convergence
   // check trips and the run leaves the loop without reaching 5c — had a value in the closed set

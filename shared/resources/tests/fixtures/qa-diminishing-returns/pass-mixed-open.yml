@@ -1,0 +1,30 @@
+schema: 1
+task: "task.RECON.pass-mixed-open"
+gate: PASS
+status_reason: "A PASS gate whose queue holds an open LOW and an open MEDIUM — a gate-writer error under gate rule 5, and not a cosmetic residue."
+reviewer: "QA Engineer"
+updated: "2026-09-17T10:10:00Z"
+
+top_issues:
+  - id: "MIX-001"
+    severity: low
+    file: "src/pipeline/guard.ts"
+    finding: "Cosmetic."
+    suggested_owner: dev
+    status: open
+  - id: "MIX-002"
+    severity: medium
+    file: "src/pipeline/gate.ts"
+    finding: "Not cosmetic."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

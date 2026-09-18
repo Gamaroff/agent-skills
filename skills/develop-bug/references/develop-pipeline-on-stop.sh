@@ -123,10 +123,25 @@ REPORT=$(jq -r '.report_path // .report // "<implementation report>"' "$LOCK")
 #
 # `qa-story`/`qa-fix` cycle until a gate PASSes, so step 6 is not always followed by
 # step 7 — the hook has no way to know, because it never reads the gate. Naming the
-# CURRENT step sidesteps that entirely: the hook can only ever say "run step 6", and
+# CURRENT step sidesteps that entirely: the hook can only ever say "run step 5", and
 # the lock reaches 7 only when the orchestrator itself decides the loop has exited.
 # The hook stops needing to predict a branch it cannot see.
+#
+# ## The QA loop's sub-position is `qa_phase`, not a second step number (task.123)
+#
+# For develop-story / develop-task the lock reads `current_step: 5` for the WHOLE
+# QA loop — 5a (review), 5b (fix), 5c (PR conformance review) — and a separate
+# `qa_phase: 5a|5b|5c` field names the sub-step. The lock helper is monotonic and
+# the loop's 5b→5a re-entry is a backward move, so a step number cannot express
+# it; `qa_phase` can, because it is a label and not a position on the ladder.
+# This hook reads it to name the right sub-skill. An ABSENT `qa_phase` on a
+# step-5 lock names 5a — the loud, re-entrant default: re-running the QA review
+# re-derives a gate, which is recoverable; naming /qa-fix or /review-pr on a
+# cycle that has no gate yet is not. Step 6 stays in the map only for a lock
+# written by a pipeline that predates `qa_phase`; develop-bug keeps its own map.
 NEXT=$CURRENT_STEP
+QA_PHASE=$(jq -r '.qa_phase // ""' "$LOCK" 2>/dev/null)
+ADVANCE_TO=$((NEXT + 1))
 
 if [ "$SKILL" = "develop-bug" ]; then
   # develop-bug has its own step sequence; several steps are internal (no distinct
@@ -149,7 +164,17 @@ else
     2) NEXT_NAME="REVIEW";          NEXT_SKILL_STORY="/review-story";  NEXT_SKILL_TASK="/review-task" ;;
     3) NEXT_NAME="DEVELOP";         NEXT_SKILL_STORY="/develop";       NEXT_SKILL_TASK="/develop" ;;
     4) NEXT_NAME="CREATE PR";       NEXT_SKILL_STORY="/create-pr";     NEXT_SKILL_TASK="/create-pr" ;;
-    5) NEXT_NAME="QA REVIEW";       NEXT_SKILL_STORY="/qa-story";      NEXT_SKILL_TASK="/qa-task" ;;
+    5)
+      # The loop exits to Step 7 — never to a "step 6" — and only when 5c returns
+      # APPROVE or CONCERNS. So the advance this hook asks for at the end of the
+      # loop is 5 → 7, and the sub-skill it names comes from `qa_phase`.
+      ADVANCE_TO=7
+      case "$QA_PHASE" in
+        5b) NEXT_NAME="QA FIX (qa_phase 5b)";                  NEXT_SKILL_STORY="/qa-fix";    NEXT_SKILL_TASK="/qa-fix" ;;
+        5c) NEXT_NAME="PR CONFORMANCE REVIEW (qa_phase 5c)";   NEXT_SKILL_STORY="/review-pr"; NEXT_SKILL_TASK="/review-pr" ;;
+        *)  NEXT_NAME="QA REVIEW (qa_phase 5a)";               NEXT_SKILL_STORY="/qa-story";  NEXT_SKILL_TASK="/qa-task" ;;
+      esac
+      ;;
     6) NEXT_NAME="QA FIX (if needed)"; NEXT_SKILL_STORY="/qa-fix";     NEXT_SKILL_TASK="/qa-fix" ;;
     7) NEXT_NAME="FINALISE";        NEXT_SKILL_STORY="/finalise";      NEXT_SKILL_TASK="/finalise" ;;
     8) NEXT_NAME="COMMIT CHANGES";  NEXT_SKILL_STORY="/commit-changes"; NEXT_SKILL_TASK="/commit-changes" ;;
@@ -165,6 +190,11 @@ else
   fi
 fi
 
+QA_LOOP_NOTE=""
+if [ "$NEXT" = "5" ] && [ "$SKILL" != "develop-bug" ]; then
+  QA_LOOP_NOTE=" Inside the QA loop the lock stays at 5: write \`qa_phase\` (5a/5b/5c) as the loop moves, and advance to 7 only when 5c returns APPROVE or CONCERNS."
+fi
+
 REASON=$(cat <<EOF
 🔁 ${BANNER_PREFIX} — **Step ${NEXT} (${NEXT_NAME}) is PENDING**, not complete. FIRST tool call this turn = the Bash call below. NO prose. NO acknowledgement of this message.
 
@@ -174,7 +204,7 @@ That call is an idempotent re-assert (the lock already reads ${NEXT}); it exists
 
 Then: emit the Remaining Work Status block (position \`Step $((NEXT - 1))/8 ✅ complete\`, then the steps still ahead through Step 8) → banner \`═══ ${BANNER_PREFIX} PIPELINE: STEP ${NEXT}/8 — ${NEXT_NAME} ═══\` → invoke ${NEXT_SKILL}. Status block and banner are one contiguous output, no prose around them.
 
-Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to $((NEXT + 1)) (or \`--complete\` if that was Step 8).
+Only once ${NEXT_SKILL} has actually completed: mark Step ${NEXT} ✅ in \`${REPORT}\` and advance the lock to ${ADVANCE_TO} (or \`--complete\` if that was Step 8).${QA_LOOP_NOTE}
 
 ⚠️ This hook names the step the lock says is PENDING. It cannot tell whether you stalled during that step or just after it, so it always assumes during — repeating a step is recoverable, skipping one is not. **If Step ${NEXT} has genuinely already finished, do NOT skip ahead on the strength of this message**: advance the lock yourself and continue from the real next step.
 

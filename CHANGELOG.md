@@ -6,6 +6,30 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **The QA loop gains two exits, a lock position that can go backwards, and a re-entry rule
+  (task 123).** Four loop shapes the step-5-6 doc had no route for, each observed burning cycles on
+  a real task, now have one. `classifyLoopRoute()` in `qa-diminishing-returns.js` is the loop's
+  route classifier — the Diminishing-returns exit is one arm of it — and returns
+  `diminishing-returns | cosmetic-residue | gate-the-last-fix | continue` from a 19-row fixture table
+  that is the spec. **Route 2b** (cosmetic residue): a `PASS` gate — PASS only, a `CONCERNS` token is
+  a reservation 5c must see raised — whose open entries are all LOW, after two HIGH-0 gates, hands to
+  5c with the LOWs carried to `recommendations.future` by id instead of spending a fix cycle on nits
+  (task.110 ran cycles 12–13 for two; obs #100). **Route 2c** (gate the last fix): at the budget, when
+  the last cycle routed to 5b, HIGH was 0 throughout and MEDIUM fell strictly for three gates, one
+  ordinary 5a runs on the fix's head *before* any escalation entry is written — a clean gate hands to
+  5c, an open entry escalates with that gate in its table (task.117 escalated an ungated fix after
+  five CONCERNS gates; obs #112). The pipeline lock now reads `current_step: 5` for the whole loop
+  with a `qa_phase: 5a|5b|5c` field the Stop hook names `/qa-task`, `/qa-fix` or `/review-pr` from
+  (absent → 5a, the loud default; end-of-loop advance is `5 → 7`); `advance-pipeline-lock.sh` stays
+  monotonic and `6 → 5` stays refused (obs #72). A re-invocation after a loop-limit halt reconstructs
+  the cycle count from `gate.{N}` files on disk, back-fills any `### QA Cycle` entry a standalone
+  `/qa-task` did not write (marked `run outside the loop (operator)`), offers "Resume at 5a with {k}
+  more cycles", and records `extra_cycles_granted` on the lock so `QA_MAX_CYCLES = 5 + k` (obs #95).
+  Guards: the on-stop and lock-helper bash suites pin the hook's `qa_phase` arms and the monotonic
+  refusal; `qa-loop-lock-fields-parity.test.mjs` fails when any of eight files spells either field
+  differently or the step doc ever advances the lock to 6; `pr-review-loop-parity` now pins §5c's five
+  routes; six replay fixtures (routes 2b, 2c, re-entry × task/story) run under `eval:all`.
+
 - **`bundle_skill.py --check` reports `UNREACHED`, and one invocation spelling is now a discovery
   path (task 122).** A `references/` copy with a live `shared/resources/` source that no discovery
   rule in the skill reaches was refreshed on every bundle and never reported — the freshness

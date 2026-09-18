@@ -1,0 +1,17 @@
+schema: 1
+gate: PASS
+status_reason: "Cycle 8."
+reviewer: "QA Engineer"
+updated: "2026-09-18T12:00:00Z"
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 92
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."

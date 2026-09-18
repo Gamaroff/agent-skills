@@ -1,0 +1,37 @@
+schema: 1
+task: "task.RECON.cosmetic-residue"
+gate: PASS
+status_reason: "Reconstruction of task.110 cycle 12 — a PASS gate carrying two LOW nits, HIGH 0 for two cycles (obs #100)."
+reviewer: "QA Engineer"
+updated: "2026-09-17T10:00:00Z"
+
+top_issues:
+  - id: "COSM-001"
+    severity: low
+    file: "src/pipeline/guard.ts"
+    finding: >-
+      A comment still names the pre-fix variable. Cosmetic — nothing reads it.
+      Wrapped prose that mentions severity: high must not be read as a field.
+    suggested_action: "Rename in the comment."
+    suggested_owner: dev
+    status: open
+  - id: "COSM-002"
+    severity: low
+    file: "docs/runbooks/qa-flow.md"
+    finding: "A stale link anchor."
+    suggested_action: "Fix the anchor."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 92
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Unchanged."
+  performance:
+    status: PASS
+    notes: "Unchanged."
