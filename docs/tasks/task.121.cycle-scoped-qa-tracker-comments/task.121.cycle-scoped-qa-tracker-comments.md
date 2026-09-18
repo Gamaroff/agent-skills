@@ -233,9 +233,9 @@ post cycle N again once — one duplicate on at most one in-flight issue, then c
 `shared/resources/tests/comment-slot-coverage.test.mjs`
 
 **Changes**:
-- [ ] Contract: one table, stage → `once per issue` | `once per cycle (numeric suffix required)`,
+- [x] Contract: one table, stage → `once per issue` | `once per cycle (numeric suffix required)`,
       derived from and cross-referencing `CYCLE_SCOPED_STAGES`, not restating it as a second list.
-- [ ] Guard: for every site in **both** `SITES` (tracker-comment.js) and `PR_SITES`
+- [x] Guard: for every site in **both** `SITES` (tracker-comment.js) and `PR_SITES`
       (stakeholder-summary-cli.js), if `CYCLE_SCOPED_STAGES.includes(stage)` — i.e. a cycle-scoped
       stage passed with no suffix — fail with the file and line. The collector's existing
       `--stage\s+"?([A-Za-z0-9_-]+)` regex already captures `qa-gate-` from
@@ -243,7 +243,7 @@ post cycle N again once — one duplicate on at most one in-flight issue, then c
       Non-vacuity: expect **5** suffixed tracker sites (`precompact.sh:329`, `develop-bug`
       verify-loop `:89`, `qa-task`, `qa-story`, `qa-fix`) and **4** suffixed PR-lead sites; assert
       `≥ 4` on each population and record the exact counts in the implementation report.
-- [ ] Mutation-prove: revert one call site to the bare form, confirm the guard names it, restore.
+- [x] Mutation-prove: revert one call site to the bare form, confirm the guard names it, restore.
 
 **Dependencies**: Phase 2 (the guard must be green on the fixed tree and red on the old one).
 
@@ -283,9 +283,9 @@ None.
 **Scope**: engine stage validation and lead rendering.
 
 **Actions**:
-- [ ] `qa-gate-2` accepted; `qa-gate` still accepted; `in-review-2` rejected.
-- [ ] Lead for `qa-gate-2` with `verdict=PASS blocking_count=0` equals the lead for `qa-gate`.
-- [ ] Marker for `qa-gate-2` is `agent-skills-comment:qa-gate-2`; a second call with the same stage
+- [x] `qa-gate-2` accepted; `qa-gate` still accepted; `in-review-2` rejected.
+- [x] Lead for `qa-gate-2` with `verdict=PASS blocking_count=0` equals the lead for `qa-gate`.
+- [x] Marker for `qa-gate-2` is `agent-skills-comment:qa-gate-2`; a second call with the same stage
       returns `already`; `qa-gate-3` posts.
 
 **Command**: `npm test`
@@ -295,13 +295,13 @@ None.
 **Scope**: the shipped call sites.
 
 **Actions**:
-- [ ] `comment-slot-coverage.test.mjs` finds 5 suffixed tracker sites and 4 suffixed PR-lead
+- [x] `comment-slot-coverage.test.mjs` finds 5 suffixed tracker sites and 4 suffixed PR-lead
       sites, and no bare cycle-scoped stage in either population.
-- [ ] Mutation: revert `qa-fix` Step 7 to `--stage qa-fix` → guard red, naming the file.
+- [x] Mutation: revert `qa-fix` Step 7 to `--stage qa-fix` → guard red, naming the file.
 
 ### Contract Tests
 
-- [ ] `CYCLE_SCOPED_STAGES` equals `CYCLE_SCOPED_LEAD_STAGES` (existing test, now with four members).
+- [x] `CYCLE_SCOPED_STAGES` equals `CYCLE_SCOPED_LEAD_STAGES` (existing test, now with four members).
 - [ ] `tests/bundled-links.test.js` and `npm run bundle:check` green after the bundle.
 
 ### Performance Tests
@@ -317,18 +317,18 @@ Not applicable — no runtime path changes beyond one array member.
 
 ### Functional
 - [ ] Every QA cycle's gate and fix comment reaches the tracker issue with a distinct marker.
-- [ ] A resumed cycle still returns `already` for its own suffixed stage.
-- [ ] Neither the `qa-cycle-{N}` nor the `qa-fix-{N}` block remains in
+- [x] A resumed cycle still returns `already` for its own suffixed stage.
+- [x] Neither the `qa-cycle-{N}` nor the `qa-fix-{N}` block remains in
       `develop-pipeline-step-5-6-qa-loop.md` (develop-story/develop-task); `develop-bug`'s
       verify-loop `qa-cycle-{N}` call is unchanged and still passes the guard.
 
 ### Performance
-- [ ] No change to comment latency; one extra list member in the validator.
+- [x] No change to comment latency; one extra list member in the validator.
 
 ### Code Quality
 - [ ] `npm test` green; the new guard has a non-vacuity floor and a passed mutation proof recorded
       in the implementation report.
-- [ ] `CYCLE_SCOPED_STAGES` remains the single definition (contract table cross-references it).
+- [x] `CYCLE_SCOPED_STAGES` remains the single definition (contract table cross-references it).
 
 ### Migration
 - [ ] Contract documents the stage classes; observation #75 marked `actioned` with the PR number.
@@ -386,7 +386,7 @@ None.
 
 - [x] Phase 1: engine
 - [x] Phase 2: call sites + orchestrator block
-- [ ] Phase 3: contract + guard
+- [x] Phase 3: contract + guard
 - [ ] QA: `task.121.qa.[N].cycle-scoped-qa-tracker-comments.md`
 - [ ] Gate: `task.121.gate.[N].cycle-scoped-qa-tracker-comments.yml`
 

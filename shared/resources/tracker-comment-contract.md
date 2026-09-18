@@ -88,6 +88,32 @@ the plain-language lead was added, it is also what selects the lead. A comment
 that genuinely should be posted every time may still omit it, but must then pass
 `--summary-file` (see below); an omitted `--stage` alone is now a usage error.
 
+### Once per issue, or once per cycle
+
+A stage's identity is also its **idempotency scope**, and the two scopes are
+not interchangeable:
+
+| Stage class | Fires | Marker | `--stage` as passed |
+|---|---|---|---|
+| Every stage not in `CYCLE_SCOPED_STAGES` — `work-started`, `in-review`, `develop-complete`, `review`, `review-story` / `review-task`, `done`, … | once per issue | `agent-skills-comment:{stage}` | the bare name; a suffix is exit 2 |
+| `qa-gate`, `qa-cycle`, `qa-fix` | once per QA cycle | `agent-skills-comment:{stage}-{N}` | **`{stage}-{N}` — the numeric suffix is required** |
+| `pipeline-paused` | once per pause | `agent-skills-comment:pipeline-paused-{step}` | `pipeline-paused-{step}` — the step it paused at |
+
+The second and third rows are `CYCLE_SCOPED_STAGES` in `tracker-comment.js`,
+and that list wins: this table describes it, and a stage added there without a
+row here is still cycle-scoped. It is not restated as a second list anywhere —
+`comment-slot-coverage.test.mjs` imports it, and the marker rule in the *Marker*
+column is what makes the scope matter. **Passing a cycle-scoped stage bare is
+not a usage error** — the bare name is a legal stage — **it is a silent
+suppression**: the marker becomes cycle 1's, so every later cycle returns
+`already`, exit 0, and posts nothing, and nothing in the log distinguishes that
+from a post. That is what the QA skills did on every multi-cycle run before
+task.121 (issue #419: three cycles, one `qa-gate` marker), and why
+`comment-slot-coverage.test.mjs` now fails on a cycle-scoped stage passed
+without a `-${cycle}` suffix at any shipped tracker or pull-request call site.
+The cycle comes from the gate filename the QA skill just wrote — derived once,
+above both calls, so the two cannot disagree about which round this is.
+
 > `--stage` here is deliberately **not** read from `pipeline:` in
 > `tracker-workflow.yaml`. That block decides which column a card moves to, and
 > an omitted moment there means "do not move the card" — it does not mean "do
@@ -187,9 +213,9 @@ the pipeline should never reach at runtime, and wants to hear about loudly if it
 does.
 
 **`--stage` is validated against a known list** (`COMMENT_STAGES`, plus a numeric
-suffix for the cycle-scoped `qa-cycle` / `qa-fix`, and for `pipeline-paused`, whose
-suffix is the step the pipeline paused at — the PreCompact hook's comment, one per
-distinct pause point). An unlisted stage is exit 2
+suffix for the cycle-scoped stages — see *Once per issue, or once per cycle* above;
+for `pipeline-paused` the suffix is the step the pipeline paused at — the PreCompact
+hook's comment, one per distinct pause point). An unlisted stage is exit 2
 rather than a silently unique marker that nothing could ever deduplicate against.
 
 ### Why `unverifiable` is not `already`
