@@ -1855,7 +1855,7 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # highest-numbered `*.gate.{N}.*.yml` in the directory. It is the STAGE SUFFIX
 # (`qa-gate-3`), which is what keys the tracker comment's idempotency marker:
 # bare `qa-gate` was suppressed by cycle 1's marker on every later cycle
-# (task.121). ONE definition — `references/qa-cycle.sh` — called in EVERY block
+# (task.121). ONE definition — the bundled `qa-cycle.sh` — called in EVERY block
 # that needs the cycle: each fenced block runs as its own shell, so a value
 # derived in this block does not exist in Step 6b's (TASK-121-BUG-2). The helper
 # refuses rather than guesses: no numbered gate → empty stdout, one ⚠️ line on
@@ -1865,15 +1865,19 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # identical to the tracker call so one guard covers both — and when the cycle
 # is unknown the pull-request comment still posts, without the lead, because it
 # carries no marker and losing it would hide the ⚠️ from the reviewer.
-# Addressed skill-relatively (`references/…`) like the lead CLI call beneath it;
-# the tracker block addresses the same helper from the repository root, like
-# ITS engine call — one cwd per block (TASK-121-BUG-4). What a block inherits
-# from earlier blocks is the INPUTS an agent re-binds when it runs the block
-# ($STORY_DIR, $GATE_DECISION, $BODY_FILE, $PR_URL); a COMPUTED value like the
-# cycle never is.
-QA_CYCLE=$(bash references/qa-cycle.sh "$STORY_DIR") || QA_CYCLE=
+# Every path in this block resolves from the REPOSITORY ROOT — `.claude/state/…`
+# above, and `.agents/skills/qa-story/references/…` for the helper and the lead
+# CLI here — one cwd per block, the same cwd in every block (TASK-121-BUG-4,
+# BUG-6). What a block inherits from earlier blocks is the INPUTS an agent
+# re-binds when it runs the block ($STORY_DIR, $GATE_DECISION, $BODY_FILE,
+# $PR_URL); a COMPUTED value like the cycle never is.
+QA_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR"); rc=$?
+# rc 1 = the helper REFUSED (no numbered gate) → empty, the skip branch below.
+# Anything else (127 not found, 126 not runnable) is a broken invocation, and
+# it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
+[ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
 if [ -n "$QA_CYCLE" ]; then
-  LEAD=$(node references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
+  LEAD=$(node .agents/skills/qa-story/references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
     --slot verdict="$GATE_DECISION") || exit 1
   printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
     && mv "${BODY_FILE}.tmp" "$BODY_FILE"
@@ -1937,12 +1941,16 @@ if [ -n "$QA_ISSUE" ]; then
   # unknown cycle skips the post and says so.
   #
   # Addressed from the REPOSITORY ROOT — `.agents/skills/qa-story/references/…` —
-  # because that is how the engine call below is addressed, and every command
-  # in one block must resolve from the same cwd (TASK-121-BUG-4). What this
+  # like the engine call below and like every block in this skill: one cwd,
+  # the repository root, everywhere (TASK-121-BUG-4, BUG-6). What this
   # block inherits from earlier blocks is the INPUTS an agent re-binds when it
   # runs a block ($STORY_DIR, $QA_ISSUE, $GATE_DECISION, $score, $PR_NUMBER,
   # $PR_URL); a COMPUTED value like the cycle is never carried over.
-  QA_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR") || QA_CYCLE=
+  QA_CYCLE=$(bash .agents/skills/qa-story/references/qa-cycle.sh "$STORY_DIR"); rc=$?
+  # rc 1 = the helper REFUSED (no numbered gate) → empty, the skip branch below.
+  # Anything else (127 not found, 126 not runnable) is a broken invocation, and
+  # it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
+  [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
 
   # blocking_count — the high-severity entries in the gate this run just wrote:
   # the gate that CARRIES the cycle number above, so the count and the suffix
@@ -2908,7 +2916,7 @@ This traceability feeds into quality gates:
 - Tasks: `task.[number].qa.[number].[descriptive-name].md` (co-located with task)
 
 **Gate Files** — the `[number]` after `gate.` is the QA cycle, and it is **load-bearing**: it is the
-suffix of the cycle-scoped tracker-comment stage (`qa-gate-N`), derived by `references/qa-cycle.sh`
+suffix of the cycle-scoped tracker-comment stage (`qa-gate-N`), derived by the bundled `qa-cycle.sh`
 from the gate filename. A gate written without it cannot be keyed to a cycle, and the helper refuses
 rather than guesses (task.121). Every writer (`qa-gate`, `qa-story`, `qa-task`) produces the numbered
 form; the un-numbered form this section once documented is not valid.

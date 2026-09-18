@@ -25,7 +25,7 @@
  * behaviour differs from bash's; the `bash references/qa-cycle.sh` invocation is
  * what makes that difference not matter, and this is where that claim is tested.
  */
-const { test } = require("node:test");
+const { test, after } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -50,8 +50,14 @@ function run(shell, dir) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
+const FIXTURE_DIRS = [];
+after(() => {
+  for (const d of FIXTURE_DIRS) fs.rmSync(d, { recursive: true, force: true });
+});
+
 function fixture(files) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cycle-"));
+  FIXTURE_DIRS.push(dir);
   // Identical mtimes on purpose: a fresh checkout looks like this, and the
   // helper must not depend on mtime order to pick the current gate.
   const t = new Date("2026-01-01T00:00:00Z");
@@ -141,6 +147,20 @@ for (const shell of SHELLS) {
     );
   });
 
+  test(`[${shell}] gate.0 (or gate.000) is not a cycle — refused alone, ignored beside a real one`, () => {
+    // The `cycle` slot is positive-integer only and `qa-gate-0` names no round,
+    // so a zero must never become the current gate (cycle-4 CR-5).
+    const alone = run(shell, fixture(["task.121.gate.0.x.yml"]));
+    assert.equal(alone.status, 1);
+    assert.equal(alone.stdout, "");
+    const beside = run(
+      shell,
+      fixture(["task.121.gate.000.x.yml", "task.121.gate.3.y.yml"]),
+    );
+    assert.equal(beside.status, 0, beside.stderr);
+    assert.equal(beside.stdout, "3\n");
+  });
+
   test(`[${shell}] a missing directory → exit 1, empty stdout`, () => {
     const r = run(shell, path.join(os.tmpdir(), "qa-cycle-does-not-exist"));
     assert.equal(r.status, 1);
@@ -157,12 +177,13 @@ const SKILLS = [
   "skills/qa-fix/SKILL.md",
 ];
 const USES_CYCLE = /--stage "qa-(?:gate|fix)-\$\{(?:QA|FIX)_CYCLE\}"/;
-// Either path form: skill-relative (`references/…`, beside a skill-relative
-// lead call) or repository-root (`.agents/skills/<skill>/references/…`, beside
-// a repo-root engine call). Which one a block may use is decided per block by
-// the path-form guard below, not here.
+// Repository-root form only. Every block in these skills writes
+// `.claude/state/…` and calls its engine from the root, so a skill-relative
+// `bash references/qa-cycle.sh` is the BUG-4/BUG-6 shape: exit 127 from the
+// cwd the rest of the block assumes. The path-form guard below says so by
+// name; this pattern is what the same-block guard counts as "derived here".
 const DERIVES_CYCLE =
-  /^\s*(?:QA|FIX)_CYCLE=\$\(bash (?:\.agents\/skills\/[a-z-]+\/)?references\/qa-cycle\.sh /m;
+  /^\s*(?:QA|FIX)_CYCLE=\$\(bash \.agents\/skills\/[a-z-]+\/references\/qa-cycle\.sh /m;
 // Any command-substitution assignment that reads a NUMBER out of a gate
 // filename, however spelled (sed/awk/grep/cut, -E/-En/-r, anchored or not), is
 // a second definition of "which gate is current". A lookup that merely names a
@@ -187,6 +208,11 @@ function fencedBlocks(file) {
       open.lines.push(l);
     }
   }
+  // Backslash continuations are joined: a guard applied per physical line misses
+  // a command split across two — which is exactly how the original inline
+  // derivation was written (`… | head -1 \` then `| sed -nE …`), and exactly
+  // what the inline-derivation guard let through until cycle 4 (TASK-121-BUG-5).
+  for (const b of blocks) b.text = b.text.replace(/\\\n\s*/g, " ");
   return blocks;
 }
 
@@ -214,7 +240,7 @@ test("every fenced block that passes a cycle-scoped stage derives the cycle in t
   assert.deepEqual(offenders, []);
 });
 
-test("within one block, the helper is addressed the way the block's engine call is", () => {
+test("every block addresses the helper from the repository root, like its engine call and its .claude/state paths", () => {
   // Two cwd assumptions in one block is how BUG-4 happened: `bash
   // references/qa-cycle.sh` beside `node .agents/skills/<s>/references/
   // tracker-comment.js` — from the cwd the engine call presupposes, the helper
@@ -239,9 +265,13 @@ test("within one block, the helper is addressed the way the block's engine call 
       checked += 1;
       const helperRoot = helper[1] !== "";
       const engineRoot = engine[1] !== "";
-      if (helperRoot !== engineRoot) {
+      // `.claude/state/…` is only ever written relative to the repository root,
+      // so a block that touches it has declared its cwd (cycle-4 BUG-6). Every
+      // block resolves from the root: helper AND engine/lead call.
+      const usesState = /\.claude\/state\//.test(b.text);
+      if (!helperRoot || !engineRoot) {
         offenders.push(
-          `${file}: block at line ${b.start} addresses the helper ${helperRoot ? "from the repo root" : "skill-relatively"} but its engine call ${engineRoot ? "from the repo root" : "skill-relatively"}`,
+          `${file}: block at line ${b.start} addresses ${!helperRoot ? "the helper" : "its engine call"} skill-relatively${usesState ? " while writing .claude/state/ from the repo root" : ""} — every block resolves from the repository root`,
         );
       }
     }
@@ -255,17 +285,44 @@ test("within one block, the helper is addressed the way the block's engine call 
 
 test("no shipped skill carries an inline gate-number derivation any more", () => {
   // One definition, in the helper. An inline `| sed … \.gate\.` copy is a second
-  // definition, and two definitions of "which gate is current" drift.
+  // definition, and two definitions of "which gate is current" drift. Scanned
+  // over fenced blocks with continuations JOINED (see fencedBlocks), because
+  // the derivation this repository actually shipped spanned two lines.
   const hits = [];
   for (const file of SKILLS) {
-    const lines = fs
-      .readFileSync(path.join(REPO_ROOT, file), "utf8")
-      .split("\n");
-    lines.forEach((l, i) => {
-      if (INLINE_DERIVATION.test(l)) hits.push(`${file}:${i + 1}`);
-    });
+    for (const b of fencedBlocks(file)) {
+      for (const l of b.text.split("\n")) {
+        if (INLINE_DERIVATION.test(l))
+          hits.push(`${file}: block at line ${b.start}`);
+      }
+    }
   }
   assert.deepEqual(hits, []);
+});
+
+test("the inline-derivation guard catches the two-line continued form it was written for (TASK-121-BUG-5)", () => {
+  // Fixture: the exact cycle-1 spelling, split by a backslash continuation.
+  // Run it through the same join fencedBlocks applies, then the same regex.
+  const twoLine =
+    'FIX_CYCLE=$(ls -t "$DOC_DIR"/*.gate.*.yml 2>/dev/null | head -1 \\\n' +
+    "  | sed -nE 's/.*\\.gate\\.([0-9]+)\\..*/\\1/p')";
+  const [l1, l2] = twoLine.split("\n");
+  assert.equal(
+    INLINE_DERIVATION.test(l1),
+    false,
+    "per-line: the first line alone must not be what catches it",
+  );
+  assert.equal(
+    INLINE_DERIVATION.test(l2),
+    false,
+    "per-line: the second line alone must not be what catches it",
+  );
+  const joined = twoLine.replace(/\\\n\s*/g, " ");
+  assert.equal(
+    INLINE_DERIVATION.test(joined),
+    true,
+    "joined, the guard must fire",
+  );
 });
 
 test("the helper is bundled into every skill whose prose calls it", () => {

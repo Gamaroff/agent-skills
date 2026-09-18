@@ -4,7 +4,7 @@
 **Bug ID**: TASK-121-BUG-4
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (cycle 3 — reviewer CR-1, verified)
 **Date Found**: 2026-09-18
 
@@ -85,3 +85,4 @@ the helper resolves; `command node --test tests/qa-cycle.test.js` → 20 pass.
 | --- | --- | --- | --- |
 | 2026-09-18 | New | QA Engineer | Cycle 3 narrowed review (CR-1) |
 | 2026-09-18 | Ready for QA | qa-fix | Path forms aligned per block + guard |
+| 2026-09-18 | Closed | QA Engineer | Verified in cycle 4 — tracker blocks root-form; path-form guard red when reverted; qa-fix-3 posted from a root-cwd shell. The PR-lead blocks' own cwd mix is BUG-6 |

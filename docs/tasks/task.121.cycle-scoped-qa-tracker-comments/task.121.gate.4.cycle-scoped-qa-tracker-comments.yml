@@ -1,0 +1,99 @@
+schema: 1
+task: 'task.121.cycle-scoped-qa-tracker-comments'
+task_title: 'QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped'
+gate: CONCERNS
+status_reason: 'Cycle-3 fixes verified and mutation-covered (BUG-4 closed; CR-2..CR-6 fixed). Narrowed review found the inline-derivation guard is blind to the two-line continued form it exists to catch (BUG-5), and that the helper invocation conflates not-found with refused while the PR-lead blocks still mix repo-root and skill-relative paths (BUG-6); four lows. No HIGH.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T06:29:46Z'
+
+top_issues:
+  - id: 'TASK-121-BUG-5'
+    severity: medium
+    file: 'tests/qa-cycle.test.js'
+    finding: 'INLINE_DERIVATION is applied per line; the original two-line continued derivation (`…| head -1 \` then `| sed -nE …([0-9]+)…`) matches on neither line and only when joined (verified), so the guard passes on the regression it was written for.'
+    suggested_action: 'Join backslash continuations before testing (or scan block text with a pattern spanning the continuation) and add the two-line form as a mutation fixture.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.121.bug.5.inline-derivation-guard-blind-to-continued-lines.md'
+  - id: 'TASK-121-BUG-6'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: '(a) `VAR=$(bash … qa-cycle.sh …) || VAR=` at all six sites maps helper-not-found (rc 127/126) onto the same empty value as a refusal (rc 1) and the message says "see qa-cycle.sh above" though it never ran — the shape BUG-4 hid in; (b) the three PR-lead blocks write `.claude/state/…` repo-root-relatively while calling `bash references/qa-cycle.sh` and `node references/stakeholder-summary-cli.js` skill-relatively, so from the repo root the (new) helper call exits 127, is swallowed by (a), and the lead is dropped (qa-story :1874, qa-fix :834 likewise).'
+    suggested_action: 'Check the rc and hard-fail on anything but 0/1 at all six sites; address helper and lead CLI from the repo root in the PR-lead blocks; make the path-form guard treat `.claude/state/` as a root-form signal.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.121.bug.6.helper-exit-codes-conflated-and-pr-lead-blocks-mix-cwds.md'
+  - id: 'CR-4'
+    severity: low
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The qa-fix tracker block writes `.claude/state/comment-body.md` from $TRACKER_COMMENT_BODY, which is computed in the PR-lead block — under the separate-shells premise the block itself now states, that value is empty here and tracker-comment.js exits 2 on an empty body file.'
+    suggested_action: 'Write the comment-body file in the PR-lead block where the body is built; the tracker block only reads it.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'shared/resources/qa-cycle.sh'
+    finding: '`$((10#$n))` accepts a zero cycle — `gate.0` prints 0 and exits 0 (verified); the engine accepts `qa-gate-0` and the `cycle` slot (positive integers only) is silently dropped.'
+    suggested_action: 'Treat a normalised 0 as un-numbered; add a `gate.0` fixture.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-6'
+    severity: low
+    file: 'skills/qa-fix/SKILL.md'
+    finding: 'The callout beneath the qa-fix tracker block still says the cycle is derived "by `references/qa-cycle.sh`" — the skill-relative spelling BUG-4 removed from that block.'
+    suggested_action: 'Say "the bundled qa-cycle.sh" or name the repo-root form.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-7'
+    severity: low
+    file: 'tests/qa-cycle.test.js'
+    finding: '`fixture()` leaks a mkdtemp directory per case (16+ per run) into os.tmpdir().'
+    suggested_action: 'Track created dirs and remove them in an `after()` hook.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3436
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged surface.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: CONCERNS
+    notes: 'BUG-6: a helper path drift is swallowed as a refusal; the PR-lead blocks still do not resolve from the repo root.'
+  maintainability:
+    status: CONCERNS
+    notes: 'BUG-5: the inline-derivation guard is blind to the original spelling; CR-6 stale callout; CR-7 tmp leak.'
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 2
+  fix_date: '2026-09-18'
+  total_iterations: 3
+  verification_method: 'Mutation proofs against committed state (cp-restore); ci:fast green at 61f20fea; helper exercised under bash and zsh'
+
+recommendations:
+  immediate:
+    - action: 'BUG-5 join continuations + fixture; BUG-6 rc check at six sites + repo-root form in the PR-lead blocks + guard; CR-4 write the body file where it is built; CR-5 zero → un-numbered; CR-6 callout; CR-7 cleanup hook.'
+      refs: ['tests/qa-cycle.test.js', 'skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'skills/qa-fix/SKILL.md', 'shared/resources/qa-cycle.sh']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-5 and BUG-6 fixed with guards', 'lows addressed or explicitly waived']

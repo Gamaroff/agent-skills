@@ -382,18 +382,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.121.qa.3.cycle-scoped-qa-tracker-comments.md](./task.121.qa.3.cycle-scoped-qa-tracker-comments.md)
-- **Gate File**: [task.121.gate.3.cycle-scoped-qa-tracker-comments.yml](./task.121.gate.3.cycle-scoped-qa-tracker-comments.yml)
-- **Previous cycles**: [qa.2](./task.121.qa.2.cycle-scoped-qa-tracker-comments.md) / [gate 2](./task.121.gate.2.cycle-scoped-qa-tracker-comments.yml) · [qa.1](./task.121.qa.1.cycle-scoped-qa-tracker-comments.md) / [gate 1](./task.121.gate.1.cycle-scoped-qa-tracker-comments.yml)
+- **Full Report**: [task.121.qa.4.cycle-scoped-qa-tracker-comments.md](./task.121.qa.4.cycle-scoped-qa-tracker-comments.md)
+- **Gate File**: [task.121.gate.4.cycle-scoped-qa-tracker-comments.yml](./task.121.gate.4.cycle-scoped-qa-tracker-comments.yml)
+- **Previous cycles**: [qa.3](./task.121.qa.3.cycle-scoped-qa-tracker-comments.md) · [qa.2](./task.121.qa.2.cycle-scoped-qa-tracker-comments.md) · [qa.1](./task.121.qa.1.cycle-scoped-qa-tracker-comments.md)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3431
+- **Tests Executed**: 3436
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-Cycle-2 fixes verified (BUG-2, BUG-3 closed). BUG-4 [medium]: the three tracker blocks call `bash references/qa-cycle.sh` beside a repo-root-relative engine call, so from that cwd the helper is not found and the post is skipped. Five lows (inherited-values sentence, digit bound, qa-story step numbers, guard breadth, tree layout). No HIGH.
+Cycle-3 fixes verified (BUG-4 closed). BUG-5 [medium]: the inline-derivation guard is per-line and misses the two-line continued form. BUG-6 [medium]: `|| VAR=` conflates helper-not-found with refused, and the PR-lead blocks mix `.claude/state` root paths with skill-relative helper/lead calls. Four lows. No HIGH.
 <!-- change-log-start -->
 ## Change Log
 
@@ -409,6 +409,8 @@ Cycle-2 fixes verified (BUG-2, BUG-3 closed). BUG-4 [medium]: the three tracker 
 | 2026-09-18 |  | QA findings fixed — BUG-2 (qa-cycle.sh helper, derived where used, no guess), BUG-3, CR-4, CR-5; cycle 2 (2 iterations so far) | qa-fix |
 | 2026-09-18 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium (helper path form), 5 low; BUG-2/BUG-3 closed | qa-task |
 | 2026-09-18 |  | QA findings fixed — BUG-4 (helper path form per block + guard), CR-2..CR-6; cycle 3 (3 iterations so far) | qa-fix |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — cycle 4: 2 medium (guard blind to continued form; rc conflation + PR-lead cwd), 4 low; BUG-4 closed | qa-task |
+| 2026-09-18 |  | QA findings fixed — BUG-5 (continuations joined), BUG-6 (rc check + one cwd everywhere), CR-4..CR-7; cycle 4 (4 iterations so far) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -476,3 +478,12 @@ the helper bounds the cycle to 9 digits (a longer run is a malformed name → re
 leading zeros. CR-4: qa-story comments use its own Step 6 / 6b numbering. CR-5: the inline-derivation
 guard catches sed/awk/grep/cut spellings with plain or escaped dots. CR-6: the co-located tree shows
 `epics/…/stories/story.x/`. Three mutation proofs; ci:fast green.
+
+**QA fix cycle 4 (qa-fix, 2026-09-18).** BUG-5: `fencedBlocks()` joins backslash continuations, so
+the inline-derivation guard now catches the two-line form the task started from (fixture added).
+BUG-6: every helper call checks its rc — refusal (1) is the skip branch, anything else aborts the
+block loudly — and all six blocks (PR-lead and tracker) address the helper and the lead CLI from
+the repository root beside their `.claude/state/…` paths; the guard requires the root form and
+treats `.claude/state/` as the block's cwd signal. CR-4: qa-fix writes the tracker body file where
+the body is built. CR-5: `gate.0` counts as un-numbered. CR-6/CR-7: callout wording; fixtures
+removed in an `after()` hook. Four mutation proofs; ci:fast green.

@@ -50,8 +50,15 @@ for f in "$DIR"/*.gate.*.yml; do
     unnumbered=$((unnumbered + 1))
     continue
   fi
-  # Strip leading zeros so `gate.007` compares as 7 and prints as 7.
+  # Strip leading zeros so `gate.007` compares as 7 and prints as 7. A value
+  # that normalises to 0 is not a cycle — the `cycle` slot is positive-integer
+  # only and would be dropped, and `qa-gate-0` names no round — so it counts
+  # as un-numbered rather than as the current gate (cycle-4 CR-5).
   n=$((10#$n))
+  if [ "$n" -eq 0 ]; then
+    unnumbered=$((unnumbered + 1))
+    continue
+  fi
   if [ -z "$best" ] || [ "$n" -gt "$best" ]; then
     best=$n
   fi
