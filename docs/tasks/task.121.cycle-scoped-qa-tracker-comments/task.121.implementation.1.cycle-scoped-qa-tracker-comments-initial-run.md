@@ -37,8 +37,8 @@ Make `qa-gate` cycle-scoped in the engine, suffix the three QA tracker call site
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration; 3/3 phases; commits 0230ac56 (P1) 7fc91472 (P2) 23289722 (P3) 09bc4d4d (fmt) 30758156 (doc); fast gate green | — (loop audit inline) |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #430: https://github.com/Gamaroff/agent-skills/pull/430 — in-review comment posted | — |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.121.qa.{N}.*.md`; `task.121.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE` or `CONCERNS` (Step 5c); PR comment posted | 5 cycles; gate 5 PASS 100; 5c CONCERNS (docs corrected in 41964e2b; develop-bug cycle source → follow-up); six bugs closed | — (reviewers ran as Explore subagents; summaries in QA reports) |
-| 7. finalise                | ⏳ Pending | `task.121.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |
+| 7. finalise                | ✅ Done    | `task.121.dod.{N}.*.md`; task `status: accepted`                       | dod.1 ACCEPTED; security probe found 2 low fail-closed defects → fixed a412f59a; CI r1 SUCCESS @ a412f59a, r2 SUCCESS @ 65a0a99f; issue #421 closed, board already | — (4 DoD Explore agents; YAML in dod.1) |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | implementation report committed; tree clean; lock removed | —                    |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 
@@ -103,6 +103,20 @@ Make `qa-gate` cycle-scoped in the engine, suffix the three QA tracker call site
 - Push budget: cycle 5 pushed once at the pre-5c commit (ae6a9d79); the docs commit after 5c (41964e2b) is a second push in the same cycle — noted as a deliberate deviation so the PR head carries the corrected prose before finalise reads it.
 
 ---
+
+### Step 7 — Finalise — 2026-09-18
+
+- **Resume**: the PreCompact hook paused the pipeline at Step 7 (`6c8cbcb8`, snapshot `develop-pipeline.last-halt.json`, `halt_step: 7`). Resumed in the same session after compaction; the lock was restored from the snapshot at `current_step: 7` before any further step ran.
+- **DoD dispatch**: four Explore agents in one message (AC traceability, security, compliance, docs). All four returned parseable YAML (26 s – 3.7 min). AC: PARTIAL (6/7 — AC7's observation-log half deferred to finalise by the task's own Notes). Security: **FAIL** — boundary deliverable, probed by execution. Compliance: NOT_APPLICABLE. Docs: **FAIL** — no CHANGELOG `(task 121)` entry.
+- **Security finding (reproduced, low severity, fixed)**: a gate filename with an embedded newline made `qa-cycle.sh`'s sed emit two lines; `$((10#$n))` raised an arithmetic error that aborted the loop, and the script exited 0 with the lower cycle it had seen (gates {3, newline-file, 12} → `3`) — the exact "lower, wrong cycle" outcome its header says it refuses. Also `isKnownStage` admitted `qa-gate-0`, a round nothing else in the chain recognised. Both reproduced by this run, fixed in **`a412f59a`** (pattern-check before arithmetic; `Number(suffix) > 0`), tests added, both mutation-proved (guard reverted → 2 red; rule reverted → 1 red), `ci:fast` 3440/3441, shellcheck, bundle:check 128/0, both reproductions re-run → refuse. **Decision**: fix inline rather than halt on gaps — a one-line fail-closed guard in the deliverable this task exists to harden, verified end-to-end; recorded as a deviation (no further QA cycle, no independent reviewer) in the DoD summary and here.
+- **Docs gap**: CHANGELOG entry written by this run under `[Unreleased]` → `### Fixed`; 6d check passes on origin.
+- **AC7**: observation #75 set `actioned` (resolution names PR #430); the seven it consolidates are already archived.
+- **CI reading 1**: SUCCESS @ `a412f59a` over 5 checks (background poll, decided at 120 s, head confirmed). The earlier SUCCESS @ `6c8cbcb8` predates the fix and is superseded.
+- **Acceptance**: ✅ ACCEPTED. Frontmatter `status: accepted`, `completed_date`, `pr_number: 430`; Change Log 1.2 via `change-log.js`; registry `ticked` (line 163, planned → accepted); DoD PASSED section; `sprint-review-summary.md`. Acceptance commit **`65a0a99f`** pushed; 6b assertions pass (all artefacts tracked and on origin; pushed doc reads `status: accepted`); PR head = acceptance head.
+- **CI reading 1**: SUCCESS @ a412f59a52e707a0148e798b887ccbec1289758c; **CI reading 2**: SUCCESS @ 65a0a99ff25298ce64e4218f6afae9505065b0a1 (5 checks, background poll decided at 90 s, sampled head = acceptance head). Both carried on the PR canonical comment (https://github.com/Gamaroff/agent-skills/pull/430#issuecomment-5726599767).
+- **Side-effects (after the boundary)**: canonical PR comment posted; full DoD body posted to the PR with the `done` lead (#issuecomment-5726606929); issue #421 Document link re-pointed to `develop` (`tracker-issue.js --kind edit` → performed); `done` tracker comment → `posted` (orchestrator re-issue → `already`, idempotent as designed); `tracker-issue.js --kind close` → performed; post-close state check (inline `gh issue view`, not the poller subagent): issue #421 state = CLOSED, errors = 0. GitHub Issue #421 — close: CLOSED ✅. GitHub Issue #421 — board: done → already.
+- **Accept gap**: journal `.claude/state/tracker-actions.jsonl` absent — no deferred mutation this run. Tracker debt: none.
+- **Task completed.**
 
 ## Issues Log
 
@@ -178,17 +192,17 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-09-18
+**Final Status**: Completed
 **Branch**: feature/task.121.cycle-scoped-qa-tracker-comments
 **PR**: https://github.com/Gamaroff/agent-skills/pull/430
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5 (gate 5 PASS 100/100; six bugs closed; 5c CONCERNS advisory)
+**DoD Summary**: `task.121.dod.1.cycle-scoped-qa-tracker-comments.md` — ✅ ACCEPTED (7/7 criteria; security FAIL resolved by a412f59a; CI reading 1 SUCCESS @ a412f59a, reading 2 SUCCESS @ 65a0a99f)
+**Tracker debt**: none
 
 ---
 
-## Pipeline Paused — 2026-09-18T07:00:46Z
+## Pipeline Paused — 2026-09-18T07:00:46Z (resumed in the same session; Step 7 re-ran from the start and completed)
 
 ⏸️ **Context compaction imminent.** The `/develop-task` orchestrator was halted by the PreCompact hook before Claude's context could be summarised.
 
