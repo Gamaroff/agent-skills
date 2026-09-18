@@ -11,8 +11,9 @@ task-ref: task.121.cycle-scoped-qa-tracker-comments.md
 
 ## Overview
 
-One list member in the engine, three `--stage` arguments at the call sites, one deleted block, one
-contract table, one guard assertion. The mechanism (numeric suffix, marker from the suffixed name,
+One list member in the engine, three tracker `--stage` arguments and four PR-lead ones at the call
+sites, two deleted orchestrator blocks, one contract table, one guard assertion over both call-site
+populations. The mechanism (numeric suffix, marker from the suffixed name,
 lead rendered from the stripped name) already exists for `qa-fix` and `qa-cycle`; nothing new is
 designed here.
 
@@ -39,48 +40,72 @@ const CYCLE_SCOPED_STAGES = Object.freeze([
 Same one-line addition in `stakeholder-summary.js`; `stakeholder-summary.test.mjs:493-505` already
 asserts the two lists are equal and ≥ 3 long — bump the floor to 4 so a future removal is noticed.
 
-Tests to extend: `tracker-comment.test.mjs` around line 1506 iterates `cli.CYCLE_SCOPED_STAGES` —
-check whether the suffix-legality cases are table-driven from the list (then nothing to add) or
-enumerated (then add `qa-gate-2` accepted / `qa-gate-x` rejected).
+Tests to extend: `tracker-comment.test.mjs:1495-1509` ("NEW-6") is **enumerated**, not
+table-driven — its closing `assert.deepEqual([...cli.CYCLE_SCOPED_STAGES], ["qa-cycle", "qa-fix",
+"pipeline-paused"])` goes red on the addition. Update the literal to four members and add
+`qa-gate-2` accepted / `qa-gate-x` rejected. (Verified 2026-09-18.)
 
 ### Phase 2: call sites
 
-**`skills/qa-fix/SKILL.md` Step 7 (line ~859):**
+**`skills/qa-fix/SKILL.md` Step 7 (tracker call `:898-900`; PR lead `:828`):**
 
 ```bash
     --stage "qa-fix-${FIX_CYCLE}" \
 ```
 
-`FIX_CYCLE` is derived a few lines above (`sed -E 's/.*\.gate\.([0-9]+)\..*/\1/'`).
+at both. `FIX_CYCLE` is derived once at `:820` (`sed -E 's/.*\.gate\.([0-9]+)\..*/\1/'`), above
+both calls — that is the shape the two QA skills must copy.
 
-**`skills/qa-task/SKILL.md` Step 13b (line ~1301) and `skills/qa-story/SKILL.md` (line ~1892):**
+**`skills/qa-task/SKILL.md` Step 13b (PR lead `:1264`, `THIS_GATE` `:1328`, tracker call
+`:1337-1339`) and `skills/qa-story/SKILL.md` (PR lead `:1854`, `THIS_GATE` `:1915`, tracker call
+`:1924-1926`):**
 
-`THIS_GATE` is already resolved for `blocking_count`. Add, immediately after it:
+The PR-lead call runs ~60 lines **before** `THIS_GATE` is resolved, so the cycle cannot be taken
+from `THIS_GATE` at the point the lead needs it. Derive it once, **above the PR-lead call**, from
+the newest gate file (the same `ls -t … | head -1` Step 13b uses later):
 
 ```bash
   # The cycle number lives in the gate filename — the same derivation qa-fix uses
   # for FIX_CYCLE, so the two comments cannot disagree about which round this is.
-  QA_CYCLE=$(printf '%s\n' "$THIS_GATE" | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+  QA_CYCLE=$(ls -t "$TASK_DIR"/task.*.gate.*.yml 2>/dev/null | head -1 \
+    | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
   QA_CYCLE=${QA_CYCLE:-1}
 ```
 
-and change the stage:
+(`$STORY_DIR`/`story.*` in qa-story.) Then change the stage at **both** calls:
 
 ```bash
     --stage "qa-gate-${QA_CYCLE}" \
 ```
 
-The lead call (`stakeholder-summary-cli.js --stage qa-gate`) can stay on the bare name — it renders
-the same lead either way — but passing the suffixed form there too keeps the two calls textually
-identical; either is correct, pick one and say why in the comment.
+Decided in review (2026-09-18, Q2): the PR-lead call takes the suffixed form too. It renders the
+same lead either way, but identical text at both calls lets the guard cover `PR_SITES` without an
+exemption. Say so in the comment beside the derivation.
+
+**`shared/resources/develop-pipeline-on-precompact.sh:227`:** the lead call passes
+`--stage pipeline-paused` bare while the tracker call at `:329` already passes
+`"pipeline-paused-${CURRENT_STEP}"`. Suffix the lead call the same way — it is the fourth PR-lead
+site the `PR_SITES` guard will find.
 
 Update the prose beside Step 13b that says "per-stage" / "posts once".
 
-**`shared/resources/develop-pipeline-step-5-6-qa-loop.md` (lines ~352-379):** delete the
-"Post QA cycle result to tracker issue" fenced block and the slot note under it. Replace with:
+**`shared/resources/develop-pipeline-step-5-6-qa-loop.md`** — two blocks, not one:
 
-> The per-cycle tracker comment is posted by the QA skill itself (Step 13b, stage `qa-gate-{N}`);
-> the orchestrator posts nothing here.
+- Lines ~350-379: delete the "Post QA cycle result to tracker issue" fenced block
+  (`--stage qa-cycle-{N}`) and the slot note under it. Replace with:
+
+  > The per-cycle gate comment is posted by the QA skill itself (`qa-task`/`qa-story` Step 13b,
+  > stage `qa-gate-{N}`); the orchestrator posts nothing here.
+
+- Lines ~894-910, step 4a: delete the "Post QA fix summary to tracker issue" fenced block
+  (`--stage qa-fix-{N}`) and its `cycle`-slot note. Replace with:
+
+  > The per-cycle fix comment is posted by `/qa-fix` itself (Step 7, stage `qa-fix-{N}`); the
+  > orchestrator posts nothing here.
+
+Leave `skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md:89` (`--stage
+qa-cycle-{N}`) alone — `develop-bug` never runs `qa-task`/`qa-story`, so that call is its only
+per-cycle comment.
 
 Then `npm run bundle` and commit the `references/` churn in the same commit.
 
@@ -100,20 +125,28 @@ State that the second row is `CYCLE_SCOPED_STAGES` in the engine and that the en
 and `baseStage` already exist. Add one test:
 
 ```js
-test("a cycle-scoped stage is never passed bare", () => {
-  const sites = collectCallSites(shippedDocs());
-  const bare = sites.filter(
-    (s) => CYCLE_SCOPED_STAGES.includes(s.stage) // no suffix → equals a list member exactly
-  );
-  const suffixed = sites.filter((s) => baseStage(s.stage) !== s.stage);
-  assert.ok(suffixed.length >= 3, `non-vacuity: expected ≥3 suffixed sites, found ${suffixed.length}`);
-  assert.deepEqual(bare.map((s) => `${s.file}:${s.line}`), []);
-});
+for (const [label, sites, floor] of [["SITES", SITES, 4], ["PR_SITES", PR_SITES, 4]]) {
+  test(`a cycle-scoped stage is never passed bare (${label})`, () => {
+    const bare = sites.filter(
+      (s) => CYCLE_SCOPED_STAGES.includes(s.stage) // no suffix → equals a list member exactly
+    );
+    const suffixed = sites.filter((s) => s.stage && baseStage(s.stage) !== s.stage);
+    assert.ok(suffixed.length >= floor, `non-vacuity: expected ≥${floor} suffixed ${label}, found ${suffixed.length}`);
+    assert.deepEqual(bare.map((s) => `${s.file}:${s.line}`), []);
+  });
+}
 ```
 
-Check how `collectCallSites` captures a `--stage "qa-gate-${QA_CYCLE}"` argument — the quoted,
-variable-bearing form must parse to a stage string whose `baseStage` is `qa-gate`. If the regex
-only matches a literal token, extend it to accept `-${…}` and `-{N}` as suffix forms.
+`SITES` and `PR_SITES` are the two populations the file already collects. Expected on the fixed
+tree (re-run the collector, do not trust this table): 5 suffixed tracker sites
+(`precompact.sh:329`, `develop-bug` verify-loop `:89`, `qa-task`, `qa-story`, `qa-fix`) and
+4 suffixed PR-lead sites (`qa-fix`, `qa-task`, `qa-story`, `precompact.sh:227`). Record the actual
+counts in the implementation report.
+
+The collector regex already handles the quoted, variable-bearing form: `--stage\s+"?([A-Za-z0-9_-]+)`
+captures `qa-gate-` from `"qa-gate-${QA_CYCLE}"` (stopping at `$`) and `baseStage` strips the
+trailing hyphen to `qa-gate` — verified 2026-09-18 by running the collector against the current
+tree. **No regex extension is needed** once `qa-gate` is in `CYCLE_SCOPED_STAGES`.
 
 **Mutation proof** (record in the implementation report): change `qa-fix` Step 7 back to
 `--stage qa-fix`, run the file, confirm the failure names `skills/qa-fix/SKILL.md`, restore.
@@ -121,7 +154,7 @@ only matches a literal token, extend it to accept `-${…}` and `-{N}` as suffix
 ## Key Patterns and References
 
 - Suffix handling: `tracker-comment.js:249-260` (validator), `stakeholder-summary.js:296` (`stripCycleSuffix`).
-- Existing correct call: `develop-pipeline-step-5-6-qa-loop.md:364` (`--stage qa-cycle-{N}`) — being removed, but its shape is the model.
+- Existing correct call: `develop-pipeline-step-5-6-qa-loop.md:364` (`--stage qa-cycle-{N}`) — being removed, but its shape is the model; `develop-pipeline-on-precompact.sh:329` is the shell-variable form that stays.
 - Call-site collection: `comment-slot-coverage.test.mjs` `shippedDocs()` / `collectCallSites()` — reuse, do not re-walk the tree.
 - Enumeration rule: `docs/reference/anti-patterns.md` — the contract table cross-references the engine list.
 
