@@ -247,8 +247,74 @@ test("Guard B — the walk sees a `$(command node …)` call site (bug.14 / cycl
     pr.length >= 1,
     "the PreCompact hook's stakeholder-summary-cli.js call was not collected",
   );
-  assert.equal(pr[0].stage, "pipeline-paused");
+  // task.121: the lead call carries the same `-${CURRENT_STEP}` suffix as the
+  // tracker call beside it, so the two are textually identical and one guard
+  // ("never passed bare", below) covers both populations without exempting one.
+  assert.equal(pr[0].stage && baseStage(pr[0].stage), "pipeline-paused");
 });
+
+// ── A cycle-scoped stage is never passed bare ───────────────────────────────
+// The marker is built from `--stage` as passed. A stage in CYCLE_SCOPED_STAGES
+// recurs once per QA cycle (or per pause), so passing it WITHOUT the numeric
+// suffix keys every cycle to the first one's marker: cycle 2 onward reads
+// `already`, exit 0, and posts nothing — and nothing in the pipeline log
+// distinguishes that from a post. That is what the QA skills did on every
+// multi-cycle run before task.121 (issue #419: three cycles, one `qa-gate`
+// marker, one `qa-fix` marker). The lead CLI has no marker, so a bare stage
+// there changes nothing it renders — it is guarded anyway so the two calls at
+// each site stay textually identical and neither population needs an exemption.
+//
+// `bare` is exact membership: the collector captures `qa-gate-` from
+// `"qa-gate-${QA_CYCLE}"` (it stops at `$`) and `qa-cycle-` from `qa-cycle-{N}`,
+// and baseStage() strips the hyphen — so a suffixed site never equals a list
+// member, and a bare one always does.
+for (const [label, sites, floor] of [
+  ["SITES", SITES, 4],
+  ["PR_SITES", PR_SITES, 4],
+]) {
+  test(`a cycle-scoped stage is never passed bare (${label})`, () => {
+    const suffixed = sites.filter(
+      (s) => s.stage && baseStage(s.stage) !== s.stage,
+    );
+    assert.ok(
+      suffixed.length >= floor,
+      `non-vacuity: expected ≥${floor} suffixed ${label} (found ${suffixed.length}) — ` +
+        `the collector may have stopped seeing the suffixed form`,
+    );
+    const bare = sites
+      .filter((s) => CYCLE_SCOPED_STAGES.includes(s.stage))
+      .map(
+        (s) => `${s.file}:${s.line} — --stage ${s.stage} (needs -\${cycle})`,
+      );
+    assert.deepEqual(
+      bare,
+      [],
+      `Cycle-scoped stage passed bare — every cycle after the first will read ` +
+        `\`already\` and post nothing:\n${bare.join("\n")}`,
+    );
+    // A FIXED numeric suffix is the bare case wearing a suffix: `--stage
+    // qa-gate-1` written into a skill keys every cycle to cycle 1's marker just
+    // as the bare name did. A real site's suffix is a shell expansion (the
+    // collector captures `qa-gate-` and stops at `$`) or a `{N}` placeholder
+    // (captured `qa-cycle-`), so the digits never reach the captured stage
+    // unless someone typed them (CR-3, task.121 QA cycle 1).
+    const literal = sites
+      .filter(
+        (s) =>
+          s.stage && /-\d+$/.test(s.stage) && baseStage(s.stage) !== s.stage,
+      )
+      .map(
+        (s) =>
+          `${s.file}:${s.line} — --stage ${s.stage} (a literal cycle; use -\${cycle})`,
+      );
+    assert.deepEqual(
+      literal,
+      [],
+      `Cycle-scoped stage with a hard-coded cycle number — the marker is fixed ` +
+        `to that one cycle:\n${literal.join("\n")}`,
+    );
+  });
+}
 
 test("Guard B — every call site passes at least one --slot", () => {
   const bare = SITES.filter(

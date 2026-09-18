@@ -809,36 +809,68 @@ FIX_SUMMARY="**Status**: ✅ Fixes Complete - Ready for Re-Review 🔄
 "
 
 # The cycle number, derived from the gate this fix cycle is answering. Gate files
-# are `*.gate.{N}.{name}.yml` and {N} IS the QA cycle, so the number is already on
-# disk — no caller has to pass it, and nothing invents it. `$STORY_FILE` is the
-# resolved story or task document, bound in Step 0 (locate-story).
+# are `*.gate.{N}.{name}.yml` and {N} IS the QA cycle — the highest-numbered gate
+# in the directory — so the number is already on disk: no caller has to pass it,
+# and nothing invents it. `$STORY_FILE` is the resolved story or task document,
+# bound in Step 0 (locate-story).
 #
-# Derived HERE, once, because both comments need it: the pull-request lead below
-# and the tracker comment further down. Deriving it twice would let the two
-# comments disagree about which round this is.
+# ONE definition — the bundled `qa-cycle.sh` — called in EVERY block that needs the
+# cycle. Each fenced block runs as its own shell, so a value derived here does not
+# exist in the tracker block further down (TASK-121-BUG-2); calling the same
+# helper in both is what keeps the two comments agreeing about which round this
+# is. The cycle is the STAGE SUFFIX (`qa-fix-3`), which keys the tracker
+# comment's idempotency marker: bare `qa-fix` was suppressed by cycle 1's marker
+# on every later cycle (task.121). The helper refuses rather than guesses — no
+# numbered gate → empty stdout, one ⚠️ line on stderr, exit 1 — because a guessed
+# `1` would key every cycle to cycle 1's marker, the very suppression the suffix
+# exists to end.
+# Every path in this block resolves from the REPOSITORY ROOT —
+# `.agents/skills/qa-fix/references/…` for the helper and the lead CLI, and
+# `.claude/state/…` for the body file written at the end — one cwd per block,
+# the same cwd in every block (TASK-121-BUG-4, BUG-6). What a block inherits
+# from earlier blocks is the INPUTS an agent re-binds when it runs the block
+# ($STORY_FILE, $PR_NUMBER, $PR_TITLE, $PR_STATE); a COMPUTED value like the
+# cycle never is — nor is $TRACKER_COMMENT_BODY, which is why this block also
+# WRITES the tracker body file the tracker block later reads.
 DOC_DIR=$(dirname "$STORY_FILE")
-FIX_CYCLE=$(ls -t "$DOC_DIR"/*.gate.*.yml 2>/dev/null | head -1 \
-  | sed -E 's/.*\.gate\.([0-9]+)\..*/\1/')
+FIX_CYCLE=$(bash .agents/skills/qa-fix/references/qa-cycle.sh "$DOC_DIR"); rc=$?
+# rc 1 = the helper REFUSED (no numbered gate) → empty, the skip branch below.
+# Anything else (127 not found, 126 not runnable) is a broken invocation, and
+# it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
+[ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
 
 # The pull-request wrapper — its own heading, then its own plain-language lead.
 # The lead is added HERE, once, above the arm split below, so both arms post the
 # same bytes. It must NOT be folded into $FIX_SUMMARY: that variable also feeds
 # $TRACKER_COMMENT_BODY, where tracker-comment.js renders the lead itself, and a
-# lead in the shared value would double-lead the tracker comment.
-QA_FIX_LEAD=$(node references/stakeholder-summary-cli.js --stage qa-fix \
-  --slot cycle="$FIX_CYCLE") || exit 1
-PR_COMMENT_BODY="## 🛠️ QA Fixes Applied
+# lead in the shared value would double-lead the tracker comment. When the cycle
+# is unknown the PR comment still posts, without its lead: it carries no marker,
+# and losing it would hide the ⚠️ from the reviewer.
+if [ -n "$FIX_CYCLE" ]; then
+  QA_FIX_LEAD=$(node .agents/skills/qa-fix/references/stakeholder-summary-cli.js --stage "qa-fix-${FIX_CYCLE}" \
+    --slot cycle="$FIX_CYCLE") || exit 1
+  PR_COMMENT_BODY="## 🛠️ QA Fixes Applied
 
 ${QA_FIX_LEAD}
 
 ---
 
 ${FIX_SUMMARY}"
+else
+  echo "⚠️  QA cycle unknown (see qa-cycle.sh above) — posting the PR comment without its lead"
+  PR_COMMENT_BODY="## 🛠️ QA Fixes Applied
+
+${FIX_SUMMARY}"
+fi
 
 # The tracker-issue wrapper — no heading of its own. tracker-comment.js renders the
 # plain-language lead above this body, and a heading between the lead and the detail
-# reads as a second opening.
+# reads as a second opening. WRITTEN TO DISK HERE: the tracker block further down
+# runs as its own shell and cannot see this variable, so the file is what carries
+# the body across (cycle-4 CR-4).
 TRACKER_COMMENT_BODY="${FIX_SUMMARY}"
+mkdir -p .claude/state
+printf '%s' "$TRACKER_COMMENT_BODY" > .claude/state/comment-body.md
 ```
 
 **Post the comment (dual-path):**
@@ -886,21 +918,39 @@ If `FIX_ISSUE` is empty, skip this step silently.
 
 ```bash
 if [ -n "$FIX_ISSUE" ]; then
-  mkdir -p .claude/state
-  printf '%s' "$TRACKER_COMMENT_BODY" > .claude/state/comment-body.md
+  # .claude/state/comment-body.md was written by the pull-request block, where
+  # $TRACKER_COMMENT_BODY exists; this block only reads it (cycle-4 CR-4).
+  [ -s .claude/state/comment-body.md ] || { echo "⚠️  comment-body.md missing — run the pull-request block first" >&2; exit 1; }
 
-  # $FIX_CYCLE was derived once, where $PR_COMMENT_BODY is built — from the gate
-  # filename, which is where the round number genuinely lives. Reused here so the
-  # pull-request comment and this tracker comment cannot disagree about which
-  # round they are reporting. Re-derive it only if you are running this block on
-  # its own.
-
-  node .agents/skills/qa-fix/references/tracker-comment.js \
-    --issue "$FIX_ISSUE" --body-file .claude/state/comment-body.md \
-    --stage qa-fix \
-    --slot cycle="$FIX_CYCLE" \
-    --json \
-    || echo "⚠️  Tracker issue comment failed — continuing"
+  # The cycle — the stage suffix — is derived HERE, in this block, by the same
+  # helper the pull-request block called. This block runs as its own shell, so
+  # that block's $FIX_CYCLE does not exist here (TASK-121-BUG-2). Same helper,
+  # same directory, same answer — that is what keeps the two comments agreeing
+  # about which round they report. No fallback: an unknown cycle skips the post
+  # and says so, rather than keying the comment to a guessed cycle.
+  #
+  # Addressed from the REPOSITORY ROOT — `.agents/skills/qa-fix/references/…` —
+  # like the engine call below and like every block in this skill: one cwd,
+  # the repository root, everywhere (TASK-121-BUG-4, BUG-6). What this block
+  # inherits from earlier blocks is the INPUTS an agent re-binds when it runs
+  # a block ($STORY_FILE, $FIX_ISSUE); a COMPUTED value like the cycle is never
+  # carried over, and the body travels as the file above.
+  DOC_DIR=$(dirname "$STORY_FILE")
+  FIX_CYCLE=$(bash .agents/skills/qa-fix/references/qa-cycle.sh "$DOC_DIR"); rc=$?
+  # rc 1 = the helper REFUSED (no numbered gate) → empty, the skip branch below.
+  # Anything else (127 not found, 126 not runnable) is a broken invocation, and
+  # it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
+  [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
+  if [ -n "$FIX_CYCLE" ]; then
+    node .agents/skills/qa-fix/references/tracker-comment.js \
+      --issue "$FIX_ISSUE" --body-file .claude/state/comment-body.md \
+      --stage "qa-fix-${FIX_CYCLE}" \
+      --slot cycle="$FIX_CYCLE" \
+      --json \
+      || echo "⚠️  Tracker issue comment failed — continuing"
+  else
+    echo "⚠️  Tracker issue comment skipped — QA cycle unknown (see qa-cycle.sh above)"
+  fi
 fi
 ```
 
@@ -912,8 +962,18 @@ fi
 > `--slot cycle="$QA_CYCLE"` — a variable that exists nowhere in this skill. It would have expanded to
 > the empty string, which the engine drops, so the lead would have degraded silently and correctly and
 > nobody would ever have found out. Deriving from the gate filename uses a value that is genuinely on
-> disk at this point. When no gate file is found, `FIX_CYCLE` is empty and the slot is dropped by the
-> same rule — the degraded path is reached by the engine's own coercion rather than by hoping.
+> disk at this point — and it is derived **in this block**, by the bundled `qa-cycle.sh`, not carried
+> over from the block above: fenced blocks run as separate shells (TASK-121-BUG-2). When no numbered
+> gate is found the helper refuses (exit 1, empty), and this block skips the post with a ⚠️ rather
+> than guessing a cycle that would key the comment to another round's marker.
+>
+> **The stage is `qa-fix-${FIX_CYCLE}`, never bare `qa-fix`.** `qa-fix` is cycle-scoped in the engine
+> (`CYCLE_SCOPED_STAGES`): the numeric suffix is what the idempotency marker is built from, so cycle
+> 2 posts under `agent-skills-comment:qa-fix-2` instead of reading cycle 1's marker and answering
+> `already` with nothing sent — which is what this block did on every multi-cycle run before task.121.
+> The pull-request lead above takes the same suffixed stage; it renders identically either way, but
+> keeping the two calls textually identical is what lets one guard
+> (`comment-slot-coverage.test.mjs`) cover both. A resumed cycle still deduplicates on its own suffix.
 >
 > This posts `$TRACKER_COMMENT_BODY`, not `$PR_COMMENT_BODY`. The two differ only by their wrapper and
 > share `$FIX_SUMMARY` — edit the summary in one place; never duplicate the prose.

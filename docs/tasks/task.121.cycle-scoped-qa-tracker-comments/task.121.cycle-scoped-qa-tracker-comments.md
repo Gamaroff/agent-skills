@@ -5,19 +5,22 @@ type: task
 description: "tracker-comment.js builds its idempotency marker from --stage alone. qa-fix is already a cycle-scoped stage in the engine but skills/qa-fix passes the bare name; qa-gate is not cycle-scoped and qa-task/qa-story pass it bare on every cycle. Result on task.110, task.113 and task.119: the PR carries every cycle, the tracker issue carries cycle 1 and reports success for the rest. Add qa-gate to the cycle-scoped list, suffix all three call sites with the cycle they already derive, state once-per-issue vs once-per-cycle in the contract, and add a guard that fails on a bare cycle-scoped stage. Observation #75 (consolidating #66, #70, #78, #80, #84, #93, #94)."
 tags: [tracker-comment, qa-task, qa-story, qa-fix, idempotency]
 category: refactoring
-status: planned
+status: accepted
 priority: High
 risk_level: low
 created: 2026-09-17
-updated: 2026-09-17
+updated: 2026-09-18
+completed_date: 2026-09-18
 assignee:
-estimated_effort_hours: 4
+estimated_effort_hours: 8
 github_issue: 421
+pr_number: 430
 ---
 
 # Technical Task: QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.121.review.1.cycle-scoped-qa-tracker-comments.md` implemented 2026-09-18
 **GitHub Issue**: [#421](https://github.com/Gamaroff/agent-skills/issues/421)
 
 ---
@@ -33,8 +36,9 @@ the engine's cycle-scoped list so the suffix is legal, states the once-per-issue
 split in the contract, and adds a test that fails on the next bare call.
 
 **Scope**: the engine's `CYCLE_SCOPED_STAGES` list and its twin in `stakeholder-summary.js`; the
-`--stage` argument at three call sites; `tracker-comment-contract.md`; one guard test; the
-orchestrator's parallel `qa-cycle-{N}` block, which the evidence shows never posts.
+`--stage` argument at three tracker call sites and the four PR-lead calls beside them;
+`tracker-comment-contract.md`; one guard test over both call-site populations; the orchestrator's
+parallel `qa-cycle-{N}` and `qa-fix-{N}` blocks, which the evidence shows never post.
 
 ## 2. Motivation
 
@@ -53,10 +57,13 @@ orchestrator's parallel `qa-cycle-{N}` block, which the evidence shows never pos
    passing `--slot cycle="$FIX_CYCLE"` on the very next line.
 4. **`qa-gate` is not cycle-scoped at all**, so `qa-task` and `qa-story` Step 13b could not suffix it
    even if they tried — the engine rejects `qa-gate-2` as an unknown stage.
-5. **Two stages exist for the same moment.** `develop-pipeline-step-5-6-qa-loop.md` tells the
-   orchestrator to post `qa-cycle-{N}` after each cycle; the QA skills post `qa-gate`. On #419 there
-   is no `qa-cycle` marker at all — the orchestrator block does not run in practice, and the one that
-   does run is the one keyed wrong.
+5. **Two writers exist for each QA moment.** `develop-pipeline-step-5-6-qa-loop.md` tells the
+   orchestrator to post `qa-cycle-{N}` after each gate (lines ~350-379) **and** `qa-fix-{N}` after
+   each fix (step 4a, lines ~894-910); the QA skills post `qa-gate` and `qa-fix` for the same two
+   moments. On #419 there is no `qa-cycle` marker and no `qa-fix-N` marker at all — neither
+   orchestrator block runs in practice, and the ones that do run are the ones keyed wrong. Once the
+   skill sites are suffixed, a run that *did* execute 4a would race the skill for the same
+   `qa-fix-N` marker: whichever posts first wins and the other silently reads `already`.
 
 ### Benefits
 
@@ -85,6 +92,8 @@ skills/qa-task/SKILL.md   Step 13b   --stage qa-gate   --slot verdict --slot blo
 skills/qa-story/SKILL.md  Step 13b   --stage qa-gate   --slot verdict --slot blocking_count
 skills/qa-fix/SKILL.md    Step 7     --stage qa-fix    --slot cycle="$FIX_CYCLE"
 shared/resources/develop-pipeline-step-5-6-qa-loop.md   --stage qa-cycle-{N}   (never observed posting)
+shared/resources/develop-pipeline-step-5-6-qa-loop.md   --stage qa-fix-{N}     (step 4a — never observed posting)
+shared/resources/develop-pipeline-on-precompact.sh      lead :227 --stage pipeline-paused (bare) / tracker :329 suffixed
 ```
 
 ### Target Architecture
@@ -98,7 +107,10 @@ stakeholder-summary.js
 qa-task   Step 13b   --stage "qa-gate-${QA_CYCLE}"    # from the gate filename, same derivation qa-fix uses
 qa-story  Step 13b   --stage "qa-gate-${QA_CYCLE}"
 qa-fix    Step 7     --stage "qa-fix-${FIX_CYCLE}"
-qa-loop doc          orchestrator qa-cycle block removed (see Clarifications)
+  …and the stakeholder-summary-cli.js PR-lead call beside each carries the same suffixed stage
+precompact.sh:227    --stage "pipeline-paused-${CURRENT_STEP}"   # lead call; tracker call at :329 already is
+qa-loop doc          orchestrator qa-cycle-{N} AND qa-fix-{N} blocks removed (see Clarifications)
+develop-bug verify   --stage qa-cycle-{N}   UNCHANGED — its only per-cycle comment (never runs qa-task)
 
 tracker-comment-contract.md   § Stages: once-per-issue vs once-per-cycle, stated once
 shared/resources/tests/comment-slot-coverage.test.mjs   + "a cycle-scoped stage is never passed bare"
@@ -109,14 +121,27 @@ shared/resources/tests/comment-slot-coverage.test.mjs   + "a cycle-scoped stage 
 - **Why `qa-gate` rather than switching the QA skills to `qa-cycle`.** The `qa-gate` lead reads
   `blocking_count`, which is what the gate file carries and what the outside reader needs; `qa-cycle`
   reads only `verdict` and `cycle`. Adding one name to a list is a smaller change than moving two call
-  sites onto a lead that says less. The orchestrator's `qa-cycle-{N}` block is the duplicate — it was
-  written for the same moment, it has never been observed posting (#419 has no `qa-cycle` marker), and
-  leaving it makes a run that *did* execute it post twice per cycle. Remove the block; keep the
-  `qa-cycle` stage in the engine (removing a stage touches the lead catalogue and its tests, and is
-  out of scope).
-- **The cycle number already exists at every site.** `qa-fix` derives `FIX_CYCLE` from the gate
-  filename; `qa-task`/`qa-story` Step 13b re-resolve `THIS_GATE` for `blocking_count` and can take the
-  number from the same filename with the same `sed`.
+  sites onto a lead that says less. The orchestrator's `qa-cycle-{N}` and `qa-fix-{N}` blocks are
+  the duplicates — each was written for the same moment as a QA-skill call, neither has been observed
+  posting (#419 has no `qa-cycle` and no `qa-fix-N` marker), and leaving them makes a run that *did*
+  execute them post twice per cycle or race for one marker. Remove both blocks; keep the `qa-cycle`
+  stage in the engine — `develop-bug`'s verify loop
+  (`skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md`) is a live consumer that
+  posts `qa-cycle-{N}` as its only per-cycle comment, because it never runs `qa-task`/`qa-story`.
+- **The PR-lead call beside each tracker call takes the same suffixed stage.** The
+  `stakeholder-summary-cli.js` lead has no marker, so the suffix changes nothing it renders — but
+  passing it keeps the two calls at each site textually identical, and lets one guard cover both
+  populations (`SITES` and `PR_SITES` in `comment-slot-coverage.test.mjs`) instead of exempting
+  one. That makes `develop-pipeline-on-precompact.sh:227` a fourth site: its lead call passes
+  `pipeline-paused` bare while its tracker call at `:329` already passes
+  `pipeline-paused-${CURRENT_STEP}`. Verified 2026-09-18: the lead CLI rejects `qa-gate-2` today
+  (exit 2, unknown stage) and accepts it once Phase 1 lands — so Phase 1 must merge first.
+- **Superseded in QA cycle 2 (see Notes and BUG-2): the cycle is derived by one shared helper, `qa-cycle.sh`, called in *every* block that uses it — each fenced block runs as its own shell, so nothing computed in one block survives into the next.** The paragraph below records the original plan. ~~The cycle number already exists at every site — derive it once, above both calls.~~ `qa-fix`
+  derives `FIX_CYCLE` from the gate filename once (`:820`) and both its comments read it.
+  `qa-task`/`qa-story` Step 13b re-resolve `THIS_GATE` for `blocking_count` (`:1328` / `:1915`), but
+  the PR-lead call sits ~60 lines **above** that (`:1264` / `:1854`) — so `QA_CYCLE` must be derived
+  once, before the PR lead, with the same `sed`, and reused by the tracker call. Two derivations
+  are the medium risk in §10.
 - **The marker for a suffixed stage is the suffixed name** (`agent-skills-comment:qa-gate-2`), so a
   resumed cycle 2 still answers `already` and cycle 3 posts. That is the behaviour the contract
   already promises for `qa-fix-N`.
@@ -127,20 +152,24 @@ shared/resources/tests/comment-slot-coverage.test.mjs   + "a cycle-scoped stage 
 
 ✅ **Engine**: `qa-gate` added to `CYCLE_SCOPED_STAGES` and `CYCLE_SCOPED_LEAD_STAGES`; the stage
    validator and `stripCycleSuffix` need no change.
-✅ **Call sites**: the three `--stage` arguments above, plus the `stakeholder-summary-cli.js` lead
-   call beside each (it accepts the suffixed form already — verify, do not assume).
+✅ **Call sites**: the three tracker `--stage` arguments above, plus the `stakeholder-summary-cli.js`
+   lead call beside each **and** the precompact hook's lead call (`:227`) — four PR-lead sites, all
+   suffixed (the lead CLI accepts the suffixed form only once Phase 1 lands — verified).
 ✅ **Contract**: `tracker-comment-contract.md` gains one table: stage → once-per-issue | once-per-cycle.
-✅ **Guard**: `comment-slot-coverage.test.mjs` (or a sibling in the same file family) asserts that no
-   shipped call site passes a cycle-scoped stage without a `-${…}` or `-{N}` suffix.
-✅ **Orchestrator**: delete the `qa-cycle-{N}` comment block from `develop-pipeline-step-5-6-qa-loop.md`
-   and the prose that documents its slots.
+✅ **Guard**: `comment-slot-coverage.test.mjs` asserts that no shipped call site — tracker
+   (`SITES`) **or** PR-lead (`PR_SITES`) — passes a cycle-scoped stage without a `-${…}` or `-{N}`
+   suffix.
+✅ **Orchestrator**: delete both the `qa-cycle-{N}` comment block (gate moment, ~`:350-379`) and the
+   `qa-fix-{N}` comment block (fix moment, step 4a, ~`:894-910`) from
+   `develop-pipeline-step-5-6-qa-loop.md`, with the prose that documents their slots.
 ✅ `npm run bundle` — the shared sources fan out into ~30 `references/` copies.
 
 ### Out of Scope
 
 ❌ Update-in-place of a single running comment (the engine has that path; per-cycle history is the
    behaviour the PR side already has and the tracker side should match).
-❌ Removing the `qa-cycle` stage from the engine or the lead catalogue.
+❌ Removing the `qa-cycle` stage from the engine or the lead catalogue — `develop-bug`'s verify
+   loop posts it and must keep doing so.
 ❌ A `bitbucket_call_with_retry` helper (noted at the call site as its own task).
 ❌ Backfilling missing cycle comments on closed issues.
 
@@ -162,10 +191,15 @@ post cycle N again once — one duplicate on at most one in-flight issue, then c
 `shared/resources/tests/tracker-comment.test.mjs`, `shared/resources/tests/stakeholder-summary.test.mjs`
 
 **Changes**:
-- [ ] Add `"qa-gate"` to `CYCLE_SCOPED_STAGES` and to `CYCLE_SCOPED_LEAD_STAGES`.
-- [ ] Extend the existing "suffix is legal only for cycle-scoped stages" test with `qa-gate-2`
-      accepted and `in-review-2` still rejected.
-- [ ] Assert the lead for `qa-gate-2` renders identically to `qa-gate` (suffix stripped).
+- [x] Add `"qa-gate"` to `CYCLE_SCOPED_STAGES` and to `CYCLE_SCOPED_LEAD_STAGES`.
+- [x] `tracker-comment.test.mjs:1495-1509` ("the numeric suffix is legal only for cycle-scoped
+      stages (NEW-6)") asserts the list **literally** —
+      `deepEqual([...CYCLE_SCOPED_STAGES], ["qa-cycle","qa-fix","pipeline-paused"])` — so it goes
+      red on the addition. Update the literal to four members and add `qa-gate-2` accepted,
+      `in-review-2` still rejected. (Verified 2026-09-18: enumerated, not table-driven.)
+- [x] `stakeholder-summary.test.mjs:492-505` is behavioural (iterates `COMMENT_STAGES`); bump its
+      `≥ 3` non-vacuity floor to `≥ 4`.
+- [x] Assert the lead for `qa-gate-2` renders identically to `qa-gate` (suffix stripped).
 
 **Dependencies**: none.
 
@@ -174,16 +208,22 @@ post cycle N again once — one duplicate on at most one in-flight issue, then c
 **Risk Level**: Low
 
 **Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `skills/qa-fix/SKILL.md`,
+`shared/resources/develop-pipeline-on-precompact.sh`,
 `shared/resources/develop-pipeline-step-5-6-qa-loop.md`
 
 **Changes**:
-- [ ] `qa-fix` Step 7: `--stage "qa-fix-${FIX_CYCLE}"`.
-- [ ] `qa-task` / `qa-story` Step 13b: derive `QA_CYCLE` from `THIS_GATE`'s filename (same `sed` as
-      `qa-fix`), pass `--stage "qa-gate-${QA_CYCLE}"`; update the adjacent prose that says the
-      comment is per-stage.
-- [ ] Delete the orchestrator's `qa-cycle-{N}` block and its slot note from the qa-loop doc; leave a
-      one-line pointer that the QA skill posts the per-cycle comment.
-- [ ] `npm run bundle`.
+- [x] `qa-fix` Step 7 (`:900`): `--stage "qa-fix-${FIX_CYCLE}"`; PR lead (`:828`) the same.
+- [x] `qa-task` / `qa-story` Step 13b (as shipped: `QA_CYCLE=$(bash .agents/skills/<skill>/references/qa-cycle.sh "$TASK_DIR")` in *both* the PR-lead and the tracker block — see Notes; original text follows): derive `QA_CYCLE` **once, above the PR-lead call**
+      (`:1264` / `:1854`) from the newest gate filename with the same `sed` `qa-fix` uses at `:820`;
+      pass `--stage "qa-gate-${QA_CYCLE}"` to both the PR lead and the tracker call (`:1339` /
+      `:1926`); update the adjacent prose that says the comment is per-stage.
+- [x] `develop-pipeline-on-precompact.sh:227`: lead call `--stage "pipeline-paused-${CURRENT_STEP}"`
+      to match its tracker call at `:329`.
+- [x] Delete the orchestrator's `qa-cycle-{N}` block (~`:350-379`) **and** its `qa-fix-{N}` block
+      (step 4a, ~`:894-910`) with their slot notes from the qa-loop doc; leave a one-line pointer at
+      each that the QA skill (`qa-task`/`qa-story` Step 13b; `qa-fix` Step 7) posts the per-cycle
+      comment. `develop-bug`'s verify loop is **not** touched.
+- [x] `npm run bundle`.
 
 **Dependencies**: Phase 1 (the suffix must be legal before a call site uses it).
 
@@ -195,13 +235,17 @@ post cycle N again once — one duplicate on at most one in-flight issue, then c
 `shared/resources/tests/comment-slot-coverage.test.mjs`
 
 **Changes**:
-- [ ] Contract: one table, stage → `once per issue` | `once per cycle (numeric suffix required)`,
+- [x] Contract: one table, stage → `once per issue` | `once per cycle (numeric suffix required)`,
       derived from and cross-referencing `CYCLE_SCOPED_STAGES`, not restating it as a second list.
-- [ ] Guard: for every call site `collectCallSites()` already finds, if `baseStage(stage) !== stage`
-      is false and `CYCLE_SCOPED_STAGES.includes(stage)` — i.e. a cycle-scoped stage passed with no
-      suffix — fail with the file and line. Non-vacuity floor: at least three suffixed cycle-scoped
-      sites must be found.
-- [ ] Mutation-prove: revert one call site to the bare form, confirm the guard names it, restore.
+- [x] Guard: for every site in **both** `SITES` (tracker-comment.js) and `PR_SITES`
+      (stakeholder-summary-cli.js), if `CYCLE_SCOPED_STAGES.includes(stage)` — i.e. a cycle-scoped
+      stage passed with no suffix — fail with the file and line. The collector's existing
+      `--stage\s+"?([A-Za-z0-9_-]+)` regex already captures `qa-gate-` from
+      `"qa-gate-${QA_CYCLE}"` and `baseStage` strips it (verified 2026-09-18) — **no regex change**.
+      Non-vacuity: expect **5** suffixed tracker sites (`precompact.sh:329`, `develop-bug`
+      verify-loop `:89`, `qa-task`, `qa-story`, `qa-fix`) and **4** suffixed PR-lead sites; assert
+      `≥ 4` on each population and record the exact counts in the implementation report.
+- [x] Mutation-prove: revert one call site to the bare form, confirm the guard names it, restore.
 
 **Dependencies**: Phase 2 (the guard must be green on the fixed tree and red on the old one).
 
@@ -214,13 +258,21 @@ post cycle N again once — one duplicate on at most one in-flight issue, then c
 3. ✅ `skills/qa-task/SKILL.md` — Step 13b stage suffix + cycle derivation
 4. ✅ `skills/qa-story/SKILL.md` — Step 13b stage suffix + cycle derivation
 5. ✅ `skills/qa-fix/SKILL.md` — Step 7 stage suffix
-6. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — remove the duplicate block
+6. ✅ `shared/resources/develop-pipeline-step-5-6-qa-loop.md` — remove both duplicate blocks
+   (`qa-cycle-{N}` gate block, `qa-fix-{N}` step-4a block)
+6a. ✅ `shared/resources/develop-pipeline-on-precompact.sh` — lead call `:227` suffixed
+6b. ✅ `shared/resources/qa-cycle.sh` — **new** (QA cycle 2, BUG-2): the one definition of the cycle, called in every block
+6c. ✅ `shared/resources/stakeholder-summary.md` — `qa-gate` entry states its cycle scope (doc sweep)
+6d. ✅ `skills/qa-story/SKILL.md` naming section + tree examples — numbered gate filename (QA cycle 2, BUG-3)
 
 ### Files to Modify (Tests)
 
-7. ✅ `shared/resources/tests/tracker-comment.test.mjs` — suffix legality for `qa-gate`
+7. ✅ `shared/resources/tests/tracker-comment.test.mjs` — suffix legality for `qa-gate`; literal
+   `deepEqual` at `:1506-1509` updated
 8. ✅ `shared/resources/tests/stakeholder-summary.test.mjs` — lead renders for `qa-gate-N`
-9. ✅ `shared/resources/tests/comment-slot-coverage.test.mjs` — bare-cycle-scoped-stage guard
+9. ✅ `shared/resources/tests/comment-slot-coverage.test.mjs` — bare-cycle-scoped-stage guard (+ literal-cycle rejection, cycle 1)
+9a. ✅ `tests/qa-cycle.test.js` — **new** (cycles 2–4): helper behaviour under bash + zsh; same-block, root-form and no-inline-derivation guards
+9b. ✅ `evals/shared/tests/transition-protocol-parity.test.mjs` — `--stage` scan accepts the quoted form, with floors (cycle 1); Steps 5–6 doc no longer a required comment site
 
 ### Files to Modify (Documentation)
 
@@ -238,9 +290,9 @@ None.
 **Scope**: engine stage validation and lead rendering.
 
 **Actions**:
-- [ ] `qa-gate-2` accepted; `qa-gate` still accepted; `in-review-2` rejected.
-- [ ] Lead for `qa-gate-2` with `verdict=PASS blocking_count=0` equals the lead for `qa-gate`.
-- [ ] Marker for `qa-gate-2` is `agent-skills-comment:qa-gate-2`; a second call with the same stage
+- [x] `qa-gate-2` accepted; `qa-gate` still accepted; `in-review-2` rejected.
+- [x] Lead for `qa-gate-2` with `verdict=PASS blocking_count=0` equals the lead for `qa-gate`.
+- [x] Marker for `qa-gate-2` is `agent-skills-comment:qa-gate-2`; a second call with the same stage
       returns `already`; `qa-gate-3` posts.
 
 **Command**: `npm test`
@@ -250,13 +302,14 @@ None.
 **Scope**: the shipped call sites.
 
 **Actions**:
-- [ ] `comment-slot-coverage.test.mjs` finds the three suffixed sites and no bare ones.
-- [ ] Mutation: revert `qa-fix` Step 7 to `--stage qa-fix` → guard red, naming the file.
+- [x] `comment-slot-coverage.test.mjs` finds 5 suffixed tracker sites and 4 suffixed PR-lead
+      sites, and no bare cycle-scoped stage in either population.
+- [x] Mutation: revert `qa-fix` Step 7 to `--stage qa-fix` → guard red, naming the file.
 
 ### Contract Tests
 
-- [ ] `CYCLE_SCOPED_STAGES` equals `CYCLE_SCOPED_LEAD_STAGES` (existing test, now with four members).
-- [ ] `tests/bundled-links.test.js` and `npm run bundle:check` green after the bundle.
+- [x] `CYCLE_SCOPED_STAGES` equals `CYCLE_SCOPED_LEAD_STAGES` (existing test, now with four members).
+- [x] `tests/bundled-links.test.js` and `npm run bundle:check` green after the bundle.
 
 ### Performance Tests
 
@@ -264,26 +317,28 @@ Not applicable — no runtime path changes beyond one array member.
 
 ### Consumer Tests
 
-- [ ] On the next `/develop-task` run with ≥2 QA cycles, the tracker issue carries one
+- [x] On the next `/develop-task` run with ≥2 QA cycles, the tracker issue carries one
       `qa-gate-N` and one `qa-fix-N` marker per cycle, in order.
 
 ## 9. Success Criteria
 
 ### Functional
-- [ ] Every QA cycle's gate and fix comment reaches the tracker issue with a distinct marker.
-- [ ] A resumed cycle still returns `already` for its own suffixed stage.
-- [ ] No `qa-cycle` comment is posted by the orchestrator.
+- [x] Every QA cycle's gate and fix comment reaches the tracker issue with a distinct marker. (Met live on #421: `qa-gate-1..5`, `qa-fix-1..4`.)
+- [x] A resumed cycle still returns `already` for its own suffixed stage.
+- [x] Neither the `qa-cycle-{N}` nor the `qa-fix-{N}` block remains in
+      `develop-pipeline-step-5-6-qa-loop.md` (develop-story/develop-task); `develop-bug`'s
+      verify-loop `qa-cycle-{N}` call is unchanged and still passes the guard.
 
 ### Performance
-- [ ] No change to comment latency; one extra list member in the validator.
+- [x] No change to comment latency; one extra list member in the validator.
 
 ### Code Quality
-- [ ] `npm test` green; the new guard has a non-vacuity floor and a passed mutation proof recorded
+- [x] `npm test` green; the new guard has a non-vacuity floor and a passed mutation proof recorded
       in the implementation report.
-- [ ] `CYCLE_SCOPED_STAGES` remains the single definition (contract table cross-references it).
+- [x] `CYCLE_SCOPED_STAGES` remains the single definition (contract table cross-references it).
 
 ### Migration
-- [ ] Contract documents the stage classes; observation #75 marked `actioned` with the PR number.
+- [x] Contract documents the stage classes; observation #75 marked `actioned` with the PR number. (Set by `/finalise` with PR #430.)
 
 ## 10. Risk Assessment
 
@@ -294,12 +349,17 @@ None.
 1. **Cycle derivation differs between qa-task and qa-fix**
    - Risk: two `sed` expressions drift and one cycle posts under the wrong number.
    - Probability: Low · Impact: Medium
-   - Mitigation: copy the `qa-fix` expression verbatim; the guard checks presence of a suffix, and the
-     consumer test checks ordering on a real run.
+   - Mitigation (as shipped, superseding the original): one definition — `shared/resources/qa-cycle.sh` —
+     called in every block that needs the cycle, so the two comments cannot disagree and no value crosses a
+     fenced-block boundary; `tests/qa-cycle.test.js` holds every block to that; the consumer test checks
+     ordering on a real run (met on #421).
 
 ### Low Risk
 1. **A call site cited in a task document trips the guard** — `collectCallSites()` already excludes
    `docs/`; confirm the new assertion goes through the same collector.
+2. **Widening the guard to `PR_SITES` trips a site the task did not list** — the 2026-09-18 review
+   enumerated all four bare PR-lead cycle-scoped calls (`qa-fix:828`, `qa-task:1264`,
+   `qa-story:1854`, `precompact.sh:227`); re-run the collector before asserting, not after.
 2. **Bundle churn** — three shared sources change; expect ~30 `references/` copies in the diff.
 
 ## 11. Rollback Plan
@@ -320,21 +380,82 @@ None.
 - **Critical**: engine rejects a stage a shipped call site passes.
 - **Non-critical**: guard false positive, contract wording.
 
-## Change Log
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-09-18
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.121.qa.5.cycle-scoped-qa-tracker-comments.md](./task.121.qa.5.cycle-scoped-qa-tracker-comments.md)
+- **Gate File**: [task.121.gate.5.cycle-scoped-qa-tracker-comments.yml](./task.121.gate.5.cycle-scoped-qa-tracker-comments.yml)
+- **Previous cycles**: [qa.4](./task.121.qa.4.cycle-scoped-qa-tracker-comments.md) · [qa.3](./task.121.qa.3.cycle-scoped-qa-tracker-comments.md) · [qa.2](./task.121.qa.2.cycle-scoped-qa-tracker-comments.md) · [qa.1](./task.121.qa.1.cycle-scoped-qa-tracker-comments.md)
+
+### Test Coverage Summary
+- **Tests Executed**: 3439
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No open issues. Six bugs across five cycles closed and mutation-covered. Four advisory follow-ups (F1–F4) recorded in gate 5: qa-fix's shared body-file path, the helper's stale header example, zero-padded gate names, stale test comments. Consumer criterion met live on #421 (`qa-gate-1..5`, `qa-fix-1..4`).
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.121.qa.5.cycle-scoped-qa-tracker-comments.md` (cycle 5 of 5)
+**Gate File**: `task.121.gate.5.cycle-scoped-qa-tracker-comments.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 7/7 met — six verified against code and per-PR tests by the DoD agents; the seventh (observation #75 → `actioned`) completed by `/finalise` with PR #430
+✅ **Tests:** `tests/qa-cycle.test.js` 25 (bash + zsh), `tracker-comment.test.mjs` 74, plus extended `stakeholder-summary`, `comment-slot-coverage` and `transition-protocol-parity` suites; `npm run ci:fast` 3440/3441 (1 skipped); every fix mutation-proved
+✅ **PR Review:** PR #430 — Step 5c `/review-pr` CONCERNS (advisory; documentation findings applied in `41964e2b`, two behaviour follow-ups recorded); CI green on the decision head `a412f59a` (5 checks)
+✅ **Documentation:** contract stage-class table, `stakeholder-summary.md`, Steps 5–6 doc, three SKILL.md call sites, bundles in sync (128/0); CHANGELOG `(task 121)` entry
+✅ **Security Review:** ✅ PASS after fix — boundary probed by execution; two low-severity fail-closed defects (newline-bearing gate filename → lower cycle at exit 0; `qa-gate-0` admitted) found by the finalise probe and fixed in `a412f59a`, tested, mutation-proved, re-probed
+✅ **Compliance Review:** NOT_APPLICABLE — no personal data, payments, UI or health data
+✅ **Performance / Reliability / Maintainability:** ✅ PASS (gate 5 NFR validation)
+
+**Advisory follow-ups (not blocking):** gate 5 F1–F4 (qa-fix body-file path, helper header example, zero-padded gate names, stale test comments); 5c follow-ups (develop-bug's `/qa-fix` cycle source; a qa-fix-specific body file).
+
+**Detailed Verification Log:** See `task.121.dod.1.cycle-scoped-qa-tracker-comments.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-09-18
 
 <!-- change-log-start -->
+## Change Log
+
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-09-17 | 1.0 | Initial draft | create-task |
+| 2026-09-18 | 1.1 | Review passed (8/10) — scope widened to the orchestrator `qa-fix-{N}` block and four PR-lead sites (incl. precompact `:227`); guard covers `SITES` + `PR_SITES`; `qa-cycle` criterion scoped so `develop-bug`'s verify loop keeps posting; `tracker-comment.test.mjs` literal `deepEqual` called out; effort 4h → 8h | review-task |
+| 2026-09-18 |  | Status → ready-for-development | review-task |
+| 2026-09-18 |  | Implemented — 16 source files (+57 bundled copies), 8 new/extended tests across 3 suites; guard mutation-proved 3 ways | develop |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — 1 medium, 2 low | qa-task |
+| 2026-09-18 |  | QA findings fixed — BUG-1 (sed -n/p at 3 sites + pinning test), CR-3, CR-4; 1 iteration | qa-fix |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium, 2 low; BUG-1 closed | qa-task |
+| 2026-09-18 |  | QA findings fixed — BUG-2 (qa-cycle.sh helper, derived where used, no guess), BUG-3, CR-4, CR-5; cycle 2 (2 iterations so far) | qa-fix |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — cycle 3: 1 medium (helper path form), 5 low; BUG-2/BUG-3 closed | qa-task |
+| 2026-09-18 |  | QA findings fixed — BUG-4 (helper path form per block + guard), CR-2..CR-6; cycle 3 (3 iterations so far) | qa-fix |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — cycle 4: 2 medium (guard blind to continued form; rc conflation + PR-lead cwd), 4 low; BUG-4 closed | qa-task |
+| 2026-09-18 |  | QA findings fixed — BUG-5 (continuations joined), BUG-6 (rc check + one cwd everywhere), CR-4..CR-7; cycle 4 (4 iterations so far) | qa-fix |
+| 2026-09-18 |  | QA gate PASS (100/100) — cycle 5: 0 open, 4 advisory follow-ups; BUG-5/BUG-6 closed | qa-task |
+| 2026-09-18 | 1.2 | DoD passed — accepted (PR #430); finalise security probe fixed two low-severity fail-closed defects in a412f59a | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: engine
-- [ ] Phase 2: call sites + orchestrator block
-- [ ] Phase 3: contract + guard
-- [ ] QA: `task.121.qa.[N].cycle-scoped-qa-tracker-comments.md`
-- [ ] Gate: `task.121.gate.[N].cycle-scoped-qa-tracker-comments.yml`
+- [x] Phase 1: engine
+- [x] Phase 2: call sites + orchestrator block
+- [x] Phase 3: contract + guard
+- [x] QA: `task.121.qa.[N].cycle-scoped-qa-tracker-comments.md`
+- [x] Gate: `task.121.gate.[N].cycle-scoped-qa-tracker-comments.yml`
 
 ## References
 
@@ -347,3 +468,58 @@ None.
 ## Notes
 
 Bugs found during QA land at `task.121.bug.[N].[name].md` in this directory.
+
+**Implementation notes (develop, 2026-09-18).** Three commits, one per phase, plus a format fix.
+Guard counts on the fixed tree (from `collectCallSites()`): 24 tracker sites / **5 suffixed**
+(`precompact.sh:329`, `develop-bug` verify-loop `:89`, `qa-fix:904`, `qa-story:1937`,
+`qa-task:1350`); 12 PR-lead sites / **4 suffixed** (`precompact.sh:227`, `qa-fix:834`,
+`qa-story:1867`, `qa-task:1277`) — exactly the plan's prediction. Mutation proofs: (A) `qa-fix`
+tracker call reverted to bare → `SITES` guard red naming `skills/qa-fix/SKILL.md:904`; (B) `qa-fix`
+PR-lead call reverted to bare → `PR_SITES` guard red; (C) `qa-gate` removed from
+`CYCLE_SCOPED_STAGES` → 6 tests red across `tracker-comment` / `stakeholder-summary` suites and both
+guard populations. Two existing guards needed updating for the intended change:
+`transition-protocol-parity.test.mjs` no longer lists the Steps 5–6 doc as a required comment site
+(it now comments through the QA skills), and `comment-slot-coverage.test.mjs` Guard B compares the
+hook's PR-lead stage through `baseStage()` like its tracker twin. One deviation from the plan:
+`FIX_CYCLE`/`QA_CYCLE` fall back to `1` when no gate file is found, because the same value is now
+the stage suffix and `qa-fix-` is not a stage the engine accepts. Consumer criterion (a real ≥2-cycle
+run) and observation #75 closure are left for the QA loop and `/finalise`.
+
+**QA fix cycle 1 (qa-fix, 2026-09-18).** BUG-1: `sed -nE … p` at all three derivations so a
+number-less gate reaches the `:-1` fallback; pinned by `tests/qa-cycle-derivation.test.js`, which
+runs the shipped lines from each SKILL.md against fixtures (newest gate → its number; empty → 1;
+number-less → 1) and asserts the three derivations share one shape. CR-4: the parity scan accepts an
+optional opening quote (`--stage\s+("?)…`) with non-vacuity floors (≥100 literals, ≥4 quoted;
+measured 259 / 6). CR-3: the never-passed-bare guard also rejects a hard-coded numeric cycle
+(`--stage qa-gate-1`). Each mutation-proved: non-printing sed at one site → 2 red; old parity regex →
+quoted floor red; literal `qa-gate-1` in qa-task → guard red naming the site.
+
+**QA fix cycle 2 (qa-fix, 2026-09-18).** BUG-2: the cycle is no longer a value carried between
+fenced blocks nor guessed — `shared/resources/qa-cycle.sh` (bundled as `references/qa-cycle.sh`)
+prints the highest-numbered gate's cycle or refuses (exit 1, empty), and every one of the six
+blocks that passes a cycle-scoped stage calls it; an unknown cycle skips the tracker post with a
+⚠️ (the PR comment still posts, without its lead). `THIS_GATE` for `blocking_count` is the gate
+carrying that cycle. `tests/qa-cycle.test.js` (bash + zsh) replaces the extraction test and adds a
+same-block guard + no-inline-derivation guard; three mutation proofs. This also closes cycle-1's
+CR-2 follow-up (mtime → highest number). BUG-3: qa-story naming section and tree examples
+numbered. CR-4: contract cell reworded ("required by convention, enforced by the guard"). CR-5:
+the helper test runs under both shells. The task's §3 "derive it once, above both calls" is
+superseded: derive it from one definition, in every block.
+
+**QA fix cycle 3 (qa-fix, 2026-09-18).** BUG-4: the three tracker blocks address the helper from the
+repository root (`.agents/skills/<skill>/references/qa-cycle.sh`) like the engine call beside them;
+the PR-lead blocks stay skill-relative like their lead CLI — one cwd per block, enforced by a new
+path-form guard. CR-2: each derivation states inherited inputs vs in-block computed values. CR-3:
+the helper bounds the cycle to 9 digits (a longer run is a malformed name → refusal) and normalises
+leading zeros. CR-4: qa-story comments use its own Step 6 / 6b numbering. CR-5: the inline-derivation
+guard catches sed/awk/grep/cut spellings with plain or escaped dots. CR-6: the co-located tree shows
+`epics/…/stories/story.x/`. Three mutation proofs; ci:fast green.
+
+**QA fix cycle 4 (qa-fix, 2026-09-18).** BUG-5: `fencedBlocks()` joins backslash continuations, so
+the inline-derivation guard now catches the two-line form the task started from (fixture added).
+BUG-6: every helper call checks its rc — refusal (1) is the skip branch, anything else aborts the
+block loudly — and all six blocks (PR-lead and tracker) address the helper and the lead CLI from
+the repository root beside their `.claude/state/…` paths; the guard requires the root form and
+treats `.claude/state/` as the block's cwd signal. CR-4: qa-fix writes the tracker body file where
+the body is built. CR-5: `gate.0` counts as un-numbered. CR-6/CR-7: callout wording; fixtures
+removed in an `after()` hook. Four mutation proofs; ci:fast green.

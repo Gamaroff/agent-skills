@@ -1247,9 +1247,9 @@ EOF
 
 # The plain-language lead, obtained ONCE and folded into $BODY_FILE — ABOVE the
 # arm split below, so the GitHub and Bitbucket arms post the same bytes and
-# cannot drift. `qa-gate` is the same stage the tracker comment for this moment
-# uses; a pull-request comment about a moment that also exists on the tracker
-# reuses that stage rather than inventing a second vocabulary.
+# cannot drift. `qa-gate-{N}` is the same stage the tracker comment for this
+# moment uses; a pull-request comment about a moment that also exists on the
+# tracker reuses that stage rather than inventing a second vocabulary.
 #
 # GATE_DECISION is bound HERE, deliberately. The heredoc above is quoted
 # (`<<'EOF'`), so its [GATE_DECISION] placeholder is filled in textually when
@@ -1261,10 +1261,39 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # nothing about whether to worry. Pass the raw token and let the catalogue map
 # it — an unknown verdict renders "the results are recorded below" rather than
 # defaulting to reassurance.
-LEAD=$(node references/stakeholder-summary-cli.js --stage qa-gate \
-  --slot verdict="$GATE_DECISION") || exit 1
-printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
-  && mv "${BODY_FILE}.tmp" "$BODY_FILE"
+# The QA cycle number lives in the gate filename this run just wrote — the
+# highest-numbered `*.gate.{N}.*.yml` in the directory. It is the STAGE SUFFIX
+# (`qa-gate-3`), which is what keys the tracker comment's idempotency marker:
+# bare `qa-gate` was suppressed by cycle 1's marker on every later cycle
+# (task.121). ONE definition — the bundled `qa-cycle.sh` — called in EVERY block
+# that needs the cycle: each fenced block runs as its own shell, so a value
+# derived in this block does not exist in Step 13b's (TASK-121-BUG-2). The helper
+# refuses rather than guesses: no numbered gate → empty stdout, one ⚠️ line on
+# stderr, exit 1. A guessed `1` would key every cycle to cycle 1's marker, the
+# very suppression this suffix exists to end. The lead below renders the same
+# sentence with or without the suffix; passing it keeps this call textually
+# identical to the tracker call so one guard covers both — and when the cycle
+# is unknown the pull-request comment still posts, without the lead, because it
+# carries no marker and losing it would hide the ⚠️ from the reviewer.
+# Every path in this block resolves from the REPOSITORY ROOT — `.claude/state/…`
+# above, and `.agents/skills/qa-task/references/…` for the helper and the lead
+# CLI here — one cwd per block, the same cwd in every block (TASK-121-BUG-4,
+# BUG-6). What a block inherits from earlier blocks is the INPUTS an agent
+# re-binds when it runs the block ($TASK_DIR, $GATE_DECISION, $BODY_FILE,
+# $PR_URL); a COMPUTED value like the cycle never is.
+QA_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR"); rc=$?
+# rc 1 = the helper REFUSED (no numbered gate) → empty, the skip branch below.
+# Anything else (127 not found, 126 not runnable) is a broken invocation, and
+# it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
+[ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
+if [ -n "$QA_CYCLE" ]; then
+  LEAD=$(node .agents/skills/qa-task/references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
+    --slot verdict="$GATE_DECISION") || exit 1
+  printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
+    && mv "${BODY_FILE}.tmp" "$BODY_FILE"
+else
+  echo "⚠️  QA cycle unknown (see qa-cycle.sh above) — posting the PR comment without its lead"
+fi
 
 if [ "$VCS" = "github" ]; then
   tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE"
@@ -1321,11 +1350,30 @@ if [ -n "$QA_ISSUE" ]; then
   printf 'QA %s (%s/100) — PR #%s: %s\n' \
     "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
 
-  # blocking_count — the high-severity entries in the gate this run just wrote.
-  # Re-resolve rather than reusing LATEST_GATE from Step 2: that one names the
-  # PREVIOUS run's gate (read to decide whether to re-review), and this run has
-  # written a newer one since.
-  THIS_GATE=$(ls -t "$TASK_DIR"/task.*.gate.*.yml 2>/dev/null | head -1)
+  # The cycle — the stage suffix — is derived HERE, in this block, by the same
+  # helper Step 13 called. This block runs as its own shell, so Step 13's
+  # $QA_CYCLE does not exist here (TASK-121-BUG-2). No fallback: a comment keyed
+  # to a guessed cycle is the suppression this suffix exists to end, so an
+  # unknown cycle skips the post and says so.
+  #
+  # Addressed from the REPOSITORY ROOT — `.agents/skills/qa-task/references/…` —
+  # like the engine call below and like every block in this skill: one cwd,
+  # the repository root, everywhere (TASK-121-BUG-4, BUG-6). What this
+  # block inherits from earlier blocks is the INPUTS an agent re-binds when it
+  # runs a block ($TASK_DIR, $QA_ISSUE, $GATE_DECISION, $score, $PR_NUMBER,
+  # $PR_URL); a COMPUTED value like the cycle is never carried over.
+  QA_CYCLE=$(bash .agents/skills/qa-task/references/qa-cycle.sh "$TASK_DIR"); rc=$?
+  # rc 1 = the helper REFUSED (no numbered gate) → empty, the skip branch below.
+  # Anything else (127 not found, 126 not runnable) is a broken invocation, and
+  # it must not wear a refusal's clothes — that is how BUG-4 hid for a cycle.
+  [ "$rc" -le 1 ] || { echo "⚠️  qa-cycle.sh not runnable (rc=$rc) — check the path" >&2; exit 1; }
+
+  # blocking_count — the high-severity entries in the gate this run just wrote:
+  # the gate that CARRIES the cycle number above, so the count and the suffix
+  # cannot name different rounds. Re-resolve rather than reusing LATEST_GATE
+  # from Step 2: that one names the PREVIOUS run's gate (read to decide whether
+  # to re-review), and this run has written a newer one since.
+  THIS_GATE=$(ls "$TASK_DIR"/task.*.gate."${QA_CYCLE:-none}".*.yml 2>/dev/null | head -1)
   # `|| true`, NOT `|| echo 0`. `grep -c` PRINTS "0" and EXITS 1 when it matches
   # nothing, so `|| echo 0` appends a second zero and the variable becomes the
   # two-line string "0\n0" — which the engine's numeric coercion then reads as
@@ -1334,13 +1382,17 @@ if [ -n "$QA_ISSUE" ]; then
   BLOCKING_COUNT=$(grep -c '^ *severity: high' "$THIS_GATE" 2>/dev/null || true)
   BLOCKING_COUNT=${BLOCKING_COUNT:-0}
 
-  node .agents/skills/qa-task/references/tracker-comment.js \
-    --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
-    --stage qa-gate \
-    --slot verdict="$GATE_DECISION" \
-    --slot blocking_count="$BLOCKING_COUNT" \
-    --json \
-    || echo "⚠️  Tracker issue comment failed — continuing"
+  if [ -n "$QA_CYCLE" ]; then
+    node .agents/skills/qa-task/references/tracker-comment.js \
+      --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
+      --stage "qa-gate-${QA_CYCLE}" \
+      --slot verdict="$GATE_DECISION" \
+      --slot blocking_count="$BLOCKING_COUNT" \
+      --json \
+      || echo "⚠️  Tracker issue comment failed — continuing"
+  else
+    echo "⚠️  Tracker issue comment skipped — QA cycle unknown (see qa-cycle.sh above)"
+  fi
 fi
 ```
 

@@ -789,6 +789,49 @@ test("qa-cycle does not match qa-cycle-2", async () => {
   assert.equal(r.reason, "posted");
 });
 
+test("qa-gate-N is keyed per cycle: the same cycle is `already`, the next cycle posts (task.121)", async () => {
+  // Before task.121 the QA skills passed `qa-gate` bare, so cycle 2's marker
+  // was cycle 1's and every gate after the first answered `already` with
+  // nothing posted. The suffixed marker is what makes a resumed cycle
+  // deduplicate while the next cycle still reaches the issue.
+  const dir = withRepo();
+  const f = bodyFile(dir, "body");
+  assert.equal(
+    cli.markerHtml("qa-gate-2"),
+    "<!-- agent-skills-comment:qa-gate-2 -->",
+  );
+  const run = (stage, gh) =>
+    cli.run({
+      argv: [
+        "node",
+        "x",
+        "--issue",
+        "42",
+        "--body-file",
+        f,
+        "--stage",
+        stage,
+        "--quiet",
+      ],
+      execImpl: gh.execImpl,
+      repoRoot: dir,
+      env: { ...baseEnv },
+    });
+  const empty = stubGh({ comments: [] });
+  assert.equal((await run("qa-gate-2", empty)).reason, "posted");
+  const withCycle2 = stubGh({
+    comments: [{ body: `${cli.markerHtml("qa-gate-2")}\ncycle two` }],
+  });
+  assert.equal((await run("qa-gate-2", withCycle2)).reason, "already");
+  assert.equal((await run("qa-gate-3", withCycle2)).reason, "posted");
+  // …and the bare stage a pre-task.121 issue already carries does not
+  // suppress the suffixed one.
+  const withBare = stubGh({
+    comments: [{ body: `${cli.markerHtml("qa-gate")}\nold` }],
+  });
+  assert.equal((await run("qa-gate-2", withBare)).reason, "posted");
+});
+
 test("the Jira footer marker matches exactly, not by prefix", () => {
   // The Jira marker has no closing delimiter (ADF drops unknown nodes, so it
   // cannot be an HTML comment), so substring matching cannot separate
@@ -1497,14 +1540,25 @@ test("the numeric suffix is legal only for cycle-scoped stages (NEW-6)", () => {
   assert.equal(cli.isKnownStage("qa-fix-11"), true);
   // `done-1` used to pass, which made the runtime rule broader than the error
   // message promised — a rule nobody can predict from its own message.
+  // A suffix that normalises to zero names no round; leading zeros are fine.
+  assert.equal(cli.isKnownStage("qa-gate-0"), false, "cycle 0 is not a round");
+  assert.equal(cli.isKnownStage("qa-gate-000"), false);
+  assert.equal(cli.isKnownStage("qa-gate-007"), true, "007 is cycle 7");
   assert.equal(cli.isKnownStage("done-1"), false);
   assert.equal(cli.isKnownStage("review-3"), false);
   // bug.14: the PreCompact hook scopes its notice by the step it paused at.
   assert.equal(cli.isKnownStage("pipeline-paused-4"), true);
   assert.equal(cli.isKnownStage("pipeline-paused"), true);
+  // task.121: the QA skills post `qa-gate` once per cycle, so it takes the
+  // cycle as its suffix like `qa-fix` does. A once-per-issue stage still does
+  // not, and a non-numeric suffix never does.
+  assert.equal(cli.isKnownStage("qa-gate-2"), true);
+  assert.equal(cli.isKnownStage("qa-gate"), true);
+  assert.equal(cli.isKnownStage("qa-gate-x"), false);
+  assert.equal(cli.isKnownStage("in-review-2"), false);
   assert.deepEqual(
     [...cli.CYCLE_SCOPED_STAGES],
-    ["qa-cycle", "qa-fix", "pipeline-paused"],
+    ["qa-gate", "qa-cycle", "qa-fix", "pipeline-paused"],
   );
 });
 

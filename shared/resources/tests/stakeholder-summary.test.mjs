@@ -487,6 +487,15 @@ test("the cycle suffix is legal only for cycle-scoped stages", () => {
   assert.equal(hasTemplate("review-1"), false);
   assert.equal(renderLead("done-3", {}), null);
   assert.equal(renderLead("qa-cycle-3", {}), renderLead("qa-cycle", {}));
+  // task.121: `qa-gate` is cycle-scoped too — the suffix keys the marker and
+  // nothing else, so the lead is the same sentence with or without it, slots
+  // filled or not.
+  assert.equal(renderLead("qa-gate-2", {}), renderLead("qa-gate", {}));
+  assert.equal(
+    renderLead("qa-gate-2", { verdict: "PASS", blocking_count: "0" }),
+    renderLead("qa-gate", { verdict: "PASS", blocking_count: "0" }),
+  );
+  assert.notEqual(renderLead("qa-gate-2", {}), null);
 });
 
 test("the catalogue and the comment engine agree on which stages take a suffix", () => {
@@ -502,8 +511,8 @@ test("the catalogue and the comment engine agree on which stages take a suffix",
     isKnownStage,
   } = require("../tracker-comment.js");
   assert.ok(
-    CYCLE_SCOPED_STAGES.length >= 3,
-    "non-vacuity: expected ≥3 suffixed stages",
+    CYCLE_SCOPED_STAGES.length >= 4,
+    "non-vacuity: expected ≥4 suffixed stages",
   );
   for (const stage of COMMENT_STAGES) {
     const suffixed = `${stage}-2`;

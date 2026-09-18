@@ -158,6 +158,11 @@ The `{verdict}` slot never renders the raw token. It is mapped through a fixed t
 | `FAIL`     | The checks found problems serious enough that the work is not finished.                          |
 | `WAIVED`   | Some checks were deliberately skipped, and the reason is recorded below.                         |
 
+Posted by `qa-task` / `qa-story` Step 13b once per QA cycle, so the stage is cycle-scoped: a stage of
+the form `qa-gate-3` resolves to this template the same way `qa-cycle-3` does, and the suffix is what
+keeps cycle 3's marker distinct from cycle 1's. Passed bare, every gate after the first would read
+`already` and post nothing (task.121).
+
 ### `qa-cycle`
 
 Slots: `{verdict}`, `{cycle}`.
