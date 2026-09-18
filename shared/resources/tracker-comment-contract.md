@@ -96,7 +96,7 @@ not interchangeable:
 | Stage class | Fires | Marker | `--stage` as passed |
 |---|---|---|---|
 | Every stage not in `CYCLE_SCOPED_STAGES` — `work-started`, `in-review`, `develop-complete`, `review`, `review-story` / `review-task`, `done`, … | once per issue | `agent-skills-comment:{stage}` | the bare name; a suffix is exit 2 |
-| `qa-gate`, `qa-cycle`, `qa-fix` | once per QA cycle | `agent-skills-comment:{stage}-{N}` | **`{stage}-{N}` — the numeric suffix is required** |
+| `qa-gate`, `qa-cycle`, `qa-fix` | once per QA cycle | `agent-skills-comment:{stage}-{N}` | `{stage}-{N}` — the suffix is **required by convention**: the engine accepts the bare name too, and it is `comment-slot-coverage.test.mjs` that fails a shipped call without one |
 | `pipeline-paused` | once per pause | `agent-skills-comment:pipeline-paused-{step}` | `pipeline-paused-{step}` — the step it paused at |
 
 The second and third rows are `CYCLE_SCOPED_STAGES` in `tracker-comment.js`,
@@ -104,15 +104,19 @@ and that list wins: this table describes it, and a stage added there without a
 row here is still cycle-scoped. It is not restated as a second list anywhere —
 `comment-slot-coverage.test.mjs` imports it, and the marker rule in the *Marker*
 column is what makes the scope matter. **Passing a cycle-scoped stage bare is
-not a usage error** — the bare name is a legal stage — **it is a silent
-suppression**: the marker becomes cycle 1's, so every later cycle returns
+not a usage error** — the bare name is a legal stage, which is why the table
+above says *by convention* — **it is a silent suppression**: the marker becomes cycle 1's, so every later cycle returns
 `already`, exit 0, and posts nothing, and nothing in the log distinguishes that
 from a post. That is what the QA skills did on every multi-cycle run before
 task.121 (issue #419: three cycles, one `qa-gate` marker), and why
 `comment-slot-coverage.test.mjs` now fails on a cycle-scoped stage passed
 without a `-${cycle}` suffix at any shipped tracker or pull-request call site.
-The cycle comes from the gate filename the QA skill just wrote — derived once,
-above both calls, so the two cannot disagree about which round this is.
+The cycle comes from the gate filename the QA skill just wrote, read by one
+helper — `qa-cycle.sh` — that every block needing it calls: fenced blocks run
+as separate shells, so a value derived in one does not exist in the next, and
+the helper refuses (exit 1, nothing printed) rather than guess a cycle when no
+numbered gate exists. One definition is what keeps the pull-request lead and
+the tracker comment agreeing about which round this is.
 
 > `--stage` here is deliberately **not** read from `pipeline:` in
 > `tracker-workflow.yaml`. That block decides which column a card moves to, and

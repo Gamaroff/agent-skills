@@ -382,17 +382,18 @@ None.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.121.qa.1.cycle-scoped-qa-tracker-comments.md](./task.121.qa.1.cycle-scoped-qa-tracker-comments.md)
-- **Gate File**: [task.121.gate.1.cycle-scoped-qa-tracker-comments.yml](./task.121.gate.1.cycle-scoped-qa-tracker-comments.yml)
+- **Full Report**: [task.121.qa.2.cycle-scoped-qa-tracker-comments.md](./task.121.qa.2.cycle-scoped-qa-tracker-comments.md)
+- **Gate File**: [task.121.gate.2.cycle-scoped-qa-tracker-comments.yml](./task.121.gate.2.cycle-scoped-qa-tracker-comments.yml)
+- **Previous cycle**: [task.121.qa.1.cycle-scoped-qa-tracker-comments.md](./task.121.qa.1.cycle-scoped-qa-tracker-comments.md) / [gate 1](./task.121.gate.1.cycle-scoped-qa-tracker-comments.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 3416
+- **Tests Executed**: 3426
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-One MEDIUM (BUG-1: the new cycle derivation echoes the path on a number-less gate name, so the `:-1` fallback is unreachable and the stage is rejected) and two LOW guard-hardening gaps (CR-3 literal suffix, CR-4 parity regex). No HIGH.
+Cycle-1 fixes verified (BUG-1 closed). Refute pass: BUG-2 [medium] the cycle is derived in one fenced block and read in another (unset where used → `qa-gate-` → nothing posts) and the `:-1` fallback guesses cycle 1 on a number-less gate; BUG-3 [medium] qa-story still documents the un-numbered gate filename; CR-4/CR-5 [low] contract wording contradiction, bash-only derivation test. No HIGH.
 <!-- change-log-start -->
 ## Change Log
 
@@ -404,6 +405,8 @@ One MEDIUM (BUG-1: the new cycle derivation echoes the path on a number-less gat
 | 2026-09-18 |  | Implemented — 16 source files (+57 bundled copies), 8 new/extended tests across 3 suites; guard mutation-proved 3 ways | develop |
 | 2026-09-18 |  | QA gate CONCERNS (90/100) — 1 medium, 2 low | qa-task |
 | 2026-09-18 |  | QA findings fixed — BUG-1 (sed -n/p at 3 sites + pinning test), CR-3, CR-4; 1 iteration | qa-fix |
+| 2026-09-18 |  | QA gate CONCERNS (90/100) — cycle 2 refute pass: 2 medium, 2 low; BUG-1 closed | qa-task |
+| 2026-09-18 |  | QA findings fixed — BUG-2 (qa-cycle.sh helper, derived where used, no guess), BUG-3, CR-4, CR-5; cycle 2 (2 iterations so far) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
@@ -450,3 +453,15 @@ optional opening quote (`--stage\s+("?)…`) with non-vacuity floors (≥100 lit
 measured 259 / 6). CR-3: the never-passed-bare guard also rejects a hard-coded numeric cycle
 (`--stage qa-gate-1`). Each mutation-proved: non-printing sed at one site → 2 red; old parity regex →
 quoted floor red; literal `qa-gate-1` in qa-task → guard red naming the site.
+
+**QA fix cycle 2 (qa-fix, 2026-09-18).** BUG-2: the cycle is no longer a value carried between
+fenced blocks nor guessed — `shared/resources/qa-cycle.sh` (bundled as `references/qa-cycle.sh`)
+prints the highest-numbered gate's cycle or refuses (exit 1, empty), and every one of the six
+blocks that passes a cycle-scoped stage calls it; an unknown cycle skips the tracker post with a
+⚠️ (the PR comment still posts, without its lead). `THIS_GATE` for `blocking_count` is the gate
+carrying that cycle. `tests/qa-cycle.test.js` (bash + zsh) replaces the extraction test and adds a
+same-block guard + no-inline-derivation guard; three mutation proofs. This also closes cycle-1's
+CR-2 follow-up (mtime → highest number). BUG-3: qa-story naming section and tree examples
+numbered. CR-4: contract cell reworded ("required by convention, enforced by the guard"). CR-5:
+the helper test runs under both shells. The task's §3 "derive it once, above both calls" is
+superseded: derive it from one definition, in every block.

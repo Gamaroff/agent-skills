@@ -1851,25 +1851,29 @@ GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the 
 # nothing about whether to worry. Pass the raw token and let the catalogue map
 # it — an unknown verdict renders "the results are recorded below" rather than
 # defaulting to reassurance.
-# The QA cycle number lives in the gate filename this run just wrote — the same
-# derivation qa-fix uses for FIX_CYCLE, so the two comments cannot disagree about
-# which round this is. Derived ONCE, here, above the pull-request lead; the
-# tracker comment further down reads the same variable. It is the STAGE SUFFIX
+# The QA cycle number lives in the gate filename this run just wrote — the
+# highest-numbered `*.gate.{N}.*.yml` in the directory. It is the STAGE SUFFIX
 # (`qa-gate-3`), which is what keys the tracker comment's idempotency marker:
 # bare `qa-gate` was suppressed by cycle 1's marker on every later cycle
-# (task.121). The lead renders the same sentence with or without the suffix;
-# passing it here too keeps both calls textually identical so one guard covers
-# both. `qa-gate-` is not a stage, so an unfound gate falls back to 1 — and so
-# does a gate whose name carries no number: `sed -n … p` prints ONLY on a match,
-# where a bare `sed` would echo the whole path into the stage (TASK-121-BUG-1).
-QA_CYCLE=$(ls -t "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | head -1 \
-  | sed -nE 's/.*\.gate\.([0-9]+)\..*/\1/p')
-QA_CYCLE=${QA_CYCLE:-1}
-
-LEAD=$(node references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
-  --slot verdict="$GATE_DECISION") || exit 1
-printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
-  && mv "${BODY_FILE}.tmp" "$BODY_FILE"
+# (task.121). ONE definition — `references/qa-cycle.sh` — called in EVERY block
+# that needs the cycle: each fenced block runs as its own shell, so a value
+# derived in this block does not exist in Step 13b's (TASK-121-BUG-2). The helper
+# refuses rather than guesses: no numbered gate → empty stdout, one ⚠️ line on
+# stderr, exit 1. A guessed `1` would key every cycle to cycle 1's marker, the
+# very suppression this suffix exists to end. The lead below renders the same
+# sentence with or without the suffix; passing it keeps this call textually
+# identical to the tracker call so one guard covers both — and when the cycle
+# is unknown the pull-request comment still posts, without the lead, because it
+# carries no marker and losing it would hide the ⚠️ from the reviewer.
+QA_CYCLE=$(bash references/qa-cycle.sh "$STORY_DIR") || QA_CYCLE=
+if [ -n "$QA_CYCLE" ]; then
+  LEAD=$(node references/stakeholder-summary-cli.js --stage "qa-gate-${QA_CYCLE}" \
+    --slot verdict="$GATE_DECISION") || exit 1
+  printf '%s\n\n---\n\n%s\n' "$LEAD" "$(cat "$BODY_FILE")" > "${BODY_FILE}.tmp" \
+    && mv "${BODY_FILE}.tmp" "$BODY_FILE"
+else
+  echo "⚠️  QA cycle unknown (see qa-cycle.sh above) — posting the PR comment without its lead"
+fi
 
 if [ "$VCS" = "github" ]; then
   tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$BODY_FILE"
@@ -1920,14 +1924,21 @@ if [ -n "$QA_ISSUE" ]; then
   printf 'QA %s (%s/100) — PR #%s: %s\n' \
     "$GATE_DECISION" "$score" "$PR_NUMBER" "$PR_URL" > .claude/state/comment-body.md
 
-  # blocking_count — the high-severity entries in the gate this run just wrote.
-  # Derived here, at the call, rather than carried from earlier: the gate file is
-  # the authority on what blocks, and it is complete by this point.
-  #
-  # Re-resolve the gate path rather than reusing LATEST_GATE from Phase 0 — that
-  # one names the PREVIOUS run's gate (it is read to decide whether to re-review),
-  # and this run has written a newer one since.
-  THIS_GATE=$(ls -t "$STORY_DIR"/story.*.gate.*.yml 2>/dev/null | head -1)
+  # The cycle — the stage suffix — is derived HERE, in this block, by the same
+  # helper Step 13 called. This block runs as its own shell, so Step 13's
+  # $QA_CYCLE does not exist here (TASK-121-BUG-2). No fallback: a comment keyed
+  # to a guessed cycle is the suppression this suffix exists to end, so an
+  # unknown cycle skips the post and says so.
+  QA_CYCLE=$(bash references/qa-cycle.sh "$STORY_DIR") || QA_CYCLE=
+
+  # blocking_count — the high-severity entries in the gate this run just wrote:
+  # the gate that CARRIES the cycle number above, so the count and the suffix
+  # cannot name different rounds. Derived here, at the call, rather than carried
+  # from earlier: the gate file is the authority on what blocks, and it is
+  # complete by this point. Re-resolve rather than reusing LATEST_GATE from
+  # Phase 0 — that one names the PREVIOUS run's gate (it is read to decide
+  # whether to re-review), and this run has written a newer one since.
+  THIS_GATE=$(ls "$STORY_DIR"/story.*.gate."${QA_CYCLE:-none}".*.yml 2>/dev/null | head -1)
   # `|| true`, NOT `|| echo 0`. `grep -c` PRINTS "0" and EXITS 1 when it matches
   # nothing, so `|| echo 0` appends a second zero and the variable becomes the
   # two-line string "0\n0" — which the engine's numeric coercion then reads as
@@ -1936,13 +1947,17 @@ if [ -n "$QA_ISSUE" ]; then
   BLOCKING_COUNT=$(grep -c '^ *severity: high' "$THIS_GATE" 2>/dev/null || true)
   BLOCKING_COUNT=${BLOCKING_COUNT:-0}
 
-  node .agents/skills/qa-story/references/tracker-comment.js \
-    --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
-    --stage "qa-gate-${QA_CYCLE}" \
-    --slot verdict="$GATE_DECISION" \
-    --slot blocking_count="$BLOCKING_COUNT" \
-    --json \
-    || echo "⚠️  Tracker issue comment failed — continuing"
+  if [ -n "$QA_CYCLE" ]; then
+    node .agents/skills/qa-story/references/tracker-comment.js \
+      --issue "$QA_ISSUE" --body-file .claude/state/comment-body.md \
+      --stage "qa-gate-${QA_CYCLE}" \
+      --slot verdict="$GATE_DECISION" \
+      --slot blocking_count="$BLOCKING_COUNT" \
+      --json \
+      || echo "⚠️  Tracker issue comment failed — continuing"
+  else
+    echo "⚠️  Tracker issue comment skipped — QA cycle unknown (see qa-cycle.sh above)"
+  fi
 fi
 ```
 
@@ -2876,13 +2891,17 @@ This traceability feeds into quality gates:
 
 **QA Reports**:
 
-- Stories: `story.[epic].[story].qa.[descriptive-name].md` (co-located with story)
-- Tasks: `task.[number].qa.[descriptive-name].md` (co-located with task)
+- Stories: `story.[epic].[story].qa.[number].[descriptive-name].md` (co-located with story)
+- Tasks: `task.[number].qa.[number].[descriptive-name].md` (co-located with task)
 
-**Gate Files**:
+**Gate Files** — the `[number]` after `gate.` is the QA cycle, and it is **load-bearing**: it is the
+suffix of the cycle-scoped tracker-comment stage (`qa-gate-N`), derived by `references/qa-cycle.sh`
+from the gate filename. A gate written without it cannot be keyed to a cycle, and the helper refuses
+rather than guesses (task.121). Every writer (`qa-gate`, `qa-story`, `qa-task`) produces the numbered
+form; the un-numbered form this section once documented is not valid.
 
-- Stories: `story.[epic].[story].gate.[descriptive-name].yml` (co-located with story)
-- Tasks: `task.[number].gate.[descriptive-name].yml` (co-located with task)
+- Stories: `story.[epic].[story].gate.[number].[descriptive-name].yml` (co-located with story)
+- Tasks: `task.[number].gate.[number].[descriptive-name].yml` (co-located with task)
 
 **NFR Assessments**: `{qa.qaLocation}/assessments/{epic}.{story}-nfr-{YYYYMMDD}.md` (legacy, deprecated)
 **Trace Reports**: `{qa.qaLocation}/assessments/{epic}.{story}-trace-{YYYYMMDD}.md` (legacy, deprecated)
@@ -2899,14 +2918,13 @@ docs/
 │   └── [domain]/
 │       └── [feature]/
 │           ├── story.1.1.epic-name.md
-│           ├── story.1.1.qa.epic-name.md    # Co-located QA report
-│           └── story.1.1.gate.epic-name.yml # Co-located gate file
-└── development/
-    └── tasks/
-        └── task.44.name/
-            ├── task.44.name.md
-            ├── task.44.qa.name.md          # Co-located QA report
-            └── task.44.gate.name.yml       # Co-located gate file
+│           ├── story.1.1.qa.1.epic-name.md    # Co-located QA report (cycle 1)
+│           └── story.1.1.gate.1.epic-name.yml # Co-located gate file (cycle 1)
+└── tasks/
+    └── task.44.name/
+        ├── task.44.name.md
+        ├── task.44.qa.1.name.md          # Co-located QA report (cycle 1)
+        └── task.44.gate.1.name.yml       # Co-located gate file (cycle 1)
 ```
 
 **LEGACY STRUCTURE** (Deprecated):
@@ -2919,7 +2937,7 @@ docs/
     │   └── 1.1-trace-20250130.md
     └── gates/             # Deprecated - use co-located gate files
         └── [mirrored PRD structure]/
-            └── story.1.1.gate.epic-name.yml
+            └── story.1.1.gate.1.epic-name.yml
 ```
 
 ---

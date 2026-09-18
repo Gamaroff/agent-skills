@@ -1,0 +1,87 @@
+schema: 1
+task: 'task.121.cycle-scoped-qa-tracker-comments'
+task_title: 'QA tracker comments are keyed per stage, so every QA cycle after the first is silently dropped'
+gate: CONCERNS
+status_reason: 'Cycle-1 fixes verified (BUG-1, CR-3, CR-4 all covered by mutation). The refute pass found the cycle is derived in one fenced block and read in another (unset where used → qa-gate- → nothing posts) and that the :-1 fallback guesses cycle 1 on a number-less gate; plus the stale un-numbered gate convention in qa-story and a contradiction in the new contract section. No HIGH.'
+reviewer: 'QA Engineer'
+updated: '2026-09-18T04:01:52Z'
+
+top_issues:
+  - id: 'TASK-121-BUG-2'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'QA_CYCLE is derived in the Step 13 fenced block (:1275, block :1200-:1300) and consumed in the Step 13b block (:1352, block :1333-:1360); each block is its own Bash call, so the variable is unset at the tracker call, the stage is qa-gate-, both CLIs exit 2 and the || echo swallows it — same split in qa-story (:1865 vs :1941) and qa-fix (:820 vs :906). And with sed -n p in place, 1 keys a number-less newest gate to cycle 1 on every cycle — the bare-stage suppression wearing a suffix — which tests/qa-cycle-derivation.test.js:121 now pins as correct. (Reviewer CR-3 medium/medium and CR-1 rated high/high; QA records CR-1 at medium: no writer produces a number-less gate, the only instruction to is BUG-3.)'
+    suggested_action: 'Derive the cycle in every block that uses it — preferably one shared helper shared/resources/qa-cycle.sh <dir> called from each block — and make a number-less (or absent) newest gate a refusal with a stderr warning and no post, never a guess of 1; retarget the test to assert the refusal and add a same-block guard over the three SKILL.md files.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.121.bug.2.cycle-must-be-derived-where-used-and-never-guessed.md'
+  - id: 'TASK-121-BUG-3'
+    severity: medium
+    file: 'skills/qa-story/SKILL.md'
+    finding: 'File Naming Conventions (~:2884) and three directory-tree examples (~:2903/:2909/:2922) still instruct the un-numbered gate filename story.[epic].[story].gate.[descriptive-name].yml / task.[number].gate.[descriptive-name].yml, which the new derivation cannot parse and no writer produces; the cycle-1 bug report cited this section and the fix left it.'
+    suggested_action: 'Rewrite the section and the three tree examples to the numbered form the file already documents at :101 and :1521-1522; grep for gate.[descriptive-name] afterwards.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.121.bug.3.qa-story-naming-section-documents-unnumbered-gate.md'
+  - id: 'CR-4'
+    severity: low
+    file: 'shared/resources/tracker-comment-contract.md'
+    finding: 'The new table cell says the numeric suffix is required for qa-gate/qa-cycle/qa-fix while the paragraph beneath it says passing the stage bare is not a usage error — the bare name is a legal stage; the section contradicts itself about what the engine enforces.'
+    suggested_action: 'Reword the cell: required by convention and enforced by comment-slot-coverage.test.mjs, not by the engine.'
+    suggested_owner: dev
+    status: open
+  - id: 'CR-5'
+    severity: low
+    file: 'tests/qa-cycle-derivation.test.js'
+    finding: 'The test executes the extracted derivation under bash only, while this repository''s Bash tool runs /bin/zsh (verified via ps); under zsh an unmatched glob prints "no matches found" to stderr before ls runs (the result still agrees), so the shipped lines are not exercised under the shell that actually runs them.'
+    suggested_action: 'Run the extracted span (or the helper) under both bash and zsh when zsh is available, following the zshAvailable() precedent in qa-execute-snippets.mjs, and assert stdout agrees.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 3426
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    notes: 'Unchanged from cycle 1 — no boundary delivered; the cycle string is validated by both CLIs against a fixed stage list (exit 2 on anything unexpected).'
+  performance:
+    status: PASS
+    notes: 'Unchanged — one list member; no runtime path.'
+  reliability:
+    status: CONCERNS
+    notes: 'The per-cycle comment is lost when the skill is executed block-by-block (BUG-2 part 2) and keyed to cycle 1 on a number-less gate (BUG-2 part 1). Both loud-ish (a ⚠️ line) or silent, neither correct.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Contract section contradicts itself (CR-4); qa-story carries two filename conventions (BUG-3); the pinning test runs under one shell only (CR-5).'
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 2
+  fix_date: '2026-09-18'
+  total_iterations: 1
+  verification_method: 'Mutation proofs re-run against committed state (cp-restore); ci:fast green at b00c17ca; CI green on the PR head'
+
+recommendations:
+  immediate:
+    - action: 'BUG-2: derive the cycle where it is used (shared helper preferred) and refuse on a number-less/absent gate; retarget the test; add a same-block guard. BUG-3: numbered filename form in qa-story naming section + tree examples. CR-4 wording. CR-5 dual-shell run.'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'skills/qa-fix/SKILL.md', 'tests/qa-cycle-derivation.test.js', 'shared/resources/tracker-comment-contract.md']
+  future:
+    - action: 'Cycle-1 CR-2 (pre-existing): ls -t vs highest-number derivation disagree in a fresh checkout with equal mtimes; the helper is the natural place to switch to the numeric maximum.'
+      refs: ['skills/qa-fix/SKILL.md']
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['BUG-2 fixed with a same-block guard and a refusing fallback', 'BUG-3 fixed', 'CR-4 and CR-5 addressed or explicitly waived']

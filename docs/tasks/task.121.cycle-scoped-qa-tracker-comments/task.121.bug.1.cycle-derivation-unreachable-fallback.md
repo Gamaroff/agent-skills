@@ -4,7 +4,7 @@
 **Bug ID**: TASK-121-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: ✅ Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-09-18
 
@@ -106,3 +106,14 @@ only a lead slot (dropped on non-numeric) rather than a stage.
 | 2026-09-18 | New | QA Engineer | Found as CR-1 by the Step 3b diff reviewer; verified by QA |
 | 2026-09-18 | In Progress | qa-fix | Investigation — print-every-line sed |
 | 2026-09-18 | Ready for QA | qa-fix | Fix at three sites + pinning test |
+
+#### QA Verification (Ready for QA → Closed)
+
+**Date**: 2026-09-18 — QA cycle 2
+**Result**: FIXED as specified. `sed -nE … p` at all three sites; `tests/qa-cycle-derivation.test.js`
+goes red when the non-printing form is restored at any one site (verified against the committed
+state, `cp`-restored). **Superseded** by TASK-121-BUG-2: the `:-1` fallback that this fix made
+reachable turns the number-less case into a *silent* cycle-1 key on every cycle — the refute pass
+found that the correct behaviour on a number-less newest gate is to refuse, not to guess.
+
+| 2026-09-18 | Closed | QA Engineer | Verified in cycle 2; design follow-up filed as BUG-2 |
